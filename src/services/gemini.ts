@@ -41,6 +41,9 @@ export const analyzeMistakeWithGemini = async (
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
   const prompt = `수학 문제 사진입니다. 이 사진 속 문제를 분석하고 올바른 풀이법과 사용자가 실수하여 틀린 부분을 진단해 주세요.
+모든 수학적 수식, 방정식, 기호, 변수 및 계산 표현은 가독성을 극대화하기 위해 반드시 LaTeX 문법으로 작성하고 수학 구분 기호로 감싸야 합니다.
+- 문장 내부의 인라인 수식은 $...$로 감싸주세요 (예: $x^2 - 4x - 5 = 0$, $x = 5$).
+- 줄바꿈이 필요한 단독 블록 수식은 $$...$$로 감싸주세요.
 출력은 지정된 JSON 스키마를 엄격히 따라 다음 5가지 항목을 모두 한국어로 작성해야 합니다:
 1. title: 문제의 주제나 공식을 담은 짤막하고 직관적인 제목 (예: '이차방정식 근의 공식 부호 실수', '지수법칙 지수 곱셈 오류')
 2. solvingProcess: 문제의 정석적인 올바른 풀이 과정

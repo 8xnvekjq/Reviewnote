@@ -5,6 +5,7 @@ import { CameraScanner } from './components/CameraScanner';
 import { encryptApiKey, decryptApiKey } from './utils/crypto';
 import { analyzeMistakeWithGemini } from './services/gemini';
 import { AuthScreen } from './components/AuthScreen';
+import { LaTeXRenderer } from './components/LaTeXRenderer';
 
 // Initial fallback mock data for visual demonstration
 const INITIAL_MOCKS: MistakeEntry[] = [
@@ -462,38 +463,38 @@ function App() {
                 <div className="space-y-5">
                   {/* Item 1 */}
                   <div className="space-y-1.5">
-                    <h4 className="text-xs font-extrabold text-indigo-400 flex items-center">
+                    <h4 className="text-sm font-extrabold text-indigo-400 flex items-center">
                       <span className="mr-1.5">✓</span> [문제 풀이 과정]
                     </h4>
-                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/60 text-xs leading-relaxed text-slate-200">
-                      {selectedEntry.analysis.solvingProcess}
+                    <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800/60">
+                      <LaTeXRenderer text={selectedEntry.analysis.solvingProcess} className="text-sm md:text-base" />
                     </div>
                   </div>
                   {/* Item 2 */}
                   <div className="space-y-1.5">
-                    <h4 className="text-xs font-extrabold text-amber-400 flex items-center">
+                    <h4 className="text-sm font-extrabold text-amber-400 flex items-center">
                       <span className="mr-1.5">⚠️</span> [실수한 지점 상세 분석]
                     </h4>
-                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/60 text-xs leading-relaxed text-slate-200">
-                      {selectedEntry.analysis.mistakeDetail}
+                    <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800/60">
+                      <LaTeXRenderer text={selectedEntry.analysis.mistakeDetail} className="text-sm md:text-base" />
                     </div>
                   </div>
                   {/* Item 3 */}
                   <div className="space-y-1.5">
-                    <h4 className="text-xs font-extrabold text-red-400 flex items-center">
+                    <h4 className="text-sm font-extrabold text-red-400 flex items-center">
                       <span className="mr-1.5">🎯</span> [근본적인 틀린 이유]
                     </h4>
-                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/60 text-xs leading-relaxed text-slate-200">
-                      {selectedEntry.analysis.rootCause}
+                    <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800/60">
+                      <LaTeXRenderer text={selectedEntry.analysis.rootCause} className="text-sm md:text-base" />
                     </div>
                   </div>
                   {/* Item 4 */}
                   <div className="space-y-1.5">
-                    <h4 className="text-xs font-extrabold text-emerald-400 flex items-center">
+                    <h4 className="text-sm font-extrabold text-emerald-400 flex items-center">
                       <span className="mr-1.5">🛡️</span> [향후 재발 방지 대책]
                     </h4>
-                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/60 text-xs leading-relaxed text-slate-200">
-                      {selectedEntry.analysis.actionPlan}
+                    <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800/60">
+                      <LaTeXRenderer text={selectedEntry.analysis.actionPlan} className="text-sm md:text-base" />
                     </div>
                   </div>
                 </div>
