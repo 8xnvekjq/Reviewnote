@@ -1,39 +1,31 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { ActiveTab, MistakeEntry } from './types';
-import { useLocalStorage } from './hooks/useLocalStorage';
 import { CameraScanner } from './components/CameraScanner';
 import { encryptApiKey, decryptApiKey } from './utils/crypto';
 import { analyzeMistakeWithGemini } from './services/gemini';
 import { AuthScreen } from './components/AuthScreen';
 import { LaTeXRenderer } from './components/LaTeXRenderer';
+import { supabase } from './services/supabase';
 
-// Initial fallback mock data for visual demonstration
-const INITIAL_MOCKS: MistakeEntry[] = [
-  {
-    id: '1',
-    title: '이차방정식 근의 공식 부호 실수',
-    imageUrl: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=400&auto=format&fit=crop&q=60',
-    date: '2026-07-02T10:30:00Z',
-    analysis: {
-      solvingProcess: 'x² - 4x - 5 = 0의 근을 구할 때 근의 공식을 적용하여 x = [4 ± √(16 - 4(1)(-5))] / 2 = [4 ± √36] / 2 로 구하는 과정.',
-      mistakeDetail: '분자 부분에서 2a에 해당하는 분모를 적용했으나, 분자의 -b를 대입할 때 b=-4 이므로 -b = 4가 되어야 하는데 실수로 -4로 대입하여 최종 근의 부호가 반대로 나옴.',
-      rootCause: '근의 공식 암기가 불안정하거나, 음수 기호(-)가 연속해서 나올 때( -(-4) ) 괄호를 씌워 계산하지 않는 나쁜 습관이 있음.',
-      actionPlan: '음수 계수를 공식에 대입할 때는 항상 괄호를 치고 1초간 부호를 재점검하는 습관을 들이고, 유사한 이차방정식 대입 문제 5개를 추가로 풀며 오답 검토 수행.'
-    }
+// Helper to convert Base64 Data URL to Blob for Storage upload
+const base64ToBlob = (base64DataUrl: string): Blob => {
+  const parts = base64DataUrl.split(';base64,');
+  const contentType = parts[0].split(':')[1];
+  const raw = window.atob(parts[1]);
+  const rawLength = raw.length;
+  const uInt8Array = new Uint8Array(rawLength);
+  for (let i = 0; i < rawLength; ++i) {
+    uInt8Array[i] = raw.charCodeAt(i);
   }
-];
+  return new Blob([uInt8Array], { type: contentType });
+};
 
 function App() {
-  const [currentUser, setCurrentUser] = useLocalStorage<string>('ai_mistakes_current_user', '');
+  const [session, setSession] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<string>('');
   const [activeTab, setActiveTab] = useState<ActiveTab>('notes');
-  const [mistakes, setMistakes] = useLocalStorage<MistakeEntry[]>(
-    currentUser ? `ai_mistakes_notes_${currentUser}` : 'ai_mistakes_notes',
-    INITIAL_MOCKS
-  );
-  const [encryptedApiKey, setEncryptedApiKey] = useLocalStorage<string>(
-    currentUser ? `gemini_api_key_enc_${currentUser}` : 'gemini_api_key_enc',
-    ''
-  );
+  const [mistakes, setMistakes] = useState<MistakeEntry[]>([]);
+  const [encryptedApiKey, setEncryptedApiKey] = useState<string>('');
   
   // App-level state for temporary decrypted API key (lasts for the session)
   const [decryptedKey, setDecryptedKey] = useState<string>(() => {
@@ -49,13 +41,79 @@ function App() {
   const [statusMessage, setStatusMessage] = useState<{ text: string; isError: boolean } | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
+  // Monitor Supabase Authentication States
+  useEffect(() => {
+    // 1. Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session?.user) {
+        const username = session.user.email?.split('@')[0] || 'User';
+        setCurrentUser(username);
+        fetchUserData(session.user.id);
+      }
+    });
+
+    // 2. Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session?.user) {
+        const username = session.user.email?.split('@')[0] || 'User';
+        setCurrentUser(username);
+        fetchUserData(session.user.id);
+      } else {
+        setCurrentUser('');
+        setMistakes([]);
+        setEncryptedApiKey('');
+        setDecryptedKey('');
+        sessionStorage.removeItem('gemini_api_key_temp');
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Fetch mistakes & API key profile from Supabase
+  const fetchUserData = async (userId: string) => {
+    try {
+      // Fetch mistakes table
+      const { data: dbMistakes, error: mistakesError } = await supabase
+        .from('mistakes')
+        .select('*')
+        .order('date', { ascending: false });
+
+      if (mistakesError) throw mistakesError;
+
+      const mappedMistakes: MistakeEntry[] = (dbMistakes || []).map((m: any) => ({
+        id: m.id,
+        title: m.title,
+        imageUrl: m.image_url,
+        date: m.date,
+        analysis: m.analysis || undefined
+      }));
+      setMistakes(mappedMistakes);
+
+      // Fetch profile encrypted key
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('encrypted_api_key')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (profileData && !profileError) {
+        setEncryptedApiKey(profileData.encrypted_api_key || '');
+      }
+    } catch (err) {
+      console.error('Error loading Supabase user data:', err);
+    }
+  };
+
   // Format date helper
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
     return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
   };
 
-  // Securely encrypt and save the API Key
+  // Securely encrypt and save the API Key to Supabase database profiles table
   const handleSaveApiKey = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatusMessage(null);
@@ -68,20 +126,33 @@ function App() {
       setStatusMessage({ text: 'PIN 번호는 최소 4자리 이상이어야 합니다.', isError: true });
       return;
     }
+    if (!session?.user) return;
 
     try {
       const encrypted = await encryptApiKey(apiKeyInput.trim(), pinInput);
+      
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert({
+          id: session.user.id,
+          encrypted_api_key: encrypted,
+          updated_at: new Date().toISOString()
+        });
+
+      if (profileError) throw profileError;
+
       setEncryptedApiKey(encrypted);
       
-      // Save temporarily in memory for seamless UX during the session
+      // Save temporarily in session storage
       setDecryptedKey(apiKeyInput.trim());
       sessionStorage.setItem('gemini_api_key_temp', apiKeyInput.trim());
 
       setApiKeyInput('');
       setPinInput('');
-      setStatusMessage({ text: 'API Key가 안전하게 암호화되어 LocalStorage에 저장되었습니다.', isError: false });
-    } catch (err) {
-      setStatusMessage({ text: '암호화 저장 중 오류가 발생했습니다.', isError: true });
+      setStatusMessage({ text: 'API Key가 암호화되어 클라우드 프로필에 안전하게 동기화되었습니다.', isError: false });
+    } catch (err: any) {
+      console.error(err);
+      setStatusMessage({ text: `저장 중 오류 발생: ${err.message}`, isError: true });
     }
   };
 
@@ -102,7 +173,6 @@ function App() {
       setShowUnlockModal(false);
       setUnlockPin('');
       
-      // Trigger analysis now that key is unlocked
       if (selectedEntry) {
         runAnalysisFlow(selectedEntry, decrypted);
       }
@@ -126,12 +196,24 @@ function App() {
     }
   };
 
-  // Actual Gemini API analysis flow
+  // Gemini API analysis flow & database updating
   const runAnalysisFlow = async (entry: MistakeEntry, apiKey: string) => {
     setIsAnalyzing(true);
     setStatusMessage(null);
     try {
       const result = await analyzeMistakeWithGemini(entry.imageUrl, apiKey);
+      
+      // Update mistake database record
+      const { error: updateError } = await supabase
+        .from('mistakes')
+        .update({
+          title: result.title,
+          analysis: result.analysis
+        })
+        .eq('id', entry.id);
+
+      if (updateError) throw updateError;
+
       const updatedEntry: MistakeEntry = {
         ...entry,
         title: result.title,
@@ -149,31 +231,91 @@ function App() {
     }
   };
 
-  // Handle camera capture and add placeholder entry
-  const handleCameraCapture = (base64Image: string) => {
-    const newEntry: MistakeEntry = {
-      id: Date.now().toString(),
-      title: `임시 스캔 문제 #${mistakes.length + 1}`,
-      imageUrl: base64Image,
-      date: new Date().toISOString()
-    };
-    
-    setMistakes(prev => [newEntry, ...prev]);
-    setActiveTab('notes');
-    setSelectedEntry(newEntry); // Open modal for newly captured entry immediately
-  };
+  // Handle camera capture, upload to Storage, and insert database record
+  const handleCameraCapture = async (base64Image: string) => {
+    if (!session?.user) return;
 
-  // Delete mistake helper
-  const handleDeleteMistake = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (confirm('이 오답 기록을 삭제하시겠습니까?')) {
-      setMistakes(prev => prev.filter(m => m.id !== id));
-      setSelectedEntry(null);
+    setIsAnalyzing(true);
+    try {
+      const blob = base64ToBlob(base64Image);
+      const fileExt = blob.type.split('/')[1] || 'jpg';
+      const fileName = `${session.user.id}/${Date.now()}.${fileExt}`;
+
+      // 1. Upload to Supabase Storage bucket
+      const { error: uploadError } = await supabase.storage
+        .from('problem-images')
+        .upload(fileName, blob, {
+          contentType: blob.type
+        });
+
+      if (uploadError) throw uploadError;
+
+      // 2. Get Public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('problem-images')
+        .getPublicUrl(fileName);
+
+      // 3. Save DB Record
+      const newEntryTitle = `스캔된 문제 #${mistakes.length + 1}`;
+      const { data: dbEntry, error: insertError } = await supabase
+        .from('mistakes')
+        .insert({
+          user_id: session.user.id,
+          title: newEntryTitle,
+          image_url: publicUrl,
+          analysis: null
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      const newEntry: MistakeEntry = {
+        id: dbEntry.id,
+        title: dbEntry.title,
+        imageUrl: dbEntry.image_url,
+        date: dbEntry.date,
+        analysis: undefined
+      };
+      
+      setMistakes(prev => [newEntry, ...prev]);
+      setActiveTab('notes');
+      setSelectedEntry(newEntry); // Open modal immediately
+    } catch (err: any) {
+      console.error(err);
+      alert('스캔 이미지 클라우드 업로드 실패: ' + err.message);
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
-  const handleLogout = () => {
+  // Delete mistake from Supabase & local state
+  const handleDeleteMistake = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirm('이 오답 기록을 삭제하시겠습니까?')) {
+      try {
+        const { error } = await supabase
+          .from('mistakes')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+
+        setMistakes(prev => prev.filter(m => m.id !== id));
+        setSelectedEntry(null);
+      } catch (err: any) {
+        console.error(err);
+        alert('삭제 실패: ' + err.message);
+      }
+    }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     setCurrentUser('');
+    setSession(null);
+    setMistakes([]);
+    setEncryptedApiKey('');
     setDecryptedKey('');
     sessionStorage.removeItem('gemini_api_key_temp');
     setActiveTab('notes');
@@ -250,12 +392,12 @@ function App() {
 
             {/* List of Mistakes */}
             {mistakes.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-slate-800 rounded-2xl p-6 bg-slate-900/20">
+              <div className="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-slate-800 rounded-2xl p-6 bg-slate-900/20 animate-scale-up">
                 <div className="w-16 h-16 rounded-full bg-slate-900 flex items-center justify-center text-2xl mb-4 text-slate-500">
                   📓
                 </div>
                 <p className="text-slate-300 font-medium">아직 등록된 오답이 없습니다</p>
-                <p className="text-xs text-slate-500 mt-1 max-w-xs">
+                <p className="text-xs text-slate-500 mt-1 max-w-xs leading-relaxed">
                   아래 카메라 버튼을 눌러 수학 문제를 촬영하고 AI의 맞춤 분석을 받아보세요.
                 </p>
               </div>
@@ -335,7 +477,7 @@ function App() {
                 </div>
                 <div>
                   <h3 className="font-bold text-white text-sm">Gemini API 보안 설정</h3>
-                  <p className="text-[10px] text-slate-400">로컬스토리지 저장 시 강력 암호화 적용</p>
+                  <p className="text-[10px] text-slate-400">클라우드 프로필 저장 시 강력 암호화 적용</p>
                 </div>
               </div>
               
@@ -361,7 +503,7 @@ function App() {
                     className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm text-white placeholder-slate-600 outline-none transition-all"
                   />
                   <p className="text-[9px] text-slate-500 leading-normal">
-                    * 설정한 PIN은 키 복호화 시 인증 수단으로 사용됩니다. 브라우저 저장소 노출 시에도 이 PIN이 없으면 API Key를 복구할 수 없습니다.
+                    * 설정한 PIN은 키 복호화 시 인증 수단으로 사용됩니다. 클라우드에 연동 저장되므로 기기가 바뀌어도 이 PIN만 있으면 언제든 키를 불러와 분석할 수 있습니다.
                   </p>
                 </div>
 
@@ -386,15 +528,15 @@ function App() {
               <div className="divide-y divide-slate-800/60 text-xs">
                 <div className="flex justify-between py-2.5">
                   <span className="text-slate-400">버전</span>
-                  <span className="text-slate-200 font-medium">v1.0.0 (PWA)</span>
+                  <span className="text-slate-200 font-medium">v1.1.0 (PWA + Supabase)</span>
+                </div>
+                <div className="flex justify-between py-2.5">
+                  <span className="text-slate-400">인증 및 데이터베이스</span>
+                  <span className="text-emerald-400 font-medium">Supabase Cloud</span>
                 </div>
                 <div className="flex justify-between py-2.5">
                   <span className="text-slate-400">보안 수준</span>
                   <span className="text-emerald-400 font-medium">AES-GCM 암호화</span>
-                </div>
-                <div className="flex justify-between py-2.5">
-                  <span className="text-slate-400">오프라인 지원</span>
-                  <span className="text-emerald-400 font-medium">활성화 (Service Worker)</span>
                 </div>
                 {decryptedKey && (
                   <div className="flex justify-between py-2.5 items-center">
@@ -455,12 +597,12 @@ function App() {
                 <div className="py-12 flex flex-col items-center justify-center space-y-4">
                   <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
                   <div className="text-center">
-                    <p className="text-sm font-semibold text-white">AI 분석 중...</p>
-                    <p className="text-xs text-slate-400 mt-1">수학 문제 오개념을 진단하고 클리닉을 설계하고 있습니다.</p>
+                    <p className="text-sm font-semibold text-white">처리 중...</p>
+                    <p className="text-xs text-slate-400 mt-1">클라우드 미디어 처리 또는 AI 클리닉 진단을 작동하고 있습니다.</p>
                   </div>
                 </div>
               ) : selectedEntry.analysis ? (
-                <div className="space-y-5">
+                <div className="space-y-5 animate-scale-up">
                   {/* Item 1 */}
                   <div className="space-y-1.5">
                     <h4 className="text-sm font-extrabold text-indigo-400 flex items-center">

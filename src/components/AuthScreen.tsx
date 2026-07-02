@@ -1,22 +1,9 @@
 import React, { useState } from 'react';
+import { supabase } from '../services/supabase';
 
 interface AuthScreenProps {
   onLogin: (username: string) => void;
 }
-
-interface UserRecord {
-  username: string;
-  passwordHash: string;
-}
-
-// Native SHA-256 Hashing Helper for secure client-side password storage
-const hashPassword = async (password: string): Promise<string> => {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
-};
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -25,21 +12,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  // Load existing users from LocalStorage
-  const getUsers = (): UserRecord[] => {
-    try {
-      const data = localStorage.getItem('ai_mistakes_users');
-      return data ? JSON.parse(data) : [];
-    } catch (e) {
-      return [];
-    }
-  };
-
-  // Save users array to LocalStorage
-  const saveUsers = (users: UserRecord[]) => {
-    localStorage.setItem('ai_mistakes_users', JSON.stringify(users));
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,8 +31,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
     setLoading(true);
 
     try {
-      const users = getUsers();
-      const passHash = await hashPassword(password);
+      // Map username to a virtual email for Supabase Auth compatibility
+      const email = `${cleanUsername}@reviewnotes.local`;
 
       if (isSignUp) {
         // Sign Up Flow
@@ -70,38 +42,47 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
           return;
         }
 
-        // Check Duplication
-        const userExists = users.some((u) => u.username === cleanUsername);
-        if (userExists) {
-          setError('이미 존재하는 아이디입니다.');
-          setLoading(false);
-          return;
+        const { data, error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              display_name: cleanUsername
+            }
+          }
+        });
+
+        if (signUpError) {
+          throw signUpError;
         }
 
-        // Create new user
-        const newUser: UserRecord = {
-          username: cleanUsername,
-          passwordHash: passHash
-        };
-        saveUsers([...users, newUser]);
-        
-        // Log in immediately
-        onLogin(cleanUsername);
+        if (data.user) {
+          // Attempt automatic login after signup (default behavior if email confirmation is disabled)
+          onLogin(cleanUsername);
+        } else {
+          setError('회원가입이 완료되었습니다. 로그인을 다시 시도해 주세요.');
+          setIsSignUp(false);
+        }
       } else {
         // Login Flow
-        const user = users.find((u) => u.username === cleanUsername);
-        if (!user || user.passwordHash !== passHash) {
-          setError('아이디 또는 비밀번호가 잘못되었습니다.');
-          setLoading(false);
-          return;
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
+
+        if (signInError) {
+          // Friendly message mapping
+          if (signInError.message.includes('Invalid login credentials')) {
+            throw new Error('아이디 또는 비밀번호가 일치하지 않습니다.');
+          }
+          throw signInError;
         }
 
-        // Login success
         onLogin(cleanUsername);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setError('인증 프로세스 도중 기술적 오류가 발생했습니다.');
+      setError(err.message || '인증 과정에서 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
@@ -120,7 +101,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
             AI 수학 오답노트
           </h2>
           <p className="text-xs text-slate-400">
-            {isSignUp ? '간편 회원가입으로 나만의 분석 노트를 시작하세요' : '로그인하여 분석 기록을 확인하세요'}
+            {isSignUp 
+              ? '간편 회원가입으로 나만의 클라우드 분석 노트를 시작하세요' 
+              : '로그인하여 클라우드에 백업된 분석 기록을 확인하세요'}
           </p>
         </div>
 
