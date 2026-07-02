@@ -33,6 +33,7 @@ create policy "Users can update their own profile" on public.profiles
 create policy "Users can view their own mistakes" on public.mistakes
   for select using (auth.uid() = user_id);
 
+-- 오류 수정: RLS insert 조건 추가
 create policy "Users can insert their own mistakes" on public.mistakes
   for insert with check (auth.uid() = user_id);
 
@@ -55,3 +56,20 @@ $$ language plpgsql security definer;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+-- 3. Supabase Storage RLS 정책 추가 (이미지 업로드 오류 해결)
+-- 인증된 사용자에게 problem-images 버킷에 대한 업로드/다운로드/삭제 권한 부여
+create policy "Allow authenticated users full access to problem-images" on storage.objects
+  for all using (
+    bucket_id = 'problem-images' 
+    and auth.role() = 'authenticated'
+  ) with check (
+    bucket_id = 'problem-images' 
+    and auth.role() = 'authenticated'
+  );
+
+-- 전체 사용자(비인증 포함)에게 이미지 읽기(조회) 권한 부여 (공개 URL 렌더링용)
+create policy "Allow public read access to problem-images" on storage.objects
+  for select using (
+    bucket_id = 'problem-images'
+  );
