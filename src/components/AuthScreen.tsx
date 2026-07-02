@@ -8,7 +8,8 @@ interface AuthScreenProps {
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
   const [isSignUp, setIsSignUp] = useState(false);
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -16,11 +17,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Load remembered email on mount
+  // Load remembered username (ID) on mount
   useEffect(() => {
-    const savedEmail = localStorage.getItem('reviewnote_remembered_email');
-    if (savedEmail) {
-      setEmail(savedEmail);
+    const savedUsername = localStorage.getItem('reviewnote_remembered_username');
+    if (savedUsername) {
+      setUsername(savedUsername);
       setRememberMe(true);
     }
   }, []);
@@ -30,11 +31,17 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
     setError(null);
     setSuccessMessage(null);
 
-    const cleanEmail = email.trim();
-    if (!cleanEmail) {
-      setError('이메일 주소를 입력해 주세요.');
+    const cleanUsername = username.trim().toLowerCase();
+    if (!cleanUsername || cleanUsername.length < 3) {
+      setError('아이디는 최소 3글자 이상이어야 합니다.');
       return;
     }
+
+    if (isSignUp && !displayName.trim()) {
+      setError('이름을 입력해 주세요.');
+      return;
+    }
+
     if (!password || password.length < 6) {
       setError('비밀번호는 최소 6글자 이상이어야 합니다.');
       return;
@@ -43,6 +50,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
     setLoading(true);
 
     try {
+      // Map username to a virtual standard .com email under the hood for Supabase Auth
+      const email = `${cleanUsername}@reviewnote.com`;
+
       if (isSignUp) {
         // Sign Up Flow
         if (password !== confirmPassword) {
@@ -52,11 +62,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
         }
 
         const { data, error: signUpError } = await supabase.auth.signUp({
-          email: cleanEmail,
+          email,
           password,
           options: {
             data: {
-              display_name: cleanEmail.split('@')[0]
+              display_name: displayName.trim()
             }
           }
         });
@@ -65,48 +75,44 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
           throw signUpError;
         }
 
-        // If email confirmation is enabled, session will be null and user needs to confirm
-        if (data.user && !data.session) {
-          setSuccessMessage(
-            '인증 이메일이 발송되었습니다! 입력하신 이메일의 편지함을 확인해 인증 링크를 클릭하신 뒤 로그인해 주세요.'
-          );
-          setIsSignUp(false); // Switch to login screen
-          setPassword('');
-          setConfirmPassword('');
-        } else {
-          // If confirmation is disabled, log in directly
-          if (rememberMe) {
-            localStorage.setItem('reviewnote_remembered_email', cleanEmail);
+        if (data.user) {
+          // If we got a session (email confirmation is off), log in directly
+          if (data.session) {
+            if (rememberMe) {
+              localStorage.setItem('reviewnote_remembered_username', cleanUsername);
+            } else {
+              localStorage.removeItem('reviewnote_remembered_username');
+            }
+            onLogin(cleanUsername);
           } else {
-            localStorage.removeItem('reviewnote_remembered_email');
+            setSuccessMessage('회원가입이 완료되었습니다! 가입하신 아이디로 로그인해 주세요.');
+            setIsSignUp(false);
+            setPassword('');
+            setConfirmPassword('');
           }
-          onLogin(cleanEmail.split('@')[0]);
         }
       } else {
         // Login Flow
         const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: cleanEmail,
+          email,
           password
         });
 
         if (signInError) {
           if (signInError.message.includes('Invalid login credentials')) {
-            throw new Error('이메일 또는 비밀번호가 일치하지 않습니다.');
-          }
-          if (signInError.message.includes('Email not confirmed')) {
-            throw new Error('이메일 인증이 아직 완료되지 않았습니다. 이메일 편지함을 확인해 주세요.');
+            throw new Error('아이디 또는 비밀번호가 일치하지 않습니다.');
           }
           throw signInError;
         }
 
-        // Save or remove email to/from localStorage
+        // Save or remove username to/from localStorage
         if (rememberMe) {
-          localStorage.setItem('reviewnote_remembered_email', cleanEmail);
+          localStorage.setItem('reviewnote_remembered_username', cleanUsername);
         } else {
-          localStorage.removeItem('reviewnote_remembered_email');
+          localStorage.removeItem('reviewnote_remembered_username');
         }
 
-        onLogin(cleanEmail.split('@')[0]);
+        onLogin(cleanUsername);
       }
     } catch (err: any) {
       console.error(err);
@@ -125,7 +131,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
           <div className="flex flex-col items-center space-y-3">
             <img 
               src={logoImg} 
-              alt="더쿠수학 로고" 
+              alt="더쿠키수학 로고" 
               className="h-16 w-auto object-contain rounded-2xl shadow-lg border border-slate-800/80" 
             />
             <h2 className="text-xl font-extrabold text-white bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
@@ -134,7 +140,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
           </div>
           <p className="text-xs text-slate-400">
             {isSignUp 
-              ? '이메일 가입으로 나만의 클라우드 분석 노트를 시작하세요' 
+              ? '아이디, 이름, 비밀번호를 적고 가입하여 분석 노트를 시작하세요' 
               : '로그인하여 클라우드에 백업된 분석 기록을 확인하세요'}
           </p>
         </div>
@@ -142,16 +148,30 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
         {/* Input Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1">
-            <label className="text-xs text-slate-400 font-bold block">이메일 주소</label>
+            <label className="text-xs text-slate-400 font-bold block">아이디 (ID)</label>
             <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="example@email.com"
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="로그인 아이디 입력 (영어/숫자)"
               className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm text-white placeholder-slate-600 outline-none transition-all"
               required
             />
           </div>
+
+          {isSignUp && (
+            <div className="space-y-1">
+              <label className="text-xs text-slate-400 font-bold block">이름 (실명/닉네임)</label>
+              <input
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="사용자 이름 입력"
+                className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm text-white placeholder-slate-600 outline-none transition-all"
+                required
+              />
+            </div>
+          )}
 
           <div className="space-y-1">
             <label className="text-xs text-slate-400 font-bold block">비밀번호</label>
@@ -179,7 +199,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
             </div>
           )}
 
-          {/* Remember Email Checkbox */}
+          {/* Remember Username Checkbox */}
           {!isSignUp && (
             <div className="flex items-center space-x-2 py-1">
               <input
@@ -190,7 +210,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                 className="w-4 h-4 rounded border-slate-800 bg-slate-950 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0 outline-none accent-indigo-500 cursor-pointer"
               />
               <label htmlFor="rememberMe" className="text-xs text-slate-400 cursor-pointer select-none">
-                이메일 기억하기
+                아이디 기억하기
               </label>
             </div>
           )}
@@ -203,7 +223,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
 
           {successMessage && (
             <div className="p-3.5 rounded-xl text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-center leading-relaxed font-semibold">
-              ✉️ {successMessage}
+              🎉 {successMessage}
             </div>
           )}
 
@@ -212,7 +232,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
             disabled={loading}
             className="w-full py-3.5 mt-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none transition-all text-sm font-bold text-white shadow-lg shadow-indigo-600/20"
           >
-            {loading ? '인증 진행 중...' : isSignUp ? '회원가입 및 인증 메일 전송' : '로그인'}
+            {loading ? '인증 진행 중...' : isSignUp ? '회원가입 및 시작하기' : '로그인'}
           </button>
         </form>
 
@@ -226,10 +246,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
               setSuccessMessage(null);
               setPassword('');
               setConfirmPassword('');
+              setDisplayName('');
             }}
             className="text-xs text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
           >
-            {isSignUp ? '이미 계정이 있으신가요? 로그인하기' : '처음이신가요? 이메일 회원가입하기'}
+            {isSignUp ? '이미 계정이 있으신가요? 로그인하기' : '처음이신가요? 회원가입하기'}
           </button>
         </div>
 
