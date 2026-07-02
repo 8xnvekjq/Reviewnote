@@ -1,0 +1,24 @@
+{
+  "short_name": "AI오답노트",
+  "name": "AI 수학 오답노트",
+  "description": "수학 문제 사진을 찍어 AI로 오답 원인을 분석하고 대책을 제안받는 오답노트 앱",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "./index.html",
+  "background_color": "#0f172a",
+  "theme_color": "#4f46e5",
+  "display": "standalone",
+  "orientation": "portrait"
+}
