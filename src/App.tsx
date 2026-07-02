@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { ActiveTab, MistakeEntry } from './types';
 import { CameraScanner } from './components/CameraScanner';
-import { encryptApiKey, decryptApiKey } from './utils/crypto';
 import { analyzeMistakeWithGemini } from './services/gemini';
 import { AuthScreen } from './components/AuthScreen';
 import { LaTeXRenderer } from './components/LaTeXRenderer';
@@ -21,6 +20,7 @@ const base64ToBlob = (base64DataUrl: string): Blob => {
 };
 
 function App() {
+  // If Supabase credentials are not configured, block and show the setup guide
   if (!isSupabaseConfigured) {
     return (
       <div className="h-full flex items-center justify-center p-6 bg-slate-950 text-slate-100 text-center">
@@ -54,21 +54,7 @@ function App() {
   const [currentUser, setCurrentUser] = useState<string>('');
   const [activeTab, setActiveTab] = useState<ActiveTab>('notes');
   const [mistakes, setMistakes] = useState<MistakeEntry[]>([]);
-  const [encryptedApiKey, setEncryptedApiKey] = useState<string>('');
-  
-  // App-level state for temporary decrypted API key (lasts for the session)
-  const [decryptedKey, setDecryptedKey] = useState<string>(() => {
-    return sessionStorage.getItem('gemini_api_key_temp') || '';
-  });
-
-  // Modal and Form States
   const [selectedEntry, setSelectedEntry] = useState<MistakeEntry | null>(null);
-  const [apiKeyInput, setApiKeyInput] = useState('');
-  const [pinInput, setPinInput] = useState('');
-  const [unlockPin, setUnlockPin] = useState('');
-  const [showUnlockModal, setShowUnlockModal] = useState(false);
-  const [showApiGuideModal, setShowApiGuideModal] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<{ text: string; isError: boolean } | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // Monitor Supabase Authentication States
@@ -93,19 +79,15 @@ function App() {
       } else {
         setCurrentUser('');
         setMistakes([]);
-        setEncryptedApiKey('');
-        setDecryptedKey('');
-        sessionStorage.removeItem('gemini_api_key_temp');
       }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  // Fetch mistakes & API key profile from Supabase
+  // Fetch mistakes from Supabase
   const fetchUserData = async (userId: string) => {
     try {
-      // Fetch mistakes table
       const { data: dbMistakes, error: mistakesError } = await supabase
         .from('mistakes')
         .select('*')
@@ -121,17 +103,6 @@ function App() {
         analysis: m.analysis || undefined
       }));
       setMistakes(mappedMistakes);
-
-      // Fetch profile encrypted key
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('encrypted_api_key')
-        .eq('id', userId)
-        .maybeSingle();
-
-      if (profileData && !profileError) {
-        setEncryptedApiKey(profileData.encrypted_api_key || '');
-      }
     } catch (err) {
       console.error('Error loading Supabase user data:', err);
     }
@@ -143,93 +114,19 @@ function App() {
     return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
   };
 
-  // Securely encrypt and save the API Key to Supabase database profiles table
-  const handleSaveApiKey = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setStatusMessage(null);
-
-    if (!apiKeyInput.trim()) {
-      setStatusMessage({ text: 'API Key를 입력해 주세요.', isError: true });
-      return;
-    }
-    if (pinInput.length < 4) {
-      setStatusMessage({ text: 'PIN 번호는 최소 4자리 이상이어야 합니다.', isError: true });
-      return;
-    }
-    if (!session?.user) return;
-
-    try {
-      const encrypted = await encryptApiKey(apiKeyInput.trim(), pinInput);
-      
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert({
-          id: session.user.id,
-          encrypted_api_key: encrypted,
-          updated_at: new Date().toISOString()
-        });
-
-      if (profileError) throw profileError;
-
-      setEncryptedApiKey(encrypted);
-      
-      // Save temporarily in session storage
-      setDecryptedKey(apiKeyInput.trim());
-      sessionStorage.setItem('gemini_api_key_temp', apiKeyInput.trim());
-
-      setApiKeyInput('');
-      setPinInput('');
-      setStatusMessage({ text: 'API Key가 암호화되어 클라우드 프로필에 안전하게 동기화되었습니다.', isError: false });
-    } catch (err: any) {
-      console.error(err);
-      setStatusMessage({ text: `저장 중 오류 발생: ${err.message}`, isError: true });
-    }
-  };
-
-  // Decrypt Key handler (used when analyzing)
-  const handleUnlockKey = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setStatusMessage(null);
-
-    if (!encryptedApiKey) {
-      setStatusMessage({ text: '저장된 API Key가 없습니다. 설정 탭에서 먼저 등록해 주세요.', isError: true });
-      return;
-    }
-
-    try {
-      const decrypted = await decryptApiKey(encryptedApiKey, unlockPin);
-      setDecryptedKey(decrypted);
-      sessionStorage.setItem('gemini_api_key_temp', decrypted);
-      setShowUnlockModal(false);
-      setUnlockPin('');
-      
-      if (selectedEntry) {
-        runAnalysisFlow(selectedEntry, decrypted);
-      }
-    } catch (err: any) {
-      setStatusMessage({ text: err.message || '복호화 실패', isError: true });
-    }
-  };
-
   // Start analysis trigger
   const handleStartAnalysis = (entry: MistakeEntry) => {
     const envKey = import.meta.env.VITE_GEMINI_API_KEY || '';
-    const activeKey = decryptedKey || envKey;
-
-    if (activeKey) {
-      runAnalysisFlow(entry, activeKey);
-    } else if (encryptedApiKey) {
-      setShowUnlockModal(true);
+    if (envKey) {
+      runAnalysisFlow(entry, envKey);
     } else {
-      setActiveTab('settings');
-      alert('AI 오답 분석을 진행하려면 먼저 설정 탭에서 Gemini API Key를 등록하거나 .env 파일에 VITE_GEMINI_API_KEY를 설정해야 합니다.');
+      alert('관리자 서버에 Gemini API Key(VITE_GEMINI_API_KEY)가 등록되지 않았습니다. Vercel 환경 변수 설정을 완료해 주세요.');
     }
   };
 
   // Gemini API analysis flow & database updating
   const runAnalysisFlow = async (entry: MistakeEntry, apiKey: string) => {
     setIsAnalyzing(true);
-    setStatusMessage(null);
     try {
       const result = await analyzeMistakeWithGemini(entry.imageUrl, apiKey);
       
@@ -254,7 +151,6 @@ function App() {
       setSelectedEntry(updatedEntry);
     } catch (err: any) {
       console.error(err);
-      setStatusMessage({ text: err.message || 'AI 분석 실행 중 오류가 발생했습니다.', isError: true });
       alert(err.message || 'AI 분석 실행 중 오류가 발생했습니다.');
     } finally {
       setIsAnalyzing(false);
@@ -345,9 +241,6 @@ function App() {
     setCurrentUser('');
     setSession(null);
     setMistakes([]);
-    setEncryptedApiKey('');
-    setDecryptedKey('');
-    sessionStorage.removeItem('gemini_api_key_temp');
     setActiveTab('notes');
   };
 
@@ -365,11 +258,11 @@ function App() {
             ∑
           </div>
           <h1 className="text-lg font-bold bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
-            AI 수학 오답노트
+            더쿠키수학 오답클리닉
           </h1>
         </div>
         <div className="flex items-center space-x-2">
-          <span className="text-[10px] text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded-full border border-slate-700 font-bold max-w-[80px] truncate">
+          <span className="text-[10px] text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded-full border border-slate-700 font-bold max-w-[100px] truncate">
             👤 {currentUser}
           </span>
           <button 
@@ -378,40 +271,6 @@ function App() {
           >
             로그아웃
           </button>
-          
-          {import.meta.env.VITE_GEMINI_API_KEY ? (
-            <button 
-              onClick={() => setShowApiGuideModal(true)}
-              className="flex items-center space-x-1 text-indigo-400 bg-indigo-500/10 px-2.5 py-0.5 rounded-full text-[10px] border border-indigo-500/30 active:scale-95 transition-all hover:bg-indigo-500/20"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
-              <span>Env Key 활성화됨 ❓</span>
-            </button>
-          ) : decryptedKey ? (
-            <button 
-              onClick={() => setShowApiGuideModal(true)}
-              className="flex items-center space-x-1 text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full text-[10px] border border-emerald-500/30 active:scale-95 transition-all hover:bg-emerald-500/20"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-              <span>보안 잠금해제됨 ❓</span>
-            </button>
-          ) : encryptedApiKey ? (
-            <button 
-              onClick={() => setShowApiGuideModal(true)}
-              className="flex items-center space-x-1 text-amber-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full text-[10px] border border-amber-500/30 active:scale-95 transition-all hover:bg-amber-500/20"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-              <span>보안 암호화됨 ❓</span>
-            </button>
-          ) : (
-            <button 
-              onClick={() => setShowApiGuideModal(true)}
-              className="text-[10px] text-slate-400 hover:text-slate-300 bg-slate-900 border border-slate-800 hover:border-slate-700 px-2.5 py-0.5 rounded-full active:scale-95 transition-all flex items-center space-x-1"
-            >
-              <span>API Key 미등록</span>
-              <span className="w-4 h-4 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center text-[9px] font-bold">?</span>
-            </button>
-          )}
         </div>
       </header>
 
@@ -505,102 +364,6 @@ function App() {
           />
         )}
 
-        {activeTab === 'settings' && (
-          <div className="space-y-6 max-w-lg mx-auto">
-            <div>
-              <h2 className="text-xl font-bold text-white">앱 설정</h2>
-              <p className="text-xs text-slate-400 mt-1">API 보안 설정 및 앱 환경설정</p>
-            </div>
-
-            {/* API Security Card */}
-            <form onSubmit={handleSaveApiKey} className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 space-y-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-xl bg-indigo-950 border border-indigo-800 flex items-center justify-center text-xl text-indigo-400">
-                  🔑
-                </div>
-                <div>
-                  <h3 className="font-bold text-white text-sm">Gemini API 보안 설정</h3>
-                  <p className="text-[10px] text-slate-400">클라우드 프로필 저장 시 강력 암호화 적용</p>
-                </div>
-              </div>
-              
-              <div className="space-y-3 pt-2">
-                <div className="space-y-1">
-                  <label className="text-xs text-slate-400 font-medium">Gemini API Key</label>
-                  <input 
-                    type="password" 
-                    value={apiKeyInput}
-                    onChange={(e) => setApiKeyInput(e.target.value)}
-                    placeholder="AIzaSy..." 
-                    className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm text-white placeholder-slate-600 outline-none transition-all"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs text-slate-400 font-medium">앱 복호화 PIN (4~6자리 숫자)</label>
-                  <input 
-                    type="password" 
-                    maxLength={6}
-                    value={pinInput}
-                    onChange={(e) => setPinInput(e.target.value.replace(/[^0-9]/g, ''))}
-                    placeholder="숫자 4~6자리 입력" 
-                    className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm text-white placeholder-slate-600 outline-none transition-all"
-                  />
-                  <p className="text-[9px] text-slate-500 leading-normal">
-                    * 설정한 PIN은 키 복호화 시 인증 수단으로 사용됩니다. 클라우드에 연동 저장되므로 기기가 바뀌어도 이 PIN만 있으면 언제든 키를 불러와 분석할 수 있습니다.
-                  </p>
-                </div>
-
-                {statusMessage && (
-                  <div className={`p-3 rounded-lg text-xs ${statusMessage.isError ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
-                    {statusMessage.text}
-                  </div>
-                )}
-
-                <button 
-                  type="submit"
-                  className="w-full py-3 mt-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 transition-all text-xs font-bold text-white shadow-md shadow-indigo-600/10"
-                >
-                  보안 저장하기
-                </button>
-              </div>
-            </form>
-
-            {/* App Info Card */}
-            <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 space-y-3">
-              <h3 className="font-bold text-white text-sm">애플리케이션 정보</h3>
-              <div className="divide-y divide-slate-800/60 text-xs">
-                <div className="flex justify-between py-2.5">
-                  <span className="text-slate-400">버전</span>
-                  <span className="text-slate-200 font-medium">v1.1.0 (PWA + Supabase)</span>
-                </div>
-                <div className="flex justify-between py-2.5">
-                  <span className="text-slate-400">인증 및 데이터베이스</span>
-                  <span className="text-emerald-400 font-medium">Supabase Cloud</span>
-                </div>
-                <div className="flex justify-between py-2.5">
-                  <span className="text-slate-400">보안 수준</span>
-                  <span className="text-emerald-400 font-medium">AES-GCM 암호화</span>
-                </div>
-                {decryptedKey && (
-                  <div className="flex justify-between py-2.5 items-center">
-                    <span className="text-slate-400">세션 상태</span>
-                    <button 
-                      onClick={() => {
-                        setDecryptedKey('');
-                        sessionStorage.removeItem('gemini_api_key_temp');
-                        alert('API Key 세션이 만료되었습니다. 다시 안전하게 잠겼습니다.');
-                      }}
-                      className="px-2 py-1 bg-red-950 border border-red-800 text-red-400 rounded-lg text-[10px]"
-                    >
-                      세션 메모리 잠금
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
       </main>
 
       {/* Selected Entry Detail Modal */}
@@ -641,45 +404,48 @@ function App() {
                   <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
                   <div className="text-center">
                     <p className="text-sm font-semibold text-white">처리 중...</p>
-                    <p className="text-xs text-slate-400 mt-1">클라우드 미디어 처리 또는 AI 클리닉 진단을 작동하고 있습니다.</p>
+                    <p className="text-xs text-slate-400 mt-1">AI 수학 클리닉 진단을 작성하고 있습니다.</p>
                   </div>
                 </div>
               ) : selectedEntry.analysis ? (
-                <div className="space-y-5 animate-scale-up">
-                  {/* Item 1 */}
-                  <div className="space-y-1.5">
+                <div className="space-y-6 animate-scale-up">
+                  {/* Card 1: 정석 풀이 과정 */}
+                  <div className="space-y-2 border-l-4 border-indigo-500 pl-4 py-1">
                     <h4 className="text-sm font-extrabold text-indigo-400 flex items-center">
-                      <span className="mr-1.5">✓</span> [문제 풀이 과정]
+                      <span className="mr-1.5 text-base">💡</span> 정석 풀이 과정
                     </h4>
-                    <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800/60">
-                      <LaTeXRenderer text={selectedEntry.analysis.solvingProcess} className="text-sm md:text-base" />
+                    <div className="bg-slate-950 p-4.5 rounded-2xl border border-slate-850">
+                      <LaTeXRenderer text={selectedEntry.analysis.solvingProcess} className="text-sm md:text-base leading-relaxed" />
                     </div>
                   </div>
-                  {/* Item 2 */}
-                  <div className="space-y-1.5">
+
+                  {/* Card 2: 실수 & 틀린 이유 분석 (요약 및 강조) */}
+                  <div className="space-y-2 border-l-4 border-amber-500 pl-4 py-1">
                     <h4 className="text-sm font-extrabold text-amber-400 flex items-center">
-                      <span className="mr-1.5">⚠️</span> [실수한 지점 상세 분석]
+                      <span className="mr-1.5 text-base">🔍</span> 틀린 이유 분석
                     </h4>
-                    <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800/60">
-                      <LaTeXRenderer text={selectedEntry.analysis.mistakeDetail} className="text-sm md:text-base" />
+                    <div className="bg-slate-950 p-4.5 rounded-2xl border border-slate-850 space-y-4">
+                      {/* 실수 분석 상세 */}
+                      <div className="space-y-1.5">
+                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">실수 지점</span>
+                        <LaTeXRenderer text={selectedEntry.analysis.mistakeDetail} className="text-sm md:text-base leading-relaxed" />
+                      </div>
+                      
+                      {/* 오개념 근본 원인 */}
+                      <div className="pt-3.5 border-t border-slate-850 space-y-1.5">
+                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">틀린 원인</span>
+                        <LaTeXRenderer text={selectedEntry.analysis.rootCause} className="text-sm md:text-base leading-relaxed text-red-300" />
+                      </div>
                     </div>
                   </div>
-                  {/* Item 3 */}
-                  <div className="space-y-1.5">
-                    <h4 className="text-sm font-extrabold text-red-400 flex items-center">
-                      <span className="mr-1.5">🎯</span> [근본적인 틀린 이유]
-                    </h4>
-                    <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800/60">
-                      <LaTeXRenderer text={selectedEntry.analysis.rootCause} className="text-sm md:text-base" />
-                    </div>
-                  </div>
-                  {/* Item 4 */}
-                  <div className="space-y-1.5">
+
+                  {/* Card 3: 재발 방지 대책 (요약 및 글머리 강조) */}
+                  <div className="space-y-2 border-l-4 border-emerald-500 pl-4 py-1">
                     <h4 className="text-sm font-extrabold text-emerald-400 flex items-center">
-                      <span className="mr-1.5">🛡️</span> [향후 재발 방지 대책]
+                      <span className="mr-1.5 text-base">🛡️</span> 재발 방지 대책
                     </h4>
-                    <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800/60">
-                      <LaTeXRenderer text={selectedEntry.analysis.actionPlan} className="text-sm md:text-base" />
+                    <div className="bg-slate-950 p-4.5 rounded-2xl border border-slate-850">
+                      <LaTeXRenderer text={selectedEntry.analysis.actionPlan} className="text-sm md:text-base leading-relaxed" />
                     </div>
                   </div>
                 </div>
@@ -689,7 +455,7 @@ function App() {
                   <div className="space-y-1">
                     <p className="text-sm font-bold text-white">AI 수학 클리닉 진단</p>
                     <p className="text-xs text-slate-400 leading-relaxed max-w-xs mx-auto">
-                      아직 오답 원인이 분석되지 않았습니다. 등록한 API Key를 통해 4가지 핵심 원인 진단을 진행합니다.
+                      아직 오답 원인이 분석되지 않았습니다. AI가 설계하는 맞춤형 오답 처방전을 확인해 보세요.
                     </p>
                   </div>
                   <button 
@@ -716,129 +482,16 @@ function App() {
         </div>
       )}
 
-      {/* Unlock API Key PIN Modal */}
-      {showUnlockModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <form 
-            onSubmit={handleUnlockKey}
-            className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-2xl animate-scale-up"
-          >
-            <div className="text-center space-y-2">
-              <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/30 text-2xl flex items-center justify-center mx-auto text-amber-400">
-                🔒
-              </div>
-              <h3 className="font-bold text-white text-base">보안 복호화</h3>
-              <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
-                암호화된 API Key를 로드하기 위해 보안 PIN 코드를 입력해 주세요.
-              </p>
-            </div>
-
-            <div className="space-y-3 pt-2">
-              <input 
-                type="password" 
-                maxLength={6}
-                value={unlockPin}
-                onChange={(e) => setUnlockPin(e.target.value.replace(/[^0-9]/g, ''))}
-                placeholder="숫자 4~6자리 PIN 입력" 
-                className="w-full px-4 py-3 text-center tracking-widest text-lg rounded-xl bg-slate-950 border border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-white placeholder-slate-600 outline-none transition-all"
-              />
-
-              {statusMessage && (
-                <div className="p-3 rounded-lg text-xs bg-red-500/10 text-red-400 border border-red-500/20">
-                  {statusMessage.text}
-                </div>
-              )}
-
-              <div className="flex space-x-3 pt-2">
-                <button 
-                  type="button"
-                  onClick={() => {
-                    setShowUnlockModal(false);
-                    setUnlockPin('');
-                    setStatusMessage(null);
-                  }}
-                  className="flex-1 py-3 rounded-xl border border-slate-800 hover:bg-slate-800 active:scale-95 text-xs font-semibold text-slate-300"
-                >
-                  취소
-                </button>
-                <button 
-                  type="submit"
-                  className="flex-1 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-xs font-bold text-white shadow-md shadow-indigo-600/20"
-                >
-                  잠금 해제
-                </button>
-              </div>
-            </div>
-          </form>
-        </div>
-      )}
-      {/* Gemini API Key Guide Modal */}
-      {showApiGuideModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-2xl animate-scale-up">
-            <div className="text-center space-y-2">
-              <div className="w-12 h-12 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-xl flex items-center justify-center mx-auto text-indigo-400">
-                🤖
-              </div>
-              <h3 className="font-bold text-white text-base">Gemini API 키 발급 가이드</h3>
-              <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
-                AI 오답노트의 자동 취약점 진단 기능을 이용하려면 무료 Google Gemini API 키가 필요합니다.
-              </p>
-            </div>
-
-            <div className="space-y-3 pt-2 text-left text-xs text-slate-300">
-              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800/60 space-y-3.5 leading-relaxed">
-                <div className="flex items-start space-x-2.5">
-                  <span className="w-5 h-5 rounded-full bg-indigo-900 text-indigo-300 text-[10px] font-bold flex items-center justify-center flex-none mt-0.5">1</span>
-                  <p>
-                    아래 <strong>'API 키 발급하러 가기'</strong> 버튼을 클릭하여 Google AI Studio 사이트로 이동합니다 (구글 계정 필요).
-                  </p>
-                </div>
-                <div className="flex items-start space-x-2.5">
-                  <span className="w-5 h-5 rounded-full bg-indigo-900 text-indigo-300 text-[10px] font-bold flex items-center justify-center flex-none mt-0.5">2</span>
-                  <p>
-                    로그인 후 상단의 <strong>"Get API key"</strong> 또는 <strong>"Create API key"</strong> 버튼을 클릭하여 새 키를 발급받습니다.
-                  </p>
-                </div>
-                <div className="flex items-start space-x-2.5">
-                  <span className="w-5 h-5 rounded-full bg-indigo-900 text-indigo-300 text-[10px] font-bold flex items-center justify-center flex-none mt-0.5">3</span>
-                  <p>
-                    발급된 키(<code className="bg-slate-900 px-1.5 py-0.5 rounded text-indigo-400 text-[10px] font-mono">AIzaSy...</code>)를 복사한 후, 오답노트 <strong>[설정]</strong> 탭에서 PIN 번호와 함께 등록합니다.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex space-x-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowApiGuideModal(false)}
-                  className="flex-1 py-3 rounded-xl border border-slate-800 hover:bg-slate-800 active:scale-95 text-xs font-semibold text-slate-300"
-                >
-                  닫기
-                </button>
-                <a 
-                  href="https://aistudio.google.com/" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="flex-1 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 active:scale-95 text-xs font-bold text-white text-center shadow-md shadow-indigo-600/20 flex items-center justify-center"
-                >
-                  API 키 발급하기 &rarr;
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
       {/* Floating Glassmorphic Bottom Navigation Bar */}
       <nav className="fixed bottom-4 left-4 right-4 z-40 h-16 rounded-2xl border border-slate-800/80 bg-slate-900/75 backdrop-blur-lg flex items-center justify-around px-4 shadow-xl shadow-black/40">
         
         {/* Tab 1: Notes List */}
         <button 
           onClick={() => setActiveTab('notes')}
-          className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition-all ${activeTab === 'notes' ? 'text-indigo-400 scale-105' : 'text-slate-500 hover:text-slate-300'}`}
+          className={`flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all ${activeTab === 'notes' ? 'text-indigo-400 scale-105 font-bold' : 'text-slate-500 hover:text-slate-300'}`}
         >
           <span className="text-lg">📓</span>
-          <span className="text-[10px] font-bold mt-0.5">오답노트</span>
+          <span className="text-[10px] mt-0.5">오답노트</span>
         </button>
 
         {/* Tab 2: Floating Camera Trigger */}
@@ -847,15 +500,6 @@ function App() {
           className={`flex items-center justify-center w-14 h-14 rounded-full transition-all -translate-y-4 shadow-lg ${activeTab === 'camera' ? 'bg-gradient-to-tr from-indigo-600 to-indigo-500 text-white scale-110 shadow-indigo-600/40 ring-4 ring-slate-950' : 'bg-slate-800 text-slate-300 hover:bg-slate-750 shadow-black/50 ring-4 ring-slate-950 hover:scale-105'}`}
         >
           <span className="text-xl">📷</span>
-        </button>
-
-        {/* Tab 3: Settings */}
-        <button 
-          onClick={() => setActiveTab('settings')}
-          className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition-all ${activeTab === 'settings' ? 'text-indigo-400 scale-105' : 'text-slate-500 hover:text-slate-300'}`}
-        >
-          <span className="text-lg">⚙️</span>
-          <span className="text-[10px] font-bold mt-0.5">설정</span>
         </button>
 
       </nav>
