@@ -67,6 +67,7 @@ function App() {
   const [pinInput, setPinInput] = useState('');
   const [unlockPin, setUnlockPin] = useState('');
   const [showUnlockModal, setShowUnlockModal] = useState(false);
+  const [showApiGuideModal, setShowApiGuideModal] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string; isError: boolean } | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
@@ -379,24 +380,37 @@ function App() {
           </button>
           
           {import.meta.env.VITE_GEMINI_API_KEY ? (
-            <span className="flex items-center space-x-1 text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full text-[10px] border border-indigo-500/30">
+            <button 
+              onClick={() => setShowApiGuideModal(true)}
+              className="flex items-center space-x-1 text-indigo-400 bg-indigo-500/10 px-2.5 py-0.5 rounded-full text-[10px] border border-indigo-500/30 active:scale-95 transition-all hover:bg-indigo-500/20"
+            >
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
-              <span>Env Key 활성화됨</span>
-            </span>
+              <span>Env Key 활성화됨 ❓</span>
+            </button>
           ) : decryptedKey ? (
-            <span className="flex items-center space-x-1 text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full text-[10px] border border-emerald-500/30">
+            <button 
+              onClick={() => setShowApiGuideModal(true)}
+              className="flex items-center space-x-1 text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full text-[10px] border border-emerald-500/30 active:scale-95 transition-all hover:bg-emerald-500/20"
+            >
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-              <span>보안 잠금해제됨</span>
-            </span>
+              <span>보안 잠금해제됨 ❓</span>
+            </button>
           ) : encryptedApiKey ? (
-            <span className="flex items-center space-x-1 text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full text-[10px] border border-amber-500/30">
+            <button 
+              onClick={() => setShowApiGuideModal(true)}
+              className="flex items-center space-x-1 text-amber-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full text-[10px] border border-amber-500/30 active:scale-95 transition-all hover:bg-amber-500/20"
+            >
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-              <span>보안 암호화됨</span>
-            </span>
+              <span>보안 암호화됨 ❓</span>
+            </button>
           ) : (
-            <span className="text-[10px] text-slate-500 border border-slate-800 px-2 py-0.5 rounded-full">
-              API Key 미등록
-            </span>
+            <button 
+              onClick={() => setShowApiGuideModal(true)}
+              className="text-[10px] text-slate-400 hover:text-slate-300 bg-slate-900 border border-slate-800 hover:border-slate-700 px-2.5 py-0.5 rounded-full active:scale-95 transition-all flex items-center space-x-1"
+            >
+              <span>API Key 미등록</span>
+              <span className="w-4 h-4 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center text-[9px] font-bold">?</span>
+            </button>
           )}
         </div>
       </header>
@@ -758,7 +772,63 @@ function App() {
           </form>
         </div>
       )}
+      {/* Gemini API Key Guide Modal */}
+      {showApiGuideModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-2xl animate-scale-up">
+            <div className="text-center space-y-2">
+              <div className="w-12 h-12 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-xl flex items-center justify-center mx-auto text-indigo-400">
+                🤖
+              </div>
+              <h3 className="font-bold text-white text-base">Gemini API 키 발급 가이드</h3>
+              <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
+                AI 오답노트의 자동 취약점 진단 기능을 이용하려면 무료 Google Gemini API 키가 필요합니다.
+              </p>
+            </div>
 
+            <div className="space-y-3 pt-2 text-left text-xs text-slate-300">
+              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800/60 space-y-3.5 leading-relaxed">
+                <div className="flex items-start space-x-2.5">
+                  <span className="w-5 h-5 rounded-full bg-indigo-900 text-indigo-300 text-[10px] font-bold flex items-center justify-center flex-none mt-0.5">1</span>
+                  <p>
+                    아래 <strong>'API 키 발급하러 가기'</strong> 버튼을 클릭하여 Google AI Studio 사이트로 이동합니다 (구글 계정 필요).
+                  </p>
+                </div>
+                <div className="flex items-start space-x-2.5">
+                  <span className="w-5 h-5 rounded-full bg-indigo-900 text-indigo-300 text-[10px] font-bold flex items-center justify-center flex-none mt-0.5">2</span>
+                  <p>
+                    로그인 후 상단의 <strong>"Get API key"</strong> 또는 <strong>"Create API key"</strong> 버튼을 클릭하여 새 키를 발급받습니다.
+                  </p>
+                </div>
+                <div className="flex items-start space-x-2.5">
+                  <span className="w-5 h-5 rounded-full bg-indigo-900 text-indigo-300 text-[10px] font-bold flex items-center justify-center flex-none mt-0.5">3</span>
+                  <p>
+                    발급된 키(<code className="bg-slate-900 px-1.5 py-0.5 rounded text-indigo-400 text-[10px] font-mono">AIzaSy...</code>)를 복사한 후, 오답노트 <strong>[설정]</strong> 탭에서 PIN 번호와 함께 등록합니다.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex space-x-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowApiGuideModal(false)}
+                  className="flex-1 py-3 rounded-xl border border-slate-800 hover:bg-slate-800 active:scale-95 text-xs font-semibold text-slate-300"
+                >
+                  닫기
+                </button>
+                <a 
+                  href="https://aistudio.google.com/" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex-1 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 active:scale-95 text-xs font-bold text-white text-center shadow-md shadow-indigo-600/20 flex items-center justify-center"
+                >
+                  API 키 발급하기 &rarr;
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Floating Glassmorphic Bottom Navigation Bar */}
       <nav className="fixed bottom-4 left-4 right-4 z-40 h-16 rounded-2xl border border-slate-800/80 bg-slate-900/75 backdrop-blur-lg flex items-center justify-around px-4 shadow-xl shadow-black/40">
         
