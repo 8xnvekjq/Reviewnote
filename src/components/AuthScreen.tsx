@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../services/supabase';
+import logoImg from '../assets/logo.jpg';
 
 interface AuthScreenProps {
   onLogin: (username: string) => void;
@@ -32,7 +33,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
 
     try {
       // Map username to a virtual email for Supabase Auth compatibility
-      const email = `${cleanUsername}@reviewnotes.local`;
+      const email = `${cleanUsername}@reviewnote.com`;
 
       if (isSignUp) {
         // Sign Up Flow
@@ -94,12 +95,16 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
         
         {/* App Logo */}
         <div className="text-center space-y-2">
-          <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr from-indigo-600 to-emerald-400 flex items-center justify-center font-bold text-2xl text-white shadow-xl shadow-indigo-500/20">
-            ∑
+          <div className="flex flex-col items-center space-y-3">
+            <img 
+              src={logoImg} 
+              alt="더쿠수학 로고" 
+              className="h-16 w-auto object-contain rounded-2xl shadow-lg border border-slate-800/80" 
+            />
+            <h2 className="text-xl font-extrabold text-white bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+              AI 수학 오답노트
+            </h2>
           </div>
-          <h2 className="text-2xl font-extrabold text-white bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-            AI 수학 오답노트
-          </h2>
           <p className="text-xs text-slate-400">
             {isSignUp 
               ? '간편 회원가입으로 나만의 클라우드 분석 노트를 시작하세요' 
