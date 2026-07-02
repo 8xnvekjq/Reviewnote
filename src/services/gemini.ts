@@ -12,11 +12,6 @@ interface GeminiResponse {
  * Parses a base64 Data URL to extract its MIME type and raw base64 data string.
  */
 const parseBase64Image = (dataUrl: string): { mimeType: string; base64Data: string } => {
-  // If it's already raw base64, return it (highly unlikely but safe)
-  if (!dataUrl.startsWith('data:')) {
-    return { mimeType: 'image/jpeg', base64Data: dataUrl };
-  }
-
   const matches = dataUrl.match(/^data:(image\/[a-zA-Z+.-]+);base64,(.+)$/);
   if (!matches || matches.length < 3) {
     throw new Error('올바르지 않은 이미지 형식입니다.');
@@ -29,13 +24,46 @@ const parseBase64Image = (dataUrl: string): { mimeType: string; base64Data: stri
 };
 
 /**
+ * Downloads a public image URL and converts it into a base64 string for Gemini API.
+ */
+const imageUrlToBase64 = async (url: string): Promise<{ mimeType: string; base64Data: string }> => {
+  if (url.startsWith('data:')) {
+    return parseBase64Image(url);
+  }
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('CDN 이미지 다운로드 실패');
+    
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        try {
+          const parsed = parseBase64Image(result);
+          resolve(parsed);
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (err: any) {
+    console.error('Error converting URL to Base64:', err);
+    throw new Error(`이미지 분석 전처리 실패: ${err.message}`);
+  }
+};
+
+/**
  * Calls Gemini API to analyze the math problem image and returns structured feedback.
  */
 export const analyzeMistakeWithGemini = async (
   imageUrl: string,
   apiKey: string
 ): Promise<{ title: string; analysis: MistakeAnalysis }> => {
-  const { mimeType, base64Data } = parseBase64Image(imageUrl);
+  const { mimeType, base64Data } = await imageUrlToBase64(imageUrl);
 
   // Endpoint for Gemini 2.5 Flash
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
