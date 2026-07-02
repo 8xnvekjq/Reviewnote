@@ -4,6 +4,7 @@ import { useLocalStorage } from './hooks/useLocalStorage';
 import { CameraScanner } from './components/CameraScanner';
 import { encryptApiKey, decryptApiKey } from './utils/crypto';
 import { analyzeMistakeWithGemini } from './services/gemini';
+import { AuthScreen } from './components/AuthScreen';
 
 // Initial fallback mock data for visual demonstration
 const INITIAL_MOCKS: MistakeEntry[] = [
@@ -22,9 +23,16 @@ const INITIAL_MOCKS: MistakeEntry[] = [
 ];
 
 function App() {
+  const [currentUser, setCurrentUser] = useLocalStorage<string>('ai_mistakes_current_user', '');
   const [activeTab, setActiveTab] = useState<ActiveTab>('notes');
-  const [mistakes, setMistakes] = useLocalStorage<MistakeEntry[]>('ai_mistakes_notes', INITIAL_MOCKS);
-  const [encryptedApiKey, setEncryptedApiKey] = useLocalStorage<string>('gemini_api_key_enc', '');
+  const [mistakes, setMistakes] = useLocalStorage<MistakeEntry[]>(
+    currentUser ? `ai_mistakes_notes_${currentUser}` : 'ai_mistakes_notes',
+    INITIAL_MOCKS
+  );
+  const [encryptedApiKey, setEncryptedApiKey] = useLocalStorage<string>(
+    currentUser ? `gemini_api_key_enc_${currentUser}` : 'gemini_api_key_enc',
+    ''
+  );
   
   // App-level state for temporary decrypted API key (lasts for the session)
   const [decryptedKey, setDecryptedKey] = useState<string>(() => {
@@ -163,6 +171,17 @@ function App() {
     }
   };
 
+  const handleLogout = () => {
+    setCurrentUser('');
+    setDecryptedKey('');
+    sessionStorage.removeItem('gemini_api_key_temp');
+    setActiveTab('notes');
+  };
+
+  if (!currentUser) {
+    return <AuthScreen onLogin={(username) => setCurrentUser(username)} />;
+  }
+
   return (
     <div className="h-full flex flex-col bg-slate-950 text-slate-100 select-none">
       
@@ -177,6 +196,16 @@ function App() {
           </h1>
         </div>
         <div className="flex items-center space-x-2">
+          <span className="text-[10px] text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded-full border border-slate-700 font-bold max-w-[80px] truncate">
+            👤 {currentUser}
+          </span>
+          <button 
+            onClick={handleLogout}
+            className="text-[10px] text-red-400 hover:text-red-300 font-bold bg-red-950/20 px-2.5 py-0.5 rounded-full border border-red-900/30 transition-colors"
+          >
+            로그아웃
+          </button>
+          
           {import.meta.env.VITE_GEMINI_API_KEY ? (
             <span className="flex items-center space-x-1 text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full text-[10px] border border-indigo-500/30">
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>

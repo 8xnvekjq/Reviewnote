@@ -12,6 +12,34 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onCapture, onClose
   const [error, setError] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
   const [loading, setLoading] = useState(true);
+  const [autoCapture, setAutoCapture] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
+
+  // Countdown timer effect for Auto-Capture
+  useEffect(() => {
+    if (!autoCapture) {
+      setCountdown(null);
+      return;
+    }
+
+    if (countdown === null) {
+      setCountdown(5);
+      return;
+    }
+
+    if (countdown === 0) {
+      handleCapture();
+      setAutoCapture(false);
+      setCountdown(null);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setCountdown(countdown - 1);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [autoCapture, countdown]);
 
   // Initialize and start camera
   const startCamera = async () => {
@@ -108,12 +136,17 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onCapture, onClose
       <div className="absolute top-0 inset-x-0 z-50 safe-top bg-gradient-to-b from-black/80 to-transparent p-4 flex items-center justify-between">
         <button
           onClick={onClose}
-          className="w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center text-white text-lg active:scale-90 transition-transform"
+          className="w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center text-white text-lg active:scale-90 transition-transform animate-scale-up"
         >
           ✕
         </button>
         <h2 className="text-sm font-bold text-white tracking-wider">문제 스캔</h2>
-        <div className="w-10" /> {/* Spacer */}
+        <button
+          onClick={() => setAutoCapture(!autoCapture)}
+          className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all active:scale-95 ${autoCapture ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+        >
+          {autoCapture ? '자동 촬영 ON (5초)' : '자동 촬영 OFF'}
+        </button>
       </div>
 
       {/* Video Viewfinder with Custom Scanning Reticle */}
@@ -155,6 +188,15 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onCapture, onClose
 
                 {/* Laser scan line effect */}
                 <div className="absolute inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent top-0 animate-[scan_2s_infinite_linear]"></div>
+
+                {/* Countdown Overlay */}
+                {countdown !== null && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-2xl">
+                    <div className="text-6xl font-black text-emerald-400 animate-ping">
+                      {countdown}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </>
@@ -176,7 +218,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onCapture, onClose
         <button
           onClick={handleCapture}
           disabled={!!error || loading}
-          className="w-18 h-18 rounded-full border-4 border-white p-1 hover:scale-105 active:scale-95 disabled:opacity-40 transition-all flex items-center justify-center"
+          className="w-16 h-16 rounded-full border-4 border-white p-1 hover:scale-105 active:scale-95 disabled:opacity-40 transition-all flex items-center justify-center"
         >
           <div className="w-full h-full rounded-full bg-white shadow-lg"></div>
         </button>
