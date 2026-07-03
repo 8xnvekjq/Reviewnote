@@ -9,6 +9,8 @@ interface MistakeCardProps {
 }
 
 export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDelete }) => {
+  const struggleCount = entry.reviews ? entry.reviews.filter(r => r === 'X' || r === 'star').length : 0;
+
   return (
     <div 
       onClick={() => onSelect(entry)}
@@ -30,10 +32,17 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
           {formatDate(entry.date)}
         </div>
       </div>
-      <div className="p-4">
-        <h3 className="font-bold text-white line-clamp-1 group-hover:text-indigo-400 transition-colors">
-          {entry.title}
-        </h3>
+      <div className="p-4 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="font-bold text-white line-clamp-1 group-hover:text-indigo-400 transition-colors flex-1">
+            {entry.title}
+          </h3>
+          {struggleCount === 3 && (
+            <span className="flex-none px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 text-[9px] font-black tracking-tight animate-pulse flex items-center gap-0.5">
+              <span>🚨</span> 집중 공략 약점
+            </span>
+          )}
+        </div>
         {entry.analysis ? (
           <p className="text-xs text-slate-400 mt-1.5 line-clamp-2 leading-relaxed">
             🔍 {entry.analysis.mistakeDetail}

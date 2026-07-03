@@ -272,7 +272,17 @@ function App() {
       <main className="flex-1 overflow-y-auto px-4 py-6 pb-24">
         {activeTab === 'notes' && (
           <MistakeList
-            mistakes={mistakes.filter(m => !(m.reviews?.filter(r => r === 'O').length === 3))}
+            mistakes={[...mistakes]
+              .filter(m => !(m.reviews?.filter(r => r === 'O').length === 3))
+              .sort((a, b) => {
+                const aStruggles = a.reviews ? a.reviews.filter(r => r === 'X' || r === 'star').length : 0;
+                const bStruggles = b.reviews ? b.reviews.filter(r => r === 'X' || r === 'star').length : 0;
+                
+                if (aStruggles === 3 && bStruggles !== 3) return -1;
+                if (bStruggles === 3 && aStruggles !== 3) return 1;
+                
+                return new Date(b.date).getTime() - new Date(a.date).getTime();
+              })}
             onSelectEntry={(entry) => setSelectedEntry(entry)}
             onDeleteMistake={handleDeleteMistake}
             onAddClick={() => setActiveTab('camera')}
