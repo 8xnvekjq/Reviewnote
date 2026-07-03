@@ -5,12 +5,15 @@ export interface MistakeAnalysis {
   actionPlan: string;       // [향후 재발 방지 대책]
 }
 
+export type ReviewState = 'O' | 'X' | 'star' | '';
+
 export interface MistakeEntry {
   id: string;
   title: string;
   imageUrl: string;         // Base64 image data url
   date: string;             // ISO date string
   analysis?: MistakeAnalysis;
+  reviews?: ReviewState[];  // Array of 3 review states, e.g. ['O', 'X', '']
 }
 
-export type ActiveTab = 'notes' | 'camera' | 'settings';
+export type ActiveTab = 'notes' | 'completed' | 'camera';

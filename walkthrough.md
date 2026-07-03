@@ -44,6 +44,16 @@
   - [date.ts](file:///c:/Users/USER/Documents/ReviewNotes/src/utils/date.ts): YYYY.MM.DD 형식 날짜 포맷터 분리
 - **결과**: `App.tsx`는 컴포넌트들을 조율하고 전체 앱 상태 흐름만 통제하는 중재자 역할을 맡아 약 230라인으로 대폭 줄어들었으며, 코드의 가독성과 확장성이 극대화되었습니다.
 
+### 5. 3단계 복습 & 오답노트 필터링 기능 구현 (O, X, ★)
+- **복습 상태 선택기**:
+  - [MistakeDetailModal.tsx](file:///c:/Users/USER/Documents/ReviewNotes/src/components/MistakeDetailModal.tsx): 상세조회 모달 내부 상단에 `📋 복습 상태 진단 (3단계)` 카드를 추가했습니다.
+  - 각 오답 문제별로 1차, 2차, 3차 복습에 대해 각각 `O` (복습 완료), `X` (다시 틀림), `★` (모름/별표) 상태를 개별적으로 선택하여 토글할 수 있습니다.
+- **복습 완료 자동 이동 및 필터링**:
+  - [App.tsx](file:///c:/Users/USER/Documents/ReviewNotes/src/App.tsx): 3단계(1차, 2차, 3차) 모두 `O`를 선택하여 총 3개의 복습 완료(`O`)가 달성되면, 해당 오답 카드는 자동으로 일반 오답 리스트(`나의 오답노트`)에서 제외됩니다.
+  - [BottomNavigation.tsx](file:///c:/Users/USER/Documents/ReviewNotes/src/components/BottomNavigation.tsx): 하단 바에 새로운 `✅ 복습완료` 탭을 추가하여, 3회 복습이 완료된 마스터 오답 문제들만 따로 모아서 볼 수 있는 보관함 기능을 추가했습니다.
+- **Supabase DB 스키마 업데이트 가이드**:
+  - 복습 이력을 클라우드에 온전히 동기화하기 위해 [supabase_setup.sql](file:///c:/Users/USER/Documents/ReviewNotes/supabase_setup.sql)에 `reviews` 컬럼 추가 SQL문을 갱신해 두었습니다. (Supabase SQL Editor에서 실행 필요)
+
 ---
 
 ## ⚙️ Vercel 최종 연동 가이드

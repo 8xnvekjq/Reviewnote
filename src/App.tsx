@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { ActiveTab, MistakeEntry } from './types';
+import type { ActiveTab, MistakeEntry, ReviewState } from './types';
 import { CameraScanner } from './components/CameraScanner';
 import { analyzeMistakeWithGemini } from './services/gemini';
 import { AuthScreen } from './components/AuthScreen';
@@ -67,7 +67,8 @@ function App() {
         title: m.title,
         imageUrl: m.image_url,
         date: m.date,
-        analysis: m.analysis || undefined
+        analysis: m.analysis || undefined,
+        reviews: m.reviews || ['', '', '']
       }));
       setMistakes(mappedMistakes);
     } catch (err) {
@@ -150,7 +151,8 @@ function App() {
           user_id: session.user.id,
           title: newEntryTitle,
           image_url: publicUrl,
-          analysis: null
+          analysis: null,
+          reviews: ['', '', '']
         })
         .select()
         .single();
@@ -162,7 +164,8 @@ function App() {
         title: dbEntry.title,
         imageUrl: dbEntry.image_url,
         date: dbEntry.date,
-        analysis: undefined
+        analysis: undefined,
+        reviews: ['', '', '']
       };
       
       setMistakes(prev => [newEntry, ...prev]);
@@ -197,6 +200,26 @@ function App() {
     }
   };
 
+  // Update reviews list in Supabase & local state
+  const handleUpdateReviews = async (id: string, newReviews: ReviewState[]) => {
+    try {
+      const { error } = await supabase
+        .from('mistakes')
+        .update({ reviews: newReviews })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setMistakes(prev => prev.map(m => m.id === id ? { ...m, reviews: newReviews } : m));
+      setSelectedEntry(prev => prev && prev.id === id ? { ...prev, reviews: newReviews } : prev);
+    } catch (err: any) {
+      console.error('Failed to update reviews:', err);
+      // Fallback: update local React state anyway for immediate validation
+      setMistakes(prev => prev.map(m => m.id === id ? { ...m, reviews: newReviews } : m));
+      setSelectedEntry(prev => prev && prev.id === id ? { ...prev, reviews: newReviews } : prev);
+    }
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setCurrentUser('');
@@ -219,10 +242,24 @@ function App() {
       <main className="flex-1 overflow-y-auto px-4 py-6 pb-24">
         {activeTab === 'notes' && (
           <MistakeList
-            mistakes={mistakes}
+            mistakes={mistakes.filter(m => !(m.reviews?.filter(r => r === 'O').length === 3))}
             onSelectEntry={(entry) => setSelectedEntry(entry)}
             onDeleteMistake={handleDeleteMistake}
             onAddClick={() => setActiveTab('camera')}
+            title="나의 오답노트"
+            emptyMessage="아직 등록된 오답이 없습니다. 아래 카메라 버튼을 눌러 수학 문제를 촬영하고 AI의 맞춤 분석을 받아보세요."
+          />
+        )}
+
+        {activeTab === 'completed' && (
+          <MistakeList
+            mistakes={mistakes.filter(m => m.reviews?.filter(r => r === 'O').length === 3)}
+            onSelectEntry={(entry) => setSelectedEntry(entry)}
+            onDeleteMistake={handleDeleteMistake}
+            onAddClick={() => setActiveTab('camera')}
+            title="복습 완료 보관함"
+            hideAddButton={true}
+            emptyMessage="아직 완전히 복습 완료(O 3회 달성)된 오답이 없습니다. 열심히 오답을 복습하여 정복해 보세요!"
           />
         )}
 
@@ -242,6 +279,7 @@ function App() {
           onClose={() => setSelectedEntry(null)}
           onDeleteMistake={handleDeleteMistake}
           onStartAnalysis={handleStartAnalysis}
+          onUpdateReviews={handleUpdateReviews}
         />
       )}
 

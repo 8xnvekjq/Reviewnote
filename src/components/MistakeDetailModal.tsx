@@ -1,5 +1,5 @@
 import React from 'react';
-import type { MistakeEntry } from '../types';
+import type { MistakeEntry, ReviewState } from '../types';
 import { LaTeXRenderer } from './LaTeXRenderer';
 import { formatDate } from '../utils/date';
 
@@ -9,6 +9,7 @@ interface MistakeDetailModalProps {
   onClose: () => void;
   onDeleteMistake: (id: string, e: React.MouseEvent) => void;
   onStartAnalysis: (entry: MistakeEntry) => void;
+  onUpdateReviews: (id: string, newReviews: ReviewState[]) => void;
 }
 
 export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
@@ -17,7 +18,14 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   onClose,
   onDeleteMistake,
   onStartAnalysis,
+  onUpdateReviews,
 }) => {
+  const handleReviewToggle = (index: number, state: ReviewState) => {
+    const currentReviews = [...(selectedEntry.reviews || ['', '', ''])];
+    currentReviews[index] = currentReviews[index] === state ? '' : state;
+    onUpdateReviews(selectedEntry.id, currentReviews as ReviewState[]);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4">
       <div className="w-full max-w-xl bg-slate-900 border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-slide-up">
@@ -50,6 +58,70 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             >
               기록 삭제
             </button>
+          </div>
+
+          {/* 3-Step Review Status Selection Card */}
+          <div className="bg-slate-950 p-4 rounded-2xl border border-slate-850 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-300 flex items-center">
+                <span className="mr-1 text-sm">📋</span> 복습 상태 진단 (3회 완료 시 보관함 이동)
+              </span>
+              {selectedEntry.reviews?.filter(r => r === 'O').length === 3 ? (
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30 font-bold">
+                  🎉 복습 완료
+                </span>
+              ) : (
+                <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full border border-slate-700 font-bold">
+                  진행 중
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              {[0, 1, 2].map((index) => {
+                const currentVal = selectedEntry.reviews?.[index] || '';
+                return (
+                  <div key={index} className="bg-slate-900 p-2.5 rounded-xl border border-slate-800 text-center space-y-2">
+                    <div className="text-[10px] font-bold text-slate-500">{index + 1}차 복습</div>
+                    <div className="flex items-center justify-center space-x-1.5">
+                      {/* O Button */}
+                      <button
+                        onClick={() => handleReviewToggle(index, 'O')}
+                        className={`w-7 h-7 rounded-full text-xs font-bold transition-all flex items-center justify-center ${
+                          currentVal === 'O' 
+                            ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20' 
+                            : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        O
+                      </button>
+                      {/* X Button */}
+                      <button
+                        onClick={() => handleReviewToggle(index, 'X')}
+                        className={`w-7 h-7 rounded-full text-xs font-bold transition-all flex items-center justify-center ${
+                          currentVal === 'X' 
+                            ? 'bg-red-500 text-white shadow-md shadow-red-500/20' 
+                            : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        X
+                      </button>
+                      {/* Star Button */}
+                      <button
+                        onClick={() => handleReviewToggle(index, 'star')}
+                        className={`w-7 h-7 rounded-full text-xs font-bold transition-all flex items-center justify-center ${
+                          currentVal === 'star' 
+                            ? 'bg-amber-450 text-slate-950 bg-amber-400 shadow-md shadow-amber-400/20' 
+                            : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        ★
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {isAnalyzing ? (

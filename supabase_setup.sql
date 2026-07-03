@@ -73,3 +73,8 @@ create policy "Allow public read access to problem-images" on storage.objects
   for select using (
     bucket_id = 'problem-images'
   );
+
+-- 4. 복습 상태 기록을 위한 컬럼 추가 (3단계 복습 내역 저장용)
+-- 이 쿼리를 Supabase 대시보드의 SQL Editor에서 실행해야 데이터베이스에 반영됩니다.
+ALTER TABLE public.mistakes ADD COLUMN reviews jsonb DEFAULT '["", "", ""]'::jsonb;
+

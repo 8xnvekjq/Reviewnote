@@ -7,6 +7,9 @@ interface MistakeListProps {
   onSelectEntry: (entry: MistakeEntry) => void;
   onDeleteMistake: (id: string, e: React.MouseEvent) => void;
   onAddClick: () => void;
+  title?: string;
+  hideAddButton?: boolean;
+  emptyMessage?: string;
 }
 
 export const MistakeList: React.FC<MistakeListProps> = ({
@@ -14,20 +17,25 @@ export const MistakeList: React.FC<MistakeListProps> = ({
   onSelectEntry,
   onDeleteMistake,
   onAddClick,
+  title = "나의 오답노트",
+  hideAddButton = false,
+  emptyMessage = "아직 등록된 오답이 없습니다. 아래 카메라 버튼을 눌러 수학 문제를 촬영하고 AI의 맞춤 분석을 받아보세요."
 }) => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-white">나의 오답노트</h2>
-          <p className="text-xs text-slate-400 mt-1">총 {mistakes.length}개의 분석된 취약점이 있습니다.</p>
+          <h2 className="text-xl font-bold text-white">{title}</h2>
+          <p className="text-xs text-slate-400 mt-1">총 {mistakes.length}개의 기록이 있습니다.</p>
         </div>
-        <button 
-          onClick={onAddClick}
-          className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white transition-all shadow-md shadow-indigo-600/20"
-        >
-          + 새 오답 추가
-        </button>
+        {!hideAddButton && (
+          <button 
+            onClick={onAddClick}
+            className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white transition-all shadow-md shadow-indigo-600/20"
+          >
+            + 새 오답 추가
+          </button>
+        )}
       </div>
 
       {/* List of Mistakes */}
@@ -36,9 +44,9 @@ export const MistakeList: React.FC<MistakeListProps> = ({
           <div className="w-16 h-16 rounded-full bg-slate-900 flex items-center justify-center text-2xl mb-4 text-slate-500">
             📓
           </div>
-          <p className="text-slate-300 font-medium">아직 등록된 오답이 없습니다</p>
-          <p className="text-xs text-slate-500 mt-1 max-w-xs leading-relaxed">
-            아래 카메라 버튼을 눌러 수학 문제를 촬영하고 AI의 맞춤 분석을 받아보세요.
+          <p className="text-slate-300 font-medium">기록이 없습니다</p>
+          <p className="text-xs text-slate-500 mt-1.5 max-w-xs leading-relaxed whitespace-pre-line">
+            {emptyMessage}
           </p>
         </div>
       ) : (
