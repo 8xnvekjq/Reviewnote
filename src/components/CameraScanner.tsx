@@ -13,7 +13,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onCapture, onClose
   const [error, setError] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
   const [loading, setLoading] = useState(true);
-  const [autoCapture, setAutoCapture] = useState(true);
+  const [autoCapture, setAutoCapture] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
 
   // Countdown timer effect for Auto-Capture

@@ -12,6 +12,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
   const [top, setTop] = useState(20);
   const [bottom, setBottom] = useState(20);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -150,9 +151,17 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
           <img
             ref={imageRef}
             src={imageSrc}
-            alt="크롭 대상 문제"
+            alt="사진"
+            onLoad={() => setImageLoaded(true)}
             className="max-h-[55vh] w-auto object-contain opacity-70 pointer-events-none"
           />
+
+          {/* Loading overlay until image paints */}
+          {!imageLoaded && (
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-950">
+              <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
 
           {/* Semi-transparent dark overlay around selection */}
           <div className="absolute inset-0 pointer-events-none">
