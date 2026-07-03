@@ -66,7 +66,7 @@
   - [gemini.ts](file:///c:/Users/USER/Documents/ReviewNotes/src/services/gemini.ts): Gemini API가 풀이 로직에 맞춰 1단계(접근법), 2단계(중간 수식), 3단계(풀이 힌트)의 구체적인 수학 힌트들을 자동으로 생성 및 반환하도록 구성했습니다.
 - **문제 영역 자르기 기능 (Image Cropper)**:
   - [ImageCropper.tsx](file:///c:/Users/USER/Documents/ReviewNotes/src/components/ImageCropper.tsx): 사진 촬영 시 여러 문제가 붙어있어 발생할 수 있는 인식 오류를 막기 위해, 원하는 문제의 테두리를 지정해 오려내는(Crop) 컴포넌트를 추가했습니다.
-  - 모바일 터치 환경에서도 정밀 조작이 가능하도록 상/하/좌/우 네 방향 테두리를 미세 조정할 수 있는 전용 슬라이더 컨트롤을 제공하며, 잘린 영역은 HTML5 Canvas를 활용하여 동적으로 이미지 처리되어 전송됩니다.
+  - 모바일 터치 환경이나 마우스 환경에서 가이드라인 상의 초록색 타원형 핸들을 직접 손가락으로 드래그(터치 조작)하여 범위를 유연하게 바꿀 수 있으며, 미세한 조작을 위해 하단 슬라이더 컨트롤러도 제공합니다. 잘린 영역은 HTML5 Canvas를 활용하여 동적으로 처리됩니다.
   - [App.tsx](file:///c:/Users/USER/Documents/ReviewNotes/src/App.tsx): 사진 스캔 및 갤러리 불러오기 완료 시 즉시 저장소에 올리지 않고 이미지 자르기 단계가 먼저 선행되도록 라이프사이클을 연계했습니다.
 
 ---

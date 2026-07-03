@@ -12,7 +12,9 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
   const [top, setTop] = useState(15);
   const [bottom, setBottom] = useState(15);
   const [isProcessing, setIsProcessing] = useState(false);
+  
   const imageRef = useRef<HTMLImageElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Safety checks to ensure crops don't collide or collapse to zero width/height
   const handleLeftChange = (val: number) => {
@@ -37,6 +39,65 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
     if (100 - top - val > 10) {
       setBottom(val);
     }
+  };
+
+  // Direct touch/mouse dragging of crop box edges
+  const handleStartDrag = (
+    e: React.MouseEvent | React.TouchEvent,
+    edge: 'top' | 'bottom' | 'left' | 'right'
+  ) => {
+    e.preventDefault();
+    if (!containerRef.current) return;
+
+    const rect = containerRef.current.getBoundingClientRect();
+    const containerWidth = rect.width;
+    const containerHeight = rect.height;
+
+    const startX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const startY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+
+    const startLeft = left;
+    const startRight = right;
+    const startTop = top;
+    const startBottom = bottom;
+
+    const onMove = (moveEvent: MouseEvent | TouchEvent) => {
+      const currentX = 'touches' in moveEvent ? moveEvent.touches[0].clientX : moveEvent.clientX;
+      const currentY = 'touches' in moveEvent ? moveEvent.touches[0].clientY : moveEvent.clientY;
+
+      const dx = currentX - startX;
+      const dy = currentY - startY;
+
+      if (edge === 'top') {
+        const dyPercent = (dy / containerHeight) * 100;
+        const newVal = Math.max(0, Math.min(100 - startBottom - 10, startTop + dyPercent));
+        setTop(newVal);
+      } else if (edge === 'bottom') {
+        const dyPercent = (dy / containerHeight) * 100;
+        const newVal = Math.max(0, Math.min(100 - startTop - 10, startBottom - dyPercent));
+        setBottom(newVal);
+      } else if (edge === 'left') {
+        const dxPercent = (dx / containerWidth) * 100;
+        const newVal = Math.max(0, Math.min(100 - startRight - 10, startLeft + dxPercent));
+        setLeft(newVal);
+      } else if (edge === 'right') {
+        const dxPercent = (dx / containerWidth) * 100;
+        const newVal = Math.max(0, Math.min(100 - startLeft - 10, startRight - dxPercent));
+        setRight(newVal);
+      }
+    };
+
+    const onEnd = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onEnd);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onEnd);
+    };
+
+    window.addEventListener('mousemove', onMove, { passive: false });
+    window.addEventListener('mouseup', onEnd);
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onEnd);
   };
 
   const executeCrop = () => {
@@ -115,13 +176,16 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
 
       {/* Interactive Bounding Box Viewfinder */}
       <div className="flex-1 relative flex items-center justify-center p-6 bg-slate-950 max-h-[60vh]">
-        <div className="relative max-w-full max-h-full overflow-hidden border border-slate-900 rounded-lg">
-          {/* Base Image */}
+        <div 
+          ref={containerRef}
+          className="relative max-w-full max-h-full overflow-hidden border border-slate-900 rounded-lg"
+        >
+          {/* Base Image (disabled pointer events to prevent interference with handle drags) */}
           <img
             ref={imageRef}
             src={imageSrc}
             alt="크롭 대상 문제"
-            className="max-h-[50vh] w-auto object-contain opacity-70"
+            className="max-h-[50vh] w-auto object-contain opacity-70 pointer-events-none"
           />
 
           {/* Semi-transparent dark overlay around selection */}
@@ -144,12 +208,13 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
 
           {/* Active selection crop box with bright green outline */}
           <div
-            className="absolute border-2 border-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.4)] pointer-events-none"
+            className="absolute border-2 border-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.4)]"
             style={{
               left: `${left}%`,
               right: `${right}%`,
               top: `${top}%`,
               bottom: `${bottom}%`,
+              pointerEvents: 'none', // children handles will explicitly enable auto pointerEvents
             }}
           >
             {/* Corner Indicators */}
@@ -157,6 +222,43 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
             <div className="absolute -top-1 -right-1 w-3 h-3 border-t-2 border-r-2 border-emerald-400"></div>
             <div className="absolute -bottom-1 -left-1 w-3 h-3 border-b-2 border-l-2 border-emerald-400"></div>
             <div className="absolute -bottom-1 -right-1 w-3 h-3 border-b-2 border-r-2 border-emerald-400"></div>
+
+            {/* Top border touch handle */}
+            <div
+              onMouseDown={(e) => handleStartDrag(e, 'top')}
+              onTouchStart={(e) => handleStartDrag(e, 'top')}
+              className="absolute -top-3.5 left-1/2 -translate-x-1/2 w-16 h-7 flex items-center justify-center cursor-ns-resize pointer-events-auto group"
+            >
+              <div className="w-10 h-1.5 bg-emerald-400 rounded-full border border-emerald-500 shadow-md group-hover:bg-emerald-300 transition-colors" />
+            </div>
+
+            {/* Bottom border touch handle */}
+            <div
+              onMouseDown={(e) => handleStartDrag(e, 'bottom')}
+              onTouchStart={(e) => handleStartDrag(e, 'bottom')}
+              className="absolute -bottom-3.5 left-1/2 -translate-x-1/2 w-16 h-7 flex items-center justify-center cursor-ns-resize pointer-events-auto group"
+            >
+              <div className="w-10 h-1.5 bg-emerald-400 rounded-full border border-emerald-500 shadow-md group-hover:bg-emerald-300 transition-colors" />
+            </div>
+
+            {/* Left border touch handle */}
+            <div
+              onMouseDown={(e) => handleStartDrag(e, 'left')}
+              onTouchStart={(e) => handleStartDrag(e, 'left')}
+              className="absolute top-1/2 -translate-y-1/2 -left-3.5 w-7 h-16 flex items-center justify-center cursor-ew-resize pointer-events-auto group"
+            >
+              <div className="w-1.5 h-10 bg-emerald-400 rounded-full border border-emerald-500 shadow-md group-hover:bg-emerald-300 transition-colors" />
+            </div>
+
+            {/* Right border touch handle */}
+            <div
+              onMouseDown={(e) => handleStartDrag(e, 'right')}
+              onTouchStart={(e) => handleStartDrag(e, 'right')}
+              className="absolute top-1/2 -translate-y-1/2 -right-3.5 w-7 h-16 flex items-center justify-center cursor-ew-resize pointer-events-auto group"
+            >
+              <div className="w-1.5 h-10 bg-emerald-400 rounded-full border border-emerald-500 shadow-md group-hover:bg-emerald-300 transition-colors" />
+            </div>
+
           </div>
         </div>
       </div>
@@ -164,7 +266,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
       {/* Spacing adjustments using sliders */}
       <div className="p-6 bg-slate-900/60 border-t border-slate-900 space-y-4 pb-8">
         <p className="text-[11px] text-slate-500 font-semibold text-center mb-1">
-          💡 슬라이더를 조절하여 테두리 선을 문제 크기에 맞게 설정해 주세요.
+          💡 가이드라인의 초록색 타원형 핸들을 직접 끌어당기거나, 아래 슬라이더를 조절해 보세요.
         </p>
 
         {/* Top/Bottom Margin sliders */}
@@ -172,7 +274,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
           <div className="space-y-1.5">
             <div className="flex justify-between text-[10px] font-bold text-slate-400">
               <span>상단 테두리</span>
-              <span>{top}%</span>
+              <span>{Math.round(top)}%</span>
             </div>
             <input
               type="range"
@@ -187,7 +289,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
           <div className="space-y-1.5">
             <div className="flex justify-between text-[10px] font-bold text-slate-400">
               <span>하단 테두리</span>
-              <span>{bottom}%</span>
+              <span>{Math.round(bottom)}%</span>
             </div>
             <input
               type="range"
@@ -205,7 +307,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
           <div className="space-y-1.5">
             <div className="flex justify-between text-[10px] font-bold text-slate-400">
               <span>좌측 테두리</span>
-              <span>{left}%</span>
+              <span>{Math.round(left)}%</span>
             </div>
             <input
               type="range"
@@ -220,7 +322,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
           <div className="space-y-1.5">
             <div className="flex justify-between text-[10px] font-bold text-slate-400">
               <span>우측 테두리</span>
-              <span>{right}%</span>
+              <span>{Math.round(right)}%</span>
             </div>
             <input
               type="range"
