@@ -125,12 +125,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
               alt={selectedEntry.title} 
               className="w-full h-auto max-h-[60vh] object-contain rounded-xl" 
             />
-            <button
-              onClick={(e) => onDeleteMistake(selectedEntry.id, e)}
-              className="absolute bottom-3 right-3 px-3 py-1.5 rounded-xl bg-red-600/95 hover:bg-red-600 text-white text-xs font-semibold shadow-lg backdrop-blur-sm transition-all"
-            >
-              기록 삭제
-            </button>
           </div>
 
           {/* 3-Step Review Status Selection Card */}
@@ -389,6 +383,14 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
         {/* Modal Footer */}
         <div className="p-4 border-t border-slate-800/80 bg-slate-950/60 flex space-x-3">
+          <button
+            onClick={(e) => onDeleteMistake(selectedEntry.id, e)}
+            className="py-3 px-4 rounded-xl border border-red-500/20 hover:border-red-500/40 bg-red-500/5 hover:bg-red-500/10 active:scale-95 transition-all text-xs font-bold text-red-400 flex items-center justify-center space-x-1.5"
+          >
+            <span>🗑️</span>
+            <span>기록 삭제</span>
+          </button>
+          
           <button 
             onClick={onClose}
             className="flex-1 py-3 rounded-xl border border-slate-800 hover:border-slate-700 active:scale-95 transition-all text-xs font-semibold text-slate-300"
