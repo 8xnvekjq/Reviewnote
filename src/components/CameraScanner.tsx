@@ -8,7 +8,6 @@ interface CameraScannerProps {
 export const CameraScanner: React.FC<CameraScannerProps> = ({ onCapture, onClose }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
   // streamRef always holds the latest stream so cleanup closures can access it
   const streamRef = useRef<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +66,6 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onCapture, onClose
       };
 
       const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
-      setStream(mediaStream);
       streamRef.current = mediaStream; // always keep ref in sync
 
       if (videoRef.current) {
@@ -118,7 +116,6 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onCapture, onClose
         // ✅ Stop camera stream immediately after capture (removes iOS indicator)
         stopStream(streamRef.current);
         streamRef.current = null;
-        setStream(null);
 
         onCapture(dataUrl);
       }
