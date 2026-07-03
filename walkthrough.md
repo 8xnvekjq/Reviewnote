@@ -31,14 +31,14 @@
 - **배경**: 기존 `App.tsx` 파일(500+ 라인)에 비즈니스 로직, 상태 제어, 다수의 하위 뷰들이 집중되어 있어 가독성과 유지보수성이 저하되는 문제가 있었습니다.
 - **컴포넌트 모듈화**:
   - [SupabaseConfigWarning.tsx](file:///c:/Users/USER/Documents/ReviewNotes/src/components/SupabaseConfigWarning.tsx): 환경변수 유효성 검사 경고 화면 분리
-  - [Header.tsx](file:///c:/Users/USER/Documents/ReviewNotes/src/components/Header.tsx): 최상단 브랜드 로고 및 로그인 사용자 세션 정보 영역 분리 (상단 Notch 및 상태 표시줄 영역 대응 완료)
+  - [Header.tsx](file:///c:/Users/USER/Documents/ReviewNotes/src/components/Header.tsx): 최상단 브랜드 로고 및 로그인 사용자 세션 정보 영역 분리 (타이틀 '오답클리닉'으로 간소화 및 상단 Notch 대응 완료)
   - [MistakeCard.tsx](file:///c:/Users/USER/Documents/ReviewNotes/src/components/MistakeCard.tsx): 목록 내의 개별 오답 항목 카드 분리
   - [MistakeList.tsx](file:///c:/Users/USER/Documents/ReviewNotes/src/components/MistakeList.tsx): 전체 오답 목록 렌더링 및 빈 화면(Empty state) 처리 로직 분리
   - [MistakeDetailModal.tsx](file:///c:/Users/USER/Documents/ReviewNotes/src/components/MistakeDetailModal.tsx): AI 오답 진단 상세조회 모달 분리
-  - [BottomNavigation.tsx](file:///c:/Users/USER/Documents/ReviewNotes/src/components/BottomNavigation.tsx): 하단 글래스모피즘 플로팅 네비게이션 분리 (바닥면에 밀착 및 PWA 모바일 세이프 영역 대응 완료)
+  - [BottomNavigation.tsx](file:///c:/Users/USER/Documents/ReviewNotes/src/components/BottomNavigation.tsx): 하단 글래스모피즘 플로팅 네비게이션 분리 (원래의 수려한 플로팅 레이아웃 복원 및 하단 간격 최적화 완료)
 - **레이아웃 개선**:
   - 모바일 노치(Notch) 및 상태 표시줄 환경에 유연하게 대응할 수 있도록 `safe-area-inset` 변수를 적용하여 상단 헤더 콘텐츠가 너무 치우치지 않게 고정 패딩을 보정했습니다.
-  - 떠 있는 것처럼 붕 떠있던 하단 네비게이션 바를 모바일 네이티브 스타일처럼 바닥면에 도킹 고정하고, `safe-area-inset-bottom` 대응 패딩을 추가하여 모바일 하단 터치 영역에 안정적으로 반응하도록 개선했습니다.
+  - 하단 네비게이션의 아이콘 및 플로팅 카메라 버튼의 레이아웃 어긋남 문제를 원래 디자인(플로팅 바 형태)으로 온전히 롤백하여 정렬 문제를 해결했으며, 바닥과의 간격(`bottom-3`)을 줄여 화면 공간을 더 효율적으로 사용하도록 마진을 조율했습니다.
 - **유틸리티 분리**:
   - [image.ts](file:///c:/Users/USER/Documents/ReviewNotes/src/utils/image.ts): Base64 데이터를 Blob으로 변환하는 업로드 전처리 헬퍼 분리
   - [date.ts](file:///c:/Users/USER/Documents/ReviewNotes/src/utils/date.ts): YYYY.MM.DD 형식 날짜 포맷터 분리

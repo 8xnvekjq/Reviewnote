@@ -13,7 +13,7 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout }) => {
           ∑
         </div>
         <h1 className="text-lg font-bold bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
-          더쿠키수학 오답클리닉
+          오답클리닉
         </h1>
       </div>
       <div className="flex items-center space-x-2">
