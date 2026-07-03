@@ -4,6 +4,7 @@ export interface MistakeAnalysis {
   rootCause: string;        // [근본적인 틀린 이유]
   actionPlan: string;       // [향후 재발 방지 대책]
   hints?: string[];         // [단계별 힌트 목록 (최대 3개)]
+  problemText?: string;     // [추출된 원본 문제 지문]
 }
 
 export type ReviewState = 'O' | 'X' | 'star' | '';

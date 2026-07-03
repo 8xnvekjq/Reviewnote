@@ -54,12 +54,16 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
         {/* Modal Body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           
-          {/* Problem Image Preview */}
-          <div className="aspect-[16/9] w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center relative">
-            <img src={selectedEntry.imageUrl} alt={selectedEntry.title} className="w-full h-full object-cover" />
+          {/* Problem Image Preview (Optimized for full-aspect rendering of geometry/graphs) */}
+          <div className="w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center relative p-2 min-h-[200px]">
+            <img 
+              src={selectedEntry.imageUrl} 
+              alt={selectedEntry.title} 
+              className="w-full h-auto max-h-[60vh] object-contain rounded-xl" 
+            />
             <button
               onClick={(e) => onDeleteMistake(selectedEntry.id, e)}
-              className="absolute bottom-3 right-3 px-3 py-1.5 rounded-xl bg-red-600/90 hover:bg-red-600 text-white text-xs font-semibold shadow-lg backdrop-blur-sm transition-all"
+              className="absolute bottom-3 right-3 px-3 py-1.5 rounded-xl bg-red-600/95 hover:bg-red-600 text-white text-xs font-semibold shadow-lg backdrop-blur-sm transition-all"
             >
               기록 삭제
             </button>
@@ -160,21 +164,21 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 </button>
               ) : (
                 <p className="text-[10px] text-slate-500 text-center font-medium py-1">
-                  모든 힌트가 공개되었습니다. 위 풀이를 참고하여 오답을 완벽히 이해해 보세요!
+                  모든 힌트가 공개되었습니다. 아래 풀이를 참고하여 오답을 완벽히 이해해 보세요!
                 </p>
               )}
             </div>
           )}
 
-          {/* Fallback for older entries without hints when struggling */}
-          {hasStruggled && selectedEntry.analysis && (!selectedEntry.analysis.hints || selectedEntry.analysis.hints.length === 0) && (
+          {/* Fallback for older entries without hints or problem text */}
+          {selectedEntry.analysis && (!selectedEntry.analysis.problemText || !selectedEntry.analysis.hints || selectedEntry.analysis.hints.length === 0) && (
             <div className="bg-slate-950 p-4 rounded-2xl border border-slate-850 text-center space-y-3 animate-scale-up">
-              <span className="text-xs text-slate-400 block">💡 이 오답 기록은 힌트 데이터가 아직 생성되지 않은 이전 버전 항목입니다.</span>
+              <span className="text-xs text-slate-400 block">💡 이 오답 기록은 문제 지문 복원 및 힌트 데이터가 생성되지 않은 이전 버전 항목입니다.</span>
               <button
                 onClick={() => onStartAnalysis(selectedEntry)}
                 className="px-4 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700 active:scale-95 text-[10px] font-bold text-white transition-all border border-slate-700"
               >
-                AI 분석 재실행하여 힌트 생성하기
+                AI 분석 재실행하여 지문 및 힌트 생성하기
               </button>
             </div>
           )}
@@ -189,6 +193,19 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             </div>
           ) : selectedEntry.analysis ? (
             <div className="space-y-6 animate-scale-up">
+              
+              {/* Card 0: 원본 문제 지문 복원 */}
+              {selectedEntry.analysis.problemText && (
+                <div className="space-y-2 border-l-4 border-slate-400 pl-4 py-1">
+                  <h4 className="text-sm font-extrabold text-slate-300 flex items-center">
+                    <span className="mr-1.5 text-base">📝</span> 원본 문제 지문
+                  </h4>
+                  <div className="bg-slate-950 p-4.5 rounded-2xl border border-slate-850">
+                    <LaTeXRenderer text={selectedEntry.analysis.problemText} className="text-sm md:text-base leading-relaxed text-slate-300" />
+                  </div>
+                </div>
+              )}
+
               {/* Card 1: 정석 풀이 과정 */}
               <div className="space-y-2 border-l-4 border-indigo-500 pl-4 py-1">
                 <h4 className="text-sm font-extrabold text-indigo-400 flex items-center">

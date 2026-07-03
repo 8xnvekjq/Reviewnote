@@ -7,6 +7,7 @@ interface GeminiResponse {
   rootCause: string;
   actionPlan: string;
   hints: string[];
+  problemText: string;
 }
 
 /**
@@ -111,13 +112,18 @@ export const analyzeMistakeWithGemini = async (
 5. hints: 단계별로 문제를 풀어나갈 수 있는 구체적인 힌트 목록 (반드시 가독성 높은 LaTeX 수식을 사용하여 순서대로 정확히 3개의 항목으로 구성할 것. 1단계 힌트는 최초 문제 접근법, 2단계는 중간 연결 공식이나 과정, 3단계는 연립 전 마지막 단서를 제공)
    - 각 힌트 항목은 이전 힌트와 줄바꿈(\\n\\n)으로 구분되어야 합니다.
 
-출력은 지정된 JSON 스키마를 엄격히 따라 다음 6가지 항목을 모두 한국어로 작성해야 합니다:
+6. problemText: 사진 속 문제 이미지에 나타난 원본 문제 지문 전체.
+   - 수학적 기호, 수식, 변수 등은 완벽하게 LaTeX 문법(인라인 $...$, 블록 $$...$$)으로 변환해서 텍스트를 작성해 주십시오.
+   - 보기 선택지(㉠, ㉡, ㉢ 혹은 ①, ②, ③ 등)가 그림에 명시되어 있다면 해당 문항 구성 지문도 빠짐없이 텍스트로 복원하여 작성해 주십시오.
+
+출력은 지정된 JSON 스키마를 엄격히 따라 다음 7가지 항목을 모두 한국어로 작성해야 합니다:
 1. title: 문제의 주제나 공식을 담은 짤막하고 직관적인 제목 (예: '원 내접 사각형의 성질과 코사인법칙 연립')
 2. solvingProcess: 위의 지시사항을 따른 올바른 풀이 과정
 3. mistakeDetail: 위의 지시사항을 따른 실수한 지점 분석 (오답 분석 가이드 형식 준수 및 줄바꿈 적용)
 4. rootCause: 위의 지시사항을 따른 근본적인 틀린 이유
 5. actionPlan: 위의 지시사항을 따른 재발 방지 대책 (발상 & 개념 클리닉 형식 준수 및 줄바꿈 적용)
-6. hints: 위의 지시사항을 따른 단계별 힌트 목록 (정확히 3개)`;
+6. hints: 위의 지시사항을 따른 단계별 힌트 목록 (정확히 3개)
+7. problemText: 위의 지시사항을 따른 추출된 원본 문제 지문`;
 
   const requestBody = {
     contents: [
@@ -146,9 +152,10 @@ export const analyzeMistakeWithGemini = async (
           hints: {
             type: 'ARRAY',
             items: { type: 'STRING' }
-          }
+          },
+          problemText: { type: 'STRING' }
         },
-        required: ['title', 'solvingProcess', 'mistakeDetail', 'rootCause', 'actionPlan', 'hints']
+        required: ['title', 'solvingProcess', 'mistakeDetail', 'rootCause', 'actionPlan', 'hints', 'problemText']
       }
     }
   };
@@ -184,7 +191,8 @@ export const analyzeMistakeWithGemini = async (
         mistakeDetail: parsedJson.mistakeDetail,
         rootCause: parsedJson.rootCause,
         actionPlan: parsedJson.actionPlan,
-        hints: parsedJson.hints
+        hints: parsedJson.hints,
+        problemText: parsedJson.problemText
       }
     };
   } catch (error: any) {
