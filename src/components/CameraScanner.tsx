@@ -9,6 +9,8 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onCapture, onClose
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  // streamRef always holds the latest stream so cleanup closures can access it
+  const streamRef = useRef<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
   const [loading, setLoading] = useState(true);
@@ -41,15 +43,18 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onCapture, onClose
     return () => clearTimeout(timer);
   }, [autoCapture, countdown]);
 
+  // Helper to stop all tracks on a stream
+  const stopStream = (s: MediaStream | null) => {
+    if (s) s.getTracks().forEach((track) => track.stop());
+  };
+
   // Initialize and start camera
   const startCamera = async () => {
     setLoading(true);
     setError(null);
 
     // Stop existing stream tracks if any
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
-    }
+    stopStream(streamRef.current);
 
     try {
       const constraints: MediaStreamConstraints = {
@@ -63,6 +68,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onCapture, onClose
 
       const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
       setStream(mediaStream);
+      streamRef.current = mediaStream; // always keep ref in sync
 
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
@@ -79,10 +85,10 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onCapture, onClose
 
   useEffect(() => {
     startCamera();
+    // Cleanup: use ref so closure always sees latest stream
     return () => {
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
-      }
+      stopStream(streamRef.current);
+      streamRef.current = null;
     };
   }, [facingMode]);
 
@@ -108,6 +114,12 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onCapture, onClose
 
         // Convert canvas image to JPEG base64 string
         const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+        // ✅ Stop camera stream immediately after capture (removes iOS indicator)
+        stopStream(streamRef.current);
+        streamRef.current = null;
+        setStream(null);
+
         onCapture(dataUrl);
       }
     }
@@ -135,7 +147,11 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onCapture, onClose
       {/* Camera Top Bar */}
       <div className="absolute top-0 inset-x-0 z-50 safe-top bg-gradient-to-b from-black/80 to-transparent p-4 flex items-center justify-between">
         <button
-          onClick={onClose}
+          onClick={() => {
+            stopStream(streamRef.current);
+            streamRef.current = null;
+            onClose();
+          }}
           className="w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center text-white text-lg active:scale-90 transition-transform animate-scale-up"
         >
           ✕
