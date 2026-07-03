@@ -12,6 +12,34 @@ interface MistakeDetailModalProps {
   onUpdateReviews: (id: string, newReviews: ReviewState[]) => void;
 }
 
+const NORMAL_PHRASES = [
+  '문제 분석을 시작합니다...',
+  '문제 이미지 분석 중...',
+  '수학 수식 및 기호 판독 중...',
+  '지문 텍스트 복원 중...',
+  '문제 해결을 위한 핵심 개념 탐색 중...',
+  '변수 및 조건 추출하는 중...',
+  '오답 원인 분석 중...',
+  '정석 풀이 흐름 설계 중...',
+  '실수 유발 지점 파악 중...',
+  '발상 및 개념 클리닉 처방 중...',
+  '단계별 힌트 작성 중...',
+  'LaTeX 수식 가독성 다듬는 중...'
+];
+
+const GAG_PHRASES = [
+  '귀여운 강아지 쓰다듬는 중...',
+  '당 보충용 초콜릿 까먹는 중...',
+  '수식 계산기 기름칠하는 중...',
+  '인공지능 뉴런 스트레칭 중...',
+  '커피 원두 가는 중...',
+  '조금만 더 힘내라고 수식 격려하는 중...',
+  '연필심 깎는 중...',
+  '답안지 슬쩍 엿보는 중... (은 장난입니다)',
+  '수학 요정 소환하는 중...',
+  '우주 에너지를 수식으로 모으는 중...'
+];
+
 export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   selectedEntry,
   isAnalyzing,
@@ -21,6 +49,32 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   onUpdateReviews,
 }) => {
   const [revealedHintCount, setRevealedHintCount] = React.useState(0);
+  const [loadingText, setLoadingText] = React.useState('처리 중...');
+
+  // Reset hint count when entry changes
+  React.useEffect(() => {
+    setRevealedHintCount(0);
+  }, [selectedEntry.id]);
+
+  // Loading text cycling effect
+  React.useEffect(() => {
+    if (!isAnalyzing) {
+      setLoadingText('처리 중...');
+      return;
+    }
+    
+    setLoadingText('문제 분석을 시작합니다...');
+
+    const interval = setInterval(() => {
+      const isGag = Math.random() < 0.2; // 1/5 probability
+      const pool = isGag ? GAG_PHRASES : NORMAL_PHRASES;
+      const nextText = pool[Math.floor(Math.random() * pool.length)];
+      setLoadingText(nextText);
+    }, 1500);
+
+    return () => clearInterval(interval);
+  }, [isAnalyzing]);
+
   
   // Visibility condition: Show hints only when student struggled (marked X or star)
   const hasStruggled = selectedEntry.reviews?.some(r => r === 'X' || r === 'star');
@@ -212,8 +266,8 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
           {isAnalyzing ? (
             <div className="py-12 flex flex-col items-center justify-center space-y-4">
               <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-              <div className="text-center">
-                <p className="text-sm font-semibold text-white">처리 중...</p>
+              <div className="text-center min-h-[60px] flex flex-col justify-center">
+                <p className="text-sm font-semibold text-white animate-pulse">{loadingText}</p>
                 <p className="text-xs text-slate-400 mt-1">AI 수학 클리닉 진단을 작성하고 있습니다.</p>
               </div>
             </div>
