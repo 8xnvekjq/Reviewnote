@@ -99,47 +99,70 @@ function App() {
     }
   };
 
-  // Start analysis trigger
-  const handleStartAnalysis = (entry: MistakeEntry) => {
-    const envKey = import.meta.env.VITE_GEMINI_API_KEY || '';
-    if (envKey) {
-      runAnalysisFlow(entry, envKey);
-    } else {
-      alert('관리자 서버에 Gemini API Key(VITE_GEMINI_API_KEY)가 등록되지 않았습니다. Vercel 환경 변수 설정을 완료해 주세요.');
-    }
-  };
+  // Start analysis trigger with automatic paid fallback
+  const handleStartAnalysis = async (entry: MistakeEntry) => {
+    const freeKey = import.meta.env.VITE_GEMINI_API_KEY || '';
+    const paidKey = import.meta.env.VITE_GEMINI_API_KEY_PAID || '';
 
-  // Gemini API analysis flow & database updating
-  const runAnalysisFlow = async (entry: MistakeEntry, apiKey: string) => {
+    if (!freeKey && !paidKey) {
+      alert('관리자 서버에 Gemini API Key가 등록되지 않았습니다. Vercel 환경 변수 설정을 완료해 주세요.');
+      return;
+    }
+
     setIsAnalyzing(true);
     try {
-      const result = await analyzeMistakeWithGemini(entry.imageUrl, apiKey);
-      
-      // Update mistake database record
-      const { error: updateError } = await supabase
-        .from('mistakes')
-        .update({
-          title: result.title,
-          analysis: result.analysis
-        })
-        .eq('id', entry.id);
+      if (freeKey) {
+        try {
+          await runAnalysisFlow(entry, freeKey);
+        } catch (err: any) {
+          const errorMsg = err?.message || '';
+          const isQuotaError = 
+            errorMsg.includes('429') || 
+            errorMsg.toUpperCase().includes('RESOURCE_EXHAUSTED') || 
+            errorMsg.includes('quota') || 
+            errorMsg.includes('limit');
 
-      if (updateError) throw updateError;
-
-      const updatedEntry: MistakeEntry = {
-        ...entry,
-        title: result.title,
-        analysis: result.analysis
-      };
-
-      setMistakes(prev => prev.map(m => m.id === entry.id ? updatedEntry : m));
-      setSelectedEntry(updatedEntry);
+          if (paidKey && isQuotaError) {
+            console.warn('Free API Key limit hit. Retrying with Paid API Key...');
+            await runAnalysisFlow(entry, paidKey);
+          } else {
+            throw err;
+          }
+        }
+      } else {
+        await runAnalysisFlow(entry, paidKey);
+      }
     } catch (err: any) {
       console.error(err);
       alert(err.message || 'AI 분석 실행 중 오류가 발생했습니다.');
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  // Gemini API analysis flow & database updating
+  const runAnalysisFlow = async (entry: MistakeEntry, apiKey: string) => {
+    const result = await analyzeMistakeWithGemini(entry.imageUrl, apiKey);
+    
+    // Update mistake database record
+    const { error: updateError } = await supabase
+      .from('mistakes')
+      .update({
+        title: result.title,
+        analysis: result.analysis
+      })
+      .eq('id', entry.id);
+
+    if (updateError) throw updateError;
+
+    const updatedEntry: MistakeEntry = {
+      ...entry,
+      title: result.title,
+      analysis: result.analysis
+    };
+
+    setMistakes(prev => prev.map(m => m.id === entry.id ? updatedEntry : m));
+    setSelectedEntry(updatedEntry);
   };
 
   // Intercept camera capture and start cropping flow
