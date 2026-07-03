@@ -16,7 +16,7 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout }) => {
           오답클리닉
         </h1>
         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-indigo-950/40 text-indigo-400 border border-indigo-900/30">
-          v1.5.0
+          v1.5.0 (07.03 14:52:20)
         </span>
       </div>
       <div className="flex items-center space-x-2">
