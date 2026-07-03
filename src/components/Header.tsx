@@ -15,6 +15,9 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout }) => {
         <h1 className="text-lg font-bold bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
           오답클리닉
         </h1>
+        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-indigo-950/40 text-indigo-400 border border-indigo-900/30">
+          v1.5.0
+        </span>
       </div>
       <div className="flex items-center space-x-2">
         <span className="text-[10px] text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded-full border border-slate-700 font-bold max-w-[100px] truncate">
