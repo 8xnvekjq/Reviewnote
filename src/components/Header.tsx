@@ -1,4 +1,5 @@
 import React from 'react';
+import logoImg from '../assets/logo.jpg';
 
 interface HeaderProps {
   currentUser: string;
@@ -9,9 +10,11 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout }) => {
   return (
     <header className="safe-top flex-none border-b border-slate-800 bg-slate-900/90 backdrop-blur-md px-6 py-4 flex items-center justify-between sticky top-0 z-30">
       <div className="flex items-center space-x-2.5">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 to-emerald-400 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/20">
-          ∑
-        </div>
+        <img 
+          src={logoImg} 
+          alt="더쿠키수학 로고" 
+          className="w-8 h-8 rounded-lg object-cover shadow-lg border border-slate-800/80"
+        />
         <div className="flex flex-col">
           <h1 className="text-base font-extrabold text-white leading-tight">
             오답클리닉
