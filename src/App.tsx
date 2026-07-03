@@ -11,6 +11,7 @@ import { MistakeList } from './components/MistakeList';
 import { MistakeDetailModal } from './components/MistakeDetailModal';
 import { BottomNavigation } from './components/BottomNavigation';
 import { ImageCropper } from './components/ImageCropper';
+import { AdminPanel } from './components/AdminPanel';
 
 function App() {
   // If Supabase credentials are not configured, block and show the setup guide
@@ -20,6 +21,7 @@ function App() {
 
   const [session, setSession] = useState<any>(null);
   const [currentUser, setCurrentUser] = useState<string>('');
+  const [isAdmin, setIsAdmin] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>('notes');
   const [mistakes, setMistakes] = useState<MistakeEntry[]>([]);
   const [selectedEntry, setSelectedEntry] = useState<MistakeEntry | null>(null);
@@ -27,6 +29,20 @@ function App() {
   
   // State for image cropping flow
   const [tempCapturedImage, setTempCapturedImage] = useState<string | null>(null);
+
+  // Check admin status from profiles table
+  const fetchAdminStatus = async (userId: string) => {
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', userId)
+        .single();
+      setIsAdmin(data?.is_admin === true);
+    } catch {
+      setIsAdmin(false);
+    }
+  };
 
   // Monitor Supabase Authentication States
   useEffect(() => {
@@ -37,6 +53,7 @@ function App() {
         const username = session.user.email?.split('@')[0] || 'User';
         setCurrentUser(username);
         fetchUserData();
+        fetchAdminStatus(session.user.id);
       }
     });
 
@@ -47,8 +64,10 @@ function App() {
         const username = session.user.email?.split('@')[0] || 'User';
         setCurrentUser(username);
         fetchUserData();
+        fetchAdminStatus(session.user.id);
       } else {
         setCurrentUser('');
+        setIsAdmin(false);
         setMistakes([]);
       }
     });
@@ -233,6 +252,7 @@ function App() {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setCurrentUser('');
+    setIsAdmin(false);
     setSession(null);
     setMistakes([]);
     setActiveTab('notes');
@@ -279,6 +299,10 @@ function App() {
             onClose={() => setActiveTab('notes')}
           />
         )}
+
+        {activeTab === 'admin' && isAdmin && (
+          <AdminPanel />
+        )}
       </main>
 
       {/* Selected Entry Detail Modal */}
@@ -303,7 +327,7 @@ function App() {
       )}
 
       {/* Floating Glassmorphic Bottom Navigation Bar */}
-      <BottomNavigation activeTab={activeTab} setActiveTab={setActiveTab} />
+      <BottomNavigation activeTab={activeTab} setActiveTab={setActiveTab} isAdmin={isAdmin} />
 
     </div>
   );

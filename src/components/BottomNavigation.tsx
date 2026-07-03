@@ -4,11 +4,24 @@ import type { ActiveTab } from '../types';
 interface BottomNavigationProps {
   activeTab: ActiveTab;
   setActiveTab: (tab: ActiveTab) => void;
+  isAdmin?: boolean;
 }
 
-export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, setActiveTab }) => {
+export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, setActiveTab, isAdmin }) => {
   return (
     <nav className="fixed bottom-3 left-4 right-4 z-40 h-16 rounded-2xl border border-slate-800/80 bg-slate-900/75 backdrop-blur-lg flex items-center justify-around px-4 shadow-xl shadow-black/40">
+      
+      {/* Admin Tab (only shown when isAdmin) */}
+      {isAdmin && (
+        <button
+          onClick={() => setActiveTab('admin')}
+          className={`flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all ${activeTab === 'admin' ? 'text-amber-400 scale-105 font-bold' : 'text-slate-500 hover:text-slate-300'}`}
+        >
+          <span className="text-lg">👑</span>
+          <span className="text-[10px] mt-0.5">어드민</span>
+        </button>
+      )}
+
       {/* Tab 1: Notes List */}
       <button 
         onClick={() => setActiveTab('notes')}
