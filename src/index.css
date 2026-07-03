@@ -19,6 +19,15 @@
   }
 }
 
+/* Safe area padding utilities for notches & status bars */
+.safe-top {
+  padding-top: calc(env(safe-area-inset-top) + 1rem) !important;
+}
+
+.safe-bottom {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 1rem) !important;
+}
+
 /* Custom CSS Keyframes and Animation Utilities for Premium UX */
 @keyframes slideUp {
   from {
