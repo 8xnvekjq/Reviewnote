@@ -10,7 +10,6 @@ import { Header } from './components/Header';
 import { MistakeList } from './components/MistakeList';
 import { MistakeDetailModal } from './components/MistakeDetailModal';
 import { BottomNavigation } from './components/BottomNavigation';
-import { ImageCropper } from './components/ImageCropper';
 import { AdminPanel } from './components/AdminPanel';
 
 function App() {
@@ -26,9 +25,6 @@ function App() {
   const [mistakes, setMistakes] = useState<MistakeEntry[]>([]);
   const [selectedEntry, setSelectedEntry] = useState<MistakeEntry | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  
-  // State for image cropping flow
-  const [tempCapturedImage, setTempCapturedImage] = useState<string | null>(null);
 
   // Check admin status from profiles table
   const fetchAdminStatus = async (userId: string) => {
@@ -142,19 +138,13 @@ function App() {
     }
   };
 
-  // Intercept camera capture and start cropping flow
-  const handleCameraCapture = (base64Image: string) => {
-    setTempCapturedImage(base64Image);
-  };
-
-  // Process crop completion, upload to Storage, and insert database record
-  const handleCropComplete = async (croppedBase64: string) => {
-    setTempCapturedImage(null);
+  // Process camera capture, upload directly to Storage, and insert database record (No cropping)
+  const handleCameraCapture = async (base64Image: string) => {
     if (!session?.user) return;
 
     setIsAnalyzing(true);
     try {
-      const blob = base64ToBlob(croppedBase64);
+      const blob = base64ToBlob(base64Image);
       const fileExt = blob.type.split('/')[1] || 'jpg';
       const fileName = `${session.user.id}/${Date.now()}.${fileExt}`;
 
@@ -314,15 +304,6 @@ function App() {
           onDeleteMistake={handleDeleteMistake}
           onStartAnalysis={handleStartAnalysis}
           onUpdateReviews={handleUpdateReviews}
-        />
-      )}
-
-      {/* Interactive Image Cropper Bounding Box overlay */}
-      {tempCapturedImage && (
-        <ImageCropper
-          imageSrc={tempCapturedImage}
-          onCropComplete={handleCropComplete}
-          onCancel={() => setTempCapturedImage(null)}
         />
       )}
 

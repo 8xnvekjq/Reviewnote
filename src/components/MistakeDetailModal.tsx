@@ -51,9 +51,19 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   const [revealedHintCount, setRevealedHintCount] = React.useState(0);
   const [loadingText, setLoadingText] = React.useState('처리 중...');
 
-  // Reset hint count when entry changes
+  // Accordion toggle states for analysis cards
+  const [showProblemText, setShowProblemText] = React.useState(false);
+  const [showSolvingProcess, setShowSolvingProcess] = React.useState(false);
+  const [showMistakeDetail, setShowMistakeDetail] = React.useState(false);
+  const [showActionPlan, setShowActionPlan] = React.useState(false);
+
+  // Reset all states when entry changes
   React.useEffect(() => {
     setRevealedHintCount(0);
+    setShowProblemText(false);
+    setShowSolvingProcess(false);
+    setShowMistakeDetail(false);
+    setShowActionPlan(false);
   }, [selectedEntry.id]);
 
   // Loading text cycling effect
@@ -108,39 +118,13 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
         {/* Modal Body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           
-          {/* Problem Image Preview - cropped by AI to exclude handwriting */}
-          <div className="w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 relative">
-            {selectedEntry.analysis?.problemBox ? (
-              /* CSS Crop: show only the printed problem area, hiding handwriting margins */
-              <div
-                className="relative w-full overflow-hidden"
-                style={{
-                  paddingBottom: `${
-                    (100 - selectedEntry.analysis.problemBox.top - selectedEntry.analysis.problemBox.bottom) /
-                    (100 - selectedEntry.analysis.problemBox.left - selectedEntry.analysis.problemBox.right) * 100
-                  }%`
-                }}
-              >
-                <img
-                  src={selectedEntry.imageUrl}
-                  alt={selectedEntry.title}
-                  className="absolute"
-                  style={{
-                    left: `${-selectedEntry.analysis.problemBox.left * (100 / (100 - selectedEntry.analysis.problemBox.left - selectedEntry.analysis.problemBox.right))}%`,
-                    top: `${-selectedEntry.analysis.problemBox.top * (100 / (100 - selectedEntry.analysis.problemBox.top - selectedEntry.analysis.problemBox.bottom))}%`,
-                    width: `${100 * (100 / (100 - selectedEntry.analysis.problemBox.left - selectedEntry.analysis.problemBox.right))}%`,
-                    height: 'auto',
-                  }}
-                />
-              </div>
-            ) : (
-              /* Fallback: no problemBox yet, show full image */
-              <img
-                src={selectedEntry.imageUrl}
-                alt={selectedEntry.title}
-                className="w-full h-auto max-h-[60vh] object-contain"
-              />
-            )}
+          {/* Problem Image Preview - displayed in full, uncropped */}
+          <div className="w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center relative p-2 min-h-[200px]">
+            <img 
+              src={selectedEntry.imageUrl} 
+              alt={selectedEntry.title} 
+              className="w-full h-auto max-h-[60vh] object-contain rounded-xl" 
+            />
             <button
               onClick={(e) => onDeleteMistake(selectedEntry.id, e)}
               className="absolute bottom-3 right-3 px-3 py-1.5 rounded-xl bg-red-600/95 hover:bg-red-600 text-white text-xs font-semibold shadow-lg backdrop-blur-sm transition-all"
@@ -250,15 +234,15 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             </div>
           )}
 
-          {/* Fallback for older entries without hints, problem text, or problemBox */}
-          {selectedEntry.analysis && (!selectedEntry.analysis.problemText || !selectedEntry.analysis.hints || selectedEntry.analysis.hints.length === 0 || !selectedEntry.analysis.problemBox) && (
+          {/* Fallback for older entries without hints or problem text */}
+          {selectedEntry.analysis && (!selectedEntry.analysis.problemText || !selectedEntry.analysis.hints || selectedEntry.analysis.hints.length === 0) && (
             <div className="bg-slate-950 p-4 rounded-2xl border border-slate-850 text-center space-y-3 animate-scale-up">
-              <span className="text-xs text-slate-400 block">💡 이 오답 기록은 문제 지문 복원 및 도형 확대 데이터가 생성되지 않은 이전 버전 항목입니다.</span>
+              <span className="text-xs text-slate-400 block">💡 이 오답 기록은 문제 지문 복원 및 힌트 데이터가 생성되지 않은 이전 버전 항목입니다.</span>
               <button
                 onClick={() => onStartAnalysis(selectedEntry)}
                 className="px-4 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700 active:scale-95 text-[10px] font-bold text-white transition-all border border-slate-700"
               >
-                AI 분석 재실행하여 지문, 힌트 및 필기 제외 크롭 생성하기
+                AI 분석 재실행하여 지문 및 힌트 생성하기
               </button>
             </div>
           )}
@@ -277,53 +261,93 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
               {/* Card 0: 원본 문제 지문 복원 */}
               {selectedEntry.analysis.problemText && (
                 <div className="space-y-2 border-l-4 border-slate-400 pl-4 py-1">
-                  <h4 className="text-sm font-extrabold text-slate-300 flex items-center">
-                    <span className="mr-1.5 text-base">📝</span> 원본 문제 지문
-                  </h4>
-                  <div className="bg-slate-950 p-4.5 rounded-2xl border border-slate-850">
-                    <LaTeXRenderer text={selectedEntry.analysis.problemText} className="text-sm md:text-base leading-relaxed text-slate-300" />
-                  </div>
+                  <button
+                    onClick={() => setShowProblemText(!showProblemText)}
+                    className="w-full flex items-center justify-between text-left focus:outline-none group"
+                  >
+                    <h4 className="text-sm font-extrabold text-slate-300 flex items-center group-hover:text-white transition-colors">
+                      <span className="mr-1.5 text-base">📝</span> 원본 문제 지문
+                    </h4>
+                    <span className="text-xs text-slate-500 font-bold mr-1 group-hover:text-slate-400 transition-colors">
+                      {showProblemText ? '▲ 닫기' : '▼ 보기'}
+                    </span>
+                  </button>
+                  {showProblemText && (
+                    <div className="bg-slate-950 p-4.5 rounded-2xl border border-slate-850 animate-scale-up mt-2">
+                      <LaTeXRenderer text={selectedEntry.analysis.problemText} className="text-sm md:text-base leading-relaxed text-slate-300" />
+                    </div>
+                  )}
                 </div>
               )}
 
               {/* Card 1: 정석 풀이 과정 */}
               <div className="space-y-2 border-l-4 border-indigo-500 pl-4 py-1">
-                <h4 className="text-sm font-extrabold text-indigo-400 flex items-center">
-                  <span className="mr-1.5 text-base">💡</span> 정석 풀이 과정
-                </h4>
-                <div className="bg-slate-950 p-4.5 rounded-2xl border border-slate-850">
-                  <LaTeXRenderer text={selectedEntry.analysis.solvingProcess} className="text-sm md:text-base leading-relaxed" />
-                </div>
+                <button
+                  onClick={() => setShowSolvingProcess(!showSolvingProcess)}
+                  className="w-full flex items-center justify-between text-left focus:outline-none group"
+                >
+                  <h4 className="text-sm font-extrabold text-indigo-400 flex items-center group-hover:text-indigo-300 transition-colors">
+                    <span className="mr-1.5 text-base">💡</span> 정석 풀이 과정
+                  </h4>
+                  <span className="text-xs text-slate-500 font-bold mr-1 group-hover:text-slate-400 transition-colors">
+                    {showSolvingProcess ? '▲ 닫기' : '▼ 보기'}
+                  </span>
+                </button>
+                {showSolvingProcess && (
+                  <div className="bg-slate-950 p-4.5 rounded-2xl border border-slate-850 animate-scale-up mt-2">
+                    <LaTeXRenderer text={selectedEntry.analysis.solvingProcess} className="text-sm md:text-base leading-relaxed" />
+                  </div>
+                )}
               </div>
 
-              {/* Card 2: 실수 & 틀린 이유 분석 (요약 및 강조) */}
+              {/* Card 2: 실수 & 틀린 이유 분석 */}
               <div className="space-y-2 border-l-4 border-amber-500 pl-4 py-1">
-                <h4 className="text-sm font-extrabold text-amber-400 flex items-center">
-                  <span className="mr-1.5 text-base">🔍</span> 틀린 이유 분석
-                </h4>
-                <div className="bg-slate-950 p-4.5 rounded-2xl border border-slate-850 space-y-4">
-                  {/* 실수 분석 상세 */}
-                  <div className="space-y-1.5">
-                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">실수 지점</span>
-                    <LaTeXRenderer text={selectedEntry.analysis.mistakeDetail} className="text-sm md:text-base leading-relaxed" />
+                <button
+                  onClick={() => setShowMistakeDetail(!showMistakeDetail)}
+                  className="w-full flex items-center justify-between text-left focus:outline-none group"
+                >
+                  <h4 className="text-sm font-extrabold text-amber-400 flex items-center group-hover:text-amber-300 transition-colors">
+                    <span className="mr-1.5 text-base">🔍</span> 틀린 이유 분석
+                  </h4>
+                  <span className="text-xs text-slate-500 font-bold mr-1 group-hover:text-slate-400 transition-colors">
+                    {showMistakeDetail ? '▲ 닫기' : '▼ 보기'}
+                  </span>
+                </button>
+                {showMistakeDetail && (
+                  <div className="bg-slate-950 p-4.5 rounded-2xl border border-slate-850 space-y-4 animate-scale-up mt-2">
+                    {/* 실수 분석 상세 */}
+                    <div className="space-y-1.5">
+                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">실수 지점</span>
+                      <LaTeXRenderer text={selectedEntry.analysis.mistakeDetail} className="text-sm md:text-base leading-relaxed" />
+                    </div>
+                    
+                    {/* 오개념 근본 원인 */}
+                    <div className="pt-3.5 border-t border-slate-850 space-y-1.5">
+                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">틀린 원인</span>
+                      <LaTeXRenderer text={selectedEntry.analysis.rootCause} className="text-sm md:text-base leading-relaxed text-red-300" />
+                    </div>
                   </div>
-                  
-                  {/* 오개념 근본 원인 */}
-                  <div className="pt-3.5 border-t border-slate-850 space-y-1.5">
-                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">틀린 원인</span>
-                    <LaTeXRenderer text={selectedEntry.analysis.rootCause} className="text-sm md:text-base leading-relaxed text-red-300" />
-                  </div>
-                </div>
+                )}
               </div>
 
-              {/* Card 3: 재발 방지 대책 (요약 및 글머리 강조) */}
+              {/* Card 3: 재발 방지 대책 */}
               <div className="space-y-2 border-l-4 border-emerald-500 pl-4 py-1">
-                <h4 className="text-sm font-extrabold text-emerald-400 flex items-center">
-                  <span className="mr-1.5 text-base">🛡️</span> 재발 방지 대책
-                </h4>
-                <div className="bg-slate-950 p-4.5 rounded-2xl border border-slate-850">
-                  <LaTeXRenderer text={selectedEntry.analysis.actionPlan} className="text-sm md:text-base leading-relaxed" />
-                </div>
+                <button
+                  onClick={() => setShowActionPlan(!showActionPlan)}
+                  className="w-full flex items-center justify-between text-left focus:outline-none group"
+                >
+                  <h4 className="text-sm font-extrabold text-emerald-400 flex items-center group-hover:text-emerald-300 transition-colors">
+                    <span className="mr-1.5 text-base">🛡️</span> 재발 방지 대책
+                  </h4>
+                  <span className="text-xs text-slate-500 font-bold mr-1 group-hover:text-slate-400 transition-colors">
+                    {showActionPlan ? '▲ 닫기' : '▼ 보기'}
+                  </span>
+                </button>
+                {showActionPlan && (
+                  <div className="bg-slate-950 p-4.5 rounded-2xl border border-slate-850 animate-scale-up mt-2">
+                    <LaTeXRenderer text={selectedEntry.analysis.actionPlan} className="text-sm md:text-base leading-relaxed" />
+                  </div>
+                )}
               </div>
             </div>
           ) : (
