@@ -7,39 +7,14 @@ interface ImageCropperProps {
 }
 
 export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComplete, onCancel }) => {
-  const [left, setLeft] = useState(10);
-  const [right, setRight] = useState(10);
-  const [top, setTop] = useState(15);
-  const [bottom, setBottom] = useState(15);
+  const [left, setLeft] = useState(15);
+  const [right, setRight] = useState(15);
+  const [top, setTop] = useState(20);
+  const [bottom, setBottom] = useState(20);
   const [isProcessing, setIsProcessing] = useState(false);
   
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  // Safety checks to ensure crops don't collide or collapse to zero width/height
-  const handleLeftChange = (val: number) => {
-    if (100 - val - right > 10) {
-      setLeft(val);
-    }
-  };
-
-  const handleRightChange = (val: number) => {
-    if (100 - left - val > 10) {
-      setRight(val);
-    }
-  };
-
-  const handleTopChange = (val: number) => {
-    if (100 - val - bottom > 10) {
-      setTop(val);
-    }
-  };
-
-  const handleBottomChange = (val: number) => {
-    if (100 - top - val > 10) {
-      setBottom(val);
-    }
-  };
 
   // Direct touch/mouse dragging of crop box edges
   const handleStartDrag = (
@@ -62,6 +37,11 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
     const startBottom = bottom;
 
     const onMove = (moveEvent: MouseEvent | TouchEvent) => {
+      // Prevent browser default scroll/pinch behavior while dragging handles
+      if (moveEvent.cancelable) {
+        moveEvent.preventDefault();
+      }
+
       const currentX = 'touches' in moveEvent ? moveEvent.touches[0].clientX : moveEvent.clientX;
       const currentY = 'touches' in moveEvent ? moveEvent.touches[0].clientY : moveEvent.clientY;
 
@@ -175,7 +155,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
       </div>
 
       {/* Interactive Bounding Box Viewfinder */}
-      <div className="flex-1 relative flex items-center justify-center p-6 bg-slate-950 max-h-[60vh]">
+      <div className="flex-1 relative flex items-center justify-center p-6 bg-slate-950 max-h-[70vh]">
         <div 
           ref={containerRef}
           className="relative max-w-full max-h-full overflow-hidden border border-slate-900 rounded-lg"
@@ -185,7 +165,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
             ref={imageRef}
             src={imageSrc}
             alt="크롭 대상 문제"
-            className="max-h-[50vh] w-auto object-contain opacity-70 pointer-events-none"
+            className="max-h-[55vh] w-auto object-contain opacity-70 pointer-events-none"
           />
 
           {/* Semi-transparent dark overlay around selection */}
@@ -227,7 +207,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
             <div
               onMouseDown={(e) => handleStartDrag(e, 'top')}
               onTouchStart={(e) => handleStartDrag(e, 'top')}
-              className="absolute -top-3.5 left-1/2 -translate-x-1/2 w-16 h-7 flex items-center justify-center cursor-ns-resize pointer-events-auto group"
+              className="absolute -top-4 left-1/2 -translate-x-1/2 w-16 h-8 flex items-center justify-center cursor-ns-resize pointer-events-auto group"
             >
               <div className="w-10 h-1.5 bg-emerald-400 rounded-full border border-emerald-500 shadow-md group-hover:bg-emerald-300 transition-colors" />
             </div>
@@ -236,7 +216,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
             <div
               onMouseDown={(e) => handleStartDrag(e, 'bottom')}
               onTouchStart={(e) => handleStartDrag(e, 'bottom')}
-              className="absolute -bottom-3.5 left-1/2 -translate-x-1/2 w-16 h-7 flex items-center justify-center cursor-ns-resize pointer-events-auto group"
+              className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-16 h-8 flex items-center justify-center cursor-ns-resize pointer-events-auto group"
             >
               <div className="w-10 h-1.5 bg-emerald-400 rounded-full border border-emerald-500 shadow-md group-hover:bg-emerald-300 transition-colors" />
             </div>
@@ -245,7 +225,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
             <div
               onMouseDown={(e) => handleStartDrag(e, 'left')}
               onTouchStart={(e) => handleStartDrag(e, 'left')}
-              className="absolute top-1/2 -translate-y-1/2 -left-3.5 w-7 h-16 flex items-center justify-center cursor-ew-resize pointer-events-auto group"
+              className="absolute top-1/2 -translate-y-1/2 -left-4 w-8 h-16 flex items-center justify-center cursor-ew-resize pointer-events-auto group"
             >
               <div className="w-1.5 h-10 bg-emerald-400 rounded-full border border-emerald-500 shadow-md group-hover:bg-emerald-300 transition-colors" />
             </div>
@@ -254,7 +234,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
             <div
               onMouseDown={(e) => handleStartDrag(e, 'right')}
               onTouchStart={(e) => handleStartDrag(e, 'right')}
-              className="absolute top-1/2 -translate-y-1/2 -right-3.5 w-7 h-16 flex items-center justify-center cursor-ew-resize pointer-events-auto group"
+              className="absolute top-1/2 -translate-y-1/2 -right-4 w-8 h-16 flex items-center justify-center cursor-ew-resize pointer-events-auto group"
             >
               <div className="w-1.5 h-10 bg-emerald-400 rounded-full border border-emerald-500 shadow-md group-hover:bg-emerald-300 transition-colors" />
             </div>
@@ -263,77 +243,20 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
         </div>
       </div>
 
-      {/* Spacing adjustments using sliders */}
-      <div className="p-6 bg-slate-900/60 border-t border-slate-900 space-y-4 pb-8">
-        <p className="text-[11px] text-slate-500 font-semibold text-center mb-1">
-          💡 가이드라인의 초록색 타원형 핸들을 직접 끌어당기거나, 아래 슬라이더를 조절해 보세요.
+      {/* Control Area (Sliders removed, Replaced with 'Retake' Button) */}
+      <div className="p-6 bg-slate-900/60 border-t border-slate-900 flex flex-col items-center space-y-4 pb-8">
+        <p className="text-[11px] text-slate-500 font-semibold text-center leading-relaxed">
+          💡 가이드라인의 초록색 타원형 핸들을 직접 드래그하여 문제 영역을 맞춘 후, 우측 상단의 '자르기 완료'를 누르세요.
         </p>
 
-        {/* Top/Bottom Margin sliders */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <div className="flex justify-between text-[10px] font-bold text-slate-400">
-              <span>상단 테두리</span>
-              <span>{Math.round(top)}%</span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="80"
-              value={top}
-              onChange={(e) => handleTopChange(parseInt(e.target.value))}
-              className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-400"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <div className="flex justify-between text-[10px] font-bold text-slate-400">
-              <span>하단 테두리</span>
-              <span>{Math.round(bottom)}%</span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="80"
-              value={bottom}
-              onChange={(e) => handleBottomChange(parseInt(e.target.value))}
-              className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-400"
-            />
-          </div>
-        </div>
-
-        {/* Left/Right Margin sliders */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <div className="flex justify-between text-[10px] font-bold text-slate-400">
-              <span>좌측 테두리</span>
-              <span>{Math.round(left)}%</span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="80"
-              value={left}
-              onChange={(e) => handleLeftChange(parseInt(e.target.value))}
-              className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-400"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <div className="flex justify-between text-[10px] font-bold text-slate-400">
-              <span>우측 테두리</span>
-              <span>{Math.round(right)}%</span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="80"
-              value={right}
-              onChange={(e) => handleRightChange(parseInt(e.target.value))}
-              className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-400"
-            />
-          </div>
-        </div>
+        <button
+          onClick={onCancel}
+          disabled={isProcessing}
+          className="w-full max-w-xs py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-bold text-xs border border-slate-700 flex items-center justify-center space-x-2 transition-all shadow-lg"
+        >
+          <span className="text-sm">📷</span>
+          <span>다시 촬영하기</span>
+        </button>
       </div>
 
     </div>
