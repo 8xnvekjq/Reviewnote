@@ -20,6 +20,11 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   onStartAnalysis,
   onUpdateReviews,
 }) => {
+  const [revealedHintCount, setRevealedHintCount] = React.useState(0);
+  
+  // Visibility condition: Show hints only when student struggled (marked X or star)
+  const hasStruggled = selectedEntry.reviews?.some(r => r === 'X' || r === 'star');
+
   const handleReviewToggle = (index: number, state: ReviewState) => {
     const currentReviews = [...(selectedEntry.reviews || ['', '', ''])];
     currentReviews[index] = currentReviews[index] === state ? '' : state;
@@ -111,7 +116,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                         onClick={() => handleReviewToggle(index, 'star')}
                         className={`w-7 h-7 rounded-full text-xs font-bold transition-all flex items-center justify-center ${
                           currentVal === 'star' 
-                            ? 'bg-amber-450 text-slate-950 bg-amber-400 shadow-md shadow-amber-400/20' 
+                            ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20' 
                             : 'bg-slate-800 text-slate-400 hover:text-slate-200'
                         }`}
                       >
@@ -123,6 +128,56 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
               })}
             </div>
           </div>
+
+          {/* Conditional Step-by-Step Hints Card (Shown only when struggling X / Star) */}
+          {hasStruggled && selectedEntry.analysis?.hints && selectedEntry.analysis.hints.length > 0 && (
+            <div className="bg-slate-950 p-4.5 rounded-2xl border border-slate-850 space-y-3 animate-scale-up">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-indigo-400 flex items-center">
+                  <span className="mr-1.5 text-sm">💡</span> 단계별 힌트
+                </span>
+                <span className="text-[10px] text-slate-500 font-bold">
+                  {revealedHintCount} / 3 공개됨
+                </span>
+              </div>
+
+              {/* Render revealed hints */}
+              <div className="space-y-2.5">
+                {selectedEntry.analysis.hints.slice(0, revealedHintCount).map((hint, i) => (
+                  <div key={i} className="p-3 bg-slate-900/60 rounded-xl border border-slate-800 animate-scale-up space-y-1">
+                    <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider block">힌트 {i + 1}단계</span>
+                    <LaTeXRenderer text={hint} className="text-xs md:text-sm leading-relaxed text-slate-300" />
+                  </div>
+                ))}
+              </div>
+
+              {revealedHintCount < 3 ? (
+                <button
+                  onClick={() => setRevealedHintCount(prev => prev + 1)}
+                  className="w-full py-2.5 rounded-xl bg-indigo-600/10 hover:bg-indigo-600/20 active:scale-95 border border-indigo-500/20 text-indigo-400 font-bold text-xs transition-all flex items-center justify-center space-x-1"
+                >
+                  <span>🔍 힌트 {revealedHintCount + 1} 보기</span>
+                </button>
+              ) : (
+                <p className="text-[10px] text-slate-500 text-center font-medium py-1">
+                  모든 힌트가 공개되었습니다. 위 풀이를 참고하여 오답을 완벽히 이해해 보세요!
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Fallback for older entries without hints when struggling */}
+          {hasStruggled && selectedEntry.analysis && (!selectedEntry.analysis.hints || selectedEntry.analysis.hints.length === 0) && (
+            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-850 text-center space-y-3 animate-scale-up">
+              <span className="text-xs text-slate-400 block">💡 이 오답 기록은 힌트 데이터가 아직 생성되지 않은 이전 버전 항목입니다.</span>
+              <button
+                onClick={() => onStartAnalysis(selectedEntry)}
+                className="px-4 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700 active:scale-95 text-[10px] font-bold text-white transition-all border border-slate-700"
+              >
+                AI 분석 재실행하여 힌트 생성하기
+              </button>
+            </div>
+          )}
 
           {isAnalyzing ? (
             <div className="py-12 flex flex-col items-center justify-center space-y-4">

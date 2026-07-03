@@ -56,6 +56,10 @@
 - **AI 피드백 프롬프트 고도화**:
   - 제공해주신 예시 오답노트 PDF 이미지의 구조와 정확히 일치하도록 [gemini.ts](file:///c:/Users/USER/Documents/ReviewNotes/src/services/gemini.ts) 프롬프트를 고도화했습니다.
   - 이제 AI가 생성하는 풀이 과정은 소문제 단위로 깔끔히 줄바꿈/들여쓰기되어 LaTeX 수식으로 구성되며, 실수 분석은 **`오답 분석 가이드`**, 대책 처방은 **`발상 & 개념 클리닉`** 헤더와 함께 약속된 포맷으로 정밀 분석을 수행합니다.
+- **3단계 복습용 단계별 힌트 기능**:
+  - [MistakeDetailModal.tsx](file:///c:/Users/USER/Documents/ReviewNotes/src/components/MistakeDetailModal.tsx): 복습 도중 막힐 때 하나씩 열어볼 수 있는 `단계별 힌트 (최대 3개)` 카드 영역을 배치했습니다.
+  - 학생들이 무작정 힌트를 보고 정답을 외우지 않도록, 최초 복습 상태(선택 전)이거나 복습을 맞춘 상태(`O`)에서는 힌트 패널이 노출되지 않으며, 틀렸거나(`X`) 잘 모르는 상태(`★`)로 표기했을 때만 힌트 버튼이 **조건부 노출**됩니다.
+  - [gemini.ts](file:///c:/Users/USER/Documents/ReviewNotes/src/services/gemini.ts): Gemini API가 풀이 로직에 맞춰 1단계(접근법), 2단계(중간 수식), 3단계(풀이 힌트)의 구체적인 수학 힌트들을 자동으로 생성 및 반환하도록 구성했습니다.
 
 ---
 

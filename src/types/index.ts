@@ -3,6 +3,7 @@ export interface MistakeAnalysis {
   mistakeDetail: string;    // [실수한 지점 상세 분석]
   rootCause: string;        // [근본적인 틀린 이유]
   actionPlan: string;       // [향후 재발 방지 대책]
+  hints?: string[];         // [단계별 힌트 목록 (최대 3개)]
 }
 
 export type ReviewState = 'O' | 'X' | 'star' | '';

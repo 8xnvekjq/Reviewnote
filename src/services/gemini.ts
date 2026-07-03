@@ -6,6 +6,7 @@ interface GeminiResponse {
   mistakeDetail: string;
   rootCause: string;
   actionPlan: string;
+  hints: string[];
 }
 
 /**
@@ -98,12 +99,15 @@ export const analyzeMistakeWithGemini = async (
      1. **원 내접 다각형의 중등 도형 성질 복습**: 원 문제에서는 사인/코사인법칙을 쓰기 전에 원주각과 현의 길이 성질을 반드시 먼저 체크합니다.
      2. **공통 변을 낀 삼각형의 연립 패턴 숙지**: 두 삼각형이 한 변($\\overline{AC}$)과 크기가 같은 각을 각각 공유하고 있을 때, 두 삼각형에서 각각 코사인법칙을 세워 식을 연립하는 풀이 흐름을 익혀 둡니다.
 
-출력은 지정된 JSON 스키마를 엄격히 따라 다음 5가지 항목을 모두 한국어로 작성해야 합니다:
+5. hints: 단계별로 문제를 풀어나갈 수 있는 구체적인 힌트 목록 (반드시 가독성 높은 LaTeX 수식을 사용하여 순서대로 정확히 3개의 항목으로 구성할 것. 1단계 힌트는 최초 문제 접근법, 2단계는 중간 연결 공식이나 과정, 3단계는 연립 전 마지막 단서를 제공)
+
+출력은 지정된 JSON 스키마를 엄격히 따라 다음 6가지 항목을 모두 한국어로 작성해야 합니다:
 1. title: 문제의 주제나 공식을 담은 짤막하고 직관적인 제목 (예: '원 내접 사각형의 성질과 코사인법칙 연립')
 2. solvingProcess: 위의 지시사항을 따른 올바른 풀이 과정
 3. mistakeDetail: 위의 지시사항을 따른 실수한 지점 분석 (오답 분석 가이드 형식 준수)
 4. rootCause: 위의 지시사항을 따른 근본적인 틀린 이유
-5. actionPlan: 위의 지시사항을 따른 재발 방지 대책 (발상 & 개념 클리닉 형식 준수)`;
+5. actionPlan: 위의 지시사항을 따른 재발 방지 대책 (발상 & 개념 클리닉 형식 준수)
+6. hints: 위의 지시사항을 따른 단계별 힌트 목록 (정확히 3개)`;
 
   const requestBody = {
     contents: [
@@ -128,9 +132,13 @@ export const analyzeMistakeWithGemini = async (
           solvingProcess: { type: 'STRING' },
           mistakeDetail: { type: 'STRING' },
           rootCause: { type: 'STRING' },
-          actionPlan: { type: 'STRING' }
+          actionPlan: { type: 'STRING' },
+          hints: {
+            type: 'ARRAY',
+            items: { type: 'STRING' }
+          }
         },
-        required: ['title', 'solvingProcess', 'mistakeDetail', 'rootCause', 'actionPlan']
+        required: ['title', 'solvingProcess', 'mistakeDetail', 'rootCause', 'actionPlan', 'hints']
       }
     }
   };
@@ -165,7 +173,8 @@ export const analyzeMistakeWithGemini = async (
         solvingProcess: parsedJson.solvingProcess,
         mistakeDetail: parsedJson.mistakeDetail,
         rootCause: parsedJson.rootCause,
-        actionPlan: parsedJson.actionPlan
+        actionPlan: parsedJson.actionPlan,
+        hints: parsedJson.hints
       }
     };
   } catch (error: any) {
