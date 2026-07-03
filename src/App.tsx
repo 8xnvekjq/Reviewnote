@@ -303,7 +303,7 @@ function App() {
           />
         )}
 
-        {activeTab === 'camera' && (
+        {activeTab === 'camera' && !tempCapturedImage && (
           <CameraScanner 
             onCapture={handleCameraCapture}
             onClose={() => setActiveTab('notes')}
