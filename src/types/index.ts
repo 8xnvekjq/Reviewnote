@@ -34,5 +34,5 @@ export interface MistakeEntry {
   reviews?: ReviewState[];  // Array of 3 review states, e.g. ['O', 'X', '']
 }
 
-export type ActiveTab = 'notes' | 'completed' | 'camera' | 'admin';
+export type ActiveTab = 'notes' | 'completed' | 'camera' | 'admin' | 'settings';
 
