@@ -1,4 +1,4 @@
-import type { MistakeAnalysis, DiagramBox } from '../types';
+import type { MistakeAnalysis, ProblemBox } from '../types';
 
 interface GeminiResponse {
   title: string;
@@ -8,7 +8,7 @@ interface GeminiResponse {
   actionPlan: string;
   hints: string[];
   problemText: string;
-  diagramBox: DiagramBox;
+  problemBox: ProblemBox;
 }
 
 /**
@@ -117,9 +117,9 @@ export const analyzeMistakeWithGemini = async (
    - 수학적 기호, 수식, 변수 등은 완벽하게 LaTeX 문법(인라인 $...$, 블록 $$...$$)으로 변환해서 텍스트를 작성해 주십시오.
    - 보기 선택지(㉠, ㉡, ㉢ 혹은 ①, ②, ③ 등)가 그림에 명시되어 있다면 해당 문항 구성 지문도 빠짐없이 텍스트로 복원하여 작성해 주십시오.
 
-7. diagramBox: 사진 속에 기하학적 도형, 원, 다각형, 그래프, 함수 좌표 평면 등의 '그림/도형'이 포함되어 있는지 판별하고, 해당 그림이 차지하는 정확한 영역의 바운딩 박스를 계산하여 상하좌우 마진 백분율(0-100 사이의 수)로 각각 응답해 주십시오.
-   - 만약 그림/도형이 존재한다면, 그 그림 영역만 타이트하게 포함하도록 마진 백분율을 입력하십시오. (예: 그림이 이미지의 한가운데 작게 있다면 top: 30, bottom: 30, left: 25, right: 25 로 입력하여 그림 바깥의 텍스트가 잘려 나가고 그림만 확대될 수 있게 감싸주십시오.)
-   - 만약 사진 속에 도형이나 그래프가 전혀 없고 단순 텍스트 줄글 수식만 존재한다면, 모든 값(top, bottom, left, right)을 0으로 입력해 주십시오.
+7. problemBox: 사진 속 이미지에서 학생이 직접 손으로 쓴 필기(풀이 과정, 메모, 낙서, 연필/펜 흔적 등)를 철저히 제외하고, 교재나 시험지에 인쇄된 문제 본문(제목, 조건, 도형, 선택지 등)만이 존재하는 영역을 타이트하게 감싸는 바운딩 박스를 상하좌우 마진 백분율(0~100 사이의 숫자)로 응답해 주십시오.
+   - 학생 필기가 문제 아래쪽이나 여백에 있다면, 필기 부분이 잘려나가도록 bottom/right/left 마진을 충분히 크게 설정하십시오.
+   - 만약 필기가 전혀 없거나 문제가 이미지 전체를 차지한다면, 여백만 제거하는 수준으로 모두 작은 값(예: top: 2, bottom: 2, left: 2, right: 2)을 입력하십시오.
 
 출력은 지정된 JSON 스키마를 엄격히 따라 다음 8가지 항목을 모두 한국어로 작성해야 합니다:
 1. title: 문제의 주제나 공식을 담은 짤막하고 직관적인 제목 (예: '원 내접 사각형의 성질과 코사인법칙 연립')
@@ -129,7 +129,7 @@ export const analyzeMistakeWithGemini = async (
 5. actionPlan: 위의 지시사항을 따른 재발 방지 대책 (발상 & 개념 클리닉 형식 준수 및 줄바꿈 적용)
 6. hints: 위의 지시사항을 따른 단계별 힌트 목록 (정확히 3개)
 7. problemText: 위의 지시사항을 따른 추출된 원본 문제 지문
-8. diagramBox: 위의 지시사항을 따른 그림/도형 영역 바운딩 박스`;
+8. problemBox: 위의 지시사항을 따른 필기 제외 인쇄 문제 영역 바운딩 박스`;
 
   const requestBody = {
     contents: [
@@ -160,7 +160,7 @@ export const analyzeMistakeWithGemini = async (
             items: { type: 'STRING' }
           },
           problemText: { type: 'STRING' },
-          diagramBox: {
+          problemBox: {
             type: 'OBJECT',
             properties: {
               top: { type: 'NUMBER' },
@@ -171,7 +171,7 @@ export const analyzeMistakeWithGemini = async (
             required: ['top', 'bottom', 'left', 'right']
           }
         },
-        required: ['title', 'solvingProcess', 'mistakeDetail', 'rootCause', 'actionPlan', 'hints', 'problemText', 'diagramBox']
+        required: ['title', 'solvingProcess', 'mistakeDetail', 'rootCause', 'actionPlan', 'hints', 'problemText', 'problemBox']
       }
     }
   };
@@ -209,7 +209,7 @@ export const analyzeMistakeWithGemini = async (
         actionPlan: parsedJson.actionPlan,
         hints: parsedJson.hints,
         problemText: parsedJson.problemText,
-        diagramBox: parsedJson.diagramBox
+        problemBox: parsedJson.problemBox
       }
     };
   } catch (error: any) {

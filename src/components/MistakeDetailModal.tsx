@@ -54,13 +54,39 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
         {/* Modal Body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           
-          {/* Problem Image Preview */}
-          <div className="w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center relative p-2 min-h-[200px]">
-            <img 
-              src={selectedEntry.imageUrl} 
-              alt={selectedEntry.title} 
-              className="w-full h-auto max-h-[60vh] object-contain rounded-xl" 
-            />
+          {/* Problem Image Preview - cropped by AI to exclude handwriting */}
+          <div className="w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 relative">
+            {selectedEntry.analysis?.problemBox ? (
+              /* CSS Crop: show only the printed problem area, hiding handwriting margins */
+              <div
+                className="relative w-full overflow-hidden"
+                style={{
+                  paddingBottom: `${
+                    (100 - selectedEntry.analysis.problemBox.top - selectedEntry.analysis.problemBox.bottom) /
+                    (100 - selectedEntry.analysis.problemBox.left - selectedEntry.analysis.problemBox.right) * 100
+                  }%`
+                }}
+              >
+                <img
+                  src={selectedEntry.imageUrl}
+                  alt={selectedEntry.title}
+                  className="absolute"
+                  style={{
+                    left: `${-selectedEntry.analysis.problemBox.left * (100 / (100 - selectedEntry.analysis.problemBox.left - selectedEntry.analysis.problemBox.right))}%`,
+                    top: `${-selectedEntry.analysis.problemBox.top * (100 / (100 - selectedEntry.analysis.problemBox.top - selectedEntry.analysis.problemBox.bottom))}%`,
+                    width: `${100 * (100 / (100 - selectedEntry.analysis.problemBox.left - selectedEntry.analysis.problemBox.right))}%`,
+                    height: 'auto',
+                  }}
+                />
+              </div>
+            ) : (
+              /* Fallback: no problemBox yet, show full image */
+              <img
+                src={selectedEntry.imageUrl}
+                alt={selectedEntry.title}
+                className="w-full h-auto max-h-[60vh] object-contain"
+              />
+            )}
             <button
               onClick={(e) => onDeleteMistake(selectedEntry.id, e)}
               className="absolute bottom-3 right-3 px-3 py-1.5 rounded-xl bg-red-600/95 hover:bg-red-600 text-white text-xs font-semibold shadow-lg backdrop-blur-sm transition-all"
@@ -68,47 +94,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
               기록 삭제
             </button>
           </div>
-
-          {/* Magnified Diagram/Graph Card (Shown only when diagramBox is non-zero and present) */}
-          {selectedEntry.analysis?.diagramBox && 
-           !(selectedEntry.analysis.diagramBox.top === 0 && 
-             selectedEntry.analysis.diagramBox.bottom === 0 && 
-             selectedEntry.analysis.diagramBox.left === 0 && 
-             selectedEntry.analysis.diagramBox.right === 0) && (
-            <div className="bg-slate-950 p-4.5 rounded-2xl border border-indigo-500/25 space-y-3 animate-scale-up">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-indigo-400 flex items-center">
-                  <span className="mr-1.5 text-sm">🔍</span> 도형/그래프 집중 확대
-                </span>
-                <span className="text-[10px] bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded-full border border-indigo-500/20 font-bold">
-                  AI 자동 크롭
-                </span>
-              </div>
-              
-              <div className="w-full overflow-hidden rounded-xl bg-slate-900 border border-slate-800 relative flex items-center justify-center min-h-[220px]">
-                {/* CSS Crop Zoom Engine */}
-                <div 
-                  className="w-full relative overflow-hidden"
-                  style={{
-                    aspectRatio: `${100 - selectedEntry.analysis.diagramBox.left - selectedEntry.analysis.diagramBox.right} / ${100 - selectedEntry.analysis.diagramBox.top - selectedEntry.analysis.diagramBox.bottom}`
-                  }}
-                >
-                  <img
-                    src={selectedEntry.imageUrl}
-                    alt="확대된 도형"
-                    className="absolute"
-                    style={{
-                      left: `${-selectedEntry.analysis.diagramBox.left * (100 / (100 - selectedEntry.analysis.diagramBox.left - selectedEntry.analysis.diagramBox.right))}%`,
-                      top: `${-selectedEntry.analysis.diagramBox.top * (100 / (100 - selectedEntry.analysis.diagramBox.top - selectedEntry.analysis.diagramBox.bottom))}%`,
-                      width: `${100 * (100 / (100 - selectedEntry.analysis.diagramBox.left - selectedEntry.analysis.diagramBox.right))}%`,
-                      height: `${100 * (100 / (100 - selectedEntry.analysis.diagramBox.top - selectedEntry.analysis.diagramBox.bottom))}%`,
-                      objectFit: 'cover',
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* 3-Step Review Status Selection Card */}
           <div className="bg-slate-950 p-4 rounded-2xl border border-slate-850 space-y-3">
@@ -211,15 +196,15 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             </div>
           )}
 
-          {/* Fallback for older entries without hints, problem text, or diagram box */}
-          {selectedEntry.analysis && (!selectedEntry.analysis.problemText || !selectedEntry.analysis.hints || selectedEntry.analysis.hints.length === 0 || !selectedEntry.analysis.diagramBox) && (
+          {/* Fallback for older entries without hints, problem text, or problemBox */}
+          {selectedEntry.analysis && (!selectedEntry.analysis.problemText || !selectedEntry.analysis.hints || selectedEntry.analysis.hints.length === 0 || !selectedEntry.analysis.problemBox) && (
             <div className="bg-slate-950 p-4 rounded-2xl border border-slate-850 text-center space-y-3 animate-scale-up">
               <span className="text-xs text-slate-400 block">💡 이 오답 기록은 문제 지문 복원 및 도형 확대 데이터가 생성되지 않은 이전 버전 항목입니다.</span>
               <button
                 onClick={() => onStartAnalysis(selectedEntry)}
                 className="px-4 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700 active:scale-95 text-[10px] font-bold text-white transition-all border border-slate-700"
               >
-                AI 분석 재실행하여 지문, 힌트 및 도형 확대본 생성하기
+                AI 분석 재실행하여 지문, 힌트 및 필기 제외 크롭 생성하기
               </button>
             </div>
           )}
