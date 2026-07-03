@@ -11,6 +11,7 @@ import { MistakeList } from './components/MistakeList';
 import { MistakeDetailModal } from './components/MistakeDetailModal';
 import { BottomNavigation } from './components/BottomNavigation';
 import { ImageCropper } from './components/ImageCropper';
+import { Analytics } from '@vercel/analytics/react';
 
 function App() {
   // If Supabase credentials are not configured, block and show the setup guide
@@ -244,6 +245,7 @@ function App() {
 
   return (
     <div className="h-full flex flex-col bg-slate-950 text-slate-100 select-none">
+      <Analytics />
       
       {/* Top Header */}
       <Header currentUser={currentUser} onLogout={handleLogout} />
