@@ -16,10 +16,10 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Direct touch/mouse dragging of crop box edges
-  const handleStartDrag = (
+  // Direct touch/mouse dragging of crop box corners
+  const handleCornerDrag = (
     e: React.MouseEvent | React.TouchEvent,
-    edge: 'top' | 'bottom' | 'left' | 'right'
+    corner: 'tl' | 'tr' | 'br' | 'bl'
   ) => {
     e.preventDefault();
     if (!containerRef.current) return;
@@ -28,42 +28,28 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
     const containerWidth = rect.width;
     const containerHeight = rect.height;
 
-    const startX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const startY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-
-    const startLeft = left;
-    const startRight = right;
-    const startTop = top;
-    const startBottom = bottom;
-
     const onMove = (moveEvent: MouseEvent | TouchEvent) => {
-      // Prevent browser default scroll/pinch behavior while dragging handles
-      if (moveEvent.cancelable) {
-        moveEvent.preventDefault();
-      }
+      if (moveEvent.cancelable) moveEvent.preventDefault();
 
       const currentX = 'touches' in moveEvent ? moveEvent.touches[0].clientX : moveEvent.clientX;
       const currentY = 'touches' in moveEvent ? moveEvent.touches[0].clientY : moveEvent.clientY;
 
-      const dx = currentX - startX;
-      const dy = currentY - startY;
+      // Convert to percentage within container
+      const xPct = Math.max(0, Math.min(100, ((currentX - rect.left) / containerWidth) * 100));
+      const yPct = Math.max(0, Math.min(100, ((currentY - rect.top) / containerHeight) * 100));
 
-      if (edge === 'top') {
-        const dyPercent = (dy / containerHeight) * 100;
-        const newVal = Math.max(0, Math.min(100 - startBottom - 10, startTop + dyPercent));
-        setTop(newVal);
-      } else if (edge === 'bottom') {
-        const dyPercent = (dy / containerHeight) * 100;
-        const newVal = Math.max(0, Math.min(100 - startTop - 10, startBottom - dyPercent));
-        setBottom(newVal);
-      } else if (edge === 'left') {
-        const dxPercent = (dx / containerWidth) * 100;
-        const newVal = Math.max(0, Math.min(100 - startRight - 10, startLeft + dxPercent));
-        setLeft(newVal);
-      } else if (edge === 'right') {
-        const dxPercent = (dx / containerWidth) * 100;
-        const newVal = Math.max(0, Math.min(100 - startLeft - 10, startRight - dxPercent));
-        setRight(newVal);
+      if (corner === 'tl') {
+        setLeft(Math.min(xPct, 100 - right - 10));
+        setTop(Math.min(yPct, 100 - bottom - 10));
+      } else if (corner === 'tr') {
+        setRight(Math.min(100 - xPct, 100 - left - 10));
+        setTop(Math.min(yPct, 100 - bottom - 10));
+      } else if (corner === 'br') {
+        setRight(Math.min(100 - xPct, 100 - left - 10));
+        setBottom(Math.min(100 - yPct, 100 - top - 10));
+      } else if (corner === 'bl') {
+        setLeft(Math.min(xPct, 100 - right - 10));
+        setBottom(Math.min(100 - yPct, 100 - top - 10));
       }
     };
 
@@ -197,46 +183,46 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
               pointerEvents: 'none', // children handles will explicitly enable auto pointerEvents
             }}
           >
-            {/* Corner Indicators */}
-            <div className="absolute -top-1 -left-1 w-3 h-3 border-t-2 border-l-2 border-emerald-400"></div>
-            <div className="absolute -top-1 -right-1 w-3 h-3 border-t-2 border-r-2 border-emerald-400"></div>
-            <div className="absolute -bottom-1 -left-1 w-3 h-3 border-b-2 border-l-2 border-emerald-400"></div>
-            <div className="absolute -bottom-1 -right-1 w-3 h-3 border-b-2 border-r-2 border-emerald-400"></div>
+            {/* Corner Indicators - visual only */}
+            <div className="absolute -top-1 -left-1 w-3 h-3 border-t-2 border-l-2 border-emerald-400" />
+            <div className="absolute -top-1 -right-1 w-3 h-3 border-t-2 border-r-2 border-emerald-400" />
+            <div className="absolute -bottom-1 -left-1 w-3 h-3 border-b-2 border-l-2 border-emerald-400" />
+            <div className="absolute -bottom-1 -right-1 w-3 h-3 border-b-2 border-r-2 border-emerald-400" />
 
-            {/* Top border touch handle */}
+            {/* Top-Left corner handle */}
             <div
-              onMouseDown={(e) => handleStartDrag(e, 'top')}
-              onTouchStart={(e) => handleStartDrag(e, 'top')}
-              className="absolute -top-4 left-1/2 -translate-x-1/2 w-16 h-8 flex items-center justify-center cursor-ns-resize pointer-events-auto group"
+              onMouseDown={(e) => handleCornerDrag(e, 'tl')}
+              onTouchStart={(e) => handleCornerDrag(e, 'tl')}
+              className="absolute -top-5 -left-5 w-10 h-10 flex items-center justify-center cursor-nwse-resize pointer-events-auto"
             >
-              <div className="w-10 h-1.5 bg-emerald-400 rounded-full border border-emerald-500 shadow-md group-hover:bg-emerald-300 transition-colors" />
+              <div className="w-5 h-5 rounded-full bg-emerald-400 border-2 border-white shadow-md" />
             </div>
 
-            {/* Bottom border touch handle */}
+            {/* Top-Right corner handle */}
             <div
-              onMouseDown={(e) => handleStartDrag(e, 'bottom')}
-              onTouchStart={(e) => handleStartDrag(e, 'bottom')}
-              className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-16 h-8 flex items-center justify-center cursor-ns-resize pointer-events-auto group"
+              onMouseDown={(e) => handleCornerDrag(e, 'tr')}
+              onTouchStart={(e) => handleCornerDrag(e, 'tr')}
+              className="absolute -top-5 -right-5 w-10 h-10 flex items-center justify-center cursor-nesw-resize pointer-events-auto"
             >
-              <div className="w-10 h-1.5 bg-emerald-400 rounded-full border border-emerald-500 shadow-md group-hover:bg-emerald-300 transition-colors" />
+              <div className="w-5 h-5 rounded-full bg-emerald-400 border-2 border-white shadow-md" />
             </div>
 
-            {/* Left border touch handle */}
+            {/* Bottom-Right corner handle */}
             <div
-              onMouseDown={(e) => handleStartDrag(e, 'left')}
-              onTouchStart={(e) => handleStartDrag(e, 'left')}
-              className="absolute top-1/2 -translate-y-1/2 -left-4 w-8 h-16 flex items-center justify-center cursor-ew-resize pointer-events-auto group"
+              onMouseDown={(e) => handleCornerDrag(e, 'br')}
+              onTouchStart={(e) => handleCornerDrag(e, 'br')}
+              className="absolute -bottom-5 -right-5 w-10 h-10 flex items-center justify-center cursor-nwse-resize pointer-events-auto"
             >
-              <div className="w-1.5 h-10 bg-emerald-400 rounded-full border border-emerald-500 shadow-md group-hover:bg-emerald-300 transition-colors" />
+              <div className="w-5 h-5 rounded-full bg-emerald-400 border-2 border-white shadow-md" />
             </div>
 
-            {/* Right border touch handle */}
+            {/* Bottom-Left corner handle */}
             <div
-              onMouseDown={(e) => handleStartDrag(e, 'right')}
-              onTouchStart={(e) => handleStartDrag(e, 'right')}
-              className="absolute top-1/2 -translate-y-1/2 -right-4 w-8 h-16 flex items-center justify-center cursor-ew-resize pointer-events-auto group"
+              onMouseDown={(e) => handleCornerDrag(e, 'bl')}
+              onTouchStart={(e) => handleCornerDrag(e, 'bl')}
+              className="absolute -bottom-5 -left-5 w-10 h-10 flex items-center justify-center cursor-nesw-resize pointer-events-auto"
             >
-              <div className="w-1.5 h-10 bg-emerald-400 rounded-full border border-emerald-500 shadow-md group-hover:bg-emerald-300 transition-colors" />
+              <div className="w-5 h-5 rounded-full bg-emerald-400 border-2 border-white shadow-md" />
             </div>
 
           </div>
@@ -246,7 +232,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
       {/* Control Area (Sliders removed, Replaced with 'Retake' Button) */}
       <div className="p-6 bg-slate-900/60 border-t border-slate-900 flex flex-col items-center space-y-4 pb-8">
         <p className="text-[11px] text-slate-500 font-semibold text-center leading-relaxed">
-          💡 가이드라인의 초록색 타원형 핸들을 직접 드래그하여 문제 영역을 맞춘 후, 우측 상단의 '자르기 완료'를 누르세요.
+          💡 4개의 초록색 꼭짓점을 드래그하여 문제 영역을 맞춘 후, 우측 상단의 '자르기 완료'를 누르세요.
         </p>
 
         <button
