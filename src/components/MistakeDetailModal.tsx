@@ -134,27 +134,12 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
           </div>
 
           {/* 3-Step Review Status Selection Card */}
-          <div className="bg-slate-950 p-4 rounded-2xl border border-slate-850 space-y-3">
+          <div className="bg-slate-950 p-4 rounded-2xl border border-slate-850 space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-300 flex items-center">
                 <span className="mr-1 text-sm">📋</span> 복습 상태 진단 (3회 완료 시 보관함 이동)
               </span>
-              <div className="flex flex-col items-end space-y-1 flex-none">
-                {selectedEntry.reviews?.every(r => r !== '') && (
-                  <button
-                    onClick={() => {
-                      if (confirm('틀리거나 보류한 기록을 정리하고 맞춘(O) 기록만 앞으로 정렬하여 다시 복습하시겠습니까?')) {
-                        const oReviews = (selectedEntry.reviews || []).filter(r => r === 'O');
-                        const newReviews = [...oReviews, '', ''].slice(0, 3) as ReviewState[];
-                        onUpdateReviews(selectedEntry.id, newReviews);
-                      }
-                    }}
-                    className="text-[9px] text-indigo-400 hover:text-indigo-300 font-bold flex items-center space-x-1 bg-indigo-500/10 hover:bg-indigo-500/20 px-2 py-0.5 rounded border border-indigo-500/20 transition-all active:scale-95"
-                  >
-                    <span>🔄</span>
-                    <span>기록 정리</span>
-                  </button>
-                )}
+              <div className="flex-none">
                 {selectedEntry.reviews?.filter(r => r === 'O').length === 3 ? (
                   <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30 font-bold">
                     🎉 복습 완료
@@ -212,6 +197,22 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 );
               })}
             </div>
+
+            {/* Prominent Reset Button below the grid */}
+            {selectedEntry.reviews?.every(r => r !== '') && (
+              <button
+                onClick={() => {
+                  if (confirm('틀리거나 보류한 기록을 정리하고 맞춘(O) 기록만 앞으로 정렬하여 다시 복습하시겠습니까?')) {
+                    const oReviews = (selectedEntry.reviews || []).filter(r => r === 'O');
+                    const newReviews = [...oReviews, '', ''].slice(0, 3) as ReviewState[];
+                    onUpdateReviews(selectedEntry.id, newReviews);
+                  }
+                }}
+                className="w-full py-2.5 rounded-xl bg-indigo-600/10 hover:bg-indigo-600/20 active:scale-95 border border-indigo-500/20 text-indigo-400 font-bold text-xs transition-all flex items-center justify-center space-x-1.5 mt-1"
+              >
+                <span>🔄 맞춘 오답 제외하고 복습 기록 정리하기</span>
+              </button>
+            )}
           </div>
 
           {/* Conditional Step-by-Step Hints Card (Shown only when struggling X / Star) */}
