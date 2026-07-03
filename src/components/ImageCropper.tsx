@@ -7,8 +7,8 @@ interface ImageCropperProps {
 }
 
 export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComplete, onCancel }) => {
-  const [left, setLeft] = useState(15);
-  const [right, setRight] = useState(15);
+  const [left, setLeft] = useState(10);
+  const [right, setRight] = useState(10);
   const [top, setTop] = useState(20);
   const [bottom, setBottom] = useState(20);
   const [isProcessing, setIsProcessing] = useState(false);
