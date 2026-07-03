@@ -53,6 +53,9 @@
   - [BottomNavigation.tsx](file:///c:/Users/USER/Documents/ReviewNotes/src/components/BottomNavigation.tsx): 하단 바에 새로운 `✅ 복습완료` 탭을 추가하여, 3회 복습이 완료된 마스터 오답 문제들만 따로 모아서 볼 수 있는 보관함 기능을 추가했습니다.
 - **Supabase DB 스키마 업데이트 가이드**:
   - 복습 이력을 클라우드에 온전히 동기화하기 위해 [supabase_setup.sql](file:///c:/Users/USER/Documents/ReviewNotes/supabase_setup.sql)에 `reviews` 컬럼 추가 SQL문을 갱신해 두었습니다. (Supabase SQL Editor에서 실행 필요)
+- **AI 피드백 프롬프트 고도화**:
+  - 제공해주신 예시 오답노트 PDF 이미지의 구조와 정확히 일치하도록 [gemini.ts](file:///c:/Users/USER/Documents/ReviewNotes/src/services/gemini.ts) 프롬프트를 고도화했습니다.
+  - 이제 AI가 생성하는 풀이 과정은 소문제 단위로 깔끔히 줄바꿈/들여쓰기되어 LaTeX 수식으로 구성되며, 실수 분석은 **`오답 분석 가이드`**, 대책 처방은 **`발상 & 개념 클리닉`** 헤더와 함께 약속된 포맷으로 정밀 분석을 수행합니다.
 
 ---
 
