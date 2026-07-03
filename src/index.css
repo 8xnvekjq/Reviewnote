@@ -28,6 +28,10 @@
   padding-bottom: calc(env(safe-area-inset-bottom) + 1rem) !important;
 }
 
+.bottom-nav-safe {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 0.5rem) !important;
+}
+
 /* Custom CSS Keyframes and Animation Utilities for Premium UX */
 @keyframes slideUp {
   from {

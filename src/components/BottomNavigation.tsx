@@ -8,7 +8,7 @@ interface BottomNavigationProps {
 
 export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, setActiveTab }) => {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-800/80 bg-slate-900/90 backdrop-blur-lg flex items-center justify-around px-6 py-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] shadow-xl shadow-black/40">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-800/80 bg-slate-900/90 backdrop-blur-lg flex items-center justify-around px-6 py-2 bottom-nav-safe shadow-xl shadow-black/40">
       {/* Tab 1: Notes List */}
       <button 
         onClick={() => setActiveTab('notes')}
