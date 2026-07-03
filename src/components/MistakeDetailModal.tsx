@@ -139,18 +139,20 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
               <span className="text-xs font-bold text-slate-300 flex items-center">
                 <span className="mr-1 text-sm">📋</span> 복습 상태 진단 (3회 완료 시 보관함 이동)
               </span>
-              <div className="flex items-center space-x-2">
-                {selectedEntry.reviews?.some(r => r !== '') && (
+              <div className="flex flex-col items-end space-y-1 flex-none">
+                {selectedEntry.reviews?.every(r => r !== '') && (
                   <button
                     onClick={() => {
-                      if (confirm('이 문제의 3단계 복습 기록을 모두 초기화하고 처음부터 다시 시작하시겠습니까?')) {
-                        onUpdateReviews(selectedEntry.id, ['', '', '']);
+                      if (confirm('틀리거나 보류한 기록을 정리하고 맞춘(O) 기록만 앞으로 정렬하여 다시 복습하시겠습니까?')) {
+                        const oReviews = (selectedEntry.reviews || []).filter(r => r === 'O');
+                        const newReviews = [...oReviews, '', ''].slice(0, 3) as ReviewState[];
+                        onUpdateReviews(selectedEntry.id, newReviews);
                       }
                     }}
-                    className="text-[10px] text-indigo-400 hover:text-indigo-300 font-bold flex items-center space-x-1 bg-indigo-500/10 hover:bg-indigo-500/20 px-2.5 py-1 rounded-lg border border-indigo-500/25 transition-all active:scale-95"
+                    className="text-[9px] text-indigo-400 hover:text-indigo-300 font-bold flex items-center space-x-1 bg-indigo-500/10 hover:bg-indigo-500/20 px-2 py-0.5 rounded border border-indigo-500/20 transition-all active:scale-95"
                   >
                     <span>🔄</span>
-                    <span>기록 초기화</span>
+                    <span>기록 정리</span>
                   </button>
                 )}
                 {selectedEntry.reviews?.filter(r => r === 'O').length === 3 ? (
