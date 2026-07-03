@@ -32,7 +32,7 @@ function App() {
       if (session?.user) {
         const username = session.user.email?.split('@')[0] || 'User';
         setCurrentUser(username);
-        fetchUserData(session.user.id);
+        fetchUserData();
       }
     });
 
@@ -42,7 +42,7 @@ function App() {
       if (session?.user) {
         const username = session.user.email?.split('@')[0] || 'User';
         setCurrentUser(username);
-        fetchUserData(session.user.id);
+        fetchUserData();
       } else {
         setCurrentUser('');
         setMistakes([]);
@@ -53,7 +53,7 @@ function App() {
   }, []);
 
   // Fetch mistakes from Supabase
-  const fetchUserData = async (userId: string) => {
+  const fetchUserData = async () => {
     try {
       const { data: dbMistakes, error: mistakesError } = await supabase
         .from('mistakes')
