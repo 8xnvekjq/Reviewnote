@@ -1,12 +1,33 @@
 import React from 'react';
 import logoImg from '../assets/logo.jpg';
 
+// vite.config.ts의 define 블록에서 빌드 시 자동 주입
+declare const __APP_VERSION__: string;
+declare const __BUILD_TIME__: string;
+
+// UTC → KST(+9) 변환 후 MM.DD HH:mm 포맷으로 반환
+const formatBuildTime = (iso: string): string => {
+  try {
+    const d = new Date(iso);
+    d.setHours(d.getHours() + 9); // UTC → KST
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return `${mm}.${dd} ${hh}:${min}`;
+  } catch {
+    return '—';
+  }
+};
+
 interface HeaderProps {
   currentUser: string;
   onLogout: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout }) => {
+  const buildLabel = `v${__APP_VERSION__} (${formatBuildTime(__BUILD_TIME__)})`;
+
   return (
     <header className="safe-top flex-none border-b border-slate-800 bg-slate-900/90 backdrop-blur-md px-6 py-4 flex items-center justify-between sticky top-0 z-30">
       <div className="flex items-center space-x-2.5">
@@ -20,7 +41,7 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout }) => {
             오답클리닉
           </h1>
           <span className="text-[8px] font-bold text-slate-500 mt-0.5">
-            최신 업데이트: v1.5.0 (07.03 14:52:20)
+            최신 업데이트: {buildLabel}
           </span>
         </div>
       </div>
