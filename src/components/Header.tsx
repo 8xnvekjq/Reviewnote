@@ -5,15 +5,17 @@ import logoImg from '../assets/logo.jpg';
 declare const __APP_VERSION__: string;
 declare const __BUILD_TIME__: string;
 
-// UTC → KST(+9) 변환 후 MM.DD HH:mm 포맷으로 반환
+// UTC → KST(+9) 강제 변환 후 MM.DD HH:mm 포맷으로 반환 (서버/클라이언트 타임존 영향 방지)
 const formatBuildTime = (iso: string): string => {
   try {
-    const d = new Date(iso);
-    d.setHours(d.getHours() + 9); // UTC → KST
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    const hh = String(d.getHours()).padStart(2, '0');
-    const min = String(d.getMinutes()).padStart(2, '0');
+    const utcDate = new Date(iso);
+    // UTC 시간에 9시간 밀리초를 명시적으로 더함
+    const kstDate = new Date(utcDate.getTime() + 9 * 60 * 60 * 1000);
+    
+    const mm = String(kstDate.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(kstDate.getUTCDate()).padStart(2, '0');
+    const hh = String(kstDate.getUTCHours()).padStart(2, '0');
+    const min = String(kstDate.getUTCMinutes()).padStart(2, '0');
     return `${mm}.${dd} ${hh}:${min}`;
   } catch {
     return '—';

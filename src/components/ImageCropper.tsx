@@ -231,31 +231,33 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
         </div>
       </div>
 
-      {/* Control Area: 촬영 완료(자르기 완료)를 하단에 크게 강조 배치 */}
+      {/* Control Area: 촬영 완료(자르기 완료)와 다시 촬영을 수평 배치 */}
       <div className="p-5 bg-slate-900/60 border-t border-slate-900 flex flex-col items-center space-y-3 pb-8">
         <p className="text-[10px] text-slate-500 font-semibold text-center leading-relaxed mb-1">
-          💡 초록색 꼭짓점을 조절해 문제 영역을 지정하고 아래 버튼을 누르세요.
+          💡 초록색 꼭짓점을 조절해 문제 영역을 지정하고 촬영 완료를 누르세요.
         </p>
 
-        {/* 메인 액션: 촬영 완료 (자르기) */}
-        <button
-          onClick={executeCrop}
-          disabled={isProcessing}
-          className="w-full max-w-xs py-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 active:scale-95 text-slate-950 font-black text-sm flex items-center justify-center space-x-2 transition-all shadow-lg shadow-emerald-500/10"
-        >
-          <span>📸</span>
-          <span>{isProcessing ? '처리 중...' : '촬영 완료 (자르기)'}</span>
-        </button>
+        <div className="flex items-center space-x-3 w-full max-w-xs justify-center">
+          {/* 보조 액션: 다시 촬영하기 (수평 왼쪽 작은 아이콘 버튼) */}
+          <button
+            onClick={onCancel}
+            disabled={isProcessing}
+            title="다시 촬영하기"
+            className="w-12 h-12 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 border border-slate-700/60 flex items-center justify-center transition-all flex-none shadow-lg"
+          >
+            <span className="text-lg">🔄</span>
+          </button>
 
-        {/* 보조 액션: 다시 촬영하기 */}
-        <button
-          onClick={onCancel}
-          disabled={isProcessing}
-          className="w-full max-w-xs py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 active:scale-95 text-slate-300 font-bold text-xs border border-slate-700/60 flex items-center justify-center space-x-1.5 transition-all"
-        >
-          <span>🔄</span>
-          <span>다시 촬영하기</span>
-        </button>
+          {/* 메인 액션: 촬영 완료 (오른쪽 채우는 큰 버튼) */}
+          <button
+            onClick={executeCrop}
+            disabled={isProcessing}
+            className="flex-1 py-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 active:scale-95 text-slate-950 font-black text-sm flex items-center justify-center space-x-2 transition-all shadow-lg shadow-emerald-500/10"
+          >
+            <span>📸</span>
+            <span>{isProcessing ? '처리 중...' : '촬영 완료'}</span>
+          </button>
+        </div>
       </div>
 
     </div>
