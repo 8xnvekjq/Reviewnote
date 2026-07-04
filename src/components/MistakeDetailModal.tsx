@@ -349,38 +349,32 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
           )}
           {/* ⚡ AI 추천 동영상 딥링크 연동 카드 (test 학생 한정) */}
           {matchedLecture && (
-            <div className="bg-gradient-to-r from-red-950/20 to-slate-900 border border-red-500/20 rounded-2xl p-4.5 space-y-3 shadow-lg animate-scale-up">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black text-red-400 flex items-center space-x-1.5">
-                  <span className="text-base animate-pulse">📺</span>
-                  <span>선생님의 개념 추천 강의</span>
-                </span>
-                <span className="text-[9px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded-full border border-red-500/20 font-bold">
-                  유튜브 앱 즉시 연동
-                </span>
-              </div>
-
-              <div className="space-y-1">
-                <h5 className="text-xs font-bold text-white leading-snug line-clamp-1">
-                  {matchedLecture.videoTitle}
-                </h5>
-                <p className="text-[11px] text-slate-400">
-                  📍 재생 구간: <span className="text-amber-400 font-semibold">{matchedLecture.chapterTitle}</span> ({
-                    Math.floor(matchedLecture.startSeconds / 60) > 0 
-                      ? `${Math.floor(matchedLecture.startSeconds / 60)}분 ${matchedLecture.startSeconds % 60}초` 
-                      : `${matchedLecture.startSeconds % 60}초`
-                  }부터)
-                </p>
+            <div className="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-3.5 flex items-center justify-between space-x-3.5 animate-scale-up">
+              <div className="flex items-center space-x-3 min-w-0">
+                <span className="text-xl flex-none">📺</span>
+                <div className="min-w-0 space-y-0.5">
+                  <p className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">선생님 추천 강의</p>
+                  <h5 className="text-xs font-bold text-slate-300 truncate leading-tight">
+                    {matchedLecture.videoTitle}
+                  </h5>
+                  <p className="text-[10px] text-slate-400 truncate">
+                    ⏱️ {matchedLecture.chapterTitle} ({
+                      Math.floor(matchedLecture.startSeconds / 60) > 0 
+                        ? `${Math.floor(matchedLecture.startSeconds / 60)}분 ${matchedLecture.startSeconds % 60}초` 
+                        : `${matchedLecture.startSeconds % 60}초`
+                    }부터)
+                  </p>
+                </div>
               </div>
 
               <a
                 href={`https://youtu.be/${matchedLecture.videoId}?t=${matchedLecture.startSeconds}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-500 active:scale-95 text-white font-bold text-xs flex items-center justify-center space-x-2 transition-all shadow-md shadow-red-600/15"
+                className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-95 text-red-400 hover:text-red-300 font-extrabold text-[10px] border border-slate-800 transition-all flex items-center space-x-1 flex-none shadow-md"
               >
                 <span>▶️</span>
-                <span>강의 시간대로 바로 가기</span>
+                <span>바로가기</span>
               </a>
             </div>
           )}
