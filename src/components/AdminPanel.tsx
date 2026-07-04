@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import type { AdminUserStat, MistakeEntry } from '../types';
 import { supabase } from '../services/supabase';
 import { formatDate } from '../utils/date';
+import { ROOT_CAUSE_OPTIONS } from '../types';
 
 export const AdminPanel: React.FC = () => {
   const [stats, setStats] = useState<AdminUserStat[]>([]);
@@ -374,22 +375,25 @@ export const AdminPanel: React.FC = () => {
             <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
               <img src={previewEntry.imageUrl} alt={previewEntry.title} className="w-full rounded-xl border border-slate-800 object-contain max-h-72" />
               {previewEntry.analysis && (
-                <>
-                  <div className="bg-slate-950 rounded-xl border border-slate-800 p-4">
-                    <p className="text-[10px] font-bold text-indigo-400 mb-2">💡 정석 풀이</p>
-                    <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{previewEntry.analysis.solvingProcess.replace(/\$[^$]+\$/g, '[수식]').slice(0, 300)}{previewEntry.analysis.solvingProcess.length > 300 ? '...' : ''}</p>
+                <div className="bg-slate-950 rounded-xl border border-slate-800 p-4">
+                  <p className="text-[10px] font-bold text-indigo-400 mb-2">💡 정석 풀이</p>
+                  <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{previewEntry.analysis.solvingProcess.replace(/\$[^$]+\$/g, '[수식]').slice(0, 300)}{previewEntry.analysis.solvingProcess.length > 300 ? '...' : ''}</p>
+                </div>
+              )}
+              {previewEntry.rootCauses && previewEntry.rootCauses.length > 0 && (
+                <div className="bg-slate-950 rounded-xl border border-slate-800 p-4 space-y-2">
+                  <p className="text-[10px] font-bold text-amber-400">⚠️ 선택된 실수 원인</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {previewEntry.rootCauses.map(rc => {
+                      const opt = ROOT_CAUSE_OPTIONS.find(o => o.id === rc);
+                      return opt ? (
+                        <span key={rc} className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-semibold">
+                          {opt.label}
+                        </span>
+                      ) : null;
+                    })}
                   </div>
-                  <div className="bg-slate-950 rounded-xl border border-slate-800 p-4">
-                    <p className="text-[10px] font-bold text-amber-400 mb-2">🔍 틀린 이유</p>
-                    <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{previewEntry.analysis.rootCause}</p>
-                  </div>
-                  {previewEntry.analysis.actionPlan && (
-                    <div className="bg-slate-950 rounded-xl border border-slate-800 p-4">
-                      <p className="text-[10px] font-bold text-emerald-400 mb-2">🛡️ 핵심 처방</p>
-                      <p className="text-xs text-slate-300 leading-relaxed">{previewEntry.analysis.actionPlan}</p>
-                    </div>
-                  )}
-                </>
+                </div>
               )}
               {previewEntry.userActionPlan && (
                 <div className="bg-emerald-950/30 rounded-xl border border-emerald-800/30 p-4">

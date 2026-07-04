@@ -20,27 +20,10 @@ const NORMAL_PHRASES = [
   '문제 이미지 분석 중...',
   '수학 수식 및 기호 판독 중...',
   '지문 텍스트 복원 중...',
-  '문제 해결을 위한 핵심 개념 탐색 중...',
-  '변수 및 조건 추출하는 중...',
-  '오답 원인 분석 중...',
-  '정석 풀이 흐름 설계 중...',
-  '실수 유발 지점 파악 중...',
-  '발상 및 개념 클리닉 처방 중...',
-  '단계별 힌트 작성 중...',
-  'LaTeX 수식 가독성 다듬는 중...'
-];
-
-const GAG_PHRASES = [
-  '귀여운 강아지 쓰다듬는 중...',
-  '당 보충용 초콜릿 까먹는 중...',
-  '수식 계산기 기름칠하는 중...',
-  '인공지능 뉴런 스트레칭 중...',
-  '커피 원두 가는 중...',
-  '조금만 더 힘내라고 수식 격려하는 중...',
-  '연필심 깎는 중...',
-  '답안지 슬쩍 엿보는 중... (은 장난입니다)',
-  '수학 요정 소환하는 중...',
-  '우주 에너지를 수식으로 모으는 중...'
+  '개념 검색 중...',
+  '정석 풀이 작성 중...',
+  '단계별 힌트 구성 중...',
+  '과목 및 단원 분류 중...'
 ];
 
 export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
@@ -62,26 +45,53 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   const [editActionPlan, setEditActionPlan] = React.useState(selectedEntry.userActionPlan || '');
   const [isSaving, setIsSaving] = React.useState(false);
 
+  // Accordion toggle states
+  const [showProblemText, setShowProblemText] = React.useState(false);
+  const [showSolvingProcess, setShowSolvingProcess] = React.useState(true); // Default open for study
+
   const chaptersForGrade = editGrade ? (MATH_CURRICULUM[editGrade] || []) : [];
 
-  // Accordion toggle states for analysis cards
-  const [showProblemText, setShowProblemText] = React.useState(false);
-  const [showSolvingProcess, setShowSolvingProcess] = React.useState(false);
-  const [showMistakeDetail, setShowMistakeDetail] = React.useState(false);
-  const [showActionPlan, setShowActionPlan] = React.useState(false);
-
-  // Reset all states when entry changes
+  // ★ 버그 수정: AI 분석이 끝나서 selectedEntry 데이터가 갱신되면 로컬 상태도 자동으로 갱신 동기화합니다.
   React.useEffect(() => {
     setRevealedHintCount(0);
     setShowProblemText(false);
-    setShowSolvingProcess(false);
-    setShowMistakeDetail(false);
-    setShowActionPlan(false);
+    setShowSolvingProcess(true);
     setEditGrade(selectedEntry.grade || '');
     setEditChapter(selectedEntry.chapter || '');
     setEditRootCauses(selectedEntry.rootCauses || []);
     setEditActionPlan(selectedEntry.userActionPlan || '');
-  }, [selectedEntry.id]);
+  }, [
+    selectedEntry.id, 
+    selectedEntry.grade, 
+    selectedEntry.chapter, 
+    selectedEntry.rootCauses, 
+    selectedEntry.userActionPlan
+  ]);
+
+  // Loading text cycling effect
+  React.useEffect(() => {
+    if (!isAnalyzing) {
+      setLoadingText('처리 중...');
+      return;
+    }
+    
+    setLoadingText('문제 분석을 시작합니다...');
+
+    const interval = setInterval(() => {
+      const nextText = NORMAL_PHRASES[Math.floor(Math.random() * NORMAL_PHRASES.length)];
+      setLoadingText(nextText);
+    }, 1500);
+
+    return () => clearInterval(interval);
+  }, [isAnalyzing]);
+
+  const hasStruggled = selectedEntry.reviews?.some(r => r === 'X' || r === 'star');
+
+  const handleReviewToggle = (index: number, state: ReviewState) => {
+    const currentReviews = [...(selectedEntry.reviews || ['', '', ''])];
+    currentReviews[index] = currentReviews[index] === state ? '' : state;
+    onUpdateReviews(selectedEntry.id, currentReviews as ReviewState[]);
+  };
 
   const toggleRootCause = (id: string) => {
     setEditRootCauses(prev =>
@@ -89,6 +99,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     );
   };
 
+  // ★ 저장하기 피드백 개선: 완료 알림 띄우고 모달 닫기
   const handleSave = async () => {
     setIsSaving(true);
     try {
@@ -101,7 +112,9 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
           user_action_plan: editActionPlan || null,
         })
         .eq('id', selectedEntry.id);
+      
       if (error) throw error;
+      
       onUpdateEntry({
         ...selectedEntry,
         grade: editGrade || undefined,
@@ -109,40 +122,14 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
         rootCauses: editRootCauses,
         userActionPlan: editActionPlan || undefined,
       });
+
+      alert('성공적으로 저장되었습니다! 🎉');
+      onClose(); // 저장 완료 후 모달창을 자동으로 닫아 위화감을 없앱니다.
     } catch (err: any) {
       alert('저장 실패: ' + err.message);
     } finally {
       setIsSaving(false);
     }
-  };
-
-  // Loading text cycling effect
-  React.useEffect(() => {
-    if (!isAnalyzing) {
-      setLoadingText('처리 중...');
-      return;
-    }
-    
-    setLoadingText('문제 분석을 시작합니다...');
-
-    const interval = setInterval(() => {
-      const isGag = Math.random() < 0.2; // 1/5 probability
-      const pool = isGag ? GAG_PHRASES : NORMAL_PHRASES;
-      const nextText = pool[Math.floor(Math.random() * pool.length)];
-      setLoadingText(nextText);
-    }, 1500);
-
-    return () => clearInterval(interval);
-  }, [isAnalyzing]);
-
-  
-  // Visibility condition: Show hints only when student struggled (marked X or star)
-  const hasStruggled = selectedEntry.reviews?.some(r => r === 'X' || r === 'star');
-
-  const handleReviewToggle = (index: number, state: ReviewState) => {
-    const currentReviews = [...(selectedEntry.reviews || ['', '', ''])];
-    currentReviews[index] = currentReviews[index] === state ? '' : state;
-    onUpdateReviews(selectedEntry.id, currentReviews as ReviewState[]);
   };
 
   return (
@@ -168,7 +155,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
         {/* Modal Body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           
-          {/* Problem Image Preview - displayed in full, uncropped */}
+          {/* Problem Image Preview */}
           <div className="w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center relative p-2 min-h-[200px]">
             <img 
               src={selectedEntry.imageUrl} 
@@ -203,7 +190,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                   <div key={index} className="bg-slate-900 p-2.5 rounded-xl border border-slate-800 text-center space-y-2">
                     <div className="text-[10px] font-bold text-slate-500">{index + 1}차 복습</div>
                     <div className="flex items-center justify-center space-x-1.5">
-                      {/* O Button */}
                       <button
                         onClick={() => handleReviewToggle(index, 'O')}
                         className={`w-7 h-7 rounded-full text-xs font-bold transition-all flex items-center justify-center ${
@@ -214,7 +200,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                       >
                         O
                       </button>
-                      {/* X Button */}
                       <button
                         onClick={() => handleReviewToggle(index, 'X')}
                         className={`w-7 h-7 rounded-full text-xs font-bold transition-all flex items-center justify-center ${
@@ -225,7 +210,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                       >
                         X
                       </button>
-                      {/* Star Button */}
                       <button
                         onClick={() => handleReviewToggle(index, 'star')}
                         className={`w-7 h-7 rounded-full text-xs font-bold transition-all flex items-center justify-center ${
@@ -242,7 +226,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
               })}
             </div>
 
-            {/* Prominent Reset Button below the grid */}
             {selectedEntry.reviews?.every(r => r !== '') && (
               <button
                 onClick={() => {
@@ -259,7 +242,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             )}
           </div>
 
-          {/* Conditional Step-by-Step Hints Card (Shown only when struggling X / Star) */}
+          {/* Conditional Step-by-Step Hints Card */}
           {hasStruggled && selectedEntry.analysis?.hints && selectedEntry.analysis.hints.length > 0 && (
             <div className="bg-slate-950 p-4.5 rounded-2xl border border-slate-850 space-y-3 animate-scale-up">
               <div className="flex items-center justify-between">
@@ -271,7 +254,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 </span>
               </div>
 
-              {/* Render revealed hints */}
               <div className="space-y-2.5">
                 {selectedEntry.analysis.hints.slice(0, revealedHintCount).map((hint, i) => (
                   <div key={i} className="p-3 bg-slate-900/60 rounded-xl border border-slate-800 animate-scale-up space-y-1">
@@ -296,19 +278,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             </div>
           )}
 
-          {/* Fallback for older entries without hints or problem text */}
-          {selectedEntry.analysis && (!selectedEntry.analysis.problemText || !selectedEntry.analysis.hints || selectedEntry.analysis.hints.length === 0) && (
-            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-850 text-center space-y-3 animate-scale-up">
-              <span className="text-xs text-slate-400 block">💡 이 오답 기록은 문제 지문 복원 및 힌트 데이터가 생성되지 않은 이전 버전 항목입니다.</span>
-              <button
-                onClick={() => onStartAnalysis(selectedEntry)}
-                className="px-4 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700 active:scale-95 text-[10px] font-bold text-white transition-all border border-slate-700"
-              >
-                AI 분석 재실행하여 지문 및 힌트 생성하기
-              </button>
-            </div>
-          )}
-
+          {/* AI Analysis trigger / solving process rendering */}
           {isAnalyzing ? (
             <div className="py-12 flex flex-col items-center justify-center space-y-4">
               <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
@@ -361,56 +331,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                   </div>
                 )}
               </div>
-
-              {/* Card 2: 실수 & 틀린 이유 분석 */}
-              <div className="space-y-2 border-l-4 border-amber-500 pl-4 py-1">
-                <button
-                  onClick={() => setShowMistakeDetail(!showMistakeDetail)}
-                  className="w-full flex items-center justify-between text-left focus:outline-none group"
-                >
-                  <h4 className="text-sm font-extrabold text-amber-400 flex items-center group-hover:text-amber-300 transition-colors">
-                    <span className="mr-1.5 text-base">🔍</span> 틀린 이유 분석
-                  </h4>
-                  <span className="text-xs text-slate-500 font-bold mr-1 group-hover:text-slate-400 transition-colors">
-                    {showMistakeDetail ? '▲ 닫기' : '▼ 보기'}
-                  </span>
-                </button>
-                {showMistakeDetail && (
-                  <div className="bg-slate-950 p-4.5 rounded-2xl border border-slate-850 space-y-4 animate-scale-up mt-2">
-                    {/* 실수 분석 상세 */}
-                    <div className="space-y-1.5">
-                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">실수 지점</span>
-                      <LaTeXRenderer text={selectedEntry.analysis.mistakeDetail} className="text-sm md:text-base leading-relaxed" />
-                    </div>
-                    
-                    {/* 오개념 근본 원인 */}
-                    <div className="pt-3.5 border-t border-slate-850 space-y-1.5">
-                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">틀린 원인</span>
-                      <LaTeXRenderer text={selectedEntry.analysis.rootCause} className="text-sm md:text-base leading-relaxed text-red-300" />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Card 3: 재발 방지 대책 */}
-              <div className="space-y-2 border-l-4 border-emerald-500 pl-4 py-1">
-                <button
-                  onClick={() => setShowActionPlan(!showActionPlan)}
-                  className="w-full flex items-center justify-between text-left focus:outline-none group"
-                >
-                  <h4 className="text-sm font-extrabold text-emerald-400 flex items-center group-hover:text-emerald-300 transition-colors">
-                    <span className="mr-1.5 text-base">🛡️</span> 재발 방지 대책
-                  </h4>
-                  <span className="text-xs text-slate-500 font-bold mr-1 group-hover:text-slate-400 transition-colors">
-                    {showActionPlan ? '▲ 닫기' : '▼ 보기'}
-                  </span>
-                </button>
-                {showActionPlan && (
-                  <div className="bg-slate-950 p-4.5 rounded-2xl border border-slate-850 animate-scale-up mt-2">
-                    <LaTeXRenderer text={selectedEntry.analysis.actionPlan} className="text-sm md:text-base leading-relaxed" />
-                  </div>
-                )}
-              </div>
             </div>
           ) : (
             <div className="py-8 bg-slate-950/60 rounded-2xl border border-slate-800 p-6 text-center space-y-4">
@@ -429,8 +349,9 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
               </button>
             </div>
           )}
+
           {/* ── 학생 입력 영역 ── */}
-          <div className="border border-slate-800 rounded-2xl overflow-hidden">
+          <div className="border border-slate-800 rounded-2xl overflow-hidden bg-slate-950/30">
             <div className="bg-slate-800/50 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between">
               <span className="text-xs font-extrabold text-slate-300">✏️ 오답 클리닉 기록</span>
               {(selectedEntry.grade || selectedEntry.rootCauses?.length) && (
@@ -447,7 +368,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-slate-400 block">과목 (AI 자동분류)</label>
                   <select value={editGrade} onChange={e => { setEditGrade(e.target.value); setEditChapter(''); }}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer">
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer">
                     <option value="">선택하세요</option>
                     {GRADE_LIST.map(g => <option key={g} value={g}>{g}</option>)}
                   </select>
@@ -456,7 +377,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                   <label className="text-[11px] font-bold text-slate-400 block">단원</label>
                   <select value={editChapter} onChange={e => setEditChapter(e.target.value)}
                     disabled={!editGrade}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer disabled:opacity-40">
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer disabled:opacity-40">
                     <option value="">선택하세요</option>
                     {chaptersForGrade.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
@@ -488,15 +409,15 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 </div>
               </div>
 
-              {/* 나만의 대삵 */}
+              {/* 나만의 대책 */}
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-slate-400 block">나만의 대첵 (직접 작성)</label>
+                <label className="text-[11px] font-bold text-slate-400 block">나만의 대책 (직접 작성)</label>
                 <textarea
                   value={editActionPlan}
                   onChange={e => setEditActionPlan(e.target.value)}
                   placeholder="이번 실수를 통해 앞으로 어떻게 풀겠다는 나만의 대책을 자유롭게 적어보세요..."
                   rows={3}
-                  className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-600 outline-none focus:border-emerald-500 transition-colors resize-none leading-relaxed"
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-600 outline-none focus:border-emerald-500 transition-colors resize-none leading-relaxed"
                 />
               </div>
 

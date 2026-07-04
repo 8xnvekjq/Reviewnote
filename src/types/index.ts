@@ -7,12 +7,12 @@ export interface ProblemBox {
 
 export interface MistakeAnalysis {
   solvingProcess: string;   // [문제 풀이 과정]
-  mistakeDetail: string;    // [실수한 지점 상세 분석]
-  rootCause: string;        // [근본적인 틀린 이유]
-  actionPlan: string;       // [한 줄 핵심 처방]
   hints?: string[];         // [단계별 힌트 목록 (최대 3개)]
   problemText?: string;     // [추출된 원본 문제 지문]
   problemBox?: ProblemBox;  // [인쇄된 문제 영역 바운딩 박스 (필기 제외)]
+  mistakeDetail?: string;   // [실수한 지점 상세 분석] (이전 데이터 호환용)
+  rootCause?: string;       // [근본적인 틀린 이유] (이전 데이터 호환용)
+  actionPlan?: string;      // [향후 재발 방지 대책] (이전 데이터 호환용)
 }
 
 export type ReviewState = 'O' | 'X' | 'star' | '';
