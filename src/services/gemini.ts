@@ -1,4 +1,5 @@
 import type { MistakeAnalysis, ProblemBox } from '../types';
+import { MATH_CURRICULUM } from '../types';
 
 interface GeminiResponse {
   title: string;
@@ -105,7 +106,7 @@ export const analyzeMistakeWithGemini = async (
      * 확률과 통계: 순열과 조합 / 확률 / 통계
      * 미적분2: 수열의 극한 / 미분법 / 적분법
 
-6. chapter: grade에서 선택한 과목의 단원 목록 중 이 문제가 속하는 단원명을 정확히 하나만 선택하여 입력하세요.
+6. chapter: grade에서 선택한 과목의 단원 목록 중 이 문제가 속하는 단원명을 아래 제공된 단원명 목록에서만 토씨 하나 틀리지 않게 정확히 골라 출력해야 합니다. 임의의 텍스트를 생성하지 마십시오.
 
 출력은 지정된 JSON 스키마를 엄격히 따라 다음 7가지 항목을 모두 한국어로 작성해야 합니다:
 1. title: 문제의 주제나 공식을 담은 짤막하고 직관적인 제목
@@ -184,10 +185,33 @@ export const analyzeMistakeWithGemini = async (
 
     const parsedJson: GeminiResponse = JSON.parse(responseText);
 
+    // ★ 단원명 보정 및 보정 로직 (Fuzzy Matching)
+    let resolvedGrade = parsedJson.grade || '기타';
+    if (!MATH_CURRICULUM[resolvedGrade]) {
+      resolvedGrade = '기타';
+    }
+
+    const allowedChapters = MATH_CURRICULUM[resolvedGrade] || ['기타'];
+    let resolvedChapter = parsedJson.chapter || '기타';
+
+    // 100% 매치되지 않는 경우, 공백 제거 후 유사성 검사로 매핑
+    if (!allowedChapters.includes(resolvedChapter)) {
+      const cleanTarget = resolvedChapter.replace(/\s+/g, '');
+      const matched = allowedChapters.find(ch => {
+        const cleanCh = ch.replace(/\s+/g, '');
+        return cleanCh.includes(cleanTarget) || cleanTarget.includes(cleanCh);
+      });
+      if (matched) {
+        resolvedChapter = matched;
+      } else {
+        resolvedChapter = allowedChapters[0] || '기타'; // 매핑 실패 시 과목의 첫 번째 단원으로 기본 지정
+      }
+    }
+
     return {
       title: parsedJson.title || '분석 완료된 문제',
-      grade: parsedJson.grade || '기타',
-      chapter: parsedJson.chapter || '기타',
+      grade: resolvedGrade,
+      chapter: resolvedChapter,
       analysis: {
         solvingProcess: parsedJson.solvingProcess,
         hints: parsedJson.hints,
