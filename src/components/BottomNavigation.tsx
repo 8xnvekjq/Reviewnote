@@ -39,10 +39,19 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, s
         <span className="text-xl">📷</span>
       </button>
 
-      {/* Tab 3: Completed Reviews */}
+      {/* Tab 3: Stats */}
+      <button 
+        onClick={() => setActiveTab('stats')}
+        className={`flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all ${activeTab === 'stats' ? 'text-emerald-400 scale-105 font-bold' : 'text-slate-500 hover:text-slate-300'}`}
+      >
+        <span className="text-lg">📊</span>
+        <span className="text-[10px] mt-0.5">분석통계</span>
+      </button>
+
+      {/* Tab 4: Completed Reviews */}
       <button 
         onClick={() => setActiveTab('completed')}
-        className={`flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all ${activeTab === 'completed' ? 'text-emerald-400 scale-105 font-bold' : 'text-slate-500 hover:text-slate-300'}`}
+        className={`flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all ${activeTab === 'completed' ? 'text-teal-400 scale-105 font-bold' : 'text-slate-500 hover:text-slate-300'}`}
       >
         <span className="text-lg">✅</span>
         <span className="text-[10px] mt-0.5">복습완료</span>

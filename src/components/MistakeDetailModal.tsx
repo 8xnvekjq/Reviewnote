@@ -1,7 +1,9 @@
 import React from 'react';
 import type { MistakeEntry, ReviewState } from '../types';
+import { ROOT_CAUSE_OPTIONS, MATH_CURRICULUM, GRADE_LIST } from '../types';
 import { LaTeXRenderer } from './LaTeXRenderer';
 import { formatDate } from '../utils/date';
+import { supabase } from '../services/supabase';
 
 interface MistakeDetailModalProps {
   selectedEntry: MistakeEntry;
@@ -10,6 +12,7 @@ interface MistakeDetailModalProps {
   onDeleteMistake: (id: string, e: React.MouseEvent) => void;
   onStartAnalysis: (entry: MistakeEntry) => void;
   onUpdateReviews: (id: string, newReviews: ReviewState[]) => void;
+  onUpdateEntry: (updated: MistakeEntry) => void;
 }
 
 const NORMAL_PHRASES = [
@@ -47,9 +50,19 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   onDeleteMistake,
   onStartAnalysis,
   onUpdateReviews,
+  onUpdateEntry,
 }) => {
   const [revealedHintCount, setRevealedHintCount] = React.useState(0);
-  const [loadingText, setLoadingText] = React.useState('처리 중...');
+  const [loadingText, setLoadingText] = React.useState('수학 문제 분석을 시작합니다...');
+
+  // Student editable fields
+  const [editGrade, setEditGrade] = React.useState(selectedEntry.grade || '');
+  const [editChapter, setEditChapter] = React.useState(selectedEntry.chapter || '');
+  const [editRootCauses, setEditRootCauses] = React.useState<string[]>(selectedEntry.rootCauses || []);
+  const [editActionPlan, setEditActionPlan] = React.useState(selectedEntry.userActionPlan || '');
+  const [isSaving, setIsSaving] = React.useState(false);
+
+  const chaptersForGrade = editGrade ? (MATH_CURRICULUM[editGrade] || []) : [];
 
   // Accordion toggle states for analysis cards
   const [showProblemText, setShowProblemText] = React.useState(false);
@@ -64,7 +77,44 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     setShowSolvingProcess(false);
     setShowMistakeDetail(false);
     setShowActionPlan(false);
+    setEditGrade(selectedEntry.grade || '');
+    setEditChapter(selectedEntry.chapter || '');
+    setEditRootCauses(selectedEntry.rootCauses || []);
+    setEditActionPlan(selectedEntry.userActionPlan || '');
   }, [selectedEntry.id]);
+
+  const toggleRootCause = (id: string) => {
+    setEditRootCauses(prev =>
+      prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
+    );
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('mistakes')
+        .update({
+          grade: editGrade || null,
+          chapter: editChapter || null,
+          root_causes: editRootCauses,
+          user_action_plan: editActionPlan || null,
+        })
+        .eq('id', selectedEntry.id);
+      if (error) throw error;
+      onUpdateEntry({
+        ...selectedEntry,
+        grade: editGrade || undefined,
+        chapter: editChapter || undefined,
+        rootCauses: editRootCauses,
+        userActionPlan: editActionPlan || undefined,
+      });
+    } catch (err: any) {
+      alert('저장 실패: ' + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // Loading text cycling effect
   React.useEffect(() => {
@@ -379,6 +429,80 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
               </button>
             </div>
           )}
+          {/* ── 학생 입력 영역 ── */}
+          <div className="border border-slate-800 rounded-2xl overflow-hidden">
+            <div className="bg-slate-800/50 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between">
+              <span className="text-xs font-extrabold text-slate-300">✏️ 오답 클리닉 기록</span>
+              {(selectedEntry.grade || selectedEntry.rootCauses?.length) && (
+                <div className="flex items-center space-x-1.5">
+                  {selectedEntry.grade && <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-600/20 text-indigo-400 border border-indigo-600/30 font-bold">{selectedEntry.grade}</span>}
+                  {selectedEntry.chapter && <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-700 text-slate-300 border border-slate-600 font-bold">{selectedEntry.chapter}</span>}
+                </div>
+              )}
+            </div>
+            <div className="p-4 space-y-4">
+
+              {/* 과목 / 단원 선택 */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-400 block">과목 (AI 자동분류)</label>
+                  <select value={editGrade} onChange={e => { setEditGrade(e.target.value); setEditChapter(''); }}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer">
+                    <option value="">선택하세요</option>
+                    {GRADE_LIST.map(g => <option key={g} value={g}>{g}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-400 block">단원</label>
+                  <select value={editChapter} onChange={e => setEditChapter(e.target.value)}
+                    disabled={!editGrade}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer disabled:opacity-40">
+                    <option value="">선택하세요</option>
+                    {chaptersForGrade.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* 실수 원인 체크박스 */}
+              <div className="space-y-2">
+                <label className="text-[11px] font-bold text-slate-400 block">실수 원인 (복수 선택 가능)</label>
+                <div className="space-y-2">
+                  {ROOT_CAUSE_OPTIONS.map(opt => (
+                    <label key={opt.id} className="flex items-center space-x-3 cursor-pointer group">
+                      <div
+                        className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-none transition-all ${
+                          editRootCauses.includes(opt.id)
+                            ? 'bg-amber-500 border-amber-500'
+                            : 'bg-slate-950 border-slate-700 group-hover:border-amber-500/50'
+                        }`}
+                        onClick={() => toggleRootCause(opt.id)}
+                      >
+                        {editRootCauses.includes(opt.id) && <span className="text-white text-[10px] font-black">✓</span>}
+                      </div>
+                      <div onClick={() => toggleRootCause(opt.id)}>
+                        <span className="text-xs font-semibold text-slate-200">{opt.label}</span>
+                        <span className="text-[10px] text-slate-500 ml-1.5">{opt.desc}</span>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* 나만의 대삵 */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-slate-400 block">나만의 대첵 (직접 작성)</label>
+                <textarea
+                  value={editActionPlan}
+                  onChange={e => setEditActionPlan(e.target.value)}
+                  placeholder="이번 실수를 통해 앞으로 어떻게 풀겠다는 나만의 대책을 자유롭게 적어보세요..."
+                  rows={3}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-600 outline-none focus:border-emerald-500 transition-colors resize-none leading-relaxed"
+                />
+              </div>
+
+            </div>
+          </div>
+
         </div>
 
         {/* Modal Footer */}
@@ -388,7 +512,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             className="py-3 px-4 rounded-xl border border-red-500/20 hover:border-red-500/40 bg-red-500/5 hover:bg-red-500/10 active:scale-95 transition-all text-xs font-bold text-red-400 flex items-center justify-center space-x-1.5"
           >
             <span>🗑️</span>
-            <span>기록 삭제</span>
+            <span>삭제</span>
           </button>
           
           <button 
@@ -396,6 +520,14 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             className="flex-1 py-3 rounded-xl border border-slate-800 hover:border-slate-700 active:scale-95 transition-all text-xs font-semibold text-slate-300"
           >
             닫기
+          </button>
+
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="flex-1 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 active:scale-95 disabled:opacity-50 transition-all text-xs font-bold text-white shadow-md shadow-emerald-600/20"
+          >
+            {isSaving ? '저장 중...' : '✅ 저장하기'}
           </button>
         </div>
 

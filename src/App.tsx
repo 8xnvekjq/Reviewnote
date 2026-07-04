@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { ActiveTab, MistakeEntry, ReviewState } from './types';
+import { ROOT_CAUSE_OPTIONS, GRADE_LIST } from './types';
 import { CameraScanner } from './components/CameraScanner';
 import { analyzeMistakeWithGemini } from './services/gemini';
 import { AuthScreen } from './components/AuthScreen';
@@ -91,7 +92,11 @@ function App() {
         imageUrl: m.image_url,
         date: m.date,
         analysis: m.analysis || undefined,
-        reviews: m.reviews || ['', '', '']
+        reviews: m.reviews || ['', '', ''],
+        grade: m.grade || undefined,
+        chapter: m.chapter || undefined,
+        rootCauses: m.root_causes || [],
+        userActionPlan: m.user_action_plan || undefined,
       }));
       setMistakes(mappedMistakes);
     } catch (err) {
@@ -144,12 +149,14 @@ function App() {
   const runAnalysisFlow = async (entry: MistakeEntry, apiKey: string) => {
     const result = await analyzeMistakeWithGemini(entry.imageUrl, apiKey);
     
-    // Update mistake database record
+    // Update mistake database record (including auto-classified grade/chapter)
     const { error: updateError } = await supabase
       .from('mistakes')
       .update({
         title: result.title,
-        analysis: result.analysis
+        analysis: result.analysis,
+        grade: result.grade || null,
+        chapter: result.chapter || null,
       })
       .eq('id', entry.id);
 
@@ -158,7 +165,9 @@ function App() {
     const updatedEntry: MistakeEntry = {
       ...entry,
       title: result.title,
-      analysis: result.analysis
+      analysis: result.analysis,
+      grade: result.grade,
+      chapter: result.chapter,
     };
 
     setMistakes(prev => prev.map(m => m.id === entry.id ? updatedEntry : m));
@@ -204,7 +213,11 @@ function App() {
           title: newEntryTitle,
           image_url: publicUrl,
           analysis: null,
-          reviews: ['', '', '']
+          reviews: ['', '', ''],
+          grade: null,
+          chapter: null,
+          root_causes: [],
+          user_action_plan: null,
         })
         .select()
         .single();
@@ -217,7 +230,8 @@ function App() {
         imageUrl: dbEntry.image_url,
         date: dbEntry.date,
         analysis: undefined,
-        reviews: ['', '', '']
+        reviews: ['', '', ''],
+        rootCauses: [],
       };
       
       setMistakes(prev => [newEntry, ...prev]);
@@ -281,6 +295,30 @@ function App() {
     setActiveTab('notes');
   };
 
+  // ── 통계 계산 ──────────────────────────────────────────────────
+  const stats = useMemo(() => {
+    const gradeCounts: Record<string, number> = {};
+    const chapterCounts: Record<string, number> = {};
+    const causeCounts: Record<string, number> = {};
+
+    mistakes.forEach(m => {
+      if (m.grade) gradeCounts[m.grade] = (gradeCounts[m.grade] || 0) + 1;
+      if (m.chapter && m.grade) {
+        const key = `${m.grade} > ${m.chapter}`;
+        chapterCounts[key] = (chapterCounts[key] || 0) + 1;
+      }
+      (m.rootCauses || []).forEach(c => {
+        causeCounts[c] = (causeCounts[c] || 0) + 1;
+      });
+    });
+
+    const totalGrade = Object.values(gradeCounts).reduce((a, b) => a + b, 0);
+    const totalCause = Object.values(causeCounts).reduce((a, b) => a + b, 0);
+    const topChapters = Object.entries(chapterCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+    return { gradeCounts, causeCounts, totalGrade, totalCause, topChapters };
+  }, [mistakes]);
+
   if (!currentUser) {
     return <AuthScreen onLogin={(username) => setCurrentUser(username)} />;
   }
@@ -336,6 +374,95 @@ function App() {
         {activeTab === 'admin' && isAdmin && (
           <AdminPanel />
         )}
+
+        {/* ── 분석통계 탭 ── */}
+        {activeTab === 'stats' && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-lg font-bold text-white">📊 나의 약점 분석</h2>
+              <p className="text-xs text-slate-400 mt-0.5">총 {mistakes.length}개의 오답 기록 기반</p>
+            </div>
+
+            {mistakes.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-slate-800 rounded-2xl bg-slate-900/20">
+                <div className="text-3xl mb-3">📊</div>
+                <p className="text-slate-300 font-medium text-sm">아직 분석할 데이터가 없습니다</p>
+                <p className="text-xs text-slate-500 mt-1">오답을 등록하고 실수 원인을 체크해 주세요.</p>
+              </div>
+            ) : (
+              <>
+                {/* 과목별 오답 분포 */}
+                <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 space-y-3">
+                  <h3 className="text-sm font-extrabold text-indigo-400">📚 과목별 오답 분포</h3>
+                  {stats.totalGrade === 0 ? (
+                    <p className="text-xs text-slate-500">AI 분석을 실행하면 과목이 자동 분류됩니다.</p>
+                  ) : (
+                    GRADE_LIST.filter(g => stats.gradeCounts[g]).map(grade => {
+                      const count = stats.gradeCounts[grade] || 0;
+                      const pct = Math.round((count / stats.totalGrade) * 100);
+                      return (
+                        <div key={grade} className="space-y-1">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-slate-300 font-medium">{grade}</span>
+                            <span className="text-slate-400">{count}개 ({pct}%)</span>
+                          </div>
+                          <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-gradient-to-r from-indigo-600 to-indigo-400 rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* 실수 유형별 분포 */}
+                <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 space-y-3">
+                  <h3 className="text-sm font-extrabold text-amber-400">⚠️ 나의 실수 유형 분석</h3>
+                  {stats.totalCause === 0 ? (
+                    <p className="text-xs text-slate-500">오답 상세창에서 실수 원인을 체크해 주세요.</p>
+                  ) : (
+                    ROOT_CAUSE_OPTIONS.map(opt => {
+                      const count = stats.causeCounts[opt.id] || 0;
+                      const pct = Math.round((count / stats.totalCause) * 100);
+                      return (
+                        <div key={opt.id} className="space-y-1">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-slate-300 font-medium">{opt.label}</span>
+                            <span className="text-slate-400">{count}회 ({pct}%)</span>
+                          </div>
+                          <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-gradient-to-r from-amber-500 to-amber-400 rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* 취약 단원 TOP 5 */}
+                {stats.topChapters.length > 0 && (
+                  <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 space-y-3">
+                    <h3 className="text-sm font-extrabold text-emerald-400">🏆 취약 단원 TOP {stats.topChapters.length}</h3>
+                    {stats.topChapters.map(([key, count], i) => (
+                      <div key={key} className="flex items-center space-x-3 bg-slate-950/50 rounded-xl p-3 border border-slate-800/60">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-black flex-none ${
+                          i === 0 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                          i === 1 ? 'bg-slate-500/20 text-slate-300 border border-slate-600/30' :
+                          i === 2 ? 'bg-orange-700/20 text-orange-400 border border-orange-700/30' :
+                          'bg-slate-800 text-slate-500'
+                        }`}>{i + 1}</div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-white truncate">{key}</p>
+                        </div>
+                        <div className="text-xs font-black text-red-400 flex-none">{count}개</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </main>
 
       {/* Selected Entry Detail Modal */}
@@ -347,6 +474,10 @@ function App() {
           onDeleteMistake={handleDeleteMistake}
           onStartAnalysis={handleStartAnalysis}
           onUpdateReviews={handleUpdateReviews}
+          onUpdateEntry={(updated) => {
+            setMistakes(prev => prev.map(m => m.id === updated.id ? updated : m));
+            setSelectedEntry(updated);
+          }}
         />
       )}
 
