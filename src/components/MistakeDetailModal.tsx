@@ -48,6 +48,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   // Accordion toggle states
   const [showProblemText, setShowProblemText] = React.useState(false);
   const [showSolvingProcess, setShowSolvingProcess] = React.useState(true); // Default open for study
+  const [showMistakeSummary, setShowMistakeSummary] = React.useState(false); // Default collapsed for self-study
 
   const chaptersForGrade = editGrade ? (MATH_CURRICULUM[editGrade] || []) : [];
 
@@ -56,6 +57,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     setRevealedHintCount(0);
     setShowProblemText(false);
     setShowSolvingProcess(true);
+    setShowMistakeSummary(false); // ID 변경 시 아코디언 닫음
     setEditGrade(selectedEntry.grade || '');
     setEditChapter(selectedEntry.chapter || '');
     setEditRootCauses(selectedEntry.rootCauses || []);
@@ -242,19 +244,29 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             )}
           </div>
 
-          {/* ⚡ AI 틀린 이유 1줄 진단 — 이미지 바로 아래 */}
+          {/* ⚡ AI 틀린 이유 1줄 진단 */}
           {selectedEntry.analysis?.mistakeSummary &&
             selectedEntry.analysis.mistakeSummary !== '학생 풀이 없음' && (
-            <div className="flex items-start space-x-3 bg-red-950/30 border border-red-500/20 rounded-2xl px-4 py-3 animate-scale-up">
-              <span className="text-lg flex-none mt-0.5">⚡</span>
-              <div>
-                <p className="text-[10px] font-extrabold text-red-400 uppercase tracking-wider mb-1">
-                  AI 틀린 이유 진단
-                </p>
-                <p className="text-sm font-semibold text-red-200 leading-snug">
-                  {selectedEntry.analysis.mistakeSummary}
-                </p>
-              </div>
+            <div className="space-y-2 border-l-4 border-red-500 pl-4 py-1">
+              <button
+                onClick={() => setShowMistakeSummary(!showMistakeSummary)}
+                className="w-full flex items-center justify-between text-left focus:outline-none group"
+              >
+                <h4 className="text-sm font-extrabold text-red-400 flex items-center group-hover:text-red-300 transition-colors">
+                  <span className="mr-1.5 text-base">⚡</span> AI 틀린 이유 진단
+                </h4>
+                <span className="text-xs text-slate-500 font-bold mr-1 group-hover:text-slate-400 transition-colors">
+                  {showMistakeSummary ? '▲ 닫기' : '▼ 보기'}
+                </span>
+              </button>
+              {showMistakeSummary && (
+                <div className="bg-red-950/20 p-4.5 rounded-2xl border border-red-500/20 animate-scale-up mt-2">
+                  <LaTeXRenderer 
+                    text={selectedEntry.analysis.mistakeSummary} 
+                    className="text-xs sm:text-sm leading-relaxed text-red-200" 
+                  />
+                </div>
+              )}
             </div>
           )}
 
