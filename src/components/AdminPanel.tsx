@@ -3,6 +3,7 @@ import type { AdminUserStat, MistakeEntry } from '../types';
 import { supabase } from '../services/supabase';
 import { formatDate } from '../utils/date';
 import { ROOT_CAUSE_OPTIONS } from '../types';
+import { LaTeXRenderer } from './LaTeXRenderer';
 
 export const AdminPanel: React.FC = () => {
   const [stats, setStats] = useState<AdminUserStat[]>([]);
@@ -326,7 +327,12 @@ export const AdminPanel: React.FC = () => {
                       )}
                     </div>
                     <div className="p-3">
-                      <p className="text-xs font-bold text-white line-clamp-1 group-hover:text-indigo-400 transition-colors">{entry.title}</p>
+                      <div className="text-xs font-bold text-white line-clamp-1 group-hover:text-indigo-400 transition-colors min-w-0">
+                        <LaTeXRenderer 
+                          text={entry.title} 
+                          className="text-white font-bold text-xs line-clamp-1 inline-block w-full"
+                        />
+                      </div>
                       {entry.chapter && <p className="text-[10px] text-slate-500 mt-0.5">📌 {entry.chapter}</p>}
                       {!entry.analysis && (
                         <p className="text-[10px] text-amber-400 mt-1 font-medium flex items-center">
@@ -370,7 +376,12 @@ export const AdminPanel: React.FC = () => {
                     </span>
                   )}
                 </div>
-                <p className="font-bold text-white text-sm mt-1">{previewEntry.title}</p>
+                <div className="font-bold text-white text-sm mt-1 min-w-0">
+                  <LaTeXRenderer 
+                    text={previewEntry.title} 
+                    className="text-white font-bold text-sm line-clamp-1 inline-block w-full"
+                  />
+                </div>
                 <p className="text-[10px] text-slate-500">{formatDate(previewEntry.date)}</p>
               </div>
               <button onClick={() => setPreviewEntry(null)} className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 active:scale-90 transition-all">✕</button>

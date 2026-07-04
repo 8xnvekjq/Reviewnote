@@ -144,7 +144,12 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-wider">
               {formatDate(selectedEntry.date)}
             </span>
-            <h3 className="font-bold text-white text-base line-clamp-1">{selectedEntry.title}</h3>
+            <h3 className="font-bold text-white text-base line-clamp-1 min-w-0">
+              <LaTeXRenderer 
+                text={selectedEntry.title} 
+                className="text-white font-bold text-base line-clamp-1 inline-block w-full"
+              />
+            </h3>
           </div>
           <button 
             onClick={onClose}

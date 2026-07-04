@@ -124,20 +124,13 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
       
       {/* Top Header */}
       <div className="p-4 border-b border-slate-900 bg-slate-900/50 flex items-center justify-between">
+        <h2 className="text-sm font-bold text-white tracking-wider">선택 영역 자르기</h2>
         <button
           onClick={onCancel}
           disabled={isProcessing}
-          className="text-xs font-bold text-slate-400 hover:text-white px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800"
+          className="w-8 h-8 rounded-full bg-slate-900 border border-slate-800 hover:bg-slate-800 flex items-center justify-center text-slate-400 font-bold active:scale-90 transition-transform"
         >
-          취소
-        </button>
-        <h2 className="text-sm font-bold text-white tracking-wider">선택 영역 자르기</h2>
-        <button
-          onClick={executeCrop}
-          disabled={isProcessing}
-          className="text-xs font-bold text-emerald-400 hover:text-emerald-300 px-4 py-1.5 rounded-full bg-emerald-950/20 border border-emerald-900/30"
-        >
-          {isProcessing ? '처리 중...' : '자르기 완료'}
+          ✕
         </button>
       </div>
 
@@ -238,18 +231,29 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
         </div>
       </div>
 
-      {/* Control Area (Sliders removed, Replaced with 'Retake' Button) */}
-      <div className="p-6 bg-slate-900/60 border-t border-slate-900 flex flex-col items-center space-y-4 pb-8">
-        <p className="text-[11px] text-slate-500 font-semibold text-center leading-relaxed">
-          💡 4개의 초록색 꼭짓점을 드래그하여 문제 영역을 맞춘 후, 우측 상단의 '자르기 완료'를 누르세요.
+      {/* Control Area: 촬영 완료(자르기 완료)를 하단에 크게 강조 배치 */}
+      <div className="p-5 bg-slate-900/60 border-t border-slate-900 flex flex-col items-center space-y-3 pb-8">
+        <p className="text-[10px] text-slate-500 font-semibold text-center leading-relaxed mb-1">
+          💡 초록색 꼭짓점을 조절해 문제 영역을 지정하고 아래 버튼을 누르세요.
         </p>
 
+        {/* 메인 액션: 촬영 완료 (자르기) */}
+        <button
+          onClick={executeCrop}
+          disabled={isProcessing}
+          className="w-full max-w-xs py-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 active:scale-95 text-slate-950 font-black text-sm flex items-center justify-center space-x-2 transition-all shadow-lg shadow-emerald-500/10"
+        >
+          <span>📸</span>
+          <span>{isProcessing ? '처리 중...' : '촬영 완료 (자르기)'}</span>
+        </button>
+
+        {/* 보조 액션: 다시 촬영하기 */}
         <button
           onClick={onCancel}
           disabled={isProcessing}
-          className="w-full max-w-xs py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-bold text-xs border border-slate-700 flex items-center justify-center space-x-2 transition-all shadow-lg"
+          className="w-full max-w-xs py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 active:scale-95 text-slate-300 font-bold text-xs border border-slate-700/60 flex items-center justify-center space-x-1.5 transition-all"
         >
-          <span className="text-sm">📷</span>
+          <span>🔄</span>
           <span>다시 촬영하기</span>
         </button>
       </div>

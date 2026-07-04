@@ -2,6 +2,8 @@ import React from 'react';
 import type { MistakeEntry } from '../types';
 import { formatDate } from '../utils/date';
 
+import { LaTeXRenderer } from './LaTeXRenderer';
+
 interface MistakeCardProps {
   entry: MistakeEntry;
   onSelect: (entry: MistakeEntry) => void;
@@ -46,8 +48,11 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
       </div>
       <div className="p-4 space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="font-bold text-white line-clamp-1 group-hover:text-indigo-400 transition-colors flex-1">
-            {entry.title}
+          <h3 className="font-bold text-white line-clamp-1 group-hover:text-indigo-400 transition-colors flex-1 min-w-0">
+            <LaTeXRenderer 
+              text={entry.title} 
+              className="text-white font-bold text-sm line-clamp-1 inline-block w-full"
+            />
           </h3>
           {struggleCount === 3 && (
             <span className="flex-none px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 text-[9px] font-black tracking-tight animate-pulse flex items-center gap-0.5">
