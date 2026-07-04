@@ -27,6 +27,8 @@ function App() {
   const [mistakes, setMistakes] = useState<MistakeEntry[]>([]);
   const [selectedEntry, setSelectedEntry] = useState<MistakeEntry | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  // userId -> displayName map (admin 전용)
+  const [profilesMap, setProfilesMap] = useState<Record<string, string>>({});
 
   // State for image cropping flow
   const [tempCapturedImage, setTempCapturedImage] = useState<string | null>(null);
@@ -79,6 +81,7 @@ function App() {
   // Fetch mistakes from Supabase
   const fetchUserData = async () => {
     try {
+      // Fetch all mistakes (RLS handles filtering: normal users see own, admin sees all)
       const { data: dbMistakes, error: mistakesError } = await supabase
         .from('mistakes')
         .select('*')
@@ -86,8 +89,20 @@ function App() {
 
       if (mistakesError) throw mistakesError;
 
+      // Fetch all profiles for admin name mapping
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, email');
+
+      const pMap: Record<string, string> = {};
+      (profiles || []).forEach((p: any) => {
+        pMap[p.id] = p.email?.split('@')[0] || p.id.slice(0, 8);
+      });
+      setProfilesMap(pMap);
+
       const mappedMistakes: MistakeEntry[] = (dbMistakes || []).map((m: any) => ({
         id: m.id,
+        userId: m.user_id,
         title: m.title,
         imageUrl: m.image_url,
         date: m.date,
@@ -292,6 +307,7 @@ function App() {
     setIsAdmin(false);
     setSession(null);
     setMistakes([]);
+    setProfilesMap({});
     setActiveTab('notes');
   };
 
@@ -349,6 +365,9 @@ function App() {
             onAddClick={() => setActiveTab('camera')}
             title="나의 오답노트"
             emptyMessage="아직 등록된 오답이 없습니다. 아래 카메라 버튼을 눌러 수학 문제를 촬영하고 AI의 맞춤 분석을 받아보세요."
+            isAdmin={isAdmin}
+            profilesMap={profilesMap}
+            currentUserId={session?.user?.id}
           />
         )}
 
@@ -361,6 +380,9 @@ function App() {
             title="복습 완료 보관함"
             hideAddButton={true}
             emptyMessage="아직 완전히 복습 완료(O 3회 달성)된 오답이 없습니다. 열심히 오답을 복습하여 정복해 보세요!"
+            isAdmin={isAdmin}
+            profilesMap={profilesMap}
+            currentUserId={session?.user?.id}
           />
         )}
 

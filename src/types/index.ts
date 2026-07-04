@@ -53,15 +53,16 @@ export const GRADE_LIST = Object.keys(MATH_CURRICULUM);
 
 export interface MistakeEntry {
   id: string;
+  userId?: string;          // Supabase user_id (admin 조회 시 사용)
   title: string;
-  imageUrl: string;         // Supabase CDN URL or Base64 data url
+  imageUrl: string;
   date: string;             // ISO date string
   analysis?: MistakeAnalysis;
-  reviews?: ReviewState[];  // Array of 3 review states, e.g. ['O', 'X', '']
-  grade?: string;           // 과목 (예: 공통수학1, 대수, 중3-1 ...)
-  chapter?: string;         // 단원 (예: 방정식과 부등식)
-  rootCauses?: string[];    // 선택된 실수 원인 ID 목록
-  userActionPlan?: string;  // 학생이 직접 타이핑한 나만의 대책
+  reviews?: ReviewState[];
+  grade?: string;
+  chapter?: string;
+  rootCauses?: string[];
+  userActionPlan?: string;
 }
 
 export type ActiveTab = 'notes' | 'completed' | 'camera' | 'stats' | 'admin';

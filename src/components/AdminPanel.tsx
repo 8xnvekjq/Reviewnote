@@ -1,19 +1,23 @@
 import React, { useEffect, useState } from 'react';
-import type { AdminUserStat } from '../types';
+import type { AdminUserStat, MistakeEntry } from '../types';
 import { supabase } from '../services/supabase';
 import { formatDate } from '../utils/date';
 
 export const AdminPanel: React.FC = () => {
   const [stats, setStats] = useState<AdminUserStat[]>([]);
+  const [allMistakes, setAllMistakes] = useState<MistakeEntry[]>([]);
+  const [profilesMap, setProfilesMap] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
+  const [filterStudent, setFilterStudent] = useState<string>('all');
+  const [previewEntry, setPreviewEntry] = useState<MistakeEntry | null>(null);
 
   const fetchAdminStats = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      // Fetch all profiles (admin RLS policy allows this)
+      // Fetch all profiles
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id, email, is_admin')
@@ -21,14 +25,38 @@ export const AdminPanel: React.FC = () => {
 
       if (profilesError) throw profilesError;
 
-      // Fetch all mistakes (admin RLS policy allows this)
+      // Build profilesMap
+      const pMap: Record<string, string> = {};
+      (profiles || []).forEach((p: any) => {
+        pMap[p.id] = p.email?.split('@')[0] || p.id.slice(0, 8);
+      });
+      setProfilesMap(pMap);
+
+      // Fetch all mistakes
       const { data: mistakes, error: mistakesError } = await supabase
         .from('mistakes')
-        .select('id, user_id, reviews, date');
+        .select('*')
+        .order('date', { ascending: false });
 
       if (mistakesError) throw mistakesError;
 
-      // Aggregate per user
+      // Map full mistake entries for the 전체 오답 뷰
+      const mappedMistakes: MistakeEntry[] = (mistakes || []).map((m: any) => ({
+        id: m.id,
+        userId: m.user_id,
+        title: m.title,
+        imageUrl: m.image_url,
+        date: m.date,
+        analysis: m.analysis || undefined,
+        reviews: m.reviews || ['', '', ''],
+        grade: m.grade || undefined,
+        chapter: m.chapter || undefined,
+        rootCauses: m.root_causes || [],
+        userActionPlan: m.user_action_plan || undefined,
+      }));
+      setAllMistakes(mappedMistakes);
+
+      // Aggregate per user (stats cards)
       const statsMap = new Map<string, AdminUserStat>();
 
       (profiles || []).forEach((p: any) => {
@@ -231,6 +259,146 @@ export const AdminPanel: React.FC = () => {
               </div>
             );
           })}
+        </div>
+      )}
+      {/* ─────────────────────────────────────────── */}
+      {/* 전체 오답 뷰 섹션 */}
+      {!isLoading && !error && allMistakes.length > 0 && (
+        <div className="space-y-4 pt-2 border-t border-slate-800">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-extrabold text-white flex items-center">
+              <span className="mr-2">📋</span> 전체 오답 뷰
+              <span className="ml-2 text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full border border-slate-700 font-bold">
+                {allMistakes.length}개
+              </span>
+            </h3>
+          </div>
+
+          {/* 학생 필터 */}
+          <div className="flex items-center space-x-2">
+            <span className="text-[11px] text-slate-500 font-bold flex-none">👤 학생</span>
+            <select
+              value={filterStudent}
+              onChange={e => setFilterStudent(e.target.value)}
+              className="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+            >
+              <option value="all">전체 ({allMistakes.length}개)</option>
+              {Array.from(new Set(allMistakes.map(m => m.userId).filter(Boolean) as string[]))
+                .map(uid => {
+                  const name = profilesMap[uid] || uid.slice(0, 8);
+                  const cnt = allMistakes.filter(m => m.userId === uid).length;
+                  return <option key={uid} value={uid}>{name} ({cnt}개)</option>;
+                })}
+            </select>
+          </div>
+
+          {/* 오답 카드 그리드 */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {allMistakes
+              .filter(m => filterStudent === 'all' || m.userId === filterStudent)
+              .map(entry => {
+                const studentName = entry.userId ? (profilesMap[entry.userId] || entry.userId.slice(0, 8)) : undefined;
+                return (
+                  <div
+                    key={entry.id}
+                    onClick={() => setPreviewEntry(entry)}
+                    className="group bg-slate-900/50 hover:bg-slate-900 border border-slate-800 hover:border-indigo-500/30 rounded-2xl overflow-hidden cursor-pointer transition-all active:scale-[0.98]"
+                  >
+                    <div className="aspect-[16/9] w-full bg-slate-950 relative overflow-hidden">
+                      <img src={entry.imageUrl} alt={entry.title} className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-500" />
+                      {/* 학생 이름 배지 */}
+                      {studentName && (
+                        <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-600/90 text-white backdrop-blur-sm flex items-center space-x-1">
+                          <span>👤</span><span>{studentName}</span>
+                        </div>
+                      )}
+                      <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-950/80 backdrop-blur-sm border border-slate-800 text-slate-300">
+                        {formatDate(entry.date)}
+                      </div>
+                      {entry.grade && (
+                        <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-600/80 text-white">
+                          {entry.grade}
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-3">
+                      <p className="text-xs font-bold text-white line-clamp-1 group-hover:text-indigo-400 transition-colors">{entry.title}</p>
+                      {entry.chapter && <p className="text-[10px] text-slate-500 mt-0.5">📌 {entry.chapter}</p>}
+                      {!entry.analysis && (
+                        <p className="text-[10px] text-amber-400 mt-1 font-medium flex items-center">
+                          <span className="w-1 h-1 rounded-full bg-amber-400 mr-1 animate-pulse"></span>AI 분석 미완료
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      )}
+
+      {/* 미리보기 모달 */}
+      {previewEntry && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          onClick={() => setPreviewEntry(null)}
+        >
+          <div
+            className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+              <div>
+                <div className="flex items-center space-x-2">
+                  {previewEntry.userId && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-600/20 text-indigo-400 border border-indigo-600/30 font-bold">
+                      👤 {profilesMap[previewEntry.userId] || previewEntry.userId.slice(0, 8)}
+                    </span>
+                  )}
+                  {previewEntry.grade && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-600/20 text-emerald-400 border border-emerald-600/30 font-bold">
+                      {previewEntry.grade}
+                    </span>
+                  )}
+                  {previewEntry.chapter && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-700 text-slate-300 border border-slate-600 font-bold">
+                      {previewEntry.chapter}
+                    </span>
+                  )}
+                </div>
+                <p className="font-bold text-white text-sm mt-1">{previewEntry.title}</p>
+                <p className="text-[10px] text-slate-500">{formatDate(previewEntry.date)}</p>
+              </div>
+              <button onClick={() => setPreviewEntry(null)} className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 active:scale-90 transition-all">✕</button>
+            </div>
+            <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
+              <img src={previewEntry.imageUrl} alt={previewEntry.title} className="w-full rounded-xl border border-slate-800 object-contain max-h-72" />
+              {previewEntry.analysis && (
+                <>
+                  <div className="bg-slate-950 rounded-xl border border-slate-800 p-4">
+                    <p className="text-[10px] font-bold text-indigo-400 mb-2">💡 정석 풀이</p>
+                    <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{previewEntry.analysis.solvingProcess.replace(/\$[^$]+\$/g, '[수식]').slice(0, 300)}{previewEntry.analysis.solvingProcess.length > 300 ? '...' : ''}</p>
+                  </div>
+                  <div className="bg-slate-950 rounded-xl border border-slate-800 p-4">
+                    <p className="text-[10px] font-bold text-amber-400 mb-2">🔍 틀린 이유</p>
+                    <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{previewEntry.analysis.rootCause}</p>
+                  </div>
+                  {previewEntry.analysis.actionPlan && (
+                    <div className="bg-slate-950 rounded-xl border border-slate-800 p-4">
+                      <p className="text-[10px] font-bold text-emerald-400 mb-2">🛡️ 핵심 처방</p>
+                      <p className="text-xs text-slate-300 leading-relaxed">{previewEntry.analysis.actionPlan}</p>
+                    </div>
+                  )}
+                </>
+              )}
+              {previewEntry.userActionPlan && (
+                <div className="bg-emerald-950/30 rounded-xl border border-emerald-800/30 p-4">
+                  <p className="text-[10px] font-bold text-emerald-400 mb-2">✏️ 학생 나만의 대책</p>
+                  <p className="text-xs text-slate-300 leading-relaxed">{previewEntry.userActionPlan}</p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

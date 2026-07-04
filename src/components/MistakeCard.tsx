@@ -6,9 +6,11 @@ interface MistakeCardProps {
   entry: MistakeEntry;
   onSelect: (entry: MistakeEntry) => void;
   onDelete: (id: string, e: React.MouseEvent) => void;
+  studentName?: string;   // admin 전용: 학생 이름/아이디
+  isOwnNote?: boolean;    // 내 오답 여부 (admin이 타인 오답 볼 때 false)
 }
 
-export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDelete }) => {
+export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDelete, studentName, isOwnNote = true }) => {
   const struggleCount = entry.reviews ? entry.reviews.filter(r => r === 'X' || r === 'star').length : 0;
 
   return (
@@ -22,12 +24,22 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
           alt={entry.title}
           className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-500" 
         />
-        <button
-          onClick={(e) => onDelete(entry.id, e)}
-          className="absolute top-2 left-2 w-7 h-7 rounded-full bg-black/60 hover:bg-red-600 flex items-center justify-center text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          🗑️
-        </button>
+        {/* 삭제 버튼: 내 오답노트일 때만 */}
+        {isOwnNote && (
+          <button
+            onClick={(e) => onDelete(entry.id, e)}
+            className="absolute top-2 left-2 w-7 h-7 rounded-full bg-black/60 hover:bg-red-600 flex items-center justify-center text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            🗑️
+          </button>
+        )}
+        {/* 학생 이름 배지 (admin 전용) */}
+        {studentName && (
+          <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-600/90 text-white backdrop-blur-sm flex items-center space-x-1">
+            <span>👤</span>
+            <span>{studentName}</span>
+          </div>
+        )}
         <div className="absolute top-2 right-2 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-950/80 backdrop-blur-sm border border-slate-800 text-slate-300">
           {formatDate(entry.date)}
         </div>
