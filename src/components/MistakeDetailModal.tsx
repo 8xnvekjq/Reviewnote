@@ -8,7 +8,7 @@ import { supabase } from '../services/supabase';
 interface MistakeDetailModalProps {
   selectedEntry: MistakeEntry;
   isAnalyzing: boolean;
-  currentUser?: string; // test 학생 한정 배포용
+  youtubeLectures?: any[]; // DB로부터 가져온 55개 강의 마스터 리스트
   onClose: () => void;
   onDeleteMistake: (id: string, e: React.MouseEvent) => void;
   onStartAnalysis: (entry: MistakeEntry) => void;
@@ -30,7 +30,7 @@ const NORMAL_PHRASES = [
 export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   selectedEntry,
   isAnalyzing,
-  currentUser,
+  youtubeLectures = [],
   onClose,
   onDeleteMistake,
   onStartAnalysis,
@@ -54,44 +54,68 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
   const chaptersForGrade = editGrade ? (MATH_CURRICULUM[editGrade] || []) : [];
 
-  // ★ test 학생용 한정 유튜브 매칭 데이터 세트 & 알고리즘
+  // ★ 모든 학생 대상 유튜브 매칭 알고리즘 (타임라인 없는 비디오 예외 처리 포함)
+  // ★ 모든 학생 대상 유튜브 매칭 알고리즘 (DB로 이식된 55개 동영상 목록 대조)
   const matchedLecture = React.useMemo(() => {
-    if (currentUser !== 'test') return null;
-
-    const mockYoutubeLectures = [
-      {
-        videoId: 'dQ_dkIb1DXo',
-        title: '12/23 고1 월수금 삼차방정식의 근과계수, 오메가',
-        grade: '공통수학1',
-        chapters: [
-          { startSeconds: 0, chapterTitle: '삼차방정식의 근과 계수' },
-          { startSeconds: 2043, chapterTitle: '오메가' } // 34분 3초
-        ]
-      }
-    ];
-
     const SYNONYM_MAP: Record<string, string[]> = {
       '오메가': ['omega', '\\omega', 'ω'],
       '로그': ['log'],
       '지수': ['exponent'],
-      '행렬': ['matrix'],
-      '사인': ['sin', 'sine'],
-      '코사인': ['cos', 'cosine'],
-      '탄젠트': ['tan', 'tangent']
+      '행렬': ['matrix', '정사각행렬', '영행렬', '단위행렬', '케일리'],
+      '조합': ['combination', '뽑기'],
+      '순열': ['permutation', '팩토리얼', 'factorial'],
+      '부등식': ['절댓값부등식', '가우스', '연립이차부등식'],
+      '함수': ['최대최소', '이차함수'],
+      '방정식': ['근과 계수', '삼사차방정식', '연립이차방정식']
     };
 
     const targetGrade = selectedEntry.grade;
     const targetChapter = selectedEntry.chapter || '';
     const problemText = selectedEntry.analysis?.problemText || '';
     const problemTitle = selectedEntry.title || '';
-
-    const matchedVideo = mockYoutubeLectures.find(v => v.grade === targetGrade);
-    if (!matchedVideo) return null;
-
-    let bestChapter = matchedVideo.chapters[0];
     const searchPool = (problemTitle + ' ' + targetChapter + ' ' + problemText).toLowerCase();
 
-    for (const ch of matchedVideo.chapters) {
+    // 1. 해당 과목(grade)에 속하는 강의 동영상들 필터링
+    const matchedVideos = youtubeLectures.filter(v => v.grade === targetGrade);
+    if (matchedVideos.length === 0) return null;
+
+    // 2. 단원명이나 제목을 비교하여 가장 일치하는 영상 찾기
+    let matchedVideo = matchedVideos[0]; // 기본값은 첫 번째 영상
+    let maxScore = -1;
+
+    for (const video of matchedVideos) {
+      let score = 0;
+      const videoTitleClean = video.title.toLowerCase();
+
+      // 문제 텍스트에 동영상 제목이 포함된 경우 점수 증가
+      if (searchPool.includes(videoTitleClean)) score += 10;
+
+      // 단원 이름이 동영상 제목에 포함된 경우
+      if (targetChapter && videoTitleClean.includes(targetChapter.toLowerCase())) score += 5;
+
+      // 동의어 매칭 스캔
+      for (const [key, synonyms] of Object.entries(SYNONYM_MAP)) {
+        if (videoTitleClean.includes(key.toLowerCase())) {
+          if (synonyms.some(syn => searchPool.includes(syn.toLowerCase()))) {
+            score += 8;
+          }
+        }
+      }
+
+      if (score > maxScore) {
+        maxScore = score;
+        matchedVideo = video;
+      }
+    }
+
+    // 3. 찾은 동영상 내부의 챕터 타임라인 매칭
+    const chaptersList = (matchedVideo.chapters && matchedVideo.chapters.length > 0)
+      ? matchedVideo.chapters
+      : [{ startSeconds: 0, chapterTitle: '개념 강의 처음부터' }];
+
+    let bestChapter = chaptersList[0];
+
+    for (const ch of chaptersList) {
       const chapterTitleClean = ch.chapterTitle.toLowerCase();
       
       // 1. 단순 포함 검사
@@ -123,7 +147,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
       chapterTitle: bestChapter.chapterTitle,
       startSeconds: bestChapter.startSeconds
     };
-  }, [selectedEntry, currentUser]);
+  }, [selectedEntry, youtubeLectures]);
 
   // ★ 버그 수정: AI 분석이 끝나서 selectedEntry 데이터가 갱신되면 로컬 상태도 자동으로 갱신 동기화합니다.
   React.useEffect(() => {

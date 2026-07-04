@@ -29,6 +29,8 @@ function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   // userId -> displayName map (admin 전용)
   const [profilesMap, setProfilesMap] = useState<Record<string, string>>({});
+  // 유튜브 매칭용 강의 마스터 리스트 상태
+  const [youtubeLectures, setYoutubeLectures] = useState<any[]>([]);
 
   // State for image cropping flow
   const [tempCapturedImage, setTempCapturedImage] = useState<string | null>(null);
@@ -47,6 +49,44 @@ function App() {
     }
   };
 
+  // Supabase로부터 55개 강의 및 타임라인 정보를 한 번에 읽어와 매칭용 구조로 가공
+  const loadYoutubeLectures = async () => {
+    try {
+      const { data: lectures } = await supabase.from('youtube_lectures').select('*');
+      const { data: timelines } = await supabase.from('youtube_timelines').select('*').order('start_seconds', { ascending: true });
+
+      if (lectures) {
+        const mapped = lectures.map(l => {
+          const chapters = (timelines || [])
+            .filter(t => t.lecture_id === l.id)
+            .map(t => ({
+              startSeconds: t.start_seconds,
+              chapterTitle: t.chapter_title
+            }));
+
+          // 제목이나 설명의 텍스트를 통해 공통수학1 / 공통수학2 과목 분류 판단
+          let derivedGrade = '기타';
+          const matchPool = (l.title + ' ' + (l.description || '')).toLowerCase();
+          if (matchPool.includes('공수2') || matchPool.includes('공통수학2')) {
+            derivedGrade = '공통수학2';
+          } else if (matchPool.includes('공수1') || matchPool.includes('공통수학1') || matchPool.includes('고1')) {
+            derivedGrade = '공통수학1';
+          }
+
+          return {
+            videoId: l.video_id,
+            title: l.title,
+            grade: derivedGrade,
+            chapters: chapters.length > 0 ? chapters : undefined
+          };
+        });
+        setYoutubeLectures(mapped);
+      }
+    } catch (err) {
+      console.error('Error loading youtube lectures:', err);
+    }
+  };
+
   // Monitor Supabase Authentication States
   useEffect(() => {
     // 1. Get initial session
@@ -57,6 +97,7 @@ function App() {
         setCurrentUser(username);
         fetchUserData();
         fetchAdminStatus(session.user.id);
+        loadYoutubeLectures(); // 유튜브 강의 데이터 로드
       }
     });
 
@@ -68,10 +109,12 @@ function App() {
         setCurrentUser(username);
         fetchUserData();
         fetchAdminStatus(session.user.id);
+        loadYoutubeLectures(); // 유튜브 강의 데이터 로드
       } else {
         setCurrentUser('');
         setIsAdmin(false);
         setMistakes([]);
+        setYoutubeLectures([]);
       }
     });
 
@@ -494,7 +537,7 @@ function App() {
         <MistakeDetailModal
           selectedEntry={selectedEntry}
           isAnalyzing={isAnalyzing}
-          currentUser={currentUser}
+          youtubeLectures={youtubeLectures}
           onClose={() => setSelectedEntry(null)}
           onDeleteMistake={handleDeleteMistake}
           onStartAnalysis={handleStartAnalysis}
