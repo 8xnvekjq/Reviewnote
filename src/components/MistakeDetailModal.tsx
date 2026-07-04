@@ -56,6 +56,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
   // ★ 모든 학생 대상 유튜브 매칭 알고리즘 (타임라인 없는 비디오 예외 처리 포함)
   // ★ 모든 학생 대상 유튜브 매칭 알고리즘 (DB로 이식된 55개 동영상 목록 대조)
+  // ★ 모든 학생 대상 고정밀 유튜브 매칭 알고리즘 (개별 챕터 교차 스캔 및 무관계 데이터 필터 차단)
   const matchedLecture = React.useMemo(() => {
     const SYNONYM_MAP: Record<string, string[]> = {
       '오메가': ['omega', '\\omega', 'ω'],
@@ -64,9 +65,9 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
       '행렬': ['matrix', '정사각행렬', '영행렬', '단위행렬', '케일리'],
       '조합': ['combination', '뽑기'],
       '순열': ['permutation', '팩토리얼', 'factorial'],
-      '부등식': ['절댓값부등식', '가우스', '연립이차부등식'],
+      '부등식': ['절댓값부등식', '가우스', '연립이차부등식', '이차부등식'],
       '함수': ['최대최소', '이차함수'],
-      '방정식': ['근과 계수', '삼사차방정식', '연립이차방정식']
+      '방정식': ['근과 계수', '삼사차방정식', '연립이차방정식', '이차방정식']
     };
 
     const targetGrade = selectedEntry.grade;
@@ -79,71 +80,68 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     const matchedVideos = youtubeLectures.filter(v => v.grade === targetGrade);
     if (matchedVideos.length === 0) return null;
 
-    // 2. 단원명이나 제목을 비교하여 가장 일치하는 영상 찾기
-    let matchedVideo = matchedVideos[0]; // 기본값은 첫 번째 영상
-    let maxScore = -1;
+    let bestVideo = null;
+    let bestChapter = null;
+    let maxScore = 0; // 0점 초과 매칭 점수만 유효 (랜덤 추천 원천 방지)
 
+    // 2. 동영상 내의 모든 챕터별로 정밀 매칭 점수 계산
     for (const video of matchedVideos) {
-      let score = 0;
       const videoTitleClean = video.title.toLowerCase();
+      const chaptersList = (video.chapters && video.chapters.length > 0)
+        ? video.chapters
+        : [{ startSeconds: 0, chapterTitle: '개념 강의 처음부터' }];
 
-      // 문제 텍스트에 동영상 제목이 포함된 경우 점수 증가
-      if (searchPool.includes(videoTitleClean)) score += 10;
+      for (const ch of chaptersList) {
+        let score = 0;
+        const chapterTitleClean = ch.chapterTitle.toLowerCase();
 
-      // 단원 이름이 동영상 제목에 포함된 경우
-      if (targetChapter && videoTitleClean.includes(targetChapter.toLowerCase())) score += 5;
+        // [핵심 1] 단원명과 챕터명이 높은 연관성을 가질 때 (가장 신뢰도 높음)
+        if (targetChapter && (
+          chapterTitleClean.includes(targetChapter.toLowerCase()) ||
+          targetChapter.toLowerCase().includes(chapterTitleClean)
+        )) {
+          score += 15;
+        }
 
-      // 동의어 매칭 스캔
-      for (const [key, synonyms] of Object.entries(SYNONYM_MAP)) {
-        if (videoTitleClean.includes(key.toLowerCase())) {
-          if (synonyms.some(syn => searchPool.includes(syn.toLowerCase()))) {
-            score += 8;
+        // [핵심 2] 챕터 타이틀이 문제 본문/제목에 그대로 포함될 때
+        if (searchPool.includes(chapterTitleClean)) {
+          score += 10;
+        }
+
+        // [핵심 3] 동의어가 서로 일치하는 경우
+        for (const [key, synonyms] of Object.entries(SYNONYM_MAP)) {
+          if (chapterTitleClean.includes(key.toLowerCase()) || videoTitleClean.includes(key.toLowerCase())) {
+            if (synonyms.some(syn => searchPool.includes(syn.toLowerCase()))) {
+              score += 8;
+            }
           }
         }
-      }
 
-      if (score > maxScore) {
-        maxScore = score;
-        matchedVideo = video;
+        // [보너스] 영상 제목 대조 보너스 점수
+        if (searchPool.includes(videoTitleClean)) {
+          score += 5;
+        }
+        if (targetChapter && videoTitleClean.includes(targetChapter.toLowerCase())) {
+          score += 3;
+        }
+
+        // 점수 갱신
+        if (score > maxScore) {
+          maxScore = score;
+          bestVideo = video;
+          bestChapter = ch;
+        }
       }
     }
 
-    // 3. 찾은 동영상 내부의 챕터 타임라인 매칭
-    const chaptersList = (matchedVideo.chapters && matchedVideo.chapters.length > 0)
-      ? matchedVideo.chapters
-      : [{ startSeconds: 0, chapterTitle: '개념 강의 처음부터' }];
-
-    let bestChapter = chaptersList[0];
-
-    for (const ch of chaptersList) {
-      const chapterTitleClean = ch.chapterTitle.toLowerCase();
-      
-      // 1. 단순 포함 검사
-      if (searchPool.includes(chapterTitleClean)) {
-        bestChapter = ch;
-        break;
-      }
-
-      // 2. 동의어 검사
-      let foundSynonym = false;
-      for (const [key, synonyms] of Object.entries(SYNONYM_MAP)) {
-        if (chapterTitleClean.includes(key.toLowerCase())) {
-          if (synonyms.some(syn => searchPool.includes(syn.toLowerCase()))) {
-            foundSynonym = true;
-            break;
-          }
-        }
-      }
-
-      if (foundSynonym) {
-        bestChapter = ch;
-        break;
-      }
+    // 최소 매칭 연관성 기준 점수(0점 초과)에 미달하면 카드를 아예 표시하지 않음
+    if (!bestVideo || !bestChapter || maxScore === 0) {
+      return null;
     }
 
     return {
-      videoId: matchedVideo.videoId,
-      videoTitle: matchedVideo.title,
+      videoId: bestVideo.videoId,
+      videoTitle: bestVideo.title,
       chapterTitle: bestChapter.chapterTitle,
       startSeconds: bestChapter.startSeconds
     };
