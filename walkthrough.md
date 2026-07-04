@@ -69,6 +69,15 @@
   - 모바일 터치 환경이나 마우스 환경에서 가이드라인 상의 초록색 타원형 핸들을 직접 손가락으로 드래그(터치 조작)하여 범위를 유연하게 바꿀 수 있으며, 미세한 조작을 위해 하단 슬라이더 컨트롤러도 제공합니다. 잘린 영역은 HTML5 Canvas를 활용하여 동적으로 처리됩니다.
   - [App.tsx](file:///c:/Users/USER/Documents/ReviewNotes/src/App.tsx): 사진 스캔 및 갤러리 불러오기 완료 시 즉시 저장소에 올리지 않고 이미지 자르기 단계가 먼저 선행되도록 라이프사이클을 연계했습니다.
 
+### 6. 유튜브 개념 강의 55개 데이터베이스 이식 및 실시간 매칭 연동 (완료)
+- **자막 기반 챕터 타임라인 구축**:
+  - 선생님이 주신 유튜브 강의 재생목록(`PLw8NENAKl4HmkkDFqP-FdqAt48gm4cHiU`)을 파싱하여, 자막 및 챕터 시작 시간(초 단위)을 분/초에서 초 단위 숫자로 환산하여 Supabase DB에 온전히 이식 완료했습니다.
+  - 총 55개의 공통수학1, 2 개념 영상 및 매칭 타임라인이 `youtube_lectures`와 `youtube_timelines` 테이블에 탑재되었습니다.
+- **실시간/소급 매칭 알고리즘 적용**:
+  - [App.tsx](file:///c:/Users/USER/Documents/ReviewNotes/src/App.tsx): 앱이 켜질 때 Supabase로부터 55개의 강의 목록과 챕터들을 한 번에 동기화하여 캐싱해 둡니다.
+  - [MistakeDetailModal.tsx](file:///c:/Users/USER/Documents/ReviewNotes/src/components/MistakeDetailModal.tsx): 오답 상세 모달을 열 때마다 매칭용 동의어 사전(`행렬`, `오메가`, `조합`, `순열`, `부등식` 등)과 과목/단원 매핑 알고리즘이 실시간 대조하여 가장 적절한 추천 영상의 딥링크 카드를 생성합니다.
+  - **전체 대상 오픈**: 특정 아이디(`test`) 제한 조건을 완전히 걷어내어, **모든 사용자의 모든 과거 오답 및 신규 오답에 즉시 소급적용**되도록 배포 완료했습니다.
+
 ---
 
 ## ⚙️ Vercel 최종 연동 가이드
