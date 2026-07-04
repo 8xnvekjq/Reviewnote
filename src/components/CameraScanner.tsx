@@ -15,6 +15,8 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onCapture, onClose
   const [loading, setLoading] = useState(true);
   const [autoCapture, setAutoCapture] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
+  // 탭 포커스 UI 표시용 상태 (좌표 + 표시 여부)
+  const [tapFocus, setTapFocus] = useState<{ x: number; y: number } | null>(null);
 
   // Countdown timer effect for Auto-Capture
   useEffect(() => {
@@ -59,14 +61,27 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onCapture, onClose
       const constraints: MediaStreamConstraints = {
         video: {
           facingMode: facingMode,
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
         },
         audio: false
       };
 
       const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
-      streamRef.current = mediaStream; // always keep ref in sync
+      streamRef.current = mediaStream;
+
+      // ★ 연속 오토포커스(Continuous Autofocus) 활성화
+      const videoTrack = mediaStream.getVideoTracks()[0];
+      if (videoTrack) {
+        const capabilities = videoTrack.getCapabilities() as any;
+        const focusConstraints: any = {};
+        if (capabilities?.focusMode?.includes('continuous')) {
+          focusConstraints.focusMode = 'continuous';
+        }
+        if (Object.keys(focusConstraints).length > 0) {
+          await videoTrack.applyConstraints({ advanced: [focusConstraints] } as any);
+        }
+      }
 
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
@@ -93,6 +108,49 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onCapture, onClose
   // Toggle Camera (front/back)
   const toggleCamera = () => {
     setFacingMode((prev) => (prev === 'user' ? 'environment' : 'user'));
+  };
+
+  // ★ 탭하여 포커스 지점 지정 (Tap-to-Focus)
+  const handleTapFocus = async (e: React.MouseEvent<HTMLVideoElement>) => {
+    const videoTrack = streamRef.current?.getVideoTracks()[0];
+    if (!videoTrack) return;
+
+    // UI 피드백: 탭한 좌표에 포커스 링 표시
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    setTapFocus({ x, y });
+    setTimeout(() => setTapFocus(null), 1200);
+
+    // 정규화된 포인트 오브 인터레스트 계산 (0~1 범위)
+    const pointX = (e.clientX - rect.left) / rect.width;
+    const pointY = (e.clientY - rect.top) / rect.height;
+
+    try {
+      const capabilities = videoTrack.getCapabilities() as any;
+      const focusConstraints: any = {};
+
+      if (capabilities?.focusMode?.includes('manual')) {
+        focusConstraints.focusMode = 'manual';
+      }
+      if (capabilities?.pointsOfInterest) {
+        focusConstraints.pointsOfInterest = [{ x: pointX, y: pointY }];
+      }
+
+      if (Object.keys(focusConstraints).length > 0) {
+        await videoTrack.applyConstraints({ advanced: [focusConstraints] } as any);
+        // 포커스 후 다시 연속 모드로 복귀
+        setTimeout(async () => {
+          const caps = videoTrack.getCapabilities() as any;
+          if (caps?.focusMode?.includes('continuous')) {
+            await videoTrack.applyConstraints({ advanced: [{ focusMode: 'continuous' }] } as any);
+          }
+        }, 2000);
+      }
+    } catch (err) {
+      // 포커스 API 미지원 기기에서는 무시
+      console.warn('Tap-to-focus not supported:', err);
+    }
   };
 
   // Capture frame from video and convert to Base64
@@ -187,8 +245,26 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onCapture, onClose
               autoPlay
               playsInline
               muted
-              className="w-full h-full object-cover"
+              onClick={handleTapFocus}
+              className="w-full h-full object-cover cursor-crosshair"
             />
+
+            {/* 탭-투-포커스 링 애니메이션 */}
+            {tapFocus && (
+              <div
+                className="absolute pointer-events-none z-30"
+                style={{
+                  left: tapFocus.x,
+                  top: tapFocus.y,
+                  transform: 'translate(-50%, -50%)'
+                }}
+              >
+                <div className="w-14 h-14 rounded-full border-2 border-yellow-400 animate-ping" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-2 h-2 rounded-full bg-yellow-400" />
+                </div>
+              </div>
+            )}
 
             {/* Target Reticle Overlay */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-6">
