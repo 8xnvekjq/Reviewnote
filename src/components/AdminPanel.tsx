@@ -18,18 +18,21 @@ export const AdminPanel: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      // Fetch all profiles
+      // Fetch all profiles (display_name 포함)
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, email, is_admin')
+        .select('id, email, is_admin, display_name')
         .order('email', { ascending: true });
 
       if (profilesError) throw profilesError;
 
-      // Build profilesMap
+      // Build profilesMap: userId -> { username, displayName, label }
       const pMap: Record<string, string> = {};
       (profiles || []).forEach((p: any) => {
-        pMap[p.id] = p.email?.split('@')[0] || p.id.slice(0, 8);
+        const username = p.email?.split('@')[0] || p.id.slice(0, 8);
+        const displayName = p.display_name?.trim();
+        // label = "이름 (아이디)" 형식, 이름이 없으면 아이디만
+        pMap[p.id] = displayName ? `${displayName} (${username})` : username;
       });
       setProfilesMap(pMap);
 

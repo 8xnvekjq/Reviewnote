@@ -89,14 +89,16 @@ function App() {
 
       if (mistakesError) throw mistakesError;
 
-      // Fetch all profiles for admin name mapping
+      // Fetch all profiles for admin name mapping (display_name 포함)
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('id, email');
+        .select('id, email, display_name');
 
       const pMap: Record<string, string> = {};
       (profiles || []).forEach((p: any) => {
-        pMap[p.id] = p.email?.split('@')[0] || p.id.slice(0, 8);
+        const username = p.email?.split('@')[0] || p.id.slice(0, 8);
+        const displayName = p.display_name?.trim();
+        pMap[p.id] = displayName ? `${displayName} (${username})` : username;
       });
       setProfilesMap(pMap);
 
