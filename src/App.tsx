@@ -494,6 +494,7 @@ function App() {
         <MistakeDetailModal
           selectedEntry={selectedEntry}
           isAnalyzing={isAnalyzing}
+          currentUser={currentUser}
           onClose={() => setSelectedEntry(null)}
           onDeleteMistake={handleDeleteMistake}
           onStartAnalysis={handleStartAnalysis}

@@ -28,3 +28,5 @@ dist-ssr
 .env.local
 .env.*.local
 
+# Local drafts and backups for YouTube integration
+youtube_backup_draft/

@@ -8,6 +8,7 @@ import { supabase } from '../services/supabase';
 interface MistakeDetailModalProps {
   selectedEntry: MistakeEntry;
   isAnalyzing: boolean;
+  currentUser?: string; // test 학생 한정 배포용
   onClose: () => void;
   onDeleteMistake: (id: string, e: React.MouseEvent) => void;
   onStartAnalysis: (entry: MistakeEntry) => void;
@@ -29,6 +30,7 @@ const NORMAL_PHRASES = [
 export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   selectedEntry,
   isAnalyzing,
+  currentUser,
   onClose,
   onDeleteMistake,
   onStartAnalysis,
@@ -51,6 +53,77 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   const [showMistakeSummary, setShowMistakeSummary] = React.useState(false); // Default collapsed for self-study
 
   const chaptersForGrade = editGrade ? (MATH_CURRICULUM[editGrade] || []) : [];
+
+  // ★ test 학생용 한정 유튜브 매칭 데이터 세트 & 알고리즘
+  const matchedLecture = React.useMemo(() => {
+    if (currentUser !== 'test') return null;
+
+    const mockYoutubeLectures = [
+      {
+        videoId: 'dQ_dkIb1DXo',
+        title: '12/23 고1 월수금 삼차방정식의 근과계수, 오메가',
+        grade: '공통수학1',
+        chapters: [
+          { startSeconds: 0, chapterTitle: '삼차방정식의 근과 계수' },
+          { startSeconds: 2043, chapterTitle: '오메가' } // 34분 3초
+        ]
+      }
+    ];
+
+    const SYNONYM_MAP: Record<string, string[]> = {
+      '오메가': ['omega', '\\omega', 'ω'],
+      '로그': ['log'],
+      '지수': ['exponent'],
+      '행렬': ['matrix'],
+      '사인': ['sin', 'sine'],
+      '코사인': ['cos', 'cosine'],
+      '탄젠트': ['tan', 'tangent']
+    };
+
+    const targetGrade = selectedEntry.grade;
+    const targetChapter = selectedEntry.chapter || '';
+    const problemText = selectedEntry.analysis?.problemText || '';
+    const problemTitle = selectedEntry.title || '';
+
+    const matchedVideo = mockYoutubeLectures.find(v => v.grade === targetGrade);
+    if (!matchedVideo) return null;
+
+    let bestChapter = matchedVideo.chapters[0];
+    const searchPool = (problemTitle + ' ' + targetChapter + ' ' + problemText).toLowerCase();
+
+    for (const ch of matchedVideo.chapters) {
+      const chapterTitleClean = ch.chapterTitle.toLowerCase();
+      
+      // 1. 단순 포함 검사
+      if (searchPool.includes(chapterTitleClean)) {
+        bestChapter = ch;
+        break;
+      }
+
+      // 2. 동의어 검사
+      let foundSynonym = false;
+      for (const [key, synonyms] of Object.entries(SYNONYM_MAP)) {
+        if (chapterTitleClean.includes(key.toLowerCase())) {
+          if (synonyms.some(syn => searchPool.includes(syn.toLowerCase()))) {
+            foundSynonym = true;
+            break;
+          }
+        }
+      }
+
+      if (foundSynonym) {
+        bestChapter = ch;
+        break;
+      }
+    }
+
+    return {
+      videoId: matchedVideo.videoId,
+      videoTitle: matchedVideo.title,
+      chapterTitle: bestChapter.chapterTitle,
+      startSeconds: bestChapter.startSeconds
+    };
+  }, [selectedEntry, currentUser]);
 
   // ★ 버그 수정: AI 분석이 끝나서 selectedEntry 데이터가 갱신되면 로컬 상태도 자동으로 갱신 동기화합니다.
   React.useEffect(() => {
@@ -274,6 +347,44 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
               )}
             </div>
           )}
+          {/* ⚡ AI 추천 동영상 딥링크 연동 카드 (test 학생 한정) */}
+          {matchedLecture && (
+            <div className="bg-gradient-to-r from-red-950/20 to-slate-900 border border-red-500/20 rounded-2xl p-4.5 space-y-3 shadow-lg animate-scale-up">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-red-400 flex items-center space-x-1.5">
+                  <span className="text-base animate-pulse">📺</span>
+                  <span>선생님의 개념 추천 강의</span>
+                </span>
+                <span className="text-[9px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded-full border border-red-500/20 font-bold">
+                  유튜브 앱 즉시 연동
+                </span>
+              </div>
+
+              <div className="space-y-1">
+                <h5 className="text-xs font-bold text-white leading-snug line-clamp-1">
+                  {matchedLecture.videoTitle}
+                </h5>
+                <p className="text-[11px] text-slate-400">
+                  📍 재생 구간: <span className="text-amber-400 font-semibold">{matchedLecture.chapterTitle}</span> ({
+                    Math.floor(matchedLecture.startSeconds / 60) > 0 
+                      ? `${Math.floor(matchedLecture.startSeconds / 60)}분 ${matchedLecture.startSeconds % 60}초` 
+                      : `${matchedLecture.startSeconds % 60}초`
+                  }부터)
+                </p>
+              </div>
+
+              <a
+                href={`https://youtu.be/${matchedLecture.videoId}?t=${matchedLecture.startSeconds}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-500 active:scale-95 text-white font-bold text-xs flex items-center justify-center space-x-2 transition-all shadow-md shadow-red-600/15"
+              >
+                <span>▶️</span>
+                <span>강의 시간대로 바로 가기</span>
+              </a>
+            </div>
+          )}
+
 
           {hasStruggled && selectedEntry.analysis?.hints && selectedEntry.analysis.hints.length > 0 && (
             <div className="bg-slate-950 p-4.5 rounded-2xl border border-slate-850 space-y-3 animate-scale-up">
