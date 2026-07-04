@@ -353,8 +353,8 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
               <div className="flex items-center space-x-3 min-w-0">
                 <span className="text-xl flex-none">📺</span>
                 <div className="min-w-0 space-y-0.5">
-                  <p className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">선생님 추천 강의</p>
-                  <h5 className="text-xs font-bold text-slate-300 truncate leading-tight">
+                  <p className="text-[10px] font-black text-rose-400 uppercase tracking-wider">선생님 추천 강의</p>
+                  <h5 className="text-xs font-bold text-slate-200 truncate leading-tight">
                     {matchedLecture.videoTitle}
                   </h5>
                   <p className="text-[10px] text-slate-400 truncate">
@@ -371,7 +371,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 href={`https://youtu.be/${matchedLecture.videoId}?t=${matchedLecture.startSeconds}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-95 text-red-400 hover:text-red-300 font-extrabold text-[10px] border border-slate-800 transition-all flex items-center space-x-1 flex-none shadow-md"
+                className="px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 active:scale-95 text-rose-300 hover:text-rose-200 font-extrabold text-[10px] border border-rose-500/20 transition-all flex items-center space-x-1 flex-none shadow-md"
               >
                 <span>▶️</span>
                 <span>바로가기</span>
