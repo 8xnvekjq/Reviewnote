@@ -9,6 +9,7 @@ interface GeminiResponse {
   problemBox: ProblemBox;
   grade: string;
   chapter: string;
+  mistakeSummary: string;
 }
 
 /**
@@ -108,14 +109,21 @@ export const analyzeMistakeWithGemini = async (
 
 6. chapter: grade에서 선택한 과목의 단원 목록 중 이 문제가 속하는 단원명을 아래 제공된 단원명 목록에서만 토씨 하나 틀리지 않게 정확히 골라 출력해야 합니다. 임의의 텍스트를 생성하지 마십시오.
 
-출력은 지정된 JSON 스키마를 엄격히 따라 다음 7가지 항목을 모두 한국어로 작성해야 합니다:
+7. mistakeSummary: 사진 속 학생이 직접 작성한 필기나 풀이 과정을 분석하여, 핵심적으로 어디서 어떻게 틀렸는지 30자 이내의 한 문장으로 날카롭게 요약하세요.
+   - 반드시 구체적인 수학적 원인을 포함해야 합니다 (예: "부호 실수", "공식 오적용", "인수분해 오류" 등)
+   - 좋은 예: "이차방정식 판별식에서 b²-4ac의 부호를 반대로 계산함"
+   - 좋은 예: "삼각함수 덧셈 공식에서 cos항의 부호를 누락함"
+   - 학생 필기가 전혀 없는 경우에만: "학생 풀이 없음"
+
+출력은 지정된 JSON 스키마를 엄격히 따라 다음 8가지 항목을 모두 한국어로 작성해야 합니다:
 1. title: 문제의 주제나 공식을 담은 짤막하고 직관적인 제목
 2. solvingProcess: 위의 지시사항을 따른 올바른 풀이 과정
 3. hints: 위의 지시사항을 따른 단계별 힌트 목록 (정확히 3개)
 4. problemText: 위의 지시사항을 따른 추출된 원본 문제 지문
 5. problemBox: 위의 지시사항을 따른 필기 제외 인쇄 문제 영역 바운딩 박스
 6. grade: 과목명
-7. chapter: 단원명`;
+7. chapter: 단원명
+8. mistakeSummary: 학생 풀이 기반 틀린 이유 1줄 요약 (30자 이내)`;
 
   const requestBody = {
     contents: [
@@ -154,9 +162,10 @@ export const analyzeMistakeWithGemini = async (
             required: ['top', 'bottom', 'left', 'right']
           },
           grade: { type: 'STRING' },
-          chapter: { type: 'STRING' }
+          chapter: { type: 'STRING' },
+          mistakeSummary: { type: 'STRING' }
         },
-        required: ['title', 'solvingProcess', 'hints', 'problemText', 'problemBox', 'grade', 'chapter']
+        required: ['title', 'solvingProcess', 'hints', 'problemText', 'problemBox', 'grade', 'chapter', 'mistakeSummary']
       }
     }
   };
@@ -214,6 +223,7 @@ export const analyzeMistakeWithGemini = async (
       chapter: resolvedChapter,
       analysis: {
         solvingProcess: parsedJson.solvingProcess,
+        mistakeSummary: parsedJson.mistakeSummary || undefined,
         hints: parsedJson.hints,
         problemText: parsedJson.problemText,
         problemBox: parsedJson.problemBox

@@ -242,7 +242,22 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             )}
           </div>
 
-          {/* Conditional Step-by-Step Hints Card */}
+          {/* ⚡ AI 틀린 이유 1줄 진단 — 이미지 바로 아래 */}
+          {selectedEntry.analysis?.mistakeSummary &&
+            selectedEntry.analysis.mistakeSummary !== '학생 풀이 없음' && (
+            <div className="flex items-start space-x-3 bg-red-950/30 border border-red-500/20 rounded-2xl px-4 py-3 animate-scale-up">
+              <span className="text-lg flex-none mt-0.5">⚡</span>
+              <div>
+                <p className="text-[10px] font-extrabold text-red-400 uppercase tracking-wider mb-1">
+                  AI 틀린 이유 진단
+                </p>
+                <p className="text-sm font-semibold text-red-200 leading-snug">
+                  {selectedEntry.analysis.mistakeSummary}
+                </p>
+              </div>
+            </div>
+          )}
+
           {hasStruggled && selectedEntry.analysis?.hints && selectedEntry.analysis.hints.length > 0 && (
             <div className="bg-slate-950 p-4.5 rounded-2xl border border-slate-850 space-y-3 animate-scale-up">
               <div className="flex items-center justify-between">
