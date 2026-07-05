@@ -26,6 +26,13 @@ export const StudentGuide: React.FC = () => {
 
   const changeLogs = [
     {
+      version: 'v1.7.5',
+      date: '2026.07.05',
+      changes: [
+        '오답노트 카드 이미지 좌하단 영역에 과목(📚) 및 단원(📌) 동그라미 배지 추가'
+      ]
+    },
+    {
       version: 'v1.7.4',
       date: '2026.07.05',
       changes: [

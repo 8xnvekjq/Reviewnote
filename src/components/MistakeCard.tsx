@@ -42,6 +42,21 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
             <span>{studentName}</span>
           </div>
         )}
+        {/* 과목 및 단원 배지 (좌하단 동그라미 양식) */}
+        {(entry.grade || entry.chapter) && (
+          <div className="absolute bottom-2 left-2 flex items-center space-x-1.5 z-10">
+            {entry.grade && (
+              <div className="px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-600/95 text-white backdrop-blur-sm shadow-sm flex items-center">
+                <span>📚</span><span className="ml-1">{entry.grade}</span>
+              </div>
+            )}
+            {entry.chapter && (
+              <div className="px-2 py-0.5 rounded-full text-[9px] font-black bg-slate-900/95 text-slate-200 border border-slate-800/80 backdrop-blur-sm shadow-sm truncate max-w-[120px] flex items-center">
+                <span>📌</span><span className="ml-1">{entry.chapter}</span>
+              </div>
+            )}
+          </div>
+        )}
         <div className="absolute top-2 right-2 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-950/80 backdrop-blur-sm border border-slate-800 text-slate-300">
           {formatDate(entry.date)}
         </div>
