@@ -26,6 +26,14 @@ export const StudentGuide: React.FC = () => {
 
   const changeLogs = [
     {
+      version: 'v1.7.3',
+      date: '2026.07.05',
+      changes: [
+        '주간 최다 오답 완료 명예의 전당 배너 전체 학생에게 전면 오픈',
+        '어드민 패널 학생 카드 레이아웃 정리 (순위 배지 제거 및 이름/아이디 표시 분리 개선)'
+      ]
+    },
+    {
       version: 'v1.7.2',
       date: '2026.07.05',
       changes: [

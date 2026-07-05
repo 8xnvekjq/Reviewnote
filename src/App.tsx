@@ -444,8 +444,8 @@ function App() {
       <main className="flex-1 overflow-y-auto px-4 py-6 pb-24">
         {activeTab === 'notes' && (
           <>
-            {/* 주간 복습왕 배너 (test 학생 전용 카나리 롤아웃) */}
-            {currentUser === 'test' && weeklyChampion && (
+            {/* 주간 복습왕 배너 (전체 학생 오픈) */}
+            {weeklyChampion && (
               <div className="bg-slate-900/80 border border-amber-500/20 rounded-2xl p-3 mb-4 flex items-center justify-between shadow-lg shadow-amber-950/10 animate-fade-in">
                 <div className="flex items-center space-x-2.5 min-w-0">
                   <span className="text-xl animate-bounce flex-none">👑</span>
