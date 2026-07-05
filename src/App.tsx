@@ -705,9 +705,9 @@ function App() {
         />
       )}
 
-      {/* 내 주간 스코어 미니 리본바 (일반 학생 로그인 시 상시 노출) */}
+      {/* 내 주간 스코어 미니 플로팅 리본바 (일반 학생 로그인 시 BottomNavigation 바로 위에 플로팅) */}
       {!isAdmin && currentUser && (
-        <div className="fixed bottom-[56px] left-0 right-0 z-20 bg-slate-900/95 backdrop-blur-md border-t border-slate-800/80 px-4 py-1.5 flex items-center justify-between text-[10px] text-slate-400 font-bold safe-bottom-offset shadow-lg shadow-indigo-950/20">
+        <div className="fixed bottom-[84px] left-4 right-4 z-30 bg-slate-900/95 backdrop-blur-md border border-slate-800/80 rounded-xl px-4 py-1.5 flex items-center justify-between text-[10px] text-slate-400 font-bold shadow-lg shadow-indigo-950/30">
           <div className="flex items-center space-x-1.5">
             <span className="text-amber-400">⚡</span>
             <span>내 주간 복습 현황:</span>

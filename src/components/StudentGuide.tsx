@@ -26,6 +26,14 @@ export const StudentGuide: React.FC = () => {
 
   const changeLogs = [
     {
+      version: 'v1.8.4',
+      date: '2026.07.06',
+      changes: [
+        '주간 복습왕 1주 롤오버(지난주 우승자 이월 표기) 및 공백기 자동 초기화 기능 배포',
+        '화면 하단 네비게이션 위에 나의 실시간 복습 진척도 및 주간 점수 플로팅 리본 탑재'
+      ]
+    },
+    {
       version: 'v1.8.3',
       date: '2026.07.05',
       changes: [
