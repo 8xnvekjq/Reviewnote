@@ -35,6 +35,38 @@ function App() {
   // 주간 최다 오답 완료 챔피언 상태
   const [weeklyChampion, setWeeklyChampion] = useState<any>(null);
 
+  // 이번주 월요일 00:00 KST UTC 경계 날짜 구하기 (내 실시간 주간 점수 계산용)
+  const myWeeklyScore = useMemo(() => {
+    if (!currentUser || mistakes.length === 0) return { total: 0, completed: 0, score: 0 };
+
+    const now = new Date();
+    const kstTime = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+    const day = kstTime.getUTCDay();
+    const diff = kstTime.getUTCDate() - day + (day === 0 ? -6 : 1);
+    const mondayKst = new Date(Date.UTC(kstTime.getUTCFullYear(), kstTime.getUTCMonth(), diff, 0, 0, 0));
+    const thisMondayUtc = new Date(mondayKst.getTime() - 9 * 60 * 60 * 1000);
+
+    // 이번 주 월요일 이후 등록된 본인 오답 필터링
+    const myWeeklyMistakes = mistakes.filter(m => {
+      const mDate = new Date(m.date);
+      return mDate >= thisMondayUtc;
+    });
+
+    const total = myWeeklyMistakes.length;
+    const completed = myWeeklyMistakes.filter(m => 
+      m.reviews && m.reviews.filter(r => r === 'O').length === 3
+    ).length;
+
+    const rate = total > 0 ? (completed / total) : 0;
+    const score = (completed * 10) + (rate * 100);
+
+    return {
+      total,
+      completed,
+      score: Math.round(score)
+    };
+  }, [currentUser, mistakes]);
+
   // State for image cropping flow
   const [tempCapturedImage, setTempCapturedImage] = useState<string | null>(null);
 
@@ -58,76 +90,21 @@ function App() {
         return;
       }
 
-      // 2. 이번 주 데이터가 없으면 지난주(Last Week) 범위 계산
-      const now = new Date();
-      const kstTime = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-      const day = kstTime.getUTCDay();
-      const diff = kstTime.getUTCDate() - day + (day === 0 ? -6 : 1);
-      const mondayKst = new Date(Date.UTC(kstTime.getUTCFullYear(), kstTime.getUTCMonth(), diff, 0, 0, 0));
-      const thisMondayUtc = new Date(mondayKst.getTime() - 9 * 60 * 60 * 1000); // UTC 날짜
-      const lastMondayUtc = new Date(thisMondayUtc.getTime() - 7 * 24 * 60 * 60 * 1000);
+      // 2. 이번 주 데이터가 없으면 지난주 랭킹 뷰(RLS 우회) 조회
+      const { data: lastWeekData, error: lastWeekError } = await supabase
+        .from('last_weekly_leaderboard')
+        .select('*')
+        .order('score', { ascending: false })
+        .limit(1);
 
-      // 지난주 월요일 UTC ~ 이번주 월요일 UTC 경계선 사이의 오답들 쿼리
-      const { data: lastWeekMistakes } = await supabase
-        .from('mistakes')
-        .select('user_id, reviews')
-        .gte('created_at', lastMondayUtc.toISOString())
-        .lt('created_at', thisMondayUtc.toISOString());
+      if (lastWeekError) throw lastWeekError;
 
-      if (lastWeekMistakes && lastWeekMistakes.length > 0) {
-        // 유저 아이디별 집계
-        const userStats: Record<string, { total: number; completed: number }> = {};
-        lastWeekMistakes.forEach((m: any) => {
-          if (!m.user_id) return;
-          if (!userStats[m.user_id]) {
-            userStats[m.user_id] = { total: 0, completed: 0 };
-          }
-          userStats[m.user_id].total += 1;
-          const reviews: string[] = m.reviews || [];
-          const isCompleted = reviews.filter(r => r === 'O').length === 3;
-          if (isCompleted) {
-            userStats[m.user_id].completed += 1;
-          }
+      if (lastWeekData && lastWeekData.length > 0 && lastWeekData[0].score > 0) {
+        setWeeklyChampion({
+          ...lastWeekData[0],
+          isLastWeek: true
         });
-
-        // 최고 점수 우승자 선정
-        let bestUserId = '';
-        let maxScore = 0;
-        let bestStat = { total: 0, completed: 0 };
-
-        Object.entries(userStats).forEach(([uid, stat]) => {
-          const rate = stat.total > 0 ? (stat.completed / stat.total) : 0;
-          const score = (stat.completed * 10) + (rate * 100);
-          // 최소 0점 초과(오답을 완료한 이력)인 경우에만 랭킹 집계
-          if (score > maxScore && stat.completed > 0) {
-            maxScore = score;
-            bestUserId = uid;
-            bestStat = stat;
-          }
-        });
-
-        if (bestUserId) {
-          // 우승자 프로필 로드 (닉네임 노출용)
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('email, display_name')
-            .eq('id', bestUserId)
-            .single();
-
-          if (profile) {
-            const username = profile.email?.split('@')[0] || profile.display_name || bestUserId.slice(0, 8);
-            setWeeklyChampion({
-              username,
-              display_name: profile.display_name?.trim() || undefined,
-              weekly_total_count: bestStat.total,
-              weekly_completed_count: bestStat.completed,
-              completion_rate: bestStat.total > 0 ? (bestStat.completed / bestStat.total) : 0,
-              score: maxScore,
-              isLastWeek: true
-            });
-            return;
-          }
-        }
+        return;
       }
 
       // 3. 지난주마저 점수가 없으면 배너를 비워 동기부여 유도
@@ -504,7 +481,7 @@ function App() {
       <Header currentUser={currentUser} onLogout={handleLogout} />
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto px-4 py-6 pb-24">
+      <main className="flex-1 overflow-y-auto px-4 py-6 pb-28">
         {activeTab === 'notes' && (
           <>
             {/* 주간 복습왕 배너 (전체 학생 오픈 / 1주 이월 및 리셋 롤오버) */}
@@ -726,6 +703,23 @@ function App() {
           onCropComplete={handleCropComplete}
           onCancel={() => setTempCapturedImage(null)}
         />
+      )}
+
+      {/* 내 주간 스코어 미니 리본바 (일반 학생 로그인 시 상시 노출) */}
+      {!isAdmin && currentUser && (
+        <div className="fixed bottom-[56px] left-0 right-0 z-20 bg-slate-900/95 backdrop-blur-md border-t border-slate-800/80 px-4 py-1.5 flex items-center justify-between text-[10px] text-slate-400 font-bold safe-bottom-offset shadow-lg shadow-indigo-950/20">
+          <div className="flex items-center space-x-1.5">
+            <span className="text-amber-400">⚡</span>
+            <span>내 주간 복습 현황:</span>
+            <span className="text-white font-extrabold">{myWeeklyScore.completed}개 완료</span>
+            <span className="text-slate-600">/</span>
+            <span className="text-slate-400">{myWeeklyScore.total}개 등록</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <span className="text-slate-500">내 점수:</span>
+            <span className="text-amber-400 font-black text-xs">{myWeeklyScore.score}점</span>
+          </div>
+        </div>
       )}
 
       {/* Floating Glassmorphic Bottom Navigation Bar */}
