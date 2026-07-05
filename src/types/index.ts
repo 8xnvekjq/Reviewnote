@@ -11,6 +11,9 @@ export interface MistakeAnalysis {
   hints?: string[];         // [단계별 힌트 목록 (최대 3개)]
   problemText?: string;     // [추출된 원본 문제 지문]
   problemBox?: ProblemBox;  // [인쇄된 문제 영역 바운딩 박스 (필기 제외)]
+  matchedVideoId?: string;       // AI가 직접 매칭한 유튜브 Video ID
+  matchedStartSeconds?: number;  // AI가 직접 매칭한 유튜브 시작 시간(초)
+  matchedChapterTitle?: string;  // AI가 직접 매칭한 챕터 제목
   mistakeDetail?: string;   // [실수한 지점 상세 분석] (이전 데이터 호환용)
   rootCause?: string;       // [근본적인 틀린 이유] (이전 데이터 호환용)
   actionPlan?: string;      // [향후 재발 방지 대책] (이전 데이터 호환용)

@@ -54,10 +54,23 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
   const chaptersForGrade = editGrade ? (MATH_CURRICULUM[editGrade] || []) : [];
 
-  // ★ 모든 학생 대상 유튜브 매칭 알고리즘 (타임라인 없는 비디오 예외 처리 포함)
-  // ★ 모든 학생 대상 유튜브 매칭 알고리즘 (DB로 이식된 55개 동영상 목록 대조)
-  // ★ 모든 학생 대상 고정밀 유튜브 매칭 알고리즘 (개별 챕터 교차 스캔 및 무관계 데이터 필터 차단)
+  // ★ 모든 학생 대상 유튜브 매칭 알고리즘 (하이브리드 AI-우선 / 키워드-보완)
   const matchedLecture = React.useMemo(() => {
+    // [우선순위 1] AI가 분석 시점에 직접 지정한 매칭 정보가 있을 때 (1안 적용 대상)
+    const aiVideoId = selectedEntry.analysis?.matchedVideoId;
+    if (aiVideoId) {
+      const bestVideo = youtubeLectures.find(v => v.videoId === aiVideoId);
+      if (bestVideo) {
+        return {
+          videoId: bestVideo.videoId,
+          videoTitle: bestVideo.title,
+          chapterTitle: selectedEntry.analysis?.matchedChapterTitle || '추천 단원 개념 강의',
+          startSeconds: selectedEntry.analysis?.matchedStartSeconds ?? 0
+        };
+      }
+    }
+
+    // [우선순위 2] AI 매칭 정보가 없을 때: 기존 로컬 스코어 매칭 로직 작동 (하위 호환용 Fallback)
     const SYNONYM_MAP: Record<string, string[]> = {
       '오메가': ['omega', '\\omega', 'ω'],
       '로그': ['log'],

@@ -251,7 +251,7 @@ function App() {
 
   // Gemini API analysis flow & database updating
   const runAnalysisFlow = async (entry: MistakeEntry, apiKey: string) => {
-    const result = await analyzeMistakeWithGemini(entry.imageUrl, apiKey);
+    const result = await analyzeMistakeWithGemini(entry.imageUrl, apiKey, youtubeLectures);
     
     // Update mistake database record (including auto-classified grade/chapter)
     const { error: updateError } = await supabase

@@ -26,6 +26,15 @@ export const StudentGuide: React.FC = () => {
 
   const changeLogs = [
     {
+      version: 'v1.8.0',
+      date: '2026.07.05',
+      changes: [
+        'Gemini 2.5-Flash 기반 고정밀 동영상 개념 매칭 기술 도입 (매칭률 비약적 상승)',
+        'AI 분석 시 등록된 모든 강의 인덱스를 실시간 비교 분석하여 정확한 강의 및 타임라인 자동 판정',
+        '기존 분석 완료 오답과의 하위 호환성을 위해 키워드 매칭(Fallback) 병행 지원'
+      ]
+    },
+    {
       version: 'v1.7.5',
       date: '2026.07.05',
       changes: [

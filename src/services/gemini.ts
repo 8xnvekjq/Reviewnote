@@ -10,6 +10,9 @@ interface GeminiResponse {
   grade: string;
   chapter: string;
   mistakeSummary: string;
+  matchedVideoId?: string | null;
+  matchedStartSeconds?: number | null;
+  matchedChapterTitle?: string | null;
 }
 
 /**
@@ -18,7 +21,7 @@ interface GeminiResponse {
 const parseBase64Image = (dataUrl: string): { mimeType: string; base64Data: string } => {
   const matches = dataUrl.match(/^data:(image\/[a-zA-Z+.-]+);base64,(.+)$/);
   if (!matches || matches.length < 3) {
-    throw new Error('올바르지 않은 이미지 형식입니다.');
+    throw new Error('올바르지 않은 이미지 포맷입니다.');
   }
 
   return {
@@ -65,9 +68,24 @@ const imageUrlToBase64 = async (url: string): Promise<{ mimeType: string; base64
  */
 export const analyzeMistakeWithGemini = async (
   imageUrl: string,
-  apiKey: string
+  apiKey: string,
+  youtubeLectures: any[] = []
 ): Promise<{ title: string; analysis: MistakeAnalysis; grade: string; chapter: string }> => {
   const { mimeType, base64Data } = await imageUrlToBase64(imageUrl);
+
+  // 우리 DB의 55개 강의 목록을 AI용 텍스트 인덱스로 정밀 가공
+  const syllabusText = (youtubeLectures || [])
+    .map((v, i) => {
+      const chaptersStr = (v.chapters || [])
+        .map((ch: any) => `  * ${ch.startSeconds}초: "${ch.chapterTitle}"`)
+        .join('\n');
+      return `[강의 #${i + 1}]
+- 비디오 ID: "${v.videoId}"
+- 과목: "${v.grade}"
+- 강의 제목: "${v.title}"
+${chaptersStr || '  * (챕터 정보 없음)'}`;
+    })
+    .join('\n\n');
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
   const prompt = `수학 문제 사진입니다. 이 사진 속 문제를 분석하고 올바른 풀이법과 메타데이터를 진단해 주세요.
@@ -88,6 +106,15 @@ export const analyzeMistakeWithGemini = async (
 ★ [가장 중요 - 줄바꿈 및 소제목 규칙] ★
 - 모든 소제목은 반드시 독립된 단독 라인에 '### 소제목 제목' 형태로 작성해 주십시오.
 - 각 소제목 앞뒤로는 반드시 줄바꿈 기호(\n\n)를 두 번 배치하여 단락을 완전히 분리해 주십시오.
+
+★ [가장 중요 - 선생님 추천 강의 매칭 규칙] ★
+아래 제공된 [선생님 강의 및 챕터 인덱스 목록]에서 이 수학 문제의 개념과 가장 관련 깊은 단 하나의 강의 영상과 챕터를 직접 선별해 주십시오.
+- 문제를 진단한 결과 도출되는 과목(grade) 및 단원(chapter)과 가장 일치하는 영상 챕터를 우선하여 고릅니다.
+- 만약 개념상 완벽하게 매칭되는 영상 챕터가 존재한다면 해당 비디오 ID, 챕터 시작 시간(초), 챕터 제목을 각각 matchedVideoId, matchedStartSeconds, matchedChapterTitle에 기입해 주십시오.
+- 만약 우리 강의 목록 중에 전혀 연관성이 없다고 판단되면 세 필드 모두 null로 응답해 주십시오. 억지로 매칭시키지 않는 것이 좋습니다.
+
+[선생님 강의 및 챕터 인덱스 목록]
+${syllabusText || '등록된 강의가 없습니다.'}
 
 1. solvingProcess: 문제의 정석적인 올바른 단계별 풀이 과정.
    - 각 소문제 단위로 '### (1) ...' 형태로 단락을 나누고, 핵심 개념 적용 단계마다 '### 개념명' 소제목을 단독 라인에 분리하여 작성해 주십시오.
@@ -135,7 +162,10 @@ export const analyzeMistakeWithGemini = async (
 5. problemBox: 위의 지시사항을 따른 필기 제외 인쇄 문제 영역 바운딩 박스
 6. grade: 과목명
 7. chapter: 단원명
-8. mistakeSummary: 학생 풀이 기반 틀린 이유 1줄 요약 (30자 이내의 한국어 문장, 절대 영문 작성 금지)`;
+8. mistakeSummary: 학생 풀이 기반 틀린 이유 1줄 요약 (30자 이내의 한국어 문장, 절대 영문 작성 금지)
+9. matchedVideoId: 선택 매칭된 강의 비디오 ID (목록에 없을 시 null)
+10. matchedStartSeconds: 선택 매칭된 강의 시작 시간 (초 단위 숫자, 없을 시 null)
+11. matchedChapterTitle: 선택 매칭된 강의 챕터 제목 (없을 시 null)`;
 
   const requestBody = {
     contents: [
@@ -175,7 +205,10 @@ export const analyzeMistakeWithGemini = async (
           },
           grade: { type: 'STRING' },
           chapter: { type: 'STRING' },
-          mistakeSummary: { type: 'STRING' }
+          mistakeSummary: { type: 'STRING' },
+          matchedVideoId: { type: 'STRING', nullable: true },
+          matchedStartSeconds: { type: 'NUMBER', nullable: true },
+          matchedChapterTitle: { type: 'STRING', nullable: true }
         },
         required: ['title', 'solvingProcess', 'hints', 'problemText', 'problemBox', 'grade', 'chapter', 'mistakeSummary']
       }
@@ -206,7 +239,7 @@ export const analyzeMistakeWithGemini = async (
 
     const parsedJson: GeminiResponse = JSON.parse(responseText);
 
-    // ★ 단원명 보정 및 보정 로직 (Fuzzy Matching)
+    // 단원명 보정 및 보정 로직 (Fuzzy Matching)
     let resolvedGrade = parsedJson.grade || '기타';
     if (!MATH_CURRICULUM[resolvedGrade]) {
       resolvedGrade = '기타';
@@ -238,7 +271,10 @@ export const analyzeMistakeWithGemini = async (
         mistakeSummary: parsedJson.mistakeSummary || undefined,
         hints: parsedJson.hints,
         problemText: parsedJson.problemText,
-        problemBox: parsedJson.problemBox
+        problemBox: parsedJson.problemBox,
+        matchedVideoId: parsedJson.matchedVideoId || undefined,
+        matchedStartSeconds: parsedJson.matchedStartSeconds != null ? parsedJson.matchedStartSeconds : undefined,
+        matchedChapterTitle: parsedJson.matchedChapterTitle || undefined
       }
     };
   } catch (error: any) {
