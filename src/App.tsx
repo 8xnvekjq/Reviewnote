@@ -451,10 +451,15 @@ function App() {
                   <span className="text-xl animate-bounce flex-none">👑</span>
                   <div className="min-w-0 leading-tight">
                     <div className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">이번주 최다 오답 완료</div>
-                    <div className="text-xs font-extrabold text-white truncate mt-0.5">
-                      {weeklyChampion.display_name 
-                        ? `${maskId(weeklyChampion.username)}(${weeklyChampion.display_name})` 
-                        : maskId(weeklyChampion.username)}
+                    <div className="flex items-center space-x-1.5 mt-0.5 min-w-0">
+                      <span className="text-xs font-black text-white truncate">
+                        {weeklyChampion.display_name 
+                          ? `${weeklyChampion.display_name} 학생` 
+                          : `${maskId(weeklyChampion.username)} 학생`}
+                      </span>
+                      <span className="text-[8px] font-black bg-amber-500/10 text-amber-300 border border-amber-500/20 px-1.5 py-0.5 rounded-full flex items-center flex-none">
+                        ⭐ 주간 MVP
+                      </span>
                     </div>
                   </div>
                 </div>

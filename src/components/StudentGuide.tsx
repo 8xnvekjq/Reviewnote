@@ -26,6 +26,14 @@ export const StudentGuide: React.FC = () => {
 
   const changeLogs = [
     {
+      version: 'v1.7.4',
+      date: '2026.07.05',
+      changes: [
+        '명예의 전당 배너 내 학생 아이디 은닉 및 이름 단독 표기 간소화',
+        '명예의 전당 실명 우측 주간 MVP 데코레이션 배지 적용'
+      ]
+    },
+    {
       version: 'v1.7.3',
       date: '2026.07.05',
       changes: [
