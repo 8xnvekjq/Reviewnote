@@ -78,6 +78,14 @@
   - [MistakeDetailModal.tsx](file:///c:/Users/USER/Documents/ReviewNotes/src/components/MistakeDetailModal.tsx): 오답 상세 모달을 열 때마다 매칭용 동의어 사전(`행렬`, `오메가`, `조합`, `순열`, `부등식` 등)과 과목/단원 매핑 알고리즘이 실시간 대조하여 가장 적절한 추천 영상의 딥링크 카드를 생성합니다.
   - **전체 대상 오픈**: 특정 아이디(`test`) 제한 조건을 완전히 걷어내어, **모든 사용자의 모든 과거 오답 및 신규 오답에 즉시 소급적용**되도록 배포 완료했습니다.
 
+### 7. 어드민 패널 학생 표시 포맷 개선 및 이메일 유실 방지 (완료)
+- **학생 아이디(이름) 표시 포맷 통일**:
+  - [AdminPanel.tsx](file:///c:/Users/USER/Documents/ReviewNotes/src/components/AdminPanel.tsx): 학생 필터 드롭다운과 전체 목록 통계 카드 타이틀을 기존 이름 단독 노출에서 사용자 요청에 맞춘 **`아이디(이름)`** (예: `test(홍길동)`) 형식으로 전면 개편했습니다.
+- **이메일 유실 폴백**:
+  - profiles 테이블에 이메일 정보가 동기화되지 않아 어드민에서 `(이메일 정보 없음)`으로 나타나는 유저를 대비해, 실명(display_name)이 존재할 경우 이름으로 매핑하고 UUID 앞자리 노출을 방지하도록 폴백 방어 코드를 적용했습니다.
+- **Supabase DB 트리거 함수 보강**:
+  - 신규 가입 시 auth.users의 이메일(`email`)이 public.profiles 테이블에 자동으로 기록되도록 trigger function을 강화하고, 기존 이메일이 빈 유저의 데이터를 소급 업데이트해주는 SQL 스키마 마이그레이션 파일 [supabase_email_sync.sql](file:///c:/Users/USER/Documents/ReviewNotes/supabase_email_sync.sql)을 루트 디렉토리에 배치했습니다.
+
 ---
 
 ## ⚙️ Vercel 최종 연동 가이드
