@@ -71,6 +71,10 @@ export const analyzeMistakeWithGemini = async (
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
   const prompt = `수학 문제 사진입니다. 이 사진 속 문제를 분석하고 올바른 풀이법과 메타데이터를 진단해 주세요.
+★ [엄격한 한글 출력 원칙] ★
+- LaTeX 수학 수식 내의 기호(예: $x, y, a, b$)를 제외한 모든 문장, 해설, 소제목, 힌트, 분석 텍스트는 100% 한국어로만 작성해야 합니다.
+- 영문 텍스트 설명(예: "Since...", "Therefore...", "Using...")이 포함되는 것을 절대적으로 금지합니다. 영문 수식이 들어간 문장 또한 한글 조사와 한글 서술어만 사용하십시오.
+
 모든 수학적 수식, 방정식, 기호, 변수 및 계산 표현은 가독성을 극대화하기 위해 반드시 LaTeX 문법으로 작성하고 수학 구분 기호로 감싸야 합니다.
 - 문장 내부의 인라인 수식은 $...$로 감싸주세요 (예: $\\angle BAC = \\angle CAD$, $\\overline{AC} = 3\\sqrt{5}$).
 - 줄바꿈이 필요한 단독 블록 수식은 $$...$$로 감싸주세요.
@@ -123,15 +127,15 @@ export const analyzeMistakeWithGemini = async (
    - 좋은 예: "삼각함수 덧셈 공식에서 cos항의 부호를 누락함"
    - 학생 필기가 전혀 없는 경우에만: "학생 풀이 없음"
 
-출력은 지정된 JSON 스키마를 엄격히 따라 다음 8가지 항목을 모두 한국어로 작성해야 합니다:
-1. title: 문제의 주제나 공식을 담은 짤막하고 직관적인 제목
-2. solvingProcess: 위의 지시사항을 따른 올바른 풀이 과정
-3. hints: 위의 지시사항을 따른 단계별 힌트 목록 (정확히 3개)
-4. problemText: 위의 지시사항을 따른 추출된 원본 문제 지문
+출력은 지정된 JSON 스키마를 엄격히 따라야 하며, 수식 기호를 제외한 모든 텍스트 해설은 예외 없이 전부 100% 한국어로만 작성해야 합니다 (영어 해설 절대 금지):
+1. title: 문제의 주제나 공식을 담은 짤막하고 직관적인 제목 (한국어)
+2. solvingProcess: 위의 지시사항을 따른 올바른 풀이 과정 (해설 설명은 100% 한국어)
+3. hints: 위의 지시사항을 따른 단계별 힌트 목록 (정확히 3개 원소 모두 한국어 문장)
+4. problemText: 위의 지시사항을 따른 추출된 원본 문제 지문 (한글 원본 텍스트 복원)
 5. problemBox: 위의 지시사항을 따른 필기 제외 인쇄 문제 영역 바운딩 박스
 6. grade: 과목명
 7. chapter: 단원명
-8. mistakeSummary: 학생 풀이 기반 틀린 이유 1줄 요약 (30자 이내)`;
+8. mistakeSummary: 학생 풀이 기반 틀린 이유 1줄 요약 (30자 이내의 한국어 문장, 절대 영문 작성 금지)`;
 
   const requestBody = {
     contents: [
