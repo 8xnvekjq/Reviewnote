@@ -27,13 +27,13 @@ export const AdminPanel: React.FC = () => {
 
       if (profilesError) throw profilesError;
 
-      // Build profilesMap: userId -> { username, displayName, label }
+      // Build profilesMap: userId -> "아이디(이름)" 또는 "아이디"
       const pMap: Record<string, string> = {};
       (profiles || []).forEach((p: any) => {
-        const username = p.email?.split('@')[0] || p.id.slice(0, 8);
+        const username = p.email?.split('@')[0] || p.display_name || p.id.slice(0, 8);
         const displayName = p.display_name?.trim();
-        // label = "이름 (아이디)" 형식, 이름이 없으면 아이디만
-        pMap[p.id] = displayName ? `${displayName} (${username})` : username;
+        // label = "아이디(이름)" 형식, 이름이 없거나 아이디와 이름이 같으면 아이디만
+        pMap[p.id] = (displayName && displayName !== username) ? `${username}(${displayName})` : username;
       });
       setProfilesMap(pMap);
 
@@ -191,8 +191,12 @@ export const AdminPanel: React.FC = () => {
       {!isLoading && !error && stats.length > 0 && (
         <div className="space-y-3">
           {stats.map((user, index) => {
-            const username = user.email.split('@')[0];
-            const domain = user.email.includes('@') ? '@' + user.email.split('@')[1] : '';
+            const displayLabel = profilesMap[user.userId] || user.email;
+            // 아바타에 표시할 글자 (아이디의 첫 글자)
+            const avatarChar = (displayLabel || 'U').charAt(0).toUpperCase();
+
+            const isEmailValid = user.email && user.email.includes('@');
+
             const activeNotes = user.mistakeCount - user.completedCount;
             const completionRate = user.mistakeCount > 0
               ? Math.round((user.completedCount / user.mistakeCount) * 100)
@@ -207,16 +211,16 @@ export const AdminPanel: React.FC = () => {
                 <div className="flex items-center space-x-3">
                   {/* Avatar */}
                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-600 to-indigo-800 flex items-center justify-center text-white font-black text-base flex-none shadow-lg shadow-indigo-900/30">
-                    {username.charAt(0).toUpperCase()}
+                    {avatarChar}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center space-x-2">
-                      <span className="font-bold text-white text-sm truncate">{username}</span>
+                      <span className="font-bold text-white text-sm truncate">{displayLabel}</span>
                       <span className="text-[10px] bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded-full border border-slate-700">
                         #{index + 1}
                       </span>
                     </div>
-                    <span className="text-[11px] text-slate-500 truncate block">{domain || user.email}</span>
+                    <span className="text-[11px] text-slate-500 truncate block">{isEmailValid ? user.email : '(이메일 정보 없음)'}</span>
                   </div>
                   {/* Last Activity */}
                   <div className="text-right flex-none">
