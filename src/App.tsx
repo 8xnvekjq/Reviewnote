@@ -38,9 +38,10 @@ function App() {
   // State for image cropping flow
   const [tempCapturedImage, setTempCapturedImage] = useState<string | null>(null);
 
-  // 주간 최다 오답 완료 챔피언 정보 로드
+  // 주간 최다 오답 완료 챔피언 정보 로드 (하이브리드 1주 이월 및 리셋 롤오버)
   const loadWeeklyChampion = async () => {
     try {
+      // 1. 이번 주 랭킹 뷰 조회
       const { data, error } = await supabase
         .from('weekly_leaderboard')
         .select('*')
@@ -50,28 +51,90 @@ function App() {
       if (error) throw error;
 
       if (data && data.length > 0) {
-        setWeeklyChampion(data[0]);
-      } else {
-        // Fallback: 뷰에 데이터가 없는 경우
         setWeeklyChampion({
-          username: 'test',
-          display_name: '홍길동',
-          weekly_total_count: 5,
-          weekly_completed_count: 3,
-          completion_rate: 0.6,
-          score: 90
+          ...data[0],
+          isLastWeek: false
         });
+        return;
       }
+
+      // 2. 이번 주 데이터가 없으면 지난주(Last Week) 범위 계산
+      const now = new Date();
+      const kstTime = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+      const day = kstTime.getUTCDay();
+      const diff = kstTime.getUTCDate() - day + (day === 0 ? -6 : 1);
+      const mondayKst = new Date(Date.UTC(kstTime.getUTCFullYear(), kstTime.getUTCMonth(), diff, 0, 0, 0));
+      const thisMondayUtc = new Date(mondayKst.getTime() - 9 * 60 * 60 * 1000); // UTC 날짜
+      const lastMondayUtc = new Date(thisMondayUtc.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+      // 지난주 월요일 UTC ~ 이번주 월요일 UTC 경계선 사이의 오답들 쿼리
+      const { data: lastWeekMistakes } = await supabase
+        .from('mistakes')
+        .select('user_id, reviews')
+        .gte('created_at', lastMondayUtc.toISOString())
+        .lt('created_at', thisMondayUtc.toISOString());
+
+      if (lastWeekMistakes && lastWeekMistakes.length > 0) {
+        // 유저 아이디별 집계
+        const userStats: Record<string, { total: number; completed: number }> = {};
+        lastWeekMistakes.forEach((m: any) => {
+          if (!m.user_id) return;
+          if (!userStats[m.user_id]) {
+            userStats[m.user_id] = { total: 0, completed: 0 };
+          }
+          userStats[m.user_id].total += 1;
+          const reviews: string[] = m.reviews || [];
+          const isCompleted = reviews.filter(r => r === 'O').length === 3;
+          if (isCompleted) {
+            userStats[m.user_id].completed += 1;
+          }
+        });
+
+        // 최고 점수 우승자 선정
+        let bestUserId = '';
+        let maxScore = 0;
+        let bestStat = { total: 0, completed: 0 };
+
+        Object.entries(userStats).forEach(([uid, stat]) => {
+          const rate = stat.total > 0 ? (stat.completed / stat.total) : 0;
+          const score = (stat.completed * 10) + (rate * 100);
+          // 최소 0점 초과(오답을 완료한 이력)인 경우에만 랭킹 집계
+          if (score > maxScore && stat.completed > 0) {
+            maxScore = score;
+            bestUserId = uid;
+            bestStat = stat;
+          }
+        });
+
+        if (bestUserId) {
+          // 우승자 프로필 로드 (닉네임 노출용)
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('email, display_name')
+            .eq('id', bestUserId)
+            .single();
+
+          if (profile) {
+            const username = profile.email?.split('@')[0] || profile.display_name || bestUserId.slice(0, 8);
+            setWeeklyChampion({
+              username,
+              display_name: profile.display_name?.trim() || undefined,
+              weekly_total_count: bestStat.total,
+              weekly_completed_count: bestStat.completed,
+              completion_rate: bestStat.total > 0 ? (bestStat.completed / bestStat.total) : 0,
+              score: maxScore,
+              isLastWeek: true
+            });
+            return;
+          }
+        }
+      }
+
+      // 3. 지난주마저 점수가 없으면 배너를 비워 동기부여 유도
+      setWeeklyChampion(null);
     } catch (err) {
-      // Fallback
-      setWeeklyChampion({
-        username: 'test',
-        display_name: '홍길동',
-        weekly_total_count: 5,
-        weekly_completed_count: 3,
-        completion_rate: 0.6,
-        score: 90
-      });
+      console.error('loadWeeklyChampion failed:', err);
+      setWeeklyChampion(null);
     }
   };
 
@@ -444,13 +507,15 @@ function App() {
       <main className="flex-1 overflow-y-auto px-4 py-6 pb-24">
         {activeTab === 'notes' && (
           <>
-            {/* 주간 복습왕 배너 (전체 학생 오픈) */}
-            {weeklyChampion && (
+            {/* 주간 복습왕 배너 (전체 학생 오픈 / 1주 이월 및 리셋 롤오버) */}
+            {weeklyChampion ? (
               <div className="bg-slate-900/80 border border-amber-500/20 rounded-2xl p-3 mb-4 flex items-center justify-between shadow-lg shadow-amber-950/10 animate-fade-in">
                 <div className="flex items-center space-x-2.5 min-w-0">
                   <span className="text-xl animate-bounce flex-none">👑</span>
                   <div className="min-w-0 leading-tight">
-                    <div className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">이번주 최다 오답 완료</div>
+                    <div className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">
+                      {weeklyChampion.isLastWeek ? '지난주 복습 MVP' : '이번주 최다 오답 완료'}
+                    </div>
                     <div className="flex items-center space-x-1.5 mt-0.5 min-w-0">
                       <span className="text-xs font-black text-white truncate">
                         {weeklyChampion.display_name 
@@ -458,7 +523,7 @@ function App() {
                           : `${maskId(weeklyChampion.username)} 학생`}
                       </span>
                       <span className="text-[8px] font-black bg-amber-500/10 text-amber-300 border border-amber-500/20 px-1.5 py-0.5 rounded-full flex items-center flex-none">
-                        ⭐ 주간 MVP
+                        {weeklyChampion.isLastWeek ? '⭐ 지난주 MVP' : '⭐ 주간 MVP'}
                       </span>
                     </div>
                   </div>
@@ -470,6 +535,24 @@ function App() {
                   </span>
                   <span className="text-[9px] text-slate-400 block mt-0.5">
                     완료 {weeklyChampion.weekly_completed_count}개 ({Math.round(weeklyChampion.completion_rate * 100)}%)
+                  </span>
+                </div>
+              </div>
+            ) : (
+              /* 두 주 연속 복습 완료자가 전혀 없을 때: 동기부여 공백 배너 제공 */
+              <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-3 mb-4 flex items-center justify-between shadow-lg shadow-indigo-950/5 animate-fade-in">
+                <div className="flex items-center space-x-2.5 min-w-0">
+                  <span className="text-xl animate-pulse flex-none">👑</span>
+                  <div className="min-w-0 leading-tight">
+                    <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">복습왕 리그</div>
+                    <div className="text-xs font-bold text-slate-300 mt-0.5">
+                      이번주 첫 복습왕의 주인공이 되어보세요!
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right flex-none pl-3 border-l border-slate-800/50">
+                  <span className="text-[8px] text-indigo-400 font-black bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20">
+                    도전 대기 중
                   </span>
                 </div>
               </div>
