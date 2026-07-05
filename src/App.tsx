@@ -424,6 +424,12 @@ function App() {
     return { gradeCounts, causeCounts, totalGrade, totalCause, topChapters };
   }, [mistakes]);
 
+  const maskId = (username: string) => {
+    if (!username) return '';
+    if (username.length <= 3) return username;
+    return username.slice(0, 3) + '*'.repeat(username.length - 3);
+  };
+
   if (!currentUser) {
     return <AuthScreen onLogin={(username) => setCurrentUser(username)} />;
   }
@@ -447,8 +453,8 @@ function App() {
                     <div className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">이번주 최다 오답 완료</div>
                     <div className="text-xs font-extrabold text-white truncate mt-0.5">
                       {weeklyChampion.display_name 
-                        ? `${weeklyChampion.username}(${weeklyChampion.display_name})` 
-                        : weeklyChampion.username}
+                        ? `${maskId(weeklyChampion.username)}(${weeklyChampion.display_name})` 
+                        : maskId(weeklyChampion.username)}
                     </div>
                   </div>
                 </div>

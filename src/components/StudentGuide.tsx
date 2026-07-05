@@ -26,6 +26,15 @@ export const StudentGuide: React.FC = () => {
 
   const changeLogs = [
     {
+      version: 'v1.7.2',
+      date: '2026.07.05',
+      changes: [
+        '명예의 전당 학생 아이디 개인정보 보호 마스킹 자동 포맷터 도입 (앞 3글자 제외 별표 대체)',
+        '어드민 패널 학생 정렬 기준을 주간 랭킹 스코어 순으로 전격 교체',
+        '어드민 패널 학생 카드에 실시간 주간 점수 배지 노출 추가'
+      ]
+    },
+    {
       version: 'v1.7.1',
       date: '2026.07.05',
       changes: [

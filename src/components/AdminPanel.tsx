@@ -62,6 +62,14 @@ export const AdminPanel: React.FC = () => {
       }));
       setAllMistakes(mappedMistakes);
 
+      // 이번주 월요일 00:00 KST에 해당하는 UTC 경계선 계산
+      const now = new Date();
+      const kstTime = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+      const day = kstTime.getUTCDay();
+      const diff = kstTime.getUTCDate() - day + (day === 0 ? -6 : 1);
+      const mondayKst = new Date(Date.UTC(kstTime.getUTCFullYear(), kstTime.getUTCMonth(), diff, 0, 0, 0));
+      const mondayDate = new Date(mondayKst.getTime() - 9 * 60 * 60 * 1000); // UTC 날짜
+
       // Aggregate per user (stats cards)
       const statsMap = new Map<string, AdminUserStat>();
 
@@ -72,6 +80,9 @@ export const AdminPanel: React.FC = () => {
           mistakeCount: 0,
           completedCount: 0,
           lastActivity: null,
+          weeklyScore: 0,
+          weeklyTotalCount: 0,
+          weeklyCompletedCount: 0,
         });
       });
 
@@ -81,10 +92,20 @@ export const AdminPanel: React.FC = () => {
 
         stat.mistakeCount += 1;
 
-        // Check if all 3 reviews are 'O' → completed
         const reviews: string[] = m.reviews || [];
-        if (reviews.filter(r => r === 'O').length === 3) {
+        const isCompleted = reviews.filter(r => r === 'O').length === 3;
+
+        if (isCompleted) {
           stat.completedCount += 1;
+        }
+
+        // 이번주 등록된 오답 집계
+        const mDate = new Date(m.date);
+        if (mDate >= mondayDate) {
+          stat.weeklyTotalCount += 1;
+          if (isCompleted) {
+            stat.weeklyCompletedCount += 1;
+          }
         }
 
         // Track latest activity date
@@ -93,9 +114,15 @@ export const AdminPanel: React.FC = () => {
         }
       });
 
-      // Sort: most mistakes first
+      // 각 유저별 주간 점수 산출
+      statsMap.forEach((stat) => {
+        const rate = stat.weeklyTotalCount > 0 ? (stat.weeklyCompletedCount / stat.weeklyTotalCount) : 0;
+        stat.weeklyScore = (stat.weeklyCompletedCount * 10) + (rate * 100);
+      });
+
+      // Sort: 주간 복습 랭킹 점수 높은 순 정렬
       const sorted = Array.from(statsMap.values()).sort(
-        (a, b) => b.mistakeCount - a.mistakeCount
+        (a, b) => b.weeklyScore - a.weeklyScore
       );
 
       setStats(sorted);
@@ -240,18 +267,29 @@ export const AdminPanel: React.FC = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-2">
                         <span className="font-bold text-white text-sm truncate">{displayLabel}</span>
-                        <span className="text-[10px] bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded-full border border-slate-700">
-                          #{index + 1}
+                        <span className="text-[10px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded-full border border-amber-500/20 font-bold">
+                          👑 주간 {index + 1}위
                         </span>
                       </div>
                       <span className="text-[11px] text-slate-500 truncate block">{isEmailValid ? user.email : '(이메일 정보 없음)'}</span>
                     </div>
-                    {/* Last Activity */}
-                    <div className="text-right flex-none">
-                      <span className="text-[10px] text-slate-500 block">마지막 활동</span>
-                      <span className="text-[11px] text-slate-400 font-medium">
-                        {user.lastActivity ? formatDate(user.lastActivity) : '—'}
-                      </span>
+                    {/* Weekly Score and Last Activity */}
+                    <div className="text-right flex-none pl-3 border-l border-slate-800/80 space-y-1">
+                      <div>
+                        <span className="text-[9px] text-slate-500 block leading-none">주간 스코어</span>
+                        <span className="text-xs font-black text-amber-400 leading-tight block">
+                          {Math.round(user.weeklyScore)}점
+                        </span>
+                        <span className="text-[8px] text-slate-500 block leading-none mt-0.5">
+                          ({user.weeklyCompletedCount}개 완료 / {user.weeklyTotalCount}개 등록)
+                        </span>
+                      </div>
+                      <div className="pt-1 border-t border-slate-850">
+                        <span className="text-[9px] text-slate-500 block leading-none">최근 활동</span>
+                        <span className="text-[10px] text-slate-400 font-medium leading-none block mt-0.5">
+                          {user.lastActivity ? formatDate(user.lastActivity).split(' ')[0] : '—'}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
