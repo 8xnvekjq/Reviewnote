@@ -478,7 +478,7 @@ function App() {
     <div className="h-full flex flex-col bg-slate-950 text-slate-100 select-none">
       
       {/* Top Header */}
-      <Header currentUser={currentUser} onLogout={handleLogout} />
+      <Header currentUser={currentUser} onLogout={handleLogout} myScore={isAdmin ? undefined : myWeeklyScore.score} />
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto px-4 py-6 pb-28">
@@ -703,23 +703,6 @@ function App() {
           onCropComplete={handleCropComplete}
           onCancel={() => setTempCapturedImage(null)}
         />
-      )}
-
-      {/* 내 주간 스코어 미니 플로팅 리본바 (일반 학생 로그인 시 BottomNavigation 바로 위에 플로팅) */}
-      {!isAdmin && currentUser && (
-        <div className="fixed bottom-[84px] left-4 right-4 z-30 bg-slate-900/95 backdrop-blur-md border border-slate-800/80 rounded-xl px-4 py-1.5 flex items-center justify-between text-[10px] text-slate-400 font-bold shadow-lg shadow-indigo-950/30">
-          <div className="flex items-center space-x-1.5">
-            <span className="text-amber-400">⚡</span>
-            <span>내 주간 복습 현황:</span>
-            <span className="text-white font-extrabold">{myWeeklyScore.completed}개 완료</span>
-            <span className="text-slate-600">/</span>
-            <span className="text-slate-400">{myWeeklyScore.total}개 등록</span>
-          </div>
-          <div className="flex items-center space-x-1">
-            <span className="text-slate-500">내 점수:</span>
-            <span className="text-amber-400 font-black text-xs">{myWeeklyScore.score}점</span>
-          </div>
-        </div>
       )}
 
       {/* Floating Glassmorphic Bottom Navigation Bar */}

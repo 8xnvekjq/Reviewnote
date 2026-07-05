@@ -25,9 +25,10 @@ const formatBuildTime = (iso: string): string => {
 interface HeaderProps {
   currentUser: string;
   onLogout: () => void;
+  myScore?: number;
 }
 
-export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout }) => {
+export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, myScore }) => {
   const buildLabel = `v${__APP_VERSION__} (${formatBuildTime(__BUILD_TIME__)})`;
 
   return (
@@ -48,6 +49,13 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout }) => {
         </div>
       </div>
       <div className="flex items-center space-x-2">
+        {/* 내 주간 점수 미니 배지 */}
+        {myScore !== undefined && (
+          <span className="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 font-black flex items-center space-x-0.5 flex-none animate-fade-in">
+            <span>⚡</span>
+            <span>{myScore}점</span>
+          </span>
+        )}
         <span className="text-[10px] text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded-full border border-slate-700 font-bold max-w-[100px] truncate">
           👤 {currentUser}
         </span>
