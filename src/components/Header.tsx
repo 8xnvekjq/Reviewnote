@@ -32,23 +32,23 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, myScore }
   const buildLabel = `v${__APP_VERSION__} (${formatBuildTime(__BUILD_TIME__)})`;
 
   return (
-    <header className="safe-top flex-none border-b border-slate-800 bg-slate-900/90 backdrop-blur-md px-6 py-4 flex items-center justify-between sticky top-0 z-30">
-      <div className="flex items-center space-x-2.5">
+    <header className="safe-top flex-none border-b border-slate-800 bg-slate-900/90 backdrop-blur-md px-4 py-3 flex items-center justify-between sticky top-0 z-30">
+      <div className="flex items-center space-x-2 min-w-0 flex-1 mr-2">
         <img 
           src={logoImg} 
           alt="더쿠키수학 로고" 
-          className="w-8 h-8 rounded-lg object-cover shadow-lg border border-slate-800/80"
+          className="w-7 h-7 rounded-lg object-cover shadow-lg border border-slate-800/80 flex-none"
         />
-        <div className="flex flex-col">
-          <h1 className="text-base font-extrabold text-white leading-tight">
+        <div className="flex flex-col min-w-0">
+          <h1 className="text-xs sm:text-sm font-extrabold text-white leading-tight truncate">
             오답클리닉
           </h1>
-          <span className="text-[8px] font-bold text-slate-500 mt-0.5">
-            최신 업데이트: {buildLabel}
+          <span className="text-[7.5px] font-bold text-slate-500 mt-0.5 truncate">
+            {buildLabel}
           </span>
         </div>
       </div>
-      <div className="flex items-center space-x-2">
+      <div className="flex items-center space-x-1.5 flex-none min-w-0 whitespace-nowrap">
         {/* 내 주간 점수 미니 배지 */}
         {myScore !== undefined && (
           <span className="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 font-black flex items-center space-x-0.5 flex-none animate-fade-in">
@@ -56,12 +56,12 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, myScore }
             <span>{myScore}점</span>
           </span>
         )}
-        <span className="text-[10px] text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded-full border border-slate-700 font-bold max-w-[100px] truncate">
+        <span className="text-[10px] text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded-full border border-slate-700 font-bold max-w-[70px] sm:max-w-[100px] truncate flex-none">
           👤 {currentUser}
         </span>
         <button 
           onClick={onLogout}
-          className="text-[10px] text-red-400 hover:text-red-300 font-bold bg-red-950/20 px-2.5 py-0.5 rounded-full border border-red-900/30 transition-colors"
+          className="text-[10px] text-red-400 hover:text-red-300 font-bold bg-red-950/20 px-2 py-0.5 rounded-full border border-red-900/30 transition-colors flex-none"
         >
           로그아웃
         </button>
