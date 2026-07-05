@@ -28,13 +28,12 @@ export const AdminPanel: React.FC = () => {
 
       if (profilesError) throw profilesError;
 
-      // Build profilesMap: userId -> "아이디(이름)" 또는 "아이디"
+      // Build profilesMap: userId -> 이름(실명) 또는 아이디
       const pMap: Record<string, string> = {};
       (profiles || []).forEach((p: any) => {
         const username = p.email?.split('@')[0] || p.display_name || p.id.slice(0, 8);
         const displayName = p.display_name?.trim();
-        // label = "아이디(이름)" 형식, 이름이 없거나 아이디와 이름이 같으면 아이디만
-        pMap[p.id] = (displayName && displayName !== username) ? `${username}(${displayName})` : username;
+        pMap[p.id] = displayName || username;
       });
       setProfilesMap(pMap);
 
@@ -71,9 +70,10 @@ export const AdminPanel: React.FC = () => {
       const mondayDate = new Date(mondayKst.getTime() - 9 * 60 * 60 * 1000); // UTC 날짜
 
       // Aggregate per user (stats cards)
-      const statsMap = new Map<string, AdminUserStat>();
+      const statsMap = new Map<string, AdminUserStat & { displayName?: string; username: string }>();
 
       (profiles || []).forEach((p: any) => {
+        const username = p.email?.split('@')[0] || p.display_name || p.id.slice(0, 8);
         statsMap.set(p.id, {
           userId: p.id,
           email: p.email || '(이메일 없음)',
@@ -83,6 +83,8 @@ export const AdminPanel: React.FC = () => {
           weeklyScore: 0,
           weeklyTotalCount: 0,
           weeklyCompletedCount: 0,
+          displayName: p.display_name?.trim() || undefined,
+          username: username,
         });
       });
 
@@ -243,10 +245,7 @@ export const AdminPanel: React.FC = () => {
           {stats.length === 0 ? (
             <div className="py-10 text-center text-slate-500 text-sm">가입자가 없습니다.</div>
           ) : (
-            stats.map((user, index) => {
-              const displayLabel = profilesMap[user.userId] || user.email;
-              const avatarChar = (displayLabel || 'U').charAt(0).toUpperCase();
-
+            stats.map((user) => {
               const isEmailValid = user.email && user.email.includes('@');
               const activeNotes = user.mistakeCount - user.completedCount;
               const completionRate = user.mistakeCount > 0
@@ -262,16 +261,17 @@ export const AdminPanel: React.FC = () => {
                   <div className="flex items-center space-x-3">
                     {/* Avatar */}
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-600 to-indigo-800 flex items-center justify-center text-white font-black text-base flex-none shadow-lg shadow-indigo-900/30">
-                      {avatarChar}
+                      {((user as any).displayName || (user as any).username || 'U').charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-2">
-                        <span className="font-bold text-white text-sm truncate">{displayLabel}</span>
-                        <span className="text-[10px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded-full border border-amber-500/20 font-bold">
-                          👑 주간 {index + 1}위
+                        <span className="font-extrabold text-white text-sm truncate">
+                          {(user as any).displayName || (user as any).username}
                         </span>
                       </div>
-                      <span className="text-[11px] text-slate-500 truncate block">{isEmailValid ? user.email : '(이메일 정보 없음)'}</span>
+                      <span className="text-[10px] text-slate-400 truncate block mt-0.5">
+                        {(user as any).displayName ? `아이디: ${(user as any).username}` : (isEmailValid ? user.email : '(이메일 정보 없음)')}
+                      </span>
                     </div>
                     {/* Weekly Score and Last Activity */}
                     <div className="text-right flex-none pl-3 border-l border-slate-800/80 space-y-1">
