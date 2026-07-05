@@ -478,7 +478,7 @@ function App() {
     <div className="h-full flex flex-col bg-slate-950 text-slate-100 select-none">
       
       {/* Top Header */}
-      <Header currentUser={currentUser} onLogout={handleLogout} myScore={isAdmin ? undefined : myWeeklyScore.score} />
+      <Header currentUser={currentUser} onLogout={handleLogout} myScore={myWeeklyScore.score} />
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto px-4 py-6 pb-28">
