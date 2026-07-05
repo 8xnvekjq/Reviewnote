@@ -486,7 +486,7 @@ function App() {
           <>
             {/* 주간 복습왕 배너 (전체 학생 오픈 / 1주 이월 및 리셋 롤오버) */}
             {weeklyChampion ? (
-              <div className="bg-slate-900/80 border border-amber-500/20 rounded-2xl p-3 mb-4 flex items-center justify-between shadow-lg shadow-amber-950/10 animate-fade-in">
+              <div className="bg-gradient-to-r from-slate-900/90 via-amber-950/20 to-slate-900/90 border border-amber-500/40 rounded-2xl p-3 mb-4 flex items-center justify-between shadow-[0_0_15px_rgba(245,158,11,0.12)] animate-fade-in">
                 <div className="flex items-center space-x-2.5 min-w-0">
                   <span className="text-xl animate-bounce flex-none">👑</span>
                   <div className="min-w-0 leading-tight">
