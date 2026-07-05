@@ -26,6 +26,13 @@ export const StudentGuide: React.FC = () => {
 
   const changeLogs = [
     {
+      version: 'v1.8.2',
+      date: '2026.07.05',
+      changes: [
+        '오답 카드 우하단 실수 원인 배지에 이모지와 함께 직관적인 두 글자 분류어(실수, 공식, 오독, 개념, 전략) 병합 출력'
+      ]
+    },
+    {
       version: 'v1.8.1',
       date: '2026.07.05',
       changes: [

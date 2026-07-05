@@ -123,22 +123,27 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
             })}
           </div>
 
-          {/* 틀린이유 이모지만 나열 (한글 텍스트 없이) */}
+          {/* 틀린이유 콤팩트 라벨 배지 나열 */}
           {entry.rootCauses && entry.rootCauses.length > 0 && (
-            <div className="flex items-center space-x-1 flex-none">
+            <div className="flex items-center space-x-1 flex-none flex-wrap justify-end gap-y-1 max-w-[150px]">
               {entry.rootCauses.map((rcId) => {
-                const EMOJI_MAP: Record<string, string> = {
-                  calc: '🧮',
-                  formula: '📘',
-                  misread: '🔍',
-                  concept: '🧠',
-                  strategy: '🎯'
+                const MAP: Record<string, { emoji: string; text: string }> = {
+                  calc: { emoji: '🧮', text: '실수' },
+                  formula: { emoji: '📘', text: '공식' },
+                  misread: { emoji: '🔍', text: '오독' },
+                  concept: { emoji: '🧠', text: '개념' },
+                  strategy: { emoji: '🎯', text: '전략' }
                 };
-                const emoji = EMOJI_MAP[rcId];
-                if (!emoji) return null;
+                const info = MAP[rcId];
+                if (!info) return null;
                 return (
-                  <span key={rcId} className="text-xs filter drop-shadow-sm" title={rcId}>
-                    {emoji}
+                  <span 
+                    key={rcId} 
+                    className="text-[8px] font-black text-slate-400 bg-slate-950/70 border border-slate-800/80 px-1 py-0.5 rounded flex items-center space-x-0.5" 
+                    title={rcId}
+                  >
+                    <span>{info.emoji}</span>
+                    <span className="text-[7.5px] text-slate-500 font-black">{info.text}</span>
                   </span>
                 );
               })}
