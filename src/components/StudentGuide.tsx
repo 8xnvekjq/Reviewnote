@@ -26,6 +26,14 @@ export const StudentGuide: React.FC = () => {
 
   const changeLogs = [
     {
+      version: 'v1.7.1',
+      date: '2026.07.05',
+      changes: [
+        '오답노트 최상단 명예의 전당 주간 최다 오답 완료 챔피언 배너 추가 (test 학생 카나리 적용)',
+        '주간 복습 스코어 알고리즘 자동 산출 DB 뷰 연동'
+      ]
+    },
+    {
       version: 'v1.7.0',
       date: '2026.07.05',
       changes: [

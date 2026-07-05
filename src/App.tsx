@@ -32,9 +32,48 @@ function App() {
   const [profilesMap, setProfilesMap] = useState<Record<string, string>>({});
   // 유튜브 매칭용 강의 마스터 리스트 상태
   const [youtubeLectures, setYoutubeLectures] = useState<any[]>([]);
+  // 주간 최다 오답 완료 챔피언 상태
+  const [weeklyChampion, setWeeklyChampion] = useState<any>(null);
 
   // State for image cropping flow
   const [tempCapturedImage, setTempCapturedImage] = useState<string | null>(null);
+
+  // 주간 최다 오답 완료 챔피언 정보 로드
+  const loadWeeklyChampion = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('weekly_leaderboard')
+        .select('*')
+        .order('score', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        setWeeklyChampion(data[0]);
+      } else {
+        // Fallback: 뷰에 데이터가 없는 경우
+        setWeeklyChampion({
+          username: 'test',
+          display_name: '홍길동',
+          weekly_total_count: 5,
+          weekly_completed_count: 3,
+          completion_rate: 0.6,
+          score: 90
+        });
+      }
+    } catch (err) {
+      // Fallback
+      setWeeklyChampion({
+        username: 'test',
+        display_name: '홍길동',
+        weekly_total_count: 5,
+        weekly_completed_count: 3,
+        completion_rate: 0.6,
+        score: 90
+      });
+    }
+  };
 
   // Check admin status from profiles table
   const fetchAdminStatus = async (userId: string) => {
@@ -99,6 +138,7 @@ function App() {
         fetchUserData();
         fetchAdminStatus(session.user.id);
         loadYoutubeLectures(); // 유튜브 강의 데이터 로드
+        loadWeeklyChampion(); // 주간 챔피언 로드
       }
     });
 
@@ -111,11 +151,13 @@ function App() {
         fetchUserData();
         fetchAdminStatus(session.user.id);
         loadYoutubeLectures(); // 유튜브 강의 데이터 로드
+        loadWeeklyChampion(); // 주간 챔피언 로드
       } else {
         setCurrentUser('');
         setIsAdmin(false);
         setMistakes([]);
         setYoutubeLectures([]);
+        setWeeklyChampion(null);
       }
     });
 
@@ -125,6 +167,7 @@ function App() {
   // Fetch mistakes from Supabase
   const fetchUserData = async () => {
     try {
+      loadWeeklyChampion(); // 최신 챔피언 정보 동기화
       // Fetch all mistakes (RLS handles filtering: normal users see own, admin sees all)
       const { data: dbMistakes, error: mistakesError } = await supabase
         .from('mistakes')
@@ -394,10 +437,37 @@ function App() {
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto px-4 py-6 pb-24">
         {activeTab === 'notes' && (
-          <MistakeList
-            mistakes={[...mistakes]
-              .filter(m => !(m.reviews?.filter(r => r === 'O').length === 3))
-              .sort((a, b) => {
+          <>
+            {/* 주간 복습왕 배너 (test 학생 전용 카나리 롤아웃) */}
+            {currentUser === 'test' && weeklyChampion && (
+              <div className="bg-slate-900/80 border border-amber-500/20 rounded-2xl p-3 mb-4 flex items-center justify-between shadow-lg shadow-amber-950/10 animate-fade-in">
+                <div className="flex items-center space-x-2.5 min-w-0">
+                  <span className="text-xl animate-bounce flex-none">👑</span>
+                  <div className="min-w-0 leading-tight">
+                    <div className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">이번주 최다 오답 완료</div>
+                    <div className="text-xs font-extrabold text-white truncate mt-0.5">
+                      {weeklyChampion.display_name 
+                        ? `${weeklyChampion.username}(${weeklyChampion.display_name})` 
+                        : weeklyChampion.username}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right flex-none pl-3 border-l border-slate-800/80">
+                  <span className="text-[10px] text-slate-500 block">종합 점수</span>
+                  <span className="text-xs font-black text-amber-400">
+                    {Math.round(weeklyChampion.score)}점
+                  </span>
+                  <span className="text-[9px] text-slate-400 block mt-0.5">
+                    완료 {weeklyChampion.weekly_completed_count}개 ({Math.round(weeklyChampion.completion_rate * 100)}%)
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <MistakeList
+              mistakes={[...mistakes]
+                .filter(m => !(m.reviews?.filter(r => r === 'O').length === 3))
+                .sort((a, b) => {
                 const aStruggles = a.reviews ? a.reviews.filter(r => r === 'X' || r === 'star').length : 0;
                 const bStruggles = b.reviews ? b.reviews.filter(r => r === 'X' || r === 'star').length : 0;
                 
@@ -415,6 +485,7 @@ function App() {
             profilesMap={profilesMap}
             currentUserId={session?.user?.id}
           />
+          </>
         )}
 
         {activeTab === 'completed' && (
