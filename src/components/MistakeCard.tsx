@@ -61,7 +61,7 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
           {formatDate(entry.date)}
         </div>
       </div>
-      <div className="p-4 space-y-2">
+      <div className="p-4 space-y-2.5">
         <div className="flex items-center justify-between gap-2">
           <h3 className="font-bold text-white line-clamp-1 group-hover:text-indigo-400 transition-colors flex-1 min-w-0">
             <LaTeXRenderer 
@@ -75,23 +75,75 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
             </span>
           )}
         </div>
-        {entry.analysis ? (
-          <p className="text-xs text-slate-400 mt-1.5 line-clamp-2 leading-relaxed">
-            🔍 {entry.analysis.mistakeDetail}
-          </p>
-        ) : (
-          <p className="text-xs text-amber-400 mt-1.5 font-medium flex items-center">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mr-1.5 animate-pulse"></span>
-            AI 분석 미완료 (스캔됨)
-          </p>
-        )}
-        <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-800/60">
-          <span className="text-[10px] text-slate-500">
-            {entry.analysis ? 'AI 피드백 완료' : '분석 대기 중'}
-          </span>
-          <span className="text-xs text-indigo-400 font-semibold group-hover:translate-x-1 transition-transform inline-flex items-center">
-            {entry.analysis ? '상세보기' : '분석하기'} &rarr;
-          </span>
+
+        {/* AI 분석 요약 & 대책 내용 */}
+        <div className="space-y-1">
+          {entry.analysis ? (
+            <p className="text-xs text-slate-400 line-clamp-1 leading-relaxed">
+              🔍 {entry.analysis.mistakeDetail}
+            </p>
+          ) : (
+            <p className="text-xs text-amber-400 font-medium flex items-center">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mr-1.5 animate-pulse"></span>
+              AI 분석 미완료 (스캔됨)
+            </p>
+          )}
+
+          {/* 대책 내용 (작은 글씨로 앞 18글자만) */}
+          {entry.userActionPlan && entry.userActionPlan.trim() && (
+            <p className="text-[10px] text-slate-500 leading-none truncate flex items-center">
+              <span className="text-indigo-400 font-extrabold mr-1">💡대책:</span>
+              {entry.userActionPlan.slice(0, 18).trim()}{entry.userActionPlan.length > 18 ? '...' : ''}
+            </p>
+          )}
+        </div>
+
+        {/* 하단 영역: 복습 진척사항 & 틀린이유 체크 이모지 */}
+        <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-slate-800/60">
+          {/* 복습 진척사항 배지 목록 */}
+          <div className="flex items-center space-x-1">
+            {(entry.reviews || ['', '', '']).slice(0, 3).map((state, idx) => {
+              let badgeStyle = "bg-slate-800 text-slate-600 border-slate-700/40";
+              let symbol = idx + 1;
+              if (state === 'O') {
+                badgeStyle = "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-extrabold";
+              } else if (state === 'X') {
+                badgeStyle = "bg-red-500/15 text-red-400 border-red-500/30 font-extrabold";
+              } else if (state === 'star') {
+                badgeStyle = "bg-amber-500/15 text-amber-400 border-amber-500/30 font-extrabold";
+              }
+              return (
+                <span
+                  key={idx}
+                  className={`w-[17px] h-[17px] rounded-full border text-[9px] flex items-center justify-center transition-all ${badgeStyle}`}
+                >
+                  {state === 'star' ? '★' : (state || symbol)}
+                </span>
+              );
+            })}
+          </div>
+
+          {/* 틀린이유 이모지만 나열 (한글 텍스트 없이) */}
+          {entry.rootCauses && entry.rootCauses.length > 0 && (
+            <div className="flex items-center space-x-1 flex-none">
+              {entry.rootCauses.map((rcId) => {
+                const EMOJI_MAP: Record<string, string> = {
+                  calc: '🧮',
+                  formula: '📘',
+                  misread: '🔍',
+                  concept: '🧠',
+                  strategy: '🎯'
+                };
+                const emoji = EMOJI_MAP[rcId];
+                if (!emoji) return null;
+                return (
+                  <span key={rcId} className="text-xs filter drop-shadow-sm" title={rcId}>
+                    {emoji}
+                  </span>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>
