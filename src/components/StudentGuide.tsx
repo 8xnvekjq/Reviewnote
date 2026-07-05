@@ -26,6 +26,15 @@ export const StudentGuide: React.FC = () => {
 
   const changeLogs = [
     {
+      version: 'v1.8.3',
+      date: '2026.07.05',
+      changes: [
+        '오답 카드 세로 길이 추가 다이어트 개편',
+        '대책 내용(좌측 정렬)과 AI 분석 요약/미완료 지표(우측 정렬)를 단일 1개 행으로 결합하여 줄 개수 압축',
+        '여백 조절 및 줄바꿈 수직 간격 감소 조정을 통해 하단의 불필요한 공백 영역 제거'
+      ]
+    },
+    {
       version: 'v1.8.2',
       date: '2026.07.05',
       changes: [

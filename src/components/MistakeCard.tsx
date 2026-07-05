@@ -61,7 +61,7 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
           {formatDate(entry.date)}
         </div>
       </div>
-      <div className="p-4 space-y-2.5">
+      <div className="p-3 pb-2.5 space-y-1.5">
         <div className="flex items-center justify-between gap-2">
           <h3 className="font-bold text-white line-clamp-1 group-hover:text-indigo-400 transition-colors flex-1 min-w-0">
             <LaTeXRenderer 
@@ -76,30 +76,37 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
           )}
         </div>
 
-        {/* AI 분석 요약 & 대책 내용 */}
-        <div className="space-y-1">
-          {entry.analysis ? (
-            <p className="text-xs text-slate-400 line-clamp-1 leading-relaxed">
-              🔍 {entry.analysis.mistakeDetail}
-            </p>
-          ) : (
-            <p className="text-xs text-amber-400 font-medium flex items-center">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mr-1.5 animate-pulse"></span>
-              AI 분석 미완료 (스캔됨)
-            </p>
-          )}
+        {/* 대책 내용(좌) & AI분석 요약/미완료(우) 단일 행 병합 */}
+        <div className="flex items-center justify-between text-[10px] text-slate-500 min-w-0 space-x-3">
+          {/* Left: Action Plan */}
+          <div className="flex-1 min-w-0 truncate">
+            {entry.userActionPlan && entry.userActionPlan.trim() ? (
+              <span className="truncate block text-[9.5px]">
+                <span className="text-indigo-400 font-bold mr-1">💡대책:</span>
+                {entry.userActionPlan.slice(0, 18).trim()}{entry.userActionPlan.length > 18 ? '...' : ''}
+              </span>
+            ) : (
+              <span className="text-slate-600 block italic text-[9.5px]">대책 작성 대기</span>
+            )}
+          </div>
 
-          {/* 대책 내용 (작은 글씨로 앞 18글자만) */}
-          {entry.userActionPlan && entry.userActionPlan.trim() && (
-            <p className="text-[10px] text-slate-500 leading-none truncate flex items-center">
-              <span className="text-indigo-400 font-extrabold mr-1">💡대책:</span>
-              {entry.userActionPlan.slice(0, 18).trim()}{entry.userActionPlan.length > 18 ? '...' : ''}
-            </p>
-          )}
+          {/* Right: AI Analysis Status/Fuzzy summary */}
+          <div className="flex-none text-right text-[9.5px] max-w-[140px] truncate">
+            {entry.analysis ? (
+              <span className="text-slate-400 truncate block">
+                🔍 {entry.analysis.mistakeDetail}
+              </span>
+            ) : (
+              <span className="text-amber-500 font-black flex items-center justify-end flex-none">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1 animate-pulse flex-none"></span>
+                미완료
+              </span>
+            )}
+          </div>
         </div>
 
         {/* 하단 영역: 복습 진척사항 & 틀린이유 체크 이모지 */}
-        <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-slate-800/60">
+        <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-800/60">
           {/* 복습 진척사항 배지 목록 */}
           <div className="flex items-center space-x-1">
             {(entry.reviews || ['', '', '']).slice(0, 3).map((state, idx) => {
