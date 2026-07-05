@@ -14,6 +14,7 @@ export const AdminPanel: React.FC = () => {
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
   const [filterStudent, setFilterStudent] = useState<string>('all');
   const [previewEntry, setPreviewEntry] = useState<MistakeEntry | null>(null);
+  const [activeSubTab, setActiveSubTab] = useState<'stats' | 'mistakes'>('stats');
 
   const fetchAdminStats = async () => {
     setIsLoading(true);
@@ -154,6 +155,34 @@ export const AdminPanel: React.FC = () => {
         </div>
       )}
 
+      {/* 서브 탭 스위처 */}
+      {!isLoading && !error && (
+        <div className="flex border-b border-slate-800/80 p-0.5 bg-slate-950/40 rounded-xl">
+          <button
+            onClick={() => setActiveSubTab('stats')}
+            className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center space-x-1.5 ${
+              activeSubTab === 'stats' 
+                ? 'bg-slate-800 text-amber-400 shadow-sm font-black' 
+                : 'text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            <span>📊</span>
+            <span>가입자 현황</span>
+          </button>
+          <button
+            onClick={() => setActiveSubTab('mistakes')}
+            className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center space-x-1.5 ${
+              activeSubTab === 'mistakes' 
+                ? 'bg-slate-800 text-indigo-400 shadow-sm font-black' 
+                : 'text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            <span>📂</span>
+            <span>전체 오답 뷰</span>
+          </button>
+        </div>
+      )}
+
       {/* Error State */}
       {error && (
         <div className="bg-red-900/20 border border-red-700/40 rounded-2xl p-4 text-center space-y-2">
@@ -181,117 +210,104 @@ export const AdminPanel: React.FC = () => {
         </div>
       )}
 
-      {/* User Stats — One Card Per User */}
-      {!isLoading && !error && stats.length === 0 && (
-        <div className="py-10 text-center text-slate-500 text-sm">
-          가입자가 없습니다.
-        </div>
-      )}
-
-      {!isLoading && !error && stats.length > 0 && (
+      {/* ── 탭 1: 가입자 현황 탭 ── */}
+      {activeSubTab === 'stats' && !isLoading && !error && (
         <div className="space-y-3">
-          {stats.map((user, index) => {
-            const displayLabel = profilesMap[user.userId] || user.email;
-            // 아바타에 표시할 글자 (아이디의 첫 글자)
-            const avatarChar = (displayLabel || 'U').charAt(0).toUpperCase();
+          {stats.length === 0 ? (
+            <div className="py-10 text-center text-slate-500 text-sm">가입자가 없습니다.</div>
+          ) : (
+            stats.map((user, index) => {
+              const displayLabel = profilesMap[user.userId] || user.email;
+              const avatarChar = (displayLabel || 'U').charAt(0).toUpperCase();
 
-            const isEmailValid = user.email && user.email.includes('@');
+              const isEmailValid = user.email && user.email.includes('@');
+              const activeNotes = user.mistakeCount - user.completedCount;
+              const completionRate = user.mistakeCount > 0
+                ? Math.round((user.completedCount / user.mistakeCount) * 100)
+                : 0;
 
-            const activeNotes = user.mistakeCount - user.completedCount;
-            const completionRate = user.mistakeCount > 0
-              ? Math.round((user.completedCount / user.mistakeCount) * 100)
-              : 0;
-
-            return (
-              <div
-                key={user.userId}
-                className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-4 transition-all hover:border-slate-700"
-              >
-                {/* User Identity Row */}
-                <div className="flex items-center space-x-3">
-                  {/* Avatar */}
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-600 to-indigo-800 flex items-center justify-center text-white font-black text-base flex-none shadow-lg shadow-indigo-900/30">
-                    {avatarChar}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2">
-                      <span className="font-bold text-white text-sm truncate">{displayLabel}</span>
-                      <span className="text-[10px] bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded-full border border-slate-700">
-                        #{index + 1}
+              return (
+                <div
+                  key={user.userId}
+                  className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-4 transition-all hover:border-slate-700"
+                >
+                  {/* User Identity Row */}
+                  <div className="flex items-center space-x-3">
+                    {/* Avatar */}
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-600 to-indigo-800 flex items-center justify-center text-white font-black text-base flex-none shadow-lg shadow-indigo-900/30">
+                      {avatarChar}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-bold text-white text-sm truncate">{displayLabel}</span>
+                        <span className="text-[10px] bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded-full border border-slate-700">
+                          #{index + 1}
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-slate-500 truncate block">{isEmailValid ? user.email : '(이메일 정보 없음)'}</span>
+                    </div>
+                    {/* Last Activity */}
+                    <div className="text-right flex-none">
+                      <span className="text-[10px] text-slate-500 block">마지막 활동</span>
+                      <span className="text-[11px] text-slate-400 font-medium">
+                        {user.lastActivity ? formatDate(user.lastActivity) : '—'}
                       </span>
                     </div>
-                    <span className="text-[11px] text-slate-500 truncate block">{isEmailValid ? user.email : '(이메일 정보 없음)'}</span>
                   </div>
-                  {/* Last Activity */}
-                  <div className="text-right flex-none">
-                    <span className="text-[10px] text-slate-500 block">마지막 활동</span>
-                    <span className="text-[11px] text-slate-400 font-medium">
-                      {user.lastActivity ? formatDate(user.lastActivity) : '—'}
-                    </span>
-                  </div>
-                </div>
 
-                {/* Stats Row */}
-                <div className="grid grid-cols-3 gap-2">
-                  {/* Total Notes */}
-                  <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 text-center">
-                    <div className="text-xl font-black text-white">{user.mistakeCount}</div>
-                    <div className="text-[10px] text-slate-500 font-bold mt-0.5">총 오답노트</div>
-                  </div>
-                  {/* Active Notes */}
-                  <div className="bg-indigo-950/50 border border-indigo-800/40 rounded-xl p-3 text-center">
-                    <div className="text-xl font-black text-indigo-300">{activeNotes}</div>
-                    <div className="text-[10px] text-indigo-500 font-bold mt-0.5">진행중</div>
-                  </div>
-                  {/* Completed */}
-                  <div className="bg-emerald-950/50 border border-emerald-800/40 rounded-xl p-3 text-center">
-                    <div className="text-xl font-black text-emerald-300">{user.completedCount}</div>
-                    <div className="text-[10px] text-emerald-500 font-bold mt-0.5">복습완료</div>
-                  </div>
-                </div>
-
-                {/* Completion Progress Bar */}
-                {user.mistakeCount > 0 && (
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-slate-500 font-bold">복습 진행률</span>
-                      <span className="text-[10px] font-black text-slate-400">{completionRate}%</span>
+                  {/* Stats Row */}
+                  <div className="grid grid-cols-3 gap-2">
+                    {/* Total Notes */}
+                    <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 text-center">
+                      <div className="text-xl font-black text-white">{user.mistakeCount}</div>
+                      <div className="text-[10px] text-slate-500 font-bold mt-0.5">총 오답노트</div>
                     </div>
-                    <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full transition-all"
-                        style={{ width: `${completionRate}%` }}
-                      />
+                    {/* Active Notes */}
+                    <div className="bg-indigo-950/50 border border-indigo-800/40 rounded-xl p-3 text-center">
+                      <div className="text-xl font-black text-indigo-300">{activeNotes}</div>
+                      <div className="text-[10px] text-indigo-500 font-bold mt-0.5">진행중</div>
+                    </div>
+                    {/* Completed */}
+                    <div className="bg-emerald-950/50 border border-emerald-800/40 rounded-xl p-3 text-center">
+                      <div className="text-xl font-black text-emerald-300">{user.completedCount}</div>
+                      <div className="text-[10px] text-emerald-500 font-bold mt-0.5">복습완료</div>
                     </div>
                   </div>
-                )}
-              </div>
-            );
-          })}
+
+                  {/* Completion Progress Bar */}
+                  {user.mistakeCount > 0 && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-slate-500 font-bold">복습 진행률</span>
+                        <span className="text-[10px] font-black text-slate-400">{completionRate}%</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full transition-all"
+                          style={{ width: `${completionRate}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
       )}
-      {/* ─────────────────────────────────────────── */}
-      {/* 전체 오답 뷰 섹션 */}
-      {!isLoading && !error && allMistakes.length > 0 && (
-        <div className="space-y-4 pt-2 border-t border-slate-800">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-extrabold text-white flex items-center">
-              <span className="mr-2">📋</span> 전체 오답 뷰
-              <span className="ml-2 text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full border border-slate-700 font-bold">
-                {allMistakes.length}개
-              </span>
-            </h3>
-          </div>
 
+      {/* ── 탭 2: 전체 오답 뷰 탭 ── */}
+      {activeSubTab === 'mistakes' && !isLoading && !error && (
+        <div className="space-y-4">
           {/* 학생 필터 */}
-          <div className="flex items-center space-x-2">
-            <span className="text-[11px] text-slate-500 font-bold flex-none">👤 학생</span>
+          <div className="flex items-center space-x-2 bg-slate-900 border border-slate-800 p-3 rounded-2xl">
+            <span className="text-[11px] text-slate-400 font-bold flex-none">👤 학생 필터</span>
             <select
               value={filterStudent}
               onChange={e => setFilterStudent(e.target.value)}
-              className="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+              className="flex-1 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-850 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer"
             >
-              <option value="all">전체 ({allMistakes.length}개)</option>
+              <option value="all">전체 학생 ({allMistakes.length}개)</option>
               {Array.from(new Set(allMistakes.map(m => m.userId).filter(Boolean) as string[]))
                 .map(uid => {
                   const name = profilesMap[uid] || uid.slice(0, 8);
@@ -301,53 +317,66 @@ export const AdminPanel: React.FC = () => {
             </select>
           </div>
 
-          {/* 오답 카드 그리드 */}
-          <div className="grid gap-3 sm:grid-cols-2">
-            {allMistakes
-              .filter(m => filterStudent === 'all' || m.userId === filterStudent)
-              .map(entry => {
-                const studentName = entry.userId ? (profilesMap[entry.userId] || entry.userId.slice(0, 8)) : undefined;
-                return (
-                  <div
-                    key={entry.id}
-                    onClick={() => setPreviewEntry(entry)}
-                    className="group bg-slate-900/50 hover:bg-slate-900 border border-slate-800 hover:border-indigo-500/30 rounded-2xl overflow-hidden cursor-pointer transition-all active:scale-[0.98]"
-                  >
-                    <div className="aspect-[16/9] w-full bg-slate-950 relative overflow-hidden">
-                      <img src={entry.imageUrl} alt={entry.title} className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-500" />
-                      {/* 학생 이름 배지 */}
-                      {studentName && (
-                        <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-600/90 text-white backdrop-blur-sm flex items-center space-x-1">
-                          <span>👤</span><span>{studentName}</span>
-                        </div>
-                      )}
-                      <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-950/80 backdrop-blur-sm border border-slate-800 text-slate-300">
-                        {formatDate(entry.date)}
+          {/* 오답 카드 그리드 (이미지 전면 제거 및 초슬림 메타 구조 변경) */}
+          {allMistakes.filter(m => filterStudent === 'all' || m.userId === filterStudent).length === 0 ? (
+            <div className="py-12 text-center text-slate-500 text-xs">등록된 오답이 없습니다.</div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {allMistakes
+                .filter(m => filterStudent === 'all' || m.userId === filterStudent)
+                .map(entry => {
+                  const studentName = entry.userId ? (profilesMap[entry.userId] || entry.userId.slice(0, 8)) : undefined;
+                  return (
+                    <div
+                      key={entry.id}
+                      onClick={() => setPreviewEntry(entry)}
+                      className="group bg-slate-900/50 hover:bg-slate-900 border border-slate-800 hover:border-indigo-500/30 rounded-2xl p-4 cursor-pointer transition-all active:scale-[0.98] space-y-3 shadow-sm flex flex-col justify-between"
+                    >
+                      {/* 카드 헤더 (이름 & 날짜) */}
+                      <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                        {studentName && (
+                          <span className="font-bold text-indigo-400">👤 {studentName}</span>
+                        )}
+                        <span className="text-slate-500">{formatDate(entry.date)}</span>
                       </div>
-                      {entry.grade && (
-                        <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-600/80 text-white">
-                          {entry.grade}
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-3">
-                      <div className="text-xs font-bold text-white line-clamp-1 group-hover:text-indigo-400 transition-colors min-w-0">
+
+                      {/* 문제 타이틀 */}
+                      <div className="text-xs font-bold text-white leading-normal line-clamp-2 min-h-[32px] group-hover:text-indigo-300 transition-colors">
                         <LaTeXRenderer 
                           text={entry.title} 
-                          className="text-white font-bold text-xs line-clamp-1 inline-block w-full"
+                          className="text-white font-bold text-xs"
                         />
                       </div>
-                      {entry.chapter && <p className="text-[10px] text-slate-500 mt-0.5">📌 {entry.chapter}</p>}
-                      {!entry.analysis && (
-                        <p className="text-[10px] text-amber-400 mt-1 font-medium flex items-center">
-                          <span className="w-1 h-1 rounded-full bg-amber-400 mr-1 animate-pulse"></span>AI 분석 미완료
-                        </p>
-                      )}
+
+                      {/* 카드 푸터 (과목, 단원, 분석완료 여부 배지) */}
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-850/80">
+                        <div className="flex items-center space-x-1.5 overflow-hidden">
+                          {entry.grade && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-600/10 text-emerald-400 border border-emerald-500/20 font-extrabold flex-none">
+                              {entry.grade}
+                            </span>
+                          )}
+                          {entry.chapter && (
+                            <span className="text-[9px] text-slate-500 truncate font-semibold">
+                              📌 {entry.chapter}
+                            </span>
+                          )}
+                        </div>
+                        {!entry.analysis ? (
+                          <span className="text-[9px] text-amber-400 font-bold flex-none flex items-center bg-amber-400/5 px-2 py-0.5 rounded-full border border-amber-400/10">
+                            <span className="w-1 h-1 rounded-full bg-amber-400 mr-1.5 animate-pulse"></span>미완료
+                          </span>
+                        ) : (
+                          <span className="text-[9px] text-indigo-400 font-bold flex-none bg-indigo-500/5 px-2 py-0.5 rounded-full border border-indigo-500/10">
+                            ✓ 진단됨
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-          </div>
+                  );
+                })}
+            </div>
+          )}
         </div>
       )}
 

@@ -13,6 +13,7 @@ import { MistakeDetailModal } from './components/MistakeDetailModal';
 import { BottomNavigation } from './components/BottomNavigation';
 import { ImageCropper } from './components/ImageCropper';
 import { AdminPanel } from './components/AdminPanel';
+import { StudentGuide } from './components/StudentGuide';
 
 function App() {
   // If Supabase credentials are not configured, block and show the setup guide
@@ -440,6 +441,10 @@ function App() {
 
         {activeTab === 'admin' && isAdmin && (
           <AdminPanel />
+        )}
+
+        {activeTab === 'guide' && !isAdmin && (
+          <StudentGuide />
         )}
 
         {/* ── 분석통계 탭 ── */}

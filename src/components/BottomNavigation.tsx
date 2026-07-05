@@ -11,14 +11,22 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, s
   return (
     <nav className="fixed bottom-3 left-4 right-4 z-40 h-16 rounded-2xl border border-slate-800/80 bg-slate-900/75 backdrop-blur-lg flex items-center justify-around px-4 shadow-xl shadow-black/40">
       
-      {/* Admin Tab (only shown when isAdmin) */}
-      {isAdmin && (
+      {/* 어드민 계정은 👑 어드민, 학생 계정은 💡 이용안내 탭 노출 */}
+      {isAdmin ? (
         <button
           onClick={() => setActiveTab('admin')}
           className={`flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all ${activeTab === 'admin' ? 'text-amber-400 scale-105 font-bold' : 'text-slate-500 hover:text-slate-300'}`}
         >
           <span className="text-lg">👑</span>
           <span className="text-[10px] mt-0.5">어드민</span>
+        </button>
+      ) : (
+        <button
+          onClick={() => setActiveTab('guide')}
+          className={`flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all ${activeTab === 'guide' ? 'text-amber-400 scale-105 font-bold' : 'text-slate-500 hover:text-slate-300'}`}
+        >
+          <span className="text-lg">💡</span>
+          <span className="text-[10px] mt-0.5">이용안내</span>
         </button>
       )}
 
