@@ -3,10 +3,9 @@ import React, { useRef, useState, useEffect } from 'react';
 interface CameraScannerProps {
   onCapture: (imageUrl: string) => void;
   onClose: () => void;
-  isAdmin?: boolean;
 }
 
-export const CameraScanner: React.FC<CameraScannerProps> = ({ onCapture, onClose, isAdmin }) => {
+export const CameraScanner: React.FC<CameraScannerProps> = ({ onCapture, onClose }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // streamRef always holds the latest stream so cleanup closures can access it
@@ -292,23 +291,6 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onCapture, onClose
           </>
         )}
       </div>
-
-      {/* 어드민 전용: 순정 카메라 앱 테스트 버튼 */}
-      {isAdmin && (
-        <div className="px-6 py-2 bg-slate-900/60 border-t border-slate-800/80 flex items-center justify-center z-10">
-          <label className="px-4 py-2 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20 text-xs font-bold flex items-center space-x-1.5 cursor-pointer active:scale-95 transition-transform">
-            <span>📸</span>
-            <span>순정 카메라 앱 촬영 테스트 (어드민 전용)</span>
-            <input 
-              type="file" 
-              accept="image/*" 
-              capture="environment" 
-              onChange={handleFileChange} 
-              className="hidden" 
-            />
-          </label>
-        </div>
-      )}
 
       {/* Camera Action Controls */}
       <div className="safe-bottom bg-slate-950 p-6 pb-8 flex items-center justify-between z-10">
