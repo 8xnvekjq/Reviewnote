@@ -82,7 +82,7 @@ function App() {
 
       if (error) throw error;
 
-      if (data && data.length > 0) {
+      if (data && data.length > 0 && data[0].score > 0) {
         setWeeklyChampion({
           ...data[0],
           isLastWeek: false
