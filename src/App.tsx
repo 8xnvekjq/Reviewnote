@@ -578,6 +578,7 @@ function App() {
           <CameraScanner 
             onCapture={handleCameraCapture}
             onClose={() => setActiveTab('notes')}
+            isAdmin={isAdmin}
           />
         )}
 
