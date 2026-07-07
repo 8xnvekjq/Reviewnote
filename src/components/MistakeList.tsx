@@ -119,15 +119,17 @@ export const MistakeList: React.FC<MistakeListProps> = ({
                 const studentName = act.display_name || act.username || '동료 학생';
                 
                 return (
-                  <div key={act.mistake_id || idx} className={`text-[10px] text-slate-300 leading-normal flex items-center justify-between ${idx > 0 ? 'pt-2' : ''}`}>
-                    <div className="flex items-center space-x-2 truncate">
-                      <span className="font-bold text-indigo-300 flex-none">👤 {studentName}</span>
+                  <div key={act.mistake_id || idx} className={`text-[10px] text-slate-300 leading-normal flex items-center justify-between space-x-2 ${idx > 0 ? 'pt-2' : ''}`}>
+                    <div className="flex items-center space-x-1.5 min-w-0 flex-1">
+                      <span className="font-bold text-indigo-300 truncate max-w-[80px] flex-none" title={studentName}>
+                        👤 {studentName}
+                      </span>
                       <span className="text-slate-500 flex-none">&rarr;</span>
-                      <span className="text-slate-200 truncate max-w-[150px] font-bold">
+                      <span className="text-slate-200 truncate flex-1 min-w-0 font-bold">
                         {act.title.replace(/\$[^$]+\$/g, '').replace(/[#*`_]/g, '')}
                       </span>
                     </div>
-                    <div className="flex-none pl-3 font-semibold text-right">
+                    <div className="flex-none pl-2 font-semibold text-right">
                       {reviewBadge}
                     </div>
                   </div>
