@@ -244,16 +244,13 @@ export const AdminPanel: React.FC = () => {
                       <span className="text-[10px] text-slate-400 truncate block mt-0.5">
                         {(user as any).displayName ? `아이디: ${(user as any).username}` : (isEmailValid ? user.email : '(이메일 정보 없음)')}
                       </span>
-                      {/* 학년 입력 컴포넌트 추가 */}
+                      {/* 학년 선택 컴포넌트 추가 */}
                       <div className="flex items-center space-x-1.5 mt-2">
                         <span className="text-[9px] text-slate-500 font-bold">학년:</span>
-                        <input
-                          type="text"
-                          defaultValue={user.schoolGrade || ''}
-                          placeholder="예: 중3, 고1"
-                          onBlur={async (e) => {
-                            const newGrade = e.target.value.trim();
-                            if (newGrade === (user.schoolGrade || '')) return;
+                        <select
+                          value={user.schoolGrade || ''}
+                          onChange={async (e) => {
+                            const newGrade = e.target.value;
                             
                             try {
                               const { error } = await supabase
@@ -269,8 +266,14 @@ export const AdminPanel: React.FC = () => {
                               alert('학년 업데이트 실패: ' + err.message);
                             }
                           }}
-                          className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 focus:border-indigo-500 text-[10px] text-white w-20 outline-none transition-colors font-bold text-center"
-                        />
+                          className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 focus:border-indigo-500 text-[10px] text-white outline-none transition-colors font-bold text-center cursor-pointer"
+                        >
+                          <option value="">선택 없음</option>
+                          <option value="중3">중3</option>
+                          <option value="고1">고1</option>
+                          <option value="고2">고2</option>
+                          <option value="고3">고3</option>
+                        </select>
                       </div>
                     </div>
                     {/* Weekly Score and Last Activity */}
