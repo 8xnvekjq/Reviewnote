@@ -15,6 +15,7 @@ interface MistakeListProps {
   profilesMap?: Record<string, string>; // userId -> displayName
   currentUserId?: string;
   viewMode?: 'card' | 'list';
+  peerActivities?: any[];
 }
 
 export const MistakeList: React.FC<MistakeListProps> = ({
@@ -29,6 +30,7 @@ export const MistakeList: React.FC<MistakeListProps> = ({
   profilesMap = {},
   currentUserId,
   viewMode = 'card',
+  peerActivities = [],
 }) => {
   const [selectedStudent, setSelectedStudent] = useState<string>('all');
   const [filterGrade, setFilterGrade] = useState<string>('all');
@@ -87,6 +89,53 @@ export const MistakeList: React.FC<MistakeListProps> = ({
           </button>
         )}
       </div>
+
+      {/* 실시간 친구들의 복습 현황 위젯 */}
+      {viewMode === 'list' && peerActivities && peerActivities.length > 0 && (
+        <div className="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-4 space-y-2.5 shadow-md animate-fade-in">
+          <div className="flex items-center space-x-1.5">
+            <span className="text-xs animate-pulse">🔥</span>
+            <span className="text-[10px] text-indigo-400 font-extrabold uppercase tracking-wider">실시간 공부 자극! 친구들의 복습 현황</span>
+          </div>
+          <div className="divide-y divide-slate-850 space-y-2">
+            {peerActivities
+              .filter(act => act.user_id !== currentUserId) // Filter out current user
+              .slice(0, 3) // Show max 3 lines
+              .map((act, idx) => {
+                const reviewsArr = act.reviews || ['', '', ''];
+                let lastReview = '';
+                for (let i = 2; i >= 0; i--) {
+                  if (reviewsArr[i] !== '') {
+                    lastReview = reviewsArr[i];
+                    break;
+                  }
+                }
+                
+                const reviewBadge = 
+                  lastReview === 'O' ? <span className="text-emerald-400 font-bold">O 성공!</span> :
+                  lastReview === 'X' ? <span className="text-red-400 font-bold">X 도전 중</span> :
+                  lastReview === 'star' ? <span className="text-amber-400 font-bold">★ 별표</span> : '—';
+
+                const studentName = act.display_name || act.username || '동료 학생';
+                
+                return (
+                  <div key={act.mistake_id || idx} className={`text-[10px] text-slate-300 leading-normal flex items-center justify-between ${idx > 0 ? 'pt-2' : ''}`}>
+                    <div className="flex items-center space-x-2 truncate">
+                      <span className="font-bold text-indigo-300 flex-none">👤 {studentName}</span>
+                      <span className="text-slate-500 flex-none">&rarr;</span>
+                      <span className="text-slate-200 truncate max-w-[150px] font-bold">
+                        {act.title.replace(/\$[^$]+\$/g, '').replace(/[#*`_]/g, '')}
+                      </span>
+                    </div>
+                    <div className="flex-none pl-3 font-semibold text-right">
+                      {reviewBadge}
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      )}
 
       {/* 어드민 학생 필터 셀렉트 */}
       {isAdmin && studentOptions.length > 0 && (

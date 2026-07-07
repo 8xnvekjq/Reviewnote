@@ -38,6 +38,8 @@ function App() {
   const [statsStudentFilter, setStatsStudentFilter] = useState<string>('all');
   // userId -> schoolGrade map (AI 학년별 분류 최적화용)
   const [profilesGradeMap, setProfilesGradeMap] = useState<Record<string, string>>({});
+  // 다른 학생들의 실시간 복습 현황 목록
+  const [peerActivities, setPeerActivities] = useState<any[]>([]);
 
   // 이번주 월요일 00:00 KST UTC 경계 날짜 구하기 (내 실시간 주간 점수 계산용)
   const myWeeklyScore = useMemo(() => {
@@ -212,6 +214,7 @@ function App() {
   const fetchUserData = async () => {
     try {
       loadWeeklyChampion(); // 최신 챔피언 정보 동기화
+      fetchPeerActivities(); // 실시간 친구들 복습 현황 로드
       // Fetch all mistakes (RLS handles filtering: normal users see own, admin sees all)
       const { data: dbMistakes, error: mistakesError } = await supabase
         .from('mistakes')
@@ -254,6 +257,28 @@ function App() {
       console.error('Error loading Supabase user data:', err);
     }
   };
+
+  // Fetch recent peer review activities from read-only VIEW
+  const fetchPeerActivities = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('recent_peer_activities')
+        .select('*')
+        .limit(10);
+
+      if (error) throw error;
+      setPeerActivities(data || []);
+    } catch (err) {
+      console.error('Failed to load peer activities:', err);
+    }
+  };
+
+  // Refresh peer activities when Completed reviews tab is opened
+  useEffect(() => {
+    if (activeTab === 'completed' && session?.user) {
+      fetchPeerActivities();
+    }
+  }, [activeTab, session]);
 
   // Start analysis trigger with automatic paid fallback
   const handleStartAnalysis = async (entry: MistakeEntry) => {
@@ -423,13 +448,19 @@ function App() {
     try {
       const { error } = await supabase
         .from('mistakes')
-        .update({ reviews: newReviews })
+        .update({ 
+          reviews: newReviews,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', id);
 
       if (error) throw error;
 
       setMistakes(prev => prev.map(m => m.id === id ? { ...m, reviews: newReviews } : m));
       setSelectedEntry(prev => prev && prev.id === id ? { ...prev, reviews: newReviews } : prev);
+      
+      // Refresh peer activities locally
+      fetchPeerActivities();
     } catch (err: any) {
       console.error('Failed to update reviews:', err);
       // Fallback: update local React state anyway for immediate validation
@@ -587,6 +618,7 @@ function App() {
             profilesMap={profilesMap}
             currentUserId={session?.user?.id}
             viewMode="list"
+            peerActivities={peerActivities}
           />
         )}
 
