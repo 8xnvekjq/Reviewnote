@@ -662,7 +662,11 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
           </div>
 
           {/* Image Container */}
-          <div className="flex-1 w-full overflow-auto flex items-center justify-center p-2 cursor-zoom-out">
+          <div 
+            className={`flex-1 w-full overflow-auto p-4 cursor-zoom-out ${
+              zoomScale === 2 ? 'block' : 'flex items-center justify-center'
+            }`}
+          >
             <img 
               src={selectedEntry.imageUrl} 
               alt="확대된 문제 이미지" 
@@ -670,8 +674,11 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 e.stopPropagation();
                 setZoomScale(prev => (prev === 1 ? 2 : 1));
               }}
-              className="max-w-full h-auto rounded-lg transition-transform duration-300 origin-center select-none"
-              style={{ transform: `scale(${zoomScale})` }}
+              className={`rounded-lg select-none transition-all duration-300 ${
+                zoomScale === 2 
+                  ? 'max-w-none w-[200%] h-auto block' 
+                  : 'max-w-full max-h-[80vh] object-contain block'
+              }`}
             />
           </div>
           
