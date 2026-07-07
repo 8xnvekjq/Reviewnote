@@ -1,13 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import type { AdminUserStat, MistakeEntry } from '../types';
+import type { AdminUserStat } from '../types';
 import { supabase } from '../services/supabase';
 import { formatDate } from '../utils/date';
-import { ROOT_CAUSE_OPTIONS } from '../types';
-import { LaTeXRenderer } from './LaTeXRenderer';
 
 export const AdminPanel: React.FC = () => {
   const [stats, setStats] = useState<AdminUserStat[]>([]);
-  const [profilesMap, setProfilesMap] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
@@ -24,15 +21,6 @@ export const AdminPanel: React.FC = () => {
         .order('email', { ascending: true });
 
       if (profilesError) throw profilesError;
-
-      // Build profilesMap: userId -> 이름(실명) 또는 아이디
-      const pMap: Record<string, string> = {};
-      (profiles || []).forEach((p: any) => {
-        const username = p.email?.split('@')[0] || p.display_name || p.id.slice(0, 8);
-        const displayName = p.display_name?.trim();
-        pMap[p.id] = displayName || username;
-      });
-      setProfilesMap(pMap);
 
       // Fetch all mistakes
       const { data: mistakes, error: mistakesError } = await supabase
