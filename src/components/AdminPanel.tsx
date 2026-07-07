@@ -7,14 +7,11 @@ import { LaTeXRenderer } from './LaTeXRenderer';
 
 export const AdminPanel: React.FC = () => {
   const [stats, setStats] = useState<AdminUserStat[]>([]);
-  const [allMistakes, setAllMistakes] = useState<MistakeEntry[]>([]);
   const [profilesMap, setProfilesMap] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
-  const [filterStudent, setFilterStudent] = useState<string>('all');
-  const [previewEntry, setPreviewEntry] = useState<MistakeEntry | null>(null);
-  const [activeSubTab, setActiveSubTab] = useState<'stats' | 'mistakes'>('stats');
+  const [activeSubTab, setActiveSubTab] = useState<'stats' | 'changelog'>('stats');
 
   const fetchAdminStats = async () => {
     setIsLoading(true);
@@ -45,21 +42,7 @@ export const AdminPanel: React.FC = () => {
 
       if (mistakesError) throw mistakesError;
 
-      // Map full mistake entries for the 전체 오답 뷰
-      const mappedMistakes: MistakeEntry[] = (mistakes || []).map((m: any) => ({
-        id: m.id,
-        userId: m.user_id,
-        title: m.title,
-        imageUrl: m.image_url,
-        date: m.date,
-        analysis: m.analysis || undefined,
-        reviews: m.reviews || ['', '', ''],
-        grade: m.grade || undefined,
-        chapter: m.chapter || undefined,
-        rootCauses: m.root_causes || [],
-        userActionPlan: m.user_action_plan || undefined,
-      }));
-      setAllMistakes(mappedMistakes);
+      // Fetch all mistakes is completed successfully, proceed to monday calculation
 
       // 이번주 월요일 00:00 KST에 해당하는 UTC 경계선 계산
       const now = new Date();
@@ -199,15 +182,15 @@ export const AdminPanel: React.FC = () => {
             <span>가입자 현황</span>
           </button>
           <button
-            onClick={() => setActiveSubTab('mistakes')}
+            onClick={() => setActiveSubTab('changelog')}
             className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center space-x-1.5 ${
-              activeSubTab === 'mistakes' 
+              activeSubTab === 'changelog' 
                 ? 'bg-slate-800 text-indigo-400 shadow-sm font-black' 
                 : 'text-slate-500 hover:text-slate-300'
             }`}
           >
-            <span>📂</span>
-            <span>전체 오답 뷰</span>
+            <span>📜</span>
+            <span>변경 이력 (Change Log)</span>
           </button>
         </div>
       )}
@@ -334,158 +317,97 @@ export const AdminPanel: React.FC = () => {
         </div>
       )}
 
-      {/* ── 탭 2: 전체 오답 뷰 탭 ── */}
-      {activeSubTab === 'mistakes' && !isLoading && !error && (
-        <div className="space-y-4">
-          {/* 학생 필터 */}
-          <div className="flex items-center space-x-2 bg-slate-900 border border-slate-800 p-3 rounded-2xl">
-            <span className="text-[11px] text-slate-400 font-bold flex-none">👤 학생 필터</span>
-            <select
-              value={filterStudent}
-              onChange={e => setFilterStudent(e.target.value)}
-              className="flex-1 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-850 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer"
-            >
-              <option value="all">전체 학생 ({allMistakes.length}개)</option>
-              {Array.from(new Set(allMistakes.map(m => m.userId).filter(Boolean) as string[]))
-                .map(uid => {
-                  const name = profilesMap[uid] || uid.slice(0, 8);
-                  const cnt = allMistakes.filter(m => m.userId === uid).length;
-                  return <option key={uid} value={uid}>{name} ({cnt}개)</option>;
-                })}
-            </select>
+      {/* ── 탭 2: 변경 이력 (Change Log) 탭 ── */}
+      {activeSubTab === 'changelog' && (
+        <div className="space-y-6 animate-scale-up">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+            <div className="flex items-center space-x-2">
+              <span className="text-base">📋</span>
+              <h3 className="font-extrabold text-white text-sm">더쿠키수학 오답클리닉 변경 이력</h3>
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              본 애플리케이션의 릴리즈 버전별 업데이트 내역 및 핵심 개선 사항을 확인할 수 있습니다.
+            </p>
           </div>
 
-          {/* 오답 카드 그리드 (이미지 전면 제거 및 초슬림 메타 구조 변경) */}
-          {allMistakes.filter(m => filterStudent === 'all' || m.userId === filterStudent).length === 0 ? (
-            <div className="py-12 text-center text-slate-500 text-xs">등록된 오답이 없습니다.</div>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {allMistakes
-                .filter(m => filterStudent === 'all' || m.userId === filterStudent)
-                .map(entry => {
-                  const studentName = entry.userId ? (profilesMap[entry.userId] || entry.userId.slice(0, 8)) : undefined;
-                  return (
-                    <div
-                      key={entry.id}
-                      onClick={() => setPreviewEntry(entry)}
-                      className="group bg-slate-900/50 hover:bg-slate-900 border border-slate-800 hover:border-indigo-500/30 rounded-2xl p-4 cursor-pointer transition-all active:scale-[0.98] space-y-3 shadow-sm flex flex-col justify-between"
-                    >
-                      {/* 카드 헤더 (이름 & 날짜) */}
-                      <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
-                        {studentName && (
-                          <span className="font-bold text-indigo-400">👤 {studentName}</span>
-                        )}
-                        <span className="text-slate-500">{formatDate(entry.date)}</span>
-                      </div>
-
-                      {/* 문제 타이틀 */}
-                      <div className="text-xs font-bold text-white leading-normal line-clamp-2 min-h-[32px] group-hover:text-indigo-300 transition-colors">
-                        <LaTeXRenderer 
-                          text={entry.title} 
-                          className="text-white font-bold text-xs"
-                        />
-                      </div>
-
-                      {/* 카드 푸터 (과목, 단원, 분석완료 여부 배지) */}
-                      <div className="flex items-center justify-between pt-2 border-t border-slate-850/80">
-                        <div className="flex items-center space-x-1.5 overflow-hidden">
-                          {entry.grade && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-600/10 text-emerald-400 border border-emerald-500/20 font-extrabold flex-none">
-                              {entry.grade}
-                            </span>
-                          )}
-                          {entry.chapter && (
-                            <span className="text-[9px] text-slate-500 truncate font-semibold">
-                              📌 {entry.chapter}
-                            </span>
-                          )}
-                        </div>
-                        {!entry.analysis ? (
-                          <span className="text-[9px] text-amber-400 font-bold flex-none flex items-center bg-amber-400/5 px-2 py-0.5 rounded-full border border-amber-400/10">
-                            <span className="w-1 h-1 rounded-full bg-amber-400 mr-1.5 animate-pulse"></span>미완료
-                          </span>
-                        ) : (
-                          <span className="text-[9px] text-indigo-400 font-bold flex-none bg-indigo-500/5 px-2 py-0.5 rounded-full border border-indigo-500/10">
-                            ✓ 진단됨
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 미리보기 모달 */}
-      {previewEntry && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
-          onClick={() => setPreviewEntry(null)}
-        >
-          <div
-            className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
-              <div>
+          <div className="relative border-l border-slate-800 pl-6 ml-3 space-y-8">
+            {/* Version 1.8.4 */}
+            <div className="relative">
+              <div className="absolute -left-[33px] top-1.5 w-4 h-4 rounded-full bg-indigo-500 border-4 border-slate-950" />
+              <div className="space-y-2">
                 <div className="flex items-center space-x-2">
-                  {previewEntry.userId && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-600/20 text-indigo-400 border border-indigo-600/30 font-bold">
-                      👤 {profilesMap[previewEntry.userId] || previewEntry.userId.slice(0, 8)}
-                    </span>
-                  )}
-                  {previewEntry.grade && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-600/20 text-emerald-400 border border-emerald-600/30 font-bold">
-                      {previewEntry.grade}
-                    </span>
-                  )}
-                  {previewEntry.chapter && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-700 text-slate-300 border border-slate-600 font-bold">
-                      {previewEntry.chapter}
-                    </span>
-                  )}
+                  <span className="text-xs font-black px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                    v1.8.4
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-bold">2026.07.07</span>
                 </div>
-                <div className="font-bold text-white text-sm mt-1 min-w-0">
-                  <LaTeXRenderer 
-                    text={previewEntry.title} 
-                    className="text-white font-bold text-sm line-clamp-1 inline-block w-full"
-                  />
-                </div>
-                <p className="text-[10px] text-slate-500">{formatDate(previewEntry.date)}</p>
+                <h4 className="font-bold text-white text-xs">주간 리더보드 롤오버 및 카드 레이아웃 슬림화</h4>
+                <ul className="text-xs text-slate-400 list-disc list-inside space-y-1.5 pl-1 leading-relaxed">
+                  <li><strong>주간 MVP 챔피언 배너</strong>: 금주 1위 점수가 0점일 시 지난주 우승자 정보로 자동 이월되는 안전성 로직 탑재</li>
+                  <li><strong>카드 레이아웃 단축</strong>: 오답 카드 내 실수 지점과 학생 대책 수립 칸을 단일 행으로 축소하여 모바일 가시성 극대화</li>
+                  <li><strong>가로 카메라 촬영 지원</strong>: 태블릿/모바일 가로 모드 촬영 시 조작 패널이 우측 사이드로 자동 재배치</li>
+                  <li><strong>오답 분류 태그</strong>: 오답 원인 분류군에 이모지와 텍스트 라벨 병기화</li>
+                </ul>
               </div>
-              <button onClick={() => setPreviewEntry(null)} className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 active:scale-90 transition-all">✕</button>
             </div>
-            <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
-              <img src={previewEntry.imageUrl} alt={previewEntry.title} className="w-full rounded-xl border border-slate-800 object-contain max-h-72" />
-              {previewEntry.analysis && (
-                <div className="bg-slate-950 rounded-xl border border-slate-800 p-4">
-                  <p className="text-[10px] font-bold text-indigo-400 mb-2">💡 정석 풀이</p>
-                  <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{previewEntry.analysis.solvingProcess.replace(/\$[^$]+\$/g, '[수식]').slice(0, 300)}{previewEntry.analysis.solvingProcess.length > 300 ? '...' : ''}</p>
+
+            {/* Version 1.7.5 */}
+            <div className="relative">
+              <div className="absolute -left-[33px] top-1.5 w-4 h-4 rounded-full bg-slate-800 border-4 border-slate-950" />
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs font-black px-2 py-0.5 rounded bg-slate-850 text-slate-400 border border-slate-700">
+                    v1.7.5
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-bold">2026.07.05</span>
                 </div>
-              )}
-              {previewEntry.rootCauses && previewEntry.rootCauses.length > 0 && (
-                <div className="bg-slate-950 rounded-xl border border-slate-800 p-4 space-y-2">
-                  <p className="text-[10px] font-bold text-amber-400">⚠️ 선택된 실수 원인</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {previewEntry.rootCauses.map(rc => {
-                      const opt = ROOT_CAUSE_OPTIONS.find(o => o.id === rc);
-                      return opt ? (
-                        <span key={rc} className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-semibold">
-                          {opt.label}
-                        </span>
-                      ) : null;
-                    })}
-                  </div>
+                <h4 className="font-bold text-white text-xs">AI 유튜브 맞춤 강의 추천 및 학생 가이드 신설</h4>
+                <ul className="text-xs text-slate-400 list-disc list-inside space-y-1.5 pl-1 leading-relaxed">
+                  <li><strong>유튜브 실시간 매칭</strong>: 오답 단원분류에 기반한 학원 재생목록 55개 강의 딥링크 추천 시스템 도입</li>
+                  <li><strong>학생 가이드 탭</strong>: PWA 앱 설치 및 진단 체크 방법 등을 담은 디지털 학습 매뉴얼 탑재</li>
+                  <li><strong>표시 포맷 개선</strong>: 어드민 패널 내 가입자 표기를 직관적인 <code className="text-indigo-400">아이디(이름)</code> 형식으로 통일</li>
+                  <li><strong>이메일 자동 동기화</strong>: 신규 가입 시 이메일 누락을 방지하는 Supabase trigger function 마이그레이션 적용</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Version 1.5.0 */}
+            <div className="relative">
+              <div className="absolute -left-[33px] top-1.5 w-4 h-4 rounded-full bg-slate-800 border-4 border-slate-950" />
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs font-black px-2 py-0.5 rounded bg-slate-850 text-slate-400 border border-slate-700">
+                    v1.5.0
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-bold">2026.07.03</span>
                 </div>
-              )}
-              {previewEntry.userActionPlan && (
-                <div className="bg-emerald-950/30 rounded-xl border border-emerald-800/30 p-4">
-                  <p className="text-[10px] font-bold text-emerald-400 mb-2">✏️ 학생 나만의 대책</p>
-                  <p className="text-xs text-slate-300 leading-relaxed">{previewEntry.userActionPlan}</p>
+                <h4 className="font-bold text-white text-xs">수동 크롭 가이드라인 매칭 및 카메라 오토포커스</h4>
+                <ul className="text-xs text-slate-400 list-disc list-inside space-y-1.5 pl-1 leading-relaxed">
+                  <li><strong>오토포커스(Autofocus)</strong>: 렌즈 연속 자동 초점 및 터치 지점 수동초점(노란 링 비주얼) 추가</li>
+                  <li><strong>조준 격자-크롭 박스 일치</strong>: 4:3 격자 비율과 크롭 기본 범위를 정확히 매칭해 자르기 피로도 경감</li>
+                  <li><strong>오답 상세모달 개선</strong>: 지문, 풀이, 대책 등 길게 늘어지던 정보를 탭형 접이식(Accordion) 메뉴로 개편</li>
+                  <li><strong>AI 오분류 크롭 차단</strong>: AI 임의 자르기 필터링을 걷어내고, 사용자가 선택한 원본 크롭 영역 그대로 고화질 보존</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Version 1.1.0 */}
+            <div className="relative">
+              <div className="absolute -left-[33px] top-1.5 w-4 h-4 rounded-full bg-slate-800 border-4 border-slate-950" />
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs font-black px-2 py-0.5 rounded bg-slate-850 text-slate-400 border border-slate-700">
+                    v1.1.0
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-bold">2026.07.01</span>
                 </div>
-              )}
+                <h4 className="font-bold text-white text-xs">3단계 복습 피드백 및 보관함 이동 시스템</h4>
+                <ul className="text-xs text-slate-400 list-disc list-inside space-y-1.5 pl-1 leading-relaxed">
+                  <li><strong>복습 상태 진단</strong>: 개별 오답별 1~3차 복습 선택기(O/X/★) 및 3회 완료 시 복습완료 탭으로 자동 이동</li>
+                  <li><strong>클리닉 리포트</strong>: 정석 풀이과정(LaTeX), 오답 분석 가이드 및 처방 대책 카드 레이아웃 고도화</li>
+                  <li><strong>UI 세이프 존 대응</strong>: 모바일 Notch 바에 알맞은 헤더 탑 마진 및 수려한 글래스모피즘 하단 바 복원</li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
