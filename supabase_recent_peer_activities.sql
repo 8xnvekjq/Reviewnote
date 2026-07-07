@@ -4,7 +4,7 @@ ALTER TABLE public.mistakes ADD COLUMN IF NOT EXISTS updated_at timestamp with t
 -- 2. Update existing rows to have updated_at equal to date
 UPDATE public.mistakes SET updated_at = date WHERE updated_at IS NULL;
 
--- 3. Create VIEW for recent peer activities (bypassing RLS securely for read-only peer updates)
+-- 3. Create VIEW for recent peer activities (excluding admin profiles)
 DROP VIEW IF EXISTS public.recent_peer_activities;
 
 CREATE OR REPLACE VIEW public.recent_peer_activities AS
@@ -20,6 +20,7 @@ FROM public.mistakes m
 INNER JOIN public.profiles p ON p.id = m.user_id
 WHERE m.reviews IS NOT NULL 
   AND (m.reviews->>0 != '' OR m.reviews->>1 != '' OR m.reviews->>2 != '')
+  AND (p.is_admin IS NOT TRUE) -- Exclude admin accounts from peer reviews widget
 ORDER BY m.updated_at DESC;
 
 -- 4. Grant select permission to authenticated users
