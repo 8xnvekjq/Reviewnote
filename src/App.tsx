@@ -34,6 +34,8 @@ function App() {
   const [youtubeLectures, setYoutubeLectures] = useState<any[]>([]);
   // 주간 최다 오답 완료 챔피언 상태
   const [weeklyChampion, setWeeklyChampion] = useState<any>(null);
+  // 분석통계 탭 학생 필터 상태 (어드민 전용)
+  const [statsStudentFilter, setStatsStudentFilter] = useState<string>('all');
 
   // 이번주 월요일 00:00 KST UTC 경계 날짜 구하기 (내 실시간 주간 점수 계산용)
   const myWeeklyScore = useMemo(() => {
@@ -441,12 +443,19 @@ function App() {
   };
 
   // ── 통계 계산 ──────────────────────────────────────────────────
+  const filteredMistakesForStats = useMemo(() => {
+    if (isAdmin && statsStudentFilter !== 'all') {
+      return mistakes.filter(m => m.userId === statsStudentFilter);
+    }
+    return mistakes;
+  }, [mistakes, isAdmin, statsStudentFilter]);
+
   const stats = useMemo(() => {
     const gradeCounts: Record<string, number> = {};
     const chapterCounts: Record<string, number> = {};
     const causeCounts: Record<string, number> = {};
 
-    mistakes.forEach(m => {
+    filteredMistakesForStats.forEach(m => {
       if (m.grade) gradeCounts[m.grade] = (gradeCounts[m.grade] || 0) + 1;
       if (m.chapter && m.grade) {
         const key = `${m.grade} > ${m.chapter}`;
@@ -462,7 +471,7 @@ function App() {
     const topChapters = Object.entries(chapterCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
     return { gradeCounts, causeCounts, totalGrade, totalCause, topChapters };
-  }, [mistakes]);
+  }, [filteredMistakesForStats]);
 
   const maskId = (username: string) => {
     if (!username) return '';
@@ -594,10 +603,30 @@ function App() {
           <div className="space-y-6">
             <div>
               <h2 className="text-lg font-bold text-white">📊 나의 약점 분석</h2>
-              <p className="text-xs text-slate-400 mt-0.5">총 {mistakes.length}개의 오답 기록 기반</p>
+              <p className="text-xs text-slate-400 mt-0.5">총 {filteredMistakesForStats.length}개의 오답 기록 기반</p>
             </div>
 
-            {mistakes.length === 0 ? (
+            {/* 어드민인 경우 학생 필터 셀렉터 추가 */}
+            {isAdmin && (
+              <div className="flex items-center space-x-2 bg-slate-900 border border-slate-800 p-3.5 rounded-2xl shadow-sm">
+                <span className="text-xs text-slate-300 font-extrabold flex-none">👤 학생별 통계 조회</span>
+                <select
+                  value={statsStudentFilter}
+                  onChange={e => setStatsStudentFilter(e.target.value)}
+                  className="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer font-bold"
+                >
+                  <option value="all">전체 학생 합계 ({mistakes.length}개)</option>
+                  {Array.from(new Set(mistakes.map(m => m.userId).filter(Boolean) as string[]))
+                    .map(uid => {
+                      const name = profilesMap[uid] || uid.slice(0, 8);
+                      const cnt = mistakes.filter(m => m.userId === uid).length;
+                      return <option key={uid} value={uid}>{name} ({cnt}개)</option>;
+                    })}
+                </select>
+              </div>
+            )}
+
+            {filteredMistakesForStats.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-slate-800 rounded-2xl bg-slate-900/20">
                 <div className="text-3xl mb-3">📊</div>
                 <p className="text-slate-300 font-medium text-sm">아직 분석할 데이터가 없습니다</p>
