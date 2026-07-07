@@ -296,22 +296,15 @@ function App() {
       if (freeKey) {
         try {
           await runAnalysisFlow(entry, freeKey, studentGrade);
-        } catch (err: any) {
-          const errorMsg = err?.message || '';
-          const isQuotaError = 
-            errorMsg.includes('429') || 
-            errorMsg.toUpperCase().includes('RESOURCE_EXHAUSTED') || 
-            errorMsg.includes('quota') || 
-            errorMsg.includes('limit');
-
-          if (paidKey && isQuotaError) {
-            console.warn('Free API Key limit hit. Retrying with Paid API Key...');
+        } catch (err) {
+          console.warn('Free API Key failed. Retrying with Paid API Key...', err);
+          if (paidKey) {
             await runAnalysisFlow(entry, paidKey, studentGrade);
           } else {
             throw err;
           }
         }
-      } else {
+      } else if (paidKey) {
         await runAnalysisFlow(entry, paidKey, studentGrade);
       }
     } catch (err: any) {
