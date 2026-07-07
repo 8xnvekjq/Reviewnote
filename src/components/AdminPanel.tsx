@@ -14,10 +14,10 @@ export const AdminPanel: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      // Fetch all profiles (display_name 포함)
+      // Fetch all profiles (display_name, school_grade 포함)
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, email, is_admin, display_name')
+        .select('id, email, is_admin, display_name, school_grade')
         .order('email', { ascending: true });
 
       if (profilesError) throw profilesError;
@@ -56,6 +56,7 @@ export const AdminPanel: React.FC = () => {
           weeklyCompletedCount: 0,
           displayName: p.display_name?.trim() || undefined,
           username: username,
+          schoolGrade: p.school_grade || '',
         });
       });
 
@@ -243,6 +244,34 @@ export const AdminPanel: React.FC = () => {
                       <span className="text-[10px] text-slate-400 truncate block mt-0.5">
                         {(user as any).displayName ? `아이디: ${(user as any).username}` : (isEmailValid ? user.email : '(이메일 정보 없음)')}
                       </span>
+                      {/* 학년 입력 컴포넌트 추가 */}
+                      <div className="flex items-center space-x-1.5 mt-2">
+                        <span className="text-[9px] text-slate-500 font-bold">학년:</span>
+                        <input
+                          type="text"
+                          defaultValue={user.schoolGrade || ''}
+                          placeholder="예: 중3, 고1"
+                          onBlur={async (e) => {
+                            const newGrade = e.target.value.trim();
+                            if (newGrade === (user.schoolGrade || '')) return;
+                            
+                            try {
+                              const { error } = await supabase
+                                .from('profiles')
+                                .update({ school_grade: newGrade || null })
+                                .eq('id', user.userId);
+                                
+                              if (error) throw error;
+                              
+                              // Update local state
+                              setStats(prev => prev.map(u => u.userId === user.userId ? { ...u, schoolGrade: newGrade } : u));
+                            } catch (err: any) {
+                              alert('학년 업데이트 실패: ' + err.message);
+                            }
+                          }}
+                          className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 focus:border-indigo-500 text-[10px] text-white w-20 outline-none transition-colors font-bold text-center"
+                        />
+                      </div>
                     </div>
                     {/* Weekly Score and Last Activity */}
                     <div className="text-right flex-none pl-3 border-l border-slate-800/80 space-y-1">

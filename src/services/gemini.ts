@@ -69,7 +69,8 @@ const imageUrlToBase64 = async (url: string): Promise<{ mimeType: string; base64
 export const analyzeMistakeWithGemini = async (
   imageUrl: string,
   apiKey: string,
-  youtubeLectures: any[] = []
+  youtubeLectures: any[] = [],
+  studentGrade?: string
 ): Promise<{ title: string; analysis: MistakeAnalysis; grade: string; chapter: string }> => {
   const { mimeType, base64Data } = await imageUrlToBase64(imageUrl);
 
@@ -88,7 +89,15 @@ ${chaptersStr || '  * (챕터 정보 없음)'}`;
     .join('\n\n');
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+  const studentInfoPrompt = studentGrade
+    ? `\n★ [학생 학년 참고 정보] ★
+- 이 오답 문제를 등록한 학생의 현재 학년/과정은 **"${studentGrade}"** 입니다.
+- 만약 이 문제가 중3-1 범위(실수, 인수분해, 이차방정식, 이차함수)와 고등학교 공통수학1 또는 공통수학2 범위에 모두 걸쳐 있는 문제라면, 이 학생의 학년 정보인 **"${studentGrade}"** 에 맞게 단원을 우선 판별하여 분류해 주세요 (예: 학생 학년이 중3 또는 중학교 학년인 경우 '공통수학1'이 아닌 '중3-1'로 분류하는 것이 대단히 바람직합니다).\n`
+    : '';
+
   const prompt = `수학 문제 사진입니다. 이 사진 속 문제를 분석하고 올바른 풀이법과 메타데이터를 진단해 주세요.
+${studentInfoPrompt}
 ★ [엄격한 한글 출력 원칙] ★
 - LaTeX 수학 수식 내의 기호(예: $x, y, a, b$)를 제외한 모든 문장, 해설, 소제목, 힌트, 분석 텍스트는 100% 한국어로만 작성해야 합니다.
 - 영문 텍스트 설명(예: "Since...", "Therefore...", "Using...")이 포함되는 것을 절대적으로 금지합니다. 영문 수식이 들어간 문장 또한 한글 조사와 한글 서술어만 사용하십시오.

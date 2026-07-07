@@ -36,6 +36,8 @@ function App() {
   const [weeklyChampion, setWeeklyChampion] = useState<any>(null);
   // 분석통계 탭 학생 필터 상태 (어드민 전용)
   const [statsStudentFilter, setStatsStudentFilter] = useState<string>('all');
+  // userId -> schoolGrade map (AI 학년별 분류 최적화용)
+  const [profilesGradeMap, setProfilesGradeMap] = useState<Record<string, string>>({});
 
   // 이번주 월요일 00:00 KST UTC 경계 날짜 구하기 (내 실시간 주간 점수 계산용)
   const myWeeklyScore = useMemo(() => {
@@ -218,18 +220,21 @@ function App() {
 
       if (mistakesError) throw mistakesError;
 
-      // Fetch all profiles for admin name mapping (display_name 포함)
+      // Fetch all profiles for admin name mapping (display_name, school_grade 포함)
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('id, email, display_name');
+        .select('id, email, display_name, school_grade');
 
       const pMap: Record<string, string> = {};
+      const gMap: Record<string, string> = {};
       (profiles || []).forEach((p: any) => {
         const username = p.email?.split('@')[0] || p.id.slice(0, 8);
         const displayName = p.display_name?.trim();
         pMap[p.id] = displayName ? `${displayName} (${username})` : username;
+        gMap[p.id] = p.school_grade || '';
       });
       setProfilesMap(pMap);
+      setProfilesGradeMap(gMap);
 
       const mappedMistakes: MistakeEntry[] = (dbMistakes || []).map((m: any) => ({
         id: m.id,
@@ -262,9 +267,10 @@ function App() {
 
     setIsAnalyzing(true);
     try {
+      const studentGrade = entry.userId ? (profilesGradeMap[entry.userId] || '') : '';
       if (freeKey) {
         try {
-          await runAnalysisFlow(entry, freeKey);
+          await runAnalysisFlow(entry, freeKey, studentGrade);
         } catch (err: any) {
           const errorMsg = err?.message || '';
           const isQuotaError = 
@@ -275,13 +281,13 @@ function App() {
 
           if (paidKey && isQuotaError) {
             console.warn('Free API Key limit hit. Retrying with Paid API Key...');
-            await runAnalysisFlow(entry, paidKey);
+            await runAnalysisFlow(entry, paidKey, studentGrade);
           } else {
             throw err;
           }
         }
       } else {
-        await runAnalysisFlow(entry, paidKey);
+        await runAnalysisFlow(entry, paidKey, studentGrade);
       }
     } catch (err: any) {
       console.error(err);
@@ -292,8 +298,8 @@ function App() {
   };
 
   // Gemini API analysis flow & database updating
-  const runAnalysisFlow = async (entry: MistakeEntry, apiKey: string) => {
-    const result = await analyzeMistakeWithGemini(entry.imageUrl, apiKey, youtubeLectures);
+  const runAnalysisFlow = async (entry: MistakeEntry, apiKey: string, studentGrade?: string) => {
+    const result = await analyzeMistakeWithGemini(entry.imageUrl, apiKey, youtubeLectures, studentGrade);
     
     // Update mistake database record (including auto-classified grade/chapter)
     const { error: updateError } = await supabase
