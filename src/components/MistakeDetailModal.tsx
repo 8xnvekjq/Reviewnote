@@ -47,6 +47,10 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   const [editActionPlan, setEditActionPlan] = React.useState(selectedEntry.userActionPlan || '');
   const [isSaving, setIsSaving] = React.useState(false);
 
+  // Image lightbox zoom states
+  const [isZoomOpen, setIsZoomOpen] = React.useState(false);
+  const [zoomScale, setZoomScale] = React.useState(1);
+
   // Accordion toggle states
   const [showProblemText, setShowProblemText] = React.useState(false);
   const [showSolvingProcess, setShowSolvingProcess] = React.useState(true); // Default open for study
@@ -271,12 +275,18 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           
           {/* Problem Image Preview */}
-          <div className="w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center relative p-2 min-h-[200px]">
+          <div 
+            onClick={() => setIsZoomOpen(true)}
+            className="w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center relative p-2 min-h-[200px] cursor-zoom-in group/img"
+          >
             <img 
               src={selectedEntry.imageUrl} 
               alt={selectedEntry.title} 
-              className="w-full h-auto max-h-[60vh] object-contain rounded-xl" 
+              className="w-full h-auto max-h-[60vh] object-contain rounded-xl group-hover/img:opacity-90 transition-opacity" 
             />
+            <div className="absolute bottom-4 right-4 bg-slate-950/80 border border-slate-800 rounded-lg px-2.5 py-1 text-[10px] text-slate-400 font-bold flex items-center space-x-1.5 shadow backdrop-blur opacity-0 group-hover/img:opacity-100 transition-opacity">
+              <span>🔍 크게 보기</span>
+            </div>
           </div>
 
           {/* 3-Step Review Status Selection Card */}
@@ -625,6 +635,54 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
         </div>
 
       </div>
+
+      {/* 이미지 전체화면 확대 모달 */}
+      {isZoomOpen && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex flex-col justify-between p-4 animate-fade-in"
+          onClick={() => {
+            setIsZoomOpen(false);
+            setZoomScale(1);
+          }}
+        >
+          {/* Top Bar */}
+          <div className="flex items-center justify-between z-10 w-full pl-2">
+            <span className="text-[10px] font-bold text-slate-400">
+              🔍 화면을 더블 탭(클릭)하면 2배 확대됩니다.
+            </span>
+            <button 
+              onClick={() => {
+                setIsZoomOpen(false);
+                setZoomScale(1);
+              }}
+              className="w-9 h-9 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-white hover:bg-slate-800 text-lg transition-all"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Image Container */}
+          <div className="flex-1 w-full overflow-auto flex items-center justify-center p-2 cursor-zoom-out">
+            <img 
+              src={selectedEntry.imageUrl} 
+              alt="확대된 문제 이미지" 
+              onClick={(e) => {
+                e.stopPropagation();
+                setZoomScale(prev => (prev === 1 ? 2 : 1));
+              }}
+              className="max-w-full h-auto rounded-lg transition-transform duration-300 origin-center select-none"
+              style={{ transform: `scale(${zoomScale})` }}
+            />
+          </div>
+          
+          {/* Bottom Bar indicator */}
+          <div className="text-center z-10 py-2">
+            <span className="text-[9px] text-slate-500 font-semibold bg-slate-900/60 px-3 py-1 rounded-full border border-slate-800/40">
+              배율: {zoomScale}x
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
