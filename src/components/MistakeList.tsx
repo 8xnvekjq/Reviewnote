@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { MistakeEntry } from '../types';
 import { MistakeCard } from './MistakeCard';
+import { LaTeXRenderer } from './LaTeXRenderer';
 
 interface MistakeListProps {
   mistakes: MistakeEntry[];
@@ -13,6 +14,7 @@ interface MistakeListProps {
   isAdmin?: boolean;
   profilesMap?: Record<string, string>; // userId -> displayName
   currentUserId?: string;
+  viewMode?: 'card' | 'list';
 }
 
 export const MistakeList: React.FC<MistakeListProps> = ({
@@ -26,8 +28,11 @@ export const MistakeList: React.FC<MistakeListProps> = ({
   isAdmin = false,
   profilesMap = {},
   currentUserId,
+  viewMode = 'card',
 }) => {
   const [selectedStudent, setSelectedStudent] = useState<string>('all');
+  const [filterGrade, setFilterGrade] = useState<string>('all');
+  const [filterChapter, setFilterChapter] = useState<string>('all');
 
   // 어드민일 때: 학생 목록 추출
   const studentOptions = isAdmin
@@ -37,10 +42,29 @@ export const MistakeList: React.FC<MistakeListProps> = ({
         .sort((a, b) => a.name.localeCompare(b.name))
     : [];
 
-  // 필터링
-  const filtered = isAdmin && selectedStudent !== 'all'
+  // 필터 학목 추출 (과목 & 단원)
+  const availableGrades = Array.from(new Set(mistakes.map(m => m.grade).filter(Boolean) as string[])).sort();
+  const availableChapters = Array.from(
+    new Set(
+      mistakes
+        .filter(m => filterGrade === 'all' || m.grade === filterGrade)
+        .map(m => m.chapter)
+        .filter(Boolean) as string[]
+    )
+  ).sort();
+
+  // 필터링 적용
+  let filtered = isAdmin && selectedStudent !== 'all'
     ? mistakes.filter(m => m.userId === selectedStudent)
     : mistakes;
+
+  if (viewMode === 'list') {
+    filtered = filtered.filter(m => {
+      const matchGrade = filterGrade === 'all' || m.grade === filterGrade;
+      const matchChapter = filterChapter === 'all' || m.chapter === filterChapter;
+      return matchGrade && matchChapter;
+    });
+  }
 
   return (
     <div className="space-y-5">
@@ -86,6 +110,44 @@ export const MistakeList: React.FC<MistakeListProps> = ({
         </div>
       )}
 
+      {/* 과목 & 단원 필터 (리스트 뷰 모드 전용) */}
+      {viewMode === 'list' && (
+        <div className="grid grid-cols-2 gap-3.5 bg-slate-900/60 border border-slate-800 p-3.5 rounded-2xl">
+          <div className="space-y-1">
+            <span className="text-[10px] text-slate-500 font-extrabold uppercase block">과목 필터</span>
+            <select
+              value={filterGrade}
+              onChange={e => {
+                setFilterGrade(e.target.value);
+                setFilterChapter('all');
+              }}
+              className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer font-bold"
+            >
+              <option value="all">전체 과목 ({mistakes.length}개)</option>
+              {availableGrades.map(g => {
+                const cnt = mistakes.filter(m => m.grade === g).length;
+                return <option key={g} value={g}>{g} ({cnt}개)</option>;
+              })}
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <span className="text-[10px] text-slate-500 font-extrabold uppercase block">단원 필터</span>
+            <select
+              value={filterChapter}
+              onChange={e => setFilterChapter(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer font-bold"
+            >
+              <option value="all">전체 단원 ({mistakes.filter(m => filterGrade === 'all' || m.grade === filterGrade).length}개)</option>
+              {availableChapters.map(ch => {
+                const cnt = mistakes.filter(m => m.chapter === ch && (filterGrade === 'all' || m.grade === filterGrade)).length;
+                return <option key={ch} value={ch}>{ch} ({cnt}개)</option>;
+              })}
+            </select>
+          </div>
+        </div>
+      )}
+
       {/* List */}
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-slate-800 rounded-2xl p-6 bg-slate-900/20 animate-scale-up">
@@ -96,6 +158,58 @@ export const MistakeList: React.FC<MistakeListProps> = ({
           <p className="text-xs text-slate-500 mt-1.5 max-w-xs leading-relaxed whitespace-pre-line">
             {emptyMessage}
           </p>
+        </div>
+      ) : viewMode === 'list' ? (
+        <div className="space-y-2.5">
+          {filtered.map((entry) => {
+            const studentName = isAdmin && entry.userId ? (profilesMap[entry.userId] || entry.userId.slice(0, 8)) : undefined;
+            const dateStr = entry.date ? entry.date.slice(5, 10).replace(/-/g, '/') : '—/—';
+            return (
+              <div
+                key={entry.id}
+                onClick={() => onSelectEntry(entry)}
+                className="group flex items-center justify-between bg-slate-900/40 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl p-3.5 cursor-pointer transition-all active:scale-[0.99] space-x-3.5 shadow-sm"
+              >
+                <div className="flex items-center space-x-3.5 min-w-0 flex-1">
+                  {/* Left Side: Badges */}
+                  <div className="flex flex-col space-y-1 flex-none items-start min-w-[80px]">
+                    {entry.grade && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-extrabold block">
+                        {entry.grade}
+                      </span>
+                    )}
+                    {entry.chapter && (
+                      <span className="text-[8px] text-slate-500 font-bold truncate max-w-[85px] block">
+                        {entry.chapter}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Middle Side: Title & Student Name */}
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-bold text-slate-200 line-clamp-1 group-hover:text-indigo-400 transition-colors">
+                      <LaTeXRenderer text={entry.title} className="text-xs" />
+                    </div>
+                    {studentName && (
+                      <span className="text-[8px] text-indigo-400 font-semibold mt-0.5 block">
+                        👤 {studentName}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right Side: Date & Arrow */}
+                <div className="flex items-center space-x-3 flex-none pl-2">
+                  <span className="text-[9px] text-slate-500 font-semibold">
+                    {dateStr}
+                  </span>
+                  <span className="text-slate-600 group-hover:text-slate-400 transition-colors text-xs font-bold">
+                    &rarr;
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">

@@ -586,6 +586,7 @@ function App() {
             isAdmin={isAdmin}
             profilesMap={profilesMap}
             currentUserId={session?.user?.id}
+            viewMode="list"
           />
         )}
 
