@@ -555,17 +555,24 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-slate-400 block">과목 (AI 자동분류)</label>
-                  <select value={editGrade} onChange={e => { setEditGrade(e.target.value); setEditChapter(''); }}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer">
+                  <select 
+                    value={editGrade} 
+                    onChange={e => { setEditGrade(e.target.value); setEditChapter(''); }}
+                    disabled={isAnalyzing}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
                     <option value="">선택하세요</option>
                     {GRADE_LIST.map(g => <option key={g} value={g}>{g}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-slate-400 block">단원</label>
-                  <select value={editChapter} onChange={e => setEditChapter(e.target.value)}
-                    disabled={!editGrade}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer disabled:opacity-40">
+                  <select 
+                    value={editChapter} 
+                    onChange={e => setEditChapter(e.target.value)}
+                    disabled={!editGrade || isAnalyzing}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
                     <option value="">선택하세요</option>
                     {chaptersForGrade.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
@@ -577,18 +584,23 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 <label className="text-[11px] font-bold text-slate-400 block">실수 원인 (복수 선택 가능)</label>
                 <div className="space-y-2">
                   {ROOT_CAUSE_OPTIONS.map(opt => (
-                    <label key={opt.id} className="flex items-center space-x-3 cursor-pointer group">
+                    <label 
+                      key={opt.id} 
+                      className={`flex items-center space-x-3 group ${
+                        isAnalyzing ? 'opacity-40 cursor-not-allowed pointer-events-none' : 'cursor-pointer'
+                      }`}
+                    >
                       <div
                         className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-none transition-all ${
                           editRootCauses.includes(opt.id)
                             ? 'bg-amber-500 border-amber-500'
                             : 'bg-slate-950 border-slate-700 group-hover:border-amber-500/50'
                         }`}
-                        onClick={() => toggleRootCause(opt.id)}
+                        onClick={() => !isAnalyzing && toggleRootCause(opt.id)}
                       >
                         {editRootCauses.includes(opt.id) && <span className="text-white text-[10px] font-black">✓</span>}
                       </div>
-                      <div onClick={() => toggleRootCause(opt.id)}>
+                      <div onClick={() => !isAnalyzing && toggleRootCause(opt.id)}>
                         <span className="text-xs font-semibold text-slate-200">{opt.label}</span>
                         <span className="text-[10px] text-slate-500 ml-1.5">{opt.desc}</span>
                       </div>
@@ -603,9 +615,10 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 <textarea
                   value={editActionPlan}
                   onChange={e => setEditActionPlan(e.target.value)}
-                  placeholder="이번 실수를 통해 앞으로 어떻게 풀겠다는 나만의 대책을 자유롭게 적어보세요..."
+                  disabled={isAnalyzing}
+                  placeholder={isAnalyzing ? "AI 분석 중에는 편집할 수 없습니다..." : "이번 실수를 통해 앞으로 어떻게 풀겠다는 나만의 대책을 자유롭게 적어보세요..."}
                   rows={3}
-                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-600 outline-none focus:border-emerald-500 transition-colors resize-none leading-relaxed"
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-600 outline-none focus:border-emerald-500 transition-colors resize-none leading-relaxed disabled:opacity-40 disabled:cursor-not-allowed"
                 />
               </div>
 
