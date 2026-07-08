@@ -231,6 +231,23 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     onUpdateReviews(selectedEntry.id, currentReviews as ReviewState[]);
   };
 
+  const handleRollbackReview = () => {
+    const currentReviews = [...(selectedEntry.reviews || ['', '', ''])];
+    // activeStep을 계산해 그 직전 완료된 단계를 초기화
+    let activeStep = 3;
+    for (let i = 0; i < 3; i++) {
+      if (currentReviews[i] === '') {
+        activeStep = i;
+        break;
+      }
+    }
+    const targetIndex = activeStep === 3 ? 2 : activeStep - 1;
+    if (targetIndex >= 0) {
+      currentReviews[targetIndex] = '';
+      onUpdateReviews(selectedEntry.id, currentReviews as ReviewState[]);
+    }
+  };
+
   const toggleRootCause = (id: string) => {
     setEditRootCauses(prev =>
       prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
@@ -332,63 +349,93 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
-              {[0, 1, 2].map((index) => {
-                const currentVal = selectedEntry.reviews?.[index] || '';
-                return (
-                  <div key={index} className="bg-slate-900 p-2.5 rounded-xl border border-slate-800 text-center space-y-2">
-                    <div className="text-[10px] font-bold text-slate-500">{index + 1}차 복습</div>
-                    <div className="flex items-center justify-center space-x-1.5">
-                      <button
-                        onClick={() => handleReviewToggle(index, 'O')}
-                        className={`w-7 h-7 rounded-full text-xs font-bold transition-all flex items-center justify-center ${
-                          currentVal === 'O' 
-                            ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20' 
-                            : 'bg-slate-800 text-slate-400 hover:text-slate-200'
-                        }`}
-                      >
-                        O
-                      </button>
-                      <button
-                        onClick={() => handleReviewToggle(index, 'X')}
-                        className={`w-7 h-7 rounded-full text-xs font-bold transition-all flex items-center justify-center ${
-                          currentVal === 'X' 
-                            ? 'bg-red-500 text-white shadow-md shadow-red-500/20' 
-                            : 'bg-slate-800 text-slate-400 hover:text-slate-200'
-                        }`}
-                      >
-                        X
-                      </button>
-                      <button
-                        onClick={() => handleReviewToggle(index, 'star')}
-                        className={`w-7 h-7 rounded-full text-xs font-bold transition-all flex items-center justify-center ${
-                          currentVal === 'star' 
-                            ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20' 
-                            : 'bg-slate-800 text-slate-400 hover:text-slate-200'
-                        }`}
-                      >
-                        ★
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            {/* 단계별 노출 영역 */}
+            {(() => {
+              const reviews = selectedEntry.reviews || ['', '', ''];
+              let activeStep = 3;
+              for (let i = 0; i < 3; i++) {
+                if (reviews[i] === '') {
+                  activeStep = i;
+                  break;
+                }
+              }
 
-            {selectedEntry.reviews?.every(r => r !== '') && (
-              <button
-                onClick={() => {
-                  if (confirm('틀리거나 보류한 기록을 정리하고 맞춘(O) 기록만 앞으로 정렬하여 다시 복습하시겠습니까?')) {
-                    const oReviews = (selectedEntry.reviews || []).filter(r => r === 'O');
-                    const newReviews = [...oReviews, '', ''].slice(0, 3) as ReviewState[];
-                    onUpdateReviews(selectedEntry.id, newReviews);
-                  }
-                }}
-                className="w-full py-2.5 rounded-xl bg-indigo-600/10 hover:bg-indigo-600/20 active:scale-95 border border-indigo-500/20 text-indigo-400 font-bold text-xs transition-all flex items-center justify-center space-x-1.5 mt-1"
-              >
-                <span>🔄 맞춘 오답 제외하고 복습 기록 정리하기</span>
-              </button>
-            )}
+              return (
+                <>
+                  {activeStep < 3 ? (
+                    <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 text-center space-y-3 shadow-inner">
+                      <div className="text-xs font-extrabold text-indigo-400">
+                        ✨ {activeStep + 1}차 복습을 완료하셨나요?
+                      </div>
+                      <p className="text-[10px] text-slate-500">
+                        아래 결과를 선택하시면 다음 복습 단계가 활성화됩니다.
+                      </p>
+                      <div className="flex items-center justify-center space-x-3.5 pt-1">
+                        <button
+                          onClick={() => handleReviewToggle(activeStep, 'O')}
+                          className="w-10 h-10 rounded-full text-sm font-black transition-all flex items-center justify-center bg-slate-855 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 shadow-sm border border-slate-700/60 active:scale-90"
+                        >
+                          O
+                        </button>
+                        <button
+                          onClick={() => handleReviewToggle(activeStep, 'X')}
+                          className="w-10 h-10 rounded-full text-sm font-black transition-all flex items-center justify-center bg-slate-855 text-red-400 hover:bg-red-500 hover:text-white shadow-sm border border-slate-700/60 active:scale-90"
+                        >
+                          X
+                        </button>
+                        <button
+                          onClick={() => handleReviewToggle(activeStep, 'star')}
+                          className="w-10 h-10 rounded-full text-sm font-black transition-all flex items-center justify-center bg-slate-855 text-amber-400 hover:bg-amber-400 hover:text-slate-950 shadow-sm border border-slate-700/60 active:scale-90"
+                        >
+                          ★
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-emerald-950/15 p-4 rounded-xl border border-emerald-500/20 text-center space-y-1">
+                      <div className="text-xs font-extrabold text-emerald-400">
+                        🏆 복습 미션 올클리어!
+                      </div>
+                      <p className="text-[10px] text-slate-500">
+                        이 문제는 완전히 정복했습니다. 완료 보관함으로 자동 보관됩니다.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* 하단 롤백(앞으로 가기) 및 복습 기록 정리 제어반 */}
+                  <div className="flex flex-col space-y-2 mt-1">
+                    {activeStep > 0 && (
+                      <button
+                        onClick={() => {
+                          const targetName = activeStep === 3 ? '3차' : `${activeStep}차`;
+                          if (confirm(`실수로 클릭하셨나요? 이전 단계인 ${targetName} 복습 전 상태로 되돌립니다.`)) {
+                            handleRollbackReview();
+                          }
+                        }}
+                        className="w-full py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 active:scale-95 border border-slate-700/60 text-slate-400 font-bold text-xs transition-all flex items-center justify-center space-x-1.5"
+                      >
+                        <span>↩ 이전 단계로 (롤백)</span>
+                      </button>
+                    )}
+
+                    {activeStep === 3 && (
+                      <button
+                        onClick={() => {
+                          if (confirm('틀리거나 보류한 기록을 정리하고 맞춘(O) 기록만 앞으로 정렬하여 다시 복습하시겠습니까?')) {
+                            const oReviews = (selectedEntry.reviews || []).filter(r => r === 'O');
+                            const newReviews = [...oReviews, '', ''].slice(0, 3) as ReviewState[];
+                            onUpdateReviews(selectedEntry.id, newReviews);
+                          }
+                        }}
+                        className="w-full py-2.5 rounded-xl bg-indigo-600/10 hover:bg-indigo-600/20 active:scale-95 border border-indigo-500/20 text-indigo-400 font-bold text-xs transition-all flex items-center justify-center space-x-1.5"
+                      >
+                        <span>🔄 맞춘 오답 제외하고 복습 기록 정리하기</span>
+                      </button>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
           </div>
 
           {/* ⚡ AI 틀린 이유 1줄 진단 */}
