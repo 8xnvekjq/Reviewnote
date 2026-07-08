@@ -78,13 +78,15 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     const SYNONYM_MAP: Record<string, string[]> = {
       '오메가': ['omega', '\\omega', 'ω'],
       '로그': ['log'],
-      '지수': ['exponent'],
+      '지수': ['exponent', '거듭제곱근', '제곱근'],
       '행렬': ['matrix', '정사각행렬', '영행렬', '단위행렬', '케일리'],
       '조합': ['combination', '뽑기'],
       '순열': ['permutation', '팩토리얼', 'factorial'],
       '부등식': ['절댓값부등식', '가우스', '연립이차부등식', '이차부등식'],
       '함수': ['최대최소', '이차함수'],
-      '방정식': ['근과 계수', '삼사차방정식', '연립이차방정식', '이차방정식']
+      '방정식': ['근과 계수', '삼사차방정식', '연립이차방정식', '이차방정식'],
+      '수열': ['sequence', '등차수열', '등비수열', '시그마', '귀납법', '원리합계'],
+      '삼각함수': ['trigonometric', 'sin', 'cos', 'tan', '사인', '코사인', '탄젠트', '호도법', '사인법칙', '코사인법칙']
     };
 
     const targetGrade = selectedEntry.grade;

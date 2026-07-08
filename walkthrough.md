@@ -74,8 +74,8 @@
   - 선생님이 주신 유튜브 강의 재생목록(`PLw8NENAKl4HmkkDFqP-FdqAt48gm4cHiU`)을 파싱하여, 자막 및 챕터 시작 시간(초 단위)을 분/초에서 초 단위 숫자로 환산하여 Supabase DB에 온전히 이식 완료했습니다.
   - 총 55개의 공통수학1, 2 개념 영상 및 매칭 타임라인이 `youtube_lectures`와 `youtube_timelines` 테이블에 탑재되었습니다.
 - **실시간/소급 매칭 알고리즘 적용**:
-  - [App.tsx](file:///c:/Users/USER/Documents/ReviewNotes/src/App.tsx): 앱이 켜질 때 Supabase로부터 55개의 강의 목록과 챕터들을 한 번에 동기화하여 캐싱해 둡니다.
-  - [MistakeDetailModal.tsx](file:///c:/Users/USER/Documents/ReviewNotes/src/components/MistakeDetailModal.tsx): 오답 상세 모달을 열 때마다 매칭용 동의어 사전(`행렬`, `오메가`, `조합`, `순열`, `부등식` 등)과 과목/단원 매핑 알고리즘이 실시간 대조하여 가장 적절한 추천 영상의 딥링크 카드를 생성합니다.
+  - [App.tsx](file:///c:/Users/USER/Documents/ReviewNotes/src/App.tsx): 앱이 켜질 때 Supabase로부터 강의 목록과 챕터들을 한 번에 동기화하여 캐싱해 둡니다. (최근 추가된 **'대수'** 과목 동영상에 대해서도 파싱 및 분류 처리가 똑같이 작동하도록 식별 판별 조건을 추가했습니다.)
+  - [MistakeDetailModal.tsx](file:///c:/Users/USER/Documents/ReviewNotes/src/components/MistakeDetailModal.tsx): 오답 상세 모달을 열 때마다 매칭용 동의어 사전(`행렬`, `오메가`, `조합`, `순열`, `부등식` 및 최근 추가된 **`수열`**, **`삼각함수`**, **`거듭제곱근`** 등)과 과목/단원 매핑 알고리즘이 실시간 대조하여 가장 적절한 추천 영상의 딥링크 카드를 생성합니다.
   - **전체 대상 오픈**: 특정 아이디(`test`) 제한 조건을 완전히 걷어내어, **모든 사용자의 모든 과거 오답 및 신규 오답에 즉시 소급적용**되도록 배포 완료했습니다.
 
 ### 7. 어드민 패널 학생 표시 포맷 개선 및 이메일 유실 방지 (완료)
@@ -85,6 +85,41 @@
   - profiles 테이블에 이메일 정보가 동기화되지 않아 어드민에서 `(이메일 정보 없음)`으로 나타나는 유저를 대비해, 실명(display_name)이 존재할 경우 이름으로 매핑하고 UUID 앞자리 노출을 방지하도록 폴백 방어 코드를 적용했습니다.
 - **Supabase DB 트리거 함수 보강**:
   - 신규 가입 시 auth.users의 이메일(`email`)이 public.profiles 테이블에 자동으로 기록되도록 trigger function을 강화하고, 기존 이메일이 빈 유저의 데이터를 소급 업데이트해주는 SQL 스키마 마이그레이션 파일 [supabase_email_sync.sql](file:///c:/Users/USER/Documents/ReviewNotes/supabase_email_sync.sql)을 루트 디렉토리에 배치했습니다.
+
+---
+
+## 🆕 최신 업데이트 진척사항 (새로 반영된 기능 및 버그 수정)
+
+이번 `git pull`을 통해 로컬 저장소에 반영된 최신 진척사항 및 주요 변경 기능들입니다.
+
+### 1. 학생 학년(school_grade) 관리 및 AI 분석 최적화
+- **DB 스키마 추가**: `profiles` 테이블에 학생의 학년 정보를 담을 수 있는 `school_grade` 컬럼이 설계되었습니다 ([supabase_student_grade_migration.sql](file:///c:/Users/8xnve/Documents/ReviewNotes/supabase_student_grade_migration.sql)).
+- **어드민 권한 부여**: 관리자(8xnvekjq 계정)가 다른 학생 프로필의 학년 정보를 수정할 수 있도록 업데이트 정책 SQL이 마련되었습니다 ([supabase_admin_update_policy.sql](file:///c:/Users/8xnve/Documents/ReviewNotes/supabase_admin_update_policy.sql)).
+- **어드민 학년 필터 및 조회**: [AdminPanel.tsx](file:///c:/Users/8xnve/Documents/ReviewNotes/src/components/AdminPanel.tsx)에 학년별 필터 드롭다운이 추가되었으며, 어드민 통계 뷰에서 학생들의 학년을 한눈에 파악하고 즉시 수정할 수 있습니다.
+- **AI 학년 연동 프롬프트**: [gemini.ts](file:///c:/Users/8xnve/Documents/ReviewNotes/src/services/gemini.ts)에서 오답 분석을 수행할 때 학생의 현재 학년 정보를 함께 보내어, 중등/고등 범위가 겹칠 때(예: 인수분해) 학생 학년에 가장 적합한 단원으로 정확히 자동 분류해 주도록 프롬프트를 고도화했습니다.
+
+### 2. 최근 복습 날짜 정렬 및 리스트 뷰 개선
+- **최근 복습 정렬**: [AdminPanel.tsx](file:///c:/Users/8xnve/Documents/ReviewNotes/src/components/AdminPanel.tsx) 내 학생 목록을 **가장 최근에 오답 노트를 복습(학습)한 날짜 순**으로 정렬하여, 관리자가 학습 진도가 빠른 학생을 우선적으로 확인할 수 있습니다.
+- **컴팩트 리스트 뷰**: [MistakeList.tsx](file:///c:/Users/8xnve/Documents/ReviewNotes/src/components/MistakeList.tsx)에 리스트 형태의 간결한 뷰가 구현되어, 카드형 뷰 외에도 과목 배지, 대단원, 학생 이름, 날짜 등을 행 단위로 깔끔히 보여줍니다.
+
+### 3. AI 분석 중 데이터 보존 및 잠금 기능
+- **수동 입력 보존**: [MistakeDetailModal.tsx](file:///c:/Users/8xnve/Documents/ReviewNotes/src/components/MistakeDetailModal.tsx)에서 AI 오답 분석이 동작하거나 완료되는 시점에 학생이 미리 수정한 체크리스트, 틀린 이유, 행동 계획 데이터가 덮어씌워져 날아가지 않고 그대로 **유지 및 보존**되도록 방어 코드가 적용되었습니다.
+- **편집 잠금**: AI 분석이 진행되는 동안에는 입력 폼이 비활성화되도록 수정하여 동기화 충돌을 방지했습니다.
+
+### 4. 렌더링 및 모바일 접근성 개선
+- **KaTeX 빨간 에러창 제거**: [LaTeXRenderer.tsx](file:///c:/Users/8xnve/Documents/ReviewNotes/src/components/LaTeXRenderer.tsx)에서 수식 렌더링 도중 괄호 불일치나 구문 파싱 실패가 일어날 때 빨갛게 에러 블록이 뜨는 문제를 완전히 막았습니다. 실패 시에는 동기식 백업 렌더링 및 정돈된 유니코드 대체 텍스트로 보정하여 깔끔한 화면을 유지합니다.
+- **모달 이미지 줌/팬(스크롤) 지원**: 상세 모달창 내부에서 첨부 문제를 확대(Zoom-in)했을 때 모바일에서도 가로/세로 드래그와 스크롤이 자연스럽게 작동하도록 지원을 보강했습니다.
+
+### 5. 최근 활동 위젯에서 관리자 제외
+- [supabase_recent_peer_activities.sql](file:///c:/Users/8xnve/Documents/ReviewNotes/supabase_recent_peer_activities.sql): 동료들의 실시간 학습 현황을 수집하는 뷰(`recent_peer_activities`)에서 관리자 계정의 활동 내역을 제외하여, 학생들 간의 순수 학습 데이터만 공유되도록 다듬었습니다.
+
+---
+
+## ⚙️ Supabase DB 반영 권장 리스트
+풀(pull) 받아온 SQL 마이그레이션 코드를 실서버 데이터베이스에 반영하여 정상적인 신규 기능을 테스트하기 위해, **Supabase SQL Editor**에서 다음 스크립트들을 차례대로 실행해 주시는 것을 권장합니다:
+1. `supabase_student_grade_migration.sql` (학생 학년 컬럼 추가)
+2. `supabase_admin_update_policy.sql` (어드민의 학생 프로필 수정 권한 부여)
+3. `supabase_recent_peer_activities.sql` (최근 동료 학습 현황 뷰 갱신)
 
 ---
 
@@ -105,3 +140,4 @@
 git push
 ```
 호스팅 서비스의 빌드가 완료되는 즉시 적용됩니다. 스마트폰에서 확인해 보세요!
+
