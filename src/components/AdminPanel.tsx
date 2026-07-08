@@ -9,6 +9,7 @@ export const AdminPanel: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
   const [activeSubTab, setActiveSubTab] = useState<'stats' | 'changelog'>('stats');
+  const [gradeFilter, setGradeFilter] = useState<string>('all');
 
   const fetchAdminStats = async () => {
     setIsLoading(true);
@@ -234,12 +235,38 @@ export const AdminPanel: React.FC = () => {
       )}
 
       {/* ── 탭 1: 가입자 현황 탭 ── */}
-      {activeSubTab === 'stats' && !isLoading && !error && (
-        <div className="space-y-3">
-          {stats.length === 0 ? (
-            <div className="py-10 text-center text-slate-500 text-sm">가입자가 없습니다.</div>
-          ) : (
-            stats.map((user) => {
+      {activeSubTab === 'stats' && !isLoading && !error && (() => {
+        const filteredStats = stats.filter(user => {
+          if (gradeFilter === 'all') return true;
+          if (gradeFilter === 'unassigned') return !user.schoolGrade;
+          return user.schoolGrade === gradeFilter;
+        });
+
+        return (
+          <div className="space-y-3.5">
+            {/* Grade Filter Dropdown */}
+            <div className="flex items-center space-x-2 bg-slate-900/60 border border-slate-800/80 p-2.5 rounded-2xl">
+              <span className="text-[10px] text-slate-500 font-extrabold uppercase px-1">🎓 학년 필터</span>
+              <select
+                value={gradeFilter}
+                onChange={e => setGradeFilter(e.target.value)}
+                className="flex-1 px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-850 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer font-bold"
+              >
+                <option value="all">전체 학년 ({stats.length}명)</option>
+                <option value="중3">중3 ({stats.filter(u => u.schoolGrade === '중3').length}명)</option>
+                <option value="고1">고1 ({stats.filter(u => u.schoolGrade === '고1').length}명)</option>
+                <option value="고2">고2 ({stats.filter(u => u.schoolGrade === '고2').length}명)</option>
+                <option value="고3">고3 ({stats.filter(u => u.schoolGrade === '고3').length}명)</option>
+                <option value="unassigned">미지정 ({stats.filter(u => !u.schoolGrade).length}명)</option>
+              </select>
+            </div>
+
+            {filteredStats.length === 0 ? (
+              <div className="py-12 text-center text-slate-500 text-xs border border-dashed border-slate-850 rounded-2xl bg-slate-900/20">
+                해당 학년의 가입자가 없습니다.
+              </div>
+            ) : (
+              filteredStats.map((user) => {
               const isEmailValid = user.email && user.email.includes('@');
               const activeNotes = user.mistakeCount - user.completedCount;
               const completionRate = user.mistakeCount > 0
@@ -360,10 +387,10 @@ export const AdminPanel: React.FC = () => {
                   )}
                 </div>
               );
-            })
-          )}
-        </div>
-      )}
+            })}
+          </div>
+        );
+      })()}
 
       {/* ── 탭 2: 변경 이력 (Change Log) 탭 ── */}
       {activeSubTab === 'changelog' && (
