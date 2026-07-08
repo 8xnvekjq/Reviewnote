@@ -319,14 +319,16 @@ function App() {
   const runAnalysisFlow = async (entry: MistakeEntry, apiKey: string, studentGrade?: string) => {
     const result = await analyzeMistakeWithGemini(entry.imageUrl, apiKey, youtubeLectures, studentGrade);
     
-    // Update mistake database record (including auto-classified grade/chapter)
+    // Update mistake database record (including auto-classified grade/chapter and preserving student edits)
     const { error: updateError } = await supabase
       .from('mistakes')
       .update({
         title: result.title,
         analysis: result.analysis,
-        grade: result.grade || null,
-        chapter: result.chapter || null,
+        grade: result.grade || entry.grade || null,
+        chapter: result.chapter || entry.chapter || null,
+        root_causes: entry.rootCauses || [],
+        user_action_plan: entry.userActionPlan || null,
       })
       .eq('id', entry.id);
 
@@ -336,8 +338,8 @@ function App() {
       ...entry,
       title: result.title,
       analysis: result.analysis,
-      grade: result.grade,
-      chapter: result.chapter,
+      grade: result.grade || entry.grade,
+      chapter: result.chapter || entry.chapter,
     };
 
     setMistakes(prev => prev.map(m => m.id === entry.id ? updatedEntry : m));

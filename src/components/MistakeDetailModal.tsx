@@ -524,7 +524,13 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 </p>
               </div>
               <button 
-                onClick={() => onStartAnalysis(selectedEntry)}
+                onClick={() => onStartAnalysis({
+                  ...selectedEntry,
+                  grade: editGrade || undefined,
+                  chapter: editChapter || undefined,
+                  rootCauses: editRootCauses,
+                  userActionPlan: editActionPlan || undefined
+                })}
                 className="px-6 py-2.5 rounded-full bg-gradient-to-r from-indigo-600 to-indigo-500 active:scale-95 transition-all text-xs font-bold text-white shadow-md shadow-indigo-600/20"
               >
                 AI 분석 시작하기
