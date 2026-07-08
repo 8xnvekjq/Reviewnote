@@ -407,12 +407,32 @@ export const AdminPanel: React.FC = () => {
           </div>
 
           <div className="relative border-l border-slate-800 pl-6 ml-3 space-y-8">
-            {/* Version 1.8.4 */}
+            {/* Version 1.9.0 */}
             <div className="relative">
               <div className="absolute -left-[33px] top-1.5 w-4 h-4 rounded-full bg-indigo-500 border-4 border-slate-950" />
               <div className="space-y-2">
                 <div className="flex items-center space-x-2">
                   <span className="text-xs font-black px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                    v1.9.0
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-bold">2026.07.09</span>
+                </div>
+                <h4 className="font-bold text-white text-xs">고등 수학 전과목 동영상 이식 및 G.Polya AI 문제 풀이 쌤 페르소나 적용</h4>
+                <ul className="text-xs text-slate-400 list-disc list-inside space-y-1.5 pl-1 leading-relaxed">
+                  <li><strong>전과목 개념 강의 매칭</strong>: 대수, 미적Ⅰ, 미적Ⅱ, 확통 총 100여 개 재생목록 비디오의 챕터 정보 수집 및 DB 시딩</li>
+                  <li><strong>경우의 수 과목 격리</strong>: 공통수학1과 확률과 통계의 단원명이 중복되어 혼선이 생기는 현상을 과목별 접두사로 완전 격리</li>
+                  <li><strong>G.Polya 4단계 & 쌤 말투 이식</strong>: 문제 해결 4단계 프레임에 맞춰 쌤 특유의 친근하고 유머러스한 어투로 해설 및 힌트가 자동 작성되는 Gemini 프롬프트 적용</li>
+                  <li><strong>헤더 레이아웃 버그 수정</strong>: 모바일/테블릿 등 좁은 화면에서 업데이트 빌드 날짜가 잘려서 보이는 레이아웃 겹침 개선</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Version 1.8.4 */}
+            <div className="relative">
+              <div className="absolute -left-[33px] top-1.5 w-4 h-4 rounded-full bg-slate-800 border-4 border-slate-950" />
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs font-black px-2 py-0.5 rounded bg-slate-850 text-slate-400 border border-slate-700">
                     v1.8.4
                   </span>
                   <span className="text-[10px] text-slate-500 font-bold">2026.07.07</span>
