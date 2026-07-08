@@ -43,7 +43,7 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, myScore }
           <h1 className="text-base font-extrabold text-white leading-tight truncate">
             오답클리닉
           </h1>
-          <span className="text-[8px] font-bold text-slate-500 mt-0.5 truncate">
+          <span className="text-[9px] font-bold text-slate-500 mt-0.5 whitespace-nowrap flex-none">
             최신 업데이트: {buildLabel}
           </span>
         </div>
