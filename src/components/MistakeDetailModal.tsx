@@ -455,12 +455,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                   <div className="flex flex-col space-y-2 mt-1">
                     {activeStep > 0 && (
                       <button
-                        onClick={() => {
-                          const targetName = activeStep === 3 ? '3차' : `${activeStep}차`;
-                          if (confirm(`실수로 클릭하셨나요? 이전 단계인 ${targetName} 복습 전 상태로 되돌립니다.`)) {
-                            handleRollbackReview();
-                          }
-                        }}
+                        onClick={handleRollbackReview}
                         className="w-full py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 active:scale-95 border border-slate-700/60 text-slate-400 font-bold text-xs transition-all flex items-center justify-center space-x-1.5"
                       >
                         <span>↩ 이전 단계로 (롤백)</span>
