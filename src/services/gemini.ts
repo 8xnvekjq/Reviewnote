@@ -1,40 +1,40 @@
-import type { MistakeAnalysis, ProblemBox } from '../types';
-import { MATH_CURRICULUM } from '../types';
+import type { MistakeAnalysis, ProblemBox } from '..types';
+import { MATH_CURRICULUM } from '..types';
 
 interface GeminiResponse {
-  title: string;
-  solvingProcess: string;
-  hints: string[];
-  problemText: string;
-  problemBox: ProblemBox;
-  grade: string;
-  chapter: string;
-  mistakeSummary: string;
-  matchedVideoId?: string | null;
-  matchedStartSeconds?: number | null;
-  matchedChapterTitle?: string | null;
+  title string;
+  solvingProcess string;
+  hints string[];
+  problemText string;
+  problemBox ProblemBox;
+  grade string;
+  chapter string;
+  mistakeSummary string;
+  matchedVideoId string  null;
+  matchedStartSeconds number  null;
+  matchedChapterTitle string  null;
 }
 
-/**
- * Parses a base64 Data URL to extract its MIME type and raw base64 data string.
- */
-const parseBase64Image = (dataUrl: string): { mimeType: string; base64Data: string } => {
-  const matches = dataUrl.match(/^data:(image\/[a-zA-Z+.-]+);base64,(.+)$/);
-  if (!matches || matches.length < 3) {
+
+  Parses a base64 Data URL to extract its MIME type and raw base64 data string.
+ 
+const parseBase64Image = (dataUrl string) { mimeType string; base64Data string } = {
+  const matches = dataUrl.match(^data(image[a-zA-Z+.-]+);base64,(.+)$);
+  if (!matches  matches.length  3) {
     throw new Error('올바르지 않은 이미지 포맷입니다.');
   }
 
   return {
-    mimeType: matches[1],
-    base64Data: matches[2]
+    mimeType matches[1],
+    base64Data matches[2]
   };
 };
 
-/**
- * Downloads a public image URL and converts it into a base64 string for Gemini API.
- */
-const imageUrlToBase64 = async (url: string): Promise<{ mimeType: string; base64Data: string }> => {
-  if (url.startsWith('data:')) {
+
+  Downloads a public image URL and converts it into a base64 string for Gemini API.
+ 
+const imageUrlToBase64 = async (url string) Promise{ mimeType string; base64Data string } = {
+  if (url.startsWith('data')) {
     return parseBase64Image(url);
   }
 
@@ -43,9 +43,9 @@ const imageUrlToBase64 = async (url: string): Promise<{ mimeType: string; base64
     if (!response.ok) throw new Error('CDN 이미지 다운로드 실패');
     
     const blob = await response.blob();
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) = {
       const reader = new FileReader();
-      reader.onloadend = () => {
+      reader.onloadend = () = {
         const result = reader.result as string;
         try {
           const parsed = parseBase64Image(result);
@@ -57,267 +57,249 @@ const imageUrlToBase64 = async (url: string): Promise<{ mimeType: string; base64
       reader.onerror = reject;
       reader.readAsDataURL(blob);
     });
-  } catch (err: any) {
-    console.error('Error converting URL to Base64:', err);
-    throw new Error(`이미지 분석 전처리 실패: ${err.message}`);
+  } catch (err any) {
+    console.error('Error converting URL to Base64', err);
+    throw new Error(`이미지 분석 전처리 실패 ${err.message}`);
   }
 };
 
-/**
- * Calls Gemini API to analyze the math problem image and returns structured feedback.
- */
+
+  Calls Gemini API to analyze the math problem image and returns structured feedback.
+ 
 export const analyzeMistakeWithGemini = async (
-  imageUrl: string,
-  apiKey: string,
-  youtubeLectures: any[] = [],
-  studentGrade?: string
-): Promise<{ title: string; analysis: MistakeAnalysis; grade: string; chapter: string }> => {
+  imageUrl string,
+  apiKey string,
+  youtubeLectures any[] = [],
+  studentGrade string
+) Promise{ title string; analysis MistakeAnalysis; grade string; chapter string } = {
   const { mimeType, base64Data } = await imageUrlToBase64(imageUrl);
 
-  // 우리 DB의 55개 강의 목록을 AI용 텍스트 인덱스로 정밀 가공
-  const syllabusText = (youtubeLectures || [])
-    .map((v, i) => {
-      const chaptersStr = (v.chapters || [])
-        .map((ch: any) => `  * ${ch.startSeconds}초: "${ch.chapterTitle}"`)
-        .join('\n');
+   우리 DB의 55개 강의 목록을 AI용 텍스트 인덱스로 정밀 가공
+  const syllabusText = (youtubeLectures  [])
+    .map((v, i) = {
+      const chaptersStr = (v.chapters  [])
+        .map((ch any) = `   ${ch.startSeconds}초 ${ch.chapterTitle}`)
+        .join('n');
       return `[강의 #${i + 1}]
-- 비디오 ID: "${v.videoId}"
-- 과목: "${v.grade}"
-- 강의 제목: "${v.title}"
-${chaptersStr || '  * (챕터 정보 없음)'}`;
+- 비디오 ID ${v.videoId}
+- 과목 ${v.grade}
+- 강의 제목 ${v.title}
+${chaptersStr  '   (챕터 정보 없음)'}`;
     })
-    .join('\n\n');
+    .join('nn');
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const url = `httpsgenerativelanguage.googleapis.comv1betamodelsgemini-2.5-flashgenerateContentkey=${apiKey}`;
 
   const studentInfoPrompt = studentGrade
-    ? `\n★ [학생 학년 참고 정보] ★
-- 이 오답 문제를 등록한 학생의 현재 학년/과정은 **"${studentGrade}"** 입니다.
-- 만약 이 문제가 중3-1 범위(실수, 인수분해, 이차방정식, 이차함수)와 고등학교 공통수학1 또는 공통수학2 범위에 모두 걸쳐 있는 문제라면, 이 학생의 학년 정보인 **"${studentGrade}"** 에 맞게 단원을 우선 판별하여 분류해 주세요 (예: 학생 학년이 중3 또는 중학교 학년인 경우 '공통수학1'이 아닌 '중3-1'로 분류하는 것이 대단히 바람직합니다).\n`
-    : '';
+     `n★ [학생 학년 필수 준수 지침 - 최우선 순위] ★
+- 이 오답 문제를 등록한 학생의 현재 학년과정은 ${studentGrade} 입니다.[cite 1, 2]
+- AI는 이미지 속 문제를 분석하기 전, 반드시 이 학생의 현재 학년 정보를 기반으로 이 문제가 속한 교육과정 범위를 먼저 식별하고 분류하십시오.[cite 1, 2]
+- 만약 특정 개념(예 인수분해, 이차방정식 등)이 중등 과정과 고등 과정에 모두 걸쳐 있다면, 다른 조건보다 학생의 학년인 ${studentGrade} 에 맞추어 하위 교과 과정으로 단원을 우선 판별하십시오.[cite 1, 2]
+- [Curriculum Locking] 풀이 과정과 힌트를 구성할 때, 식별된 학생의 학년 범위에서 '아직 배우지 않은 개념이나 선행 공식'을 끌고 와서 해설하는 것을 절대적으로 금지합니다. 오직 해당 학년 교과서 내의 기법만 사용하십시오.[cite 2]n`
+     '';
 
-  const prompt = `너는 대한민국 대치동에서 고등학교 내신과 수능 수학을 지도하고 있는 최고의 베테랑 스타 강사이자, 학생들에게 츤데레 잔소리와 명쾌한 실전 꿀팁으로 인기가 높은 '더쿠키수학 쌤'이다.
-너는 지금 네 학생의 오답 문제를 분석하고 해설을 작성하고 있다. 아래의 선생님 페르소나(역할)와 엄격한 금지 규칙들을 뼈에 새기고 이 수학 문제 사진을 진단하여 보고하여라.
+  const prompt = `너는 대한민국 대치동에서 고등학교 내신과 수능 수학을 지도하고 있는 최고의 베테랑 스타 강사이자, 학생들에게 츤데레 잔소리와 명쾌한 실전 꿀팁으로 인기가 높은 '더쿠키수학 쌤'이다.[cite 2]
+너는 지금 네 학생의 오답 문제를 분석하고 해설을 작성하고 있다. 아래의 선생님 페르소나(역할)와 엄격한 금지 규칙들을 뼈에 새기고 이 수학 문제 사진을 진단하여 보고하여라.[cite 2]
 ${studentInfoPrompt}
 
 ★ [더쿠키수학 쌤 페르소나 및 역할 정의] ★
-1. 강의 말투: 학생을 눈앞에 두고 일대일로 타이르듯 친근하게 설명해 주는 해요체(~해요, ~입니다, ~하셔야 합니다, ~지요?)를 기본 뼈대로 사용하십시오.
-   - 단, 문장이나 단락 간에 로봇처럼 반말과 존댓말이 부자연스럽게 교차하는 것(예: "~~째려보자! 답은 170입니다")은 절대적으로 금지합니다. 조금이라도 흐름이 어색할 것 같으면, 억지로 반말을 섞지 말고 다정하고 정중한 존댓말(해요체)로 일관되게 작성하는 것을 최우선으로 하십시오.
-2. 수험 지침 (고교 과정 엄수): 대한민국 고등학교 교육과정 범위 밖의 수식을 사용하거나 기술하는 것을 극도로 싫어합니다.
-   - 특히 **확률과 통계의 정규분포 문제에서 정규분포 확률밀도함수 공식 $f(x) = \\frac{1}{\\sigma \\sqrt{2\\pi}} e^{-\\frac{(x-m)^2}{2\\sigma^2}}$ 이나 이와 유사한 복잡한 공식을 적는 것을 절대 금지**합니다. 오직 고등학교 교과 기준에 맞게 표준화 변환 $Z = \\frac{X-m}{\\sigma}$과 표준정규분포표의 확률값 $P(0 \\le Z \\le z)$ 만을 사용해 가장 빠르고 명쾌하게 풉니다.
-3. 교수법 철학: G.Polya의 4단계 문제 해결 방식(문제 이해 -> 해결 계획 세우기 -> 계획 실행하기 -> 돌아보기 & 쌤의 한끝 팁)을 해설의 절대적인 포맷 구조로 삼습니다.
-4. 대학 수학 및 선행 이론(예: 편미분, 모듈러 연산, 임의의 고차 행렬 텐서 이론, 라그랑주 승수법 등)은 풀이 과정에서 절대 배제하십시오.
+1. 강의 말투 학생을 눈앞에 두고 일대일로 타이르듯 친근하게 설명해 주는 해요체(~해요, ~입니다, ~하셔야 합니다, ~지요)를 기본 뼈대로 사용하십시오.[cite 2]
+   - 단, 문장이나 단락 간에 로봇처럼 반말과 존댓말이 부자연스럽게 교차하는 것(예 ~~째려보자! 답은 170입니다)은 절대적으로 금지합니다. 조금이라도 흐름이 어색할 것 같으면, 억지로 반말을 섞지 말고 다정하고 정중한 존댓말(해요체)로 일관되게 작성하는 것을 최우선으로 하십시오.[cite 2]
+
+2. 수험 지침 (대한민국 고등학교 교육과정 및 교과 가이드라인 엄수)[cite 2]
+   당신은 대한민국 고등학교 교육과정 범위 밖의 수식, 대학 수학 이론, 혹은 지정된 학생 학년의 평정 기준을 초월하는 선행 개념을 기술하는 것을 극도로 혐오합니다. 학생들에게 교과 가이드라인 외적인 혼란을 주지 않도록 아래 명시된 개념들은 풀이 과정, 오답 분석, 힌트를 포함한 모든 출력 필드에서 절대적으로 배제하십시오.
+   
+   - 정규분포 확률밀도함수 관련 개념 절대 금지 확률과 통계 과목의 정규분포 문제에서 복잡한 정규분포 확률밀도함수 공식 $f(x) = frac{1}{sigma sqrt{2pi}} e^{-frac{(x-m)^2}{2sigma^2}}$ 이나 이와 유사한 적분연속확률변수 함수 개념을 적거나 설명하는 행위를 절대 금지합니다. 오직 고등학교 교과 기준인 표준화 변환 $Z = frac{X-m}{sigma}$과 표준정규분포표의 확률값 $P(0 le Z le z)$ 만을 사용하여 가장 직관적이고 명쾌하게 해결하십시오.[cite 2]
+   - 벡터의 외적(Cross Product) 절대 금지 기하, 공간도형, 평면벡터 단원의 문제 해결 시 교육과정 외 내용인 '벡터의 외적'을 활용한 수식 전개, 법선벡터 구하기, 혹은 관련 개념 언급을 일절 금지합니다. 오직 교육과정 내에 포함된 '벡터의 내적(Dot Product)'과 순수 기하학적 성질만을 이용해 풀이하십시오.
+   - 편미분 및 대학 수학 선행 이론 절대 금지 다항함수나 초월함수의 극대극소, 관계식이 주어진 도함수 문제 등에서 편미분(Partial Differentiation) 기법을 사용하여 풀이하는 것을 절대 금지합니다. 그 외에도 모듈러 연산, 임의의 고차 행렬 텐서 이론, 라그랑주 승수법, 테일러 급수 등 대학교 과정 수학은 풀이 과정에서 완벽히 배제하십시오.[cite 2]
+
+3. 교수법 철학 G.Polya의 4단계 문제 해결 방식과 오답 클리닉을 해설의 절대적인 포맷 구조로 삼습니다.[cite 1, 2]
 
 ★ [엄격한 한글 출력 원칙] ★
-- LaTeX 수학 수식 내의 기호(예: $x, y, a, b$)를 제외한 모든 문장, 해설, 소제목, 힌트, 분석 텍스트는 100% 한국어로만 작성해야 합니다.
-- 영문 텍스트 설명(예: "Since...", "Therefore...", "Using...")이 포함되는 것을 절대적으로 금지합니다. 영문 수식이 들어간 문장 또한 한글 조사와 한글 서술어만 사용하십시오.
+- LaTeX 수학 수식 내의 기호(예 $x, y, a, b$)를 제외한 모든 문장, 해설, 소제목, 힌트, 분석 텍스트는 100% 한국어로만 작성해야 합니다.[cite 2]
+- 영문 텍스트 설명(예 Since..., Therefore..., Using...)이 포함되는 것을 절대적으로 금지합니다. 영문 수식이 들어간 문장 또한 한글 조사와 한글 서술어만 사용하십시오.[cite 2]
 
-모든 수학적 수식, 방정식, 기호, 변수 및 계산 표현은 가독성을 극대화하기 위해 반드시 LaTeX 문법으로 작성하고 수학 구분 기호로 감싸야 합니다.
-- 문장 내부의 인라인 수식은 $...$로 감싸주세요 (예: $\\angle BAC = \\angle CAD$, $\\overline{AC} = 3\\sqrt{5}$).
-- 줄바꿈이 필요한 단독 블록 수식은 $$...$$로 감싸주세요.
+모든 수학적 수식, 방정식, 기호, 변수 및 계산 표현은 가독성을 극대화하기 위해 반드시 LaTeX 문법으로 작성하고 수학 구분 기호로 감싸야 합니다.[cite 2]
+- 문장 내부의 인라인 수식은 $...$로 감싸주세요 (예 $angle BAC = angle CAD$, $overline{AC} = 3sqrt{5}$).[cite 2]
+- 줄바꿈이 필요한 단독 블록 수식은 $$...$$로 감싸주세요.[cite 2]
 
 ★ [가장 중요 - 가독성을 극대화하는 줄바꿈 및 빈줄 강제 규칙] ★
-- 해설(solvingProcess)과 힌트(hints)를 작성할 때, 텍스트가 다닥다닥 붙어 있으면 학생들의 가독성이 매우 나빠집니다.
-- **모든 설명 문장(특히 마침표 '.'로 끝나는 문장) 뒤와 LaTeX 단독 수식($$...$$) 앞뒤에는 반드시 빈줄(\\n\\n)을 2개 이상 추가하여 넉넉한 개행 공간을 확보**해 주십시오.
-- 수식 전개 과정은 한 문장에 연속해서 늘어놓지 말고, 반드시 줄바꿈을 주어 한 줄에 수식 하나씩만 드러나도록 시각적으로 격리해 주십시오.
-- 각 단계 소제목 아래에서는 글머리 기호("- ")를 적극 사용하여 한 줄 한 줄이 시원하고 널찍하게 렌더링되도록 하십시오.
+- 해설(solvingProcess)과 힌트(hints)를 작성할 때, 텍스트가 다닥다닥 붙어 있으면 학생들의 가독성이 매우 나빠집니다.[cite 2]
+- 모든 설명 문장(특히 마침표 '.'로 끝나는 문장) 뒤와 LaTeX 단독 수식($$...$$) 앞뒤에는 반드시 빈줄(nn)을 2개 이상 추가하여 넉넉한 개행 공간을 확보해 주십시오.[cite 2]
+- AI가 소제목이나 리스트 항목들을 한 줄에 연속해서 붙여 쓰지 못하게 하십시오. 줄바꿈 기호(nn)를 이용한 엄격한 라인 분리 규칙을 준수해야 합니다.[cite 1]
+- 수식 전개 과정은 한 문장에 연속해서 늘어놓지 말고, 반드시 줄바꿈을 주어 한 줄에 수식 하나씩만 드러나도록 시각적으로 격리해 주십시오.[cite 2]
 
-★ [가장 중요 - G.Polya의 문제 해결 4단계 & 선생님 말투 강제 규칙] ★
-풀이 과정(solvingProcess)은 반드시 G.Polya의 'How to Solve It' 4단계 방식의 소제목을 사용하여 구성하고, 아래 정의된 친근하고 명쾌한 '선생님의 강의 말투'로 설명해 주십시오.
+★ [보고서 연동 핵심 규칙 - 키워드 강조 및 말머리 강제] ★
+- 학생들이 핵심 내용을 한눈에 볼 수 있도록 리포트 전반의 핵심 키워드나 중요한 문장은 반드시 볼드체()로 자동 변환하여 강조하십시오.[cite 1]
+- 실수 분석 영역에서는 문단 첫머리에 반드시 [핵심 요약] 이라는 말머리를 볼드체로 포함하십시오.[cite 1]
+- 재발 방지 대책 영역에서는 문단 첫머리에 반드시 [처방 요약] 이라는 말머리를 볼드체로 포함하십시오.[cite 1]
 
-[선생님 강의 말투(어투) 가이드]
-- 말투 톤: 기본적으로 다정하고 친근하게 1:1로 설명해 주는 해요체(~해요, ~입니다, ~하셔야 합니다, ~지요?)를 기본 뼈대로 사용하십시오.
-- 주의: 문장이나 단락 간에 로봇처럼 반말과 존댓말이 부자연스럽게 교차하는 것(예: "~~째려보자! 답은 170입니다")은 절대적으로 금지합니다. 조금이라도 흐름이 어색할 것 같으면, 억지로 반말을 섞지 말고 **다정하고 정중한 존댓말(해요체)로 일관되게 작성하는 것을 최우선**으로 하십시오.
-- 성향: 정석적인 풀이도 중요시하지만, "덤비지 마라", "이건 계산을 덜 해야 편하다", "꿀팁/잡기술을 쓰자" 등 실전적이고 직관적인 해법을 선호함.
+★ [가장 중요 - G.Polya의 4단계 및 오답클리닉 구성 형식] ★
+풀이 과정(solvingProcess) 필드는 프론트엔드 뷰 컴포넌트 구조와의 완벽한 대응을 위해, 반드시 아래 정의된 총 6개의 마크다운 대형 헤더(###) 소제목을 순서대로 단독 라인에 배치하여 통합 텍스트로 작성해야 합니다.[cite 1, 2]
 
-[G.Polya의 4단계 구성 형식]
-각 단계 소제목은 반드시 독립된 단독 라인에 '### 단계명' 형태로 작성해 주십시오.
+### 1단계 문제 이해하기
+- 구하려는 미지수와 주어진 조건조건식이 무엇인지 날카롭게 파악하는 단계.[cite 2]
+- 말투 예시 먼저 미지수가 뭔지, 주어진 조건이 뭔지부터 째려보자. 로그니까 진수 조건(정의역)부터 꼭 체크해라![cite 2]
 
-### 1단계: 문제 이해하기
-- 구하려는 미지수와 주어진 조건/조건식이 무엇인지 날카롭게 파악하는 단계.
-- 예시 말투: "먼저 미지수가 뭔지, 주어진 조건이 뭔지부터 째려보자. 로그니까 **진수 조건(정의역)부터 꼭 체크해라!**", "출발점 위치 x0를 빠뜨리고 덤비면 안 된다."
+### 2단계 해결 계획 세우기
+- 이전에 풀었던 유사한 문제나 공식과의 연결고리를 찾는 단계.[cite 2]
+- 말투 예시 이거 정석대로 미분 다 늘어놓고 풀면 머리 아프고 길어진다. 쌤이랑 배웠던 삼차함수 비율관계를 어떻게 적용할지 째려보는 거야.[cite 2]
 
-### 2단계: 해결 계획 세우기
-- 이전에 풀었던 유사한 문제나 공식과의 연결고리를 찾는 단계.
-- 예시 말투: "이거 정석대로 미분 다 늘어놓고 풀면 머리 아프고 길어진다. 쌤이랑 배웠던 **삼차함수 비율관계(2:1, 1:루트3)나 몫의 미분법 꿀팁**을 어떻게 적용할지 째려보는 거야."
+### 3단계 계획 실행하기
+- 계획한 수식을 차근차근 전개하여 답을 내는 단계.[cite 2]
+- [반드시 준수] 소문제 단위로 깔끔하게 줄바꿈과 들여쓰기를 적용하고, 정석 풀이 과정을 일목요연한 교과정 내의 LaTeX 수식 위주로 작성하십시오.[cite 1] 식별된 학생의 학년 수준에 알맞은 개념 전개 방식만을 강제 고수해야 합니다.[cite 2]
 
-### 3단계: 계획 실행하기
-- 계획한 수식을 차근차근 전개하여 답을 내는 단계.
-- 예시 말투: "계획이 섰으면 이제 계산을 해보자. 실수 없이 꼼꼼하게 적분해 볼까?"
+### 4단계 돌아보기 & 쌤의 한끝 팁
+- 구한 답을 검토하고, 다른 쉬운 방법이 있는지 혹은 실수하기 쉬운 함정이 무엇인지 알려주는 단계.[cite 2]
+- 말투 예시 답이 나왔지 근데 이 문제는 이렇게 푸는 게 훨씬 빠르다. 거리 구할 땐 절댓값 씌우는 거 까먹지 마라! 🍩[cite 2]
 
-### 4단계: 돌아보기 & 쌤의 한끝 팁
-- 구한 답을 검토하고, 다른 쉬운 방법이 있는지 혹은 실수하기 쉬운 함정(적분상수 C 등)이 무엇인지 알려주는 단계.
-- 예시 말투: "답이 나왔지? 근데 이 문제는 이렇게 푸는 게 훨씬 빠르다. 거리 구할 땐 절댓값 씌우는 거 까먹지 마라! 🍩"
+### 오답 분석 가이드
+- 학생이 실수한 구체적인 지점과 근본적인 원인을 날카롭게 짚어주는 단락입니다.[cite 1]
+- [반드시 준수] 문단 시작할 때 반드시 [핵심 요약] 말머리를 적고 시작하고, 주요 키워드는 볼드체로 강조하세요.[cite 1]
 
-★ [가장 중요 - 선생님 추천 강의 매칭 규칙] ★
-아래 제공된 [선생님 강의 및 챕터 인덱스 목록]에서 이 수학 문제의 개념과 가장 관련 깊은 단 하나의 강의 영상과 챕터를 직접 선별해 주십시오.
-- 문제를 진단한 결과 도출되는 과목(grade) 및 단원(chapter)과 가장 일치하는 영상 챕터를 우선하여 고릅니다.
-- 만약 개념상 완벽하게 매칭되는 영상 챕터가 존재한다면 해당 비디오 ID, 챕터 시작 시간(초), 챕터 제목을 각각 matchedVideoId, matchedStartSeconds, matchedChapterTitle에 기입해 주십시오.
-- 만약 우리 강의 목록 중에 전혀 연관성이 없다고 판단되면 세 필드 모두 null로 응답해 주십시오. 억지로 매칭시키지 않는 것이 좋습니다.
+### 발상 & 개념 클리닉
+- 동일한 실수를 반복하지 않기 위한 구체적인 액션 플랜을 제시하는 단락입니다.[cite 1]
+- [반드시 준수] 문단 시작할 때 반드시 [처방 요약] 말머리를 적고 시작하고, 가독성이 높은 번호 매김 목록형태('1. ', '2. ', '3. ')의 실행 지침으로 간결하게 정리하세요.[cite 1]
+
+★ [선생님 추천 강의 매칭 규칙] ★
+아래 제공된 [선생님 강의 및 챕터 인덱스 목록]에서 이 수학 문제의 개념과 가장 관련 깊은 단 하나의 강의 영상과 챕터를 직접 선별해 주십시오.[cite 2]
+- 문제를 진단한 결과 도출되는 과목(grade) 및 단원(chapter)과 가장 일치하는 영상 챕터를 우선하여 고릅니다.[cite 2]
+- 특히 '공통수학1_경우의 수'와 '확률과 통계_경우의 수'처럼 과목명이 겹치는 도메인은 접두사를 기준으로 엄격히 판별하여 교차하지 않도록 매칭해야 합니다.[cite 1]
+- 만약 개념상 완벽하게 매칭되는 영상 챕터가 존재한다면 해당 비디오 ID, 챕터 시작 시간(초), 챕터 제목을 각각 matchedVideoId, matchedStartSeconds, matchedChapterTitle에 기입해 주십시오.[cite 2]
+- 만약 우리 강의 목록 중에 전혀 연관성이 없다고 판단되면 세 필드 모두 null로 응답해 주십시오. 억지로 매칭시키지 않는 것이 좋습니다.[cite 2]
 
 [선생님 강의 및 챕터 인덱스 목록]
-${syllabusText || '등록된 강의가 없습니다.'}
+${syllabusText  '등록된 강의가 없습니다.'}[cite 2]
 
-1. solvingProcess: 위의 G.Polya 4단계 및 선생님 말투 가이드를 적용하여 단락을 나누고 각 소제목(### 1단계...) 아래에 글머리 기호('- ') 또는 번호 목록('1. ')을 사용해 깔끔히 작성해 주십시오.
-2. hints: 단계별로 문제를 풀어나갈 수 있는 구체적인 힌트 목록.
-   - 반드시 정확히 3개의 문자열 원소를 가진 JSON 배열이어야 합니다.
-   - 1단계: 최초 접근법/발상, 2단계: 중간 연결 공식, 3단계: 마지막 핵심 실마리.
-   - 각 단계의 힌트는 수학적 식을 포함하여 1~2문장 내외로 쌤의 친근한 말투로 작성하십시오.
+---
 
-3. problemText: 사진 속 문제 이미지에 나타난 원본 문제 지문 전체.
-   - 수학적 기호, 수식, 변수 등은 완벽하게 LaTeX 문법으로 변환해서 텍스트를 작성해 주십시오.
-   - 보기 선택지가 있다면 해당 문항 구성 지문도 빠짐없이 텍스트로 복원하여 작성해 주십시오.
-
-4. problemBox: 학생 필기를 제외한 인쇄된 문제 본문 영역을 타이트하게 감싸는 바운딩 박스를 상하좌우 마진 백분율(0~100)로 응답해 주십시오.
-   - 학생 필기가 여백에 있다면 필기 부분이 잘려나가도록 마진을 충분히 크게 설정하십시오.
-
-5. grade: 아래 과목 목록 중 이 문제가 속하는 과목명을 정확히 하나만 선택하여 입력하세요.
-   - 선택 가능한 과목: 중3-1, 중3-2, 공통수학1, 공통수학2, 대수, 미적분Ⅰ, 미적분Ⅱ, 확률과 통계, 기하, 기타
-   - 과목별 단원 기준:
-     * 중3-1: 실수와 그 연산 / 다항식의 곱셈과 인수분해 / 이차방정식 / 이차함
-     * 중3-2: 삼각비 / 원의 성질 / 통계
-     * 공통수학1: 다항식 / 방정식과 부등식 / 경우의 수 / 행렬
-     * 공통수학2: 도형의 방정식 / 집합과 명제 / 함수와 그래프
-     * 대수: 지수함수와 로그함수 / 삼각함수 / 수열
-     * 미적분Ⅰ: 함수의 극한과 연속 / 미분 / 적분
-     * 미적분Ⅱ: 수열의 극한 / 미분법 / 적분법
-     * 확률과 통계: 경우의 수 / 확률 / 통계
-     * 기하: 이차곡선 / 평면벡터 / 공간도형과 공간좌표
-
-6. chapter: grade에서 선택한 과목의 단원 목록 중 이 문제가 속하는 단원명을 아래 제공된 단원명 목록에서만 토씨 하나 틀리지 않게 정확히 골라 출력해야 합니다. 임의의 텍스트를 생성하지 마십시오.
-   예를 들어, grade가 '미적분Ⅱ'이면 chapter는 반드시 '수열의 극한', '미분법', '적분법' 중 하나여야 합니다. 구체적인 하위 소단원명이나 자의적인 단원명(예: "다항식의 미분")은 사용하지 마십시오.
-
-7. mistakeSummary: 사진 속 학생이 직접 작성한 필기나 풀이 과정을 분석하여, 핵심적으로 어디서 어떻게 틀렸는지 30자 이내의 한 문장으로 날카롭게 요약하세요.
-   - 반드시 구체적인 수학적 원인을 포함해야 합니다 (예: "부호 실수", "공식 오적용", "인수분해 오류" 등)
-   - 좋은 예: "이차방정식 판별식에서 b²-4ac의 부호를 반대로 계산함"
-   - 좋은 예: "삼각함수 덧셈 공식에서 cos항의 부호를 누락함"
-   - 학생 필기가 전혀 없는 경우에만: "학생 풀이 없음"
-
-출력은 지정된 JSON 스키마를 엄격히 따라야 하며, 수식 기호를 제외한 모든 텍스트 해설은 예외 없이 전부 100% 한국어로만 작성해야 합니다 (영어 해설 절대 금지):
-1. title: 문제의 주제나 공식을 담은 짤막하고 직관적인 제목 (한국어)
-2. solvingProcess: 위의 지시사항을 따른 올바른 풀이 과정 (해설 설명은 100% 한국어)
-3. hints: 위의 지시사항을 따른 단계별 힌트 목록 (정확히 3개 원소 모두 한국어 문장)
-4. problemText: 위의 지시사항을 따른 추출된 원본 문제 지문 (한글 원본 텍스트 복원)
-5. problemBox: 위의 지시사항을 따른 필기 제외 인쇄 문제 영역 바운딩 박스
-6. grade: 과목명
-7. chapter: 단원명
-8. mistakeSummary: 학생 풀이 기반 틀린 이유 1줄 요약 (30자 이내의 한국어 문장, 절대 영문 작성 금지)
-9. matchedVideoId: 선택 매칭된 강의 비디오 ID (목록에 없을 시 null)
-10. matchedStartSeconds: 선택 매칭된 강의 시작 시간 (초 단위 숫자, 없을 시 null)
-11. matchedChapterTitle: 선택 매칭된 강의 챕터 제목 (없을 시 null)`;
+[반환할 JSON 구조의 각 필드 정의]
+1. title 문제의 주제나 공식을 담은 짤막하고 직관적인 제목 (한국어)[cite 2]
+2. solvingProcess 위의 G.Polya 4단계 및 오답 클리닉 헤더들(총 6개 헤더 필수 포함)을 포함한 통합 리포트 본문 텍스트.[cite 1, 2]
+3. hints 3단계 복습 도중 막힐 때 조건부 노출되는 점진적 힌트 목록.[cite 1, 2]
+   - 반드시 정확히 3개의 문자열 원소를 가진 JSON 배열이어야 합니다.[cite 2]
+   - hints[0] (1단계) 최초 접근법 및 발상 힌트[cite 1, 2]
+   - hints[1] (2단계) 중간 연결 공식 및 수식 힌트[cite 1, 2]
+   - hints[2] (3단계) 최종 결론을 내기 직전의 결정적인 풀이 실마리 힌트[cite 1, 2]
+4. problemText 사진 속 문제 이미지에 나타난 원본 문제 지문 전체 (LaTeX 변환 필수).[cite 2]
+5. problemBox 학생 필기를 제외한 인쇄된 문제 본문 영역의 바운딩 박스 (상하좌우 마진 백분율 0~100).[cite 2]
+6. grade 과목 목록 중 정확히 하나만 선택 (선택 가능 과목 중3-1, 중3-2, 공통수학1, 공통수학2, 대수, 미적분Ⅰ, 미적분Ⅱ, 확률과 통계, 기하, 기타)[cite 2]
+7. chapter 선택한 과목에 허용된 단원 목록 중 토씨 하나 틀리지 않게 선택.[cite 2]
+8. mistakeSummary 학생 풀이 기반 틀린 이유를 리스트 뷰용으로 30자 이내로 날카롭게 요약한 한 문장 (예 이차방정식 판별식에서 b²-4ac의 부호를 반대로 계산함).[cite 2]
+9. matchedVideoId  matchedStartSeconds  matchedChapterTitle 매칭된 동영상 정보 (없을 시 null)[cite 2]`;
 
   const requestBody = {
-    contents: [
+    contents [
       {
-        parts: [
-          { text: prompt },
+        parts [
+          { text prompt },
           {
-            inlineData: {
-              mimeType: mimeType,
-              data: base64Data
+            inlineData {
+              mimeType mimeType,
+              data base64Data
             }
           }
         ]
       }
     ],
-    generationConfig: {
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: 'OBJECT',
-        properties: {
-          title: { type: 'STRING' },
-          solvingProcess: { type: 'STRING' },
-          hints: {
-            type: 'ARRAY',
-            items: { type: 'STRING' }
+    generationConfig {
+      responseMimeType 'applicationjson',
+      responseSchema {
+        type 'OBJECT',
+        properties {
+          title { type 'STRING' },
+          solvingProcess { type 'STRING' },
+          hints {
+            type 'ARRAY',
+            items { type 'STRING' }
           },
-          problemText: { type: 'STRING' },
-          problemBox: {
-            type: 'OBJECT',
-            properties: {
-              top: { type: 'NUMBER' },
-              bottom: { type: 'NUMBER' },
-              left: { type: 'NUMBER' },
-              right: { type: 'NUMBER' }
+          problemText { type 'STRING' },
+          problemBox {
+            type 'OBJECT',
+            properties {
+              top { type 'NUMBER' },
+              bottom { type 'NUMBER' },
+              left { type 'NUMBER' },
+              right { type 'NUMBER' }
             },
-            required: ['top', 'bottom', 'left', 'right']
+            required ['top', 'bottom', 'left', 'right']
           },
-          grade: { type: 'STRING' },
-          chapter: { type: 'STRING' },
-          mistakeSummary: { type: 'STRING' },
-          matchedVideoId: { type: 'STRING', nullable: true },
-          matchedStartSeconds: { type: 'NUMBER', nullable: true },
-          matchedChapterTitle: { type: 'STRING', nullable: true }
+          grade { type 'STRING' },
+          chapter { type 'STRING' },
+          mistakeSummary { type 'STRING' },
+          matchedVideoId { type 'STRING', nullable true },
+          matchedStartSeconds { type 'NUMBER', nullable true },
+          matchedChapterTitle { type 'STRING', nullable true }
         },
-        required: ['title', 'solvingProcess', 'hints', 'problemText', 'problemBox', 'grade', 'chapter', 'mistakeSummary']
+        required ['title', 'solvingProcess', 'hints', 'problemText', 'problemBox', 'grade', 'chapter', 'mistakeSummary']
       }
     }
   };
 
   try {
     const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
+      method 'POST',
+      headers {
+        'Content-Type' 'applicationjson'
       },
-      body: JSON.stringify(requestBody)
+      body JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
-      const errorJson = await response.json().catch(() => ({}));
-      const errorMessage = errorJson?.error?.message || '네트워크 응답 오류';
-      throw new Error(`Gemini API 오류: ${errorMessage}`);
+      const errorJson = await response.json().catch(() = ({}));
+      const errorMessage = errorJson.error.message  '네트워크 응답 오류';
+      throw new Error(`Gemini API 오류 ${errorMessage}`);
     }
 
     const result = await response.json();
-    const responseText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const responseText = result.candidates.[0].content.parts.[0].text;
 
     if (!responseText) {
       throw new Error('Gemini API로부터 올바른 응답 텍스트를 받지 못했습니다.');
     }
 
-    const parsedJson: GeminiResponse = JSON.parse(responseText);
+    const parsedJson GeminiResponse = JSON.parse(responseText);
 
-    // 단원명 보정 및 보정 로직 (Fuzzy Matching)
-    let resolvedGrade = parsedJson.grade || '기타';
+     단원명 보정 및 보정 로직 (Fuzzy Matching)
+    let resolvedGrade = parsedJson.grade  '기타';
     if (!MATH_CURRICULUM[resolvedGrade]) {
       resolvedGrade = '기타';
     }
 
-    const allowedChapters = MATH_CURRICULUM[resolvedGrade] || ['기타'];
-    let resolvedChapter = parsedJson.chapter || '기타';
+    const allowedChapters = MATH_CURRICULUM[resolvedGrade]  ['기타'];
+    let resolvedChapter = parsedJson.chapter  '기타';
 
-    // 100% 매치되지 않는 경우, 공백 제거 후 유사성 검사로 매핑
+     100% 매치되지 않는 경우, 공백 제거 후 유사성 검사로 매핑
     if (!allowedChapters.includes(resolvedChapter)) {
-      const cleanTarget = resolvedChapter.replace(/\s+/g, '');
-      const matched = allowedChapters.find(ch => {
-        const cleanCh = ch.replace(/\s+/g, '');
-        return cleanCh.includes(cleanTarget) || cleanTarget.includes(cleanCh);
+      const cleanTarget = resolvedChapter.replace(s+g, '');
+      const matched = allowedChapters.find(ch = {
+        const cleanCh = ch.replace(s+g, '');
+        return cleanCh.includes(cleanTarget)  cleanTarget.includes(cleanCh);
       });
       if (matched) {
         resolvedChapter = matched;
       } else {
-        resolvedChapter = allowedChapters[0] || '기타'; // 매핑 실패 시 과목의 첫 번째 단원으로 기본 지정
+        resolvedChapter = allowedChapters[0]  '기타';  매핑 실패 시 과목의 첫 번째 단원으로 기본 지정
       }
     }
 
     return {
-      title: parsedJson.title || '분석 완료된 문제',
-      grade: resolvedGrade,
-      chapter: resolvedChapter,
-      analysis: {
-        solvingProcess: parsedJson.solvingProcess,
-        mistakeSummary: parsedJson.mistakeSummary || undefined,
-        hints: parsedJson.hints,
-        problemText: parsedJson.problemText,
-        problemBox: parsedJson.problemBox,
-        matchedVideoId: parsedJson.matchedVideoId || undefined,
-        matchedStartSeconds: parsedJson.matchedStartSeconds != null ? parsedJson.matchedStartSeconds : undefined,
-        matchedChapterTitle: parsedJson.matchedChapterTitle || undefined
+      title parsedJson.title  '분석 완료된 문제',
+      grade resolvedGrade,
+      chapter resolvedChapter,
+      analysis {
+        solvingProcess parsedJson.solvingProcess,
+        mistakeSummary parsedJson.mistakeSummary  undefined,
+        hints parsedJson.hints,
+        problemText parsedJson.problemText,
+        problemBox parsedJson.problemBox,
+        matchedVideoId parsedJson.matchedVideoId  undefined,
+        matchedStartSeconds parsedJson.matchedStartSeconds != null  parsedJson.matchedStartSeconds  undefined,
+        matchedChapterTitle parsedJson.matchedChapterTitle  undefined
       }
     };
-  } catch (error: any) {
-    console.error('Gemini API call failed:', error);
-    throw new Error(error.message || 'Gemini API 호출 중 장애가 발생했습니다.');
+  } catch (error any) {
+    console.error('Gemini API call failed', error);
+    throw new Error(error.message  'Gemini API 호출 중 장애가 발생했습니다.');
   }
 };
