@@ -349,7 +349,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
               </div>
             </div>
 
-            {/* 단계별 노출 영역 */}
+            {/* 단계별 유기적 활성화 영역 (3열 구조 복원 및 포커싱 강화) */}
             {(() => {
               const reviews = selectedEntry.reviews || ['', '', ''];
               let activeStep = 3;
@@ -362,45 +362,83 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
               return (
                 <>
-                  {activeStep < 3 ? (
-                    <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 text-center space-y-3 shadow-inner">
-                      <div className="text-xs font-extrabold text-indigo-400">
-                        ✨ {activeStep + 1}차 복습을 완료하셨나요?
-                      </div>
-                      <p className="text-[10px] text-slate-500">
-                        아래 결과를 선택하시면 다음 복습 단계가 활성화됩니다.
-                      </p>
-                      <div className="flex items-center justify-center space-x-3.5 pt-1">
-                        <button
-                          onClick={() => handleReviewToggle(activeStep, 'O')}
-                          className="w-10 h-10 rounded-full text-sm font-black transition-all flex items-center justify-center bg-slate-855 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 shadow-sm border border-slate-700/60 active:scale-90"
+                  <div className="grid grid-cols-3 gap-3">
+                    {[0, 1, 2].map((index) => {
+                      const state = reviews[index];
+                      const isCompleted = state !== '';
+                      const isActive = index === activeStep;
+                      const isLocked = index > activeStep;
+
+                      let cardStyle = "";
+                      if (isActive) {
+                        cardStyle = "bg-slate-900 border-indigo-500/80 shadow-lg shadow-indigo-500/5 ring-1 ring-indigo-500/30";
+                      } else if (isCompleted) {
+                        cardStyle = "bg-slate-900/80 border-slate-800 opacity-95";
+                      } else if (isLocked) {
+                        cardStyle = "bg-slate-900/40 border-slate-900 opacity-40";
+                      }
+
+                      return (
+                        <div 
+                          key={index} 
+                          className={`p-3 rounded-2xl border text-center flex flex-col justify-between min-h-[90px] transition-all duration-300 ${cardStyle}`}
                         >
-                          O
-                        </button>
-                        <button
-                          onClick={() => handleReviewToggle(activeStep, 'X')}
-                          className="w-10 h-10 rounded-full text-sm font-black transition-all flex items-center justify-center bg-slate-855 text-red-400 hover:bg-red-500 hover:text-white shadow-sm border border-slate-700/60 active:scale-90"
-                        >
-                          X
-                        </button>
-                        <button
-                          onClick={() => handleReviewToggle(activeStep, 'star')}
-                          className="w-10 h-10 rounded-full text-sm font-black transition-all flex items-center justify-center bg-slate-855 text-amber-400 hover:bg-amber-400 hover:text-slate-950 shadow-sm border border-slate-700/60 active:scale-90"
-                        >
-                          ★
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="bg-emerald-950/15 p-4 rounded-xl border border-emerald-500/20 text-center space-y-1">
-                      <div className="text-xs font-extrabold text-emerald-400">
-                        🏆 복습 미션 올클리어!
-                      </div>
-                      <p className="text-[10px] text-slate-500">
-                        이 문제는 완전히 정복했습니다. 완료 보관함으로 자동 보관됩니다.
-                      </p>
-                    </div>
-                  )}
+                          <div className="text-[10px] font-bold text-slate-500 mb-1">{index + 1}차 복습</div>
+                          
+                          <div className="flex-1 flex items-center justify-center">
+                            {isCompleted ? (
+                              /* 완료 상태: 큼직한 결과 스탬프 배지 단독 노출 */
+                              <div className="animate-scale-up">
+                                {state === 'O' && (
+                                  <span className="w-9 h-9 rounded-full bg-emerald-500 text-slate-950 font-black text-sm flex items-center justify-center shadow-lg shadow-emerald-500/10">
+                                    O
+                                  </span>
+                                )}
+                                {state === 'X' && (
+                                  <span className="w-9 h-9 rounded-full bg-red-500 text-white font-black text-sm flex items-center justify-center shadow-lg shadow-red-500/10">
+                                    X
+                                  </span>
+                                )}
+                                {state === 'star' && (
+                                  <span className="w-9 h-9 rounded-full bg-amber-400 text-slate-950 font-black text-sm flex items-center justify-center shadow-lg shadow-amber-400/10">
+                                    ★
+                                  </span>
+                                )}
+                              </div>
+                            ) : isActive ? (
+                              /* 활성 상태: 클릭 가능한 입력 버튼 활성화 */
+                              <div className="flex items-center space-x-1.5 animate-fade-in">
+                                <button
+                                  onClick={() => handleReviewToggle(index, 'O')}
+                                  className="w-7 h-7 rounded-full text-xs font-black bg-slate-800 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 transition-all active:scale-90 border border-slate-700/60"
+                                >
+                                  O
+                                </button>
+                                <button
+                                  onClick={() => handleReviewToggle(index, 'X')}
+                                  className="w-7 h-7 rounded-full text-xs font-black bg-slate-800 text-red-400 hover:bg-red-500 hover:text-white transition-all active:scale-90 border border-slate-700/60"
+                                >
+                                  X
+                                </button>
+                                <button
+                                  onClick={() => handleReviewToggle(index, 'star')}
+                                  className="w-7 h-7 rounded-full text-xs font-black bg-slate-800 text-amber-400 hover:bg-amber-400 hover:text-slate-950 transition-all active:scale-90 border border-slate-700/60"
+                                >
+                                  ★
+                                </button>
+                              </div>
+                            ) : (
+                              /* 잠금 상태: 🔒 표시 */
+                              <div className="text-[10px] text-slate-600 font-bold flex flex-col items-center justify-center space-y-1">
+                                <span className="text-xs">🔒</span>
+                                <span>대기 중</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
 
                   {/* 하단 롤백(앞으로 가기) 및 복습 기록 정리 제어반 */}
                   <div className="flex flex-col space-y-2 mt-1">
