@@ -39,6 +39,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 }) => {
   const [revealedHintCount, setRevealedHintCount] = React.useState(0);
   const [loadingText, setLoadingText] = React.useState('수학 문제 분석을 시작합니다...');
+  const analysisCardRef = React.useRef<HTMLDivElement>(null);
 
   // Student editable fields
   const [editGrade, setEditGrade] = React.useState(selectedEntry.grade || '');
@@ -222,6 +223,16 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
     return () => clearInterval(interval);
   }, [isAnalyzing]);
+
+  // 3. 사진 업로드 후 AI 진단 카드로 부드럽게 스크롤 이동
+  React.useEffect(() => {
+    if (selectedEntry && !selectedEntry.analysis) {
+      const timer = setTimeout(() => {
+        analysisCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 350);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedEntry.id, selectedEntry.analysis]);
 
   const hasStruggled = selectedEntry.reviews?.some(r => r === 'X' || r === 'star');
 
@@ -624,7 +635,10 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
               </div>
             </div>
           ) : (
-            <div className="py-8 bg-slate-950/60 rounded-2xl border border-slate-800 p-6 text-center space-y-4">
+            <div 
+              ref={analysisCardRef}
+              className="py-8 bg-slate-950/60 rounded-2xl border border-slate-800 p-6 text-center space-y-4"
+            >
               <div className="text-3xl">🤖</div>
               <div className="space-y-1">
                 <p className="text-sm font-bold text-white">AI 수학 클리닉 진단</p>
