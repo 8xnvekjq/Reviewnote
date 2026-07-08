@@ -103,10 +103,23 @@ export const AdminPanel: React.FC = () => {
         stat.weeklyScore = (stat.weeklyCompletedCount * 10) + (rate * 100);
       });
 
-      // Sort: 주간 복습 랭킹 점수 높은 순 정렬
-      const sorted = Array.from(statsMap.values()).sort(
-        (a, b) => b.weeklyScore - a.weeklyScore
-      );
+      // Sort: 최근 오답 복습한 순 정렬 (복습 기록이 없는 학생은 최하단 배치)
+      const sorted = Array.from(statsMap.values()).sort((a, b) => {
+        if (a.lastReviewDate && b.lastReviewDate) {
+          return new Date(b.lastReviewDate).getTime() - new Date(a.lastReviewDate).getTime();
+        }
+        if (a.lastReviewDate) return -1;
+        if (b.lastReviewDate) return 1;
+        
+        // 복습 기록이 모두 없는 경우, 최근 업로드(lastActivity) 순 정렬
+        if (a.lastActivity && b.lastActivity) {
+          return new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime();
+        }
+        if (a.lastActivity) return -1;
+        if (b.lastActivity) return 1;
+
+        return a.email.localeCompare(b.email);
+      });
 
       setStats(sorted);
       setLastRefreshed(new Date());
