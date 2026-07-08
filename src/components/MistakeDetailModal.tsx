@@ -456,9 +456,9 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                     {activeStep > 0 && (
                       <button
                         onClick={handleRollbackReview}
-                        className="w-full py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 active:scale-95 border border-slate-700/60 text-slate-400 font-bold text-xs transition-all flex items-center justify-center space-x-1.5"
+                        className="px-3 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-500 hover:text-slate-400 font-bold text-[10px] transition-all active:scale-95 w-fit mx-auto flex items-center justify-center mt-1"
                       >
-                        <span>↩ 이전 단계로 (롤백)</span>
+                        <span>↩ 이전 단계로</span>
                       </button>
                     )}
 
