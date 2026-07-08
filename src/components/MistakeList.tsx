@@ -116,8 +116,9 @@ export const MistakeList: React.FC<MistakeListProps> = ({
                   lastReview === 'X' ? <span className="text-red-400 font-bold">X 도전 중</span> :
                   lastReview === 'star' ? <span className="text-amber-400 font-bold">★ 별표</span> : '—';
 
+                const reviewDateStr = act.updated_at ? act.updated_at.slice(5, 10).replace(/-/g, '/') : '';
                 const studentName = act.display_name || act.username || '동료 학생';
-                
+
                 return (
                   <div key={act.mistake_id || idx} className={`text-[10px] text-slate-300 leading-normal flex items-center justify-between space-x-2 ${idx > 0 ? 'pt-2' : ''}`}>
                     <div className="flex items-center space-x-1.5 min-w-0 flex-1">
@@ -129,8 +130,13 @@ export const MistakeList: React.FC<MistakeListProps> = ({
                         {act.title.replace(/\$[^$]+\$/g, '').replace(/[#*`_]/g, '')}
                       </span>
                     </div>
-                    <div className="flex-none pl-2 font-semibold text-right">
-                      {reviewBadge}
+                    <div className="flex-none pl-2 text-right flex items-center space-x-1.5">
+                      <span className="font-semibold">{reviewBadge}</span>
+                      {reviewDateStr && (
+                        <span className="text-[8px] text-slate-500 font-semibold bg-slate-950 px-1 py-0.5 rounded border border-slate-850">
+                          {reviewDateStr}
+                        </span>
+                      )}
                     </div>
                   </div>
                 );

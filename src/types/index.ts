@@ -31,6 +31,7 @@ export interface AdminUserStat {
   weeklyTotalCount: number;  // 이번주 등록된 오답 수
   weeklyCompletedCount: number; // 이번주 복습완료(O 3회) 수
   schoolGrade?: string;      // 학년 정보 (예: 중3, 고1)
+  lastReviewDate?: string | null; // 마지막 복습 일자
 }
 
 // 5대 실수 원인 유형 (체크박스)

@@ -57,6 +57,7 @@ export const AdminPanel: React.FC = () => {
           displayName: p.display_name?.trim() || undefined,
           username: username,
           schoolGrade: p.school_grade || '',
+          lastReviewDate: null,
         });
       });
 
@@ -85,6 +86,14 @@ export const AdminPanel: React.FC = () => {
         // Track latest activity date
         if (!stat.lastActivity || m.date > stat.lastActivity) {
           stat.lastActivity = m.date;
+        }
+
+        // Track last review date (check if reviews array has at least one checked state)
+        const hasBeenReviewed = reviews.some(r => r !== '');
+        if (hasBeenReviewed && m.updated_at) {
+          if (!stat.lastReviewDate || m.updated_at > stat.lastReviewDate) {
+            stat.lastReviewDate = m.updated_at;
+          }
         }
       });
 
@@ -288,9 +297,15 @@ export const AdminPanel: React.FC = () => {
                         </span>
                       </div>
                       <div className="pt-1 border-t border-slate-850">
-                        <span className="text-[9px] text-slate-500 block leading-none">최근 활동</span>
+                        <span className="text-[9px] text-slate-500 block leading-none">최근 업로드</span>
                         <span className="text-[10px] text-slate-400 font-medium leading-none block mt-0.5">
                           {user.lastActivity ? formatDate(user.lastActivity).split(' ')[0] : '—'}
+                        </span>
+                      </div>
+                      <div className="pt-1 border-t border-slate-850">
+                        <span className="text-[9px] text-indigo-400 block leading-none font-bold">마지막 복습</span>
+                        <span className="text-[10px] text-indigo-300 font-semibold leading-none block mt-0.5">
+                          {user.lastReviewDate ? formatDate(user.lastReviewDate).split(' ')[0] : '—'}
                         </span>
                       </div>
                     </div>
