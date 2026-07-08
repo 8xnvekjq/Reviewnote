@@ -92,7 +92,11 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
       '적분': ['integral', '정적분', '부정적분', '넓이', '속도와 거리', '6분의 공식', '12분의 공식', '구분구적법', 'FTC', '원시함수', '적분상수'],
       '수열의 극한': ['급수', '등비급수', '수열의 극한', '부분합', '조화급수', '샌드위치 정리', '등비수열의 극한', '자연상수', 'e'],
       '미분법': ['몫의 미분법', '합성함수의 미분법', '음함수 미분법', '역함수 미분법', '매개변수', '지수함수의 미분', '로그함수의 미분', '삼각함수의 미분', '삼각함수의 덧셈정리', '극대극소', '접선의 방정식', '체인룰', '이계도함수'],
-      '적분법': ['치환적분', '부분적분', '삼각함수의 부정적분', '부피', '속도와 거리', '구분구적법', '회전체', '단면적']
+      '적분법': ['치환적분', '부분적분', '삼각함수의 부정적분', '부피', '속도와 거리', '구분구적법', '회전체', '단면적'],
+      '공통수학1_경우의 수': ['순열', '조합', '합의 법칙', '곱의 법칙', '일렬로', '나열', '이웃', '교대로', '대표'],
+      '확률과 통계_경우의 수': ['원순열', '중복순열', '중복조합', '이항정리', '같은 것이 있는 순열', '조합', '순열', '팩토리얼', '이항계수', '파스칼', '하키스틱'],
+      '확률': ['조건부확률', '독립시행', '종속', '독립', '여사건', '덧셈정리', '곱셈정리', '전확률', '베이즈', '배반사건', '표본공간'],
+      '통계': ['확률분포', '이항분포', '정규분포', '통계적 추정', '표본평균', '신뢰구간', '신뢰도', '모평균', '표본분산', '기댓값', '분산', '표준편차', '이산확률변수', '연속확률변수', '확률밀도함수', '모집단', '표본 조사']
     };
 
     const targetGrade = selectedEntry.grade;
@@ -135,7 +139,15 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
         // [핵심 3] 동의어가 서로 일치하는 경우
         for (const [key, synonyms] of Object.entries(SYNONYM_MAP)) {
-          if (chapterTitleClean.includes(key.toLowerCase()) || videoTitleClean.includes(key.toLowerCase())) {
+          let cleanKey = key;
+          if (key.includes('_')) {
+            const [gradePrefix, realKey] = key.split('_');
+            if (gradePrefix !== targetGrade) {
+              continue;
+            }
+            cleanKey = realKey;
+          }
+          if (chapterTitleClean.includes(cleanKey.toLowerCase()) || videoTitleClean.includes(cleanKey.toLowerCase())) {
             if (synonyms.some(syn => searchPool.includes(syn.toLowerCase()))) {
               score += 8;
             }

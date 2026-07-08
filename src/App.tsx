@@ -155,6 +155,8 @@ function App() {
           const matchPool = (l.title + ' ' + (l.description || '')).toLowerCase();
           if (matchPool.includes('공수2') || matchPool.includes('공통수학2')) {
             derivedGrade = '공통수학2';
+          } else if (matchPool.includes('확통') || matchPool.includes('확률과통계') || matchPool.includes('확률과 통계')) {
+            derivedGrade = '확률과 통계';
           } else if (matchPool.includes('공수1') || matchPool.includes('공통수학1') || matchPool.includes('고1')) {
             derivedGrade = '공통수학1';
           } else if (matchPool.includes('대수')) {
