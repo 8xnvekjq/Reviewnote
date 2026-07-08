@@ -164,7 +164,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     };
   }, [selectedEntry, youtubeLectures]);
 
-  // ★ 버그 수정: AI 분석이 끝나서 selectedEntry 데이터가 갱신되면 로컬 상태도 자동으로 갱신 동기화합니다.
+  // 1. Reset all local states when the selected mistake ID changes (opening a different mistake card)
   React.useEffect(() => {
     setRevealedHintCount(0);
     setShowProblemText(false);
@@ -174,13 +174,17 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     setEditChapter(selectedEntry.chapter || '');
     setEditRootCauses(selectedEntry.rootCauses || []);
     setEditActionPlan(selectedEntry.userActionPlan || '');
-  }, [
-    selectedEntry.id, 
-    selectedEntry.grade, 
-    selectedEntry.chapter, 
-    selectedEntry.rootCauses, 
-    selectedEntry.userActionPlan
-  ]);
+  }, [selectedEntry.id]);
+
+  // 2. Sync grade and chapter when they change in parent (e.g. when AI classification finishes)
+  React.useEffect(() => {
+    if (selectedEntry.grade) {
+      setEditGrade(selectedEntry.grade);
+    }
+    if (selectedEntry.chapter) {
+      setEditChapter(selectedEntry.chapter);
+    }
+  }, [selectedEntry.grade, selectedEntry.chapter]);
 
   // Loading text cycling effect
   React.useEffect(() => {
@@ -558,8 +562,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                   <select 
                     value={editGrade} 
                     onChange={e => { setEditGrade(e.target.value); setEditChapter(''); }}
-                    disabled={isAnalyzing}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer"
                   >
                     <option value="">선택하세요</option>
                     {GRADE_LIST.map(g => <option key={g} value={g}>{g}</option>)}
@@ -570,8 +573,8 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                   <select 
                     value={editChapter} 
                     onChange={e => setEditChapter(e.target.value)}
-                    disabled={!editGrade || isAnalyzing}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    disabled={!editGrade}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer disabled:opacity-40"
                   >
                     <option value="">선택하세요</option>
                     {chaptersForGrade.map(c => <option key={c} value={c}>{c}</option>)}
@@ -586,9 +589,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                   {ROOT_CAUSE_OPTIONS.map(opt => (
                     <label 
                       key={opt.id} 
-                      className={`flex items-center space-x-3 group ${
-                        isAnalyzing ? 'opacity-40 cursor-not-allowed pointer-events-none' : 'cursor-pointer'
-                      }`}
+                      className="flex items-center space-x-3 cursor-pointer group"
                     >
                       <div
                         className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-none transition-all ${
@@ -596,11 +597,11 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                             ? 'bg-amber-500 border-amber-500'
                             : 'bg-slate-950 border-slate-700 group-hover:border-amber-500/50'
                         }`}
-                        onClick={() => !isAnalyzing && toggleRootCause(opt.id)}
+                        onClick={() => toggleRootCause(opt.id)}
                       >
                         {editRootCauses.includes(opt.id) && <span className="text-white text-[10px] font-black">✓</span>}
                       </div>
-                      <div onClick={() => !isAnalyzing && toggleRootCause(opt.id)}>
+                      <div onClick={() => toggleRootCause(opt.id)}>
                         <span className="text-xs font-semibold text-slate-200">{opt.label}</span>
                         <span className="text-[10px] text-slate-500 ml-1.5">{opt.desc}</span>
                       </div>
@@ -615,10 +616,9 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 <textarea
                   value={editActionPlan}
                   onChange={e => setEditActionPlan(e.target.value)}
-                  disabled={isAnalyzing}
-                  placeholder={isAnalyzing ? "AI 분석 중에는 편집할 수 없습니다..." : "이번 실수를 통해 앞으로 어떻게 풀겠다는 나만의 대책을 자유롭게 적어보세요..."}
+                  placeholder="이번 실수를 통해 앞으로 어떻게 풀겠다는 나만의 대책을 자유롭게 적어보세요..."
                   rows={3}
-                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-600 outline-none focus:border-emerald-500 transition-colors resize-none leading-relaxed disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-600 outline-none focus:border-emerald-500 transition-colors resize-none leading-relaxed"
                 />
               </div>
 
