@@ -387,10 +387,11 @@ export const AdminPanel: React.FC = () => {
                   )}
                 </div>
               );
-            })}
-          </div>
-        );
-      })()}
+            })
+          )}
+        </div>
+      );
+    })()}
 
       {/* ── 탭 2: 변경 이력 (Change Log) 탭 ── */}
       {activeSubTab === 'changelog' && (
