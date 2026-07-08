@@ -74,8 +74,8 @@
   - 선생님이 주신 유튜브 강의 재생목록(`PLw8NENAKl4HmkkDFqP-FdqAt48gm4cHiU`)을 파싱하여, 자막 및 챕터 시작 시간(초 단위)을 분/초에서 초 단위 숫자로 환산하여 Supabase DB에 온전히 이식 완료했습니다.
   - 총 55개의 공통수학1, 2 개념 영상 및 매칭 타임라인이 `youtube_lectures`와 `youtube_timelines` 테이블에 탑재되었습니다.
 - **실시간/소급 매칭 알고리즘 적용**:
-  - [App.tsx](file:///c:/Users/USER/Documents/ReviewNotes/src/App.tsx): 앱이 켜질 때 Supabase로부터 강의 목록과 챕터들을 한 번에 동기화하여 캐싱해 둡니다. (최근 추가된 **'대수'** 과목 동영상에 대해서도 파싱 및 분류 처리가 똑같이 작동하도록 식별 판별 조건을 추가했습니다.)
-  - [MistakeDetailModal.tsx](file:///c:/Users/USER/Documents/ReviewNotes/src/components/MistakeDetailModal.tsx): 오답 상세 모달을 열 때마다 매칭용 동의어 사전(`행렬`, `오메가`, `조합`, `순열`, `부등식` 및 최근 추가된 **`수열`**, **`삼각함수`**, **`거듭제곱근`** 등)과 과목/단원 매핑 알고리즘이 실시간 대조하여 가장 적절한 추천 영상의 딥링크 카드를 생성합니다.
+  - [App.tsx](file:///c:/Users/USER/Documents/ReviewNotes/src/App.tsx): 앱이 켜질 때 Supabase로부터 강의 목록과 챕터들을 한 번에 동기화하여 캐싱해 둡니다. (최근 추가된 **'대수'** 및 **'미적분Ⅰ(수2)'** 과목 동영상에 대해서도 파싱 및 분류 처리가 똑같이 작동하도록 식별 판별 조건을 추가했습니다.)
+  - [MistakeDetailModal.tsx](file:///c:/Users/USER/Documents/ReviewNotes/src/components/MistakeDetailModal.tsx): 오답 상세 모달을 열 때마다 매칭용 동의어 사전(`행렬`, `오메가`, `조합`, `순열`, `부등식` 및 최근 추가된 **`수열`**, **`삼각함수`**, **`거듭제곱근`**, **`함수의 극한과 연속`**, **`미분`**, **`적분`** 등)과 과목/단원 매핑 알고리즘이 실시간 대조하여 가장 적절한 추천 영상의 딥링크 카드를 생성합니다.
   - **전체 대상 오픈**: 특정 아이디(`test`) 제한 조건을 완전히 걷어내어, **모든 사용자의 모든 과거 오답 및 신규 오답에 즉시 소급적용**되도록 배포 완료했습니다.
 
 ### 7. 어드민 패널 학생 표시 포맷 개선 및 이메일 유실 방지 (완료)

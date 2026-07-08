@@ -159,6 +159,8 @@ function App() {
             derivedGrade = '공통수학1';
           } else if (matchPool.includes('대수')) {
             derivedGrade = '대수';
+          } else if (matchPool.includes('미적분') || matchPool.includes('수2') || matchPool.includes('극한') || matchPool.includes('미분') || matchPool.includes('적분')) {
+            derivedGrade = '미적분Ⅰ';
           }
 
           return {
