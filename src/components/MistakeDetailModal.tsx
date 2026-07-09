@@ -8,6 +8,7 @@ import { supabase } from '../services/supabase';
 interface MistakeDetailModalProps {
   selectedEntry: MistakeEntry;
   isAnalyzing: boolean;
+  isEditable: boolean;
   youtubeLectures?: any[]; // DB로부터 가져온 55개 강의 마스터 리스트
   onClose: () => void;
   onDeleteMistake: (id: string, e: React.MouseEvent) => void;
@@ -30,6 +31,7 @@ const NORMAL_PHRASES = [
 export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   selectedEntry,
   isAnalyzing,
+  isEditable,
   youtubeLectures = [],
   onClose,
   onDeleteMistake,
@@ -304,6 +306,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   };
 
   const toggleRootCause = (id: string) => {
+    if (!isEditable) return;
     setEditRootCauses(prev =>
       prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
     );
@@ -730,30 +733,36 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
               </div>
             </div>
           ) : (
-            <div 
-              ref={analysisCardRef}
-              className="py-8 bg-slate-950/60 rounded-2xl border border-slate-800 p-6 text-center space-y-4"
-            >
-              <div className="text-3xl">🤖</div>
-              <div className="space-y-1">
-                <p className="text-sm font-bold text-white">AI 수학 클리닉 진단</p>
-                <p className="text-xs text-slate-400 leading-relaxed max-w-xs mx-auto">
-                  아직 오답 원인이 분석되지 않았습니다. AI가 설계하는 맞춤형 오답 처방전을 확인해 보세요.
-                </p>
-              </div>
-              <button 
-                onClick={() => onStartAnalysis({
-                  ...selectedEntry,
-                  grade: editGrade || undefined,
-                  chapter: editChapter || undefined,
-                  rootCauses: editRootCauses,
-                  userActionPlan: editActionPlan || undefined
-                })}
-                className="px-6 py-2.5 rounded-full bg-gradient-to-r from-indigo-600 to-indigo-500 active:scale-95 transition-all text-xs font-bold text-white shadow-md shadow-indigo-600/20"
+            <>
+              {!isAnalyzing && !selectedEntry.analysis && isEditable && (
+                <div className="flex justify-center p-6 border-b border-slate-800">
+                  <button
+                    onClick={() => onStartAnalysis({
+                      ...selectedEntry,
+                      grade: editGrade || undefined,
+                      chapter: editChapter || undefined,
+                      rootCauses: editRootCauses,
+                      userActionPlan: editActionPlan || undefined
+                    })}
+                    className="px-6 py-2.5 rounded-full bg-gradient-to-r from-indigo-600 to-indigo-500 active:scale-95 transition-all text-xs font-bold text-white shadow-md shadow-indigo-600/20"
+                  >
+                    AI 분석 시작하기
+                  </button>
+                </div>
+              )}
+              <div 
+                ref={analysisCardRef}
+                className="py-8 bg-slate-950/60 rounded-2xl border border-slate-800 p-6 text-center space-y-4"
               >
-                AI 분석 시작하기
-              </button>
-            </div>
+                <div className="text-3xl">🤖</div>
+                <div className="space-y-1">
+                  <p className="text-sm font-bold text-white">AI 수학 클리닉 진단</p>
+                  <p className="text-xs text-slate-400 leading-relaxed max-w-xs mx-auto">
+                    아직 오답 원인이 분석되지 않았습니다. AI가 설계하는 맞춤형 오답 처방전을 확인해 보세요.
+                  </p>
+                </div>
+              </div>
+            </>
           )}
 
           {/* ── 학생 입력 영역 ── */}
@@ -769,14 +778,14 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             </div>
             <div className="p-4 space-y-4">
 
-              {/* 과목 / 단원 선택 */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-slate-400 block">과목 (AI 자동분류)</label>
                   <select 
                     value={editGrade} 
                     onChange={e => { setEditGrade(e.target.value); setEditChapter(''); }}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+                    disabled={!isEditable}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer disabled:opacity-50"
                   >
                     <option value="">선택하세요</option>
                     {GRADE_LIST.map(g => <option key={g} value={g}>{g}</option>)}
@@ -787,8 +796,8 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                   <select 
                     value={editChapter} 
                     onChange={e => setEditChapter(e.target.value)}
-                    disabled={!editGrade}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer disabled:opacity-40"
+                    disabled={!isEditable || !editGrade}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer disabled:opacity-50"
                   >
                     <option value="">선택하세요</option>
                     {chaptersForGrade.map(c => <option key={c} value={c}>{c}</option>)}
@@ -803,13 +812,13 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                   {ROOT_CAUSE_OPTIONS.map(opt => (
                     <label 
                       key={opt.id} 
-                      className="flex items-center space-x-3 cursor-pointer group"
+                      className={`flex items-center space-x-3 group ${isEditable ? 'cursor-pointer' : 'cursor-default'}`}
                     >
                       <div
                         className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-none transition-all ${
                           editRootCauses.includes(opt.id)
                             ? 'bg-amber-500 border-amber-500'
-                            : 'bg-slate-950 border-slate-700 group-hover:border-amber-500/50'
+                            : 'bg-slate-950 border-slate-700 ' + (isEditable ? 'group-hover:border-amber-500/50' : '')
                         }`}
                         onClick={() => toggleRootCause(opt.id)}
                       >
@@ -830,9 +839,10 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 <textarea
                   value={editActionPlan}
                   onChange={e => setEditActionPlan(e.target.value)}
-                  placeholder="이번 실수를 통해 앞으로 어떻게 풀겠다는 나만의 대책을 자유롭게 적어보세요..."
+                  disabled={!isEditable}
+                  placeholder={isEditable ? "이번 실수를 통해 앞으로 어떻게 풀겠다는 나만의 대책을 자유롭게 적어보세요..." : "등록된 대책이 없습니다."}
                   rows={3}
-                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-600 outline-none focus:border-emerald-500 transition-colors resize-none leading-relaxed"
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-600 outline-none focus:border-emerald-500 transition-colors resize-none leading-relaxed disabled:opacity-60"
                 />
               </div>
 
@@ -843,20 +853,31 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
         {/* Modal Footer */}
         <div className="p-4 border-t border-slate-800/80 bg-slate-950/60 flex space-x-3">
-          <button
-            onClick={(e) => onDeleteMistake(selectedEntry.id, e)}
-            className="py-3 px-4 rounded-xl border border-red-500/20 hover:border-red-500/40 bg-red-500/5 hover:bg-red-500/10 active:scale-95 transition-all text-xs font-bold text-red-400 flex items-center justify-center space-x-1.5"
-          >
-            <span>🗑️</span>
-            <span>삭제</span>
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="flex-1 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 active:scale-95 disabled:opacity-50 transition-all text-xs font-bold text-white shadow-md shadow-emerald-600/20"
-          >
-            {isSaving ? '저장 중...' : '✅ 저장하기'}
-          </button>
+          {isEditable ? (
+           <>
+             <button
+               onClick={(e) => onDeleteMistake(selectedEntry.id, e)}
+               className="py-3 px-4 rounded-xl border border-red-500/20 hover:border-red-500/40 bg-red-500/5 hover:bg-red-500/10 active:scale-95 transition-all text-xs font-bold text-red-400 flex items-center justify-center space-x-1.5"
+             >
+               <span>🗑️</span>
+               <span>삭제</span>
+             </button>
+             <button
+               onClick={handleSave}
+               disabled={isSaving}
+               className="flex-1 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 active:scale-95 disabled:opacity-50 transition-all text-xs font-bold text-white shadow-md shadow-emerald-600/20"
+             >
+               {isSaving ? '저장 중...' : '✅ 저장하기'}
+             </button>
+           </>
+         ) : (
+           <button
+             onClick={onClose}
+             className="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 transition-all text-xs font-bold text-slate-300 border border-slate-700"
+           >
+             닫기
+           </button>
+         )}
         </div>
 
       </div>

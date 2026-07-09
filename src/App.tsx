@@ -756,6 +756,7 @@ function App() {
         <MistakeDetailModal
           selectedEntry={selectedEntry}
           isAnalyzing={isAnalyzing}
+          isEditable={isAdmin || selectedEntry.userId === session?.user?.id}
           youtubeLectures={youtubeLectures}
           onClose={() => setSelectedEntry(null)}
           onDeleteMistake={handleDeleteMistake}
