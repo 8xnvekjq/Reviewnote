@@ -18,11 +18,11 @@ interface MistakeDetailModalProps {
 }
 
 const NORMAL_PHRASES = [
-  '문제 분석을 시작합니다...',
-  '문제 이미지 분석 중...',
-  '수학 수식 및 기호 판독 중...',
+  '밤티가 오답 분석을 시작합니다...',
+  '밤티가 문제 이미지를 열심히 째려보는 중...',
+  '밤티가 수학 수식과 기호들을 판독하고 있어요... 🔍',
   '지문 텍스트 복원 중...',
-  '개념 검색 중...',
+  '핵심 개념 검색 중...',
   '정석 풀이 작성 중...',
   '단계별 힌트 구성 중...',
   '과목 및 단원 분류 중...'
@@ -255,7 +255,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
         const option = ROOT_CAUSE_OPTIONS.find(opt => opt.id === topCause);
         if (option) {
           const ratio = Math.round((topCount / totalCauses) * 100);
-          dynamicPhrases.push(`최근에는 '${option.label}' 유형(${ratio}%)이 제일 잦아요. 더 째려봅시다! 👀`);
+          dynamicPhrases.push(`최근에는 '${option.label}' 유형(${ratio}%)이 제일 잦아요. 밤티랑 같이 째려봅시다! 👀`);
         }
       }
     }
@@ -279,7 +279,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
         dynamicPhrases.push(`이차방정식은 등식의 기본 원리만 꿰뚫으면 실수가 확 줍니다! 🔑`);
       }
       
-      dynamicPhrases.push(`[${grade} ➔ ${chapter}] 단원을 정교하게 현미경 분석 중... 🔬`);
+      dynamicPhrases.push(`밤티가 [${grade} ➔ ${chapter}] 단원을 정교하게 현미경 분석 중... 🔬`);
     }
 
     setLoadingText('오답 빅데이터 분석을 시작합니다...');
