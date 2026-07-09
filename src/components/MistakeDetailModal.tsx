@@ -418,18 +418,12 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     }
   }, [isAnalyzing, selectedEntry.id]);
 
-  // 5. 통계 인사이트 자동 슬라이드 로직 (3초 간격)
+  // 5. AI 분석 시작 시 첫 번째 통계 인덱스로 초기화
   React.useEffect(() => {
     if (isAnalyzing) {
       setInsightIndex(0);
-      const interval = setInterval(() => {
-        setInsightIndex(prev => (prev + 1) % statsInsights.length);
-      }, 3000);
-      return () => clearInterval(interval);
-    } else {
-      setInsightIndex(0);
     }
-  }, [isAnalyzing, statsInsights.length]);
+  }, [isAnalyzing]);
 
   const hasStruggled = selectedEntry.reviews?.some(r => r === 'X' || r === 'star');
 
@@ -842,24 +836,32 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 </div>
                 
                 {/* 카드 본체 */}
-                <div className="min-h-[110px] bg-slate-950/80 border border-slate-850 p-4.5 rounded-2xl relative shadow-inner flex flex-col justify-center transition-all duration-300">
+                <div 
+                  onClick={() => setInsightIndex(prev => (prev + 1) % statsInsights.length)}
+                  className="min-h-[110px] bg-slate-950/80 border border-slate-850 p-4.5 rounded-2xl relative shadow-inner flex flex-col justify-center transition-all duration-200 cursor-pointer hover:bg-slate-900 active:scale-[0.98] select-none"
+                >
                   <div className="flex items-start space-x-3">
                     <span className="text-2xl mt-0.5 select-none animate-bounce">
                       {statsInsights[insightIndex]?.emoji}
                     </span>
                     <div className="space-y-1 flex-1 text-left">
-                      <h5 className="text-xs font-black text-slate-300">
+                      <h5 className="text-[11px] font-bold text-slate-400">
                         {statsInsights[insightIndex]?.title}
                       </h5>
-                      <p className="text-xs text-slate-400 leading-relaxed font-medium">
+                      <p className="text-[11px] text-slate-300 leading-relaxed font-semibold">
                         {statsInsights[insightIndex]?.value}
                       </p>
                     </div>
                   </div>
                 </div>
 
+                {/* 터치 가이드 멘트 */}
+                <p className="text-[9px] text-slate-500 text-center mt-2.5 opacity-80 tracking-tight">
+                  ☝ 카드를 터치하면 다음 분석 통계가 나타나요
+                </p>
+
                 {/* 인디케이터 도트 */}
-                <div className="flex items-center justify-center space-x-1.5 mt-3.5">
+                <div className="flex items-center justify-center space-x-1.5 mt-3">
                   {statsInsights.map((_, idx) => (
                     <button
                       key={idx}
