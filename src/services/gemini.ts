@@ -16,6 +16,55 @@ interface GeminiResponse {
 }
 
 /**
+ * 브라우저 Canvas를 이용하여 이미지를 최대 가로/세로 1200px 크기로 축소하고,
+ * JPEG 0.82 화질로 압축하여 base64 문자열을 리턴하는 헬퍼 함수.
+ */
+async function resizeAndCompressImage(dataUrl: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous'; // CORS 에러 예방
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(dataUrl); // 캔버스 미지원 시 원본 리턴
+        return;
+      }
+
+      const MAX_WIDTH = 1200;
+      const MAX_HEIGHT = 1200;
+      let width = img.width;
+      let height = img.height;
+
+      // 종횡비 유지 리사이징 계산
+      if (width > height) {
+        if (width > MAX_WIDTH) {
+          height = Math.round((height * MAX_WIDTH) / width);
+          width = MAX_WIDTH;
+        }
+      } else {
+        if (height > MAX_HEIGHT) {
+          width = Math.round((width * MAX_HEIGHT) / height);
+          height = MAX_HEIGHT;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // JPEG 포맷으로 화질 0.82로 압축하여 용량 대폭 절감
+      const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+      resolve(compressedDataUrl);
+    };
+    img.onerror = () => {
+      reject(new Error('이미지 로딩 중 오류 발생'));
+    };
+    img.src = dataUrl;
+  });
+}
+
+/**
  * Parses a base64 Data URL to extract its MIME type and raw base64 data string.
  */
 function parseBase64Image(dataUrl: string): { mimeType: string; base64Data: string } {
@@ -34,32 +83,34 @@ function parseBase64Image(dataUrl: string): { mimeType: string; base64Data: stri
  * Downloads a public image URL and converts it into a base64 string for Gemini API.
  */
 async function imageUrlToBase64(url: string): Promise<{ mimeType: string; base64Data: string }> {
-  if (url.startsWith('data:')) {
-    return parseBase64Image(url);
+  let targetUrl = url;
+
+  if (!url.startsWith('data:')) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('CDN 이미지 다운로드 실패');
+      
+      const blob = await response.blob();
+      targetUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (err: any) {
+      console.error('Error fetching image CDN:', err);
+      throw new Error(`이미지 다운로드 실패: ${err.message}`);
+    }
   }
 
   try {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error('CDN 이미지 다운로드 실패');
-    
-    const blob = await response.blob();
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result as string;
-        try {
-          const parsed = parseBase64Image(result);
-          resolve(parsed);
-        } catch (err) {
-          reject(err);
-        }
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
+    // Canvas를 통한 고속 이미지 압축 및 리사이징 적용 (Input 토큰 요금 절감)
+    const compressedDataUrl = await resizeAndCompressImage(targetUrl);
+    return parseBase64Image(compressedDataUrl);
   } catch (err: any) {
-    console.error('Error converting URL to Base64:', err);
-    throw new Error(`이미지 분석 전처리 실패: ${err.message}`);
+    console.error('Error compressing image:', err);
+    // 압축 에러 시 원본 parse 시도 (Fallback)
+    return parseBase64Image(targetUrl);
   }
 }
 
@@ -402,9 +453,9 @@ ${syllabusText || '등록된 강의가 없습니다.'}
   };
 
   try {
-    const resolvedModel = 'gemini-2.5-pro';
+    const resolvedModel = 'gemini-2.5-flash';
 
-    // 메인 모델인 gemini-2.5-pro 단독 1회 호출로 OCR 및 고정밀 수학 진단 실행
+    // 가성비가 17배 뛰어나고 5초대로 속도가 빠른 gemini-2.5-flash 정식 모델 호출
     const parsedJson: GeminiResponse = await callGeminiApi(resolvedModel, requestBody, apiKey);
 
     // 단원명 보정 및 보정 로직 (통합 Fuzzy Matching 및 선행 확장 보정)

@@ -78,7 +78,7 @@ graph TD
    ▼
 [gemini.ts] analyzeProblemImage 실행 (Google AI SDK 호출)
    │ 
-   │ ➔ 엔진: 'gemini-2.5-pro' 단독 1회 호출
+   │ ➔ 엔진: 'gemini-2.5-flash' 단독 1회 호출 (가성비 요금 세이브 핫픽스)
    │ ➔ 프롬프트 규칙에 따라 4단계 초슬림 처방전 및 grade/chapter 단독 분류 응답
    ▼
 [gemini.ts] normalizeGradeAndChapter 매퍼 보정
