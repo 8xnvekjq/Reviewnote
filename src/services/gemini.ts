@@ -157,12 +157,20 @@ ${chaptersStr || '  * (챕터 정보 없음)'}`;
     })
     .join('\n\n');
 
+  const gradeMappingText = 
+    studentGrade === '중3' ? '학생의 교육과정 범위는 주로 [중3-1] 또는 [중3-2] 과목에 매핑됩니다.' :
+    studentGrade === '고1' ? '학생의 교육과정 범위는 주로 [공통수학1] 또는 [공통수학2] 과목에 매핑됩니다.' :
+    studentGrade === '고2' ? '학생의 교육과정 범위는 주로 [대수], [미적분Ⅰ], [확률과 통계], [기하] 과목에 매핑됩니다.' :
+    studentGrade === '고3' ? '학생의 교육과정 범위는 주로 [대수], [미적분Ⅰ], [미적분Ⅱ], [확률과 통계], [기하] 과목에 매핑됩니다.' :
+    '';
+
   const studentInfoPrompt = studentGrade
     ? `\n★ [학생 학년 필수 준수 지침 - 최우선 순위] ★
-- 이 오답 문제를 등록한 학생의 현재 학년/과정은 **"${studentGrade}"** 입니다.[cite: 1, 2]
-- AI는 이미지 속 문제를 분석하기 전, **반드시 이 학생의 현재 학년 정보를 기반으로 이 문제가 속한 교육과정 범위를 먼저 식별하고 분류**하십시오.[cite: 1, 2]
-- 만약 특정 개념(예: 인수분해, 이차방정식 등)이 중등 과정과 고등 과정에 모두 걸쳐 있다면, 다른 조건보다 학생의 학년인 **"${studentGrade}"** 에 맞추어 하위 교과 과정으로 단원을 우선 판별하십시오.[cite: 1, 2]
-- **[Curriculum Locking]**: 풀이 과정และ 힌트를 구성할 때, 식별된 학생의 학년 범위에서 '아직 배우지 않은 개념이나 선행 공식'을 끌고 와서 해설하는 것을 절대적으로 금지합니다. 오직 해당 학년 교과서 내의 기법만 사용하십시오.[cite: 2]\n`
+- 이 오답 문제를 등록한 학생의 현재 학년/과정은 **"${studentGrade}"** 입니다.
+- ${gradeMappingText}
+- AI는 이미지 속 문제를 분석하기 전, **반드시 이 학생의 현재 학년 정보를 기반으로 이 문제가 속한 교육과정 범위를 먼저 식별하고 분류**하십시오.
+- 만약 특정 개념(예: 인수분해, 이차방정식, 이차함수 등)이 중등 과정과 고등 과정에 모두 걸쳐 있다면, 다른 조건보다 학생의 학년인 **"${studentGrade}"** 에 맞추어 하위 교과 과정으로 과목(grade) 및 단원(chapter)을 우선 판별하십시오. (예: 중3 학생이 올린 이차함수/이차방정식 문제는 절대 "공통수학1" 또는 "공통수학2"가 아닌 **"중3-1"** 과목의 **"이차함수"** 또는 **"이차방정식"** 단원으로 분류해야 합니다. 이것은 수험생 교육 매칭에서 절대적으로 가장 중요합니다.)
+- **[Curriculum Locking]**: 풀이 과정과 힌트를 구성할 때, 식별된 학생의 학년 범위에서 '아직 배우지 않은 개념이나 선행 공식'을 끌고 와서 해설하는 것을 절대적으로 금지합니다. 오직 해당 학년 교과서 내의 기법만 사용하십시오.\n`
     : '';
 
   const prompt = `너는 대한민국 대치동에서 고등학교 내신과 수능 수학을 지도하고 있는 최고의 베테랑 스타 강사이자, 학생들에게 츤데레 잔소리와 명쾌한 실전 꿀팁으로 인기가 높은 '더쿠키수학 쌤'이다.[cite: 2]
@@ -333,15 +341,44 @@ ${syllabusText || '등록된 강의가 없습니다.'}[cite: 2]
     const allowedChapters = MATH_CURRICULUM[resolvedGrade] || ['기타'];
     let resolvedChapter = parsedJson.chapter || '기타';
 
-    // 100% 매치되지 않는 경우, 공백 제거 후 유사성 검사로 매핑
+    // 100% 매치되지 않는 경우, 공백 및 특수문자 제거 후 유니크 글자 겹침 비교 기반 매핑 (Fuzzy Match 오차 방지)
     if (!allowedChapters.includes(resolvedChapter)) {
-      const cleanTarget = resolvedChapter.replace(/\s+/g, '');
-      const matched = allowedChapters.find(ch => {
-        const cleanCh = ch.replace(/\s+/g, '');
-        return cleanCh.includes(cleanTarget) || cleanTarget.includes(cleanCh);
+      const cleanTarget = resolvedChapter.replace(/[^a-zA-Z0-9가-힣]/g, '').toLowerCase();
+      
+      let bestMatch = '';
+      let highestScore = -1;
+
+      allowedChapters.forEach(ch => {
+        const cleanCh = ch.replace(/[^a-zA-Z0-9가-힣]/g, '').toLowerCase();
+        
+        // 1. 완전 부분 집합 매치
+        if (cleanCh.includes(cleanTarget) || cleanTarget.includes(cleanCh)) {
+          const score = 1000 + Math.max(cleanCh.length, cleanTarget.length);
+          if (score > highestScore) {
+            highestScore = score;
+            bestMatch = ch;
+          }
+          return;
+        }
+
+        // 2. 글자 셋 중복 빈도 매치 (글자당 1점)
+        const setCh = new Set(cleanCh.split(''));
+        const setTarget = new Set(cleanTarget.split(''));
+        let commonCount = 0;
+        setTarget.forEach(char => {
+          if (setCh.has(char)) {
+            commonCount++;
+          }
+        });
+
+        if (commonCount > highestScore && commonCount > 0) {
+          highestScore = commonCount;
+          bestMatch = ch;
+        }
       });
-      if (matched) {
-        resolvedChapter = matched;
+
+      if (bestMatch && highestScore > 0) {
+        resolvedChapter = bestMatch;
       } else {
         resolvedChapter = allowedChapters[0] || '기타'; // 매핑 실패 시 과목의 첫 번째 단원으로 기본 지정
       }
