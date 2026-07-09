@@ -406,6 +406,7 @@ function App() {
 
       const newEntry: MistakeEntry = {
         id: dbEntry.id,
+        userId: dbEntry.user_id,
         title: dbEntry.title,
         imageUrl: dbEntry.image_url,
         date: dbEntry.date,

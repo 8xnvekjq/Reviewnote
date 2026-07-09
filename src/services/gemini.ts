@@ -64,6 +64,47 @@ async function imageUrlToBase64(url: string): Promise<{ mimeType: string; base64
 }
 
 /**
+ * Helper to normalize grade output from Gemini to match MATH_CURRICULUM keys.
+ * Accounts for 2022 revised curriculum naming and student's profile grade context.
+ */
+function normalizeGrade(rawGrade: string, studentGrade?: string): string {
+  const clean = (rawGrade || '').replace(/\s+/g, '').toLowerCase();
+
+  // 1. Direct match check
+  const keys = Object.keys(MATH_CURRICULUM);
+  const match = keys.find(k => k.toLowerCase() === clean);
+  if (match) return match;
+
+  // 2. Fuzzy mapping for common names
+  if (clean.includes('중3-1') || (clean.includes('중3') && clean.includes('1'))) return '중3-1';
+  if (clean.includes('중3-2') || (clean.includes('중3') && clean.includes('2'))) return '중3-2';
+  if (clean.includes('공통수학1') || clean.includes('공통수학(상)') || clean.includes('수학(상)')) return '공통수학1';
+  if (clean.includes('공통수학2') || clean.includes('공통수학(하)') || clean.includes('수학(하)')) return '공통수학2';
+  
+  // 2022 개정 교육과정 매핑: 수학1 -> 대수, 수학2 -> 미적분I
+  if (clean.includes('대수') || clean.includes('수학1') || clean.includes('수학i')) return '대수';
+  if (clean.includes('미적분1') || clean.includes('미적분i') || clean.includes('수학2') || clean.includes('수학ii')) return '미적분Ⅰ';
+  if (clean.includes('미적분2') || clean.includes('미적분ii')) return '미적분Ⅱ';
+  
+  if (clean.includes('확률') || clean.includes('통계') || clean.includes('확통')) return '확률과 통계';
+  if (clean.includes('기하')) return '기하';
+
+  // "중3" 또는 "고1" 등의 단순 매핑
+  if (clean === '중3') return '중3-1';
+  if (clean === '고1') return '공통수학1';
+
+  // 3. Fallback based on student's profile grade
+  if (studentGrade) {
+    const cleanStudent = studentGrade.replace(/\s+/g, '').toLowerCase();
+    if (cleanStudent.includes('중3')) return '중3-1';
+    if (cleanStudent.includes('고1')) return '공통수학1';
+    if (cleanStudent.includes('고2') || cleanStudent.includes('고3')) return '대수';
+  }
+
+  return '기타';
+}
+
+/**
  * Helper to escape LaTeX backslashes inside the raw JSON response text.
  * Prevents double-JSON parsing from stripping backslashes (e.g. converting \times to [tab]imes, \text to [tab]ext).
  */
@@ -334,10 +375,8 @@ ${syllabusText || '등록된 강의가 없습니다.'}[cite: 2]
     }
 
     // 단원명 보정 및 보정 로직 (Fuzzy Matching)
-    let resolvedGrade = parsedJson.grade || '기타';
-    if (!MATH_CURRICULUM[resolvedGrade]) {
-      resolvedGrade = '기타';
-    }
+    const resolvedGrade = normalizeGrade(parsedJson.grade || '', studentGrade);
+    console.log(`Gemini response - rawGrade: "${parsedJson.grade}", resolvedGrade: "${resolvedGrade}", rawChapter: "${parsedJson.chapter}"`);
 
     const allowedChapters = MATH_CURRICULUM[resolvedGrade] || ['기타'];
     let resolvedChapter = parsedJson.chapter || '기타';
