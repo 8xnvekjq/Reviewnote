@@ -35,6 +35,12 @@ export const MistakeList: React.FC<MistakeListProps> = ({
   const [selectedStudent, setSelectedStudent] = useState<string>('all');
   const [filterGrade, setFilterGrade] = useState<string>('all');
   const [filterChapter, setFilterChapter] = useState<string>('all');
+  const [visibleCount, setVisibleCount] = useState<number>(10);
+
+  // 필터나 뷰모드가 변경되면 표시 개수를 10개로 리셋
+  React.useEffect(() => {
+    setVisibleCount(10);
+  }, [selectedStudent, filterGrade, filterChapter, viewMode]);
 
   // 어드민일 때: 학생 목록 추출
   const studentOptions = isAdmin
@@ -216,71 +222,88 @@ export const MistakeList: React.FC<MistakeListProps> = ({
             {emptyMessage}
           </p>
         </div>
-      ) : viewMode === 'list' ? (
-        <div className="space-y-2.5">
-          {filtered.map((entry) => {
-            const studentName = isAdmin && entry.userId ? (profilesMap[entry.userId] || entry.userId.slice(0, 8)) : undefined;
-            const dateStr = entry.date ? entry.date.slice(5, 10).replace(/-/g, '/') : '—/—';
-            return (
-              <div
-                key={entry.id}
-                onClick={() => onSelectEntry(entry)}
-                className="group flex items-center justify-between bg-slate-900/40 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl p-3.5 cursor-pointer transition-all active:scale-[0.99] space-x-3.5 shadow-sm"
-              >
-                <div className="flex items-center space-x-3.5 min-w-0 flex-1">
-                  {/* Left Side: Badges */}
-                  <div className="flex flex-col space-y-1 flex-none items-start min-w-[80px]">
-                    {entry.grade && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-extrabold block">
-                        {entry.grade}
-                      </span>
-                    )}
-                    {entry.chapter && (
-                      <span className="text-[8px] text-slate-500 font-bold truncate max-w-[85px] block">
-                        {entry.chapter}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Middle Side: Title & Student Name */}
-                  <div className="min-w-0 flex-1">
-                    <div className="text-xs font-bold text-slate-200 line-clamp-1 group-hover:text-indigo-400 transition-colors">
-                      <LaTeXRenderer text={entry.title} className="text-xs" />
-                    </div>
-                    {studentName && (
-                      <span className="text-[8px] text-indigo-400 font-semibold mt-0.5 block">
-                        👤 {studentName}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Right Side: Date & Arrow */}
-                <div className="flex items-center space-x-3 flex-none pl-2">
-                  <span className="text-[9px] text-slate-500 font-semibold">
-                    {dateStr}
-                  </span>
-                  <span className="text-slate-600 group-hover:text-slate-400 transition-colors text-xs font-bold">
-                    &rarr;
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {filtered.map((entry) => (
-            <MistakeCard
-              key={entry.id}
-              entry={entry}
-              onSelect={onSelectEntry}
-              onDelete={onDeleteMistake}
-              studentName={isAdmin && entry.userId ? (profilesMap[entry.userId] || entry.userId.slice(0, 8)) : undefined}
-              isOwnNote={!isAdmin || entry.userId === currentUserId}
-            />
-          ))}
-        </div>
+        <>
+          {viewMode === 'list' ? (
+            <div className="space-y-2.5">
+              {filtered.slice(0, visibleCount).map((entry) => {
+                const studentName = isAdmin && entry.userId ? (profilesMap[entry.userId] || entry.userId.slice(0, 8)) : undefined;
+                const dateStr = entry.date ? entry.date.slice(5, 10).replace(/-/g, '/') : '—/—';
+                return (
+                  <div
+                    key={entry.id}
+                    onClick={() => onSelectEntry(entry)}
+                    className="group flex items-center justify-between bg-slate-900/40 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl p-3.5 cursor-pointer transition-all active:scale-[0.99] space-x-3.5 shadow-sm"
+                  >
+                    <div className="flex items-center space-x-3.5 min-w-0 flex-1">
+                      {/* Left Side: Badges */}
+                      <div className="flex flex-col space-y-1 flex-none items-start min-w-[80px]">
+                        {entry.grade && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-extrabold block">
+                            {entry.grade}
+                          </span>
+                        )}
+                        {entry.chapter && (
+                          <span className="text-[8px] text-slate-500 font-bold truncate max-w-[85px] block">
+                            {entry.chapter}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Middle Side: Title & Student Name */}
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-bold text-slate-200 line-clamp-1 group-hover:text-indigo-400 transition-colors">
+                          <LaTeXRenderer text={entry.title} className="text-xs" />
+                        </div>
+                        {studentName && (
+                          <span className="text-[8px] text-indigo-400 font-semibold mt-0.5 block">
+                            👤 {studentName}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Right Side: Date & Arrow */}
+                    <div className="flex items-center space-x-3 flex-none pl-2">
+                      <span className="text-[9px] text-slate-500 font-semibold">
+                        {dateStr}
+                      </span>
+                      <span className="text-slate-600 group-hover:text-slate-400 transition-colors text-xs font-bold">
+                        &rarr;
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {filtered.slice(0, visibleCount).map((entry) => (
+                <MistakeCard
+                  key={entry.id}
+                  entry={entry}
+                  onSelect={onSelectEntry}
+                  onDelete={onDeleteMistake}
+                  studentName={isAdmin && entry.userId ? (profilesMap[entry.userId] || entry.userId.slice(0, 8)) : undefined}
+                  isOwnNote={!isAdmin || entry.userId === currentUserId}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* 더 보기 버튼 */}
+          {filtered.length > visibleCount && (
+            <div className="pt-4 flex justify-center">
+              <button
+                onClick={() => setVisibleCount(prev => prev + 10)}
+                className="px-6 py-2.5 rounded-full text-xs font-bold bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-indigo-500/40 active:scale-95 transition-all shadow-lg flex items-center space-x-2 animate-fade-in"
+              >
+                <span>➕</span>
+                <span>오답 기록 더 보기 ({filtered.length - visibleCount}개 남음)</span>
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

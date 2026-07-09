@@ -24,6 +24,7 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
         <img 
           src={entry.imageUrl} 
           alt={entry.title}
+          loading="lazy"
           className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-500" 
         />
         {/* 삭제 버튼: 내 오답노트일 때만 */}
