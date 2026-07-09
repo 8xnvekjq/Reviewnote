@@ -299,9 +299,9 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
         const cleanTitle = (act.title || '').replace(/\$[^$]+\$/g, '').replace(/[#*`_]/g, '').slice(0, 15);
         
         if (lastReview === 'O') {
-          dynamicPhrases.push(`👤 ${studentName} 친구가 '${cleanTitle}...' 복습 O 성공! 우리도 힘냅시다! 🏆`);
+          dynamicPhrases.push(`👤 ${studentName}님이 방금 '${cleanTitle}...' 오답을 깔끔하게 해결했어요! 🎉`);
         } else {
-          dynamicPhrases.push(`👤 ${studentName} 친구가 '${cleanTitle}...' 오답을 열심히 격파 중이에요! ✍️`);
+          dynamicPhrases.push(`👤 ${studentName}님이 '${cleanTitle}...' 복습 카드에 다시 도전하는 중... 👀`);
         }
       });
     }
