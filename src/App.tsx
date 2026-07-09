@@ -756,6 +756,7 @@ function App() {
         <MistakeDetailModal
           selectedEntry={selectedEntry}
           allEntries={mistakes}
+          peerActivities={peerActivities}
           isAnalyzing={isAnalyzing}
           youtubeLectures={youtubeLectures}
           onClose={() => setSelectedEntry(null)}

@@ -8,6 +8,7 @@ import { supabase } from '../services/supabase';
 interface MistakeDetailModalProps {
   selectedEntry: MistakeEntry;
   allEntries?: MistakeEntry[];
+  peerActivities?: any[];
   isAnalyzing: boolean;
   youtubeLectures?: any[]; // DB로부터 가져온 55개 강의 마스터 리스트
   onClose: () => void;
@@ -31,6 +32,7 @@ const NORMAL_PHRASES = [
 export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   selectedEntry,
   allEntries = [],
+  peerActivities = [],
   isAnalyzing,
   youtubeLectures = [],
   onClose,
@@ -282,6 +284,28 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
       dynamicPhrases.push(`밤티가 [${grade} ➔ ${chapter}] 단원을 정교하게 현미경 분석 중... 🔬`);
     }
 
+    // 5. 실시간 동료 복습 자극 문구 추가 (최근 피드 연동)
+    if (peerActivities && peerActivities.length > 0) {
+      peerActivities.slice(0, 3).forEach((act: any) => {
+        const studentName = act.display_name || act.username || '동료 학생';
+        const reviewsArr = act.reviews || ['', '', ''];
+        let lastReview = '';
+        for (let i = 2; i >= 0; i--) {
+          if (reviewsArr[i] !== '') {
+            lastReview = reviewsArr[i];
+            break;
+          }
+        }
+        const cleanTitle = (act.title || '').replace(/\$[^$]+\$/g, '').replace(/[#*`_]/g, '').slice(0, 15);
+        
+        if (lastReview === 'O') {
+          dynamicPhrases.push(`👤 ${studentName} 친구가 '${cleanTitle}...' 복습 O 성공! 우리도 힘냅시다! 🏆`);
+        } else {
+          dynamicPhrases.push(`👤 ${studentName} 친구가 '${cleanTitle}...' 오답을 열심히 격파 중이에요! ✍️`);
+        }
+      });
+    }
+
     setLoadingText('오답 빅데이터 분석을 시작합니다...');
 
     let phraseIndex = 0;
@@ -289,10 +313,10 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
       const phrase = dynamicPhrases[phraseIndex % dynamicPhrases.length];
       setLoadingText(phrase);
       phraseIndex++;
-    }, 1800);
+    }, 3000); // 문구 가독성을 위해 3초 간격으로 전환 늦춤
 
     return () => clearInterval(interval);
-  }, [isAnalyzing, allEntries, selectedEntry.grade, selectedEntry.chapter]);
+  }, [isAnalyzing, allEntries, peerActivities, selectedEntry.grade, selectedEntry.chapter]);
 
   // 3. 사진 업로드 후 AI 진단 카드로 부드럽게 스크롤 이동
   React.useEffect(() => {
