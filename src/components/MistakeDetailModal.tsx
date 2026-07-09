@@ -222,10 +222,76 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     // 1. 동적 반복 멘트 풀(repeatPhrases) 조립
     const repeatPhrases: string[] = [];
 
-    // 누적 오답 개수 동적 문구 추가
+    // 누적 오답 개수 및 복습 완료율 동적 문구 추가
     if (allEntries && allEntries.length > 0) {
       repeatPhrases.push(`지금까지 누적 오답 노트를 ${allEntries.length}개나 돌파했어요! 🚀`);
       repeatPhrases.push(`오늘도 어김없이 실력을 단단하게 키우는 중... 🔥`);
+
+      // 복습 완료율 집계 (3차 복습 O 완료)
+      const completedCount = allEntries.filter(entry => {
+        const reviews = entry.reviews || [];
+        return reviews.filter(r => r === 'O').length === 3;
+      }).length;
+
+      if (completedCount > 0) {
+        repeatPhrases.push(`지금까지 총 ${completedCount}개의 오답 카드를 완벽히 격파하여 졸업시켰답니다! 🎉`);
+        const completionRatio = Math.round((completedCount / allEntries.length) * 100);
+        repeatPhrases.push(`벌써 전체 오답 중 ${completionRatio}%를 완벽하게 정복하여 보관함으로 보냈어요! 🏆`);
+      }
+    }
+
+    // 복습 정답률, 오늘 등록 공부량, 잠자는 오답 리마인더 통계 추가
+    if (allEntries && allEntries.length > 0) {
+      // 복습 정답률 집계 (O의 비율)
+      let totalReviewAttempts = 0;
+      let successReviewAttempts = 0;
+      allEntries.forEach((entry: MistakeEntry) => {
+        (entry.reviews || []).forEach(r => {
+          if (r === 'O' || r === 'X') {
+            totalReviewAttempts++;
+            if (r === 'O') successReviewAttempts++;
+          }
+        });
+      });
+
+      if (totalReviewAttempts > 0) {
+        const passRate = Math.round((successReviewAttempts / totalReviewAttempts) * 100);
+        repeatPhrases.push(`최근 복습 정답률이 ${passRate}%에 육박하고 있어요! 수학 실력이 수직 상승하는 중 📈`);
+      }
+
+      // 오늘 하루 공부량 집계
+      const today = new Date();
+      const todayYear = today.getFullYear();
+      const todayMonth = today.getMonth();
+      const todayDate = today.getDate();
+      const todayRegisteredCount = allEntries.filter(entry => {
+        if (!entry.date) return false;
+        const d = new Date(entry.date);
+        return d.getFullYear() === todayYear && d.getMonth() === todayMonth && d.getDate() === todayDate;
+      }).length;
+
+      if (todayRegisteredCount > 0) {
+        repeatPhrases.push(`오늘 벌써 ${todayRegisteredCount}개의 오답을 꼼꼼하게 수집했어요. 성실한 오늘치의 수학 흔적! ✍️`);
+      }
+
+      // 잠자는 오답 리마인더 (가장 오래 복습을 안 한 카드 검출)
+      const unreviewedEntries = allEntries
+        .filter(entry => {
+          const reviews = entry.reviews || [];
+          return reviews.length === 0 || reviews.every(r => r === '');
+        })
+        .sort((a, b) => {
+          if (!a.date) return 1;
+          if (!b.date) return -1;
+          return new Date(a.date).getTime() - new Date(b.date).getTime();
+        });
+
+      if (unreviewedEntries.length > 0) {
+        const sleepingEntry = unreviewedEntries[0];
+        const sleepingGrade = sleepingEntry.grade || '공통';
+        const sleepingChapter = sleepingEntry.chapter || '기타';
+        repeatPhrases.push(`구석에서 방치되고 있는 '${sleepingGrade} ➔ ${sleepingChapter}' 복습 카드도 잊지 마세요! 🤙`);
+      }
     }
 
     // 실수 원인 비율 통계 동적 문구 추가
