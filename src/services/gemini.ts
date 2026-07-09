@@ -64,44 +64,131 @@ async function imageUrlToBase64(url: string): Promise<{ mimeType: string; base64
 }
 
 /**
- * Helper to normalize grade output from Gemini to match MATH_CURRICULUM keys.
- * Accounts for 2022 revised curriculum naming and student's profile grade context.
+ * 학생의 학년 정보와 AI가 분류한 과목/단원을 종합 검증하여,
+ * 선행 학습 흐름을 존중하면서 꼬인 매핑을 역보정하는 프리미엄 통합 헬퍼 함수
  */
-function normalizeGrade(rawGrade: string, studentGrade?: string): string {
-  const clean = (rawGrade || '').replace(/\s+/g, '').toLowerCase();
+function normalizeGradeAndChapter(
+  rawGrade: string,
+  rawChapter: string,
+  studentGrade?: string
+): { grade: string; chapter: string } {
+  const cleanGrade = (rawGrade || '').replace(/\s+/g, '').toLowerCase();
+  const cleanChapter = (rawChapter || '').replace(/[^a-zA-Z0-9가-힣]/g, '').toLowerCase();
 
-  // 1. Direct match check
-  const keys = Object.keys(MATH_CURRICULUM);
-  const match = keys.find(k => k.toLowerCase() === clean);
-  if (match) return match;
+  // 1. 학생 학년 및 선행 탐색 우선순위 배열 구성
+  // 학생 학년에서 시작해 한 학년씩 올려가며 우선 탐색할 수 있는 리스트
+  let gradeSearchOrder = [
+    '중3-1', '중3-2', '공통수학1', '공통수학2', '대수', '미적분Ⅰ', '미적분Ⅱ', '확률과 통계', '기하', '기타'
+  ];
 
-  // 2. Fuzzy mapping for common names
-  if (clean.includes('중3-1') || (clean.includes('중3') && clean.includes('1'))) return '중3-1';
-  if (clean.includes('중3-2') || (clean.includes('중3') && clean.includes('2'))) return '중3-2';
-  if (clean.includes('공통수학1') || clean.includes('공통수학(상)') || clean.includes('수학(상)')) return '공통수학1';
-  if (clean.includes('공통수학2') || clean.includes('공통수학(하)') || clean.includes('수학(하)')) return '공통수학2';
-  
-  // 2022 개정 교육과정 매핑: 수학1 -> 대수, 수학2 -> 미적분I
-  if (clean.includes('대수') || clean.includes('수학1') || clean.includes('수학i')) return '대수';
-  if (clean.includes('미적분1') || clean.includes('미적분i') || clean.includes('수학2') || clean.includes('수학ii')) return '미적분Ⅰ';
-  if (clean.includes('미적분2') || clean.includes('미적분ii')) return '미적분Ⅱ';
-  
-  if (clean.includes('확률') || clean.includes('통계') || clean.includes('확통')) return '확률과 통계';
-  if (clean.includes('기하')) return '기하';
-
-  // "중3" 또는 "고1" 등의 단순 매핑
-  if (clean === '중3') return '중3-1';
-  if (clean === '고1') return '공통수학1';
-
-  // 3. Fallback based on student's profile grade
   if (studentGrade) {
     const cleanStudent = studentGrade.replace(/\s+/g, '').toLowerCase();
-    if (cleanStudent.includes('중3')) return '중3-1';
-    if (cleanStudent.includes('고1')) return '공통수학1';
-    if (cleanStudent.includes('고2') || cleanStudent.includes('고3')) return '대수';
+    if (cleanStudent.includes('중3')) {
+      gradeSearchOrder = [
+        '중3-1', '중3-2', '공통수학1', '공통수학2', '대수', '미적분Ⅰ', '미적분Ⅱ', '확률과 통계', '기하', '기타'
+      ];
+    } else if (cleanStudent.includes('고1')) {
+      gradeSearchOrder = [
+        '공통수학1', '공통수학2', '대수', '미적분Ⅰ', '미적분Ⅱ', '확률과 통계', '기하', '중3-1', '중3-2', '기타'
+      ];
+    } else if (cleanStudent.includes('고2')) {
+      gradeSearchOrder = [
+        '대수', '미적분Ⅰ', '확률과 통계', '기하', '미적분Ⅱ', '공통수학1', '공통수학2', '중3-1', '중3-2', '기타'
+      ];
+    } else if (cleanStudent.includes('고3')) {
+      gradeSearchOrder = [
+        '대수', '미적분Ⅰ', '미적분Ⅱ', '확률과 통계', '기하', '공통수학1', '공통수학2', '중3-1', '중3-2', '기타'
+      ];
+    }
   }
 
-  return '기타';
+  // 2. 단원명(rawChapter) 매칭 우선 탐색
+  // AI가 보낸 단원이 100% 매칭되거나 퍼지 매칭에 걸리는 진짜 교과를 찾음
+  if (cleanChapter && cleanChapter !== '기타') {
+    let bestGrade = '';
+    let bestChapter = '';
+    let highestScore = -1;
+
+    // 우선순위가 높은 과목부터 순회
+    for (const gradeKey of gradeSearchOrder) {
+      const allowedChapters = MATH_CURRICULUM[gradeKey] || [];
+      
+      for (const ch of allowedChapters) {
+        const cleanCh = ch.replace(/[^a-zA-Z0-9가-힣]/g, '').toLowerCase();
+
+        // 2-1. 단원이 토씨 하나 틀리지 않고 100% 일치할 때
+        if (cleanCh === cleanChapter) {
+          return { grade: gradeKey, chapter: ch };
+        }
+
+        // 2-2. 부분 일치 매칭 (예: "이차방정식의 풀이" -> "이차방정식" / "정적분" -> "적분")
+        if (cleanCh.includes(cleanChapter) || cleanChapter.includes(cleanCh)) {
+          const score = 1000 + Math.max(cleanCh.length, cleanChapter.length);
+          if (score > highestScore) {
+            highestScore = score;
+            bestGrade = gradeKey;
+            bestChapter = ch;
+          }
+        }
+
+        // 2-3. 자카드 유사도 매칭 (글자 겹침 수준 검사)
+        const setCh = new Set(cleanCh.split(''));
+        const setTarget = new Set(cleanChapter.split(''));
+        let commonCount = 0;
+        setTarget.forEach(char => {
+          if (setCh.has(char)) commonCount++;
+        });
+
+        if (commonCount > highestScore && commonCount > 1) { // 최소 2글자 이상 일치 조건
+          highestScore = commonCount;
+          bestGrade = gradeKey;
+          bestChapter = ch;
+        }
+      }
+
+      // 만약 우선순위 높은 과목에서 매우 높은 확률(1000점 이상 부분일치)의 매칭을 찾았다면 루프를 일찍 조기 종료
+      if (highestScore >= 1000) {
+        break;
+      }
+    }
+
+    if (bestGrade && bestChapter) {
+      return { grade: bestGrade, chapter: bestChapter };
+    }
+  }
+
+  // 3. 단원 매핑에 실패한 경우, 과목명(rawGrade)을 기반으로 매핑 복원 시도
+  let resolvedGrade = '기타';
+  const keys = Object.keys(MATH_CURRICULUM);
+  
+  // 3-1. 과목명 직접 일치 검사
+  const match = keys.find(k => k.toLowerCase() === cleanGrade);
+  if (match) {
+    resolvedGrade = match;
+  } else {
+    // 3-2. 과목명 대표 키워드 포함 검사
+    if (cleanGrade.includes('중3-1') || (cleanGrade.includes('중3') && cleanGrade.includes('1'))) resolvedGrade = '중3-1';
+    else if (cleanGrade.includes('중3-2') || (cleanGrade.includes('중3') && cleanGrade.includes('2'))) resolvedGrade = '중3-2';
+    else if (cleanGrade.includes('공통수학1') || cleanGrade.includes('공통수학(상)') || cleanGrade.includes('수학(상)')) resolvedGrade = '공통수학1';
+    else if (cleanGrade.includes('공통수학2') || cleanGrade.includes('공통수학(하)') || cleanGrade.includes('수학(하)')) resolvedGrade = '공통수학2';
+    else if (cleanGrade === '대수' || cleanGrade === '수학1' || cleanGrade === '수학i') resolvedGrade = '대수'; // 대수 완전 일치 우선
+    else if (cleanGrade.includes('미적분1') || cleanGrade.includes('미적분i') || cleanGrade.includes('수학2') || cleanGrade.includes('수학ii')) resolvedGrade = '미적분Ⅰ';
+    else if (cleanGrade.includes('미적분2') || cleanGrade.includes('미적분ii')) resolvedGrade = '미적분Ⅱ';
+    else if (cleanGrade.includes('확률') || cleanGrade.includes('통계') || cleanGrade.includes('확통')) resolvedGrade = '확률과 통계';
+    else if (cleanGrade.includes('기하')) resolvedGrade = '기하';
+    else if (cleanGrade === '중3') resolvedGrade = '중3-1';
+    else if (cleanGrade === '고1') resolvedGrade = '공통수학1';
+    else if (studentGrade) {
+      // 3-3. 최후의 폴백: 학생의 학년 기준 대입
+      const cleanStudent = studentGrade.replace(/\s+/g, '').toLowerCase();
+      if (cleanStudent.includes('중3')) resolvedGrade = '중3-1';
+      else if (cleanStudent.includes('고1')) resolvedGrade = '공통수학1';
+      else if (cleanStudent.includes('고2') || cleanStudent.includes('고3')) resolvedGrade = '대수';
+    }
+  }
+
+  // 매핑 실패 시 과목만이라도 건졌다면, 해당 과목의 단원 목록 중 첫 번째 단원으로 덮어쓰지 않고 "기타" 단원으로 안전 배정
+  return { grade: resolvedGrade, chapter: '기타' };
 }
 
 /**
@@ -331,55 +418,13 @@ ${syllabusText || '등록된 강의가 없습니다.'}
       }
     }
 
-    // 단원명 보정 및 보정 로직 (Fuzzy Matching)
-    const resolvedGrade = normalizeGrade(parsedJson.grade || '', studentGrade);
-    console.log(`Gemini response - rawGrade: "${parsedJson.grade}", resolvedGrade: "${resolvedGrade}", rawChapter: "${parsedJson.chapter}"`);
-
-    const allowedChapters = MATH_CURRICULUM[resolvedGrade] || ['기타'];
-    let resolvedChapter = parsedJson.chapter || '기타';
-
-    // 100% 매치되지 않는 경우, 공백 및 특수문자 제거 후 유니크 글자 겹침 비교 기반 매핑 (Fuzzy Match 오차 방지)
-    if (!allowedChapters.includes(resolvedChapter)) {
-      const cleanTarget = resolvedChapter.replace(/[^a-zA-Z0-9가-힣]/g, '').toLowerCase();
-      
-      let bestMatch = '';
-      let highestScore = -1;
-
-      allowedChapters.forEach(ch => {
-        const cleanCh = ch.replace(/[^a-zA-Z0-9가-힣]/g, '').toLowerCase();
-        
-        // 1. 완전 부분 집합 매치
-        if (cleanCh.includes(cleanTarget) || cleanTarget.includes(cleanCh)) {
-          const score = 1000 + Math.max(cleanCh.length, cleanTarget.length);
-          if (score > highestScore) {
-            highestScore = score;
-            bestMatch = ch;
-          }
-          return;
-        }
-
-        // 2. 글자 셋 중복 빈도 매치 (글자당 1점)
-        const setCh = new Set(cleanCh.split(''));
-        const setTarget = new Set(cleanTarget.split(''));
-        let commonCount = 0;
-        setTarget.forEach(char => {
-          if (setCh.has(char)) {
-            commonCount++;
-          }
-        });
-
-        if (commonCount > highestScore && commonCount > 0) {
-          highestScore = commonCount;
-          bestMatch = ch;
-        }
-      });
-
-      if (bestMatch && highestScore > 0) {
-        resolvedChapter = bestMatch;
-      } else {
-        resolvedChapter = allowedChapters[0] || '기타'; // 매핑 실패 시 과목의 첫 번째 단원으로 기본 지정
-      }
-    }
+    // 단원명 보정 및 보정 로직 (통합 Fuzzy Matching 및 선행 확장 보정)
+    const { grade: resolvedGrade, chapter: resolvedChapter } = normalizeGradeAndChapter(
+      parsedJson.grade || '',
+      parsedJson.chapter || '',
+      studentGrade
+    );
+    console.log(`Gemini response - rawGrade: "${parsedJson.grade}", resolvedGrade: "${resolvedGrade}", rawChapter: "${parsedJson.chapter}", resolvedChapter: "${resolvedChapter}"`);
 
     return {
       title: parsedJson.title || '분석 완료된 문제',
