@@ -17,6 +17,7 @@ export interface MistakeAnalysis {
   mistakeDetail?: string;   // [실수한 지점 상세 분석] (이전 데이터 호환용)
   rootCause?: string;       // [근본적인 틀린 이유] (이전 데이터 호환용)
   actionPlan?: string;      // [향후 재발 방지 대책] (이전 데이터 호환용)
+  modelUsed?: string;       // 분석에 사용된 AI 모델 명
 }
 
 export type ReviewState = 'O' | 'X' | 'star' | '';

@@ -679,6 +679,15 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             </div>
           ) : selectedEntry.analysis ? (
             <div className="space-y-6 animate-scale-up">
+              {/* AI 모델 명시 정보 */}
+              {selectedEntry.analysis.modelUsed && (
+                <div className="flex items-center justify-end">
+                  <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-slate-800 text-indigo-400 border border-slate-700/60 flex items-center space-x-1 select-none">
+                    <span>⚡ AI 엔진:</span>
+                    <span className="font-extrabold">{selectedEntry.analysis.modelUsed}</span>
+                  </span>
+                </div>
+              )}
               
               {/* Card 0: 원본 문제 지문 복원 */}
               {selectedEntry.analysis.problemText && (

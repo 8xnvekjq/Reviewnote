@@ -264,20 +264,23 @@ ${syllabusText || '등록된 강의가 없습니다.'}[cite: 2]
   };
 
   try {
+    let resolvedModel = 'gemini-2.5-flash';
+
     // 1단계: 기본적으로 gemini-2.5-flash 모델을 통해 빠른 OCR 및 분석 수행
     let parsedJson = await callGeminiApi('gemini-2.5-flash', requestBody, apiKey);
 
-    // 2단계: 문제 지문에 "다음 그림과 같이" 문구가 있는지 감지 (공백 제거 후 유연하게 검사)
+    // 2단계: 문제 지문에 "그림" 이라는 단어가 포함되어 있는지 유연하게 검사 (예: "다음 그림과 같이", "그림과 같이", "그림에서" 등 모두 매칭)
     const cleanText = (parsedJson.problemText || '').replace(/\s+/g, '');
-    if (cleanText.includes('다음그림과같이')) {
-      console.log('Detected "다음 그림과 같이" in problem text. Temporarily switching to gemini-3.5-flash for higher visual recognition accuracy.');
+    if (cleanText.includes('그림')) {
+      console.log('Detected figure reference ("그림") in problem text. Temporarily switching to gemini-3.5-flash for higher visual recognition accuracy.');
       try {
         // 일시적으로 gemini-3.5-flash 모델로 정밀 재분석 수행 후 덮어쓰기
         const parsedJson35 = await callGeminiApi('gemini-3.5-flash', requestBody, apiKey);
         parsedJson = parsedJson35;
+        resolvedModel = 'gemini-3.5-flash';
         console.log('Successfully re-analyzed using gemini-3.5-flash.');
-      } catch (err35) {
-        console.warn('Re-analysis with gemini-3.5-flash failed. Falling back to the initial gemini-2.5-flash result:', err35);
+      } catch (err35: any) {
+        console.warn('Re-analysis with gemini-3.5-flash failed. Falling back to the initial gemini-2.5-flash result. Error:', err35.message || err35);
       }
     }
 
@@ -316,7 +319,8 @@ ${syllabusText || '등록된 강의가 없습니다.'}[cite: 2]
         problemBox: parsedJson.problemBox,
         matchedVideoId: parsedJson.matchedVideoId || undefined,
         matchedStartSeconds: parsedJson.matchedStartSeconds != null ? parsedJson.matchedStartSeconds : undefined,
-        matchedChapterTitle: parsedJson.matchedChapterTitle || undefined
+        matchedChapterTitle: parsedJson.matchedChapterTitle || undefined,
+        modelUsed: resolvedModel
       }
     };
   } catch (error: any) {
