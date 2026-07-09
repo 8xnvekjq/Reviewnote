@@ -7,6 +7,7 @@ import { supabase } from '../services/supabase';
 
 interface MistakeDetailModalProps {
   selectedEntry: MistakeEntry;
+  allEntries?: MistakeEntry[]; // 전체 오답 노트 리스트 (통계 분석용)
   isAnalyzing: boolean;
   youtubeLectures?: any[]; // DB로부터 가져온 55개 강의 마스터 리스트
   onClose: () => void;
@@ -29,6 +30,7 @@ const NORMAL_PHRASES = [
 
 export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   selectedEntry,
+  allEntries = [],
   isAnalyzing,
   youtubeLectures = [],
   onClose,
@@ -39,7 +41,149 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 }) => {
   const [revealedHintCount, setRevealedHintCount] = React.useState(0);
   const [loadingText, setLoadingText] = React.useState('수학 문제 분석을 시작합니다...');
+  const [progress, setProgress] = React.useState(0);
+  const [showResult, setShowResult] = React.useState(!isAnalyzing && !!selectedEntry.analysis);
+  const [insightIndex, setInsightIndex] = React.useState(0);
   const analysisCardRef = React.useRef<HTMLDivElement>(null);
+
+  // 1. 개인 오답 데이터 기반 5대 통계 인사이트 도출
+  const statsInsights = React.useMemo(() => {
+    if (!allEntries || allEntries.length === 0) {
+      return [
+        { emoji: '📝', title: '나의 오답 노트', value: '첫 오답 노트를 분석해 나만의 수학 약점 노트를 완성해 보세요!' },
+        { emoji: '🔥', title: '열정적인 학습', value: '오늘부터 매일 오답을 정리하는 습관을 만들어 가요.' },
+        { emoji: '🎯', title: '복습의 중요성', value: '오답을 등록하고 3번 복습을 마친 오답은 자동으로 보관함으로 이동합니다.' },
+        { emoji: '🧠', title: '메타인지 훈련', value: '내가 왜 틀렸는지 직시하는 것이 실력 향상의 지름길입니다.' },
+        { emoji: '💡', title: '꿀팁 처방전', value: 'AI 분석이 완료되면 맞춤형 힌트와 유사 비디오가 자동 제공됩니다.' }
+      ];
+    }
+
+    const insights = [];
+
+    // 1-1. 총 오답 개수
+    insights.push({
+      emoji: '📝',
+      title: '총 오답 현황',
+      value: `선생님은 지금까지 총 ${allEntries.length}개의 오답노트를 만드셨어요!`
+    });
+
+    // 1-2. 복습 완료율 (reviews 중 'O'가 3개인 항목)
+    const completedCount = allEntries.filter(
+      e => e.reviews && e.reviews.filter(r => r === 'O').length === 3
+    ).length;
+    const completedRate = Math.round((completedCount / allEntries.length) * 100) || 0;
+    insights.push({
+      emoji: '🎯',
+      title: '복습 완료율',
+      value: `누적 오답 중 ${completedRate}%(${completedCount}문제)의 복습을 완벽히 마쳤어요. 훌륭해요!`
+    });
+
+    // 1-3. 가장 많이 틀린 오답 원인 (rootCauses 집계)
+    const causeCount: Record<string, number> = {};
+    allEntries.forEach(e => {
+      e.rootCauses?.forEach(c => {
+        causeCount[c] = (causeCount[c] || 0) + 1;
+      });
+    });
+    const causeMap: Record<string, string> = {
+      calc: '🧮 계산 실수',
+      formula: '📘 공식 오적용',
+      misread: '🔍 문제 오독',
+      concept: '🧠 개념 부족',
+      strategy: '🎯 풀이 전략 실패'
+    };
+    let topCauseId = '';
+    let topCauseMax = 0;
+    Object.entries(causeCount).forEach(([id, count]) => {
+      if (count > topCauseMax) {
+        topCauseMax = count;
+        topCauseId = id;
+      }
+    });
+
+    if (topCauseId && topCauseMax > 0) {
+      insights.push({
+        emoji: '📊 취약 원인 분석',
+        title: '나의 약점 유형',
+        value: `"${causeMap[topCauseId] || topCauseId}"로 인해 틀린 적이 가장 많아요 (${topCauseMax}회).`
+      });
+    }
+
+    // 1-4. 최다 오답 과목/단원 (grade / chapter 집계)
+    const chapterCount: Record<string, number> = {};
+    allEntries.forEach(e => {
+      if (e.grade && e.chapter) {
+        const key = `${e.grade} > ${e.chapter}`;
+        chapterCount[key] = (chapterCount[key] || 0) + 1;
+      }
+    });
+    let topChapterKey = '';
+    let topChapterMax = 0;
+    Object.entries(chapterCount).forEach(([key, count]) => {
+      if (count > topChapterMax) {
+        topChapterMax = count;
+        topChapterKey = key;
+      }
+    });
+    if (topChapterKey && topChapterMax > 0) {
+      insights.push({
+        emoji: '📚 최다 오답 단원',
+        title: '집중 보완 필요',
+        value: `"${topChapterKey}" 단원에서 가장 많은 오답(${topChapterMax}문제)이 등록되었어요.`
+      });
+    }
+
+    // 1-5. 연속 등록일 (스트릭)
+    const dates = allEntries
+      .map(e => e.date.substring(0, 10))
+      .filter((v, i, self) => self.indexOf(v) === i)
+      .sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+
+    let streak = 0;
+    if (dates.length > 0) {
+      const todayStr = new Date().toISOString().substring(0, 10);
+      const yesterdayStr = new Date(Date.now() - 86400000).toISOString().substring(0, 10);
+
+      if (dates[0] === todayStr || dates[0] === yesterdayStr) {
+        streak = 1;
+        for (let i = 0; i < dates.length - 1; i++) {
+          const curr = new Date(dates[i]);
+          const next = new Date(dates[i + 1]);
+          const diffDays = (curr.getTime() - next.getTime()) / (1000 * 3600 * 24);
+          if (diffDays === 1) {
+            streak++;
+          } else if (diffDays > 1) {
+            break;
+          }
+        }
+      }
+    }
+
+    if (streak >= 2) {
+      insights.push({
+        emoji: '🔥 연속 기록',
+        title: '오답 습관 형성 중',
+        value: `벌써 ${streak}일 연속으로 오답을 등록하며 실력을 쌓고 계시네요!`
+      });
+    } else {
+      insights.push({
+        emoji: '💡 매일 오답 노트',
+        title: '꾸준한 습관',
+        value: '매일 틀린 문제를 꾸준히 1개씩 기록하는 습관이 실력 도약의 첫걸음입니다!'
+      });
+    }
+
+    // 만약 insights 개수가 3개 미만이면 기본 멘트 추가
+    while (insights.length < 3) {
+      insights.push({
+        emoji: '🧠 메타인지 훈련',
+        title: '나를 마주하는 시간',
+        value: '내가 왜 틀렸는지 분석하고 반성할 때 진짜 내 실력이 됩니다.'
+      });
+    }
+
+    return insights;
+  }, [allEntries]);
 
   // Student editable fields
   const [editGrade, setEditGrade] = React.useState(selectedEntry.grade || '');
@@ -233,6 +377,59 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
       return () => clearTimeout(timer);
     }
   }, [selectedEntry.id, selectedEntry.analysis]);
+
+  // 4. 지능형 감속 가상 타이머 로직
+  React.useEffect(() => {
+    if (isAnalyzing) {
+      setProgress(0);
+      setShowResult(false);
+      
+      const startTime = Date.now();
+      const timer = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        let nextProgress = 0;
+        if (elapsed <= 8000) {
+          // 0 ~ 8초: 70%까지 빠르게 상승
+          nextProgress = (elapsed / 8000) * 70;
+        } else if (elapsed <= 20000) {
+          // 8 ~ 20초: 90%까지 서서히 상승
+          const ratio = (elapsed - 8000) / 12000;
+          nextProgress = 70 + ratio * 20;
+        } else {
+          // 20초 이상: 90%에서 99.5%까지 지수함수 형태로 점근
+          const extra = elapsed - 20000;
+          nextProgress = 90 + 9.5 * (1 - Math.exp(-extra / 15000));
+        }
+        setProgress(Math.min(99.5, nextProgress));
+      }, 100);
+
+      return () => clearInterval(timer);
+    } else {
+      // API 응답 완료 (isAnalyzing: true -> false)
+      if (progress > 0 && progress < 100) {
+        setProgress(100); // 100%로 강제 도달시킴
+        const delayTimer = setTimeout(() => {
+          setShowResult(true);
+        }, 500); // 100% 도달한 상태를 0.5초 노출
+        return () => clearTimeout(delayTimer);
+      } else {
+        setShowResult(!!selectedEntry.analysis);
+      }
+    }
+  }, [isAnalyzing, selectedEntry.id]);
+
+  // 5. 통계 인사이트 자동 슬라이드 로직 (3초 간격)
+  React.useEffect(() => {
+    if (isAnalyzing) {
+      setInsightIndex(0);
+      const interval = setInterval(() => {
+        setInsightIndex(prev => (prev + 1) % statsInsights.length);
+      }, 3000);
+      return () => clearInterval(interval);
+    } else {
+      setInsightIndex(0);
+    }
+  }, [isAnalyzing, statsInsights.length]);
 
   const hasStruggled = selectedEntry.reviews?.some(r => r === 'X' || r === 'star');
 
@@ -576,12 +773,103 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
           )}
 
           {/* AI Analysis trigger / solving process rendering */}
-          {isAnalyzing ? (
-            <div className="py-12 flex flex-col items-center justify-center space-y-4">
-              <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-              <div className="text-center min-h-[60px] flex flex-col justify-center">
-                <p className="text-sm font-semibold text-white animate-pulse">{loadingText}</p>
-                <p className="text-xs text-slate-400 mt-1">AI 수학 클리닉 진단을 작성하고 있습니다.</p>
+          {(!showResult && (isAnalyzing || (progress > 0 && progress < 100))) ? (
+            <div className="py-8 px-4 flex flex-col items-center space-y-8 animate-fade-in bg-slate-900/20 rounded-3xl border border-slate-800/40 backdrop-blur-md">
+              {/* 상단: 타이머와 로딩 텍스트를 담은 세련된 원형 기기 */}
+              <div className="flex flex-col items-center space-y-4">
+                <div className="relative w-32 h-32 flex items-center justify-center">
+                  {/* 뒷배경 서클 트랙 */}
+                  <svg className="w-full h-full transform -rotate-90">
+                    <circle
+                      cx="64"
+                      cy="64"
+                      r="54"
+                      className="stroke-slate-800/60"
+                      strokeWidth="6"
+                      fill="transparent"
+                    />
+                    {/* 앞 배경 프로그레스 서클 */}
+                    <circle
+                      cx="64"
+                      cy="64"
+                      r="54"
+                      className="stroke-indigo-500 transition-all duration-100 ease-out"
+                      strokeWidth="6"
+                      fill="transparent"
+                      strokeDasharray="339.29"
+                      strokeDashoffset={339.29 - (339.29 * progress) / 100}
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  {/* 중앙 진행 퍼센티지 텍스트 */}
+                  <div className="absolute flex flex-col items-center justify-center">
+                    <span className="text-2xl font-black text-white font-mono">
+                      {Math.round(progress)}%
+                    </span>
+                    <span className="text-[10px] text-indigo-400 font-bold tracking-wider mt-0.5 animate-pulse">
+                      진단 중
+                    </span>
+                  </div>
+                </div>
+                
+                {/* 진행 상황 및 남은 예상 시간 설명 */}
+                <div className="text-center space-y-1">
+                  <p className="text-sm font-semibold text-white tracking-tight flex items-center justify-center space-x-1.5 min-h-[20px]">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-500 animate-ping"></span>
+                    <span className="animate-pulse">{loadingText}</span>
+                  </p>
+                  <p className="text-[11px] text-slate-500">
+                    {progress >= 100 ? (
+                      <span className="text-emerald-400 font-bold animate-pulse">완료! 상세 진단을 표시합니다...</span>
+                    ) : progress >= 90 ? (
+                      <span>마지막 맞춤 처방을 다듬는 중입니다...</span>
+                    ) : (
+                      <span>예상 대기 시간: 약 {Math.max(1, Math.round((30 * (100 - progress)) / 100))}초</span>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              {/* 중앙 분할선 */}
+              <div className="w-full max-w-md h-[1px] bg-gradient-to-r from-transparent via-slate-800 to-transparent"></div>
+
+              {/* 하단: 통계 인사이트 카드 */}
+              <div className="w-full max-w-sm">
+                <div className="text-center mb-3">
+                  <span className="text-[10px] font-extrabold text-indigo-400 bg-indigo-500/10 px-2.5 py-1 rounded-full border border-indigo-500/20 tracking-widest uppercase">
+                    📊 나의 오답 분석 분석소
+                  </span>
+                </div>
+                
+                {/* 카드 본체 */}
+                <div className="min-h-[110px] bg-slate-950/80 border border-slate-850 p-4.5 rounded-2xl relative shadow-inner flex flex-col justify-center transition-all duration-300">
+                  <div className="flex items-start space-x-3">
+                    <span className="text-2xl mt-0.5 select-none animate-bounce">
+                      {statsInsights[insightIndex]?.emoji}
+                    </span>
+                    <div className="space-y-1 flex-1 text-left">
+                      <h5 className="text-xs font-black text-slate-300">
+                        {statsInsights[insightIndex]?.title}
+                      </h5>
+                      <p className="text-xs text-slate-400 leading-relaxed font-medium">
+                        {statsInsights[insightIndex]?.value}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 인디케이터 도트 */}
+                <div className="flex items-center justify-center space-x-1.5 mt-3.5">
+                  {statsInsights.map((_, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setInsightIndex(idx)}
+                      className={`h-1.5 rounded-full transition-all duration-300 ${
+                        idx === insightIndex ? 'w-4 bg-indigo-500' : 'w-1.5 bg-slate-800'
+                      }`}
+                    ></button>
+                  ))}
+                </div>
               </div>
             </div>
           ) : selectedEntry.analysis ? (
