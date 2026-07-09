@@ -18,15 +18,10 @@ interface MistakeDetailModalProps {
   onUpdateEntry: (updated: MistakeEntry) => void;
 }
 
-const NORMAL_PHRASES = [
+const INITIAL_PHRASES = [
   '밤티가 오답 분석을 시작합니다...',
   '밤티가 문제 이미지를 열심히 째려보는 중...',
-  '밤티가 수학 수식과 기호들을 판독하고 있어요... 🔍',
-  '지문 텍스트 복원 중...',
-  '핵심 개념 검색 중...',
-  '정석 풀이 작성 중...',
-  '단계별 힌트 구성 중...',
-  '과목 및 단원 분류 중...'
+  '밤티가 수학 수식과 기호들을 판독하고 있어요... 🔍'
 ];
 
 export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
@@ -224,16 +219,16 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
       return;
     }
     
-    // 1. 기본 문구 복제
-    const dynamicPhrases = [...NORMAL_PHRASES];
+    // 1. 동적 반복 멘트 풀(repeatPhrases) 조립
+    const repeatPhrases: string[] = [];
 
-    // 2. 전체 오답 개수 동적 문구 추가
+    // 누적 오답 개수 동적 문구 추가
     if (allEntries && allEntries.length > 0) {
-      dynamicPhrases.push(`지금까지 누적 오답 노트를 ${allEntries.length}개나 돌파했어요! 🚀`);
-      dynamicPhrases.push(`오늘도 어김없이 실력을 단단하게 키우는 중... 🔥`);
+      repeatPhrases.push(`지금까지 누적 오답 노트를 ${allEntries.length}개나 돌파했어요! 🚀`);
+      repeatPhrases.push(`오늘도 어김없이 실력을 단단하게 키우는 중... 🔥`);
     }
 
-    // 3. 실수 원인 비율 통계 동적 문구 추가
+    // 실수 원인 비율 통계 동적 문구 추가
     if (allEntries && allEntries.length > 0) {
       const causeCounts: Record<string, number> = {};
       let totalCauses = 0;
@@ -257,34 +252,34 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
         const option = ROOT_CAUSE_OPTIONS.find(opt => opt.id === topCause);
         if (option) {
           const ratio = Math.round((topCount / totalCauses) * 100);
-          dynamicPhrases.push(`최근에는 '${option.label}' 유형(${ratio}%)이 제일 잦아요. 밤티랑 같이 째려봅시다! 👀`);
+          repeatPhrases.push(`최근에는 '${option.label}' 유형(${ratio}%)이 제일 잦아요. 밤티랑 같이 째려봅시다! 👀`);
         }
       }
     }
 
-    // 4. 과목 및 단원 맞춤형 따뜻한 츤데레 멘트 추가
+    // 과목 및 단원 맞춤형 따뜻한 츤데레 멘트 추가
     if (selectedEntry.grade && selectedEntry.chapter) {
       const grade = selectedEntry.grade;
       const chapter = selectedEntry.chapter;
       
       if (grade.includes('미적분')) {
-        dynamicPhrases.push(`미적분은 수능 수학의 최종 보스예요! 쌤과 완전 정복해 봐요. 🍩`);
+        repeatPhrases.push(`미적분은 수능 수학의 최종 보스예요! 쌤과 완전 정복해 봐요. 🍩`);
       } else if (grade.includes('대수')) {
-        dynamicPhrases.push(`지수, 로그, 수열은 수식 정렬만 잘 잡으면 무조건 다 맞춥니다! 🍯`);
+        repeatPhrases.push(`지수, 로그, 수열은 수식 정렬만 잘 잡으면 무조건 다 맞춥니다! 🍯`);
       } else if (grade.includes('공통수학')) {
-        dynamicPhrases.push(`고1 공통수학은 수능 고득점의 가장 단단한 주춧돌이에요! 🧱`);
+        repeatPhrases.push(`고1 공통수학은 수능 고득점의 가장 단단한 주춧돌이에요! 🧱`);
       }
       
       if (chapter.includes('이차함수') || chapter.includes('함수')) {
-        dynamicPhrases.push(`함수 그래프는 직접 손으로 째려보며 그려봐야 직관이 섭니다! 📈`);
+        repeatPhrases.push(`함수 그래프는 직접 손으로 째려보며 그려봐야 직관이 섭니다! 📈`);
       } else if (chapter.includes('방정식')) {
-        dynamicPhrases.push(`이차방정식은 등식의 기본 원리만 꿰뚫으면 실수가 확 줍니다! 🔑`);
+        repeatPhrases.push(`이차방정식은 등식의 기본 원리만 꿰뚫으면 실수가 확 줍니다! 🔑`);
       }
       
-      dynamicPhrases.push(`밤티가 [${grade} ➔ ${chapter}] 단원을 정교하게 현미경 분석 중... 🔬`);
+      repeatPhrases.push(`밤티가 [${grade} ➔ ${chapter}] 단원을 정교하게 현미경 분석 중... 🔬`);
     }
 
-    // 5. 실시간 동료 복습 자극 문구 추가 (최근 피드 연동)
+    // 실시간 동료 복습 자극 문구 추가 (최근 피드 연동)
     if (peerActivities && peerActivities.length > 0) {
       peerActivities.slice(0, 3).forEach((act: any) => {
         const studentName = act.display_name || act.username || '동료 학생';
@@ -299,21 +294,33 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
         const cleanTitle = (act.title || '').replace(/\$[^$]+\$/g, '').replace(/[#*`_]/g, '').slice(0, 15);
         
         if (lastReview === 'O') {
-          dynamicPhrases.push(`👤 ${studentName}님이 방금 '${cleanTitle}...' 오답을 깔끔하게 해결했어요! 🎉`);
+          repeatPhrases.push(`👤 ${studentName}님이 방금 '${cleanTitle}...' 오답을 깔끔하게 해결했어요! 🎉`);
         } else {
-          dynamicPhrases.push(`👤 ${studentName}님이 '${cleanTitle}...' 복습 카드에 다시 도전하는 중... 👀`);
+          repeatPhrases.push(`👤 ${studentName}님이 '${cleanTitle}...' 복습 카드에 다시 도전하는 중... 👀`);
         }
       });
     }
 
-    setLoadingText('오답 빅데이터 분석을 시작합니다...');
+    // 동적 멘트 풀이 아예 없을 시 폴백 문구
+    if (repeatPhrases.length === 0) {
+      repeatPhrases.push('오늘도 힘차게 수학 오답 정복에 나선 당신을 응원해요! 🍩');
+    }
 
-    let phraseIndex = 0;
+    // 최초 0초 시작 문구 노출
+    setLoadingText(INITIAL_PHRASES[0]);
+
+    let count = 1;
     const interval = setInterval(() => {
-      const phrase = dynamicPhrases[phraseIndex % dynamicPhrases.length];
-      setLoadingText(phrase);
-      phraseIndex++;
-    }, 3000); // 문구 가독성을 위해 3초 간격으로 전환 늦춤
+      if (count < INITIAL_PHRASES.length) {
+        // 초반 3초, 6초 시점에는 INITIAL_PHRASES 순서대로 1회성 출력
+        setLoadingText(INITIAL_PHRASES[count]);
+      } else {
+        // 9초 이후부터는 동적 멘트 풀(repeatPhrases)에서만 롤링 출력
+        const repeatIndex = (count - INITIAL_PHRASES.length) % repeatPhrases.length;
+        setLoadingText(repeatPhrases[repeatIndex]);
+      }
+      count++;
+    }, 3000); // 3초 주기
 
     return () => clearInterval(interval);
   }, [isAnalyzing, allEntries, peerActivities, selectedEntry.grade, selectedEntry.chapter]);
