@@ -20,8 +20,8 @@ interface MistakeDetailModalProps {
 
 const INITIAL_PHRASES = [
   '밤티가 오답 분석을 시작합니다...',
-  '밤티가 문제 이미지를 열심히 째려보는 중...',
-  '밤티가 수학 수식과 기호들을 판독하고 있어요... 🔍'
+  '밤티가 문제 이미지를 열심히 판독하고 있어요... 🔍',
+  '밤티가 수학 수식과 기호들을 꼼꼼하게 정리하고 있어요. ✍️'
 ];
 
 export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
@@ -224,8 +224,8 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
     // 누적 오답 개수 및 복습 완료율 동적 문구 추가
     if (allEntries && allEntries.length > 0) {
-      repeatPhrases.push(`지금까지 누적 오답 노트를 ${allEntries.length}개나 돌파했어요! 🚀`);
-      repeatPhrases.push(`오늘도 어김없이 실력을 단단하게 키우는 중... 🔥`);
+      repeatPhrases.push(`지금까지 누적 오답 카드를 ${allEntries.length}개나 돌파했어요! 🚀`);
+      repeatPhrases.push(`오늘도 밤티와 함께 실력을 한 단계 더 탄탄하게 쌓아 올려요! 🔥`);
 
       // 복습 완료율 집계 (3차 복습 O 완료)
       const completedCount = allEntries.filter(entry => {
@@ -234,9 +234,9 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
       }).length;
 
       if (completedCount > 0) {
-        repeatPhrases.push(`지금까지 총 ${completedCount}개의 오답 카드를 완벽히 격파하여 졸업시켰답니다! 🎉`);
+        repeatPhrases.push(`지금까지 총 ${completedCount}개의 오답을 완벽하게 해결해 보관함에 넣었어요! 🎉`);
         const completionRatio = Math.round((completedCount / allEntries.length) * 100);
-        repeatPhrases.push(`벌써 전체 오답 중 ${completionRatio}%를 완벽하게 정복하여 보관함으로 보냈어요! 🏆`);
+        repeatPhrases.push(`벌써 전체 오답 중 ${completionRatio}%를 완벽하게 정복하여 완료했답니다! 🏆`);
       }
     }
 
@@ -256,7 +256,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
       if (totalReviewAttempts > 0) {
         const passRate = Math.round((successReviewAttempts / totalReviewAttempts) * 100);
-        repeatPhrases.push(`최근 복습 정답률이 ${passRate}%에 육박하고 있어요! 수학 실력이 수직 상승하는 중 📈`);
+        repeatPhrases.push(`최근 복습 정답률이 ${passRate}%에 달하고 있어요! 실력이 쑥쑥 자라나고 있네요. 📈`);
       }
 
       // 오늘 하루 공부량 집계
@@ -271,7 +271,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
       }).length;
 
       if (todayRegisteredCount > 0) {
-        repeatPhrases.push(`오늘 벌써 ${todayRegisteredCount}개의 오답을 꼼꼼하게 수집했어요. 성실한 오늘치의 수학 흔적! ✍️`);
+        repeatPhrases.push(`오늘 벌써 ${todayRegisteredCount}개의 오답을 등록했어요. 오늘의 성실함이 빛나네요! ✍️`);
       }
 
       // 잠자는 오답 리마인더 (가장 오래 복습을 안 한 카드 검출)
@@ -290,7 +290,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
         const sleepingEntry = unreviewedEntries[0];
         const sleepingGrade = sleepingEntry.grade || '공통';
         const sleepingChapter = sleepingEntry.chapter || '기타';
-        repeatPhrases.push(`구석에서 방치되고 있는 '${sleepingGrade} ➔ ${sleepingChapter}' 복습 카드도 잊지 마세요! 🤙`);
+        repeatPhrases.push(`아직 복습을 시작하지 않은 '${sleepingGrade} ➔ ${sleepingChapter}' 카드도 차근차근 해결해 봐요! 🔍`);
       }
     }
 
@@ -318,7 +318,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
         const option = ROOT_CAUSE_OPTIONS.find(opt => opt.id === topCause);
         if (option) {
           const ratio = Math.round((topCount / totalCauses) * 100);
-          repeatPhrases.push(`최근에는 '${option.label}' 유형(${ratio}%)이 제일 잦아요. 밤티랑 같이 째려봅시다! 👀`);
+          repeatPhrases.push(`최근에는 '${option.label}' 유형(${ratio}%)의 오답률이 높은 편이에요. 밤티와 함께 집중 공략해 봐요! 🎯`);
         }
       }
     }
@@ -329,20 +329,20 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
       const chapter = selectedEntry.chapter;
       
       if (grade.includes('미적분')) {
-        repeatPhrases.push(`미적분은 수능 수학의 최종 보스예요! 쌤과 완전 정복해 봐요. 🍩`);
+        repeatPhrases.push(`미적분은 수능 수학의 최종 보스예요! 밤티와 함께 완전 정복해 봐요. 🍩`);
       } else if (grade.includes('대수')) {
-        repeatPhrases.push(`지수, 로그, 수열은 수식 정렬만 잘 잡으면 무조건 다 맞춥니다! 🍯`);
+        repeatPhrases.push(`지수, 로그, 수열은 수식 정렬을 예쁘게 잡는 연습부터 시작해 봐요! 🍯`);
       } else if (grade.includes('공통수학')) {
-        repeatPhrases.push(`고1 공통수학은 수능 고득점의 가장 단단한 주춧돌이에요! 🧱`);
+        repeatPhrases.push(`고1 공통수학은 수능 고득점으로 가는 가장 든든한 주춧돌이에요! 🧱`);
       }
       
       if (chapter.includes('이차함수') || chapter.includes('함수')) {
-        repeatPhrases.push(`함수 그래프는 직접 손으로 째려보며 그려봐야 직관이 섭니다! 📈`);
+        repeatPhrases.push(`함수 그래프는 연습장에 직접 한 번 그려보는 것이 개념 이해에 가장 좋아요! 📈`);
       } else if (chapter.includes('방정식')) {
-        repeatPhrases.push(`이차방정식은 등식의 기본 원리만 꿰뚫으면 실수가 확 줍니다! 🔑`);
+        repeatPhrases.push(`이차방정식은 등식의 기본 성질을 차근차근 따라가면 계산 실수를 줄일 수 있어요! 🔑`);
       }
       
-      repeatPhrases.push(`밤티가 [${grade} ➔ ${chapter}] 단원을 정교하게 현미경 분석 중... 🔬`);
+      repeatPhrases.push(`밤티가 [${grade} ➔ ${chapter}] 단원을 정교하게 분석하고 있어요. 🔬`);
     }
 
     // 실시간 동료 복습 자극 문구 추가 (최근 피드 연동)
