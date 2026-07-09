@@ -7,7 +7,6 @@ import { supabase } from '../services/supabase';
 
 interface MistakeDetailModalProps {
   selectedEntry: MistakeEntry;
-  allEntries?: MistakeEntry[]; // 전체 오답 노트 리스트 (통계 분석용)
   isAnalyzing: boolean;
   youtubeLectures?: any[]; // DB로부터 가져온 55개 강의 마스터 리스트
   onClose: () => void;
@@ -30,7 +29,6 @@ const NORMAL_PHRASES = [
 
 export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   selectedEntry,
-  allEntries = [],
   isAnalyzing,
   youtubeLectures = [],
   onClose,
@@ -43,147 +41,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   const [loadingText, setLoadingText] = React.useState('수학 문제 분석을 시작합니다...');
   const [progress, setProgress] = React.useState(0);
   const [showResult, setShowResult] = React.useState(!isAnalyzing && !!selectedEntry.analysis);
-  const [insightIndex, setInsightIndex] = React.useState(0);
   const analysisCardRef = React.useRef<HTMLDivElement>(null);
-
-  // 1. 개인 오답 데이터 기반 5대 통계 인사이트 도출
-  const statsInsights = React.useMemo(() => {
-    if (!allEntries || allEntries.length === 0) {
-      return [
-        { emoji: '📝', title: '나의 오답 노트', value: '첫 오답 노트를 분석해 나만의 수학 약점 노트를 완성해 보세요!' },
-        { emoji: '🔥', title: '열정적인 학습', value: '오늘부터 매일 오답을 정리하는 습관을 만들어 가요.' },
-        { emoji: '🎯', title: '복습의 중요성', value: '오답을 등록하고 3번 복습을 마친 오답은 자동으로 보관함으로 이동합니다.' },
-        { emoji: '🧠', title: '메타인지 훈련', value: '내가 왜 틀렸는지 직시하는 것이 실력 향상의 지름길입니다.' },
-        { emoji: '💡', title: '꿀팁 처방전', value: 'AI 분석이 완료되면 맞춤형 힌트와 유사 비디오가 자동 제공됩니다.' }
-      ];
-    }
-
-    const insights = [];
-
-    // 1-1. 총 오답 개수
-    insights.push({
-      emoji: '📝',
-      title: '총 오답 현황',
-      value: `지금까지 총 ${allEntries.length}개의 오답노트를 작성하셨어요!`
-    });
-
-    // 1-2. 복습 완료율 (reviews 중 'O'가 3개인 항목)
-    const completedCount = allEntries.filter(
-      e => e.reviews && e.reviews.filter(r => r === 'O').length === 3
-    ).length;
-    const completedRate = Math.round((completedCount / allEntries.length) * 100) || 0;
-    insights.push({
-      emoji: '🎯',
-      title: '복습 완료율',
-      value: `누적 오답 중 ${completedRate}%(${completedCount}문제)의 복습을 완벽히 마쳤어요. 훌륭해요!`
-    });
-
-    // 1-3. 가장 많이 틀린 오답 원인 (rootCauses 집계)
-    const causeCount: Record<string, number> = {};
-    allEntries.forEach(e => {
-      e.rootCauses?.forEach(c => {
-        causeCount[c] = (causeCount[c] || 0) + 1;
-      });
-    });
-    const causeMap: Record<string, string> = {
-      calc: '🧮 계산 실수',
-      formula: '📘 공식 오적용',
-      misread: '🔍 문제 오독',
-      concept: '🧠 개념 부족',
-      strategy: '🎯 풀이 전략 실패'
-    };
-    let topCauseId = '';
-    let topCauseMax = 0;
-    Object.entries(causeCount).forEach(([id, count]) => {
-      if (count > topCauseMax) {
-        topCauseMax = count;
-        topCauseId = id;
-      }
-    });
-
-    if (topCauseId && topCauseMax > 0) {
-      insights.push({
-        emoji: '📊 취약 원인 분석',
-        title: '나의 약점 유형',
-        value: `"${causeMap[topCauseId] || topCauseId}"로 인해 틀린 적이 가장 많아요 (${topCauseMax}회).`
-      });
-    }
-
-    // 1-4. 최다 오답 과목/단원 (grade / chapter 집계)
-    const chapterCount: Record<string, number> = {};
-    allEntries.forEach(e => {
-      if (e.grade && e.chapter) {
-        const key = `${e.grade} > ${e.chapter}`;
-        chapterCount[key] = (chapterCount[key] || 0) + 1;
-      }
-    });
-    let topChapterKey = '';
-    let topChapterMax = 0;
-    Object.entries(chapterCount).forEach(([key, count]) => {
-      if (count > topChapterMax) {
-        topChapterMax = count;
-        topChapterKey = key;
-      }
-    });
-    if (topChapterKey && topChapterMax > 0) {
-      insights.push({
-        emoji: '📚 최다 오답 단원',
-        title: '집중 보완 필요',
-        value: `"${topChapterKey}" 단원에서 가장 많은 오답(${topChapterMax}문제)이 등록되었어요.`
-      });
-    }
-
-    // 1-5. 연속 등록일 (스트릭)
-    const dates = allEntries
-      .map(e => e.date.substring(0, 10))
-      .filter((v, i, self) => self.indexOf(v) === i)
-      .sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-
-    let streak = 0;
-    if (dates.length > 0) {
-      const todayStr = new Date().toISOString().substring(0, 10);
-      const yesterdayStr = new Date(Date.now() - 86400000).toISOString().substring(0, 10);
-
-      if (dates[0] === todayStr || dates[0] === yesterdayStr) {
-        streak = 1;
-        for (let i = 0; i < dates.length - 1; i++) {
-          const curr = new Date(dates[i]);
-          const next = new Date(dates[i + 1]);
-          const diffDays = (curr.getTime() - next.getTime()) / (1000 * 3600 * 24);
-          if (diffDays === 1) {
-            streak++;
-          } else if (diffDays > 1) {
-            break;
-          }
-        }
-      }
-    }
-
-    if (streak >= 2) {
-      insights.push({
-        emoji: '🔥 연속 기록',
-        title: '오답 습관 형성 중',
-        value: `벌써 ${streak}일 연속으로 오답을 등록하며 실력을 쌓고 계시네요!`
-      });
-    } else {
-      insights.push({
-        emoji: '💡 매일 오답 노트',
-        title: '꾸준한 습관',
-        value: '매일 틀린 문제를 꾸준히 1개씩 기록하는 습관이 실력 도약의 첫걸음입니다!'
-      });
-    }
-
-    // 만약 insights 개수가 3개 미만이면 기본 멘트 추가
-    while (insights.length < 3) {
-      insights.push({
-        emoji: '🧠 메타인지 훈련',
-        title: '나를 마주하는 시간',
-        value: '내가 왜 틀렸는지 분석하고 반성할 때 진짜 내 실력이 됩니다.'
-      });
-    }
-
-    return insights;
-  }, [allEntries]);
 
   // Student editable fields
   const [editGrade, setEditGrade] = React.useState(selectedEntry.grade || '');
@@ -418,12 +276,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     }
   }, [isAnalyzing, selectedEntry.id]);
 
-  // 5. AI 분석 시작 시 첫 번째 통계 인덱스로 초기화
-  React.useEffect(() => {
-    if (isAnalyzing) {
-      setInsightIndex(0);
-    }
-  }, [isAnalyzing]);
+
 
   const hasStruggled = selectedEntry.reviews?.some(r => r === 'X' || r === 'star');
 
@@ -821,56 +674,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                       <span>예상 대기 시간: 약 {Math.max(1, Math.round((30 * (100 - progress)) / 100))}초</span>
                     )}
                   </p>
-                </div>
-              </div>
-
-              {/* 중앙 분할선 */}
-              <div className="w-full max-w-md h-[1px] bg-gradient-to-r from-transparent via-slate-800 to-transparent"></div>
-
-              {/* 하단: 통계 인사이트 카드 */}
-              <div className="w-full max-w-sm">
-                <div className="text-center mb-3">
-                  <span className="text-[10px] font-extrabold text-indigo-400 bg-indigo-500/10 px-2.5 py-1 rounded-full border border-indigo-500/20 tracking-widest uppercase">
-                    📊 나의 오답 분석 분석소
-                  </span>
-                </div>
-                
-                {/* 카드 본체 */}
-                <div 
-                  onClick={() => setInsightIndex(prev => (prev + 1) % statsInsights.length)}
-                  className="min-h-[110px] bg-slate-950/80 border border-slate-850 p-4.5 rounded-2xl relative shadow-inner flex flex-col justify-center transition-all duration-200 cursor-pointer hover:bg-slate-900 active:scale-[0.98] select-none"
-                >
-                  <div className="flex items-start space-x-3">
-                    <span className="text-2xl mt-0.5 select-none animate-bounce">
-                      {statsInsights[insightIndex]?.emoji}
-                    </span>
-                    <div className="space-y-1 flex-1 text-left">
-                      <h5 className="text-[11px] font-bold text-slate-400">
-                        {statsInsights[insightIndex]?.title}
-                      </h5>
-                      <p className="text-[11px] text-slate-300 leading-relaxed font-semibold">
-                        {statsInsights[insightIndex]?.value}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 터치 가이드 멘트 */}
-                <p className="text-[9px] text-slate-500 text-center mt-2.5 opacity-80 tracking-tight">
-                  ☝ 카드를 터치하면 다음 분석 통계가 나타나요
-                </p>
-
-                {/* 인디케이터 도트 */}
-                <div className="flex items-center justify-center space-x-1.5 mt-3">
-                  {statsInsights.map((_, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setInsightIndex(idx)}
-                      className={`h-1.5 rounded-full transition-all duration-300 ${
-                        idx === insightIndex ? 'w-4 bg-indigo-500' : 'w-1.5 bg-slate-800'
-                      }`}
-                    ></button>
-                  ))}
                 </div>
               </div>
             </div>
