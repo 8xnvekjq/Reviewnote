@@ -1038,14 +1038,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             <span>🗑️</span>
             <span>삭제</span>
           </button>
-          
-          <button 
-            onClick={onClose}
-            className="flex-1 py-3 rounded-xl border border-slate-800 hover:border-slate-700 active:scale-95 transition-all text-xs font-semibold text-slate-300"
-          >
-            닫기
-          </button>
-
           <button
             onClick={handleSave}
             disabled={isSaving}
