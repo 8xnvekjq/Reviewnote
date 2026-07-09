@@ -323,27 +323,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
       }
     }
 
-    // 과목 및 단원 맞춤형 따뜻한 츤데레 멘트 추가
-    if (selectedEntry.grade && selectedEntry.chapter) {
-      const grade = selectedEntry.grade;
-      const chapter = selectedEntry.chapter;
-      
-      if (grade.includes('미적분')) {
-        repeatPhrases.push(`미적분은 수능 수학의 최종 보스예요! 밤티와 함께 완전 정복해 봐요. 🍩`);
-      } else if (grade.includes('대수')) {
-        repeatPhrases.push(`지수, 로그, 수열은 수식 정렬을 예쁘게 잡는 연습부터 시작해 봐요! 🍯`);
-      } else if (grade.includes('공통수학')) {
-        repeatPhrases.push(`고1 공통수학은 수능 고득점으로 가는 가장 든든한 주춧돌이에요! 🧱`);
-      }
-      
-      if (chapter.includes('이차함수') || chapter.includes('함수')) {
-        repeatPhrases.push(`함수 그래프는 연습장에 직접 한 번 그려보는 것이 개념 이해에 가장 좋아요! 📈`);
-      } else if (chapter.includes('방정식')) {
-        repeatPhrases.push(`이차방정식은 등식의 기본 성질을 차근차근 따라가면 계산 실수를 줄일 수 있어요! 🔑`);
-      }
-      
-      repeatPhrases.push(`밤티가 [${grade} ➔ ${chapter}] 단원을 정교하게 분석하고 있어요. 🔬`);
-    }
+
 
     // 실시간 동료 복습 자극 문구 추가 (최근 피드 연동)
     if (peerActivities && peerActivities.length > 0) {
