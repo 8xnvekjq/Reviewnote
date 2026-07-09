@@ -19,7 +19,6 @@ interface MistakeDetailModalProps {
 }
 
 const INITIAL_PHRASES = [
-  '밤티가 오답 분석을 시작합니다...',
   '밤티가 문제 이미지를 열심히 판독하고 있어요... 🔍',
   '밤티가 수학 수식과 기호들을 꼼꼼하게 정리하고 있어요. ✍️'
 ];
@@ -225,7 +224,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     // 누적 오답 개수 및 복습 완료율 동적 문구 추가
     if (allEntries && allEntries.length > 0) {
       repeatPhrases.push(`지금까지 누적 오답 카드를 ${allEntries.length}개나 돌파했어요! 🚀`);
-      repeatPhrases.push(`오늘도 밤티와 함께 실력을 한 단계 더 탄탄하게 쌓아 올려요! 🔥`);
 
       // 복습 완료율 집계 (3차 복습 O 완료)
       const completedCount = allEntries.filter(entry => {
@@ -352,18 +350,18 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
       repeatPhrases.push('오늘도 힘차게 수학 오답 정복에 나선 당신을 응원해요! 🍩');
     }
 
-    // 최초 0초 시작 문구 노출
+    // 최초 0초 시작 문구 노출 (첫 번째 정적 문구)
     setLoadingText(INITIAL_PHRASES[0]);
 
     let count = 1;
     const interval = setInterval(() => {
       if (count < INITIAL_PHRASES.length) {
-        // 초반 3초, 6초 시점에는 INITIAL_PHRASES 순서대로 1회성 출력
+        // 초반 3초 시점에는 INITIAL_PHRASES 순서대로 1회성 출력
         setLoadingText(INITIAL_PHRASES[count]);
       } else {
-        // 9초 이후부터는 동적 멘트 풀(repeatPhrases)에서만 롤링 출력
-        const repeatIndex = (count - INITIAL_PHRASES.length) % repeatPhrases.length;
-        setLoadingText(repeatPhrases[repeatIndex]);
+        // 초반 정적 문구 노출이 끝나면, 동적 멘트 풀(repeatPhrases)에서 무작위(Random)로 롤링 출력
+        const randomIndex = Math.floor(Math.random() * repeatPhrases.length);
+        setLoadingText(repeatPhrases[randomIndex]);
       }
       count++;
     }, 3000); // 3초 주기
