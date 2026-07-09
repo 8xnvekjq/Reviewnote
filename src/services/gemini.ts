@@ -64,6 +64,45 @@ async function imageUrlToBase64(url: string): Promise<{ mimeType: string; base64
 }
 
 /**
+ * Helper to escape LaTeX backslashes inside the raw JSON response text.
+ * Prevents double-JSON parsing from stripping backslashes (e.g. converting \times to [tab]imes, \text to [tab]ext).
+ */
+function escapeLatexBackslashes(jsonStr: string): string {
+  return jsonStr.replace(/\\(.)/g, (match, char, offset) => {
+    // If followed by a letter
+    if (/[a-zA-Z]/.test(char)) {
+      const nextChar = jsonStr.charAt(offset + match.length);
+      const isJsonEscapeLetter = ['n', 'r', 't', 'b', 'f'].includes(char.toLowerCase());
+      
+      if (isJsonEscapeLetter) {
+        // If followed by another letter, it's a LaTeX command (like \text, \times, \new, \begin, \frac)
+        if (/[a-zA-Z]/.test(nextChar)) {
+          return '\\\\' + char;
+        }
+        return match;
+      }
+      
+      if (char.toLowerCase() === 'u') {
+        const fourChars = jsonStr.slice(offset + match.length, offset + match.length + 4);
+        if (/^[0-9a-fA-F]{4}$/.test(fourChars)) {
+          return match;
+        }
+        return '\\\\' + char;
+      }
+      
+      return '\\\\' + char;
+    }
+    
+    // For non-letters, if it's not a standard JSON escape character (like \", \\, \/)
+    if (!['"', '\\', '/'].includes(char)) {
+      return '\\\\' + char;
+    }
+    
+    return match;
+  });
+}
+
+/**
  * Helper to call a specific Gemini model with request body
  */
 async function callGeminiApi(modelName: string, requestBody: any, apiKey: string): Promise<any> {
@@ -89,7 +128,8 @@ async function callGeminiApi(modelName: string, requestBody: any, apiKey: string
     throw new Error(`Gemini API로부터 올바른 응답 텍스트를 받지 못했습니다. (${modelName})`);
   }
 
-  return JSON.parse(responseText);
+  const escapedText = escapeLatexBackslashes(responseText);
+  return JSON.parse(escapedText);
 }
 
 /**
