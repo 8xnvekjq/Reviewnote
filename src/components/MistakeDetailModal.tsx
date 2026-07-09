@@ -269,13 +269,22 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     } else {
       // API 응답 완료 (isAnalyzing: true -> false)
       if (progress > 0 && progress < 100) {
-        setProgress(100); // 100%로 강제 도달시킴
-        const delayTimer = setTimeout(() => {
-          setShowResult(true);
-        }, 500); // 100% 도달한 상태를 0.5초 노출
-        return () => clearTimeout(delayTimer);
+        if (selectedEntry.analysis) {
+          setProgress(100); // 성공 시에만 100%로 도달 후 전환
+          const delayTimer = setTimeout(() => {
+            setShowResult(true);
+          }, 500);
+          return () => clearTimeout(delayTimer);
+        } else {
+          // 분석 오류로 데이터가 누락되었을 시, 99%에 멈추지 않고 0%로 안전 리셋
+          setProgress(0);
+          setShowResult(false);
+        }
       } else {
         setShowResult(!!selectedEntry.analysis);
+        if (!selectedEntry.analysis) {
+          setProgress(0);
+        }
       }
     }
   }, [isAnalyzing, selectedEntry.id]);
