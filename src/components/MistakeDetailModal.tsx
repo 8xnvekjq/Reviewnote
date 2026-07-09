@@ -64,7 +64,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     insights.push({
       emoji: '📝',
       title: '총 오답 현황',
-      value: `선생님은 지금까지 총 ${allEntries.length}개의 오답노트를 만드셨어요!`
+      value: `지금까지 총 ${allEntries.length}개의 오답노트를 작성하셨어요!`
     });
 
     // 1-2. 복습 완료율 (reviews 중 'O'가 3개인 항목)
