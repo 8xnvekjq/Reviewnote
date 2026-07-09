@@ -64,6 +64,35 @@ async function imageUrlToBase64(url: string): Promise<{ mimeType: string; base64
 }
 
 /**
+ * Helper to call a specific Gemini model with request body
+ */
+async function callGeminiApi(modelName: string, requestBody: any, apiKey: string): Promise<any> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(requestBody)
+  });
+
+  if (!response.ok) {
+    const errorJson = await response.json().catch(() => ({}));
+    const errorMessage = errorJson?.error?.message || '네트워크 응답 오류';
+    throw new Error(`Gemini API 오류 (${modelName}): ${errorMessage}`);
+  }
+
+  const result = await response.json();
+  const responseText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+  if (!responseText) {
+    throw new Error(`Gemini API로부터 올바른 응답 텍스트를 받지 못했습니다. (${modelName})`);
+  }
+
+  return JSON.parse(responseText);
+}
+
+/**
  * Calls Gemini API to analyze the math problem image and returns structured feedback.
  */
 export async function analyzeMistakeWithGemini(
@@ -87,8 +116,6 @@ export async function analyzeMistakeWithGemini(
 ${chaptersStr || '  * (챕터 정보 없음)'}`;
     })
     .join('\n\n');
-
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
   const studentInfoPrompt = studentGrade
     ? `\n★ [학생 학년 필수 준수 지침 - 최우선 순위] ★
@@ -237,28 +264,22 @@ ${syllabusText || '등록된 강의가 없습니다.'}[cite: 2]
   };
 
   try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(requestBody)
-    });
+    // 1단계: 기본적으로 gemini-2.5-flash 모델을 통해 빠른 OCR 및 분석 수행
+    let parsedJson = await callGeminiApi('gemini-2.5-flash', requestBody, apiKey);
 
-    if (!response.ok) {
-      const errorJson = await response.json().catch(() => ({}));
-      const errorMessage = errorJson?.error?.message || '네트워크 응답 오류';
-      throw new Error(`Gemini API 오류: ${errorMessage}`);
+    // 2단계: 문제 지문에 "다음 그림과 같이" 문구가 있는지 감지 (공백 제거 후 유연하게 검사)
+    const cleanText = (parsedJson.problemText || '').replace(/\s+/g, '');
+    if (cleanText.includes('다음그림과같이')) {
+      console.log('Detected "다음 그림과 같이" in problem text. Temporarily switching to gemini-3.5-flash for higher visual recognition accuracy.');
+      try {
+        // 일시적으로 gemini-3.5-flash 모델로 정밀 재분석 수행 후 덮어쓰기
+        const parsedJson35 = await callGeminiApi('gemini-3.5-flash', requestBody, apiKey);
+        parsedJson = parsedJson35;
+        console.log('Successfully re-analyzed using gemini-3.5-flash.');
+      } catch (err35) {
+        console.warn('Re-analysis with gemini-3.5-flash failed. Falling back to the initial gemini-2.5-flash result:', err35);
+      }
     }
-
-    const result = await response.json();
-    const responseText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!responseText) {
-      throw new Error('Gemini API로부터 올바른 응답 텍스트를 받지 못했습니다.');
-    }
-
-    const parsedJson: GeminiResponse = JSON.parse(responseText);
 
     // 단원명 보정 및 보정 로직 (Fuzzy Matching)
     let resolvedGrade = parsedJson.grade || '기타';
