@@ -7,6 +7,7 @@ import { supabase } from '../services/supabase';
 
 interface MistakeDetailModalProps {
   selectedEntry: MistakeEntry;
+  allEntries?: MistakeEntry[];
   isAnalyzing: boolean;
   youtubeLectures?: any[]; // DB로부터 가져온 55개 강의 마스터 리스트
   onClose: () => void;
@@ -29,6 +30,7 @@ const NORMAL_PHRASES = [
 
 export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   selectedEntry,
+  allEntries = [],
   isAnalyzing,
   youtubeLectures = [],
   onClose,
@@ -213,22 +215,84 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     wasAnalyzingRef.current = isAnalyzing;
   }, [isAnalyzing, selectedEntry.grade, selectedEntry.chapter]);
 
-  // Loading text cycling effect
+  // Loading text cycling effect with real-time statistics and domain metadata
   React.useEffect(() => {
     if (!isAnalyzing) {
       setLoadingText('처리 중...');
       return;
     }
     
-    setLoadingText('문제 분석을 시작합니다...');
+    // 1. 기본 문구 복제
+    const dynamicPhrases = [...NORMAL_PHRASES];
 
+    // 2. 전체 오답 개수 동적 문구 추가
+    if (allEntries && allEntries.length > 0) {
+      dynamicPhrases.push(`지금까지 누적 오답 노트를 ${allEntries.length}개나 돌파했어요! 🚀`);
+      dynamicPhrases.push(`오늘도 어김없이 실력을 단단하게 키우는 중... 🔥`);
+    }
+
+    // 3. 실수 원인 비율 통계 동적 문구 추가
+    if (allEntries && allEntries.length > 0) {
+      const causeCounts: Record<string, number> = {};
+      let totalCauses = 0;
+      allEntries.forEach((entry: MistakeEntry) => {
+        (entry.rootCauses || []).forEach((cause: string) => {
+          causeCounts[cause] = (causeCounts[cause] || 0) + 1;
+          totalCauses++;
+        });
+      });
+
+      if (totalCauses > 0) {
+        let topCause = '';
+        let topCount = 0;
+        Object.entries(causeCounts).forEach(([cause, count]) => {
+          if (count > topCount) {
+            topCount = count;
+            topCause = cause;
+          }
+        });
+
+        const option = ROOT_CAUSE_OPTIONS.find(opt => opt.id === topCause);
+        if (option) {
+          const ratio = Math.round((topCount / totalCauses) * 100);
+          dynamicPhrases.push(`최근에는 '${option.label}' 유형(${ratio}%)이 제일 잦아요. 더 째려봅시다! 👀`);
+        }
+      }
+    }
+
+    // 4. 과목 및 단원 맞춤형 따뜻한 츤데레 멘트 추가
+    if (selectedEntry.grade && selectedEntry.chapter) {
+      const grade = selectedEntry.grade;
+      const chapter = selectedEntry.chapter;
+      
+      if (grade.includes('미적분')) {
+        dynamicPhrases.push(`미적분은 수능 수학의 최종 보스예요! 쌤과 완전 정복해 봐요. 🍩`);
+      } else if (grade.includes('대수')) {
+        dynamicPhrases.push(`지수, 로그, 수열은 수식 정렬만 잘 잡으면 무조건 다 맞춥니다! 🍯`);
+      } else if (grade.includes('공통수학')) {
+        dynamicPhrases.push(`고1 공통수학은 수능 고득점의 가장 단단한 주춧돌이에요! 🧱`);
+      }
+      
+      if (chapter.includes('이차함수') || chapter.includes('함수')) {
+        dynamicPhrases.push(`함수 그래프는 직접 손으로 째려보며 그려봐야 직관이 섭니다! 📈`);
+      } else if (chapter.includes('방정식')) {
+        dynamicPhrases.push(`이차방정식은 등식의 기본 원리만 꿰뚫으면 실수가 확 줍니다! 🔑`);
+      }
+      
+      dynamicPhrases.push(`[${grade} ➔ ${chapter}] 단원을 정교하게 현미경 분석 중... 🔬`);
+    }
+
+    setLoadingText('오답 빅데이터 분석을 시작합니다...');
+
+    let phraseIndex = 0;
     const interval = setInterval(() => {
-      const nextText = NORMAL_PHRASES[Math.floor(Math.random() * NORMAL_PHRASES.length)];
-      setLoadingText(nextText);
-    }, 1500);
+      const phrase = dynamicPhrases[phraseIndex % dynamicPhrases.length];
+      setLoadingText(phrase);
+      phraseIndex++;
+    }, 1800);
 
     return () => clearInterval(interval);
-  }, [isAnalyzing]);
+  }, [isAnalyzing, allEntries, selectedEntry.grade, selectedEntry.chapter]);
 
   // 3. 사진 업로드 후 AI 진단 카드로 부드럽게 스크롤 이동
   React.useEffect(() => {
