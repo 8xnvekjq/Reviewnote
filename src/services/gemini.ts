@@ -397,9 +397,9 @@ ${syllabusText || '등록된 강의가 없습니다.'}
   };
 
   try {
-    const resolvedModel = 'gemini-3.5-flash';
+    const resolvedModel = 'gemini-2.5-pro';
 
-    // 메인 모델인 gemini-3.5-flash 단독 1회 호출로 OCR 및 고정밀 수학 진단 실행
+    // 메인 모델인 gemini-2.5-pro 단독 1회 호출로 OCR 및 고정밀 수학 진단 실행
     const parsedJson: GeminiResponse = await callGeminiApi(resolvedModel, requestBody, apiKey);
 
     // 단원명 보정 및 보정 로직 (통합 Fuzzy Matching 및 선행 확장 보정)
