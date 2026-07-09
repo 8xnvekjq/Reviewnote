@@ -342,13 +342,14 @@ ${studentInfoPrompt}
 ${syllabusText || '등록된 강의가 없습니다.'}
 
 [반환할 JSON 구조의 각 필드 정의]
-1. title: 문제의 주제나 공식을 담은 짤막하고 직관적인 제목 (한국어)
-2. solvingProcess: 위의 6개 헤더가 모두 포함된 해설 리포트 텍스트 (한국어)
-3. hints: 3단계 복습 시 점진적으로 공개되는 3개의 원소를 가진 힌트 배열 (hints[0]: 발상, hints[1]: 중간공식, hints[2]: 최종실마리)
-4. problemText: 이미지에서 추출한 원본 문제 지문 (LaTeX 변환 필수)
-5. problemBox: 인쇄 문제 영역 바운딩 박스 (top, bottom, left, right 마진 백분율 0~100)
-6. grade: 과목명 (중3-1, 중3-2, 공통수학1, 공통수학2, 대수, 미적분Ⅰ, 미적분Ⅱ, 확률과 통계, 기하, 기타 중 택1)
-7. chapter: 선택한 과목에 허용된 단원명 중 정확히 선택 (예: 미적분Ⅰ이면 '미분', '적분', '함수의 극한과 연속' 중 택1)
+- ★ [초중요 - 자가 규제 순서 준수] ★: 생성 시 반드시 grade와 chapter를 가장 첫 번째로 판단하고 뱉어내십시오. 당신이 스스로 뱉은 이 과목/단원 락(Lock)에 완벽히 얽매인 상태에서만 그 뒷단 필드들(solvingProcess 등)을 순차적으로 서술해야 합니다.
+1. grade: 과목명 (중3-1, 중3-2, 공통수학1, 공통수학2, 대수, 미적분Ⅰ, 미적분Ⅱ, 확률과 통계, 기하, 기타 중 택1)
+2. chapter: 선택한 과목에 허용된 단원명 중 정확히 선택 (예: 미적분Ⅰ이면 '미분', '적분', '함수의 극한과 연속' 중 택1)
+3. title: 문제의 주제나 공식을 담은 짤막하고 직관적인 제목 (한국어)
+4. solvingProcess: 위의 6개 헤더가 모두 포함된 해설 리포트 텍스트 (한국어)
+5. hints: 3단계 복습 시 점진적으로 공개되는 3개의 원소를 가진 힌트 배열 (hints[0]: 발상, hints[1]: 중간공식, hints[2]: 최종실마리)
+6. problemText: 이미지에서 추출한 원본 문제 지문 (LaTeX 변환 필수)
+7. problemBox: 인쇄 문제 영역 바운딩 박스 (top, bottom, left, right 마진 백분율 0~100)
 8. mistakeSummary: 학생 풀이 기반 틀린 이유를 30자 이내로 요약한 한 문장
 9. matchedVideoId / matchedStartSeconds / matchedChapterTitle: 매칭된 동영상 정보 (없으면 null)`;
 
@@ -371,6 +372,8 @@ ${syllabusText || '등록된 강의가 없습니다.'}
       responseSchema: {
         type: 'OBJECT',
         properties: {
+          grade: { type: 'STRING' },
+          chapter: { type: 'STRING' },
           title: { type: 'STRING' },
           solvingProcess: { type: 'STRING' },
           hints: {
@@ -388,14 +391,12 @@ ${syllabusText || '등록된 강의가 없습니다.'}
             },
             required: ['top', 'bottom', 'left', 'right']
           },
-          grade: { type: 'STRING' },
-          chapter: { type: 'STRING' },
           mistakeSummary: { type: 'STRING' },
           matchedVideoId: { type: 'STRING', nullable: true },
           matchedStartSeconds: { type: 'NUMBER', nullable: true },
           matchedChapterTitle: { type: 'STRING', nullable: true }
         },
-        required: ['title', 'solvingProcess', 'hints', 'problemText', 'problemBox', 'grade', 'chapter', 'mistakeSummary']
+        required: ['grade', 'chapter', 'title', 'solvingProcess', 'hints', 'problemText', 'problemBox', 'mistakeSummary']
       }
     }
   };
