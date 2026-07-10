@@ -943,20 +943,20 @@ function App() {
 
         {/* ── 분석통계 탭 ── */}
         {activeTab === 'stats' && (
-          <div className="space-y-6">
+          <div className="space-y-6 w-full overflow-x-hidden min-w-0">
             <div>
               <h2 className="text-lg font-bold text-white">📊 나의 약점 분석</h2>
               <p className="text-xs text-slate-400 mt-0.5">총 {filteredMistakesForStats.length}개의 오답 기록 기반</p>
             </div>
 
-            {/* 어드민인 경우 학생 필터 셀렉터 추가 */}
+            {/* 어드민인 경우 학생 필터 셀렉터 추가 - 모바일 overflow 방지를 위해 세로 flex-col 배치 */}
             {isAdmin && (
-              <div className="flex items-center space-x-2 bg-slate-900 border border-slate-800 p-3.5 rounded-2xl shadow-sm">
+              <div className="flex flex-col space-y-2 bg-slate-900 border border-slate-800 p-3.5 rounded-2xl shadow-sm min-w-0">
                 <span className="text-xs text-slate-300 font-extrabold flex-none">👤 학생별 통계 조회</span>
                 <select
                   value={statsStudentFilter}
                   onChange={e => setStatsStudentFilter(e.target.value)}
-                  className="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer font-bold"
+                  className="w-full min-w-0 px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer font-bold"
                 >
                   <option value="all">전체 학생 합계 ({mistakes.length}개)</option>
                   {Array.from(new Set(mistakes.map(m => m.userId).filter(Boolean) as string[]))
