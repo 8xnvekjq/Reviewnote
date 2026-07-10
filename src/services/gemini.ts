@@ -112,53 +112,88 @@ function normalizeGradeAndChapter(
   const cleanGrade = (rawGrade || '').replace(/\s+/g, '').toLowerCase();
   const cleanChapter = (rawChapter || '').replace(/[^a-zA-Z0-9가-힣]/g, '').toLowerCase();
 
-  // 1. 학생 학년 및 선행 탐색 우선순위 배열 구성
-  // 학생 학년에서 시작해 한 학년씩 올려가며 우선 탐색할 수 있는 리스트
-  let gradeSearchOrder = [
-    '중3-1', '중3-2', '공통수학1', '공통수학2', '대수', '미적분Ⅰ', '미적분Ⅱ', '확률과 통계', '기하', '기타'
-  ];
-
-  if (studentGrade) {
-    const cleanStudent = studentGrade.replace(/\s+/g, '').toLowerCase();
-    if (cleanStudent.includes('중3')) {
-      gradeSearchOrder = [
-        '중3-1', '중3-2', '공통수학1', '공통수학2', '대수', '미적분Ⅰ', '미적분Ⅱ', '확률과 통계', '기하', '기타'
-      ];
-    } else if (cleanStudent.includes('고1')) {
-      gradeSearchOrder = [
-        '공통수학1', '공통수학2', '대수', '미적분Ⅰ', '미적분Ⅱ', '확률과 통계', '기하', '중3-1', '중3-2', '기타'
-      ];
-    } else if (cleanStudent.includes('고2')) {
-      gradeSearchOrder = [
-        '대수', '미적분Ⅰ', '확률과 통계', '기하', '미적분Ⅱ', '공통수학1', '공통수학2', '중3-1', '중3-2', '기타'
-      ];
-    } else if (cleanStudent.includes('고3')) {
-      gradeSearchOrder = [
-        '대수', '미적분Ⅰ', '미적분Ⅱ', '확률과 통계', '기하', '공통수학1', '공통수학2', '중3-1', '중3-2', '기타'
-      ];
+  // 1. AI가 식별한 rawGrade를 공식 과목명으로 정밀 복원 시도 (과목 카테고리 락)
+  let lockedGrade = '';
+  const keys = Object.keys(MATH_CURRICULUM);
+  const match = keys.find(k => k.replace(/\s+/g, '').toLowerCase() === cleanGrade);
+  
+  if (match) {
+    lockedGrade = match;
+  } else {
+    // 과목명 대표 키워드 포함 검사
+    if (cleanGrade.includes('중3-1') || (cleanGrade.includes('중3') && cleanGrade.includes('1'))) lockedGrade = '중3-1';
+    else if (cleanGrade.includes('중3-2') || (cleanGrade.includes('중3') && cleanGrade.includes('2'))) lockedGrade = '중3-2';
+    else if (cleanGrade.includes('공통수학1') || cleanGrade.includes('공통수학(상)') || cleanGrade.includes('수학(상)')) lockedGrade = '공통수학1';
+    else if (cleanGrade.includes('공통수학2') || cleanGrade.includes('공통수학(하)') || cleanGrade.includes('수학(하)')) lockedGrade = '공통수학2';
+    else if (cleanGrade === '대수' || cleanGrade === '수학1' || cleanGrade === '수학i') lockedGrade = '대수';
+    else if (cleanGrade.includes('미적분1') || cleanGrade.includes('미적분i') || cleanGrade.includes('수학2') || cleanGrade.includes('수학ii')) lockedGrade = '미적분Ⅰ';
+    else if (cleanGrade.includes('미적분2') || cleanGrade.includes('미적분ii')) lockedGrade = '미적분Ⅱ';
+    else if (cleanGrade.includes('확률') || cleanGrade.includes('통계') || cleanGrade.includes('확통')) lockedGrade = '확률과 통계';
+    else if (cleanGrade.includes('기하')) lockedGrade = '기하';
+    else if (cleanGrade === '중3') lockedGrade = '중3-1';
+    else if (cleanGrade === '고1') lockedGrade = '공통수학1';
+    else if (studentGrade) {
+      // 최후의 폴백: 학생의 학년 기준 대입
+      const cleanStudent = studentGrade.replace(/\s+/g, '').toLowerCase();
+      if (cleanStudent.includes('중3')) lockedGrade = '중3-1';
+      else if (cleanStudent.includes('고1')) lockedGrade = '공통수학1';
+      else if (cleanStudent.includes('고2') || cleanStudent.includes('고3')) lockedGrade = '대수';
+    } else {
+      lockedGrade = '기타';
     }
   }
 
-  // 2. 단원명(rawChapter) 매칭 우선 탐색
+  // 2. 탐색 과목 순서(gradeSearchOrder) 정의
+  // 과목 락(lockedGrade)이 존재한다면, 타 과목으로 단원 매핑이 탈출(가로채기)하는 것을 방지하기 위해 오직 해당 과목만 탐색하도록 제한합니다.
+  let gradeSearchOrder: string[] = [];
+  if (lockedGrade && lockedGrade !== '기타') {
+    gradeSearchOrder = [lockedGrade];
+  } else {
+    // 과목 락이 없을 때만 학생 학년 기반 우선순위 탐색 작동 (일반적이지 않음 - AI 판별이 최우선)
+    gradeSearchOrder = [
+      '중3-1', '중3-2', '공통수학1', '공통수학2', '대수', '미적분Ⅰ', '미적분Ⅱ', '확률과 통계', '기하', '기타'
+    ];
+    if (studentGrade) {
+      const cleanStudent = studentGrade.replace(/\s+/g, '').toLowerCase();
+      if (cleanStudent.includes('중3')) {
+        gradeSearchOrder = [
+          '중3-1', '중3-2', '공통수학1', '공통수학2', '대수', '미적분Ⅰ', '미적분Ⅱ', '확률과 통계', '기하', '기타'
+        ];
+      } else if (cleanStudent.includes('고1')) {
+        gradeSearchOrder = [
+          '공통수학1', '공통수학2', '대수', '미적분Ⅰ', '미적분Ⅱ', '확률과 통계', '기하', '중3-1', '중3-2', '기타'
+        ];
+      } else if (cleanStudent.includes('고2')) {
+        gradeSearchOrder = [
+          '대수', '미적분Ⅰ', '확률과 통계', '기하', '미적분Ⅱ', '공통수학1', '공통수학2', '중3-1', '중3-2', '기타'
+        ];
+      } else if (cleanStudent.includes('고3')) {
+        gradeSearchOrder = [
+          '대수', '미적분Ⅰ', '미적분Ⅱ', '확률과 통계', '기하', '공통수학1', '공통수학2', '중3-1', '중3-2', '기타'
+        ];
+      }
+    }
+  }
+
+  // 3. 단원명(rawChapter) 매칭 탐색
   // AI가 보낸 단원이 100% 매칭되거나 퍼지 매칭에 걸리는 진짜 교과를 찾음
   if (cleanChapter && cleanChapter !== '기타') {
     let bestGrade = '';
     let bestChapter = '';
     let highestScore = -1;
 
-    // 우선순위가 높은 과목부터 순회
     for (const gradeKey of gradeSearchOrder) {
       const allowedChapters = MATH_CURRICULUM[gradeKey] || [];
       
       for (const ch of allowedChapters) {
         const cleanCh = ch.replace(/[^a-zA-Z0-9가-힣]/g, '').toLowerCase();
 
-        // 2-1. 단원이 토씨 하나 틀리지 않고 100% 일치할 때
+        // 3-1. 단원이 토씨 하나 틀리지 않고 100% 일치할 때
         if (cleanCh === cleanChapter) {
           return { grade: gradeKey, chapter: ch };
         }
 
-        // 2-2. 부분 일치 매칭 (예: "이차방정식의 풀이" -> "이차방정식" / "정적분" -> "적분")
+        // 3-2. 부분 일치 매칭 (예: "이차방정식의 풀이" -> "이차방정식" / "정적분" -> "적분")
         if (cleanCh.includes(cleanChapter) || cleanChapter.includes(cleanCh)) {
           const score = 1000 + Math.max(cleanCh.length, cleanChapter.length);
           if (score > highestScore) {
@@ -168,7 +203,7 @@ function normalizeGradeAndChapter(
           }
         }
 
-        // 2-3. 자카드 유사도 매칭 (글자 겹침 수준 검사)
+        // 3-3. 자카드 유사도 매칭 (글자 겹침 수준 검사)
         const setCh = new Set(cleanCh.split(''));
         const setTarget = new Set(cleanChapter.split(''));
         let commonCount = 0;
@@ -194,38 +229,8 @@ function normalizeGradeAndChapter(
     }
   }
 
-  // 3. 단원 매핑에 실패한 경우, 과목명(rawGrade)을 기반으로 매핑 복원 시도
-  let resolvedGrade = '기타';
-  const keys = Object.keys(MATH_CURRICULUM);
-  
-  // 3-1. 과목명 직접 일치 검사
-  const match = keys.find(k => k.toLowerCase() === cleanGrade);
-  if (match) {
-    resolvedGrade = match;
-  } else {
-    // 3-2. 과목명 대표 키워드 포함 검사
-    if (cleanGrade.includes('중3-1') || (cleanGrade.includes('중3') && cleanGrade.includes('1'))) resolvedGrade = '중3-1';
-    else if (cleanGrade.includes('중3-2') || (cleanGrade.includes('중3') && cleanGrade.includes('2'))) resolvedGrade = '중3-2';
-    else if (cleanGrade.includes('공통수학1') || cleanGrade.includes('공통수학(상)') || cleanGrade.includes('수학(상)')) resolvedGrade = '공통수학1';
-    else if (cleanGrade.includes('공통수학2') || cleanGrade.includes('공통수학(하)') || cleanGrade.includes('수학(하)')) resolvedGrade = '공통수학2';
-    else if (cleanGrade === '대수' || cleanGrade === '수학1' || cleanGrade === '수학i') resolvedGrade = '대수'; // 대수 완전 일치 우선
-    else if (cleanGrade.includes('미적분1') || cleanGrade.includes('미적분i') || cleanGrade.includes('수학2') || cleanGrade.includes('수학ii')) resolvedGrade = '미적분Ⅰ';
-    else if (cleanGrade.includes('미적분2') || cleanGrade.includes('미적분ii')) resolvedGrade = '미적분Ⅱ';
-    else if (cleanGrade.includes('확률') || cleanGrade.includes('통계') || cleanGrade.includes('확통')) resolvedGrade = '확률과 통계';
-    else if (cleanGrade.includes('기하')) resolvedGrade = '기하';
-    else if (cleanGrade === '중3') resolvedGrade = '중3-1';
-    else if (cleanGrade === '고1') resolvedGrade = '공통수학1';
-    else if (studentGrade) {
-      // 3-3. 최후의 폴백: 학생의 학년 기준 대입
-      const cleanStudent = studentGrade.replace(/\s+/g, '').toLowerCase();
-      if (cleanStudent.includes('중3')) resolvedGrade = '중3-1';
-      else if (cleanStudent.includes('고1')) resolvedGrade = '공통수학1';
-      else if (cleanStudent.includes('고2') || cleanStudent.includes('고3')) resolvedGrade = '대수';
-    }
-  }
-
   // 매핑 실패 시 과목만이라도 건졌다면, 해당 과목의 단원 목록 중 첫 번째 단원으로 덮어쓰지 않고 "기타" 단원으로 안전 배정
-  return { grade: resolvedGrade, chapter: '기타' };
+  return { grade: lockedGrade || '기타', chapter: '기타' };
 }
 
 /**
