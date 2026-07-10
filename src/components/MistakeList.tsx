@@ -273,12 +273,12 @@ export const MistakeList: React.FC<MistakeListProps> = ({
                           e.stopPropagation();
                           onTogglePrintSelect(entry.id);
                         }}
-                        className="flex-none pr-1 select-none"
+                        className="flex-none p-2 -ml-2 select-none cursor-pointer"
                       >
-                        <div className={`w-4.5 h-4.5 rounded border flex items-center justify-center transition-all ${
+                        <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${
                           selectedPrintIds.includes(entry.id)
                             ? 'bg-indigo-600 border-indigo-600 text-white'
-                            : 'border-slate-750 bg-slate-950 hover:border-slate-500'
+                            : 'border-slate-700 bg-slate-950 hover:border-slate-500'
                         }`}>
                           {selectedPrintIds.includes(entry.id) && (
                             <span className="text-[10px] font-black leading-none">✓</span>
