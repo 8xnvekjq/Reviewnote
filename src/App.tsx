@@ -997,7 +997,7 @@ function App() {
                   {heatmapData.length === 0 ? (
                     <p className="text-xs text-slate-500 py-4 text-center">최근 30일 내 분석된 약점 데이터가 없습니다.</p>
                   ) : (
-                    <div className="space-y-4">
+                    <div className="space-y-4 max-w-[360px] mx-auto w-full">
                       {/* 가로 헤더 (5대 실수 유형 이름) */}
                       <div className="flex items-center text-[10px] text-slate-500 font-extrabold">
                         {/* 왼쪽 여백 (과목명 컬럼 크기 확보) */}
