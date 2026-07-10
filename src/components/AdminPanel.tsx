@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import type { AdminUserStat } from '../types';
 import { supabase } from '../services/supabase';
 import { formatDate } from '../utils/date';
+import { CHRONOLOGICAL_CHANGELOGS } from './StudentGuide';
 
 const GUIDE_ITEMS = [
   {
@@ -470,104 +471,27 @@ export const AdminPanel: React.FC = () => {
           <div className="space-y-4 pt-6 border-t border-slate-800">
             <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider pl-1 text-left">더쿠키수학 오답클리닉 변경 이력</h3>
             <div className="relative border-l border-slate-800 pl-6 ml-3 space-y-8">
-              {/* Version 1.9.0 */}
-              <div className="relative">
-              <div className="absolute -left-[33px] top-1.5 w-4 h-4 rounded-full bg-indigo-500 border-4 border-slate-950" />
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs font-black px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                    v1.9.0
-                  </span>
-                  <span className="text-[10px] text-slate-500 font-bold">2026.07.09</span>
+              {CHRONOLOGICAL_CHANGELOGS.map((log, idx) => (
+                <div key={idx} className="relative">
+                  <div className={`absolute -left-[33px] top-1.5 w-4 h-4 rounded-full ${idx === 0 ? 'bg-indigo-500' : 'bg-slate-800'} border-4 border-slate-950`} />
+                  <div className="space-y-2 text-left">
+                    <div className="flex items-center space-x-2">
+                      <span className={`text-xs font-black px-2 py-0.5 rounded ${idx === 0 ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-slate-850 text-slate-400 border border-slate-700'}`}>
+                        {log.version}
+                      </span>
+                      <span className="text-[10px] text-slate-500 font-bold">{log.date}</span>
+                    </div>
+                    <ul className="text-xs text-slate-400 list-disc list-inside space-y-1.5 pl-1 leading-relaxed">
+                      {log.changes.map((change, cIdx) => (
+                        <li key={cIdx} className="pl-1.5 -indent-4 list-none flex items-start">
+                          <span className="text-emerald-500/80 mr-1.5 select-none">•</span>
+                          <span>{change}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
-                <h4 className="font-bold text-white text-xs">고등 수학 전과목 동영상 이식 및 G.Polya AI 문제 풀이 쌤 페르소나 적용</h4>
-                <ul className="text-xs text-slate-400 list-disc list-inside space-y-1.5 pl-1 leading-relaxed">
-                  <li><strong>전과목 개념 강의 매칭</strong>: 대수, 미적Ⅰ, 미적Ⅱ, 확통 총 100여 개 재생목록 비디오의 챕터 정보 수집 및 DB 시딩</li>
-                  <li><strong>경우의 수 과목 격리</strong>: 공통수학1과 확률과 통계의 단원명이 중복되어 혼선이 생기는 현상을 과목별 접두사로 완전 격리</li>
-                  <li><strong>G.Polya 4단계 & 쌤 말투 이식</strong>: 문제 해결 4단계 프레임에 맞춰 쌤 특유의 친근하고 유머러스한 어투로 해설 및 힌트가 자동 작성되는 Gemini 프롬프트 적용</li>
-                  <li><strong>헤더 레이아웃 버그 수정</strong>: 모바일/테블릿 등 좁은 화면에서 업데이트 빌드 날짜가 잘려서 보이는 레이아웃 겹침 개선</li>
-                </ul>
-              </div>
-            </div>
-
-            {/* Version 1.8.4 */}
-            <div className="relative">
-              <div className="absolute -left-[33px] top-1.5 w-4 h-4 rounded-full bg-slate-800 border-4 border-slate-950" />
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs font-black px-2 py-0.5 rounded bg-slate-850 text-slate-400 border border-slate-700">
-                    v1.8.4
-                  </span>
-                  <span className="text-[10px] text-slate-500 font-bold">2026.07.07</span>
-                </div>
-                <h4 className="font-bold text-white text-xs">주간 리더보드 롤오버 및 카드 레이아웃 슬림화</h4>
-                <ul className="text-xs text-slate-400 list-disc list-inside space-y-1.5 pl-1 leading-relaxed">
-                  <li><strong>주간 MVP 챔피언 배너</strong>: 금주 1위 점수가 0점일 시 지난주 우승자 정보로 자동 이월되는 안전성 로직 탑재</li>
-                  <li><strong>카드 레이아웃 단축</strong>: 오답 카드 내 실수 지점과 학생 대책 수립 칸을 단일 행으로 축소하여 모바일 가시성 극대화</li>
-                  <li><strong>가로 카메라 촬영 지원</strong>: 태블릿/모바일 가로 모드 촬영 시 조작 패널이 우측 사이드로 자동 재배치</li>
-                  <li><strong>오답 분류 태그</strong>: 오답 원인 분류군에 이모지와 텍스트 라벨 병기화</li>
-                </ul>
-              </div>
-            </div>
-
-            {/* Version 1.7.5 */}
-            <div className="relative">
-              <div className="absolute -left-[33px] top-1.5 w-4 h-4 rounded-full bg-slate-800 border-4 border-slate-950" />
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs font-black px-2 py-0.5 rounded bg-slate-850 text-slate-400 border border-slate-700">
-                    v1.7.5
-                  </span>
-                  <span className="text-[10px] text-slate-500 font-bold">2026.07.05</span>
-                </div>
-                <h4 className="font-bold text-white text-xs">AI 유튜브 맞춤 강의 추천 및 학생 가이드 신설</h4>
-                <ul className="text-xs text-slate-400 list-disc list-inside space-y-1.5 pl-1 leading-relaxed">
-                  <li><strong>유튜브 실시간 매칭</strong>: 오답 단원분류에 기반한 학원 재생목록 55개 강의 딥링크 추천 시스템 도입</li>
-                  <li><strong>학생 가이드 탭</strong>: PWA 앱 설치 및 진단 체크 방법 등을 담은 디지털 학습 매뉴얼 탑재</li>
-                  <li><strong>표시 포맷 개선</strong>: 어드민 패널 내 가입자 표기를 직관적인 <code className="text-indigo-400">아이디(이름)</code> 형식으로 통일</li>
-                  <li><strong>이메일 자동 동기화</strong>: 신규 가입 시 이메일 누락을 방지하는 Supabase trigger function 마이그레이션 적용</li>
-                </ul>
-              </div>
-            </div>
-
-            {/* Version 1.5.0 */}
-            <div className="relative">
-              <div className="absolute -left-[33px] top-1.5 w-4 h-4 rounded-full bg-slate-800 border-4 border-slate-950" />
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs font-black px-2 py-0.5 rounded bg-slate-850 text-slate-400 border border-slate-700">
-                    v1.5.0
-                  </span>
-                  <span className="text-[10px] text-slate-500 font-bold">2026.07.03</span>
-                </div>
-                <h4 className="font-bold text-white text-xs">수동 크롭 가이드라인 매칭 및 카메라 오토포커스</h4>
-                <ul className="text-xs text-slate-400 list-disc list-inside space-y-1.5 pl-1 leading-relaxed">
-                  <li><strong>오토포커스(Autofocus)</strong>: 렌즈 연속 자동 초점 및 터치 지점 수동초점(노란 링 비주얼) 추가</li>
-                  <li><strong>조준 격자-크롭 박스 일치</strong>: 4:3 격자 비율과 크롭 기본 범위를 정확히 매칭해 자르기 피로도 경감</li>
-                  <li><strong>오답 상세모달 개선</strong>: 지문, 풀이, 대책 등 길게 늘어지던 정보를 탭형 접이식(Accordion) 메뉴로 개편</li>
-                  <li><strong>AI 오분류 크롭 차단</strong>: AI 임의 자르기 필터링을 걷어내고, 사용자가 선택한 원본 크롭 영역 그대로 고화질 보존</li>
-                </ul>
-              </div>
-            </div>
-
-            {/* Version 1.1.0 */}
-            <div className="relative">
-              <div className="absolute -left-[33px] top-1.5 w-4 h-4 rounded-full bg-slate-800 border-4 border-slate-950" />
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs font-black px-2 py-0.5 rounded bg-slate-850 text-slate-400 border border-slate-700">
-                    v1.1.0
-                  </span>
-                  <span className="text-[10px] text-slate-500 font-bold">2026.07.01</span>
-                </div>
-                <h4 className="font-bold text-white text-xs">3단계 복습 피드백 및 보관함 이동 시스템</h4>
-                <ul className="text-xs text-slate-400 list-disc list-inside space-y-1.5 pl-1 leading-relaxed">
-                  <li><strong>복습 상태 진단</strong>: 개별 오답별 1~3차 복습 선택기(O/X/★) 및 3회 완료 시 복습완료 탭으로 자동 이동</li>
-                  <li><strong>클리닉 리포트</strong>: 정석 풀이과정(LaTeX), 오답 분석 가이드 및 처방 대책 카드 레이아웃 고도화</li>
-                  <li><strong>UI 세이프 존 대응</strong>: 모바일 Notch 바에 알맞은 헤더 탑 마진 및 수려한 글래스모피즘 하단 바 복원</li>
-                </ul>
-              </div>
-            </div>
+              ))}
             </div>
           </div>
         </div>
