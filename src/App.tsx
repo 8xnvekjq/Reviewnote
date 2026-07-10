@@ -770,6 +770,16 @@ function App() {
     return matrix;
   }, [filteredMistakesForStats]);
 
+  const maxCountInMatrix = useMemo(() => {
+    let maxVal = 0;
+    heatmapData.forEach(row => {
+      row.stats.forEach(cell => {
+        if (cell.count > maxVal) maxVal = cell.count;
+      });
+    });
+    return Math.max(maxVal, 1);
+  }, [heatmapData]);
+
   const maskId = (username: string) => {
     if (!username) return '';
     if (username.length <= 3) return username;
@@ -1018,26 +1028,27 @@ function App() {
                             <div className="flex-1 grid grid-cols-5 gap-2">
                               {row.stats.map(cell => {
                                 const count = cell.count;
+                                const ratio = count / maxCountInMatrix;
                                 let bgStyle: React.CSSProperties = {};
                                 let chipClass = '';
 
                                 if (count === 0) {
                                   // 0회: 아주 옅은 꺼진 상태
                                   chipClass = 'bg-[#101524] border-[#182136]/50 text-slate-800';
-                                } else if (count === 1) {
-                                  // 1회: 옅은 퍼플
+                                } else if (ratio <= 0.33) {
+                                  // 하위 33% (옅음)
                                   chipClass = 'bg-indigo-500/10 border-indigo-500/20';
-                                } else if (count === 2) {
-                                  // 2회: 중간 퍼플
-                                  chipClass = 'bg-indigo-500/30 border-indigo-500/40';
-                                } else if (count === 3) {
-                                  // 3회: 진한 퍼플 + 은은한 네온 글로우
-                                  chipClass = 'bg-indigo-500/60 border-indigo-400/60';
+                                } else if (ratio <= 0.66) {
+                                  // 중위 33% ~ 66% (보통)
+                                  chipClass = 'bg-indigo-500/35 border-indigo-500/40';
+                                } else if (ratio <= 0.9) {
+                                  // 상위 66% ~ 90% (진함 + 은은한 글로우)
+                                  chipClass = 'bg-indigo-500/65 border-indigo-400/60';
                                   bgStyle = {
                                     boxShadow: '0 0 8px rgba(99, 102, 241, 0.4)'
                                   };
                                 } else {
-                                  // 4회 이상: 최고 밝기 네온 글로우
+                                  // 90% 초과: 해당 학생 기준 최고 빈도 오답 영역 (최고 밝기 네온)
                                   chipClass = 'bg-indigo-500 border-indigo-300';
                                   bgStyle = {
                                     boxShadow: '0 0 15px rgba(99, 102, 241, 0.7)'
