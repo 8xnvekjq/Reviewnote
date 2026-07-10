@@ -1,19 +1,5 @@
-import type { MistakeAnalysis, ProblemBox } from '../types';
+import type { ProblemBox } from '../types';
 import { MATH_CURRICULUM } from '../types';
-
-interface GeminiResponse {
-  title: string;
-  solvingProcess: string;
-  hints: string[];
-  problemText: string;
-  problemBox: ProblemBox;
-  grade: string;
-  chapter: string;
-  mistakeSummary: string;
-  matchedVideoId?: string | null;
-  matchedStartSeconds?: number | null;
-  matchedChapterTitle?: string | null;
-}
 
 /**
  * 브라우저 Canvas를 이용하여 이미지를 최대 가로/세로 1200px 크기로 축소하고,
@@ -312,17 +298,24 @@ async function callGeminiApi(modelName: string, requestBody: any, apiKey: string
 }
 
 /**
- * Calls Gemini API to analyze the math problem image and returns structured feedback.
+ * 1차 API 호출: 이미지 분석을 통해 과목/단원을 분류하고 유튜브 개념 강의를 실시간 매칭
  */
-export async function analyzeMistakeWithGemini(
+export async function classifyMistakeWithGemini(
   imageUrl: string,
   apiKey: string,
   youtubeLectures: any[] = [],
   studentGrade?: string
-): Promise<{ title: string; analysis: MistakeAnalysis; grade: string; chapter: string }> {
+): Promise<{
+  title: string;
+  grade: string;
+  chapter: string;
+  matchedVideoId?: string;
+  matchedStartSeconds?: number;
+  matchedChapterTitle?: string;
+}> {
   const { mimeType, base64Data } = await imageUrlToBase64(imageUrl);
 
-  // 우리 DB의 55개 강의 목록을 AI용 텍스트 인덱스로 정밀 가공
+  // 우리 DB의 강의 목록을 AI용 텍스트 인덱스로 정밀 가공
   const syllabusText = (youtubeLectures || [])
     .map((v, i) => {
       const chaptersStr = (v.chapters || [])
@@ -354,38 +347,15 @@ ${chaptersStr || '  * (챕터 정보 없음)'}`;
 - **[Curriculum Locking]**: 풀이 과정과 힌트를 구성할 때, 식별된 대상 과목 및 학년 범위에서 '아직 배우지 않은 개념이나 선행 공식'을 끌고 와서 해설하는 것을 절대적으로 금지합니다. 오직 해당 학년 교과서 내의 기법만 사용하십시오.\n`
     : '';
 
-  const prompt = `너는 더쿠키수학 선생님을 보좌하여 학생들의 수학 오답을 과학적으로 분석하고 올바른 복습 처방을 제공하는 스마트한 AI 수학 클리닉 비서 **'밤티'**이다.
-아래의 비서 페르소나와 포맷 규칙을 엄격히 준수하여 수학 문제 사진을 분석해 JSON 보고서를 작성하여라.
+  const prompt = `너는 더쿠키수학 오답클리닉의 문제 분류 담당 인공지능 비서 **'밤티'**이다.
+주어진 수학 문제 이미지를 보고 과목과 단원을 식별하고, 가장 어울리는 유튜브 개념 강의 딥링크를 추천하여라.
 ${studentInfoPrompt}
 
-★ [AI 비서 밤티 가이드라인] ★
-1. 절대 자신을 실제 선생님(더쿠키수학 쌤 등)과 동일시하지 마십시오. 당신은 수학 오답 분석을 보조하는 인공지능 비서 캐릭터 **'밤티'**입니다. 대화 톤은 학생에게 정중하고 다정한 존댓말(해요체)로 작성하되, 친근하고 귀여운 밤티 비서로서의 예의 바르고 객관적인 어조를 유지해야 합니다.
-2. 대한민국 고교 교육과정을 벗어난 수식(예: 대학 수학, 편미분, 벡터 외적, 복잡한 정규분포 확률밀도함수 식 $f(x) = \\\\frac{1}{\\\\sigma \\\\sqrt{2\\\\pi}} e^{-\\\\frac{(x-m)^2}{2\\\\sigma^2}}$ 등)은 절대 배제하고 오직 고교 교과 공식(예: 표준화 $Z = \\\\frac{X-m}{\\\\sigma}$)만 쓰십시오.
-3. [학생 학년에 따른 수학 기호 노출 절대 통제 지침]:
-   - 학생 학년이 **"중3"**인 경우: 시그마($\sum$, \sum), 로그($\log$), 극한($\lim$), 미적분 기호($\int$, dx) 등 고등 선행 수학 기호를 풀이와 힌트에서 **일절 사용하지 마십시오.** 수열이나 항들의 합은 시그마 기호 대신 반드시 덧셈의 원시적 나열식(예: $a_1 + a_2 + a_3 + \dots$)으로 대체하여 풀어 쓰십시오.
-   - 학생 학년이 **"고1"**인 경우: 시그마($\sum$), 극한($\lim$), 미적분($\int$) 등 고2 과정 이상의 수학 전용 특수 기호를 풀이에 노출하지 마십시오.
-4. 모든 수식은 반드시 LaTeX($...$ 또는 $$...$$)로 작성하고, 문장 끝과 단독 수식 앞뒤에는 반드시 빈줄(\\n\\n)을 2개 이상 추가해 널찍하게 줄바꿈해 주십시오. 모든 텍스트 해설은 100% 한국어로만 작성해야 합니다.
-5. [단일 대단원/소단원 분리 판정 지침 - 절대 묶음 분류 금지]:
-   - 단원(chapter)을 분류할 때 '이차방정식과 이차함수', '인수분해와 방정식' 처럼 여러 단원명을 문장이나 '와/과'로 묶어 복수로 제출하는 것을 엄격히 금지합니다.
-   - 문제의 핵심이 그래프 기하(y절편, 꼭짓점, 최댓값/최솟값, 그래프 평행이동 등)라면 무조건 **"이차함수"** 단원 하나로만 분류하십시오.
-   - 문제의 핵심이 등식의 풀이(해 구하기, 근의 공식, 근과 계수의 관계, 판별식 등)라면 무조건 **"이차방정식"** 단원 하나로만 분류하십시오.
-   - 절대로 단원들을 하이브리드로 혼합하여 묶어 적지 말고, 단 하나의 고유 단원명으로만 명확하게 규정하여 리턴하십시오.
-
-★ [보고서 포맷 형식 (solvingProcess 필드)] ★
-반드시 아래 4개의 마크다운 헤더(###)를 순서대로 단독 라인에 배치하여 하나의 통합 텍스트로 작성하십시오.
-
-### 1단계: 문제 이해하기
-- 미지수와 주어진 조건을 짚어줍니다.
-
-### 2단계: 해결 계획 세우기
-- 실전 꿀팁이나 연관 공식을 적용할 계획을 세웁니다.
-
-### 3단계: 계획 실행하기
-- 교과정 내의 LaTeX 수식을 들여쓰기하여 차근차근 전개해 계산합니다.
-
-### 4단계: 돌아보기 & 쌤의 한끝 팁
-- 구한 답을 가볍게 검토하고 함정을 짚어줍니다.
-- 단락 맨 마지막 줄에 실수를 방지할 한 줄짜리 짧은 개념 처방을 **[처방 요약]** 이라는 말머리를 붙여 단 한 줄로만 간결하게 적어주십시오.
+★ [단일 대단원/소단원 분리 판정 지침 - 절대 묶음 분류 금지] ★
+- 단원(chapter)을 분류할 때 '이차방정식과 이차함수', '인수분해와 방정식' 처럼 여러 단원명을 문장이나 '와/과'로 묶어 복수로 제출하는 것을 엄격히 금지합니다.
+- 문제의 핵심이 그래프 기하(y절편, 꼭짓점, 최댓값/최솟값, 그래프 평행이동 등)라면 무조건 **"이차함수"** 단원 하나로만 분류하십시오.
+- 문제의 핵심이 등식의 풀이(해 구하기, 근의 공식, 근과 계수의 관계, 판별식 등)라면 무조건 **"이차방정식"** 단원 하나로만 분류하십시오.
+- 절대로 단원들을 하이브리드로 혼합하여 묶어 적지 말고, 단 하나의 고유 단원명으로만 명확하게 규정하여 리턴하십시오.
 
 ★ [선생님 추천 강의 매칭 규칙] ★
 제공된 [선생님 강의 및 챕터 인덱스 목록]에서 과목(grade) 및 단원(chapter)이 가장 일치하는 단 하나의 비디오 ID와 챕터명, 시작시간(초)을 골라 matchedVideoId, matchedStartSeconds, matchedChapterTitle에 기입하고, 일치하는 게 없으면 모두 null 처리하십시오.
@@ -393,17 +363,11 @@ ${studentInfoPrompt}
 [선생님 강의 및 챕터 인덱스 목록]
 ${syllabusText || '등록된 강의가 없습니다.'}
 
-[반환할 JSON 구조 of 각 필드 정의]
-- ★ [초중요 - 자가 규제 순서 준수] ★: 생성 시 반드시 grade와 chapter를 가장 첫 번째로 판단하고 뱉어내십시오. 당신이 스스로 뱉은 이 과목/단원 락(Lock)에 완벽히 얽매인 상태에서만 그 뒷단 필드들(solvingProcess 등)을 순차적으로 서술해야 합니다.
+[반환할 JSON 구조 정의]
 1. grade: 과목명 (중3-1, 중3-2, 공통수학1, 공통수학2, 대수, 미적분Ⅰ, 미적분Ⅱ, 확률과 통계, 기하, 기타 중 택1)
 2. chapter: 선택한 과목에 허용된 단원명 중 정확히 선택 (예: 미적분Ⅰ이면 '미분', '적분', '함수의 극한과 연속' 중 택1)
 3. title: 문제의 주제나 공식을 담은 짤막하고 직관적인 제목 (한국어)
-4. solvingProcess: 위의 4개 헤더가 모두 포함된 해설 리포트 텍스트 (한국어)
-5. hints: 3단계 복습 시 점진적으로 공개되는 3개의 원소를 가진 힌트 배열 (hints[0]: 발상, hints[1]: 중간공식, hints[2]: 최종실마리)
-6. problemText: 이미지에서 추출한 원본 문제 지문 (LaTeX 변환 필수)
-7. problemBox: 인쇄 문제 영역 바운딩 박스 (top, bottom, left, right 마진 백분율 0~100)
-8. mistakeSummary: 학생 풀이 기반 틀린 이유를 30자 이내로 요약한 한 문장
-9. matchedVideoId / matchedStartSeconds / matchedChapterTitle: 매칭된 동영상 정보 (없으면 null)`;
+4. matchedVideoId / matchedStartSeconds / matchedChapterTitle: 매칭된 동영상 정보 (없으면 null)`;
 
   const requestBody = {
     contents: [
@@ -424,9 +388,134 @@ ${syllabusText || '등록된 강의가 없습니다.'}
       responseSchema: {
         type: 'OBJECT',
         properties: {
-          grade: { type: 'STRING' },
+          grade: { 
+            type: 'STRING',
+            enum: ['중3-1', '중3-2', '공통수학1', '공통수학2', '대수', '미적분Ⅰ', '미적분Ⅱ', '확률과 통계', '기하', '기타']
+          },
           chapter: { type: 'STRING' },
           title: { type: 'STRING' },
+          matchedVideoId: { type: 'STRING', nullable: true },
+          matchedStartSeconds: { type: 'NUMBER', nullable: true },
+          matchedChapterTitle: { type: 'STRING', nullable: true }
+        },
+        required: ['grade', 'chapter', 'title']
+      }
+    }
+  };
+
+  try {
+    const resolvedModel = 'gemini-2.5-flash';
+    const parsedJson = await callGeminiApi(resolvedModel, requestBody, apiKey);
+
+    // 단원명 보정 및 보정 로직 (통합 Fuzzy Matching 및 선행 확장 보정)
+    const { grade: resolvedGrade, chapter: resolvedChapter } = normalizeGradeAndChapter(
+      parsedJson.grade || '',
+      parsedJson.chapter || '',
+      studentGrade
+    );
+
+    return {
+      title: parsedJson.title || '분석 완료된 문제',
+      grade: resolvedGrade,
+      chapter: resolvedChapter,
+      matchedVideoId: parsedJson.matchedVideoId || undefined,
+      matchedStartSeconds: parsedJson.matchedStartSeconds != null ? parsedJson.matchedStartSeconds : undefined,
+      matchedChapterTitle: parsedJson.matchedChapterTitle || undefined
+    };
+  } catch (error: any) {
+    console.error('Gemini classification failed:', error);
+    throw new Error(error.message || 'Gemini API 호출 중 장애가 발생했습니다.');
+  }
+}
+
+/**
+ * 2차 API 호출: 확정된 과목/단원을 엄격한 가이드로 삼아 해설 및 힌트 정밀 생성
+ */
+export async function solveMistakeWithGemini(
+  imageUrl: string,
+  apiKey: string,
+  resolvedGrade: string,
+  resolvedChapter: string,
+  studentGrade?: string
+): Promise<{
+  solvingProcess: string;
+  hints: string[];
+  problemText: string;
+  problemBox: ProblemBox;
+  mistakeSummary: string;
+}> {
+  const { mimeType, base64Data } = await imageUrlToBase64(imageUrl);
+
+  const gradeMappingText = 
+    studentGrade === '중3' ? '학생의 교육과정 범위는 주로 [중3-1] 또는 [중3-2] 과목에 매핑됩니다.' :
+    studentGrade === '고1' ? '학생의 교육과정 범위는 주로 [공통수학1] 또는 [공통수학2] 과목에 매핑됩니다.' :
+    studentGrade === '고2' ? '학생의 교육과정 범위는 주로 [대수], [미적분Ⅰ], [확률과 통계], [기하] 과목에 매핑됩니다.' :
+    studentGrade === '고3' ? '학생의 교육과정 범위는 주로 [대수], [미적분Ⅰ], [미적분Ⅱ], [확률과 통계], [기하] 과목에 매핑됩니다.' :
+    '';
+
+  const studentInfoPrompt = studentGrade
+    ? `\n★ [학생 학년 필수 준수 지침 - 최우선 순위] ★
+- 이 오답 문제를 등록한 학생의 현재 학년/과정은 **"${studentGrade}"** 입니다.
+- ${gradeMappingText}
+- **[Curriculum Locking]**: 이 오답 문제의 확정된 과목은 **"${resolvedGrade}"** 이며, 단원은 **"${resolvedChapter}"** 입니다.
+- 풀이 과정과 힌트를 구성할 때, 식별된 대상 과목 및 학년 범위에서 '아직 배우지 않은 개념이나 선행 공식'을 끌고 와서 해설하는 것을 절대적으로 금지합니다. 오직 해당 학년 교과서 내의 기법만 사용하십시오.\n`
+    : '';
+
+  const prompt = `너는 더쿠키수학 선생님을 보좌하여 학생들의 수학 오답을 과학적으로 분석하고 올바른 복습 처방을 제공하는 스마트한 AI 수학 클리닉 비서 **'밤티'**이다.
+이 문제의 과목은 **"${resolvedGrade}"** 이며, 단원은 **"${resolvedChapter}"** 으로 확정되었습니다.
+아래의 비서 페르소나와 포맷 규칙을 엄격히 준수하여 수학 문제 사진을 분석해 풀이 및 힌트 JSON 보고서를 작성하여라.
+${studentInfoPrompt}
+
+★ [AI 비서 밤티 가이드라인] ★
+1. 절대 자신을 실제 선생님(더쿠키수학 쌤 등)과 동일시하지 마십시오. 당신은 수학 오답 분석을 보조하는 인공지능 비서 캐릭터 **'밤티'**입니다. 대화 톤은 학생에게 정중하고 다정한 존댓말(해요체)로 작성하되, 친근하고 귀여운 밤티 비서로서의 예의 바르고 객관적인 어조를 유지해야 합니다.
+2. 대한민국 고교 교육과정을 벗어난 수식(예: 대학 수학, 편미분, 벡터 외적, 복잡한 정규분포 확률밀도함수 식 등)은 절대 배제하고 오직 고교 교과 공식(예: 표준화 $Z = \\\\frac{X-m}{\\\\sigma}$)만 쓰십시오.
+3. [학생 학년에 따른 수학 기호 노출 절대 통제 지침]:
+   - 학생 학년이 **"중3"**인 경우: 시그마($\sum$, \sum), 로그($\log$), 극한($\lim$), 미적분 기호($\int$, dx) 등 고등 선행 수학 기호를 풀이와 힌트에서 **일절 사용하지 마십시오.** 수열이나 항들의 합은 시그마 기호 대신 반드시 덧셈의 원시적 나열식(예: $a_1 + a_2 + a_3 + \dots$)으로 대체하여 풀어 쓰십시오.
+   - 학생 학년이 **"고1"**인 경우: 시그마($\sum$), 극한($\lim$), 미적분($\int$) 등 고2 과정 이상의 수학 전용 특수 기호를 풀이에 노출하지 마십시오.
+4. 모든 수식은 반드시 LaTeX($...$ 또는 $$...$$)로 작성하고, 문장 끝과 단독 수식 앞뒤에는 반드시 빈줄(\\n\\n)을 2개 이상 추가해 널찍하게 줄바꿈해 주십시오. 모든 텍스트 해설은 100% 한국어로만 작성해야 합니다.
+
+★ [보고서 포맷 형식 (solvingProcess 필드)] ★
+반드시 아래 4개의 마크다운 헤더(###)를 순서대로 단독 라인에 배치하여 하나의 통합 텍스트로 작성하십시오.
+
+### 1단계: 문제 이해하기
+- 미지수와 주어진 조건을 짚어줍니다.
+
+### 2단계: 해결 계획 세우기
+- 실전 꿀팁이나 연관 공식을 적용할 계획을 세웁니다.
+
+### 3단계: 계획 실행하기
+- 교과정 내의 LaTeX 수식을 들여쓰기하여 차근차근 전개해 계산합니다.
+
+### 4단계: 돌아보기 & 쌤의 한끝 팁
+- 구한 답을 가볍게 검토하고 함정을 짚어줍니다.
+- 단락 맨 마지막 줄에 실수를 방지할 한 줄짜리 짧은 개념 처방을 **[처방 요약]** 이라는 말머리를 붙여 단 한 줄로만 간결하게 적어주십시오.
+
+[반환할 JSON 구조 정의]
+1. solvingProcess: 위의 4개 헤더가 모두 포함된 해설 리포트 텍스트 (한국어)
+2. hints: 3단계 복습 시 점진적으로 공개되는 3개의 원소를 가진 힌트 배열 (hints[0]: 발상, hints[1]: 중간공식, hints[2]: 최종실마리)
+3. problemText: 이미지에서 추출한 원본 문제 지문 (LaTeX 변환 필수)
+4. problemBox: 인쇄 문제 영역 바운딩 박스 (top, bottom, left, right 마진 백분율 0~100)
+5. mistakeSummary: 학생 풀이 기반 틀린 이유를 30자 이내로 요약한 한 문장`;
+
+  const requestBody = {
+    contents: [
+      {
+        parts: [
+          { text: prompt },
+          {
+            inlineData: {
+              mimeType: mimeType,
+              data: base64Data
+            }
+          }
+        ]
+      }
+    ],
+    generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: 'OBJECT',
+        properties: {
           solvingProcess: { type: 'STRING' },
           hints: {
             type: 'ARRAY',
@@ -443,48 +532,26 @@ ${syllabusText || '등록된 강의가 없습니다.'}
             },
             required: ['top', 'bottom', 'left', 'right']
           },
-          mistakeSummary: { type: 'STRING' },
-          matchedVideoId: { type: 'STRING', nullable: true },
-          matchedStartSeconds: { type: 'NUMBER', nullable: true },
-          matchedChapterTitle: { type: 'STRING', nullable: true }
+          mistakeSummary: { type: 'STRING' }
         },
-        required: ['grade', 'chapter', 'title', 'solvingProcess', 'hints', 'problemText', 'problemBox', 'mistakeSummary']
+        required: ['solvingProcess', 'hints', 'problemText', 'problemBox', 'mistakeSummary']
       }
     }
   };
 
   try {
     const resolvedModel = 'gemini-2.5-flash';
-
-    // 가성비가 17배 뛰어나고 5초대로 속도가 빠른 gemini-2.5-flash 정식 모델 호출
-    const parsedJson: GeminiResponse = await callGeminiApi(resolvedModel, requestBody, apiKey);
-
-    // 단원명 보정 및 보정 로직 (통합 Fuzzy Matching 및 선행 확장 보정)
-    const { grade: resolvedGrade, chapter: resolvedChapter } = normalizeGradeAndChapter(
-      parsedJson.grade || '',
-      parsedJson.chapter || '',
-      studentGrade
-    );
-    console.log(`Gemini response - rawGrade: "${parsedJson.grade}", resolvedGrade: "${resolvedGrade}", rawChapter: "${parsedJson.chapter}", resolvedChapter: "${resolvedChapter}"`);
+    const parsedJson = await callGeminiApi(resolvedModel, requestBody, apiKey);
 
     return {
-      title: parsedJson.title || '분석 완료된 문제',
-      grade: resolvedGrade,
-      chapter: resolvedChapter,
-      analysis: {
-        solvingProcess: parsedJson.solvingProcess,
-        mistakeSummary: parsedJson.mistakeSummary || undefined,
-        hints: parsedJson.hints,
-        problemText: parsedJson.problemText,
-        problemBox: parsedJson.problemBox,
-        matchedVideoId: parsedJson.matchedVideoId || undefined,
-        matchedStartSeconds: parsedJson.matchedStartSeconds != null ? parsedJson.matchedStartSeconds : undefined,
-        matchedChapterTitle: parsedJson.matchedChapterTitle || undefined,
-        modelUsed: resolvedModel
-      }
+      solvingProcess: parsedJson.solvingProcess,
+      hints: parsedJson.hints,
+      problemText: parsedJson.problemText,
+      problemBox: parsedJson.problemBox,
+      mistakeSummary: parsedJson.mistakeSummary
     };
   } catch (error: any) {
-    console.error('Gemini API call failed:', error);
+    console.error('Gemini solving failed:', error);
     throw new Error(error.message || 'Gemini API 호출 중 장애가 발생했습니다.');
   }
 }

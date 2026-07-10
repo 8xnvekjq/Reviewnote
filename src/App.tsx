@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import type { ActiveTab, MistakeEntry, ReviewState, MistakeAnalysis } from './types';
 import { ROOT_CAUSE_OPTIONS, GRADE_LIST } from './types';
 import { CameraScanner } from './components/CameraScanner';
-import { analyzeMistakeWithGemini } from './services/gemini';
+import { classifyMistakeWithGemini, solveMistakeWithGemini } from './services/gemini';
 import { AuthScreen } from './components/AuthScreen';
 import { supabase, isSupabaseConfigured } from './services/supabase';
 import { base64ToBlob } from './utils/image';
@@ -364,31 +364,78 @@ function App() {
 
   // Gemini API analysis flow & database updating
   const runAnalysisFlow = async (entry: MistakeEntry, apiKey: string, studentGrade?: string) => {
-    const result = await analyzeMistakeWithGemini(entry.imageUrl, apiKey, youtubeLectures, studentGrade);
+    // --- 1단계: 과목/단원 및 유튜브 딥링크 1차 판단 ---
+    const firstResult = await classifyMistakeWithGemini(entry.imageUrl, apiKey, youtubeLectures, studentGrade);
     
-    // Update mistake database record (including auto-classified grade/chapter and preserving student edits)
-    const { error: updateError } = await supabase
+    // 1단계 결과를 기반으로 Supabase DB에 과목, 단원, 유튜브 매칭 필드 우선 업데이트
+    const partialAnalysis: MistakeAnalysis = {
+      solvingProcess: "### 1단계: 문제 이해하기\nAI가 정밀 문제 해설 및 힌트를 분석 중입니다... 잠시만 기다려 주세요.",
+      hints: ["해설 분석 중...", "해설 분석 중...", "해설 분석 중..."],
+      matchedVideoId: firstResult.matchedVideoId,
+      matchedStartSeconds: firstResult.matchedStartSeconds,
+      matchedChapterTitle: firstResult.matchedChapterTitle,
+    };
+
+    const { error: firstUpdateError } = await supabase
       .from('mistakes')
       .update({
-        title: result.title,
-        analysis: result.analysis,
-        grade: result.grade || entry.grade || null,
-        chapter: result.chapter || entry.chapter || null,
+        title: firstResult.title,
+        grade: firstResult.grade || entry.grade || null,
+        chapter: firstResult.chapter || entry.chapter || null,
+        analysis: partialAnalysis,
         root_causes: entry.rootCauses || [],
         user_action_plan: entry.userActionPlan || null,
       })
       .eq('id', entry.id);
 
-    if (updateError) throw updateError;
+    if (firstUpdateError) throw firstUpdateError;
 
-    const updatedEntry: MistakeEntry = {
+    let updatedEntry: MistakeEntry = {
       ...entry,
-      title: result.title,
-      analysis: result.analysis,
-      grade: result.grade || entry.grade,
-      chapter: result.chapter || entry.chapter,
+      title: firstResult.title,
+      grade: firstResult.grade || entry.grade,
+      chapter: firstResult.chapter || entry.chapter,
+      analysis: partialAnalysis,
     };
 
+    // 로컬 상태 1차 갱신 (화면에 과목/단원 및 유튜브 딥링크가 바로 노출됨)
+    setMistakes(prev => prev.map(m => m.id === entry.id ? updatedEntry : m));
+    setSelectedEntry(updatedEntry);
+
+    // --- 2단계: 문제 풀이 및 힌트 2차 정밀 분석 ---
+    const secondResult = await solveMistakeWithGemini(
+      entry.imageUrl, 
+      apiKey, 
+      updatedEntry.grade || '', 
+      updatedEntry.chapter || '', 
+      studentGrade
+    );
+
+    const finalAnalysis: MistakeAnalysis = {
+      ...partialAnalysis,
+      solvingProcess: secondResult.solvingProcess,
+      hints: secondResult.hints,
+      problemText: secondResult.problemText,
+      problemBox: secondResult.problemBox,
+      mistakeSummary: secondResult.mistakeSummary || undefined,
+      modelUsed: 'gemini-2.5-flash'
+    };
+
+    const { error: secondUpdateError } = await supabase
+      .from('mistakes')
+      .update({
+        analysis: finalAnalysis,
+      })
+      .eq('id', entry.id);
+
+    if (secondUpdateError) throw secondUpdateError;
+
+    updatedEntry = {
+      ...updatedEntry,
+      analysis: finalAnalysis
+    };
+
+    // 로컬 상태 2차 갱신 (상세 해설 및 힌트 로딩 완료 노출)
     setMistakes(prev => prev.map(m => m.id === entry.id ? updatedEntry : m));
     setSelectedEntry(updatedEntry);
   };
