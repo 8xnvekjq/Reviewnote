@@ -3,38 +3,36 @@ import React from 'react';
 export const StudentGuide: React.FC = () => {
   const guideItems = [
     {
+      step: '01',
       emoji: '📷',
       title: '오답 사진 등록',
-      desc: '하단 카메라 버튼을 누르고 오답을 정밀 촬영한 뒤, 원하는 문제 영역만 깔끔하게 사각형으로 조절해 오려내어 저장하세요.'
+      desc: '하단 카메라 버튼을 누르고 오답을 정밀 촬영한 뒤, 원하는 문제 영역만 깔끔하게 사각형으로 조절해 오려내어 저장하세요.',
+      colorClass: 'from-indigo-500/20 via-indigo-500/5 to-slate-900/40 border-indigo-500/30 text-indigo-400 bg-indigo-950/60 shadow-indigo-950/50'
     },
     {
+      step: '02',
       emoji: '🤖',
       title: 'AI 수학 클리닉 진단',
-      desc: '등록된 오답을 터치하고 [AI 분석 시작하기]를 누르면 수식 인식과 분류를 거쳐 정석 풀이, 실수 요인, 대책, 3단계 힌트가 자동 처방됩니다.'
+      desc: '등록된 오답을 터치하고 [AI 분석 시작하기]를 누르면 수식 인식과 분류를 거쳐 정석 풀이, 실수 요인, 대책, 3단계 힌트가 자동 처방됩니다.',
+      colorClass: 'from-purple-500/20 via-purple-500/5 to-slate-900/40 border-purple-500/30 text-purple-400 bg-purple-950/60 shadow-purple-950/50'
     },
     {
+      step: '03',
       emoji: '📺',
       title: '선생님 추천 강의 딥링크',
-      desc: '진단된 단원에 매핑되는 선생님의 개념 개념 강의 유튜브 영상 및 정확한 챕터 시작점(타임라인) 바로가기가 매칭되어 제공됩니다.'
+      desc: '진단된 단원에 매핑되는 선생님의 개념 강의 유튜브 영상 및 정확한 챕터 시작점(타임라인) 바로가기가 매칭되어 제공됩니다.',
+      colorClass: 'from-amber-500/20 via-amber-500/5 to-slate-900/40 border-amber-500/30 text-amber-400 bg-amber-950/60 shadow-amber-950/50'
     },
     {
+      step: '04',
       emoji: '✏️',
       title: '3단계 누적 복습 시스템',
-      desc: '기억이 흐려질 때마다 O/X/★ 버튼으로 복습 성공 여부를 체크하세요. 3회 완료(O 세 번) 시 자동으로 복습 완료함으로 안전하게 분리 보관됩니다.'
+      desc: '기억이 흐려질 때마다 O/X/★ 버튼으로 복습 성공 여부를 체크하세요. 3회 완료(O 세 번) 시 자동으로 복습 완료함으로 안전하게 분리 보관됩니다.',
+      colorClass: 'from-emerald-500/20 via-emerald-500/5 to-slate-900/40 border-emerald-500/30 text-emerald-400 bg-emerald-950/60 shadow-emerald-950/50'
     }
   ];
 
   const changeLogs = [
-    {
-      version: '기본 이용 가이드',
-      date: '간단 사용법',
-      changes: [
-        '📷 오답 사진 등록: 하단 카메라 버튼을 눌러 사진 촬영 후 원하는 문제 영역을 선택하여 등록하세요.',
-        '🤖 AI 진단 시작: 등록된 오답을 터치하고 [AI 분석 시작하기]를 실행하면 분석 보고서가 생성됩니다.',
-        '📺 추천 강의 시청: 진단된 단원에 맞춰 매칭되는 선생님의 유튜브 개념 영상 타임라인 딥링크를 클릭해 학습하세요.',
-        '✏️ 3단계 복습 토글: O/X/★ 버튼으로 복습 성공 여부를 기록하고, 3회 완료 시 복습 완료함으로 자동 보관됩니다.'
-      ]
-    },
     {
       version: 'v1.10.3',
       date: '2026.07.10',
@@ -205,16 +203,29 @@ export const StudentGuide: React.FC = () => {
         </p>
       </div>
 
-      {/* 2. Main Feature Guides */}
-      <div className="space-y-3">
-        <h3 className="text-xs font-black text-indigo-400 uppercase tracking-wider">주요 기능 이용법</h3>
-        <div className="grid gap-3">
+      {/* 2. Main Feature Guides (개편된 고해상도 큰 이모지 디자인) */}
+      <div className="space-y-4">
+        <h3 className="text-xs font-black text-indigo-400 uppercase tracking-wider pl-1">오답클리닉 이용방법</h3>
+        <div className="grid gap-4">
           {guideItems.map((item, idx) => (
-            <div key={idx} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-start space-x-3.5 shadow-sm">
-              <span className="text-2xl flex-none bg-slate-950 w-11 h-11 rounded-xl flex items-center justify-center border border-slate-800/80">{item.emoji}</span>
-              <div className="space-y-1 min-w-0">
-                <h4 className="text-xs font-bold text-slate-200">{item.title}</h4>
-                <p className="text-[11px] text-slate-400 leading-relaxed">{item.desc}</p>
+            <div 
+              key={idx} 
+              className={`relative bg-gradient-to-br ${item.colorClass} border rounded-3xl p-5 flex items-center space-x-5 shadow-lg backdrop-blur-sm hover:-translate-y-0.5 hover:shadow-xl transition-all duration-300 group`}
+            >
+              {/* 우상단 네온 스타일 스텝 인덱스 배지 */}
+              <span className="absolute top-4 right-5 text-2xl font-black text-slate-800/50 select-none tracking-tighter group-hover:text-slate-700/60 transition-colors font-mono">
+                {item.step}
+              </span>
+              
+              {/* 커다란 이모지 블록 */}
+              <span className="text-4xl flex-none w-16 h-16 rounded-2xl flex items-center justify-center border border-slate-800/60 bg-slate-950/80 shadow-inner group-hover:scale-105 transition-transform duration-300 select-none">
+                {item.emoji}
+              </span>
+              
+              {/* 텍스트 설명 영역 */}
+              <div className="space-y-1.5 min-w-0 pr-6">
+                <h4 className="text-sm font-extrabold text-white tracking-tight">{item.title}</h4>
+                <p className="text-xs text-slate-300 leading-relaxed font-medium">{item.desc}</p>
               </div>
             </div>
           ))}
