@@ -153,7 +153,11 @@ export const MistakeList: React.FC<MistakeListProps> = ({
                   lastReview === 'X' ? <span className="text-red-400 font-bold">X 도전 중</span> :
                   lastReview === 'star' ? <span className="text-amber-400 font-bold">★ 별표</span> : '—';
 
-                const reviewDateStr = act.updated_at ? act.updated_at.slice(5, 10).replace(/-/g, '/') : '';
+                let reviewDateStr = '';
+                if (act.updated_at) {
+                  const uD = new Date(act.updated_at);
+                  reviewDateStr = `${uD.getMonth() + 1}/${uD.getDate()} ${String(uD.getHours()).padStart(2, '0')}:${String(uD.getMinutes()).padStart(2, '0')}`;
+                }
                 const studentName = act.display_name || act.username || '동료 학생';
 
                 return (
