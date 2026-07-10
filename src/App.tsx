@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import type { ActiveTab, MistakeEntry, ReviewState } from './types';
+import type { ActiveTab, MistakeEntry, ReviewState, MistakeAnalysis } from './types';
 import { ROOT_CAUSE_OPTIONS, GRADE_LIST } from './types';
 import { CameraScanner } from './components/CameraScanner';
 import { analyzeMistakeWithGemini } from './services/gemini';
