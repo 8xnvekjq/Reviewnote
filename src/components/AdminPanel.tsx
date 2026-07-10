@@ -431,15 +431,6 @@ export const AdminPanel: React.FC = () => {
       {/* ── 탭 2: 변경 이력 (Change Log) 탭 ── */}
       {activeSubTab === 'changelog' && (
         <div className="space-y-6 animate-scale-up">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
-            <div className="flex items-center space-x-2">
-              <span className="text-base">📋</span>
-              <h3 className="font-extrabold text-white text-sm">더쿠키수학 오답클리닉 변경 이력</h3>
-            </div>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              본 애플리케이션의 릴리즈 버전별 업데이트 내역 및 핵심 개선 사항을 확인할 수 있습니다.
-            </p>
-          </div>
 
           {/* 오답클리닉 이용방법 (큰 이모지 디자인) */}
           <div className="space-y-4 pt-2">
