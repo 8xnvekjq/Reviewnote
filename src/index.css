@@ -120,6 +120,12 @@
     position: static !important;
   }
 
+  /* 인쇄 시 모든 텍스트/수식을 검은색으로 강제 (배경 투명화) */
+  .print-only-layout, .print-only-layout * {
+    color: black !important;
+    background: transparent !important;
+  }
+
   /* 3. 세로 2열 배치 및 구분선 스타일 */
   .print-column-wrapper {
     column-count: 2 !important;

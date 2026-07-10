@@ -14,6 +14,7 @@ import { BottomNavigation } from './components/BottomNavigation';
 import { ImageCropper } from './components/ImageCropper';
 import { AdminPanel } from './components/AdminPanel';
 import { StudentGuide } from './components/StudentGuide';
+import { LaTeXRenderer } from './components/LaTeXRenderer';
 
 function App() {
   // If Supabase credentials are not configured, block and show the setup guide
@@ -42,6 +43,8 @@ function App() {
   const [peerActivities, setPeerActivities] = useState<any[]>([]);
   // 인쇄할 완료 오답 리스트 임시 보관 상태
   const [printItems, setPrintItems] = useState<MistakeEntry[] | null>(null);
+  // 개별 오답의 인쇄 형식 상태 (id -> true: 텍스트로 인쇄, false/undefined: 이미지로 인쇄)
+  const [printAsTextMap, setPrintAsTextMap] = useState<Record<string, boolean>>({});
 
   // 이번주 월요일 00:00 KST UTC 경계 날짜 구하기 (내 실시간 주간 점수 계산용)
   const myWeeklyScore = useMemo(() => {
@@ -375,6 +378,11 @@ function App() {
     }, 250);
   };
 
+  // 인쇄 모드 (텍스트/이미지) 토글 핸들러
+  const handleTogglePrintAsText = (id: string) => {
+    setPrintAsTextMap(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
   // Process crop completion, upload to Storage, and insert database record
   const handleCropComplete = async (croppedBase64: string) => {
     setTempCapturedImage(null);
@@ -640,6 +648,8 @@ function App() {
             currentUserId={session?.user?.id}
             viewMode="list"
             peerActivities={peerActivities}
+            printAsTextMap={printAsTextMap}
+            onTogglePrintAsText={handleTogglePrintAsText}
           />
         )}
 
@@ -820,6 +830,9 @@ function App() {
                 ? new Date(entry.date).toLocaleDateString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit' }).replace(/\s/g, '')
                 : '—';
               
+              const isTextPrint = printAsTextMap[entry.id];
+              const hasProblemText = !!entry.analysis?.problemText;
+
               return (
                 <div key={entry.id} className="print-card-item">
                   {/* 단정한 헤더 이력 바 */}
@@ -827,8 +840,14 @@ function App() {
                     <span className="font-bold text-slate-800">[{entry.grade || '공통'} ➔ {entry.chapter || '기타'}] {cleanTitle}...</span>
                     <span>등록: {formattedDate}</span>
                   </div>
-                  {/* 문제 이미지 */}
-                  <img src={entry.imageUrl} alt={entry.title} />
+                  {/* 문제 영역 (텍스트 또는 이미지) */}
+                  {isTextPrint && hasProblemText ? (
+                    <div className="text-[10px] text-slate-900 leading-relaxed font-sans select-text whitespace-pre-line py-1 border border-slate-100 rounded px-2 bg-slate-50/30">
+                      <LaTeXRenderer text={entry.analysis!.problemText} className="text-[10px] text-slate-900 leading-relaxed" />
+                    </div>
+                  ) : (
+                    <img src={entry.imageUrl} alt={entry.title} />
+                  )}
                 </div>
               );
             })}

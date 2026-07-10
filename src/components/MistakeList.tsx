@@ -17,6 +17,8 @@ interface MistakeListProps {
   currentUserId?: string;
   viewMode?: 'card' | 'list';
   peerActivities?: any[];
+  printAsTextMap?: Record<string, boolean>;
+  onTogglePrintAsText?: (id: string) => void;
 }
 
 export const MistakeList: React.FC<MistakeListProps> = ({
@@ -33,6 +35,8 @@ export const MistakeList: React.FC<MistakeListProps> = ({
   currentUserId,
   viewMode = 'card',
   peerActivities = [],
+  printAsTextMap = {},
+  onTogglePrintAsText,
 }) => {
   const [selectedStudent, setSelectedStudent] = useState<string>('all');
   const [filterGrade, setFilterGrade] = useState<string>('all');
@@ -275,6 +279,23 @@ export const MistakeList: React.FC<MistakeListProps> = ({
 
                     {/* Right Side: Date & Arrow */}
                     <div className="flex items-center space-x-3 flex-none pl-2">
+                      {onTogglePrintAsText && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onTogglePrintAsText(entry.id);
+                          }}
+                          className={`px-2 py-1 rounded-lg text-[9px] font-bold border transition-all flex items-center space-x-1 select-none active:scale-95 ${
+                            printAsTextMap[entry.id]
+                              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                              : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                          }`}
+                          title={printAsTextMap[entry.id] ? "지문 텍스트로 인쇄" : "사진 이미지로 인쇄"}
+                        >
+                          <span>{printAsTextMap[entry.id] ? '📝 텍스트' : '🖼️ 이미지'}</span>
+                        </button>
+                      )}
                       <span className="text-[9px] text-slate-500 font-semibold">
                         {dateStr}
                       </span>
