@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import type { ActiveTab, MistakeEntry, ReviewState } from './types';
 import { ROOT_CAUSE_OPTIONS, GRADE_LIST } from './types';
 import { CameraScanner } from './components/CameraScanner';
@@ -45,6 +45,22 @@ function App() {
   const [printItems, setPrintItems] = useState<MistakeEntry[] | null>(null);
   // 개별 오답의 인쇄 형식 상태 (id -> true: 텍스트로 인쇄, false/undefined: 이미지로 인쇄)
   const [printAsTextMap, setPrintAsTextMap] = useState<Record<string, boolean>>({});
+  // 인쇄할 아이템 선택 ID 목록 상태
+  const [selectedPrintIds, setSelectedPrintIds] = useState<string[]>([]);
+  
+  const prevTabRef = useRef(activeTab);
+
+  // 3차 복습 완료 보관함 탭 활성화 시 아직 인쇄되지 않은 카드만 디폴트로 체크 선택
+  useEffect(() => {
+    if (activeTab === 'completed' && prevTabRef.current !== 'completed') {
+      const completedList = mistakes.filter(m => m.reviews?.filter(r => r === 'O').length === 3);
+      const unprintedIds = completedList
+        .filter(m => !m.analysis?.printed)
+        .map(m => m.id);
+      setSelectedPrintIds(unprintedIds);
+    }
+    prevTabRef.current = activeTab;
+  }, [activeTab, mistakes]);
 
   // 이번주 월요일 00:00 KST UTC 경계 날짜 구하기 (내 실시간 주간 점수 계산용)
   const myWeeklyScore = useMemo(() => {
@@ -365,17 +381,74 @@ function App() {
   };
 
   // 완료 오답 일괄 인쇄 트리거 핸들러
-  const handlePrintCompleted = () => {
+  const handlePrintCompleted = async () => {
     const completedList = mistakes.filter(m => m.reviews?.filter(r => r === 'O').length === 3);
-    if (completedList.length === 0) return;
+    const toPrint = completedList.filter(m => selectedPrintIds.includes(m.id));
+    if (toPrint.length === 0) return;
 
-    setPrintItems(completedList);
+    setPrintItems(toPrint);
+
+    // 출력 완료 상태 DB 및 로컬 싱크
+    await handleMarkAsPrinted(toPrint.map(m => m.id));
 
     // React가 DOM을 마운트하고 이미지를 적재할 때까지 250ms 대기 후 인쇄 다이얼로그 실행
     setTimeout(() => {
       window.print();
       setPrintItems(null);
     }, 250);
+  };
+
+  // 인쇄 완료 처리 (Supabase DB 및 로컬 상태 동기화)
+  const handleMarkAsPrinted = async (ids: string[]) => {
+    try {
+      const promises = mistakes
+        .filter(m => ids.includes(m.id))
+        .map(async (m) => {
+          const updatedAnalysis = {
+            ...m.analysis,
+            printed: true
+          };
+
+          const { error } = await supabase
+            .from('mistakes')
+            .update({
+              analysis: updatedAnalysis
+            })
+            .eq('id', m.id);
+
+          if (error) throw error;
+          return { id: m.id, updatedAnalysis };
+        });
+
+      const results = await Promise.all(promises);
+
+      setMistakes(prev => prev.map(m => {
+        const match = results.find(r => r.id === m.id);
+        if (match) {
+          return { ...m, analysis: match.updatedAnalysis };
+        }
+        return m;
+      }));
+    } catch (err) {
+      console.error('Failed to mark as printed:', err);
+    }
+  };
+
+  // 인쇄 선택 토글 핸들러
+  const handleTogglePrintSelect = (id: string) => {
+    setSelectedPrintIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  // 인쇄 전체 선택/해제 핸들러
+  const handleToggleAllPrintSelect = () => {
+    const completedList = mistakes.filter(m => m.reviews?.filter(r => r === 'O').length === 3);
+    if (selectedPrintIds.length === completedList.length) {
+      setSelectedPrintIds([]);
+    } else {
+      setSelectedPrintIds(completedList.map(m => m.id));
+    }
   };
 
   // 인쇄 모드 (텍스트/이미지) 토글 핸들러
@@ -650,6 +723,9 @@ function App() {
             peerActivities={peerActivities}
             printAsTextMap={printAsTextMap}
             onTogglePrintAsText={handleTogglePrintAsText}
+            selectedPrintIds={selectedPrintIds}
+            onTogglePrintSelect={handleTogglePrintSelect}
+            onToggleAllPrintSelect={handleToggleAllPrintSelect}
           />
         )}
 

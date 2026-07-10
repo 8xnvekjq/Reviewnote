@@ -91,6 +91,11 @@
   overflow-wrap: break-word !important;
 }
 
+/* Unify font of non-math LaTeX text (preserve KaTeX math symbols) */
+.katex-rendered-text, .katex-rendered-text :not(.katex):not(.katex *) {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans KR", "Apple SD Gothic Neo", sans-serif !important;
+}
+
 /* Print-only Stylesheet for 오답 카드 2열 세로 인쇄 */
 @media print {
   /* 1. 도화지 역할인 html, body, #root는 숨기지 않고 리셋 */
@@ -124,6 +129,11 @@
   .print-only-layout, .print-only-layout * {
     color: black !important;
     background: transparent !important;
+  }
+
+  /* 인쇄 시 비수식 텍스트 폰트 통일 (KaTeX 수학 심볼 보존) */
+  .print-only-layout, .print-only-layout :not(.katex):not(.katex *) {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans KR", "Apple SD Gothic Neo", sans-serif !important;
   }
 
   /* 3. 세로 2열 배치 및 구분선 스타일 */

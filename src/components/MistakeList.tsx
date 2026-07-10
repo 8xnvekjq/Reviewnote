@@ -19,6 +19,9 @@ interface MistakeListProps {
   peerActivities?: any[];
   printAsTextMap?: Record<string, boolean>;
   onTogglePrintAsText?: (id: string) => void;
+  selectedPrintIds?: string[];
+  onTogglePrintSelect?: (id: string) => void;
+  onToggleAllPrintSelect?: () => void;
 }
 
 export const MistakeList: React.FC<MistakeListProps> = ({
@@ -37,6 +40,9 @@ export const MistakeList: React.FC<MistakeListProps> = ({
   peerActivities = [],
   printAsTextMap = {},
   onTogglePrintAsText,
+  selectedPrintIds = [],
+  onTogglePrintSelect,
+  onToggleAllPrintSelect,
 }) => {
   const [selectedStudent, setSelectedStudent] = useState<string>('all');
   const [filterGrade, setFilterGrade] = useState<string>('all');
@@ -101,12 +107,23 @@ export const MistakeList: React.FC<MistakeListProps> = ({
           </button>
         )}
         {onPrintClick && mistakes.length > 0 && (
-          <button
-            onClick={onPrintClick}
-            className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 hover:text-white transition-all shadow-md border border-slate-750 flex items-center gap-1.5"
-          >
-            🖨️ PDF 인쇄
-          </button>
+          <div className="flex items-center space-x-2">
+            {onToggleAllPrintSelect && (
+              <button
+                onClick={onToggleAllPrintSelect}
+                className="px-3 py-1.5 rounded-full text-[11px] font-semibold bg-slate-900 border border-slate-850 text-slate-400 hover:text-slate-200 active:scale-95 transition-all"
+              >
+                {selectedPrintIds.length === mistakes.length ? '▢ 전체 해제' : '☑ 전체 선택'}
+              </button>
+            )}
+            <button
+              onClick={onPrintClick}
+              disabled={selectedPrintIds.length === 0}
+              className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 hover:text-white transition-all shadow-md border border-slate-750 flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              🖨️ PDF 인쇄 ({selectedPrintIds.length}개)
+            </button>
+          </div>
         )}
       </div>
 
@@ -249,6 +266,27 @@ export const MistakeList: React.FC<MistakeListProps> = ({
                     onClick={() => onSelectEntry(entry)}
                     className="group flex items-center justify-between bg-slate-900/40 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl p-3.5 cursor-pointer transition-all active:scale-[0.99] space-x-3.5 shadow-sm"
                   >
+                    {/* Print Selection Checkbox */}
+                    {onTogglePrintSelect && (
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onTogglePrintSelect(entry.id);
+                        }}
+                        className="flex-none pr-1 select-none"
+                      >
+                        <div className={`w-4.5 h-4.5 rounded border flex items-center justify-center transition-all ${
+                          selectedPrintIds.includes(entry.id)
+                            ? 'bg-indigo-600 border-indigo-600 text-white'
+                            : 'border-slate-750 bg-slate-950 hover:border-slate-500'
+                        }`}>
+                          {selectedPrintIds.includes(entry.id) && (
+                            <span className="text-[10px] font-black leading-none">✓</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex items-center space-x-3.5 min-w-0 flex-1">
                       {/* Left Side: Badges */}
                       <div className="flex flex-col space-y-1 flex-none items-start min-w-[80px]">
@@ -266,8 +304,15 @@ export const MistakeList: React.FC<MistakeListProps> = ({
 
                       {/* Middle Side: Title & Student Name */}
                       <div className="min-w-0 flex-1">
-                        <div className="text-xs font-bold text-slate-200 line-clamp-1 group-hover:text-indigo-400 transition-colors">
-                          <LaTeXRenderer text={entry.title} className="text-xs" />
+                        <div className="flex items-center space-x-2">
+                          <div className="text-xs font-bold text-slate-200 line-clamp-1 group-hover:text-indigo-400 transition-colors">
+                            <LaTeXRenderer text={entry.title} className="text-xs" />
+                          </div>
+                          {entry.analysis?.printed && (
+                            <span className="text-[8px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1 py-0.5 rounded flex-none select-none">
+                              🖨️ 인쇄완료
+                            </span>
+                          )}
                         </div>
                         {studentName && (
                           <span className="text-[8px] text-indigo-400 font-semibold mt-0.5 block">

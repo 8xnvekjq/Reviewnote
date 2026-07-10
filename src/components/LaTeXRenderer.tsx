@@ -194,7 +194,7 @@ export const LaTeXRenderer: React.FC<LaTeXRendererProps> = ({ text, className = 
   return (
     <div 
       ref={containerRef} 
-      className={`${className} break-words leading-relaxed text-slate-200`} 
+      className={`${className} break-words leading-relaxed text-slate-200 katex-rendered-text`} 
     />
   );
 };
