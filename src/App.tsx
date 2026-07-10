@@ -1035,23 +1035,20 @@ function App() {
                                 if (count === 0) {
                                   // 0회: 아주 옅은 꺼진 상태
                                   chipClass = 'bg-[#101524] border-[#182136]/50 text-slate-800';
-                                } else if (ratio <= 0.33) {
-                                  // 하위 33% (옅음)
-                                  chipClass = 'bg-indigo-500/10 border-indigo-500/20';
-                                } else if (ratio <= 0.66) {
-                                  // 중위 33% ~ 66% (보통)
-                                  chipClass = 'bg-indigo-500/35 border-indigo-500/40';
-                                } else if (ratio <= 0.9) {
-                                  // 상위 66% ~ 90% (진함 + 은은한 글로우)
-                                  chipClass = 'bg-indigo-500/65 border-indigo-400/60';
-                                  bgStyle = {
-                                    boxShadow: '0 0 8px rgba(99, 102, 241, 0.4)'
-                                  };
+                                } else if (ratio <= 0.25) {
+                                  // 하위 25%: 에메랄드 그린 (양호)
+                                  chipClass = 'bg-emerald-500/15 border-emerald-500/25';
+                                } else if (ratio <= 0.50) {
+                                  // 26% ~ 50%: 옐로우 (보통/주의)
+                                  chipClass = 'bg-yellow-500/25 border-yellow-500/35';
+                                } else if (ratio <= 0.75) {
+                                  // 51% ~ 75%: 오렌지 (경고/나쁨)
+                                  chipClass = 'bg-orange-500/45 border-orange-500/55';
                                 } else {
-                                  // 90% 초과: 해당 학생 기준 최고 빈도 오답 영역 (최고 밝기 네온)
-                                  chipClass = 'bg-indigo-500 border-indigo-300';
+                                  // 76% 초과: 로즈 레드 (위험/취약 - 네온 글로우)
+                                  chipClass = 'bg-rose-500 border-rose-300';
                                   bgStyle = {
-                                    boxShadow: '0 0 15px rgba(99, 102, 241, 0.7)'
+                                    boxShadow: '0 0 12px rgba(244, 63, 94, 0.7)'
                                   };
                                 }
 
@@ -1067,7 +1064,7 @@ function App() {
                                     {/* 호버 시 툴팁 대응 */}
                                     {count > 0 && (
                                       <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-800 text-[8px] text-indigo-300 px-1.5 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 shadow-lg font-bold">
-                                        {count}
+                                        {count}회
                                       </span>
                                     )}
                                   </div>
@@ -1085,11 +1082,11 @@ function App() {
                           <span>적음 (low)</span>
                           <span>➔</span>
                           <span>많음 (high)</span>
-                          {/* 퍼플 4단계 채도 변화 범례 */}
-                          <span className="w-2 h-2 rounded-[2px] bg-indigo-500/10 border border-indigo-500/20"></span>
-                          <span className="w-2 h-2 rounded-[2px] bg-indigo-500/30 border border-indigo-500/40"></span>
-                          <span className="w-2 h-2 rounded-[2px] bg-indigo-500/60 border border-indigo-400/60" style={{ boxShadow: '0 0 3px rgba(99, 102, 241, 0.3)' }}></span>
-                          <span className="w-2.5 h-2.5 rounded-[2px] bg-indigo-500 border border-indigo-300" style={{ boxShadow: '0 0 6px rgba(99, 102, 241, 0.6)' }}></span>
+                          {/* 초록 -> 노랑 -> 주황 -> 빨강의 신호등 범례 */}
+                          <span className="w-2 h-2 rounded-[2px] bg-emerald-500/15 border border-emerald-500/25"></span>
+                          <span className="w-2 h-2 rounded-[2px] bg-yellow-500/25 border border-yellow-500/35"></span>
+                          <span className="w-2 h-2 rounded-[2px] bg-orange-500/45 border border-orange-500/55"></span>
+                          <span className="w-2.5 h-2.5 rounded-[2px] bg-rose-500 border border-rose-300" style={{ boxShadow: '0 0 5px rgba(244, 63, 94, 0.7)' }}></span>
                         </div>
                         <span>최근 30일 데이터</span>
                       </div>
