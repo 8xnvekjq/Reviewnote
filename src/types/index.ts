@@ -19,6 +19,7 @@ export interface MistakeAnalysis {
   actionPlan?: string;      // [향후 재발 방지 대책] (이전 데이터 호환용)
   modelUsed?: string;       // 분석에 사용된 AI 모델 명
   printed?: boolean;        // 인쇄/출력 완료 여부
+  reviewDates?: string[];   // 단계별 복습 완료 일자 배열 (['7/10', '', ''])
 }
 
 export type ReviewState = 'O' | 'X' | 'star' | '';

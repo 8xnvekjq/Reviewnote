@@ -588,14 +588,14 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                       return (
                         <div 
                           key={index} 
-                          className={`p-3 rounded-2xl border text-center flex flex-col justify-between min-h-[90px] transition-all duration-300 ${cardStyle}`}
+                          className={`p-3 rounded-2xl border text-center flex flex-col justify-between min-h-[105px] transition-all duration-300 ${cardStyle}`}
                         >
                           <div className="text-[10px] font-bold text-slate-500 mb-1">{index + 1}차 복습</div>
                           
                           <div className="flex-1 flex items-center justify-center">
                             {isCompleted ? (
-                              /* 완료 상태: 큼직한 결과 스탬프 배지 단독 노출 */
-                              <div className="animate-scale-up">
+                              /* 완료 상태: 큼직한 결과 스탬프 배지 및 아래 날짜 노출 */
+                              <div className="animate-scale-up flex flex-col items-center">
                                 {state === 'O' && (
                                   <span className="w-9 h-9 rounded-full bg-emerald-500 text-slate-950 font-black text-sm flex items-center justify-center shadow-lg shadow-emerald-500/10">
                                     O
@@ -609,6 +609,11 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                                 {state === 'star' && (
                                   <span className="w-9 h-9 rounded-full bg-amber-400 text-slate-950 font-black text-sm flex items-center justify-center shadow-lg shadow-amber-400/10">
                                     ★
+                                  </span>
+                                )}
+                                {selectedEntry.analysis?.reviewDates?.[index] && (
+                                  <span className="text-[9px] text-slate-400 font-bold font-mono mt-1.5 block select-none">
+                                    📅 {selectedEntry.analysis.reviewDates[index]}
                                   </span>
                                 )}
                               </div>

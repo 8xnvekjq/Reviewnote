@@ -551,26 +551,79 @@ function App() {
   // Update reviews list in Supabase & local state
   const handleUpdateReviews = async (id: string, newReviews: ReviewState[]) => {
     try {
+      const targetEntry = mistakes.find(m => m.id === id);
+      if (!targetEntry) return;
+
+      const currentDates = [...(targetEntry.analysis?.reviewDates || ['', '', ''])];
+      const oldReviews = targetEntry.reviews || ['', '', ''];
+
+      for (let i = 0; i < 3; i++) {
+        if (newReviews[i] !== '' && oldReviews[i] === '') {
+          const now = new Date();
+          const dateStr = `${now.getMonth() + 1}/${now.getDate()}`;
+          currentDates[i] = dateStr;
+        } else if (newReviews[i] === '') {
+          currentDates[i] = '';
+        }
+      }
+
+      const updatedAnalysis: MistakeAnalysis = {
+        solvingProcess: targetEntry.analysis?.solvingProcess || '',
+        ...targetEntry.analysis,
+        reviewDates: currentDates
+      };
+
       const { error } = await supabase
         .from('mistakes')
         .update({ 
           reviews: newReviews,
+          analysis: updatedAnalysis,
           updated_at: new Date().toISOString()
         })
         .eq('id', id);
 
       if (error) throw error;
 
-      setMistakes(prev => prev.map(m => m.id === id ? { ...m, reviews: newReviews } : m));
-      setSelectedEntry(prev => prev && prev.id === id ? { ...prev, reviews: newReviews } : prev);
+      const updatedEntry = {
+        ...targetEntry,
+        reviews: newReviews,
+        analysis: updatedAnalysis
+      };
+
+      setMistakes(prev => prev.map(m => m.id === id ? updatedEntry : m));
+      setSelectedEntry(prev => prev && prev.id === id ? updatedEntry : prev);
       
       // Refresh peer activities locally
       fetchPeerActivities();
     } catch (err: any) {
       console.error('Failed to update reviews:', err);
       // Fallback: update local React state anyway for immediate validation
-      setMistakes(prev => prev.map(m => m.id === id ? { ...m, reviews: newReviews } : m));
-      setSelectedEntry(prev => prev && prev.id === id ? { ...prev, reviews: newReviews } : prev);
+      const targetEntry = mistakes.find(m => m.id === id);
+      if (targetEntry) {
+        const currentDates = [...(targetEntry.analysis?.reviewDates || ['', '', ''])];
+        const oldReviews = targetEntry.reviews || ['', '', ''];
+        for (let i = 0; i < 3; i++) {
+          if (newReviews[i] !== '' && oldReviews[i] === '') {
+            const now = new Date();
+            const dateStr = `${now.getMonth() + 1}/${now.getDate()}`;
+            currentDates[i] = dateStr;
+          } else if (newReviews[i] === '') {
+            currentDates[i] = '';
+          }
+        }
+        const updatedAnalysis: MistakeAnalysis = {
+          solvingProcess: targetEntry.analysis?.solvingProcess || '',
+          ...targetEntry.analysis,
+          reviewDates: currentDates
+        };
+        const updatedEntry = {
+          ...targetEntry,
+          reviews: newReviews,
+          analysis: updatedAnalysis
+        };
+        setMistakes(prev => prev.map(m => m.id === id ? updatedEntry : m));
+        setSelectedEntry(prev => prev && prev.id === id ? updatedEntry : prev);
+      }
     }
   };
 
