@@ -5,6 +5,7 @@ import 'katex/dist/katex.min.css';
 interface LaTeXRendererProps {
   text: string;
   className?: string;
+  isPrintMode?: boolean; // 인쇄 모드 여부
 }
 
 /**
@@ -92,7 +93,7 @@ const sanitizeLatex = (raw: string): string => {
  * Pre-compiles Markdown text & LaTeX formulas directly to fully rendered HTML strings.
  * Catches any KaTeX parse errors and replaces them with clean Unicode fallbacks.
  */
-const parseMarkdownWithMath = (text: string): string => {
+const parseMarkdownWithMath = (text: string, isPrintMode = false): string => {
   let s = sanitizeLatex(text);
 
   // 1. Compile Display Math $$...$$
@@ -149,12 +150,18 @@ const parseMarkdownWithMath = (text: string): string => {
     // Bullet lists
     const matchBullet = trimmed.match(/^[-*]\s+(.*)$/);
     if (matchBullet) {
+      if (isPrintMode) {
+        return `<div class="flex items-start space-x-2 my-1 text-slate-900 font-medium text-[9.5pt]"><span class="text-slate-950 mt-2 flex-none w-1 h-1 rounded-full bg-slate-950"></span><span class="flex-1">${matchBullet[1]}</span></div>`;
+      }
       return `<div class="flex items-start space-x-2 my-2.5 text-slate-300 font-medium text-xs sm:text-sm"><span class="text-indigo-400 mt-1.5 flex-none w-1.5 h-1.5 rounded-full bg-indigo-500"></span><span class="flex-1">${matchBullet[1]}</span></div>`;
     }
     
     // Numbered lists
     const matchNumber = trimmed.match(/^(\d+)\.\s+(.*)$/);
     if (matchNumber) {
+      if (isPrintMode) {
+        return `<div class="flex items-start space-x-2 my-1 text-slate-900 font-medium text-[9.5pt]"><span class="text-slate-950 font-bold text-[9.5pt] mt-0.5 flex-none">${matchNumber[1]}.</span><span class="flex-1">${matchNumber[2]}</span></div>`;
+      }
       return `<div class="flex items-start space-x-2 my-2.5 text-slate-300 font-medium text-xs sm:text-sm"><span class="text-emerald-400 font-bold text-xs sm:text-sm mt-0.5 flex-none">${matchNumber[1]}.</span><span class="flex-1">${matchNumber[2]}</span></div>`;
     }
 
@@ -181,15 +188,15 @@ const parseMarkdownWithMath = (text: string): string => {
   return result;
 };
 
-export const LaTeXRenderer: React.FC<LaTeXRendererProps> = ({ text, className = '' }) => {
+export const LaTeXRenderer: React.FC<LaTeXRendererProps> = ({ text, className = '', isPrintMode = false }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
     
     // Render and inject pre-compiled math HTML safely
-    containerRef.current.innerHTML = parseMarkdownWithMath(text);
-  }, [text]);
+    containerRef.current.innerHTML = parseMarkdownWithMath(text, isPrintMode);
+  }, [text, isPrintMode]);
 
   return (
     <div 

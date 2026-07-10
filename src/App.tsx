@@ -976,7 +976,7 @@ function App() {
                   {/* 문제 영역 (텍스트 또는 이미지) */}
                   {isTextPrint && hasProblemText ? (
                     <div className="text-[10px] text-slate-900 leading-relaxed font-sans select-text whitespace-pre-line py-1 border border-slate-100 rounded px-2 bg-slate-50/30">
-                      <LaTeXRenderer text={entry.analysis!.problemText || ''} className="text-[10px] text-slate-900 leading-relaxed" />
+                      <LaTeXRenderer text={entry.analysis!.problemText || ''} className="text-[10px] text-slate-900 leading-relaxed" isPrintMode={true} />
                     </div>
                   ) : (
                     <img src={entry.imageUrl} alt={entry.title} />
