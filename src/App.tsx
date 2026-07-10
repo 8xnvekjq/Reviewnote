@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import type { ActiveTab, MistakeEntry, ReviewState, MistakeAnalysis } from './types';
-import { ROOT_CAUSE_OPTIONS, GRADE_LIST } from './types';
+import { ROOT_CAUSE_OPTIONS } from './types';
 import { CameraScanner } from './components/CameraScanner';
 import { classifyMistakeWithGemini, solveMistakeWithGemini } from './services/gemini';
 import { AuthScreen } from './components/AuthScreen';
@@ -737,6 +737,34 @@ function App() {
     return { gradeCounts, causeCounts, totalGrade, totalCause, topChapters };
   }, [filteredMistakesForStats]);
 
+  const heatmapData = useMemo(() => {
+    // 실제로 등록된 과목들만 세로축 지정 (유동적 가변)
+    const activeGrades = Array.from(
+      new Set(filteredMistakesForStats.map(m => m.grade).filter(Boolean))
+    ) as string[];
+
+    // 각 과목별 실수 원인 카운트 집계
+    const matrix = activeGrades.map(grade => {
+      const rowStats = ROOT_CAUSE_OPTIONS.map(opt => {
+        const count = filteredMistakesForStats.filter(
+          m => m.grade === grade && m.rootCauses?.includes(opt.id)
+        ).length;
+        return {
+          id: opt.id,
+          label: opt.label,
+          count
+        };
+      });
+
+      return {
+        grade,
+        stats: rowStats
+      };
+    });
+
+    return matrix;
+  }, [filteredMistakesForStats]);
+
   const maskId = (username: string) => {
     if (!username) return '';
     if (username.length <= 3) return username;
@@ -944,51 +972,97 @@ function App() {
               </div>
             ) : (
               <>
-                {/* 과목별 오답 분포 */}
-                <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 space-y-3">
-                  <h3 className="text-sm font-extrabold text-indigo-400">📚 과목별 오답 분포</h3>
-                  {stats.totalGrade === 0 ? (
-                    <p className="text-xs text-slate-500">AI 분석을 실행하면 과목이 자동 분류됩니다.</p>
-                  ) : (
-                    GRADE_LIST.filter(g => stats.gradeCounts[g]).map(grade => {
-                      const count = stats.gradeCounts[grade] || 0;
-                      const pct = Math.round((count / stats.totalGrade) * 100);
-                      return (
-                        <div key={grade} className="space-y-1">
-                          <div className="flex justify-between text-xs">
-                            <span className="text-slate-300 font-medium">{grade}</span>
-                            <span className="text-slate-400">{count}개 ({pct}%)</span>
-                          </div>
-                          <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
-                            <div className="h-full bg-gradient-to-r from-indigo-600 to-indigo-400 rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
+                {/* 나의 약점 분석 매트릭스 (격자형 히트맵) */}
+                <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-sm font-extrabold text-indigo-400 flex items-center space-x-1.5">
+                      <span>📊</span>
+                      <span>나의 약점 분석 매트릭스</span>
+                    </h3>
+                    <span className="text-[9px] text-slate-500 font-bold">오답이 있는 과목만 자동 가변</span>
+                  </div>
 
-                {/* 실수 유형별 분포 */}
-                <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 space-y-3">
-                  <h3 className="text-sm font-extrabold text-amber-400">⚠️ 나의 실수 유형 분석</h3>
-                  {stats.totalCause === 0 ? (
-                    <p className="text-xs text-slate-500">오답 상세창에서 실수 원인을 체크해 주세요.</p>
+                  {heatmapData.length === 0 ? (
+                    <p className="text-xs text-slate-500 py-4 text-center">AI 분석을 실행하면 약점 매트릭스가 채워집니다.</p>
                   ) : (
-                    ROOT_CAUSE_OPTIONS.map(opt => {
-                      const count = stats.causeCounts[opt.id] || 0;
-                      const pct = Math.round((count / stats.totalCause) * 100);
-                      return (
-                        <div key={opt.id} className="space-y-1">
-                          <div className="flex justify-between text-xs">
-                            <span className="text-slate-300 font-medium">{opt.label}</span>
-                            <span className="text-slate-400">{count}회 ({pct}%)</span>
-                          </div>
-                          <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
-                            <div className="h-full bg-gradient-to-r from-amber-500 to-amber-400 rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
-                          </div>
+                    <div className="space-y-4">
+                      {/* 가로 헤더 (실수 유형 약어) */}
+                      <div className="flex items-center text-[10px] text-slate-500 font-black">
+                        {/* 왼쪽 여백 (과목명 컬럼 크기 확보) */}
+                        <div className="w-16 flex-none"></div>
+                        {/* 격자 컬럼 헤더 */}
+                        <div className="flex-1 grid grid-cols-4 gap-2 text-center">
+                          {ROOT_CAUSE_OPTIONS.map(opt => {
+                            // 앞 두 글자만 노출하여 모바일 가로폭 확보
+                            const shortLabel = opt.label.slice(0, 2);
+                            return (
+                              <div key={opt.id} className="truncate" title={opt.label}>
+                                {shortLabel}
+                              </div>
+                            );
+                          })}
                         </div>
-                      );
-                    })
+                      </div>
+
+                      {/* 세로 행 (과목별 격자선) */}
+                      <div className="space-y-2.5">
+                        {heatmapData.map(row => (
+                          <div key={row.grade} className="flex items-center">
+                            {/* 과목명 (왼쪽 고정 컬럼) */}
+                            <div className="w-16 flex-none text-xs font-black text-slate-300 truncate pr-2">
+                              {row.grade}
+                            </div>
+                            {/* 가로 칩들 */}
+                            <div className="flex-1 grid grid-cols-4 gap-2">
+                              {row.stats.map(cell => {
+                                // 오답 개수에 따른 불투명도(Opacity) 계산 (최대 1.0, 최소 0.05)
+                                const opacity = cell.count > 0 
+                                  ? Math.min(0.2 + (cell.count / 5) * 0.8, 1.0) 
+                                  : 0.05;
+                                
+                                // 실수가 있으면 밝은 네온 인디고/퍼플 계열, 없으면 어두운 회색 슬레이트
+                                const bgStyle = cell.count > 0 
+                                  ? { backgroundColor: `rgba(99, 102, 241, ${opacity})`, borderColor: `rgba(129, 140, 248, ${opacity * 0.4})` }
+                                  : { backgroundColor: 'rgba(30, 41, 59, 0.2)', borderColor: 'rgba(51, 65, 85, 0.2)' };
+
+                                const textStyle = cell.count > 0 
+                                  ? 'text-indigo-200 font-black' 
+                                  : 'text-slate-750 font-bold';
+
+                                return (
+                                  <div
+                                    key={cell.id}
+                                    style={bgStyle}
+                                    className={`h-9 border rounded-xl flex flex-col items-center justify-center text-[11px] transition-all duration-300 shadow-sm relative group cursor-pointer ${textStyle}`}
+                                    title={`${row.grade} - ${cell.label}: ${cell.count}회 발생`}
+                                  >
+                                    <span>{cell.count}</span>
+                                    {/* 호버 시 툴팁 대응 */}
+                                    {cell.count > 0 && (
+                                      <span className="absolute -top-6 bg-slate-900 border border-slate-800 text-[8px] text-indigo-300 px-1.5 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 shadow-lg">
+                                        {cell.count}회
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* 하단 범례 안내 */}
+                      <div className="flex justify-between items-center text-[9px] text-slate-500 pt-2 border-t border-slate-900/60 font-bold">
+                        <span>💡 숫자는 실수가 기록된 횟수입니다.</span>
+                        <div className="flex items-center space-x-1">
+                          <span>옅음</span>
+                          <span className="w-2.5 h-2.5 bg-indigo-500/20 border border-indigo-500/10 rounded"></span>
+                          <span className="w-2.5 h-2.5 bg-indigo-500/60 border border-indigo-500/20 rounded"></span>
+                          <span className="w-2.5 h-2.5 bg-indigo-500 border border-indigo-500/40 rounded"></span>
+                          <span>짙음</span>
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
 
