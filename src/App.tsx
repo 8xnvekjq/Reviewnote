@@ -404,7 +404,8 @@ function App() {
       const promises = mistakes
         .filter(m => ids.includes(m.id))
         .map(async (m) => {
-          const updatedAnalysis = {
+          const updatedAnalysis: MistakeAnalysis = {
+            solvingProcess: m.analysis?.solvingProcess || '',
             ...m.analysis,
             printed: true
           };
