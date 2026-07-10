@@ -973,82 +973,96 @@ function App() {
             ) : (
               <>
                 {/* 나의 약점 분석 매트릭스 (격자형 히트맵) */}
-                <div className="bg-gradient-to-br from-[#0e1322] via-[#090d18] to-[#060810] border border-slate-800/80 rounded-2xl p-5 space-y-4 shadow-[0_4px_30px_rgba(0,0,0,0.4)] backdrop-blur-md">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-sm font-extrabold text-indigo-400 flex items-center space-x-1.5">
-                      <span>📊</span>
-                      <span>나의 약점 분석 매트릭스</span>
-                    </h3>
-                    <span className="text-[9px] text-slate-500 font-bold">오답이 있는 과목만 자동 가변</span>
+                <div className="bg-[#0e1322] border border-slate-800/80 rounded-2xl p-5 space-y-4 shadow-[0_4px_30px_rgba(0,0,0,0.4)] backdrop-blur-md">
+                  <div className="flex items-center space-x-1.5">
+                    <span className="text-base select-none">🧩</span>
+                    <h3 className="text-sm font-extrabold text-white">수학 오답 분석 매트릭스</h3>
                   </div>
 
                   {heatmapData.length === 0 ? (
                     <p className="text-xs text-slate-500 py-4 text-center">AI 분석을 실행하면 약점 매트릭스가 채워집니다.</p>
                   ) : (
                     <div className="space-y-4">
-                      {/* 가로 헤더 (실수 유형 약어) */}
-                      <div className="flex items-center text-[10px] text-slate-500 font-black">
+                      {/* 가로 헤더 (실수 유형 전체 이름) */}
+                      <div className="flex items-center text-[10px] text-slate-500 font-extrabold">
                         {/* 왼쪽 여백 (과목명 컬럼 크기 확보) */}
                         <div className="w-16 flex-none"></div>
                         {/* 격자 컬럼 헤더 */}
-                        <div className="flex-1 grid grid-cols-4 gap-2 text-center">
-                          {ROOT_CAUSE_OPTIONS.map(opt => {
-                            // 앞 두 글자만 노출하여 모바일 가로폭 확보
-                            const shortLabel = opt.label.slice(0, 2);
-                            return (
-                              <div key={opt.id} className="truncate bg-slate-950/40 border border-slate-900/60 py-1 rounded-lg text-[9px] tracking-wide text-slate-400 font-bold" title={opt.label}>
-                                {shortLabel}
-                              </div>
-                            );
-                          })}
+                        <div className="flex-1 grid grid-cols-4 gap-3 text-center">
+                          {ROOT_CAUSE_OPTIONS.map(opt => (
+                            <div key={opt.id} className="truncate text-[9px] tracking-wide text-slate-400 font-bold">
+                              {opt.label}
+                            </div>
+                          ))}
                         </div>
                       </div>
 
                       {/* 세로 행 (과목별 격자선) */}
-                      <div className="space-y-2.5">
+                      <div className="space-y-3">
                         {heatmapData.map(row => (
                           <div key={row.grade} className="flex items-center">
                             {/* 과목명 (왼쪽 고정 컬럼) */}
-                            <div className="w-16 flex-none text-xs font-black text-slate-400 truncate pr-2 tracking-tight">
+                            <div className="w-16 flex-none text-xs font-black text-slate-400 truncate pr-2 text-right tracking-tight">
                               {row.grade}
                             </div>
-                            {/* 가로 칩들 */}
-                            <div className="flex-1 grid grid-cols-4 gap-2">
-                              {row.stats.map(cell => {
-                                // 오답 개수에 따른 불투명도(Opacity) 계산 (최대 1.0, 최소 0.05)
-                                const opacity = cell.count > 0 
-                                  ? Math.min(0.2 + (cell.count / 5) * 0.8, 1.0) 
-                                  : 0.05;
-                                
-                                // 실수가 있으면 밝은 네온 인디고/퍼플 계열, 없으면 어두운 회색 슬레이트
-                                // 네온 글로우(boxShadow) 효과 부여!
-                                const bgStyle = cell.count > 0 
-                                  ? { 
-                                      backgroundColor: `rgba(99, 102, 241, ${opacity * 0.22})`, 
-                                      borderColor: `rgba(129, 140, 248, ${opacity * 0.65})`,
-                                      boxShadow: `0 0 ${Math.min(cell.count * 4.5, 15)}px rgba(99, 102, 241, ${opacity * 0.45})`
-                                    }
-                                  : { 
-                                      backgroundColor: '#070a13', 
-                                      borderColor: '#121827',
-                                      boxShadow: 'none'
-                                    };
+                            {/* 3x3 격자 칩들 */}
+                            <div className="flex-1 grid grid-cols-4 gap-3">
+                              {row.stats.map((cell, cellIdx) => {
+                                // 0, 1 (개념부족, 계산실수) -> 보라색 테마
+                                // 2, 3 (문제오독, 공식오류) -> 노란색/오렌지 테마
+                                const isPurple = cellIdx < 2;
 
-                                const textStyle = cell.count > 0 
-                                  ? 'text-indigo-300 font-black scale-105' 
-                                  : 'text-slate-800 font-bold';
+                                // 3x3 미니 그리드를 채운다.
+                                const miniChips = Array.from({ length: 9 });
+
+                                // 세로 채우기 우선순위 인덱스 순서
+                                const FILL_ORDER = [4, 1, 7, 5, 2, 8, 3, 0, 6];
 
                                 return (
                                   <div
                                     key={cell.id}
-                                    style={bgStyle}
-                                    className={`h-9 border rounded-xl flex flex-col items-center justify-center text-[11px] transition-all duration-300 hover:scale-102 hover:-translate-y-0.5 cursor-pointer relative group ${textStyle}`}
+                                    className="grid grid-cols-3 gap-0.5 p-1 border border-[#1b2336] bg-[#070b13]/50 rounded-xl relative group cursor-pointer hover:border-slate-700/60 transition-all duration-300"
                                     title={`${row.grade} - ${cell.label}: ${cell.count}회 발생`}
                                   >
-                                    <span>{cell.count}</span>
+                                    {miniChips.map((_, mIdx) => {
+                                      // 이 미니 칩의 충전 인덱스 순서가 cell.count 보다 작으면 불이 켜진다 (Active)
+                                      const activeIndex = FILL_ORDER.indexOf(mIdx);
+                                      const isActive = activeIndex < cell.count;
+
+                                      // 미니 칩 스타일 계산
+                                      let chipStyle: React.CSSProperties = {};
+                                      let chipClass = '';
+
+                                      if (isActive) {
+                                        // 불이 켜진 상태 (Active)
+                                        if (isPurple) {
+                                          chipClass = 'bg-[#a855f7] border-[#c084fc]/50';
+                                          chipStyle = {
+                                            boxShadow: '0 0 5px rgba(168, 85, 247, 0.75)'
+                                          };
+                                        } else {
+                                          chipClass = 'bg-[#f59e0b] border-[#fbbf24]/50';
+                                          chipStyle = {
+                                            boxShadow: '0 0 5px rgba(245, 158, 11, 0.75)'
+                                          };
+                                        }
+                                      } else {
+                                        // 불이 꺼진 상태 (Inactive) - 회색/어두운 칩
+                                        chipClass = 'bg-[#182135]/40 border-[#202c46]/20';
+                                      }
+
+                                      return (
+                                        <div
+                                          key={mIdx}
+                                          style={chipStyle}
+                                          className={`w-2 h-2 rounded-[2px] border ${chipClass} transition-all duration-300`}
+                                        />
+                                      );
+                                    })}
+
                                     {/* 호버 시 툴팁 대응 */}
                                     {cell.count > 0 && (
-                                      <span className="absolute -top-6 bg-slate-900 border border-slate-800 text-[8px] text-indigo-300 px-1.5 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 shadow-lg">
+                                      <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-800 text-[8px] text-indigo-300 px-1.5 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 shadow-lg font-bold">
                                         {cell.count}회
                                       </span>
                                     )}
@@ -1061,15 +1075,17 @@ function App() {
                       </div>
 
                       {/* 하단 범례 안내 */}
-                      <div className="flex justify-between items-center text-[9px] text-slate-500 pt-2 border-t border-slate-900/60 font-bold">
-                        <span>💡 숫자는 실수가 기록된 횟수입니다.</span>
-                        <div className="flex items-center space-x-1">
-                          <span>옅음</span>
-                          <span className="w-2.5 h-2.5 bg-indigo-500/10 border border-indigo-500/20 rounded"></span>
-                          <span className="w-2.5 h-2.5 bg-indigo-500/30 border border-indigo-500/40 rounded"></span>
-                          <span className="w-2.5 h-2.5 bg-indigo-500/70 border border-indigo-500/80 rounded" style={{ boxShadow: '0 0 4px rgba(99, 102, 241, 0.4)' }}></span>
-                          <span>짙음</span>
+                      <div className="flex justify-between items-center text-[9px] text-slate-500 pt-3 border-t border-slate-800/60 font-bold">
+                        <div className="flex items-center space-x-1.5">
+                          <span className="w-2 h-2 bg-[#182135]/40 border border-[#202c46]/20 rounded-[2px]"></span>
+                          <span>적음 (low)</span>
+                          <span>➔</span>
+                          <span>많음 (high)</span>
+                          {/* 보라/오렌지 빛나는 칩 */}
+                          <span className="w-2.5 h-2.5 rounded-[2px] bg-[#a855f7] border border-purple-400" style={{ boxShadow: '0 0 4px rgba(168, 85, 247, 0.8)' }}></span>
+                          <span className="w-2.5 h-2.5 rounded-[2px] bg-[#f59e0b] border border-amber-400" style={{ boxShadow: '0 0 4px rgba(245, 158, 11, 0.8)' }}></span>
                         </div>
+                        <span>최근 30일 데이터</span>
                       </div>
                     </div>
                   )}
