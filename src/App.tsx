@@ -381,19 +381,22 @@ function App() {
   };
 
   // 완료 오답 일괄 인쇄 트리거 핸들러
-  const handlePrintCompleted = async () => {
+  const handlePrintCompleted = () => {
     const completedList = mistakes.filter(m => m.reviews?.filter(r => r === 'O').length === 3);
     const toPrint = completedList.filter(m => selectedPrintIds.includes(m.id));
     if (toPrint.length === 0) return;
 
     setPrintItems(toPrint);
 
-    // 출력 완료 상태 DB 및 로컬 싱크
-    await handleMarkAsPrinted(toPrint.map(m => m.id));
-
     // React가 DOM을 마운트하고 이미지를 적재할 때까지 250ms 대기 후 인쇄 다이얼로그 실행
-    setTimeout(() => {
+    setTimeout(async () => {
+      // 1. 인쇄 다이얼로그 띄움 (사용자 인쇄 액션 대기)
       window.print();
+      
+      // 2. 인쇄창이 닫힌 후에 비로소 인쇄 완료(printed: true) 처리 및 DB/상태 동기화
+      await handleMarkAsPrinted(toPrint.map(m => m.id));
+      
+      // 3. 인쇄 임시 아이템 초기화
       setPrintItems(null);
     }, 250);
   };
