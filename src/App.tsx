@@ -1002,13 +1002,13 @@ function App() {
                       <div className="flex items-center text-[10px] text-slate-500 font-extrabold">
                         {/* 왼쪽 여백 (과목명 컬럼 크기 확보) */}
                         <div className="w-16 flex-none"></div>
-                        {/* 5칸 격자 컬럼 헤더 */}
-                        <div className="flex-1 grid grid-cols-5 gap-2 text-center">
+                        {/* 5칸 격자 컬럼 헤더 - 가로폭이 넓어져도 가운데 정렬선을 일치시키기 위해 justify-items-center 추가 */}
+                        <div className="flex-1 grid grid-cols-5 gap-2 text-center justify-items-center">
                           {ROOT_CAUSE_OPTIONS.map(opt => {
                             // 이모지와 공백을 소거한 순수 4글자 텍스트 추출
                             const labelClean = opt.label.replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
                             return (
-                              <div key={opt.id} className="truncate text-[8px] sm:text-[9px] tracking-tight text-slate-400 font-extrabold">
+                              <div key={opt.id} className="w-full max-w-[44px] truncate text-[8px] sm:text-[9px] tracking-tight text-slate-400 font-extrabold text-center">
                                 {labelClean}
                               </div>
                             );
@@ -1024,8 +1024,8 @@ function App() {
                             <div className="w-16 flex-none text-xs font-black text-slate-400 truncate pr-2 text-right tracking-tight">
                               {row.grade}
                             </div>
-                            {/* 5칸 칩 격자 */}
-                            <div className="flex-1 grid grid-cols-5 gap-2">
+                            {/* 5칸 칩 격자 - 가로폭 확장 시 정사각형 고정을 위해 justify-items-center 탑재 */}
+                            <div className="flex-1 grid grid-cols-5 gap-2 justify-items-center">
                               {row.stats.map(cell => {
                                 const count = cell.count;
                                 const ratio = count / maxCountInMatrix;
@@ -1059,7 +1059,7 @@ function App() {
                                   <div
                                     key={cell.id}
                                     style={bgStyle}
-                                    className={`h-9 border rounded-xl flex items-center justify-center transition-all duration-300 hover:scale-102 hover:-translate-y-0.5 cursor-pointer relative group ${chipClass}`}
+                                    className={`w-full max-w-[44px] aspect-square border rounded-xl flex items-center justify-center transition-all duration-300 hover:scale-105 hover:-translate-y-0.5 cursor-pointer relative group ${chipClass}`}
                                     title={`${row.grade} - ${cell.label}: ${count}회 발생`}
                                   >
                                     {/* 개수 텍스트는 칩 내부에서 제거 */}
@@ -1067,7 +1067,7 @@ function App() {
                                     {/* 호버 시 툴팁 대응 */}
                                     {count > 0 && (
                                       <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-800 text-[8px] text-indigo-300 px-1.5 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 shadow-lg font-bold">
-                                        {count}회
+                                        {count}
                                       </span>
                                     )}
                                   </div>
