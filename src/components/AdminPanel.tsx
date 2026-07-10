@@ -407,6 +407,26 @@ export const AdminPanel: React.FC = () => {
           </div>
 
           <div className="relative border-l border-slate-800 pl-6 ml-3 space-y-8">
+            {/* 기본 이용 가이드 */}
+            <div className="relative">
+              <div className="absolute -left-[33px] top-1.5 w-4 h-4 rounded-full bg-emerald-500 border-4 border-slate-950" />
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs font-black px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    이용 가이드
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-bold">간단 사용법</span>
+                </div>
+                <h4 className="font-bold text-white text-xs">오답노트 핵심 이용 프로세스 안내</h4>
+                <ul className="text-xs text-slate-400 list-disc list-inside space-y-1.5 pl-1 leading-relaxed">
+                  <li><strong>📷 오답 사진 등록</strong>: 하단 카메라 버튼을 눌러 사진 촬영 후 원하는 문제 영역을 선택하여 등록하세요.</li>
+                  <li><strong>🤖 AI 진단 시작</strong>: 등록된 오답을 터치하고 [AI 분석 시작하기]를 실행하면 분석 보고서가 생성됩니다.</li>
+                  <li><strong>📺 추천 강의 시청</strong>: 진단된 단원에 맞춰 매칭되는 선생님의 유튜브 개념 영상 타임라인 딥링크를 클릭해 학습하세요.</li>
+                  <li><strong>✏️ 3단계 복습 토글</strong>: O/X/★ 버튼으로 복습 성공 여부를 기록하고, 3회 완료 시 복습 완료함으로 자동 보관됩니다.</li>
+                </ul>
+              </div>
+            </div>
+
             {/* Version 1.9.0 */}
             <div className="relative">
               <div className="absolute -left-[33px] top-1.5 w-4 h-4 rounded-full bg-indigo-500 border-4 border-slate-950" />
