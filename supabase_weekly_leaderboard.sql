@@ -42,7 +42,10 @@ SELECT
 FROM public.profiles p
 LEFT JOIN m_total t ON t.user_id = p.id
 LEFT JOIN m_completed c ON c.user_id = p.id
-WHERE COALESCE(t.count, 0) > 0 OR COALESCE(c.count, 0) > 0;
+WHERE (p.is_admin IS NOT TRUE)
+  AND (COALESCE(p.email, '') NOT LIKE '8xnvekjq%')
+  AND (COALESCE(p.email, '') NOT LIKE 'test%')
+  AND (COALESCE(t.count, 0) > 0 OR COALESCE(c.count, 0) > 0);
 
 -- 2. 지난주 리더보드 뷰 (RLS 우회 조회용)
 DROP VIEW IF EXISTS public.last_weekly_leaderboard;
@@ -85,4 +88,7 @@ SELECT
 FROM public.profiles p
 LEFT JOIN m_total t ON t.user_id = p.id
 LEFT JOIN m_completed c ON c.user_id = p.id
-WHERE COALESCE(t.count, 0) > 0 OR COALESCE(c.count, 0) > 0;
+WHERE (p.is_admin IS NOT TRUE)
+  AND (COALESCE(p.email, '') NOT LIKE '8xnvekjq%')
+  AND (COALESCE(p.email, '') NOT LIKE 'test%')
+  AND (COALESCE(t.count, 0) > 0 OR COALESCE(c.count, 0) > 0);

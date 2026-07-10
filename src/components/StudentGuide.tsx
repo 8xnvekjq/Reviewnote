@@ -26,6 +26,13 @@ export const StudentGuide: React.FC = () => {
 
   const changeLogs = [
     {
+      version: 'v1.10.2',
+      date: '2026.07.10',
+      changes: [
+        '주간 명예의 전당(Leaderboard) 집계 대상에서 관리자 계정(8xnvekjq) 및 테스트 계정(test) 제외 필터링 적용'
+      ]
+    },
+    {
       version: 'v1.10.1',
       date: '2026.07.10',
       changes: [
