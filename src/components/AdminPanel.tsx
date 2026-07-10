@@ -107,13 +107,16 @@ export const AdminPanel: React.FC = () => {
           stat.completedCount += 1;
         }
 
-        // 이번주 등록된 오답 집계
+        // 이번주 등록된 오답 집계 (신규 등록 오답)
         const mDate = new Date(m.date);
         if (mDate >= mondayDate) {
           stat.weeklyTotalCount += 1;
-          if (isCompleted) {
-            stat.weeklyCompletedCount += 1;
-          }
+        }
+
+        // 이번주 복습 완료 집계 (등록일 무관, 이번주 완료 건)
+        const updateDate = m.updated_at ? new Date(m.updated_at) : mDate;
+        if (isCompleted && updateDate >= mondayDate) {
+          stat.weeklyCompletedCount += 1;
         }
 
         // Track latest activity date
@@ -132,7 +135,7 @@ export const AdminPanel: React.FC = () => {
 
       // 각 유저별 주간 점수 산출
       statsMap.forEach((stat) => {
-        const rate = stat.weeklyTotalCount > 0 ? (stat.weeklyCompletedCount / stat.weeklyTotalCount) : 0;
+        const rate = stat.weeklyTotalCount > 0 ? (stat.weeklyCompletedCount / stat.weeklyTotalCount) : 1.0;
         stat.weeklyScore = (stat.weeklyCompletedCount * 10) + (rate * 100);
       });
 
