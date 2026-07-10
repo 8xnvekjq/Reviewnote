@@ -90,3 +90,54 @@
   word-break: break-word !important;
   overflow-wrap: break-word !important;
 }
+
+/* Print-only Stylesheet for 오답 카드 2열 세로 인쇄 */
+@media print {
+  /* 1. 일반 PWA 웹 레이아웃 전체 숨김 */
+  html, body, #root, .app-container, .modal-backdrop, header, nav, button, .bottom-nav-safe, .safe-top {
+    display: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    position: static !important;
+    width: auto !important;
+  }
+
+  /* 2. 인쇄 전용 레이아웃 노출 */
+  .print-only-layout {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 8mm !important;
+    background: white !important;
+    color: black !important;
+    overflow: visible !important;
+    position: static !important;
+  }
+
+  /* 3. 세로 2열 배치 및 구분선 스타일 */
+  .print-column-wrapper {
+    column-count: 2 !important;
+    column-gap: 10mm !important;
+    column-rule: 1px dashed #cbd5e1 !important; /* 연회색 세로 점선 구분선 */
+    width: 100% !important;
+  }
+
+  /* 4. 개별 문제 카드 레이아웃 */
+  .print-card-item {
+    display: block !important;
+    break-inside: avoid !important; /* 페이지/단 경계에서 문제 이미지 찢어짐 차단 */
+    page-break-inside: avoid !important;
+    margin-bottom: 6mm !important;
+    padding-bottom: 6mm !important;
+    border-bottom: 1px solid #e2e8f0 !important; /* 가로 얇은 실선 구분선 */
+  }
+
+  .print-card-item img {
+    max-width: 100% !important;
+    height: auto !important;
+    display: block !important;
+    margin-top: 6px !important;
+    border: 1px solid #f1f5f9 !important;
+    border-radius: 4px !important;
+  }
+}

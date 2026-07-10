@@ -8,6 +8,7 @@ interface MistakeListProps {
   onSelectEntry: (entry: MistakeEntry) => void;
   onDeleteMistake: (id: string, e: React.MouseEvent) => void;
   onAddClick: () => void;
+  onPrintClick?: () => void;
   title?: string;
   hideAddButton?: boolean;
   emptyMessage?: string;
@@ -23,6 +24,7 @@ export const MistakeList: React.FC<MistakeListProps> = ({
   onSelectEntry,
   onDeleteMistake,
   onAddClick,
+  onPrintClick,
   title = "나의 오답노트",
   hideAddButton = false,
   emptyMessage = "아직 등록된 오답이 없습니다.",
@@ -92,6 +94,14 @@ export const MistakeList: React.FC<MistakeListProps> = ({
             className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white transition-all shadow-md shadow-indigo-600/20"
           >
             + 새 오답 추가
+          </button>
+        )}
+        {onPrintClick && mistakes.length > 0 && (
+          <button
+            onClick={onPrintClick}
+            className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 hover:text-white transition-all shadow-md border border-slate-750 flex items-center gap-1.5"
+          >
+            🖨️ PDF 인쇄
           </button>
         )}
       </div>

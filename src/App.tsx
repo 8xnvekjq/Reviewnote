@@ -40,6 +40,8 @@ function App() {
   const [profilesGradeMap, setProfilesGradeMap] = useState<Record<string, string>>({});
   // 다른 학생들의 실시간 복습 현황 목록
   const [peerActivities, setPeerActivities] = useState<any[]>([]);
+  // 인쇄할 완료 오답 리스트 임시 보관 상태
+  const [printItems, setPrintItems] = useState<MistakeEntry[] | null>(null);
 
   // 이번주 월요일 00:00 KST UTC 경계 날짜 구하기 (내 실시간 주간 점수 계산용)
   const myWeeklyScore = useMemo(() => {
@@ -359,6 +361,20 @@ function App() {
     setTempCapturedImage(base64Image);
   };
 
+  // 완료 오답 일괄 인쇄 트리거 핸들러
+  const handlePrintCompleted = () => {
+    const completedList = mistakes.filter(m => m.reviews?.filter(r => r === 'O').length === 3);
+    if (completedList.length === 0) return;
+
+    setPrintItems(completedList);
+
+    // React가 DOM을 마운트하고 이미지를 적재할 때까지 250ms 대기 후 인쇄 다이얼로그 실행
+    setTimeout(() => {
+      window.print();
+      setPrintItems(null);
+    }, 250);
+  };
+
   // Process crop completion, upload to Storage, and insert database record
   const handleCropComplete = async (croppedBase64: string) => {
     setTempCapturedImage(null);
@@ -615,6 +631,7 @@ function App() {
             onSelectEntry={(entry) => setSelectedEntry(entry)}
             onDeleteMistake={handleDeleteMistake}
             onAddClick={() => setActiveTab('camera')}
+            onPrintClick={handlePrintCompleted}
             title="복습 완료 보관함"
             hideAddButton={true}
             emptyMessage="아직 완전히 복습 완료(O 3회 달성)된 오답이 없습니다. 열심히 오답을 복습하여 정복해 보세요!"
@@ -781,6 +798,43 @@ function App() {
 
       {/* Floating Glassmorphic Bottom Navigation Bar */}
       <BottomNavigation activeTab={activeTab} setActiveTab={setActiveTab} isAdmin={isAdmin} />
+
+      {/* 인쇄 전용 2열 세로 구분선 레이아웃 (@media print 시에만 노출) */}
+      {printItems && printItems.length > 0 && (
+        <div className="print-only-layout hidden">
+          {/* 정갈한 학습지 타이틀 */}
+          <div className="border-b-2 border-slate-850 pb-2.5 mb-6 flex justify-between items-end">
+            <div>
+              <h1 className="text-base font-extrabold text-slate-900 tracking-tight">더쿠키수학 오답노트</h1>
+              <p className="text-[8px] text-slate-500 font-mono mt-0.5">완료된 문제 모아찍기 학습지</p>
+            </div>
+            <div className="text-right text-[8px] text-slate-500 font-mono">
+              <span>인쇄일: {new Date().toLocaleDateString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit' }).replace(/\s/g, '')}</span>
+            </div>
+          </div>
+
+          <div className="print-column-wrapper">
+            {printItems.map((entry) => {
+              const cleanTitle = (entry.title || '').replace(/\$[^$]+\$/g, '').replace(/[#*`_]/g, '').slice(0, 16);
+              const formattedDate = entry.date 
+                ? new Date(entry.date).toLocaleDateString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit' }).replace(/\s/g, '')
+                : '—';
+              
+              return (
+                <div key={entry.id} className="print-card-item">
+                  {/* 단정한 헤더 이력 바 */}
+                  <div className="flex justify-between items-center text-[7px] text-slate-500 border-b border-slate-200 pb-1 mb-1.5 font-mono">
+                    <span className="font-bold text-slate-800">[{entry.grade || '공통'} ➔ {entry.chapter || '기타'}] {cleanTitle}...</span>
+                    <span>등록: {formattedDate}</span>
+                  </div>
+                  {/* 문제 이미지 */}
+                  <img src={entry.imageUrl} alt={entry.title} />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
     </div>
   );
