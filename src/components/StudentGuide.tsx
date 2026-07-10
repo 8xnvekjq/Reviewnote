@@ -203,56 +203,61 @@ export const StudentGuide: React.FC = () => {
         </p>
       </div>
 
-      {/* 2. Main Feature Guides (개편된 고해상도 큰 이모지 디자인) */}
-      <div className="space-y-4">
-        <h3 className="text-xs font-black text-indigo-400 uppercase tracking-wider pl-1">오답클리닉 이용방법</h3>
-        <div className="grid gap-4">
-          {guideItems.map((item, idx) => (
-            <div 
-              key={idx} 
-              className={`relative bg-gradient-to-br ${item.colorClass} border rounded-3xl p-5 flex items-center space-x-5 shadow-lg backdrop-blur-sm hover:-translate-y-0.5 hover:shadow-xl transition-all duration-300 group`}
-            >
-              {/* 우상단 네온 스타일 스텝 인덱스 배지 */}
-              <span className="absolute top-4 right-5 text-2xl font-black text-slate-800/50 select-none tracking-tighter group-hover:text-slate-700/60 transition-colors font-mono">
-                {item.step}
-              </span>
-              
-              {/* 커다란 이모지 블록 */}
-              <span className="text-4xl flex-none w-16 h-16 rounded-2xl flex items-center justify-center border border-slate-800/60 bg-slate-950/80 shadow-inner group-hover:scale-105 transition-transform duration-300 select-none">
-                {item.emoji}
-              </span>
-              
-              {/* 텍스트 설명 영역 */}
-              <div className="space-y-1.5 min-w-0 pr-6">
-                <h4 className="text-sm font-extrabold text-white tracking-tight">{item.title}</h4>
-                <p className="text-xs text-slate-300 leading-relaxed font-medium">{item.desc}</p>
+      {/* 2. Patch Notes / Change Log 패널 */}
+      <div className="space-y-6 pt-2 border-t border-slate-800">
+        
+        {/* 오답클리닉 이용방법 (큰 이모지 디자인) */}
+        <div className="space-y-4 pt-2">
+          <h3 className="text-xs font-black text-indigo-400 uppercase tracking-wider pl-1">오답클리닉 이용방법</h3>
+          <div className="grid gap-4">
+            {guideItems.map((item, idx) => (
+              <div 
+                key={idx} 
+                className={`relative bg-gradient-to-br ${item.colorClass} border rounded-3xl p-5 flex items-center space-x-5 shadow-lg backdrop-blur-sm hover:-translate-y-0.5 hover:shadow-xl transition-all duration-300 group`}
+              >
+                {/* 우상단 네온 스타일 스텝 인덱스 배지 */}
+                <span className="absolute top-4 right-5 text-2xl font-black text-slate-800/50 select-none tracking-tighter group-hover:text-slate-700/60 transition-colors font-mono">
+                  {item.step}
+                </span>
+                
+                {/* 커다란 이모지 블록 */}
+                <span className="text-4xl flex-none w-16 h-16 rounded-2xl flex items-center justify-center border border-slate-800/60 bg-slate-950/80 shadow-inner group-hover:scale-105 transition-transform duration-300 select-none">
+                  {item.emoji}
+                </span>
+                
+                {/* 텍스트 설명 영역 */}
+                <div className="space-y-1.5 min-w-0 pr-6">
+                  <h4 className="text-sm font-extrabold text-white tracking-tight">{item.title}</h4>
+                  <p className="text-xs text-slate-300 leading-relaxed font-medium">{item.desc}</p>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* 3. Patch Notes / Change Log */}
-      <div className="space-y-3 pt-2 border-t border-slate-800">
-        <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider">업데이트 소식 (Change Log)</h3>
-        <div className="space-y-3">
-          {changeLogs.map((log, idx) => (
-            <div key={idx} className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black text-emerald-400">{log.version}</span>
-                <span className="text-[10px] text-slate-500 font-bold">{log.date}</span>
+        {/* 더쿠키수학 오답클리닉 변경 이력 */}
+        <div className="space-y-4 pt-6 border-t border-slate-800">
+          <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider pl-1">더쿠키수학 오답클리닉 변경 이력</h3>
+          <div className="space-y-3">
+            {changeLogs.map((log, idx) => (
+              <div key={idx} className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-emerald-400">{log.version}</span>
+                  <span className="text-[10px] text-slate-500 font-bold">{log.date}</span>
+                </div>
+                <ul className="space-y-1.5 list-disc list-inside">
+                  {log.changes.map((change, cIdx) => (
+                    <li key={cIdx} className="text-[11px] text-slate-400 leading-relaxed pl-1.5 -indent-4 list-none flex items-start">
+                      <span className="text-emerald-500/80 mr-1.5 select-none">•</span>
+                      <span>{change}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <ul className="space-y-1.5 list-disc list-inside">
-                {log.changes.map((change, cIdx) => (
-                  <li key={cIdx} className="text-[11px] text-slate-400 leading-relaxed pl-1.5 -indent-4 list-none flex items-start">
-                    <span className="text-emerald-500/80 mr-1.5 select-none">•</span>
-                    <span>{change}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
+
       </div>
 
     </div>
