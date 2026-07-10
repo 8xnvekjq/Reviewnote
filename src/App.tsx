@@ -171,21 +171,39 @@ function App() {
               chapterTitle: t.chapter_title
             }));
 
-          // 제목이나 설명의 텍스트를 통해 공통수학1 / 공통수학2 / 대수 과목 분류 판단
+          // 1. 설명(description)에서 명시적 과목명 추출 (하드코딩 배제 및 정확성 보장)
           let derivedGrade = '기타';
-          const matchPool = (l.title + ' ' + (l.description || '')).toLowerCase();
-          if (matchPool.includes('공수2') || matchPool.includes('공통수학2')) {
-            derivedGrade = '공통수학2';
-          } else if (matchPool.includes('확통') || matchPool.includes('확률과통계') || matchPool.includes('확률과 통계')) {
-            derivedGrade = '확률과 통계';
-          } else if (matchPool.includes('공수1') || matchPool.includes('공통수학1') || matchPool.includes('고1')) {
-            derivedGrade = '공통수학1';
-          } else if (matchPool.includes('대수')) {
-            derivedGrade = '대수';
-          } else if (matchPool.includes('미적분ⅱ') || matchPool.includes('미적분2') || matchPool.includes('고3')) {
-            derivedGrade = '미적분Ⅱ';
-          } else if (matchPool.includes('미적분') || matchPool.includes('수2') || matchPool.includes('극한') || matchPool.includes('미분') || matchPool.includes('적분') || matchPool.includes('고2')) {
-            derivedGrade = '미적분Ⅰ';
+          const desc = l.description || '';
+          const knownGrades = ['공통수학1', '공통수학2', '대수', '미적분Ⅰ', '미적분Ⅱ', '확률과 통계', '기하', '중3-1', '중3-2'];
+          for (const grade of knownGrades) {
+            if (desc.includes(grade)) {
+              derivedGrade = grade;
+              break;
+            }
+          }
+
+          // 2. 설명에 없을 시 제목/키워드 분석 매핑 (범용 '고1', '고2' 등 하드코딩 배제)
+          if (derivedGrade === '기타') {
+            const matchPool = (l.title + ' ' + desc).toLowerCase().replace(/\s+/g, '');
+            if (matchPool.includes('공통수학2') || matchPool.includes('공수2')) {
+              derivedGrade = '공통수학2';
+            } else if (matchPool.includes('공통수학1') || matchPool.includes('공수1')) {
+              derivedGrade = '공통수학1';
+            } else if (matchPool.includes('확률과통계') || matchPool.includes('확통')) {
+              derivedGrade = '확률과 통계';
+            } else if (matchPool.includes('대수')) {
+              derivedGrade = '대수';
+            } else if (matchPool.includes('미적분ⅱ') || matchPool.includes('미적분2')) {
+              derivedGrade = '미적분Ⅱ';
+            } else if (matchPool.includes('미적분ⅰ') || matchPool.includes('미적분1') || matchPool.includes('미적분')) {
+              derivedGrade = '미적분Ⅰ';
+            } else if (matchPool.includes('기하')) {
+              derivedGrade = '기하';
+            } else if (matchPool.includes('중3-1') || matchPool.includes('중31')) {
+              derivedGrade = '중3-1';
+            } else if (matchPool.includes('중3-2') || matchPool.includes('중32')) {
+              derivedGrade = '중3-2';
+            }
           }
 
           return {

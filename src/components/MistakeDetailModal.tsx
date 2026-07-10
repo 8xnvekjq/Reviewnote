@@ -127,15 +127,15 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
         const chapterTitleClean = ch.chapterTitle.toLowerCase();
 
         // [핵심 1] 단원명과 챕터명이 높은 연관성을 가질 때 (가장 신뢰도 높음)
-        if (targetChapter && (
+        if (targetChapter && targetChapter.trim().length > 1 && chapterTitleClean.length > 1 && (
           chapterTitleClean.includes(targetChapter.toLowerCase()) ||
           targetChapter.toLowerCase().includes(chapterTitleClean)
         )) {
           score += 15;
         }
 
-        // [핵심 2] 챕터 타이틀이 문제 본문/제목에 그대로 포함될 때
-        if (searchPool.includes(chapterTitleClean)) {
+        // [핵심 2] 챕터 타이틀이 문제 본문/제목에 그대로 포함될 때 (한 글자 초과 조건 추가로 짧은 음절 배제)
+        if (chapterTitleClean.length > 1 && searchPool.includes(chapterTitleClean)) {
           score += 10;
         }
 

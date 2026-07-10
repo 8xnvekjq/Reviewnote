@@ -26,6 +26,14 @@ export const StudentGuide: React.FC = () => {
 
   const changeLogs = [
     {
+      version: 'v1.10.1',
+      date: '2026.07.10',
+      changes: [
+        '유튜브 동영상 강의 매칭 알고리즘 고도화 (한 글자 짧은 음절의 가점 매칭 배제)',
+        '유튜브 과목(grade) 자동 분류 시 범용 키워드(고1, 고2 등) 의존성을 배제하고 설명 문서(description) 명시값을 기반으로 대폭 개선'
+      ]
+    },
+    {
       version: 'v1.10.0',
       date: '2026.07.10',
       changes: [
