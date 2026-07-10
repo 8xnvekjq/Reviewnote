@@ -973,7 +973,7 @@ function App() {
             ) : (
               <>
                 {/* 나의 약점 분석 매트릭스 (격자형 히트맵) */}
-                <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 space-y-4">
+                <div className="bg-gradient-to-br from-[#0e1322] via-[#090d18] to-[#060810] border border-slate-800/80 rounded-2xl p-5 space-y-4 shadow-[0_4px_30px_rgba(0,0,0,0.4)] backdrop-blur-md">
                   <div className="flex justify-between items-center">
                     <h3 className="text-sm font-extrabold text-indigo-400 flex items-center space-x-1.5">
                       <span>📊</span>
@@ -996,7 +996,7 @@ function App() {
                             // 앞 두 글자만 노출하여 모바일 가로폭 확보
                             const shortLabel = opt.label.slice(0, 2);
                             return (
-                              <div key={opt.id} className="truncate" title={opt.label}>
+                              <div key={opt.id} className="truncate bg-slate-950/40 border border-slate-900/60 py-1 rounded-lg text-[9px] tracking-wide text-slate-400 font-bold" title={opt.label}>
                                 {shortLabel}
                               </div>
                             );
@@ -1009,7 +1009,7 @@ function App() {
                         {heatmapData.map(row => (
                           <div key={row.grade} className="flex items-center">
                             {/* 과목명 (왼쪽 고정 컬럼) */}
-                            <div className="w-16 flex-none text-xs font-black text-slate-300 truncate pr-2">
+                            <div className="w-16 flex-none text-xs font-black text-slate-400 truncate pr-2 tracking-tight">
                               {row.grade}
                             </div>
                             {/* 가로 칩들 */}
@@ -1021,19 +1021,28 @@ function App() {
                                   : 0.05;
                                 
                                 // 실수가 있으면 밝은 네온 인디고/퍼플 계열, 없으면 어두운 회색 슬레이트
+                                // 네온 글로우(boxShadow) 효과 부여!
                                 const bgStyle = cell.count > 0 
-                                  ? { backgroundColor: `rgba(99, 102, 241, ${opacity})`, borderColor: `rgba(129, 140, 248, ${opacity * 0.4})` }
-                                  : { backgroundColor: 'rgba(30, 41, 59, 0.2)', borderColor: 'rgba(51, 65, 85, 0.2)' };
+                                  ? { 
+                                      backgroundColor: `rgba(99, 102, 241, ${opacity * 0.22})`, 
+                                      borderColor: `rgba(129, 140, 248, ${opacity * 0.65})`,
+                                      boxShadow: `0 0 ${Math.min(cell.count * 4.5, 15)}px rgba(99, 102, 241, ${opacity * 0.45})`
+                                    }
+                                  : { 
+                                      backgroundColor: '#070a13', 
+                                      borderColor: '#121827',
+                                      boxShadow: 'none'
+                                    };
 
                                 const textStyle = cell.count > 0 
-                                  ? 'text-indigo-200 font-black' 
-                                  : 'text-slate-750 font-bold';
+                                  ? 'text-indigo-300 font-black scale-105' 
+                                  : 'text-slate-800 font-bold';
 
                                 return (
                                   <div
                                     key={cell.id}
                                     style={bgStyle}
-                                    className={`h-9 border rounded-xl flex flex-col items-center justify-center text-[11px] transition-all duration-300 shadow-sm relative group cursor-pointer ${textStyle}`}
+                                    className={`h-9 border rounded-xl flex flex-col items-center justify-center text-[11px] transition-all duration-300 hover:scale-102 hover:-translate-y-0.5 cursor-pointer relative group ${textStyle}`}
                                     title={`${row.grade} - ${cell.label}: ${cell.count}회 발생`}
                                   >
                                     <span>{cell.count}</span>
@@ -1056,9 +1065,9 @@ function App() {
                         <span>💡 숫자는 실수가 기록된 횟수입니다.</span>
                         <div className="flex items-center space-x-1">
                           <span>옅음</span>
-                          <span className="w-2.5 h-2.5 bg-indigo-500/20 border border-indigo-500/10 rounded"></span>
-                          <span className="w-2.5 h-2.5 bg-indigo-500/60 border border-indigo-500/20 rounded"></span>
-                          <span className="w-2.5 h-2.5 bg-indigo-500 border border-indigo-500/40 rounded"></span>
+                          <span className="w-2.5 h-2.5 bg-indigo-500/10 border border-indigo-500/20 rounded"></span>
+                          <span className="w-2.5 h-2.5 bg-indigo-500/30 border border-indigo-500/40 rounded"></span>
+                          <span className="w-2.5 h-2.5 bg-indigo-500/70 border border-indigo-500/80 rounded" style={{ boxShadow: '0 0 4px rgba(99, 102, 241, 0.4)' }}></span>
                           <span>짙음</span>
                         </div>
                       </div>
