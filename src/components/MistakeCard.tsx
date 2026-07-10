@@ -1,6 +1,6 @@
 import React from 'react';
 import type { MistakeEntry } from '../types';
-import { formatDate } from '../utils/date';
+import { formatDate, formatDateTime } from '../utils/date';
 
 import { LaTeXRenderer } from './LaTeXRenderer';
 
@@ -14,6 +14,7 @@ interface MistakeCardProps {
 
 export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDelete, studentName, isOwnNote = true }) => {
   const struggleCount = entry.reviews ? entry.reviews.filter(r => r === 'X' || r === 'star').length : 0;
+  const isCompleted = entry.reviews && entry.reviews.filter(r => r === 'O').length === 3;
 
   return (
     <div 
@@ -58,8 +59,11 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
             )}
           </div>
         )}
-        <div className="absolute top-2 right-2 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-950/80 backdrop-blur-sm border border-slate-800 text-slate-300">
-          {formatDate(entry.date)}
+        <div className={`absolute top-2 right-2 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-950/80 backdrop-blur-sm border ${isCompleted ? 'border-emerald-500/50 text-emerald-400' : 'border-slate-800 text-slate-300'}`}>
+          {isCompleted 
+            ? `✅ 완료: ${formatDateTime(entry.updatedAt || entry.date)}` 
+            : formatDate(entry.date)
+          }
         </div>
       </div>
       <div className="p-3 pb-2.5 space-y-1.5">

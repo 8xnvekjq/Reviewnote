@@ -628,7 +628,7 @@ function App() {
       for (let i = 0; i < 3; i++) {
         if (newReviews[i] !== '' && oldReviews[i] === '') {
           const now = new Date();
-          const dateStr = `${now.getMonth() + 1}/${now.getDate()}`;
+          const dateStr = `${now.getMonth() + 1}/${now.getDate()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
           currentDates[i] = dateStr;
         } else if (newReviews[i] === '') {
           currentDates[i] = '';
@@ -674,7 +674,7 @@ function App() {
         for (let i = 0; i < 3; i++) {
           if (newReviews[i] !== '' && oldReviews[i] === '') {
             const now = new Date();
-            const dateStr = `${now.getMonth() + 1}/${now.getDate()}`;
+            const dateStr = `${now.getMonth() + 1}/${now.getDate()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
             currentDates[i] = dateStr;
           } else if (newReviews[i] === '') {
             currentDates[i] = '';
