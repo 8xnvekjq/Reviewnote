@@ -708,10 +708,15 @@ function App() {
 
   // ── 통계 계산 ──────────────────────────────────────────────────
   const filteredMistakesForStats = useMemo(() => {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const thirtyDaysAgoStr = thirtyDaysAgo.toISOString();
+
+    let list = mistakes;
     if (isAdmin && statsStudentFilter !== 'all') {
-      return mistakes.filter(m => m.userId === statsStudentFilter);
+      list = mistakes.filter(m => m.userId === statsStudentFilter);
     }
-    return mistakes;
+    return list.filter(m => m.date && m.date >= thirtyDaysAgoStr);
   }, [mistakes, isAdmin, statsStudentFilter]);
 
   const stats = useMemo(() => {
@@ -980,20 +985,24 @@ function App() {
                   </div>
 
                   {heatmapData.length === 0 ? (
-                    <p className="text-xs text-slate-500 py-4 text-center">AI 분석을 실행하면 약점 매트릭스가 채워집니다.</p>
+                    <p className="text-xs text-slate-500 py-4 text-center">최근 30일 내 분석된 약점 데이터가 없습니다.</p>
                   ) : (
                     <div className="space-y-4">
-                      {/* 가로 헤더 (실수 유형 전체 이름) */}
+                      {/* 가로 헤더 (5대 실수 유형 이름) */}
                       <div className="flex items-center text-[10px] text-slate-500 font-extrabold">
                         {/* 왼쪽 여백 (과목명 컬럼 크기 확보) */}
                         <div className="w-16 flex-none"></div>
-                        {/* 격자 컬럼 헤더 */}
-                        <div className="flex-1 grid grid-cols-4 gap-3 text-center">
-                          {ROOT_CAUSE_OPTIONS.map(opt => (
-                            <div key={opt.id} className="truncate text-[9px] tracking-wide text-slate-400 font-bold">
-                              {opt.label}
-                            </div>
-                          ))}
+                        {/* 5칸 격자 컬럼 헤더 */}
+                        <div className="flex-1 grid grid-cols-5 gap-2 text-center">
+                          {ROOT_CAUSE_OPTIONS.map(opt => {
+                            // 이모지와 공백을 소거한 순수 4글자 텍스트 추출
+                            const labelClean = opt.label.replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
+                            return (
+                              <div key={opt.id} className="truncate text-[8px] sm:text-[9px] tracking-tight text-slate-400 font-extrabold">
+                                {labelClean}
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
 
@@ -1005,65 +1014,49 @@ function App() {
                             <div className="w-16 flex-none text-xs font-black text-slate-400 truncate pr-2 text-right tracking-tight">
                               {row.grade}
                             </div>
-                            {/* 3x3 격자 칩들 */}
-                            <div className="flex-1 grid grid-cols-4 gap-3">
-                              {row.stats.map((cell, cellIdx) => {
-                                // 0, 1 (개념부족, 계산실수) -> 보라색 테마
-                                // 2, 3 (문제오독, 공식오류) -> 노란색/오렌지 테마
-                                const isPurple = cellIdx < 2;
+                            {/* 5칸 칩 격자 */}
+                            <div className="flex-1 grid grid-cols-5 gap-2">
+                              {row.stats.map(cell => {
+                                const count = cell.count;
+                                let bgStyle: React.CSSProperties = {};
+                                let chipClass = '';
 
-                                // 3x3 미니 그리드를 채운다.
-                                const miniChips = Array.from({ length: 9 });
-
-                                // 세로 채우기 우선순위 인덱스 순서
-                                const FILL_ORDER = [4, 1, 7, 5, 2, 8, 3, 0, 6];
+                                if (count === 0) {
+                                  // 0회: 아주 옅은 꺼진 상태
+                                  chipClass = 'bg-[#101524] border-[#182136]/50 text-slate-800';
+                                } else if (count === 1) {
+                                  // 1회: 옅은 퍼플
+                                  chipClass = 'bg-indigo-500/10 border-indigo-500/20';
+                                } else if (count === 2) {
+                                  // 2회: 중간 퍼플
+                                  chipClass = 'bg-indigo-500/30 border-indigo-500/40';
+                                } else if (count === 3) {
+                                  // 3회: 진한 퍼플 + 은은한 네온 글로우
+                                  chipClass = 'bg-indigo-500/60 border-indigo-400/60';
+                                  bgStyle = {
+                                    boxShadow: '0 0 8px rgba(99, 102, 241, 0.4)'
+                                  };
+                                } else {
+                                  // 4회 이상: 최고 밝기 네온 글로우
+                                  chipClass = 'bg-indigo-500 border-indigo-300';
+                                  bgStyle = {
+                                    boxShadow: '0 0 15px rgba(99, 102, 241, 0.7)'
+                                  };
+                                }
 
                                 return (
                                   <div
                                     key={cell.id}
-                                    className="grid grid-cols-3 gap-0.5 p-1 border border-[#1b2336] bg-[#070b13]/50 rounded-xl relative group cursor-pointer hover:border-slate-700/60 transition-all duration-300"
-                                    title={`${row.grade} - ${cell.label}: ${cell.count}회 발생`}
+                                    style={bgStyle}
+                                    className={`h-9 border rounded-xl flex items-center justify-center transition-all duration-300 hover:scale-102 hover:-translate-y-0.5 cursor-pointer relative group ${chipClass}`}
+                                    title={`${row.grade} - ${cell.label}: ${count}회 발생`}
                                   >
-                                    {miniChips.map((_, mIdx) => {
-                                      // 이 미니 칩의 충전 인덱스 순서가 cell.count 보다 작으면 불이 켜진다 (Active)
-                                      const activeIndex = FILL_ORDER.indexOf(mIdx);
-                                      const isActive = activeIndex < cell.count;
-
-                                      // 미니 칩 스타일 계산
-                                      let chipStyle: React.CSSProperties = {};
-                                      let chipClass = '';
-
-                                      if (isActive) {
-                                        // 불이 켜진 상태 (Active)
-                                        if (isPurple) {
-                                          chipClass = 'bg-[#a855f7] border-[#c084fc]/50';
-                                          chipStyle = {
-                                            boxShadow: '0 0 5px rgba(168, 85, 247, 0.75)'
-                                          };
-                                        } else {
-                                          chipClass = 'bg-[#f59e0b] border-[#fbbf24]/50';
-                                          chipStyle = {
-                                            boxShadow: '0 0 5px rgba(245, 158, 11, 0.75)'
-                                          };
-                                        }
-                                      } else {
-                                        // 불이 꺼진 상태 (Inactive) - 회색/어두운 칩
-                                        chipClass = 'bg-[#182135]/40 border-[#202c46]/20';
-                                      }
-
-                                      return (
-                                        <div
-                                          key={mIdx}
-                                          style={chipStyle}
-                                          className={`w-2 h-2 rounded-[2px] border ${chipClass} transition-all duration-300`}
-                                        />
-                                      );
-                                    })}
-
+                                    {/* 개수 텍스트는 칩 내부에서 제거 */}
+                                    
                                     {/* 호버 시 툴팁 대응 */}
-                                    {cell.count > 0 && (
+                                    {count > 0 && (
                                       <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-800 text-[8px] text-indigo-300 px-1.5 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 shadow-lg font-bold">
-                                        {cell.count}회
+                                        {count}회
                                       </span>
                                     )}
                                   </div>
@@ -1077,13 +1070,15 @@ function App() {
                       {/* 하단 범례 안내 */}
                       <div className="flex justify-between items-center text-[9px] text-slate-500 pt-3 border-t border-slate-800/60 font-bold">
                         <div className="flex items-center space-x-1.5">
-                          <span className="w-2 h-2 bg-[#182135]/40 border border-[#202c46]/20 rounded-[2px]"></span>
+                          <span className="w-2 h-2 bg-[#101524] border border-[#182136]/50 rounded-[2px]"></span>
                           <span>적음 (low)</span>
                           <span>➔</span>
                           <span>많음 (high)</span>
-                          {/* 보라/오렌지 빛나는 칩 */}
-                          <span className="w-2.5 h-2.5 rounded-[2px] bg-[#a855f7] border border-purple-400" style={{ boxShadow: '0 0 4px rgba(168, 85, 247, 0.8)' }}></span>
-                          <span className="w-2.5 h-2.5 rounded-[2px] bg-[#f59e0b] border border-amber-400" style={{ boxShadow: '0 0 4px rgba(245, 158, 11, 0.8)' }}></span>
+                          {/* 퍼플 4단계 채도 변화 범례 */}
+                          <span className="w-2 h-2 rounded-[2px] bg-indigo-500/10 border border-indigo-500/20"></span>
+                          <span className="w-2 h-2 rounded-[2px] bg-indigo-500/30 border border-indigo-500/40"></span>
+                          <span className="w-2 h-2 rounded-[2px] bg-indigo-500/60 border border-indigo-400/60" style={{ boxShadow: '0 0 3px rgba(99, 102, 241, 0.3)' }}></span>
+                          <span className="w-2.5 h-2.5 rounded-[2px] bg-indigo-500 border border-indigo-300" style={{ boxShadow: '0 0 6px rgba(99, 102, 241, 0.6)' }}></span>
                         </div>
                         <span>최근 30일 데이터</span>
                       </div>
