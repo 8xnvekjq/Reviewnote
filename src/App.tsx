@@ -39,6 +39,9 @@ function App() {
   const [statsStudentFilter, setStatsStudentFilter] = useState<string>('all');
   // userId -> schoolGrade map (AI 학년별 분류 최적화용)
   const [profilesGradeMap, setProfilesGradeMap] = useState<Record<string, string>>({});
+  // Supabase system_config 테이블에서 로드한 Gemini API Key 상태
+  const [freeGeminiKey, setFreeGeminiKey] = useState<string>('');
+  const [paidGeminiKey, setPaidGeminiKey] = useState<string>('');
   // 다른 학생들의 실시간 복습 현황 목록
   const [peerActivities, setPeerActivities] = useState<any[]>([]);
   // 인쇄할 완료 오답 리스트 임시 보관 상태
@@ -233,6 +236,7 @@ function App() {
         fetchAdminStatus(session.user.id);
         loadYoutubeLectures(); // 유튜브 강의 데이터 로드
         loadWeeklyChampions(); // 주간 챔피언 로드
+        fetchGeminiApiKeys(); // 동적 API 키 로드
       }
     });
 
@@ -246,17 +250,40 @@ function App() {
         fetchAdminStatus(session.user.id);
         loadYoutubeLectures(); // 유튜브 강의 데이터 로드
         loadWeeklyChampions(); // 주간 챔피언 로드
+        fetchGeminiApiKeys(); // 동적 API 키 로드
       } else {
         setCurrentUser('');
         setIsAdmin(false);
         setMistakes([]);
         setYoutubeLectures([]);
         setWeeklyChampions([]);
+        setFreeGeminiKey('');
+        setPaidGeminiKey('');
       }
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Supabase system_config 로부터 Gemini API Key들을 로드
+  const fetchGeminiApiKeys = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('system_config')
+        .select('key, value');
+      if (error) throw error;
+      
+      (data || []).forEach((row: any) => {
+        if (row.key === 'gemini_api_key') {
+          setFreeGeminiKey(row.value || '');
+        } else if (row.key === 'gemini_api_key_paid') {
+          setPaidGeminiKey(row.value || '');
+        }
+      });
+    } catch (err) {
+      console.error('Failed to load Gemini API Keys from Supabase config:', err);
+    }
+  };
 
   // Fetch mistakes from Supabase
   const fetchUserData = async () => {
@@ -331,11 +358,11 @@ function App() {
 
   // Start analysis trigger with automatic paid fallback
   const handleStartAnalysis = async (entry: MistakeEntry) => {
-    const freeKey = import.meta.env.VITE_GEMINI_API_KEY || '';
-    const paidKey = import.meta.env.VITE_GEMINI_API_KEY_PAID || '';
+    const freeKey = freeGeminiKey;
+    const paidKey = paidGeminiKey;
 
     if (!freeKey && !paidKey) {
-      alert('관리자 서버에 Gemini API Key가 등록되지 않았습니다. Vercel 환경 변수 설정을 완료해 주세요.');
+      alert('Supabase 보안 테이블(system_config)에 API 키가 등록되지 않았습니다. Supabase 대시보드에서 키 설정을 완료해 주세요.');
       return;
     }
 
