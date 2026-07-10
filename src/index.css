@@ -93,13 +93,19 @@
 
 /* Print-only Stylesheet for 오답 카드 2열 세로 인쇄 */
 @media print {
-  /* 1. 일반 PWA 웹 레이아웃 전체 숨김 */
-  html, body, #root, .app-container, .modal-backdrop, header, nav, button, .bottom-nav-safe, .safe-top {
-    display: none !important;
+  /* 1. 도화지 역할인 html, body, #root는 숨기지 않고 리셋 */
+  html, body, #root {
+    background: white !important;
+    color: black !important;
     height: auto !important;
     overflow: visible !important;
     position: static !important;
     width: auto !important;
+  }
+
+  /* PWA 화면의 일반 웹 컴포넌트들을 일괄 숨김 (인쇄용 레이아웃 제외) */
+  header, nav, button, .bottom-nav-safe, .safe-top, main, .modal-backdrop, #root > div > *:not(.print-only-layout) {
+    display: none !important;
   }
 
   /* 2. 인쇄 전용 레이아웃 노출 */
