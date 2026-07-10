@@ -139,7 +139,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
           score += 10;
         }
 
-        // [핵심 3] 동의어가 서로 일치하는 경우
+        // [핵심 3] 동의어가 서로 일치하는 경우 (오직 현재 타겟 단원에 대응하는 키만 매칭되도록 가점 범위 제한)
         for (const [key, synonyms] of Object.entries(SYNONYM_MAP)) {
           let cleanKey = key;
           if (key.includes('_')) {
@@ -149,9 +149,14 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             }
             cleanKey = realKey;
           }
-          if (chapterTitleClean.includes(cleanKey.toLowerCase()) || videoTitleClean.includes(cleanKey.toLowerCase())) {
-            if (synonyms.some(syn => searchPool.includes(syn.toLowerCase()))) {
-              score += 8;
+          if (targetChapter && (
+            cleanKey.toLowerCase().includes(targetChapter.toLowerCase()) ||
+            targetChapter.toLowerCase().includes(cleanKey.toLowerCase())
+          )) {
+            if (chapterTitleClean.includes(cleanKey.toLowerCase()) || videoTitleClean.includes(cleanKey.toLowerCase())) {
+              if (synonyms.some(syn => searchPool.includes(syn.toLowerCase()))) {
+                score += 8;
+              }
             }
           }
         }

@@ -26,6 +26,13 @@ export const StudentGuide: React.FC = () => {
 
   const changeLogs = [
     {
+      version: 'v1.10.3',
+      date: '2026.07.10',
+      changes: [
+        '선생님 추천 강의 알고리즘 내 동의어 가점 범위 누출 버그 패치 (선택된 단원 외의 타 과목/단원 가점 중복 획득 차단)'
+      ]
+    },
+    {
       version: 'v1.10.2',
       date: '2026.07.10',
       changes: [
