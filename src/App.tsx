@@ -33,8 +33,8 @@ function App() {
   const [profilesMap, setProfilesMap] = useState<Record<string, string>>({});
   // 유튜브 매칭용 강의 마스터 리스트 상태
   const [youtubeLectures, setYoutubeLectures] = useState<any[]>([]);
-  // 주간 최다 오답 완료 챔피언 상태
-  const [weeklyChampion, setWeeklyChampion] = useState<any>(null);
+  // 주간 최다 오답 완료 챔피언 상태 (1~3위)
+  const [weeklyChampions, setWeeklyChampions] = useState<any[]>([]);
   // 분석통계 탭 학생 필터 상태 (어드민 전용)
   const [statsStudentFilter, setStatsStudentFilter] = useState<string>('all');
   // userId -> schoolGrade map (AI 학년별 분류 최적화용)
@@ -103,47 +103,43 @@ function App() {
   const [tempCapturedImage, setTempCapturedImage] = useState<string | null>(null);
 
   // 주간 최다 오답 완료 챔피언 정보 로드 (하이브리드 1주 이월 및 리셋 롤오버)
-  const loadWeeklyChampion = async () => {
+  const loadWeeklyChampions = async () => {
     try {
-      // 1. 이번 주 랭킹 뷰 조회
+      // 1. 이번 주 랭킹 뷰 조회 (최대 3명)
       const { data, error } = await supabase
         .from('weekly_leaderboard')
         .select('*')
         .order('score', { ascending: false })
-        .limit(1);
+        .limit(3);
 
       if (error) throw error;
 
       if (data && data.length > 0 && data[0].score > 0) {
-        setWeeklyChampion({
-          ...data[0],
-          isLastWeek: false
-        });
+        const mapped = data.map((item: any) => ({ ...item, isLastWeek: false }));
+        setWeeklyChampions(mapped);
         return;
       }
 
-      // 2. 이번 주 데이터가 없으면 지난주 랭킹 뷰(RLS 우회) 조회
+      // 2. 이번 주 데이터가 없으면 지난주 랭킹 뷰(RLS 우회) 조회 (최대 3명)
       const { data: lastWeekData, error: lastWeekError } = await supabase
         .from('last_weekly_leaderboard')
         .select('*')
         .order('score', { ascending: false })
-        .limit(1);
+        .limit(3);
 
       if (lastWeekError) throw lastWeekError;
 
       if (lastWeekData && lastWeekData.length > 0 && lastWeekData[0].score > 0) {
-        setWeeklyChampion({
-          ...lastWeekData[0],
-          isLastWeek: true
-        });
+        const mapped = lastWeekData.map((item: any) => ({ ...item, isLastWeek: true }));
+        setWeeklyChampions(mapped);
         return;
       }
 
       // 3. 지난주마저 점수가 없으면 배너를 비워 동기부여 유도
-      setWeeklyChampion(null);
+      setWeeklyChampions([]);
     } catch (err) {
-      console.error('loadWeeklyChampion failed:', err);
-      setWeeklyChampion(null);
+      console.error('loadWeeklyChampions failed:', err);
+      setWeeklyChampions([]);
     }
   };
 
@@ -236,7 +232,7 @@ function App() {
         fetchUserData();
         fetchAdminStatus(session.user.id);
         loadYoutubeLectures(); // 유튜브 강의 데이터 로드
-        loadWeeklyChampion(); // 주간 챔피언 로드
+        loadWeeklyChampions(); // 주간 챔피언 로드
       }
     });
 
@@ -249,13 +245,13 @@ function App() {
         fetchUserData();
         fetchAdminStatus(session.user.id);
         loadYoutubeLectures(); // 유튜브 강의 데이터 로드
-        loadWeeklyChampion(); // 주간 챔피언 로드
+        loadWeeklyChampions(); // 주간 챔피언 로드
       } else {
         setCurrentUser('');
         setIsAdmin(false);
         setMistakes([]);
         setYoutubeLectures([]);
-        setWeeklyChampion(null);
+        setWeeklyChampions([]);
       }
     });
 
@@ -265,7 +261,7 @@ function App() {
   // Fetch mistakes from Supabase
   const fetchUserData = async () => {
     try {
-      loadWeeklyChampion(); // 최신 챔피언 정보 동기화
+      loadWeeklyChampions(); // 최신 챔피언 정보 동기화
       fetchPeerActivities(); // 실시간 친구들 복습 현황 로드
       // Fetch all mistakes (RLS handles filtering: normal users see own, admin sees all)
       const { data: dbMistakes, error: mistakesError } = await supabase
@@ -612,7 +608,7 @@ function App() {
 
         setMistakes(prev => prev.filter(m => m.id !== id));
         setSelectedEntry(null);
-        loadWeeklyChampion(); // MVP 챔피언 배너 즉각 갱신
+        loadWeeklyChampions(); // MVP 챔피언 배너 즉각 갱신
       } catch (err: any) {
         console.error(err);
         alert('삭제 실패: ' + err.message);
@@ -667,7 +663,7 @@ function App() {
       
       // Refresh peer activities locally
       fetchPeerActivities();
-      loadWeeklyChampion(); // MVP 챔피언 배너 즉각 갱신
+      loadWeeklyChampions(); // MVP 챔피언 배너 즉각 갱신
     } catch (err: any) {
       console.error('Failed to update reviews:', err);
       // Fallback: update local React state anyway for immediate validation
@@ -762,34 +758,72 @@ function App() {
         {activeTab === 'notes' && (
           <>
             {/* 주간 복습왕 배너 (전체 학생 오픈 / 1주 이월 및 리셋 롤오버) */}
-            {weeklyChampion ? (
-              <div className="bg-gradient-to-r from-slate-900/90 via-amber-950/20 to-slate-900/90 border border-amber-500/40 rounded-2xl p-3 mb-4 flex items-center justify-between shadow-[0_0_15px_rgba(245,158,11,0.12)] animate-fade-in">
-                <div className="flex items-center space-x-2.5 min-w-0">
-                  <span className="text-xl animate-bounce flex-none">👑</span>
-                  <div className="min-w-0 leading-tight">
-                    <div className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">
-                      {weeklyChampion.isLastWeek ? '지난주 복습 MVP' : '이번주 최다 오답 완료'}
-                    </div>
-                    <div className="flex items-center space-x-1.5 mt-0.5 min-w-0">
-                      <span className="text-xs font-black text-white truncate">
-                        {weeklyChampion.display_name 
-                          ? `${weeklyChampion.display_name} 학생` 
-                          : `${maskId(weeklyChampion.username)} 학생`}
-                      </span>
-                      <span className="text-[8px] font-black bg-amber-500/10 text-amber-300 border border-amber-500/20 px-1.5 py-0.5 rounded-full flex items-center flex-none">
-                        {weeklyChampion.isLastWeek ? '⭐ 지난주 MVP' : '⭐ 주간 MVP'}
-                      </span>
+            {weeklyChampions && weeklyChampions.length > 0 ? (
+              <div className="bg-gradient-to-b from-slate-900/90 via-slate-900/95 to-slate-900/90 border border-amber-500/30 rounded-2xl p-4 mb-4 shadow-[0_0_15px_rgba(245,158,11,0.08)] animate-fade-in flex flex-col space-y-3">
+                {/* 1등 MVP */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2.5 min-w-0">
+                    <span className="text-2xl animate-bounce flex-none">👑</span>
+                    <div className="min-w-0 leading-tight">
+                      <div className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">
+                        {weeklyChampions[0].isLastWeek ? '지난주 복습 MVP' : '이번주 최다 오답 완료'}
+                      </div>
+                      <div className="flex items-center space-x-1.5 mt-0.5 min-w-0">
+                        <span className="text-xs font-black text-white truncate">
+                          {weeklyChampions[0].display_name 
+                            ? `${weeklyChampions[0].display_name} 학생` 
+                            : `${maskId(weeklyChampions[0].username)} 학생`}
+                        </span>
+                        <span className="text-[8px] font-black bg-amber-500/10 text-amber-300 border border-amber-500/20 px-1.5 py-0.5 rounded-full flex items-center flex-none">
+                          {weeklyChampions[0].isLastWeek ? '⭐ 지난주 MVP' : '⭐ 주간 MVP'}
+                        </span>
+                      </div>
                     </div>
                   </div>
+                  <div className="text-right flex-none pl-3 border-l border-slate-800/80">
+                    <span className="text-[10px] text-slate-500 block">종합 점수</span>
+                    <span className="text-xs font-black text-amber-400">
+                      {Math.round(weeklyChampions[0].score)}점
+                    </span>
+                    <span className="text-[9px] text-slate-400 block mt-0.5">
+                      완료 {weeklyChampions[0].weekly_completed_count}개 ({Math.round(weeklyChampions[0].completion_rate * 100)}%)
+                    </span>
+                  </div>
                 </div>
-                <div className="text-right flex-none pl-3 border-l border-slate-800/80">
-                  <span className="text-[10px] text-slate-500 block">종합 점수</span>
-                  <span className="text-xs font-black text-amber-400">
-                    {Math.round(weeklyChampion.score)}점
-                  </span>
-                  <span className="text-[9px] text-slate-400 block mt-0.5">
-                    완료 {weeklyChampion.weekly_completed_count}개 ({Math.round(weeklyChampion.completion_rate * 100)}%)
-                  </span>
+
+                {/* 2등 & 3등 작게 노출 */}
+                <div className="border-t border-slate-800/80 pt-2.5 flex items-center justify-between text-[10px] text-slate-400">
+                  {/* 2위 */}
+                  <div className="flex-1 flex items-center space-x-1 min-w-0 pr-2">
+                    <span className="flex-none font-bold text-slate-500">🥈 2위:</span>
+                    {weeklyChampions[1] && weeklyChampions[1].score > 0 ? (
+                      <span className="font-extrabold text-slate-300 truncate">
+                        {weeklyChampions[1].display_name || maskId(weeklyChampions[1].username)}
+                        <span className="font-normal text-slate-500 text-[9px] ml-1">({Math.round(weeklyChampions[1].score)}점)</span>
+                      </span>
+                    ) : (
+                      <span className="text-slate-600 font-bold flex items-center space-x-1">
+                        <span>'-')?</span>
+                        <span className="text-[8px] font-normal text-slate-700">(대기)</span>
+                      </span>
+                    )}
+                  </div>
+
+                  {/* 3위 */}
+                  <div className="flex-1 flex items-center space-x-1 min-w-0 pl-2 border-l border-slate-800/40">
+                    <span className="flex-none font-bold text-slate-500">🥉 3위:</span>
+                    {weeklyChampions[2] && weeklyChampions[2].score > 0 ? (
+                      <span className="font-extrabold text-slate-300 truncate">
+                        {weeklyChampions[2].display_name || maskId(weeklyChampions[2].username)}
+                        <span className="font-normal text-slate-500 text-[9px] ml-1">({Math.round(weeklyChampions[2].score)}점)</span>
+                      </span>
+                    ) : (
+                      <span className="text-slate-600 font-bold flex items-center space-x-1">
+                        <span>'-')?</span>
+                        <span className="text-[8px] font-normal text-slate-700">(대기)</span>
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             ) : (
