@@ -70,6 +70,7 @@ export interface MistakeEntry {
   title: string;
   imageUrl: string;
   date: string;             // ISO date string
+  updatedAt?: string;       // ISO date string
   analysis?: MistakeAnalysis;
   reviews?: ReviewState[];
   grade?: string;

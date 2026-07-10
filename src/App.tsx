@@ -73,18 +73,23 @@ function App() {
     const mondayKst = new Date(Date.UTC(kstTime.getUTCFullYear(), kstTime.getUTCMonth(), diff, 0, 0, 0));
     const thisMondayUtc = new Date(mondayKst.getTime() - 9 * 60 * 60 * 1000);
 
-    // 이번 주 월요일 이후 등록된 본인 오답 필터링
+    // 이번 주 월요일 이후 등록된 본인 오답 수 (신규 등록)
     const myWeeklyMistakes = mistakes.filter(m => {
       const mDate = new Date(m.date);
       return mDate >= thisMondayUtc;
     });
 
     const total = myWeeklyMistakes.length;
-    const completed = myWeeklyMistakes.filter(m => 
-      m.reviews && m.reviews.filter(r => r === 'O').length === 3
-    ).length;
+    
+    // 이번 주 월요일 이후 최종 완료(reviews 'O' 3개)된 본인 오답 수 (등록일 무관)
+    const completed = mistakes.filter(m => {
+      const isCompleted = m.reviews && m.reviews.filter(r => r === 'O').length === 3;
+      if (!isCompleted) return false;
+      const updateDate = new Date(m.updatedAt || m.date);
+      return updateDate >= thisMondayUtc;
+    }).length;
 
-    const rate = total > 0 ? (completed / total) : 0;
+    const rate = total > 0 ? (completed / total) : 1.0;
     const score = (completed * 10) + (rate * 100);
 
     return {
@@ -292,6 +297,7 @@ function App() {
         title: m.title,
         imageUrl: m.image_url,
         date: m.date,
+        updatedAt: m.updated_at,
         analysis: m.analysis || undefined,
         reviews: m.reviews || ['', '', ''],
         grade: m.grade || undefined,
@@ -606,6 +612,7 @@ function App() {
 
         setMistakes(prev => prev.filter(m => m.id !== id));
         setSelectedEntry(null);
+        loadWeeklyChampion(); // MVP 챔피언 배너 즉각 갱신
       } catch (err: any) {
         console.error(err);
         alert('삭제 실패: ' + err.message);
@@ -660,6 +667,7 @@ function App() {
       
       // Refresh peer activities locally
       fetchPeerActivities();
+      loadWeeklyChampion(); // MVP 챔피언 배너 즉각 갱신
     } catch (err: any) {
       console.error('Failed to update reviews:', err);
       // Fallback: update local React state anyway for immediate validation
