@@ -110,6 +110,13 @@ export const StudentGuide: React.FC = () => {
 
 export const CHRONOLOGICAL_CHANGELOGS = [
   {
+    version: 'v1.12.6',
+    date: '2026.07.11',
+    changes: [
+      '오답 진단 대기 패널의 고양이 아이콘을 화사한 핑크-퍼플 입체 광택 고양이 앱 아이콘 이미지(/clinic_cat_icon.png)로 원상 복구 완료'
+    ]
+  },
+  {
     version: 'v1.12.5',
     date: '2026.07.11',
     changes: [
