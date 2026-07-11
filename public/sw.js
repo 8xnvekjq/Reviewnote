@@ -1,10 +1,10 @@
-const CACHE_NAME = 'ai-review-notes-v1';
+const CACHE_NAME = 'ai-review-notes-v2';
 const ASSETS = [
   './',
   './index.html',
-  './manifest.json',
-  './icons/icon-192.png',
-  './icons/icon-512.png'
+  './manifest.json?v=2',
+  './icons/icon-192.png?v=2',
+  './icons/icon-512.png?v=2'
 ];
 
 // Install Event
