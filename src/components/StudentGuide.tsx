@@ -110,6 +110,13 @@ export const StudentGuide: React.FC = () => {
 
 export const CHRONOLOGICAL_CHANGELOGS = [
   {
+    version: 'v1.12.2',
+    date: '2026.07.11',
+    changes: [
+      '미진단 오답 분석 대기 뷰 영역의 로봇 아이콘을 귀여운 로봇 고양이 아이콘(🤖🐱)으로 변경 적용'
+    ]
+  },
+  {
     version: 'v1.12.1',
     date: '2026.07.11',
     changes: [
