@@ -110,6 +110,13 @@ export const StudentGuide: React.FC = () => {
 
 export const CHRONOLOGICAL_CHANGELOGS = [
   {
+    version: 'v1.12.7',
+    date: '2026.07.11',
+    changes: [
+      '오답 진단 대기 영역의 아이콘을 직관적이고 심플한 텍스트 형태의 노란 고양이 이모지(🐱)로 최종 복구 적용'
+    ]
+  },
+  {
     version: 'v1.12.6',
     date: '2026.07.11',
     changes: [

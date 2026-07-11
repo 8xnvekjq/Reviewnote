@@ -894,13 +894,9 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
           ) : (
             <div 
               ref={analysisCardRef}
-              className="py-8 bg-slate-950/60 rounded-2xl border border-slate-800 p-6 text-center space-y-4 flex flex-col items-center justify-center"
+              className="py-8 bg-slate-950/60 rounded-2xl border border-slate-800 p-6 text-center space-y-4"
             >
-              <img 
-                src="/clinic_cat_icon.png" 
-                alt="AI Cat Clinic Icon" 
-                className="w-16 h-16 rounded-2xl object-cover shadow-lg border border-slate-800/60 transition-transform hover:scale-105 duration-300"
-              />
+              <div className="text-3xl">🐱</div>
               <div className="space-y-1">
                 <p className="text-sm font-bold text-white">AI 수학 클리닉 진단</p>
                 <p className="text-xs text-slate-400 leading-relaxed max-w-xs mx-auto">
