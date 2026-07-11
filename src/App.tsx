@@ -109,9 +109,14 @@ function App() {
       const reviews = m.reviews || [];
       const reviewDates = m.analysis?.reviewDates || [];
 
-      if (reviews[0] === 'O' && isDateInCurrentWeekLocal(reviewDates[0])) score += 2;
-      if (reviews[1] === 'O' && isDateInCurrentWeekLocal(reviewDates[1])) score += 3;
-      if (reviews[2] === 'O' && isDateInCurrentWeekLocal(reviewDates[2])) score += 15;
+      // reviewDates가 없거나 빈 문자열일 때 updatedAt 및 date로 폴백 처리
+      const rDate0 = reviewDates[0] || m.updatedAt || m.date;
+      const rDate1 = reviewDates[1] || m.updatedAt || m.date;
+      const rDate2 = reviewDates[2] || m.updatedAt || m.date;
+
+      if (reviews[0] === 'O' && isDateInCurrentWeekLocal(rDate0)) score += 2;
+      if (reviews[1] === 'O' && isDateInCurrentWeekLocal(rDate1)) score += 3;
+      if (reviews[2] === 'O' && isDateInCurrentWeekLocal(rDate2)) score += 15;
     });
 
     return {

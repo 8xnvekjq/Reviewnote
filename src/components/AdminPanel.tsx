@@ -139,10 +139,15 @@ export const AdminPanel: React.FC = () => {
         }
 
         // 3단 콤보 점수 계산 (1차: 2점, 2차: 3점, 3차 완료: 15점)
+        // reviewDates가 없거나 빈 문자열일 때 updated_at 및 date로 폴백 처리
+        const rDate0 = reviewDates[0] || m.updated_at || m.date;
+        const rDate1 = reviewDates[1] || m.updated_at || m.date;
+        const rDate2 = reviewDates[2] || m.updated_at || m.date;
+
         let comboScore = 0;
-        if (reviews[0] === 'O' && isDateInCurrentWeek(reviewDates[0])) comboScore += 2;
-        if (reviews[1] === 'O' && isDateInCurrentWeek(reviewDates[1])) comboScore += 3;
-        if (reviews[2] === 'O' && isDateInCurrentWeek(reviewDates[2])) comboScore += 15;
+        if (reviews[0] === 'O' && isDateInCurrentWeek(rDate0)) comboScore += 2;
+        if (reviews[1] === 'O' && isDateInCurrentWeek(rDate1)) comboScore += 3;
+        if (reviews[2] === 'O' && isDateInCurrentWeek(rDate2)) comboScore += 15;
 
         stat.weeklyScore += comboScore;
 
