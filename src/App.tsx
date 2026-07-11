@@ -76,15 +76,26 @@ function App() {
     const mondayKst = new Date(Date.UTC(kstTime.getUTCFullYear(), kstTime.getUTCMonth(), diff, 0, 0, 0));
     const thisMondayUtc = new Date(mondayKst.getTime() - 9 * 60 * 60 * 1000);
 
-    // 이번 주 월요일 이후 등록된 본인 오답 수 (신규 등록)
-    const myWeeklyMistakes = mistakes.filter(m => {
-      const mDate = new Date(m.date);
-      return mDate >= thisMondayUtc;
-    });
+    // 날짜 파싱 유틸리티 함수 선언 (이번 주 내 스탬프 확인용)
+    const isDateInCurrentWeekLocal = (dateStr: string) => {
+      if (!dateStr) return false;
+      try {
+        let parsedDate: Date;
+        if (dateStr.includes('-') || dateStr.includes('T')) {
+          parsedDate = new Date(dateStr);
+        } else if (dateStr.includes('.')) {
+          parsedDate = new Date(dateStr.replace(/\./g, '/'));
+        } else {
+          parsedDate = new Date(`${new Date().getFullYear()}/${dateStr}`);
+        }
+        return !isNaN(parsedDate.getTime()) && parsedDate >= thisMondayUtc;
+      } catch {
+        return false;
+      }
+    };
 
-    const total = myWeeklyMistakes.length;
-    
-    // 이번 주 월요일 이후 최종 완료(reviews 'O' 3개)된 본인 오답 수 (등록일 무관)
+    // UI 안내용 등록 수 및 완료 수 계산 (점수 공식에선 이제 빠짐)
+    const total = mistakes.filter(m => new Date(m.date) >= thisMondayUtc).length;
     const completed = mistakes.filter(m => {
       const isCompleted = m.reviews && m.reviews.filter(r => r === 'O').length === 3;
       if (!isCompleted) return false;
@@ -92,8 +103,16 @@ function App() {
       return updateDate >= thisMondayUtc;
     }).length;
 
-    const rate = total > 0 ? (completed / total) : 1.0;
-    const score = (completed * 10) + (rate * 100);
+    // 3단 콤보 주간 점수 누적 연산
+    let score = 0;
+    mistakes.forEach(m => {
+      const reviews = m.reviews || [];
+      const reviewDates = m.analysis?.reviewDates || [];
+
+      if (reviews[0] === 'O' && isDateInCurrentWeekLocal(reviewDates[0])) score += 2;
+      if (reviews[1] === 'O' && isDateInCurrentWeekLocal(reviewDates[1])) score += 3;
+      if (reviews[2] === 'O' && isDateInCurrentWeekLocal(reviewDates[2])) score += 15;
+    });
 
     return {
       total,

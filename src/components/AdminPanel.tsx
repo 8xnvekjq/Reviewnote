@@ -94,6 +94,24 @@ export const AdminPanel: React.FC = () => {
         });
       });
 
+      // 날짜 파싱 유틸리티 (이번 주 오답 스탬프 여부 확인용)
+      const isDateInCurrentWeek = (dateStr: string) => {
+        if (!dateStr) return false;
+        try {
+          let parsedDate: Date;
+          if (dateStr.includes('-') || dateStr.includes('T')) {
+            parsedDate = new Date(dateStr);
+          } else if (dateStr.includes('.')) {
+            parsedDate = new Date(dateStr.replace(/\./g, '/'));
+          } else {
+            parsedDate = new Date(`${new Date().getFullYear()}/${dateStr}`);
+          }
+          return !isNaN(parsedDate.getTime()) && parsedDate >= mondayDate;
+        } catch {
+          return false;
+        }
+      };
+
       (mistakes || []).forEach((m: any) => {
         const stat = statsMap.get(m.user_id);
         if (!stat) return;
@@ -101,6 +119,7 @@ export const AdminPanel: React.FC = () => {
         stat.mistakeCount += 1;
 
         const reviews: string[] = m.reviews || [];
+        const reviewDates: string[] = m.analysis?.reviewDates || [];
         const isCompleted = reviews.filter(r => r === 'O').length === 3;
 
         if (isCompleted) {
@@ -119,6 +138,14 @@ export const AdminPanel: React.FC = () => {
           stat.weeklyCompletedCount += 1;
         }
 
+        // 3단 콤보 점수 계산 (1차: 2점, 2차: 3점, 3차 완료: 15점)
+        let comboScore = 0;
+        if (reviews[0] === 'O' && isDateInCurrentWeek(reviewDates[0])) comboScore += 2;
+        if (reviews[1] === 'O' && isDateInCurrentWeek(reviewDates[1])) comboScore += 3;
+        if (reviews[2] === 'O' && isDateInCurrentWeek(reviewDates[2])) comboScore += 15;
+
+        stat.weeklyScore += comboScore;
+
         // Track latest activity date
         if (!stat.lastActivity || m.date > stat.lastActivity) {
           stat.lastActivity = m.date;
@@ -133,10 +160,9 @@ export const AdminPanel: React.FC = () => {
         }
       });
 
-      // 각 유저별 주간 점수 산출
+      // 각 유저별 주간 점수 산출 (콤보제 적용)
       statsMap.forEach((stat) => {
-        const rate = stat.weeklyTotalCount > 0 ? (stat.weeklyCompletedCount / stat.weeklyTotalCount) : 1.0;
-        stat.weeklyScore = (stat.weeklyCompletedCount * 10) + (rate * 100);
+        stat.weeklyScore = Math.round(stat.weeklyScore);
       });
 
       // Sort: 최근 오답 복습한 순 정렬 (복습 기록이 없는 학생은 최하단 배치)

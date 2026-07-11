@@ -110,6 +110,16 @@ export const StudentGuide: React.FC = () => {
 
 export const CHRONOLOGICAL_CHANGELOGS = [
   {
+    version: 'v1.12.8',
+    date: '2026.07.12',
+    changes: [
+      '주간 명예의 전당 점수 알고리즘을 3단 콤보 단계별 가중치 배점제(1차: 2점, 2차: 3점, 3차 완료: 15점)로 전면 리팩토링 완료',
+      '신규 등록 오답 수가 분모로 작용하여 생기던 무임승차 얌체 1등(신규 0개, 기존 1개 완료) 버그 원천 차단',
+      '복습 완료 시각(reviewDates) 스탬프를 정교하게 대조하여 이번 주에 실질적으로 획득한 단계만 KST 시간대로 역산 합산하는 고도화 구현',
+      'Supabase DB 단의 weekly_leaderboard 및 last_weekly_leaderboard SQL 뷰를 콤보 스코어 기준으로 완벽 매핑 이식'
+    ]
+  },
+  {
     version: 'v1.12.7',
     date: '2026.07.11',
     changes: [
