@@ -110,6 +110,13 @@ export const StudentGuide: React.FC = () => {
 
 export const CHRONOLOGICAL_CHANGELOGS = [
   {
+    version: 'v1.12.3',
+    date: '2026.07.11',
+    changes: [
+      '미진단 오답 분석 대기 뷰 영역의 아이콘을 귀여운 고양이 이모지(🐱) 단독 표기로 심플하게 수정'
+    ]
+  },
+  {
     version: 'v1.12.2',
     date: '2026.07.11',
     changes: [
