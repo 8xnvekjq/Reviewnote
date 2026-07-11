@@ -110,6 +110,13 @@ export const StudentGuide: React.FC = () => {
 
 export const CHRONOLOGICAL_CHANGELOGS = [
   {
+    version: 'v1.12.4',
+    date: '2026.07.11',
+    changes: [
+      '인스타그램 로고 디자인의 그라데이션 및 둥근 스퀘어 감성을 접목한 맞춤형 AI 수학 클리닉 고양이 아이콘 이미지(/clinic_cat_icon.png) 전격 탑재'
+    ]
+  },
+  {
     version: 'v1.12.3',
     date: '2026.07.11',
     changes: [
