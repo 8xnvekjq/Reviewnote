@@ -318,11 +318,38 @@ export const MistakeList: React.FC<MistakeListProps> = ({
                             </span>
                           )}
                         </div>
-                        {studentName && (
-                          <span className="text-[8px] text-indigo-400 font-semibold mt-0.5 block">
-                            👤 {studentName}
-                          </span>
-                        )}
+                        <div className="flex items-center space-x-2 mt-1">
+                          {studentName && (
+                            <span className="text-[8px] text-indigo-400 font-semibold block">
+                              👤 {studentName}
+                            </span>
+                          )}
+                          {/* 미니 복습 진단 배지 (oox, xo별 등) */}
+                          <div className="flex items-center space-x-0.5 select-none">
+                            {(entry.reviews || ['', '', '']).slice(0, 3).map((state, idx) => {
+                              let badgeStyle = "bg-slate-950 text-slate-700 border-slate-900/60";
+                              let text = String(idx + 1);
+                              if (state === 'O') {
+                                badgeStyle = "bg-emerald-500/20 text-emerald-400 border-emerald-500/20 font-black";
+                                text = 'o';
+                              } else if (state === 'X') {
+                                badgeStyle = "bg-red-500/20 text-red-400 border-red-500/20 font-black";
+                                text = 'x';
+                              } else if (state === 'star') {
+                                badgeStyle = "bg-amber-500/20 text-amber-400 border-amber-500/20 font-black";
+                                text = '★';
+                              }
+                              return (
+                                <span
+                                  key={idx}
+                                  className={`w-[13px] h-[13px] rounded-full border text-[7.5px] flex items-center justify-center font-mono leading-none ${badgeStyle}`}
+                                >
+                                  {text}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </div>
                       </div>
                     </div>
 
