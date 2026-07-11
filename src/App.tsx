@@ -356,7 +356,7 @@ function App() {
     }
   }, [activeTab, session]);
 
-  // Start analysis trigger with automatic paid fallback
+  // Start analysis trigger with automatic paid fallback (일 10회까지 무료키 사용 후 자동 유료키 전환)
   const handleStartAnalysis = async (entry: MistakeEntry) => {
     const freeKey = freeGeminiKey;
     const paidKey = paidGeminiKey;
@@ -369,19 +369,64 @@ function App() {
     setIsAnalyzing(true);
     try {
       const studentGrade = entry.userId ? (profilesGradeMap[entry.userId] || '') : '';
-      if (freeKey) {
+      
+      // 1. 한국 표준시(KST) 오늘 날짜 구하기
+      const kstDate = new Date(new Date().getTime() + 9 * 60 * 60 * 1000);
+      const todayStr = kstDate.toISOString().split('T')[0];
+
+      // 2. 현재 로그인한 사용자의 오늘 무료 API 사용 횟수 조회
+      let dailyFreeCount = 0;
+      const userProfileId = session?.user?.id;
+      
+      if (userProfileId) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('daily_free_count, last_request_date')
+          .eq('id', userProfileId)
+          .single();
+          
+        if (profile && profile.last_request_date === todayStr) {
+          dailyFreeCount = profile.daily_free_count || 0;
+        }
+      }
+
+      console.log(`[Gemini API] 오늘 무료 사용 횟수: ${dailyFreeCount}/10`);
+
+      // 3. 사용 횟수 판단 분기 및 요청 실행
+      if (freeKey && dailyFreeCount < 10) {
         try {
+          // 무료키 시도
           await runAnalysisFlow(entry, freeKey, studentGrade);
+          
+          // 성공 시 무료 사용 횟수 증가 및 날짜 업데이트
+          if (userProfileId) {
+            await supabase
+              .from('profiles')
+              .update({
+                daily_free_count: dailyFreeCount + 1,
+                last_request_date: todayStr
+              })
+              .eq('id', userProfileId);
+          }
         } catch (err) {
-          console.warn('Free API Key failed. Retrying with Paid API Key...', err);
+          console.warn('Free API Key rate limited or failed. Retrying with Paid API Key...', err);
           if (paidKey) {
             await runAnalysisFlow(entry, paidKey, studentGrade);
           } else {
             throw err;
           }
         }
-      } else if (paidKey) {
-        await runAnalysisFlow(entry, paidKey, studentGrade);
+      } else {
+        // 무료키 소진(10회 이상) 혹은 무료키 미등록 시 유료키 즉시 사용
+        if (paidKey) {
+          console.log('[Gemini API] 무료 10회 제한 초과 또는 무료키 없음 -> 유료키로 직접 분석 수행');
+          await runAnalysisFlow(entry, paidKey, studentGrade);
+        } else if (freeKey) {
+          // 유료키가 없을 경우 최후의 수단으로 무료키 시도
+          await runAnalysisFlow(entry, freeKey, studentGrade);
+        } else {
+          throw new Error('사용 가능한 Gemini API Key가 존재하지 않습니다.');
+        }
       }
     } catch (err: any) {
       console.error(err);

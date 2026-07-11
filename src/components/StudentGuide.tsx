@@ -110,6 +110,13 @@ export const StudentGuide: React.FC = () => {
 
 export const CHRONOLOGICAL_CHANGELOGS = [
   {
+    version: 'v1.12.1',
+    date: '2026.07.11',
+    changes: [
+      '일일 무료 API 키 사용 한도(10회) 설정 및 한도 초과 시 유료 API 키 자동 즉시 전환 로직 구현 (과도한 무료 할당량 소진 방지 및 레이트 리밋 차단)'
+    ]
+  },
+  {
     version: 'v1.12.0',
     date: '2026.07.11',
     changes: [
