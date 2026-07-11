@@ -110,6 +110,13 @@ export const StudentGuide: React.FC = () => {
 
 export const CHRONOLOGICAL_CHANGELOGS = [
   {
+    version: 'v1.12.5',
+    date: '2026.07.11',
+    changes: [
+      '오답클리닉 대표 아이콘(더쿠키수학 초록색 한 입 베어문 쿠키 로고)을 귀여운 AI 로봇 고양이 스타일로 자연스럽게 변형 및 합성한 정밀 진단 이미지(/clinic_cat_icon.png) 업로드 완료'
+    ]
+  },
+  {
     version: 'v1.12.4',
     date: '2026.07.11',
     changes: [
