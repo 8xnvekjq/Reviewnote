@@ -1011,7 +1011,17 @@ function App() {
 
         {activeTab === 'completed' && (
           <MistakeList
-            mistakes={mistakes.filter(m => m.reviews?.filter(r => r === 'O').length === 3)}
+            mistakes={mistakes.filter(m => {
+              const oCount = m.reviews?.filter(r => r === 'O').length || 0;
+              if (oCount === 3) return true; // 3차 완주는 상시 노출
+              
+              // 어드민인 경우, 3칸 다 채웠지만 O가 3개가 아닌 오답(예: XOO, OXO 등)도 추가 노출
+              if (isAdmin) {
+                const isStampsFilled = m.reviews && m.reviews.every(r => r !== '');
+                return isStampsFilled && oCount < 3;
+              }
+              return false;
+            })}
             onSelectEntry={(entry) => setSelectedEntry(entry)}
             onDeleteMistake={handleDeleteMistake}
             onAddClick={() => setActiveTab('camera')}

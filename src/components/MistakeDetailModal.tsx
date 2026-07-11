@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import type { MistakeEntry, ReviewState } from '../types';
 import { ROOT_CAUSE_OPTIONS, MATH_CURRICULUM, GRADE_LIST } from '../types';
 import { LaTeXRenderer } from './LaTeXRenderer';
@@ -435,36 +435,12 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
 
 
-  const [autoCleanMsg, setAutoCleanMsg] = useState<string | null>(null);
-
   const hasStruggled = selectedEntry.reviews?.some(r => r === 'X' || r === 'star');
 
   const handleReviewToggle = (index: number, state: ReviewState) => {
-    if (autoCleanMsg) return; // 자동 정리 대기 중 터치 방지
-
     const currentReviews = [...(selectedEntry.reviews || ['', '', ''])];
-    const targetState = currentReviews[index] === state ? '' : state;
-    currentReviews[index] = targetState;
-
-    // 3차 도장까지 다 채워졌는데, O가 3개가 아닌 경우 (자동 정리 넛지 발동)
-    const isThreeStampsFilled = currentReviews.every(r => r !== '');
-    const isCompleted = currentReviews.filter(r => r === 'O').length === 3;
-
-    if (isThreeStampsFilled && !isCompleted && targetState !== '') {
-      // 1. 임시로 3번째 도장이 찍힌 비주얼을 반영
-      onUpdateReviews(selectedEntry.id, currentReviews as ReviewState[]);
-
-      // 2. 1.5초 딜레이 자동 슬라이드 정리 적용
-      setAutoCleanMsg('💡 오답 기록이 감지되어 복습이 연장됩니다. 맞춘 기록(O)만 남기고 1.5초 후 자동 정돈됩니다...');
-      setTimeout(() => {
-        const oReviews = currentReviews.filter(r => r === 'O');
-        const cleanedReviews = [...oReviews, '', ''].slice(0, 3) as ReviewState[];
-        onUpdateReviews(selectedEntry.id, cleanedReviews);
-        setAutoCleanMsg(null);
-      }, 1500);
-    } else {
-      onUpdateReviews(selectedEntry.id, currentReviews as ReviewState[]);
-    }
+    currentReviews[index] = currentReviews[index] === state ? '' : state;
+    onUpdateReviews(selectedEntry.id, currentReviews as ReviewState[]);
   };
 
   const handleRollbackReview = () => {
@@ -692,11 +668,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                       </button>
                     )}
 
-                    {autoCleanMsg ? (
-                      <div className="w-full py-3 px-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-400 font-extrabold text-[10px] text-center leading-relaxed animate-pulse shadow-md shadow-amber-500/5">
-                        {autoCleanMsg}
-                      </div>
-                    ) : activeStep === 3 && (
+                    {activeStep === 3 && (
                       <button
                         onClick={() => {
                           if (confirm('틀리거나 보류한 기록을 정리하고 맞춘(O) 기록만 앞으로 정렬하여 다시 복습하시겠습니까?')) {
