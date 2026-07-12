@@ -37,6 +37,10 @@ function App() {
   const [weeklyChampions, setWeeklyChampions] = useState<any[]>([]);
   // 분석통계 탭 학생 필터 상태 (어드민 전용)
   const [statsStudentFilter, setStatsStudentFilter] = useState<string>('all');
+  // 분석통계 탭 기간 필터 상태 (디폴트: 'all' 전체기간)
+  const [statsPeriodFilter, setStatsPeriodFilter] = useState<'all' | '90' | '30'>('all');
+  // 분석통계 탭 과목 아코디언 상태 (grade -> true/false)
+  const [statsExpandedGrades, setStatsExpandedGrades] = useState<Record<string, boolean>>({});
   // userId -> schoolGrade map (AI 학년별 분류 최적화용)
   const [profilesGradeMap, setProfilesGradeMap] = useState<Record<string, string>>({});
   // Supabase system_config 테이블에서 로드한 Gemini API Key 상태
@@ -804,16 +808,30 @@ function App() {
 
   // ── 통계 계산 ──────────────────────────────────────────────────
   const filteredMistakesForStats = useMemo(() => {
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const thirtyDaysAgoStr = thirtyDaysAgo.toISOString();
-
     let list = mistakes;
-    if (isAdmin && statsStudentFilter !== 'all') {
-      list = mistakes.filter(m => m.userId === statsStudentFilter);
+    if (isAdmin) {
+      if (statsStudentFilter !== 'all') {
+        list = mistakes.filter(m => m.userId === statsStudentFilter);
+      }
+    } else {
+      if (session?.user) {
+        list = mistakes.filter(m => m.userId === session.user.id);
+      } else {
+        list = [];
+      }
     }
-    return list.filter(m => m.date && m.date >= thirtyDaysAgoStr);
-  }, [mistakes, isAdmin, statsStudentFilter]);
+
+    if (statsPeriodFilter === 'all') {
+      return list;
+    }
+
+    const days = statsPeriodFilter === '90' ? 90 : 30;
+    const limitDate = new Date();
+    limitDate.setDate(limitDate.getDate() - days);
+    const limitDateStr = limitDate.toISOString();
+
+    return list.filter(m => m.date && m.date >= limitDateStr);
+  }, [mistakes, isAdmin, statsStudentFilter, statsPeriodFilter, session]);
 
   const stats = useMemo(() => {
     const gradeCounts: Record<string, number> = {};
@@ -838,43 +856,68 @@ function App() {
     return { gradeCounts, causeCounts, totalGrade, totalCause, topChapters };
   }, [filteredMistakesForStats]);
 
-  const heatmapData = useMemo(() => {
-    // 실제로 등록된 과목들만 세로축 지정 (유동적 가변)
+  const bubbleChartData = useMemo(() => {
+    // 실제로 등록된 과목들만 세로축 지정 (가변)
     const activeGrades = Array.from(
       new Set(filteredMistakesForStats.map(m => m.grade).filter(Boolean))
-    ) as string[];
+    ).sort() as string[];
 
-    // 각 과목별 실수 원인 카운트 집계
-    const matrix = activeGrades.map(grade => {
-      const rowStats = ROOT_CAUSE_OPTIONS.map(opt => {
-        const count = filteredMistakesForStats.filter(
-          m => m.grade === grade && m.rootCauses?.includes(opt.id)
-        ).length;
+    return activeGrades.map(grade => {
+      // 해당 과목에 속한 고유 단원들
+      const chaptersInGrade = Array.from(
+        new Set(
+          filteredMistakesForStats
+            .filter(m => m.grade === grade && m.chapter)
+            .map(m => m.chapter)
+        )
+      ).sort() as string[];
+
+      // 단원 정보가 없는 오답이 있다면 '기타/미분류' 단원 추가
+      const hasNoChapter = filteredMistakesForStats.some(m => m.grade === grade && !m.chapter);
+      if (hasNoChapter) {
+        chaptersInGrade.push('기타/미분류');
+      }
+
+      const chapterRows = chaptersInGrade.map(chapter => {
+        const rowStats = ROOT_CAUSE_OPTIONS.map(opt => {
+          const count = filteredMistakesForStats.filter(m => {
+            const matchGrade = m.grade === grade;
+            const matchChapter = chapter === '기타/미분류' ? !m.chapter : m.chapter === chapter;
+            const matchCause = m.rootCauses?.includes(opt.id);
+            return matchGrade && matchChapter && matchCause;
+          }).length;
+
+          return {
+            id: opt.id,
+            label: opt.label,
+            count
+          };
+        });
+
         return {
-          id: opt.id,
-          label: opt.label,
-          count
+          chapter,
+          stats: rowStats
         };
       });
 
       return {
         grade,
-        stats: rowStats
+        rows: chapterRows
       };
     });
-
-    return matrix;
   }, [filteredMistakesForStats]);
 
-  const maxCountInMatrix = useMemo(() => {
+  const maxCountInBubbles = useMemo(() => {
     let maxVal = 0;
-    heatmapData.forEach(row => {
-      row.stats.forEach(cell => {
-        if (cell.count > maxVal) maxVal = cell.count;
+    bubbleChartData.forEach(gGroup => {
+      gGroup.rows.forEach(row => {
+        row.stats.forEach(cell => {
+          if (cell.count > maxVal) maxVal = cell.count;
+        });
       });
     });
     return Math.max(maxVal, 1);
-  }, [heatmapData]);
+  }, [bubbleChartData]);
 
   const maskId = (username: string) => {
     if (!username) return '';
@@ -1093,108 +1136,145 @@ function App() {
               </div>
             ) : (
               <>
-                {/* 나의 약점 분석 매트릭스 (격자형 히트맵) */}
+                {/* 아코디언 범주형 버블 차트 (Categorical Bubble Chart) */}
                 <div className="bg-[#0e1322] border border-slate-800/80 rounded-2xl p-5 space-y-4 shadow-[0_4px_30px_rgba(0,0,0,0.4)] backdrop-blur-md">
-                  <div className="flex items-center space-x-1.5">
-                    <span className="text-base select-none">🧩</span>
-                    <h3 className="text-sm font-extrabold text-white">수학 오답 분석 매트릭스</h3>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-800/60 pb-3">
+                    <div className="flex items-center space-x-1.5">
+                      <span className="text-base select-none">🫧</span>
+                      <h3 className="text-sm font-extrabold text-white">단원별 취약 버블 분석</h3>
+                    </div>
+                    {/* 기간 필터 토글 탭 */}
+                    <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-850 space-x-1 w-fit select-none">
+                      {(['all', '90', '30'] as const).map(p => {
+                        const label = p === 'all' ? '전체누적' : p === '90' ? '90일' : '30일';
+                        const isAct = statsPeriodFilter === p;
+                        return (
+                          <button
+                            key={p}
+                            onClick={() => setStatsPeriodFilter(p)}
+                            className={`px-2.5 py-1 rounded-lg text-[9px] font-black transition-all ${
+                              isAct ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
 
-                  {heatmapData.length === 0 ? (
-                    <p className="text-xs text-slate-500 py-4 text-center">최근 30일 내 분석된 약점 데이터가 없습니다.</p>
+                  {bubbleChartData.length === 0 ? (
+                    <p className="text-xs text-slate-500 py-6 text-center">해당 기간 내 분석된 약점 데이터가 없습니다.</p>
                   ) : (
                     <div className="space-y-4 max-w-[360px] mx-auto w-full">
-                      {/* 가로 헤더 (5대 실수 유형 이름) */}
-                      <div className="flex items-center text-[10px] text-slate-500 font-extrabold">
-                        {/* 왼쪽 여백 (과목명 컬럼 크기 확보) */}
-                        <div className="w-16 flex-none"></div>
-                        {/* 5칸 격자 컬럼 헤더 - 가로폭이 넓어져도 가운데 정렬선을 일치시키기 위해 justify-items-center 추가 */}
-                        <div className="flex-1 grid grid-cols-5 gap-2 text-center justify-items-center">
-                          {ROOT_CAUSE_OPTIONS.map(opt => {
-                            // 이모지와 공백을 소거한 순수 4글자 텍스트 추출
-                            const labelClean = opt.label.replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
-                            return (
-                              <div key={opt.id} className="w-full max-w-[44px] truncate text-[8px] sm:text-[9px] tracking-tight text-slate-400 font-extrabold text-center">
-                                {labelClean}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
+                      {bubbleChartData.map(gGroup => {
+                        const isExpanded = statsExpandedGrades[gGroup.grade] !== false; // 기본값: 펼침
+                        return (
+                          <div key={gGroup.grade} className="border border-slate-800/60 rounded-2xl overflow-hidden bg-slate-950/20">
+                            {/* 아코디언 헤더 */}
+                            <button
+                              onClick={() => setStatsExpandedGrades(prev => ({ ...prev, [gGroup.grade]: !isExpanded }))}
+                              className="w-full flex items-center justify-between px-4 py-3 bg-slate-900/40 hover:bg-slate-900/70 transition-colors border-b border-slate-850/40 text-left"
+                            >
+                              <span className="text-xs font-black text-indigo-400">📚 {gGroup.grade}</span>
+                              <span className="text-[9px] text-slate-500 font-extrabold">{isExpanded ? '▲ 접기' : '▼ 펼치기'}</span>
+                            </button>
 
-                      {/* 세로 행 (과목별 격자선) */}
-                      <div className="space-y-3">
-                        {heatmapData.map(row => (
-                          <div key={row.grade} className="flex items-center">
-                            {/* 과목명 (왼쪽 고정 컬럼) */}
-                            <div className="w-16 flex-none text-xs font-black text-slate-400 truncate pr-2 text-right tracking-tight">
-                              {row.grade}
-                            </div>
-                            {/* 5칸 칩 격자 - 가로폭 확장 시 정사각형 고정을 위해 justify-items-center 탑재 */}
-                            <div className="flex-1 grid grid-cols-5 gap-2 justify-items-center">
-                              {row.stats.map(cell => {
-                                const count = cell.count;
-                                const ratio = count / maxCountInMatrix;
-                                let bgStyle: React.CSSProperties = {};
-                                let chipClass = '';
-
-                                if (count === 0) {
-                                  // 0회: 아주 옅은 꺼진 상태
-                                  chipClass = 'bg-[#101524] border-[#182136]/50 text-slate-800';
-                                } else if (ratio <= 0.25) {
-                                  // 하위 25%: 에메랄드 그린 (양호)
-                                  chipClass = 'bg-emerald-500/15 border-emerald-500/25';
-                                } else if (ratio <= 0.50) {
-                                  // 26% ~ 50%: 옐로우 (보통/주의)
-                                  chipClass = 'bg-yellow-500/25 border-yellow-500/35';
-                                } else if (ratio <= 0.75) {
-                                  // 51% ~ 75%: 오렌지 (경고/나쁨)
-                                  chipClass = 'bg-orange-500/45 border-orange-500/55';
-                                } else {
-                                  // 76% 초과: 로즈 레드 (위험/취약 - 네온 글로우)
-                                  chipClass = 'bg-rose-500 border-rose-300';
-                                  bgStyle = {
-                                    boxShadow: '0 0 12px rgba(244, 63, 94, 0.7)'
-                                  };
-                                }
-
-                                return (
-                                  <div
-                                    key={cell.id}
-                                    style={bgStyle}
-                                    className={`w-full max-w-[44px] aspect-square border rounded-xl flex items-center justify-center transition-all duration-300 hover:scale-105 hover:-translate-y-0.5 cursor-pointer relative group ${chipClass}`}
-                                    title={`${row.grade} - ${cell.label}: ${count}회 발생`}
-                                  >
-                                    {/* 개수 텍스트는 칩 내부에서 제거 */}
-                                    
-                                    {/* 호버 시 툴팁 대응 */}
-                                    {count > 0 && (
-                                      <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-800 text-[8px] text-indigo-300 px-1.5 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 shadow-lg font-bold">
-                                        {count}회
-                                      </span>
-                                    )}
+                            {/* 아코디언 컨텐츠 */}
+                            {isExpanded && (
+                              <div className="p-3.5 space-y-4">
+                                {/* 가로 헤더 (실수 유형) */}
+                                <div className="flex items-center text-[9px] text-slate-500 font-black">
+                                  <div className="w-20 flex-none text-right pr-2">단원명</div>
+                                  <div className="flex-1 grid grid-cols-5 gap-2 text-center justify-items-center">
+                                    {ROOT_CAUSE_OPTIONS.map(opt => {
+                                      const labelClean = opt.label.replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
+                                      return (
+                                        <div key={opt.id} className="w-full max-w-[40px] truncate text-[8px] tracking-tighter text-slate-400 font-black text-center">
+                                          {labelClean}
+                                        </div>
+                                      );
+                                    })}
                                   </div>
-                                );
-                              })}
-                            </div>
+                                </div>
+
+                                {/* 단원별 버블 가로 행 */}
+                                <div className="space-y-3.5">
+                                  {gGroup.rows.map(row => (
+                                    <div key={row.chapter} className="flex items-center">
+                                      {/* 단원명 (왼쪽 고정 컬럼) */}
+                                      <div className="w-20 flex-none text-[9px] font-black text-slate-400 truncate pr-2 text-right tracking-tight" title={row.chapter}>
+                                        {row.chapter}
+                                      </div>
+
+                                      {/* 5칸 버블 격자 */}
+                                      <div className="flex-1 grid grid-cols-5 gap-2 justify-items-center items-center">
+                                        {row.stats.map(cell => {
+                                          const count = cell.count;
+                                          const ratio = count / maxCountInBubbles;
+                                          let bubbleClass = '';
+                                          let bgStyle: React.CSSProperties = {};
+
+                                          if (count === 0) {
+                                            // 0회: 아주 옅은 오프 상태
+                                            bubbleClass = 'w-1.5 h-1.5 bg-slate-800/80 rounded-full hover:bg-slate-700 transition-all';
+                                          } else {
+                                            // 1회 이상: 방울 크기 비율 적용
+                                            const size = Math.round(12 + (ratio * 16)); // 최소 12px ~ 최대 28px
+                                            bgStyle = { width: `${size}px`, height: `${size}px` };
+
+                                            if (ratio <= 0.25) {
+                                              bubbleClass = 'rounded-full border border-emerald-500/50 bg-emerald-500/20 text-emerald-300 shadow-[0_0_6px_rgba(16,185,129,0.2)]';
+                                            } else if (ratio <= 0.50) {
+                                              bubbleClass = 'rounded-full border border-yellow-500/50 bg-yellow-500/30 text-yellow-300 shadow-[0_0_8px_rgba(245,158,11,0.25)]';
+                                            } else if (ratio <= 0.75) {
+                                              bubbleClass = 'rounded-full border border-orange-500/60 bg-orange-500/40 text-orange-300 shadow-[0_0_10px_rgba(249,115,22,0.3)]';
+                                            } else {
+                                              bubbleClass = 'rounded-full border border-rose-300 bg-rose-500 text-white shadow-[0_0_12px_rgba(244,63,94,0.75)]';
+                                            }
+                                          }
+
+                                          return (
+                                            <div
+                                              key={cell.id}
+                                              style={bgStyle}
+                                              className={`flex items-center justify-center transition-all duration-300 hover:scale-115 active:scale-95 cursor-pointer relative group ${bubbleClass}`}
+                                            >
+                                              {/* 호버 시 툴팁 대응 */}
+                                              {count > 0 && (
+                                                <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-800 text-[8px] text-indigo-300 px-1.5 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 shadow-lg font-bold">
+                                                  {count}회
+                                                </span>
+                                              )}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        ))}
-                      </div>
+                        );
+                      })}
 
                       {/* 하단 범례 안내 */}
-                      <div className="flex justify-between items-center text-[9px] text-slate-500 pt-3 border-t border-slate-800/60 font-bold">
+                      <div className="flex justify-between items-center text-[8.5px] text-slate-500 pt-3 border-t border-slate-800/60 font-bold select-none">
                         <div className="flex items-center space-x-1.5">
-                          <span className="w-2 h-2 bg-[#101524] border border-[#182136]/50 rounded-[2px]"></span>
+                          <span className="w-1.5 h-1.5 bg-slate-800 rounded-full"></span>
                           <span>적음 (low)</span>
                           <span>➔</span>
                           <span>많음 (high)</span>
-                          {/* 초록 -> 노랑 -> 주황 -> 빨강의 신호등 범례 */}
-                          <span className="w-2 h-2 rounded-[2px] bg-emerald-500/15 border border-emerald-500/25"></span>
-                          <span className="w-2 h-2 rounded-[2px] bg-yellow-500/25 border border-yellow-500/35"></span>
-                          <span className="w-2 h-2 rounded-[2px] bg-orange-500/45 border border-orange-500/55"></span>
-                          <span className="w-2.5 h-2.5 rounded-[2px] bg-rose-500 border border-rose-300" style={{ boxShadow: '0 0 5px rgba(244, 63, 94, 0.7)' }}></span>
+                          {/* 범례 미니 버블 나열 */}
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/20 border border-emerald-500/50"></span>
+                          <span className="w-3 h-3 rounded-full bg-yellow-500/30 border border-yellow-500/50"></span>
+                          <span className="w-3.5 h-3.5 rounded-full bg-orange-500/40 border border-orange-500/60"></span>
+                          <span className="w-4 h-4 rounded-full bg-rose-500 border border-rose-300" style={{ boxShadow: '0 0 6px rgba(244, 63, 94, 0.7)' }}></span>
                         </div>
-                        <span>최근 30일 데이터</span>
+                        <span className="text-[8px] text-slate-400">
+                          {statsPeriodFilter === 'all' ? '전체 누적 통계' : statsPeriodFilter === '90' ? '최근 90일 데이터' : '최근 30일 데이터'}
+                        </span>
                       </div>
                     </div>
                   )}
