@@ -209,10 +209,14 @@ export const MistakeList: React.FC<MistakeListProps> = ({
                 return (
                   <div
                     key={act.mistake_id || idx}
-                    onClick={() => handleActivityClick(act)}
+                    onClick={() => isAdmin && handleActivityClick(act)}
                     className={`text-[10px] text-slate-300 leading-normal flex items-center justify-between space-x-2 ${
                       idx > 0 ? 'pt-2' : ''
-                    } hover:bg-slate-800/40 cursor-pointer p-1.5 -mx-1.5 rounded-lg active:scale-[0.99] transition-all ${
+                    } ${
+                      isAdmin 
+                        ? 'hover:bg-slate-800/40 cursor-pointer p-1.5 -mx-1.5 rounded-lg active:scale-[0.99] transition-all' 
+                        : 'py-1'
+                    } ${
                       isLoadingThis ? 'opacity-50 pointer-events-none animate-pulse' : ''
                     }`}
                   >
