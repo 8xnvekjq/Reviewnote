@@ -110,6 +110,16 @@ export const StudentGuide: React.FC = () => {
 
 export const CHRONOLOGICAL_CHANGELOGS = [
   {
+    version: 'v1.13.1',
+    date: '2026.07.13',
+    changes: [
+      '복습완료 탭 내 "실시간 공부자극! 친구들의 복습 현황" 위젯의 행을 터치 시 해당 오답의 상세 정보 모달이 열리도록 연동',
+      '다른 학생의 오답도 에러 없이 구경하고 공부 자극을 받을 수 있도록 데이터베이스(Supabase) SELECT RLS 권한 패치 적용',
+      '로컬에 캐싱되지 않은 타인 오답 카드 조회 시 Supabase 단건 쿼리를 실시간 비동기 로딩하여 부드럽게 팝업 연동',
+      '카드 로딩 순간을 직관적으로 알 수 있도록 펄스(Pulse) 로딩 애니메이션 및 투명도 전환 피드백 탑재'
+    ]
+  },
+  {
     version: 'v1.13.0',
     date: '2026.07.13',
     changes: [

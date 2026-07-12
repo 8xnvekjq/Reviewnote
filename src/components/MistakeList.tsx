@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { MistakeEntry } from '../types';
 import { MistakeCard } from './MistakeCard';
 import { LaTeXRenderer } from './LaTeXRenderer';
+import { supabase } from '../services/supabase';
 
 interface MistakeListProps {
   mistakes: MistakeEntry[];
@@ -48,6 +49,49 @@ export const MistakeList: React.FC<MistakeListProps> = ({
   const [filterGrade, setFilterGrade] = useState<string>('all');
   const [filterChapter, setFilterChapter] = useState<string>('all');
   const [visibleCount, setVisibleCount] = useState<number>(10);
+  const [isLoadingActivity, setIsLoadingActivity] = useState<string | null>(null);
+
+  const handleActivityClick = async (act: any) => {
+    if (!act.mistake_id) return;
+    setIsLoadingActivity(act.mistake_id);
+    try {
+      // 1. 로컬 리스트에서 탐색
+      const localFind = mistakes.find(m => m.id === act.mistake_id);
+      if (localFind) {
+        onSelectEntry(localFind);
+        return;
+      }
+      // 2. 리모트 단건 SELECT 땡기기
+      const { data, error } = await supabase
+        .from('mistakes')
+        .select('*')
+        .eq('id', act.mistake_id)
+        .single();
+
+      if (error) throw error;
+      if (data) {
+        const remoteEntry: MistakeEntry = {
+          id: data.id,
+          userId: data.user_id,
+          title: data.title,
+          imageUrl: data.image_url,
+          date: data.date,
+          analysis: data.analysis || undefined,
+          reviews: data.reviews || ['', '', ''],
+          rootCauses: data.root_causes || [],
+          userActionPlan: data.user_action_plan || undefined,
+          grade: data.grade || undefined,
+          chapter: data.chapter || undefined,
+        };
+        onSelectEntry(remoteEntry);
+      }
+    } catch (err: any) {
+      console.error('활동 오답 로드 실패:', err);
+      alert('오답 카드를 불러오는데 실패했습니다: ' + err.message);
+    } finally {
+      setIsLoadingActivity(null);
+    }
+  };
 
   // 필터나 뷰모드가 변경되면 표시 개수를 10개로 리셋
   React.useEffect(() => {
@@ -160,8 +204,18 @@ export const MistakeList: React.FC<MistakeListProps> = ({
                 }
                 const studentName = act.display_name || act.username || '동료 학생';
 
+                const isLoadingThis = isLoadingActivity === act.mistake_id;
+
                 return (
-                  <div key={act.mistake_id || idx} className={`text-[10px] text-slate-300 leading-normal flex items-center justify-between space-x-2 ${idx > 0 ? 'pt-2' : ''}`}>
+                  <div
+                    key={act.mistake_id || idx}
+                    onClick={() => handleActivityClick(act)}
+                    className={`text-[10px] text-slate-300 leading-normal flex items-center justify-between space-x-2 ${
+                      idx > 0 ? 'pt-2' : ''
+                    } hover:bg-slate-800/40 cursor-pointer p-1.5 -mx-1.5 rounded-lg active:scale-[0.99] transition-all ${
+                      isLoadingThis ? 'opacity-50 pointer-events-none animate-pulse' : ''
+                    }`}
+                  >
                     <div className="flex items-center space-x-1.5 min-w-0 flex-1">
                       <span className="font-bold text-indigo-300 truncate max-w-[80px] flex-none" title={studentName}>
                         👤 {studentName}
