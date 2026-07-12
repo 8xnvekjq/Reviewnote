@@ -48,6 +48,8 @@ function App() {
   const [paidGeminiKey, setPaidGeminiKey] = useState<string>('');
   // 다른 학생들의 실시간 복습 현황 목록
   const [peerActivities, setPeerActivities] = useState<any[]>([]);
+  // 실시간 접속(활동) 중인 학생 목록
+  const [onlineUsers, setOnlineUsers] = useState<any[]>([]);
   // 인쇄할 완료 오답 리스트 임시 보관 상태
   const [printItems, setPrintItems] = useState<MistakeEntry[] | null>(null);
   // 개별 오답의 인쇄 형식 상태 (id -> true: 텍스트로 인쇄, false/undefined: 이미지로 인쇄)
@@ -311,6 +313,41 @@ function App() {
 
     const timer = setInterval(updateLastSeen, 120000); // 2분 주기
     return () => clearInterval(timer);
+  }, [session]);
+
+  // ── 실시간 온라인 사용자 리스트 폴링 ──────────────────────────
+  useEffect(() => {
+    if (!session?.user) {
+      setOnlineUsers([]);
+      return;
+    }
+
+    const fetchOnlineUsers = async () => {
+      try {
+        const fiveMinutesAgo = new Date(Date.now() - 300000).toISOString();
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, display_name, email')
+          .gte('last_seen_at', fiveMinutesAgo)
+          .eq('is_admin', false); // 학생들만 집계
+
+        if (error) throw error;
+        if (data) {
+          const mapped = data.map(p => ({
+            id: p.id,
+            display_name: p.display_name,
+            username: p.email?.split('@')[0] || 'User'
+          }));
+          setOnlineUsers(mapped);
+        }
+      } catch (err) {
+        console.error('Error fetching online users:', err);
+      }
+    };
+
+    fetchOnlineUsers();
+    const interval = setInterval(fetchOnlineUsers, 30000); // 30초 폴링
+    return () => clearInterval(interval);
   }, [session]);
 
   // Supabase system_config 로부터 Gemini API Key들을 로드
@@ -1355,7 +1392,7 @@ function App() {
       )}
 
       {/* Floating Glassmorphic Bottom Navigation Bar */}
-      <BottomNavigation activeTab={activeTab} setActiveTab={setActiveTab} isAdmin={isAdmin} />
+      <BottomNavigation activeTab={activeTab} setActiveTab={setActiveTab} isAdmin={isAdmin} onlineUsers={onlineUsers} />
 
       {/* 인쇄 전용 2열 세로 구분선 레이아웃 (@media print 시에만 노출) */}
       {printItems && printItems.length > 0 && (
