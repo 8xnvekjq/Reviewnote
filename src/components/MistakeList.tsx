@@ -203,6 +203,7 @@ export const MistakeList: React.FC<MistakeListProps> = ({
                   reviewDateStr = `${uD.getMonth() + 1}/${uD.getDate()} ${String(uD.getHours()).padStart(2, '0')}:${String(uD.getMinutes()).padStart(2, '0')}`;
                 }
                 const studentName = act.display_name || act.username || '동료 학생';
+                const isOnline = act.last_seen_at && (Date.now() - new Date(act.last_seen_at).getTime() < 300000); // 5분
 
                 const isLoadingThis = isLoadingActivity === act.mistake_id;
 
@@ -221,9 +222,14 @@ export const MistakeList: React.FC<MistakeListProps> = ({
                     }`}
                   >
                     <div className="flex items-center space-x-1.5 min-w-0 flex-1">
-                      <span className="font-bold text-indigo-300 truncate max-w-[80px] flex-none" title={studentName}>
-                        👤 {studentName}
-                      </span>
+                      <div className="flex items-center space-x-1 flex-none min-w-0">
+                        <span className="font-bold text-indigo-300 truncate max-w-[70px] flex-none" title={studentName}>
+                          👤 {studentName}
+                        </span>
+                        {isOnline && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse flex-none" title="온라인 상태" />
+                        )}
+                      </div>
                       <span className="text-slate-500 flex-none">&rarr;</span>
                       <span className="text-slate-200 truncate flex-1 min-w-0 font-bold">
                         {act.title.replace(/\$[^$]+\$/g, '').replace(/[#*`_]/g, '')}

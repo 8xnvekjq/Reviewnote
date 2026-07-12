@@ -293,6 +293,26 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // ── 실시간 온라인 상태 업데이트 ────────────────────────────
+  useEffect(() => {
+    if (!session?.user) return;
+
+    const updateLastSeen = async () => {
+      try {
+        await supabase
+          .from('profiles')
+          .update({ last_seen_at: new Date().toISOString() })
+          .eq('id', session.user.id);
+      } catch (err) {
+        console.error('Failed to update last_seen_at:', err);
+      }
+    };
+    updateLastSeen();
+
+    const timer = setInterval(updateLastSeen, 120000); // 2분 주기
+    return () => clearInterval(timer);
+  }, [session]);
+
   // Supabase system_config 로부터 Gemini API Key들을 로드
   const fetchGeminiApiKeys = async () => {
     try {
