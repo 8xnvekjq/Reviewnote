@@ -779,16 +779,48 @@ function App() {
       const targetEntry = mistakes.find(m => m.id === id);
       if (!targetEntry) return;
 
-      const currentDates = [...(targetEntry.analysis?.reviewDates || ['', '', ''])];
       const oldReviews = targetEntry.reviews || ['', '', ''];
+      const oldReviewDates = targetEntry.analysis?.reviewDates || ['', '', ''];
+
+      // 1. 기존에 'O' 였던 칸들의 날짜정보를 순서대로 수집
+      const existingODates: string[] = [];
+      oldReviews.forEach((r, idx) => {
+        if (r === 'O' && oldReviewDates[idx]) {
+          existingODates.push(oldReviewDates[idx]);
+        }
+      });
+
+      // 2. newReviews 에 대응하여 currentDates 정렬 조립
+      const currentDates = ['', '', ''];
+      let oCounter = 0;
 
       for (let i = 0; i < 3; i++) {
-        if (newReviews[i] !== '' && oldReviews[i] === '') {
-          const now = new Date();
-          const dateStr = `${now.getMonth() + 1}/${now.getDate()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-          currentDates[i] = dateStr;
-        } else if (newReviews[i] === '') {
+        const state = newReviews[i];
+        const oldState = oldReviews[i];
+
+        if (state === '') {
           currentDates[i] = '';
+        } else if (state === 'O') {
+          // O 인 경우:
+          // 기존에 'O' 였던 개수 범위 내의 도장은 예전 맞춘 시간 슬라이딩 정비
+          if (oCounter < existingODates.length) {
+            currentDates[i] = existingODates[oCounter];
+            oCounter++;
+          } else {
+            // 새로 찍힌 O 이면 신규 타임스탬프 기록
+            const now = new Date();
+            const dateStr = `${now.getMonth() + 1}/${now.getDate()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+            currentDates[i] = dateStr;
+          }
+        } else {
+          // X 또는 star 인 경우
+          if (state === oldState && oldReviewDates[i]) {
+            currentDates[i] = oldReviewDates[i];
+          } else {
+            const now = new Date();
+            const dateStr = `${now.getMonth() + 1}/${now.getDate()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+            currentDates[i] = dateStr;
+          }
         }
       }
 
