@@ -260,11 +260,16 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
           score += 3;
         }
 
-        // [특수 우선순위] 선생님이 촬영하여 직접 업로드한 최신 동영상 가중치 부여
-        // 제목이 "월/일 " (예: 7/15 , 3/7 , 2/21 ) 날짜 포맷으로 시작하는 영상
-        const isTeacherDirectVideo = /^\d{1,2}\/\d{1,2}\s/.test(video.title);
-        if (isTeacherDirectVideo && score > 0) {
-          score += 50;
+        // [특수 우선순위] 선생님의 최근 유튜브 강의(제목의 월/일 날짜가 최신인 영상) 우선 매칭
+        // 비디오 제목의 M/D(월/일) 포맷을 파싱하여 학기 선후관계(yearOffset)를 고려한 가중치 부여
+        const dateMatch = video.title.match(/^(\d{1,2})\/(\d{1,2})\s/);
+        if (dateMatch && score > 0) {
+          const month = parseInt(dateMatch[1], 10);
+          const day = parseInt(dateMatch[2], 10);
+          // 학년도 학기 흐름상 8~12월은 작년 하반기 영상, 1~7월은 올해 상반기 최신 영상으로 분류
+          const yearOffset = (month >= 8 && month <= 12) ? 0 : 1200;
+          const dateVal = yearOffset + (month * 100) + day;
+          score += dateVal * 0.05;
         }
 
         // 점수 갱신
