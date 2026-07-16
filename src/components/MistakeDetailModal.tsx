@@ -1117,7 +1117,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
       {/* 이미지 전체화면 확대 모달 (두 손가락 Pinch-to-zoom 제스처 지원 + 풀스크린 오버레이 방식) */}
       {isZoomOpen && (
         <div 
-          className="fixed inset-0 z-50 bg-black/98 flex items-center justify-center animate-fade-in"
+          className="fixed inset-0 z-50 bg-black/98 flex items-center justify-center animate-fade-in cursor-zoom-out"
           onClick={() => {
             setIsZoomOpen(false);
             setScale(1);
@@ -1130,7 +1130,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
-            onClick={(e) => e.stopPropagation()} // 백그라운드 클릭 클로즈 방어
           >
             <img 
               src={selectedEntry.imageUrl} 
@@ -1140,25 +1139,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
               }}
             />
-          </div>
-
-          {/* Top Bar Floating Controls (이미지 위에 공중 플로팅 배치 - 노치 세이프 여백 pt-12) */}
-          <div className="absolute top-0 left-0 right-0 z-10 flex items-start justify-between p-4 pt-12 sm:pt-6 select-none pointer-events-none">
-            <div className="bg-slate-950/80 border border-slate-850 px-3 py-1.5 rounded-full backdrop-blur-md shadow-lg pointer-events-auto">
-              <span className="text-[9.5px] font-bold text-slate-300">
-                👋 두 손가락 핀치 제스처로 자유롭게 조절
-              </span>
-            </div>
-            <button 
-              onClick={() => {
-                setIsZoomOpen(false);
-                setScale(1);
-                setPosition({ x: 0, y: 0 });
-              }}
-              className="w-10 h-10 rounded-full bg-slate-950/80 border border-slate-850 flex items-center justify-center text-white hover:bg-slate-800 text-lg transition-all shadow-lg pointer-events-auto backdrop-blur-md active:scale-95"
-            >
-              ✕
-            </button>
           </div>
           
           {/* Bottom Bar indicator Floating */}
