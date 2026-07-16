@@ -54,7 +54,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
       </div>
 
       {/* 복습하기 배지 버튼 (하단 내비바 우측 상단 플로팅) */}
-      {onStartReviewSession && !isAdmin && (
+      {onStartReviewSession && (
         <div className="absolute -top-3.5 right-3 select-none z-50">
           <button
             onClick={onStartReviewSession}
