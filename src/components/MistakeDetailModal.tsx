@@ -53,9 +53,14 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   const [editActionPlan, setEditActionPlan] = React.useState(selectedEntry.userActionPlan || '');
   const [isSaving, setIsSaving] = React.useState(false);
 
-  // Image lightbox zoom states
+  // Image lightbox zoom states & Touch gestures (Pinch-to-zoom)
   const [isZoomOpen, setIsZoomOpen] = React.useState(false);
-  const [zoomScale, setZoomScale] = React.useState(1);
+  const [scale, setScale] = React.useState(1);
+  const [position, setPosition] = React.useState({ x: 0, y: 0 });
+  const touchStartRef = React.useRef({ x: 0, y: 0 });
+  const initialDistanceRef = React.useRef(0);
+  const initialScaleRef = React.useRef(1);
+  const isDraggingRef = React.useRef(false);
 
   // Accordion toggle states
   const [showProblemText, setShowProblemText] = React.useState(false);
@@ -88,6 +93,61 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     setRevealedHintCount(0);
     setShowResult(!isAnalyzing && !!selectedEntry.analysis);
   }, [selectedEntry.id, selectedEntry.grade, selectedEntry.chapter, selectedEntry.rootCauses, selectedEntry.userActionPlan, isAnalyzing]);
+
+  // ── 핀치 줌 및 터치 드래그 제스처 핸들러 ──────────────────────────────
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 1) {
+      isDraggingRef.current = scale > 1;
+      const touch = e.touches[0];
+      touchStartRef.current = { x: touch.clientX - position.x, y: touch.clientY - position.y };
+    } else if (e.touches.length === 2) {
+      isDraggingRef.current = false;
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const distance = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+      initialDistanceRef.current = distance;
+      initialScaleRef.current = scale;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 1 && isDraggingRef.current) {
+      const touch = e.touches[0];
+      const dx = touch.clientX - touchStartRef.current.x;
+      const dy = touch.clientY - touchStartRef.current.y;
+      
+      // 드래그 최대 범위 제한 (확대 상태에서 화면 밖으로 끝없이 사라짐 방지)
+      const maxDragX = (scale - 1) * 200;
+      const maxDragY = (scale - 1) * 300;
+      const boundedX = Math.max(-maxDragX, Math.min(maxDragX, dx));
+      const boundedY = Math.max(-maxDragY, Math.min(maxDragY, dy));
+
+      setPosition({ x: boundedX, y: boundedY });
+    } else if (e.touches.length === 2) {
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const distance = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+      if (initialDistanceRef.current > 0) {
+        const factor = distance / initialDistanceRef.current;
+        let newScale = initialScaleRef.current * factor;
+        // 최소 1배 ~ 최대 4.5배 줌 스케일 제한
+        newScale = Math.max(1, Math.min(4.5, newScale));
+        setScale(newScale);
+
+        if (newScale === 1) {
+          setPosition({ x: 0, y: 0 });
+        }
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    isDraggingRef.current = false;
+    if (scale <= 1) {
+      setScale(1);
+      setPosition({ x: 0, y: 0 });
+    }
+  };
 
   const chaptersForGrade = editGrade ? (MATH_CURRICULUM[editGrade] || []) : [];
 
@@ -1054,56 +1114,55 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
       </div>
 
-      {/* 이미지 전체화면 확대 모달 */}
+      {/* 이미지 전체화면 확대 모달 (두 손가락 Pinch-to-zoom 제스처 지원) */}
       {isZoomOpen && (
         <div 
-          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex flex-col justify-between p-4 animate-fade-in"
+          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex flex-col justify-between pt-14 pb-4 px-4 animate-fade-in"
           onClick={() => {
             setIsZoomOpen(false);
-            setZoomScale(1);
+            setScale(1);
+            setPosition({ x: 0, y: 0 });
           }}
         >
-          {/* Top Bar */}
-          <div className="flex items-center justify-between z-10 w-full pl-2">
+          {/* Top Bar (모바일 노치 안겹치게 세이프 마진 확보) */}
+          <div className="flex items-center justify-between z-10 w-full pl-2 select-none">
             <span className="text-[10px] font-bold text-slate-400">
-              🔍 화면을 더블 탭(클릭)하면 2배 확대됩니다.
+              👋 두 손가락으로 화면을 벌려 자유롭게 확대해 보세요.
             </span>
             <button 
               onClick={() => {
                 setIsZoomOpen(false);
-                setZoomScale(1);
+                setScale(1);
+                setPosition({ x: 0, y: 0 });
               }}
-              className="w-9 h-9 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-white hover:bg-slate-800 text-lg transition-all"
+              className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-white hover:bg-slate-800 text-lg transition-all"
             >
               ✕
             </button>
           </div>
 
-          {/* Image Container */}
+          {/* Image Container (Touch 제스처 이벤트 바인딩) */}
           <div 
-            className={`flex-1 w-full overflow-auto p-4 cursor-zoom-out ${
-              zoomScale === 2 ? 'block' : 'flex items-center justify-center'
-            }`}
+            className="flex-1 w-full overflow-hidden flex items-center justify-center relative touch-none select-none"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onClick={(e) => e.stopPropagation()} // 백그라운드 클릭 클로즈 방어
           >
             <img 
               src={selectedEntry.imageUrl} 
               alt="확대된 문제 이미지" 
-              onClick={(e) => {
-                e.stopPropagation();
-                setZoomScale(prev => (prev === 1 ? 2 : 1));
+              className="rounded-lg select-none max-w-full max-h-[80vh] object-contain transition-transform duration-75 pointer-events-none"
+              style={{
+                transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
               }}
-              className={`rounded-lg select-none transition-all duration-300 ${
-                zoomScale === 2 
-                  ? 'max-w-none w-[200%] h-auto block' 
-                  : 'max-w-full max-h-[80vh] object-contain block'
-              }`}
             />
           </div>
           
           {/* Bottom Bar indicator */}
-          <div className="text-center z-10 py-2">
+          <div className="text-center z-10 py-2 select-none">
             <span className="text-[9px] text-slate-500 font-semibold bg-slate-900/60 px-3 py-1 rounded-full border border-slate-800/40">
-              배율: {zoomScale}x
+              배율: {scale.toFixed(1)}x
             </span>
           </div>
         </div>
