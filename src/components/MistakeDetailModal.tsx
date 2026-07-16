@@ -633,9 +633,9 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             </div>
           </div>
 
-          {/* 이미지 확대 안내 팁 텍스트 (기존 프레임을 해치지 않게 컨테이너 없이 텍스트만 배치) */}
-          <div className="text-center py-0.5 select-none">
-            <span className="text-[10.5px] font-extrabold text-slate-500">
+          {/* 이미지 확대 안내 팁 텍스트 (마이너스 마진으로 space-y-6 간격 축소 및 고대비 밝은 텍스트 부여) */}
+          <div className="text-center -mt-4 -mb-2 select-none">
+            <span className="text-[10px] font-black text-slate-300 tracking-wide">
               💡 위(↑)를 누르면 이미지가 확대돼요!
             </span>
           </div>
