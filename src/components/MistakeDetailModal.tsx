@@ -628,20 +628,18 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
               alt={selectedEntry.title} 
               className="w-full h-auto max-h-[60vh] object-contain rounded-xl group-hover/img:opacity-90 transition-opacity" 
             />
+            {/* 이미지 확대 가이드 골드 배지 (상시 노출 + 노란색/황금색 텍스트) */}
+            <div className="absolute bottom-4 left-4 bg-slate-950/85 border border-slate-800/60 rounded-lg px-2 py-0.5 text-[9px] font-black text-amber-400 flex items-center space-x-1 shadow backdrop-blur select-none">
+              <span>💡 이미지를 누르면 확대돼요!</span>
+            </div>
+            
             <div className="absolute bottom-4 right-4 bg-slate-950/80 border border-slate-800 rounded-lg px-2.5 py-1 text-[10px] text-slate-400 font-bold flex items-center space-x-1.5 shadow backdrop-blur opacity-0 group-hover/img:opacity-100 transition-opacity">
               <span>🔍 크게 보기</span>
             </div>
           </div>
 
-          {/* 이미지 확대 안내 팁 텍스트 (마이너스 마진으로 space-y-6 간격 축소 및 고대비 밝은 텍스트 부여) */}
-          <div className="text-center -mt-4 -mb-2 select-none">
-            <span className="text-[10px] font-black text-slate-300 tracking-wide">
-              💡 위(↑)를 누르면 이미지가 확대돼요!
-            </span>
-          </div>
-
-          {/* 3-Step Review Status Selection Card */}
-          <div className="bg-slate-950 p-4 rounded-2xl border border-slate-850 space-y-4">
+          {/* 3-Step Review Status Selection Card (이미지와 아예 밀착되도록 -mt-4.5 상단 마진 인가) */}
+          <div className="bg-slate-950 p-4 rounded-2xl border border-slate-850 space-y-4 -mt-4.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-300 flex items-center">
                 <span className="mr-1 text-sm">📋</span> 복습 상태 진단 (3회 완료 시 보관함 이동)
