@@ -633,6 +633,13 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             </div>
           </div>
 
+          {/* 이미지 확대 안내 팁 프레임 */}
+          <div className="py-2 bg-slate-950/50 border border-slate-850 rounded-xl text-center select-none">
+            <span className="text-[9.5px] font-bold text-slate-500 flex items-center justify-center gap-1.5">
+              💡 위(화살표 ↑)를 누르면 이미지가 확대되요!
+            </span>
+          </div>
+
           {/* 3-Step Review Status Selection Card */}
           <div className="bg-slate-950 p-4 rounded-2xl border border-slate-850 space-y-4">
             <div className="flex items-center justify-between">
