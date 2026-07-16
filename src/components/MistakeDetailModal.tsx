@@ -1134,7 +1134,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             <img 
               src={selectedEntry.imageUrl} 
               alt="확대된 문제 이미지" 
-              className="max-w-full max-h-full object-contain transition-transform duration-75 pointer-events-none"
+              className="max-w-full max-h-full object-contain pointer-events-none select-none"
               style={{
                 transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
               }}
