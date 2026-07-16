@@ -1,0 +1,1939 @@
+﻿commit ab31ada5efd3b25e39ffb67ace2bfbde116feafa
+Author: ReviewNotes Developer <developer@reviewnotes.local>
+Date:   Thu Jul 9 01:34:25 2026 +0900
+
+    Fix: Add v1.9.0 entry to AdminPanel changelog and make build time label responsive to prevent overlap
+
+diff --git a/src/components/AdminPanel.tsx b/src/components/AdminPanel.tsx
+index e598a31..38992f9 100644
+--- a/src/components/AdminPanel.tsx
++++ b/src/components/AdminPanel.tsx
+@@ -407,12 +407,32 @@ export const AdminPanel: React.FC = () => {
+           </div>
+ 
+           <div className="relative border-l border-slate-800 pl-6 ml-3 space-y-8">
+-            {/* Version 1.8.4 */}
++            {/* Version 1.9.0 */}
+             <div className="relative">
+               <div className="absolute -left-[33px] top-1.5 w-4 h-4 rounded-full bg-indigo-500 border-4 border-slate-950" />
+               <div className="space-y-2">
+                 <div className="flex items-center space-x-2">
+                   <span className="text-xs font-black px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
++                    v1.9.0
++                  </span>
++                  <span className="text-[10px] text-slate-500 font-bold">2026.07.09</span>
++                </div>
++                <h4 className="font-bold text-white text-xs">怨좊벑 ?섑븰 ?꾧낵紐??숈쁺???댁떇 諛?G.Polya AI 臾몄젣 ??????섎Ⅴ?뚮굹 ?곸슜</h4>
++                <ul className="text-xs text-slate-400 list-disc list-inside space-y-1.5 pl-1 leading-relaxed">
++                  <li><strong>?꾧낵紐?媛쒕뀗 媛뺤쓽 留ㅼ묶</strong>: ??? 誘몄쟻?? 誘몄쟻?? ?뺥넻 珥?100??媛??ъ깮紐⑸줉 鍮꾨뵒?ㅼ쓽 梨뺥꽣 ?뺣낫 ?섏쭛 諛?DB ?쒕뵫</li>
++                  <li><strong>寃쎌슦????怨쇰ぉ 寃⑸━</strong>: 怨듯넻?섑븰1怨??뺣쪧怨??듦퀎???⑥썝紐낆씠 以묐났?섏뼱 ?쇱꽑???앷린???꾩긽??怨쇰ぉ蹂??묐몢?щ줈 ?꾩쟾 寃⑸━</li>
++                  <li><strong>G.Polya 4?④퀎 & ??留먰닾 ?댁떇</strong>: 臾몄젣 ?닿껐 4?④퀎 ?꾨젅?꾩뿉 留욎떠 ???뱀쑀??移쒓렐?섍퀬 ?좊㉧?ъ뒪???댄닾濡??댁꽕 諛??뚰듃媛 ?먮룞 ?묒꽦?섎뒗 Gemini ?꾨＼?꾪듃 ?곸슜</li>
++                  <li><strong>?ㅻ뜑 ?덉씠?꾩썐 踰꾧렇 ?섏젙</strong>: 紐⑤컮???뚮툝由???醫곸? ?붾㈃?먯꽌 ?낅뜲?댄듃 鍮뚮뱶 ?좎쭨媛 ?섎젮??蹂댁씠???덉씠?꾩썐 寃뱀묠 媛쒖꽑</li>
++                </ul>
++              </div>
++            </div>
++
++            {/* Version 1.8.4 */}
++            <div className="relative">
++              <div className="absolute -left-[33px] top-1.5 w-4 h-4 rounded-full bg-slate-800 border-4 border-slate-950" />
++              <div className="space-y-2">
++                <div className="flex items-center space-x-2">
++                  <span className="text-xs font-black px-2 py-0.5 rounded bg-slate-850 text-slate-400 border border-slate-700">
+                     v1.8.4
+                   </span>
+                   <span className="text-[10px] text-slate-500 font-bold">2026.07.07</span>
+
+commit 12e542d2083ead40bf53981162506d19a1a14f19
+Author: 8xnvekjq <8xnvekjq@users.noreply.github.com>
+Date:   Wed Jul 8 19:41:59 2026 +0900
+
+    Fix: Correct bracket mismatch syntax error in AdminPanel stats view IIFE
+
+diff --git a/src/components/AdminPanel.tsx b/src/components/AdminPanel.tsx
+index a9d2250..e598a31 100644
+--- a/src/components/AdminPanel.tsx
++++ b/src/components/AdminPanel.tsx
+@@ -387,10 +387,11 @@ export const AdminPanel: React.FC = () => {
+                   )}
+                 </div>
+               );
+-            })}
+-          </div>
+-        );
+-      })()}
++            })
++          )}
++        </div>
++      );
++    })()}
+ 
+       {/* ?? ??2: 蹂寃??대젰 (Change Log) ???? */}
+       {activeSubTab === 'changelog' && (
+
+commit 3efe7a9f3ad7352b9fe5af5a27874eeabfbdb20c
+Author: 8xnvekjq <8xnvekjq@users.noreply.github.com>
+Date:   Wed Jul 8 19:37:50 2026 +0900
+
+    Feat: Add school grade filtering dropdown inside AdminPanel statistics view
+
+diff --git a/src/components/AdminPanel.tsx b/src/components/AdminPanel.tsx
+index bbf2067..a9d2250 100644
+--- a/src/components/AdminPanel.tsx
++++ b/src/components/AdminPanel.tsx
+@@ -9,6 +9,7 @@ export const AdminPanel: React.FC = () => {
+   const [error, setError] = useState<string | null>(null);
+   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
+   const [activeSubTab, setActiveSubTab] = useState<'stats' | 'changelog'>('stats');
++  const [gradeFilter, setGradeFilter] = useState<string>('all');
+ 
+   const fetchAdminStats = async () => {
+     setIsLoading(true);
+@@ -234,12 +235,38 @@ export const AdminPanel: React.FC = () => {
+       )}
+ 
+       {/* ?? ??1: 媛?낆옄 ?꾪솴 ???? */}
+-      {activeSubTab === 'stats' && !isLoading && !error && (
+-        <div className="space-y-3">
+-          {stats.length === 0 ? (
+-            <div className="py-10 text-center text-slate-500 text-sm">媛?낆옄媛 ?놁뒿?덈떎.</div>
+-          ) : (
+-            stats.map((user) => {
++      {activeSubTab === 'stats' && !isLoading && !error && (() => {
++        const filteredStats = stats.filter(user => {
++          if (gradeFilter === 'all') return true;
++          if (gradeFilter === 'unassigned') return !user.schoolGrade;
++          return user.schoolGrade === gradeFilter;
++        });
++
++        return (
++          <div className="space-y-3.5">
++            {/* Grade Filter Dropdown */}
++            <div className="flex items-center space-x-2 bg-slate-900/60 border border-slate-800/80 p-2.5 rounded-2xl">
++              <span className="text-[10px] text-slate-500 font-extrabold uppercase px-1">?럳 ?숇뀈 ?꾪꽣</span>
++              <select
++                value={gradeFilter}
++                onChange={e => setGradeFilter(e.target.value)}
++                className="flex-1 px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-850 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer font-bold"
++              >
++                <option value="all">?꾩껜 ?숇뀈 ({stats.length}紐?</option>
++                <option value="以?">以? ({stats.filter(u => u.schoolGrade === '以?').length}紐?</option>
++                <option value="怨?">怨? ({stats.filter(u => u.schoolGrade === '怨?').length}紐?</option>
++                <option value="怨?">怨? ({stats.filter(u => u.schoolGrade === '怨?').length}紐?</option>
++                <option value="怨?">怨? ({stats.filter(u => u.schoolGrade === '怨?').length}紐?</option>
++                <option value="unassigned">誘몄???({stats.filter(u => !u.schoolGrade).length}紐?</option>
++              </select>
++            </div>
++
++            {filteredStats.length === 0 ? (
++              <div className="py-12 text-center text-slate-500 text-xs border border-dashed border-slate-850 rounded-2xl bg-slate-900/20">
++                ?대떦 ?숇뀈??媛?낆옄媛 ?놁뒿?덈떎.
++              </div>
++            ) : (
++              filteredStats.map((user) => {
+               const isEmailValid = user.email && user.email.includes('@');
+               const activeNotes = user.mistakeCount - user.completedCount;
+               const completionRate = user.mistakeCount > 0
+@@ -360,10 +387,10 @@ export const AdminPanel: React.FC = () => {
+                   )}
+                 </div>
+               );
+-            })
+-          )}
+-        </div>
+-      )}
++            })}
++          </div>
++        );
++      })()}
+ 
+       {/* ?? ??2: 蹂寃??대젰 (Change Log) ???? */}
+       {activeSubTab === 'changelog' && (
+
+commit b7a2a85198da255fe54fc71a072cd8adc9581d05
+Author: 8xnvekjq <8xnvekjq@users.noreply.github.com>
+Date:   Wed Jul 8 19:36:37 2026 +0900
+
+    Feat: Sort student list in AdminPanel by most recent review date
+
+diff --git a/src/components/AdminPanel.tsx b/src/components/AdminPanel.tsx
+index 48dd962..bbf2067 100644
+--- a/src/components/AdminPanel.tsx
++++ b/src/components/AdminPanel.tsx
+@@ -103,10 +103,23 @@ export const AdminPanel: React.FC = () => {
+         stat.weeklyScore = (stat.weeklyCompletedCount * 10) + (rate * 100);
+       });
+ 
+-      // Sort: 二쇨컙 蹂듭뒿 ??궧 ?먯닔 ?믪? ???뺣젹
+-      const sorted = Array.from(statsMap.values()).sort(
+-        (a, b) => b.weeklyScore - a.weeklyScore
+-      );
++      // Sort: 理쒓렐 ?ㅻ떟 蹂듭뒿?????뺣젹 (蹂듭뒿 湲곕줉???녿뒗 ?숈깮? 理쒗븯??諛곗튂)
++      const sorted = Array.from(statsMap.values()).sort((a, b) => {
++        if (a.lastReviewDate && b.lastReviewDate) {
++          return new Date(b.lastReviewDate).getTime() - new Date(a.lastReviewDate).getTime();
++        }
++        if (a.lastReviewDate) return -1;
++        if (b.lastReviewDate) return 1;
++        
++        // 蹂듭뒿 湲곕줉??紐⑤몢 ?녿뒗 寃쎌슦, 理쒓렐 ?낅줈??lastActivity) ???뺣젹
++        if (a.lastActivity && b.lastActivity) {
++          return new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime();
++        }
++        if (a.lastActivity) return -1;
++        if (b.lastActivity) return 1;
++
++        return a.email.localeCompare(b.email);
++      });
+ 
+       setStats(sorted);
+       setLastRefreshed(new Date());
+
+commit e26af3facaea7b16257de63961bd2b137f429a2c
+Author: 8xnvekjq <8xnvekjq@users.noreply.github.com>
+Date:   Wed Jul 8 19:13:51 2026 +0900
+
+    Feat: Display last review dates in Completed tab widget and Admin Panel statistics
+
+diff --git a/src/components/AdminPanel.tsx b/src/components/AdminPanel.tsx
+index 57e985e..48dd962 100644
+--- a/src/components/AdminPanel.tsx
++++ b/src/components/AdminPanel.tsx
+@@ -57,6 +57,7 @@ export const AdminPanel: React.FC = () => {
+           displayName: p.display_name?.trim() || undefined,
+           username: username,
+           schoolGrade: p.school_grade || '',
++          lastReviewDate: null,
+         });
+       });
+ 
+@@ -86,6 +87,14 @@ export const AdminPanel: React.FC = () => {
+         if (!stat.lastActivity || m.date > stat.lastActivity) {
+           stat.lastActivity = m.date;
+         }
++
++        // Track last review date (check if reviews array has at least one checked state)
++        const hasBeenReviewed = reviews.some(r => r !== '');
++        if (hasBeenReviewed && m.updated_at) {
++          if (!stat.lastReviewDate || m.updated_at > stat.lastReviewDate) {
++            stat.lastReviewDate = m.updated_at;
++          }
++        }
+       });
+ 
+       // 媛??좎?蹂?二쇨컙 ?먯닔 ?곗텧
+@@ -288,11 +297,17 @@ export const AdminPanel: React.FC = () => {
+                         </span>
+                       </div>
+                       <div className="pt-1 border-t border-slate-850">
+-                        <span className="text-[9px] text-slate-500 block leading-none">理쒓렐 ?쒕룞</span>
++                        <span className="text-[9px] text-slate-500 block leading-none">理쒓렐 ?낅줈??/span>
+                         <span className="text-[10px] text-slate-400 font-medium leading-none block mt-0.5">
+                           {user.lastActivity ? formatDate(user.lastActivity).split(' ')[0] : '??}
+                         </span>
+                       </div>
++                      <div className="pt-1 border-t border-slate-850">
++                        <span className="text-[9px] text-indigo-400 block leading-none font-bold">留덉?留?蹂듭뒿</span>
++                        <span className="text-[10px] text-indigo-300 font-semibold leading-none block mt-0.5">
++                          {user.lastReviewDate ? formatDate(user.lastReviewDate).split(' ')[0] : '??}
++                        </span>
++                      </div>
+                     </div>
+                   </div>
+ 
+
+commit 57fe5dba44d9bf048cd24bcaca3cdfdf3845f501
+Author: 8xnvekjq <8xnvekjq@users.noreply.github.com>
+Date:   Tue Jul 7 15:14:19 2026 +0900
+
+    Feat: Change admin student school grade input to select dropdown with predefined options
+
+diff --git a/src/components/AdminPanel.tsx b/src/components/AdminPanel.tsx
+index 25eb5f0..57e985e 100644
+--- a/src/components/AdminPanel.tsx
++++ b/src/components/AdminPanel.tsx
+@@ -244,16 +244,13 @@ export const AdminPanel: React.FC = () => {
+                       <span className="text-[10px] text-slate-400 truncate block mt-0.5">
+                         {(user as any).displayName ? `?꾩씠?? ${(user as any).username}` : (isEmailValid ? user.email : '(?대찓???뺣낫 ?놁쓬)')}
+                       </span>
+-                      {/* ?숇뀈 ?낅젰 而댄룷?뚰듃 異붽? */}
++                      {/* ?숇뀈 ?좏깮 而댄룷?뚰듃 異붽? */}
+                       <div className="flex items-center space-x-1.5 mt-2">
+                         <span className="text-[9px] text-slate-500 font-bold">?숇뀈:</span>
+-                        <input
+-                          type="text"
+-                          defaultValue={user.schoolGrade || ''}
+-                          placeholder="?? 以?, 怨?"
+-                          onBlur={async (e) => {
+-                            const newGrade = e.target.value.trim();
+-                            if (newGrade === (user.schoolGrade || '')) return;
++                        <select
++                          value={user.schoolGrade || ''}
++                          onChange={async (e) => {
++                            const newGrade = e.target.value;
+                             
+                             try {
+                               const { error } = await supabase
+@@ -269,8 +266,14 @@ export const AdminPanel: React.FC = () => {
+                               alert('?숇뀈 ?낅뜲?댄듃 ?ㅽ뙣: ' + err.message);
+                             }
+                           }}
+-                          className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 focus:border-indigo-500 text-[10px] text-white w-20 outline-none transition-colors font-bold text-center"
+-                        />
++                          className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 focus:border-indigo-500 text-[10px] text-white outline-none transition-colors font-bold text-center cursor-pointer"
++                        >
++                          <option value="">?좏깮 ?놁쓬</option>
++                          <option value="以?">以?</option>
++                          <option value="怨?">怨?</option>
++                          <option value="怨?">怨?</option>
++                          <option value="怨?">怨?</option>
++                        </select>
+                       </div>
+                     </div>
+                     {/* Weekly Score and Last Activity */}
+
+commit 2e70bb69f8e96fc82c850e90c094c3a63b1cadfb
+Author: 8xnvekjq <8xnvekjq@users.noreply.github.com>
+Date:   Tue Jul 7 15:12:04 2026 +0900
+
+    Feat: Implement student school grade tracking and Gemini AI classification bias tuning
+
+diff --git a/src/components/AdminPanel.tsx b/src/components/AdminPanel.tsx
+index 987cfb7..25eb5f0 100644
+--- a/src/components/AdminPanel.tsx
++++ b/src/components/AdminPanel.tsx
+@@ -14,10 +14,10 @@ export const AdminPanel: React.FC = () => {
+     setIsLoading(true);
+     setError(null);
+     try {
+-      // Fetch all profiles (display_name ?ы븿)
++      // Fetch all profiles (display_name, school_grade ?ы븿)
+       const { data: profiles, error: profilesError } = await supabase
+         .from('profiles')
+-        .select('id, email, is_admin, display_name')
++        .select('id, email, is_admin, display_name, school_grade')
+         .order('email', { ascending: true });
+ 
+       if (profilesError) throw profilesError;
+@@ -56,6 +56,7 @@ export const AdminPanel: React.FC = () => {
+           weeklyCompletedCount: 0,
+           displayName: p.display_name?.trim() || undefined,
+           username: username,
++          schoolGrade: p.school_grade || '',
+         });
+       });
+ 
+@@ -243,6 +244,34 @@ export const AdminPanel: React.FC = () => {
+                       <span className="text-[10px] text-slate-400 truncate block mt-0.5">
+                         {(user as any).displayName ? `?꾩씠?? ${(user as any).username}` : (isEmailValid ? user.email : '(?대찓???뺣낫 ?놁쓬)')}
+                       </span>
++                      {/* ?숇뀈 ?낅젰 而댄룷?뚰듃 異붽? */}
++                      <div className="flex items-center space-x-1.5 mt-2">
++                        <span className="text-[9px] text-slate-500 font-bold">?숇뀈:</span>
++                        <input
++                          type="text"
++                          defaultValue={user.schoolGrade || ''}
++                          placeholder="?? 以?, 怨?"
++                          onBlur={async (e) => {
++                            const newGrade = e.target.value.trim();
++                            if (newGrade === (user.schoolGrade || '')) return;
++                            
++                            try {
++                              const { error } = await supabase
++                                .from('profiles')
++                                .update({ school_grade: newGrade || null })
++                                .eq('id', user.userId);
++                                
++                              if (error) throw error;
++                              
++                              // Update local state
++                              setStats(prev => prev.map(u => u.userId === user.userId ? { ...u, schoolGrade: newGrade } : u));
++                            } catch (err: any) {
++                              alert('?숇뀈 ?낅뜲?댄듃 ?ㅽ뙣: ' + err.message);
++                            }
++                          }}
++                          className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 focus:border-indigo-500 text-[10px] text-white w-20 outline-none transition-colors font-bold text-center"
++                        />
++                      </div>
+                     </div>
+                     {/* Weekly Score and Last Activity */}
+                     <div className="text-right flex-none pl-3 border-l border-slate-800/80 space-y-1">
+
+commit bc56017146ed5c0ff3f98fdb4a3b508c48abe3f6
+Author: 8xnvekjq <8xnvekjq@users.noreply.github.com>
+Date:   Tue Jul 7 15:06:49 2026 +0900
+
+    Fix: Remove unused imports and variables in AdminPanel.tsx to fix Vercel compilation build failure
+
+diff --git a/src/components/AdminPanel.tsx b/src/components/AdminPanel.tsx
+index 2366a8c..987cfb7 100644
+--- a/src/components/AdminPanel.tsx
++++ b/src/components/AdminPanel.tsx
+@@ -1,13 +1,10 @@
+ import React, { useEffect, useState } from 'react';
+-import type { AdminUserStat, MistakeEntry } from '../types';
++import type { AdminUserStat } from '../types';
+ import { supabase } from '../services/supabase';
+ import { formatDate } from '../utils/date';
+-import { ROOT_CAUSE_OPTIONS } from '../types';
+-import { LaTeXRenderer } from './LaTeXRenderer';
+ 
+ export const AdminPanel: React.FC = () => {
+   const [stats, setStats] = useState<AdminUserStat[]>([]);
+-  const [profilesMap, setProfilesMap] = useState<Record<string, string>>({});
+   const [isLoading, setIsLoading] = useState(true);
+   const [error, setError] = useState<string | null>(null);
+   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
+@@ -25,15 +22,6 @@ export const AdminPanel: React.FC = () => {
+ 
+       if (profilesError) throw profilesError;
+ 
+-      // Build profilesMap: userId -> ?대쫫(?ㅻ챸) ?먮뒗 ?꾩씠??-      const pMap: Record<string, string> = {};
+-      (profiles || []).forEach((p: any) => {
+-        const username = p.email?.split('@')[0] || p.display_name || p.id.slice(0, 8);
+-        const displayName = p.display_name?.trim();
+-        pMap[p.id] = displayName || username;
+-      });
+-      setProfilesMap(pMap);
+-
+       // Fetch all mistakes
+       const { data: mistakes, error: mistakesError } = await supabase
+         .from('mistakes')
+
+commit 75e4551a14e716f72c1f6f2013f4e3a1af1838d9
+Author: 8xnvekjq <8xnvekjq@users.noreply.github.com>
+Date:   Tue Jul 7 15:02:35 2026 +0900
+
+    Feat: Replace 'All Mistakes View' with 'Change Log' tab inside AdminPanel
+
+diff --git a/src/components/AdminPanel.tsx b/src/components/AdminPanel.tsx
+index 5e1ff80..2366a8c 100644
+--- a/src/components/AdminPanel.tsx
++++ b/src/components/AdminPanel.tsx
+@@ -7,14 +7,11 @@ import { LaTeXRenderer } from './LaTeXRenderer';
+ 
+ export const AdminPanel: React.FC = () => {
+   const [stats, setStats] = useState<AdminUserStat[]>([]);
+-  const [allMistakes, setAllMistakes] = useState<MistakeEntry[]>([]);
+   const [profilesMap, setProfilesMap] = useState<Record<string, string>>({});
+   const [isLoading, setIsLoading] = useState(true);
+   const [error, setError] = useState<string | null>(null);
+   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
+-  const [filterStudent, setFilterStudent] = useState<string>('all');
+-  const [previewEntry, setPreviewEntry] = useState<MistakeEntry | null>(null);
+-  const [activeSubTab, setActiveSubTab] = useState<'stats' | 'mistakes'>('stats');
++  const [activeSubTab, setActiveSubTab] = useState<'stats' | 'changelog'>('stats');
+ 
+   const fetchAdminStats = async () => {
+     setIsLoading(true);
+@@ -45,21 +42,7 @@ export const AdminPanel: React.FC = () => {
+ 
+       if (mistakesError) throw mistakesError;
+ 
+-      // Map full mistake entries for the ?꾩껜 ?ㅻ떟 酉?-      const mappedMistakes: MistakeEntry[] = (mistakes || []).map((m: any) => ({
+-        id: m.id,
+-        userId: m.user_id,
+-        title: m.title,
+-        imageUrl: m.image_url,
+-        date: m.date,
+-        analysis: m.analysis || undefined,
+-        reviews: m.reviews || ['', '', ''],
+-        grade: m.grade || undefined,
+-        chapter: m.chapter || undefined,
+-        rootCauses: m.root_causes || [],
+-        userActionPlan: m.user_action_plan || undefined,
+-      }));
+-      setAllMistakes(mappedMistakes);
++      // Fetch all mistakes is completed successfully, proceed to monday calculation
+ 
+       // ?대쾲二??붿슂??00:00 KST???대떦?섎뒗 UTC 寃쎄퀎??怨꾩궛
+       const now = new Date();
+@@ -199,15 +182,15 @@ export const AdminPanel: React.FC = () => {
+             <span>媛?낆옄 ?꾪솴</span>
+           </button>
+           <button
+-            onClick={() => setActiveSubTab('mistakes')}
++            onClick={() => setActiveSubTab('changelog')}
+             className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center space-x-1.5 ${
+-              activeSubTab === 'mistakes' 
++              activeSubTab === 'changelog' 
+                 ? 'bg-slate-800 text-indigo-400 shadow-sm font-black' 
+                 : 'text-slate-500 hover:text-slate-300'
+             }`}
+           >
+-            <span>?뱛</span>
+-            <span>?꾩껜 ?ㅻ떟 酉?/span>
++            <span>?뱶</span>
++            <span>蹂寃??대젰 (Change Log)</span>
+           </button>
+         </div>
+       )}
+@@ -334,158 +317,97 @@ export const AdminPanel: React.FC = () => {
+         </div>
+       )}
+ 
+-      {/* ?? ??2: ?꾩껜 ?ㅻ떟 酉????? */}
+-      {activeSubTab === 'mistakes' && !isLoading && !error && (
+-        <div className="space-y-4">
+-          {/* ?숈깮 ?꾪꽣 */}
+-          <div className="flex items-center space-x-2 bg-slate-900 border border-slate-800 p-3 rounded-2xl">
+-            <span className="text-[11px] text-slate-400 font-bold flex-none">?뫀 ?숈깮 ?꾪꽣</span>
+-            <select
+-              value={filterStudent}
+-              onChange={e => setFilterStudent(e.target.value)}
+-              className="flex-1 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-850 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+-            >
+-              <option value="all">?꾩껜 ?숈깮 ({allMistakes.length}媛?</option>
+-              {Array.from(new Set(allMistakes.map(m => m.userId).filter(Boolean) as string[]))
+-                .map(uid => {
+-                  const name = profilesMap[uid] || uid.slice(0, 8);
+-                  const cnt = allMistakes.filter(m => m.userId === uid).length;
+-                  return <option key={uid} value={uid}>{name} ({cnt}媛?</option>;
+-                })}
+-            </select>
++      {/* ?? ??2: 蹂寃??대젰 (Change Log) ???? */}
++      {activeSubTab === 'changelog' && (
++        <div className="space-y-6 animate-scale-up">
++          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
++            <div className="flex items-center space-x-2">
++              <span className="text-base">?뱥</span>
++              <h3 className="font-extrabold text-white text-sm">?붿퓼?ㅼ닔???ㅻ떟?대━??蹂寃??대젰</h3>
++            </div>
++            <p className="text-xs text-slate-400 leading-relaxed">
++              蹂??좏뵆由ъ??댁뀡??由대━利?踰꾩쟾蹂??낅뜲?댄듃 ?댁뿭 諛??듭떖 媛쒖꽑 ?ы빆???뺤씤?????덉뒿?덈떎.
++            </p>
+           </div>
+ 
+-          {/* ?ㅻ떟 移대뱶 洹몃━??(?대?吏 ?꾨㈃ ?쒓굅 諛?珥덉뒳由?硫뷀? 援ъ“ 蹂寃? */}
+-          {allMistakes.filter(m => filterStudent === 'all' || m.userId === filterStudent).length === 0 ? (
+-            <div className="py-12 text-center text-slate-500 text-xs">?깅줉???ㅻ떟???놁뒿?덈떎.</div>
+-          ) : (
+-            <div className="grid gap-3 sm:grid-cols-2">
+-              {allMistakes
+-                .filter(m => filterStudent === 'all' || m.userId === filterStudent)
+-                .map(entry => {
+-                  const studentName = entry.userId ? (profilesMap[entry.userId] || entry.userId.slice(0, 8)) : undefined;
+-                  return (
+-                    <div
+-                      key={entry.id}
+-                      onClick={() => setPreviewEntry(entry)}
+-                      className="group bg-slate-900/50 hover:bg-slate-900 border border-slate-800 hover:border-indigo-500/30 rounded-2xl p-4 cursor-pointer transition-all active:scale-[0.98] space-y-3 shadow-sm flex flex-col justify-between"
+-                    >
+-                      {/* 移대뱶 ?ㅻ뜑 (?대쫫 & ?좎쭨) */}
+-                      <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+-                        {studentName && (
+-                          <span className="font-bold text-indigo-400">?뫀 {studentName}</span>
+-                        )}
+-                        <span className="text-slate-500">{formatDate(entry.date)}</span>
+-                      </div>
+-
+-                      {/* 臾몄젣 ??댄? */}
+-                      <div className="text-xs font-bold text-white leading-normal line-clamp-2 min-h-[32px] group-hover:text-indigo-300 transition-colors">
+-                        <LaTeXRenderer 
+-                          text={entry.title} 
+-                          className="text-white font-bold text-xs"
+-                        />
+-                      </div>
+-
+-                      {/* 移대뱶 ?명꽣 (怨쇰ぉ, ?⑥썝, 遺꾩꽍?꾨즺 ?щ? 諛곗?) */}
+-                      <div className="flex items-center justify-between pt-2 border-t border-slate-850/80">
+-                        <div className="flex items-center space-x-1.5 overflow-hidden">
+-                          {entry.grade && (
+-                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-600/10 text-emerald-400 border border-emerald-500/20 font-extrabold flex-none">
+-                              {entry.grade}
+-                            </span>
+-                          )}
+-                          {entry.chapter && (
+-                            <span className="text-[9px] text-slate-500 truncate font-semibold">
+-                              ?뱦 {entry.chapter}
+-                            </span>
+-                          )}
+-                        </div>
+-                        {!entry.analysis ? (
+-                          <span className="text-[9px] text-amber-400 font-bold flex-none flex items-center bg-amber-400/5 px-2 py-0.5 rounded-full border border-amber-400/10">
+-                            <span className="w-1 h-1 rounded-full bg-amber-400 mr-1.5 animate-pulse"></span>誘몄셿猷?-                          </span>
+-                        ) : (
+-                          <span className="text-[9px] text-indigo-400 font-bold flex-none bg-indigo-500/5 px-2 py-0.5 rounded-full border border-indigo-500/10">
+-                            ??吏꾨떒??-                          </span>
+-                        )}
+-                      </div>
+-                    </div>
+-                  );
+-                })}
++          <div className="relative border-l border-slate-800 pl-6 ml-3 space-y-8">
++            {/* Version 1.8.4 */}
++            <div className="relative">
++              <div className="absolute -left-[33px] top-1.5 w-4 h-4 rounded-full bg-indigo-500 border-4 border-slate-950" />
++              <div className="space-y-2">
++                <div className="flex items-center space-x-2">
++                  <span className="text-xs font-black px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
++                    v1.8.4
++                  </span>
++                  <span className="text-[10px] text-slate-500 font-bold">2026.07.07</span>
++                </div>
++                <h4 className="font-bold text-white text-xs">二쇨컙 由щ뜑蹂대뱶 濡ㅼ삤踰?諛?移대뱶 ?덉씠?꾩썐 ?щ┝??/h4>
++                <ul className="text-xs text-slate-400 list-disc list-inside space-y-1.5 pl-1 leading-relaxed">
++                  <li><strong>二쇨컙 MVP 梨뷀뵾??諛곕꼫</strong>: 湲덉＜ 1???먯닔媛 0?먯씪 ??吏?쒖＜ ?곗듅???뺣낫濡??먮룞 ?댁썡?섎뒗 ?덉쟾??濡쒖쭅 ?묒옱</li>
++                  <li><strong>移대뱶 ?덉씠?꾩썐 ?⑥텞</strong>: ?ㅻ떟 移대뱶 ???ㅼ닔 吏?먭낵 ?숈깮 ?梨??섎┰ 移몄쓣 ?⑥씪 ?됱쑝濡?異뺤냼?섏뿬 紐⑤컮??媛?쒖꽦 洹밸???/li>
++                  <li><strong>媛濡?移대찓??珥ъ쁺 吏??/strong>: ?쒕툝由?紐⑤컮??媛濡?紐⑤뱶 珥ъ쁺 ??議곗옉 ?⑤꼸???곗륫 ?ъ씠?쒕줈 ?먮룞 ?щ같移?/li>
++                  <li><strong>?ㅻ떟 遺꾨쪟 ?쒓렇</strong>: ?ㅻ떟 ?먯씤 遺꾨쪟援곗뿉 ?대え吏? ?띿뒪???쇰꺼 蹂묎린??/li>
++                </ul>
++              </div>
+             </div>
+-          )}
+-        </div>
+-      )}
+ 
+-      {/* 誘몃━蹂닿린 紐⑤떖 */}
+-      {previewEntry && (
+-        <div
+-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+-          onClick={() => setPreviewEntry(null)}
+-        >
+-          <div
+-            className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl"
+-            onClick={e => e.stopPropagation()}
+-          >
+-            <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+-              <div>
++            {/* Version 1.7.5 */}
++            <div className="relative">
++              <div className="absolute -left-[33px] top-1.5 w-4 h-4 rounded-full bg-slate-800 border-4 border-slate-950" />
++              <div className="space-y-2">
+                 <div className="flex items-center space-x-2">
+-                  {previewEntry.userId && (
+-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-600/20 text-indigo-400 border border-indigo-600/30 font-bold">
+-                      ?뫀 {profilesMap[previewEntry.userId] || previewEntry.userId.slice(0, 8)}
+-                    </span>
+-                  )}
+-                  {previewEntry.grade && (
+-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-600/20 text-emerald-400 border border-emerald-600/30 font-bold">
+-                      {previewEntry.grade}
+-                    </span>
+-                  )}
+-                  {previewEntry.chapter && (
+-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-700 text-slate-300 border border-slate-600 font-bold">
+-                      {previewEntry.chapter}
+-                    </span>
+-                  )}
++                  <span className="text-xs font-black px-2 py-0.5 rounded bg-slate-850 text-slate-400 border border-slate-700">
++                    v1.7.5
++                  </span>
++                  <span className="text-[10px] text-slate-500 font-bold">2026.07.05</span>
+                 </div>
+-                <div className="font-bold text-white text-sm mt-1 min-w-0">
+-                  <LaTeXRenderer 
+-                    text={previewEntry.title} 
+-                    className="text-white font-bold text-sm line-clamp-1 inline-block w-full"
+-                  />
+-                </div>
+-                <p className="text-[10px] text-slate-500">{formatDate(previewEntry.date)}</p>
++                <h4 className="font-bold text-white text-xs">AI ?좏뒠釉?留욎땄 媛뺤쓽 異붿쿇 諛??숈깮 媛?대뱶 ?좎꽕</h4>
++                <ul className="text-xs text-slate-400 list-disc list-inside space-y-1.5 pl-1 leading-relaxed">
++                  <li><strong>?좏뒠釉??ㅼ떆媛?留ㅼ묶</strong>: ?ㅻ떟 ?⑥썝遺꾨쪟??湲곕컲???숈썝 ?ъ깮紐⑸줉 55媛?媛뺤쓽 ?λ쭅??異붿쿇 ?쒖뒪???꾩엯</li>
++                  <li><strong>?숈깮 媛?대뱶 ??/strong>: PWA ???ㅼ튂 諛?吏꾨떒 泥댄겕 諛⑸쾿 ?깆쓣 ?댁? ?붿????숈뒿 留ㅻ돱???묒옱</li>
++                  <li><strong>?쒖떆 ?щ㎎ 媛쒖꽑</strong>: ?대뱶誘??⑤꼸 ??媛?낆옄 ?쒓린瑜?吏곴??곸씤 <code className="text-indigo-400">?꾩씠???대쫫)</code> ?뺤떇?쇰줈 ?듭씪</li>
++                  <li><strong>?대찓???먮룞 ?숆린??/strong>: ?좉퇋 媛?????대찓???꾨씫??諛⑹??섎뒗 Supabase trigger function 留덉씠洹몃젅?댁뀡 ?곸슜</li>
++                </ul>
+               </div>
+-              <button onClick={() => setPreviewEntry(null)} className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 active:scale-90 transition-all">??/button>
+             </div>
+-            <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
+-              <img src={previewEntry.imageUrl} alt={previewEntry.title} className="w-full rounded-xl border border-slate-800 object-contain max-h-72" />
+-              {previewEntry.analysis && (
+-                <div className="bg-slate-950 rounded-xl border border-slate-800 p-4">
+-                  <p className="text-[10px] font-bold text-indigo-400 mb-2">?뮕 ?뺤꽍 ???/p>
+-                  <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{previewEntry.analysis.solvingProcess.replace(/\$[^$]+\$/g, '[?섏떇]').slice(0, 300)}{previewEntry.analysis.solvingProcess.length > 300 ? '...' : ''}</p>
+-                </div>
+-              )}
+-              {previewEntry.rootCauses && previewEntry.rootCauses.length > 0 && (
+-                <div className="bg-slate-950 rounded-xl border border-slate-800 p-4 space-y-2">
+-                  <p className="text-[10px] font-bold text-amber-400">?좑툘 ?좏깮???ㅼ닔 ?먯씤</p>
+-                  <div className="flex flex-wrap gap-1.5">
+-                    {previewEntry.rootCauses.map(rc => {
+-                      const opt = ROOT_CAUSE_OPTIONS.find(o => o.id === rc);
+-                      return opt ? (
+-                        <span key={rc} className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-semibold">
+-                          {opt.label}
+-                        </span>
+-                      ) : null;
+-                    })}
+-                  </div>
++
++            {/* Version 1.5.0 */}
++            <div className="relative">
++              <div className="absolute -left-[33px] top-1.5 w-4 h-4 rounded-full bg-slate-800 border-4 border-slate-950" />
++              <div className="space-y-2">
++                <div className="flex items-center space-x-2">
++                  <span className="text-xs font-black px-2 py-0.5 rounded bg-slate-850 text-slate-400 border border-slate-700">
++                    v1.5.0
++                  </span>
++                  <span className="text-[10px] text-slate-500 font-bold">2026.07.03</span>
+                 </div>
+-              )}
+-              {previewEntry.userActionPlan && (
+-                <div className="bg-emerald-950/30 rounded-xl border border-emerald-800/30 p-4">
+-                  <p className="text-[10px] font-bold text-emerald-400 mb-2">?륅툘 ?숈깮 ?섎쭔???梨?/p>
+-                  <p className="text-xs text-slate-300 leading-relaxed">{previewEntry.userActionPlan}</p>
++                <h4 className="font-bold text-white text-xs">?섎룞 ?щ∼ 媛?대뱶?쇱씤 留ㅼ묶 諛?移대찓???ㅽ넗?ъ빱??/h4>
++                <ul className="text-xs text-slate-400 list-disc list-inside space-y-1.5 pl-1 leading-relaxed">
++                  <li><strong>?ㅽ넗?ъ빱??Autofocus)</strong>: ?뚯쫰 ?곗냽 ?먮룞 珥덉젏 諛??곗튂 吏???섎룞珥덉젏(?몃? 留?鍮꾩＜?? 異붽?</li>
++                  <li><strong>議곗? 寃⑹옄-?щ∼ 諛뺤뒪 ?쇱튂</strong>: 4:3 寃⑹옄 鍮꾩쑉怨??щ∼ 湲곕낯 踰붿쐞瑜??뺥솗??留ㅼ묶???먮Ⅴ湲??쇰줈??寃쎄컧</li>
++                  <li><strong>?ㅻ떟 ?곸꽭紐⑤떖 媛쒖꽑</strong>: 吏臾? ??? ?梨???湲멸쾶 ?섏뼱吏???뺣낫瑜???삎 ?묒씠??Accordion) 硫붾돱濡?媛쒗렪</li>
++                  <li><strong>AI ?ㅻ텇瑜??щ∼ 李⑤떒</strong>: AI ?꾩쓽 ?먮Ⅴ湲??꾪꽣留곸쓣 嫄룹뼱?닿퀬, ?ъ슜?먭? ?좏깮???먮낯 ?щ∼ ?곸뿭 洹몃?濡?怨좏솕吏?蹂댁〈</li>
++                </ul>
++              </div>
++            </div>
++
++            {/* Version 1.1.0 */}
++            <div className="relative">
++              <div className="absolute -left-[33px] top-1.5 w-4 h-4 rounded-full bg-slate-800 border-4 border-slate-950" />
++              <div className="space-y-2">
++                <div className="flex items-center space-x-2">
++                  <span className="text-xs font-black px-2 py-0.5 rounded bg-slate-850 text-slate-400 border border-slate-700">
++                    v1.1.0
++                  </span>
++                  <span className="text-[10px] text-slate-500 font-bold">2026.07.01</span>
+                 </div>
+-              )}
++                <h4 className="font-bold text-white text-xs">3?④퀎 蹂듭뒿 ?쇰뱶諛?諛?蹂닿????대룞 ?쒖뒪??/h4>
++                <ul className="text-xs text-slate-400 list-disc list-inside space-y-1.5 pl-1 leading-relaxed">
++                  <li><strong>蹂듭뒿 ?곹깭 吏꾨떒</strong>: 媛쒕퀎 ?ㅻ떟蹂?1~3李?蹂듭뒿 ?좏깮湲?O/X/?? 諛?3???꾨즺 ??蹂듭뒿?꾨즺 ??쑝濡??먮룞 ?대룞</li>
++                  <li><strong>?대━??由ы룷??/strong>: ?뺤꽍 ??닿낵??LaTeX), ?ㅻ떟 遺꾩꽍 媛?대뱶 諛?泥섎갑 ?梨?移대뱶 ?덉씠?꾩썐 怨좊룄??/li>
++                  <li><strong>UI ?몄씠??議????/strong>: 紐⑤컮??Notch 諛붿뿉 ?뚮쭪? ?ㅻ뜑 ??留덉쭊 諛??섎젮??湲?섏뒪紐⑦뵾利??섎떒 諛?蹂듭썝</li>
++                </ul>
++              </div>
+             </div>
+           </div>
+         </div>
+
+commit 2e7385daba9b2a0bd6aa75dd9192de6dabf5afc8
+Author: ReviewNotes Developer <developer@reviewnotes.local>
+Date:   Sun Jul 5 20:42:53 2026 +0900
+
+    fix: Simplify student card display layout, separate Name/ID and remove weekly ranking badges
+
+diff --git a/src/components/AdminPanel.tsx b/src/components/AdminPanel.tsx
+index 135ad79..5e1ff80 100644
+--- a/src/components/AdminPanel.tsx
++++ b/src/components/AdminPanel.tsx
+@@ -28,13 +28,12 @@ export const AdminPanel: React.FC = () => {
+ 
+       if (profilesError) throw profilesError;
+ 
+-      // Build profilesMap: userId -> "?꾩씠???대쫫)" ?먮뒗 "?꾩씠??
++      // Build profilesMap: userId -> ?대쫫(?ㅻ챸) ?먮뒗 ?꾩씠??       const pMap: Record<string, string> = {};
+       (profiles || []).forEach((p: any) => {
+         const username = p.email?.split('@')[0] || p.display_name || p.id.slice(0, 8);
+         const displayName = p.display_name?.trim();
+-        // label = "?꾩씠???대쫫)" ?뺤떇, ?대쫫???녾굅???꾩씠?붿? ?대쫫??媛숈쑝硫??꾩씠?붾쭔
+-        pMap[p.id] = (displayName && displayName !== username) ? `${username}(${displayName})` : username;
++        pMap[p.id] = displayName || username;
+       });
+       setProfilesMap(pMap);
+ 
+@@ -71,9 +70,10 @@ export const AdminPanel: React.FC = () => {
+       const mondayDate = new Date(mondayKst.getTime() - 9 * 60 * 60 * 1000); // UTC ?좎쭨
+ 
+       // Aggregate per user (stats cards)
+-      const statsMap = new Map<string, AdminUserStat>();
++      const statsMap = new Map<string, AdminUserStat & { displayName?: string; username: string }>();
+ 
+       (profiles || []).forEach((p: any) => {
++        const username = p.email?.split('@')[0] || p.display_name || p.id.slice(0, 8);
+         statsMap.set(p.id, {
+           userId: p.id,
+           email: p.email || '(?대찓???놁쓬)',
+@@ -83,6 +83,8 @@ export const AdminPanel: React.FC = () => {
+           weeklyScore: 0,
+           weeklyTotalCount: 0,
+           weeklyCompletedCount: 0,
++          displayName: p.display_name?.trim() || undefined,
++          username: username,
+         });
+       });
+ 
+@@ -243,10 +245,7 @@ export const AdminPanel: React.FC = () => {
+           {stats.length === 0 ? (
+             <div className="py-10 text-center text-slate-500 text-sm">媛?낆옄媛 ?놁뒿?덈떎.</div>
+           ) : (
+-            stats.map((user, index) => {
+-              const displayLabel = profilesMap[user.userId] || user.email;
+-              const avatarChar = (displayLabel || 'U').charAt(0).toUpperCase();
+-
++            stats.map((user) => {
+               const isEmailValid = user.email && user.email.includes('@');
+               const activeNotes = user.mistakeCount - user.completedCount;
+               const completionRate = user.mistakeCount > 0
+@@ -262,16 +261,17 @@ export const AdminPanel: React.FC = () => {
+                   <div className="flex items-center space-x-3">
+                     {/* Avatar */}
+                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-600 to-indigo-800 flex items-center justify-center text-white font-black text-base flex-none shadow-lg shadow-indigo-900/30">
+-                      {avatarChar}
++                      {((user as any).displayName || (user as any).username || 'U').charAt(0).toUpperCase()}
+                     </div>
+                     <div className="flex-1 min-w-0">
+                       <div className="flex items-center space-x-2">
+-                        <span className="font-bold text-white text-sm truncate">{displayLabel}</span>
+-                        <span className="text-[10px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded-full border border-amber-500/20 font-bold">
+-                          ?몣 二쇨컙 {index + 1}??+                        <span className="font-extrabold text-white text-sm truncate">
++                          {(user as any).displayName || (user as any).username}
+                         </span>
+                       </div>
+-                      <span className="text-[11px] text-slate-500 truncate block">{isEmailValid ? user.email : '(?대찓???뺣낫 ?놁쓬)'}</span>
++                      <span className="text-[10px] text-slate-400 truncate block mt-0.5">
++                        {(user as any).displayName ? `?꾩씠?? ${(user as any).username}` : (isEmailValid ? user.email : '(?대찓???뺣낫 ?놁쓬)')}
++                      </span>
+                     </div>
+                     {/* Weekly Score and Last Activity */}
+                     <div className="text-right flex-none pl-3 border-l border-slate-800/80 space-y-1">
+
+commit 099d4773b444c1194ebf2614299b81179b4595d2
+Author: ReviewNotes Developer <developer@reviewnotes.local>
+Date:   Sun Jul 5 20:40:50 2026 +0900
+
+    feat: Implement student ID privacy masking and enable weekly score ranking and indicators in AdminPanel
+
+diff --git a/src/components/AdminPanel.tsx b/src/components/AdminPanel.tsx
+index 6c6070a..135ad79 100644
+--- a/src/components/AdminPanel.tsx
++++ b/src/components/AdminPanel.tsx
+@@ -62,6 +62,14 @@ export const AdminPanel: React.FC = () => {
+       }));
+       setAllMistakes(mappedMistakes);
+ 
++      // ?대쾲二??붿슂??00:00 KST???대떦?섎뒗 UTC 寃쎄퀎??怨꾩궛
++      const now = new Date();
++      const kstTime = new Date(now.getTime() + 9 * 60 * 60 * 1000);
++      const day = kstTime.getUTCDay();
++      const diff = kstTime.getUTCDate() - day + (day === 0 ? -6 : 1);
++      const mondayKst = new Date(Date.UTC(kstTime.getUTCFullYear(), kstTime.getUTCMonth(), diff, 0, 0, 0));
++      const mondayDate = new Date(mondayKst.getTime() - 9 * 60 * 60 * 1000); // UTC ?좎쭨
++
+       // Aggregate per user (stats cards)
+       const statsMap = new Map<string, AdminUserStat>();
+ 
+@@ -72,6 +80,9 @@ export const AdminPanel: React.FC = () => {
+           mistakeCount: 0,
+           completedCount: 0,
+           lastActivity: null,
++          weeklyScore: 0,
++          weeklyTotalCount: 0,
++          weeklyCompletedCount: 0,
+         });
+       });
+ 
+@@ -81,21 +92,37 @@ export const AdminPanel: React.FC = () => {
+ 
+         stat.mistakeCount += 1;
+ 
+-        // Check if all 3 reviews are 'O' ??completed
+         const reviews: string[] = m.reviews || [];
+-        if (reviews.filter(r => r === 'O').length === 3) {
++        const isCompleted = reviews.filter(r => r === 'O').length === 3;
++
++        if (isCompleted) {
+           stat.completedCount += 1;
+         }
+ 
++        // ?대쾲二??깅줉???ㅻ떟 吏묎퀎
++        const mDate = new Date(m.date);
++        if (mDate >= mondayDate) {
++          stat.weeklyTotalCount += 1;
++          if (isCompleted) {
++            stat.weeklyCompletedCount += 1;
++          }
++        }
++
+         // Track latest activity date
+         if (!stat.lastActivity || m.date > stat.lastActivity) {
+           stat.lastActivity = m.date;
+         }
+       });
+ 
+-      // Sort: most mistakes first
++      // 媛??좎?蹂?二쇨컙 ?먯닔 ?곗텧
++      statsMap.forEach((stat) => {
++        const rate = stat.weeklyTotalCount > 0 ? (stat.weeklyCompletedCount / stat.weeklyTotalCount) : 0;
++        stat.weeklyScore = (stat.weeklyCompletedCount * 10) + (rate * 100);
++      });
++
++      // Sort: 二쇨컙 蹂듭뒿 ??궧 ?먯닔 ?믪? ???뺣젹
+       const sorted = Array.from(statsMap.values()).sort(
+-        (a, b) => b.mistakeCount - a.mistakeCount
++        (a, b) => b.weeklyScore - a.weeklyScore
+       );
+ 
+       setStats(sorted);
+@@ -240,18 +267,29 @@ export const AdminPanel: React.FC = () => {
+                     <div className="flex-1 min-w-0">
+                       <div className="flex items-center space-x-2">
+                         <span className="font-bold text-white text-sm truncate">{displayLabel}</span>
+-                        <span className="text-[10px] bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded-full border border-slate-700">
+-                          #{index + 1}
++                        <span className="text-[10px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded-full border border-amber-500/20 font-bold">
++                          ?몣 二쇨컙 {index + 1}??                         </span>
+                       </div>
+                       <span className="text-[11px] text-slate-500 truncate block">{isEmailValid ? user.email : '(?대찓???뺣낫 ?놁쓬)'}</span>
+                     </div>
+-                    {/* Last Activity */}
+-                    <div className="text-right flex-none">
+-                      <span className="text-[10px] text-slate-500 block">留덉?留??쒕룞</span>
+-                      <span className="text-[11px] text-slate-400 font-medium">
+-                        {user.lastActivity ? formatDate(user.lastActivity) : '??}
+-                      </span>
++                    {/* Weekly Score and Last Activity */}
++                    <div className="text-right flex-none pl-3 border-l border-slate-800/80 space-y-1">
++                      <div>
++                        <span className="text-[9px] text-slate-500 block leading-none">二쇨컙 ?ㅼ퐫??/span>
++                        <span className="text-xs font-black text-amber-400 leading-tight block">
++                          {Math.round(user.weeklyScore)}??+                        </span>
++                        <span className="text-[8px] text-slate-500 block leading-none mt-0.5">
++                          ({user.weeklyCompletedCount}媛??꾨즺 / {user.weeklyTotalCount}媛??깅줉)
++                        </span>
++                      </div>
++                      <div className="pt-1 border-t border-slate-850">
++                        <span className="text-[9px] text-slate-500 block leading-none">理쒓렐 ?쒕룞</span>
++                        <span className="text-[10px] text-slate-400 font-medium leading-none block mt-0.5">
++                          {user.lastActivity ? formatDate(user.lastActivity).split(' ')[0] : '??}
++                        </span>
++                      </div>
+                     </div>
+                   </div>
+ 
+
+commit 4a6eb04afea00ebd1f0a4c36a935317f8341dd40
+Author: ReviewNotes Developer <developer@reviewnotes.local>
+Date:   Sun Jul 5 20:23:23 2026 +0900
+
+    feat: Add Student Guide tab and refactor Admin Panel to use sub-tabs without mistake images
+
+diff --git a/src/components/AdminPanel.tsx b/src/components/AdminPanel.tsx
+index 0553b6a..6c6070a 100644
+--- a/src/components/AdminPanel.tsx
++++ b/src/components/AdminPanel.tsx
+@@ -14,6 +14,7 @@ export const AdminPanel: React.FC = () => {
+   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
+   const [filterStudent, setFilterStudent] = useState<string>('all');
+   const [previewEntry, setPreviewEntry] = useState<MistakeEntry | null>(null);
++  const [activeSubTab, setActiveSubTab] = useState<'stats' | 'mistakes'>('stats');
+ 
+   const fetchAdminStats = async () => {
+     setIsLoading(true);
+@@ -154,6 +155,34 @@ export const AdminPanel: React.FC = () => {
+         </div>
+       )}
+ 
++      {/* ?쒕툕 ???ㅼ쐞泥?*/}
++      {!isLoading && !error && (
++        <div className="flex border-b border-slate-800/80 p-0.5 bg-slate-950/40 rounded-xl">
++          <button
++            onClick={() => setActiveSubTab('stats')}
++            className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center space-x-1.5 ${
++              activeSubTab === 'stats' 
++                ? 'bg-slate-800 text-amber-400 shadow-sm font-black' 
++                : 'text-slate-500 hover:text-slate-300'
++            }`}
++          >
++            <span>?뱤</span>
++            <span>媛?낆옄 ?꾪솴</span>
++          </button>
++          <button
++            onClick={() => setActiveSubTab('mistakes')}
++            className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center space-x-1.5 ${
++              activeSubTab === 'mistakes' 
++                ? 'bg-slate-800 text-indigo-400 shadow-sm font-black' 
++                : 'text-slate-500 hover:text-slate-300'
++            }`}
++          >
++            <span>?뱛</span>
++            <span>?꾩껜 ?ㅻ떟 酉?/span>
++          </button>
++        </div>
++      )}
++
+       {/* Error State */}
+       {error && (
+         <div className="bg-red-900/20 border border-red-700/40 rounded-2xl p-4 text-center space-y-2">
+@@ -181,117 +210,104 @@ export const AdminPanel: React.FC = () => {
+         </div>
+       )}
+ 
+-      {/* User Stats ??One Card Per User */}
+-      {!isLoading && !error && stats.length === 0 && (
+-        <div className="py-10 text-center text-slate-500 text-sm">
+-          媛?낆옄媛 ?놁뒿?덈떎.
+-        </div>
+-      )}
+-
+-      {!isLoading && !error && stats.length > 0 && (
++      {/* ?? ??1: 媛?낆옄 ?꾪솴 ???? */}
++      {activeSubTab === 'stats' && !isLoading && !error && (
+         <div className="space-y-3">
+-          {stats.map((user, index) => {
+-            const displayLabel = profilesMap[user.userId] || user.email;
+-            // ?꾨컮????쒖떆??湲??(?꾩씠?붿쓽 泥?湲??
+-            const avatarChar = (displayLabel || 'U').charAt(0).toUpperCase();
+-
+-            const isEmailValid = user.email && user.email.includes('@');
+-
+-            const activeNotes = user.mistakeCount - user.completedCount;
+-            const completionRate = user.mistakeCount > 0
+-              ? Math.round((user.completedCount / user.mistakeCount) * 100)
+-              : 0;
+-
+-            return (
+-              <div
+-                key={user.userId}
+-                className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-4 transition-all hover:border-slate-700"
+-              >
+-                {/* User Identity Row */}
+-                <div className="flex items-center space-x-3">
+-                  {/* Avatar */}
+-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-600 to-indigo-800 flex items-center justify-center text-white font-black text-base flex-none shadow-lg shadow-indigo-900/30">
+-                    {avatarChar}
+-                  </div>
+-                  <div className="flex-1 min-w-0">
+-                    <div className="flex items-center space-x-2">
+-                      <span className="font-bold text-white text-sm truncate">{displayLabel}</span>
+-                      <span className="text-[10px] bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded-full border border-slate-700">
+-                        #{index + 1}
++          {stats.length === 0 ? (
++            <div className="py-10 text-center text-slate-500 text-sm">媛?낆옄媛 ?놁뒿?덈떎.</div>
++          ) : (
++            stats.map((user, index) => {
++              const displayLabel = profilesMap[user.userId] || user.email;
++              const avatarChar = (displayLabel || 'U').charAt(0).toUpperCase();
++
++              const isEmailValid = user.email && user.email.includes('@');
++              const activeNotes = user.mistakeCount - user.completedCount;
++              const completionRate = user.mistakeCount > 0
++                ? Math.round((user.completedCount / user.mistakeCount) * 100)
++                : 0;
++
++              return (
++                <div
++                  key={user.userId}
++                  className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-4 transition-all hover:border-slate-700"
++                >
++                  {/* User Identity Row */}
++                  <div className="flex items-center space-x-3">
++                    {/* Avatar */}
++                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-600 to-indigo-800 flex items-center justify-center text-white font-black text-base flex-none shadow-lg shadow-indigo-900/30">
++                      {avatarChar}
++                    </div>
++                    <div className="flex-1 min-w-0">
++                      <div className="flex items-center space-x-2">
++                        <span className="font-bold text-white text-sm truncate">{displayLabel}</span>
++                        <span className="text-[10px] bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded-full border border-slate-700">
++                          #{index + 1}
++                        </span>
++                      </div>
++                      <span className="text-[11px] text-slate-500 truncate block">{isEmailValid ? user.email : '(?대찓???뺣낫 ?놁쓬)'}</span>
++                    </div>
++                    {/* Last Activity */}
++                    <div className="text-right flex-none">
++                      <span className="text-[10px] text-slate-500 block">留덉?留??쒕룞</span>
++                      <span className="text-[11px] text-slate-400 font-medium">
++                        {user.lastActivity ? formatDate(user.lastActivity) : '??}
+                       </span>
+                     </div>
+-                    <span className="text-[11px] text-slate-500 truncate block">{isEmailValid ? user.email : '(?대찓???뺣낫 ?놁쓬)'}</span>
+-                  </div>
+-                  {/* Last Activity */}
+-                  <div className="text-right flex-none">
+-                    <span className="text-[10px] text-slate-500 block">留덉?留??쒕룞</span>
+-                    <span className="text-[11px] text-slate-400 font-medium">
+-                      {user.lastActivity ? formatDate(user.lastActivity) : '??}
+-                    </span>
+                   </div>
+-                </div>
+ 
+-                {/* Stats Row */}
+-                <div className="grid grid-cols-3 gap-2">
+-                  {/* Total Notes */}
+-                  <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 text-center">
+-                    <div className="text-xl font-black text-white">{user.mistakeCount}</div>
+-                    <div className="text-[10px] text-slate-500 font-bold mt-0.5">珥??ㅻ떟?명듃</div>
+-                  </div>
+-                  {/* Active Notes */}
+-                  <div className="bg-indigo-950/50 border border-indigo-800/40 rounded-xl p-3 text-center">
+-                    <div className="text-xl font-black text-indigo-300">{activeNotes}</div>
+-                    <div className="text-[10px] text-indigo-500 font-bold mt-0.5">吏꾪뻾以?/div>
+-                  </div>
+-                  {/* Completed */}
+-                  <div className="bg-emerald-950/50 border border-emerald-800/40 rounded-xl p-3 text-center">
+-                    <div className="text-xl font-black text-emerald-300">{user.completedCount}</div>
+-                    <div className="text-[10px] text-emerald-500 font-bold mt-0.5">蹂듭뒿?꾨즺</div>
+-                  </div>
+-                </div>
+-
+-                {/* Completion Progress Bar */}
+-                {user.mistakeCount > 0 && (
+-                  <div className="space-y-1.5">
+-                    <div className="flex items-center justify-between">
+-                      <span className="text-[10px] text-slate-500 font-bold">蹂듭뒿 吏꾪뻾瑜?/span>
+-                      <span className="text-[10px] font-black text-slate-400">{completionRate}%</span>
++                  {/* Stats Row */}
++                  <div className="grid grid-cols-3 gap-2">
++                    {/* Total Notes */}
++                    <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 text-center">
++                      <div className="text-xl font-black text-white">{user.mistakeCount}</div>
++                      <div className="text-[10px] text-slate-500 font-bold mt-0.5">珥??ㅻ떟?명듃</div>
++                    </div>
++                    {/* Active Notes */}
++                    <div className="bg-indigo-950/50 border border-indigo-800/40 rounded-xl p-3 text-center">
++                      <div className="text-xl font-black text-indigo-300">{activeNotes}</div>
++                      <div className="text-[10px] text-indigo-500 font-bold mt-0.5">吏꾪뻾以?/div>
+                     </div>
+-                    <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+-                      <div
+-                        className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full transition-all"
+-                        style={{ width: `${completionRate}%` }}
+-                      />
++                    {/* Completed */}
++                    <div className="bg-emerald-950/50 border border-emerald-800/40 rounded-xl p-3 text-center">
++                      <div className="text-xl font-black text-emerald-300">{user.completedCount}</div>
++                      <div className="text-[10px] text-emerald-500 font-bold mt-0.5">蹂듭뒿?꾨즺</div>
+                     </div>
+                   </div>
+-                )}
+-              </div>
+-            );
+-          })}
++
++                  {/* Completion Progress Bar */}
++                  {user.mistakeCount > 0 && (
++                    <div className="space-y-1.5">
++                      <div className="flex items-center justify-between">
++                        <span className="text-[10px] text-slate-500 font-bold">蹂듭뒿 吏꾪뻾瑜?/span>
++                        <span className="text-[10px] font-black text-slate-400">{completionRate}%</span>
++                      </div>
++                      <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
++                        <div
++                          className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full transition-all"
++                          style={{ width: `${completionRate}%` }}
++                        />
++                      </div>
++                    </div>
++                  )}
++                </div>
++              );
++            })
++          )}
+         </div>
+       )}
+-      {/* ??????????????????????????????????????????? */}
+-      {/* ?꾩껜 ?ㅻ떟 酉??뱀뀡 */}
+-      {!isLoading && !error && allMistakes.length > 0 && (
+-        <div className="space-y-4 pt-2 border-t border-slate-800">
+-          <div className="flex items-center justify-between">
+-            <h3 className="text-sm font-extrabold text-white flex items-center">
+-              <span className="mr-2">?뱥</span> ?꾩껜 ?ㅻ떟 酉?-              <span className="ml-2 text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full border border-slate-700 font-bold">
+-                {allMistakes.length}媛?-              </span>
+-            </h3>
+-          </div>
+ 
++      {/* ?? ??2: ?꾩껜 ?ㅻ떟 酉????? */}
++      {activeSubTab === 'mistakes' && !isLoading && !error && (
++        <div className="space-y-4">
+           {/* ?숈깮 ?꾪꽣 */}
+-          <div className="flex items-center space-x-2">
+-            <span className="text-[11px] text-slate-500 font-bold flex-none">?뫀 ?숈깮</span>
++          <div className="flex items-center space-x-2 bg-slate-900 border border-slate-800 p-3 rounded-2xl">
++            <span className="text-[11px] text-slate-400 font-bold flex-none">?뫀 ?숈깮 ?꾪꽣</span>
+             <select
+               value={filterStudent}
+               onChange={e => setFilterStudent(e.target.value)}
+-              className="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer"
++              className="flex-1 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-850 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+             >
+-              <option value="all">?꾩껜 ({allMistakes.length}媛?</option>
++              <option value="all">?꾩껜 ?숈깮 ({allMistakes.length}媛?</option>
+               {Array.from(new Set(allMistakes.map(m => m.userId).filter(Boolean) as string[]))
+                 .map(uid => {
+                   const name = profilesMap[uid] || uid.slice(0, 8);
+@@ -301,53 +317,66 @@ export const AdminPanel: React.FC = () => {
+             </select>
+           </div>
+ 
+-          {/* ?ㅻ떟 移대뱶 洹몃━??*/}
+-          <div className="grid gap-3 sm:grid-cols-2">
+-            {allMistakes
+-              .filter(m => filterStudent === 'all' || m.userId === filterStudent)
+-              .map(entry => {
+-                const studentName = entry.userId ? (profilesMap[entry.userId] || entry.userId.slice(0, 8)) : undefined;
+-                return (
+-                  <div
+-                    key={entry.id}
+-                    onClick={() => setPreviewEntry(entry)}
+-                    className="group bg-slate-900/50 hover:bg-slate-900 border border-slate-800 hover:border-indigo-500/30 rounded-2xl overflow-hidden cursor-pointer transition-all active:scale-[0.98]"
+-                  >
+-                    <div className="aspect-[16/9] w-full bg-slate-950 relative overflow-hidden">
+-                      <img src={entry.imageUrl} alt={entry.title} className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-500" />
+-                      {/* ?숈깮 ?대쫫 諛곗? */}
+-                      {studentName && (
+-                        <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-600/90 text-white backdrop-blur-sm flex items-center space-x-1">
+-                          <span>?뫀</span><span>{studentName}</span>
+-                        </div>
+-                      )}
+-                      <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-950/80 backdrop-blur-sm border border-slate-800 text-slate-300">
+-                        {formatDate(entry.date)}
++          {/* ?ㅻ떟 移대뱶 洹몃━??(?대?吏 ?꾨㈃ ?쒓굅 諛?珥덉뒳由?硫뷀? 援ъ“ 蹂寃? */}
++          {allMistakes.filter(m => filterStudent === 'all' || m.userId === filterStudent).length === 0 ? (
++            <div className="py-12 text-center text-slate-500 text-xs">?깅줉???ㅻ떟???놁뒿?덈떎.</div>
++          ) : (
++            <div className="grid gap-3 sm:grid-cols-2">
++              {allMistakes
++                .filter(m => filterStudent === 'all' || m.userId === filterStudent)
++                .map(entry => {
++                  const studentName = entry.userId ? (profilesMap[entry.userId] || entry.userId.slice(0, 8)) : undefined;
++                  return (
++                    <div
++                      key={entry.id}
++                      onClick={() => setPreviewEntry(entry)}
++                      className="group bg-slate-900/50 hover:bg-slate-900 border border-slate-800 hover:border-indigo-500/30 rounded-2xl p-4 cursor-pointer transition-all active:scale-[0.98] space-y-3 shadow-sm flex flex-col justify-between"
++                    >
++                      {/* 移대뱶 ?ㅻ뜑 (?대쫫 & ?좎쭨) */}
++                      <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
++                        {studentName && (
++                          <span className="font-bold text-indigo-400">?뫀 {studentName}</span>
++                        )}
++                        <span className="text-slate-500">{formatDate(entry.date)}</span>
+                       </div>
+-                      {entry.grade && (
+-                        <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-600/80 text-white">
+-                          {entry.grade}
+-                        </div>
+-                      )}
+-                    </div>
+-                    <div className="p-3">
+-                      <div className="text-xs font-bold text-white line-clamp-1 group-hover:text-indigo-400 transition-colors min-w-0">
++
++                      {/* 臾몄젣 ??댄? */}
++                      <div className="text-xs font-bold text-white leading-normal line-clamp-2 min-h-[32px] group-hover:text-indigo-300 transition-colors">
+                         <LaTeXRenderer 
+                           text={entry.title} 
+-                          className="text-white font-bold text-xs line-clamp-1 inline-block w-full"
++                          className="text-white font-bold text-xs"
+                         />
+                       </div>
+-                      {entry.chapter && <p className="text-[10px] text-slate-500 mt-0.5">?뱦 {entry.chapter}</p>}
+-                      {!entry.analysis && (
+-                        <p className="text-[10px] text-amber-400 mt-1 font-medium flex items-center">
+-                          <span className="w-1 h-1 rounded-full bg-amber-400 mr-1 animate-pulse"></span>AI 遺꾩꽍 誘몄셿猷?-                        </p>
+-                      )}
++
++                      {/* 移대뱶 ?명꽣 (怨쇰ぉ, ?⑥썝, 遺꾩꽍?꾨즺 ?щ? 諛곗?) */}
++                      <div className="flex items-center justify-between pt-2 border-t border-slate-850/80">
++                        <div className="flex items-center space-x-1.5 overflow-hidden">
++                          {entry.grade && (
++                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-600/10 text-emerald-400 border border-emerald-500/20 font-extrabold flex-none">
++                              {entry.grade}
++                            </span>
++                          )}
++                          {entry.chapter && (
++                            <span className="text-[9px] text-slate-500 truncate font-semibold">
++                              ?뱦 {entry.chapter}
++                            </span>
++                          )}
++                        </div>
++                        {!entry.analysis ? (
++                          <span className="text-[9px] text-amber-400 font-bold flex-none flex items-center bg-amber-400/5 px-2 py-0.5 rounded-full border border-amber-400/10">
++                            <span className="w-1 h-1 rounded-full bg-amber-400 mr-1.5 animate-pulse"></span>誘몄셿猷?+                          </span>
++                        ) : (
++                          <span className="text-[9px] text-indigo-400 font-bold flex-none bg-indigo-500/5 px-2 py-0.5 rounded-full border border-indigo-500/10">
++                            ??吏꾨떒??+                          </span>
++                        )}
++                      </div>
+                     </div>
+-                  </div>
+-                );
+-              })}
+-          </div>
++                  );
++                })}
++            </div>
++          )}
+         </div>
+       )}
+ 
+
+commit 3d3f44967fdeddaef277040b635f1cf23ebe4194
+Author: ReviewNotes Developer <developer@reviewnotes.local>
+Date:   Sun Jul 5 20:18:24 2026 +0900
+
+    feat: Format Admin user display as ID(Name) and handle missing email fallbacks
+
+diff --git a/src/components/AdminPanel.tsx b/src/components/AdminPanel.tsx
+index 3335d8b..0553b6a 100644
+--- a/src/components/AdminPanel.tsx
++++ b/src/components/AdminPanel.tsx
+@@ -27,13 +27,13 @@ export const AdminPanel: React.FC = () => {
+ 
+       if (profilesError) throw profilesError;
+ 
+-      // Build profilesMap: userId -> { username, displayName, label }
++      // Build profilesMap: userId -> "?꾩씠???대쫫)" ?먮뒗 "?꾩씠??
+       const pMap: Record<string, string> = {};
+       (profiles || []).forEach((p: any) => {
+-        const username = p.email?.split('@')[0] || p.id.slice(0, 8);
++        const username = p.email?.split('@')[0] || p.display_name || p.id.slice(0, 8);
+         const displayName = p.display_name?.trim();
+-        // label = "?대쫫 (?꾩씠??" ?뺤떇, ?대쫫???놁쑝硫??꾩씠?붾쭔
+-        pMap[p.id] = displayName ? `${displayName} (${username})` : username;
++        // label = "?꾩씠???대쫫)" ?뺤떇, ?대쫫???녾굅???꾩씠?붿? ?대쫫??媛숈쑝硫??꾩씠?붾쭔
++        pMap[p.id] = (displayName && displayName !== username) ? `${username}(${displayName})` : username;
+       });
+       setProfilesMap(pMap);
+ 
+@@ -191,8 +191,12 @@ export const AdminPanel: React.FC = () => {
+       {!isLoading && !error && stats.length > 0 && (
+         <div className="space-y-3">
+           {stats.map((user, index) => {
+-            const username = user.email.split('@')[0];
+-            const domain = user.email.includes('@') ? '@' + user.email.split('@')[1] : '';
++            const displayLabel = profilesMap[user.userId] || user.email;
++            // ?꾨컮????쒖떆??湲??(?꾩씠?붿쓽 泥?湲??
++            const avatarChar = (displayLabel || 'U').charAt(0).toUpperCase();
++
++            const isEmailValid = user.email && user.email.includes('@');
++
+             const activeNotes = user.mistakeCount - user.completedCount;
+             const completionRate = user.mistakeCount > 0
+               ? Math.round((user.completedCount / user.mistakeCount) * 100)
+@@ -207,16 +211,16 @@ export const AdminPanel: React.FC = () => {
+                 <div className="flex items-center space-x-3">
+                   {/* Avatar */}
+                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-600 to-indigo-800 flex items-center justify-center text-white font-black text-base flex-none shadow-lg shadow-indigo-900/30">
+-                    {username.charAt(0).toUpperCase()}
++                    {avatarChar}
+                   </div>
+                   <div className="flex-1 min-w-0">
+                     <div className="flex items-center space-x-2">
+-                      <span className="font-bold text-white text-sm truncate">{username}</span>
++                      <span className="font-bold text-white text-sm truncate">{displayLabel}</span>
+                       <span className="text-[10px] bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded-full border border-slate-700">
+                         #{index + 1}
+                       </span>
+                     </div>
+-                    <span className="text-[11px] text-slate-500 truncate block">{domain || user.email}</span>
++                    <span className="text-[11px] text-slate-500 truncate block">{isEmailValid ? user.email : '(?대찓???뺣낫 ?놁쓬)'}</span>
+                   </div>
+                   {/* Last Activity */}
+                   <div className="text-right flex-none">
+
+commit a3d726e786398b0446b46662231d656931c93973
+Author: ReviewNotes Developer <developer@reviewnotes.local>
+Date:   Sun Jul 5 02:08:38 2026 +0900
+
+    fix: render mistake titles with LaTeXRenderer and reorder crop viewfinder buttons to put crop action at the bottom
+
+diff --git a/src/components/AdminPanel.tsx b/src/components/AdminPanel.tsx
+index eb6c41f..3335d8b 100644
+--- a/src/components/AdminPanel.tsx
++++ b/src/components/AdminPanel.tsx
+@@ -3,6 +3,7 @@ import type { AdminUserStat, MistakeEntry } from '../types';
+ import { supabase } from '../services/supabase';
+ import { formatDate } from '../utils/date';
+ import { ROOT_CAUSE_OPTIONS } from '../types';
++import { LaTeXRenderer } from './LaTeXRenderer';
+ 
+ export const AdminPanel: React.FC = () => {
+   const [stats, setStats] = useState<AdminUserStat[]>([]);
+@@ -326,7 +327,12 @@ export const AdminPanel: React.FC = () => {
+                       )}
+                     </div>
+                     <div className="p-3">
+-                      <p className="text-xs font-bold text-white line-clamp-1 group-hover:text-indigo-400 transition-colors">{entry.title}</p>
++                      <div className="text-xs font-bold text-white line-clamp-1 group-hover:text-indigo-400 transition-colors min-w-0">
++                        <LaTeXRenderer 
++                          text={entry.title} 
++                          className="text-white font-bold text-xs line-clamp-1 inline-block w-full"
++                        />
++                      </div>
+                       {entry.chapter && <p className="text-[10px] text-slate-500 mt-0.5">?뱦 {entry.chapter}</p>}
+                       {!entry.analysis && (
+                         <p className="text-[10px] text-amber-400 mt-1 font-medium flex items-center">
+@@ -370,7 +376,12 @@ export const AdminPanel: React.FC = () => {
+                     </span>
+                   )}
+                 </div>
+-                <p className="font-bold text-white text-sm mt-1">{previewEntry.title}</p>
++                <div className="font-bold text-white text-sm mt-1 min-w-0">
++                  <LaTeXRenderer 
++                    text={previewEntry.title} 
++                    className="text-white font-bold text-sm line-clamp-1 inline-block w-full"
++                  />
++                </div>
+                 <p className="text-[10px] text-slate-500">{formatDate(previewEntry.date)}</p>
+               </div>
+               <button onClick={() => setPreviewEntry(null)} className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 active:scale-90 transition-all">??/button>
+
+commit 28fc615bd0dc9069366bf7e2a1a86950ded4946c
+Author: ReviewNotes Developer <developer@reviewnotes.local>
+Date:   Sun Jul 5 01:48:19 2026 +0900
+
+    feat: Show display_name alongside username ID in admin panel and note badges
+
+diff --git a/src/components/AdminPanel.tsx b/src/components/AdminPanel.tsx
+index 85728b3..eb6c41f 100644
+--- a/src/components/AdminPanel.tsx
++++ b/src/components/AdminPanel.tsx
+@@ -18,18 +18,21 @@ export const AdminPanel: React.FC = () => {
+     setIsLoading(true);
+     setError(null);
+     try {
+-      // Fetch all profiles
++      // Fetch all profiles (display_name ?ы븿)
+       const { data: profiles, error: profilesError } = await supabase
+         .from('profiles')
+-        .select('id, email, is_admin')
++        .select('id, email, is_admin, display_name')
+         .order('email', { ascending: true });
+ 
+       if (profilesError) throw profilesError;
+ 
+-      // Build profilesMap
++      // Build profilesMap: userId -> { username, displayName, label }
+       const pMap: Record<string, string> = {};
+       (profiles || []).forEach((p: any) => {
+-        pMap[p.id] = p.email?.split('@')[0] || p.id.slice(0, 8);
++        const username = p.email?.split('@')[0] || p.id.slice(0, 8);
++        const displayName = p.display_name?.trim();
++        // label = "?대쫫 (?꾩씠??" ?뺤떇, ?대쫫???놁쑝硫??꾩씠?붾쭔
++        pMap[p.id] = displayName ? `${displayName} (${username})` : username;
+       });
+       setProfilesMap(pMap);
+ 
+
+commit 9b91046f276e86adfd0010371555f2eb8f357f17
+Author: ReviewNotes Developer <developer@reviewnotes.local>
+Date:   Sat Jul 4 13:13:13 2026 +0900
+
+    feat: Remove AI rootCause/actionPlan in favor of student checkpoints, fix auto-classification state sync, and auto-close modal on save
+
+diff --git a/src/components/AdminPanel.tsx b/src/components/AdminPanel.tsx
+index 5339ce6..85728b3 100644
+--- a/src/components/AdminPanel.tsx
++++ b/src/components/AdminPanel.tsx
+@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
+ import type { AdminUserStat, MistakeEntry } from '../types';
+ import { supabase } from '../services/supabase';
+ import { formatDate } from '../utils/date';
++import { ROOT_CAUSE_OPTIONS } from '../types';
+ 
+ export const AdminPanel: React.FC = () => {
+   const [stats, setStats] = useState<AdminUserStat[]>([]);
+@@ -374,22 +375,25 @@ export const AdminPanel: React.FC = () => {
+             <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
+               <img src={previewEntry.imageUrl} alt={previewEntry.title} className="w-full rounded-xl border border-slate-800 object-contain max-h-72" />
+               {previewEntry.analysis && (
+-                <>
+-                  <div className="bg-slate-950 rounded-xl border border-slate-800 p-4">
+-                    <p className="text-[10px] font-bold text-indigo-400 mb-2">?뮕 ?뺤꽍 ???/p>
+-                    <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{previewEntry.analysis.solvingProcess.replace(/\$[^$]+\$/g, '[?섏떇]').slice(0, 300)}{previewEntry.analysis.solvingProcess.length > 300 ? '...' : ''}</p>
+-                  </div>
+-                  <div className="bg-slate-950 rounded-xl border border-slate-800 p-4">
+-                    <p className="text-[10px] font-bold text-amber-400 mb-2">?뵇 ?由??댁쑀</p>
+-                    <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{previewEntry.analysis.rootCause}</p>
++                <div className="bg-slate-950 rounded-xl border border-slate-800 p-4">
++                  <p className="text-[10px] font-bold text-indigo-400 mb-2">?뮕 ?뺤꽍 ???/p>
++                  <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{previewEntry.analysis.solvingProcess.replace(/\$[^$]+\$/g, '[?섏떇]').slice(0, 300)}{previewEntry.analysis.solvingProcess.length > 300 ? '...' : ''}</p>
++                </div>
++              )}
++              {previewEntry.rootCauses && previewEntry.rootCauses.length > 0 && (
++                <div className="bg-slate-950 rounded-xl border border-slate-800 p-4 space-y-2">
++                  <p className="text-[10px] font-bold text-amber-400">?좑툘 ?좏깮???ㅼ닔 ?먯씤</p>
++                  <div className="flex flex-wrap gap-1.5">
++                    {previewEntry.rootCauses.map(rc => {
++                      const opt = ROOT_CAUSE_OPTIONS.find(o => o.id === rc);
++                      return opt ? (
++                        <span key={rc} className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-semibold">
++                          {opt.label}
++                        </span>
++                      ) : null;
++                    })}
+                   </div>
+-                  {previewEntry.analysis.actionPlan && (
+-                    <div className="bg-slate-950 rounded-xl border border-slate-800 p-4">
+-                      <p className="text-[10px] font-bold text-emerald-400 mb-2">?썳截??듭떖 泥섎갑</p>
+-                      <p className="text-xs text-slate-300 leading-relaxed">{previewEntry.analysis.actionPlan}</p>
+-                    </div>
+-                  )}
+-                </>
++                </div>
+               )}
+               {previewEntry.userActionPlan && (
+                 <div className="bg-emerald-950/30 rounded-xl border border-emerald-800/30 p-4">
+
+commit 228632133716a4000211bb7f43299ade864c0da8
+Author: ReviewNotes Developer <developer@reviewnotes.local>
+Date:   Sat Jul 4 13:01:01 2026 +0900
+
+    feat: Admin can view all students notes with name badge, filter select, and detail preview modal
+
+diff --git a/src/components/AdminPanel.tsx b/src/components/AdminPanel.tsx
+index 784d744..5339ce6 100644
+--- a/src/components/AdminPanel.tsx
++++ b/src/components/AdminPanel.tsx
+@@ -1,19 +1,23 @@
+ import React, { useEffect, useState } from 'react';
+-import type { AdminUserStat } from '../types';
++import type { AdminUserStat, MistakeEntry } from '../types';
+ import { supabase } from '../services/supabase';
+ import { formatDate } from '../utils/date';
+ 
+ export const AdminPanel: React.FC = () => {
+   const [stats, setStats] = useState<AdminUserStat[]>([]);
++  const [allMistakes, setAllMistakes] = useState<MistakeEntry[]>([]);
++  const [profilesMap, setProfilesMap] = useState<Record<string, string>>({});
+   const [isLoading, setIsLoading] = useState(true);
+   const [error, setError] = useState<string | null>(null);
+   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
++  const [filterStudent, setFilterStudent] = useState<string>('all');
++  const [previewEntry, setPreviewEntry] = useState<MistakeEntry | null>(null);
+ 
+   const fetchAdminStats = async () => {
+     setIsLoading(true);
+     setError(null);
+     try {
+-      // Fetch all profiles (admin RLS policy allows this)
++      // Fetch all profiles
+       const { data: profiles, error: profilesError } = await supabase
+         .from('profiles')
+         .select('id, email, is_admin')
+@@ -21,14 +25,38 @@ export const AdminPanel: React.FC = () => {
+ 
+       if (profilesError) throw profilesError;
+ 
+-      // Fetch all mistakes (admin RLS policy allows this)
++      // Build profilesMap
++      const pMap: Record<string, string> = {};
++      (profiles || []).forEach((p: any) => {
++        pMap[p.id] = p.email?.split('@')[0] || p.id.slice(0, 8);
++      });
++      setProfilesMap(pMap);
++
++      // Fetch all mistakes
+       const { data: mistakes, error: mistakesError } = await supabase
+         .from('mistakes')
+-        .select('id, user_id, reviews, date');
++        .select('*')
++        .order('date', { ascending: false });
+ 
+       if (mistakesError) throw mistakesError;
+ 
+-      // Aggregate per user
++      // Map full mistake entries for the ?꾩껜 ?ㅻ떟 酉?+      const mappedMistakes: MistakeEntry[] = (mistakes || []).map((m: any) => ({
++        id: m.id,
++        userId: m.user_id,
++        title: m.title,
++        imageUrl: m.image_url,
++        date: m.date,
++        analysis: m.analysis || undefined,
++        reviews: m.reviews || ['', '', ''],
++        grade: m.grade || undefined,
++        chapter: m.chapter || undefined,
++        rootCauses: m.root_causes || [],
++        userActionPlan: m.user_action_plan || undefined,
++      }));
++      setAllMistakes(mappedMistakes);
++
++      // Aggregate per user (stats cards)
+       const statsMap = new Map<string, AdminUserStat>();
+ 
+       (profiles || []).forEach((p: any) => {
+@@ -233,6 +261,146 @@ export const AdminPanel: React.FC = () => {
+           })}
+         </div>
+       )}
++      {/* ??????????????????????????????????????????? */}
++      {/* ?꾩껜 ?ㅻ떟 酉??뱀뀡 */}
++      {!isLoading && !error && allMistakes.length > 0 && (
++        <div className="space-y-4 pt-2 border-t border-slate-800">
++          <div className="flex items-center justify-between">
++            <h3 className="text-sm font-extrabold text-white flex items-center">
++              <span className="mr-2">?뱥</span> ?꾩껜 ?ㅻ떟 酉?+              <span className="ml-2 text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full border border-slate-700 font-bold">
++                {allMistakes.length}媛?+              </span>
++            </h3>
++          </div>
++
++          {/* ?숈깮 ?꾪꽣 */}
++          <div className="flex items-center space-x-2">
++            <span className="text-[11px] text-slate-500 font-bold flex-none">?뫀 ?숈깮</span>
++            <select
++              value={filterStudent}
++              onChange={e => setFilterStudent(e.target.value)}
++              className="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer"
++            >
++              <option value="all">?꾩껜 ({allMistakes.length}媛?</option>
++              {Array.from(new Set(allMistakes.map(m => m.userId).filter(Boolean) as string[]))
++                .map(uid => {
++                  const name = profilesMap[uid] || uid.slice(0, 8);
++                  const cnt = allMistakes.filter(m => m.userId === uid).length;
++                  return <option key={uid} value={uid}>{name} ({cnt}媛?</option>;
++                })}
++            </select>
++          </div>
++
++          {/* ?ㅻ떟 移대뱶 洹몃━??*/}
++          <div className="grid gap-3 sm:grid-cols-2">
++            {allMistakes
++              .filter(m => filterStudent === 'all' || m.userId === filterStudent)
++              .map(entry => {
++                const studentName = entry.userId ? (profilesMap[entry.userId] || entry.userId.slice(0, 8)) : undefined;
++                return (
++                  <div
++                    key={entry.id}
++                    onClick={() => setPreviewEntry(entry)}
++                    className="group bg-slate-900/50 hover:bg-slate-900 border border-slate-800 hover:border-indigo-500/30 rounded-2xl overflow-hidden cursor-pointer transition-all active:scale-[0.98]"
++                  >
++                    <div className="aspect-[16/9] w-full bg-slate-950 relative overflow-hidden">
++                      <img src={entry.imageUrl} alt={entry.title} className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-500" />
++                      {/* ?숈깮 ?대쫫 諛곗? */}
++                      {studentName && (
++                        <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-600/90 text-white backdrop-blur-sm flex items-center space-x-1">
++                          <span>?뫀</span><span>{studentName}</span>
++                        </div>
++                      )}
++                      <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-950/80 backdrop-blur-sm border border-slate-800 text-slate-300">
++                        {formatDate(entry.date)}
++                      </div>
++                      {entry.grade && (
++                        <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-600/80 text-white">
++                          {entry.grade}
++                        </div>
++                      )}
++                    </div>
++                    <div className="p-3">
++                      <p className="text-xs font-bold text-white line-clamp-1 group-hover:text-indigo-400 transition-colors">{entry.title}</p>
++                      {entry.chapter && <p className="text-[10px] text-slate-500 mt-0.5">?뱦 {entry.chapter}</p>}
++                      {!entry.analysis && (
++                        <p className="text-[10px] text-amber-400 mt-1 font-medium flex items-center">
++                          <span className="w-1 h-1 rounded-full bg-amber-400 mr-1 animate-pulse"></span>AI 遺꾩꽍 誘몄셿猷?+                        </p>
++                      )}
++                    </div>
++                  </div>
++                );
++              })}
++          </div>
++        </div>
++      )}
++
++      {/* 誘몃━蹂닿린 紐⑤떖 */}
++      {previewEntry && (
++        <div
++          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
++          onClick={() => setPreviewEntry(null)}
++        >
++          <div
++            className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl"
++            onClick={e => e.stopPropagation()}
++          >
++            <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
++              <div>
++                <div className="flex items-center space-x-2">
++                  {previewEntry.userId && (
++                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-600/20 text-indigo-400 border border-indigo-600/30 font-bold">
++                      ?뫀 {profilesMap[previewEntry.userId] || previewEntry.userId.slice(0, 8)}
++                    </span>
++                  )}
++                  {previewEntry.grade && (
++                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-600/20 text-emerald-400 border border-emerald-600/30 font-bold">
++                      {previewEntry.grade}
++                    </span>
++                  )}
++                  {previewEntry.chapter && (
++                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-700 text-slate-300 border border-slate-600 font-bold">
++                      {previewEntry.chapter}
++                    </span>
++                  )}
++                </div>
++                <p className="font-bold text-white text-sm mt-1">{previewEntry.title}</p>
++                <p className="text-[10px] text-slate-500">{formatDate(previewEntry.date)}</p>
++              </div>
++              <button onClick={() => setPreviewEntry(null)} className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 active:scale-90 transition-all">??/button>
++            </div>
++            <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
++              <img src={previewEntry.imageUrl} alt={previewEntry.title} className="w-full rounded-xl border border-slate-800 object-contain max-h-72" />
++              {previewEntry.analysis && (
++                <>
++                  <div className="bg-slate-950 rounded-xl border border-slate-800 p-4">
++                    <p className="text-[10px] font-bold text-indigo-400 mb-2">?뮕 ?뺤꽍 ???/p>
++                    <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{previewEntry.analysis.solvingProcess.replace(/\$[^$]+\$/g, '[?섏떇]').slice(0, 300)}{previewEntry.analysis.solvingProcess.length > 300 ? '...' : ''}</p>
++                  </div>
++                  <div className="bg-slate-950 rounded-xl border border-slate-800 p-4">
++                    <p className="text-[10px] font-bold text-amber-400 mb-2">?뵇 ?由??댁쑀</p>
++                    <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{previewEntry.analysis.rootCause}</p>
++                  </div>
++                  {previewEntry.analysis.actionPlan && (
++                    <div className="bg-slate-950 rounded-xl border border-slate-800 p-4">
++                      <p className="text-[10px] font-bold text-emerald-400 mb-2">?썳截??듭떖 泥섎갑</p>
++                      <p className="text-xs text-slate-300 leading-relaxed">{previewEntry.analysis.actionPlan}</p>
++                    </div>
++                  )}
++                </>
++              )}
++              {previewEntry.userActionPlan && (
++                <div className="bg-emerald-950/30 rounded-xl border border-emerald-800/30 p-4">
++                  <p className="text-[10px] font-bold text-emerald-400 mb-2">?륅툘 ?숈깮 ?섎쭔???梨?/p>
++                  <p className="text-xs text-slate-300 leading-relaxed">{previewEntry.userActionPlan}</p>
++                </div>
++              )}
++            </div>
++          </div>
++        </div>
++      )}
+     </div>
+   );
+ };
+
+commit 59058f6c7bfc9969bdfcd3eed6ea9eb6fee60b42
+Author: 8xnvekjq <8xnvekjq@users.noreply.github.com>
+Date:   Fri Jul 3 18:41:08 2026 +0900
+
+    Feat: Add admin dashboard tab with per-user mistake stats (requires Supabase migration)
+
+diff --git a/src/components/AdminPanel.tsx b/src/components/AdminPanel.tsx
+new file mode 100644
+index 0000000..784d744
+--- /dev/null
++++ b/src/components/AdminPanel.tsx
+@@ -0,0 +1,238 @@
++import React, { useEffect, useState } from 'react';
++import type { AdminUserStat } from '../types';
++import { supabase } from '../services/supabase';
++import { formatDate } from '../utils/date';
++
++export const AdminPanel: React.FC = () => {
++  const [stats, setStats] = useState<AdminUserStat[]>([]);
++  const [isLoading, setIsLoading] = useState(true);
++  const [error, setError] = useState<string | null>(null);
++  const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
++
++  const fetchAdminStats = async () => {
++    setIsLoading(true);
++    setError(null);
++    try {
++      // Fetch all profiles (admin RLS policy allows this)
++      const { data: profiles, error: profilesError } = await supabase
++        .from('profiles')
++        .select('id, email, is_admin')
++        .order('email', { ascending: true });
++
++      if (profilesError) throw profilesError;
++
++      // Fetch all mistakes (admin RLS policy allows this)
++      const { data: mistakes, error: mistakesError } = await supabase
++        .from('mistakes')
++        .select('id, user_id, reviews, date');
++
++      if (mistakesError) throw mistakesError;
++
++      // Aggregate per user
++      const statsMap = new Map<string, AdminUserStat>();
++
++      (profiles || []).forEach((p: any) => {
++        statsMap.set(p.id, {
++          userId: p.id,
++          email: p.email || '(?대찓???놁쓬)',
++          mistakeCount: 0,
++          completedCount: 0,
++          lastActivity: null,
++        });
++      });
++
++      (mistakes || []).forEach((m: any) => {
++        const stat = statsMap.get(m.user_id);
++        if (!stat) return;
++
++        stat.mistakeCount += 1;
++
++        // Check if all 3 reviews are 'O' ??completed
++        const reviews: string[] = m.reviews || [];
++        if (reviews.filter(r => r === 'O').length === 3) {
++          stat.completedCount += 1;
++        }
++
++        // Track latest activity date
++        if (!stat.lastActivity || m.date > stat.lastActivity) {
++          stat.lastActivity = m.date;
++        }
++      });
++
++      // Sort: most mistakes first
++      const sorted = Array.from(statsMap.values()).sort(
++        (a, b) => b.mistakeCount - a.mistakeCount
++      );
++
++      setStats(sorted);
++      setLastRefreshed(new Date());
++    } catch (err: any) {
++      setError(err.message || '?곗씠?곕? 遺덈윭?ㅻ뒗 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.');
++    } finally {
++      setIsLoading(false);
++    }
++  };
++
++  useEffect(() => {
++    fetchAdminStats();
++  }, []);
++
++  const totalMistakes = stats.reduce((s, u) => s + u.mistakeCount, 0);
++  const totalCompleted = stats.reduce((s, u) => s + u.completedCount, 0);
++  const totalUsers = stats.length;
++
++  return (
++    <div className="space-y-6">
++      {/* Admin Header */}
++      <div className="flex items-center justify-between">
++        <div>
++          <h2 className="text-lg font-extrabold text-white flex items-center">
++            <span className="mr-2">?몣</span> ?대뱶誘???쒕낫??+          </h2>
++          <p className="text-[11px] text-slate-500 mt-0.5">
++            留덉?留?媛깆떊: {lastRefreshed.toLocaleTimeString('ko-KR')}
++          </p>
++        </div>
++        <button
++          onClick={fetchAdminStats}
++          disabled={isLoading}
++          className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-700 text-xs font-bold text-slate-300 transition-all disabled:opacity-50 flex items-center space-x-1.5"
++        >
++          <span className={isLoading ? 'animate-spin' : ''}>?봽</span>
++          <span>?덈줈怨좎묠</span>
++        </button>
++      </div>
++
++      {/* Summary Cards */}
++      {!isLoading && !error && (
++        <div className="grid grid-cols-3 gap-3">
++          <div className="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-3 text-center">
++            <div className="text-2xl font-black text-white">{totalUsers}</div>
++            <div className="text-[10px] text-slate-400 font-bold mt-0.5">珥?媛?낆옄</div>
++          </div>
++          <div className="bg-indigo-900/30 border border-indigo-700/40 rounded-2xl p-3 text-center">
++            <div className="text-2xl font-black text-indigo-300">{totalMistakes}</div>
++            <div className="text-[10px] text-indigo-400 font-bold mt-0.5">?꾩껜 ?ㅻ떟?명듃</div>
++          </div>
++          <div className="bg-emerald-900/30 border border-emerald-700/40 rounded-2xl p-3 text-center">
++            <div className="text-2xl font-black text-emerald-300">{totalCompleted}</div>
++            <div className="text-[10px] text-emerald-400 font-bold mt-0.5">?꾩껜 蹂듭뒿?꾨즺</div>
++          </div>
++        </div>
++      )}
++
++      {/* Error State */}
++      {error && (
++        <div className="bg-red-900/20 border border-red-700/40 rounded-2xl p-4 text-center space-y-2">
++          <div className="text-2xl">?좑툘</div>
++          <p className="text-sm font-bold text-red-300">?곗씠??濡쒕뱶 ?ㅽ뙣</p>
++          <p className="text-xs text-red-400/80 leading-relaxed">{error}</p>
++          <p className="text-[10px] text-slate-500">Supabase SQL ?먮뵒?곗뿉??admin 留덉씠洹몃젅?댁뀡???ㅽ뻾?덈뒗吏 ?뺤씤??二쇱꽭??</p>
++        </div>
++      )}
++
++      {/* Loading Shimmer */}
++      {isLoading && (
++        <div className="space-y-3">
++          {[1, 2, 3].map(i => (
++            <div key={i} className="bg-slate-800/40 border border-slate-700/40 rounded-2xl p-4 animate-pulse">
++              <div className="flex items-center space-x-3">
++                <div className="w-10 h-10 rounded-full bg-slate-700/60" />
++                <div className="flex-1 space-y-2">
++                  <div className="h-3 bg-slate-700/60 rounded w-2/3" />
++                  <div className="h-2.5 bg-slate-700/40 rounded w-1/3" />
++                </div>
++              </div>
++            </div>
++          ))}
++        </div>
++      )}
++
++      {/* User Stats ??One Card Per User */}
++      {!isLoading && !error && stats.length === 0 && (
++        <div className="py-10 text-center text-slate-500 text-sm">
++          媛?낆옄媛 ?놁뒿?덈떎.
++        </div>
++      )}
++
++      {!isLoading && !error && stats.length > 0 && (
++        <div className="space-y-3">
++          {stats.map((user, index) => {
++            const username = user.email.split('@')[0];
++            const domain = user.email.includes('@') ? '@' + user.email.split('@')[1] : '';
++            const activeNotes = user.mistakeCount - user.completedCount;
++            const completionRate = user.mistakeCount > 0
++              ? Math.round((user.completedCount / user.mistakeCount) * 100)
++              : 0;
++
++            return (
++              <div
++                key={user.userId}
++                className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-4 transition-all hover:border-slate-700"
++              >
++                {/* User Identity Row */}
++                <div className="flex items-center space-x-3">
++                  {/* Avatar */}
++                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-600 to-indigo-800 flex items-center justify-center text-white font-black text-base flex-none shadow-lg shadow-indigo-900/30">
++                    {username.charAt(0).toUpperCase()}
++                  </div>
++                  <div className="flex-1 min-w-0">
++                    <div className="flex items-center space-x-2">
++                      <span className="font-bold text-white text-sm truncate">{username}</span>
++                      <span className="text-[10px] bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded-full border border-slate-700">
++                        #{index + 1}
++                      </span>
++                    </div>
++                    <span className="text-[11px] text-slate-500 truncate block">{domain || user.email}</span>
++                  </div>
++                  {/* Last Activity */}
++                  <div className="text-right flex-none">
++                    <span className="text-[10px] text-slate-500 block">留덉?留??쒕룞</span>
++                    <span className="text-[11px] text-slate-400 font-medium">
++                      {user.lastActivity ? formatDate(user.lastActivity) : '??}
++                    </span>
++                  </div>
++                </div>
++
++                {/* Stats Row */}
++                <div className="grid grid-cols-3 gap-2">
++                  {/* Total Notes */}
++                  <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 text-center">
++                    <div className="text-xl font-black text-white">{user.mistakeCount}</div>
++                    <div className="text-[10px] text-slate-500 font-bold mt-0.5">珥??ㅻ떟?명듃</div>
++                  </div>
++                  {/* Active Notes */}
++                  <div className="bg-indigo-950/50 border border-indigo-800/40 rounded-xl p-3 text-center">
++                    <div className="text-xl font-black text-indigo-300">{activeNotes}</div>
++                    <div className="text-[10px] text-indigo-500 font-bold mt-0.5">吏꾪뻾以?/div>
++                  </div>
++                  {/* Completed */}
++                  <div className="bg-emerald-950/50 border border-emerald-800/40 rounded-xl p-3 text-center">
++                    <div className="text-xl font-black text-emerald-300">{user.completedCount}</div>
++                    <div className="text-[10px] text-emerald-500 font-bold mt-0.5">蹂듭뒿?꾨즺</div>
++                  </div>
++                </div>
++
++                {/* Completion Progress Bar */}
++                {user.mistakeCount > 0 && (
++                  <div className="space-y-1.5">
++                    <div className="flex items-center justify-between">
++                      <span className="text-[10px] text-slate-500 font-bold">蹂듭뒿 吏꾪뻾瑜?/span>
++                      <span className="text-[10px] font-black text-slate-400">{completionRate}%</span>
++                    </div>
++                    <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
++                      <div
++                        className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full transition-all"
++                        style={{ width: `${completionRate}%` }}
++                      />
++                    </div>
++                  </div>
++                )}
++              </div>
++            );
++          })}
++        </div>
++      )}
++    </div>
++  );
++};

@@ -6,13 +6,15 @@ interface BottomNavigationProps {
   setActiveTab: (tab: ActiveTab) => void;
   isAdmin?: boolean;
   onlineUsers: { id: string; display_name: string; username: string }[];
+  onStartReviewSession?: () => void;
 }
 
 export const BottomNavigation: React.FC<BottomNavigationProps> = ({ 
   activeTab, 
   setActiveTab, 
   isAdmin,
-  onlineUsers = []
+  onlineUsers = [],
+  onStartReviewSession
 }) => {
   const [showOnlinePopup, setShowOnlinePopup] = useState(false);
 
@@ -22,7 +24,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
       <div className="absolute -top-3.5 left-3 select-none z-50">
         <button
           onClick={() => setShowOnlinePopup(!showOnlinePopup)}
-          className="px-2.5 py-0.5 rounded-full bg-slate-950/90 border border-slate-800 text-[8px] font-black text-slate-300 hover:text-white flex items-center space-x-1 shadow-md hover:scale-105 active:scale-95 transition-all backdrop-blur-md"
+          className="px-2.5 py-0.5 rounded-full bg-slate-955/90 border border-slate-800 text-[8px] font-black text-slate-300 hover:text-white flex items-center space-x-1 shadow-md hover:scale-105 active:scale-95 transition-all backdrop-blur-md"
         >
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
           <span>Online {onlineUsers.length}</span>
@@ -30,7 +32,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         
         {/* 온라인 사용자 이름 목록 팝업 */}
         {showOnlinePopup && (
-          <div className="absolute bottom-6 left-0 w-44 bg-slate-950/95 border border-slate-800/80 rounded-xl p-3 shadow-2xl backdrop-blur-md space-y-1.5 animate-fade-in">
+          <div className="absolute bottom-6 left-0 w-44 bg-slate-955/95 border border-slate-800/80 rounded-xl p-3 shadow-2xl backdrop-blur-md space-y-1.5 animate-fade-in">
             <div className="flex items-center justify-between border-b border-slate-850 pb-1 text-[8.5px] text-slate-500 font-extrabold select-none">
               <span>공부 중인 친구들</span>
               <span className="text-[7.5px] text-emerald-400">● Live</span>
@@ -50,6 +52,18 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
           </div>
         )}
       </div>
+
+      {/* 복습하기 배지 버튼 (하단 내비바 우측 상단 플로팅) */}
+      {onStartReviewSession && !isAdmin && (
+        <div className="absolute -top-3.5 right-3 select-none z-50">
+          <button
+            onClick={onStartReviewSession}
+            className="px-3 py-0.5 rounded-full bg-gradient-to-r from-indigo-600 to-indigo-500 border border-indigo-500/30 text-[8.5px] font-black text-white hover:from-indigo-500 hover:to-indigo-400 flex items-center space-x-1 shadow-lg shadow-indigo-600/25 hover:scale-105 active:scale-95 transition-all backdrop-blur-md"
+          >
+            <span>📝 복습하기</span>
+          </button>
+        </div>
+      )}
 
       <nav className="h-16 rounded-2xl border border-slate-800/80 bg-slate-900/75 backdrop-blur-lg flex items-center justify-around px-4 shadow-xl shadow-black/40">
         {/* 어드민 계정은 👑 어드민, 학생 계정은 💡 이용안내 탭 노출 */}

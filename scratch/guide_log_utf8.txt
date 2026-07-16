@@ -1,0 +1,521 @@
+﻿commit a990536f7cf56a30b7e7359ccf1afa783d1e4aeb
+Author: 8xnvekjq <8xnvekjq@users.noreply.github.com>
+Date:   Fri Jul 10 19:36:42 2026 +0900
+
+    Fix: Plug synonym matching score leak by limiting score addition to targetChapter-only keys
+
+diff --git a/src/components/StudentGuide.tsx b/src/components/StudentGuide.tsx
+index 0ff08af..54fce4c 100644
+--- a/src/components/StudentGuide.tsx
++++ b/src/components/StudentGuide.tsx
+@@ -25,6 +25,13 @@ export const StudentGuide: React.FC = () => {
+   ];
+ 
+   const changeLogs = [
++    {
++      version: 'v1.10.3',
++      date: '2026.07.10',
++      changes: [
++        '?좎깮??異붿쿇 媛뺤쓽 ?뚭퀬由ъ쬁 ???숈쓽??媛??踰붿쐞 ?꾩텧 踰꾧렇 ?⑥튂 (?좏깮???⑥썝 ?몄쓽 ? 怨쇰ぉ/?⑥썝 媛??以묐났 ?띾뱷 李⑤떒)'
++      ]
++    },
+     {
+       version: 'v1.10.2',
+       date: '2026.07.10',
+
+commit 291f6d6d08f3860985cf600e816a9179e37bf1e9
+Author: 8xnvekjq <8xnvekjq@users.noreply.github.com>
+Date:   Fri Jul 10 19:29:31 2026 +0900
+
+    Fix: Exclude admin (8xnvekjq) and test accounts from leaderboard query views
+
+diff --git a/src/components/StudentGuide.tsx b/src/components/StudentGuide.tsx
+index 0378a70..0ff08af 100644
+--- a/src/components/StudentGuide.tsx
++++ b/src/components/StudentGuide.tsx
+@@ -25,6 +25,13 @@ export const StudentGuide: React.FC = () => {
+   ];
+ 
+   const changeLogs = [
++    {
++      version: 'v1.10.2',
++      date: '2026.07.10',
++      changes: [
++        '二쇨컙 紐낆삁???꾨떦(Leaderboard) 吏묎퀎 ??곸뿉??愿由ъ옄 怨꾩젙(8xnvekjq) 諛??뚯뒪??怨꾩젙(test) ?쒖쇅 ?꾪꽣留??곸슜'
++      ]
++    },
+     {
+       version: 'v1.10.1',
+       date: '2026.07.10',
+
+commit 16a7003bc49a3a8b0168394a04e0910f1583da74
+Author: 8xnvekjq <8xnvekjq@users.noreply.github.com>
+Date:   Fri Jul 10 19:28:33 2026 +0900
+
+    Fix: Exclude single-syllable false positive matches and clean up derivedGrade classification logic in App.tsx
+
+diff --git a/src/components/StudentGuide.tsx b/src/components/StudentGuide.tsx
+index 31cf3fa..0378a70 100644
+--- a/src/components/StudentGuide.tsx
++++ b/src/components/StudentGuide.tsx
+@@ -25,6 +25,14 @@ export const StudentGuide: React.FC = () => {
+   ];
+ 
+   const changeLogs = [
++    {
++      version: 'v1.10.1',
++      date: '2026.07.10',
++      changes: [
++        '?좏뒠釉??숈쁺??媛뺤쓽 留ㅼ묶 ?뚭퀬由ъ쬁 怨좊룄??(??湲??吏㏃? ?뚯젅??媛??留ㅼ묶 諛곗젣)',
++        '?좏뒠釉?怨쇰ぉ(grade) ?먮룞 遺꾨쪟 ??踰붿슜 ?ㅼ썙??怨?, 怨? ?? ?섏〈?깆쓣 諛곗젣?섍퀬 ?ㅻ챸 臾몄꽌(description) 紐낆떆媛믪쓣 湲곕컲?쇰줈 ???媛쒖꽑'
++      ]
++    },
+     {
+       version: 'v1.10.0',
+       date: '2026.07.10',
+
+commit 548fc9be4fcf1a6434a9a86cd602718ecc45ec8a
+Author: 8xnvekjq <8xnvekjq@users.noreply.github.com>
+Date:   Fri Jul 10 19:19:50 2026 +0900
+
+    Chore: Bump version to 1.10.0 and update StudentGuide changelog with new print and database features
+
+diff --git a/src/components/StudentGuide.tsx b/src/components/StudentGuide.tsx
+index 9421081..31cf3fa 100644
+--- a/src/components/StudentGuide.tsx
++++ b/src/components/StudentGuide.tsx
+@@ -25,6 +25,18 @@ export const StudentGuide: React.FC = () => {
+   ];
+ 
+   const changeLogs = [
++    {
++      version: 'v1.10.0',
++      date: '2026.07.10',
++      changes: [
++        '蹂듭뒿 ?꾨즺 蹂닿??????몄뇙??泥댄겕諛뺤뒪 ?묒옱 諛?異쒕젰 媛쒖닔 ?쒖떆 湲곕뒫 援ы쁽',
++        '?몄뇙李?醫낅즺 ?쒖젏???곕룞?섎뒗 ?몄뇙 ?꾨즺 ?곹깭 異붿쟻 諛?紐⑸줉 ???뼥截??몄뇙?꾨즺 諛곗? ?쒖떆',
++        '?몄뇙 諛????붾㈃ ?곸쓽 LaTeX ?섏떇 ???띿뒪???고듃 ?쒖껜 諛??ш린(9.5pt) ?쇨????⑥씪??,
++        '蹂듭뒿 ?꾨즺(1~3李? 泥댄겕 ???ㅽ꺃??諛붾줈 ?섎떒??蹂듭뒿 ?섑뻾 ?쇱옄(?뱟 ???? 湲곕줉 諛??몄텧',
++        '?대뱶誘?怨꾩젙???숈깮 ?ㅻ떟 遺꾨쪟 ?섏젙 沅뚰븳(RLS ?뺤콉) ?⑥튂 諛고룷 諛?Gemini ?먮룞 遺꾨쪟 ?좎뿰??媛쒖꽑',
++        '二쇨컙 蹂듭뒿 梨뷀뵾???곗텧 諛⑹떇???깅줉 湲곗??먯꽌 ?ㅼ젣 蹂듭뒿 ?섑뻾 ?쒓컙(updated_at) 湲곗??쇰줈 怨좊룄??媛쒗렪'
++      ]
++    },
+     {
+       version: 'v1.9.0',
+       date: '2026.07.09',
+
+commit 1ee48cd001b74e6e9e9e6df4aa0f890122efa058
+Author: ReviewNotes Developer <developer@reviewnotes.local>
+Date:   Thu Jul 9 01:32:23 2026 +0900
+
+    Bump version to v1.9.0 and fix header version truncation layout
+
+diff --git a/src/components/StudentGuide.tsx b/src/components/StudentGuide.tsx
+index 9e60f0a..9421081 100644
+--- a/src/components/StudentGuide.tsx
++++ b/src/components/StudentGuide.tsx
+@@ -25,6 +25,16 @@ export const StudentGuide: React.FC = () => {
+   ];
+ 
+   const changeLogs = [
++    {
++      version: 'v1.9.0',
++      date: '2026.07.09',
++      changes: [
++        '??? 誘몄쟻遺꾟뀪, 誘몄쟻遺꾟뀫, ?뺣쪧怨??듦퀎 怨좊벑 ?섑븰 4? ?꾧낵紐??좏뒠釉?媛쒕뀗 媛뺤쓽 諛?梨뺥꽣 留ㅼ묶 ?댁떇 ?꾨즺',
++        '怨듯넻?섑븰1怨??뺣쪧怨??듦퀎??寃쎌슦?????ㅼ씤 留ㅼ묶???꾨꼍 諛⑹??섎뒗 怨쇰ぉ 寃⑸━ 留ㅼ묶 ?뚭퀬由ъ쬁 援ы쁽',
++        'AI 臾몄젣???遺꾩꽍??G.Polya??4?④퀎 臾몄젣 ?닿껐 ?먮쫫 諛??좎깮???뱀쑀??媛뺤쓽 ?붾쾿(?댄닾) ?섎Ⅴ?뚮굹 ?곸슜',
++        '?곷떒 ?ㅻ뜑 ?곸뿭??理쒖떊 ?낅뜲?댄듃 鍮뚮뱶 ?좎쭨媛 醫곸? ?붾㈃?먯꽌 ?섎━???덉씠?꾩썐 踰꾧렇 ?섏젙'
++      ]
++    },
+     {
+       version: 'v1.8.4',
+       date: '2026.07.06',
+
+commit a797aaece7ceeeaa03f8502595e93a22ee38c73b
+Author: ReviewNotes Developer <developer@reviewnotes.local>
+Date:   Mon Jul 6 01:09:24 2026 +0900
+
+    feat: Redesign weekly score ribbon to hover above BottomNavigation and sync changelog/package.json version to 1.8.4
+
+diff --git a/src/components/StudentGuide.tsx b/src/components/StudentGuide.tsx
+index 20d487c..9e60f0a 100644
+--- a/src/components/StudentGuide.tsx
++++ b/src/components/StudentGuide.tsx
+@@ -25,6 +25,14 @@ export const StudentGuide: React.FC = () => {
+   ];
+ 
+   const changeLogs = [
++    {
++      version: 'v1.8.4',
++      date: '2026.07.06',
++      changes: [
++        '二쇨컙 蹂듭뒿??1二?濡ㅼ삤踰?吏?쒖＜ ?곗듅???댁썡 ?쒓린) 諛?怨듬갚湲??먮룞 珥덇린??湲곕뒫 諛고룷',
++        '?붾㈃ ?섎떒 ?ㅻ퉬寃뚯씠???꾩뿉 ?섏쓽 ?ㅼ떆媛?蹂듭뒿 吏꾩쿃??諛?二쇨컙 ?먯닔 ?뚮줈??由щ낯 ?묒옱'
++      ]
++    },
+     {
+       version: 'v1.8.3',
+       date: '2026.07.05',
+
+commit 58d325dee6ccda1f9a1590316cb3958e1bd21926
+Author: ReviewNotes Developer <developer@reviewnotes.local>
+Date:   Sun Jul 5 22:16:17 2026 +0900
+
+    fix: Merge userActionPlan and mistakeDetail into a single row to reduce MistakeCard height
+
+diff --git a/src/components/StudentGuide.tsx b/src/components/StudentGuide.tsx
+index 6183970..20d487c 100644
+--- a/src/components/StudentGuide.tsx
++++ b/src/components/StudentGuide.tsx
+@@ -25,6 +25,15 @@ export const StudentGuide: React.FC = () => {
+   ];
+ 
+   const changeLogs = [
++    {
++      version: 'v1.8.3',
++      date: '2026.07.05',
++      changes: [
++        '?ㅻ떟 移대뱶 ?몃줈 湲몄씠 異붽? ?ㅼ씠?댄듃 媛쒗렪',
++        '?梨??댁슜(醫뚯륫 ?뺣젹)怨?AI 遺꾩꽍 ?붿빟/誘몄셿猷?吏???곗륫 ?뺣젹)瑜??⑥씪 1媛??됱쑝濡?寃고빀?섏뿬 以?媛쒖닔 ?뺤텞',
++        '?щ갚 議곗젅 諛?以꾨컮轅??섏쭅 媛꾧꺽 媛먯냼 議곗젙???듯빐 ?섎떒??遺덊븘?뷀븳 怨듬갚 ?곸뿭 ?쒓굅'
++      ]
++    },
+     {
+       version: 'v1.8.2',
+       date: '2026.07.05',
+
+commit d95660c50ca054fa7c959a978e3f0544822a1464
+Author: ReviewNotes Developer <developer@reviewnotes.local>
+Date:   Sun Jul 5 22:11:48 2026 +0900
+
+    feat: Add text labels to rootCauses emojis inside MistakeCard
+
+diff --git a/src/components/StudentGuide.tsx b/src/components/StudentGuide.tsx
+index d47d5db..6183970 100644
+--- a/src/components/StudentGuide.tsx
++++ b/src/components/StudentGuide.tsx
+@@ -25,6 +25,13 @@ export const StudentGuide: React.FC = () => {
+   ];
+ 
+   const changeLogs = [
++    {
++      version: 'v1.8.2',
++      date: '2026.07.05',
++      changes: [
++        '?ㅻ떟 移대뱶 ?고븯???ㅼ닔 ?먯씤 諛곗????대え吏? ?④퍡 吏곴??곸씤 ??湲??遺꾨쪟???ㅼ닔, 怨듭떇, ?ㅻ룆, 媛쒕뀗, ?꾨왂) 蹂묓빀 異쒕젰'
++      ]
++    },
+     {
+       version: 'v1.8.1',
+       date: '2026.07.05',
+
+commit 07fa60586a10ed871b8db35eee146c6ffac2c5db
+Author: ReviewNotes Developer <developer@reviewnotes.local>
+Date:   Sun Jul 5 22:09:33 2026 +0900
+
+    feat: Optimize MistakeCard layout to display inline reviews, root cause emojis, userActionPlan preview, and remove details navigation
+
+diff --git a/src/components/StudentGuide.tsx b/src/components/StudentGuide.tsx
+index a1adb84..d47d5db 100644
+--- a/src/components/StudentGuide.tsx
++++ b/src/components/StudentGuide.tsx
+@@ -25,6 +25,17 @@ export const StudentGuide: React.FC = () => {
+   ];
+ 
+   const changeLogs = [
++    {
++      version: 'v1.8.1',
++      date: '2026.07.05',
++      changes: [
++        '?ㅻ떟 移대뱶 ?덉씠?꾩썐 怨좊???媛쒗렪 (移대뱶 ?몃줈 湲몄씠 利앹텞 ?듭젣)',
++        '?ㅻ떟 移대뱶 ?대??먯꽌 利됯컖?곸씤 1~3李?蹂듭뒿 吏꾩쿃???꾪솴???뚮뜑留?,
++        '?ㅻ떟 移대뱶 ?고븯?⑥뿉 泥댄겕???ㅼ닔 ?먯씤(Root Cause)???대え吏留?而댄뙥???섏뿴',
++        '?ㅻ떟 移대뱶 ?쒕ぉ ?섎떒??吏곸젒 ?섎┰??"?뮕?梨??댁슜" ??18湲??吏ㅻ쭑 ?몄텧 異붽?',
++        '媛?낆꽦 媛쒖꽑???꾪빐 ?고븯??"?곸꽭蹂닿린 ->" ?띿뒪??留곹겕 ?쒓굅'
++      ]
++    },
+     {
+       version: 'v1.8.0',
+       date: '2026.07.05',
+
+commit 076f75d68c354304f28f2aa076db843fcf0d4cfd
+Author: ReviewNotes Developer <developer@reviewnotes.local>
+Date:   Sun Jul 5 22:02:58 2026 +0900
+
+    feat: Implement Option 1 high-precision AI-driven YouTube lecture matching system
+
+diff --git a/src/components/StudentGuide.tsx b/src/components/StudentGuide.tsx
+index bc69b09..a1adb84 100644
+--- a/src/components/StudentGuide.tsx
++++ b/src/components/StudentGuide.tsx
+@@ -25,6 +25,15 @@ export const StudentGuide: React.FC = () => {
+   ];
+ 
+   const changeLogs = [
++    {
++      version: 'v1.8.0',
++      date: '2026.07.05',
++      changes: [
++        'Gemini 2.5-Flash 湲곕컲 怨좎젙諛 ?숈쁺??媛쒕뀗 留ㅼ묶 湲곗닠 ?꾩엯 (留ㅼ묶瑜?鍮꾩빟???곸듅)',
++        'AI 遺꾩꽍 ???깅줉??紐⑤뱺 媛뺤쓽 ?몃뜳?ㅻ? ?ㅼ떆媛?鍮꾧탳 遺꾩꽍?섏뿬 ?뺥솗??媛뺤쓽 諛???꾨씪???먮룞 ?먯젙',
++        '湲곗〈 遺꾩꽍 ?꾨즺 ?ㅻ떟怨쇱쓽 ?섏쐞 ?명솚?깆쓣 ?꾪빐 ?ㅼ썙??留ㅼ묶(Fallback) 蹂묓뻾 吏??
++      ]
++    },
+     {
+       version: 'v1.7.5',
+       date: '2026.07.05',
+
+commit d62fe8af6d84de8d0c4c732eb9c5140394c5453b
+Author: ReviewNotes Developer <developer@reviewnotes.local>
+Date:   Sun Jul 5 21:46:07 2026 +0900
+
+    feat: Add subject and chapter badges on mistake card bottom-left image overlay
+
+diff --git a/src/components/StudentGuide.tsx b/src/components/StudentGuide.tsx
+index 506fa74..bc69b09 100644
+--- a/src/components/StudentGuide.tsx
++++ b/src/components/StudentGuide.tsx
+@@ -25,6 +25,13 @@ export const StudentGuide: React.FC = () => {
+   ];
+ 
+   const changeLogs = [
++    {
++      version: 'v1.7.5',
++      date: '2026.07.05',
++      changes: [
++        '?ㅻ떟?명듃 移대뱶 ?대?吏 醫뚰븯???곸뿭??怨쇰ぉ(?뱴) 諛??⑥썝(?뱦) ?숆렇?쇰? 諛곗? 異붽?'
++      ]
++    },
+     {
+       version: 'v1.7.4',
+       date: '2026.07.05',
+
+commit a60255b822e0679ae5477298674be3cbabc81e7e
+Author: ReviewNotes Developer <developer@reviewnotes.local>
+Date:   Sun Jul 5 20:47:57 2026 +0900
+
+    feat: Hide weekly champion username, display only displayName and attach weekly MVP badge
+
+diff --git a/src/components/StudentGuide.tsx b/src/components/StudentGuide.tsx
+index e73d358..506fa74 100644
+--- a/src/components/StudentGuide.tsx
++++ b/src/components/StudentGuide.tsx
+@@ -25,6 +25,14 @@ export const StudentGuide: React.FC = () => {
+   ];
+ 
+   const changeLogs = [
++    {
++      version: 'v1.7.4',
++      date: '2026.07.05',
++      changes: [
++        '紐낆삁???꾨떦 諛곕꼫 ???숈깮 ?꾩씠?????諛??대쫫 ?⑤룆 ?쒓린 媛꾩냼??,
++        '紐낆삁???꾨떦 ?ㅻ챸 ?곗륫 二쇨컙 MVP ?곗퐫?덉씠??諛곗? ?곸슜'
++      ]
++    },
+     {
+       version: 'v1.7.3',
+       date: '2026.07.05',
+
+commit 958d6ffab94286fb0dbef76fe186c08a9c8b6b16
+Author: ReviewNotes Developer <developer@reviewnotes.local>
+Date:   Sun Jul 5 20:44:11 2026 +0900
+
+    feat: Release weekly champion leaderboard banner to all users globally
+
+diff --git a/src/components/StudentGuide.tsx b/src/components/StudentGuide.tsx
+index 1850c8a..e73d358 100644
+--- a/src/components/StudentGuide.tsx
++++ b/src/components/StudentGuide.tsx
+@@ -25,6 +25,14 @@ export const StudentGuide: React.FC = () => {
+   ];
+ 
+   const changeLogs = [
++    {
++      version: 'v1.7.3',
++      date: '2026.07.05',
++      changes: [
++        '二쇨컙 理쒕떎 ?ㅻ떟 ?꾨즺 紐낆삁???꾨떦 諛곕꼫 ?꾩껜 ?숈깮?먭쾶 ?꾨㈃ ?ㅽ뵂',
++        '?대뱶誘??⑤꼸 ?숈깮 移대뱶 ?덉씠?꾩썐 ?뺣━ (?쒖쐞 諛곗? ?쒓굅 諛??대쫫/?꾩씠???쒖떆 遺꾨━ 媛쒖꽑)'
++      ]
++    },
+     {
+       version: 'v1.7.2',
+       date: '2026.07.05',
+
+commit 099d4773b444c1194ebf2614299b81179b4595d2
+Author: ReviewNotes Developer <developer@reviewnotes.local>
+Date:   Sun Jul 5 20:40:50 2026 +0900
+
+    feat: Implement student ID privacy masking and enable weekly score ranking and indicators in AdminPanel
+
+diff --git a/src/components/StudentGuide.tsx b/src/components/StudentGuide.tsx
+index d20421a..1850c8a 100644
+--- a/src/components/StudentGuide.tsx
++++ b/src/components/StudentGuide.tsx
+@@ -25,6 +25,15 @@ export const StudentGuide: React.FC = () => {
+   ];
+ 
+   const changeLogs = [
++    {
++      version: 'v1.7.2',
++      date: '2026.07.05',
++      changes: [
++        '紐낆삁???꾨떦 ?숈깮 ?꾩씠??媛쒖씤?뺣낫 蹂댄샇 留덉뒪???먮룞 ?щ㎎???꾩엯 (??3湲???쒖쇅 蹂꾪몴 ?泥?',
++        '?대뱶誘??⑤꼸 ?숈깮 ?뺣젹 湲곗???二쇨컙 ??궧 ?ㅼ퐫???쒖쑝濡??꾧꺽 援먯껜',
++        '?대뱶誘??⑤꼸 ?숈깮 移대뱶???ㅼ떆媛?二쇨컙 ?먯닔 諛곗? ?몄텧 異붽?'
++      ]
++    },
+     {
+       version: 'v1.7.1',
+       date: '2026.07.05',
+
+commit 1f07d9a39216dc4d47fa38d23c782b7b1da0c8b5
+Author: ReviewNotes Developer <developer@reviewnotes.local>
+Date:   Sun Jul 5 20:36:29 2026 +0900
+
+    feat: Add weekly champion banner at the top of Mistakes view for test student canary rollout
+
+diff --git a/src/components/StudentGuide.tsx b/src/components/StudentGuide.tsx
+index 35ebbd7..d20421a 100644
+--- a/src/components/StudentGuide.tsx
++++ b/src/components/StudentGuide.tsx
+@@ -25,6 +25,14 @@ export const StudentGuide: React.FC = () => {
+   ];
+ 
+   const changeLogs = [
++    {
++      version: 'v1.7.1',
++      date: '2026.07.05',
++      changes: [
++        '?ㅻ떟?명듃 理쒖긽??紐낆삁???꾨떦 二쇨컙 理쒕떎 ?ㅻ떟 ?꾨즺 梨뷀뵾??諛곕꼫 異붽? (test ?숈깮 移대굹由??곸슜)',
++        '二쇨컙 蹂듭뒿 ?ㅼ퐫???뚭퀬由ъ쬁 ?먮룞 ?곗텧 DB 酉??곕룞'
++      ]
++    },
+     {
+       version: 'v1.7.0',
+       date: '2026.07.05',
+
+commit 4a6eb04afea00ebd1f0a4c36a935317f8341dd40
+Author: ReviewNotes Developer <developer@reviewnotes.local>
+Date:   Sun Jul 5 20:23:23 2026 +0900
+
+    feat: Add Student Guide tab and refactor Admin Panel to use sub-tabs without mistake images
+
+diff --git a/src/components/StudentGuide.tsx b/src/components/StudentGuide.tsx
+new file mode 100644
+index 0000000..35ebbd7
+--- /dev/null
++++ b/src/components/StudentGuide.tsx
+@@ -0,0 +1,111 @@
++import React from 'react';
++
++export const StudentGuide: React.FC = () => {
++  const guideItems = [
++    {
++      emoji: '?벜',
++      title: '?ㅻ떟 ?ъ쭊 ?깅줉',
++      desc: '?섎떒 移대찓??踰꾪듉???꾨Ⅴ怨??ㅻ떟???뺣? 珥ъ쁺???? ?먰븯??臾몄젣 ?곸뿭留?源붾걫?섍쾶 ?ш컖?뺤쑝濡?議곗젅???ㅻ젮?댁뼱 ??ν븯?몄슂.'
++    },
++    {
++      emoji: '?쨼',
++      title: 'AI ?섑븰 ?대━??吏꾨떒',
++      desc: '?깅줉???ㅻ떟???곗튂?섍퀬 [AI 遺꾩꽍 ?쒖옉?섍린]瑜??꾨Ⅴ硫??섏떇 ?몄떇怨?遺꾨쪟瑜?嫄곗퀜 ?뺤꽍 ??? ?ㅼ닔 ?붿씤, ?梨? 3?④퀎 ?뚰듃媛 ?먮룞 泥섎갑?⑸땲??'
++    },
++    {
++      emoji: '?벟',
++      title: '?좎깮??異붿쿇 媛뺤쓽 ?λ쭅??,
++      desc: '吏꾨떒???⑥썝??留ㅽ븨?섎뒗 ?좎깮?섏쓽 媛쒕뀗 媛쒕뀗 媛뺤쓽 ?좏뒠釉??곸긽 諛??뺥솗??梨뺥꽣 ?쒖옉????꾨씪?? 諛붾줈媛湲곌? 留ㅼ묶?섏뼱 ?쒓났?⑸땲??'
++    },
++    {
++      emoji: '?륅툘',
++      title: '3?④퀎 ?꾩쟻 蹂듭뒿 ?쒖뒪??,
++      desc: '湲곗뼲???먮젮吏??뚮쭏??O/X/??踰꾪듉?쇰줈 蹂듭뒿 ?깃났 ?щ?瑜?泥댄겕?섏꽭?? 3???꾨즺(O ??踰? ???먮룞?쇰줈 蹂듭뒿 ?꾨즺?⑥쑝濡??덉쟾?섍쾶 遺꾨━ 蹂닿??⑸땲??'
++    }
++  ];
++
++  const changeLogs = [
++    {
++      version: 'v1.7.0',
++      date: '2026.07.05',
++      changes: [
++        '?대뱶誘??⑤꼸 ?듦퀎 ??쒕낫??諛??꾩껜 ?ㅻ떟 酉????꾪솚 湲곕뒫 ?쒓났',
++        '?숈깮 ?대찓???뺣낫 ?꾨씫 蹂듦뎄 諛??꾩씠???대쫫) 紐낅떒 ?뺣? ?뺣젹 媛쒖꽑',
++        '?쇰컲 ?숈깮???쒕퉬???ㅻ챸??諛??낅뜲?댄듃 ?덈궡???댁슜?덈궡 ?? 異붽?'
++      ]
++    },
++    {
++      version: 'v1.6.0',
++      date: '2026.07.04',
++      changes: [
++        '怨듯넻?섑븰 55媛?媛뺤쓽 ?좏뒠釉??먮쭑 ??꾨씪???곕룞 媛쒖떆',
++        '?ㅻ떟?명듃 梨뺥꽣 ?곌????ㅼ틪 諛?怨좎젙諛 留ㅼ묶 ?뚭퀬由ъ쬁 ?쒕떇',
++        '?ㅻ떟 ?붿빟 ?곸꽭 ?꾩퐫?붿뼵 而댄룷?뚰듃 異붽? (湲곕낯 ?ロ옒 ?ㅼ젙)'
++      ]
++    },
++    {
++      version: 'v1.5.0',
++      date: '2026.07.02',
++      changes: [
++        '3?④퀎 蹂듭뒿 ?깃났 異붿쟻 ?쒖뒪??O / X / ?? 由대━利?,
++        '留덉뒪???ㅻ떟 ?꾩슜 蹂듭뒿?꾨즺????諛?移댁슫??湲곕뒫 ?묒옱',
++        '?섏떇 源⑥쭚 諛⑹???LaTeX ?뚮뜑留?臾닿껐???꾩쿂由??묒옱'
++      ]
++    }
++  ];
++
++  return (
++    <div className="space-y-6 animate-scale-up pb-20">
++      
++      {/* 1. Header */}
++      <div>
++        <h2 className="text-lg font-extrabold text-white flex items-center">
++          <span className="mr-2">?뮕</span> ?붿퓼?ㅼ닔???ㅻ떟?대━??媛?대뱶
++        </h2>
++        <p className="text-[11px] text-slate-500 mt-0.5">
++          二쇱슂 湲곕뒫 ?ъ슜踰뺢낵 ?낅뜲?댄듃 湲곕줉???쒕늿??蹂????덉뒿?덈떎.
++        </p>
++      </div>
++
++      {/* 2. Main Feature Guides */}
++      <div className="space-y-3">
++        <h3 className="text-xs font-black text-indigo-400 uppercase tracking-wider">二쇱슂 湲곕뒫 ?댁슜踰?/h3>
++        <div className="grid gap-3">
++          {guideItems.map((item, idx) => (
++            <div key={idx} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-start space-x-3.5 shadow-sm">
++              <span className="text-2xl flex-none bg-slate-950 w-11 h-11 rounded-xl flex items-center justify-center border border-slate-800/80">{item.emoji}</span>
++              <div className="space-y-1 min-w-0">
++                <h4 className="text-xs font-bold text-slate-200">{item.title}</h4>
++                <p className="text-[11px] text-slate-400 leading-relaxed">{item.desc}</p>
++              </div>
++            </div>
++          ))}
++        </div>
++      </div>
++
++      {/* 3. Patch Notes / Change Log */}
++      <div className="space-y-3 pt-2 border-t border-slate-800">
++        <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider">?낅뜲?댄듃 ?뚯떇 (Change Log)</h3>
++        <div className="space-y-3">
++          {changeLogs.map((log, idx) => (
++            <div key={idx} className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 space-y-2">
++              <div className="flex items-center justify-between">
++                <span className="text-xs font-black text-emerald-400">{log.version}</span>
++                <span className="text-[10px] text-slate-500 font-bold">{log.date}</span>
++              </div>
++              <ul className="space-y-1.5 list-disc list-inside">
++                {log.changes.map((change, cIdx) => (
++                  <li key={cIdx} className="text-[11px] text-slate-400 leading-relaxed pl-1.5 -indent-4 list-none flex items-start">
++                    <span className="text-emerald-500/80 mr-1.5 select-none">??/span>
++                    <span>{change}</span>
++                  </li>
++                ))}
++              </ul>
++            </div>
++          ))}
++        </div>
++      </div>
++
++    </div>
++  );
++};

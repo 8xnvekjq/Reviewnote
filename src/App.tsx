@@ -885,6 +885,30 @@ function App() {
     }
   };
 
+  // 가장 옛날에 등록되었으나 아직 3회 오답 완료하지 않은 카드부터 복습 세션 시작
+  const handleStartReviewSession = () => {
+    if (!session?.user || mistakes.length === 0) return;
+
+    // 미완료 상태 (O 개수가 3개 미만인 오답 필터링)
+    const uncompleted = mistakes.filter(m => {
+      const oCount = m.reviews?.filter(r => r === 'O').length || 0;
+      return oCount < 3;
+    });
+
+    if (uncompleted.length === 0) {
+      alert('🎉 완벽합니다! 현재 복습할 남은 오답이 없습니다. 모두 완료했습니다! 🐱');
+      return;
+    }
+
+    // 등록 시각(m.date) 기준 오름차순(가장 오래된 것 먼저) 정렬
+    const sorted = [...uncompleted].sort((a, b) => {
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
+    });
+
+    // 가장 오래된 오답을 타겟으로 모달 즉시 활성화
+    setSelectedEntry(sorted[0]);
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setCurrentUser('');
@@ -1407,6 +1431,7 @@ function App() {
           onDeleteMistake={handleDeleteMistake}
           onStartAnalysis={handleStartAnalysis}
           onUpdateReviews={handleUpdateReviews}
+          onSelectEntry={setSelectedEntry}
           onUpdateEntry={(updated) => {
             setMistakes(prev => prev.map(m => m.id === updated.id ? updated : m));
             setSelectedEntry(updated);
@@ -1424,7 +1449,13 @@ function App() {
       )}
 
       {/* Floating Glassmorphic Bottom Navigation Bar */}
-      <BottomNavigation activeTab={activeTab} setActiveTab={setActiveTab} isAdmin={isAdmin} onlineUsers={onlineUsers} />
+      <BottomNavigation 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        isAdmin={isAdmin} 
+        onlineUsers={onlineUsers}
+        onStartReviewSession={handleStartReviewSession}
+      />
 
       {/* 인쇄 전용 2열 세로 구분선 레이아웃 (@media print 시에만 노출) */}
       {printItems && printItems.length > 0 && (

@@ -16,6 +16,7 @@ interface MistakeDetailModalProps {
   onStartAnalysis: (entry: MistakeEntry) => void;
   onUpdateReviews: (id: string, newReviews: ReviewState[]) => void;
   onUpdateEntry: (updated: MistakeEntry) => void;
+  onSelectEntry?: (entry: MistakeEntry | null) => void;
 }
 
 const INITIAL_PHRASES = [
@@ -34,6 +35,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   onStartAnalysis,
   onUpdateReviews,
   onUpdateEntry,
+  onSelectEntry,
 }) => {
   const [revealedHintCount, setRevealedHintCount] = React.useState(0);
   const [loadingText, setLoadingText] = React.useState('수학 문제 분석을 시작합니다...');
@@ -57,6 +59,33 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   const [showProblemText, setShowProblemText] = React.useState(false);
   const [showSolvingProcess, setShowSolvingProcess] = React.useState(true); // Default open for study
   const [showMistakeSummary, setShowMistakeSummary] = React.useState(false); // Default collapsed for self-study
+
+  // ── 다음 오답 이동을 위한 미완료 정렬 목록 연산 ──────────────────────────────
+  const uncompletedSorted = React.useMemo(() => {
+    return allEntries
+      .filter(m => {
+        const oCount = m.reviews?.filter(r => r === 'O').length || 0;
+        return oCount < 3;
+      })
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [allEntries]);
+
+  const currentIndex = React.useMemo(() => {
+    return uncompletedSorted.findIndex(m => m.id === selectedEntry.id);
+  }, [uncompletedSorted, selectedEntry.id]);
+
+  const hasNextEntry = onSelectEntry && currentIndex !== -1 && currentIndex < uncompletedSorted.length - 1;
+  const nextEntry = hasNextEntry ? uncompletedSorted[currentIndex + 1] : null;
+
+  // 카드가 다음 카드로 전환될 때 모달 내부 편집 폼 상태값 동기화
+  React.useEffect(() => {
+    setEditGrade(selectedEntry.grade || '');
+    setEditChapter(selectedEntry.chapter || '');
+    setEditRootCauses(selectedEntry.rootCauses || []);
+    setEditActionPlan(selectedEntry.userActionPlan || '');
+    setRevealedHintCount(0);
+    setShowResult(!isAnalyzing && !!selectedEntry.analysis);
+  }, [selectedEntry.id, selectedEntry.grade, selectedEntry.chapter, selectedEntry.rootCauses, selectedEntry.userActionPlan, isAnalyzing]);
 
   const chaptersForGrade = editGrade ? (MATH_CURRICULUM[editGrade] || []) : [];
 
@@ -1076,6 +1105,18 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             </span>
           </div>
         </div>
+      )}
+
+      {/* Next 화살표 버튼 (우측 화면 플로팅) */}
+      {hasNextEntry && nextEntry && onSelectEntry && (
+        <button
+          onClick={() => onSelectEntry(nextEntry)}
+          className="fixed right-3 sm:right-6 top-1/2 -translate-y-1/2 z-[60] w-12 h-20 sm:w-16 sm:h-28 rounded-2xl bg-indigo-600/90 hover:bg-indigo-500 border border-indigo-500/50 flex flex-col items-center justify-center text-white shadow-2xl shadow-indigo-600/30 active:scale-95 transition-all group animate-fade-in backdrop-blur-sm"
+          title="다음 미완료 오답 복습"
+        >
+          <span className="text-xl sm:text-2xl font-bold group-hover:translate-x-0.5 transition-transform">&rarr;</span>
+          <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider mt-1 select-none">Next</span>
+        </button>
       )}
     </div>
   );
