@@ -62,6 +62,10 @@ const formatMathFallback = (latex: string): string => {
 const sanitizeLatex = (raw: string): string => {
   let s = raw;
 
+  // 0. Convert \[...\] to $$...$$ and \(...\) to $...$
+  s = s.replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$');
+  s = s.replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$');
+
   // 1. Protect $$...$$ blocks
   const displayBlocks: string[] = [];
   s = s.replace(/\$\$([\s\S]*?)\$\$/g, (_match, inner) => {
@@ -99,7 +103,8 @@ const parseMarkdownWithMath = (text: string, isPrintMode = false): string => {
   // 1. Compile Display Math $$...$$
   const displayBlocks: string[] = [];
   s = s.replace(/\$\$([\s\S]*?)\$\$/g, (_match, inner) => {
-    const mathText = inner.trim();
+    // 백슬래시 이중 이스케이프 오염 정화 (\\alpha -> \alpha)
+    const mathText = inner.trim().replace(/\\\\([a-zA-Z])/g, '\\$1');
     try {
       const html = katex.renderToString(mathText, { displayMode: true, throwOnError: true });
       displayBlocks.push(`<div class="my-3 overflow-x-auto">${html}</div>`);
@@ -114,7 +119,8 @@ const parseMarkdownWithMath = (text: string, isPrintMode = false): string => {
   // 2. Compile Inline Math $...$
   const inlineBlocks: string[] = [];
   s = s.replace(/\$([^$]*?)\$/g, (_match, inner) => {
-    const mathText = inner.trim();
+    // 백슬래시 이중 이스케이프 오염 정화 (\\alpha -> \alpha)
+    const mathText = inner.trim().replace(/\\\\([a-zA-Z])/g, '\\$1');
     if (!mathText) return '';
     try {
       const html = katex.renderToString(mathText, { displayMode: false, throwOnError: true });
