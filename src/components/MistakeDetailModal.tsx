@@ -260,6 +260,13 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
           score += 3;
         }
 
+        // [특수 우선순위] 선생님이 촬영하여 직접 업로드한 최신 동영상 가중치 부여
+        // 제목이 "월/일 " (예: 7/15 , 3/7 , 2/21 ) 날짜 포맷으로 시작하는 영상
+        const isTeacherDirectVideo = /^\d{1,2}\/\d{1,2}\s/.test(video.title);
+        if (isTeacherDirectVideo && score > 0) {
+          score += 50;
+        }
+
         // 점수 갱신
         if (score > maxScore) {
           maxScore = score;
