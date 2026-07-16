@@ -53,12 +53,12 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         )}
       </div>
 
-      {/* 복습하기 배지 버튼 (하단 내비바 우측 상단 플로팅) */}
+      {/* 복습하기 배지 버튼 (하단 내비바 우측 상단 플로팅 + 네온 글로우 펄스 효과) */}
       {onStartReviewSession && (
         <div className="absolute -top-3.5 right-3 select-none z-50">
           <button
             onClick={onStartReviewSession}
-            className="px-3 py-0.5 rounded-full bg-gradient-to-r from-indigo-600 to-indigo-500 border border-indigo-500/30 text-[8.5px] font-black text-white hover:from-indigo-500 hover:to-indigo-400 flex items-center space-x-1 shadow-lg shadow-indigo-600/25 hover:scale-105 active:scale-95 transition-all backdrop-blur-md"
+            className="px-3 py-0.5 rounded-full bg-gradient-to-r from-indigo-600 to-indigo-500 border border-indigo-400/50 text-[8.5px] font-black text-white hover:from-indigo-500 hover:to-indigo-400 flex items-center space-x-1 shadow-[0_0_14px_rgba(99,102,241,0.85)] hover:shadow-[0_0_20px_rgba(99,102,241,1)] hover:scale-105 active:scale-95 transition-all backdrop-blur-md animate-pulse"
           >
             <span>📝 복습하기</span>
           </button>

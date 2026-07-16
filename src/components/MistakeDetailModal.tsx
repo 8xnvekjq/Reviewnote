@@ -17,6 +17,7 @@ interface MistakeDetailModalProps {
   onUpdateReviews: (id: string, newReviews: ReviewState[]) => void;
   onUpdateEntry: (updated: MistakeEntry) => void;
   onSelectEntry?: (entry: MistakeEntry | null) => void;
+  isReviewSession?: boolean;
 }
 
 const INITIAL_PHRASES = [
@@ -36,6 +37,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   onUpdateReviews,
   onUpdateEntry,
   onSelectEntry,
+  isReviewSession = false,
 }) => {
   const [revealedHintCount, setRevealedHintCount] = React.useState(0);
   const [loadingText, setLoadingText] = React.useState('수학 문제 분석을 시작합니다...');
@@ -1107,15 +1109,15 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
         </div>
       )}
 
-      {/* Next 화살표 버튼 (우측 화면 플로팅) */}
-      {hasNextEntry && nextEntry && onSelectEntry && (
+      {/* Next 화살표 버튼 (복습하기 세션 때만 우측 스크린 하단에 플로팅 + 반투명화 및 컴팩트화) */}
+      {isReviewSession && hasNextEntry && nextEntry && onSelectEntry && (
         <button
           onClick={() => onSelectEntry(nextEntry)}
-          className="fixed right-3 sm:right-6 top-1/2 -translate-y-1/2 z-[60] w-12 h-20 sm:w-16 sm:h-28 rounded-2xl bg-indigo-600/90 hover:bg-indigo-500 border border-indigo-500/50 flex flex-col items-center justify-center text-white shadow-2xl shadow-indigo-600/30 active:scale-95 transition-all group animate-fade-in backdrop-blur-sm"
+          className="fixed right-3 sm:right-6 top-[62%] -translate-y-1/2 z-[60] w-9 h-14 sm:w-11 sm:h-18 rounded-xl bg-indigo-950/30 hover:bg-indigo-600 border border-indigo-500/20 text-white/40 hover:text-white shadow-lg active:scale-95 transition-all group animate-fade-in backdrop-blur-sm opacity-30 hover:opacity-100"
           title="다음 미완료 오답 복습"
         >
-          <span className="text-xl sm:text-2xl font-bold group-hover:translate-x-0.5 transition-transform">&rarr;</span>
-          <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider mt-1 select-none">Next</span>
+          <span className="text-base sm:text-lg font-bold group-hover:translate-x-0.5 transition-transform">&rarr;</span>
+          <span className="text-[7.5px] sm:text-[8px] font-black uppercase tracking-wider mt-0.5 select-none">Next</span>
         </button>
       )}
     </div>

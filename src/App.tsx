@@ -50,6 +50,8 @@ function App() {
   const [peerActivities, setPeerActivities] = useState<any[]>([]);
   // 실시간 접속(활동) 중인 학생 목록
   const [onlineUsers, setOnlineUsers] = useState<any[]>([]);
+  // 현재 "복습하기" 퀵 버튼을 눌러 순차 복습 세션을 진행 중인지 여부
+  const [isReviewSession, setIsReviewSession] = useState<boolean>(false);
   // 인쇄할 완료 오답 리스트 임시 보관 상태
   const [printItems, setPrintItems] = useState<MistakeEntry[] | null>(null);
   // 개별 오답의 인쇄 형식 상태 (id -> true: 텍스트로 인쇄, false/undefined: 이미지로 인쇄)
@@ -906,6 +908,7 @@ function App() {
     });
 
     // 가장 오래된 오답을 타겟으로 모달 즉시 활성화
+    setIsReviewSession(true);
     setSelectedEntry(sorted[0]);
   };
 
@@ -1153,7 +1156,10 @@ function App() {
                 
                 return new Date(b.date).getTime() - new Date(a.date).getTime();
               })}
-            onSelectEntry={(entry) => setSelectedEntry(entry)}
+            onSelectEntry={(entry) => {
+              setIsReviewSession(false);
+              setSelectedEntry(entry);
+            }}
             onDeleteMistake={handleDeleteMistake}
             onAddClick={() => setActiveTab('camera')}
             title="나의 오답노트"
@@ -1178,7 +1184,10 @@ function App() {
               }
               return false;
             })}
-            onSelectEntry={(entry) => setSelectedEntry(entry)}
+            onSelectEntry={(entry) => {
+              setIsReviewSession(false);
+              setSelectedEntry(entry);
+            }}
             onDeleteMistake={handleDeleteMistake}
             onAddClick={() => setActiveTab('camera')}
             onPrintClick={handlePrintCompleted}
@@ -1427,11 +1436,15 @@ function App() {
           peerActivities={peerActivities}
           isAnalyzing={isAnalyzing}
           youtubeLectures={youtubeLectures}
-          onClose={() => setSelectedEntry(null)}
+          onClose={() => {
+            setIsReviewSession(false);
+            setSelectedEntry(null);
+          }}
           onDeleteMistake={handleDeleteMistake}
           onStartAnalysis={handleStartAnalysis}
           onUpdateReviews={handleUpdateReviews}
           onSelectEntry={setSelectedEntry}
+          isReviewSession={isReviewSession}
           onUpdateEntry={(updated) => {
             setMistakes(prev => prev.map(m => m.id === updated.id ? updated : m));
             setSelectedEntry(updated);
