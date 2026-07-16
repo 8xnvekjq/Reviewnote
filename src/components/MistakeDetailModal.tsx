@@ -1114,36 +1114,19 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
       </div>
 
-      {/* 이미지 전체화면 확대 모달 (두 손가락 Pinch-to-zoom 제스처 지원) */}
+      {/* 이미지 전체화면 확대 모달 (두 손가락 Pinch-to-zoom 제스처 지원 + 풀스크린 오버레이 방식) */}
       {isZoomOpen && (
         <div 
-          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex flex-col justify-between pt-14 pb-4 px-4 animate-fade-in"
+          className="fixed inset-0 z-50 bg-black/98 flex items-center justify-center animate-fade-in"
           onClick={() => {
             setIsZoomOpen(false);
             setScale(1);
             setPosition({ x: 0, y: 0 });
           }}
         >
-          {/* Top Bar (모바일 노치 안겹치게 세이프 마진 확보) */}
-          <div className="flex items-center justify-between z-10 w-full pl-2 select-none">
-            <span className="text-[10px] font-bold text-slate-400">
-              👋 두 손가락으로 화면을 벌려 자유롭게 확대해 보세요.
-            </span>
-            <button 
-              onClick={() => {
-                setIsZoomOpen(false);
-                setScale(1);
-                setPosition({ x: 0, y: 0 });
-              }}
-              className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-white hover:bg-slate-800 text-lg transition-all"
-            >
-              ✕
-            </button>
-          </div>
-
-          {/* Image Container (Touch 제스처 이벤트 바인딩) */}
+          {/* Image Container (Touch 제스처 이벤트 바인딩 - 스크린 100% 꽉 채우기) */}
           <div 
-            className="flex-1 w-full overflow-hidden flex items-center justify-center relative touch-none select-none"
+            className="absolute inset-0 flex items-center justify-center touch-none select-none"
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
@@ -1152,16 +1135,35 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             <img 
               src={selectedEntry.imageUrl} 
               alt="확대된 문제 이미지" 
-              className="rounded-lg select-none max-w-full max-h-[80vh] object-contain transition-transform duration-75 pointer-events-none"
+              className="max-w-full max-h-full object-contain transition-transform duration-75 pointer-events-none"
               style={{
                 transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
               }}
             />
           </div>
+
+          {/* Top Bar Floating Controls (이미지 위에 공중 플로팅 배치 - 노치 세이프 여백 pt-12) */}
+          <div className="absolute top-0 left-0 right-0 z-10 flex items-start justify-between p-4 pt-12 sm:pt-6 select-none pointer-events-none">
+            <div className="bg-slate-950/80 border border-slate-850 px-3 py-1.5 rounded-full backdrop-blur-md shadow-lg pointer-events-auto">
+              <span className="text-[9.5px] font-bold text-slate-300">
+                👋 두 손가락 핀치 제스처로 자유롭게 조절
+              </span>
+            </div>
+            <button 
+              onClick={() => {
+                setIsZoomOpen(false);
+                setScale(1);
+                setPosition({ x: 0, y: 0 });
+              }}
+              className="w-10 h-10 rounded-full bg-slate-950/80 border border-slate-850 flex items-center justify-center text-white hover:bg-slate-800 text-lg transition-all shadow-lg pointer-events-auto backdrop-blur-md active:scale-95"
+            >
+              ✕
+            </button>
+          </div>
           
-          {/* Bottom Bar indicator */}
-          <div className="text-center z-10 py-2 select-none">
-            <span className="text-[9px] text-slate-500 font-semibold bg-slate-900/60 px-3 py-1 rounded-full border border-slate-800/40">
+          {/* Bottom Bar indicator Floating */}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 select-none pointer-events-none">
+            <span className="text-[9.5px] text-slate-400 font-extrabold bg-slate-950/85 px-4 py-1.5 rounded-full border border-slate-850 shadow-lg backdrop-blur-md pointer-events-auto">
               배율: {scale.toFixed(1)}x
             </span>
           </div>
