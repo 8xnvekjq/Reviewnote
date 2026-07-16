@@ -1109,11 +1109,11 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
         </div>
       )}
 
-      {/* Next 화살표 버튼 (복습하기 세션 때만 우측 스크린 하단에 플로팅 + 반투명화 및 컴팩트화) */}
+      {/* Next 화살표 버튼 (복습하기 세션 때만 우측 스크린 하단에 플로팅 + 크기만 컴팩트화) */}
       {isReviewSession && hasNextEntry && nextEntry && onSelectEntry && (
         <button
           onClick={() => onSelectEntry(nextEntry)}
-          className="fixed right-3 sm:right-6 top-[62%] -translate-y-1/2 z-[60] w-9 h-14 sm:w-11 sm:h-18 rounded-xl bg-indigo-950/30 hover:bg-indigo-600 border border-indigo-500/20 text-white/40 hover:text-white shadow-lg active:scale-95 transition-all group animate-fade-in backdrop-blur-sm opacity-30 hover:opacity-100"
+          className="fixed right-3 sm:right-6 top-[62%] -translate-y-1/2 z-[60] w-9 h-14 sm:w-11 sm:h-18 rounded-xl bg-indigo-600/95 hover:bg-indigo-500 border border-indigo-500/50 flex flex-col items-center justify-center text-white shadow-2xl active:scale-95 transition-all group animate-fade-in backdrop-blur-sm"
           title="다음 미완료 오답 복습"
         >
           <span className="text-base sm:text-lg font-bold group-hover:translate-x-0.5 transition-transform">&rarr;</span>
