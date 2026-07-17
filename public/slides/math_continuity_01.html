@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>개념원리 미적분 I - 함수의 연속 (p.31~55)</title>
+    
+    <!-- Tailwind CSS for modern utility layout -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome for professional icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- MathJax for rendering LaTeX equations -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <!-- Professional Font Families -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            overflow-hidden: true;
+        }
+
+        /* Slide Container Aspect Ratio (16:9) */
+        .presentation-deck {
+            position: relative;
+            width: 1280px;
+            height: 720px;
+            background: radial-gradient(circle at 10% 20%, #1e293b 0%, #0f172a 100%);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            overflow: hidden;
+        }
+
+        /* Slide Transitions */
+        .slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            padding: 60px 80px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            opacity: 0;
+            transform: translateX(50px);
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .slide.active {
+            opacity: 1;
+            transform: translateX(0);
+            pointer-events: auto;
+            z-index: 10;
+        }
+
+        /* Academic Premium Glassmorphism & Cards */
+        .concept-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .problem-box {
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.8) 100%);
+            border-left: 8px solid #3b82f6;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 0 16px 16px 0;
+        }
+
+        /* Highlight effects */
+        .math-highlight {
+            color: #60a5fa;
+            font-weight: 700;
+        }
+
+        /* Custom Scrollbar for side-notes/lists */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+        }
+
+        /* Interactive Laser Pointer (Optional Teaching Tool) */
+        .laser-pointer {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: rgba(239, 68, 68, 0.8);
+            box-shadow: 0 0 15px 5px rgba(239, 68, 68, 0.8);
+            pointer-events: none;
+            z-index: 9999;
+            transform: translate(-50%, -50%);
+            display: none;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4 select-none">
+
+    <!-- Laser Pointer Node -->
+    <div id="laser" class="laser-pointer"></div>
+
+    <!-- MAIN PRESENTATION CANVAS -->
+    <div class="presentation-deck rounded-2xl flex flex-col justify-between" id="deck">
+        
+        <!-- Header: Constant branding across slides -->
+        <div class="flex justify-between items-center z-20 pb-3 border-b border-slate-700/50">
+            <div class="flex items-center gap-3">
+                <span class="bg-blue-600 text-white text-xs font-black px-2.5 py-1 rounded-md tracking-wider">개념원리</span>
+                <span class="text-slate-400 text-sm font-medium tracking-tight">미적분 I &gt; II. 함수의 연속</span>
+            </div>
+            <div class="text-right">
+                <span class="text-xs text-blue-400 font-semibold uppercase tracking-widest" id="slide-category">개념원리 이해</span>
+            </div>
+        </div>
+
+        <!-- SLIDES WORKSPACE -->
+        <div class="relative flex-grow my-4 overflow-hidden">
+            
+            <!-- Slide 1: Chapter Cover -->
+            <div class="slide active" data-category="Intro">
+                <div class="flex flex-col items-center justify-center h-full text-center">
+                    <span class="text-blue-500 font-bold tracking-widest text-lg mb-3">MATHEMATICS I</span>
+                    <h1 class="text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-blue-400 tracking-tight leading-tight mb-6">
+                        II. 함수의 극한과 연속
+                    </h1>
+                    <div class="h-1.5 w-32 bg-blue-500 rounded-full mb-8"></div>
+                    <h2 class="text-3xl font-bold text-slate-300">
+                        02. 함수의 연속 <span class="text-blue-400 font-normal text-xl ml-2">(p.31 ~ p.55)</span>
+                    </h2>
+                    <p class="text-slate-400 mt-6 text-lg max-w-xl font-light">
+                        개념의 완전한 이해를 바탕으로 설계된 수업용 공식 프레젠테이션 교안입니다.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Slide 2: 개념원리 이해 - 함수의 연속 정의 -->
+            <div class="slide" data-category="개념원리 이해">
+                <h2 class="text-3xl font-extrabold text-white mb-4 flex items-center gap-3">
+                    <span class="text-blue-500 text-2xl">01</span> 한 점에서 함수의 연속
+                </h2>
+                <div class="grid grid-cols-2 gap-6 items-stretch flex-grow overflow-y-auto">
+                    <div class="concept-card p-6 flex flex-col justify-center">
+                        <p class="text-slate-300 text-lg mb-4 leading-relaxed">
+                            함수 $f(x)$가 실수 $a$에 대하여 다음 <span class="text-blue-400 font-bold">세 가지 조건</span>을 모두 만족할 때, $f(x)$는 <span class="text-blue-400 font-bold">$x=a$에서 연속</span>이라고 정의합니다.
+                        </p>
+                        <div class="space-y-3">
+                            <div class="bg-slate-800/80 p-3 rounded-lg border border-slate-700">
+                                <span class="text-emerald-400 font-bold mr-2">1. 함숫값 정의:</span> $f(a)$가 존재한다.
+                            </div>
+                            <div class="bg-slate-800/80 p-3 rounded-lg border border-slate-700">
+                                <span class="text-emerald-400 font-bold mr-2">2. 극한값 존재:</span> $\lim\limits_{x \to a} f(x)$가 존재한다.
+                            </div>
+                            <div class="bg-slate-800/80 p-3 rounded-lg border border-slate-700">
+                                <span class="text-emerald-400 font-bold mr-2">3. 두 값의 일치:</span> $\lim\limits_{x \to a} f(x) = f(a)$
+                            </div>
+                        </div>
+                    </div>
+                    <div class="concept-card p-6 flex flex-col justify-center bg-slate-900/50 border border-slate-800">
+                        <h4 class="text-lg font-bold text-slate-200 mb-2"><i class="fa-solid fa-triangle-exclamation text-yellow-500 mr-2"></i>x=a에서 불연속인 경우</h4>
+                        <ul class="space-y-2 text-base text-slate-400">
+                            <li>• 함숫값 $f(a)$가 정의되어 있지 않은 경우 (그래프에 구멍)</li>
+                            <li>• 좌극한과 우극한이 달라 극한값 $\lim\limits_{x \to a} f(x)$가 존재하지 않는 경우 (계단형 단절)</li>
+                            <li>• 함숫값과 극한값이 각각 존재하지만 서로 다른 경우 (따로 떨어진 점)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 3: 필수예제 01 -->
+            <div class="slide" data-category="필수예제">
+                <h2 class="text-3xl font-extrabold text-white mb-6">필수예제 01 &nbsp;<span class="text-blue-400 text-lg">한 점에서의 연속성 조사</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-between">
+                    <div>
+                        <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Problem 01</div>
+                        <h3 class="text-2xl font-bold text-slate-100 leading-relaxed">
+                            다음 함수가 주어진 $x$의 값에서 연속인지 불연속인지 조사하시오.
+                        </h3>
+                        <div class="mt-8 space-y-8 pl-4">
+                            <div class="text-xl">
+                                (1) $f(x) = x^2 - 2x$ &nbsp;&nbsp; $[x=1]$
+                            </div>
+                            <div class="text-xl">
+                                (2) $f(x) = \begin{cases} \dfrac{x^2-1}{x-1} & (x \ne 1) \\ 2 & (x = 1) \end{cases}$ &nbsp;&nbsp; $[x=1]$
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-right text-sm text-slate-500">
+                        * 직접 연필로 함숫값, 우극한, 좌극한을 구해 일치하는지 확인해 보세요.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 4: 필수예제 02 -->
+            <div class="slide" data-category="필수예제">
+                <h2 class="text-3xl font-extrabold text-white mb-6">필수예제 02 &nbsp;<span class="text-blue-400 text-lg">가우스 기호가 포함된 연속성</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-between">
+                    <div>
+                        <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Problem 02</div>
+                        <h3 class="text-2xl font-bold text-slate-100 leading-relaxed">
+                            함수 $f(x) = [x] + [x]^2$ 에 대하여 $x=1$에서의 연속성을 조사하시오.<br>
+                            <span class="text-base text-slate-400">(단, $[x]$는 $x$보다 크지 않은 최대의 정수이다.)</span>
+                        </h3>
+                    </div>
+                    <div class="text-right text-sm text-slate-500">
+                        * 우극한 $x \to 1+$, 좌극한 $x \to 1-$의 값을 나눌 때 가우스 값의 변화를 추적합니다.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 5: 필수예제 03 -->
+            <div class="slide" data-category="필수예제">
+                <h2 class="text-3xl font-extrabold text-white mb-6">필수예제 03 &nbsp;<span class="text-blue-400 text-lg">합성함수의 연속성</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-between">
+                    <div>
+                        <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Problem 03</div>
+                        <h3 class="text-2xl font-bold text-slate-100 leading-relaxed">
+                            두 함수 $y=f(x)$와 $y=g(x)$의 그래프가 교재의 그림과 같을 때, $x=1$에서 합성함수 $(g \circ f)(x)$의 연속성을 조사하시오.
+                        </h3>
+                        <p class="text-base text-slate-400 mt-4 leading-relaxed">
+                            * $t = f(x)$로 치환하여 $x \to 1+$와 $x \to 1-$일 때 $t$가 다가가는 방향과 상태를 파악하는 것이 중요합니다.
+                        </p>
+                    </div>
+                    <div class="text-right text-sm text-slate-500">
+                        * 속함수의 치환 방향($+$, $-$, 혹은 상수 상태)에 세심히 주의하세요.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 6: 개념원리 이해 - 구간과 연속함수 -->
+            <div class="slide" data-category="개념원리 이해">
+                <h2 class="text-3xl font-extrabold text-white mb-4 flex items-center gap-3">
+                    <span class="text-blue-500 text-2xl">02</span> 구간과 연속함수의 정의
+                </h2>
+                <div class="grid grid-cols-2 gap-6 items-stretch flex-grow overflow-y-auto">
+                    <div class="concept-card p-6 flex flex-col justify-center">
+                        <h3 class="text-xl font-bold text-white mb-3">1. 구간(Interval)의 기호 표시</h3>
+                        <p class="text-slate-300 text-base mb-4 leading-relaxed">
+                            두 실수 $a, b$에 대하여 실수의 집합을 기호로 다음과 같이 표현합니다.
+                        </p>
+                        <div class="grid grid-cols-2 gap-2 text-sm text-slate-300">
+                            <div class="bg-slate-800 p-2.5 rounded border border-slate-700">
+                                <strong>닫힌구간:</strong> $[a, b]$<br>$\{x \,|\, a \le x \le b\}$
+                            </div>
+                            <div class="bg-slate-800 p-2.5 rounded border border-slate-700">
+                                <strong>열린구간:</strong> $(a, b)$<br>$\{x \,|\, a < x < b\}$
+                            </div>
+                            <div class="bg-slate-800 p-2.5 rounded border border-slate-700">
+                                <strong>반열린구간:</strong> $[a, b)$<br>$\{x \,|\, a \le x < b\}$
+                            </div>
+                            <div class="bg-slate-800 p-2.5 rounded border border-slate-700">
+                                <strong>반닫힌구간:</strong> $(a, b]$<br>$\{x \,|\, a < x \le b\}$
+                            </div>
+                        </div>
+                    </div>
+                    <div class="concept-card p-6 flex flex-col justify-center">
+                        <h3 class="text-xl font-bold text-white mb-3">2. 연속함수의 엄밀한 정의</h3>
+                        <ul class="space-y-3 text-base text-slate-300">
+                            <li>
+                                <span class="text-blue-400 font-bold">열린구간에서의 연속:</span> 어떤 열린구간에 속하는 모든 실수 $x$에서 연속일 때, 이 구간에서 <span class="text-blue-400 font-bold">연속</span>이라고 한다.
+                            </li>
+                            <li>
+                                <span class="text-blue-400 font-bold">닫힌구간에서의 연속:</span> 다음 두 조건을 만족해야 한다.
+                                <div class="bg-slate-800/80 p-2 rounded mt-2 text-sm text-slate-400">
+                                    1) 열린구간 $(a, b)$에서 연속이다.<br>
+                                    2) $\lim\limits_{x \to a+} f(x) = f(a)$ 이고 $\lim\limits_{x \to b-} f(x) = f(b)$ 이다.
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 7: 필수예제 04 -->
+            <div class="slide" data-category="필수예제">
+                <h2 class="text-3xl font-extrabold text-white mb-6">필수예제 04 &nbsp;<span class="text-blue-400 text-lg">구간에서 연속함수의 연속성</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-between">
+                    <div>
+                        <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Problem 04</div>
+                        <h3 class="text-2xl font-bold text-slate-100 leading-relaxed">
+                            다음 함수가 연속인 구간을 구하시오.
+                        </h3>
+                        <div class="mt-8 space-y-8 pl-4">
+                            <div class="text-xl">
+                                (1) $f(x) = \dfrac{1}{x-1}$
+                            </div>
+                            <div class="text-xl">
+                                (2) $f(x) = \sqrt{2-x}$
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-right text-sm text-slate-500">
+                        * 분모가 $0$이 되는 점이나 근호 안의 값이 음수가 되는 점을 피하여 구간을 설정합니다.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 8: 필수예제 05 -->
+            <div class="slide" data-category="필수예제">
+                <h2 class="text-3xl font-extrabold text-white mb-6">필수예제 05 &nbsp;<span class="text-blue-400 text-lg">연속조건을 이용한 미정계수의 결정</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-between">
+                    <div>
+                        <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Problem 05</div>
+                        <h3 class="text-2xl font-bold text-slate-100 leading-relaxed">
+                            함수 $f(x) = \begin{cases} \dfrac{x^2+ax-6}{x-2} & (x \ne 2) \\ b & (x = 2) \end{cases}$ 가 모든 실수에서 연속일 때, 상수 $a, b$의 값을 구하시오.
+                        </h3>
+                    </div>
+                    <div class="text-right text-sm text-slate-500">
+                        * 모든 실수에서 연속이면 $x=2$에서도 연속이어야 하므로, 극한값과 함숫값이 같음을 이용합니다.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 9: 필수예제 06 -->
+            <div class="slide" data-category="필수예제">
+                <h2 class="text-3xl font-extrabold text-white mb-6">필수예제 06 &nbsp;<span class="text-blue-400 text-lg">모든 실수에서 연속인 조건</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-between">
+                    <div>
+                        <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Problem 06</div>
+                        <h3 class="text-2xl font-bold text-slate-100 leading-relaxed">
+                            모든 실수 $x$에서 연속인 함수 $f(x)$가 관계식
+                            $$(x-2)f(x) = x^2 + ax - 2$$
+                            를 만족시킬 때, 상수 $a$의 값과 함숫값 $f(2)$를 구하시오.
+                        </h3>
+                    </div>
+                    <div class="text-right text-sm text-slate-500">
+                        * $x \ne 2$일 때 $f(x)$를 식 형태로 나타낸 후, $x \to 2$로의 극한값을 통해 연속성 조건 $f(2) = \lim\limits_{x \to 2} f(x)$를 적용합니다.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 10: 필수예제 07 -->
+            <div class="slide" data-category="필수예제">
+                <h2 class="text-3xl font-extrabold text-white mb-6">필수예제 07 &nbsp;<span class="text-blue-400 text-lg">연속성과 주기함수</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-between">
+                    <div>
+                        <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Problem 07</div>
+                        <h3 class="text-2xl font-bold text-slate-100 leading-relaxed">
+                            모든 실수 $x$에서 연속인 함수 $f(x)$가 임의의 실수 $x$에 대하여 $f(x+3)=f(x)$를 만족하고,
+                            $$f(x) = \begin{cases} x^2+1 & (0 \le x < 2) \\ ax+b & (2 \le x < 3) \end{cases}$$
+                            일 때, 상수 $a, b$의 값을 구하시오.
+                        </h3>
+                    </div>
+                    <div class="text-right text-sm text-slate-500">
+                        * 경계 지점인 $x=2$에서의 연속성과 주기 조건에 의해 시작점과 끝점($x=0$과 $x=3$)에서의 값이 이어져야 함을 이용합니다.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 11: 개념원리 이해 - 연속함수의 성질 & 최대·최소 정리 -->
+            <div class="slide" data-category="개념원리 이해">
+                <h2 class="text-3xl font-extrabold text-white mb-4 flex items-center gap-3">
+                    <span class="text-blue-500 text-2xl">03</span> 연속함수의 성질과 최대·최소 정리
+                </h2>
+                <div class="grid grid-cols-2 gap-6 items-stretch flex-grow overflow-y-auto">
+                    <div class="concept-card p-6 flex flex-col justify-center">
+                        <h3 class="text-xl font-bold text-white mb-3">1. 연속함수의 성질</h3>
+                        <p class="text-slate-300 text-base mb-2">
+                            두 함수 $f(x), g(x)$가 $x=a$에서 연속이면 다음 함수도 $x=a$에서 연속이다.
+                        </p>
+                        <ul class="text-sm text-slate-400 space-y-1">
+                            <li>• $c f(x)$ &nbsp;(상수배)</li>
+                            <li>• $f(x) \pm g(x)$ &nbsp;(합과 차)</li>
+                            <li>• $f(x)g(x)$ &nbsp;(곱)</li>
+                            <li>• $\dfrac{f(x)}{g(x)}$ &nbsp;(나눗셈, 단 $g(a) \ne 0$)</li>
+                        </ul>
+                    </div>
+                    <div class="concept-card p-6 flex flex-col justify-center">
+                        <h3 class="text-xl font-bold text-white mb-3">2. 최대·최소 정리</h3>
+                        <p class="text-slate-300 text-base leading-relaxed">
+                            함수 $f(x)$가 닫힌구간 $[a, b]$에서 <span class="text-blue-400 font-bold">연속</span>이면,<br>
+                            $f(x)$는 이 구간에서 반드시 <span class="text-emerald-400 font-bold">최댓값</span>과 <span class="text-emerald-400 font-bold">최솟값</span>을 가진다.
+                        </p>
+                        <div class="bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-sm p-3 rounded mt-3">
+                            <i class="fa-solid fa-lightbulb"></i> 열린구간이거나 연속이 아닐 경우에는 최댓값 또는 최솟값이 존재하지 않을 수도 있습니다.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 12: 필수예제 08 -->
+            <div class="slide" data-category="필수예제">
+                <h2 class="text-3xl font-extrabold text-white mb-6">필수예제 08 &nbsp;<span class="text-blue-400 text-lg">연속함수의 성질 판정</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-between">
+                    <div>
+                        <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Problem 08</div>
+                        <h3 class="text-2xl font-bold text-slate-100 leading-relaxed">
+                            두 함수 $f(x)$와 $g(x)$가 모든 실수에서 연속일 때, 다음 보기 중 항상 모든 실수에서 연속인 함수만을 있는 대로 고르시오.
+                        </h3>
+                        <div class="mt-4 bg-slate-800/50 p-4 rounded-lg border border-slate-700/80 grid grid-cols-2 gap-4 text-lg">
+                            <div>ㄱ. $3f(x) - g(x)$</div>
+                            <div>ㄴ. $f(x)g(x)$</div>
+                            <div>ㄷ. $\dfrac{1}{\{f(x)\}^2 + 1}$</div>
+                            <div>ㄹ. $\dfrac{f(x)}{g(x)}$</div>
+                        </div>
+                    </div>
+                    <div class="text-right text-sm text-slate-500">
+                        * 나눗셈 꼴에서 분모가 $0$이 될 가능성을 면밀하게 따지는 능력이 필요합니다.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 13: 필수예제 09 -->
+            <div class="slide" data-category="필수예제">
+                <h2 class="text-3xl font-extrabold text-white mb-6">필수예제 09 &nbsp;<span class="text-blue-400 text-lg">구간에서의 최대·최소</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-between">
+                    <div>
+                        <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Problem 09</div>
+                        <h3 class="text-2xl font-bold text-slate-100 leading-relaxed">
+                            다음 함수에 대하여 주어진 구간에서의 최댓값과 최솟값을 구하시오.
+                        </h3>
+                        <div class="mt-8 space-y-8 pl-4">
+                            <div class="text-xl">
+                                (1) $f(x) = 2x^2 - 4x - 1$ &nbsp;&nbsp; $[0, 3]$
+                            </div>
+                            <div class="text-xl">
+                                (2) $f(x) = \dfrac{x+1}{x-1}$ &nbsp;&nbsp; $[2, 3]$
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-right text-sm text-slate-500">
+                        * 두 함수가 주어진 구간 내에서 연속임을 먼저 파악하고, 경계값과 극값을 비교합니다.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 14: 개념원리 이해 - 사잇값 정리 -->
+            <div class="slide" data-category="개념원리 이해">
+                <h2 class="text-3xl font-extrabold text-white mb-4 flex items-center gap-3">
+                    <span class="text-blue-500 text-2xl">04</span> 사잇값 정리 (Intermediate Value Theorem)
+                </h2>
+                <div class="grid grid-cols-2 gap-6 items-stretch flex-grow overflow-y-auto">
+                    <div class="concept-card p-6 flex flex-col justify-center">
+                        <h3 class="text-xl font-bold text-white mb-3">사잇값 정리의 정의</h3>
+                        <p class="text-slate-300 text-base leading-relaxed mb-3">
+                            함수 $f(x)$가 닫힌구간 $[a, b]$에서 <span class="text-blue-400 font-bold">연속</span>이고 $f(a) \ne f(b)$일 때, $f(a)$와 $f(b)$ 사이의 임의의 값 $k$에 대하여
+                        </p>
+                        <div class="bg-blue-900/40 p-3 rounded border border-blue-500/30 text-center font-bold text-lg text-blue-300 mb-3">
+                            $f(c) = k$
+                        </div>
+                        <p class="text-slate-300 text-base">
+                            인 $c$가 열린구간 $(a, b)$에 <span class="text-emerald-400 font-bold">적어도 하나 존재</span>한다.
+                        </p>
+                    </div>
+                    <div class="concept-card p-6 flex flex-col justify-center">
+                        <h3 class="text-xl font-bold text-white mb-3"><i class="fa-solid fa-arrow-trend-up text-emerald-400 mr-2"></i>방정식 실근에의 활용</h3>
+                        <p class="text-slate-300 text-sm leading-relaxed mb-3">
+                            함수 $f(x)$가 닫힌구간 $[a, b]$에서 연속이고, 구간의 양 끝점에서의 함숫값의 부호가 다르면 즉,
+                        </p>
+                        <div class="bg-emerald-900/40 p-3 rounded border border-emerald-500/30 text-center font-bold text-lg text-emerald-300 mb-3">
+                            $f(a)f(b) < 0$
+                        </div>
+                        <p class="text-slate-300 text-sm">
+                            이면, 방정식 $f(x) = 0$은 열린구간 $(a, b)$에서 <span class="text-yellow-400 font-bold">적어도 하나의 실근</span>을 가집니다.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 15: 필수예제 10 -->
+            <div class="slide" data-category="필수예제">
+                <h2 class="text-3xl font-extrabold text-white mb-6">필수예제 10 &nbsp;<span class="text-blue-400 text-lg">사잇값 정리를 이용한 실근 존재성</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-between">
+                    <div>
+                        <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Problem 10</div>
+                        <h3 class="text-2xl font-bold text-slate-100 leading-relaxed">
+                            방정식 $x^3 - 2x^2 - 1 = 0$ 은 열린구간 $(2, 3)$에서 적어도 하나의 실근을 가짐을 보이시오.
+                        </h3>
+                    </div>
+                    <div class="text-right text-sm text-slate-500">
+                        * 좌변을 $f(x)$로 설정한 후 연속성을 체크하고, $f(2)$와 $f(3)$의 부호를 각각 구해 곱합니다.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 16: 필수예제 11 -->
+            <div class="slide" data-category="필수예제">
+                <h2 class="text-3xl font-extrabold text-white mb-6">필수예제 11 &nbsp;<span class="text-blue-400 text-lg">사잇값 정리와 실근의 존재 영역</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-between">
+                    <div>
+                        <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Problem 11</div>
+                        <h3 class="text-2xl font-bold text-slate-100 leading-relaxed">
+                            모든 실수 $x$에서 연속인 함수 $f(x)$에 대하여 다음 표와 같은 함숫값이 성립합니다.
+                        </h3>
+                        <div class="mt-4 overflow-x-auto">
+                            <table class="min-w-full text-center border-collapse border border-slate-700 text-lg">
+                                <thead>
+                                    <tr class="bg-slate-800">
+                                        <th class="border border-slate-700 p-2">$x$</th>
+                                        <td class="border border-slate-700 p-2">$-1$</td>
+                                        <td class="border border-slate-700 p-2">$0$</td>
+                                        <td class="border border-slate-700 p-2">$1$</td>
+                                        <td class="border border-slate-700 p-2">$2$</td>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <th class="border border-slate-700 p-2 bg-slate-800">$f(x)$</th>
+                                        <td class="border border-slate-700 p-2 font-bold text-emerald-400">$2$</td>
+                                        <td class="border border-slate-700 p-2 font-bold text-rose-400">$-5$</td>
+                                        <td class="border border-slate-700 p-2 font-bold text-rose-400">$-1$</td>
+                                        <td class="border border-slate-700 p-2 font-bold text-emerald-400">$3$</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-xl mt-6 text-slate-200 font-semibold">
+                            이때, 방정식 $f(x)=0$은 열린구간 $(-1, 2)$에서 적어도 몇 개의 실근을 갖는지 조사하시오.
+                        </p>
+                    </div>
+                    <div class="text-right text-sm text-slate-500">
+                        * 각 인접한 구간마다 함숫값 곱의 부호가 변하는 경계가 몇 군데 나타나는지 셉니다.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 17: 필수예제 12 -->
+            <div class="slide" data-category="필수예제">
+                <h2 class="text-3xl font-extrabold text-white mb-6">필수예제 12 &nbsp;<span class="text-blue-400 text-lg">사잇값 정리의 대수적 응용</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-between">
+                    <div>
+                        <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Problem 12</div>
+                        <h3 class="text-2xl font-bold text-slate-100 leading-relaxed">
+                            연속함수 $f(x)$에 대하여 다음이 성립할 때,
+                            $$f(-1) = 2, \quad f(0) = -1, \quad f(1) = 3, \quad f(2) = -3$$
+                            방정식 $f(x) - x = 0$은 열린구간 $(-1, 2)$에서 적어도 몇 개의 실근을 갖는지 구하시오.
+                        </h3>
+                    </div>
+                    <div class="text-right text-sm text-slate-500">
+                        * 새로운 연속함수 $g(x) = f(x) - x$를 정의하고 각각의 대입 부호를 구하는 방식을 유도합니다.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 18: Closing Outro -->
+            <div class="slide" data-category="Outro">
+                <div class="flex flex-col items-center justify-center h-full text-center">
+                    <i class="fa-solid fa-graduation-cap text-6xl text-blue-500 mb-6"></i>
+                    <h2 class="text-4xl font-extrabold text-white mb-4">함수의 연속 단원을 마치며</h2>
+                    <div class="h-1 w-24 bg-blue-500 rounded-full mb-6"></div>
+                    <p class="text-xl text-slate-300 max-w-2xl leading-relaxed font-light">
+                        개념원리의 이론과 필수 유형들을 마스터했습니다.<br>
+                        "개념원리 익히기" 및 단원 종합 연습문제로 실력을 단단히 다져봅시다.
+                    </p>
+                    <p class="text-slate-500 mt-6 text-base">
+                        수고하셨습니다. 질문이 있는 학생들은 편하게 피드백해 주세요.
+                    </p>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer: Slide Controls and Page Number indicator -->
+        <div class="flex justify-between items-center z-20 pt-3 border-t border-slate-700/50">
+            <div class="flex items-center gap-2">
+                <button onclick="prevSlide()" class="bg-slate-800 hover:bg-slate-700 text-white w-10 h-10 rounded-lg transition-all flex items-center justify-center border border-slate-700">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+                <button onclick="nextSlide()" class="bg-slate-800 hover:bg-slate-700 text-white w-10 h-10 rounded-lg transition-all flex items-center justify-center border border-slate-700">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </button>
+                <button onclick="toggleLaser()" id="laserBtn" class="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-rose-500 w-10 h-10 rounded-lg transition-all flex items-center justify-center border border-slate-700 ml-2" title="수업용 레이저 포인터 활성화">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                </button>
+                <button onclick="toggleFullscreen()" class="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-blue-400 w-10 h-10 rounded-lg transition-all flex items-center justify-center border border-slate-700" title="전체화면 프레젠테이션 모드">
+                    <i class="fa-solid fa-expand"></i>
+                </button>
+            </div>
+            
+            <!-- Quick navigation points/indicators -->
+            <div class="flex gap-1.5" id="nav-dots">
+                <!-- Javascript will render dots here -->
+            </div>
+
+            <div class="text-slate-400 text-sm font-semibold tracking-wider">
+                <span id="current-page">1</span> / <span id="total-pages">18</span>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- PRESENTATION LOGIC SCRIPT -->
+    <script>
+        const slides = document.querySelectorAll('.slide');
+        const pageIndicator = document.getElementById('current-page');
+        const totalIndicator = document.getElementById('total-pages');
+        const categoryIndicator = document.getElementById('slide-category');
+        const navDotsContainer = document.getElementById('nav-dots');
+        const deck = document.getElementById('deck');
+        const laser = document.getElementById('laser');
+        
+        let currentSlideIdx = 0;
+        let isLaserActive = false;
+
+        totalIndicator.innerText = slides.length;
+
+        // Initialize Nav Dots
+        slides.forEach((slide, idx) => {
+            const dot = document.createElement('button');
+            dot.className = `w-2.5 h-2.5 rounded-full transition-all ${idx === 0 ? 'bg-blue-500 w-5' : 'bg-slate-600 hover:bg-slate-500'}`;
+            dot.title = `슬라이드 ${idx + 1}`;
+            dot.onclick = () => goToSlide(idx);
+            navDotsContainer.appendChild(dot);
+        });
+
+        function updateSlideUI() {
+            slides.forEach((slide, idx) => {
+                if (idx === currentSlideIdx) {
+                    slide.classList.add('active');
+                } else {
+                    slide.classList.remove('active');
+                }
+            });
+
+            // Update Indicator State
+            pageIndicator.innerText = currentSlideIdx + 1;
+            const currentSlide = slides[currentSlideIdx];
+            categoryIndicator.innerText = currentSlide.getAttribute('data-category');
+
+            // Update Dot styling
+            const dots = navDotsContainer.querySelectorAll('button');
+            dots.forEach((dot, idx) => {
+                if (idx === currentSlideIdx) {
+                    dot.className = "w-2.5 h-2.5 rounded-full transition-all bg-blue-500 w-5";
+                } else {
+                    dot.className = "w-2.5 h-2.5 rounded-full transition-all bg-slate-600 hover:bg-slate-500";
+                }
+            });
+
+            // Trigger MathJax typesetting for dynamically loaded/changed math in the new slide
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                window.MathJax.typesetPromise();
+            }
+        }
+
+        function nextSlide() {
+            if (currentSlideIdx < slides.length - 1) {
+                currentSlideIdx++;
+                updateSlideUI();
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlideIdx > 0) {
+                currentSlideIdx--;
+                updateSlideUI();
+            }
+        }
+
+        function goToSlide(idx) {
+            currentSlideIdx = idx;
+            updateSlideUI();
+        }
+
+        // Keybindings for slide change
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === 'Space') {
+                nextSlide();
+            } else if (e.key === 'ArrowLeft') {
+                prevSlide();
+            }
+        });
+
+        // Toggle Fullscreen mode for real-world TV/Beamer/PC classes
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                deck.requestFullscreen().catch(err => {
+                    console.log(`Error attempting to enable full-screen mode: ${err.message}`);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        // Teaching laser pointer implementation
+        function toggleLaser() {
+            isLaserActive = !isLaserActive;
+            const laserBtn = document.getElementById('laserBtn');
+            if (isLaserActive) {
+                laserBtn.classList.add('text-rose-500', 'bg-rose-950/40');
+                deck.style.cursor = 'none'; // hide default cursor within deck boundaries
+                deck.addEventListener('mousemove', moveLaser);
+                deck.addEventListener('mouseleave', hideLaser);
+            } else {
+                laserBtn.classList.remove('text-rose-500', 'bg-rose-950/40');
+                deck.style.cursor = 'default';
+                laser.style.display = 'none';
+                deck.removeEventListener('mousemove', moveLaser);
+                deck.removeEventListener('mouseleave', hideLaser);
+            }
+        }
+
+        function moveLaser(e) {
+            const rect = deck.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            laser.style.display = 'block';
+            laser.style.left = `${x}px`;
+            laser.style.top = `${y}px`;
+        }
+
+        function hideLaser() {
+            laser.style.display = 'none';
+        }
+    </script>
+</body>
+</html>

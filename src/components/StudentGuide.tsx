@@ -33,10 +33,12 @@ export const StudentGuide: React.FC = () => {
   ];
 
   const SLIDE_LIST = [
-    { title: '함수의 극한', filename: 'slide_functions_limit.html', date: '2026.07.15' },
-    { title: '우극한, 좌극한', filename: 'slide_functions_limit_left_right.html', date: '2026.07.15' },
-    { title: '함수의 극한에 대한 성질', filename: 'slide_functions_properties.html', date: '2026.07.15' },
-    { title: '이항분포', filename: 'slide_binomial_distribution.html', date: '2026.07.16' },
+    { title: 'I. 함수의 극한과 연속 - 04. 함수의 극한의 응용', filename: 'math_limit_applications.html', date: '2026.07.18' },
+    { title: 'II. 함수의 극한과 연속 - 01. 함수의 연속', filename: 'math_continuity_01.html', date: '2026.07.18' },
+    { title: '개념원리 공통수학2 - 평면좌표 (내분점~무게중심)', filename: 'math2_plane_coordinates.html', date: '2026.07.18' },
+    { title: '2024학년도 수능 수학 14번 및 변형문제', filename: '2024_suneung_math_14.html', date: '2026.07.18' },
+    { title: '2024학년도 수능 수학 미적분 27, 28번 및 변형문제', filename: '2024_suneung_calculus_27_28.html', date: '2026.07.18' },
+    { title: '2024학년도 수능 수학 확률과 통계 30번 및 변형문제', filename: '2024_suneung_prob_stat_30.html', date: '2026.07.18' },
   ];
 
   const changeLogs = CHRONOLOGICAL_CHANGELOGS;

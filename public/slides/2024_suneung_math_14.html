@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2024학년도 수능 수학 14, 20, 21번 및 변형문제</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true
+            },
+            options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'] }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        .presentation-deck { position: relative; width: 1280px; height: 720px; background: radial-gradient(circle at 10% 20%, #1e293b 0%, #0f172a 100%); border: 1px solid rgba(255, 255, 255, 0.08); margin: 20px auto; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+        .slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 50px 80px; display: none; flex-direction: column; justify-content: space-between; z-index: 1; background: transparent; }
+        .slide.active { display: flex; z-index: 10; }
+        .concept-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2); }
+        .problem-box { background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.8) 100%); border-left: 8px solid #ef4444; border-top: 1px solid rgba(255, 255, 255, 0.05); border-right: 1px solid rgba(255, 255, 255, 0.05); border-bottom: 1px solid rgba(255, 255, 255, 0.05); border-radius: 0 16px 16px 0; }
+        
+        /* 폰트사이즈 기존 대비 80% 축소 조절 (24px -> 19.2px) */
+        .problem-text { font-size: 1.2rem; font-weight: 700; color: #f1f5f9; line-height: 1.625; }
+
+        /* 판서용 모눈 칠판 스타일 */
+        .chalkboard {
+            background-color: rgba(15, 23, 42, 0.5);
+            border: 2px dashed rgba(255, 255, 255, 0.12);
+            background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1.5px, transparent 0);
+            background-size: 24px 24px;
+            border-radius: 16px;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        @media print {
+            body { background-color: #ffffff !important; margin: 0 !important; padding: 0 !important; }
+            .presentation-deck { width: 1280px !important; height: auto !important; box-shadow: none !important; border: none !important; margin: 0 !important; overflow: visible !important; display: block !important; }
+            .slide { position: relative !important; display: flex !important; width: 1280px !important; height: 720px !important; page-break-after: always !important; page-break-inside: avoid !important; background: #0f172a !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="presentation-deck" id="deck">
+        <!-- Header: 공통 탑바 -->
+        <div class="flex justify-between items-center z-20 pb-3 border-b border-slate-700/50 mx-8 mt-6 no-print">
+            <div class="flex items-center gap-3">
+                <span class="bg-red-600 text-white text-xs font-black px-2.5 py-1 rounded-md tracking-wider">수능 기출</span>
+                <span class="text-slate-400 text-sm font-medium">2024학년도 대학수학능력시험 &gt; 수학 영역</span>
+            </div>
+            <div class="text-right">
+                <span class="text-xs text-red-400 font-semibold uppercase tracking-wider" id="slide-category">공통문항 분석</span>
+            </div>
+        </div>
+
+        <!-- 슬라이드 본문 영역 -->
+        <div class="relative flex-grow my-2 overflow-hidden" id="slide-container">
+            
+            <!-- Slide 1: 표지 -->
+            <div class="slide active" data-category="Chapter Intro">
+                <div class="flex flex-col items-center justify-center h-full text-center">
+                    <span class="text-red-500 font-bold tracking-widest text-lg mb-3">2024 CSAT MATHEMATICS</span>
+                    <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-red-400 tracking-tight leading-tight mb-6">
+                        2024학년도 수능 수학 공통 문항
+                    </h1>
+                    <div class="h-1.5 w-32 bg-red-500 rounded-full mb-8"></div>
+                    <h2 class="text-3xl font-bold text-slate-300">
+                        핵심 킬러 14번, 20번, 21번 및 변형문제
+                    </h2>
+                    <p class="text-slate-400 mt-6 text-lg max-w-xl font-light">
+                        함수의 개형 추론, 접선과 도형의 기하학적 분석, 구간 내 최댓값 함수의 연속성에 대한 고난도 문항 모음
+                    </p>
+                </div>
+            </div>
+
+            <!-- Slide 2: 2024학년도 수능 14번 원본 -->
+            <div class="slide" data-category="2024학년도 수능 14번 (원본)">
+                <h2 class="text-2xl font-extrabold text-white mb-4">2024학년도 수능 14번 &nbsp;<span class="text-red-400 text-lg">원본 문제</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-red-500 uppercase tracking-widest mb-2">Problem 14</div>
+                        <h3 class="problem-text">
+                            두 자연수 $a, b$에 대하여 함수 $f(x)$는
+                            $$f(x) = \begin{cases} 2x^3 - 6x + 1 & (x \le 2) \\ a(x-2)(x-b) + 9 & (x > 2) \end{cases}$$
+                            이다. 실수 $t$에 대하여 함수 $y=f(x)$의 그래프와 직선 $y=t$가 만나는 점의 개수를 $g(t)$라 하자.
+                            $$g(k) + \lim_{t \to k^-} g(t) + \lim_{t \to k^+} g(t) = 9$$
+                            를 만족시키는 실수 $k$의 개수가 $1$이 되도록 하는 두 자연수 $a, b$의 순서쌍 $(a, b)$에 대하여 $a+b$의 최댓값은?
+                        </h3>
+                        <div class="grid grid-cols-5 gap-4 mt-6 max-w-xl text-sm text-slate-300 font-semibold pl-2">
+                            <div>① 51</div>
+                            <div>② 52</div>
+                            <div>③ 53</div>
+                            <div>④ 54</div>
+                            <div>⑤ 55</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 3: 14번 원본 풀이 / 판서 슬라이드 -->
+            <div class="slide" data-category="14번 원본 풀이 및 판서">
+                <h2 class="text-2xl font-extrabold text-white mb-3">14번 원본 &nbsp;<span class="text-red-400 text-lg">해설 판서 영역</span></h2>
+                <div class="grid grid-cols-12 gap-6 items-stretch flex-grow">
+                    <!-- 왼쪽: 팁 및 정답 -->
+                    <div class="col-span-4 flex flex-col gap-3">
+                        <!-- 정답 박스 -->
+                        <div class="concept-card p-3.5 border-l-4 border-red-500">
+                            <span class="text-red-400 font-black text-xs uppercase tracking-wider block mb-0.5">Answer</span>
+                            <div class="text-lg font-bold text-white">정답: ① (51)</div>
+                            <div class="text-[11px] text-slate-400">$(a, b) = (48, 3)$ 일 때 최댓값</div>
+                        </div>
+                        <!-- 팁 박스 -->
+                        <div class="concept-card p-3.5 space-y-2 flex-grow text-[11px] leading-relaxed text-slate-300 overflow-y-auto">
+                            <div>
+                                <span class="text-yellow-400 font-bold block mb-0.5"><i class="fa-solid fa-lightbulb mr-1"></i> 삼차 극값 ($x \le 2$)</span>
+                                $f(-1) = 5$, $f(1) = -3$, $f(2) = 5$
+                            </div>
+                            <hr class="border-slate-700/50">
+                            <div>
+                                <span class="text-blue-400 font-bold block mb-0.5"><i class="fa-solid fa-circle-info mr-1"></i> 이차 최솟값 ($x > 2$)</span>
+                                $x = \frac{b+2}{2}$에서 최솟값 $y_0$
+                            </div>
+                            <hr class="border-slate-700/50">
+                            <div>
+                                <span class="text-emerald-400 font-bold block mb-0.5"><i class="fa-solid fa-key mr-1"></i> $H(k)=9$ 단 1개 조건</span>
+                                $y_0$가 극솟값 $-3$과 일치해야 함.<br>
+                                $\implies y_0 = -3$<br>
+                                $\implies -\frac{a(b-2)^2}{4} + 9 = -3$<br>
+                                $\implies a(b-2)^2 = 48$
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 오른쪽: 판서 공간 -->
+                    <div class="col-span-8 h-full">
+                        <div class="chalkboard">
+                            <span class="absolute top-3 left-4 text-xs font-bold text-slate-500 tracking-wider">
+                                <i class="fa-solid fa-pen-ruler mr-1.5"></i> 판서 / 풀이 영역
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 4: 14번 변형 문제 -->
+            <div class="slide" data-category="14번 변형 문제 (정답 변형)">
+                <h2 class="text-2xl font-extrabold text-white mb-4">14번 변형 문제 &nbsp;<span class="text-red-400 text-lg">미세 변형 문항</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-red-500 uppercase tracking-widest mb-2">Problem 14 (Modified)</div>
+                        <h3 class="problem-text">
+                            두 자연수 $a, b$에 대하여 함수 $f(x)$는
+                            $$f(x) = \begin{cases} 2x^3 - 6x + 1 & (x \le 2) \\ a(x-2)(x-b) + 10 & (x > 2) \end{cases}$$
+                            이다. 실수 $t$에 대하여 함수 $y=f(x)$의 그래프와 직선 $y=t$가 만나는 점의 개수를 $g(t)$라 하자.
+                            $$g(k) + \lim_{t \to k^-} g(t) + \lim_{t \to k^+} g(t) = 9$$
+                            를 만족시키는 실수 $k$의 개수가 $1$이 되도록 하는 두 자연수 $a, b$의 순서쌍 $(a, b)$에 대하여 $a+b$의 최댓값은?
+                        </h3>
+                        <div class="grid grid-cols-5 gap-4 mt-6 max-w-xl text-sm text-slate-300 font-semibold pl-2">
+                            <div>① 51</div>
+                            <div>② 52</div>
+                            <div>③ 53</div>
+                            <div>④ 54</div>
+                            <div>⑤ 55</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 5: 14번 변형 풀이 / 판서 슬라이드 -->
+            <div class="slide" data-category="14번 변형 풀이 및 판서">
+                <h2 class="text-2xl font-extrabold text-white mb-3">14번 변형 &nbsp;<span class="text-red-400 text-lg">해설 판서 영역</span></h2>
+                <div class="grid grid-cols-12 gap-6 items-stretch flex-grow">
+                    <!-- 왼쪽: 팁 및 정답 -->
+                    <div class="col-span-4 flex flex-col gap-3">
+                        <!-- 정답 박스 -->
+                        <div class="concept-card p-3.5 border-l-4 border-red-500">
+                            <span class="text-red-400 font-black text-xs uppercase tracking-wider block mb-0.5">Answer</span>
+                            <div class="text-lg font-bold text-white">정답: ⑤ (55)</div>
+                            <div class="text-[11px] text-slate-400">$(a, b) = (52, 3)$ 일 때 최댓값</div>
+                        </div>
+                        <!-- 팁 박스 -->
+                        <div class="concept-card p-3.5 space-y-2 flex-grow text-[11px] leading-relaxed text-slate-300 overflow-y-auto">
+                            <div>
+                                <span class="text-yellow-400 font-bold block mb-0.5"><i class="fa-solid fa-lightbulb mr-1"></i> 삼차 극값 ($x \le 2$)</span>
+                                $f(-1) = 5$, $f(1) = -3$, $f(2) = 5$
+                            </div>
+                            <hr class="border-slate-700/50">
+                            <div>
+                                <span class="text-blue-400 font-bold block mb-0.5"><i class="fa-solid fa-circle-info mr-1"></i> 이차 최솟값 ($x > 2$)</span>
+                                $x = \frac{b+2}{2}$에서 최솟값 $y_0$
+                            </div>
+                            <hr class="border-slate-700/50">
+                            <div>
+                                <span class="text-emerald-400 font-bold block mb-0.5"><i class="fa-solid fa-key mr-1"></i> $H(k)=9$ 단 1개 조건</span>
+                                $y_0$가 극솟값 $-3$과 일치해야 함.<br>
+                                $\implies y_0 = -3$<br>
+                                $\implies -\frac{a(b-2)^2}{4} + 10 = -3$<br>
+                                $\implies a(b-2)^2 = 52$<br>
+                                $\implies b-2=1$ 일 때 최댓값 $a=52, b=3$
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 오른쪽: 판서 공간 -->
+                    <div class="col-span-8 h-full">
+                        <div class="chalkboard">
+                            <span class="absolute top-3 left-4 text-xs font-bold text-slate-500 tracking-wider">
+                                <i class="fa-solid fa-pen-ruler mr-1.5"></i> 판서 / 풀이 영역
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 6: 2024학년도 수능 20번 원본 -->
+            <div class="slide" data-category="2024학년도 수능 20번 (원본)">
+                <h2 class="text-2xl font-extrabold text-white mb-4">2024학년도 수능 20번 &nbsp;<span class="text-red-400 text-lg">원본 문제</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-red-500 uppercase tracking-widest mb-2">Problem 20</div>
+                        <h3 class="problem-text">
+                            $a > \sqrt{2}$인 실수 $a$에 대하여 함수 $f(x)$를
+                            $$f(x) = -x^3 + ax^2 + 2x$$
+                            라 하자. 곡선 $y=f(x)$ 위의 점 $O(0,0)$에서의 접선이 곡선 $y=f(x)$와 만나는 점 중 $O$가 아닌 점을 $A$라 하고, 곡선 $y=f(x)$ 위의 점 $A$에서의 접선이 $x$축과 만나는 점을 $B$라 하자. 점 $A$가 선분 $OB$를 지름으로 하는 원 위의 점일 때, $OA \times AB$의 값을 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 7: 20번 원본 풀이 / 판서 슬라이드 -->
+            <div class="slide" data-category="20번 원본 풀이 및 판서">
+                <h2 class="text-2xl font-extrabold text-white mb-3">20번 원본 &nbsp;<span class="text-red-400 text-lg">해설 판서 영역</span></h2>
+                <div class="grid grid-cols-12 gap-6 items-stretch flex-grow">
+                    <!-- 왼쪽: 팁 및 정답 -->
+                    <div class="col-span-4 flex flex-col gap-3">
+                        <!-- 정답 박스 -->
+                        <div class="concept-card p-3.5 border-l-4 border-red-500">
+                            <span class="text-red-400 font-black text-xs uppercase tracking-wider block mb-0.5">Answer</span>
+                            <div class="text-xl font-bold text-white">정답: 25</div>
+                            <div class="text-[11px] text-slate-400">$a^2 = \frac{5}{2}$ 일 때 기하학적 곱</div>
+                        </div>
+                        <!-- 팁 박스 -->
+                        <div class="concept-card p-3.5 space-y-2 flex-grow text-[11px] leading-relaxed text-slate-300 overflow-y-auto">
+                            <div>
+                                <span class="text-yellow-400 font-bold block mb-0.5"><i class="fa-solid fa-lightbulb mr-1"></i> 원점 O에서의 접선</span>
+                                $f'(0) = 2 \implies y = 2x$<br>
+                                곡선과의 교점 $A$:<br>
+                                $-x^3 + ax^2 + 2x = 2x \implies x_A = a$<br>
+                                $\implies A(a, 2a)$
+                            </div>
+                            <hr class="border-slate-700/50">
+                            <div>
+                                <span class="text-blue-400 font-bold block mb-0.5"><i class="fa-solid fa-circle-info mr-1"></i> 점 A에서의 접선과 B</span>
+                                $f'(a) = -a^2 + 2$<br>
+                                접선: $y - 2a = (-a^2+2)(x-a)$<br>
+                                $y=0$ 대입 $\implies B\left(\frac{a^3}{a^2-2}, 0\right)$
+                            </div>
+                            <hr class="border-slate-700/50">
+                            <div>
+                                <span class="text-emerald-400 font-bold block mb-0.5"><i class="fa-solid fa-key mr-1"></i> 원 위의 점 조건 ($\angle OAB = 90^\circ$)</span>
+                                $OA \perp AB \implies (\text{OA 기울기}) \times (\text{AB 기울기}) = -1$<br>
+                                $2 \times (-a^2+2) = -1 \implies a^2 = \frac{5}{2}$<br>
+                                $OA \times AB = OB \times (\text{A의 y좌표}) = \frac{2a^4}{a^2-2}$<br>
+                                $\implies \text{대입 계산} = 25$
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 오른쪽: 판서 공간 -->
+                    <div class="col-span-8 h-full">
+                        <div class="chalkboard">
+                            <span class="absolute top-3 left-4 text-xs font-bold text-slate-500 tracking-wider">
+                                <i class="fa-solid fa-pen-ruler mr-1.5"></i> 판서 / 풀이 영역
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 8: 20번 변형 문제 -->
+            <div class="slide" data-category="20번 변형 문제">
+                <h2 class="text-2xl font-extrabold text-white mb-4">20번 변형 문제 &nbsp;<span class="text-red-400 text-lg">미세 변형 문항</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-red-500 uppercase tracking-widest mb-2">Problem 20 (Modified)</div>
+                        <h3 class="problem-text">
+                            $a > \sqrt{3}$인 실수 $a$에 대하여 함수 $f(x)$를
+                            $$f(x) = -x^3 + ax^2 + 3x$$
+                            라 하자. 곡선 $y=f(x)$ 위의 점 $O(0,0)$에서의 접선이 곡선 $y=f(x)$와 만나는 점 중 $O$가 아닌 점을 $A$라 하고, 곡선 $y=f(x)$ 위의 점 $A$에서의 접선이 $x$축과 만나는 점을 $B$라 하자. 점 $A$가 선분 $OB$를 지름으로 하는 원 위의 점일 때, $OA \times AB$의 값을 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 9: 20번 변형 풀이 / 판서 슬라이드 -->
+            <div class="slide" data-category="20번 변형 풀이 및 판서">
+                <h2 class="text-2xl font-extrabold text-white mb-3">20번 변형 &nbsp;<span class="text-red-400 text-lg">해설 판서 영역</span></h2>
+                <div class="grid grid-cols-12 gap-6 items-stretch flex-grow">
+                    <!-- 왼쪽: 팁 및 정답 -->
+                    <div class="col-span-4 flex flex-col gap-3">
+                        <!-- 정답 박스 -->
+                        <div class="concept-card p-3.5 border-l-4 border-red-500">
+                            <span class="text-red-400 font-black text-xs uppercase tracking-wider block mb-0.5">Answer</span>
+                            <div class="text-xl font-bold text-white">정답: 100</div>
+                            <div class="text-[11px] text-slate-400">$a^2 = \frac{10}{3}$ 일 때 기하학적 곱</div>
+                        </div>
+                        <!-- 팁 박스 -->
+                        <div class="concept-card p-3.5 space-y-2 flex-grow text-[11px] leading-relaxed text-slate-300 overflow-y-auto">
+                            <div>
+                                <span class="text-yellow-400 font-bold block mb-0.5"><i class="fa-solid fa-lightbulb mr-1"></i> 원점 O에서의 접선</span>
+                                $f'(0) = 3 \implies y = 3x$<br>
+                                곡선과의 교점 $A$:<br>
+                                $-x^3 + ax^2 + 3x = 3x \implies x_A = a$<br>
+                                $\implies A(a, 3a)$
+                            </div>
+                            <hr class="border-slate-700/50">
+                            <div>
+                                <span class="text-blue-400 font-bold block mb-0.5"><i class="fa-solid fa-circle-info mr-1"></i> 점 A에서의 접선과 B</span>
+                                $f'(a) = -a^2 + 3$<br>
+                                접선: $y - 3a = (-a^2+3)(x-a)$<br>
+                                $y=0$ 대입 $\implies B\left(\frac{a^3}{a^2-3}, 0\right)$
+                            </div>
+                            <hr class="border-slate-700/50">
+                            <div>
+                                <span class="text-emerald-400 font-bold block mb-0.5"><i class="fa-solid fa-key mr-1"></i> 수직 조건 및 계산 구조</span>
+                                $OA \perp AB \implies 3 \times (-a^2+3) = -1$<br>
+                                $\implies a^2 = 3 + \frac{1}{3} = \frac{10}{3}$<br>
+                                $OA \times AB = OB \times 3a = \frac{3a^4}{a^2-3}$<br>
+                                $\implies \text{대입 계산} = 100$
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 오른쪽: 판서 공간 -->
+                    <div class="col-span-8 h-full">
+                        <div class="chalkboard">
+                            <span class="absolute top-3 left-4 text-xs font-bold text-slate-500 tracking-wider">
+                                <i class="fa-solid fa-pen-ruler mr-1.5"></i> 판서 / 풀이 영역
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 10: 2024학년도 수능 21번 원본 -->
+            <div class="slide" data-category="2024학년도 수능 21번 (원본)">
+                <h2 class="text-2xl font-extrabold text-white mb-4">2024학년도 수능 21번 &nbsp;<span class="text-red-400 text-lg">원본 문제</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-red-500 uppercase tracking-widest mb-2">Problem 21</div>
+                        <h3 class="problem-text">
+                            양수 $a$에 대하여 $x \ge -1$에서 정의된 함수 $f(x)$는
+                            $$f(x) = \begin{cases} -x^2 + 6x & (-1 \le x < 6) \\ a \log_4(x-5) & (x \ge 6) \end{cases}$$
+                            이다. $t \ge 0$인 실수 $t$에 대하여 닫힌구간 $[t-1, t+1]$에서의 $f(x)$의 최댓값을 $g(t)$라 하자. 구간 $[0, \infty)$에서 함수 $g(t)$의 최솟값이 $5$가 되도록 하는 양수 $a$의 최솟값을 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 11: 21번 원본 풀이 / 판서 슬라이드 -->
+            <div class="slide" data-category="21번 원본 풀이 및 판서">
+                <h2 class="text-2xl font-extrabold text-white mb-3">21번 원본 &nbsp;<span class="text-red-400 text-lg">해설 판서 영역</span></h2>
+                <div class="grid grid-cols-12 gap-6 items-stretch flex-grow">
+                    <!-- 왼쪽: 팁 및 정답 -->
+                    <div class="col-span-4 flex flex-col gap-3">
+                        <!-- 정답 박스 -->
+                        <div class="concept-card p-3.5 border-l-4 border-red-500">
+                            <span class="text-red-400 font-black text-xs uppercase tracking-wider block mb-0.5">Answer</span>
+                            <div class="text-xl font-bold text-white">정답: 10</div>
+                            <div class="text-[11px] text-slate-400">$f(7) \ge 5$ 관계를 통한 유도</div>
+                        </div>
+                        <!-- 팁 박스 -->
+                        <div class="concept-card p-3.5 space-y-2 flex-grow text-[11px] leading-relaxed text-slate-300 overflow-y-auto">
+                            <div>
+                                <span class="text-yellow-400 font-bold block mb-0.5"><i class="fa-solid fa-lightbulb mr-1"></i> 최댓값 함수 g(t) 개형</span>
+                                $g(t) = \max\limits_{x \in [t-1, t+1]} f(x)$<br>
+                                $0 \le t \le 2 \implies g(t) = f(t+1)$ (증가)<br>
+                                $2 \le t \le 4 \implies g(t) = f(3) = 9$ (상수)<br>
+                                $t \ge 4 \implies g(t) = \max(f(t-1), f(t+1))$
+                            </div>
+                            <hr class="border-slate-700/50">
+                            <div>
+                                <span class="text-blue-400 font-bold block mb-0.5"><i class="fa-solid fa-circle-info mr-1"></i> 최솟값 5 임계 분석</span>
+                                $t-1 \ge 3$ 영역에서 $f(t-1)$은 감소하고 $f(t+1)$은 증가하므로 두 끝점의 교점에서 최솟값 발생.<br>
+                                $f(t-1) = 5 \implies t-1 = 5 \implies t=6$<br>
+                                즉, $t=6$에서 $f(5)=5$가 될 때, 다른 쪽 끝인 $f(7)$이 $5$ 이상이어야만 최솟값 $g(t) \ge 5$가 만족됨.
+                            </div>
+                            <hr class="border-slate-700/50">
+                            <div>
+                                <span class="text-emerald-400 font-bold block mb-0.5"><i class="fa-solid fa-key mr-1"></i> 로그 함수 조건식 계산</span>
+                                $f(7) = a \log_4(2) = \frac{a}{2} \ge 5$<br>
+                                $\implies a \ge 10$<br>
+                                양수 $a$의 최솟값은 $10$
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 오른쪽: 판서 공간 -->
+                    <div class="col-span-8 h-full">
+                        <div class="chalkboard">
+                            <span class="absolute top-3 left-4 text-xs font-bold text-slate-500 tracking-wider">
+                                <i class="fa-solid fa-pen-ruler mr-1.5"></i> 판서 / 풀이 영역
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 12: 21번 변형 문제 -->
+            <div class="slide" data-category="21번 변형 문제">
+                <h2 class="text-2xl font-extrabold text-white mb-4">21번 변형 문제 &nbsp;<span class="text-red-400 text-lg">미세 변형 문항</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-red-500 uppercase tracking-widest mb-2">Problem 21 (Modified)</div>
+                        <h3 class="problem-text">
+                            양수 $a$에 대하여 $x \ge -1$에서 정의된 함수 $f(x)$는
+                            $$f(x) = \begin{cases} -x^2 + 6x & (-1 \le x < 6) \\ a \log_2(x-5) & (x \ge 6) \end{cases}$$
+                            이다. $t \ge 0$인 실수 $t$에 대하여 닫힌구간 $[t-1, t+1]$에서의 $f(x)$의 최댓값을 $g(t)$라 하자. 구간 $[0, \infty)$에서 함수 $g(t)$의 최솟값이 $5$가 되도록 하는 양수 $a$의 최솟값을 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 13: 21번 변형 풀이 / 판서 슬라이드 -->
+            <div class="slide" data-category="21번 변형 풀이 및 판서">
+                <h2 class="text-2xl font-extrabold text-white mb-3">21번 변형 &nbsp;<span class="text-red-400 text-lg">해설 판서 영역</span></h2>
+                <div class="grid grid-cols-12 gap-6 items-stretch flex-grow">
+                    <!-- 왼쪽: 팁 및 정답 -->
+                    <div class="col-span-4 flex flex-col gap-3">
+                        <!-- 정답 박스 -->
+                        <div class="concept-card p-3.5 border-l-4 border-red-500">
+                            <span class="text-red-400 font-black text-xs uppercase tracking-wider block mb-0.5">Answer</span>
+                            <div class="text-xl font-bold text-white">정답: 5</div>
+                            <div class="text-[11px] text-slate-400">$f(7) \ge 5$ 관계를 통한 유도</div>
+                        </div>
+                        <!-- 팁 박스 -->
+                        <div class="concept-card p-3.5 space-y-2 flex-grow text-[11px] leading-relaxed text-slate-300 overflow-y-auto">
+                            <div>
+                                <span class="text-yellow-400 font-bold block mb-0.5"><i class="fa-solid fa-lightbulb mr-1"></i> 최댓값 함수 g(t) 개형</span>
+                                $g(t) = \max\limits_{x \in [t-1, t+1]} f(x)$<br>
+                                $t \ge 4 \implies g(t) = \max(f(t-1), f(t+1))$
+                            </div>
+                            <hr class="border-slate-700/50">
+                            <div>
+                                <span class="text-blue-400 font-bold block mb-0.5"><i class="fa-solid fa-circle-info mr-1"></i> 최솟값 5 임계 분석</span>
+                                $f(t-1) = 5 \implies t-1 = 5 \implies t=6$<br>
+                                즉, $t=6$에서 $f(5)=5$가 될 때, 다른 쪽 끝인 $f(7)$이 $5$ 이상이어야만 최솟값 $g(t) \ge 5$가 만족됨.
+                            </div>
+                            <hr class="border-slate-700/50">
+                            <div>
+                                <span class="text-emerald-400 font-bold block mb-0.5"><i class="fa-solid fa-key mr-1"></i> 로그 함수 조건식 계산 (밑 2 변경)</span>
+                                $f(7) = a \log_2(7-5) = a \log_2(2) = a \ge 5$<br>
+                                $\implies a \ge 5$<br>
+                                양수 $a$의 최솟값은 $5$
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 오른쪽: 판서 공간 -->
+                    <div class="col-span-8 h-full">
+                        <div class="chalkboard">
+                            <span class="absolute top-3 left-4 text-xs font-bold text-slate-500 tracking-wider">
+                                <i class="fa-solid fa-pen-ruler mr-1.5"></i> 판서 / 풀이 영역
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 14: Outro -->
+            <div class="slide" data-category="Outro">
+                <div class="flex flex-col items-center justify-center h-full text-center">
+                    <i class="fa-solid fa-graduation-cap text-6xl text-red-500 mb-6"></i>
+                    <h2 class="text-4xl font-extrabold text-white mb-4">수능 수학 공통문항 마스터!</h2>
+                    <div class="h-1 w-24 bg-red-500 rounded-full mb-6"></div>
+                    <p class="text-xl text-slate-300 max-w-2xl leading-relaxed font-light mb-4">
+                        2024학년도 수능 수학 공통과목의 고난도 킬러 3대장<br>
+                        **14번(함수 극한), 20번(접선 기하), 21번(구간 최댓값)** 분석을 완료했습니다.
+                    </p>
+                    <p class="text-slate-400 text-base">
+                        수치와 조건이 바뀐 변형 문제를 스스로 풀어내며 수학적 체력을 다져봅시다.
+                    </p>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer: 슬라이드 컨트롤 및 페이지 표시 -->
+        <div class="flex justify-between items-center z-20 pt-3 border-t border-slate-700/50 mx-8 mb-6 no-print">
+            <div class="flex items-center gap-3">
+                <button onclick="prevSlide()" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg font-bold transition-all border border-slate-700 flex items-center gap-2">
+                    <i class="fa-solid fa-chevron-left"></i> 이전
+                </button>
+                <button onclick="nextSlide()" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg font-bold transition-all border border-slate-700 flex items-center gap-2">
+                    다음 <i class="fa-solid fa-chevron-right"></i>
+                </button>
+            </div>
+            <div class="text-slate-400 text-sm font-semibold tracking-widest">
+                <span id="current-page" class="text-red-400 font-bold">1</span> / <span id="total-pages">14</span>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 슬라이드 조작 스크립트 -->
+    <script>
+        const slides = document.querySelectorAll('.slide');
+        const pageIndicator = document.getElementById('current-page');
+        const totalIndicator = document.getElementById('total-pages');
+        const categoryIndicator = document.getElementById('slide-category');
+        
+        let currentSlideIdx = 0;
+        totalIndicator.innerText = slides.length;
+
+        function updateSlideUI() {
+            slides.forEach((slide, idx) => {
+                if (idx === currentSlideIdx) {
+                    slide.classList.add('active');
+                } else {
+                    slide.classList.remove('active');
+                }
+            });
+
+            pageIndicator.innerText = currentSlideIdx + 1;
+            const currentSlide = slides[currentSlideIdx];
+            categoryIndicator.innerText = currentSlide.getAttribute('data-category');
+
+            // MathJax 렌더링 동적 갱신
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                window.MathJax.typesetPromise();
+            }
+        }
+
+        function nextSlide() {
+            if (currentSlideIdx < slides.length - 1) {
+                currentSlideIdx++;
+                updateSlideUI();
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlideIdx > 0) {
+                currentSlideIdx--;
+                updateSlideUI();
+            }
+        }
+
+        // 초기 UI 로딩
+        updateSlideUI();
+    </script>
+</body>
+</html>

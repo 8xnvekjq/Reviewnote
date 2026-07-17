@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>개념원리 미적분 I - 함수의 극한의 응용</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true
+            },
+            options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'] }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        .presentation-deck { position: relative; width: 1280px; height: 720px; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.1); margin: 20px auto; display: flex; flex-direction: column; overflow: hidden; }
+        .slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 50px 80px; display: none; flex-direction: column; justify-content: space-between; z-index: 1; background: #0f172a; }
+        .slide.active { display: flex; z-index: 10; }
+        .concept-card { background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; }
+        .problem-box { background: #1e293b; border-left: 6px solid #3b82f6; border-radius: 8px; }
+        
+        /* 인쇄(PDF 저장) 시 완벽한 출력을 위한 최적화 CSS */
+        @media print {
+            body { background-color: #ffffff !important; margin: 0 !important; padding: 0 !important; }
+            .presentation-deck { width: 1280px !important; height: auto !important; box-shadow: none !important; border: none !important; margin: 0 !important; overflow: visible !important; display: block !important; }
+            .slide { position: relative !important; display: flex !important; width: 1280px !important; height: 720px !important; page-break-after: always !important; page-break-inside: avoid !important; background-color: #0f172a !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="presentation-deck" id="deck">
+        <div class="flex justify-between items-center z-20 pb-3 border-b border-slate-700/50 mx-6 mt-6 no-print">
+            <div class="flex items-center gap-3">
+                <span class="bg-blue-600 text-white text-xs font-black px-2.5 py-1 rounded-md">개념원리</span>
+                <span class="text-slate-400 text-sm font-medium">미적분 I &gt; I. 함수의 극한</span>
+            </div>
+            <div class="text-right">
+                <span class="text-xs text-blue-400 font-semibold uppercase" id="slide-category">04. 함수의 극한의 응용</span>
+            </div>
+        </div>
+
+        <div class="relative flex-grow my-4 overflow-hidden" id="slide-container">
+            <!-- Slide 1: 표지 -->
+            <div class="slide active" data-category="Chapter Intro">
+                <div class="flex flex-col items-center justify-center h-full text-center">
+                    <span class="text-blue-500 font-bold tracking-widest text-lg mb-3">MATHEMATICS I</span>
+                    <h1 class="text-6xl font-extrabold text-white tracking-tight leading-tight mb-6">I. 함수의 극한과 연속</h1>
+                    <div class="h-1.5 w-32 bg-blue-500 rounded-full mb-8"></div>
+                    <h2 class="text-3xl font-bold text-slate-300">04. 함수의 극한의 응용 <span class="text-blue-400 font-normal text-xl ml-2">[교재 p.31 ~ p.35]</span></h2>
+                    <p class="text-slate-400 mt-6 text-lg max-w-xl font-light">미정계수의 결정 조건부터 함수의 극한의 대소 관계 및 도형을 통한 대수적 활용의 정밀 분석</p>
+                </div>
+            </div>
+
+            <!-- Slide 2: 개념 설명 1 -->
+            <div class="slide" data-category="개념원리 이해 (p.31)">
+                <h2 class="text-3xl font-extrabold text-white mb-4 flex items-center gap-3"><span class="text-blue-500 text-2xl">01</span> 미정계수의 결정 조건</h2>
+                <div class="concept-card p-6 flex flex-col justify-center flex-grow">
+                    <p class="text-slate-300 text-lg mb-6 leading-relaxed">두 함수 $f(x)$, $g(x)$에 대하여 극한 $\lim\limits_{x \to a} \dfrac{f(x)}{g(x)} = L$ ($L$은 실수)이 성립할 때 다음의 성질을 갖습니다.</p>
+                    <div class="grid grid-cols-2 gap-6">
+                        <div class="bg-slate-800 p-5 rounded-lg border border-slate-700">
+                            <span class="text-blue-400 font-bold text-lg block mb-3">1. 분모가 0으로 수렴할 때</span>
+                            <div class="text-slate-200 text-2xl text-center mb-4">$\lim\limits_{x \to a} g(x) = 0 \ \Longrightarrow \ \lim\limits_{x \to a} f(x) = 0$</div>
+                            <p class="text-sm text-slate-400 leading-relaxed">분모가 $0$으로 한없이 가까워지는데 극한값이 존재한다면, 분자 역시 반드시 $0$으로 한없이 가까워져야 합니다.</p>
+                        </div>
+                        <div class="bg-slate-800 p-5 rounded-lg border border-slate-700">
+                            <span class="text-blue-400 font-bold text-lg block mb-3">2. 분자가 0으로 수렴할 때 ($L \ne 0$)</span>
+                            <div class="text-slate-200 text-2xl text-center mb-4">$\lim\limits_{x \to a} f(x) = 0 \ \Longrightarrow \ \lim\limits_{x \to a} g(x) = 0$</div>
+                            <p class="text-sm text-slate-400 leading-relaxed">극한값이 $0$이 아닌 실수이고 분자가 $0$으로 수렴하면, 분모 역시 반드시 $0$으로 수렴해야 합니다.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 3: 개념 설명 2 -->
+            <div class="slide" data-category="개념원리 이해 (p.31)">
+                <h2 class="text-3xl font-extrabold text-white mb-4 flex items-center gap-3"><span class="text-blue-500 text-2xl">02</span> 함수의 극한의 대소 관계 (샌드위치 정리)</h2>
+                <div class="concept-card p-8 flex flex-col justify-center flex-grow">
+                    <p class="text-slate-300 text-lg mb-6 leading-relaxed">$\lim\limits_{x \to a} f(x) = L$, $\lim\limits_{x \to a} g(x) = M$ ($L, M$은 실수)일 때, $a$에 가까운 모든 실수 $x$에 대하여 다음이 성립합니다.</p>
+                    <div class="space-y-6">
+                        <div class="bg-slate-800 p-5 rounded-lg border border-slate-700">
+                            <span class="text-emerald-400 font-bold text-lg block mb-2">(1) 극한의 대소 보존</span>
+                            <p class="text-slate-300 text-xl">$f(x) \le g(x)$ 이면 $\lim\limits_{x \to a} f(x) \le \lim\limits_{x \to a} g(x)$, 즉 $L \le M$</p>
+                        </div>
+                        <div class="bg-blue-900/40 p-5 rounded-lg border border-blue-500/30 text-center">
+                            <span class="text-blue-400 font-bold text-lg block mb-2">(2) 샌드위치 정리 (조임 정리)</span>
+                            <p class="text-slate-300 text-lg mb-3">새로운 함수 $h(x)$가 $f(x) \le h(x) \le g(x)$ 를 만족시키고 $L=M$ 이면,</p>
+                            <div class="text-white text-3xl font-bold">$\lim\limits_{x \to a} h(x) = L$</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 4: 필수예제 13 -->
+            <div class="slide" data-category="필수예제 13 (p.32)">
+                <h2 class="text-3xl font-extrabold text-white mb-6">필수예제 13 &nbsp;<span class="text-blue-400 text-lg">미정계수의 결정</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col">
+                    <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Problem 13</div>
+                    <h3 class="text-2xl font-bold text-slate-100 leading-relaxed mb-10">다음 등식이 성립하도록 하는 상수 $a, b$의 값을 구하시오.</h3>
+                    <div class="space-y-12 pl-6">
+                        <div class="text-3xl text-white">(1) $\lim\limits_{x \to 1} \dfrac{\sqrt{a+x}-b}{x-1} = \dfrac{1}{4}$</div>
+                        <div class="text-3xl text-white">(2) $\lim\limits_{x \to 2} \dfrac{x-2}{x^2+ax+b} = \dfrac{1}{3}$</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 5: 필수예제 14 -->
+            <div class="slide" data-category="필수예제 14 (p.33)">
+                <h2 class="text-3xl font-extrabold text-white mb-6">필수예제 14 &nbsp;<span class="text-blue-400 text-lg">다항함수의 결정</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col">
+                    <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Problem 14</div>
+                    <h3 class="text-2xl font-bold text-slate-100 leading-relaxed mb-10">다항함수 $f(x)$가 다음 두 극한 식을 만족시킬 때, $f(0)$의 값을 구하시오.</h3>
+                    <div class="space-y-12 pl-6">
+                        <div class="text-3xl text-white">$\lim\limits_{x \to \infty} \dfrac{f(x)}{2x^2+x+1} = 1$</div>
+                        <div class="text-3xl text-white">$\lim\limits_{x \to 2} \dfrac{f(x)}{x^2-x-2} = 1$</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 6: 필수예제 15 -->
+            <div class="slide" data-category="필수예제 15 (p.34)">
+                <h2 class="text-3xl font-extrabold text-white mb-6">필수예제 15 &nbsp;<span class="text-blue-400 text-lg">함수의 극한의 대소 관계</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col">
+                    <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Problem 15</div>
+                    <h3 class="text-2xl font-bold text-slate-100 leading-relaxed mb-8">다음 물음에 답하시오.</h3>
+                    <div class="space-y-10 pl-6">
+                        <div>
+                            <p class="text-xl text-slate-200 mb-4">(1) 함수 $f(x)$가 모든 실수 $x$에 대하여 다음을 만족시킬 때, $\lim\limits_{x \to \infty} f(x)$의 값을 구하시오.</p>
+                            <div class="text-3xl text-white ml-8">$\dfrac{x^2+x-1}{3x^2+2} \le f(x) \le \dfrac{x^2+x+4}{3x^2+2}$</div>
+                        </div>
+                        <div>
+                            <p class="text-xl text-slate-200 mb-4">(2) 함수 $f(x)$가 모든 양의 실수 $x$에 대하여 $3x+1 < f(x) < 3x+4$를 만족시킬 때, 다음 극한값을 구하시오.</p>
+                            <div class="text-3xl text-white ml-8">$\lim\limits_{x \to \infty} \dfrac{\{f(x)\}^2}{x^2+1}$</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 7: 필수예제 16 -->
+            <div class="slide" data-category="필수예제 16 (p.35)">
+                <h2 class="text-3xl font-extrabold text-white mb-6">필수예제 16 &nbsp;<span class="text-blue-400 text-lg">함수의 극한의 활용</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col">
+                    <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Problem 16</div>
+                    <h3 class="text-2xl font-bold text-slate-100 leading-relaxed mb-10">함수 $y=-ax^2+a$ ($a > 0$)의 그래프와 $x$축으로 둘러싸인 부분에 정사각형이 내접하고 있다. 이 정사각형의 넓이를 $S(a)$라 할 때, 다음 극한값을 구하시오.</h3>
+                    <div class="text-4xl text-white text-center mt-12">$\lim\limits_{a \to \infty} S(a)$</div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- 하단 네비게이션 컨트롤러 -->
+        <div class="flex justify-between items-center z-20 pt-3 border-t border-slate-700/50 mx-6 mb-6 no-print">
+            <div class="flex items-center gap-2">
+                <button onclick="prevSlide()" class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg font-bold">
+                    이전
+                </button>
+                <button onclick="nextSlide()" class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg font-bold">
+                    다음
+                </button>
+            </div>
+            <div class="text-slate-400 text-sm font-semibold tracking-wider">
+                <span id="current-page">1</span> / <span id="total-pages">7</span>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const slides = document.querySelectorAll('.slide');
+        const pageIndicator = document.getElementById('current-page');
+        const categoryIndicator = document.getElementById('slide-category');
+        let currentIdx = 0;
+        document.getElementById('total-pages').innerText = slides.length;
+
+        function updateSlideUI() {
+            slides.forEach((slide, idx) => {
+                if (idx === currentIdx) {
+                    slide.classList.add('active');
+                } else {
+                    slide.classList.remove('active');
+                }
+            });
+            pageIndicator.innerText = currentIdx + 1;
+            categoryIndicator.innerText = slides[currentIdx].getAttribute('data-category');
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                window.MathJax.typesetPromise();
+            }
+        }
+
+        function nextSlide() { if (currentIdx < slides.length - 1) { currentIdx++; updateSlideUI(); } }
+        function prevSlide() { if (currentIdx > 0) { currentIdx--; updateSlideUI(); } }
+
+        // 키보드 방향키 조작 이벤트
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === 'Space') nextSlide();
+            else if (e.key === 'ArrowLeft') prevSlide();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2024학년도 수능 수학 미적분 27, 28번 및 변형문제</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true
+            },
+            options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'] }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        .presentation-deck { position: relative; width: 1280px; height: 720px; background: radial-gradient(circle at 10% 20%, #1e293b 0%, #0f172a 100%); border: 1px solid rgba(255, 255, 255, 0.08); margin: 20px auto; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+        .slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 50px 80px; display: none; flex-direction: column; justify-content: space-between; z-index: 1; background: transparent; }
+        .slide.active { display: flex; z-index: 10; }
+        .concept-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2); }
+        .problem-box { background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.8) 100%); border-left: 8px solid #ef4444; border-top: 1px solid rgba(255, 255, 255, 0.05); border-right: 1px solid rgba(255, 255, 255, 0.05); border-bottom: 1px solid rgba(255, 255, 255, 0.05); border-radius: 0 16px 16px 0; }
+        
+        /* 폰트사이즈 기존 대비 80% 축소 조절 (24px -> 19.2px) */
+        .problem-text { font-size: 1.2rem; font-weight: 700; color: #f1f5f9; line-height: 1.625; }
+
+        /* 판서용 모눈 칠판 스타일 */
+        .chalkboard {
+            background-color: rgba(15, 23, 42, 0.5);
+            border: 2px dashed rgba(255, 255, 255, 0.12);
+            background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1.5px, transparent 0);
+            background-size: 24px 24px;
+            border-radius: 16px;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        @media print {
+            body { background-color: #ffffff !important; margin: 0 !important; padding: 0 !important; }
+            .presentation-deck { width: 1280px !important; height: auto !important; box-shadow: none !important; border: none !important; margin: 0 !important; overflow: visible !important; display: block !important; }
+            .slide { position: relative !important; display: flex !important; width: 1280px !important; height: 720px !important; page-break-after: always !important; page-break-inside: avoid !important; background: #0f172a !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="presentation-deck" id="deck">
+        <!-- Header: 공통 탑바 -->
+        <div class="flex justify-between items-center z-20 pb-3 border-b border-slate-700/50 mx-8 mt-6 no-print">
+            <div class="flex items-center gap-3">
+                <span class="bg-red-600 text-white text-xs font-black px-2.5 py-1 rounded-md tracking-wider">수능 기출</span>
+                <span class="text-slate-400 text-sm font-medium">2024학년도 대학수학능력시험 &gt; 선택과목 (미적분)</span>
+            </div>
+            <div class="text-right">
+                <span class="text-xs text-red-400 font-semibold uppercase tracking-wider" id="slide-category">미적분 문항 분석</span>
+            </div>
+        </div>
+
+        <!-- 슬라이드 본문 영역 -->
+        <div class="relative flex-grow my-2 overflow-hidden" id="slide-container">
+            
+            <!-- Slide 1: 표지 -->
+            <div class="slide active" data-category="Chapter Intro">
+                <div class="flex flex-col items-center justify-center h-full text-center">
+                    <span class="text-red-500 font-bold tracking-widest text-lg mb-3">2024 CSAT CALCULUS</span>
+                    <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-red-400 tracking-tight leading-tight mb-6">
+                        2024학년도 수능 수학 미적분
+                    </h1>
+                    <div class="h-1.5 w-32 bg-red-500 rounded-full mb-8"></div>
+                    <h2 class="text-3xl font-bold text-slate-300">
+                        선택과목 27번, 28번 및 변형문제
+                    </h2>
+                    <p class="text-slate-400 mt-6 text-lg max-w-xl font-light">
+                        매개변수 음함수 미분법 기반 접선의 기울기 계산 및 대칭성/연속성을 활용한 초월함수 적분 문항 분석
+                    </p>
+                </div>
+            </div>
+
+            <!-- Slide 2: 2024학년도 수능 미적분 27번 원본 -->
+            <div class="slide" data-category="2024학년도 수능 미적분 27번 (원본)">
+                <h2 class="text-2xl font-extrabold text-white mb-4">수능 미적분 27번 &nbsp;<span class="text-red-400 text-lg">원본 문제</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-red-500 uppercase tracking-widest mb-2">Problem 27</div>
+                        <h3 class="problem-text">
+                            실수 $t$에 대하여 원점을 지나고 곡선 $y = \dfrac{e^x}{1+e^t}$에 접하는 직선의 기울기를 $f(t)$라 하자. 
+                            $f(a) = -e\sqrt{e}$를 만족시키는 상수 $a$에 대하여 $f'(a)$의 값은?
+                        </h3>
+                        <div class="grid grid-cols-5 gap-4 mt-8 max-w-xl text-sm text-slate-300 font-semibold pl-2">
+                            <div>① $-\dfrac{1}{3}e\sqrt{e}$</div>
+                            <div>② $-\dfrac{1}{2}e\sqrt{e}$</div>
+                            <div>③ $-\dfrac{2}{3}e\sqrt{e}$</div>
+                            <div>④ $-\dfrac{5}{6}e\sqrt{e}$</div>
+                            <div>⑤ $-e\sqrt{e}$</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 3: 27번 원본 풀이 / 판서 슬라이드 -->
+            <div class="slide" data-category="27번 원본 풀이 및 판서">
+                <h2 class="text-2xl font-extrabold text-white mb-3">27번 원본 &nbsp;<span class="text-red-400 text-lg">해설 판서 영역</span></h2>
+                <div class="grid grid-cols-12 gap-6 items-stretch flex-grow">
+                    <!-- 왼쪽: 폴야 4단계 팁 및 정답 -->
+                    <div class="col-span-4 flex flex-col gap-3">
+                        <!-- 정답 박스 -->
+                        <div class="concept-card p-3.5 border-l-4 border-red-500">
+                            <span class="text-red-400 font-black text-xs uppercase tracking-wider block mb-0.5">Answer</span>
+                            <div class="text-lg font-bold text-white">정답: ①</div>
+                            <div class="text-[11px] text-slate-400">$-\frac{1}{3}e\sqrt{e}$</div>
+                        </div>
+                        <!-- 폴야 4단계 요약 팁 박스 -->
+                        <div class="concept-card p-3.5 space-y-3 flex-grow text-[11px] leading-relaxed text-slate-300 overflow-y-auto">
+                            <div>
+                                <span class="text-yellow-400 font-bold block mb-0.5">1단계 (문제 이해)</span>
+                                원점과 곡선 위의 접점 $(s, e^{-s}+e^t)$을 잇는 직선의 기울기와 해당 점의 접선 기울기 일치 이해.
+                            </div>
+                            <hr class="border-slate-700/50">
+                            <div>
+                                <span class="text-blue-400 font-bold block mb-0.5">2단계 (계획 수립)</span>
+                                두 기울기가 같음을 통한 매개변수 관계식 $-(s+1)e^{-s} = e^t$ 수립.
+                            </div>
+                            <hr class="border-slate-700/50">
+                            <div>
+                                <span class="text-indigo-400 font-bold block mb-0.5">3단계 (계획 실행)</span>
+                                양변을 $t$로 미분하여 매개변수 미분계수 관계식 $\frac{ds}{dt} = -\frac{s+1}{s}$ 도출.
+                            </div>
+                            <hr class="border-slate-700/50">
+                            <div>
+                                <span class="text-emerald-400 font-bold block mb-0.5">4단계 (반성)</span>
+                                $f(a) = -e^{1.5} \implies s_a = -1.5$ 및 $\frac{ds}{dt}$ 대입하여 $f'(a) = -\frac{1}{3}e\sqrt{e}$ 최종 유도 및 검증.
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 오른쪽: 판서 공간 -->
+                    <div class="col-span-8 h-full">
+                        <div class="chalkboard">
+                            <span class="absolute top-3 left-4 text-xs font-bold text-slate-500 tracking-wider">
+                                <i class="fa-solid fa-pen-ruler mr-1.5"></i> 판서 / 풀이 영역
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 4: 수능 미적분 27번 변형 문제 -->
+            <div class="slide" data-category="27번 변형 문제">
+                <h2 class="text-2xl font-extrabold text-white mb-4">27번 변형 문제 &nbsp;<span class="text-red-400 text-lg">미세 변형 문항</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-red-500 uppercase tracking-widest mb-2">Problem 27 (Modified)</div>
+                        <h3 class="problem-text">
+                            실수 $t$에 대하여 원점을 지나고 곡선 $y = \dfrac{e^x}{1+e^{2t}}$에 접하는 직선의 기울기를 $f(t)$라 하자. 
+                            $f(a) = -e\sqrt{e}$를 만족시키는 상수 $a$에 대하여 $f'(a)$의 값은?
+                        </h3>
+                        <div class="grid grid-cols-5 gap-4 mt-8 max-w-xl text-sm text-slate-300 font-semibold pl-2">
+                            <div>① $-\dfrac{1}{3}e\sqrt{e}$</div>
+                            <div>② $-\dfrac{1}{2}e\sqrt{e}$</div>
+                            <div>③ $-\dfrac{2}{3}e\sqrt{e}$</div>
+                            <div>④ $-\dfrac{5}{6}e\sqrt{e}$</div>
+                            <div>⑤ $-e\sqrt{e}$</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 5: 27번 변형 풀이 / 판서 슬라이드 -->
+            <div class="slide" data-category="27번 변형 풀이 및 판서">
+                <h2 class="text-2xl font-extrabold text-white mb-3">27번 변형 &nbsp;<span class="text-red-400 text-lg">해설 판서 영역</span></h2>
+                <div class="grid grid-cols-12 gap-6 items-stretch flex-grow">
+                    <!-- 왼쪽: 폴야 4단계 팁 및 정답 -->
+                    <div class="col-span-4 flex flex-col gap-3">
+                        <!-- 정답 박스 -->
+                        <div class="concept-card p-3.5 border-l-4 border-red-500">
+                            <span class="text-red-400 font-black text-xs uppercase tracking-wider block mb-0.5">Answer</span>
+                            <div class="text-lg font-bold text-white">정답: ③</div>
+                            <div class="text-[11px] text-slate-400">$-\frac{2}{3}e\sqrt{e}$</div>
+                        </div>
+                        <!-- 폴야 4단계 요약 팁 박스 -->
+                        <div class="concept-card p-3.5 space-y-3 flex-grow text-[11px] leading-relaxed text-slate-300 overflow-y-auto">
+                            <div>
+                                <span class="text-yellow-400 font-bold block mb-0.5">1단계 (문제 이해)</span>
+                                원점과 곡선 위의 접점 $(s, e^{-s}+e^{2t})$을 잇는 직선의 기울기와 접선 기울기 일치 이해.
+                            </div>
+                            <hr class="border-slate-700/50">
+                            <div>
+                                <span class="text-blue-400 font-bold block mb-0.5">2단계 (계획 수립)</span>
+                                두 기울기가 같음을 통한 매개변수 관계식 $-(s+1)e^{-s} = e^{2t}$ 수립.
+                            </div>
+                            <hr class="border-slate-700/50">
+                            <div>
+                                <span class="text-indigo-400 font-bold block mb-0.5">3단계 (계획 실행)</span>
+                                양변을 $t$로 미분하여 매개변수 미분계수 관계식 $\frac{ds}{dt} = -2\frac{s+1}{s}$ 도출.
+                            </div>
+                            <hr class="border-slate-700/50">
+                            <div>
+                                <span class="text-emerald-400 font-bold block mb-0.5">4단계 (반성)</span>
+                                $f(a) = -e^{1.5} \implies s_a = -1.5$ 및 $\frac{ds}{dt}$ 대입하여 $f'(a) = -\frac{2}{3}e\sqrt{e}$ 최종 유도 및 검증.
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 오른쪽: 판서 공간 -->
+                    <div class="col-span-8 h-full">
+                        <div class="chalkboard">
+                            <span class="absolute top-3 left-4 text-xs font-bold text-slate-500 tracking-wider">
+                                <i class="fa-solid fa-pen-ruler mr-1.5"></i> 판서 / 풀이 영역
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 6: 2024학년도 수능 미적분 28번 원본 -->
+            <div class="slide" data-category="2024학년도 수능 미적분 28번 (원본)">
+                <h2 class="text-2xl font-extrabold text-white mb-4">수능 미적분 28번 &nbsp;<span class="text-red-400 text-lg">원본 문제</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-red-500 uppercase tracking-widest mb-2">Problem 28</div>
+                        <h3 class="problem-text">
+                            실수 전체의 집합에서 연속인 함수 $f(x)$가 모든 실수 $x$에 대하여 $f(x) \ge 0$이고, $x < 0$일 때 $f(x) = -4x e^{4x^2}$이다.
+                            모든 양수 $t$에 대하여 $x$에 대한 방정식 $f(x)=t$의 서로 다른 실근의 개수는 $2$이고, 이 방정식의 두 실근 중 작은 값을 $g(t)$, 큰 값을 $h(t)$라 하자.
+                            두 함수 $g(t), h(t)$는 모든 양수 $t$에 대하여 $2g(t)+h(t)=k$ ($k$는 상수)를 만족시킨다.
+                            $\int_{0}^{7} f(x) dx = e^4 - 1$일 때, $\dfrac{f(9)}{f(8)}$의 값은?
+                        </h3>
+                        <div class="grid grid-cols-5 gap-4 mt-8 max-w-xl text-sm text-slate-300 font-semibold pl-2">
+                            <div>① $\dfrac{2}{3}e^5$</div>
+                            <div>② $\dfrac{4}{3}e^7$</div>
+                            <div>③ $\dfrac{4}{5}e^9$</div>
+                            <div>④ $\dfrac{5}{6}e^{11}$</div>
+                            <div>⑤ $\dfrac{6}{7}e^{13}$</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 7: 28번 원본 풀이 / 판서 슬라이드 -->
+            <div class="slide" data-category="28번 원본 풀이 및 판서">
+                <h2 class="text-2xl font-extrabold text-white mb-3">28번 원본 &nbsp;<span class="text-red-400 text-lg">해설 판서 영역</span></h2>
+                <div class="grid grid-cols-12 gap-6 items-stretch flex-grow">
+                    <!-- 왼쪽: 폴야 4단계 팁 및 정답 -->
+                    <div class="col-span-4 flex flex-col gap-3">
+                        <!-- 정답 박스 -->
+                        <div class="concept-card p-3.5 border-l-4 border-red-500">
+                            <span class="text-red-400 font-black text-xs uppercase tracking-wider block mb-0.5">Answer</span>
+                            <div class="text-lg font-bold text-white">정답: ②</div>
+                            <div class="text-[11px] text-slate-400">$\frac{4}{3}e^7$</div>
+                        </div>
+                        <!-- 폴야 4단계 요약 팁 박스 -->
+                        <div class="concept-card p-3.5 space-y-3 flex-grow text-[11px] leading-relaxed text-slate-300 overflow-y-auto">
+                            <div>
+                                <span class="text-yellow-400 font-bold block mb-0.5">1단계 (문제 이해)</span>
+                                $x < 0$의 감소조건 및 실근 2개 조건을 바탕으로 $0 \le x < k$에서 $f(x)=0$인 평탄구간 추론.
+                            </div>
+                            <hr class="border-slate-700/50">
+                            <div>
+                                <span class="text-blue-400 font-bold block mb-0.5">2단계 (계획 수립)</span>
+                                실근 관계 $2g(t)+h(t)=k$에 기반하여 대칭 평행이동한 $x \ge k$ 구간 식 $f(x)=2(x-k)e^{(x-k)^2}$ 유도.
+                            </div>
+                            <hr class="border-slate-700/50">
+                            <div>
+                                <span class="text-indigo-400 font-bold block mb-0.5">3단계 (계획 실행)</span>
+                                정적분 식 $\int_k^7 f(x)dx = e^{(7-k)^2}-1 = e^4-1$을 계산하여 경계 상수 $k=5$ 도출.
+                            </div>
+                            <hr class="border-slate-700/50">
+                            <div>
+                                <span class="text-emerald-400 font-bold block mb-0.5">4단계 (반성)</span>
+                                결정된 식 $f(x)=2(x-5)e^{(x-5)^2}$ ($x \ge 5$)로 $\frac{f(9)}{f(8)} = \frac{4}{3}e^7$ 계산 및 검증.
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 오른쪽: 판서 공간 -->
+                    <div class="col-span-8 h-full">
+                        <div class="chalkboard">
+                            <span class="absolute top-3 left-4 text-xs font-bold text-slate-500 tracking-wider">
+                                <i class="fa-solid fa-pen-ruler mr-1.5"></i> 판서 / 풀이 영역
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 8: 수능 미적분 28번 변형 문제 -->
+            <div class="slide" data-category="28번 변형 문제">
+                <h2 class="text-2xl font-extrabold text-white mb-4">28번 변형 문제 &nbsp;<span class="text-red-400 text-lg">미세 변형 문항</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-red-500 uppercase tracking-widest mb-2">Problem 28 (Modified)</div>
+                        <h3 class="problem-text">
+                            실수 전체의 집합에서 연속인 함수 $f(x)$가 모든 실수 $x$에 대하여 $f(x) \ge 0$이고, $x < 0$일 때 $f(x) = -4x e^{4x^2}$이다.
+                            모든 양수 $t$에 대하여 $x$에 대한 방정식 $f(x)=t$의 서로 다른 실근의 개수는 $2$이고, 이 방정식의 두 실근 중 작은 값을 $g(t)$, 큰 값을 $h(t)$라 하자.
+                            두 함수 $g(t), h(t)$는 모든 양수 $t$에 대하여 $2g(t)+h(t)=k$ ($k$는 상수)를 만족시킨다.
+                            $\int_{0}^{7} f(x) dx = e^9 - 1$일 때, $\dfrac{f(9)}{f(8)}$의 값은?
+                        </h3>
+                        <div class="grid grid-cols-5 gap-4 mt-8 max-w-xl text-sm text-slate-300 font-semibold pl-2">
+                            <div>① $\dfrac{3}{4}e^7$</div>
+                            <div>② $\dfrac{4}{3}e^7$</div>
+                            <div>③ $\dfrac{5}{4}e^9$</div>
+                            <div>④ $\dfrac{6}{5}e^{11}$</div>
+                            <div>⑤ $\dfrac{7}{6}e^{13}$</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 9: 28번 변형 풀이 / 판서 슬라이드 -->
+            <div class="slide" data-category="28번 변형 풀이 및 판서">
+                <h2 class="text-2xl font-extrabold text-white mb-3">28번 변형 &nbsp;<span class="text-red-400 text-lg">해설 판서 영역</span></h2>
+                <div class="grid grid-cols-12 gap-6 items-stretch flex-grow">
+                    <!-- 왼쪽: 폴야 4단계 팁 및 정답 -->
+                    <div class="col-span-4 flex flex-col gap-3">
+                        <!-- 정답 박스 -->
+                        <div class="concept-card p-3.5 border-l-4 border-red-500">
+                            <span class="text-red-400 font-black text-xs uppercase tracking-wider block mb-0.5">Answer</span>
+                            <div class="text-lg font-bold text-white">정답: ③</div>
+                            <div class="text-[11px] text-slate-400">$\frac{5}{4}e^9$</div>
+                        </div>
+                        <!-- 폴야 4단계 요약 팁 박스 -->
+                        <div class="concept-card p-3.5 space-y-3 flex-grow text-[11px] leading-relaxed text-slate-300 overflow-y-auto">
+                            <div>
+                                <span class="text-yellow-400 font-bold block mb-0.5">1단계 (문제 이해)</span>
+                                $x < 0$의 감소조건 및 실근 2개 조건을 바탕으로 $0 \le x < k$에서 $f(x)=0$인 평탄구간 추론.
+                            </div>
+                            <hr class="border-slate-700/50">
+                            <div>
+                                <span class="text-blue-400 font-bold block mb-0.5">2단계 (계획 수립)</span>
+                                실근 관계 $2g(t)+h(t)=k$에 기반하여 대칭 평행이동한 $x \ge k$ 구간 식 $f(x)=2(x-k)e^{(x-k)^2}$ 유도.
+                            </div>
+                            <hr class="border-slate-700/50">
+                            <div>
+                                <span class="text-indigo-400 font-bold block mb-0.5">3단계 (계획 실행)</span>
+                                정적분 식 $\int_k^7 f(x)dx = e^{(7-k)^2}-1 = e^9-1$을 계산하여 경계 상수 $k=4$ 도출.
+                            </div>
+                            <hr class="border-slate-700/50">
+                            <div>
+                                <span class="text-emerald-400 font-bold block mb-0.5">4단계 (반성)</span>
+                                결정된 식 $f(x)=2(x-4)e^{(x-4)^2}$ ($x \ge 4$)로 $\frac{f(9)}{f(8)} = \frac{5}{4}e^9$ 계산 및 검증.
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 오른쪽: 판서 공간 -->
+                    <div class="col-span-8 h-full">
+                        <div class="chalkboard">
+                            <span class="absolute top-3 left-4 text-xs font-bold text-slate-500 tracking-wider">
+                                <i class="fa-solid fa-pen-ruler mr-1.5"></i> 판서 / 풀이 영역
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 10: Outro -->
+            <div class="slide" data-category="Outro">
+                <div class="flex flex-col items-center justify-center h-full text-center">
+                    <i class="fa-solid fa-graduation-cap text-6xl text-red-500 mb-6"></i>
+                    <h2 class="text-4xl font-extrabold text-white mb-4">수능 미적분 핵심 정복!</h2>
+                    <div class="h-1 w-24 bg-red-500 rounded-full mb-6"></div>
+                    <p class="text-xl text-slate-300 max-w-2xl leading-relaxed font-light mb-4">
+                        2024학년도 수능 수학 미적분의 최고난이도 2대장<br>
+                        **27번(접선 기울기 매개변수) 및 28번(합성대칭 적분)** 분석을 마쳤습니다.
+                    </p>
+                    <p class="text-slate-400 text-base">
+                        수치를 바꾼 변형 문제를 끝까지 직접 해결하며 계산 능력을 완성해 봅시다.
+                    </p>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer: 슬라이드 컨트롤 및 페이지 표시 -->
+        <div class="flex justify-between items-center z-20 pt-3 border-t border-slate-700/50 mx-8 mb-6 no-print">
+            <div class="flex items-center gap-3">
+                <button onclick="prevSlide()" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg font-bold transition-all border border-slate-700 flex items-center gap-2">
+                    <i class="fa-solid fa-chevron-left"></i> 이전
+                </button>
+                <button onclick="nextSlide()" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg font-bold transition-all border border-slate-700 flex items-center gap-2">
+                    다음 <i class="fa-solid fa-chevron-right"></i>
+                </button>
+            </div>
+            <div class="text-slate-400 text-sm font-semibold tracking-widest">
+                <span id="current-page" class="text-red-400 font-bold">1</span> / <span id="total-pages">10</span>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 슬라이드 조작 스크립트 -->
+    <script>
+        const slides = document.querySelectorAll('.slide');
+        const pageIndicator = document.getElementById('current-page');
+        const totalIndicator = document.getElementById('total-pages');
+        const categoryIndicator = document.getElementById('slide-category');
+        
+        let currentSlideIdx = 0;
+        totalIndicator.innerText = slides.length;
+
+        function updateSlideUI() {
+            slides.forEach((slide, idx) => {
+                if (idx === currentSlideIdx) {
+                    slide.classList.add('active');
+                } else {
+                    slide.classList.remove('active');
+                }
+            });
+
+            pageIndicator.innerText = currentSlideIdx + 1;
+            const currentSlide = slides[currentSlideIdx];
+            categoryIndicator.innerText = currentSlide.getAttribute('data-category');
+
+            // MathJax 렌더링 동적 갱신
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                window.MathJax.typesetPromise();
+            }
+        }
+
+        function nextSlide() {
+            if (currentSlideIdx < slides.length - 1) {
+                currentSlideIdx++;
+                updateSlideUI();
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlideIdx > 0) {
+                currentSlideIdx--;
+                updateSlideUI();
+            }
+        }
+
+        // 초기 UI 로딩
+        updateSlideUI();
+    </script>
+</body>
+</html>
