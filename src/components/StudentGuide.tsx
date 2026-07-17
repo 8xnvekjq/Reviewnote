@@ -120,7 +120,7 @@ export const StudentGuide: React.FC = () => {
                 </div>
                 
                 <span className="text-[10.5px] font-extrabold text-slate-400 group-hover:text-emerald-400 transition-colors flex items-center space-x-1 flex-none bg-slate-950/80 px-3 py-1.5 border border-slate-850 rounded-xl">
-                  <span>교안 보기</span>
+                  <span>View</span>
                   <span className="text-[9px]">▶</span>
                 </span>
               </a>
