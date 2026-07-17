@@ -5,15 +5,6 @@ import { LaTeXRenderer } from './LaTeXRenderer';
 import { formatDate } from '../utils/date';
 import { supabase } from '../services/supabase';
 
-// 선생님 수업용 슬라이드 HTML 파일 매핑 사전
-const SLIDE_MAP: Record<string, string> = {
-  '함수의 극한': 'slide_functions_limit.html',
-  '우극한, 좌극한': 'slide_functions_limit_left_right.html',
-  '우극한과 좌극한': 'slide_functions_limit_left_right.html',
-  '함수의 극한에 대한 성질': 'slide_functions_properties.html',
-  '이항분포': 'slide_binomial_distribution.html',
-};
-
 interface MistakeDetailModalProps {
   selectedEntry: MistakeEntry;
   allEntries?: MistakeEntry[];
@@ -54,10 +45,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   const [showResult, setShowResult] = React.useState(!isAnalyzing && !!selectedEntry.analysis);
   const analysisCardRef = React.useRef<HTMLDivElement>(null);
   const wasAnalyzingRef = React.useRef(isAnalyzing);
-
-  // 슬라이드 관련 제어 상태 및 레퍼런스
-  const [isSlideOpen, setIsSlideOpen] = React.useState(false);
-  const slideIframeRef = React.useRef<HTMLIFrameElement>(null);
 
   // Student editable fields
   const [editGrade, setEditGrade] = React.useState(selectedEntry.grade || '');
@@ -307,24 +294,12 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     };
   }, [selectedEntry, youtubeLectures]);
 
-  // 개념 슬라이드 매칭 연산
-  const matchedSlideFile = React.useMemo(() => {
-    if (!selectedEntry?.chapter) return null;
-    const chapter = selectedEntry.chapter.trim();
-    const foundKey = Object.keys(SLIDE_MAP).find(key => 
-      chapter.toLowerCase().includes(key.toLowerCase()) || 
-      key.toLowerCase().includes(chapter.toLowerCase())
-    );
-    return foundKey ? SLIDE_MAP[foundKey] : null;
-  }, [selectedEntry.chapter]);
-
   // 1. Reset all local states when the selected mistake ID changes (opening a different mistake card)
   React.useEffect(() => {
     setRevealedHintCount(0);
     setShowProblemText(false);
     setShowSolvingProcess(true);
     setShowMistakeSummary(false); // ID 변경 시 아코디언 닫음
-    setIsSlideOpen(false); // 슬라이드 보기 상태도 리셋
     setEditGrade(selectedEntry.grade || '');
     setEditChapter(selectedEntry.chapter || '');
     setEditRootCauses(selectedEntry.rootCauses || []);
@@ -875,74 +850,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 <span>▶️</span>
                 <span>바로가기</span>
               </a>
-            </div>
-          )}
-
-          {/* 🖥️ 수업 개념 슬라이드 아코디언 카드 */}
-          {matchedSlideFile && (
-            <div className="bg-slate-950/40 border border-slate-800/80 rounded-2xl overflow-hidden animate-scale-up">
-              {/* Header Button Toggle */}
-              <button
-                onClick={() => setIsSlideOpen(!isSlideOpen)}
-                className="w-full p-4 flex items-center justify-between hover:bg-slate-900/20 active:bg-slate-900/40 transition-colors"
-              >
-                <div className="flex items-center space-x-3 text-left">
-                  <span className="text-xl">🖥️</span>
-                  <div>
-                    <p className="text-[10px] font-black text-emerald-400 uppercase tracking-wider">선생님 직강 자료</p>
-                    <h5 className="text-xs font-bold text-slate-200">
-                      개념 핵심 수업 슬라이드
-                    </h5>
-                  </div>
-                </div>
-                <span className="text-xs text-slate-500 font-extrabold flex items-center space-x-1">
-                  <span>{isSlideOpen ? '접기 🔼' : '열기 🔽'}</span>
-                </span>
-              </button>
-
-              {/* Slide Content IFrame */}
-              {isSlideOpen && (
-                <div className="p-4 border-t border-slate-850/60 bg-slate-950/80 space-y-3.5 animate-slide-down">
-                  {/* Aspect Ratio 16:9 Iframe Container */}
-                  <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-slate-800 bg-slate-950 shadow-inner">
-                    <iframe
-                      ref={slideIframeRef}
-                      src={`/slides/${matchedSlideFile}`}
-                      title="Lesson Slideshow"
-                      className="absolute inset-0 w-full h-full border-none"
-                      allowFullScreen
-                    />
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex space-x-2.5">
-                    <a
-                      href={`/slides/${matchedSlideFile}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 py-3.5 rounded-xl bg-slate-900 hover:bg-slate-850 active:scale-95 text-slate-300 hover:text-slate-200 border border-slate-800 hover:border-slate-700 transition-all font-bold text-xs flex items-center justify-center space-x-2 shadow-lg shadow-black/30"
-                    >
-                      <span>🖥️</span>
-                      <span>새 창에서 전체화면 보기</span>
-                    </a>
-                    
-                    <button
-                      onClick={() => {
-                        if (slideIframeRef.current?.contentWindow) {
-                          slideIframeRef.current.contentWindow.focus();
-                          slideIframeRef.current.contentWindow.print();
-                        } else {
-                          alert("인쇄 기능이 지원되지 않는 브라우저입니다. 새 창으로 열어서 인쇄(Ctrl+P)해 주세요.");
-                        }
-                      }}
-                      className="py-3.5 px-4.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-95 text-emerald-400 hover:text-emerald-300 border border-emerald-500/20 transition-all font-extrabold text-xs flex items-center justify-center space-x-1.5 shadow-md shadow-emerald-950/20"
-                    >
-                      <span>📄</span>
-                      <span>PDF 저장/인쇄</span>
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
