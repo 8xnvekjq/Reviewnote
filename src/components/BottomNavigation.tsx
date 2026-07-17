@@ -7,6 +7,7 @@ interface BottomNavigationProps {
   isAdmin?: boolean;
   onlineUsers: { id: string; display_name: string; username: string }[];
   onStartReviewSession?: () => void;
+  onOpenSlideList?: () => void;
 }
 
 export const BottomNavigation: React.FC<BottomNavigationProps> = ({ 
@@ -14,7 +15,8 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
   setActiveTab, 
   isAdmin,
   onlineUsers = [],
-  onStartReviewSession
+  onStartReviewSession,
+  onOpenSlideList
 }) => {
   const [showOnlinePopup, setShowOnlinePopup] = useState(false);
 
@@ -52,6 +54,18 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
           </div>
         )}
       </div>
+
+      {/* 수업자료 배지 버튼 (하단 내비바 우측 복습하기 왼편 플로팅 + 세련된 에메랄드 테두리 글로우) */}
+      {onOpenSlideList && (
+        <div className="absolute -top-3.5 right-[86px] select-none z-50">
+          <button
+            onClick={onOpenSlideList}
+            className="px-3 py-0.5 rounded-full bg-emerald-700 hover:bg-emerald-650 border-2 border-emerald-400 text-[8.5px] font-black text-white flex items-center space-x-1 shadow-[0_0_12px_rgba(16,185,129,0.65)] hover:shadow-[0_0_18px_rgba(16,185,129,0.85)] hover:scale-105 active:scale-95 transition-all backdrop-blur-md"
+          >
+            <span>🖥️ 수업자료</span>
+          </button>
+        </div>
+      )}
 
       {/* 복습하기 배지 버튼 (하단 내비바 우측 상단 플로팅 + 차분한 황금 테두리 글로우 효과) */}
       {onStartReviewSession && (

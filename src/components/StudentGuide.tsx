@@ -32,15 +32,6 @@ export const StudentGuide: React.FC = () => {
     }
   ];
 
-  const SLIDE_LIST = [
-    { title: 'I. 함수의 극한과 연속 - 04. 함수의 극한의 응용', filename: 'math_limit_applications.html', date: '2026.07.18' },
-    { title: 'II. 함수의 극한과 연속 - 01. 함수의 연속', filename: 'math_continuity_01.html', date: '2026.07.18' },
-    { title: '개념원리 공통수학2 - 평면좌표 (내분점~무게중심)', filename: 'math2_plane_coordinates.html', date: '2026.07.18' },
-    { title: '2024학년도 수능 수학 14번 및 변형문제', filename: '2024_suneung_math_14.html', date: '2026.07.18' },
-    { title: '2024학년도 수능 수학 미적분 27, 28번 및 변형문제', filename: '2024_suneung_calculus_27_28.html', date: '2026.07.18' },
-    { title: '2024학년도 수능 수학 확률과 통계 30번 및 변형문제', filename: '2024_suneung_prob_stat_30.html', date: '2026.07.18' },
-  ];
-
   const changeLogs = CHRONOLOGICAL_CHANGELOGS;
 
   return (
@@ -88,45 +79,7 @@ export const StudentGuide: React.FC = () => {
           </div>
         </div>
 
-        {/* 🖥️ 수업 개념 슬라이드 교안 리스트 */}
-        <div className="space-y-4 pt-6 border-t border-slate-800">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-black text-emerald-400 uppercase tracking-wider pl-1 flex items-center space-x-1.5">
-              <span>🖥️</span>
-              <span>선생님 수업 개념 슬라이드</span>
-            </h3>
-            <span className="text-[10px] text-slate-500 font-bold">총 {SLIDE_LIST.length}개 자료</span>
-          </div>
-          
-          <div className="grid gap-2.5">
-            {SLIDE_LIST.map((slide, idx) => (
-              <a
-                key={idx}
-                href={`/slides/${slide.filename}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-between p-3.5 bg-slate-900/40 hover:bg-slate-900/80 border border-slate-800 hover:border-emerald-500/30 rounded-2xl transition-all duration-200 group active:scale-[0.99]"
-              >
-                <div className="flex items-center space-x-3 min-w-0">
-                  <span className="text-lg flex-none select-none group-hover:scale-110 transition-transform">📄</span>
-                  <div className="min-w-0 space-y-0.5">
-                    <h4 className="text-xs font-bold text-slate-200 group-hover:text-emerald-400 transition-colors truncate">
-                      {slide.title}
-                    </h4>
-                    <p className="text-[9.5px] text-slate-500">
-                      등록일: {slide.date} • {slide.filename}
-                    </p>
-                  </div>
-                </div>
-                
-                <span className="text-[10.5px] font-extrabold text-slate-400 group-hover:text-emerald-400 transition-colors flex items-center space-x-1 flex-none bg-slate-950/80 px-3 py-1.5 border border-slate-850 rounded-xl">
-                  <span>View</span>
-                  <span className="text-[9px]">▶</span>
-                </span>
-              </a>
-            ))}
-          </div>
-        </div>
+
 
         {/* 더쿠키수학 오답클리닉 변경 이력 */}
         <div className="space-y-4 pt-6 border-t border-slate-800">

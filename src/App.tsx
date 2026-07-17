@@ -15,6 +15,7 @@ import { ImageCropper } from './components/ImageCropper';
 import { AdminPanel } from './components/AdminPanel';
 import { StudentGuide } from './components/StudentGuide';
 import { LaTeXRenderer } from './components/LaTeXRenderer';
+import { SlideListModal } from './components/SlideListModal';
 
 function App() {
   // If Supabase credentials are not configured, block and show the setup guide
@@ -58,6 +59,8 @@ function App() {
   const [printAsTextMap, setPrintAsTextMap] = useState<Record<string, boolean>>({});
   // 인쇄할 아이템 선택 ID 목록 상태
   const [selectedPrintIds, setSelectedPrintIds] = useState<string[]>([]);
+  // 수업자료 리스트 모달 팝업 상태
+  const [isSlideListOpen, setIsSlideListOpen] = useState(false);
   
   const prevTabRef = useRef(activeTab);
 
@@ -1468,6 +1471,13 @@ function App() {
         isAdmin={isAdmin} 
         onlineUsers={onlineUsers}
         onStartReviewSession={handleStartReviewSession}
+        onOpenSlideList={() => setIsSlideListOpen(true)}
+      />
+
+      {/* 수업자료 모달 다이얼로그 */}
+      <SlideListModal
+        isOpen={isSlideListOpen}
+        onClose={() => setIsSlideListOpen(false)}
       />
 
       {/* 인쇄 전용 2열 세로 구분선 레이아웃 (@media print 시에만 노출) */}
