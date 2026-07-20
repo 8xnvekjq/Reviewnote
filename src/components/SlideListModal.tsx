@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 
 interface SlideItem {
   title: string;
@@ -42,7 +42,11 @@ export const SlideListModal: React.FC<SlideListModalProps> = ({ isOpen, onClose 
     setOpenGroups(prev => ({ ...prev, [label]: prev[label] === false ? true : false }));
   };
 
-  const isGroupOpen = (label: string) => openGroups[label] !== false;
+  // 명시적으로 설정된 값이 있으면 그 값 사용, 없으면 첫 번째(최신) 그룹만 열림, 나머지 닫힘
+  const isGroupOpen = (label: string, isFirst: boolean) => {
+    if (label in openGroups) return openGroups[label];
+    return isFirst;
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-955/85 backdrop-blur-sm animate-fade-in">
@@ -63,8 +67,8 @@ export const SlideListModal: React.FC<SlideListModalProps> = ({ isOpen, onClose 
         </div>
 
         <div className="p-4 overflow-y-auto space-y-3 flex-1 min-h-0 scrollbar-thin scrollbar-thumb-slate-800">
-          {groupedSlides.map((group) => {
-            const open = isGroupOpen(group.dateLabel);
+          {groupedSlides.map((group, groupIdx) => {
+            const open = isGroupOpen(group.dateLabel, groupIdx === 0);
             return (
               <div key={group.dateLabel} className="rounded-2xl border border-slate-800/60 overflow-hidden bg-slate-950/30 animate-scale-up">
 
