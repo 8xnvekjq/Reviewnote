@@ -36,6 +36,8 @@ function App() {
   const [youtubeLectures, setYoutubeLectures] = useState<any[]>([]);
   // 주간 최다 오답 완료 챔피언 상태 (1~3위)
   const [weeklyChampions, setWeeklyChampions] = useState<any[]>([]);
+  // 내 주간 점수 (Supabase weekly_leaderboard DB 뷰 기반 — 배너와 동일 소스)
+  const [myWeeklyScoreFromDB, setMyWeeklyScoreFromDB] = useState<number>(0);
   // 분석통계 탭 학생 필터 상태 (어드민 전용)
   const [statsStudentFilter, setStatsStudentFilter] = useState<string>('all');
   // 분석통계 탭 기간 필터 상태 (디폴트: 'all' 전체기간)
@@ -76,84 +78,41 @@ function App() {
     prevTabRef.current = activeTab;
   }, [activeTab, mistakes]);
 
-  // 이번주 월요일 00:00 KST UTC 경계 날짜 구하기 (내 실시간 주간 점수 계산용)
-  const myWeeklyScore = useMemo(() => {
-    if (!currentUser || mistakes.length === 0) return { total: 0, completed: 0, score: 0 };
-
-    const now = new Date();
-    const kstTime = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-    const day = kstTime.getUTCDay();
-    const diff = kstTime.getUTCDate() - day + (day === 0 ? -6 : 1);
-    const mondayKst = new Date(Date.UTC(kstTime.getUTCFullYear(), kstTime.getUTCMonth(), diff, 0, 0, 0));
-    const thisMondayUtc = new Date(mondayKst.getTime() - 9 * 60 * 60 * 1000);
-
-    // 날짜 파싱 유틸리티 함수 선언 (이번 주 내 스탬프 확인용)
-    const isDateInCurrentWeekLocal = (dateStr: string) => {
-      if (!dateStr) return false;
-      try {
-        let parsedDate: Date;
-        if (dateStr.includes('-') || dateStr.includes('T')) {
-          parsedDate = new Date(dateStr);
-        } else if (dateStr.includes('.')) {
-          parsedDate = new Date(dateStr.replace(/\./g, '/'));
-        } else {
-          parsedDate = new Date(`${new Date().getFullYear()}/${dateStr}`);
-        }
-        return !isNaN(parsedDate.getTime()) && parsedDate >= thisMondayUtc;
-      } catch {
-        return false;
+  // 내 주간 점수 조회 (Supabase weekly_leaderboard 뷰 — 배너·어드민과 동일 소스 통일)
+  const fetchMyWeeklyScore = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('weekly_leaderboard')
+        .select('score')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (!error && data) {
+        setMyWeeklyScoreFromDB(Math.round(data.score ?? 0));
+      } else {
+        setMyWeeklyScoreFromDB(0);
       }
-    };
-
-    // UI 안내용 등록 수 및 완료 수 계산 (점수 공식에선 이제 빠짐)
-    const total = mistakes.filter(m => new Date(m.date) >= thisMondayUtc).length;
-    const completed = mistakes.filter(m => {
-      const isCompleted = m.reviews && m.reviews.filter(r => r === 'O').length === 3;
-      if (!isCompleted) return false;
-      const updateDate = new Date(m.updatedAt || m.date);
-      return updateDate >= thisMondayUtc;
-    }).length;
-
-    // 3단 콤보 주간 점수 누적 연산
-    let score = 0;
-    mistakes.forEach(m => {
-      const reviews = m.reviews || [];
-      const reviewDates = m.analysis?.reviewDates || [];
-
-      // reviewDates가 없거나 빈 문자열일 때 updatedAt 및 date로 폴백 처리
-      const rDate0 = reviewDates[0] || m.updatedAt || m.date;
-      const rDate1 = reviewDates[1] || m.updatedAt || m.date;
-      const rDate2 = reviewDates[2] || m.updatedAt || m.date;
-
-      if (reviews[0] === 'O' && isDateInCurrentWeekLocal(rDate0)) score += 2;
-      if (reviews[1] === 'O' && isDateInCurrentWeekLocal(rDate1)) score += 3;
-      if (reviews[2] === 'O' && isDateInCurrentWeekLocal(rDate2)) score += 15;
-    });
-
-    return {
-      total,
-      completed,
-      score: Math.round(score)
-    };
-  }, [currentUser, mistakes]);
+    } catch {
+      setMyWeeklyScoreFromDB(0);
+    }
+  };
 
   // State for image cropping flow
   const [tempCapturedImage, setTempCapturedImage] = useState<string | null>(null);
 
-  // 주간 최다 오답 완료 챔피언 정보 로드 (하이브리드 1주 이월 및 리셋 롤오버)
+  // 주간 최다 오답 완료 챔피언 정보 로드 + 내 점수 동시 갱신 (하이브리드 1주 이월 및 리셋 롤오버)
   const loadWeeklyChampions = async () => {
     try {
-      // 1. 이번 주 랭킹 뷰 조회 (최대 3명)
+      // 1. 이번 주 랭킹 뷰 전체 조회 (상위 3명 표시 + 내 점수 추출)
       const { data, error } = await supabase
         .from('weekly_leaderboard')
         .select('*')
-        .order('score', { ascending: false })
-        .limit(3);
+        .order('score', { ascending: false });
 
       if (error) throw error;
 
       if (data && data.length > 0 && data[0].score > 0) {
-        const mapped = data.map((item: any) => ({ ...item, isLastWeek: false }));
+        // 상위 3명 챔피언 세팅
+        const mapped = data.slice(0, 3).map((item: any) => ({ ...item, isLastWeek: false }));
         setWeeklyChampions(mapped);
         return;
       }
@@ -170,14 +129,17 @@ function App() {
       if (lastWeekData && lastWeekData.length > 0 && lastWeekData[0].score > 0) {
         const mapped = lastWeekData.map((item: any) => ({ ...item, isLastWeek: true }));
         setWeeklyChampions(mapped);
-        return;
+      } else {
+        // 3. 지난주마저 점수가 없으면 배너를 비워 동기부여 유도
+        setWeeklyChampions([]);
       }
 
-      // 3. 지난주마저 점수가 없으면 배너를 비워 동기부여 유도
-      setWeeklyChampions([]);
+      // 이번 주 점수가 없으면 내 점수도 0
+      setMyWeeklyScoreFromDB(0);
     } catch (err) {
       console.error('loadWeeklyChampions failed:', err);
       setWeeklyChampions([]);
+      setMyWeeklyScoreFromDB(0);
     }
   };
 
@@ -271,6 +233,7 @@ function App() {
         fetchAdminStatus(session.user.id);
         loadYoutubeLectures(); // 유튜브 강의 데이터 로드
         loadWeeklyChampions(); // 주간 챔피언 로드
+        fetchMyWeeklyScore(session.user.id); // 내 주간 점수 DB 조회
         fetchGeminiApiKeys(); // 동적 API 키 로드
       }
     });
@@ -285,6 +248,7 @@ function App() {
         fetchAdminStatus(session.user.id);
         loadYoutubeLectures(); // 유튜브 강의 데이터 로드
         loadWeeklyChampions(); // 주간 챔피언 로드
+        fetchMyWeeklyScore(session.user.id); // 내 주간 점수 DB 조회
         fetchGeminiApiKeys(); // 동적 API 키 로드
       } else {
         setCurrentUser('');
@@ -858,6 +822,7 @@ function App() {
       // Refresh peer activities locally
       fetchPeerActivities();
       loadWeeklyChampions(); // MVP 챔피언 배너 즉각 갱신
+      if (session?.user?.id) fetchMyWeeklyScore(session.user.id); // 내 점수 즉각 갱신
     } catch (err: any) {
       console.error('Failed to update reviews:', err);
       // Fallback: update local React state anyway for immediate validation
@@ -1052,7 +1017,7 @@ function App() {
     <div className="h-full flex flex-col bg-slate-950 text-slate-100 select-none">
       
       {/* Top Header */}
-      <Header currentUser={currentUser} onLogout={handleLogout} myScore={myWeeklyScore.score} />
+      <Header currentUser={currentUser} onLogout={handleLogout} myScore={myWeeklyScoreFromDB} />
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto px-4 py-6 pb-28">
