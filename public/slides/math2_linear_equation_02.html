@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>개념원리 공통수학2 - 02.직선의 방정식(p34~62)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true
+            },
+            options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'] }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        .presentation-deck { position: relative; width: 1280px; height: 720px; background: radial-gradient(circle at 10% 20%, #1e293b 0%, #0f172a 100%); border: 1px solid rgba(255, 255, 255, 0.08); margin: 20px auto; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+        .slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 50px 80px; display: none; flex-direction: column; justify-content: space-between; z-index: 1; background: transparent; }
+        .slide.active { display: flex; z-index: 10; }
+        .concept-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2); }
+        .problem-box { background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.8) 100%); border-left: 8px solid #3b82f6; border-top: 1px solid rgba(255, 255, 255, 0.05); border-right: 1px solid rgba(255, 255, 255, 0.05); border-bottom: 1px solid rgba(255, 255, 255, 0.05); border-radius: 0 16px 16px 0; }
+        
+        /* 폰트사이즈 기존 대비 80% 축소 조절 (24px -> 19.2px) */
+        .problem-text { font-size: 1.2rem; font-weight: 700; color: #f1f5f9; line-height: 1.625; }
+
+        @media print {
+            body { background-color: #ffffff !important; margin: 0 !important; padding: 0 !important; }
+            .presentation-deck { width: 1280px !important; height: auto !important; box-shadow: none !important; border: none !important; margin: 0 !important; overflow: visible !important; display: block !important; }
+            .slide { position: relative !important; display: flex !important; width: 1280px !important; height: 720px !important; page-break-after: always !important; page-break-inside: avoid !important; background: #0f172a !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <!-- 오답노트 귀환용 닫기 X 버튼 (PWA 네비게이션 미지원 단말 대응) -->
+    <button onclick="window.close()" class="no-print" style="position: fixed; top: 16px; left: 16px; z-index: 99999; display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; background-color: rgba(15, 23, 42, 0.85); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 50%; font-family: sans-serif; font-size: 14px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.5); backdrop-filter: blur(8px); transition: all 0.2s;" onmouseover="this.style.backgroundColor='rgba(30, 41, 59, 0.95)';" onmouseout="this.style.backgroundColor='rgba(15, 23, 42, 0.85)';">
+        ❌
+    </button>
+    <div class="presentation-deck" id="deck">
+        <!-- Header: 공통 탑바 -->
+        <div class="flex justify-between items-center z-20 pb-3 border-b border-slate-700/50 mx-8 mt-6 no-print">
+            <div class="flex items-center gap-3">
+                <span class="bg-blue-600 text-white text-xs font-black px-2.5 py-1 rounded-md tracking-wider">개념원리</span>
+                <span class="text-slate-400 text-sm font-medium">공통수학2 &gt; Ⅱ. 도형의 방정식 &gt; 02. 직선의 방정식</span>
+            </div>
+            <div class="text-right">
+                <span class="text-xs text-blue-400 font-semibold uppercase tracking-wider" id="slide-category">수업 개념 &amp; 필수예제</span>
+            </div>
+        </div>
+
+        <!-- 슬라이드 본문 영역 -->
+        <div class="relative flex-grow my-2 overflow-hidden" id="slide-container">
+            
+            <!-- Slide 1: 표지 -->
+            <div class="slide active" data-category="Chapter Intro">
+                <div class="flex flex-col items-center justify-center h-full text-center">
+                    <span class="text-blue-500 font-bold tracking-widest text-lg mb-3">2026.07.21 CLASS</span>
+                    <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-blue-400 tracking-tight leading-tight mb-6">
+                        개념원리 공통수학2
+                    </h1>
+                    <div class="h-1.5 w-32 bg-blue-500 rounded-full mb-8"></div>
+                    <h2 class="text-3xl font-bold text-slate-300">
+                        02. 직선의 방정식 (p.34 ~ 62)
+                    </h2>
+                    <p class="text-slate-400 mt-6 text-lg max-w-xl font-light">
+                        직선의 방정식 구하기, 두 직선의 위치 관계(평행·수직), 점과 직선 사이의 거리 전 단원 핵심 마스터
+                    </p>
+                </div>
+            </div>
+
+            <!-- Slide 2: 개념 01 - 직선의 방정식 (p.34~35) -->
+            <div class="slide" data-category="개념 01 | 직선의 방정식">
+                <h2 class="text-2xl font-extrabold text-white mb-4">01. 직선의 방정식 &nbsp;<span class="text-blue-400 text-lg">p.34 ~ 35</span></h2>
+                <div class="grid grid-cols-2 gap-6 flex-grow items-stretch">
+                    <div class="concept-card p-6 flex flex-col justify-center space-y-4">
+                        <div class="border-b border-slate-700/50 pb-2">
+                            <span class="text-blue-400 font-bold text-sm">1. 한 점과 기울기가 주어진 직선</span>
+                            <div class="text-base font-bold text-white mt-1">점 $(x_1, y_1)$을 지나고 기울기가 $m$인 직선</div>
+                            <div class="text-lg font-extrabold text-yellow-400 mt-1">$y - y_1 = m(x - x_1)$</div>
+                        </div>
+                        <div class="border-b border-slate-700/50 pb-2">
+                            <span class="text-blue-400 font-bold text-sm">2. 두 점을 지나는 직선</span>
+                            <div class="text-base font-bold text-white mt-1">두 점 $(x_1, y_1), (x_2, y_2)$를 지나는 직선</div>
+                            <div class="text-base text-slate-200 mt-1">
+                                $x_1 \ne x_2 \implies y - y_1 = \dfrac{y_2 - y_1}{x_2 - x_1}(x - x_1)$<br>
+                                $x_1 = x_2 \implies x = x_1$
+                            </div>
+                        </div>
+                    </div>
+                    <div class="concept-card p-6 flex flex-col justify-center space-y-4">
+                        <div class="border-b border-slate-700/50 pb-2">
+                            <span class="text-blue-400 font-bold text-sm">3. x절편과 y절편이 주어진 직선</span>
+                            <div class="text-base font-bold text-white mt-1">$x$절편이 $a$, $y$절편이 $b$인 직선 ($a \ne 0, b \ne 0$)</div>
+                            <div class="text-lg font-extrabold text-yellow-400 mt-1 font-mono">$\dfrac{x}{a} + \dfrac{y}{b} = 1$</div>
+                        </div>
+                        <div>
+                            <span class="text-blue-400 font-bold text-sm">4. 일차방정식이 나타내는 도형</span>
+                            <div class="text-base font-bold text-white mt-1">직선의 방정식의 일반형</div>
+                            <div class="text-base text-slate-200 mt-1">
+                                $ax + by + c = 0$ ($a \ne 0$ 또는 $b \ne 0$)<br>
+                                기울기 $= -\dfrac{a}{b}$, $y$절편 $= -\dfrac{c}{b}$
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 3: 필수예제 01 (p.37) -->
+            <div class="slide" data-category="필수예제 01 | p.37">
+                <h2 class="text-2xl font-extrabold text-white mb-4">필수예제 01 &nbsp;<span class="text-blue-400 text-lg">한 점과 기울기가 주어진 직선의 방정식 (p.37)</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Essential Example 01</div>
+                        <h3 class="problem-text">
+                            두 점 $(-4, 2), (6, 8)$을 이은 선분의 중점을 지나고 기울기가 $-3$인 직선의 방정식을 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 4: 필수예제 02 (p.37) -->
+            <div class="slide" data-category="필수예제 02 | p.37">
+                <h2 class="text-2xl font-extrabold text-white mb-4">필수예제 02 &nbsp;<span class="text-blue-400 text-lg">두 점을 지나는 직선의 방정식 (p.37)</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Essential Example 02</div>
+                        <h3 class="problem-text">
+                            두 점 $A(7, -3), B(2, -8)$을 이은 선분 $AB$를 $3 : 2$로 내분하는 점과 점 $(5, 2)$를 지나는 직선의 방정식을 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 5: 필수예제 03 (p.38) -->
+            <div class="slide" data-category="필수예제 03 | p.38">
+                <h2 class="text-2xl font-extrabold text-white mb-4">필수예제 03 &nbsp;<span class="text-blue-400 text-lg">x절편과 y절편이 주어진 직선의 방정식 (p.38)</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Essential Example 03</div>
+                        <h3 class="problem-text">
+                            $x$절편이 $6$이고 $y$절편이 $-2$인 직선 위에 두 점 $(a, -1), (4, b)$가 있을 때, $ab$의 값을 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 6: 필수예제 04 (p.38) -->
+            <div class="slide" data-category="필수예제 04 | p.38">
+                <h2 class="text-2xl font-extrabold text-white mb-4">필수예제 04 &nbsp;<span class="text-blue-400 text-lg">세 점이 한 직선 위에 있을 조건 (p.38)</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Essential Example 04</div>
+                        <h3 class="problem-text">
+                            세 점 $A(3, 2), B(1, -a), C(a, 5)$가 한 직선 위에 있도록 하는 양수 $a$의 값을 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 7: 필수예제 05 (p.39) -->
+            <div class="slide" data-category="필수예제 05 | p.39">
+                <h2 class="text-2xl font-extrabold text-white mb-4">필수예제 05 &nbsp;<span class="text-blue-400 text-lg">도형의 넓이를 이등분하는 직선의 방정식 (p.39)</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Essential Example 05</div>
+                        <h3 class="problem-text">
+                            세 점 $A(-2, 4), B(-1, 2), C(3, 4)$를 꼭짓점으로 하는 삼각형 $ABC$가 있다. 점 $A$를 지나고 삼각형 $ABC$의 넓이를 이등분하는 직선의 방정식을 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 8: 필수예제 06 (p.40) -->
+            <div class="slide" data-category="필수예제 06 | p.40">
+                <h2 class="text-2xl font-extrabold text-white mb-4">필수예제 06 &nbsp;<span class="text-blue-400 text-lg">계수의 부호와 그래프의 개형 (p.40)</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Essential Example 06</div>
+                        <h3 class="problem-text">
+                            상수 $a, b, c$가 다음을 만족시킬 때, 직선 $ax + by + c = 0$이 지나는 사분면을 모두 구하시오.<br><br>
+                            (1) $ac > 0, bc > 0$<br>
+                            (2) $ab < 0, bc > 0$<br>
+                            (3) $ac > 0, b = 0$
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 9: 필수예제 07 (p.41) -->
+            <div class="slide" data-category="필수예제 07 | p.41">
+                <h2 class="text-2xl font-extrabold text-white mb-4">필수예제 07 &nbsp;<span class="text-blue-400 text-lg">직선이 항상 지나는 점 (p.41)</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Essential Example 07</div>
+                        <h3 class="problem-text">
+                            직선 $(2-k)x + (3k-1)y - 5 = 0$이 실수 $k$의 값에 관계없이 항상 지나는 점의 좌표를 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 10: 필수예제 08 (p.42) -->
+            <div class="slide" data-category="필수예제 08 | p.42">
+                <h2 class="text-2xl font-extrabold text-white mb-4">필수예제 08 &nbsp;<span class="text-blue-400 text-lg">직선이 항상 지나는 점의 활용 (p.42)</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Essential Example 08</div>
+                        <h3 class="problem-text">
+                            두 직선 $x + y - 2 = 0$, $mx - y + m + 1 = 0$이 제1사분면에서 만나도록 하는 실수 $m$의 값의 범위를 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 11: 필수예제 09 (p.43) -->
+            <div class="slide" data-category="필수예제 09 | p.43">
+                <h2 class="text-2xl font-extrabold text-white mb-4">필수예제 09 &nbsp;<span class="text-blue-400 text-lg">두 직선의 교점을 지나는 직선의 방정식 (p.43)</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Essential Example 09</div>
+                        <h3 class="problem-text">
+                            두 직선 $2x - y - 1 = 0$, $x - y - 3 = 0$의 교점과 점 $(2, 2)$를 지나는 직선의 방정식을 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 12: 개념 02 - 두 직선의 위치 관계 (p.47~48) -->
+            <div class="slide" data-category="개념 02 | 두 직선의 위치 관계">
+                <h2 class="text-2xl font-extrabold text-white mb-4">02. 두 직선의 위치 관계 &nbsp;<span class="text-blue-400 text-lg">p.47 ~ 48</span></h2>
+                <div class="concept-card p-6 flex flex-col justify-center space-y-6 h-full">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-center border-collapse border border-slate-700/60">
+                            <thead>
+                                <tr class="bg-slate-800 text-blue-400 text-base">
+                                    <th class="border border-slate-700/60 py-3 font-bold">위치 관계</th>
+                                    <th class="border border-slate-700/60 py-3 font-bold">표준형 ($y=mx+n, y=m'x+n'$)</th>
+                                    <th class="border border-slate-700/60 py-3 font-bold">일반형 ($ax+by+c=0, a'x+b'y+c'=0$)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-slate-200 text-base">
+                                <tr class="hover:bg-slate-800/40">
+                                    <td class="border border-slate-700/60 py-3 font-bold text-yellow-400">평행하다</td>
+                                    <td class="border border-slate-700/60 py-3">$m = m', n \ne n'$</td>
+                                    <td class="border border-slate-700/60 py-3 font-mono">$\dfrac{a}{a'} = \dfrac{b}{b'} \ne \dfrac{c}{c'}$</td>
+                                </tr>
+                                <tr class="hover:bg-slate-800/40">
+                                    <td class="border border-slate-700/60 py-3 font-bold text-emerald-400">일치한다</td>
+                                    <td class="border border-slate-700/60 py-3">$m = m', n = n'$</td>
+                                    <td class="border border-slate-700/60 py-3 font-mono">$\dfrac{a}{a'} = \dfrac{b}{b'} = \dfrac{c}{c'}$</td>
+                                </tr>
+                                <tr class="hover:bg-slate-800/40">
+                                    <td class="border border-slate-700/60 py-3 font-bold text-blue-400">한 점에서 만난다</td>
+                                    <td class="border border-slate-700/60 py-3">$m \ne m'$</td>
+                                    <td class="border border-slate-700/60 py-3 font-mono">$\dfrac{a}{a'} \ne \dfrac{b}{b'}$</td>
+                                </tr>
+                                <tr class="hover:bg-slate-800/40">
+                                    <td class="border border-slate-700/60 py-3 font-bold text-red-400">수직이다</td>
+                                    <td class="border border-slate-700/60 py-3">$mm' = -1$</td>
+                                    <td class="border border-slate-700/60 py-3 font-mono">$aa' + bb' = 0$</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 13: 필수예제 10 (p.50) -->
+            <div class="slide" data-category="필수예제 10 | p.50">
+                <h2 class="text-2xl font-extrabold text-white mb-4">필수예제 10 &nbsp;<span class="text-blue-400 text-lg">두 직선의 평행·수직 조건 (p.50)</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Essential Example 10</div>
+                        <h3 class="problem-text">
+                            두 직선 $x + ay + 1 = 0$, $ax + (a+2)y + 2 = 0$에 대하여 다음 물음에 답하시오.<br><br>
+                            (1) 두 직선이 평행할 때, 상수 $a$의 값을 구하시오.<br>
+                            (2) 두 직선이 수직일 때, 상수 $a$의 값을 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 14: 필수예제 11 (p.51) -->
+            <div class="slide" data-category="필수예제 11 | p.51">
+                <h2 class="text-2xl font-extrabold text-white mb-4">필수예제 11 &nbsp;<span class="text-blue-400 text-lg">한 직선에 평행 또는 수직인 직선의 방정식 (p.51)</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Essential Example 11</div>
+                        <h3 class="problem-text">
+                            다음 물음에 답하시오.<br><br>
+                            (1) 두 점 $(2, -1), (4, 3)$을 지나는 직선에 평행하고 $x$절편이 $4$인 직선의 방정식을 구하시오.<br>
+                            (2) 점 $(-1, 2)$를 지나고 직선 $3x - 2y + 4 = 0$에 수직인 직선의 방정식을 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 15: 필수예제 12 (p.52) -->
+            <div class="slide" data-category="필수예제 12 | p.52">
+                <h2 class="text-2xl font-extrabold text-white mb-4">필수예제 12 &nbsp;<span class="text-blue-400 text-lg">선분의 수직이등분선의 방정식 (p.52)</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Essential Example 12</div>
+                        <h3 class="problem-text">
+                            두 점 $A(-1, 3), B(3, -5)$를 이은 선분 $AB$의 수직이등분선의 방정식이 $x + ay + b = 0$일 때, 상수 $a, b$에 대하여 $ab$의 값을 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 16: 필수예제 13 (p.53) -->
+            <div class="slide" data-category="필수예제 13 | p.53">
+                <h2 class="text-2xl font-extrabold text-white mb-4">필수예제 13 &nbsp;<span class="text-blue-400 text-lg">세 직선의 위치 관계 (p.53)</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Essential Example 13</div>
+                        <h3 class="problem-text">
+                            세 직선 $x - y = 0$, $x + y = 2$, $5x - ky = 15$가 삼각형을 이루지 않도록 하는 상수 $k$의 값을 모두 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 17: 개념 03 - 점과 직선 사이의 거리 (p.56) -->
+            <div class="slide" data-category="개념 03 | 점과 직선 사이의 거리">
+                <h2 class="text-2xl font-extrabold text-white mb-4">03. 점과 직선 사이의 거리 &nbsp;<span class="text-blue-400 text-lg">p.56</span></h2>
+                <div class="grid grid-cols-2 gap-6 flex-grow items-stretch">
+                    <div class="concept-card p-6 flex flex-col justify-center space-y-4">
+                        <span class="text-blue-400 font-bold text-sm">1. 점과 직선 사이의 거리</span>
+                        <div class="text-base text-slate-200">
+                            점 $P(x_1, y_1)$과 직선 $ax + by + c = 0$ 사이의 거리 $d$:
+                        </div>
+                        <div class="text-xl font-extrabold text-yellow-400 my-2">
+                            $$d = \frac{|ax_1 + by_1 + c|}{\sqrt{a^2 + b^2}}$$
+                        </div>
+                        <div class="text-sm text-slate-400">
+                            ※ 원점 $(0, 0)$과 직선 사이의 거리: $d = \dfrac{|c|}{\sqrt{a^2 + b^2}}$
+                        </div>
+                    </div>
+                    <div class="concept-card p-6 flex flex-col justify-center space-y-4">
+                        <span class="text-blue-400 font-bold text-sm">2. 평행한 두 직선 사이의 거리</span>
+                        <div class="text-base text-slate-200">
+                            평행한 두 직선 $ax + by + c = 0$, $ax + by + c' = 0$ 사이의 거리 $d$:
+                        </div>
+                        <div class="text-xl font-extrabold text-emerald-400 my-2">
+                            $$d = \frac{|c - c'|}{\sqrt{a^2 + b^2}}$$
+                        </div>
+                        <div class="text-sm text-slate-400">
+                            ※ 한 직선 위의 임의의 한 점을 잡고 다른 직선까지의 거리를 계산해도 동일함.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 18: 필수예제 14 (p.58) -->
+            <div class="slide" data-category="필수예제 14 | p.58">
+                <h2 class="text-2xl font-extrabold text-white mb-4">필수예제 14 &nbsp;<span class="text-blue-400 text-lg">점과 직선 사이의 거리 (p.58)</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Essential Example 14</div>
+                        <h3 class="problem-text">
+                            점 $(2, 3)$과 직선 $y = \frac{3}{4}x + \frac{k}{2}$ 사이의 거리가 $2$일 때, 모든 상수 $k$의 값의 합을 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 19: 필수예제 15 (p.59) -->
+            <div class="slide" data-category="필수예제 15 | p.59">
+                <h2 class="text-2xl font-extrabold text-white mb-4">필수예제 15 &nbsp;<span class="text-blue-400 text-lg">평행한 두 직선 사이의 거리 (p.59)</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Essential Example 15</div>
+                        <h3 class="problem-text">
+                            평행한 두 직선 $2x - y + 5 = 0$, $2x - y + k = 0$ 사이의 거리가 $2\sqrt{5}$일 때, 상수 $k$의 값을 모두 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 20: 필수예제 16 (p.60) -->
+            <div class="slide" data-category="필수예제 16 | p.60">
+                <h2 class="text-2xl font-extrabold text-white mb-4">필수예제 16 &nbsp;<span class="text-blue-400 text-lg">삼각형의 넓이 (p.60)</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Essential Example 16</div>
+                        <h3 class="problem-text">
+                            세 점 $A(2, 5), B(-3, 2), C(1, -4)$를 꼭짓점으로 하는 삼각형 $ABC$의 넓이를 점과 직선 사이의 거리 공식을 이용하여 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 21: 필수예제 17 (p.61) -->
+            <div class="slide" data-category="필수예제 17 | p.61">
+                <h2 class="text-2xl font-extrabold text-white mb-4">필수예제 17 &nbsp;<span class="text-blue-400 text-lg">각의 이등분선의 방정식 (p.61)</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Essential Example 17</div>
+                        <h3 class="problem-text">
+                            두 직선 $2x - y - 1 = 0$, $x + 2y - 1 = 0$이 이루는 각의 이등분선의 방정식을 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 22: Outro -->
+            <div class="slide" data-category="Outro">
+                <div class="flex flex-col items-center justify-center h-full text-center">
+                    <i class="fa-solid fa-flag-checkered text-6xl text-blue-500 mb-6"></i>
+                    <h2 class="text-4xl font-extrabold text-white mb-4">직선의 방정식 완강!</h2>
+                    <div class="h-1 w-24 bg-blue-500 rounded-full mb-6"></div>
+                    <p class="text-xl text-slate-300 max-w-2xl leading-relaxed font-light mb-4">
+                        개념원리 공통수학2<br>
+                        **02. 직선의 방정식 (p.34 ~ 62)** 전체 개념 및 필수예제 17문항 학습을 모두 마쳤습니다.
+                    </p>
+                    <p class="text-slate-400 text-base">
+                        수고하셨습니다! 다음 단원에서도 완벽한 개념을 다져봅시다.
+                    </p>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer: 슬라이드 컨트롤 및 페이지 표시 -->
+        <div class="flex justify-between items-center z-20 pt-3 border-t border-slate-700/50 mx-8 mb-6 no-print">
+            <div class="flex items-center gap-3">
+                <button onclick="prevSlide()" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg font-bold transition-all border border-slate-700 flex items-center gap-2">
+                    <i class="fa-solid fa-chevron-left"></i> 이전
+                </button>
+                <button onclick="nextSlide()" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg font-bold transition-all border border-slate-700 flex items-center gap-2">
+                    다음 <i class="fa-solid fa-chevron-right"></i>
+                </button>
+            </div>
+            <div class="text-slate-400 text-sm font-semibold tracking-widest">
+                <span id="current-page" class="text-blue-400 font-bold">1</span> / <span id="total-pages">22</span>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 슬라이드 조작 스크립트 -->
+    <script>
+        const slides = document.querySelectorAll('.slide');
+        const pageIndicator = document.getElementById('current-page');
+        const totalIndicator = document.getElementById('total-pages');
+        const categoryIndicator = document.getElementById('slide-category');
+        
+        let currentSlideIdx = 0;
+        totalIndicator.innerText = slides.length;
+
+        function updateSlideUI() {
+            slides.forEach((slide, idx) => {
+                if (idx === currentSlideIdx) {
+                    slide.classList.add('active');
+                } else {
+                    slide.classList.remove('active');
+                }
+            });
+
+            pageIndicator.innerText = currentSlideIdx + 1;
+            const currentSlide = slides[currentSlideIdx];
+            categoryIndicator.innerText = currentSlide.getAttribute('data-category');
+
+            // MathJax 렌더링 동적 갱신
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                window.MathJax.typesetPromise();
+            }
+        }
+
+        function nextSlide() {
+            if (currentSlideIdx < slides.length - 1) {
+                currentSlideIdx++;
+                updateSlideUI();
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlideIdx > 0) {
+                currentSlideIdx--;
+                updateSlideUI();
+            }
+        }
+
+        // 초기 UI 로딩
+        updateSlideUI();
+    </script>
+</body>
+</html>
