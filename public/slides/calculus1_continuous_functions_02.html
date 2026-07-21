@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>개념원리 미적분1 - 02.연속함수의 성질(p51~55)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true
+            },
+            options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'] }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        .presentation-deck { position: relative; width: 1280px; height: 720px; background: radial-gradient(circle at 10% 20%, #1e293b 0%, #0f172a 100%); border: 1px solid rgba(255, 255, 255, 0.08); margin: 20px auto; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+        .slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 50px 80px; display: none; flex-direction: column; justify-content: space-between; z-index: 1; background: transparent; }
+        .slide.active { display: flex; z-index: 10; }
+        .concept-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2); }
+        .problem-box { background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.8) 100%); border-left: 8px solid #06b6d4; border-top: 1px solid rgba(255, 255, 255, 0.05); border-right: 1px solid rgba(255, 255, 255, 0.05); border-bottom: 1px solid rgba(255, 255, 255, 0.05); border-radius: 0 16px 16px 0; }
+        
+        /* 폰트사이즈 기존 대비 80% 축소 조절 (24px -> 19.2px) */
+        .problem-text { font-size: 1.2rem; font-weight: 700; color: #f1f5f9; line-height: 1.625; }
+
+        @media print {
+            body { background-color: #ffffff !important; margin: 0 !important; padding: 0 !important; }
+            .presentation-deck { width: 1280px !important; height: auto !important; box-shadow: none !important; border: none !important; margin: 0 !important; overflow: visible !important; display: block !important; }
+            .slide { position: relative !important; display: flex !important; width: 1280px !important; height: 720px !important; page-break-after: always !important; page-break-inside: avoid !important; background: #0f172a !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <!-- 오답노트 귀환용 닫기 X 버튼 (PWA 네비게이션 미지원 단말 대응) -->
+    <button onclick="window.close()" class="no-print" style="position: fixed; top: 16px; left: 16px; z-index: 99999; display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; background-color: rgba(15, 23, 42, 0.85); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 50%; font-family: sans-serif; font-size: 14px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.5); backdrop-filter: blur(8px); transition: all 0.2s;" onmouseover="this.style.backgroundColor='rgba(30, 41, 59, 0.95)';" onmouseout="this.style.backgroundColor='rgba(15, 23, 42, 0.85)';">
+        ❌
+    </button>
+    <div class="presentation-deck" id="deck">
+        <!-- Header: 공통 탑바 -->
+        <div class="flex justify-between items-center z-20 pb-3 border-b border-slate-700/50 mx-8 mt-6 no-print">
+            <div class="flex items-center gap-3">
+                <span class="bg-cyan-600 text-white text-xs font-black px-2.5 py-1 rounded-md tracking-wider">개념원리</span>
+                <span class="text-slate-400 text-sm font-medium">미적분1 &gt; Ⅰ. 함수의 극한과 연속 &gt; 02. 연속함수의 성질</span>
+            </div>
+            <div class="text-right">
+                <span class="text-xs text-cyan-400 font-semibold uppercase tracking-wider" id="slide-category">수업 개념 &amp; 필수예제</span>
+            </div>
+        </div>
+
+        <!-- 슬라이드 본문 영역 -->
+        <div class="relative flex-grow my-2 overflow-hidden" id="slide-container">
+            
+            <!-- Slide 1: 표지 (PDF 변환 시 오류 없는 솔리드 텍스트 적용) -->
+            <div class="slide active" data-category="Chapter Intro">
+                <div class="flex flex-col items-center justify-center h-full text-center">
+                    <span class="text-cyan-400 font-bold tracking-widest text-lg mb-3">2026.07.22 CLASS</span>
+                    <!-- PDF 변환 오류 방지: text-transparent / bg-clip-text 대신 솔리드 text-white 적용 -->
+                    <h1 class="text-5xl font-extrabold text-white tracking-tight leading-tight mb-6 drop-shadow-md">
+                        개념원리 미적분1
+                    </h1>
+                    <div class="h-1.5 w-32 bg-cyan-500 rounded-full mb-8"></div>
+                    <h2 class="text-3xl font-bold text-slate-200">
+                        02. 연속함수의 성질 (p.51 ~ 55)
+                    </h2>
+                    <p class="text-slate-400 mt-6 text-lg max-w-xl font-light">
+                        연속함수의 사칙연산 성질, 최대·최소 정리, 사잇값 정리 및 방정식의 실근 존재성 판별
+                    </p>
+                </div>
+            </div>
+
+            <!-- Slide 2: 개념 01 - 연속함수의 성질 (p.51) -->
+            <div class="slide" data-category="개념 01 | 연속함수의 성질">
+                <h2 class="text-2xl font-extrabold text-white mb-4">01. 연속함수의 성질 &nbsp;<span class="text-cyan-400 text-lg">p.51</span></h2>
+                <div class="grid grid-cols-12 gap-6 flex-grow items-stretch">
+                    <!-- 좌측: 시각적 그래프 카드 -->
+                    <div class="col-span-5 concept-card p-5 flex flex-col items-center justify-center text-center">
+                        <span class="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-2">Visual Concept</span>
+                        <div class="w-full h-44 bg-slate-900/80 rounded-xl border border-slate-700/60 p-3 flex items-center justify-center">
+                            <svg viewBox="0 0 200 120" class="w-full h-full">
+                                <!-- Axes -->
+                                <line x1="20" y1="100" x2="180" y2="100" stroke="#64748b" stroke-width="1.5" />
+                                <line x1="40" y1="10" x2="40" y2="110" stroke="#64748b" stroke-width="1.5" />
+                                <text x="185" y="104" fill="#94a3b8" font-size="10">x</text>
+                                <text x="36" y="12" fill="#94a3b8" font-size="10">y</text>
+                                
+                                <!-- x = a line -->
+                                <line x1="110" y1="15" x2="110" y2="100" stroke="#38bdf8" stroke-width="1" stroke-dasharray="3 3" />
+                                <text x="106" y="112" fill="#38bdf8" font-size="11" font-weight="bold">a</text>
+                                
+                                <!-- Curve f(x) -->
+                                <path d="M 40,80 Q 80,30 170,40" fill="none" stroke="#06b6d4" stroke-width="2.5" />
+                                <text x="165" y="32" fill="#06b6d4" font-size="11" font-weight="bold">f(x)</text>
+
+                                <!-- Curve g(x) -->
+                                <path d="M 40,90 Q 100,50 170,75" fill="none" stroke="#f59e0b" stroke-width="2.5" />
+                                <text x="165" y="85" fill="#f59e0b" font-size="11" font-weight="bold">g(x)</text>
+
+                                <!-- Continuous Point -->
+                                <circle cx="110" cy="46" r="3.5" fill="#06b6d4" />
+                                <circle cx="110" cy="62" r="3.5" fill="#f59e0b" />
+                            </svg>
+                        </div>
+                        <p class="text-xs text-slate-300 mt-3 font-medium">
+                            두 함수 $f(x), g(x)$가 $x=a$에서 연속이면 사칙연산으로 결합된 함수도 연속!
+                        </p>
+                    </div>
+
+                    <!-- 우측: 개념 핵심정리 및 판서 여백 -->
+                    <div class="col-span-7 concept-card p-6 flex flex-col justify-between">
+                        <div class="space-y-4">
+                            <span class="text-sm font-bold text-cyan-400">연속함수의 사칙연산 성질</span>
+                            <p class="text-sm text-slate-200 leading-relaxed">
+                                두 함수 $f(x), g(x)$가 $x=a$에서 연속이면 다음 함수도 $x=a$에서 연속이다.
+                            </p>
+                            <div class="grid grid-cols-2 gap-3 text-sm text-slate-200 pt-1">
+                                <div class="bg-slate-800/80 p-3 rounded-lg border border-slate-700/50">
+                                    <span class="text-cyan-400 font-bold">1. 실수배:</span> $k f(x)$ ($k$는 상수)
+                                </div>
+                                <div class="bg-slate-800/80 p-3 rounded-lg border border-slate-700/50">
+                                    <span class="text-cyan-400 font-bold">2. 합·차:</span> $f(x) \pm g(x)$
+                                </div>
+                                <div class="bg-slate-800/80 p-3 rounded-lg border border-slate-700/50">
+                                    <span class="text-cyan-400 font-bold">3. 곱:</span> $f(x)g(x)$
+                                </div>
+                                <div class="bg-slate-800/80 p-3 rounded-lg border border-slate-700/50">
+                                    <span class="text-cyan-400 font-bold">4. 나눗셈:</span> $\dfrac{f(x)}{g(x)}$ <span class="text-xs text-yellow-400">(단, $g(a) \ne 0$)</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="border-t border-slate-700/50 pt-3 text-xs text-slate-400">
+                            ※ 다항함수는 모든 실수에서 연속, 유리함수는 (분모) $\ne 0$ 인 구간에서 연속이다.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 3: 개념 02 - 최대·최소 정리 (p.52) -->
+            <div class="slide" data-category="개념 02 | 최대·최소 정리">
+                <h2 class="text-2xl font-extrabold text-white mb-4">02. 최대·최소 정리 &nbsp;<span class="text-cyan-400 text-lg">p.52</span></h2>
+                <div class="grid grid-cols-12 gap-6 flex-grow items-stretch">
+                    <!-- 좌측: 시각적 그래프 카드 -->
+                    <div class="col-span-5 concept-card p-5 flex flex-col items-center justify-center text-center">
+                        <span class="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-2">Visual Concept</span>
+                        <div class="w-full h-44 bg-slate-900/80 rounded-xl border border-slate-700/60 p-3 flex items-center justify-center">
+                            <svg viewBox="0 0 200 120" class="w-full h-full">
+                                <!-- Axes -->
+                                <line x1="20" y1="105" x2="180" y2="105" stroke="#64748b" stroke-width="1.5" />
+                                <line x1="30" y1="10" x2="30" y2="110" stroke="#64748b" stroke-width="1.5" />
+                                
+                                <!-- x = a, b lines -->
+                                <line x1="50" y1="20" x2="50" y2="105" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2 2" />
+                                <line x1="160" y1="20" x2="160" y2="105" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2 2" />
+                                <text x="47" y="116" fill="#94a3b8" font-size="10">a</text>
+                                <text x="157" y="116" fill="#94a3b8" font-size="10">b</text>
+                                
+                                <!-- Curve -->
+                                <path d="M 50,75 C 80,15 120,110 160,35" fill="none" stroke="#38bdf8" stroke-width="2.5" />
+
+                                <!-- Max Point -->
+                                <circle cx="85" cy="30" fill="#ef4444" r="4" />
+                                <line x1="30" y1="30" x2="85" y2="30" stroke="#ef4444" stroke-width="1" stroke-dasharray="2 2" />
+                                <text x="12" y="33" fill="#ef4444" font-size="10" font-weight="bold">Max M</text>
+
+                                <!-- Min Point -->
+                                <circle cx="130" cy="85" fill="#10b981" r="4" />
+                                <line x1="30" y1="85" x2="130" y2="85" stroke="#10b981" stroke-width="1" stroke-dasharray="2 2" />
+                                <text x="12" y="88" fill="#10b981" font-size="10" font-weight="bold">min m</text>
+                            </svg>
+                        </div>
+                        <p class="text-xs text-slate-300 mt-3 font-medium">
+                            닫힌구간 $[a, b]$에서 연속이면 반드시 최댓값 $M$과 최솟값 $m$을 갖는다.
+                        </p>
+                    </div>
+
+                    <!-- 우측: 개념 설명 및 판서 여백 -->
+                    <div class="col-span-7 concept-card p-6 flex flex-col justify-between">
+                        <div class="space-y-4">
+                            <span class="text-sm font-bold text-cyan-400">최대·최소 정리 (Extreme Value Theorem)</span>
+                            <div class="bg-cyan-950/40 p-4 rounded-xl border border-cyan-500/30 text-slate-200 text-base leading-relaxed font-semibold">
+                                함수 $f(x)$가 <span class="text-yellow-400 font-bold">닫힌구간 $[a, b]$</span>에서 <span class="text-cyan-400 font-bold">연속</span>이면<br>
+                                $f(x)$는 이 구간에서 반드시 <span class="text-red-400 font-bold">최댓값</span>과 <span class="text-emerald-400 font-bold">최솟값</span>을 갖는다.
+                            </div>
+                        </div>
+                        <div class="bg-slate-800/60 p-3.5 rounded-lg border border-slate-700/50 text-xs text-slate-300 space-y-1">
+                            <span class="text-yellow-400 font-bold block mb-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i> 주의사항</span>
+                            • 열린구간 $(a, b)$이거나 연속이 아닌 경우, 최댓값 또는 최솟값이 존재하지 않을 수 있습니다.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 4: 개념 03 - 사잇값 정리 및 실근 존재성 (p.52) -->
+            <div class="slide" data-category="개념 03 | 사잇값 정리">
+                <h2 class="text-2xl font-extrabold text-white mb-4">03. 사잇값 정리 &nbsp;<span class="text-cyan-400 text-lg">p.52</span></h2>
+                <div class="grid grid-cols-12 gap-6 flex-grow items-stretch">
+                    <!-- 좌측: 시각적 그래프 카드 -->
+                    <div class="col-span-5 concept-card p-5 flex flex-col items-center justify-center text-center">
+                        <span class="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-2">Visual Concept</span>
+                        <div class="w-full h-44 bg-slate-900/80 rounded-xl border border-slate-700/60 p-3 flex items-center justify-center">
+                            <svg viewBox="0 0 200 120" class="w-full h-full">
+                                <!-- Axes -->
+                                <line x1="20" y1="95" x2="180" y2="95" stroke="#64748b" stroke-width="1.5" />
+                                <text x="185" y="99" fill="#94a3b8" font-size="10">x</text>
+                                
+                                <!-- y = k line -->
+                                <line x1="20" y1="50" x2="180" y2="50" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4 3" />
+                                <text x="183" y="54" fill="#f59e0b" font-size="10" font-weight="bold">y=k</text>
+
+                                <!-- Curve -->
+                                <path d="M 40,85 C 80,95 120,15 160,25" fill="none" stroke="#06b6d4" stroke-width="2.5" />
+
+                                <!-- End Points -->
+                                <circle cx="40" cy="85" r="3.5" fill="#06b6d4" />
+                                <text x="35" y="108" fill="#94a3b8" font-size="10">a</text>
+                                
+                                <circle cx="160" cy="25" r="3.5" fill="#06b6d4" />
+                                <text x="157" y="108" fill="#94a3b8" font-size="10">b</text>
+
+                                <!-- Intersection c -->
+                                <circle cx="112" cy="50" r="4" fill="#ef4444" />
+                                <line x1="112" y1="50" x2="112" y2="95" stroke="#ef4444" stroke-width="1" stroke-dasharray="2 2" />
+                                <text x="110" y="108" fill="#ef4444" font-size="10" font-weight="bold">c</text>
+                            </svg>
+                        </div>
+                        <p class="text-xs text-slate-300 mt-3 font-medium">
+                            $f(a)$와 $f(b)$ 사이의 임의의 값 $k$에 대하여 $f(c)=k$인 $c \in (a,b)$가 적어도 하나 존재!
+                        </p>
+                    </div>
+
+                    <!-- 우측: 개념 설명 및 판서 여백 -->
+                    <div class="col-span-7 concept-card p-6 flex flex-col justify-between">
+                        <div class="space-y-3">
+                            <span class="text-sm font-bold text-cyan-400">사잇값 정리 (Intermediate Value Theorem)</span>
+                            <p class="text-xs text-slate-300 leading-relaxed">
+                                $f(x)$가 닫힌구간 $[a, b]$에서 연속이고 $f(a) \ne f(b)$일 때, $f(a)$와 $f(b)$ 사이의 임의의 값 $k$에 대하여 $f(c) = k$인 $c$가 열린구간 $(a, b)$에 적어도 하나 존재한다.
+                            </p>
+                            <div class="bg-cyan-950/40 p-3.5 rounded-xl border border-cyan-500/30 space-y-1.5">
+                                <span class="text-xs font-bold text-yellow-400"><i class="fa-solid fa-key mr-1"></i> 사잇값 정리의 활용 (방정식 실근 존재성)</span>
+                                <p class="text-xs text-slate-200 leading-relaxed">
+                                    $f(x)$가 $[a, b]$에서 연속이고 <span class="text-red-400 font-bold">$f(a)f(b) < 0$</span> 이면<br>
+                                    방정식 $f(x) = 0$은 열린구간 $(a, b)$에서 <span class="text-cyan-400 font-bold">적어도 하나의 실근</span>을 갖는다!
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 5: 필수예제 06 (p.53) (해설 카드 완전 제거 -> 판서 공간 극대화) -->
+            <div class="slide" data-category="필수예제 06 | p.53">
+                <h2 class="text-2xl font-extrabold text-white mb-4">필수예제 06 &nbsp;<span class="text-cyan-400 text-lg">연속함수의 성질 (p.53)</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-cyan-400 uppercase tracking-widest mb-2">Essential Example 06</div>
+                        <h3 class="problem-text">
+                            두 함수 $f(x) = x^2 - 3, \quad g(x) = x^2 - 4x - 5$에 대하여 다음 함수가 연속인 구간을 구하시오.<br><br>
+                            (1) $f(x) - 3g(x)$<br><br>
+                            (2) $f(x)g(x)$<br><br>
+                            (3) $\dfrac{f(x)}{g(x)}$<br><br>
+                            (4) $\dfrac{1}{f(x) - g(x)}$
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 6: 필수예제 07 (p.54) (해설 카드 완전 제거 -> 판서 공간 극대화) -->
+            <div class="slide" data-category="필수예제 07 | p.54">
+                <h2 class="text-2xl font-extrabold text-white mb-4">필수예제 07 &nbsp;<span class="text-cyan-400 text-lg">최대·최소 정리 (p.54)</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-cyan-400 uppercase tracking-widest mb-2">Essential Example 07</div>
+                        <h3 class="problem-text">
+                            주어진 구간에서 다음 함수 $f(x)$의 최댓값과 최솟값을 구하시오.<br><br>
+                            (1) $f(x) = -x^2 + 2x + 3 \quad [-2, 2]$<br><br><br>
+                            (2) $f(x) = \dfrac{2}{x-1} \quad [3, 5]$
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 7: 필수예제 08 (p.55) (해설 카드 완전 제거 -> 판서 공간 극대화) -->
+            <div class="slide" data-category="필수예제 08 | p.55">
+                <h2 class="text-2xl font-extrabold text-white mb-4">필수예제 08 &nbsp;<span class="text-cyan-400 text-lg">사잇값 정리 (1) (p.55)</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-cyan-400 uppercase tracking-widest mb-2">Essential Example 08</div>
+                        <h3 class="problem-text">
+                            방정식 $x^3 - 2x^2 - 1 = 0$이 열린구간 $(2, 3)$에서 적어도 하나의 실근을 가짐을 보이시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 8: 필수예제 09 (p.55) (해설 카드 완전 제거 -> 판서 공간 극대화) -->
+            <div class="slide" data-category="필수예제 09 | p.55">
+                <h2 class="text-2xl font-extrabold text-white mb-4">필수예제 09 &nbsp;<span class="text-cyan-400 text-lg">사잇값 정리 (2) (p.55)</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-cyan-400 uppercase tracking-widest mb-2">Essential Example 09</div>
+                        <h3 class="problem-text">
+                            모든 실수 $x$에서 연속인 함수 $f(x)$에 대하여
+                            $$f(-1) = 2, \quad f(0) = -5, \quad f(1) = 3, \quad f(2) = 4$$
+                            일 때, 방정식 $f(x) = 0$은 열린구간 $(-1, 2)$에서 적어도 몇 개의 실근을 갖는지 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 9: Outro -->
+            <div class="slide" data-category="Outro">
+                <div class="flex flex-col items-center justify-center h-full text-center">
+                    <i class="fa-solid fa-graduation-cap text-6xl text-cyan-500 mb-6"></i>
+                    <h2 class="text-4xl font-extrabold text-white mb-4">연속함수의 성질 완강!</h2>
+                    <div class="h-1 w-24 bg-cyan-500 rounded-full mb-6"></div>
+                    <p class="text-xl text-slate-300 max-w-2xl leading-relaxed font-light mb-4">
+                        개념원리 미적분1<br>
+                        **02. 연속함수의 성질 (p.51 ~ 55)** 학습을 모두 마쳤습니다.
+                    </p>
+                    <p class="text-slate-400 text-base">
+                        수고하셨습니다! 판서를 활용해 직접 문제를 풀어보며 완벽하게 내것으로 만들어 봅시다.
+                    </p>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer: 슬라이드 컨트롤 및 페이지 표시 -->
+        <div class="flex justify-between items-center z-20 pt-3 border-t border-slate-700/50 mx-8 mb-6 no-print">
+            <div class="flex items-center gap-3">
+                <button onclick="prevSlide()" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg font-bold transition-all border border-slate-700 flex items-center gap-2">
+                    <i class="fa-solid fa-chevron-left"></i> 이전
+                </button>
+                <button onclick="nextSlide()" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg font-bold transition-all border border-slate-700 flex items-center gap-2">
+                    다음 <i class="fa-solid fa-chevron-right"></i>
+                </button>
+            </div>
+            <div class="text-slate-400 text-sm font-semibold tracking-widest">
+                <span id="current-page" class="text-cyan-400 font-bold">1</span> / <span id="total-pages">9</span>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 슬라이드 조작 스크립트 -->
+    <script>
+        const slides = document.querySelectorAll('.slide');
+        const pageIndicator = document.getElementById('current-page');
+        const totalIndicator = document.getElementById('total-pages');
+        const categoryIndicator = document.getElementById('slide-category');
+        
+        let currentSlideIdx = 0;
+        totalIndicator.innerText = slides.length;
+
+        function updateSlideUI() {
+            slides.forEach((slide, idx) => {
+                if (idx === currentSlideIdx) {
+                    slide.classList.add('active');
+                } else {
+                    slide.classList.remove('active');
+                }
+            });
+
+            pageIndicator.innerText = currentSlideIdx + 1;
+            const currentSlide = slides[currentSlideIdx];
+            categoryIndicator.innerText = currentSlide.getAttribute('data-category');
+
+            // MathJax 렌더링 동적 갱신
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                window.MathJax.typesetPromise();
+            }
+        }
+
+        function nextSlide() {
+            if (currentSlideIdx < slides.length - 1) {
+                currentSlideIdx++;
+                updateSlideUI();
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlideIdx > 0) {
+                currentSlideIdx--;
+                updateSlideUI();
+            }
+        }
+
+        // 초기 UI 로딩
+        updateSlideUI();
+    </script>
+</body>
+</html>
