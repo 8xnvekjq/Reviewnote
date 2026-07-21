@@ -26,7 +26,6 @@
         .concept-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2); }
         .problem-box { background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.8) 100%); border-left: 8px solid #06b6d4; border-top: 1px solid rgba(255, 255, 255, 0.05); border-right: 1px solid rgba(255, 255, 255, 0.05); border-bottom: 1px solid rgba(255, 255, 255, 0.05); border-radius: 0 16px 16px 0; }
         
-        /* 폰트사이즈 기존 대비 80% 축소 조절 (24px -> 19.2px) */
         .problem-text { font-size: 1.2rem; font-weight: 700; color: #f1f5f9; line-height: 1.625; }
 
         @media print {
@@ -43,7 +42,7 @@
         ❌
     </button>
     <div class="presentation-deck" id="deck">
-        <!-- Header: 공통 탑바 -->
+        <!-- Header -->
         <div class="flex justify-between items-center z-20 pb-3 border-b border-slate-700/50 mx-8 mt-6 no-print">
             <div class="flex items-center gap-3">
                 <span class="bg-cyan-600 text-white text-xs font-black px-2.5 py-1 rounded-md tracking-wider">개념원리</span>
@@ -54,14 +53,11 @@
             </div>
         </div>
 
-        <!-- 슬라이드 본문 영역 -->
         <div class="relative flex-grow my-2 overflow-hidden" id="slide-container">
-            
-            <!-- Slide 1: 표지 (PDF 변환 시 오류 없는 솔리드 화이트 타이틀) -->
+            <!-- Slide 1 -->
             <div class="slide active" data-category="Chapter Intro">
                 <div class="flex flex-col items-center justify-center h-full text-center">
                     <span class="text-cyan-400 font-bold tracking-widest text-lg mb-3">2026.07.22 CLASS</span>
-                    <!-- PDF 변환 오류 방지: text-transparent 대신 솔리드 text-white 적용 -->
                     <h1 class="text-5xl font-extrabold text-white tracking-tight leading-tight mb-6 drop-shadow-md">
                         개념원리 미적분1
                     </h1>
@@ -75,48 +71,27 @@
                 </div>
             </div>
 
-            <!-- Slide 2: 개념 01 - 평균변화율 (p.58~59) -->
+            <!-- Slide 2 -->
             <div class="slide" data-category="개념 01 | 평균변화율">
                 <h2 class="text-2xl font-extrabold text-white mb-4">01. 평균변화율 &nbsp;<span class="text-cyan-400 text-lg">p.58 ~ 59</span></h2>
                 <div class="grid grid-cols-12 gap-6 flex-grow items-stretch">
-                    <!-- 좌측: 시각적 그래프 카드 -->
                     <div class="col-span-5 concept-card p-5 flex flex-col items-center justify-center text-center">
                         <span class="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-2">Visual Concept</span>
                         <div class="w-full h-44 bg-slate-900/80 rounded-xl border border-slate-700/60 p-3 flex items-center justify-center">
                             <svg viewBox="0 0 200 120" class="w-full h-full">
-                                <!-- Axes -->
                                 <line x1="20" y1="105" x2="180" y2="105" stroke="#64748b" stroke-width="1.5" />
                                 <line x1="30" y1="10" x2="30" y2="110" stroke="#64748b" stroke-width="1.5" />
-                                
-                                <!-- Curve -->
                                 <path d="M 40,85 Q 100,90 160,25" fill="none" stroke="#06b6d4" stroke-width="2.5" />
-
-                                <!-- Points A(a, f(a)), B(b, f(b)) -->
                                 <circle cx="60" cy="81" r="3.5" fill="#f59e0b" />
                                 <circle cx="140" cy="38" r="3.5" fill="#f59e0b" />
-
-                                <!-- Secant Line (할선) -->
                                 <line x1="40" y1="92" x2="160" y2="27" stroke="#ef4444" stroke-width="2" stroke-dasharray="4 2" />
-
-                                <!-- Dashed Projection Lines -->
                                 <line x1="60" y1="81" x2="60" y2="105" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2 2" />
                                 <line x1="140" y1="38" x2="140" y2="105" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2 2" />
                                 <text x="57" y="116" fill="#94a3b8" font-size="10">a</text>
                                 <text x="137" y="116" fill="#94a3b8" font-size="10">b</text>
-
-                                <!-- Delta x, Delta y -->
-                                <line x1="60" y1="81" x2="140" y2="81" stroke="#38bdf8" stroke-width="1" stroke-dasharray="2 2" />
-                                <line x1="140" y1="81" x2="140" y2="38" stroke="#38bdf8" stroke-width="1" stroke-dasharray="2 2" />
-                                <text x="95" y="93" fill="#38bdf8" font-size="9">Δx = b-a</text>
-                                <text x="145" y="63" fill="#38bdf8" font-size="9">Δy</text>
                             </svg>
                         </div>
-                        <p class="text-xs text-slate-300 mt-3 font-medium">
-                            평균변화율 = 두 점 $A(a, f(a)), B(b, f(b))$를 지나는 <span class="text-red-400 font-bold">할선의 기울기</span>
-                        </p>
                     </div>
-
-                    <!-- 우측: 개념 설명 및 판서 여백 -->
                     <div class="col-span-7 concept-card p-6 flex flex-col justify-between">
                         <div class="space-y-4">
                             <span class="text-sm font-bold text-cyan-400">평균변화율 (Average Rate of Change)</span>
@@ -127,95 +102,53 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="bg-slate-800/60 p-3.5 rounded-lg border border-slate-700/50 text-xs text-slate-300">
-                            <span class="text-cyan-400 font-bold block mb-1"><i class="fa-solid fa-lightbulb mr-1"></i> 기하학적 의미</span>
-                            곡선 $y=f(x)$ 위의 두 점 $(a, f(a))$와 $(b, f(b))$를 잇는 <b>직선의 기울기</b>와 같습니다.
-                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Slide 3: 개념 02 - 미분계수와 접선의 기울기 (p.59~60) -->
+            <!-- Slide 3 -->
             <div class="slide" data-category="개념 02 | 미분계수">
                 <h2 class="text-2xl font-extrabold text-white mb-4">02. 미분계수 (순간변화율) &nbsp;<span class="text-cyan-400 text-lg">p.59 ~ 60</span></h2>
                 <div class="grid grid-cols-12 gap-6 flex-grow items-stretch">
-                    <!-- 좌측: 시각적 그래프 카드 -->
                     <div class="col-span-5 concept-card p-5 flex flex-col items-center justify-center text-center">
                         <span class="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-2">Visual Concept</span>
                         <div class="w-full h-44 bg-slate-900/80 rounded-xl border border-slate-700/60 p-3 flex items-center justify-center">
                             <svg viewBox="0 0 200 120" class="w-full h-full">
-                                <!-- Axes -->
                                 <line x1="20" y1="105" x2="180" y2="105" stroke="#64748b" stroke-width="1.5" />
                                 <line x1="30" y1="10" x2="30" y2="110" stroke="#64748b" stroke-width="1.5" />
-                                
-                                <!-- Curve y = f(x) -->
                                 <path d="M 40,105 Q 100,40.6 160,33.4" fill="none" stroke="#06b6d4" stroke-width="2.5" />
-
-                                <!-- True Tangent Line at (100, 55) -->
                                 <line x1="40" y1="91" x2="160" y2="19" stroke="#10b981" stroke-width="2.5" />
-
-                                <!-- Point A(a, f(a)) at (100, 55) -->
                                 <circle cx="100" cy="55" r="4" fill="#ef4444" />
-                                <line x1="100" y1="55" x2="100" y2="105" stroke="#ef4444" stroke-width="1" stroke-dasharray="2 2" />
-                                <text x="97" y="116" fill="#ef4444" font-size="10" font-weight="bold">a</text>
-
-                                <!-- Labels -->
-                                <text x="165" y="30" fill="#06b6d4" font-size="10" font-weight="bold">y=f(x)</text>
-                                <text x="125" y="18" fill="#10b981" font-size="10" font-weight="bold">접선 (기울기 f'(a))</text>
                             </svg>
                         </div>
-                        <p class="text-xs text-slate-300 mt-3 font-medium">
-                            미분계수 $f'(a)$ = 곡선 $y=f(x)$ 위 점 $(a, f(a))$에서의 <span class="text-emerald-400 font-bold">접선의 기울기</span>
-                        </p>
                     </div>
-
-                    <!-- 우측: 개념 설명 및 판서 여백 -->
                     <div class="col-span-7 concept-card p-6 flex flex-col justify-between">
                         <div class="space-y-4">
                             <span class="text-sm font-bold text-cyan-400">미분계수 (Derivative Coefficient)</span>
                             <div class="bg-cyan-950/40 p-4 rounded-xl border border-cyan-500/30 text-slate-200 text-base leading-relaxed">
                                 함수 $y=f(x)$의 $x=a$에서의 미분계수 $f'(a)$:<br>
                                 <div class="text-lg font-extrabold text-yellow-400 my-2 text-center">
-                                    $$f'(a) = \lim_{\Delta x \to 0} \frac{f(a + \Delta x) - f(a)}{\Delta x} = \lim_{x \to a} \frac{f(x) - f(a)}{x - a}$$
+                                    $$f'(a) = \lim\limits_{\Delta x \to 0} \frac{f(a + \Delta x) - f(a)}{\Delta x} = \lim\limits_{x \to a} \frac{f(x) - f(a)}{x - a}$$
                                 </div>
                             </div>
-                        </div>
-                        <div class="bg-slate-800/60 p-3.5 rounded-lg border border-slate-700/50 text-xs text-slate-300">
-                            <span class="text-emerald-400 font-bold block mb-1"><i class="fa-solid fa-chart-line mr-1"></i> 기하학적 의미</span>
-                            $x=a$에서의 미분계수 $f'(a)$는 곡선 $y=f(x)$ 위의 점 $(a, f(a))$에서의 <b>접선의 기울기</b>입니다.
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Slide 4: 개념 03 - 미분가능성과 연속성 (p.61) -->
+            <!-- Slide 4 -->
             <div class="slide" data-category="개념 03 | 미분가능성과 연속성">
                 <h2 class="text-2xl font-extrabold text-white mb-4">03. 미분가능성과 연속성 &nbsp;<span class="text-cyan-400 text-lg">p.61</span></h2>
                 <div class="grid grid-cols-12 gap-6 flex-grow items-stretch">
-                    <!-- 좌측: 시각적 벤다이어그램 카드 -->
                     <div class="col-span-5 concept-card p-5 flex flex-col items-center justify-center text-center">
                         <span class="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-2">Visual Concept</span>
                         <div class="w-full h-44 bg-slate-900/80 rounded-xl border border-slate-700/60 p-3 flex items-center justify-center">
                             <svg viewBox="0 0 200 120" class="w-full h-full">
-                                <!-- Outer Ellipse: Continuous -->
                                 <ellipse cx="100" cy="60" rx="85" ry="48" fill="rgba(6, 182, 212, 0.15)" stroke="#06b6d4" stroke-width="2" />
-                                <text x="30" y="30" fill="#38bdf8" font-size="11" font-weight="bold">연속함수</text>
-
-                                <!-- Inner Ellipse: Differentiable -->
                                 <ellipse cx="115" cy="65" rx="50" ry="30" fill="rgba(16, 185, 129, 0.25)" stroke="#10b981" stroke-width="2" />
-                                <text x="85" y="68" fill="#10b981" font-size="11" font-weight="bold">미분가능한 함수</text>
-
-                                <!-- Sharp Point Example -->
-                                <text x="35" y="75" fill="#f59e0b" font-size="9">첨점 (꺾인점)</text>
-                                <text x="35" y="88" fill="#f59e0b" font-size="9">ex) y=|x|</text>
                             </svg>
                         </div>
-                        <p class="text-xs text-slate-300 mt-3 font-medium">
-                            미분가능 $\implies$ 연속 (역은 성립하지 않음! 첨점에서 불능)
-                        </p>
                     </div>
-
-                    <!-- 우측: 개념 설명 및 판서 여백 -->
                     <div class="col-span-7 concept-card p-6 flex flex-col justify-between">
                         <div class="space-y-4">
                             <span class="text-sm font-bold text-cyan-400">미분가능성과 연속성의 관계</span>
@@ -224,16 +157,11 @@
                                 $f(x)$는 $x=a$에서 반드시 <span class="text-cyan-400 font-bold">연속</span>이다.
                             </div>
                         </div>
-                        <div class="bg-slate-800/60 p-3.5 rounded-lg border border-slate-700/50 text-xs text-slate-300 space-y-1">
-                            <span class="text-yellow-400 font-bold block mb-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i> 반례 (역은 성립하지 않음)</span>
-                            • 연속이지만 미분가능하지 않은 점: <b>첨점(꺾인점)</b><br>
-                            예) $f(x) = |x|$는 $x=0$에서 연속이지만 좌미분계수(-1) $\ne$ 우미분계수(+1)이므로 미분불능!
-                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Slide 5: 필수예제 01 (p.62) (해설 카드 완전 제거 -> 판서 공간 극대화) -->
+            <!-- Slide 5 -->
             <div class="slide" data-category="필수예제 01 | p.62">
                 <h2 class="text-2xl font-extrabold text-white mb-4">필수예제 01 &nbsp;<span class="text-cyan-400 text-lg">평균변화율 구하기 (p.62)</span></h2>
                 <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
@@ -246,7 +174,7 @@
                 </div>
             </div>
 
-            <!-- Slide 6: 필수예제 02 (p.63) (해설 카드 완전 제거 -> 판서 공간 극대화) -->
+            <!-- Slide 6 -->
             <div class="slide" data-category="필수예제 02 | p.63">
                 <h2 class="text-2xl font-extrabold text-white mb-4">필수예제 02 &nbsp;<span class="text-cyan-400 text-lg">미세변화량 $\Delta x$ 형태의 미분계수 (p.63)</span></h2>
                 <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
@@ -254,15 +182,15 @@
                         <div class="text-xs font-bold text-cyan-400 uppercase tracking-widest mb-2">Essential Example 02</div>
                         <h3 class="problem-text">
                             $f'(a) = 1$일 때, 다음 극한값을 구하시오.<br><br>
-                            (1) $\lim_{h \to 0} \dfrac{f(a + 3h) - f(a)}{h}$<br><br><br>
-                            (2) $\lim_{h \to 0} \dfrac{f(a + h^2) - f(a)}{h}$<br><br><br>
-                            (3) $\lim_{h \to 0} \dfrac{f(a + 2h) - f(a - h)}{h}$
+                            (1) $\lim\limits_{h \to 0} \dfrac{f(a + 3h) - f(a)}{h}$<br><br><br>
+                            (2) $\lim\limits_{h \to 0} \dfrac{f(a + h^2) - f(a)}{h}$<br><br><br>
+                            (3) $\lim\limits_{h \to 0} \dfrac{f(a + 2h) - f(a - h)}{h}$
                         </h3>
                     </div>
                 </div>
             </div>
 
-            <!-- Slide 7: 필수예제 03 (p.64) (해설 카드 완전 제거 -> 판서 공간 극대화) -->
+            <!-- Slide 7 -->
             <div class="slide" data-category="필수예제 03 | p.64">
                 <h2 class="text-2xl font-extrabold text-white mb-4">필수예제 03 &nbsp;<span class="text-cyan-400 text-lg">$x \to a$ 형태의 미분계수 (p.64)</span></h2>
                 <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
@@ -270,14 +198,14 @@
                         <div class="text-xs font-bold text-cyan-400 uppercase tracking-widest mb-2">Essential Example 03</div>
                         <h3 class="problem-text">
                             $f(a) = 1, \quad f'(a) = 2$일 때, 다음 극한값을 구하시오.<br><br>
-                            (1) $\lim_{x \to a} \dfrac{f(x^2) - f(a)}{x - a}$<br><br><br>
-                            (2) $\lim_{x \to a} \dfrac{x f(a) - a f(x)}{x - a}$
+                            (1) $\lim\limits_{x \to a} \dfrac{f(x^2) - f(a)}{x - a}$<br><br><br>
+                            (2) $\lim\limits_{x \to a} \dfrac{x f(a) - a f(x)}{x - a}$
                         </h3>
                     </div>
                 </div>
             </div>
 
-            <!-- Slide 8: 필수예제 04 (p.65) (해설 카드 완전 제거 -> 판서 공간 극대화) -->
+            <!-- Slide 8 -->
             <div class="slide" data-category="필수예제 04 | p.65">
                 <h2 class="text-2xl font-extrabold text-white mb-4">필수예제 04 &nbsp;<span class="text-cyan-400 text-lg">관계식이 주어진 경우의 미분계수 (p.65)</span></h2>
                 <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
@@ -292,21 +220,60 @@
                 </div>
             </div>
 
-            <!-- Slide 9: 필수예제 05 (p.66) (해설 카드 완전 제거 -> 판서 공간 극대화) -->
+            <!-- Slide 9: 필수예제 05 (교재 원본 필수 SVG 그래프 탑재) -->
             <div class="slide" data-category="필수예제 05 | p.66">
                 <h2 class="text-2xl font-extrabold text-white mb-4">필수예제 05 &nbsp;<span class="text-cyan-400 text-lg">미분계수의 기하학적 의미 (p.66)</span></h2>
-                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
-                    <div class="max-w-4xl w-full mx-auto">
+                <div class="problem-box p-6 flex-grow flex items-center justify-between gap-6">
+                    <div class="w-6/12 flex flex-col justify-start">
                         <div class="text-xs font-bold text-cyan-400 uppercase tracking-widest mb-2">Essential Example 05</div>
                         <h3 class="problem-text">
                             오른쪽 그림과 같이 곡선 $y=f(x)$ 위의 두 점 $A(a, f(a)), B(b, f(b))$ ($0 < a < b$)에 대하여 다음 세 값의 대소를 비교하시오.
                             $$\frac{f(a)}{a}, \quad \frac{f(b)}{b}, \quad \frac{f(b)-f(a)}{b-a}$$
                         </h3>
                     </div>
+                    <!-- 교재 원본 그래프 SVG 카드 -->
+                    <div class="w-6/12 concept-card p-4 flex flex-col items-center justify-center">
+                        <span class="text-xs font-bold text-cyan-400 mb-2">y = f(x) 기하학적 기울기 비교</span>
+                        <div class="w-full h-56 bg-slate-900/90 rounded-xl border border-slate-700/60 p-2 flex items-center justify-center">
+                            <svg viewBox="0 0 220 150" class="w-full h-full">
+                                <!-- Axes -->
+                                <line x1="30" y1="130" x2="200" y2="130" stroke="#64748b" stroke-width="1.5" />
+                                <line x1="30" y1="20" x2="30" y2="130" stroke="#64748b" stroke-width="1.5" />
+                                <text x="203" y="134" fill="#94a3b8" font-size="10">x</text>
+                                <text x="26" y="16" fill="#94a3b8" font-size="10">y</text>
+                                <text x="22" y="142" fill="#94a3b8" font-size="9">O</text>
+
+                                <!-- Concave Down Curve y=f(x) -->
+                                <path d="M 30,130 Q 90,30 200,45" fill="none" stroke="#38bdf8" stroke-width="2.5" />
+                                <text x="185" y="38" fill="#38bdf8" font-size="10" font-weight="bold">y=f(x)</text>
+
+                                <!-- Point A (80, 70) -->
+                                <circle cx="80" cy="70" r="4" fill="#ef4444" />
+                                <text x="75" y="62" fill="#ef4444" font-size="11" font-weight="bold">A</text>
+                                <line x1="80" y1="70" x2="80" y2="130" stroke="#ef4444" stroke-width="1" stroke-dasharray="2 2" />
+                                <text x="78" y="142" fill="#ef4444" font-size="10" font-weight="bold">a</text>
+
+                                <!-- Point B (160, 46) -->
+                                <circle cx="160" cy="46" r="4" fill="#f59e0b" />
+                                <text x="165" y="42" fill="#f59e0b" font-size="11" font-weight="bold">B</text>
+                                <line x1="160" y1="46" x2="160" y2="130" stroke="#f59e0b" stroke-width="1" stroke-dasharray="2 2" />
+                                <text x="158" y="142" fill="#f59e0b" font-size="10" font-weight="bold">b</text>
+
+                                <!-- Secant OA (red) -->
+                                <line x1="30" y1="130" x2="105" y2="40" stroke="#ef4444" stroke-width="1.5" opacity="0.8" />
+
+                                <!-- Secant OB (amber) -->
+                                <line x1="30" y1="130" x2="185" y2="30" stroke="#f59e0b" stroke-width="1.5" opacity="0.8" />
+
+                                <!-- Secant AB (cyan dashed) -->
+                                <line x1="60" y1="76" x2="180" y2="40" stroke="#10b981" stroke-width="2" stroke-dasharray="4 2" />
+                            </svg>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Slide 10: 필수예제 06 (p.67) (해설 카드 완전 제거 -> 판서 공간 극대화) -->
+            <!-- Slide 10 -->
             <div class="slide" data-category="필수예제 06 | p.67">
                 <h2 class="text-2xl font-extrabold text-white mb-4">필수예제 06 &nbsp;<span class="text-cyan-400 text-lg">미분가능성과 연속성 판별 (p.67)</span></h2>
                 <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
@@ -319,7 +286,7 @@
                 </div>
             </div>
 
-            <!-- Slide 11: Outro -->
+            <!-- Slide 11 -->
             <div class="slide" data-category="Outro">
                 <div class="flex flex-col items-center justify-center h-full text-center">
                     <i class="fa-solid fa-graduation-cap text-6xl text-cyan-500 mb-6"></i>
@@ -329,21 +296,16 @@
                         개념원리 미적분1<br>
                         **03. 미분계수 (p.58 ~ 68)** 개념 및 필수예제 학습을 모두 마쳤습니다.
                     </p>
-                    <p class="text-slate-400 text-base">
-                        수고하셨습니다! 다음 단원 도함수에서도 완벽하게 개념을 다져봅시다.
-                    </p>
                 </div>
             </div>
-
         </div>
 
-        <!-- Footer: 슬라이드 컨트롤 및 페이지 표시 -->
         <div class="flex justify-between items-center z-20 pt-3 border-t border-slate-700/50 mx-8 mb-6 no-print">
             <div class="flex items-center gap-3">
-                <button onclick="prevSlide()" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg font-bold transition-all border border-slate-700 flex items-center gap-2">
+                <button onclick="prevSlide()" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg font-bold border border-slate-700 flex items-center gap-2">
                     <i class="fa-solid fa-chevron-left"></i> 이전
                 </button>
-                <button onclick="nextSlide()" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg font-bold transition-all border border-slate-700 flex items-center gap-2">
+                <button onclick="nextSlide()" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg font-bold border border-slate-700 flex items-center gap-2">
                     다음 <i class="fa-solid fa-chevron-right"></i>
                 </button>
             </div>
@@ -351,53 +313,28 @@
                 <span id="current-page" class="text-cyan-400 font-bold">1</span> / <span id="total-pages">11</span>
             </div>
         </div>
-
     </div>
 
-    <!-- 슬라이드 조작 스크립트 -->
     <script>
         const slides = document.querySelectorAll('.slide');
         const pageIndicator = document.getElementById('current-page');
         const totalIndicator = document.getElementById('total-pages');
         const categoryIndicator = document.getElementById('slide-category');
-        
         let currentSlideIdx = 0;
         totalIndicator.innerText = slides.length;
 
         function updateSlideUI() {
             slides.forEach((slide, idx) => {
-                if (idx === currentSlideIdx) {
-                    slide.classList.add('active');
-                } else {
-                    slide.classList.remove('active');
-                }
+                if (idx === currentSlideIdx) slide.classList.add('active');
+                else slide.classList.remove('active');
             });
-
             pageIndicator.innerText = currentSlideIdx + 1;
-            const currentSlide = slides[currentSlideIdx];
-            categoryIndicator.innerText = currentSlide.getAttribute('data-category');
-
-            // MathJax 렌더링 동적 갱신
-            if (window.MathJax && window.MathJax.typesetPromise) {
-                window.MathJax.typesetPromise();
-            }
+            categoryIndicator.innerText = slides[currentSlideIdx].getAttribute('data-category');
+            if (window.MathJax && window.MathJax.typesetPromise) window.MathJax.typesetPromise();
         }
 
-        function nextSlide() {
-            if (currentSlideIdx < slides.length - 1) {
-                currentSlideIdx++;
-                updateSlideUI();
-            }
-        }
-
-        function prevSlide() {
-            if (currentSlideIdx > 0) {
-                currentSlideIdx--;
-                updateSlideUI();
-            }
-        }
-
-        // 초기 UI 로딩
+        function nextSlide() { if (currentSlideIdx < slides.length - 1) { currentSlideIdx++; updateSlideUI(); } }
+        function prevSlide() { if (currentSlideIdx > 0) { currentSlideIdx--; updateSlideUI(); } }
         updateSlideUI();
     </script>
 </body>
