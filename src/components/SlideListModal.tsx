@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 
 interface SlideItem {
   title: string;
@@ -41,8 +41,7 @@ export const SlideListModal: React.FC<SlideListModalProps> = ({ isOpen, onClose 
     // 7월 4W (7/22)
     { title: "개념원리 미적분1 - 02. 연속함수의 성질 (p51~55)", filename: "calculus1_continuous_functions_02.html", date: "2026-07-22" },
     { title: "개념원리 미적분1 - 03. 미분계수 (p58~68)", filename: "calculus1_derivative_03.html", date: "2026-07-22" },
-    // 7월 3W (7/21)
-    { title: "개념원리 공통수학2 - 02. 직선의 방정식 (p34~62)", filename: "math2_linear_equation_02.html", date: "2026-07-21" },
+    { title: "개념원리 공통수학2 - 02. 직선의 방정식 (p34~62)", filename: "math2_linear_equation_02.html", date: "2026-07-22" },
     // 7월 3W (7/18)
     { title: "I. 함수의 극한과 연속 - 04. 함수의 극한의 응용", filename: "math_limit_applications.html", date: "2026-07-18" },
     { title: "II. 함수의 극한과 연속 - 01. 함수의 연속", filename: "math_continuity_01.html", date: "2026-07-18" },
