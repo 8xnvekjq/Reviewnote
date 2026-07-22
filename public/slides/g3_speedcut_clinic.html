@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>고3 준킬러 스피드 & 숏컷 클리닉 (260723)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true
+            },
+            options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'] }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        .presentation-deck { position: relative; width: 1280px; height: 720px; background: radial-gradient(circle at 10% 20%, #2e1014 0%, #0f172a 100%); border: 1px solid rgba(255, 255, 255, 0.08); margin: 20px auto; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+        .slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 45px 70px; display: none; flex-direction: column; justify-content: space-between; z-index: 1; background: transparent; }
+        .slide.active { display: flex; z-index: 10; }
+        .concept-card { background: rgba(30, 41, 59, 0.75); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.25); }
+        
+        .problem-box { background: linear-gradient(135deg, rgba(30, 20, 25, 0.9) 0%, rgba(15, 23, 42, 0.8) 100%); border-left: 8px solid #f43f5e; border-top: 1px solid rgba(255, 255, 255, 0.05); border-right: 1px solid rgba(255, 255, 255, 0.05); border-bottom: 1px solid rgba(255, 255, 255, 0.05); border-radius: 0 16px 16px 0; }
+        
+        .problem-text { font-size: 1.25rem; font-weight: 700; color: #f1f5f9; line-height: 1.625; }
+
+        @media print {
+            body { background-color: #ffffff !important; margin: 0 !important; padding: 0 !important; }
+            .presentation-deck { width: 1280px !important; height: auto !important; box-shadow: none !important; border: none !important; margin: 0 !important; overflow: visible !important; display: block !important; }
+            .slide { position: relative !important; display: flex !important; width: 1280px !important; height: 720px !important; page-break-after: always !important; page-break-inside: avoid !important; background: #0f172a !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <!-- 오답노트 귀환용 닫기 X 버튼 (PWA 네비게이션 미지원 단말 대응) -->
+    <button onclick="window.close()" class="no-print" style="position: fixed; top: 16px; left: 16px; z-index: 99999; display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; background-color: rgba(15, 23, 42, 0.85); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 50%; font-family: sans-serif; font-size: 14px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.5); backdrop-filter: blur(8px); transition: all 0.2s;" onmouseover="this.style.backgroundColor='rgba(30, 41, 59, 0.95)';" onmouseout="this.style.backgroundColor='rgba(15, 23, 42, 0.85)';">
+        ❌
+    </button>
+    <div class="presentation-deck" id="deck">
+        <!-- Header -->
+        <div class="flex justify-between items-center z-20 pb-3 border-b border-slate-700/50 mx-8 mt-6 no-print">
+            <div class="flex items-center gap-3">
+                <span class="bg-rose-600 text-white text-xs font-black px-2.5 py-1 rounded-md tracking-wider">고3 특강</span>
+                <span class="text-slate-400 text-sm font-medium">준킬러 스피드 &amp; 숏컷 클리닉</span>
+            </div>
+            <div class="text-right">
+                <span class="text-xs text-rose-400 font-semibold uppercase tracking-wider" id="slide-category">대표 문항</span>
+            </div>
+        </div>
+
+        <!-- 슬라이드 본문 영역 -->
+        <div class="relative flex-grow my-2 overflow-hidden" id="slide-container">
+            
+            <!-- Slide 1: 표지 -->
+            <div class="slide active" data-category="Intro">
+                <div class="flex flex-col items-center justify-center h-full text-center">
+                    <span class="bg-rose-600 text-white text-xs font-black px-3.5 py-1.5 rounded-full tracking-wider mb-4 uppercase">
+                        고3 대상 2시간 특강
+                    </span>
+                    <h1 class="text-5xl font-black text-white tracking-tight leading-tight mb-6 drop-shadow-md">
+                        준킬러 스피드 &amp; 숏컷 클리닉
+                    </h1>
+                    <div class="h-1.5 w-32 bg-rose-600 rounded-full mb-8"></div>
+                    <h2 class="text-3xl font-bold text-rose-400">
+                        시간 단축의 핵심: 대칭성, 비율관계, 그리고 구조적 직관
+                    </h2>
+                    <p class="text-slate-400 mt-6 text-lg max-w-xl font-light">
+                        260723 특강 | 7개 주제별 [원문 - 해설비교 - 실전구조변형] 세트
+                    </p>
+                </div>
+            </div>
+
+            <!-- Slide 2: [원문] 문항 1 -->
+            <div class="slide" data-category="문항 01 | 원문">
+                <h2 class="text-2xl font-extrabold text-white mb-4">문항 01 [원문] &nbsp;<span class="text-rose-400 text-lg">수학Ⅱ | 다항함수의 적분법 | 2022학년도 9월 모평 14번</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-2">Original Question</div>
+                        <h3 class="problem-text">
+                            삼차함수 $f(x) = x^3 - 3x^2$의 극대점 $A$를 지나고 $x$축에 평행한 직선이 이 곡선과 만나는 점 중 $A$가 아닌 점을 $B$라 하자. 곡선 $y=f(x)$와 선분 $AB$로 둘러싸인 도형의 넓이를 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 3: [원문 해설] 문항 1 -->
+            <div class="slide" data-category="문항 01 | 원문 해설">
+                <h2 class="text-2xl font-extrabold text-white mb-4">문항 01 [원문 해설] &nbsp;<span class="text-rose-400 text-lg">수학Ⅱ | 다항함수의 적분법 | 2022학년도 9월 모평 14번</span></h2>
+                <div class="grid grid-cols-2 gap-6 flex-grow items-stretch">
+                    <!-- 정석 풀이 -->
+                    <div class="concept-card p-5 border-t-4 border-slate-500 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-slate-400 font-bold uppercase tracking-wider block mb-1">정석 풀이 (Classic Solution)</span>
+                            <h3 class="text-base font-bold text-white mb-3">연산 4단계</h3>
+                            <div class="text-xs text-slate-300 space-y-2 leading-relaxed">
+                                <p>1. 미분하여 극대 위치 탐색:<br>&nbsp;&nbsp;&nbsp;$f'(x) = 3x^2 - 6x = 3x(x-2) = 0 \implies x=0$ (극대)</p>
+                                <p>2. 극대점 $A(0,0)$ 및 접선 $y=0$ 설정</p>
+                                <p>3. 교점 $B$ 계산:<br>&nbsp;&nbsp;&nbsp;$x^3 - 3x^2 = 0 \implies x^2(x-3) = 0 \implies B(3,0)$</p>
+                                <p>4. 정적분 계산:<br>&nbsp;&nbsp;&nbsp;$S = \int_{0}^{3} (0 - f(x)) dx = \left[-\frac{1;}{4}x^4 + x^3\right]_{0}^{3} = \frac{27}{4}$</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-slate-400 mt-2">시간 소요 요인: 다항식 적분 계산량 폭발 및 계산 실수 위험</div>
+                    </div>
+                    <!-- 숏컷 풀이 -->
+                    <div class="concept-card p-5 border-t-4 border-rose-500 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-rose-400 font-bold uppercase tracking-wider block mb-1">숏컷 풀이 (Shortcut Skill)</span>
+                            <h3 class="text-base font-bold text-rose-300 mb-3">30초 컷 핵심 아이디어</h3>
+                            <div class="text-xs text-slate-200 space-y-3 leading-relaxed">
+                                <p><b>1. 삼차함수 비율 관계 (2:1 법칙)</b><br>
+                                극대 위치 $x=0$, 극소 위치 $x=2$이므로,<br>
+                                극대 접선과 삼차함수의 교점 $B$의 $x$좌표는 계산 없이 **$x=3$** 도출.</p>
+                                <p><b>2. 접선 면적 공식 (12 공식)</b><br>
+                                $$S = \frac{|a|}{12}(\beta - \alpha)^4$$
+                                $$S = \frac{1}{12}(3 - 0)^4 = \frac{81}{12} = \frac{27}{4}$$</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-rose-300/80 mt-2"><i class="fa-solid fa-bolt mr-1"></i> 비율관계로 점 좌표 즉시 획득 후, 정적분 없이 넓이 공식 대입</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 4: [구조 변형] 문항 1 -->
+            <div class="slide" data-category="문항 01 | 구조 변형">
+                <h2 class="text-2xl font-extrabold text-white mb-4">문항 01 [구조 변형] &nbsp;<span class="text-rose-400 text-lg">수학Ⅱ | 다항함수의 적분법 | 사선 접선과 넓이</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-2">Structure Extension</div>
+                        <h3 class="problem-text">
+                            삼차함수 $f(x) = x^3 - 3x^2 + 2x$와 이 곡선 위의 점 $A(0,0)$에서의 접선 $l$이 있다. 곡선 $y=f(x)$와 접선 $l$로 둘러싸인 도형의 넓이를 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 5: [원문] 문항 2 -->
+            <div class="slide" data-category="문항 02 | 원문">
+                <h2 class="text-2xl font-extrabold text-white mb-4">문항 02 [원문] &nbsp;<span class="text-rose-400 text-lg">수학Ⅰ | 삼각함수 | 2023학년도 수능 11번</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-2">Original Question</div>
+                        <h3 class="problem-text">
+                            방정식 $\cos(\pi x) = \dfrac{1}{4}$의 $0 \le x \le 4$에서의 모든 실근의 합을 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 6: [원문 해설] 문항 2 -->
+            <div class="slide" data-category="문항 02 | 원문 해설">
+                <h2 class="text-2xl font-extrabold text-white mb-4">문항 02 [원문 해설] &nbsp;<span class="text-rose-400 text-lg">수학Ⅰ | 삼각함수 | 2023학년도 수능 11번</span></h2>
+                <div class="grid grid-cols-2 gap-6 flex-grow items-stretch">
+                    <!-- 정석 풀이 -->
+                    <div class="concept-card p-5 border-t-4 border-slate-500 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-slate-400 font-bold uppercase tracking-wider block mb-1">정석 풀이 (Classic Solution)</span>
+                            <h3 class="text-base font-bold text-white mb-3">미지수 매개화 풀이</h3>
+                            <div class="text-xs text-slate-300 space-y-2.5 leading-relaxed">
+                                <p>1. 첫 번째 근을 $x=\alpha$로 정의 ($\cos(\pi\alpha) = \frac{1}{4}$)</p>
+                                <p>2. 삼각함수의 대칭성에 따라 각 실근 표현:<br>
+                                &nbsp;&nbsp;&nbsp;• 1주기($0 \le x \le 2$): $x_1 = \alpha, \; x_2 = 2-\alpha$<br>
+                                &nbsp;&nbsp;&nbsp;• 2주기($2 \le x \le 4$): $x_3 = 2+\alpha, \; x_4 = 4-\alpha$</p>
+                                <p>3. 실근 합산:<br>
+                                &nbsp;&nbsp;&nbsp;$x_1 + x_2 + x_3 + x_4 = \alpha + (2-\alpha) + (2+\alpha) + (4-\alpha) = 8$</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-slate-400 mt-2">시간 소요 요인: 문자가 섞이면서 주기점과 대칭점을 덧셈뺄셈하다 연산 실수 발생</div>
+                    </div>
+                    <!-- 숏컷 풀이 -->
+                    <div class="concept-card p-5 border-t-4 border-rose-500 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-rose-400 font-bold uppercase tracking-wider block mb-1">숏컷 풀이 (Shortcut Skill)</span>
+                            <h3 class="text-base font-bold text-rose-300 mb-3">20초 컷 핵심 아이디어</h3>
+                            <div class="text-xs text-slate-200 space-y-3 leading-relaxed">
+                                <p><b>1. 선대칭성의 성질 이용</b><br>
+                                주기 $T = \frac{2\pi}{\pi} = 2$이므로 $0 \le x \le 4$는 **2주기** (근 4개).</p>
+                                <p><b>2. 대칭축 즉시 합산</b><br>
+                                • 첫 주기 대칭축: $x = 1 \implies$ 두 근의 합 = $1 \times 2 = 2$<br>
+                                • 둘째 주기 대칭축: $x = 3 \implies$ 두 근의 합 = $3 \times 2 = 6$<br>
+                                • **총합 $= 2 + 6 = \mathbf{8}$**</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-rose-300/80 mt-2"><i class="fa-solid fa-bolt mr-1"></i> 특수각이 아닐 때는 개별 실근을 잡지 말고 대칭축의 곱으로 다이렉트 해결</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 7: [구조 변형] 문항 2 -->
+            <div class="slide" data-category="문항 02 | 구조 변형">
+                <h2 class="text-2xl font-extrabold text-white mb-4">문항 02 [구조 변형] &nbsp;<span class="text-rose-400 text-lg">수학Ⅰ | 삼각함수 | 절댓값 대칭형 실근의 합</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-2">Structure Extension</div>
+                        <h3 class="problem-text">
+                            방정식 $|\sin(2\pi x)| = \dfrac{1}{3}$의 $0 \le x \le 2$에서의 모든 실근의 합을 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 8: [원문] 문항 3 -->
+            <div class="slide" data-category="문항 03 | 원문">
+                <h2 class="text-2xl font-extrabold text-white mb-4">문항 03 [원문] &nbsp;<span class="text-rose-400 text-lg">수학Ⅰ | 등차수열 | 2021학년도 6월 모평 12번</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-2">Original Question</div>
+                        <h3 class="problem-text">
+                            첫째항이 양수이고 공차가 $d$인 등차수열 $a_n$의 첫째항부터 제$n$항까지의 합 $S_n$이 $S_3 = S_{11}$을 만족시킨다. $S_n$이 최대가 되는 자연수 $n$의 값을 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 9: [원문 해설] 문항 3 -->
+            <div class="slide" data-category="문항 03 | 원문 해설">
+                <h2 class="text-2xl font-extrabold text-white mb-4">문항 03 [원문 해설] &nbsp;<span class="text-rose-400 text-lg">수학Ⅰ | 등차수열 | 2021학년도 6월 모평 12번</span></h2>
+                <div class="grid grid-cols-2 gap-6 flex-grow items-stretch">
+                    <!-- 정석 풀이 -->
+                    <div class="concept-card p-5 border-t-4 border-slate-500 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-slate-400 font-bold uppercase tracking-wider block mb-1">정석 풀이 (Classic Solution)</span>
+                            <h3 class="text-base font-bold text-white mb-3">공식 대입 연립 풀이</h3>
+                            <div class="text-xs text-slate-300 space-y-2 leading-relaxed">
+                                <p>1. 합 공식 $S_n = \frac{n(2a+(n-1)d)}{2}$ 대입</p>
+                                <p>2. $S_3 = S_{11} \implies \frac{3(2a+2d)}{2} = \frac{11(2a+10d)}{2} \implies 2a = -13d$</p>
+                                <p>3. $a_1 > 0 \implies d &lt; 0$ 판별</p>
+                                <p>4. $S_n$ 식에 $a = -6.5d$ 대입하여 이차함수 일반식 작성 후 완전제곱식으로 전개하여 꼭짓점 축 구하기</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-slate-400 mt-2">시간 소요 요인: 다항식 전개 과정에서 $a$와 $d$의 비례 상수가 지저분해 연산 유발</div>
+                    </div>
+                    <!-- 숏컷 풀이 -->
+                    <div class="concept-card p-5 border-t-4 border-rose-500 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-rose-400 font-bold uppercase tracking-wider block mb-1">숏컷 풀이 (Shortcut Skill)</span>
+                            <h3 class="text-base font-bold text-rose-300 mb-3">15초 컷 핵심 아이디어</h3>
+                            <div class="text-xs text-slate-200 space-y-3 leading-relaxed">
+                                <p><b>1. 등차합의 이차함수 모델링</b><br>
+                                등차수열의 합 $S_n$은 상수항이 없는 **이차함수** $y=S(x)$ 상의 값이다.</p>
+                                <p><b>2. 이차함수 정중앙 대칭성</b><br>
+                                $S(3) = S(11)$이므로 대칭축 $x$는 정확히 두 지점의 정중앙인 **$n = \frac{3+11}{2} = 7$** 이다.<br>
+                                $a_1 > 0$이고 수열이 줄어들며 최댓값을 가지므로 축인 **$n=7$**에서 $S_n$은 최대가 된다.</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-rose-300/80 mt-2"><i class="fa-solid fa-bolt mr-1"></i> 수식 없이 대칭축 공식 $n=\frac{\alpha+\beta}{2}$ 만으로 정답 도출</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 10: [구조 변형] 문항 3 -->
+            <div class="slide" data-category="문항 03 | 구조 변형">
+                <h2 class="text-2xl font-extrabold text-white mb-4">문항 03 [구조 변형] &nbsp;<span class="text-rose-400 text-lg">수학Ⅰ | 등차수열 | 이산적 대칭 최댓값 조건</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-2">Structure Extension</div>
+                        <h3 class="problem-text">
+                            첫째항이 양수이고 공차가 $d$인 등차수열 $a_n$의 첫째항부터 제$n$항까지의 합 $S_n$이 다음 두 조건을 만족시킨다.<br><br>
+                            (가) $S_5 = S_{16}$<br><br>
+                            (나) $S_k = S_{k+1}$을 만족하는 자연수 $k$가 존재한다.<br><br>
+                            이때 $S_n$이 최대가 되는 모든 자연수 $n$의 값의 합을 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 11: [원문] 문항 4 -->
+            <div class="slide" data-category="문항 04 | 원문">
+                <h2 class="text-2xl font-extrabold text-white mb-4">문항 04 [원문] &nbsp;<span class="text-rose-400 text-lg">미적분 | 수열의 극한 | 2024학년도 수능 28번</span></h2>
+                <div class="problem-box p-6 flex-grow flex items-center justify-between gap-6">
+                    <div class="w-7/12 flex flex-col justify-start">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-2">Original Question</div>
+                        <h3 class="problem-text">
+                            그림과 같이 한 변의 길이가 $4$인 정사각형 $A_1B_1C_1D_1$에 내접하는 원 $O_1$을 그린다. 원 $O_1$에 외접하고 두 변 $A_1B_1, A_1D_1$에 접하는 가장 큰 원을 $O_2$라 할 때, 동일한 과정을 반복하여 얻은 모든 원 $O_n$들의 넓이의 총합을 구하시오.
+                        </h3>
+                    </div>
+                    <!-- 기하 도형 SVG 카드 -->
+                    <div class="w-5/12 concept-card p-4 flex flex-col items-center justify-center">
+                        <span class="text-xs font-bold text-rose-400 mb-2">원들의 무한 내접 기하 구조</span>
+                        <div class="w-full h-52 bg-slate-900/90 rounded-xl border border-slate-700/60 p-2 flex items-center justify-center">
+                            <svg viewBox="0 0 160 160" class="w-full h-full">
+                                <rect x="10" y="10" width="140" height="140" fill="none" stroke="#f43f5e" stroke-width="2" />
+                                <text x="6" y="20" fill="#f43f5e" font-size="9" font-weight="bold">A1</text>
+                                <text x="148" y="20" fill="#f43f5e" font-size="9" font-weight="bold">B1</text>
+                                <text x="148" y="152" fill="#f43f5e" font-size="9" font-weight="bold">C1</text>
+                                <text x="6" y="152" fill="#f43f5e" font-size="9" font-weight="bold">D1</text>
+                                <line x1="10" y1="10" x2="150" y2="150" stroke="#475569" stroke-width="1" stroke-dasharray="3 3" />
+                                <circle cx="80" cy="80" r="70" fill="none" stroke="#38bdf8" stroke-width="1.8" />
+                                <text x="75" y="85" fill="#38bdf8" font-size="9" font-weight="bold">O1</text>
+                                <circle cx="22" cy="22" r="12" fill="none" stroke="#f59e0b" stroke-width="1.5" />
+                                <text x="18" y="25" fill="#f59e0b" font-size="8" font-weight="bold">O2</text>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 12: [원문 해설] 문항 4 -->
+            <div class="slide" data-category="문항 04 | 원문 해설">
+                <h2 class="text-2xl font-extrabold text-white mb-4">문항 04 [원문 해설] &nbsp;<span class="text-rose-400 text-lg">미적분 | 수열의 극한 | 2024학년도 수능 28번</span></h2>
+                <div class="grid grid-cols-2 gap-6 flex-grow items-stretch">
+                    <!-- 정석 풀이 -->
+                    <div class="concept-card p-5 border-t-4 border-slate-500 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-slate-400 font-bold uppercase tracking-wider block mb-1">정석 풀이 (Classic Solution)</span>
+                            <h3 class="text-base font-bold text-white mb-3">좌표평면 연립 풀이</h3>
+                            <div class="text-xs text-slate-300 space-y-2 leading-relaxed">
+                                <p>1. 좌표 도입: $A_1(0,4)$, 원 $O_1(2,2)$, $R_1=2$</p>
+                                <p>2. 원 $O_2$의 중심을 $(R_2, R_2)$로 잡음</p>
+                                <p>3. 두 원의 접조건 (중심거리 = 반지름 합):<br>
+                                &nbsp;&nbsp;&nbsp;$\sqrt{(2-R_2)^2 + (2-R_2)^2} = 2 + R_2$</p>
+                                <p>4. 양변을 제곱하여 2차 방정식 풀기:<br>
+                                &nbsp;&nbsp;&nbsp;$R_2^2 - 12R_2 + 4 = 0 \implies R_2 = 6 - 4\sqrt{2}$</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-slate-400 mt-2">시간 소요 요인: 양변 제곱 전개 과정 및 수식 계산량이 매우 큼</div>
+                    </div>
+                    <!-- 숏컷 풀이 -->
+                    <div class="concept-card p-5 border-t-4 border-rose-500 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-rose-400 font-bold uppercase tracking-wider block mb-1">숏컷 풀이 (Shortcut Skill)</span>
+                            <h3 class="text-base font-bold text-rose-300 mb-3">1분 컷 핵심 아이디어</h3>
+                            <div class="text-xs text-slate-200 space-y-2 leading-relaxed">
+                                <p><b>1. 대각선 상의 일직선 정렬 성질</b><br>
+                                꼭짓점 $A_1$에서 $O_1$ 중심까지의 거리 $2\sqrt{2}$는 기하학적으로 세 성분의 합이다.</p>
+                                <p>$$R_2\sqrt{2} + R_2 + R_1 = 2\sqrt{2}$$
+                                $$R_2(\sqrt{2}+1) + 2 = 2\sqrt{2}$$
+                                $$R_2 = \frac{2(\sqrt{2}-1)}{\sqrt{2}+1} = 2(\sqrt{2}-1)^2$$</p>
+                                <p>• 닮음비: $r = (\sqrt{2}-1)^2 = 3-2\sqrt{2}$</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-rose-300/80 mt-2"><i class="fa-solid fa-bolt mr-1"></i> 대칭 기하 구조를 이용해 수식 전개 없이 비례식으로 직접 풀이</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 13: [구조 변형] 문항 4 -->
+            <div class="slide" data-category="문항 04 | 구조 변형">
+                <h2 class="text-2xl font-extrabold text-white mb-4">문항 04 [구조 변형] &nbsp;<span class="text-rose-400 text-lg">미적분 | 부채꼴 내접원의 무한 등비 급수</span></h2>
+                <div class="problem-box p-6 flex-grow flex items-center justify-between gap-6">
+                    <div class="w-7/12 flex flex-col justify-start">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-2">Structure Extension</div>
+                        <h3 class="problem-text">
+                            그림과 같이 반지름의 길이가 $3$이고 중심각의 크기가 $90^\circ$인 부채꼴 $OP_1Q_1$이 있다. 이 부채꼴에 내접하는 가장 큰 원을 $C_1$이라 하고, 원 $C_1$에 외접하면서 부채꼴의 두 반지름 $OP_1, OQ_1$에 접하는 작은 원을 $C_2$라 하자. 동일한 과정을 반복하여 얻은 모든 원 $C_n$들의 넓이의 총합을 구하시오.
+                        </h3>
+                    </div>
+                    <!-- 부채꼴 내접원 전용 SVG 카드 -->
+                    <div class="w-5/12 concept-card p-4 flex flex-col items-center justify-center">
+                        <span class="text-xs font-bold text-rose-400 mb-2">부채꼴 내부 무한 수렴 원 기하 구조</span>
+                        <div class="w-full h-52 bg-slate-900/90 rounded-xl border border-slate-700/60 p-2 flex items-center justify-center">
+                            <svg viewBox="0 0 160 160" class="w-full h-full">
+                                <!-- Sector Arc (Center 10,150) -->
+                                <path d="M 10 150 L 150 150 A 140 140 0 0 0 10 10 Z" fill="none" stroke="#f43f5e" stroke-width="2" />
+                                <text x="5" y="158" fill="#f43f5e" font-size="9" font-weight="bold">O</text>
+                                <text x="152" y="152" fill="#f43f5e" font-size="9" font-weight="bold">P1</text>
+                                <text x="10" y="8" fill="#f43f5e" font-size="9" font-weight="bold">Q1</text>
+                                <!-- Angle Bisector Line -->
+                                <line x1="10" y1="150" x2="109" y2="51" stroke="#475569" stroke-width="1" stroke-dasharray="3 3" />
+                                <!-- Inscribed Circle C1 (Radius 58, center 68, 92) -->
+                                <circle cx="68" cy="92" r="58" fill="none" stroke="#38bdf8" stroke-width="1.8" />
+                                <text x="64" y="95" fill="#38bdf8" font-size="8" font-weight="bold">C1</text>
+                                <!-- Inscribed Circle C2 (Radius 10, center 20, 140) -->
+                                <circle cx="20" cy="140" r="10" fill="none" stroke="#f59e0b" stroke-width="1.5" />
+                                <text x="18" y="143" fill="#f59e0b" font-size="6" font-weight="bold">C2</text>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 14: [원문] 문항 5 -->
+            <div class="slide" data-category="문항 05 | 원문">
+                <h2 class="text-2xl font-extrabold text-white mb-4">문항 05 [원문] &nbsp;<span class="text-rose-400 text-lg">수학Ⅱ | 함수의 극한 | 2023학년도 9월 모평 20번</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-2">Original Question</div>
+                        <h3 class="problem-text">
+                            삼차함수 $f(x)$가 다음 두 조건을 만족시킬 때, $f(2)$의 값을 구하시오.<br><br>
+                            (가) $\lim\limits_{x \to 0} \dfrac{f(x)}{x} = -3$<br><br><br>
+                            (나) $\lim\limits_{x \to 1} \dfrac{f(x)}{x-1} = 2$
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 15: [원문 해설] 문항 5 -->
+            <div class="slide" data-category="문항 05 | 원문 해설">
+                <h2 class="text-2xl font-extrabold text-white mb-4">문항 05 [원문 해설] &nbsp;<span class="text-rose-400 text-lg">수학Ⅱ | 함수의 극한 | 2023학년도 9월 모평 20번</span></h2>
+                <div class="grid grid-cols-2 gap-6 flex-grow items-stretch">
+                    <!-- 정석 풀이 -->
+                    <div class="concept-card p-5 border-t-4 border-slate-500 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-slate-400 font-bold uppercase tracking-wider block mb-1">정석 풀이 (Classic Solution)</span>
+                            <h3 class="text-base font-bold text-white mb-3">다항 일반식 대입 풀이</h3>
+                            <div class="text-xs text-slate-300 space-y-2.5 leading-relaxed">
+                                <p>1. 식 설정: $f(x) = ax^3 + bx^2 + cx + d$</p>
+                                <p>2. (가)에서 $f(0)=0 \implies d=0, \; f'(0)=-3 \implies c=-3$</p>
+                                <p>3. (나)에서 $f(1)=0 \implies a+b-3=0 \implies a+b=3$</p>
+                                <p>4. $f'(1)=2 \implies 3a+2b-3=2 \implies 3a+2b=5$</p>
+                                <p>5. 연립방정식을 연산하여 $a=-1, b=4$ 도출 후 식 완성</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-slate-400 mt-2">시간 소요 요인: 3차 일반 수식을 4개 문자로 연립하면서 쓸데없이 손이 바빠짐</div>
+                    </div>
+                    <!-- 숏컷 풀이 -->
+                    <div class="concept-card p-5 border-t-4 border-rose-500 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-rose-400 font-bold uppercase tracking-wider block mb-1">숏컷 풀이 (Shortcut Skill)</span>
+                            <h3 class="text-base font-bold text-rose-300 mb-3">40초 컷 핵심 아이디어</h3>
+                            <div class="text-xs text-slate-200 space-y-2.5 leading-relaxed">
+                                <p><b>1. 인수 정리 기반의 즉시 세팅</b><br>
+                                $f(0)=0, f(1)=0$ 이므로 식을 다이렉트로 축약한다.<br>
+                                $$f(x) = x(x-1)(ax+b)$$</p>
+                                <p><b>2. 미분 없는 극한값 정리</b><br>
+                                • (가) 조건: $x$ 소거 후 $x=0$ 대입 $\implies -b=-3 \implies b=3$<br>
+                                • (나) 조건: $x-1$ 소거 후 $x=1$ 대입 $\implies a+b=2 \implies a=-1$</p>
+                                <p>$$f(x)=x(x-1)(-x+3) \implies f(2)=2(1)(1)=\mathbf{2}$$</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-rose-300/80 mt-2"><i class="fa-solid fa-bolt mr-1"></i> 연립 대신 인수로 식을 묶고 바로 대입하여 해결</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 16: [구조 변형] 문항 5 -->
+            <div class="slide" data-category="문항 05 | 구조 변형">
+                <h2 class="text-2xl font-extrabold text-white mb-4">문항 05 [구조 변형] &nbsp;<span class="text-rose-400 text-lg">수학Ⅱ | 함수의 극한 | 미분계수 극점 연립</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-start pt-10">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-2">Structure Extension</div>
+                        <h3 class="problem-text">
+                            최고차항의 계수가 $1$인 삼차함수 $f(x)$가 다음 두 조건을 만족시킬 때, $f(3)$의 값을 구하시오.<br><br>
+                            (가) $\lim\limits_{x \to 1} \dfrac{f(x)}{x-1} = -3$<br><br>
+                            (나) $f(x)$는 $x=2$에서 극값을 갖는다.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 17: Outro & Answer Key -->
+            <div class="slide" data-category="Outro">
+                <div class="flex flex-col justify-between h-full">
+                    <div class="flex flex-col items-center justify-center text-center pt-2">
+                        <i class="fa-solid fa-fire text-4xl text-rose-500 mb-2"></i>
+                        <h2 class="text-3xl font-extrabold text-white mb-2">준킬러 스피드 클리닉 완료!</h2>
+                        <div class="h-1 w-20 bg-rose-600 rounded-full mb-4"></div>
+                    </div>
+                    
+                    <!-- Answer Key Table -->
+                    <div class="concept-card p-5 border-t-4 border-rose-500 max-w-3xl w-full mx-auto flex-grow my-2 flex flex-col justify-center">
+                        <span class="text-xs text-rose-400 font-bold uppercase tracking-wider block mb-3 text-center"><i class="fa-solid fa-key mr-1.5"></i> 특강 문항 정답표 (Answer Key)</span>
+                        <div class="grid grid-cols-2 gap-6 text-xs">
+                            <!-- 원문 정답 -->
+                            <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/50">
+                                <h4 class="font-bold text-white mb-2 text-center text-rose-300 border-b border-slate-700/50 pb-1">[원문] 정답 모음</h4>
+                                <ul class="space-y-2 font-mono">
+                                    <li class="flex justify-between"><span>문항 01:</span><span class="text-rose-400 font-bold">$\dfrac{27}{4}$</span></li>
+                                    <li class="flex justify-between"><span>문항 02:</span><span class="text-rose-400 font-bold">$8$</span></li>
+                                    <li class="flex justify-between"><span>문항 03:</span><span class="text-rose-400 font-bold">$7$</span></li>
+                                    <li class="flex justify-between"><span>문항 04:</span><span class="text-rose-400 font-bold">$\dfrac{4+3\sqrt{2}}{2}\pi$</span></li>
+                                    <li class="flex justify-between"><span>문항 05:</span><span class="text-rose-400 font-bold">$2$</span></li>
+                                </ul>
+                            </div>
+                            <!-- 구조 변형 정답 -->
+                            <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/50">
+                                <h4 class="font-bold text-white mb-2 text-center text-rose-300 border-b border-slate-700/50 pb-1">[구조 변형] 정답 모음</h4>
+                                <ul class="space-y-2 font-mono">
+                                    <li class="flex justify-between"><span>문항 01:</span><span class="text-rose-400 font-bold">$\dfrac{27}{4}$</span></li>
+                                    <li class="flex justify-between"><span>문항 02:</span><span class="text-rose-400 font-bold">$8$</span></li>
+                                    <li class="flex justify-between"><span>문항 03:</span><span class="text-rose-400 font-bold">$21$</span></li>
+                                    <li class="flex justify-between"><span>문항 04:</span><span class="text-rose-400 font-bold">$\dfrac{9\sqrt{2}}{8}\pi$</span></li>
+                                    <li class="flex justify-between"><span>문항 05:</span><span class="text-rose-400 font-bold">$2$</span></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="text-center text-[11px] text-slate-400 mt-2">
+                        지름길(Shortcut)을 보는 눈이 곧 최고 등급의 열쇠입니다.
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer -->
+        <div class="flex justify-between items-center z-20 pt-3 border-t border-slate-700/50 mx-8 mb-6 no-print">
+            <div class="flex items-center gap-3">
+                <button onclick="prevSlide()" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg font-bold border border-slate-700 flex items-center gap-2">
+                    <i class="fa-solid fa-chevron-left"></i> 이전
+                </button>
+                <button onclick="nextSlide()" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg font-bold border border-slate-700 flex items-center gap-2">
+                    다음 <i class="fa-solid fa-chevron-right"></i>
+                </button>
+            </div>
+            <div class="text-slate-400 text-sm font-semibold tracking-widest">
+                <span id="current-page" class="text-rose-400 font-bold">1</span> / <span id="total-pages">17</span>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const slides = document.querySelectorAll('.slide');
+        const pageIndicator = document.getElementById('current-page');
+        const totalIndicator = document.getElementById('total-pages');
+        const categoryIndicator = document.getElementById('slide-category');
+        let currentSlideIdx = 0;
+        totalIndicator.innerText = slides.length;
+
+        function updateSlideUI() {
+            slides.forEach((slide, idx) => {
+                if (idx === currentSlideIdx) slide.classList.add('active');
+                else slide.classList.remove('active');
+            });
+            pageIndicator.innerText = currentSlideIdx + 1;
+            categoryIndicator.innerText = slides[currentSlideIdx].getAttribute('data-category');
+            if (window.MathJax && window.MathJax.typesetPromise) window.MathJax.typesetPromise();
+        }
+
+        function nextSlide() { if (currentSlideIdx < slides.length - 1) { currentSlideIdx++; updateSlideUI(); } }
+        function prevSlide() { if (currentSlideIdx > 0) { currentSlideIdx--; updateSlideUI(); } }
+        updateSlideUI();
+    </script>
+</body>
+</html>

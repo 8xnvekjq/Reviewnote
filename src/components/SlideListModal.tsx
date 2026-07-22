@@ -38,7 +38,8 @@ export const SlideListModal: React.FC<SlideListModalProps> = ({ isOpen, onClose 
   // ── 수업 슬라이드 마스터 리스트 ──────────────────────────────────────
   // 새 자료 추가 시 이 배열에 한 줄만 추가하면 주차 자동 그루핑됩니다.
   const SLIDE_LIST: SlideItem[] = [
-    // 7월 4W (7/22)
+    // 7월 4W (7/22~7/23)
+    { title: "고3 준킬러 스피드 & 숏컷 클리닉", filename: "g3_speedcut_clinic.html", date: "2026-07-23" },
     { title: "개념원리 미적분1 - 01. 함수의 극한과 연속 (p31~47)", filename: "calculus1_limit_continuity_01.html", date: "2026-07-22" },
     { title: "개념원리 미적분1 - 02. 연속함수의 성질 (p51~55)", filename: "calculus1_continuous_functions_02.html", date: "2026-07-22" },
     { title: "개념원리 미적분1 - 03. 미분계수 (p58~68)", filename: "calculus1_derivative_03.html", date: "2026-07-22" },
