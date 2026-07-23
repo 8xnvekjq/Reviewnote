@@ -323,3 +323,19 @@ try {
 - `npx tsc -b --noEmit` 통과
 - `npx oxlint src` — 새로 추가된 오류/경고 없음
 - (사용자 요청에 따라 이번부터는 실제 API로 재테스트하지 않고 코드 변경만 반영 — 실사용 테스트는 사용자가 직접 진행)
+
+---
+
+## 15. 10차 개선 — 평균 대기시간을 오답 카드 삭제와 무관하게 영구 저장
+
+배경: 사용자가 "사진을 세 번 정도 찍었는데 평균 대기시간이 안 뜬다"고 문의했습니다. 원인은 기존 구현이 `durationMs`를 오답 카드(`mistakes.analysis`)에 저장해서, **테스트하고 삭제하는 걸 반복하면 그 기록도 같이 사라져** 3건이 절대 안 쌓이는 구조였습니다.
+
+### 해결: 오답 카드와 완전히 분리된 전역 통계 테이블
+- **[supabase_diagnosis_stats.sql](supabase_diagnosis_stats.sql)**: `diagnosis_stats` 테이블(단일 행, `total_count`/`total_duration_ms` 누적)을 신설. 오답 카드를 몇 개를 지우든 이 통계는 전혀 영향받지 않습니다. 동시에 여러 학생이 진단을 끝낼 때 read-then-write 경쟁 상태로 카운트가 씹히지 않도록, 직접 UPDATE 대신 원자적으로 누적하는 `record_diagnosis_duration(duration_ms)` 함수(SECURITY DEFINER)를 통해서만 갱신하도록 설계했습니다. 사용자가 Supabase SQL 에디터에서 직접 실행 완료함.
+- **[App.tsx](src/App.tsx)**: `fetchDiagnosisStats()`로 로그인 시 평균을 조회(3건 미만이면 아직 미노출)하고, `solveStep` 완료 시마다 `record_diagnosis_duration` RPC를 호출해 이번 진단 시간을 누적한 뒤 즉시 재조회해서 상태를 갱신합니다. 통계 기록 실패가 진단 자체의 성공/실패에 영향을 주지 않도록 별도 try/catch로 감쌌습니다.
+- **[MistakeDetailModal.tsx](src/components/MistakeDetailModal.tsx)**: 기존에 `allEntries`(오답 카드 목록)에서 `durationMs`를 모아 계산하던 `useMemo`를 제거하고, `averageWaitMs`를 App.tsx로부터 prop으로 전달받아 그대로 사용하도록 변경.
+
+### 검증
+- `npx tsc -b --noEmit` 통과
+- `npx oxlint src` — 새로 추가된 오류/경고 없음
+- SQL은 사용자가 Supabase에서 직접 실행해 성공 확인함; 앱 쪽 연동 코드는 사용자가 실사용 중 직접 테스트 예정

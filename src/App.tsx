@@ -48,6 +48,8 @@ function App() {
   const [profilesGradeMap, setProfilesGradeMap] = useState<Record<string, string>>({});
   // Supabase system_config 테이블에서 로드한 Gemini API Key 상태 (무료키는 레이트리밋 문제로 배제하고 유료키만 사용)
   const [paidGeminiKey, setPaidGeminiKey] = useState<string>('');
+  // AI 진단 평균 소요시간(ms) — diagnosis_stats 테이블의 전역 누적치 기반, 오답 카드 삭제와 무관하게 유지됨
+  const [averageWaitMs, setAverageWaitMs] = useState<number | null>(null);
   // 다른 학생들의 실시간 복습 현황 목록
   const [peerActivities, setPeerActivities] = useState<any[]>([]);
   // 실시간 접속(활동) 중인 학생 목록
@@ -234,6 +236,7 @@ function App() {
         loadWeeklyChampions(); // 주간 챔피언 로드
         fetchMyWeeklyScore(session.user.id); // 내 주간 점수 DB 조회
         fetchGeminiApiKeys(); // 동적 API 키 로드
+        fetchDiagnosisStats(); // 평균 진단 소요시간 조회
       }
     });
 
@@ -249,6 +252,7 @@ function App() {
         loadWeeklyChampions(); // 주간 챔피언 로드
         fetchMyWeeklyScore(session.user.id); // 내 주간 점수 DB 조회
         fetchGeminiApiKeys(); // 동적 API 키 로드
+        fetchDiagnosisStats(); // 평균 진단 소요시간 조회
       } else {
         setCurrentUser('');
         setIsAdmin(false);
@@ -333,6 +337,22 @@ function App() {
       });
     } catch (err) {
       console.error('Failed to load Gemini API Keys from Supabase config:', err);
+    }
+  };
+
+  // diagnosis_stats 테이블(전역 누적, 오답 카드 삭제와 무관하게 유지됨)에서 평균 진단 소요시간 조회
+  const fetchDiagnosisStats = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('diagnosis_stats')
+        .select('total_count, total_duration_ms')
+        .eq('id', 1)
+        .single();
+      if (error) throw error;
+      // 표본이 너무 적으면(3건 미만) 신뢰하기 어려운 값이라 아직 노출하지 않음
+      setAverageWaitMs(data && data.total_count >= 3 ? data.total_duration_ms / data.total_count : null);
+    } catch (err) {
+      console.error('Failed to load diagnosis stats from Supabase:', err);
     }
   };
 
@@ -551,6 +571,18 @@ function App() {
     // 로컬 상태 2차 갱신 (상세 해설 로딩 완료 노출)
     setMistakes(prev => prev.map(m => m.id === updatedEntry.id ? finalEntry : m));
     setSelectedEntry(finalEntry);
+
+    // 평균 대기시간 통계에 이번 진단 소요시간 반영 (오답 카드 삭제와 무관하게 영구 누적).
+    // 통계 기록 실패는 진단 자체의 성공/실패에 영향을 주면 안 되므로 별도로 감싸서 처리.
+    try {
+      const { error: statsError } = await supabase.rpc('record_diagnosis_duration', {
+        duration_ms: finalAnalysis.durationMs
+      });
+      if (statsError) throw statsError;
+      await fetchDiagnosisStats();
+    } catch (err) {
+      console.error('Failed to record diagnosis duration stats:', err);
+    }
   };
 
   // Intercept camera capture and start cropping flow
@@ -1388,6 +1420,7 @@ function App() {
           allEntries={mistakes}
           peerActivities={peerActivities}
           isAnalyzing={isAnalyzing}
+          averageWaitMs={averageWaitMs}
           youtubeLectures={youtubeLectures}
           onClose={() => {
             setIsReviewSession(false);

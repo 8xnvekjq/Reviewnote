@@ -10,6 +10,7 @@ interface MistakeDetailModalProps {
   allEntries?: MistakeEntry[];
   peerActivities?: any[];
   isAnalyzing: boolean;
+  averageWaitMs?: number | null; // diagnosis_stats 테이블 기반 평균 진단 소요시간(ms) — 오답 카드 삭제와 무관하게 유지됨
   youtubeLectures?: any[]; // DB로부터 가져온 55개 강의 마스터 리스트
   onClose: () => void;
   onDeleteMistake: (id: string, e: React.MouseEvent) => void;
@@ -30,6 +31,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   allEntries = [],
   peerActivities = [],
   isAnalyzing,
+  averageWaitMs = null,
   youtubeLectures = [],
   onClose,
   onDeleteMistake,
@@ -44,15 +46,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   const [showResult, setShowResult] = React.useState(!isAnalyzing && !!selectedEntry.analysis);
   const analysisCardRef = React.useRef<HTMLDivElement>(null);
   const wasAnalyzingRef = React.useRef(isAnalyzing);
-
-  // 실제 진단 소요 시간 기록(analysis.durationMs)들의 평균 — 최소 3건 이상 쌓여야 추정치로 신뢰해서 사용
-  const averageWaitMs = React.useMemo(() => {
-    const durations = (allEntries || [])
-      .map(e => e.analysis?.durationMs)
-      .filter((d): d is number => typeof d === 'number' && d > 0);
-    if (durations.length < 3) return null;
-    return durations.reduce((sum, d) => sum + d, 0) / durations.length;
-  }, [allEntries]);
 
   // Student editable fields
   const [editGrade, setEditGrade] = React.useState(selectedEntry.grade || '');
