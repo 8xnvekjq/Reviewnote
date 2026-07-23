@@ -342,7 +342,7 @@ ${chaptersStr || '  * (챕터 정보 없음)'}`;
 - 만약 특정 개념(예: 인수분해, 이차방정식, 이차함수 등)이 중등 과정과 고등 과정에 모두 걸쳐 있고 중등 범위 내의 기법으로 충분히 풀 수 있는 평이한 수준이라면, 다른 조건보다 학생의 학년인 **"${studentGrade}"** 에 맞추어 하위 교과 과정(예: "중3-1" 과목의 "이차함수")으로 우선 판별하십시오.
 - **[선행학습(Advanced Placement) 고려 지침]**: 학생의 학년이 "중3"이더라도, 문제 내용에 고등 과정 전용 개념(예: 허수단위 $i$, 나머지정리, 판별식 $D < 0$인 허근, 행렬, 조립제법 등)이 명시적으로 포함되어 있어 고등 교과 과정으로 해석하고 풀어야만 하는 문제라면, 학생 학년에 국한되지 말고 실제 문제 수준에 맞는 고등 과목(예: "공통수학1", "공통수학2")으로 정확하게 분류해 주십시오.
 - **[복습/기초학습(Review/Remedial) 고려 지침]**: 반대로, 학생의 현재 학년이 높더라도(예: "고1", "고2" 이상), 복습 및 기초 다지기를 위해 이전 학년의 문제(예: "중3-1"의 이차함수, "중3-2"의 삼각비 등)를 풀이할 수 있습니다. 문제의 소재나 표현이 명백히 하위 학년 수준에 해당한다면, 현재 학년에 억지로 매핑하지 말고 실제 문제 수준에 맞는 하위 학년 과목(예: "중3-1", "중3-2")으로 정확하게 분류하십시오.
-- **[Curriculum Locking]**: 풀이 과정과 힌트를 구성할 때, 식별된 대상 과목 및 학년 범위에서 '아직 배우지 않은 개념이나 선행 공식'을 끌고 와서 해설하는 것을 절대적으로 금지합니다. 오직 해당 학년 교과서 내의 기법만 사용하십시오.\n`
+- **[Curriculum Locking]**: 이후 풀이 과정을 구성할 때, 식별된 대상 과목 및 학년 범위에서 '아직 배우지 않은 개념이나 선행 공식'을 끌고 와서 해설하는 것을 절대적으로 금지합니다. 오직 해당 학년 교과서 내의 기법만 사용하십시오.\n`
     : '';
 
   const prompt = `너는 더쿠키수학 오답클리닉의 문제 분류 담당 인공지능 비서 **'밤티'**이다.
@@ -394,11 +394,15 @@ ${syllabusText || '등록된 강의가 없습니다.'}
       }
     ],
     generationConfig: {
+      // 분류는 정해진 목록(enum) 중 고르는 패턴 매칭 작업이라 깊은 추론이 필요 없으므로
+      // thinking을 꺼서 지연시간을 줄입니다. (실제 풀이를 계산하는 solve 단계는 정확도가
+      // 우선이라 thinking을 그대로 둡니다 — 함께 끄지 않도록 주의)
+      thinkingConfig: { thinkingBudget: 0 },
       responseMimeType: 'application/json',
       responseSchema: {
         type: 'OBJECT',
         properties: {
-          grade: { 
+          grade: {
             type: 'STRING',
             enum: ['중3-1', '중3-2', '공통수학1', '공통수학2', '대수', '미적분Ⅰ', '미적분Ⅱ', '확률과 통계', '기하', '기타']
           },
@@ -439,7 +443,7 @@ ${syllabusText || '등록된 강의가 없습니다.'}
 }
 
 /**
- * 2차 API 호출: 확정된 과목/단원을 엄격한 가이드로 삼아 해설 및 힌트 정밀 생성
+ * 2차 API 호출: 확정된 과목/단원을 엄격한 가이드로 삼아 해설 정밀 생성
  */
 export async function solveMistakeWithGemini(
   image: { mimeType: string; base64Data: string },
@@ -449,7 +453,6 @@ export async function solveMistakeWithGemini(
   studentGrade?: string
 ): Promise<{
   solvingProcess: string;
-  hints: string[];
   problemText: string;
   problemBox: ProblemBox;
   mistakeSummary: string;
@@ -467,20 +470,19 @@ export async function solveMistakeWithGemini(
     ? `\n★ [학생 학년 필수 준수 지침 - 최우선 순위] ★
 - 이 오답 문제를 등록한 학생의 현재 학년/과정은 **"${studentGrade}"** 입니다.
 - ${gradeMappingText}
-- **[Curriculum Locking]**: 이 오답 문제의 확정된 과목은 **"${resolvedGrade}"** 이며, 단원은 **"${resolvedChapter}"** 입니다.
-- 풀이 과정과 힌트를 구성할 때, 식별된 대상 과목 및 학년 범위에서 '아직 배우지 않은 개념이나 선행 공식'을 끌고 와서 해설하는 것을 절대적으로 금지합니다. 오직 해당 학년 교과서 내의 기법만 사용하십시오.\n`
+- **[Curriculum Locking]**: 풀이 과정을 구성할 때, 위에서 이미 확정된 과목·단원 범위 안에서 '아직 배우지 않은 개념이나 선행 공식'을 끌고 와서 해설하는 것을 절대적으로 금지합니다. 오직 해당 학년 교과서 내의 기법만 사용하십시오.\n`
     : '';
 
   const prompt = `너는 더쿠키수학 선생님을 보좌하여 학생들의 수학 오답을 과학적으로 분석하고 올바른 복습 처방을 제공하는 스마트한 AI 수학 클리닉 비서 **'밤티'**이다.
 이 문제의 과목은 **"${resolvedGrade}"** 이며, 단원은 **"${resolvedChapter}"** 으로 확정되었습니다.
-아래의 비서 페르소나와 포맷 규칙을 엄격히 준수하여 수학 문제 사진을 분석해 풀이 및 힌트 JSON 보고서를 작성하여라.
+아래의 비서 페르소나와 포맷 규칙을 엄격히 준수하여 수학 문제 사진을 분석해 풀이 JSON 보고서를 작성하여라.
 ${studentInfoPrompt}
 
 ★ [AI 비서 밤티 가이드라인] ★
 1. 절대 자신을 실제 선생님(더쿠키수학 쌤 등)과 동일시하지 마십시오. 당신은 수학 오답 분석을 보조하는 인공지능 비서 캐릭터 **'밤티'**입니다. 대화 톤은 학생에게 정중하고 다정한 존댓말(해요체)로 작성하되, 친근하고 귀여운 밤티 비서로서의 예의 바르고 객관적인 어조를 유지해야 합니다.
 2. 대한민국 고교 교육과정을 벗어난 수식(예: 대학 수학, 편미분, 벡터 외적, 복잡한 정규분포 확률밀도함수 식 등)은 절대 배제하고 오직 고교 교과 공식(예: 표준화 $Z = \\\\frac{X-m}{\\\\sigma}$)만 쓰십시오.
 3. [학생 학년에 따른 수학 기호 노출 절대 통제 지침]:
-   - 학생 학년이 **"중3"**인 경우: 시그마($\sum$, \sum), 로그($\log$), 극한($\lim$), 미적분 기호($\int$, dx) 등 고등 선행 수학 기호를 풀이와 힌트에서 **일절 사용하지 마십시오.** 수열이나 항들의 합은 시그마 기호 대신 반드시 덧셈의 원시적 나열식(예: $a_1 + a_2 + a_3 + \dots$)으로 대체하여 풀어 쓰십시오.
+   - 학생 학년이 **"중3"**인 경우: 시그마($\sum$, \sum), 로그($\log$), 극한($\lim$), 미적분 기호($\int$, dx) 등 고등 선행 수학 기호를 풀이에서 **일절 사용하지 마십시오.** 수열이나 항들의 합은 시그마 기호 대신 반드시 덧셈의 원시적 나열식(예: $a_1 + a_2 + a_3 + \dots$)으로 대체하여 풀어 쓰십시오.
    - 학생 학년이 **"고1"**인 경우: 시그마($\sum$), 극한($\lim$), 미적분($\int$) 등 고2 과정 이상의 수학 전용 특수 기호를 풀이에 노출하지 마십시오.
 4. 모든 수식은 반드시 LaTeX($...$ 또는 $$...$$)로 작성하고, 문장 끝과 단독 수식 앞뒤에는 반드시 빈줄(\\n\\n)을 2개 이상 추가해 널찍하게 줄바꿈해 주십시오. 모든 텍스트 해설은 100% 한국어로만 작성해야 합니다.
 
@@ -502,10 +504,9 @@ ${studentInfoPrompt}
 
 [반환할 JSON 구조 정의]
 1. solvingProcess: 위의 4개 헤더가 모두 포함된 해설 리포트 텍스트 (한국어)
-2. hints: 3단계 복습 시 점진적으로 공개되는 3개의 원소를 가진 힌트 배열 (hints[0]: 발상, hints[1]: 중간공식, hints[2]: 최종실마리)
-3. problemText: 이미지에서 추출한 원본 문제 지문 (LaTeX 변환 필수)
-4. problemBox: 인쇄 문제 영역 바운딩 박스 (top, bottom, left, right 마진 백분율 0~100)
-5. mistakeSummary: 학생 풀이 기반 틀린 이유를 30자 이내로 요약한 한 문장`;
+2. problemText: 이미지에서 추출한 원본 문제 지문 (LaTeX 변환 필수)
+3. problemBox: 인쇄 문제 영역 바운딩 박스 (top, bottom, left, right 마진 백분율 0~100)
+4. mistakeSummary: 학생 풀이 기반 틀린 이유를 30자 이내로 요약한 한 문장`;
 
   const requestBody = {
     contents: [
@@ -527,10 +528,6 @@ ${studentInfoPrompt}
         type: 'OBJECT',
         properties: {
           solvingProcess: { type: 'STRING' },
-          hints: {
-            type: 'ARRAY',
-            items: { type: 'STRING' }
-          },
           problemText: { type: 'STRING' },
           problemBox: {
             type: 'OBJECT',
@@ -544,7 +541,7 @@ ${studentInfoPrompt}
           },
           mistakeSummary: { type: 'STRING' }
         },
-        required: ['solvingProcess', 'hints', 'problemText', 'problemBox', 'mistakeSummary']
+        required: ['solvingProcess', 'problemText', 'problemBox', 'mistakeSummary']
       }
     }
   };
@@ -555,7 +552,6 @@ ${studentInfoPrompt}
 
     return {
       solvingProcess: parsedJson.solvingProcess,
-      hints: parsedJson.hints,
       problemText: parsedJson.problemText,
       problemBox: parsedJson.problemBox,
       mistakeSummary: parsedJson.mistakeSummary

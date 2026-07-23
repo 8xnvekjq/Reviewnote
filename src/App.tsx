@@ -46,8 +46,7 @@ function App() {
   const [statsExpandedGrades, setStatsExpandedGrades] = useState<Record<string, boolean>>({});
   // userId -> schoolGrade map (AI 학년별 분류 최적화용)
   const [profilesGradeMap, setProfilesGradeMap] = useState<Record<string, string>>({});
-  // Supabase system_config 테이블에서 로드한 Gemini API Key 상태
-  const [freeGeminiKey, setFreeGeminiKey] = useState<string>('');
+  // Supabase system_config 테이블에서 로드한 Gemini API Key 상태 (무료키는 레이트리밋 문제로 배제하고 유료키만 사용)
   const [paidGeminiKey, setPaidGeminiKey] = useState<string>('');
   // 다른 학생들의 실시간 복습 현황 목록
   const [peerActivities, setPeerActivities] = useState<any[]>([]);
@@ -256,7 +255,6 @@ function App() {
         setMistakes([]);
         setYoutubeLectures([]);
         setWeeklyChampions([]);
-        setFreeGeminiKey('');
         setPaidGeminiKey('');
       }
     });
@@ -328,9 +326,8 @@ function App() {
       if (error) throw error;
       
       (data || []).forEach((row: any) => {
-        if (row.key === 'gemini_api_key') {
-          setFreeGeminiKey(row.value || '');
-        } else if (row.key === 'gemini_api_key_paid') {
+        // 무료키(gemini_api_key)는 레이트리밋으로 인한 지연/오류 문제로 더 이상 사용하지 않고, 유료키만 사용합니다.
+        if (row.key === 'gemini_api_key_paid') {
           setPaidGeminiKey(row.value || '');
         }
       });
@@ -410,13 +407,12 @@ function App() {
     }
   }, [activeTab, session]);
 
-  // Start analysis trigger with automatic paid fallback (일 10회까지 무료키 사용 후 자동 유료키 전환)
+  // Start analysis trigger (유료키 전용 — 무료키는 레이트리밋으로 인한 지연/오류가 잦아 배제)
   const handleStartAnalysis = async (entry: MistakeEntry) => {
-    const freeKey = freeGeminiKey;
     const paidKey = paidGeminiKey;
 
-    if (!freeKey && !paidKey) {
-      alert('Supabase 보안 테이블(system_config)에 API 키가 등록되지 않았습니다. Supabase 대시보드에서 키 설정을 완료해 주세요.');
+    if (!paidKey) {
+      alert('Supabase 보안 테이블(system_config)에 유료 API 키(gemini_api_key_paid)가 등록되지 않았습니다. Supabase 대시보드에서 키 설정을 완료해 주세요.');
       return;
     }
 
@@ -424,80 +420,12 @@ function App() {
     try {
       const studentGrade = entry.userId ? (profilesGradeMap[entry.userId] || '') : '';
 
-      // 1. 한국 표준시(KST) 오늘 날짜 구하기
-      const kstDate = new Date(new Date().getTime() + 9 * 60 * 60 * 1000);
-      const todayStr = kstDate.toISOString().split('T')[0];
-
-      // 2. 현재 로그인한 사용자의 오늘 무료 API 사용 횟수 조회
-      let dailyFreeCount = 0;
-      const userProfileId = session?.user?.id;
-
-      if (userProfileId) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('daily_free_count, last_request_date')
-          .eq('id', userProfileId)
-          .single();
-
-        if (profile && profile.last_request_date === todayStr) {
-          dailyFreeCount = profile.daily_free_count || 0;
-        }
-      }
-
-      console.log(`[Gemini API] 오늘 무료 사용 횟수: ${dailyFreeCount}/10`);
-
-      // 이미지 다운로드 + 리사이즈/압축은 진단당 단 한 번만 수행하고,
-      // classify(1차)/solve(2차) 및 무료→유료 키 재시도 전 구간에서 재사용합니다.
+      // 이미지 다운로드 + 리사이즈/압축은 진단당 단 한 번만 수행하고 classify(1차)/solve(2차)에서 재사용합니다.
       // (과거에는 1차/2차 호출이 각자 이미지를 재다운로드+재압축해서 진단 시간이 두 배로 늘어났었음)
       const image = await prepareGeminiImage(entry.imageUrl);
 
-      // 3. 사용 횟수 판단 분기 및 요청 실행
-      if (freeKey && dailyFreeCount < 10) {
-        // 무료키로 1차(classify)까지는 성공했는지 추적 → 실패 시 유료키로는 실패한 단계부터만 재시도
-        let classifiedEntry: MistakeEntry | null = null;
-        try {
-          // 무료키 시도
-          classifiedEntry = await classifyStep(entry, freeKey, studentGrade, image);
-          await solveStep(classifiedEntry, freeKey, studentGrade, image);
-
-          // 성공 시 무료 사용 횟수 증가 및 날짜 업데이트
-          if (userProfileId) {
-            await supabase
-              .from('profiles')
-              .update({
-                daily_free_count: dailyFreeCount + 1,
-                last_request_date: todayStr
-              })
-              .eq('id', userProfileId);
-          }
-        } catch (err) {
-          console.warn('Free API Key rate limited or failed. Retrying with Paid API Key...', err);
-          if (paidKey) {
-            if (classifiedEntry) {
-              // 1차 분류는 이미 성공했으므로 2차(해설) 단계만 유료키로 재시도
-              await solveStep(classifiedEntry, paidKey, studentGrade, image);
-            } else {
-              const retryEntry = await classifyStep(entry, paidKey, studentGrade, image);
-              await solveStep(retryEntry, paidKey, studentGrade, image);
-            }
-          } else {
-            throw err;
-          }
-        }
-      } else {
-        // 무료키 소진(10회 이상) 혹은 무료키 미등록 시 유료키 즉시 사용
-        if (paidKey) {
-          console.log('[Gemini API] 무료 10회 제한 초과 또는 무료키 없음 -> 유료키로 직접 분석 수행');
-          const updated = await classifyStep(entry, paidKey, studentGrade, image);
-          await solveStep(updated, paidKey, studentGrade, image);
-        } else if (freeKey) {
-          // 유료키가 없을 경우 최후의 수단으로 무료키 시도
-          const updated = await classifyStep(entry, freeKey, studentGrade, image);
-          await solveStep(updated, freeKey, studentGrade, image);
-        } else {
-          throw new Error('사용 가능한 Gemini API Key가 존재하지 않습니다.');
-        }
-      }
+      const updated = await classifyStep(entry, paidKey, studentGrade, image);
+      await solveStep(updated, paidKey, studentGrade, image);
     } catch (err: any) {
       console.error(err);
       alert(err.message || 'AI 분석 실행 중 오류가 발생했습니다.');
@@ -517,8 +445,7 @@ function App() {
 
     // 1단계 결과를 기반으로 Supabase DB에 과목, 단원, 유튜브 매칭 필드 우선 업데이트
     const partialAnalysis: MistakeAnalysis = {
-      solvingProcess: "### 1단계: 문제 이해하기\nAI가 정밀 문제 해설 및 힌트를 분석 중입니다... 잠시만 기다려 주세요.",
-      hints: ["해설 분석 중...", "해설 분석 중...", "해설 분석 중..."],
+      solvingProcess: "### 1단계: 문제 이해하기\nAI가 정밀 문제 해설을 분석 중입니다... 잠시만 기다려 주세요.",
       matchedVideoId: firstResult.matchedVideoId,
       matchedStartSeconds: firstResult.matchedStartSeconds,
       matchedChapterTitle: firstResult.matchedChapterTitle,
@@ -553,7 +480,7 @@ function App() {
     return updatedEntry;
   };
 
-  // --- 2단계: 문제 풀이 및 힌트 2차 정밀 분석 + DB/로컬 상태 갱신 ---
+  // --- 2단계: 문제 풀이 2차 정밀 분석 + DB/로컬 상태 갱신 ---
   const solveStep = async (
     updatedEntry: MistakeEntry,
     apiKey: string,
@@ -571,7 +498,6 @@ function App() {
     const finalAnalysis: MistakeAnalysis = {
       ...updatedEntry.analysis,
       solvingProcess: secondResult.solvingProcess,
-      hints: secondResult.hints,
       problemText: secondResult.problemText,
       problemBox: secondResult.problemBox,
       mistakeSummary: secondResult.mistakeSummary || undefined,
@@ -592,7 +518,7 @@ function App() {
       analysis: finalAnalysis
     };
 
-    // 로컬 상태 2차 갱신 (상세 해설 및 힌트 로딩 완료 노출)
+    // 로컬 상태 2차 갱신 (상세 해설 로딩 완료 노출)
     setMistakes(prev => prev.map(m => m.id === updatedEntry.id ? finalEntry : m));
     setSelectedEntry(finalEntry);
   };

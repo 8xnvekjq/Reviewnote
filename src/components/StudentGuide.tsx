@@ -13,7 +13,7 @@ export const StudentGuide: React.FC = () => {
       step: '02',
       emoji: '🤖',
       title: 'AI 수학 클리닉 진단',
-      desc: '등록된 오답을 터치하고 [AI 분석 시작하기]를 누르면 수식 인식과 분류를 거쳐 정석 풀이, 실수 요인, 대책, 3단계 힌트가 자동 처방됩니다.',
+      desc: '등록된 오답을 터치하고 [AI 분석 시작하기]를 누르면 수식 인식과 분류를 거쳐 정석 풀이, 실수 요인, 대책이 자동 처방됩니다.',
       colorClass: 'from-purple-500/20 via-purple-500/5 to-slate-900/40 border-purple-500/30 text-purple-400 bg-purple-950/60 shadow-purple-950/50'
     },
     {

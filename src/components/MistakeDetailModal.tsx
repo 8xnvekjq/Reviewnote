@@ -39,7 +39,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   onSelectEntry,
   isReviewSession = false,
 }) => {
-  const [revealedHintCount, setRevealedHintCount] = React.useState(0);
   const [loadingText, setLoadingText] = React.useState('수학 문제 분석을 시작합니다...');
   const [progress, setProgress] = React.useState(0);
   const [showResult, setShowResult] = React.useState(!isAnalyzing && !!selectedEntry.analysis);
@@ -90,7 +89,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     setEditChapter(selectedEntry.chapter || '');
     setEditRootCauses(selectedEntry.rootCauses || []);
     setEditActionPlan(selectedEntry.userActionPlan || '');
-    setRevealedHintCount(0);
     setShowResult(!isAnalyzing && !!selectedEntry.analysis);
   }, [selectedEntry.id, selectedEntry.grade, selectedEntry.chapter, selectedEntry.rootCauses, selectedEntry.userActionPlan, isAnalyzing]);
 
@@ -296,7 +294,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
   // 1. Reset all local states when the selected mistake ID changes (opening a different mistake card)
   React.useEffect(() => {
-    setRevealedHintCount(0);
     setShowProblemText(false);
     setShowSolvingProcess(true);
     setShowMistakeSummary(false); // ID 변경 시 아코디언 닫음
@@ -537,8 +534,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   }, [isAnalyzing, selectedEntry.id]);
 
 
-
-  const hasStruggled = selectedEntry.reviews?.some(r => r === 'X' || r === 'star');
 
   const handleReviewToggle = (index: number, state: ReviewState) => {
     const currentReviews = [...(selectedEntry.reviews || ['', '', ''])];
@@ -850,41 +845,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 <span>▶️</span>
                 <span>바로가기</span>
               </a>
-            </div>
-          )}
-
-          {hasStruggled && selectedEntry.analysis?.hints && selectedEntry.analysis.hints.length > 0 && (
-            <div className="bg-slate-950 p-4.5 rounded-2xl border border-slate-850 space-y-3 animate-scale-up">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-indigo-400 flex items-center">
-                  <span className="mr-1.5 text-sm">💡</span> 단계별 힌트
-                </span>
-                <span className="text-[10px] text-slate-500 font-bold">
-                  {revealedHintCount} / 3 공개됨
-                </span>
-              </div>
-
-              <div className="space-y-2.5">
-                {selectedEntry.analysis.hints.slice(0, revealedHintCount).map((hint, i) => (
-                  <div key={i} className="p-3 bg-slate-900/60 rounded-xl border border-slate-800 animate-scale-up space-y-1">
-                    <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider block">힌트 {i + 1}단계</span>
-                    <LaTeXRenderer text={hint} className="text-xs md:text-sm leading-relaxed text-slate-300" />
-                  </div>
-                ))}
-              </div>
-
-              {revealedHintCount < 3 ? (
-                <button
-                  onClick={() => setRevealedHintCount(prev => prev + 1)}
-                  className="w-full py-2.5 rounded-xl bg-indigo-600/10 hover:bg-indigo-600/20 active:scale-95 border border-indigo-500/20 text-indigo-400 font-bold text-xs transition-all flex items-center justify-center space-x-1"
-                >
-                  <span>🔍 힌트 {revealedHintCount + 1} 보기</span>
-                </button>
-              ) : (
-                <p className="text-[10px] text-slate-500 text-center font-medium py-1">
-                  모든 힌트가 공개되었습니다. 아래 풀이를 참고하여 오답을 완벽히 이해해 보세요!
-                </p>
-              )}
             </div>
           )}
 

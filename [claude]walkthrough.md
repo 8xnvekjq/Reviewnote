@@ -116,3 +116,51 @@ try {
 
 - `npx tsc -b --noEmit` 통과 (타입 오류 없음)
 - UI 동작(브라우저 실사용) 검증은 별도로 진행되지 않았으므로, 실제 진단 흐름(무료키 성공/실패 각각) 테스트를 권장합니다.
+
+---
+
+## 7. 2차 개선 — 무료키 배제 + thinking 설정 + 프롬프트 정리
+
+배경: 1차 개선 이후에도 "AI 진단 누르고 풀이가 뜨기까지 1분이 넘고, 간혹 응답시간초과 에러가 뜬다"는 문제가 계속 보고되었습니다. 조사 결과, 무료 API 키가 **앱 전체 사용자가 공유하는 단일 키**([App.tsx](src/App.tsx) `fetchGeminiApiKeys`)이고, Gemini 무료 티어는 분당 10~15회(RPM)로 제한되며 2025년 12월에 Google이 무료 할당량을 추가로 50~80% 축소한 사실을 확인했습니다. 여러 학생이 동시에 진단을 요청하면 이 낮은 공유 RPM에 걸려 지연/오류가 발생할 가능성이 높다고 판단했습니다.
+
+### 7-1. 무료 키 완전 배제, 유료 키만 사용 ([App.tsx](src/App.tsx))
+- `freeGeminiKey` 상태와 무료→유료 폴백 분기, `daily_free_count`/`last_request_date` 조회·갱신 로직을 모두 제거했습니다.
+- `handleStartAnalysis`는 이제 `paidGeminiKey`가 없으면 즉시 안내 후 중단하고, 있으면 바로 `classifyStep` → `solveStep` 순으로 진행합니다.
+- 참고: `profiles.daily_free_count`/`last_request_date` DB 컬럼과 `system_config`의 `gemini_api_key`(무료키) 값 자체는 그대로 두었습니다 — 스키마 삭제는 이번 범위에 포함하지 않았고, 필요시 나중에 되돌리거나 정리할 수 있습니다.
+
+### 7-2. classify 단계만 thinking 비활성화 ([gemini.ts](src/services/gemini.ts))
+- `classifyMistakeWithGemini`의 `generationConfig`에 `thinkingConfig: { thinkingBudget: 0 }`을 추가했습니다. 이 단계는 정해진 과목/단원 목록(enum) 중에서 고르는 분류 작업이라 깊은 추론이 필요 없어 안전하게 지연시간을 줄일 수 있습니다.
+- **`solveMistakeWithGemini`는 의도적으로 그대로 두었습니다.** 실제 수학 문제를 계산해서 풀어야 하는 단계라 thinking을 끄면 검산 없이 한 번에 답을 써내려가게 되어, 특히 미적분/확통/기하 등 다단계 연산에서 오답 위험이 커질 수 있다고 판단했기 때문입니다. (사용자 확인 후 결정)
+
+### 7-3. solve 프롬프트 경미한 중복 제거 ([gemini.ts](src/services/gemini.ts))
+- `solveMistakeWithGemini`의 `studentInfoPrompt` 중 `[Curriculum Locking]` 항목에서 이미 메인 프롬프트 상단에 명시된 `resolvedGrade`/`resolvedChapter`를 다시 반복 언급하던 부분만 제거했습니다. 지침의 실질 내용(선행 개념 사용 금지)은 그대로 유지했습니다.
+- 이 변경은 지연시간에 미치는 영향이 미미합니다(입력 토큰 수 감소는 적음). 실제 1분 이상 걸리는 원인은 주로 solve 단계가 한 번의 비-스트리밍 호출에서 OCR 추출·바운딩박스 계산·실제 풀이·정형 포맷팅·힌트 생성까지 한꺼번에 처리하기 때문이며, 이는 스트리밍 전환 등 더 큰 변경 없이는 근본적으로 해결하기 어렵다는 점을 사용자에게 별도로 안내했습니다 (이번 라운드에는 미포함).
+
+### 7-4. 변경하지 않은 것 (검토했으나 보류)
+- **스트리밍(`streamGenerateContent`) 전환**: 체감 속도 개선 효과가 가장 크지만, `responseSchema` 기반 구조화 JSON 출력을 스트리밍으로 받으면 완성되기 전까지는 유효한 JSON이 아니어서 부분 파싱이 필요합니다. 이 프롬프트/파서는 과거에도 LaTeX 백슬래시 이스케이프 문제로 버그가 난 이력이 있어(`6f4e884` "Eliminate double escape legacy parser"), 리스크가 있다고 판단해 별도 논의 후 진행하기로 보류했습니다.
+
+### 검증
+- `npx tsc -b --noEmit` 통과
+- `npx oxlint src/App.tsx` 결과, 기존에도 있던 `rules-of-hooks` 관련 오탐(35건, 이번 변경 전 커밋에서도 동일하게 발생 확인)은 이번 변경과 무관하며, 변경 후 34건으로 오히려 1건 감소(제거된 `freeGeminiKey` 훅 1개만큼 자연 감소) — 새로 추가된 lint 오류 없음.
+
+---
+
+## 8. 3차 개선 — 힌트(hints) 기능 완전 제거
+
+배경: "힌트는 아무도 안 보더라, 힌트는 제거하자"는 피드백에 따라, 학생 학습에 실사용되지 않는 3단계 힌트 기능을 프롬프트·타입·UI 전 영역에서 제거했습니다. 사용하지 않는 출력 필드를 없애면 solve 단계가 생성해야 할 텍스트 양이 줄어 부수적으로 지연시간에도 소폭 도움이 됩니다.
+
+### 변경 파일
+- **[gemini.ts](src/services/gemini.ts)** — `solveMistakeWithGemini`의 반환 타입·프롬프트 지시문·`responseSchema`·`required` 배열에서 `hints` 관련 내용을 모두 제거. classify 단계 프롬프트에 남아있던 "힌트" 언급(원래 단일 프롬프트였던 시절의 잔재 문구)도 함께 정리.
+- **[types/index.ts](src/types/index.ts)** — `MistakeAnalysis.hints?: string[]` 필드 제거.
+- **[App.tsx](src/App.tsx)** — `classifyStep`의 1차 placeholder 분석과 `solveStep`의 최종 분석 조립부에서 `hints` 대입 제거, 관련 주석 문구 정리.
+- **[MistakeDetailModal.tsx](src/components/MistakeDetailModal.tsx)** — "💡 단계별 힌트" 공개 UI 블록 전체 삭제, 이 UI에서만 쓰이던 `revealedHintCount` state(및 리셋 호출 2곳)와 `hasStruggled` 변수도 함께 제거.
+- **[StudentGuide.tsx](src/components/StudentGuide.tsx)**, **[AdminPanel.tsx](src/components/AdminPanel.tsx)** — 사용법 안내 문구에서 "3단계 힌트가 자동 처방됩니다" → "대책이 자동 처방됩니다"로 수정.
+
+### 변경하지 않은 것
+- DB(`mistakes.analysis` JSONB)에 이미 저장된 과거 `hints` 데이터는 그대로 둡니다. 앱이 더 이상 이 필드를 읽지 않으므로 화면에는 노출되지 않고, 별도 마이그레이션 없이도 안전합니다.
+- `src/services/tmp/(기존)gemini.txt`는 코드에서 import되지 않는 과거 백업 텍스트라 손대지 않았습니다.
+
+### 검증
+- `npx tsc -b --noEmit` 통과
+- `npx oxlint src` — hook 관련 기존 오탐(36건) 및 그 외 경고(10건) 모두 이번 변경 전과 동일 — 새로 추가된 lint 오류 없음
+- 활성 소스 전체에서 `hints`/`힌트` 문자열 재검색 결과 없음 (아카이브 파일 제외)

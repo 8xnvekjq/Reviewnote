@@ -8,7 +8,6 @@ export interface ProblemBox {
 export interface MistakeAnalysis {
   solvingProcess: string;   // [문제 풀이 과정]
   mistakeSummary?: string;  // [학생 풀이 기반 틀린 이유 1줄 요약]
-  hints?: string[];         // [단계별 힌트 목록 (최대 3개)]
   problemText?: string;     // [추출된 원본 문제 지문]
   problemBox?: ProblemBox;  // [인쇄된 문제 영역 바운딩 박스 (필기 제외)]
   matchedVideoId?: string;       // AI가 직접 매칭한 유튜브 Video ID
