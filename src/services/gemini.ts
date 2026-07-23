@@ -307,7 +307,8 @@ async function callGeminiApi(modelName: string, requestBody: any, apiKey: string
     const responseText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!responseText) {
-      throw new Error(`Gemini API로부터 올바른 응답 텍스트를 받지 못했습니다. (${modelName})`);
+      const finishReason = result?.candidates?.[0]?.finishReason;
+      throw new Error(`Gemini API로부터 올바른 응답 텍스트를 받지 못했습니다. (${modelName}, finishReason: ${finishReason || '알 수 없음'})`);
     }
 
     return JSON.parse(responseText);
@@ -369,6 +370,7 @@ async function streamGeminiApi(
       const decoder = new TextDecoder('utf-8');
       let buffer = '';
       let fullText = '';
+      let lastFinishReason: string | undefined;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -392,6 +394,10 @@ async function streamGeminiApi(
             continue; // 경계가 걸쳐 불완전한 조각은 건너뜀 (이론상 위 split 로직상 발생하지 않아야 함)
           }
 
+          if (parsed?.candidates?.[0]?.finishReason) {
+            lastFinishReason = parsed.candidates[0].finishReason;
+          }
+
           const deltaText = parsed?.candidates?.[0]?.content?.parts?.[0]?.text;
           if (deltaText) {
             fullText += deltaText;
@@ -401,7 +407,7 @@ async function streamGeminiApi(
       }
 
       if (!fullText) {
-        throw new Error(`Gemini API로부터 올바른 응답 텍스트를 받지 못했습니다. (${modelName})`);
+        throw new Error(`Gemini API로부터 올바른 응답 텍스트를 받지 못했습니다. (${modelName}, finishReason: ${lastFinishReason || '알 수 없음'})`);
       }
 
       return fullText;
@@ -516,6 +522,10 @@ ${syllabusText || '등록된 강의가 없습니다.'}
       // thinking을 꺼서 지연시간을 줄입니다. (실제 풀이를 계산하는 solve 단계는 정확도가
       // 우선이라 thinking을 그대로 둡니다 — 함께 끄지 않도록 주의)
       thinkingConfig: { thinkingBudget: 0 },
+      // maxOutputTokens를 명시하지 않으면 thinking 토큰이 기본 출력 상한을 다 써버려서
+      // 응답 텍스트가 비어버리는(올바른 응답 텍스트를 받지 못함) 사례가 실제로 발생해서 넉넉히 지정.
+      // (실제 사용량만큼만 과금되므로 상한을 높게 잡아도 비용에 영향 없음)
+      maxOutputTokens: 65536,
       responseMimeType: 'application/json',
       responseSchema: {
         type: 'OBJECT',
@@ -590,6 +600,9 @@ export async function extractProblemWithGemini(
       // 완전히 엉뚱한 값(0~100 범위를 벗어난 값)으로 뱉어내는 걸 확인해서, classify와 달리
       // 여기서는 thinking을 끄지 않고 기본값(dynamic thinking)을 그대로 둔다.
       // (problemText 자체는 0 thinking으로도 정확했지만, 공간 추론이 필요한 problemBox 때문에 유지)
+      // maxOutputTokens 미지정 시 thinking 토큰이 기본 출력 상한을 다 써버려 응답이 비는 사례가
+      // 있어서 넉넉히 지정 (실제 사용량만큼만 과금되므로 비용 영향 없음)
+      maxOutputTokens: 65536,
       responseMimeType: 'application/json',
       responseSchema: {
         type: 'OBJECT',
@@ -712,8 +725,15 @@ JSON이나 코드블록 없이 위 4개 헤더가 포함된 해설 리포트를 
           }
         ]
       }
-    ]
-    // 의도적으로 responseMimeType/responseSchema 없음 — 순수 텍스트로 스트리밍
+    ],
+    generationConfig: {
+      // 의도적으로 responseMimeType/responseSchema 없음 — 순수 텍스트로 스트리밍
+      // solve는 thinking을 가장 많이 쓰는 단계라, maxOutputTokens 미지정 시 thinking 토큰이
+      // 기본 출력 상한을 다 써버려서 실제 풀이 텍스트가 하나도 안 나오는(빈 응답) 사례가 실제로
+      // 발생했음. 넉넉히 지정해서 thinking이 얼마를 쓰든 풀이 작성에 항상 여유가 남도록 함
+      // (실제 사용량만큼만 과금되므로 상한을 높게 잡아도 비용에 영향 없음)
+      maxOutputTokens: 65536
+    }
   };
 
   try {

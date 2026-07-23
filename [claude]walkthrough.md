@@ -339,3 +339,21 @@ try {
 - `npx tsc -b --noEmit` 통과
 - `npx oxlint src` — 새로 추가된 오류/경고 없음
 - SQL은 사용자가 Supabase에서 직접 실행해 성공 확인함; 앱 쪽 연동 코드는 사용자가 실사용 중 직접 테스트 예정
+
+---
+
+## 16. 11차 개선 — "Gemini API로부터 올바른 응답 텍스트를 받지 못했습니다" 버그 수정
+
+배경: 사용자가 실제 앱에서 AI 진단을 두 번째로 돌렸을 때 이 에러가 발생했다고 신고했습니다.
+
+### 원인
+[GitHub 이슈](https://github.com/valentinfrlch/ha-llmvision/issues/609) 등에서 확인한 잘 알려진 Gemini 2.5 계열의 함정입니다: **thinking 토큰이 `maxOutputTokens`와 같은 출력 토큰 예산을 공유합니다.** `maxOutputTokens`를 명시하지 않으면 모델의 기본 상한이 적용되는데, 어려운 문제일수록 thinking이 많이 늘어나는 걸 이미 여러 차례 실측했었고(1,173~4,606 토큰까지 관측), thinking이 이 기본 상한을 다 써버리면 **실제 풀이 텍스트가 한 글자도 안 나온 채로 응답이 끝나버립니다.** classify/extract/solve 세 호출 모두 `maxOutputTokens`를 지정하지 않고 있어서 이 문제에 노출되어 있었습니다.
+
+### 수정 ([gemini.ts](src/services/gemini.ts))
+- 세 호출(classify/extract/solve) 모두에 `maxOutputTokens: 65536`을 명시적으로 추가했습니다. 실제 사용량만큼만 과금되므로 상한을 넉넉히 잡아도 비용에는 영향이 없고, thinking이 얼마를 쓰든 실제 풀이 작성에 항상 충분한 여유가 남도록 했습니다.
+- 추가로, 응답 텍스트가 비어있을 때 에러 메시지에 `finishReason`(예: `MAX_TOKENS`, `SAFETY` 등)을 함께 표시하도록 `callGeminiApi`/`streamGeminiApi` 양쪽을 개선했습니다. 다음에 비슷한 문제가 또 생기면 원인을 추측하지 않고 에러 메시지만으로 바로 알 수 있습니다.
+
+### 검증
+- `npx tsc -b --noEmit` 통과
+- `npx oxlint src` — 새로 추가된 오류/경고 없음
+- (사용자 요청에 따라 API 재테스트 없이 코드만 반영 — 실사용 테스트는 사용자가 직접 진행)
