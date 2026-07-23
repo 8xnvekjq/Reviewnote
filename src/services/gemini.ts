@@ -65,17 +65,30 @@ function parseBase64Image(dataUrl: string): { mimeType: string; base64Data: stri
   };
 }
 
+/** CDN 이미지 다운로드 및 Gemini API 요청에 타임아웃을 걸어 무한 대기를 방지하기 위한 기본값 */
+const FETCH_TIMEOUT_MS = 20000;
+
+function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timeoutId));
+}
+
 /**
  * Downloads a public image URL and converts it into a base64 string for Gemini API.
+ *
+ * 1차/2차 분석 호출(classify/solve) 양쪽에서 동일한 이미지를 사용하므로,
+ * 이 함수는 분석 플로우당 정확히 한 번만 호출되어야 합니다 (호출부에서 결과를 공유해서 재사용).
  */
 async function imageUrlToBase64(url: string): Promise<{ mimeType: string; base64Data: string }> {
   let targetUrl = url;
 
   if (!url.startsWith('data:')) {
     try {
-      const response = await fetch(url);
+      const response = await fetchWithTimeout(url);
       if (!response.ok) throw new Error('CDN 이미지 다운로드 실패');
-      
+
       const blob = await response.blob();
       targetUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -85,7 +98,8 @@ async function imageUrlToBase64(url: string): Promise<{ mimeType: string; base64
       });
     } catch (err: any) {
       console.error('Error fetching image CDN:', err);
-      throw new Error(`이미지 다운로드 실패: ${err.message}`);
+      const message = err?.name === 'AbortError' ? '이미지 다운로드 시간이 초과되었습니다.' : err.message;
+      throw new Error(`이미지 다운로드 실패: ${message}`);
     }
   }
 
@@ -98,6 +112,15 @@ async function imageUrlToBase64(url: string): Promise<{ mimeType: string; base64
     // 압축 에러 시 원본 parse 시도 (Fallback)
     return parseBase64Image(targetUrl);
   }
+}
+
+/**
+ * 진단 플로우 진입점에서 단 한 번만 호출해서 얻은 이미지 데이터를
+ * classifyMistakeWithGemini / solveMistakeWithGemini 양쪽에 공유하기 위한 준비 함수.
+ * (과거에는 두 함수가 각자 이미지를 재다운로드+재압축해서 진단 시간이 두 배로 늘어났음)
+ */
+export async function prepareGeminiImage(imageUrl: string): Promise<{ mimeType: string; base64Data: string }> {
+  return imageUrlToBase64(imageUrl);
 }
 
 /**
@@ -239,13 +262,22 @@ function normalizeGradeAndChapter(
  */
 async function callGeminiApi(modelName: string, requestBody: any, apiKey: string): Promise<any> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(requestBody)
-  });
+
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody)
+    }, 45000); // 텍스트 생성량이 많은 solve 단계를 고려해 넉넉한 45초 타임아웃
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      throw new Error(`Gemini API 응답 시간이 초과되었습니다. (${modelName})`);
+    }
+    throw err;
+  }
 
   if (!response.ok) {
     const errorJson = await response.json().catch(() => ({}));
@@ -267,7 +299,7 @@ async function callGeminiApi(modelName: string, requestBody: any, apiKey: string
  * 1차 API 호출: 이미지 분석을 통해 과목/단원을 분류하고 유튜브 개념 강의를 실시간 매칭
  */
 export async function classifyMistakeWithGemini(
-  imageUrl: string,
+  image: { mimeType: string; base64Data: string },
   apiKey: string,
   youtubeLectures: any[] = [],
   studentGrade?: string
@@ -279,7 +311,7 @@ export async function classifyMistakeWithGemini(
   matchedStartSeconds?: number;
   matchedChapterTitle?: string;
 }> {
-  const { mimeType, base64Data } = await imageUrlToBase64(imageUrl);
+  const { mimeType, base64Data } = image;
 
   // 우리 DB의 강의 목록을 AI용 텍스트 인덱스로 정밀 가공
   const syllabusText = (youtubeLectures || [])
@@ -410,7 +442,7 @@ ${syllabusText || '등록된 강의가 없습니다.'}
  * 2차 API 호출: 확정된 과목/단원을 엄격한 가이드로 삼아 해설 및 힌트 정밀 생성
  */
 export async function solveMistakeWithGemini(
-  imageUrl: string,
+  image: { mimeType: string; base64Data: string },
   apiKey: string,
   resolvedGrade: string,
   resolvedChapter: string,
@@ -422,9 +454,9 @@ export async function solveMistakeWithGemini(
   problemBox: ProblemBox;
   mistakeSummary: string;
 }> {
-  const { mimeType, base64Data } = await imageUrlToBase64(imageUrl);
+  const { mimeType, base64Data } = image;
 
-  const gradeMappingText = 
+  const gradeMappingText =
     studentGrade === '중3' ? '학생의 교육과정 범위는 주로 [중3-1] 또는 [중3-2] 과목에 매핑됩니다.' :
     studentGrade === '고1' ? '학생의 교육과정 범위는 주로 [공통수학1] 또는 [공통수학2] 과목에 매핑됩니다.' :
     studentGrade === '고2' ? '학생의 교육과정 범위는 주로 [대수], [미적분Ⅰ], [확률과 통계], [기하] 과목에 매핑됩니다.' :
