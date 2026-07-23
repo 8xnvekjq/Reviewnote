@@ -650,7 +650,8 @@ export async function solveMistakeWithGemini(
   resolvedChapter: string,
   studentGrade?: string,
   onProgress?: (partialSolvingProcess: string) => void,
-  sameChapterMistakeCount?: number
+  sameChapterMistakeCount?: number,
+  recurringRootCause?: { label: string; count: number }
 ): Promise<{
   solvingProcess: string;
   mistakeSummary: string;
@@ -676,10 +677,15 @@ export async function solveMistakeWithGemini(
     ? `\n★ [학생 학습 통계 참고] ★\n이 학생은 "${resolvedChapter}" 단원에서 이번 문제를 포함해 총 ${sameChapterMistakeCount}번째 오답을 기록했습니다. 인사말에서 이 사실을 부담스럽지 않고 따뜻하게 언급하며 격려해 주십시오 (예: 같은 단원에서 계속 도전하고 있는 꾸준함을 칭찬하되, 반복되는 실수를 다그치는 어조는 피할 것).\n`
     : `\n★ [학생 학습 통계 참고] ★\n이 학생은 "${resolvedChapter}" 단원의 오답을 처음 등록했습니다. 인사말에서 새로운 단원에 도전하는 것을 반갑게 환영해 주십시오.\n`;
 
+  // 이 학생이 과거 오답들에서 반복적으로 체크한 실수 원인이 있으면, 4단계 총평에서 부드럽게 짚어주기 위한 지침 생성
+  const recurringRootCausePrompt = recurringRootCause
+    ? `\n★ [반복되는 실수 패턴 참고] ★\n이 학생은 과거 오답들에서 "${recurringRootCause.label}"을(를) 실수 원인으로 ${recurringRootCause.count}번 체크한 이력이 있습니다. 4단계(돌아보기 & 쌤의 한끝 팁)에서 이 패턴을 한 번 부드럽게 짚어주고, 이번 문제에서도 그 부분을 특별히 신경 써서 확인하도록 안내하십시오. 절대 다그치거나 지적하는 어조가 되지 않도록, 따뜻하고 응원하는 톤을 유지하십시오.\n`
+    : '';
+
   const prompt = `너는 더쿠키수학 선생님을 보좌하여 학생들의 수학 오답을 과학적으로 분석하고 올바른 복습 처방을 제공하는 스마트한 AI 수학 클리닉 비서 **'밤티'**이다.
 이 문제의 과목은 **"${resolvedGrade}"** 이며, 단원은 **"${resolvedChapter}"** 으로 확정되었습니다.
 아래의 비서 페르소나와 포맷 규칙을 엄격히 준수하여 수학 문제 사진을 분석해 풀이 리포트를 작성하여라.
-${studentInfoPrompt}${chapterStatsPrompt}
+${studentInfoPrompt}${chapterStatsPrompt}${recurringRootCausePrompt}
 
 ★ [AI 비서 밤티 가이드라인] ★
 1. 절대 자신을 실제 선생님(더쿠키수학 쌤 등)과 동일시하지 마십시오. 당신은 수학 오답 분석을 보조하는 인공지능 비서 캐릭터 **'밤티'**입니다. 대화 톤은 학생에게 정중하고 다정한 존댓말(해요체)로 작성하되, 친근하고 귀여운 밤티 비서로서의 예의 바르고 객관적인 어조를 유지해야 합니다.
@@ -705,6 +711,7 @@ ${studentInfoPrompt}${chapterStatsPrompt}
 
 ### 4단계: 돌아보기 & 쌤의 한끝 팁
 - 구한 답을 가볍게 검토하고 함정을 짚어줍니다.
+- 위에 [반복되는 실수 패턴 참고]가 주어졌다면, 이 단락에서 그 패턴을 자연스럽게 한 번 짚어주십시오.
 - 단락 맨 마지막 줄에 실수를 방지할 한 줄짜리 짧은 개념 처방을 **[처방 요약]** 이라는 말머리를 붙여 단 한 줄로만 간결하게 적어주십시오.
 
 ★ [출력 형식 - 매우 중요, 반드시 그대로 따를 것] ★

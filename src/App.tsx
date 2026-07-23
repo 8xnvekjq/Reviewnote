@@ -531,6 +531,27 @@ function App() {
       ? mistakes.filter(m => m.userId === updatedEntry.userId && m.grade === updatedEntry.grade && m.chapter === updatedEntry.chapter).length
       : undefined;
 
+    // 이 학생의 과거 오답들(현재 건 제외)에서 가장 자주 체크된 실수 원인을 찾아, 2회 이상 반복된 경우만
+    // "반복되는 실수 패턴"으로 4단계 총평에 녹여준다 (이미 로드된 목록으로 즉시 계산, 추가 조회 없음)
+    const rootCauseCounts: Record<string, number> = {};
+    mistakes
+      .filter(m => m.userId === updatedEntry.userId && m.id !== updatedEntry.id)
+      .forEach(m => {
+        (m.rootCauses || []).forEach(causeId => {
+          rootCauseCounts[causeId] = (rootCauseCounts[causeId] || 0) + 1;
+        });
+      });
+    let recurringRootCause: { label: string; count: number } | undefined;
+    Object.entries(rootCauseCounts).forEach(([causeId, count]) => {
+      if (count >= 2 && (!recurringRootCause || count > recurringRootCause.count)) {
+        const option = ROOT_CAUSE_OPTIONS.find(o => o.id === causeId);
+        if (option) {
+          // 라벨의 이모지 접두사(예: "🧠 개념 부족")는 떼고 순수 텍스트만 프롬프트에 전달
+          recurringRootCause = { label: option.label.split(' ').slice(1).join(' '), count };
+        }
+      }
+    });
+
     const [secondResult, extractResult] = await Promise.all([
       solveMistakeWithGemini(
         image,
@@ -539,7 +560,8 @@ function App() {
         updatedEntry.chapter || '',
         studentGrade,
         onProgress,
-        sameChapterMistakeCount
+        sameChapterMistakeCount,
+        recurringRootCause
       ),
       extractPromise
     ]);
