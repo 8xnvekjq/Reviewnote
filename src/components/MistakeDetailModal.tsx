@@ -43,6 +43,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 }) => {
   const [loadingText, setLoadingText] = React.useState('수학 문제 분석을 시작합니다...');
   const [progress, setProgress] = React.useState(0);
+  const [elapsedMs, setElapsedMs] = React.useState(0);
   const [showResult, setShowResult] = React.useState(!isAnalyzing && !!selectedEntry.analysis);
   const analysisCardRef = React.useRef<HTMLDivElement>(null);
   const wasAnalyzingRef = React.useRef(isAnalyzing);
@@ -488,32 +489,24 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     }
   }, [selectedEntry.id, selectedEntry.analysis]);
 
-  // 4. 지능형 감속 가상 타이머 로직
+  // 4. 실제 평균 대기시간 기반 선형 타이머 로직
+  // (예전에는 시간대별로 가속/감속하는 연출용 곡선이었는데, 실제 경과 시간과 무관하게
+  // 움직이는 것처럼 느껴진다는 피드백에 따라 "경과시간 / 평균시간"에 정확히 비례하는
+  // 선형 진행률로 교체했습니다. 평균을 넘기면 링은 99%에서 멈추고 별도로 초과 시간을 표시합니다.)
   React.useEffect(() => {
     if (isAnalyzing) {
       setProgress(0);
+      setElapsedMs(0);
       setShowResult(false);
-      
+
       const startTime = Date.now();
       // 실제 평균 대기시간(averageWaitMs)이 3건 이상 쌓여 있으면 그 값을 기준으로,
-      // 아직 데이터가 부족하면 기존의 20초 가정 곡선으로 진행률을 추정합니다.
+      // 아직 데이터가 부족하면 기존의 20초 가정치를 기준으로 선형 계산합니다.
       const referenceTime = averageWaitMs ?? 20000;
       const timer = setInterval(() => {
         const elapsed = Date.now() - startTime;
-        let nextProgress = 0;
-        if (elapsed <= referenceTime * 0.4) {
-          // 초반: 70%까지 빠르게 상승
-          nextProgress = (elapsed / (referenceTime * 0.4)) * 70;
-        } else if (elapsed <= referenceTime) {
-          // 중반: 90%까지 서서히 상승
-          const ratio = (elapsed - referenceTime * 0.4) / (referenceTime * 0.6);
-          nextProgress = 70 + ratio * 20;
-        } else {
-          // 평균 대기시간 초과: 90%에서 99.5%까지 지수함수 형태로 점근
-          const extra = elapsed - referenceTime;
-          nextProgress = 90 + 9.5 * (1 - Math.exp(-extra / (referenceTime * 0.75)));
-        }
-        setProgress(Math.min(99.5, nextProgress));
+        setElapsedMs(elapsed);
+        setProgress(Math.min(99, (elapsed / referenceTime) * 100));
       }, 100);
 
       return () => clearInterval(timer);
@@ -603,6 +596,12 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
       setIsSaving(false);
     }
   };
+
+  // 남은 예상 시간 / 초과 시간(+N초)을 실제 경과 시간 기준으로 정확히 1초 단위로 계산
+  const referenceTimeMs = averageWaitMs ?? 20000;
+  const remainingMs = referenceTimeMs - elapsedMs;
+  const remainingSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+  const overtimeSeconds = remainingMs < 0 ? Math.floor(-remainingMs / 1000) + 1 : 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4">
@@ -904,12 +903,10 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                   <p className="text-[11px] text-slate-500">
                     {progress >= 100 ? (
                       <span className="text-emerald-400 font-bold animate-pulse">완료! 상세 진단을 표시합니다...</span>
-                    ) : progress >= 90 ? (
-                      <span>마지막 맞춤 처방을 다듬는 중입니다...</span>
+                    ) : overtimeSeconds > 0 ? (
+                      <span className="text-amber-400 font-bold">예상보다 오래 걸리고 있어요 (+{overtimeSeconds}초)</span>
                     ) : (
-                      <span>
-                        예상 대기 시간: 약 {Math.max(1, Math.round((((averageWaitMs ?? 30000) / 1000) * (100 - progress)) / 100))}초
-                      </span>
+                      <span>예상 대기 시간: 약 {remainingSeconds}초</span>
                     )}
                   </p>
                   {averageWaitMs && (
