@@ -849,7 +849,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
           )}
 
           {/* AI Analysis trigger / solving process rendering */}
-          {(!showResult && (isAnalyzing || (progress > 0 && progress < 100))) ? (
+          {(!showResult && (isAnalyzing || (progress > 0 && progress < 100)) && !selectedEntry.analysis?.solvingProcess) ? (
             <div className="py-8 px-4 flex flex-col items-center space-y-8 animate-fade-in bg-slate-900/20 rounded-3xl border border-slate-800/40 backdrop-blur-md">
               {/* 상단: 타이머와 로딩 텍스트를 담은 세련된 원형 기기 */}
               <div className="flex flex-col items-center space-y-4">
@@ -946,6 +946,9 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 >
                   <h4 className="text-sm font-extrabold text-indigo-400 flex items-center group-hover:text-indigo-300 transition-colors">
                     <span className="mr-1.5 text-base">💡</span> 정석 풀이 과정
+                    {isAnalyzing && (
+                      <span className="ml-2 text-[10px] font-bold text-indigo-300 animate-pulse">✍️ 밤티가 실시간으로 작성 중...</span>
+                    )}
                   </h4>
                   <span className="text-xs text-slate-500 font-bold mr-1 group-hover:text-slate-400 transition-colors">
                     {showSolvingProcess ? '▲ 닫기' : '▼ 보기'}

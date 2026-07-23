@@ -207,3 +207,30 @@ try {
 - `npx tsc -b --noEmit` 통과
 - `npx oxlint src` — 새로 추가된 오류/경고 없음 (기존 pre-existing 항목과 동일)
 - 실제 Gemini API 호출로 classify/extract/solve 각각과 전체 파이프라인을 검증 완료 (브라우저 UI를 통한 실사용 테스트는 별도로 필요)
+
+---
+
+## 10. 5차 개선 — 스트리밍이 화면에 실제로 안 보이던 버그 수정
+
+배경: 사용자가 실제 배포된 앱에서 테스트해보니 "병렬 처리는 단계적으로 나오는 게 좋다"고 확인했지만, **정작 풀이(solvingProcess)는 스트리밍이 아니라 다 끝난 뒤 한 번에 나타난다**고 피드백을 주었습니다. 9번 항목에서 만든 스트리밍 로직 자체(`onProgress` 콜백, `setSelectedEntry` 실시간 갱신)는 정상 동작하고 있었는데, **UI 쪽에 이걸 실제로 보여줄 경로가 없었던 게 원인**이었습니다.
+
+### 원인
+[MistakeDetailModal.tsx:488-534](src/components/MistakeDetailModal.tsx:488)에 `isAnalyzing`이 `true`인 동안 실제 데이터와 무관하게 시간 기반으로만 0→99.5%까지 올라가는 "가상 진행률 타이머"가 있고, [852번째 줄](src/components/MistakeDetailModal.tsx:852)의 렌더링 분기가:
+
+```
+{(!showResult && (isAnalyzing || ...)) ? (로딩 스피너) : (실제 결과 UI)}
+```
+
+즉 `isAnalyzing`이 `true`인 동안은 무조건 로딩 스피너만 그리고, `showResult`는 전체 분석(solve+extract+DB 저장)이 **완전히 끝난 뒤**에야 `true`가 되도록 설계되어 있었습니다. `selectedEntry.analysis.solvingProcess`는 스트리밍 청크마다 실제로 갱신되고 있었지만, 화면에는 그 상태를 보여줄 조건 분기 자체가 없어서 항상 스피너만 보이다가 끝나야 결과가 "띡" 나타난 것입니다.
+
+### 수정 ([MistakeDetailModal.tsx](src/components/MistakeDetailModal.tsx))
+- 로딩 스피너 표시 조건에 `&& !selectedEntry.analysis?.solvingProcess`를 추가해서, **`solvingProcess`에 내용이 생기는 순간부터는(classify 직후 플레이스홀더 텍스트든, solve 스트리밍 중 실제 내용이든) 스피너 대신 실제 콘텐츠 뷰를 즉시 보여주도록** 변경했습니다.
+- classify 완료 직후 표시되는 플레이스홀더("AI가 정밀 문제 해설을 분석 중입니다...")도 이미 `### 1단계` 헤더 포맷을 갖추고 있어서, 그대로 실제 콘텐츠 뷰에 자연스럽게 표시되다가 solve 스트리밍이 시작되면 실시간으로 내용이 교체되는 자연스러운 전환이 됩니다.
+- "정석 풀이 과정" 카드 제목 옆에 `isAnalyzing`인 동안만 "✍️ 밤티가 실시간으로 작성 중..." pulse 표시를 추가해서, 아직 생성이 끝나지 않았음을 알 수 있게 했습니다.
+
+### 타자기(글자 단위) 애니메이션은 적용하지 않음
+사용자와 논의 후, 청크 단위(문장/구 단위, 실측상 200~500ms 간격) 표시로 충분하다고 판단해 별도의 글자 단위 타이핑 애니메이션은 추가하지 않았습니다. (이유: 이 앱은 LaTeX 수식이 많아 글자 단위로 자르면 KaTeX가 매 글자마다 재파싱해야 해서 화면 깜빡임과 저사양 기기 성능 저하 우려가 있었음)
+
+### 검증
+- `npx tsc -b --noEmit` 통과
+- `npx oxlint src` — 새로 추가된 오류/경고 없음 (기존 pre-existing 10건과 동일)
