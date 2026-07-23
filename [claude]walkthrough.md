@@ -300,6 +300,26 @@ try {
 - **개선 안 된 부분**: 마지막 $f(0)$ 대입 계산은 여전히 5줄의 디스플레이 수식으로 그대로 나열됨.
 - 결론: LLM이 지침을 100% 일관되게 따르지는 않아서 부분적 개선에 그쳤습니다. 사용자와 상의 후 "이 정도면 우선 반영하고 실사용하면서 판단"하기로 결정, 추가로 더 세게 못박는 건 보류했습니다.
 
+### 검증 (13번)
+- `npx tsc -b --noEmit` 통과
+- `npx oxlint src` — 새로 추가된 오류/경고 없음
+
+---
+
+## 14. 9차 개선 — 실수원인/대책 초기화 버그 수정 + 프롬프트 추가 조정
+
+배경: 사용자가 "AI 진단 중에 오답 클리닉 기록(실수 원인 체크, 대책)을 작성하다가 진단이 끝나면 내용이 초기화되어 사라진다"는 버그를 신고했습니다. 추가로 "2단계 해결 계획 세우기에는 구체적 숫자 없이 언어적 계획만 담아라", "계산식은 하나의 식당 최대 3~4줄로 더 줄여라" 두 가지 프롬프트 조정도 요청했습니다.
+
+### 버그 원인 및 수정 ([MistakeDetailModal.tsx](src/components/MistakeDetailModal.tsx))
+[MistakeDetailModal.tsx:96-102](src/components/MistakeDetailModal.tsx:96)의 useEffect가 `isAnalyzing`을 의존성 배열에 포함한 채로 `editRootCauses`/`editActionPlan`을 `selectedEntry.rootCauses`/`selectedEntry.userActionPlan`로부터 매번 다시 세팅하고 있었습니다. `rootCauses`/`userActionPlan`은 100% 학생이 직접 입력하는 필드인데, AI 진단이 시작되거나 끝날 때(`isAnalyzing` true↔false 전환)마다 이 effect가 재실행되면서 **학생이 진단 대기 중 입력하고 있던 내용을 진단 시작 전 스냅샷 값으로 덮어써버리는** 버그였습니다.
+
+수정: 이 effect에서 `editRootCauses`/`editActionPlan` 초기화 로직과 관련 의존성(`selectedEntry.rootCauses`, `selectedEntry.userActionPlan`)을 제거했습니다. 이 두 필드는 오직 `selectedEntry.id`가 바뀔 때(다른 카드로 전환할 때)만 초기화하는 별도 effect([MistakeDetailModal.tsx:304-313](src/components/MistakeDetailModal.tsx:304), 의존성 `[selectedEntry.id]`만 사용)가 이미 올바르게 처리하고 있어서 그대로 유지했습니다. (AI가 직접 판정하는 `grade`/`chapter`는 분석 완료 시 갱신되는 게 의도된 동작이라 그대로 둠.)
+
+### 프롬프트 조정 ([gemini.ts](src/services/gemini.ts))
+- **2단계(해결 계획 세우기)**: "이 단계에서는 구체적인 숫자 대입이나 수식 전개, 계산 결과를 절대 먼저 보여주지 말고, 어떤 개념/공식을 어떤 순서로 적용할 것인지를 말로만 설명하라"는 지침 추가 — 실제 계산은 3단계에서만 하도록 명확히 분리.
+- **3단계 계산 압축 지침 강화**: 기존 "1~2줄로 압축"이 실측상 잘 안 지켜졌던 것을 참고해, 사용자가 제안한 구체적 숫자인 "하나의 계산 흐름당 디스플레이 수식 최대 3~4줄"로 상한을 재조정했습니다.
+
 ### 검증
 - `npx tsc -b --noEmit` 통과
 - `npx oxlint src` — 새로 추가된 오류/경고 없음
+- (사용자 요청에 따라 이번부터는 실제 API로 재테스트하지 않고 코드 변경만 반영 — 실사용 테스트는 사용자가 직접 진행)

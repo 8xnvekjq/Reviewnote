@@ -93,13 +93,15 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   const nextEntry = hasNextEntry ? uncompletedSorted[currentIndex + 1] : null;
 
   // 카드가 다음 카드로 전환될 때 모달 내부 편집 폼 상태값 동기화
+  // 주의: rootCauses/userActionPlan은 학생이 직접 작성하는 필드라, AI 분석(isAnalyzing) 완료로
+  // 이 effect가 재실행되면서 분석 대기 중 입력하던 내용을 덮어써버리는 버그가 있었음.
+  // 이 두 필드는 selectedEntry.id가 바뀔 때(다른 카드로 전환할 때)만 동기화하는 아래 effect에서 처리하고,
+  // 여기서는 AI가 직접 판정하는 grade/chapter만 동기화한다.
   React.useEffect(() => {
     setEditGrade(selectedEntry.grade || '');
     setEditChapter(selectedEntry.chapter || '');
-    setEditRootCauses(selectedEntry.rootCauses || []);
-    setEditActionPlan(selectedEntry.userActionPlan || '');
     setShowResult(!isAnalyzing && !!selectedEntry.analysis);
-  }, [selectedEntry.id, selectedEntry.grade, selectedEntry.chapter, selectedEntry.rootCauses, selectedEntry.userActionPlan, isAnalyzing]);
+  }, [selectedEntry.id, selectedEntry.grade, selectedEntry.chapter, isAnalyzing]);
 
   // ── 핀치 줌 및 터치 드래그 제스처 핸들러 ──────────────────────────────
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
