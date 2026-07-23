@@ -1,6 +1,6 @@
 import React from 'react';
 import type { MistakeEntry, ReviewState } from '../types';
-import { ROOT_CAUSE_OPTIONS, MATH_CURRICULUM, GRADE_LIST } from '../types';
+import { ROOT_CAUSE_OPTIONS, MATH_CURRICULUM, GRADE_LIST, SOLVING_PLACEHOLDER_TEXT } from '../types';
 import { LaTeXRenderer } from './LaTeXRenderer';
 import { formatDate } from '../utils/date';
 import { supabase } from '../services/supabase';
@@ -44,6 +44,15 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   const [showResult, setShowResult] = React.useState(!isAnalyzing && !!selectedEntry.analysis);
   const analysisCardRef = React.useRef<HTMLDivElement>(null);
   const wasAnalyzingRef = React.useRef(isAnalyzing);
+
+  // 실제 진단 소요 시간 기록(analysis.durationMs)들의 평균 — 최소 3건 이상 쌓여야 추정치로 신뢰해서 사용
+  const averageWaitMs = React.useMemo(() => {
+    const durations = (allEntries || [])
+      .map(e => e.analysis?.durationMs)
+      .filter((d): d is number => typeof d === 'number' && d > 0);
+    if (durations.length < 3) return null;
+    return durations.reduce((sum, d) => sum + d, 0) / durations.length;
+  }, [allEntries]);
 
   // Student editable fields
   const [editGrade, setEditGrade] = React.useState(selectedEntry.grade || '');
@@ -491,20 +500,23 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
       setShowResult(false);
       
       const startTime = Date.now();
+      // 실제 평균 대기시간(averageWaitMs)이 3건 이상 쌓여 있으면 그 값을 기준으로,
+      // 아직 데이터가 부족하면 기존의 20초 가정 곡선으로 진행률을 추정합니다.
+      const referenceTime = averageWaitMs ?? 20000;
       const timer = setInterval(() => {
         const elapsed = Date.now() - startTime;
         let nextProgress = 0;
-        if (elapsed <= 8000) {
-          // 0 ~ 8초: 70%까지 빠르게 상승
-          nextProgress = (elapsed / 8000) * 70;
-        } else if (elapsed <= 20000) {
-          // 8 ~ 20초: 90%까지 서서히 상승
-          const ratio = (elapsed - 8000) / 12000;
+        if (elapsed <= referenceTime * 0.4) {
+          // 초반: 70%까지 빠르게 상승
+          nextProgress = (elapsed / (referenceTime * 0.4)) * 70;
+        } else if (elapsed <= referenceTime) {
+          // 중반: 90%까지 서서히 상승
+          const ratio = (elapsed - referenceTime * 0.4) / (referenceTime * 0.6);
           nextProgress = 70 + ratio * 20;
         } else {
-          // 20초 이상: 90%에서 99.5%까지 지수함수 형태로 점근
-          const extra = elapsed - 20000;
-          nextProgress = 90 + 9.5 * (1 - Math.exp(-extra / 15000));
+          // 평균 대기시간 초과: 90%에서 99.5%까지 지수함수 형태로 점근
+          const extra = elapsed - referenceTime;
+          nextProgress = 90 + 9.5 * (1 - Math.exp(-extra / (referenceTime * 0.75)));
         }
         setProgress(Math.min(99.5, nextProgress));
       }, 100);
@@ -849,7 +861,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
           )}
 
           {/* AI Analysis trigger / solving process rendering */}
-          {(!showResult && (isAnalyzing || (progress > 0 && progress < 100)) && !selectedEntry.analysis?.solvingProcess) ? (
+          {(!showResult && (isAnalyzing || (progress > 0 && progress < 100)) && (!selectedEntry.analysis?.solvingProcess || selectedEntry.analysis.solvingProcess === SOLVING_PLACEHOLDER_TEXT)) ? (
             <div className="py-8 px-4 flex flex-col items-center space-y-8 animate-fade-in bg-slate-900/20 rounded-3xl border border-slate-800/40 backdrop-blur-md">
               {/* 상단: 타이머와 로딩 텍스트를 담은 세련된 원형 기기 */}
               <div className="flex flex-col items-center space-y-4">
@@ -900,9 +912,16 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                     ) : progress >= 90 ? (
                       <span>마지막 맞춤 처방을 다듬는 중입니다...</span>
                     ) : (
-                      <span>예상 대기 시간: 약 {Math.max(1, Math.round((30 * (100 - progress)) / 100))}초</span>
+                      <span>
+                        예상 대기 시간: 약 {Math.max(1, Math.round((((averageWaitMs ?? 30000) / 1000) * (100 - progress)) / 100))}초
+                      </span>
                     )}
                   </p>
+                  {averageWaitMs && (
+                    <p className="text-[10px] text-slate-600">
+                      (최근 진단 평균 소요 시간: 약 {Math.round(averageWaitMs / 1000)}초)
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

@@ -234,3 +234,52 @@ try {
 ### 검증
 - `npx tsc -b --noEmit` 통과
 - `npx oxlint src` — 새로 추가된 오류/경고 없음 (기존 pre-existing 10건과 동일)
+
+---
+
+## 11. 6차 개선 — 인사말 일관성 + 학생 통계 기반 격려 멘트
+
+배경: 사용자가 실제 화면 캡처 두 장을 비교하며 "해설 풀이 느낌이 이전과 많이 달라졌다, 페르소나가 바뀐 것 같다"고 지적했습니다. 하나는 "### 1단계"로 바로 시작했고, 다른 하나는 "안녕하세요, 밤티예요!" 인사말로 시작했습니다.
+
+### 원인
+9번 항목에서 solve를 `responseMimeType: 'application/json'`(JSON 모드)에서 순수 텍스트 스트리밍으로 전환하면서, `solvingProcess`가 더 이상 스키마로 강제되는 문자열 필드가 아니게 되어 모델이 응답을 어떻게 시작할지에 대한 자유도가 커졌습니다. 프롬프트에 "인사말을 넣어라/넣지 마라"는 지침이 아예 없었기 때문에, 호출마다 인사말 포함 여부가 랜덤하게 갈리고 있었습니다. (밤티 페르소나·말투 자체는 바뀐 적 없음 — 인사말 유무만 불안정했던 것)
+
+### 수정 ([gemini.ts](src/services/gemini.ts), [App.tsx](src/App.tsx))
+- 사용자와 상의해 **"매번 인사말 포함 + 학생의 학습 통계를 자연스럽게 녹여 격려/환영 멘트를 추가"**하는 방향으로 결정했습니다.
+- `solveMistakeWithGemini`에 `sameChapterMistakeCount`(이 학생이 같은 단원에서 이번 건 포함 몇 번째 오답인지) 파라미터를 추가하고, 프롬프트에 값에 따라 다른 격려 지침을 주입합니다:
+  - 1건(처음): "새로운 단원에 도전하는 것을 반갑게 환영"
+  - 2건 이상: "반복 실수를 다그치지 않고 꾸준함을 칭찬"
+- 가이드라인에 **"본문 시작 전 2~3문장 인사말은 절대 생략 금지"** 항목을 명시적으로 추가해서 매번 일관되게 포함되도록 고정했습니다.
+- [App.tsx](src/App.tsx) `solveStep`에서 `mistakes`(이미 로드된 목록)로 `sameChapterMistakeCount`를 즉시 계산해서 넘겨줍니다 — **추가 DB 조회 없음.**
+- 실측 검증: count=1(처음)/count=3(세 번째) 두 시나리오 모두 인사말이 빠짐없이 포함되고, 통계 언급도 자연스럽게 녹아드는 것을 확인했습니다 (예: "벌써 세 번째 문제를 만났지만, 계속해서 도전하고 있다는 건 정말 대단한 꾸준함이에요").
+
+### 검증 (11번)
+- `npx tsc -b --noEmit` 통과
+- `npx oxlint src` — 새로 추가된 오류/경고 없음
+
+---
+
+## 12. 7차 개선 — 대기 화면: 회전 통계 문구 복원 + 실측 평균 대기시간 기반 진행률
+
+배경: 사용자가 "AI 진단 누르면 고정된 텍스트로 'AI가 풀이 작성중' 이라고만 뜬다, 원래처럼 통계 문구가 돌아가면서 뜨는 게 낫지 않냐"고 지적했습니다.
+
+### 원인
+[MistakeDetailModal.tsx](src/components/MistakeDetailModal.tsx)에는 원래 3초마다 누적 오답 개수·복습 완료율·오늘 등록량·실수 유형 비율·동료 활동 등을 무작위로 순환 표시하는 `loadingText` 로직이 이미 잘 만들어져 있었습니다. 그런데 10번 항목에서 "스트리밍 콘텐츠를 실제로 보여주자"고 고친 조건(`!selectedEntry.analysis?.solvingProcess`)이, classify 완료 직후 세팅되는 **placeholder 문구**("AI가 정밀 문제 해설을 분석 중입니다...")까지 "진짜 콘텐츠"로 취급해버려서, classify가 끝나자마자(2~3초 만에) 회전 통계 스피너를 벗어나 이 정적 placeholder 문구만 계속 보여주고 있었습니다. 정작 회전 통계가 필요한 구간(solve의 thinking~스트리밍 시작 전, 보통 10초 이상)에는 아무것도 안 돌아가고 있었던 것입니다.
+
+### 수정
+- **[types/index.ts](src/types/index.ts)**: placeholder 문구를 매직 스트링 중복 없이 공유하도록 `SOLVING_PLACEHOLDER_TEXT` 상수로 추출.
+- **[MistakeDetailModal.tsx](src/components/MistakeDetailModal.tsx)**: 스피너 표시 조건을 `(!solvingProcess || solvingProcess === SOLVING_PLACEHOLDER_TEXT)`로 수정해서, **placeholder 상태에서는 회전 통계 스피너를 계속 보여주고, solve가 실제 텍스트를 스트리밍하기 시작하는 순간에만** 실제 콘텐츠 뷰로 전환되도록 고쳤습니다.
+
+### 평균 대기시간 실측 + 진행률 반영
+- **[types/index.ts](src/types/index.ts)**: `MistakeAnalysis.durationMs` 필드 추가 (진단 1건의 classify+extract+solve 전체 소요 시간).
+- **[App.tsx](src/App.tsx)**: `handleStartAnalysis`에서 시작 시각을 기록하고, `solveStep` 완료 시 `durationMs`를 계산해 `analysis`에 함께 저장합니다. DB 스키마 변경 없음 (`analysis`는 이미 스키마리스 JSONB).
+- **[MistakeDetailModal.tsx](src/components/MistakeDetailModal.tsx)**: 이미 로드된 `allEntries`에서 `durationMs`가 있는 항목들의 평균을 `useMemo`로 계산(3건 미만이면 아직 신뢰 못 할 데이터로 보고 `null` 처리, 추가 DB 조회 없음). 이 평균값(`averageWaitMs`)으로:
+  - 기존의 "8초/20초" 하드코딩 곡선 대신, 실제 평균을 기준으로 비례 조정된 곡선으로 원형 진행률 링을 채웁니다 (데이터가 3건 미만이면 기존 20초 가정 곡선으로 자연스럽게 폴백).
+  - "예상 대기 시간" 문구의 기준값도 하드코딩된 30초 대신 실제 평균으로 계산합니다.
+  - 진행률 링 아래에 "(최근 진단 평균 소요 시간: 약 N초)" 참고 문구를 추가로 표시합니다.
+- 별도의 새 도넛/파이 차트를 만들지 않고, **기존에 이미 있던 원형 진행률 링을 실측 데이터 기반으로 다시 캘리브레이션**하는 방식을 택했습니다 — UI를 더 늘리지 않으면서 요청하신 "원그래프로 평균 대기시간 표시"를 만족합니다.
+
+### 검증
+- `npx tsc -b --noEmit` 통과
+- `npx oxlint src` — 새로 추가된 오류/경고 없음 (기존 pre-existing 10건과 동일)
+- 실제 Gemini API 호출로 두 통계 시나리오(처음/반복) 모두 인사말 포함 여부와 톤을 확인 완료

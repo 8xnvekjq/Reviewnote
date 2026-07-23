@@ -19,7 +19,12 @@ export interface MistakeAnalysis {
   modelUsed?: string;       // 분석에 사용된 AI 모델 명
   printed?: boolean;        // 인쇄/출력 완료 여부
   reviewDates?: string[];   // 단계별 복습 완료 일자 배열 (['7/10', '', ''])
+  durationMs?: number;      // 이 진단(classify+extract+solve 전체)이 실제로 걸린 시간(ms) — 평균 대기시간 계산용
 }
+
+// classify 완료 직후, solve가 아직 실질적인 텍스트를 스트리밍하기 전까지 잠깐 노출되는 placeholder 문구.
+// App.tsx(classifyStep)에서 설정하고, MistakeDetailModal에서 "아직 진짜 풀이 내용이 아님"을 구분하는 데 사용.
+export const SOLVING_PLACEHOLDER_TEXT = "### 1단계: 문제 이해하기\nAI가 정밀 문제 해설을 분석 중입니다... 잠시만 기다려 주세요.";
 
 export type ReviewState = 'O' | 'X' | 'star' | '';
 

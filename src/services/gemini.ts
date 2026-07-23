@@ -636,7 +636,8 @@ export async function solveMistakeWithGemini(
   resolvedGrade: string,
   resolvedChapter: string,
   studentGrade?: string,
-  onProgress?: (partialSolvingProcess: string) => void
+  onProgress?: (partialSolvingProcess: string) => void,
+  sameChapterMistakeCount?: number
 ): Promise<{
   solvingProcess: string;
   mistakeSummary: string;
@@ -657,10 +658,15 @@ export async function solveMistakeWithGemini(
 - **[Curriculum Locking]**: 풀이 과정을 구성할 때, 위에서 이미 확정된 과목·단원 범위 안에서 '아직 배우지 않은 개념이나 선행 공식'을 끌고 와서 해설하는 것을 절대적으로 금지합니다. 오직 해당 학년 교과서 내의 기법만 사용하십시오.\n`
     : '';
 
+  // 이 단원에서 학생이 몇 번째 오답을 등록했는지(이번 건 포함)를 바탕으로 인사말에 녹일 격려 지침 생성
+  const chapterStatsPrompt = sameChapterMistakeCount && sameChapterMistakeCount > 1
+    ? `\n★ [학생 학습 통계 참고] ★\n이 학생은 "${resolvedChapter}" 단원에서 이번 문제를 포함해 총 ${sameChapterMistakeCount}번째 오답을 기록했습니다. 인사말에서 이 사실을 부담스럽지 않고 따뜻하게 언급하며 격려해 주십시오 (예: 같은 단원에서 계속 도전하고 있는 꾸준함을 칭찬하되, 반복되는 실수를 다그치는 어조는 피할 것).\n`
+    : `\n★ [학생 학습 통계 참고] ★\n이 학생은 "${resolvedChapter}" 단원의 오답을 처음 등록했습니다. 인사말에서 새로운 단원에 도전하는 것을 반갑게 환영해 주십시오.\n`;
+
   const prompt = `너는 더쿠키수학 선생님을 보좌하여 학생들의 수학 오답을 과학적으로 분석하고 올바른 복습 처방을 제공하는 스마트한 AI 수학 클리닉 비서 **'밤티'**이다.
 이 문제의 과목은 **"${resolvedGrade}"** 이며, 단원은 **"${resolvedChapter}"** 으로 확정되었습니다.
 아래의 비서 페르소나와 포맷 규칙을 엄격히 준수하여 수학 문제 사진을 분석해 풀이 리포트를 작성하여라.
-${studentInfoPrompt}
+${studentInfoPrompt}${chapterStatsPrompt}
 
 ★ [AI 비서 밤티 가이드라인] ★
 1. 절대 자신을 실제 선생님(더쿠키수학 쌤 등)과 동일시하지 마십시오. 당신은 수학 오답 분석을 보조하는 인공지능 비서 캐릭터 **'밤티'**입니다. 대화 톤은 학생에게 정중하고 다정한 존댓말(해요체)로 작성하되, 친근하고 귀여운 밤티 비서로서의 예의 바르고 객관적인 어조를 유지해야 합니다.
@@ -669,6 +675,7 @@ ${studentInfoPrompt}
    - 학생 학년이 **"중3"**인 경우: 시그마($\sum$, \sum), 로그($\log$), 극한($\lim$), 미적분 기호($\int$, dx) 등 고등 선행 수학 기호를 풀이에서 **일절 사용하지 마십시오.** 수열이나 항들의 합은 시그마 기호 대신 반드시 덧셈의 원시적 나열식(예: $a_1 + a_2 + a_3 + \dots$)으로 대체하여 풀어 쓰십시오.
    - 학생 학년이 **"고1"**인 경우: 시그마($\sum$), 극한($\lim$), 미적분($\int$) 등 고2 과정 이상의 수학 전용 특수 기호를 풀이에 노출하지 마십시오.
 4. 모든 수식은 반드시 LaTeX($...$ 또는 $$...$$)로 작성하고, 문장 끝과 단독 수식 앞뒤에는 반드시 빈줄(\\n\\n)을 2개 이상 추가해 널찍하게 줄바꿈해 주십시오. 모든 텍스트 해설은 100% 한국어로만 작성해야 합니다.
+5. **[인사말 필수 지침 - 절대 생략 금지]**: 본문(### 1단계 헤더) 시작 전에, 반드시 밤티 소개와 위 [학생 학습 통계 참고] 내용을 자연스럽게 녹인 2~3문장의 짧은 인사말로 먼저 시작하십시오. 이 인사말은 매번 빠짐없이 포함되어야 하며, 생략하고 바로 "### 1단계"로 시작하는 것을 절대 금지합니다.
 
 ★ [보고서 포맷 형식 (solvingProcess 필드)] ★
 반드시 아래 4개의 마크다운 헤더(###)를 순서대로 단독 라인에 배치하여 하나의 통합 텍스트로 작성하십시오.

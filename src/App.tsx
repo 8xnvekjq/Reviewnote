@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import type { ActiveTab, MistakeEntry, ReviewState, MistakeAnalysis } from './types';
-import { ROOT_CAUSE_OPTIONS } from './types';
+import { ROOT_CAUSE_OPTIONS, SOLVING_PLACEHOLDER_TEXT } from './types';
 import { CameraScanner } from './components/CameraScanner';
 import { classifyMistakeWithGemini, solveMistakeWithGemini, extractProblemWithGemini, prepareGeminiImage } from './services/gemini';
 import { AuthScreen } from './components/AuthScreen';
@@ -417,6 +417,8 @@ function App() {
     }
 
     setIsAnalyzing(true);
+    // 진단 전체(classify+extract+solve) 소요 시간을 재서 평균 대기시간 계산에 사용
+    const analysisStartTime = Date.now();
     try {
       const studentGrade = entry.userId ? (profilesGradeMap[entry.userId] || '') : '';
 
@@ -431,7 +433,7 @@ function App() {
       extractPromise.catch(() => {});
 
       const updated = await classifyStep(entry, paidKey, studentGrade, image);
-      await solveStep(updated, paidKey, studentGrade, image, extractPromise);
+      await solveStep(updated, paidKey, studentGrade, image, extractPromise, analysisStartTime);
     } catch (err: any) {
       console.error(err);
       alert(err.message || 'AI 분석 실행 중 오류가 발생했습니다.');
@@ -451,7 +453,7 @@ function App() {
 
     // 1단계 결과를 기반으로 Supabase DB에 과목, 단원, 유튜브 매칭 필드 우선 업데이트
     const partialAnalysis: MistakeAnalysis = {
-      solvingProcess: "### 1단계: 문제 이해하기\nAI가 정밀 문제 해설을 분석 중입니다... 잠시만 기다려 주세요.",
+      solvingProcess: SOLVING_PLACEHOLDER_TEXT,
       matchedVideoId: firstResult.matchedVideoId,
       matchedStartSeconds: firstResult.matchedStartSeconds,
       matchedChapterTitle: firstResult.matchedChapterTitle,
@@ -492,7 +494,8 @@ function App() {
     apiKey: string,
     studentGrade: string | undefined,
     image: { mimeType: string; base64Data: string },
-    extractPromise: ReturnType<typeof extractProblemWithGemini>
+    extractPromise: ReturnType<typeof extractProblemWithGemini>,
+    analysisStartTime: number
   ): Promise<void> => {
     // 풀이가 생성되는 대로 상세 모달에 실시간으로 흘려보냄 (완성될 때까지 기다리지 않음)
     const onProgress = (partialSolvingProcess: string) => {
@@ -502,6 +505,12 @@ function App() {
       });
     };
 
+    // 이 학생이 같은 단원에서 이번 건을 포함해 몇 번째 오답을 등록했는지 계산 (이미 로드된 목록으로 즉시 계산, 추가 조회 없음)
+    // → solve 인사말에서 자연스러운 격려/환영 멘트를 녹이는 데 사용
+    const sameChapterMistakeCount = updatedEntry.chapter
+      ? mistakes.filter(m => m.userId === updatedEntry.userId && m.grade === updatedEntry.grade && m.chapter === updatedEntry.chapter).length
+      : undefined;
+
     const [secondResult, extractResult] = await Promise.all([
       solveMistakeWithGemini(
         image,
@@ -509,7 +518,8 @@ function App() {
         updatedEntry.grade || '',
         updatedEntry.chapter || '',
         studentGrade,
-        onProgress
+        onProgress,
+        sameChapterMistakeCount
       ),
       extractPromise
     ]);
@@ -520,7 +530,8 @@ function App() {
       problemText: extractResult.problemText,
       problemBox: extractResult.problemBox,
       mistakeSummary: secondResult.mistakeSummary || undefined,
-      modelUsed: 'gemini-2.5-flash'
+      modelUsed: 'gemini-2.5-flash',
+      durationMs: Date.now() - analysisStartTime
     };
 
     const { error: secondUpdateError } = await supabase
