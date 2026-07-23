@@ -76,6 +76,17 @@ function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = FE
 }
 
 /**
+ * Gemini가 "일시적으로 과부하(503 UNAVAILABLE)" 상태일 때 재시도하기 위한 설정.
+ * 실측 결과 유료키로도 503이 간헐적으로 발생하는 걸 확인해서 추가함 (재시도하면 대부분 바로 성공).
+ */
+const MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 2000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
  * Downloads a public image URL and converts it into a base64 string for Gemini API.
  *
  * 1차/2차 분석 호출(classify/solve) 양쪽에서 동일한 이미지를 사용하므로,
@@ -263,36 +274,143 @@ function normalizeGradeAndChapter(
 async function callGeminiApi(modelName: string, requestBody: any, apiKey: string): Promise<any> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
-  let response: Response;
-  try {
-    response = await fetchWithTimeout(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(requestBody)
-    }, 45000); // 텍스트 생성량이 많은 solve 단계를 고려해 넉넉한 45초 타임아웃
-  } catch (err: any) {
-    if (err?.name === 'AbortError') {
-      throw new Error(`Gemini API 응답 시간이 초과되었습니다. (${modelName})`);
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    let response: Response;
+    try {
+      response = await fetchWithTimeout(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      }, 90000); // solve 단계 정상 응답이 1분 안팎으로 걸리는 경우가 있어, 정상 응답을 오탐하지 않도록 90초로 넉넉히 설정
+    } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        throw new Error(`Gemini API 응답 시간이 초과되었습니다. (${modelName})`);
+      }
+      throw err;
     }
-    throw err;
+
+    if (response.status === 503 && attempt < MAX_RETRIES) {
+      console.warn(`Gemini API 일시적 과부하(503), ${RETRY_DELAY_MS}ms 후 재시도합니다... (${attempt + 1}/${MAX_RETRIES})`);
+      await sleep(RETRY_DELAY_MS);
+      continue;
+    }
+
+    if (!response.ok) {
+      const errorJson = await response.json().catch(() => ({}));
+      const errorMessage = errorJson?.error?.message || '네트워크 응답 오류';
+      throw new Error(`Gemini API 오류 (${modelName}): ${errorMessage}`);
+    }
+
+    const result = await response.json();
+    const responseText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!responseText) {
+      throw new Error(`Gemini API로부터 올바른 응답 텍스트를 받지 못했습니다. (${modelName})`);
+    }
+
+    return JSON.parse(responseText);
   }
 
-  if (!response.ok) {
-    const errorJson = await response.json().catch(() => ({}));
-    const errorMessage = errorJson?.error?.message || '네트워크 응답 오류';
-    throw new Error(`Gemini API 오류 (${modelName}): ${errorMessage}`);
+  throw new Error(`Gemini API가 반복적으로 과부하 상태입니다 (${modelName}). 잠시 후 다시 시도해 주세요.`);
+}
+
+/**
+ * solve 단계 전용 스트리밍 호출. responseSchema/JSON 모드를 쓰지 않고 순수 텍스트를 그대로 스트리밍해서
+ * (1) LaTeX 백슬래시가 JSON 이스케이프를 거치지 않아 안전하고, (2) 리포트가 완성되는 대로 화면에
+ * 흘려보낼 수 있다 (완전한 JSON 한 덩어리를 다 기다릴 필요가 없음).
+ * onProgress는 지금까지 누적된 원본 텍스트를 매 청크마다 전달한다.
+ */
+async function streamGeminiApi(
+  modelName: string,
+  requestBody: any,
+  apiKey: string,
+  onProgress: (accumulatedText: string) => void
+): Promise<string> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:streamGenerateContent?alt=sse&key=${apiKey}`;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 90000);
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+        signal: controller.signal
+      });
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err?.name === 'AbortError') {
+        throw new Error(`Gemini API 응답 시간이 초과되었습니다. (${modelName})`);
+      }
+      throw err;
+    }
+
+    if (response.status === 503 && attempt < MAX_RETRIES) {
+      clearTimeout(timeoutId);
+      console.warn(`Gemini API 일시적 과부하(503), ${RETRY_DELAY_MS}ms 후 재시도합니다... (${attempt + 1}/${MAX_RETRIES})`);
+      await sleep(RETRY_DELAY_MS);
+      continue;
+    }
+
+    if (!response.ok || !response.body) {
+      clearTimeout(timeoutId);
+      const errorJson = await response.json().catch(() => ({}));
+      const errorMessage = errorJson?.error?.message || '네트워크 응답 오류';
+      throw new Error(`Gemini API 오류 (${modelName}): ${errorMessage}`);
+    }
+
+    try {
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+      let fullText = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        // SSE 이벤트는 \r\n\r\n(환경에 따라 \n\n)으로 구분되고, 각 이벤트는 "data: {...}" 형태
+        const events = buffer.split(/\r?\n\r?\n/);
+        buffer = events.pop() ?? ''; // 마지막 미완성 조각은 다음 read에서 이어붙이도록 남겨둠
+
+        for (const evt of events) {
+          const line = evt.trim();
+          if (!line.startsWith('data:')) continue;
+          const jsonStr = line.slice(5).trim();
+          if (!jsonStr) continue;
+
+          let parsed: any;
+          try {
+            parsed = JSON.parse(jsonStr);
+          } catch {
+            continue; // 경계가 걸쳐 불완전한 조각은 건너뜀 (이론상 위 split 로직상 발생하지 않아야 함)
+          }
+
+          const deltaText = parsed?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (deltaText) {
+            fullText += deltaText;
+            onProgress(fullText);
+          }
+        }
+      }
+
+      if (!fullText) {
+        throw new Error(`Gemini API로부터 올바른 응답 텍스트를 받지 못했습니다. (${modelName})`);
+      }
+
+      return fullText;
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 
-  const result = await response.json();
-  const responseText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-  if (!responseText) {
-    throw new Error(`Gemini API로부터 올바른 응답 텍스트를 받지 못했습니다. (${modelName})`);
-  }
-
-  return JSON.parse(responseText);
+  throw new Error(`Gemini API가 반복적으로 과부하 상태입니다 (${modelName}). 잠시 후 다시 시도해 주세요.`);
 }
 
 /**
@@ -443,18 +561,84 @@ ${syllabusText || '등록된 강의가 없습니다.'}
 }
 
 /**
- * 2차 API 호출: 확정된 과목/단원을 엄격한 가이드로 삼아 해설 정밀 생성
+ * 문제 지문(OCR)과 인쇄 영역 바운딩 박스를 추출하는 전용 호출.
+ * 과목/단원 판정과 무관한 작업이라 classify와 동시에 병렬로 실행할 수 있다. (예전에는 solve
+ * 호출 안에 함께 묶여 있어서 실제 풀이 계산과 순차적으로 처리되며 solve의 출력량/시간을 늘리고 있었음)
  */
+export async function extractProblemWithGemini(
+  image: { mimeType: string; base64Data: string },
+  apiKey: string
+): Promise<{ problemText: string; problemBox: ProblemBox }> {
+  const { mimeType, base64Data } = image;
+
+  const prompt = `주어진 수학 문제 사진에서 아래 두 가지를 정확하게 추출하여라.
+
+1. problemText: 사진 속 인쇄된 문제 지문 원문을 그대로 추출하되, 모든 수식은 LaTeX($...$ 또는 $$...$$)로 변환하여 작성하십시오. 학생이 손으로 쓴 풀이나 낙서는 제외하고 인쇄된 문제 지문만 추출하십시오.
+2. problemBox: 사진에서 인쇄된 문제 영역(지문+보기)만을 감싸는 바운딩 박스를 top, bottom, left, right 마진 백분율(0~100)로 계산하십시오. 학생의 손글씨 풀이 영역은 제외하고 인쇄된 문제 영역만 포함하십시오.`;
+
+  const requestBody = {
+    contents: [
+      {
+        parts: [
+          { text: prompt },
+          { inlineData: { mimeType, data: base64Data } }
+        ]
+      }
+    ],
+    generationConfig: {
+      // 실측 결과 problemBox(바운딩박스 백분율 계산)는 thinkingBudget:0으로 끄면 좌표를
+      // 완전히 엉뚱한 값(0~100 범위를 벗어난 값)으로 뱉어내는 걸 확인해서, classify와 달리
+      // 여기서는 thinking을 끄지 않고 기본값(dynamic thinking)을 그대로 둔다.
+      // (problemText 자체는 0 thinking으로도 정확했지만, 공간 추론이 필요한 problemBox 때문에 유지)
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: 'OBJECT',
+        properties: {
+          problemText: { type: 'STRING' },
+          problemBox: {
+            type: 'OBJECT',
+            properties: {
+              top: { type: 'NUMBER' },
+              bottom: { type: 'NUMBER' },
+              left: { type: 'NUMBER' },
+              right: { type: 'NUMBER' }
+            },
+            required: ['top', 'bottom', 'left', 'right']
+          }
+        },
+        required: ['problemText', 'problemBox']
+      }
+    }
+  };
+
+  try {
+    const resolvedModel = 'gemini-2.5-flash';
+    const parsedJson = await callGeminiApi(resolvedModel, requestBody, apiKey);
+
+    return {
+      problemText: parsedJson.problemText,
+      problemBox: parsedJson.problemBox
+    };
+  } catch (error: any) {
+    console.error('Gemini problem extraction failed:', error);
+    throw new Error(error.message || 'Gemini API 호출 중 장애가 발생했습니다.');
+  }
+}
+
+/**
+ * 2차 API 호출: 확정된 과목/단원을 엄격한 가이드로 삼아 해설 정밀 생성 (스트리밍)
+ */
+const MISTAKE_SUMMARY_DELIMITER = '%%MISTAKE_SUMMARY%%';
+
 export async function solveMistakeWithGemini(
   image: { mimeType: string; base64Data: string },
   apiKey: string,
   resolvedGrade: string,
   resolvedChapter: string,
-  studentGrade?: string
+  studentGrade?: string,
+  onProgress?: (partialSolvingProcess: string) => void
 ): Promise<{
   solvingProcess: string;
-  problemText: string;
-  problemBox: ProblemBox;
   mistakeSummary: string;
 }> {
   const { mimeType, base64Data } = image;
@@ -475,7 +659,7 @@ export async function solveMistakeWithGemini(
 
   const prompt = `너는 더쿠키수학 선생님을 보좌하여 학생들의 수학 오답을 과학적으로 분석하고 올바른 복습 처방을 제공하는 스마트한 AI 수학 클리닉 비서 **'밤티'**이다.
 이 문제의 과목은 **"${resolvedGrade}"** 이며, 단원은 **"${resolvedChapter}"** 으로 확정되었습니다.
-아래의 비서 페르소나와 포맷 규칙을 엄격히 준수하여 수학 문제 사진을 분석해 풀이 JSON 보고서를 작성하여라.
+아래의 비서 페르소나와 포맷 규칙을 엄격히 준수하여 수학 문제 사진을 분석해 풀이 리포트를 작성하여라.
 ${studentInfoPrompt}
 
 ★ [AI 비서 밤티 가이드라인] ★
@@ -502,11 +686,10 @@ ${studentInfoPrompt}
 - 구한 답을 가볍게 검토하고 함정을 짚어줍니다.
 - 단락 맨 마지막 줄에 실수를 방지할 한 줄짜리 짧은 개념 처방을 **[처방 요약]** 이라는 말머리를 붙여 단 한 줄로만 간결하게 적어주십시오.
 
-[반환할 JSON 구조 정의]
-1. solvingProcess: 위의 4개 헤더가 모두 포함된 해설 리포트 텍스트 (한국어)
-2. problemText: 이미지에서 추출한 원본 문제 지문 (LaTeX 변환 필수)
-3. problemBox: 인쇄 문제 영역 바운딩 박스 (top, bottom, left, right 마진 백분율 0~100)
-4. mistakeSummary: 학생 풀이 기반 틀린 이유를 30자 이내로 요약한 한 문장`;
+★ [출력 형식 - 매우 중요, 반드시 그대로 따를 것] ★
+JSON이나 코드블록 없이 위 4개 헤더가 포함된 해설 리포트를 순수 텍스트로 작성하십시오.
+리포트를 모두 작성한 다음, 맨 마지막 줄에 정확히 "${MISTAKE_SUMMARY_DELIMITER}" 라는 구분자를 한 줄 쓰고,
+그 다음 줄에 학생 풀이 기반 틀린 이유를 30자 이내로 요약한 한 문장(mistakeSummary)만 적으십시오.`;
 
   const requestBody = {
     contents: [
@@ -521,40 +704,27 @@ ${studentInfoPrompt}
           }
         ]
       }
-    ],
-    generationConfig: {
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: 'OBJECT',
-        properties: {
-          solvingProcess: { type: 'STRING' },
-          problemText: { type: 'STRING' },
-          problemBox: {
-            type: 'OBJECT',
-            properties: {
-              top: { type: 'NUMBER' },
-              bottom: { type: 'NUMBER' },
-              left: { type: 'NUMBER' },
-              right: { type: 'NUMBER' }
-            },
-            required: ['top', 'bottom', 'left', 'right']
-          },
-          mistakeSummary: { type: 'STRING' }
-        },
-        required: ['solvingProcess', 'problemText', 'problemBox', 'mistakeSummary']
-      }
-    }
+    ]
+    // 의도적으로 responseMimeType/responseSchema 없음 — 순수 텍스트로 스트리밍
   };
 
   try {
     const resolvedModel = 'gemini-2.5-flash';
-    const parsedJson = await callGeminiApi(resolvedModel, requestBody, apiKey);
+    const fullText = await streamGeminiApi(resolvedModel, requestBody, apiKey, (accumulatedText) => {
+      const delimIdx = accumulatedText.indexOf(MISTAKE_SUMMARY_DELIMITER);
+      const visibleSoFar = delimIdx === -1 ? accumulatedText : accumulatedText.slice(0, delimIdx);
+      onProgress?.(visibleSoFar.trim());
+    });
+
+    const delimIdx = fullText.indexOf(MISTAKE_SUMMARY_DELIMITER);
+    if (delimIdx === -1) {
+      // 구분자를 못 찾은 예외적인 경우, 전체를 해설로 취급하고 요약은 비워둠 (안전한 폴백)
+      return { solvingProcess: fullText.trim(), mistakeSummary: '' };
+    }
 
     return {
-      solvingProcess: parsedJson.solvingProcess,
-      problemText: parsedJson.problemText,
-      problemBox: parsedJson.problemBox,
-      mistakeSummary: parsedJson.mistakeSummary
+      solvingProcess: fullText.slice(0, delimIdx).trim(),
+      mistakeSummary: fullText.slice(delimIdx + MISTAKE_SUMMARY_DELIMITER.length).trim()
     };
   } catch (error: any) {
     console.error('Gemini solving failed:', error);

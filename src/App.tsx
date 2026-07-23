@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import type { ActiveTab, MistakeEntry, ReviewState, MistakeAnalysis } from './types';
 import { ROOT_CAUSE_OPTIONS } from './types';
 import { CameraScanner } from './components/CameraScanner';
-import { classifyMistakeWithGemini, solveMistakeWithGemini, prepareGeminiImage } from './services/gemini';
+import { classifyMistakeWithGemini, solveMistakeWithGemini, extractProblemWithGemini, prepareGeminiImage } from './services/gemini';
 import { AuthScreen } from './components/AuthScreen';
 import { supabase, isSupabaseConfigured } from './services/supabase';
 import { base64ToBlob } from './utils/image';
@@ -420,12 +420,18 @@ function App() {
     try {
       const studentGrade = entry.userId ? (profilesGradeMap[entry.userId] || '') : '';
 
-      // 이미지 다운로드 + 리사이즈/압축은 진단당 단 한 번만 수행하고 classify(1차)/solve(2차)에서 재사용합니다.
+      // 이미지 다운로드 + 리사이즈/압축은 진단당 단 한 번만 수행하고 classify/extract/solve에서 재사용합니다.
       // (과거에는 1차/2차 호출이 각자 이미지를 재다운로드+재압축해서 진단 시간이 두 배로 늘어났었음)
       const image = await prepareGeminiImage(entry.imageUrl);
 
+      // 문제 지문(OCR)/바운딩박스 추출은 과목·단원과 무관한 작업이라 classify와 완전히 동시에 시작합니다.
+      const extractPromise = extractProblemWithGemini(image, paidKey);
+      // classify가 끝날 때까지 extractPromise를 아직 await하지 않으므로, 그 사이 실패하더라도
+      // "unhandled promise rejection" 경고가 뜨지 않도록 별도 채널로 미리 캐치해둔다 (실제 처리는 solveStep에서).
+      extractPromise.catch(() => {});
+
       const updated = await classifyStep(entry, paidKey, studentGrade, image);
-      await solveStep(updated, paidKey, studentGrade, image);
+      await solveStep(updated, paidKey, studentGrade, image, extractPromise);
     } catch (err: any) {
       console.error(err);
       alert(err.message || 'AI 분석 실행 중 오류가 발생했습니다.');
@@ -480,26 +486,39 @@ function App() {
     return updatedEntry;
   };
 
-  // --- 2단계: 문제 풀이 2차 정밀 분석 + DB/로컬 상태 갱신 ---
+  // --- 2단계: 문제 풀이(스트리밍) + 문제 지문/바운딩박스 추출을 동시 진행 + DB/로컬 상태 갱신 ---
   const solveStep = async (
     updatedEntry: MistakeEntry,
     apiKey: string,
     studentGrade: string | undefined,
-    image: { mimeType: string; base64Data: string }
+    image: { mimeType: string; base64Data: string },
+    extractPromise: ReturnType<typeof extractProblemWithGemini>
   ): Promise<void> => {
-    const secondResult = await solveMistakeWithGemini(
-      image,
-      apiKey,
-      updatedEntry.grade || '',
-      updatedEntry.chapter || '',
-      studentGrade
-    );
+    // 풀이가 생성되는 대로 상세 모달에 실시간으로 흘려보냄 (완성될 때까지 기다리지 않음)
+    const onProgress = (partialSolvingProcess: string) => {
+      setSelectedEntry(prev => {
+        if (!prev || prev.id !== updatedEntry.id) return prev;
+        return { ...prev, analysis: { ...prev.analysis, solvingProcess: partialSolvingProcess } };
+      });
+    };
+
+    const [secondResult, extractResult] = await Promise.all([
+      solveMistakeWithGemini(
+        image,
+        apiKey,
+        updatedEntry.grade || '',
+        updatedEntry.chapter || '',
+        studentGrade,
+        onProgress
+      ),
+      extractPromise
+    ]);
 
     const finalAnalysis: MistakeAnalysis = {
       ...updatedEntry.analysis,
       solvingProcess: secondResult.solvingProcess,
-      problemText: secondResult.problemText,
-      problemBox: secondResult.problemBox,
+      problemText: extractResult.problemText,
+      problemBox: extractResult.problemBox,
       mistakeSummary: secondResult.mistakeSummary || undefined,
       modelUsed: 'gemini-2.5-flash'
     };

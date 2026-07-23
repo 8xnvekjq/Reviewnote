@@ -164,3 +164,46 @@ try {
 - `npx tsc -b --noEmit` 통과
 - `npx oxlint src` — hook 관련 기존 오탐(36건) 및 그 외 경고(10건) 모두 이번 변경 전과 동일 — 새로 추가된 lint 오류 없음
 - 활성 소스 전체에서 `hints`/`힌트` 문자열 재검색 결과 없음 (아카이브 파일 제외)
+
+---
+
+## 9. 4차 개선 — 실측 기반 검증 + 스트리밍 전환 + problemText/problemBox 병렬화
+
+배경: 사용자가 제공한 실제 수능 문제 사진 1장과 유료 API 키로, 매 단계 코드 변경을 실제 Gemini API 호출로 검증하며 진행했습니다 (스크립트는 세션 스크래치패드에 위치, 저장소에는 포함 안 됨). 이 과정에서 처음의 가설(무료키 rate limit이 주범)이 실측으로 뒷받침됐고, 추가로 두 가지 실제 개선 기회와 버그 하나를 발견했습니다.
+
+### 9-1. 실측으로 확인된 것
+- 유료키 단독 호출 시 classify(2.7초, thinking 0)+solve(29.1초, thinking 4,606) = **총 31.9초** — 사용자가 보고한 "1분 넘게"보다 훨씬 빠름. 무료키 rate limit이 실제 원인이었을 가능성을 뒷받침.
+- 힌트 유/무 A/B 비교: 힌트 추가 시 +8.8초(37% 느려짐), thinking 토큰 +142% — 힌트 텍스트 자체(≈130 토큰)보다 훨씬 큰 비율로 thinking을 소모함을 확인. 힌트 제거가 실제로 유의미한 개선이었음을 검증.
+- solve의 dynamic thinking은 동일 문제·동일 프롬프트에도 호출마다 편차가 큼(관측: 1,173 / 2,834 / 4,606 토큰). thinkingBudget을 0으로 끄면 안 되는 이유(계산 정확도)와, 대신 상한선만 걸어 안전판으로 쓰는 방안을 논의했으나 이번 라운드에는 적용하지 않음 (사용자가 4번 항목 진행을 요청).
+- **Gemini 쪽 실제 503 "model is currently experiencing high demand" 오류를 스트리밍 테스트 중 2연속으로 직접 관측함.** 이건 앱 코드와 무관한 Google 서버 과부하이며, "가끔 에러 뜬다"는 문제의 또 다른 실제 원인일 수 있음 → 재시도 로직 추가로 대응 (9-2 참고).
+
+### 9-2. Gemini API 503(일시적 과부하) 자동 재시도 ([gemini.ts](src/services/gemini.ts))
+- `callGeminiApi`(non-streaming)와 신규 `streamGeminiApi`(streaming) 양쪽에 동일하게, HTTP 503 응답을 받으면 2초 간격으로 최대 2회 재시도하는 로직을 추가했습니다.
+- 401/400 등 재시도해도 의미 없는 에러는 즉시 실패 처리하고, 503만 선별적으로 재시도합니다.
+
+### 9-3. `problemText`/`problemBox`를 classify와 병렬 실행하는 `extractProblemWithGemini` 신설 ([gemini.ts](src/services/gemini.ts))
+- 기존에는 solve 호출 하나가 풀이 계산 + OCR 지문 추출 + 바운딩박스 계산을 전부 담당해서 solve의 출력량과 처리 시간이 늘어나고 있었습니다.
+- OCR/바운딩박스 추출은 과목·단원 확정과 무관한 작업이라, 별도 함수 `extractProblemWithGemini(image, apiKey)`로 분리해서 **classify와 완전히 동시에** 시작하도록 [App.tsx](src/App.tsx)의 `handleStartAnalysis`를 수정했습니다.
+- **버그 발견 및 수정**: 처음에 이 함수도 classify처럼 `thinkingBudget: 0`을 걸었더니, `problemBox`(0~100 백분율이어야 함)가 `{top:86, bottom:841, left:73, right:923}`처럼 범위를 완전히 벗어난 값으로 나오는 걸 실측으로 발견했습니다. 같은 프롬프트를 기본 thinking으로 다시 호출하니 `{top:11.67, bottom:94.47, ...}`처럼 정상 범위로 돌아옴을 확인 — **바운딩박스 좌표 추정은 공간 추론이 필요해서 thinking을 끄면 안 된다는 것**을 실측으로 확인하고, `thinkingConfig` 오버라이드를 제거해 기본값(dynamic thinking)으로 되돌렸습니다. (problemText 자체는 0 thinking으로도 정확했지만 problemBox 때문에 유지)
+- 실측 결과, extract 호출(~3~10초)이 solve의 thinking 단계(~12초 이상) 안에 완전히 가려져서 **파이프라인 전체 시간에 추가 지연이 거의 없었습니다.**
+
+### 9-4. `solveMistakeWithGemini`를 스트리밍 순수 텍스트로 전환 ([gemini.ts](src/services/gemini.ts))
+- 지난 라운드에 보류했던 스트리밍을 프로토타입으로 먼저 검증한 뒤 적용했습니다. `responseSchema` 기반 JSON을 스트리밍하면 완성 전까지 유효한 JSON이 아니라서 부분 파싱이 위험하다는 우려가 있었는데, **JSON 모드를 아예 쓰지 않고 순수 텍스트 + 구분자(`%%MISTAKE_SUMMARY%%`) 방식**으로 바꿔서 이 문제를 원천 차단했습니다.
+  - solve는 이제 `responseMimeType`/`responseSchema` 없이 4개 마크다운 헤더로 된 해설을 그대로 스트리밍하고, 맨 마지막 줄에 구분자 + `mistakeSummary` 한 줄을 덧붙이도록 프롬프트를 수정했습니다.
+  - `problemText`/`problemBox`는 9-3에서 분리했으므로 solve의 반환 타입은 `{ solvingProcess, mistakeSummary }`로 단순화됐습니다.
+  - 실측 검증: LaTeX 명령어(`\int`, `\frac`, `\ln` 등 73개)가 청크 경계에서 전혀 깨지지 않고 완전하게 보존됨을 확인했습니다 — 과거 `6f4e884` 커밋에서 겪었던 이중 이스케이프 버그 유형이 이 방식에서는 애초에 발생할 수 없는 구조입니다.
+  - **SSE 파싱 버그 발견 및 수정**: Gemini 스트리밍 응답의 이벤트 구분자가 `\n\n`이 아니라 `\r\n\r\n`이라는 걸 처음에 놓쳐서 청크가 0개로 파싱되는 문제가 있었습니다. 정규식 `/\r?\n\r?\n/`으로 분리하도록 고쳐서 해결했습니다.
+- [App.tsx](src/App.tsx)의 `solveStep`은 이제 `onProgress` 콜백으로 스트리밍 중간 텍스트를 받아 `selectedEntry`(상세 모달)를 실시간 갱신합니다. `mistakes` 목록 상태는 기존과 동일하게 최종 완료 시 1회만 갱신합니다 (목록 카드는 풀이 전문을 안 보여주므로 매 청크 갱신할 필요 없음).
+- solve와 extract는 `Promise.all`로 동시에 진행되고, 둘 다 끝난 뒤 결과를 합쳐 DB에 1회만 기록합니다.
+
+### 9-5. 실측 파이프라인 전체 시간
+동일 이미지로 새 구조(classify+extract 병렬 → solve 스트리밍) 전체를 실행: classify 2.2초 → (extract는 그 사이 3.2초 만에 완료, 지연에 기여 안 함) → solve 스트리밍 첫 청크 12.2초 후 도착 → 전체 완료 **17.5초**. 이전 순차 구조 실측(31.9초)과 사용자가 원래 보고한 "1분 넘게"에 비해 큰 폭으로 개선되었습니다.
+
+### 9-6. 변경하지 않은 것 / 참고
+- LaTeXRenderer는 스트리밍 도중 아직 안 닫힌 `$...$`/`$$...$$`를 만나면 기존 `sanitizeLatex`의 홀수-달러 보정 로직이 임시로 plain text로 보여주다가, 닫는 기호가 도착하면 정상 렌더링됩니다. 즉 스트리밍 중 수식이 잠깐 깨져 보이다 완성되는 건 정상 동작이며 별도 수정이 필요 없습니다.
+- 테스트에 사용한 이미지 파일과 유료 API 키는 세션 스크래치패드/`.env.test`에만 있고 저장소에는 포함되지 않았습니다.
+
+### 검증
+- `npx tsc -b --noEmit` 통과
+- `npx oxlint src` — 새로 추가된 오류/경고 없음 (기존 pre-existing 항목과 동일)
+- 실제 Gemini API 호출로 classify/extract/solve 각각과 전체 파이프라인을 검증 완료 (브라우저 UI를 통한 실사용 테스트는 별도로 필요)
