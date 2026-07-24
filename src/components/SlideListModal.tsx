@@ -40,6 +40,7 @@ export const SlideListModal: React.FC<SlideListModalProps> = ({ isOpen, onClose 
   const SLIDE_LIST: SlideItem[] = [
     // 7월 4W (7/22~7/25)
     { title: "2025학년도 수능 수학 15, 20, 21, 22번 및 변형문제", filename: "2025_suneung_math_15_20_21_22.html", date: "2026-07-25" },
+    { title: "개념원리 미적분1 - 04. 도함수 (p72~81)", filename: "calculus1_derivative_04.html", date: "2026-07-25" },
     { title: "고3 준킬러 스피드 & 숏컷 클리닉", filename: "g3_speedcut_clinic.html", date: "2026-07-23" },
     { title: "개념원리 미적분1 - 01. 함수의 극한과 연속 (p31~47)", filename: "calculus1_limit_continuity_01.html", date: "2026-07-22" },
     { title: "개념원리 미적분1 - 02. 연속함수의 성질 (p51~55)", filename: "calculus1_continuous_functions_02.html", date: "2026-07-22" },
