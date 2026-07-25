@@ -1157,9 +1157,10 @@ function App() {
                       ? 'bg-gradient-to-r from-amber-500/10 via-slate-900 to-slate-900 border-amber-500/40 shadow-md'
                       : 'bg-slate-955/70 border-slate-850';
 
-                    // 해당 챔피언이 현재 로그인 유저인 경우 칭호 대입
+                    // 샘플 칭호 또는 장착 칭호
+                    const sampleTitles = ['수학의 신', '킬러문항 포식자', '계산의 달인'];
                     const isMe = champ && (champ.username === currentUser || champ.user_id === currentUser);
-                    const activeTitle = isMe ? equippedItems.title : (champ?.title || undefined);
+                    const activeTitle = (isMe && equippedItems.title) ? equippedItems.title : (champ?.title || sampleTitles[idx]);
 
                     const studentDisplayName = champ
                       ? (champ.display_name ? `${champ.display_name} 학생` : `${maskId(champ.username)} 학생`)
