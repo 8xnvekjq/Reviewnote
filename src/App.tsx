@@ -446,7 +446,16 @@ function App() {
           .maybeSingle();
         if (myProfile) {
           setMyNickname(myProfile.nickname || myProfile.display_name || '');
-          setMyBonusPoints(myProfile.bonus_points || 0);
+          const bonus = myProfile.bonus_points || 0;
+          setMyBonusPoints(bonus);
+          if (bonus > 0) {
+            setPointAdjustment(0);
+            try {
+              localStorage.removeItem('reviewnote_point_adj');
+            } catch (e) {
+              console.error(e);
+            }
+          }
         }
         // 닉네임 변경권 보유 여부 확인 (Header에 버튼 노출 제어)
         checkNameChangeTicket();
