@@ -116,7 +116,8 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, nickname, onLogout,
                 {onUpdateNickname && (
                   <button 
                     onClick={async () => {
-                      const input = prompt("새로운 닉네임을 입력하세요 (실제 이름은 변경되지 않습니다):", displayName);
+                      const currentNick = nickname || displayName;
+                      const input = prompt("새로운 닉네임을 입력하세요 (실제 이름은 변경되지 않습니다):", currentNick);
                       if (input !== null && input.trim()) {
                         await onUpdateNickname(input.trim());
                         setShowUserMenu(false);
