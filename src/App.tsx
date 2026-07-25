@@ -1197,49 +1197,43 @@ function App() {
                     return (
                       <div
                         key={idx}
-                        className={`p-3 rounded-xl border flex flex-wrap items-center justify-between gap-2 transition-all ${rowBg}`}
+                        className={`p-2.5 rounded-xl border flex items-center justify-between space-x-2 whitespace-nowrap overflow-x-auto no-scrollbar transition-all ${rowBg}`}
                       >
-                        {/* Left: 메달 + 칭호 + 학생 풀 네임 */}
-                        <div className="flex items-center space-x-2 flex-wrap gap-y-1">
-                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${medalStyle}`}>
+                        {/* Left: 메달 + 칭호 + 학생 이름 (단일 행 고정) */}
+                        <div className="flex items-center space-x-1.5 flex-none min-w-0">
+                          <span className={`text-[9.5px] font-black px-1.5 py-0.5 rounded-full border flex-none ${medalStyle}`}>
                             {medal}
                           </span>
 
                           {champ && champ.score > 0 ? (
                             <>
-                              {/* 칭호 장착 시 희귀도별 커스텀 배지 표시 */}
+                              {/* 칭호 배지 */}
                               {activeTitle && titleBadge && (
-                                <span className={`text-[9px] font-black border px-2 py-0.5 rounded-full flex items-center space-x-1 ${titleBadge.style}`}>
+                                <span className={`text-[8.5px] font-black border px-1.5 py-0.2 rounded-full flex items-center space-x-0.5 flex-none ${titleBadge.style}`}>
                                   <span>{titleBadge.icon}</span>
                                   <span>{activeTitle}</span>
                                 </span>
                               )}
 
-                              {/* 풀 네임 (폰트 슬림화하여 긴 이름도 다 나옴) */}
-                              <span className={`font-black ${isFirst ? 'text-white text-[12.5px]' : 'text-slate-200 text-[11px]'}`}>
+                              {/* 풀 네임 (단일 행 표출) */}
+                              <span className={`font-black flex-none ${isFirst ? 'text-white text-[11.5px]' : 'text-slate-200 text-[10.5px]'}`}>
                                 {studentDisplayName}
                               </span>
-
-                              {isFirst && (
-                                <span className="text-[8.5px] font-black bg-amber-500/10 text-amber-300 border border-amber-500/20 px-1.5 py-0.5 rounded-full">
-                                  ⭐ 주간 MVP
-                                </span>
-                              )}
                             </>
                           ) : (
-                            <span className="text-xs font-bold text-slate-600 italic">
+                            <span className="text-[10.5px] font-bold text-slate-600 italic flex-none">
                               도전 대기 중... 🐱
                             </span>
                           )}
                         </div>
 
-                        {/* Right: 점수 & 복습 완료 건수 */}
+                        {/* Right: 완료 X개 + X점 (단일 행 표출) */}
                         {champ && champ.score > 0 && (
-                          <div className="text-right ml-auto flex items-center space-x-2">
-                            <span className="text-[10px] text-slate-400 font-medium">
+                          <div className="flex items-center space-x-1.5 flex-none text-right whitespace-nowrap pl-1">
+                            <span className="text-[9.5px] text-slate-400 font-medium">
                               완료 {champ.weekly_completed_count}개
                             </span>
-                            <span className={`font-black ${isFirst ? 'text-amber-400 text-sm' : 'text-slate-300 text-xs'}`}>
+                            <span className={`font-black ${isFirst ? 'text-amber-400 text-[12px]' : 'text-slate-300 text-[11px]'}`}>
                               {Math.round(champ.score)}점
                             </span>
                           </div>
