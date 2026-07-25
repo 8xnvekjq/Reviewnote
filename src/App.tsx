@@ -111,9 +111,7 @@ function App() {
   };
 
   // 현재 표시 가능한 복습 콤보 보유 점수 (DB 뷰 점수 + 상점 사용 포인트 차감치)
-  // 어드민 테스트 계정(8xnvekjq)은 가챠 테스트용 9,999점 보너스 부여
-  const adminTestBonus = (isAdmin || currentUser.toLowerCase().includes('8xnvekjq')) ? 9999 : 0;
-  const currentDisplayPoints = Math.max(0, (myWeeklyScoreFromDB || 0) + adminTestBonus + pointAdjustment);
+  const currentDisplayPoints = Math.max(0, (myWeeklyScoreFromDB || 0) + pointAdjustment);
   
   const prevTabRef = useRef(activeTab);
 
