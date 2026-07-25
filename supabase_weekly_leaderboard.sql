@@ -31,6 +31,7 @@ SELECT
   split_part(p.email, '@', 1) as username,
   p.display_name,
   COALESCE(p.nickname, p.display_name) as nickname,
+  p.equipped_title as title,
   COALESCE(t.count, 0) as weekly_total_count,
   COALESCE(c.count, 0) as weekly_completed_count,
   CASE 
@@ -84,6 +85,7 @@ SELECT
   split_part(p.email, '@', 1) as username,
   p.display_name,
   COALESCE(p.nickname, p.display_name) as nickname,
+  p.equipped_title as title,
   COALESCE(t.count, 0) as weekly_total_count,
   COALESCE(c.count, 0) as weekly_completed_count,
   CASE 

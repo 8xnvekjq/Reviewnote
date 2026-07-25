@@ -47,10 +47,10 @@ export const AdminPanel: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      // Fetch all profiles (display_name, school_grade 포함)
+      // Fetch all profiles (display_name, school_grade, equipped_title 포함)
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, email, is_admin, display_name, school_grade')
+        .select('id, email, is_admin, display_name, school_grade, equipped_title')
         .order('email', { ascending: true });
 
       if (profilesError) throw profilesError;
@@ -90,6 +90,7 @@ export const AdminPanel: React.FC = () => {
           displayName: p.display_name?.trim() || undefined,
           username: username,
           schoolGrade: p.school_grade || '',
+          equippedTitle: p.equipped_title || undefined,
           lastReviewDate: null,
         });
       });
@@ -351,10 +352,16 @@ export const AdminPanel: React.FC = () => {
                       {((user as any).displayName || (user as any).username || 'U').charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2 flex-wrap gap-y-1">
                         <span className="font-extrabold text-white text-sm truncate">
                           {(user as any).displayName || (user as any).username}
                         </span>
+                        {user.equippedTitle && (
+                          <span className="text-[9px] font-black bg-gradient-to-r from-amber-400 via-pink-500 to-purple-500 text-white border border-amber-300/60 px-2 py-0.2 rounded-full shadow-sm flex items-center space-x-1 flex-none">
+                            <span>👑</span>
+                            <span>{user.equippedTitle}</span>
+                          </span>
+                        )}
                       </div>
                       <span className="text-[10px] text-slate-400 truncate block mt-0.5">
                         {(user as any).displayName ? `아이디: ${(user as any).username}` : (isEmailValid ? user.email : '(이메일 정보 없음)')}
