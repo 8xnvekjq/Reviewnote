@@ -16,6 +16,8 @@ import { AdminPanel } from './components/AdminPanel';
 import { StudentGuide } from './components/StudentGuide';
 import { LaTeXRenderer } from './components/LaTeXRenderer';
 import { SlideListModal } from './components/SlideListModal';
+import { GachaStore } from './components/GachaStore';
+import type { EquippedItems } from './types';
 
 function App() {
   // If Supabase credentials are not configured, block and show the setup guide
@@ -64,6 +66,52 @@ function App() {
   const [selectedPrintIds, setSelectedPrintIds] = useState<string[]>([]);
   // 수업자료 리스트 모달 팝업 상태
   const [isSlideListOpen, setIsSlideListOpen] = useState(false);
+
+  // 럭키 상점 장착 아이템 및 포인트 상태 (LocalStorage 관리)
+  const [equippedItems, setEquippedItems] = useState<EquippedItems>(() => {
+    try {
+      const saved = localStorage.getItem('reviewnote_equipped_items');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const [pointAdjustment, setPointAdjustment] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('reviewnote_point_adj');
+      return saved ? Number(saved) : 0;
+    } catch {
+      return 0;
+    }
+  });
+
+  const handleEquipItem = (category: keyof EquippedItems, value: string | undefined) => {
+    setEquippedItems(prev => {
+      const updated = { ...prev, [category]: value };
+      try {
+        localStorage.setItem('reviewnote_equipped_items', JSON.stringify(updated));
+      } catch (e) {
+        console.error(e);
+      }
+      return updated;
+    });
+  };
+
+  const handleDeductPoints = (amount: number) => {
+    setPointAdjustment(prev => {
+      const next = prev - amount;
+      try {
+        localStorage.setItem('reviewnote_point_adj', String(next));
+      } catch (e) {
+        console.error(e);
+      }
+      return next;
+    });
+  };
+
+  // 현재 표시 가능한 복습 콤보 보유 점수 (DB 뷰 점수 + 상점 사용 포인트 차감치)
+  const currentDisplayPoints = Math.max(0, (myWeeklyScoreFromDB || 0) + pointAdjustment);
   
   const prevTabRef = useRef(activeTab);
 
@@ -1056,10 +1104,25 @@ function App() {
     <div className="h-full flex flex-col bg-slate-950 text-slate-100 select-none">
       
       {/* Top Header */}
-      <Header currentUser={currentUser} onLogout={handleLogout} myScore={myWeeklyScoreFromDB} />
+      <Header 
+        currentUser={currentUser} 
+        onLogout={handleLogout} 
+        myScore={currentDisplayPoints} 
+        onOpenStore={() => setActiveTab('store')}
+        equippedTitle={equippedItems.title}
+      />
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto px-4 py-6 pb-28">
+        {activeTab === 'store' && (
+          <GachaStore
+            userPoints={currentDisplayPoints}
+            onDeductPoints={handleDeductPoints}
+            equippedItems={equippedItems}
+            onEquipItem={handleEquipItem}
+          />
+        )}
+
         {activeTab === 'notes' && (
           <>
             {/* 주간 복습왕 배너 (전체 학생 오픈 / 1주 이월 및 리셋 롤오버) */}

@@ -26,9 +26,11 @@ interface HeaderProps {
   currentUser: string;
   onLogout: () => void;
   myScore?: number;
+  onOpenStore?: () => void;
+  equippedTitle?: string;
 }
 
-export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, myScore }) => {
+export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, myScore, onOpenStore, equippedTitle }) => {
   const buildLabel = `v${__APP_VERSION__} (${formatBuildTime(__BUILD_TIME__)})`;
 
   return (
@@ -49,11 +51,21 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, myScore }
         </div>
       </div>
       <div className="flex items-center space-x-2 flex-none min-w-0 whitespace-nowrap">
-        {/* 내 주간 점수 미니 배지 */}
+        {/* 내 주간 점수 미니 배지 (클릭 시 럭키상점으로 이동) */}
         {myScore !== undefined && (
-          <span className="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 font-black flex items-center space-x-0.5 flex-none animate-fade-in">
+          <button 
+            onClick={onOpenStore}
+            className="text-[10px] text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-500/30 font-black flex items-center space-x-1 flex-none animate-fade-in hover:scale-105 active:scale-95 transition-all shadow-sm"
+            title="럭키상점으로 이동"
+          >
             <span>⚡</span>
             <span>{myScore}점</span>
+            <span className="text-[8px] bg-amber-400 text-slate-950 px-1 rounded-full ml-0.5 font-bold">🎁</span>
+          </button>
+        )}
+        {equippedTitle && (
+          <span className="text-[9px] text-amber-300 bg-gradient-to-r from-amber-500/20 to-purple-500/20 px-2 py-0.5 rounded-full border border-amber-500/40 font-black truncate max-w-[90px] flex-none">
+            👑 {equippedTitle}
           </span>
         )}
         <span className="text-[10px] text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded-full border border-slate-700 font-bold max-w-[100px] truncate flex-none">

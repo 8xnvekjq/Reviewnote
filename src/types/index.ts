@@ -83,4 +83,26 @@ export interface MistakeEntry {
   userActionPlan?: string;
 }
 
-export type ActiveTab = 'notes' | 'completed' | 'camera' | 'stats' | 'admin' | 'guide';
+export type ActiveTab = 'notes' | 'completed' | 'camera' | 'stats' | 'admin' | 'guide' | 'store';
+
+export type GachaRarity = 'UR' | 'SSR' | 'SR' | 'R';
+export type GachaCategory = 'STAMP' | 'TITLE' | 'THEME' | 'SHIELD' | 'AI_VOICE' | 'CHARM';
+
+export interface GachaItem {
+  id: string;
+  name: string;
+  description: string;
+  rarity: GachaRarity;
+  category: GachaCategory;
+  icon: string;
+  effectValue?: string; // e.g. '#10B981', '🐾', '수학의 연금술사'
+  color: string;
+}
+
+export interface EquippedItems {
+  stamp?: string;     // stamp emoji e.g. '🐾'
+  title?: string;     // title string e.g. '수학의 연금술사'
+  theme?: string;     // theme color name/hex e.g. 'emerald'
+  aiVoice?: string;   // AI persona type e.g. 'tsundere'
+}
+
