@@ -31,10 +31,10 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
     <div className="fixed bottom-0 left-0 right-0 z-40 select-none">
 
       {/* ── 1. 플로팅 상단 배지 (온라인 N명 / 수업자료 / 복습하기) ───────────────── */}
-      <div className="relative w-full max-w-lg mx-auto px-4">
+      <div className="relative w-full px-4">
 
-        {/* Online 인원수 배지 (하단 내비바 좌측 상단 플로팅) */}
-        <div className="absolute -top-3.5 left-3 z-50">
+        {/* Online 인원수 배지 (화면 좌측 상단 플로팅) */}
+        <div className="absolute -top-3.5 left-4 z-50">
           <button
             onClick={() => setShowOnlinePopup(!showOnlinePopup)}
             className="px-2.5 py-0.5 rounded-full bg-slate-955/90 border border-slate-800 text-[8px] font-black text-slate-300 hover:text-white flex items-center space-x-1 shadow-md hover:scale-105 active:scale-95 transition-all backdrop-blur-md"
@@ -42,7 +42,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             <span>Online {onlineUsers.length}</span>
           </button>
-
+          
           {/* 온라인 사용자 목록 팝업 */}
           {showOnlinePopup && (
             <div className="absolute bottom-7 left-0 w-44 bg-slate-955/95 border border-slate-800/80 rounded-xl p-3 shadow-2xl backdrop-blur-md space-y-1.5 animate-fade-in z-50">
@@ -66,9 +66,9 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
           )}
         </div>
 
-        {/* 수업자료 배지 버튼 (하단 내비바 우측 복습하기 왼편 플로팅 + 세련된 에메랄드 테두리 글로우) */}
+        {/* 수업자료 배지 버튼 (화면 우측 복습하기 왼편 플로팅) */}
         {onOpenSlideList && (
-          <div className="absolute -top-3.5 right-[86px] z-50">
+          <div className="absolute -top-3.5 right-[90px] z-50">
             <button
               onClick={onOpenSlideList}
               className="px-3 py-0.5 rounded-full bg-emerald-700 hover:bg-emerald-650 border-2 border-emerald-400 text-[8.5px] font-black text-white flex items-center space-x-1 shadow-[0_0_12px_rgba(16,185,129,0.65)] hover:shadow-[0_0_18px_rgba(16,185,129,0.85)] hover:scale-105 active:scale-95 transition-all backdrop-blur-md"
@@ -78,9 +78,9 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
           </div>
         )}
 
-        {/* 복습하기 배지 버튼 (하단 내비바 우측 상단 플로팅 + 차분한 황금 테두리 글로우 효과) */}
+        {/* 복습하기 배지 버튼 (화면 우측 상단 플로팅 + 황금 글로우) */}
         {onStartReviewSession && (
-          <div className="absolute -top-3.5 right-3 z-50">
+          <div className="absolute -top-3.5 right-4 z-50">
             <button
               onClick={onStartReviewSession}
               className="px-3 py-0.5 rounded-full bg-indigo-600 hover:bg-indigo-550 border-2 border-amber-400 text-[8.5px] font-black text-white flex items-center space-x-1 shadow-[0_0_12px_rgba(251,191,36,0.65)] hover:shadow-[0_0_18px_rgba(251,191,36,0.85)] hover:scale-105 active:scale-95 transition-all backdrop-blur-md"
