@@ -66,9 +66,9 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
           )}
         </div>
 
-        {/* 수업자료 배지 버튼 (우측 중간 플로팅) */}
+        {/* 수업자료 배지 버튼 (하단 내비바 우측 복습하기 왼편 플로팅 + 세련된 에메랄드 테두리 글로우) */}
         {onOpenSlideList && (
-          <div className="absolute -top-4 right-[92px] z-50">
+          <div className="absolute -top-3.5 right-[86px] z-50">
             <button
               onClick={onOpenSlideList}
               className="px-3 py-0.5 rounded-full bg-emerald-700 hover:bg-emerald-650 border-2 border-emerald-400 text-[8.5px] font-black text-white flex items-center space-x-1 shadow-[0_0_12px_rgba(16,185,129,0.65)] hover:shadow-[0_0_18px_rgba(16,185,129,0.85)] hover:scale-105 active:scale-95 transition-all backdrop-blur-md"
@@ -78,9 +78,9 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
           </div>
         )}
 
-        {/* 복습하기 배지 버튼 (우측 상단 플로팅 + 황금 글로우) */}
+        {/* 복습하기 배지 버튼 (하단 내비바 우측 상단 플로팅 + 차분한 황금 테두리 글로우 효과) */}
         {onStartReviewSession && (
-          <div className="absolute -top-4 right-4 z-50">
+          <div className="absolute -top-3.5 right-3 z-50">
             <button
               onClick={onStartReviewSession}
               className="px-3 py-0.5 rounded-full bg-indigo-600 hover:bg-indigo-550 border-2 border-amber-400 text-[8.5px] font-black text-white flex items-center space-x-1 shadow-[0_0_12px_rgba(251,191,36,0.65)] hover:shadow-[0_0_18px_rgba(251,191,36,0.85)] hover:scale-105 active:scale-95 transition-all backdrop-blur-md"
