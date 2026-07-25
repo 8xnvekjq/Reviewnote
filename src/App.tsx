@@ -337,6 +337,14 @@ function App() {
         setYoutubeLectures([]);
         setWeeklyChampions([]);
         setPaidGeminiKey('');
+        setEquippedItems({});
+        setMyNickname('');
+        try {
+          localStorage.removeItem('reviewnote_equipped_items');
+          localStorage.removeItem('reviewnote_point_adj');
+        } catch (e) {
+          console.error(e);
+        }
       }
     });
 
@@ -458,9 +466,7 @@ function App() {
           .maybeSingle();
         if (myProfile) {
           setMyNickname(myProfile.nickname || myProfile.display_name || '');
-          if (myProfile.equipped_title !== undefined) {
-            setEquippedItems(prev => ({ ...prev, title: myProfile.equipped_title || undefined }));
-          }
+          setEquippedItems({ title: myProfile.equipped_title || undefined });
           const bonus = myProfile.bonus_points || 0;
           setMyBonusPoints(bonus);
           if (bonus > 0) {
@@ -1115,6 +1121,14 @@ function App() {
     setSession(null);
     setMistakes([]);
     setProfilesMap({});
+    setEquippedItems({});
+    setMyNickname('');
+    try {
+      localStorage.removeItem('reviewnote_equipped_items');
+      localStorage.removeItem('reviewnote_point_adj');
+    } catch (e) {
+      console.error(e);
+    }
     setActiveTab('notes');
   };
 
