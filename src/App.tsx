@@ -1271,22 +1271,22 @@ function App() {
 
         {activeTab === 'notes' && (
           <>
-            {/* 명예의 전당 배너 (1등, 2등, 3등 3줄 세로 노출 + 칭호 & 풀네임 표시) */}
+            {/* 명예의 전당 배너 (컴팩트 고정 프레임) */}
             {weeklyChampions && weeklyChampions.length > 0 ? (
-              <div className="bg-gradient-to-b from-slate-900/95 via-slate-900/90 to-slate-900/95 border border-amber-500/30 rounded-2xl p-4 mb-4 shadow-[0_0_20px_rgba(245,158,11,0.1)] animate-fade-in space-y-3">
+              <div className="bg-gradient-to-b from-slate-900/95 via-slate-900/90 to-slate-900/95 border border-amber-500/30 rounded-2xl p-2.5 mb-3 shadow-[0_0_15px_rgba(245,158,11,0.08)] animate-fade-in space-y-2">
                 {/* 헤더 타이틀 */}
-                <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-xl animate-bounce">👑</span>
-                    <h3 className="text-xs font-black text-amber-400 uppercase tracking-wider">
-                      {weeklyChampions[0]?.isLastWeek ? '🏆 명예의 전당 (지난주 복습 MVP)' : '🏆 명예의 전당 (주간 복습 랭킹)'}
+                <div className="flex items-center justify-between border-b border-slate-800/80 pb-1.5">
+                  <div className="flex items-center space-x-1.5">
+                    <span className="text-sm">👑</span>
+                    <h3 className="text-[11px] font-black text-amber-400 uppercase tracking-wider">
+                      {weeklyChampions[0]?.isLastWeek ? '🏆 명예의 전당 (지난주 MVP)' : '🏆 명예의 전당 (주간 복습 랭킹)'}
                     </h3>
                   </div>
-                  <span className="text-[9px] text-slate-500 font-bold">매주 월요일 갱신</span>
+                  <span className="text-[8.5px] text-slate-500 font-bold">매주 월요일 갱신</span>
                 </div>
 
                 {/* 1등 / 2등 / 3등 3줄 세로 명예의 전당 리스트 */}
-                <div className="space-y-2">
+                <div className="space-y-1">
                   {[0, 1, 2].map((idx) => {
                     const champ = weeklyChampions[idx];
                     const isFirst = idx === 0;
@@ -1342,11 +1342,11 @@ function App() {
                     return (
                       <div
                         key={idx}
-                        className={`p-2.5 rounded-xl border flex items-center justify-between space-x-2 whitespace-nowrap overflow-x-auto no-scrollbar transition-all ${rowBg}`}
+                        className={`p-1.5 px-2.5 rounded-xl border flex items-center justify-between space-x-2 whitespace-nowrap overflow-x-auto no-scrollbar transition-all ${rowBg}`}
                       >
                         {/* Left: 메달 + 칭호 + 학생 이름 (단일 행 고정) */}
                         <div className="flex items-center space-x-1.5 flex-none min-w-0">
-                          <span className={`text-[9.5px] font-black px-1.5 py-0.5 rounded-full border flex-none ${medalStyle}`}>
+                          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full border flex-none ${medalStyle}`}>
                             {medal}
                           </span>
 
@@ -1354,19 +1354,19 @@ function App() {
                             <>
                               {/* 칭호 배지 */}
                               {activeTitle && titleBadge && (
-                                <span className={`text-[8.5px] font-black border px-1.5 py-0.2 rounded-full flex items-center space-x-0.5 flex-none ${titleBadge.style}`}>
+                                <span className={`text-[8px] font-black border px-1.5 py-0.2 rounded-full flex items-center space-x-0.5 flex-none ${titleBadge.style}`}>
                                   <span>{titleBadge.icon}</span>
                                   <span>{activeTitle}</span>
                                 </span>
                               )}
 
                               {/* 풀 네임 (단일 행 표출) */}
-                              <span className={`font-black flex-none ${isFirst ? 'text-white text-[11.5px]' : 'text-slate-200 text-[10.5px]'}`}>
+                              <span className={`font-black flex-none ${isFirst ? 'text-white text-[11px]' : 'text-slate-200 text-[10px]'}`}>
                                 {studentDisplayName}
                               </span>
                             </>
                           ) : (
-                            <span className="text-[10.5px] font-bold text-slate-600 italic flex-none">
+                            <span className="text-[10px] font-bold text-slate-600 italic flex-none">
                               도전 대기 중... 🐱
                             </span>
                           )}
@@ -1375,10 +1375,10 @@ function App() {
                         {/* Right: 완료 X개 + X점 (단일 행 표출) */}
                         {champ && champ.score > 0 && (
                           <div className="flex items-center space-x-1.5 flex-none text-right whitespace-nowrap pl-1">
-                            <span className="text-[9.5px] text-slate-400 font-medium">
+                            <span className="text-[9px] text-slate-400 font-medium">
                               완료 {champ.weekly_completed_count}개
                             </span>
-                            <span className={`font-black ${isFirst ? 'text-amber-400 text-[12px]' : 'text-slate-300 text-[11px]'}`}>
+                            <span className={`font-black ${isFirst ? 'text-amber-400 text-[11.5px]' : 'text-slate-300 text-[10.5px]'}`}>
                               {Math.round(champ.score)}점
                             </span>
                           </div>
