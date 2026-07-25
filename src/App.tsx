@@ -1162,6 +1162,34 @@ function App() {
                     const isMe = champ && (champ.username === currentUser || champ.user_id === currentUser);
                     const activeTitle = (isMe && equippedItems.title) ? equippedItems.title : (champ?.title || sampleTitles[idx]);
 
+                    // 칭호 희귀도별 화려한 이펙트 스타일 구분
+                    const getTitleBadgeStyle = (title: string) => {
+                      if (title.includes('수학의 신')) {
+                        return {
+                          style: 'bg-gradient-to-r from-amber-400 via-pink-500 to-purple-500 text-white border-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.5)] animate-pulse',
+                          icon: '👑'
+                        };
+                      }
+                      if (title.includes('킬러문항') || title.includes('포식자')) {
+                        return {
+                          style: 'bg-gradient-to-r from-amber-500/25 via-yellow-500/35 to-amber-500/25 text-amber-300 border-amber-400/60 shadow-[0_0_8px_rgba(251,191,36,0.35)]',
+                          icon: '⚔️'
+                        };
+                      }
+                      if (title.includes('계산') || title.includes('달인')) {
+                        return {
+                          style: 'bg-gradient-to-r from-purple-500/25 to-indigo-500/25 text-purple-300 border-purple-400/50 shadow-[0_0_6px_rgba(168,85,247,0.25)]',
+                          icon: '🔮'
+                        };
+                      }
+                      return {
+                        style: 'bg-slate-800/90 text-sky-300 border-slate-700',
+                        icon: '🦉'
+                      };
+                    };
+
+                    const titleBadge = activeTitle ? getTitleBadgeStyle(activeTitle) : null;
+
                     const studentDisplayName = champ
                       ? (champ.display_name ? `${champ.display_name} 학생` : `${maskId(champ.username)} 학생`)
                       : null;
@@ -1179,16 +1207,16 @@ function App() {
 
                           {champ && champ.score > 0 ? (
                             <>
-                              {/* 칭호 장착 시 이름 앞에 배지 표시 */}
-                              {activeTitle && (
-                                <span className="text-[9px] font-black text-amber-300 bg-gradient-to-r from-amber-500/20 to-purple-500/20 border border-amber-500/40 px-2 py-0.5 rounded-full flex items-center space-x-1">
-                                  <span>👑</span>
+                              {/* 칭호 장착 시 희귀도별 커스텀 배지 표시 */}
+                              {activeTitle && titleBadge && (
+                                <span className={`text-[9px] font-black border px-2 py-0.5 rounded-full flex items-center space-x-1 ${titleBadge.style}`}>
+                                  <span>{titleBadge.icon}</span>
                                   <span>{activeTitle}</span>
                                 </span>
                               )}
 
-                              {/* 풀 네임 표시 (잘림 없음) */}
-                              <span className={`font-black ${isFirst ? 'text-white text-sm' : 'text-slate-200 text-xs'}`}>
+                              {/* 풀 네임 (폰트 슬림화하여 긴 이름도 다 나옴) */}
+                              <span className={`font-black ${isFirst ? 'text-white text-[12.5px]' : 'text-slate-200 text-[11px]'}`}>
                                 {studentDisplayName}
                               </span>
 
