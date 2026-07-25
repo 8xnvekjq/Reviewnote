@@ -1157,10 +1157,8 @@ function App() {
                       ? 'bg-gradient-to-r from-amber-500/10 via-slate-900 to-slate-900 border-amber-500/40 shadow-md'
                       : 'bg-slate-955/70 border-slate-850';
 
-                    // 샘플 칭호 또는 장착 칭호
-                    const sampleTitles = ['수학의 신', '킬러문항 포식자', '계산의 달인'];
                     const isMe = champ && (champ.username === currentUser || champ.user_id === currentUser);
-                    const activeTitle = (isMe && equippedItems.title) ? equippedItems.title : (champ?.title || sampleTitles[idx]);
+                    const activeTitle = (isMe && equippedItems.title) ? equippedItems.title : (champ?.title || undefined);
 
                     // 칭호 희귀도별 화려한 이펙트 스타일 구분
                     const getTitleBadgeStyle = (title: string) => {
