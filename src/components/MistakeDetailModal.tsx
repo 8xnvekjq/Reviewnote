@@ -713,9 +713,15 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                               /* 완료 상태: 큼직한 결과 스탬프 배지 및 아래 날짜 노출 */
                               <div className="animate-scale-up flex flex-col items-center">
                                 {state === 'O' && (
-                                  <span className="w-9 h-9 rounded-full bg-emerald-500 text-slate-950 font-black text-sm flex items-center justify-center shadow-lg shadow-emerald-500/10">
-                                    {equippedStamp || 'O'}
-                                  </span>
+                                  equippedStamp ? (
+                                    <span className="w-9 h-9 flex items-center justify-center text-[26px] drop-shadow-[0_2px_8px_rgba(245,158,11,0.25)] animate-scale-up">
+                                      {equippedStamp}
+                                    </span>
+                                  ) : (
+                                    <span className="w-9 h-9 rounded-full bg-emerald-500 text-slate-950 font-black text-sm flex items-center justify-center shadow-lg shadow-emerald-500/10">
+                                      O
+                                    </span>
+                                  )
                                 )}
                                 {state === 'X' && (
                                   <span className="w-9 h-9 rounded-full bg-red-500 text-white font-black text-sm flex items-center justify-center shadow-lg shadow-red-500/10">

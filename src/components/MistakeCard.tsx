@@ -119,7 +119,9 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
               let badgeStyle = "bg-slate-800 text-slate-600 border-slate-700/40";
               let symbol = idx + 1;
               if (state === 'O') {
-                badgeStyle = "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-extrabold";
+                badgeStyle = equippedStamp
+                  ? "bg-transparent border-transparent text-[11.5px] font-black flex items-center justify-center"
+                  : "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-extrabold";
               } else if (state === 'X') {
                 badgeStyle = "bg-red-500/15 text-red-400 border-red-500/30 font-extrabold";
               } else if (state === 'star') {
