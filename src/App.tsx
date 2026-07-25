@@ -56,6 +56,8 @@ function App() {
   const [statsExpandedGrades, setStatsExpandedGrades] = useState<Record<string, boolean>>({});
   // userId -> schoolGrade map (AI 학년별 분류 최적화용)
   const [profilesGradeMap, setProfilesGradeMap] = useState<Record<string, string>>({});
+  // userId -> equippedStamp map (유저별 레어 도장 표출용)
+  const [profilesStampMap, setProfilesStampMap] = useState<Record<string, string>>({});
   // Supabase system_config 테이블에서 로드한 Gemini API Key 상태 (무료키는 레이트리밋 문제로 배제하고 유료키만 사용)
   const [paidGeminiKey, setPaidGeminiKey] = useState<string>('');
   // AI 진단 평균 소요시간(ms) — diagnosis_stats 테이블의 전역 누적치 기반, 오답 카드 삭제와 무관하게 유지됨
@@ -492,21 +494,26 @@ function App() {
         checkNameChangeTicket(targetId);
       }
 
-      // Fetch all profiles for admin name mapping (display_name, school_grade 포함)
+      // Fetch all profiles for admin name mapping (display_name, school_grade, equipped_stamp 포함)
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('id, email, display_name, school_grade');
+        .select('id, email, display_name, school_grade, equipped_stamp');
 
       const pMap: Record<string, string> = {};
       const gMap: Record<string, string> = {};
+      const sMap: Record<string, string> = {};
       (profiles || []).forEach((p: any) => {
         const username = p.email?.split('@')[0] || p.id.slice(0, 8);
         const displayName = p.display_name?.trim();
         pMap[p.id] = displayName ? `${displayName} (${username})` : username;
         gMap[p.id] = p.school_grade || '';
+        if (p.equipped_stamp) {
+          sMap[p.id] = p.equipped_stamp;
+        }
       });
       setProfilesMap(pMap);
       setProfilesGradeMap(gMap);
+      setProfilesStampMap(sMap);
 
       const mappedMistakes: MistakeEntry[] = (dbMistakes || []).map((m: any) => ({
         id: m.id,
@@ -1456,6 +1463,7 @@ function App() {
             profilesMap={profilesMap}
             currentUserId={session?.user?.id}
             equippedStamp={equippedItems.stamp}
+            profilesStampMap={profilesStampMap}
           />
           </>
         )}
@@ -1494,6 +1502,7 @@ function App() {
             onTogglePrintSelect={handleTogglePrintSelect}
             onToggleAllPrintSelect={handleToggleAllPrintSelect}
             equippedStamp={equippedItems.stamp}
+            profilesStampMap={profilesStampMap}
           />
         )}
 
@@ -1741,6 +1750,7 @@ function App() {
             setSelectedEntry(updated);
           }}
           equippedStamp={equippedItems.stamp}
+          profilesStampMap={profilesStampMap}
         />
       )}
 

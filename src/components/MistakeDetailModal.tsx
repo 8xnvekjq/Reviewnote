@@ -20,6 +20,7 @@ interface MistakeDetailModalProps {
   onSelectEntry?: (entry: MistakeEntry | null) => void;
   isReviewSession?: boolean;
   equippedStamp?: string;
+  profilesStampMap?: Record<string, string>;
 }
 
 const INITIAL_PHRASES = [
@@ -42,7 +43,9 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   onSelectEntry,
   isReviewSession = false,
   equippedStamp,
+  profilesStampMap = {},
 }) => {
+  const authorStamp = selectedEntry.userId ? (profilesStampMap[selectedEntry.userId] || equippedStamp) : equippedStamp;
   const [loadingText, setLoadingText] = React.useState('수학 문제 분석을 시작합니다...');
   const [progress, setProgress] = React.useState(0);
   const [elapsedMs, setElapsedMs] = React.useState(0);
@@ -713,9 +716,9 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                               /* 완료 상태: 큼직한 결과 스탬프 배지 및 아래 날짜 노출 */
                               <div className="animate-scale-up flex flex-col items-center">
                                 {state === 'O' && (
-                                  equippedStamp ? (
+                                  authorStamp ? (
                                     <span className="w-9 h-9 flex items-center justify-center text-[26px] drop-shadow-[0_2px_8px_rgba(245,158,11,0.25)] animate-scale-up">
-                                      {equippedStamp}
+                                      {authorStamp}
                                     </span>
                                   ) : (
                                     <span className="w-9 h-9 rounded-full bg-emerald-500 text-slate-950 font-black text-sm flex items-center justify-center shadow-lg shadow-emerald-500/10">
