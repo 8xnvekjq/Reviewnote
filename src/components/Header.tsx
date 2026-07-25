@@ -24,16 +24,19 @@ const formatBuildTime = (iso: string): string => {
 
 interface HeaderProps {
   currentUser: string;
+  nickname?: string;
   onLogout: () => void;
+  onUpdateNickname?: (newNickname: string) => Promise<void>;
   myScore?: number;
   onOpenStore?: () => void;
   equippedTitle?: string;
   streakDays?: number;
 }
 
-export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, myScore, onOpenStore, equippedTitle, streakDays }) => {
+export const Header: React.FC<HeaderProps> = ({ currentUser, nickname, onLogout, onUpdateNickname, myScore, onOpenStore, equippedTitle, streakDays }) => {
   const [showUserMenu, setShowUserMenu] = React.useState(false);
   const buildLabel = `v${__APP_VERSION__} (${formatBuildTime(__BUILD_TIME__)})`;
+  const displayName = nickname || currentUser;
 
   return (
     <header className="safe-top flex-none border-b border-slate-800 bg-slate-900/90 backdrop-blur-md px-4 py-3 flex items-center justify-between sticky top-0 z-30">
@@ -82,15 +85,15 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, myScore, 
           </span>
         )}
 
-        {/* 내 아이디 클릭 시 펼쳐지는 우측 상단 유저 드롭다운 메뉴 (로그아웃 포함) */}
+        {/* 내 아이디/닉네임 클릭 시 펼쳐지는 우측 상단 유저 드롭다운 메뉴 (닉네임 변경 및 로그아웃 포함) */}
         <div className="relative">
           <button 
             onClick={() => setShowUserMenu(!showUserMenu)}
-            className="text-[10px] text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-750 px-2.5 py-1 rounded-full border border-slate-700 font-bold max-w-[110px] truncate flex items-center space-x-1 transition-all"
+            className="text-[10px] text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-750 px-2.5 py-1 rounded-full border border-slate-700 font-bold max-w-[120px] truncate flex items-center space-x-1 transition-all"
             title="내 계정 메뉴"
           >
             <span>👤</span>
-            <span className="truncate">{currentUser}</span>
+            <span className="truncate">{displayName}</span>
             <span className="text-[8px] text-slate-500 ml-0.5">▼</span>
           </button>
 
@@ -102,13 +105,31 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, myScore, 
                 onClick={() => setShowUserMenu(false)} 
               />
 
-              {/* 우측 상단 로그아웃 팝업 드롭다운 */}
-              <div className="absolute right-0 mt-1.5 w-36 bg-slate-900/95 border border-slate-800 rounded-xl p-2 shadow-2xl z-50 backdrop-blur-md animate-fade-in space-y-1.5">
+              {/* 우측 상단 팝업 드롭다운 */}
+              <div className="absolute right-0 mt-1.5 w-40 bg-slate-900/95 border border-slate-800 rounded-xl p-2 shadow-2xl z-50 backdrop-blur-md animate-fade-in space-y-1.5">
                 <div className="px-2 py-1 border-b border-slate-800">
-                  <p className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">접속 아이디</p>
-                  <p className="text-[10.5px] font-black text-slate-200 truncate">{currentUser}</p>
+                  <p className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">접속 닉네임</p>
+                  <p className="text-[10.5px] font-black text-slate-200 truncate">{displayName}</p>
                 </div>
 
+                {/* 닉네임 변경 버튼 (로그아웃 바로 위) */}
+                {onUpdateNickname && (
+                  <button 
+                    onClick={async () => {
+                      const input = prompt("새로운 닉네임을 입력하세요 (실제 이름은 변경되지 않습니다):", displayName);
+                      if (input !== null && input.trim()) {
+                        await onUpdateNickname(input.trim());
+                        setShowUserMenu(false);
+                      }
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg bg-indigo-950/30 hover:bg-indigo-900/40 text-indigo-300 hover:text-indigo-200 text-[10.5px] font-bold flex items-center space-x-1.5 transition-colors border border-indigo-900/30"
+                  >
+                    <span>✏️</span>
+                    <span>닉네임 변경</span>
+                  </button>
+                )}
+
+                {/* 로그아웃 버튼 */}
                 <button 
                   onClick={() => {
                     setShowUserMenu(false);

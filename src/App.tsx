@@ -36,6 +36,8 @@ function App() {
 
   // 매일 연속 복습 스트릭 상태 (🔥 Streak 관리)
   const [streakState, setStreakState] = useState<StreakState>(() => loadStreakState());
+  // 학생 커스텀 닉네임 상태 (실제 이름 display_name 과 보존 분리)
+  const [myNickname, setMyNickname] = useState<string>('');
   // userId -> displayName map (admin 전용)
   const [profilesMap, setProfilesMap] = useState<Record<string, string>>({});
   // 유튜브 매칭용 강의 마스터 리스트 상태
@@ -421,6 +423,18 @@ function App() {
 
       if (mistakesError) throw mistakesError;
 
+      // 로그인 유저의 닉네임 로드
+      if (session?.user?.id) {
+        const { data: myProfile } = await supabase
+          .from('profiles')
+          .select('nickname, display_name')
+          .eq('id', session.user.id)
+          .maybeSingle();
+        if (myProfile) {
+          setMyNickname(myProfile.nickname || myProfile.display_name || '');
+        }
+      }
+
       // Fetch all profiles for admin name mapping (display_name, school_grade 포함)
       const { data: profiles } = await supabase
         .from('profiles')
@@ -454,6 +468,26 @@ function App() {
       setMistakes(mappedMistakes);
     } catch (err) {
       console.error('Error loading Supabase user data:', err);
+    }
+  };
+  // 내 닉네임 수정 함수 (실제 이름 display_name은 변경되지 않고 nickname 컬럼만 업데이트)
+  const handleUpdateNickname = async (newNick: string) => {
+    if (!session?.user?.id) return;
+    const trimmed = newNick.trim();
+    if (!trimmed) return;
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ nickname: trimmed, updated_at: new Date().toISOString() })
+        .eq('id', session.user.id);
+
+      if (error) throw error;
+      setMyNickname(trimmed);
+      loadWeeklyChampions(); // 명예의 전당 배너 실시간 갱신
+      alert(`✅ 닉네임이 '${trimmed}'(으)로 성공적으로 변경되었습니다!\n(어드민 대시보드에는 원래 이름이 그대로 안전하게 유지됩니다)`);
+    } catch (err: any) {
+      alert(`닉네임 변경에 실패했습니다: ${err.message}`);
     }
   };
 
@@ -1127,7 +1161,9 @@ function App() {
       {/* Top Header */}
       <Header 
         currentUser={currentUser} 
+        nickname={myNickname}
         onLogout={handleLogout} 
+        onUpdateNickname={handleUpdateNickname}
         myScore={currentDisplayPoints} 
         onOpenStore={() => setActiveTab('store')}
         equippedTitle={equippedItems.title}
@@ -1210,8 +1246,9 @@ function App() {
 
                     const titleBadge = activeTitle ? getTitleBadgeStyle(activeTitle) : null;
 
+                    const nameToDisplay = champ?.nickname || champ?.display_name;
                     const studentDisplayName = champ
-                      ? (champ.display_name ? `${champ.display_name} 학생` : `${maskId(champ.username)} 학생`)
+                      ? (nameToDisplay ? `${nameToDisplay} 학생` : `${maskId(champ.username)} 학생`)
                       : null;
 
                     return (
