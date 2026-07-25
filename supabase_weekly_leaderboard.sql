@@ -3,22 +3,26 @@
 -- 이 SQL 구문을 Supabase 대시보드의 SQL Editor에 복사하여 실행(Run)해 주세요.
 -- ================================================
 
--- 1. 이번주 리더보드 뷰
+-- 1. 이번주 리더보드 뷰 (타임존 비교 KST 정확 적용, 점수 공식 원본 유지)
 DROP VIEW IF EXISTS public.weekly_leaderboard;
 
-CREATE OR REPLACE VIEW public.weekly_leaderboard AS
-WITH m_total AS (
+CREATE VIEW public.weekly_leaderboard AS
+WITH week_start AS (
+  -- KST 월요일 00:00:00을 UTC timestamptz로 변환하여 정확한 비교
+  SELECT timezone('Asia/Seoul', date_trunc('week', timezone('Asia/Seoul', now()))) as ts
+),
+m_total AS (
   -- 이번주(한국시간 월요일 00:00:00 기준) 등록된 신규 오답 총합
   SELECT user_id, count(*) as count 
-  FROM public.mistakes 
-  WHERE date >= date_trunc('week', timezone('Asia/Seoul', now()))
+  FROM public.mistakes, week_start
+  WHERE date >= week_start.ts
   GROUP BY user_id
 ),
 m_completed AS (
   -- 이번주에 복습이 완전히 완료(reviews O 3개)된 오답 수 (이전 등록 오답의 이번주 완료건 포함)
   SELECT user_id, count(*) as count 
-  FROM public.mistakes 
-  WHERE updated_at >= date_trunc('week', timezone('Asia/Seoul', now()))
+  FROM public.mistakes, week_start
+  WHERE updated_at >= week_start.ts
     AND (reviews->>0 = 'O' AND reviews->>1 = 'O' AND reviews->>2 = 'O')
   GROUP BY user_id
 )
@@ -26,6 +30,7 @@ SELECT
   p.id as user_id,
   split_part(p.email, '@', 1) as username,
   p.display_name,
+  COALESCE(p.nickname, p.display_name) as nickname,
   COALESCE(t.count, 0) as weekly_total_count,
   COALESCE(c.count, 0) as weekly_completed_count,
   CASE 
@@ -47,24 +52,30 @@ WHERE (p.is_admin IS NOT TRUE)
   AND (COALESCE(p.email, '') NOT LIKE 'test%')
   AND (COALESCE(t.count, 0) > 0 OR COALESCE(c.count, 0) > 0);
 
--- 2. 지난주 리더보드 뷰 (RLS 우회 조회용)
+-- 2. 지난주 리더보드 뷰 (타임존 비교 KST 정확 적용, 점수 공식 원본 유지)
 DROP VIEW IF EXISTS public.last_weekly_leaderboard;
 
-CREATE OR REPLACE VIEW public.last_weekly_leaderboard AS
-WITH m_total AS (
+CREATE VIEW public.last_weekly_leaderboard AS
+WITH week_start AS (
+  SELECT timezone('Asia/Seoul', date_trunc('week', timezone('Asia/Seoul', now()))) as ts
+),
+last_week_start AS (
+  SELECT timezone('Asia/Seoul', date_trunc('week', timezone('Asia/Seoul', now())) - interval '1 week') as ts
+),
+m_total AS (
   -- 지난주(한국시간 지난주 월요일 ~ 이번주 월요일 KST) 등록된 신규 오답 총합
   SELECT user_id, count(*) as count 
-  FROM public.mistakes 
-  WHERE date >= date_trunc('week', timezone('Asia/Seoul', now())) - interval '1 week'
-    AND date < date_trunc('week', timezone('Asia/Seoul', now()))
+  FROM public.mistakes, last_week_start, week_start
+  WHERE date >= last_week_start.ts
+    AND date < week_start.ts
   GROUP BY user_id
 ),
 m_completed AS (
   -- 지난주에 복습이 완전히 완료(reviews O 3개)된 오답 수
   SELECT user_id, count(*) as count 
-  FROM public.mistakes 
-  WHERE updated_at >= date_trunc('week', timezone('Asia/Seoul', now())) - interval '1 week'
-    AND updated_at < date_trunc('week', timezone('Asia/Seoul', now()))
+  FROM public.mistakes, last_week_start, week_start
+  WHERE updated_at >= last_week_start.ts
+    AND updated_at < week_start.ts
     AND (reviews->>0 = 'O' AND reviews->>1 = 'O' AND reviews->>2 = 'O')
   GROUP BY user_id
 )
@@ -72,6 +83,7 @@ SELECT
   p.id as user_id,
   split_part(p.email, '@', 1) as username,
   p.display_name,
+  COALESCE(p.nickname, p.display_name) as nickname,
   COALESCE(t.count, 0) as weekly_total_count,
   COALESCE(c.count, 0) as weekly_completed_count,
   CASE 
