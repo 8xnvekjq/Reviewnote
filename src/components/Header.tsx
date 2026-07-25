@@ -32,10 +32,11 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, myScore, onOpenStore, equippedTitle, streakDays }) => {
+  const [showUserMenu, setShowUserMenu] = React.useState(false);
   const buildLabel = `v${__APP_VERSION__} (${formatBuildTime(__BUILD_TIME__)})`;
 
   return (
-    <header className="safe-top flex-none border-b border-slate-800 bg-slate-900/90 backdrop-blur-md px-6 py-4 flex items-center justify-between sticky top-0 z-30">
+    <header className="safe-top flex-none border-b border-slate-800 bg-slate-900/90 backdrop-blur-md px-4 py-3 flex items-center justify-between sticky top-0 z-30">
       <div className="flex items-center space-x-2.5 min-w-0 flex-1 mr-2">
         <img 
           src={logoImg} 
@@ -51,14 +52,16 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, myScore, 
           </span>
         </div>
       </div>
+
       <div className="flex items-center space-x-2 flex-none min-w-0 whitespace-nowrap">
-        {/* 연속 복습 일수 (🔥 Streak 배지) */}
+        {/* 연속 복습 일수 (🔥 Streak 배지 - 깜빡임 제거) */}
         {streakDays !== undefined && streakDays > 0 && (
-          <span className="text-[9.5px] text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-full border border-orange-500/30 font-black flex items-center space-x-0.5 flex-none animate-pulse">
+          <span className="text-[9.5px] text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-full border border-orange-500/30 font-black flex items-center space-x-0.5 flex-none">
             <span>🔥</span>
             <span>{streakDays}일 연속</span>
           </span>
         )}
+
         {/* 내 주간 점수 미니 배지 (클릭 시 럭키상점으로 이동) */}
         {myScore !== undefined && (
           <button 
@@ -71,20 +74,55 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, myScore, 
             <span className="text-[8px] bg-amber-400 text-slate-950 px-1 rounded-full ml-0.5 font-bold">🎁</span>
           </button>
         )}
+
+        {/* 칭호 배지 */}
         {equippedTitle && (
           <span className="text-[9px] text-amber-300 bg-gradient-to-r from-amber-500/20 to-purple-500/20 px-2 py-0.5 rounded-full border border-amber-500/40 font-black truncate max-w-[90px] flex-none">
             👑 {equippedTitle}
           </span>
         )}
-        <span className="text-[10px] text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded-full border border-slate-700 font-bold max-w-[100px] truncate flex-none">
-          👤 {currentUser}
-        </span>
-        <button 
-          onClick={onLogout}
-          className="text-[10px] text-red-400 hover:text-red-300 font-bold bg-red-950/20 px-2.5 py-0.5 rounded-full border border-red-900/30 transition-colors flex-none"
-        >
-          로그아웃
-        </button>
+
+        {/* 내 아이디 클릭 시 펼쳐지는 우측 상단 유저 드롭다운 메뉴 (로그아웃 포함) */}
+        <div className="relative">
+          <button 
+            onClick={() => setShowUserMenu(!showUserMenu)}
+            className="text-[10px] text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-750 px-2.5 py-1 rounded-full border border-slate-700 font-bold max-w-[110px] truncate flex items-center space-x-1 transition-all"
+            title="내 계정 메뉴"
+          >
+            <span>👤</span>
+            <span className="truncate">{currentUser}</span>
+            <span className="text-[8px] text-slate-500 ml-0.5">▼</span>
+          </button>
+
+          {showUserMenu && (
+            <>
+              {/* 드롭다운 바깥 클릭 시 닫기 오버레이 */}
+              <div 
+                className="fixed inset-0 z-40" 
+                onClick={() => setShowUserMenu(false)} 
+              />
+
+              {/* 우측 상단 로그아웃 팝업 드롭다운 */}
+              <div className="absolute right-0 mt-1.5 w-36 bg-slate-900/95 border border-slate-800 rounded-xl p-2 shadow-2xl z-50 backdrop-blur-md animate-fade-in space-y-1.5">
+                <div className="px-2 py-1 border-b border-slate-800">
+                  <p className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">접속 아이디</p>
+                  <p className="text-[10.5px] font-black text-slate-200 truncate">{currentUser}</p>
+                </div>
+
+                <button 
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    onLogout();
+                  }}
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg bg-red-950/30 hover:bg-red-900/40 text-red-400 hover:text-red-300 text-[10.5px] font-bold flex items-center space-x-1.5 transition-colors border border-red-900/30"
+                >
+                  <span>🚪</span>
+                  <span>로그아웃</span>
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </header>
   );
