@@ -118,8 +118,11 @@ function App() {
     });
   };
 
-  // 현재 표시 가능한 복습 콤보 보유 점수 (DB 뷰 점수 + 상점 사용 포인트 차감치)
-  const currentDisplayPoints = Math.max(0, (myWeeklyScoreFromDB || 0) + pointAdjustment);
+  // DB 지정 보너스 점수 (어드민 또는 이벤트 적립)
+  const [myBonusPoints, setMyBonusPoints] = useState<number>(0);
+
+  // 현재 표시 가능한 복습 콤보 보유 점수 (DB 뷰 점수 + DB 보너스 점수 + 상점 사용 포인트 차감치)
+  const currentDisplayPoints = Math.max(0, (myWeeklyScoreFromDB || 0) + (myBonusPoints || 0) + pointAdjustment);
   
   const prevTabRef = useRef(activeTab);
 
@@ -434,15 +437,16 @@ function App() {
 
       if (mistakesError) throw mistakesError;
 
-      // 로그인 유저의 닉네임 로드
+      // 로그인 유저의 닉네임 및 보너스 점수 로드
       if (session?.user?.id) {
         const { data: myProfile } = await supabase
           .from('profiles')
-          .select('nickname, display_name')
+          .select('nickname, display_name, bonus_points')
           .eq('id', session.user.id)
           .maybeSingle();
         if (myProfile) {
           setMyNickname(myProfile.nickname || myProfile.display_name || '');
+          setMyBonusPoints(myProfile.bonus_points || 0);
         }
         // 닉네임 변경권 보유 여부 확인 (Header에 버튼 노출 제어)
         checkNameChangeTicket();
