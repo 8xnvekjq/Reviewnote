@@ -3,6 +3,21 @@ import type { GachaItem, EquippedItems } from '../types';
 import { GACHA_ITEMS, drawGachaItem } from '../utils/gachaCatalog';
 import { supabase } from '../services/supabase';
 
+export interface ExtendedGachaItem extends GachaItem {
+  isDuplicate?: boolean;
+  refundPoints?: number;
+}
+
+const getRefundPointsForRarity = (rarity: string): number => {
+  switch (rarity) {
+    case 'UR': return 50;
+    case 'SSR': return 30;
+    case 'SR': return 15;
+    case 'R': return 5;
+    default: return 5;
+  }
+};
+
 interface GachaStoreProps {
   userId: string;
   userPoints: number;
@@ -29,7 +44,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
   // 뽑기 연출 관련 상태
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawStep, setDrawStep] = useState<'idle' | 'shaking' | 'opening' | 'result'>('idle');
-  const [drawnItemsResult, setDrawnItemsResult] = useState<GachaItem[]>([]);
+  const [drawnItemsResult, setDrawnItemsResult] = useState<ExtendedGachaItem[]>([]);
   const [currentResultIndex, setCurrentResultIndex] = useState(0);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -177,13 +192,45 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
       setDrawStep('opening');
 
       setTimeout(() => {
-        const drawnResults: GachaItem[] = [];
+        const drawnResults: ExtendedGachaItem[] = [];
+        let totalRefundPoints = 0;
+        const currentInventory = { ...inventory };
+
         for (let i = 0; i < count; i++) {
-          drawnResults.push(drawGachaItem());
+          const item = drawGachaItem();
+          const isConsumable = item.category === 'SHIELD' || item.category === 'CHARM';
+          const alreadyOwned = (currentInventory[item.id] || 0) > 0;
+
+          if (!isConsumable && alreadyOwned) {
+            // 영구 아이템 중복! 희귀도별 점수 환급 (페이백)
+            const refund = getRefundPointsForRarity(item.rarity);
+            totalRefundPoints += refund;
+            drawnResults.push({
+              ...item,
+              isDuplicate: true,
+              refundPoints: refund,
+            });
+          } else {
+            // 신규 아이템이거나 소모품 -> 인벤토리에 추가
+            currentInventory[item.id] = (currentInventory[item.id] || 0) + 1;
+            drawnResults.push({
+              ...item,
+              isDuplicate: false,
+            });
+          }
         }
 
-        // Supabase에 저장
-        addItemsToInventory(drawnResults);
+        // 신규/소모품만 Supabase user_items 에 저장
+        const itemsToSave = drawnResults.filter(r => !r.isDuplicate);
+        if (itemsToSave.length > 0) {
+          addItemsToInventory(itemsToSave);
+        }
+
+        // 중복 환급 점수가 있으면 유저 보유 점수로 가산 (음수 차감 = 점수 플러스)
+        if (totalRefundPoints > 0) {
+          onDeductPoints(-totalRefundPoints);
+        }
+
         setDrawnItemsResult(drawnResults);
         setDrawStep('result');
 
@@ -537,9 +584,16 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                     {drawnItemsResult[currentResultIndex].icon}
                   </span>
 
-                  <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full text-white bg-gradient-to-r ${drawnItemsResult[currentResultIndex].color}`}>
-                    {drawnItemsResult[currentResultIndex].rarity} 등급
-                  </span>
+                  <div className="flex items-center space-x-1.5 justify-center flex-wrap gap-y-1 relative z-10">
+                    <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full text-white bg-gradient-to-r ${drawnItemsResult[currentResultIndex].color}`}>
+                      {drawnItemsResult[currentResultIndex].rarity} 등급
+                    </span>
+                    {drawnItemsResult[currentResultIndex].isDuplicate && (
+                      <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full text-amber-300 bg-amber-500/20 border border-amber-400/50 shadow-[0_0_8px_rgba(245,158,11,0.35)] animate-pulse">
+                        ⚡ 중복 보물 페이백 (+{drawnItemsResult[currentResultIndex].refundPoints}점 환급)
+                      </span>
+                    )}
+                  </div>
 
                   <h4 className="text-base font-black text-white relative z-10">
                     {drawnItemsResult[currentResultIndex].name}
