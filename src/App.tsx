@@ -102,15 +102,22 @@ function App() {
       } catch (e) {
         console.error(e);
       }
-      // DB와 칭호 장착 상태 실시간 동기화 (명예의 전당 및 어드민 표출용)
-      if (category === 'title' && session?.user?.id) {
-        supabase
-          .from('profiles')
-          .update({ equipped_title: value || null })
-          .eq('id', session.user.id)
-          .then(() => {
-            loadWeeklyChampions();
-          });
+      // DB와 칭호/스탬프 장착 상태 실시간 동기화 (명예의 전당 및 오답노트 표출용)
+      if (session?.user?.id) {
+        if (category === 'title') {
+          supabase
+            .from('profiles')
+            .update({ equipped_title: value || null })
+            .eq('id', session.user.id)
+            .then(() => {
+              loadWeeklyChampions();
+            });
+        } else if (category === 'stamp') {
+          supabase
+            .from('profiles')
+            .update({ equipped_stamp: value || null })
+            .eq('id', session.user.id);
+        }
       }
       return updated;
     });
@@ -461,12 +468,15 @@ function App() {
       if (targetId) {
         const { data: myProfile } = await supabase
           .from('profiles')
-          .select('nickname, display_name, bonus_points, equipped_title')
+          .select('nickname, display_name, bonus_points, equipped_title, equipped_stamp')
           .eq('id', targetId)
           .maybeSingle();
         if (myProfile) {
           setMyNickname(myProfile.nickname || myProfile.display_name || '');
-          setEquippedItems({ title: myProfile.equipped_title || undefined });
+          setEquippedItems({
+            title: myProfile.equipped_title || undefined,
+            stamp: myProfile.equipped_stamp || undefined,
+          });
           const bonus = myProfile.bonus_points || 0;
           setMyBonusPoints(bonus);
           if (bonus > 0) {
@@ -1445,6 +1455,7 @@ function App() {
             isAdmin={isAdmin}
             profilesMap={profilesMap}
             currentUserId={session?.user?.id}
+            equippedStamp={equippedItems.stamp}
           />
           </>
         )}
@@ -1482,6 +1493,7 @@ function App() {
             selectedPrintIds={selectedPrintIds}
             onTogglePrintSelect={handleTogglePrintSelect}
             onToggleAllPrintSelect={handleToggleAllPrintSelect}
+            equippedStamp={equippedItems.stamp}
           />
         )}
 
@@ -1728,6 +1740,7 @@ function App() {
             setMistakes(prev => prev.map(m => m.id === updated.id ? updated : m));
             setSelectedEntry(updated);
           }}
+          equippedStamp={equippedItems.stamp}
         />
       )}
 

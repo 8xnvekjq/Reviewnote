@@ -19,6 +19,7 @@ interface MistakeDetailModalProps {
   onUpdateEntry: (updated: MistakeEntry) => void;
   onSelectEntry?: (entry: MistakeEntry | null) => void;
   isReviewSession?: boolean;
+  equippedStamp?: string;
 }
 
 const INITIAL_PHRASES = [
@@ -40,6 +41,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   onUpdateEntry,
   onSelectEntry,
   isReviewSession = false,
+  equippedStamp,
 }) => {
   const [loadingText, setLoadingText] = React.useState('수학 문제 분석을 시작합니다...');
   const [progress, setProgress] = React.useState(0);
@@ -712,7 +714,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                               <div className="animate-scale-up flex flex-col items-center">
                                 {state === 'O' && (
                                   <span className="w-9 h-9 rounded-full bg-emerald-500 text-slate-950 font-black text-sm flex items-center justify-center shadow-lg shadow-emerald-500/10">
-                                    O
+                                    {equippedStamp || 'O'}
                                   </span>
                                 )}
                                 {state === 'X' && (

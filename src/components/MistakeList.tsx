@@ -23,6 +23,7 @@ interface MistakeListProps {
   selectedPrintIds?: string[];
   onTogglePrintSelect?: (id: string) => void;
   onToggleAllPrintSelect?: () => void;
+  equippedStamp?: string;
 }
 
 export const MistakeList: React.FC<MistakeListProps> = ({
@@ -44,6 +45,7 @@ export const MistakeList: React.FC<MistakeListProps> = ({
   selectedPrintIds = [],
   onTogglePrintSelect,
   onToggleAllPrintSelect,
+  equippedStamp,
 }) => {
   const [selectedStudent, setSelectedStudent] = useState<string>('all');
   const [filterGrade, setFilterGrade] = useState<string>('all');
@@ -457,6 +459,7 @@ export const MistakeList: React.FC<MistakeListProps> = ({
                   onDelete={onDeleteMistake}
                   studentName={isAdmin && entry.userId ? (profilesMap[entry.userId] || entry.userId.slice(0, 8)) : undefined}
                   isOwnNote={!isAdmin || entry.userId === currentUserId}
+                  equippedStamp={equippedStamp}
                 />
               ))}
             </div>

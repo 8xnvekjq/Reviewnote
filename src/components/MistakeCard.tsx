@@ -10,9 +10,10 @@ interface MistakeCardProps {
   onDelete: (id: string, e: React.MouseEvent) => void;
   studentName?: string;   // admin 전용: 학생 이름/아이디
   isOwnNote?: boolean;    // 내 오답 여부 (admin이 타인 오답 볼 때 false)
+  equippedStamp?: string; // 학생이 장착한 레어 도장 (예: 🔥, ⭐, 👑, 🐾, 💎)
 }
 
-export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDelete, studentName, isOwnNote = true }) => {
+export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDelete, studentName, isOwnNote = true, equippedStamp }) => {
   const struggleCount = entry.reviews ? entry.reviews.filter(r => r === 'X' || r === 'star').length : 0;
   const isCompleted = entry.reviews && entry.reviews.filter(r => r === 'O').length === 3;
 
@@ -129,7 +130,7 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
                   key={idx}
                   className={`w-[17px] h-[17px] rounded-full border text-[9px] flex items-center justify-center transition-all ${badgeStyle}`}
                 >
-                  {state === 'star' ? '★' : (state || symbol)}
+                  {state === 'star' ? '★' : (state === 'O' ? (equippedStamp || 'O') : (state || symbol))}
                 </span>
               );
             })}
