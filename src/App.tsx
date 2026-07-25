@@ -297,7 +297,7 @@ function App() {
       if (session?.user) {
         const username = session.user.email?.split('@')[0] || 'User';
         setCurrentUser(username);
-        fetchUserData();
+        fetchUserData(session.user.id);
         fetchAdminStatus(session.user.id);
         loadYoutubeLectures(); // 유튜브 강의 데이터 로드
         loadWeeklyChampions(); // 주간 챔피언 로드
@@ -313,7 +313,7 @@ function App() {
       if (session?.user) {
         const username = session.user.email?.split('@')[0] || 'User';
         setCurrentUser(username);
-        fetchUserData();
+        fetchUserData(session.user.id);
         fetchAdminStatus(session.user.id);
         loadYoutubeLectures(); // 유튜브 강의 데이터 로드
         loadWeeklyChampions(); // 주간 챔피언 로드
@@ -425,7 +425,7 @@ function App() {
   };
 
   // Fetch mistakes from Supabase
-  const fetchUserData = async () => {
+  const fetchUserData = async (targetUserId?: string) => {
     try {
       loadWeeklyChampions(); // 최신 챔피언 정보 동기화
       fetchPeerActivities(); // 실시간 친구들 복습 현황 로드
@@ -437,12 +437,14 @@ function App() {
 
       if (mistakesError) throw mistakesError;
 
+      const targetId = targetUserId || session?.user?.id;
+
       // 로그인 유저의 닉네임 및 보너스 점수 로드
-      if (session?.user?.id) {
+      if (targetId) {
         const { data: myProfile } = await supabase
           .from('profiles')
           .select('nickname, display_name, bonus_points')
-          .eq('id', session.user.id)
+          .eq('id', targetId)
           .maybeSingle();
         if (myProfile) {
           setMyNickname(myProfile.nickname || myProfile.display_name || '');
@@ -458,7 +460,7 @@ function App() {
           }
         }
         // 닉네임 변경권 보유 여부 확인 (Header에 버튼 노출 제어)
-        checkNameChangeTicket();
+        checkNameChangeTicket(targetId);
       }
 
       // Fetch all profiles for admin name mapping (display_name, school_grade 포함)
@@ -550,12 +552,13 @@ function App() {
   };
 
   // 닉네임 변경권 보유 여부 확인
-  const checkNameChangeTicket = async () => {
-    if (!session?.user?.id) return;
+  const checkNameChangeTicket = async (targetUserId?: string) => {
+    const targetId = targetUserId || session?.user?.id;
+    if (!targetId) return;
     const { data } = await supabase
       .from('user_items')
       .select('quantity')
-      .eq('user_id', session.user.id)
+      .eq('user_id', targetId)
       .eq('item_id', 'item_name_change')
       .maybeSingle();
     setHasNameChangeTicket(!!(data && data.quantity > 0));
