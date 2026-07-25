@@ -352,7 +352,7 @@ function App() {
         const fiveMinutesAgo = new Date(Date.now() - 300000).toISOString();
         const { data, error } = await supabase
           .from('profiles')
-          .select('id, display_name, email')
+          .select('id, display_name, nickname, email')
           .gte('last_seen_at', fiveMinutesAgo)
           .eq('is_admin', false); // 학생들만 집계
 
@@ -361,6 +361,7 @@ function App() {
           const mapped = data.map(p => ({
             id: p.id,
             display_name: p.display_name,
+            nickname: p.nickname,
             username: p.email?.split('@')[0] || 'User'
           }));
           setOnlineUsers(mapped);

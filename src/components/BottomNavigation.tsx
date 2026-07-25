@@ -5,7 +5,7 @@ interface BottomNavigationProps {
   activeTab: ActiveTab;
   setActiveTab: (tab: ActiveTab) => void;
   isAdmin?: boolean;
-  onlineUsers: { id: string; display_name: string; username: string }[];
+  onlineUsers: { id: string; display_name: string; nickname?: string; username: string }[];
   onStartReviewSession?: () => void;
   onOpenSlideList?: () => void;
 }
@@ -57,7 +57,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                   {onlineUsers.map(u => (
                     <div key={u.id} className="text-[9.5px] text-slate-300 font-black flex items-center space-x-1 py-0.5 select-none">
                       <span className="w-1 h-1 rounded-full bg-emerald-500 flex-none" />
-                      <span className="truncate flex-1">{u.display_name || u.username}</span>
+                      <span className="truncate flex-1">{u.nickname || u.display_name || u.username}</span>
                     </div>
                   ))}
                 </div>
