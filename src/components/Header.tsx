@@ -28,9 +28,10 @@ interface HeaderProps {
   myScore?: number;
   onOpenStore?: () => void;
   equippedTitle?: string;
+  streakDays?: number;
 }
 
-export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, myScore, onOpenStore, equippedTitle }) => {
+export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, myScore, onOpenStore, equippedTitle, streakDays }) => {
   const buildLabel = `v${__APP_VERSION__} (${formatBuildTime(__BUILD_TIME__)})`;
 
   return (
@@ -51,6 +52,13 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, myScore, 
         </div>
       </div>
       <div className="flex items-center space-x-2 flex-none min-w-0 whitespace-nowrap">
+        {/* 연속 복습 일수 (🔥 Streak 배지) */}
+        {streakDays !== undefined && streakDays > 0 && (
+          <span className="text-[9.5px] text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-full border border-orange-500/30 font-black flex items-center space-x-0.5 flex-none animate-pulse">
+            <span>🔥</span>
+            <span>{streakDays}일 연속</span>
+          </span>
+        )}
         {/* 내 주간 점수 미니 배지 (클릭 시 럭키상점으로 이동) */}
         {myScore !== undefined && (
           <button 

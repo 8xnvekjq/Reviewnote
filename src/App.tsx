@@ -18,6 +18,7 @@ import { LaTeXRenderer } from './components/LaTeXRenderer';
 import { SlideListModal } from './components/SlideListModal';
 import { GachaStore } from './components/GachaStore';
 import type { EquippedItems } from './types';
+import { loadStreakState, recordReviewStreak, type StreakState } from './utils/streak';
 
 function App() {
   // If Supabase credentials are not configured, block and show the setup guide
@@ -32,6 +33,9 @@ function App() {
   const [mistakes, setMistakes] = useState<MistakeEntry[]>([]);
   const [selectedEntry, setSelectedEntry] = useState<MistakeEntry | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  // 매일 연속 복습 스트릭 상태 (🔥 Streak 관리)
+  const [streakState, setStreakState] = useState<StreakState>(() => loadStreakState());
   // userId -> displayName map (admin 전용)
   const [profilesMap, setProfilesMap] = useState<Record<string, string>>({});
   // 유튜브 매칭용 강의 마스터 리스트 상태
@@ -906,6 +910,23 @@ function App() {
       setMistakes(prev => prev.map(m => m.id === id ? updatedEntry : m));
       setSelectedEntry(prev => prev && prev.id === id ? updatedEntry : prev);
       
+      // 매일 연속 복습 스트릭 갱신 (🔥 Daily Streak)
+      const unlockedItemIds: string[] = (() => {
+        try {
+          const saved = localStorage.getItem('reviewnote_unlocked_items');
+          return saved ? JSON.parse(saved) : [];
+        } catch {
+          return [];
+        }
+      })();
+      const hasShieldItem = unlockedItemIds.includes('item_streak_shield');
+      const { updatedState, shieldUsed } = recordReviewStreak(streakState, hasShieldItem);
+      setStreakState(updatedState);
+
+      if (shieldUsed) {
+        alert("🛡️ [스트릭 방어 성공!] 어제 복습을 놓쳤지만, 럭키상점에서 보유한 '스트릭 방어권'이 자동으로 발동되어 🔥 연속 복습 기록이 안전하게 보호되었습니다!");
+      }
+
       // Refresh peer activities locally
       fetchPeerActivities();
       loadWeeklyChampions(); // MVP 챔피언 배너 즉각 갱신
@@ -1110,6 +1131,7 @@ function App() {
         myScore={currentDisplayPoints} 
         onOpenStore={() => setActiveTab('store')}
         equippedTitle={equippedItems.title}
+        streakDays={streakState.currentStreak}
       />
 
       {/* Main Content Area */}
