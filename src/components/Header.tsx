@@ -36,7 +36,7 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ currentUser, nickname, onLogout, onUpdateNickname, myScore, onOpenStore, equippedTitle, streakDays }) => {
   const [showUserMenu, setShowUserMenu] = React.useState(false);
   const buildLabel = `v${__APP_VERSION__} (${formatBuildTime(__BUILD_TIME__)})`;
-  const displayName = nickname || currentUser;
+
 
   return (
     <header className="safe-top flex-none border-b border-slate-800 bg-slate-900/90 backdrop-blur-md px-4 py-3 flex items-center justify-between sticky top-0 z-30">
@@ -93,7 +93,7 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, nickname, onLogout,
             title="내 계정 메뉴"
           >
             <span>👤</span>
-            <span className="truncate">{displayName}</span>
+            <span className="truncate">{currentUser}</span>
             <span className="text-[8px] text-slate-500 ml-0.5">▼</span>
           </button>
 
@@ -108,16 +108,18 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, nickname, onLogout,
               {/* 우측 상단 팝업 드롭다운 */}
               <div className="absolute right-0 mt-1.5 w-40 bg-slate-900/95 border border-slate-800 rounded-xl p-2 shadow-2xl z-50 backdrop-blur-md animate-fade-in space-y-1.5">
                 <div className="px-2 py-1 border-b border-slate-800">
-                  <p className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">접속 닉네임</p>
-                  <p className="text-[10.5px] font-black text-slate-200 truncate">{displayName}</p>
+                  <p className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">아이디</p>
+                  <p className="text-[9px] text-slate-400 truncate mb-0.5">{currentUser}</p>
+                  <p className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">닉네임</p>
+                  <p className="text-[10.5px] font-black text-slate-200 truncate">{nickname || currentUser}</p>
                 </div>
 
                 {/* 닉네임 변경 버튼 (로그아웃 바로 위) */}
                 {onUpdateNickname && (
                   <button 
                     onClick={async () => {
-                      const currentNick = nickname || displayName;
-                      const input = prompt("새로운 닉네임을 입력하세요 (실제 이름은 변경되지 않습니다):", currentNick);
+                      // 프롬프트 기본값은 현재 닉네임만 (아이디 절대 표시 안 함)
+                      const input = prompt("새로운 닉네임을 입력하세요 (실제 이름은 변경되지 않습니다):", nickname || '');
                       if (input !== null && input.trim()) {
                         await onUpdateNickname(input.trim());
                         setShowUserMenu(false);
