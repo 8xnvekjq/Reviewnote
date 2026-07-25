@@ -266,39 +266,6 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                 </button>
               )}
 
-              {/* 4. 오답노트 이용안내 */}
-              <button
-                onClick={() => handleSelectMenu('guide')}
-                className={`w-full p-3.5 rounded-2xl border flex items-center space-x-3.5 transition-all text-left group ${
-                  activeTab === 'guide'
-                    ? 'bg-amber-500/10 border-amber-500/50 text-amber-300 font-bold shadow-lg shadow-amber-500/5'
-                    : 'bg-slate-955/60 border-slate-850 hover:border-slate-700 text-slate-300 hover:bg-slate-850'
-                }`}
-              >
-                <span className="text-2xl group-hover:scale-110 transition-transform">💡</span>
-                <div>
-                  <div className="text-xs font-black">앱 이용안내</div>
-                  <div className="text-[9.5px] text-slate-500 mt-0.5">오답노트 및 복습 시스템 활용법</div>
-                </div>
-              </button>
-
-              {/* 5. 어드민 관리자 패널 (어드민 전용) */}
-              {isAdmin && (
-                <button
-                  onClick={() => handleSelectMenu('admin')}
-                  className={`w-full p-3.5 rounded-2xl border flex items-center space-x-3.5 transition-all text-left group ${
-                    activeTab === 'admin'
-                      ? 'bg-purple-500/10 border-purple-500/50 text-purple-300 font-bold shadow-lg shadow-purple-500/5'
-                      : 'bg-slate-955/60 border-slate-850 hover:border-slate-700 text-slate-300 hover:bg-slate-850'
-                  }`}
-                >
-                  <span className="text-2xl group-hover:scale-110 transition-transform">👑</span>
-                  <div>
-                    <div className="text-xs font-black text-purple-300">어드민 관리자</div>
-                    <div className="text-[9.5px] text-slate-500 mt-0.5">학생 데이터 통계 및 랭킹 관리</div>
-                  </div>
-                </button>
-              )}
             </div>
 
             {/* 패널 하단 카피라이트 정보 */}
