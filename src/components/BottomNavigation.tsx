@@ -19,12 +19,12 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
   onOpenSlideList
 }) => {
   const [showOnlinePopup, setShowOnlinePopup] = useState(false);
-  const [showMenuDrawer, setShowMenuDrawer] = useState(false);
+  const [showRightDrawer, setShowRightDrawer] = useState(false);
 
-  // 더보기 메뉴에서 탭 클릭 시 드로어 자동 닫기
-  const handleSelectDrawerTab = (tab: ActiveTab) => {
+  // 메뉴 선택 시 우측 사이드바 자동 닫기 및 탭 이동
+  const handleSelectMenu = (tab: ActiveTab) => {
     setActiveTab(tab);
-    setShowMenuDrawer(false);
+    setShowRightDrawer(false);
   };
 
   return (
@@ -98,7 +98,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         <button
           onClick={() => {
             setActiveTab('notes');
-            setShowMenuDrawer(false);
+            setShowRightDrawer(false);
           }}
           className={`flex flex-col items-center justify-center w-14 h-11 rounded-xl transition-all ${
             activeTab === 'notes' ? 'text-indigo-400 scale-105 font-black' : 'text-slate-500 hover:text-slate-300'
@@ -112,7 +112,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         <button
           onClick={() => {
             setActiveTab('stats');
-            setShowMenuDrawer(false);
+            setShowRightDrawer(false);
           }}
           className={`flex flex-col items-center justify-center w-14 h-11 rounded-xl transition-all ${
             activeTab === 'stats' ? 'text-emerald-400 scale-105 font-black' : 'text-slate-500 hover:text-slate-300'
@@ -126,7 +126,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         <button
           onClick={() => {
             setActiveTab('camera');
-            setShowMenuDrawer(false);
+            setShowRightDrawer(false);
           }}
           className={`flex items-center justify-center w-13 h-13 rounded-full transition-all -translate-y-3.5 shadow-lg ${
             activeTab === 'camera'
@@ -141,7 +141,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         <button
           onClick={() => {
             setActiveTab('store');
-            setShowMenuDrawer(false);
+            setShowRightDrawer(false);
           }}
           className={`flex flex-col items-center justify-center w-14 h-11 rounded-xl transition-all relative ${
             activeTab === 'store' ? 'text-amber-400 scale-105 font-black' : 'text-slate-500 hover:text-slate-300'
@@ -151,11 +151,11 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
           <span className="text-[9.5px] mt-0.5">럭키상점</span>
         </button>
 
-        {/* Tab 5: ☰ 전체메뉴 (더보기 바텀시트 팝업) */}
+        {/* Tab 5: ☰ 전체메뉴 (우측 슬라이드 메뉴 펼침 버튼) */}
         <button
-          onClick={() => setShowMenuDrawer(!showMenuDrawer)}
+          onClick={() => setShowRightDrawer(!showRightDrawer)}
           className={`flex flex-col items-center justify-center w-14 h-11 rounded-xl transition-all ${
-            showMenuDrawer || ['guide', 'admin', 'completed'].includes(activeTab)
+            showRightDrawer || ['guide', 'admin', 'completed'].includes(activeTab)
               ? 'text-purple-400 scale-105 font-black'
               : 'text-slate-500 hover:text-slate-300'
           }`}
@@ -165,95 +165,115 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         </button>
       </nav>
 
-      {/* ── 3. ☰ 전체메뉴 슬라이드 바텀시트 (Bottom Drawer) ───────────────────── */}
-      {showMenuDrawer && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-955/80 backdrop-blur-sm animate-fade-in">
-          {/* 배경 오버레이 클릭 시 닫기 */}
-          <div className="absolute inset-0" onClick={() => setShowMenuDrawer(false)} />
+      {/* ── 3. ☰ 우측 세로 슬라이드 패널 (Right Side Slide-Over Drawer) ─────────── */}
+      {showRightDrawer && (
+        <div className="fixed inset-0 z-50 overflow-hidden">
+          {/* 어두운 배경 반투명 오버레이 (클릭 시 슬라이드 패널 닫기) */}
+          <div
+            className="absolute inset-0 bg-slate-955/75 backdrop-blur-sm animate-fade-in transition-opacity"
+            onClick={() => setShowRightDrawer(false)}
+          />
 
-          <div className="relative w-full max-w-lg bg-slate-900 border-t border-slate-800 rounded-t-3xl p-5 shadow-2xl space-y-4 animate-scale-up z-10 pb-safe">
-            {/* 드로어 상단 손잡이 & 타이틀 */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center space-x-2">
-                <span className="text-lg">☰</span>
-                <h3 className="text-sm font-black text-white">전체 메뉴 & 학습 도구</h3>
+          {/* 우측에서 스스륵 펼쳐지는 세로 직사각형 메뉴 패널 */}
+          <div className="absolute top-0 right-0 bottom-0 w-72 max-w-[85vw] bg-slate-900 border-l border-slate-800 shadow-2xl flex flex-col animate-slide-left z-50 overflow-y-auto">
+
+            {/* 슬라이드 헤더 */}
+            <div className="p-5 border-b border-slate-800 bg-slate-950/60 flex items-center justify-between">
+              <div className="flex items-center space-x-2.5">
+                <span className="text-xl">☰</span>
+                <div>
+                  <h3 className="text-sm font-black text-white">전체 메뉴</h3>
+                  <p className="text-[9.5px] text-slate-500 font-bold">더쿠키수학 오답클리닉</p>
+                </div>
               </div>
+
+              {/* X 닫기 버튼 */}
               <button
-                onClick={() => setShowMenuDrawer(false)}
-                className="w-7 h-7 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-400 hover:text-white"
+                onClick={() => setShowRightDrawer(false)}
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-white font-black text-xs transition-colors"
               >
                 ✕
               </button>
             </div>
 
-            {/* 메뉴 그리드 카드 */}
-            <div className="grid grid-cols-2 gap-2.5">
-              {/* 3차 복습완료 보관함 */}
+            {/* 세로 메뉴 항목 리스트 */}
+            <div className="p-4 space-y-2 flex-1">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block px-2 pb-1">
+                학습 기능 & 메뉴
+              </span>
+
+              {/* 1. 3차 복습완료 보관함 */}
               <button
-                onClick={() => handleSelectDrawerTab('completed')}
-                className={`p-3.5 rounded-2xl border flex items-center space-x-3 transition-all ${
+                onClick={() => handleSelectMenu('completed')}
+                className={`w-full p-3.5 rounded-2xl border flex items-center space-x-3.5 transition-all text-left group ${
                   activeTab === 'completed'
-                    ? 'bg-teal-500/10 border-teal-500/50 text-teal-300 font-bold'
-                    : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:bg-slate-850'
+                    ? 'bg-teal-500/10 border-teal-500/50 text-teal-300 font-bold shadow-lg shadow-teal-500/5'
+                    : 'bg-slate-955/60 border-slate-850 hover:border-slate-700 text-slate-300 hover:bg-slate-850'
                 }`}
               >
-                <span className="text-2xl">✅</span>
-                <div className="text-left leading-tight">
+                <span className="text-2xl group-hover:scale-110 transition-transform">✅</span>
+                <div>
                   <div className="text-xs font-black">복습완료 보관함</div>
-                  <div className="text-[9px] text-slate-500 mt-0.5">3차 완료 오답 & 인쇄</div>
+                  <div className="text-[9.5px] text-slate-500 mt-0.5">3차 완료 오답 & 모아 찍기 인쇄</div>
                 </div>
               </button>
 
-              {/* 수업자료 교안 */}
+              {/* 2. 더쿠키수학 핵심 수업자료 */}
               {onOpenSlideList && (
                 <button
                   onClick={() => {
-                    setShowMenuDrawer(false);
+                    setShowRightDrawer(false);
                     onOpenSlideList();
                   }}
-                  className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 text-slate-300 hover:bg-slate-850 flex items-center space-x-3 transition-all"
+                  className="w-full p-3.5 rounded-2xl bg-slate-955/60 border border-slate-850 hover:border-slate-700 text-slate-300 hover:bg-slate-850 flex items-center space-x-3.5 transition-all text-left group"
                 >
-                  <span className="text-2xl">🖥️</span>
-                  <div className="text-left leading-tight">
-                    <div className="text-xs font-black">핵심 수업자료</div>
-                    <div className="text-[9px] text-slate-500 mt-0.5">주차별 교안 슬라이드</div>
+                  <span className="text-2xl group-hover:scale-110 transition-transform">🖥️</span>
+                  <div>
+                    <div className="text-xs font-black text-emerald-400">핵심 수업자료</div>
+                    <div className="text-[9.5px] text-slate-500 mt-0.5">선생님 제작 주차별 교안 슬라이드</div>
                   </div>
                 </button>
               )}
 
-              {/* 이용안내 가이드 */}
+              {/* 3. 오답노트 이용안내 */}
               <button
-                onClick={() => handleSelectDrawerTab('guide')}
-                className={`p-3.5 rounded-2xl border flex items-center space-x-3 transition-all ${
+                onClick={() => handleSelectMenu('guide')}
+                className={`w-full p-3.5 rounded-2xl border flex items-center space-x-3.5 transition-all text-left group ${
                   activeTab === 'guide'
-                    ? 'bg-amber-500/10 border-amber-500/50 text-amber-300 font-bold'
-                    : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:bg-slate-850'
+                    ? 'bg-amber-500/10 border-amber-500/50 text-amber-300 font-bold shadow-lg shadow-amber-500/5'
+                    : 'bg-slate-955/60 border-slate-850 hover:border-slate-700 text-slate-300 hover:bg-slate-850'
                 }`}
               >
-                <span className="text-2xl">💡</span>
-                <div className="text-left leading-tight">
+                <span className="text-2xl group-hover:scale-110 transition-transform">💡</span>
+                <div>
                   <div className="text-xs font-black">앱 이용안내</div>
-                  <div className="text-[9px] text-slate-500 mt-0.5">오답노트 사용 팁</div>
+                  <div className="text-[9.5px] text-slate-500 mt-0.5">오답노트 및 복습 시스템 활용법</div>
                 </div>
               </button>
 
-              {/* 어드민 관리자 패널 (관리자 계정 전용) */}
+              {/* 4. 어드민 관리자 패널 (어드민 전용) */}
               {isAdmin && (
                 <button
-                  onClick={() => handleSelectDrawerTab('admin')}
-                  className={`p-3.5 rounded-2xl border flex items-center space-x-3 transition-all ${
+                  onClick={() => handleSelectMenu('admin')}
+                  className={`w-full p-3.5 rounded-2xl border flex items-center space-x-3.5 transition-all text-left group ${
                     activeTab === 'admin'
-                      ? 'bg-purple-500/10 border-purple-500/50 text-purple-300 font-bold'
-                      : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:bg-slate-850'
+                      ? 'bg-purple-500/10 border-purple-500/50 text-purple-300 font-bold shadow-lg shadow-purple-500/5'
+                      : 'bg-slate-955/60 border-slate-850 hover:border-slate-700 text-slate-300 hover:bg-slate-850'
                   }`}
                 >
-                  <span className="text-2xl">👑</span>
-                  <div className="text-left leading-tight">
-                    <div className="text-xs font-black">어드민 관리자</div>
-                    <div className="text-[9px] text-slate-500 mt-0.5">학생 통계 및 관리</div>
+                  <span className="text-2xl group-hover:scale-110 transition-transform">👑</span>
+                  <div>
+                    <div className="text-xs font-black text-purple-300">어드민 관리자</div>
+                    <div className="text-[9.5px] text-slate-500 mt-0.5">학생 데이터 통계 및 랭킹 관리</div>
                   </div>
                 </button>
               )}
+            </div>
+
+            {/* 패널 하단 카피라이트 정보 */}
+            <div className="p-4 border-t border-slate-800/80 bg-slate-950/60 text-center space-y-1">
+              <span className="text-[9px] font-black text-slate-500">더쿠키수학 AI 오답클리닉</span>
+              <p className="text-[8px] text-slate-600 font-mono">Designed for Premium Math Learning</p>
             </div>
           </div>
         </div>
