@@ -33,14 +33,14 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
       {/* ── 1. 플로팅 상단 배지 (온라인 N명 / 수업자료 / 복습하기) ───────────────── */}
       <div className="relative w-full max-w-lg mx-auto px-4">
 
-        {/* Online 인원수 배지 (좌측 상단 플로팅) */}
-        <div className="absolute -top-4 left-4 z-50">
+        {/* Online 인원수 배지 (하단 내비바 좌측 상단 플로팅) */}
+        <div className="absolute -top-3.5 left-3 z-50">
           <button
             onClick={() => setShowOnlinePopup(!showOnlinePopup)}
-            className="px-2.5 py-0.5 rounded-full bg-slate-955/90 border border-slate-800 text-[8.5px] font-black text-slate-300 hover:text-white flex items-center space-x-1 shadow-md hover:scale-105 active:scale-95 transition-all backdrop-blur-md"
+            className="px-2.5 py-0.5 rounded-full bg-slate-955/90 border border-slate-800 text-[8px] font-black text-slate-300 hover:text-white flex items-center space-x-1 shadow-md hover:scale-105 active:scale-95 transition-all backdrop-blur-md"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Live {onlineUsers.length}명</span>
+            <span>Online {onlineUsers.length}</span>
           </button>
 
           {/* 온라인 사용자 목록 팝업 */}
