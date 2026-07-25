@@ -94,7 +94,36 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
       {/* ── 2. 스마트폰 하단 밀착형 5대 탭 네비게이션 바 ───────────────────────── */}
       <nav className="w-full bg-slate-900/95 border-t border-slate-800/80 backdrop-blur-xl flex items-center justify-around px-2 py-1.5 shadow-2xl pb-safe">
 
-        {/* Tab 1: 📓 오답노트 (메인) */}
+        {/* Tab 1: 💡 이용안내 (어드민일 때 👑 어드민) */}
+        {isAdmin ? (
+          <button
+            onClick={() => {
+              setActiveTab('admin');
+              setShowRightDrawer(false);
+            }}
+            className={`flex flex-col items-center justify-center w-14 h-11 rounded-xl transition-all ${
+              activeTab === 'admin' ? 'text-amber-400 scale-105 font-black' : 'text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            <span className="text-lg">👑</span>
+            <span className="text-[9.5px] mt-0.5">어드민</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => {
+              setActiveTab('guide');
+              setShowRightDrawer(false);
+            }}
+            className={`flex flex-col items-center justify-center w-14 h-11 rounded-xl transition-all ${
+              activeTab === 'guide' ? 'text-amber-400 scale-105 font-black' : 'text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            <span className="text-lg">💡</span>
+            <span className="text-[9.5px] mt-0.5">이용안내</span>
+          </button>
+        )}
+
+        {/* Tab 2: 📓 오답노트 (메인) */}
         <button
           onClick={() => {
             setActiveTab('notes');
@@ -106,20 +135,6 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         >
           <span className="text-lg">📓</span>
           <span className="text-[9.5px] mt-0.5">오답노트</span>
-        </button>
-
-        {/* Tab 2: 📊 분석통계 */}
-        <button
-          onClick={() => {
-            setActiveTab('stats');
-            setShowRightDrawer(false);
-          }}
-          className={`flex flex-col items-center justify-center w-14 h-11 rounded-xl transition-all ${
-            activeTab === 'stats' ? 'text-emerald-400 scale-105 font-black' : 'text-slate-500 hover:text-slate-300'
-          }`}
-        >
-          <span className="text-lg">📊</span>
-          <span className="text-[9.5px] mt-0.5">분석통계</span>
         </button>
 
         {/* Tab 3: 📷 중앙 카메라스캐너 (시그니처 입체 셔터) */}
@@ -155,7 +170,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         <button
           onClick={() => setShowRightDrawer(!showRightDrawer)}
           className={`flex flex-col items-center justify-center w-14 h-11 rounded-xl transition-all ${
-            showRightDrawer || ['guide', 'admin', 'completed'].includes(activeTab)
+            showRightDrawer || ['stats', 'completed'].includes(activeTab)
               ? 'text-purple-400 scale-105 font-black'
               : 'text-slate-500 hover:text-slate-300'
           }`}
@@ -202,7 +217,23 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                 학습 기능 & 메뉴
               </span>
 
-              {/* 1. 3차 복습완료 보관함 */}
+              {/* 1. 📊 분석통계 (전체메뉴로 이동) */}
+              <button
+                onClick={() => handleSelectMenu('stats')}
+                className={`w-full p-3.5 rounded-2xl border flex items-center space-x-3.5 transition-all text-left group ${
+                  activeTab === 'stats'
+                    ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-300 font-bold shadow-lg shadow-emerald-500/5'
+                    : 'bg-slate-955/60 border-slate-850 hover:border-slate-700 text-slate-300 hover:bg-slate-850'
+                }`}
+              >
+                <span className="text-2xl group-hover:scale-110 transition-transform">📊</span>
+                <div>
+                  <div className="text-xs font-black text-emerald-400">분석통계</div>
+                  <div className="text-[9.5px] text-slate-500 mt-0.5">내 학습 현황 & 취약 단원 분석</div>
+                </div>
+              </button>
+
+              {/* 2. 3차 복습완료 보관함 */}
               <button
                 onClick={() => handleSelectMenu('completed')}
                 className={`w-full p-3.5 rounded-2xl border flex items-center space-x-3.5 transition-all text-left group ${
@@ -218,7 +249,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                 </div>
               </button>
 
-              {/* 2. 더쿠키수학 핵심 수업자료 */}
+              {/* 3. 더쿠키수학 핵심 수업자료 */}
               {onOpenSlideList && (
                 <button
                   onClick={() => {
@@ -235,7 +266,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                 </button>
               )}
 
-              {/* 3. 오답노트 이용안내 */}
+              {/* 4. 오답노트 이용안내 */}
               <button
                 onClick={() => handleSelectMenu('guide')}
                 className={`w-full p-3.5 rounded-2xl border flex items-center space-x-3.5 transition-all text-left group ${
@@ -251,7 +282,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                 </div>
               </button>
 
-              {/* 4. 어드민 관리자 패널 (어드민 전용) */}
+              {/* 5. 어드민 관리자 패널 (어드민 전용) */}
               {isAdmin && (
                 <button
                   onClick={() => handleSelectMenu('admin')}
