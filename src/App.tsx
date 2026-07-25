@@ -1125,73 +1125,99 @@ function App() {
 
         {activeTab === 'notes' && (
           <>
-            {/* 주간 복습왕 배너 (전체 학생 오픈 / 1주 이월 및 리셋 롤오버) */}
+            {/* 명예의 전당 배너 (1등, 2등, 3등 3줄 세로 노출 + 칭호 & 풀네임 표시) */}
             {weeklyChampions && weeklyChampions.length > 0 ? (
-              <div className="bg-gradient-to-b from-slate-900/90 via-slate-900/95 to-slate-900/90 border border-amber-500/30 rounded-2xl p-4 mb-4 shadow-[0_0_15px_rgba(245,158,11,0.08)] animate-fade-in flex flex-col space-y-3">
-                {/* 1등 MVP */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2.5 min-w-0">
-                    <span className="text-2xl animate-bounce flex-none">👑</span>
-                    <div className="min-w-0 leading-tight">
-                      <div className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">
-                        {weeklyChampions[0].isLastWeek ? '지난주 복습 MVP' : '이번주 최다 오답 완료'}
-                      </div>
-                      <div className="flex items-center space-x-1.5 mt-0.5 min-w-0">
-                        <span className="text-xs font-black text-white truncate">
-                          {weeklyChampions[0].display_name 
-                            ? `${weeklyChampions[0].display_name} 학생` 
-                            : `${maskId(weeklyChampions[0].username)} 학생`}
-                        </span>
-                        <span className="text-[8px] font-black bg-amber-500/10 text-amber-300 border border-amber-500/20 px-1.5 py-0.5 rounded-full flex items-center flex-none">
-                          {weeklyChampions[0].isLastWeek ? '⭐ 지난주 MVP' : '⭐ 주간 MVP'}
-                        </span>
-                      </div>
-                    </div>
+              <div className="bg-gradient-to-b from-slate-900/95 via-slate-900/90 to-slate-900/95 border border-amber-500/30 rounded-2xl p-4 mb-4 shadow-[0_0_20px_rgba(245,158,11,0.1)] animate-fade-in space-y-3">
+                {/* 헤더 타이틀 */}
+                <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xl animate-bounce">👑</span>
+                    <h3 className="text-xs font-black text-amber-400 uppercase tracking-wider">
+                      {weeklyChampions[0]?.isLastWeek ? '🏆 명예의 전당 (지난주 복습 MVP)' : '🏆 명예의 전당 (주간 복습 랭킹)'}
+                    </h3>
                   </div>
-                  <div className="text-right flex-none pl-3 border-l border-slate-800/80">
-                    <span className="text-[10px] text-slate-500 block">종합 점수</span>
-                    <span className="text-xs font-black text-amber-400">
-                      {Math.round(weeklyChampions[0].score)}점
-                    </span>
-                    <span className="text-[9px] text-slate-400 block mt-0.5">
-                      완료 {weeklyChampions[0].weekly_completed_count}개 ({Math.round(weeklyChampions[0].completion_rate * 100)}%)
-                    </span>
-                  </div>
+                  <span className="text-[9px] text-slate-500 font-bold">매주 월요일 갱신</span>
                 </div>
 
-                {/* 2등 & 3등 작게 노출 */}
-                <div className="border-t border-slate-800/80 pt-2.5 flex items-center justify-between text-[10px] text-slate-400">
-                  {/* 2위 */}
-                  <div className="flex-1 flex items-center space-x-1 min-w-0 pr-2">
-                    <span className="flex-none font-bold text-slate-500">🥈 2위:</span>
-                    {weeklyChampions[1] && weeklyChampions[1].score > 0 ? (
-                      <span className="font-extrabold text-slate-300 truncate">
-                        {weeklyChampions[1].display_name || maskId(weeklyChampions[1].username)}
-                        <span className="font-normal text-slate-500 text-[9px] ml-1">({Math.round(weeklyChampions[1].score)}점)</span>
-                      </span>
-                    ) : (
-                      <span className="text-slate-600 font-bold flex items-center space-x-1">
-                        <span>'-')?</span>
-                        <span className="text-[8px] font-normal text-slate-700">(대기)</span>
-                      </span>
-                    )}
-                  </div>
+                {/* 1등 / 2등 / 3등 3줄 세로 명예의 전당 리스트 */}
+                <div className="space-y-2">
+                  {[0, 1, 2].map((idx) => {
+                    const champ = weeklyChampions[idx];
+                    const isFirst = idx === 0;
+                    const isSecond = idx === 1;
 
-                  {/* 3위 */}
-                  <div className="flex-1 flex items-center space-x-1 min-w-0 pl-2 border-l border-slate-800/40">
-                    <span className="flex-none font-bold text-slate-500">🥉 3위:</span>
-                    {weeklyChampions[2] && weeklyChampions[2].score > 0 ? (
-                      <span className="font-extrabold text-slate-300 truncate">
-                        {weeklyChampions[2].display_name || maskId(weeklyChampions[2].username)}
-                        <span className="font-normal text-slate-500 text-[9px] ml-1">({Math.round(weeklyChampions[2].score)}점)</span>
-                      </span>
-                    ) : (
-                      <span className="text-slate-600 font-bold flex items-center space-x-1">
-                        <span>'-')?</span>
-                        <span className="text-[8px] font-normal text-slate-700">(대기)</span>
-                      </span>
-                    )}
-                  </div>
+                    const medal = isFirst ? '🥇 1등' : isSecond ? '🥈 2등' : '🥉 3등';
+                    const medalStyle = isFirst
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                      : isSecond
+                      ? 'bg-slate-400/20 text-slate-200 border-slate-400/30'
+                      : 'bg-amber-700/20 text-amber-400 border-amber-700/30';
+
+                    const rowBg = isFirst
+                      ? 'bg-gradient-to-r from-amber-500/10 via-slate-900 to-slate-900 border-amber-500/40 shadow-md'
+                      : 'bg-slate-955/70 border-slate-850';
+
+                    // 해당 챔피언이 현재 로그인 유저인 경우 칭호 대입
+                    const isMe = champ && (champ.username === currentUser || champ.user_id === currentUser);
+                    const activeTitle = isMe ? equippedItems.title : (champ?.title || undefined);
+
+                    const studentDisplayName = champ
+                      ? (champ.display_name ? `${champ.display_name} 학생` : `${maskId(champ.username)} 학생`)
+                      : null;
+
+                    return (
+                      <div
+                        key={idx}
+                        className={`p-3 rounded-xl border flex flex-wrap items-center justify-between gap-2 transition-all ${rowBg}`}
+                      >
+                        {/* Left: 메달 + 칭호 + 학생 풀 네임 */}
+                        <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${medalStyle}`}>
+                            {medal}
+                          </span>
+
+                          {champ && champ.score > 0 ? (
+                            <>
+                              {/* 칭호 장착 시 이름 앞에 배지 표시 */}
+                              {activeTitle && (
+                                <span className="text-[9px] font-black text-amber-300 bg-gradient-to-r from-amber-500/20 to-purple-500/20 border border-amber-500/40 px-2 py-0.5 rounded-full flex items-center space-x-1">
+                                  <span>👑</span>
+                                  <span>{activeTitle}</span>
+                                </span>
+                              )}
+
+                              {/* 풀 네임 표시 (잘림 없음) */}
+                              <span className={`font-black ${isFirst ? 'text-white text-sm' : 'text-slate-200 text-xs'}`}>
+                                {studentDisplayName}
+                              </span>
+
+                              {isFirst && (
+                                <span className="text-[8.5px] font-black bg-amber-500/10 text-amber-300 border border-amber-500/20 px-1.5 py-0.5 rounded-full">
+                                  ⭐ 주간 MVP
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-xs font-bold text-slate-600 italic">
+                              도전 대기 중... 🐱
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Right: 점수 & 복습 완료 건수 */}
+                        {champ && champ.score > 0 && (
+                          <div className="text-right ml-auto flex items-center space-x-2">
+                            <span className="text-[10px] text-slate-400 font-medium">
+                              완료 {champ.weekly_completed_count}개
+                            </span>
+                            <span className={`font-black ${isFirst ? 'text-amber-400 text-sm' : 'text-slate-300 text-xs'}`}>
+                              {Math.round(champ.score)}점
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ) : (
