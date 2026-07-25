@@ -38,6 +38,8 @@ function App() {
   const [streakState, setStreakState] = useState<StreakState>(() => loadStreakState());
   // 학생 커스텀 닉네임 상태 (실제 이름 display_name 과 보존 분리)
   const [myNickname, setMyNickname] = useState<string>('');
+  // 닉네임 변경권 보유 여부
+  const [hasNameChangeTicket, setHasNameChangeTicket] = useState<boolean>(false);
   // userId -> displayName map (admin 전용)
   const [profilesMap, setProfilesMap] = useState<Record<string, string>>({});
   // 유튜브 매칭용 강의 마스터 리스트 상태
@@ -442,6 +444,8 @@ function App() {
         if (myProfile) {
           setMyNickname(myProfile.nickname || myProfile.display_name || '');
         }
+        // 닉네임 변경권 보유 여부 확인 (Header에 버튼 노출 제어)
+        checkNameChangeTicket();
       }
 
       // Fetch all profiles for admin name mapping (display_name, school_grade 포함)
@@ -485,19 +489,63 @@ function App() {
     const trimmed = newNick.trim();
     if (!trimmed) return;
 
+    // 닉네임 변경권 재확인
+    const { data: ticketRow } = await supabase
+      .from('user_items')
+      .select('quantity')
+      .eq('user_id', session.user.id)
+      .eq('item_id', 'item_name_change')
+      .maybeSingle();
+
+    if (!ticketRow || ticketRow.quantity < 1) {
+      alert('🏷️ 닉네임 변경권이 없습니다!\n럭키 상점에서 뽑기를 통해 획득하세요.');
+      return;
+    }
+
     try {
+      // 닉네임 변경
       const { error } = await supabase
         .from('profiles')
         .update({ nickname: trimmed, updated_at: new Date().toISOString() })
         .eq('id', session.user.id);
-
       if (error) throw error;
+
+      // 변경권 1개 차감
+      const newQty = ticketRow.quantity - 1;
+      await supabase
+        .from('user_items')
+        .update({ quantity: newQty })
+        .eq('user_id', session.user.id)
+        .eq('item_id', 'item_name_change');
+
       setMyNickname(trimmed);
-      loadWeeklyChampions(); // 명예의 전당 배너 실시간 갱신
-      alert(`✅ 닉네임이 '${trimmed}'(으)로 성공적으로 변경되었습니다!\n(어드민 대시보드에는 원래 이름이 그대로 안전하게 유지됩니다)`);
+      setHasNameChangeTicket(newQty > 0);
+      loadWeeklyChampions();
+      alert(`✅ 닉네임이 '${trimmed}'(으)로 변경되었습니다!\n(잔여 변경권: ${newQty}개)`);
     } catch (err: any) {
       alert(`닉네임 변경에 실패했습니다: ${err.message}`);
     }
+  };
+
+  // 보물가방에서 닉네임 변경권 사용 시 호출
+  const handleUseNameChangeTicket = async () => {
+    if (!session?.user?.id) return;
+    const newNick = prompt('새로운 닉네임을 입력하세요 (실제 이름은 변경되지 않습니다):', myNickname || '');
+    if (newNick !== null && newNick.trim()) {
+      await handleUpdateNickname(newNick.trim());
+    }
+  };
+
+  // 닉네임 변경권 보유 여부 확인
+  const checkNameChangeTicket = async () => {
+    if (!session?.user?.id) return;
+    const { data } = await supabase
+      .from('user_items')
+      .select('quantity')
+      .eq('user_id', session.user.id)
+      .eq('item_id', 'item_name_change')
+      .maybeSingle();
+    setHasNameChangeTicket(!!(data && data.quantity > 0));
   };
 
   // Fetch recent peer review activities from read-only VIEW
@@ -1172,7 +1220,7 @@ function App() {
         currentUser={currentUser} 
         nickname={myNickname}
         onLogout={handleLogout} 
-        onUpdateNickname={handleUpdateNickname}
+        onUpdateNickname={hasNameChangeTicket ? handleUpdateNickname : undefined}
         myScore={currentDisplayPoints} 
         onOpenStore={() => setActiveTab('store')}
         equippedTitle={equippedItems.title}
@@ -1183,10 +1231,12 @@ function App() {
       <main className="flex-1 overflow-y-auto px-4 py-6 pb-28">
         {activeTab === 'store' && (
           <GachaStore
+            userId={session?.user?.id || ''}
             userPoints={currentDisplayPoints}
             onDeductPoints={handleDeductPoints}
             equippedItems={equippedItems}
             onEquipItem={handleEquipItem}
+            onUseNameChangeTicket={handleUseNameChangeTicket}
           />
         )}
 

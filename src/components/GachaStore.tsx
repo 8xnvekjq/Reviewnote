@@ -1,31 +1,30 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { GachaItem, EquippedItems } from '../types';
 import { GACHA_ITEMS, drawGachaItem } from '../utils/gachaCatalog';
+import { supabase } from '../services/supabase';
 
 interface GachaStoreProps {
+  userId: string;
   userPoints: number;
   onDeductPoints: (amount: number) => void;
   equippedItems: EquippedItems;
   onEquipItem: (category: keyof EquippedItems, value: string | undefined) => void;
+  onUseNameChangeTicket?: () => void; // 닉네임 변경권 사용 콜백
 }
 
 export const GachaStore: React.FC<GachaStoreProps> = ({
+  userId,
   userPoints,
   onDeductPoints,
   equippedItems,
   onEquipItem,
+  onUseNameChangeTicket,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'draw' | 'inventory' | 'catalog'>('draw');
 
-  // 해금된 아이템 ID 리스트 (LocalStorage 연동)
-  const [unlockedItemIds, setUnlockedItemIds] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('reviewnote_unlocked_items');
-      return saved ? JSON.parse(saved) : ['item_name_change'];
-    } catch {
-      return ['item_name_change'];
-    }
-  });
+  // Supabase 기반 인벤토리: { item_id: quantity }
+  const [inventory, setInventory] = useState<Record<string, number>>({});
+  const [inventoryLoading, setInventoryLoading] = useState(true);
 
   // 뽑기 연출 관련 상태
   const [isDrawing, setIsDrawing] = useState(false);
@@ -35,14 +34,64 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // LocalStorage 저장
-  useEffect(() => {
+  // ── 인벤토리 Supabase 로드 ──────────────────────────────
+  const loadInventory = async () => {
+    if (!userId) return;
+    setInventoryLoading(true);
     try {
-      localStorage.setItem('reviewnote_unlocked_items', JSON.stringify(unlockedItemIds));
+      const { data, error } = await supabase
+        .from('user_items')
+        .select('item_id, quantity')
+        .eq('user_id', userId);
+
+      if (error) throw error;
+      const map: Record<string, number> = {};
+      (data || []).forEach((row: { item_id: string; quantity: number }) => { map[row.item_id] = row.quantity; });
+      setInventory(map);
     } catch (e) {
-      console.error(e);
+      console.error('인벤토리 로드 실패:', e);
+    } finally {
+      setInventoryLoading(false);
     }
-  }, [unlockedItemIds]);
+  };
+
+  useEffect(() => {
+    // localStorage 구 데이터 제거
+    localStorage.removeItem('reviewnote_unlocked_items');
+    loadInventory();
+  }, [userId]);
+
+  // ── 아이템 추가 (뽑기 결과 → DB 저장) ──────────────────
+  const addItemsToInventory = async (items: GachaItem[]) => {
+    if (!userId) return;
+    // 아이템별 카운트
+    const counts: Record<string, number> = {};
+    items.forEach(item => { counts[item.id] = (counts[item.id] || 0) + 1; });
+
+    const upserts = Object.entries(counts).map(([item_id, qty]) => ({
+      user_id: userId,
+      item_id,
+      quantity: (inventory[item_id] || 0) + qty,
+    }));
+
+    const { error } = await supabase
+      .from('user_items')
+      .upsert(upserts, { onConflict: 'user_id,item_id' });
+
+    if (error) { console.error('아이템 저장 실패:', error); return; }
+
+    // 로컬 상태 갱신
+    setInventory(prev => {
+      const next = { ...prev };
+      Object.entries(counts).forEach(([id, qty]) => { next[id] = (next[id] || 0) + qty; });
+      return next;
+    });
+  };
+
+  // 보유 아이템 id 목록 (quantity > 0)
+  const unlockedItemIds = Object.entries(inventory)
+    .filter(([, qty]) => qty > 0)
+    .map(([id]) => id);
 
   // 파티클 폭죽 연출 (Canvas Confetti)
   const triggerConfetti = (rarity: string) => {
@@ -85,7 +134,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
         alive = true;
         p.x += p.vx;
         p.y += p.vy;
-        p.vy += 0.3; // 중력
+        p.vy += 0.3;
         p.alpha -= 0.015;
 
         ctx.save();
@@ -114,41 +163,30 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
       return;
     }
 
-    // 점수 차감
     onDeductPoints(cost);
 
-    // 가챠 뽑기 연출 준비
     setIsDrawing(true);
     setDrawStep('shaking');
     setCurrentResultIndex(0);
 
-    // 햅틱 진동 (지원 단말)
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
       navigator.vibrate([40, 60, 40, 60]);
     }
 
-    // 1초 후 상자 열림 연출
     setTimeout(() => {
       setDrawStep('opening');
 
-      // 0.8초 후 결과 공개
       setTimeout(() => {
         const drawnResults: GachaItem[] = [];
-        const newUnlocked = [...unlockedItemIds];
-
         for (let i = 0; i < count; i++) {
-          const item = drawGachaItem();
-          drawnResults.push(item);
-          if (!newUnlocked.includes(item.id)) {
-            newUnlocked.push(item.id);
-          }
+          drawnResults.push(drawGachaItem());
         }
 
-        setUnlockedItemIds(newUnlocked);
+        // Supabase에 저장
+        addItemsToInventory(drawnResults);
         setDrawnItemsResult(drawnResults);
         setDrawStep('result');
 
-        // 희귀도 최고 등급에 맞춰 폭죽 터뜨리기
         const highestRarity = drawnResults.some(r => r.rarity === 'UR')
           ? 'UR'
           : drawnResults.some(r => r.rarity === 'SSR')
@@ -238,7 +276,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
             }`}
           >
             <span>🎒 내 보물가방</span>
-            {unlockedItemIds.length > 1 && (
+            {unlockedItemIds.length > 0 && (
               <span className="ml-1 text-[9px] bg-emerald-500 text-white px-1.5 py-0.2 rounded-full">
                 {unlockedItemIds.length}
               </span>
@@ -322,7 +360,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
               <span>🎒 보유 아이템 및 착용 상태</span>
             </h3>
 
-            {/* 현재 장착된 아이템 요약 카트 */}
+            {/* 현재 장착된 아이템 요약 카드 */}
             <div className="bg-slate-900/90 border border-indigo-500/30 rounded-2xl p-4 space-y-2.5 shadow-lg">
               <span className="text-[10px] font-black text-indigo-400 uppercase tracking-wider block">현재 장착된 설정</span>
               <div className="grid grid-cols-2 gap-2 text-xs font-bold">
@@ -345,51 +383,79 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
               </div>
             </div>
 
-            {/* 획득한 아이템 목록 */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {GACHA_ITEMS.filter(item => unlockedItemIds.includes(item.id)).map(item => {
-                const isEquipped =
-                  (item.category === 'STAMP' && equippedItems.stamp === item.effectValue) ||
-                  (item.category === 'TITLE' && equippedItems.title === item.effectValue) ||
-                  (item.category === 'THEME' && equippedItems.theme === item.effectValue) ||
-                  (item.category === 'AI_VOICE' && equippedItems.aiVoice === item.effectValue);
+            {inventoryLoading ? (
+              <div className="text-center py-8 text-slate-500 text-sm">로딩 중...</div>
+            ) : unlockedItemIds.length === 0 ? (
+              <div className="text-center py-8 text-slate-600 text-sm">
+                <p>🎒 보물가방이 비어있어요!</p>
+                <p className="text-xs mt-1">뽑기 머신에서 아이템을 획득해보세요.</p>
+              </div>
+            ) : (
+              /* 획득한 아이템 목록 */
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {GACHA_ITEMS.filter(item => unlockedItemIds.includes(item.id)).map(item => {
+                  const qty = inventory[item.id] || 0;
+                  const isEquipped =
+                    (item.category === 'STAMP' && equippedItems.stamp === item.effectValue) ||
+                    (item.category === 'TITLE' && equippedItems.title === item.effectValue) ||
+                    (item.category === 'THEME' && equippedItems.theme === item.effectValue) ||
+                    (item.category === 'AI_VOICE' && equippedItems.aiVoice === item.effectValue);
 
-                return (
-                  <div
-                    key={item.id}
-                    className={`p-3.5 rounded-2xl border flex items-center justify-between bg-slate-900/60 transition-all ${
-                      isEquipped ? 'border-amber-400/80 bg-amber-500/10 shadow-lg shadow-amber-500/10' : 'border-slate-800 hover:border-slate-700'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-3 min-w-0">
-                      <span className="text-3xl flex-none">{item.icon}</span>
-                      <div className="min-w-0">
-                        <div className="flex items-center space-x-2">
-                          <span className={`text-[9px] font-black px-1.5 py-0.2 rounded bg-gradient-to-r ${item.color} text-white`}>
-                            {item.rarity}
-                          </span>
-                          <h4 className="text-xs font-black text-white truncate">{item.name}</h4>
+                  return (
+                    <div
+                      key={item.id}
+                      className={`p-3.5 rounded-2xl border flex items-center justify-between bg-slate-900/60 transition-all ${
+                        isEquipped ? 'border-amber-400/80 bg-amber-500/10 shadow-lg shadow-amber-500/10' : 'border-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3 min-w-0">
+                        <div className="relative flex-none">
+                          <span className="text-3xl">{item.icon}</span>
+                          {qty > 1 && (
+                            <span className="absolute -top-1 -right-1 text-[9px] bg-indigo-600 text-white rounded-full w-4 h-4 flex items-center justify-center font-black">
+                              {qty}
+                            </span>
+                          )}
                         </div>
-                        <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">{item.description}</p>
+                        <div className="min-w-0">
+                          <div className="flex items-center space-x-2">
+                            <span className={`text-[9px] font-black px-1.5 py-0.2 rounded bg-gradient-to-r ${item.color} text-white`}>
+                              {item.rarity}
+                            </span>
+                            <h4 className="text-xs font-black text-white truncate">{item.name}</h4>
+                          </div>
+                          <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">{item.description}</p>
+                        </div>
                       </div>
-                    </div>
 
-                    {item.effectValue && (
-                      <button
-                        onClick={() => handleToggleEquip(item)}
-                        className={`px-3 py-1.5 rounded-xl text-[10px] font-black flex-none transition-all ${
-                          isEquipped
-                            ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
-                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                        }`}
-                      >
-                        {isEquipped ? '착용 중 ✓' : '장착하기'}
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                      {/* SHIELD/CHARM 류 소모성 아이템 */}
+                      {item.category === 'SHIELD' && item.id === 'item_name_change' && onUseNameChangeTicket && (
+                        <button
+                          onClick={onUseNameChangeTicket}
+                          className="px-3 py-1.5 rounded-xl text-[10px] font-black flex-none transition-all bg-indigo-700 text-white hover:bg-indigo-600"
+                        >
+                          사용하기
+                        </button>
+                      )}
+
+                      {/* 장착형 아이템 */}
+                      {item.effectValue && item.category !== 'SHIELD' && item.category !== 'CHARM' && (
+                        <button
+                          onClick={() => handleToggleEquip(item)}
+                          className={`px-3 py-1.5 rounded-xl text-[10px] font-black flex-none transition-all ${
+                            isEquipped
+                              ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
+                              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                          }`}
+                        >
+                          {isEquipped ? '착용 중 ✓' : '장착하기'}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
