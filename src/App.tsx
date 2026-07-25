@@ -157,7 +157,7 @@ function App() {
   // 주간 최다 오답 완료 챔피언 정보 로드 + 내 점수 동시 갱신 (하이브리드 1주 이월 및 리셋 롤오버)
   const loadWeeklyChampions = async () => {
     try {
-      // 1. 이번 주 랭킹 뷰 전체 조회 (상위 3명 표시 + 내 점수 추출)
+      // 1. 이번 주 랭킹 뷰 전체 조회
       const { data, error } = await supabase
         .from('weekly_leaderboard')
         .select('*')
@@ -165,25 +165,33 @@ function App() {
 
       if (error) throw error;
 
-      if (data && data.length > 0 && data[0].score > 0) {
-        // 상위 3명 챔피언 세팅
-        const mapped = data.slice(0, 3).map((item: any) => ({ ...item, isLastWeek: false }));
-        setWeeklyChampions(mapped);
+      // 이번주 점수가 0 초과인 데이터만 추출
+      const activeThisWeek = (data || []).filter((item: any) => item.score > 0).map((item: any) => ({ ...item, isLastWeek: false }));
+
+      if (activeThisWeek.length >= 3) {
+        setWeeklyChampions(activeThisWeek.slice(0, 3));
         return;
       }
 
-      // 2. 이번 주 데이터가 없으면 지난주 랭킹 뷰(RLS 우회) 조회 (최대 3명)
+      // 이번 주 복습 완료자가 3명 미만이면 지난주 랭킹(RLS 우회)에서 부족한 인원을 이월 보충
       const { data: lastWeekData, error: lastWeekError } = await supabase
         .from('last_weekly_leaderboard')
         .select('*')
-        .order('score', { ascending: false })
-        .limit(3);
+        .order('score', { ascending: false });
 
-      if (lastWeekError) throw lastWeekError;
+      if (!lastWeekError && lastWeekData) {
+        const activeLastWeek = lastWeekData
+          .filter((item: any) => item.score > 0)
+          .map((item: any) => ({ ...item, isLastWeek: true }));
 
-      if (lastWeekData && lastWeekData.length > 0 && lastWeekData[0].score > 0) {
-        const mapped = lastWeekData.map((item: any) => ({ ...item, isLastWeek: true }));
-        setWeeklyChampions(mapped);
+        // 이미 이번 주 랭킹에 들어있는 유저는 중복 제거
+        const existingUserIds = new Set(activeThisWeek.map(u => u.user_id));
+        const fillFromLastWeek = activeLastWeek.filter(u => !existingUserIds.has(u.user_id));
+
+        const combined = [...activeThisWeek, ...fillFromLastWeek].slice(0, 3);
+        setWeeklyChampions(combined);
+      } else if (activeThisWeek.length > 0) {
+        setWeeklyChampions(activeThisWeek);
       } else {
         // 3. 지난주마저 점수가 없으면 배너를 비워 동기부여 유도
         setWeeklyChampions([]);
