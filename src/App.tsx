@@ -19,7 +19,7 @@ import { SlideListModal } from './components/SlideListModal';
 import { GachaStore } from './components/GachaStore';
 import type { EquippedItems } from './types';
 import { applyThemeColor } from './utils/theme';
-import { loadStreakState, recordReviewStreak, type StreakState } from './utils/streak';
+import { loadStreakState, recordReviewStreak, reconcileStreakState, getNewlyReachedMilestones, type StreakState } from './utils/streak';
 
 function App() {
   // If Supabase credentials are not configured, block and show the setup guide
@@ -147,6 +147,7 @@ function App() {
 
   // DB 지정 보너스 점수 (어드민 또는 이벤트 적립)
   const [myBonusPoints, setMyBonusPoints] = useState<number>(0);
+  const [streakMilestoneClaimed, setStreakMilestoneClaimed] = useState<number>(0); // 이번 스트릭 런에서 이미 지급받은 콤보 보너스 마일스톤 (0/3/7/14)
 
   // 현재 표시 가능한 복습 콤보 보유 점수 (DB 뷰 점수 + DB 보너스 점수 + 상점 사용 포인트 차감치)
   const currentDisplayPoints = Math.max(0, (myWeeklyScoreFromDB || 0) + (myBonusPoints || 0) + pointAdjustment);
@@ -478,7 +479,7 @@ function App() {
       if (targetId) {
         const { data: myProfile } = await supabase
           .from('profiles')
-          .select('nickname, display_name, bonus_points, equipped_title, equipped_stamp, equipped_theme, equipped_ai_voice')
+          .select('nickname, display_name, bonus_points, equipped_title, equipped_stamp, equipped_theme, equipped_ai_voice, current_streak, streak_last_review_date, streak_shields, streak_milestone_claimed')
           .eq('id', targetId)
           .maybeSingle();
         if (myProfile) {
@@ -499,6 +500,17 @@ function App() {
               console.error(e);
             }
           }
+
+          // 🔥 연속 복습 스트릭: 기기를 바꿔도 안 끊기도록 서버 값과 로컬(localStorage) 값을 합쳐 반영
+          const dbStreak: StreakState | null = myProfile.streak_last_review_date
+            ? {
+                currentStreak: myProfile.current_streak || 0,
+                lastReviewDate: myProfile.streak_last_review_date,
+                shieldsCount: myProfile.streak_shields || 0,
+              }
+            : null;
+          setStreakState(prev => reconcileStreakState(dbStreak, prev));
+          setStreakMilestoneClaimed(myProfile.streak_milestone_claimed || 0);
         }
         // 닉네임 변경권 보유 여부 확인 (Header에 버튼 노출 제어)
         checkNameChangeTicket(targetId);
@@ -1079,6 +1091,36 @@ function App() {
 
       if (shieldUsed) {
         alert("🛡️ [스트릭 방어 성공!] 어제 복습을 놓쳤지만, 럭키상점에서 보유한 '스트릭 방어권'이 자동으로 발동되어 🔥 연속 복습 기록이 안전하게 보호되었습니다!");
+      }
+
+      // 🔥 스트릭 서버 동기화 + 3/7/14일 콤보 마일스톤 보너스 지급
+      if (session?.user?.id) {
+        // 스트릭이 새로 시작된 경우(1일차) 이전에 받은 마일스톤은 리셋되어 다시 받을 수 있음
+        const previousClaimed = updatedState.currentStreak === 1 ? 0 : streakMilestoneClaimed;
+        const newMilestones = getNewlyReachedMilestones(previousClaimed, updatedState.currentStreak);
+        const bonusGained = newMilestones.reduce((sum, m) => sum + m.bonus, 0);
+        const newClaimed = newMilestones.length > 0 ? newMilestones[newMilestones.length - 1].days : previousClaimed;
+
+        const streakUpdatePayload: Record<string, number | string> = {
+          current_streak: updatedState.currentStreak,
+          streak_last_review_date: updatedState.lastReviewDate,
+          streak_shields: updatedState.shieldsCount,
+          streak_milestone_claimed: newClaimed,
+        };
+        if (bonusGained > 0) {
+          streakUpdatePayload.bonus_points = (myBonusPoints || 0) + bonusGained;
+        }
+
+        supabase.from('profiles').update(streakUpdatePayload).eq('id', session.user.id).then(({ error: streakSyncError }) => {
+          if (streakSyncError) console.error('Failed to sync streak to server:', streakSyncError);
+        });
+
+        setStreakMilestoneClaimed(newClaimed);
+        if (bonusGained > 0) {
+          setMyBonusPoints(prev => (prev || 0) + bonusGained);
+          const milestoneDaysLabel = newMilestones.map(m => `${m.days}일`).join(', ');
+          alert(`🔥 [연속 복습 콤보 달성!] ${milestoneDaysLabel} 마일스톤 보너스 ${bonusGained}점이 적립되었습니다!`);
+        }
       }
 
       // Refresh peer activities locally
