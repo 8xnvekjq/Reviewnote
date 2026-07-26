@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../services/supabase';
 
 export interface MistakeScaffolding {
@@ -288,7 +289,10 @@ export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> =
 
                   {/* 힌트 사진 — 탭 시 풀스크린 확대 (문제사진과 동일) */}
                   <div
-                    onClick={() => openZoom(sc.image_url)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openZoom(sc.image_url);
+                    }}
                     className="rounded-xl overflow-hidden border border-slate-800 bg-black flex justify-center relative cursor-zoom-in group/scimg"
                   >
                     <img
@@ -364,10 +368,10 @@ export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> =
         </div>
       )}
 
-      {/* 풀스크린 이미지 확대 모달 (문제 사진과 동일 — pinch-to-zoom + 터치 드래그 지원) */}
-      {zoomImageUrl && (
+      {/* 풀스크린 이미지 확대 모달 (React Portal로 document.body에 렌더링하여 overflow/z-index 격리 탈출) */}
+      {zoomImageUrl && createPortal(
         <div
-          className="fixed inset-0 z-[100] bg-black/98 flex items-center justify-center animate-fade-in cursor-zoom-out"
+          className="fixed inset-0 z-[9999] bg-black/98 flex items-center justify-center animate-fade-in cursor-zoom-out"
           onClick={closeZoom}
         >
           <div
@@ -387,12 +391,13 @@ export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> =
           </div>
 
           {/* 배율 표시 + 닫기 가이드 */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 select-none pointer-events-none">
-            <span className="text-[9.5px] text-slate-400 font-extrabold bg-slate-950/85 px-4 py-1.5 rounded-full border border-slate-850 shadow-lg backdrop-blur-md">
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 select-none pointer-events-none">
+            <span className="text-[10.5px] text-amber-300 font-extrabold bg-slate-950/90 px-4 py-2 rounded-full border border-amber-500/30 shadow-2xl backdrop-blur-md pointer-events-auto">
               배율: {scale.toFixed(1)}x　·　탭하면 닫혀요
             </span>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
