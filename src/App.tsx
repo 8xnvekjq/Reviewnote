@@ -1176,11 +1176,17 @@ function App() {
         reviewPointDelta *= 2;
       }
       if (reviewPointDelta !== 0 && session?.user?.id) {
-        const newBonusTotal = Math.max(0, (myBonusPoints || 0) + reviewPointDelta);
-        setMyBonusPoints(newBonusTotal);
-        supabase.from('profiles').update({ bonus_points: newBonusTotal }).eq('id', session.user.id).then(({ error: bonusError }) => {
-          if (bonusError) console.error('Failed to sync review combo points:', bonusError);
-        });
+        // 클라이언트에서 "현재값 + 델타"를 계산해 절대값으로 쓰면 동시 요청(빠른 연속 클릭,
+        // 실시간 동기화 재조회 등)이 겹칠 때 레이스 컨디션으로 포인트가 유실/오적용될 수 있어서,
+        // 서버 측 원자적 증감 RPC로 처리하고 그 응답값을 그대로 신뢰한다.
+        supabase.rpc('increment_bonus_points', { user_id_param: session.user.id, amount_param: reviewPointDelta })
+          .then(({ data, error: bonusError }) => {
+            if (bonusError) {
+              console.error('Failed to sync review combo points:', bonusError);
+            } else if (typeof data === 'number') {
+              setMyBonusPoints(data);
+            }
+          });
       }
 
       // 매일 연속 복습 스트릭 갱신 (🔥 Daily Streak)
@@ -1217,9 +1223,6 @@ function App() {
           streak_shields: updatedState.shieldsCount,
           streak_milestone_claimed: newClaimed,
         };
-        if (bonusGained > 0) {
-          streakUpdatePayload.bonus_points = (myBonusPoints || 0) + bonusGained;
-        }
 
         supabase.from('profiles').update(streakUpdatePayload).eq('id', session.user.id).then(({ error: streakSyncError }) => {
           if (streakSyncError) console.error('Failed to sync streak to server:', streakSyncError);
@@ -1227,7 +1230,15 @@ function App() {
 
         setStreakMilestoneClaimed(newClaimed);
         if (bonusGained > 0) {
-          setMyBonusPoints(prev => (prev || 0) + bonusGained);
+          // 스트릭 보너스도 리뷰 콤보 포인트와 동일하게 원자적 증감 RPC로 처리 (레이스 컨디션 방지)
+          supabase.rpc('increment_bonus_points', { user_id_param: session.user.id, amount_param: bonusGained })
+            .then(({ data, error: bonusRpcError }) => {
+              if (bonusRpcError) {
+                console.error('Failed to grant streak milestone bonus:', bonusRpcError);
+              } else if (typeof data === 'number') {
+                setMyBonusPoints(data);
+              }
+            });
           const milestoneDaysLabel = newMilestones.map(m => `${m.days}일`).join(', ');
           alert(`🔥 [연속 복습 콤보 달성!] ${milestoneDaysLabel} 마일스톤 보너스 ${bonusGained}점이 적립되었습니다!`);
         }
