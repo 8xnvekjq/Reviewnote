@@ -2,6 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* 럭키상점 테마 장착 기능이 재정의하는 indigo 팔레트의 기본값(원래 남색 테마).
+     R G B 공백 구분 형식이어야 tailwind.config.js의 rgb(var(--x) / <alpha-value>) 패턴과 맞물려
+     bg-indigo-500/10 같은 투명도 모디파이어가 정상 동작한다. */
+  --color-indigo-50: 238 242 255;
+  --color-indigo-100: 224 231 255;
+  --color-indigo-200: 199 210 254;
+  --color-indigo-300: 165 180 252;
+  --color-indigo-400: 129 140 248;
+  --color-indigo-500: 99 102 241;
+  --color-indigo-600: 79 70 229;
+  --color-indigo-700: 67 56 202;
+  --color-indigo-800: 55 48 163;
+  --color-indigo-900: 49 46 129;
+  --color-indigo-950: 30 27 75;
+}
+
 @layer base {
   body {
     @apply bg-slate-950 text-slate-100 font-sans antialiased select-none;

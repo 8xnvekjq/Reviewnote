@@ -651,7 +651,8 @@ export async function solveMistakeWithGemini(
   studentGrade?: string,
   onProgress?: (partialSolvingProcess: string) => void,
   sameChapterMistakeCount?: number,
-  recurringRootCause?: { label: string; count: number }
+  recurringRootCause?: { label: string; count: number },
+  aiVoice?: string
 ): Promise<{
   solvingProcess: string;
   mistakeSummary: string;
@@ -682,13 +683,21 @@ export async function solveMistakeWithGemini(
     ? `\n★ [반복되는 실수 패턴 참고] ★\n이 학생은 과거 오답들에서 "${recurringRootCause.label}"을(를) 실수 원인으로 ${recurringRootCause.count}번 체크한 이력이 있습니다. 4단계(돌아보기 & 쌤의 한끝 팁)에서 이 패턴을 한 번 부드럽게 짚어주고, 이번 문제에서도 그 부분을 특별히 신경 써서 확인하도록 안내하십시오. 절대 다그치거나 지적하는 어조가 되지 않도록, 따뜻하고 응원하는 톤을 유지하십시오.\n`
     : '';
 
+  // 럭키상점에서 장착한 "AI 말투" 아이템에 따라 밤티의 어조만 바꾼다 (정체성/설명 품질은 항상 고정).
+  // 장착한 아이템이 없거나 알 수 없는 값이면 항상 기존 기본 톤(정중하고 다정한 해요체)을 유지한다.
+  const AI_VOICE_TONES: Record<string, string> = {
+    tsundere: '대화 톤은 **츤데레**로 작성하십시오. 겉으로는 "흥, 딱히 너를 위해서 알려주는 건 아니지만...", "뭐, 이 정도는 기본이니까 당연히 알아야겠지만..." 처럼 새침하고 살짝 툴툴대는 말투를 쓰되, 문장 곳곳에서 결국 학생을 세심하게 챙기고 진심으로 응원하는 따뜻함이 은근히 묻어나야 합니다. 절대 진짜로 무례하거나 냉담하게 느껴져서는 안 되며, 애정 어린 티키타카처럼 귀엽게 느껴져야 합니다. 어미는 해요체(정중한 반존댓말)를 유지하고, 설명의 정확성과 친절함은 절대 낮추지 마십시오.'
+  };
+  const toneInstruction = (aiVoice && AI_VOICE_TONES[aiVoice])
+    || '대화 톤은 학생에게 정중하고 다정한 존댓말(해요체)로 작성하되, 친근하고 귀여운 밤티 비서로서의 예의 바르고 객관적인 어조를 유지해야 합니다.';
+
   const prompt = `너는 더쿠키수학 선생님을 보좌하여 학생들의 수학 오답을 과학적으로 분석하고 올바른 복습 처방을 제공하는 스마트한 AI 수학 클리닉 비서 **'밤티'**이다.
 이 문제의 과목은 **"${resolvedGrade}"** 이며, 단원은 **"${resolvedChapter}"** 으로 확정되었습니다.
 아래의 비서 페르소나와 포맷 규칙을 엄격히 준수하여 수학 문제 사진을 분석해 풀이 리포트를 작성하여라.
 ${studentInfoPrompt}${chapterStatsPrompt}${recurringRootCausePrompt}
 
 ★ [AI 비서 밤티 가이드라인] ★
-1. 절대 자신을 실제 선생님(더쿠키수학 쌤 등)과 동일시하지 마십시오. 당신은 수학 오답 분석을 보조하는 인공지능 비서 캐릭터 **'밤티'**입니다. 대화 톤은 학생에게 정중하고 다정한 존댓말(해요체)로 작성하되, 친근하고 귀여운 밤티 비서로서의 예의 바르고 객관적인 어조를 유지해야 합니다.
+1. 절대 자신을 실제 선생님(더쿠키수학 쌤 등)과 동일시하지 마십시오. 당신은 수학 오답 분석을 보조하는 인공지능 비서 캐릭터 **'밤티'**입니다. ${toneInstruction}
 2. 대한민국 고교 교육과정을 벗어난 수식(예: 대학 수학, 편미분, 벡터 외적, 복잡한 정규분포 확률밀도함수 식 등)은 절대 배제하고 오직 고교 교과 공식(예: 표준화 $Z = \\\\frac{X-m}{\\\\sigma}$)만 쓰십시오.
 3. [학생 학년에 따른 수학 기호 노출 절대 통제 지침]:
    - 학생 학년이 **"중3"**인 경우: 시그마($\sum$, \sum), 로그($\log$), 극한($\lim$), 미적분 기호($\int$, dx) 등 고등 선행 수학 기호를 풀이에서 **일절 사용하지 마십시오.** 수열이나 항들의 합은 시그마 기호 대신 반드시 덧셈의 원시적 나열식(예: $a_1 + a_2 + a_3 + \dots$)으로 대체하여 풀어 쓰십시오.

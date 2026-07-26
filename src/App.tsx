@@ -18,6 +18,7 @@ import { LaTeXRenderer } from './components/LaTeXRenderer';
 import { SlideListModal } from './components/SlideListModal';
 import { GachaStore } from './components/GachaStore';
 import type { EquippedItems } from './types';
+import { applyThemeColor } from './utils/theme';
 import { loadStreakState, recordReviewStreak, type StreakState } from './utils/streak';
 
 function App() {
@@ -86,6 +87,11 @@ function App() {
       return {};
     }
   });
+
+  // 장착한 테마(hex)가 바뀔 때마다(최초 로드 복원 포함) 앱 전체 indigo 배색에 즉시 반영
+  useEffect(() => {
+    applyThemeColor(equippedItems.theme);
+  }, [equippedItems.theme]);
 
   const [pointAdjustment, setPointAdjustment] = useState<number>(() => {
     try {
@@ -760,7 +766,8 @@ function App() {
         studentGrade,
         onProgress,
         sameChapterMistakeCount,
-        recurringRootCause
+        recurringRootCause,
+        equippedItems.aiVoice
       ),
       extractPromise
     ]);
