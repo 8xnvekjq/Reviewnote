@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { GachaItem, EquippedItems } from '../types';
 import { GACHA_ITEMS, drawGachaItem } from '../utils/gachaCatalog';
 import { supabase } from '../services/supabase';
+import { getKSTDateString } from '../utils/streak';
 
 export interface ExtendedGachaItem extends GachaItem {
   isDuplicate?: boolean;
@@ -16,6 +17,19 @@ const getRefundPointsForRarity = (rarity: string): number => {
     case 'R': return 5;
     default: return 5;
   }
+};
+
+// 이번 주 월요일(한국시간 기준) 날짜 문자열 — weekly_leaderboard SQL 뷰의 date_trunc('week', ...)와 동일한 주 경계 사용
+const getKSTMondayDateString = (date: Date = new Date()): string => {
+  const utc = date.getTime() + date.getTimezoneOffset() * 60000;
+  const kst = new Date(utc + 9 * 3600000);
+  const day = kst.getDay(); // 0=일 ~ 6=토
+  const diffToMonday = day === 0 ? 6 : day - 1;
+  kst.setDate(kst.getDate() - diffToMonday);
+  const year = kst.getFullYear();
+  const month = String(kst.getMonth() + 1).padStart(2, '0');
+  const d = String(kst.getDate()).padStart(2, '0');
+  return `${year}-${month}-${d}`;
 };
 
 interface GachaStoreProps {
@@ -47,6 +61,14 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
   const [drawnItemsResult, setDrawnItemsResult] = useState<ExtendedGachaItem[]>([]);
   const [currentResultIndex, setCurrentResultIndex] = useState(0);
 
+  // 무료 뽑기 사용 이력 (서버 기준 — 기기를 바꿔도 중복 수령 못 하도록)
+  const [lastFreeDrawDate, setLastFreeDrawDate] = useState<string | null>(null);
+  const [lastFreeWeeklyDrawDate, setLastFreeWeeklyDrawDate] = useState<string | null>(null);
+  const todayKst = getKSTDateString();
+  const mondayKst = getKSTMondayDateString();
+  const canFreeDraw1 = lastFreeDrawDate !== todayKst;
+  const canFreeDraw10 = lastFreeWeeklyDrawDate !== mondayKst;
+
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // ── 인벤토리 Supabase 로드 ──────────────────────────────
@@ -70,10 +92,25 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
     }
   };
 
+  // ── 무료 뽑기(일일 1회/주간 10회) 사용 이력 Supabase 로드 ──────
+  const loadFreeDrawStatus = async () => {
+    if (!userId) return;
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('last_free_draw_date, last_free_weekly_draw_date')
+      .eq('id', userId)
+      .maybeSingle();
+    if (!error && data) {
+      setLastFreeDrawDate(data.last_free_draw_date || null);
+      setLastFreeWeeklyDrawDate(data.last_free_weekly_draw_date || null);
+    }
+  };
+
   useEffect(() => {
     // localStorage 구 데이터 제거
     localStorage.removeItem('reviewnote_unlocked_items');
     loadInventory();
+    loadFreeDrawStatus();
 
     const handleInventoryUpdate = () => {
       loadInventory();
@@ -189,15 +226,44 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
     return () => cancelAnimationFrame(animationFrameId);
   };
 
-  // 가챠 뽑기 시작 (count: 1 또는 10)
-  const handleStartDraw = (count: number) => {
+  // 가챠 뽑기 시작 (count: 1 또는 10, isFree: 매일 무료 1회 / 매주 월요일 무료 10회)
+  const handleStartDraw = (count: number, isFree: boolean = false) => {
     const cost = count * 10;
-    if (userPoints < cost) {
+
+    if (isFree) {
+      if (count === 1 && !canFreeDraw1) {
+        alert('🎁 오늘의 무료 1회 뽑기는 이미 사용했어요! 내일 다시 도전해보세요.');
+        return;
+      }
+      if (count === 10 && !canFreeDraw10) {
+        alert('🔥 이번 주 무료 10회 뽑기는 이미 사용했어요! 다음 주 월요일에 다시 열려요.');
+        return;
+      }
+    } else if (userPoints < cost) {
       alert(`⚡ 복습 점수가 부족합니다! (필요: ${cost}점, 현재: ${userPoints}점)\n오답 노트를 복습해서 콤보 점수를 쌓아보세요! 🐱`);
       return;
     }
 
-    onDeductPoints(cost);
+    if (isFree) {
+      // 무료 뽑기 사용 처리 — 서버에 사용 날짜를 기록해서 기기를 바꿔도 중복 수령 못 하게 함
+      if (count === 1) {
+        setLastFreeDrawDate(todayKst);
+        if (userId) {
+          supabase.from('profiles').update({ last_free_draw_date: todayKst }).eq('id', userId).then(({ error }) => {
+            if (error) console.error('무료 1회 뽑기 기록 실패:', error);
+          });
+        }
+      } else {
+        setLastFreeWeeklyDrawDate(mondayKst);
+        if (userId) {
+          supabase.from('profiles').update({ last_free_weekly_draw_date: mondayKst }).eq('id', userId).then(({ error }) => {
+            if (error) console.error('무료 10회 뽑기 기록 실패:', error);
+          });
+        }
+      }
+    } else {
+      onDeductPoints(cost);
+    }
 
     setIsDrawing(true);
     setDrawStep('shaking');
@@ -367,7 +433,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
         {activeSubTab === 'draw' && (
           <div className="flex flex-col items-center justify-center py-6 space-y-6">
             {/* 보물 상자 비주얼 뷰 */}
-            <div className="relative group cursor-pointer" onClick={() => handleStartDraw(1)}>
+            <div className="relative group cursor-pointer" onClick={() => handleStartDraw(1, canFreeDraw1)}>
               <div className="absolute -inset-4 bg-gradient-to-r from-amber-500/20 via-purple-500/30 to-pink-500/20 rounded-full blur-xl animate-pulse" />
               <div className="relative w-44 h-44 bg-gradient-to-b from-slate-900 to-slate-950 border-2 border-amber-500/40 rounded-3xl flex flex-col items-center justify-center shadow-2xl group-hover:scale-105 transition-transform duration-300">
                 <span className="text-7xl group-hover:rotate-6 transition-transform">🧰</span>
@@ -377,28 +443,36 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
               </div>
             </div>
 
-            {/* 뽑기 버튼 패널 */}
+            {/* 뽑기 버튼 패널 — 무료 뽑기가 남아있으면 무료로, 이미 썼으면 점수 차감으로 자동 전환 */}
             <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
               <button
-                onClick={() => handleStartDraw(1)}
-                className="flex flex-col items-center justify-center p-4 rounded-2xl bg-gradient-to-b from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white border border-indigo-400/30 shadow-lg shadow-indigo-600/30 active:scale-95 transition-all"
+                onClick={() => handleStartDraw(1, canFreeDraw1)}
+                className={`flex flex-col items-center justify-center p-4 rounded-2xl text-white border shadow-lg active:scale-95 transition-all ${
+                  canFreeDraw1
+                    ? 'bg-gradient-to-b from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 border-emerald-400/40 shadow-emerald-600/30'
+                    : 'bg-gradient-to-b from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 border-indigo-400/30 shadow-indigo-600/30'
+                }`}
               >
-                <span className="text-sm font-black">1회 뽑기</span>
+                <span className="text-sm font-black">{canFreeDraw1 ? '오늘의 무료 1회' : '1회 뽑기'}</span>
                 <span className="text-xs font-bold text-amber-300 mt-1 flex items-center space-x-1">
-                  <span>⚡ 10점</span>
+                  <span>{canFreeDraw1 ? '무료' : '⚡ 10점'}</span>
                 </span>
               </button>
 
               <button
-                onClick={() => handleStartDraw(10)}
-                className="flex flex-col items-center justify-center p-4 rounded-2xl bg-gradient-to-b from-amber-600 to-purple-700 hover:from-amber-500 hover:to-purple-600 text-white border border-amber-400/40 shadow-lg shadow-purple-600/30 active:scale-95 transition-all relative overflow-hidden"
+                onClick={() => handleStartDraw(10, canFreeDraw10)}
+                className={`flex flex-col items-center justify-center p-4 rounded-2xl text-white border shadow-lg active:scale-95 transition-all relative overflow-hidden ${
+                  canFreeDraw10
+                    ? 'bg-gradient-to-b from-sky-600 to-blue-700 hover:from-sky-500 hover:to-blue-600 border-sky-400/40 shadow-blue-600/30'
+                    : 'bg-gradient-to-b from-amber-600 to-purple-700 hover:from-amber-500 hover:to-purple-600 border-amber-400/40 shadow-purple-600/30'
+                }`}
               >
                 <div className="absolute -right-6 -top-6 w-12 h-12 bg-amber-400/20 rotate-45" />
                 <span className="text-sm font-black flex items-center space-x-1">
-                  <span>🔥 10회 연속 뽑기</span>
+                  <span>{canFreeDraw10 ? '🔥 주간 무료 10회' : '🔥 10회 연속 뽑기'}</span>
                 </span>
                 <span className="text-xs font-bold text-amber-200 mt-1 flex items-center space-x-1">
-                  <span>⚡ 100점</span>
+                  <span>{canFreeDraw10 ? '무료' : '⚡ 100점'}</span>
                 </span>
               </button>
             </div>
