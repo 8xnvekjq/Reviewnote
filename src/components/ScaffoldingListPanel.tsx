@@ -62,7 +62,19 @@ export const ScaffoldingListPanel: React.FC<ScaffoldingListPanelProps> = ({
 
       const mistakeIds = Object.keys(grouped);
 
-      // Fetch mistake entries (profiles 조인 없이 mistakes만 조회)
+      // 2. Fetch profiles for student names
+      const studentIds = Array.from(new Set(rows.map((r: any) => r.student_id)));
+      const { data: profileRows } = await supabase
+        .from('profiles')
+        .select('id, nickname, display_name, email')
+        .in('id', studentIds);
+
+      const profileMap: Record<string, string> = {};
+      (profileRows || []).forEach((p: any) => {
+        profileMap[p.id] = p.nickname || p.display_name || (p.email || '').split('@')[0] || '';
+      });
+
+      // 3. Fetch mistake entries
       const { data: mistakeRows, error: mErr } = await supabase
         .from('mistakes')
         .select('*')
@@ -80,8 +92,7 @@ export const ScaffoldingListPanel: React.FC<ScaffoldingListPanelProps> = ({
         scList.sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
         const latest = scList[scList.length - 1];
-        // student_id는 mistake_scaffoldings에 있음 → 이름은 학생 ID 표시 또는 단순 '학생'으로
-        const studentName = '학생';
+        const studentName = profileMap[m.user_id] || profileMap[latest.student_id] || '';
 
         const entry: MistakeEntry = {
           id: m.id,
@@ -195,7 +206,7 @@ export const ScaffoldingListPanel: React.FC<ScaffoldingListPanelProps> = ({
               <div className="flex items-center justify-between border-b border-slate-850 pb-2">
                 <div className="flex items-center space-x-2">
                   <span className="text-xs font-black text-white group-hover:text-amber-300 transition-colors">
-                    {t.studentName} 학생의 오답노트
+                    {t.studentName ? `${t.studentName} 학생의 오답노트` : '오답노트'}
                   </span>
                   <span className="text-[9px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full">
                     🧩 힌트 {t.scaffoldingCount}개
