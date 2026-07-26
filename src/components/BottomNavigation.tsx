@@ -170,7 +170,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         <button
           onClick={() => setShowRightDrawer(!showRightDrawer)}
           className={`flex flex-col items-center justify-center w-14 h-11 rounded-xl transition-all ${
-            showRightDrawer || ['stats', 'completed'].includes(activeTab)
+            showRightDrawer || ['stats', 'completed', 'activity'].includes(activeTab)
               ? 'text-purple-400 scale-105 font-black'
               : 'text-slate-500 hover:text-slate-300'
           }`}
@@ -192,8 +192,8 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
           {/* 우측에서 스스륵 펼쳐지는 세로 직사각형 메뉴 패널 */}
           <div className="absolute top-0 right-0 bottom-0 w-72 max-w-[85vw] bg-slate-900 border-l border-slate-800 shadow-2xl flex flex-col animate-slide-left z-50 overflow-y-auto">
 
-            {/* 슬라이드 헤더 */}
-            <div className="p-5 border-b border-slate-800 bg-slate-950/60 flex items-center justify-between">
+            {/* 슬라이드 헤더 (safe-top: 노치/상태바에 X 버튼이 가려지지 않도록) */}
+            <div className="safe-top p-5 border-b border-slate-800 bg-slate-950/60 flex items-center justify-between flex-none">
               <div className="flex items-center space-x-2.5">
                 <span className="text-xl">☰</span>
                 <div>
@@ -249,7 +249,23 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                 </div>
               </button>
 
-              {/* 3. 더쿠키수학 핵심 수업자료 */}
+              {/* 3. 🕘 최근 활동기록 */}
+              <button
+                onClick={() => handleSelectMenu('activity')}
+                className={`w-full p-3.5 rounded-2xl border flex items-center space-x-3.5 transition-all text-left group ${
+                  activeTab === 'activity'
+                    ? 'bg-purple-500/10 border-purple-500/50 text-purple-300 font-bold shadow-lg shadow-purple-500/5'
+                    : 'bg-slate-955/60 border-slate-850 hover:border-slate-700 text-slate-300 hover:bg-slate-850'
+                }`}
+              >
+                <span className="text-2xl group-hover:scale-110 transition-transform">🕘</span>
+                <div>
+                  <div className="text-xs font-black text-purple-400">최근 활동기록</div>
+                  <div className="text-[9.5px] text-slate-500 mt-0.5">친구들의 오답 등록 & 복습 소식</div>
+                </div>
+              </button>
+
+              {/* 4. 더쿠키수학 핵심 수업자료 */}
               {onOpenSlideList && (
                 <button
                   onClick={() => {

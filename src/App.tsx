@@ -17,6 +17,7 @@ import { StudentGuide } from './components/StudentGuide';
 import { LaTeXRenderer } from './components/LaTeXRenderer';
 import { SlideListModal } from './components/SlideListModal';
 import { GachaStore } from './components/GachaStore';
+import { RecentActivityFeed } from './components/RecentActivityFeed';
 import { StoreGuideModal } from './components/StoreGuideModal';
 import { getTitleBadgeStyle } from './utils/gachaCatalog';
 import type { EquippedItems } from './types';
@@ -1628,6 +1629,10 @@ function App() {
 
         {activeTab === 'guide' && !isAdmin && (
           <StudentGuide />
+        )}
+
+        {activeTab === 'activity' && (
+          <RecentActivityFeed />
         )}
 
         {/* ── 분석통계 탭 ── */}
