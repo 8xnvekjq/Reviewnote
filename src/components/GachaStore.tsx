@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { GachaItem, EquippedItems } from '../types';
-import { GACHA_ITEMS, drawGachaItem, getRarityTheme } from '../utils/gachaCatalog';
+import { GACHA_ITEMS, drawGachaItem, getRarityTheme, getTitleBadgeStyle } from '../utils/gachaCatalog';
 import { supabase } from '../services/supabase';
 import { getKSTDateString } from '../utils/streak';
 
@@ -830,6 +830,18 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                       <p className="text-[10px] text-slate-500 mt-1 truncate">
                         {isUnlocked ? item.description : '뽑기를 통해 보물을 해금해보세요.'}
                       </p>
+                      {/* 칭호 아이템은 헤더에 실제로 장착됐을 때와 동일한 스타일로 미리보기를 보여줌 */}
+                      {isUnlocked && item.category === 'TITLE' && item.effectValue && (() => {
+                        const badge = getTitleBadgeStyle(item.effectValue);
+                        return (
+                          <div className="mt-1.5">
+                            <span className={`text-[9px] px-2 py-0.5 rounded-full border inline-flex items-center space-x-1 ${badge.style}`}>
+                              <span>{badge.icon}</span>
+                              <span>{item.effectValue}</span>
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 );
