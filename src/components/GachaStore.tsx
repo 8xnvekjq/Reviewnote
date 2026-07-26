@@ -471,7 +471,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
         <div className="flex space-x-1 bg-slate-950 p-1 rounded-2xl border border-slate-800">
           <button
             onClick={() => setActiveSubTab('draw')}
-            className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all ${
+            className={`px-3 py-2 rounded-xl text-[11px] font-extrabold transition-all whitespace-nowrap ${
               activeSubTab === 'draw'
                 ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md scale-105'
                 : 'text-slate-400 hover:text-slate-200'
@@ -481,7 +481,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
           </button>
           <button
             onClick={() => setActiveSubTab('inventory')}
-            className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all relative ${
+            className={`px-3 py-2 rounded-xl text-[11px] font-extrabold transition-all relative whitespace-nowrap ${
               activeSubTab === 'inventory'
                 ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md scale-105'
                 : 'text-slate-400 hover:text-slate-200'
@@ -496,7 +496,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
           </button>
           <button
             onClick={() => setActiveSubTab('catalog')}
-            className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all ${
+            className={`px-3 py-2 rounded-xl text-[11px] font-extrabold transition-all whitespace-nowrap ${
               activeSubTab === 'catalog'
                 ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md scale-105'
                 : 'text-slate-400 hover:text-slate-200'
