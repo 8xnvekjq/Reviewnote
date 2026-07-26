@@ -370,6 +370,19 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // 인벤토리 상태 변경 시 (가챠 보물 획득/사용 시) 닉네임 변경권 수량 실시간 재조회
+  useEffect(() => {
+    const handleInvUpdated = () => {
+      if (session?.user?.id) {
+        checkNameChangeTicket(session.user.id);
+      }
+    };
+    window.addEventListener('reviewnote_inventory_updated', handleInvUpdated);
+    return () => {
+      window.removeEventListener('reviewnote_inventory_updated', handleInvUpdated);
+    };
+  }, [session?.user?.id]);
+
   // ── 실시간 온라인 상태 업데이트 ────────────────────────────
   useEffect(() => {
     if (!session?.user) return;
@@ -604,13 +617,9 @@ function App() {
     }
   };
 
-  // 보물가방에서 닉네임 변경권 사용 시 호출
-  const handleUseNameChangeTicket = async () => {
-    if (!session?.user?.id) return;
-    const newNick = prompt('새로운 닉네임을 입력하세요 (실제 이름은 변경되지 않습니다):', myNickname || '');
-    if (newNick !== null && newNick.trim()) {
-      await handleUpdateNickname(newNick.trim());
-    }
+  // 보물가방에서 닉네임 변경권 사용 시 호출 (중앙 커스텀 팝업 모달 호출)
+  const handleUseNameChangeTicket = () => {
+    window.dispatchEvent(new CustomEvent('reviewnote_open_nickname_modal'));
   };
 
   // 닉네임 변경권 보유 여부 확인
@@ -1352,7 +1361,8 @@ function App() {
         currentUser={currentUser} 
         nickname={myNickname}
         onLogout={handleLogout} 
-        onUpdateNickname={hasNameChangeTicket ? handleUpdateNickname : undefined}
+        onUpdateNickname={handleUpdateNickname}
+        hasNameChangeTicket={hasNameChangeTicket}
         myScore={currentDisplayPoints} 
         onOpenStore={() => setActiveTab('store')}
         equippedTitle={equippedItems.title}
