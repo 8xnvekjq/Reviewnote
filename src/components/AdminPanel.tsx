@@ -3,7 +3,7 @@ import type { AdminUserStat } from '../types';
 import { supabase } from '../services/supabase';
 import { formatDate } from '../utils/date';
 import { CHRONOLOGICAL_CHANGELOGS } from './StudentGuide';
-import { GACHA_ITEMS } from '../utils/gachaCatalog';
+import { GACHA_ITEMS, getTitleBadgeStyle } from '../utils/gachaCatalog';
 
 const GUIDE_ITEMS = [
   {
@@ -600,6 +600,18 @@ export const AdminPanel: React.FC = () => {
                               <span className="text-xs font-bold text-white truncate">{catalogItem.name}</span>
                             </div>
                             <p className="text-[10px] text-slate-500 truncate mt-0.5">{catalogItem.description}</p>
+                            {/* 칭호는 실제 헤더에 보이는 것과 동일한 스타일로 미리보기 (희귀도별 공통 색이 아닌 실제 발광 효과) */}
+                            {slot.category === 'TITLE' && catalogItem.effectValue && (() => {
+                              const titleBadge = getTitleBadgeStyle(catalogItem.effectValue);
+                              return (
+                                <div className="mt-1.5">
+                                  <span className={`text-[9px] px-2 py-0.5 rounded-full border inline-flex items-center space-x-1 ${titleBadge.style}`}>
+                                    <span>{titleBadge.icon}</span>
+                                    <span>{catalogItem.effectValue}</span>
+                                  </span>
+                                </div>
+                              );
+                            })()}
                           </>
                         ) : (
                           <span className="text-xs text-slate-600">미장착 (기본값)</span>
