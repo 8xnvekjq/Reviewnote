@@ -566,10 +566,10 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                         <span className="text-[8.5px] font-extrabold px-1.5 py-0.2 rounded bg-slate-800/90 text-slate-300 border border-slate-700/60 flex-none">
                           {catLabel}
                         </span>
-                        <h4 className="text-xs font-black truncate">{isUnlocked ? item.name : `미해금 ${catLabel}`}</h4>
+                        <h4 className="text-xs font-black truncate">{isUnlocked ? item.name : '미해금 보물'}</h4>
                       </div>
                       <p className="text-[10px] text-slate-500 mt-1 truncate">
-                        {isUnlocked ? item.description : `뽑기를 통해 ${catLabel} 보물을 해금해보세요.`}
+                        {isUnlocked ? item.description : '뽑기를 통해 보물을 해금해보세요.'}
                       </p>
                     </div>
                   </div>
