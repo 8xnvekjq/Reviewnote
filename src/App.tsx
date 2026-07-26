@@ -47,8 +47,6 @@ function App() {
   const [youtubeLectures, setYoutubeLectures] = useState<any[]>([]);
   // 주간 최다 오답 완료 챔피언 상태 (1~3위)
   const [weeklyChampions, setWeeklyChampions] = useState<any[]>([]);
-  // 내 주간 점수 (Supabase weekly_leaderboard DB 뷰 기반 — 배너와 동일 소스)
-  const [myWeeklyScoreFromDB, setMyWeeklyScoreFromDB] = useState<number>(0);
   // 분석통계 탭 학생 필터 상태 (어드민 전용)
   const [statsStudentFilter, setStatsStudentFilter] = useState<string>('all');
   // 분석통계 탭 기간 필터 상태 (디폴트: 'all' 전체기간)
@@ -150,15 +148,23 @@ function App() {
   const [streakMilestoneClaimed, setStreakMilestoneClaimed] = useState<number>(0); // 이번 스트릭 런에서 이미 지급받은 콤보 보너스 마일스톤 (0/3/7/14)
 
   // 내 전체 누적 복습 적립 점수 (Cumulative Score — 럭키상점 포인트는 주간 리셋 없이 연속 모음)
-  const allTimeEarnedPoints = useMemo(() => {
-    if (!mistakes || mistakes.length === 0) return 0;
-    const completedCount = mistakes.filter(m => m.reviews?.filter(r => r === 'O').length === 3).length;
-    const rate = (completedCount / mistakes.length) * 100;
-    return Math.round((completedCount * 10) + (rate * 100));
-  }, [mistakes]);
+  // 완료 오답 개수 * 10점 고정 기준만 사용한다. 이전에는 완료율(rate)에도 가중치를 줬는데,
+  // rate의 분모가 "현재 남아있는 오답 개수"라서 미완료 오답을 지우기만 해도 완료율이 올라가
+  // 실제 복습 없이 점수가 부풀어 오르는 문제가 있었다.
+  const completedReviewCount = mistakes.filter(m => m.reviews?.filter(r => r === 'O').length === 3).length;
+  let allTimeEarnedPoints = completedReviewCount * 10;
+  // 🎟️ 콤보 부스터(포인트 2배권) 보유 시 완료 점수 2배 지급
+  try {
+    const unlockedItemIds: string[] = JSON.parse(localStorage.getItem('reviewnote_unlocked_items') || '[]');
+    if (unlockedItemIds.includes('item_point_booster')) {
+      allTimeEarnedPoints *= 2;
+    }
+  } catch (e) {
+    console.error(e);
+  }
 
   // 현재 표시 가능한 럭키상점 보유 콤보 점수 (누적 전체 점수 + DB 보너스 점수 + 상점 사용 차감치)
-  const currentDisplayPoints = Math.max(0, (allTimeEarnedPoints || myWeeklyScoreFromDB || 0) + (myBonusPoints || 0) + pointAdjustment);
+  const currentDisplayPoints = Math.max(0, allTimeEarnedPoints + (myBonusPoints || 0) + pointAdjustment);
   
   const prevTabRef = useRef(activeTab);
 
@@ -173,24 +179,6 @@ function App() {
     }
     prevTabRef.current = activeTab;
   }, [activeTab, mistakes]);
-
-  // 내 주간 점수 조회 (Supabase weekly_leaderboard 뷰 — 배너·어드민과 동일 소스 통일)
-  const fetchMyWeeklyScore = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('weekly_leaderboard')
-        .select('score')
-        .eq('user_id', userId)
-        .maybeSingle();
-      if (!error && data) {
-        setMyWeeklyScoreFromDB(Math.round(data.score ?? 0));
-      } else {
-        setMyWeeklyScoreFromDB(0);
-      }
-    } catch {
-      setMyWeeklyScoreFromDB(0);
-    }
-  };
 
   // State for image cropping flow
   const [tempCapturedImage, setTempCapturedImage] = useState<string | null>(null);
@@ -237,13 +225,9 @@ function App() {
         // 3. 지난주마저 점수가 없으면 배너를 비워 동기부여 유도
         setWeeklyChampions([]);
       }
-
-      // 이번 주 점수가 없으면 내 점수도 0
-      setMyWeeklyScoreFromDB(0);
     } catch (err) {
       console.error('loadWeeklyChampions failed:', err);
       setWeeklyChampions([]);
-      setMyWeeklyScoreFromDB(0);
     }
   };
 
@@ -337,7 +321,6 @@ function App() {
         fetchAdminStatus(session.user.id);
         loadYoutubeLectures(); // 유튜브 강의 데이터 로드
         loadWeeklyChampions(); // 주간 챔피언 로드
-        fetchMyWeeklyScore(session.user.id); // 내 주간 점수 DB 조회
         fetchGeminiApiKeys(); // 동적 API 키 로드
         fetchDiagnosisStats(); // 평균 진단 소요시간 조회
       }
@@ -353,7 +336,6 @@ function App() {
         fetchAdminStatus(session.user.id);
         loadYoutubeLectures(); // 유튜브 강의 데이터 로드
         loadWeeklyChampions(); // 주간 챔피언 로드
-        fetchMyWeeklyScore(session.user.id); // 내 주간 점수 DB 조회
         fetchGeminiApiKeys(); // 동적 API 키 로드
         fetchDiagnosisStats(); // 평균 진단 소요시간 조회
       } else {
@@ -1134,7 +1116,6 @@ function App() {
       // Refresh peer activities locally
       fetchPeerActivities();
       loadWeeklyChampions(); // MVP 챔피언 배너 즉각 갱신
-      if (session?.user?.id) fetchMyWeeklyScore(session.user.id); // 내 점수 즉각 갱신
     } catch (err: any) {
       console.error('Failed to update reviews:', err);
       // Fallback: update local React state anyway for immediate validation
