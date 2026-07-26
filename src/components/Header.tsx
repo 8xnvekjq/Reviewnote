@@ -57,25 +57,12 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, nickname, onLogout,
       </div>
 
       <div className="flex items-center space-x-2 flex-none min-w-0 whitespace-nowrap">
-        {/* 연속 복습 일수 (🔥 Streak 배지 - 깜빡임 제거) */}
+        {/* 연속 복습 일수 (🔥 Streak 배지 - "연속" 텍스트 빼고 다이어트) */}
         {streakDays !== undefined && streakDays > 0 && (
           <span className="text-[9.5px] text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-full border border-orange-500/30 font-black flex items-center space-x-0.5 flex-none">
             <span>🔥</span>
-            <span>{streakDays}일 연속</span>
+            <span>{streakDays}일</span>
           </span>
-        )}
-
-        {/* 내 주간 점수 미니 배지 (클릭 시 럭키상점으로 이동) */}
-        {myScore !== undefined && (
-          <button 
-            onClick={onOpenStore}
-            className="text-[10px] text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-500/30 font-black flex items-center space-x-1 flex-none animate-fade-in hover:scale-105 active:scale-95 transition-all shadow-sm"
-            title="럭키상점으로 이동"
-          >
-            <span>⚡</span>
-            <span>{myScore}점</span>
-            <span className="text-[8px] bg-amber-400 text-slate-950 px-1 rounded-full ml-0.5 font-bold">🎁</span>
-          </button>
         )}
 
         {/* 칭호 배지 */}
@@ -85,9 +72,9 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, nickname, onLogout,
           </span>
         )}
 
-        {/* 내 아이디/닉네임 클릭 시 펼쳐지는 우측 상단 유저 드롭다운 메뉴 (닉네임 변경 및 로그아웃 포함) */}
+        {/* 내 아이디/닉네임 클릭 시 펼쳐지는 우측 상단 유저 드롭다운 메뉴 (주간 점수, 닉네임 변경, 로그아웃 포함) */}
         <div className="relative">
-          <button 
+          <button
             onClick={() => setShowUserMenu(!showUserMenu)}
             className="text-[10px] text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-750 px-2.5 py-1 rounded-full border border-slate-700 font-bold max-w-[120px] truncate flex items-center space-x-1 transition-all"
             title="내 계정 메뉴"
@@ -100,9 +87,9 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, nickname, onLogout,
           {showUserMenu && (
             <>
               {/* 드롭다운 바깥 클릭 시 닫기 오버레이 */}
-              <div 
-                className="fixed inset-0 z-40" 
-                onClick={() => setShowUserMenu(false)} 
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setShowUserMenu(false)}
               />
 
               {/* 우측 상단 팝업 드롭다운 */}
@@ -114,9 +101,24 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, nickname, onLogout,
                   <p className="text-[10.5px] font-black text-slate-200 truncate">{nickname || currentUser}</p>
                 </div>
 
+                {/* 주간 점수 (탭하면 럭키상점으로 이동, 헤더 배지에서 이쪽으로 이전) */}
+                {myScore !== undefined && (
+                  <button
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      onOpenStore?.();
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg bg-amber-950/30 hover:bg-amber-900/40 text-amber-300 hover:text-amber-200 text-[10.5px] font-bold flex items-center space-x-1.5 transition-colors border border-amber-900/30"
+                  >
+                    <span>⚡</span>
+                    <span>{myScore}점 · 럭키상점</span>
+                    <span className="text-[8px] bg-amber-400 text-slate-950 px-1 rounded-full ml-auto font-bold">🎁</span>
+                  </button>
+                )}
+
                 {/* 닉네임 변경 버튼 (로그아웃 바로 위) */}
                 {onUpdateNickname && (
-                  <button 
+                  <button
                     onClick={async () => {
                       // 프롬프트 기본값은 현재 닉네임만 (아이디 절대 표시 안 함)
                       const input = prompt("새로운 닉네임을 입력하세요 (실제 이름은 변경되지 않습니다):", nickname || '');
@@ -133,7 +135,7 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, nickname, onLogout,
                 )}
 
                 {/* 로그아웃 버튼 */}
-                <button 
+                <button
                   onClick={() => {
                     setShowUserMenu(false);
                     onLogout();
