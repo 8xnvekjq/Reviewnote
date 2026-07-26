@@ -18,6 +18,7 @@ import { LaTeXRenderer } from './components/LaTeXRenderer';
 import { SlideListModal } from './components/SlideListModal';
 import { GachaStore } from './components/GachaStore';
 import { RecentActivityFeed } from './components/RecentActivityFeed';
+import { ScaffoldingListPanel } from './components/ScaffoldingListPanel';
 import { StoreGuideModal } from './components/StoreGuideModal';
 import { getTitleBadgeStyle } from './utils/gachaCatalog';
 import type { EquippedItems } from './types';
@@ -1839,6 +1840,15 @@ function App() {
             )}
           </div>
         )}
+
+        {/* Tab: 🧩 힌트 모음 (스캐폴딩) */}
+        {activeTab === 'scaffolding' && (
+          <ScaffoldingListPanel
+            currentUserId={session?.user?.id || currentUser || ''}
+            isAdmin={isAdmin}
+            onSelectMistake={(entry) => setSelectedEntry(entry)}
+          />
+        )}
       </main>
 
       {/* Selected Entry Detail Modal */}
@@ -1865,6 +1875,8 @@ function App() {
           }}
           equippedStamp={equippedItems.stamp}
           profilesStampMap={profilesStampMap}
+          currentUserId={session?.user?.id || currentUser || ''}
+          isAdmin={isAdmin}
         />
       )}
 

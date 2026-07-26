@@ -170,7 +170,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         <button
           onClick={() => setShowRightDrawer(!showRightDrawer)}
           className={`flex flex-col items-center justify-center w-14 h-11 rounded-xl transition-all ${
-            showRightDrawer || ['stats', 'completed', 'guide'].includes(activeTab)
+            showRightDrawer || ['stats', 'completed', 'guide', 'scaffolding'].includes(activeTab)
               ? 'text-purple-400 scale-105 font-black'
               : 'text-slate-500 hover:text-slate-300'
           }`}
@@ -249,7 +249,23 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                 </div>
               </button>
 
-              {/* 3. 💡 이용안내 (전체메뉴로 이동) */}
+              {/* 3. 🧩 Scaffolding(스캐폴딩) */}
+              <button
+                onClick={() => handleSelectMenu('scaffolding')}
+                className={`w-full p-3.5 rounded-2xl border flex items-center space-x-3.5 transition-all text-left group ${
+                  activeTab === 'scaffolding'
+                    ? 'bg-amber-500/10 border-amber-500/50 text-amber-300 font-bold shadow-lg shadow-amber-500/5'
+                    : 'bg-slate-955/60 border-slate-850 hover:border-slate-700 text-slate-300 hover:bg-slate-850'
+                }`}
+              >
+                <span className="text-2xl group-hover:scale-110 transition-transform">🧩</span>
+                <div>
+                  <div className="text-xs font-black text-amber-400">Scaffolding(스캐폴딩)</div>
+                  <div className="text-[9.5px] text-slate-500 mt-0.5">선생님의 손글씨 풀이 힌트 모음</div>
+                </div>
+              </button>
+
+              {/* 4. 💡 이용안내 (전체메뉴로 이동) */}
               <button
                 onClick={() => handleSelectMenu('guide')}
                 className={`w-full p-3.5 rounded-2xl border flex items-center space-x-3.5 transition-all text-left group ${

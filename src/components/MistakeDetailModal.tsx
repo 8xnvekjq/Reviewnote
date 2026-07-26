@@ -5,6 +5,7 @@ import { LaTeXRenderer } from './LaTeXRenderer';
 import { formatDate } from '../utils/date';
 import { supabase } from '../services/supabase';
 import { GACHA_ITEMS, getRarityTheme } from '../utils/gachaCatalog';
+import { MistakeScaffoldingDrawer } from './MistakeScaffoldingDrawer';
 
 interface MistakeDetailModalProps {
   selectedEntry: MistakeEntry;
@@ -22,6 +23,8 @@ interface MistakeDetailModalProps {
   isReviewSession?: boolean;
   equippedStamp?: string;
   profilesStampMap?: Record<string, string>;
+  currentUserId?: string;
+  isAdmin?: boolean;
 }
 
 const INITIAL_PHRASES = [
@@ -45,6 +48,8 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   isReviewSession = false,
   equippedStamp,
   profilesStampMap = {},
+  currentUserId = '',
+  isAdmin = false,
 }) => {
   const authorStamp = selectedEntry.userId ? (profilesStampMap[selectedEntry.userId] || equippedStamp) : equippedStamp;
   // 장착한 스탬프의 실제 뽑기 등급(UR/SSR/SR/R)에 맞는 테두리 클래스
@@ -965,6 +970,14 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                   )}
                 </div>
               )}
+
+              {/* Card 0.5: 선생님 힌트 (스캐폴딩) (접힘 상태 디폴트) */}
+              <MistakeScaffoldingDrawer
+                mistakeId={selectedEntry.id}
+                studentId={selectedEntry.userId || ''}
+                currentUserId={currentUserId || ''}
+                isAdmin={isAdmin}
+              />
 
               {/* Card 1: 정석 풀이 과정 */}
               <div className="space-y-2 border-l-4 border-indigo-500 pl-4 py-1">
