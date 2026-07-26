@@ -20,7 +20,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'TITLE',
     icon: '🚀',
     effectValue: '우주 최강 수재',
-    color: 'from-cyan-400 via-purple-400 to-pink-500'
+    color: 'from-amber-400 via-pink-500 to-purple-500'
   },
   {
     id: 'stamp_diamond',
@@ -30,7 +30,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'STAMP',
     icon: '💎',
     effectValue: '💎',
-    color: 'from-cyan-400 via-sky-300 to-blue-500'
+    color: 'from-amber-400 via-pink-500 to-purple-500'
   },
   {
     id: 'stamp_rocket',
@@ -40,7 +40,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'STAMP',
     icon: '🚀',
     effectValue: '🚀',
-    color: 'from-orange-400 via-red-500 to-purple-600'
+    color: 'from-amber-400 via-pink-500 to-purple-500'
   },
   {
     id: 'charm_score_hundred',
@@ -50,7 +50,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'CHARM',
     icon: '🎴',
     effectValue: '시험 100점 선택',
-    color: 'from-amber-300 via-pink-400 to-purple-600'
+    color: 'from-amber-400 via-pink-500 to-purple-500'
   },
   {
     id: 'theme_legendary_gold',
@@ -60,7 +60,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'THEME',
     icon: '☀️',
     effectValue: '#F59E0B',
-    color: 'from-amber-300 via-pink-400 to-purple-600'
+    color: 'from-amber-400 via-pink-500 to-purple-500'
   },
   {
     id: 'theme_nebula_pink',
@@ -70,7 +70,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'THEME',
     icon: '🌸',
     effectValue: '#EC4899',
-    color: 'from-pink-400 via-rose-500 to-purple-600'
+    color: 'from-amber-400 via-pink-500 to-purple-500'
   },
 
   // ── SSR (7%) - Super Special Rare (황금 빛) ────────────────────────
@@ -82,7 +82,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'SHIELD',
     icon: '🎟️',
     effectValue: 'point_booster',
-    color: 'from-amber-400 to-yellow-600'
+    color: 'from-amber-400 via-yellow-400 to-amber-500'
   },
   {
     id: 'charm_grade_one',
@@ -92,7 +92,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'CHARM',
     icon: '🎴',
     effectValue: '1등급 선택',
-    color: 'from-amber-400 to-rose-500'
+    color: 'from-amber-400 via-yellow-400 to-amber-500'
   },
   {
     id: 'stamp_cat_paw',
@@ -102,7 +102,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'STAMP',
     icon: '🐾',
     effectValue: '🐾',
-    color: 'from-amber-300 to-amber-500'
+    color: 'from-amber-400 via-yellow-400 to-amber-500'
   },
   {
     id: 'stamp_lightning',
@@ -112,7 +112,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'STAMP',
     icon: '⚡',
     effectValue: '⚡',
-    color: 'from-yellow-400 to-amber-500'
+    color: 'from-amber-400 via-yellow-400 to-amber-500'
   },
   {
     id: 'stamp_cherry_blossom',
@@ -122,7 +122,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'STAMP',
     icon: '🌸',
     effectValue: '🌸',
-    color: 'from-pink-300 to-rose-500'
+    color: 'from-amber-400 via-yellow-400 to-amber-500'
   },
   {
     id: 'theme_ocean_blue',
@@ -132,7 +132,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'THEME',
     icon: '🌊',
     effectValue: '#3B82F6',
-    color: 'from-blue-400 to-cyan-600'
+    color: 'from-amber-400 via-yellow-400 to-amber-500'
   },
   {
     id: 'theme_toxic_lime',
@@ -142,7 +142,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'THEME',
     icon: '🧪',
     effectValue: '#84CC16',
-    color: 'from-lime-400 to-emerald-600'
+    color: 'from-amber-400 via-yellow-400 to-amber-500'
   },
   {
     id: 'ai_tsundere',
@@ -152,7 +152,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'AI_VOICE',
     icon: '😼',
     effectValue: 'tsundere',
-    color: 'from-pink-400 to-purple-600'
+    color: 'from-amber-400 via-yellow-400 to-amber-500'
   },
   {
     id: 'ai_seonbi',
@@ -162,7 +162,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'AI_VOICE',
     icon: '📜',
     effectValue: 'seonbi',
-    color: 'from-amber-400 to-yellow-600'
+    color: 'from-amber-400 via-yellow-400 to-amber-500'
   },
   {
     id: 'ai_sherlock',
@@ -172,7 +172,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'AI_VOICE',
     icon: '🕵️',
     effectValue: 'sherlock',
-    color: 'from-indigo-400 to-slate-700'
+    color: 'from-amber-400 via-yellow-400 to-amber-500'
   },
   {
     id: 'ai_knight',
@@ -182,7 +182,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'AI_VOICE',
     icon: '🛡️',
     effectValue: 'knight',
-    color: 'from-red-400 to-amber-600'
+    color: 'from-amber-400 via-yellow-400 to-amber-500'
   },
   {
     id: 'title_22_killer',
@@ -192,7 +192,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'TITLE',
     icon: '⚔️',
     effectValue: '킬러문항 포식자',
-    color: 'from-red-400 to-amber-500'
+    color: 'from-amber-400 via-yellow-400 to-amber-500'
   },
 
   // ── SR (22%) - Special Rare (보라빛) ────────────────────────
@@ -204,7 +204,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'SHIELD',
     icon: '🏷️',
     effectValue: 'name_change',
-    color: 'from-slate-400 to-slate-600'
+    color: 'from-purple-400 via-indigo-400 to-purple-600'
   },
   {
     id: 'theme_emerald',
@@ -214,7 +214,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'THEME',
     icon: '🟢',
     effectValue: '#10B981',
-    color: 'from-emerald-400 to-teal-600'
+    color: 'from-purple-400 via-indigo-400 to-purple-600'
   },
   {
     id: 'theme_cyber_purple',
@@ -224,7 +224,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'THEME',
     icon: '🟣',
     effectValue: '#8B5CF6',
-    color: 'from-purple-400 to-indigo-600'
+    color: 'from-purple-400 via-indigo-400 to-purple-600'
   },
   {
     id: 'theme_aurora',
@@ -234,7 +234,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'THEME',
     icon: '🌌',
     effectValue: '#06B6D4',
-    color: 'from-cyan-400 to-blue-600'
+    color: 'from-purple-400 via-indigo-400 to-purple-600'
   },
   {
     id: 'theme_coral',
@@ -244,7 +244,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'THEME',
     icon: '🌅',
     effectValue: '#F43F5E',
-    color: 'from-rose-400 to-pink-600'
+    color: 'from-purple-400 via-indigo-400 to-purple-600'
   },
   {
     id: 'ai_healing',
@@ -254,7 +254,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'AI_VOICE',
     icon: '🧘',
     effectValue: 'healing',
-    color: 'from-teal-300 to-emerald-500'
+    color: 'from-purple-400 via-indigo-400 to-purple-600'
   },
   {
     id: 'ai_cyberpunk',
@@ -264,7 +264,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'AI_VOICE',
     icon: '🤖',
     effectValue: 'cyberpunk',
-    color: 'from-cyan-400 to-purple-600'
+    color: 'from-purple-400 via-indigo-400 to-purple-600'
   },
   {
     id: 'item_streak_shield',
@@ -274,7 +274,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'SHIELD',
     icon: '🛡️',
     effectValue: 'streak_shield',
-    color: 'from-blue-400 to-indigo-600'
+    color: 'from-purple-400 via-indigo-400 to-purple-600'
   },
   {
     id: 'title_calculator',
@@ -284,7 +284,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'TITLE',
     icon: '🔮',
     effectValue: '계산의 달인',
-    color: 'from-indigo-400 to-purple-500'
+    color: 'from-purple-400 via-indigo-400 to-purple-600'
   },
 
   // ── R (70%) - Rare (파란/일반 빛) ───────────────────────────
@@ -296,7 +296,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'CHARM',
     icon: '🎴',
     effectValue: '찍기 신공',
-    color: 'from-sky-400 to-blue-600'
+    color: 'from-sky-400 via-blue-400 to-indigo-500'
   },
   {
     id: 'charm_no_mistake',
@@ -304,9 +304,9 @@ export const GACHA_ITEMS: GachaItem[] = [
     description: '부호 실수, 덧셈 실수를 싹 막아주는 시험 대박 예방 부적입니다.',
     rarity: 'R',
     category: 'CHARM',
-    icon: '🧧',
+    icon: '<ctrl42>',
     effectValue: '실수 퇴치',
-    color: 'from-blue-400 to-indigo-500'
+    color: 'from-sky-400 via-blue-400 to-indigo-500'
   },
   {
     id: 'theme_classic_mono',
@@ -316,7 +316,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'THEME',
     icon: '🖤',
     effectValue: '#64748B',
-    color: 'from-slate-400 to-slate-600'
+    color: 'from-sky-400 via-blue-400 to-indigo-500'
   },
   {
     id: 'theme_warm_latte',
@@ -326,7 +326,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'THEME',
     icon: '☕',
     effectValue: '#D97706',
-    color: 'from-amber-600 to-orange-700'
+    color: 'from-sky-400 via-blue-400 to-indigo-500'
   },
   {
     id: 'ai_sergeant',
@@ -336,7 +336,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'AI_VOICE',
     icon: '🎖️',
     effectValue: 'sergeant',
-    color: 'from-green-500 to-emerald-700'
+    color: 'from-sky-400 via-blue-400 to-indigo-500'
   },
   {
     id: 'ai_poet',
@@ -346,7 +346,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'AI_VOICE',
     icon: '☕',
     effectValue: 'poet',
-    color: 'from-amber-600 to-orange-800'
+    color: 'from-sky-400 via-blue-400 to-indigo-500'
   },
   {
     id: 'ai_vampire',
@@ -356,7 +356,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'AI_VOICE',
     icon: '🧛',
     effectValue: 'vampire',
-    color: 'from-purple-800 to-rose-950'
+    color: 'from-sky-400 via-blue-400 to-indigo-500'
   },
   {
     id: 'stamp_star',
@@ -366,7 +366,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'STAMP',
     icon: '⭐',
     effectValue: '⭐',
-    color: 'from-amber-300 to-yellow-500'
+    color: 'from-sky-400 via-blue-400 to-indigo-500'
   },
   {
     id: 'title_pythagoras',
@@ -376,7 +376,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'TITLE',
     icon: '📐',
     effectValue: '피타고라스의 후예',
-    color: 'from-blue-400 to-teal-500'
+    color: 'from-sky-400 via-blue-400 to-indigo-500'
   },
   {
     id: 'stamp_fire',
@@ -386,7 +386,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'STAMP',
     icon: '🔥',
     effectValue: '🔥',
-    color: 'from-orange-400 to-red-500'
+    color: 'from-sky-400 via-blue-400 to-indigo-500'
   },
   {
     id: 'title_night_owl',
@@ -396,7 +396,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'TITLE',
     icon: '🦉',
     effectValue: '새벽의 오답마스터',
-    color: 'from-slate-500 to-slate-700'
+    color: 'from-sky-400 via-blue-400 to-indigo-500'
   }
 ];
 
@@ -423,3 +423,76 @@ export function drawGachaItem(): GachaItem {
   const selectedIndex = Math.floor(Math.random() * pool.length);
   return pool[selectedIndex];
 }
+
+// ── 칭호 희귀도별 화려한 이펙트 스타일 공통 반환 함수 ─────────────────
+export const getTitleBadgeStyle = (title: string) => {
+  if (title.includes('수학의 신')) {
+    return {
+      style: 'bg-gradient-to-r from-amber-400 via-pink-500 to-purple-500 text-white border-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.6)] animate-pulse font-black',
+      icon: '👑'
+    };
+  }
+  if (title.includes('우주') || title.includes('수재')) {
+    return {
+      style: 'bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-500 text-white border-cyan-300 shadow-[0_0_10px_rgba(6,182,212,0.6)] animate-pulse font-black',
+      icon: '🚀'
+    };
+  }
+  if (title.includes('킬러문항') || title.includes('포식자')) {
+    return {
+      style: 'bg-gradient-to-r from-amber-500/30 via-yellow-500/40 to-amber-500/30 text-amber-300 border border-amber-400/70 shadow-[0_0_8px_rgba(251,191,36,0.4)] font-black',
+      icon: '⚔️'
+    };
+  }
+  if (title.includes('계산') || title.includes('달인')) {
+    return {
+      style: 'bg-gradient-to-r from-purple-500/30 to-indigo-500/30 text-purple-300 border border-purple-400/60 shadow-[0_0_6px_rgba(168,85,247,0.3)] font-black',
+      icon: '🔮'
+    };
+  }
+  if (title.includes('피타고라스')) {
+    return {
+      style: 'bg-gradient-to-r from-blue-500/30 to-teal-500/30 text-cyan-300 border border-cyan-400/60 shadow-[0_0_6px_rgba(6,182,212,0.3)] font-black',
+      icon: '📐'
+    };
+  }
+  return {
+    style: 'bg-slate-800/90 text-sky-300 border border-slate-700 font-black shadow-sm',
+    icon: '🦉'
+  };
+};
+
+// ── 등급별(UR/SSR/SR/R) 100% 통일된 테마 스타일 반환 함수 ─────────────
+export const getRarityTheme = (rarity: GachaRarity) => {
+  switch (rarity) {
+    case 'UR':
+      return {
+        badge: 'bg-gradient-to-r from-amber-400 via-pink-500 to-purple-500 text-white font-black animate-pulse shadow-md shadow-amber-500/20',
+        border: 'border-amber-400/60 shadow-[0_0_12px_rgba(245,158,11,0.25)]',
+        bgGradient: 'from-amber-400 via-pink-500 to-purple-500',
+        textColor: 'text-amber-300',
+      };
+    case 'SSR':
+      return {
+        badge: 'bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-slate-950 font-black shadow-sm',
+        border: 'border-amber-400/50 shadow-[0_0_8px_rgba(251,191,36,0.2)]',
+        bgGradient: 'from-amber-400 via-yellow-400 to-amber-500',
+        textColor: 'text-amber-400',
+      };
+    case 'SR':
+      return {
+        badge: 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-black shadow-sm',
+        border: 'border-purple-500/50 shadow-[0_0_8px_rgba(168,85,247,0.2)]',
+        bgGradient: 'from-purple-400 via-indigo-400 to-purple-600',
+        textColor: 'text-purple-300',
+      };
+    case 'R':
+    default:
+      return {
+        badge: 'bg-gradient-to-r from-sky-400 to-blue-500 text-white font-black shadow-sm',
+        border: 'border-sky-500/40 shadow-[0_0_6px_rgba(56,189,248,0.15)]',
+        bgGradient: 'from-sky-400 via-blue-400 to-indigo-500',
+        textColor: 'text-sky-300',
+      };
+  }
+};

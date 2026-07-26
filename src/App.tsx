@@ -17,6 +17,7 @@ import { StudentGuide } from './components/StudentGuide';
 import { LaTeXRenderer } from './components/LaTeXRenderer';
 import { SlideListModal } from './components/SlideListModal';
 import { GachaStore } from './components/GachaStore';
+import { getTitleBadgeStyle } from './utils/gachaCatalog';
 import type { EquippedItems } from './types';
 import { applyThemeColor } from './utils/theme';
 import { loadStreakState, recordReviewStreak, reconcileStreakState, getNewlyReachedMilestones, type StreakState } from './utils/streak';
@@ -1418,33 +1419,6 @@ function App() {
 
                     const isMe = champ && (champ.username === currentUser || champ.user_id === currentUser);
                     const activeTitle = (isMe && equippedItems.title) ? equippedItems.title : (champ?.title || undefined);
-
-                    // 칭호 희귀도별 화려한 이펙트 스타일 구분
-                    const getTitleBadgeStyle = (title: string) => {
-                      if (title.includes('수학의 신')) {
-                        return {
-                          style: 'bg-gradient-to-r from-amber-400 via-pink-500 to-purple-500 text-white border-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.5)] animate-pulse',
-                          icon: '👑'
-                        };
-                      }
-                      if (title.includes('킬러문항') || title.includes('포식자')) {
-                        return {
-                          style: 'bg-gradient-to-r from-amber-500/25 via-yellow-500/35 to-amber-500/25 text-amber-300 border-amber-400/60 shadow-[0_0_8px_rgba(251,191,36,0.35)]',
-                          icon: '⚔️'
-                        };
-                      }
-                      if (title.includes('계산') || title.includes('달인')) {
-                        return {
-                          style: 'bg-gradient-to-r from-purple-500/25 to-indigo-500/25 text-purple-300 border-purple-400/50 shadow-[0_0_6px_rgba(168,85,247,0.25)]',
-                          icon: '🔮'
-                        };
-                      }
-                      return {
-                        style: 'bg-slate-800/90 text-sky-300 border-slate-700',
-                        icon: '🦉'
-                      };
-                    };
-
                     const titleBadge = activeTitle ? getTitleBadgeStyle(activeTitle) : null;
 
                     const nameToDisplay = champ?.nickname || champ?.display_name;

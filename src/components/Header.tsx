@@ -1,5 +1,6 @@
 import React from 'react';
 import logoImg from '../assets/logo.jpg';
+import { getTitleBadgeStyle } from '../utils/gachaCatalog';
 
 // vite.config.ts의 define 블록에서 빌드 시 자동 주입
 declare const __APP_VERSION__: string;
@@ -89,12 +90,16 @@ export const Header: React.FC<HeaderProps> = ({
             </span>
           )}
 
-          {/* 칭호 배지 */}
-          {equippedTitle && (
-            <span className="text-[9px] text-amber-300 bg-gradient-to-r from-amber-500/20 to-purple-500/20 px-2 py-0.5 rounded-full border border-amber-500/40 font-black truncate max-w-[90px] flex-none">
-              👑 {equippedTitle}
-            </span>
-          )}
+          {/* 칭호 배지 (희귀도별 삐까뻔쩍 글로우 발광 이펙트 적용) */}
+          {equippedTitle && (() => {
+            const badge = getTitleBadgeStyle(equippedTitle);
+            return (
+              <span className={`text-[9px] px-2 py-0.5 rounded-full border truncate max-w-[105px] flex-none flex items-center space-x-0.5 ${badge.style}`}>
+                <span>{badge.icon}</span>
+                <span>{equippedTitle}</span>
+              </span>
+            );
+          })()}
 
           {/* 내 계정 메뉴 드롭다운 */}
           <div className="relative">

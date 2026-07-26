@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { GachaItem, EquippedItems } from '../types';
-import { GACHA_ITEMS, drawGachaItem } from '../utils/gachaCatalog';
+import { GACHA_ITEMS, drawGachaItem, getRarityTheme } from '../utils/gachaCatalog';
 import { supabase } from '../services/supabase';
 import { getKSTDateString } from '../utils/streak';
 
@@ -594,6 +594,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                     const p = log.profiles;
                     const userName = log.user_name || p?.nickname || p?.display_name || '학생';
                     const isUR = log.rarity === 'UR';
+                    const rTheme = getRarityTheme(log.rarity as any);
 
                     const formatRelativeTime = (isoString: string) => {
                       try {
@@ -617,7 +618,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                         key={log.id}
                         className={`p-2.5 px-3 rounded-xl border flex items-center justify-between text-xs whitespace-nowrap transition-all ${
                           isUR
-                            ? 'bg-slate-900/90 border-amber-500/30 shadow-sm'
+                            ? 'bg-slate-900/90 border-amber-500/40 shadow-sm'
                             : 'bg-slate-955/80 border-slate-850'
                         }`}
                       >
@@ -628,12 +629,10 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
 
                         {/* 우측 (오른쪽 완벽 정렬): 희귀도 배지 + 획득 아이템 명칭 + 상대 시간 */}
                         <div className="flex items-center justify-end space-x-1.5 flex-1 min-w-0 text-right overflow-hidden">
-                          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded flex-none ${
-                            isUR ? 'bg-gradient-to-r from-amber-400 via-pink-500 to-purple-500 text-white' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                          }`}>
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded flex-none ${rTheme.badge}`}>
                             {log.rarity}
                           </span>
-                          <span className="text-xs font-extrabold text-amber-200 truncate text-right min-w-0">
+                          <span className={`text-xs font-extrabold truncate text-right min-w-0 ${rTheme.textColor}`}>
                             {log.item_name}
                           </span>
                           <span className="text-[9.5px] text-slate-500 font-bold whitespace-nowrap flex-none text-right pl-1">
