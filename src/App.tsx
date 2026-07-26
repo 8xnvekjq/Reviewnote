@@ -41,6 +41,7 @@ function App() {
   const [myNickname, setMyNickname] = useState<string>('');
   // 닉네임 변경권 보유 여부
   const [hasNameChangeTicket, setHasNameChangeTicket] = useState<boolean>(false);
+  const [hasPointBooster, setHasPointBooster] = useState<boolean>(false); // 콤보 부스터(포인트 2배권) 보유 여부
   // userId -> displayName map (admin 전용)
   const [profilesMap, setProfilesMap] = useState<Record<string, string>>({});
   // 유튜브 매칭용 강의 마스터 리스트 상태
@@ -91,6 +92,15 @@ function App() {
     applyThemeColor(equippedItems.theme);
   }, [equippedItems.theme]);
 
+  // 럭키상점에서 뽑기/아이템 소모로 인벤토리가 바뀔 때마다 콤보 부스터 보유 여부 재확인
+  useEffect(() => {
+    const handleInventoryUpdate = () => {
+      if (session?.user?.id) checkPointBooster(session.user.id);
+    };
+    window.addEventListener('reviewnote_inventory_updated', handleInventoryUpdate);
+    return () => window.removeEventListener('reviewnote_inventory_updated', handleInventoryUpdate);
+  }, [session?.user?.id]);
+
   const [pointAdjustment, setPointAdjustment] = useState<number>(() => {
     try {
       const saved = localStorage.getItem('reviewnote_point_adj');
@@ -139,6 +149,12 @@ function App() {
       } catch (e) {
         console.error(e);
       }
+      // 기기를 바꿔도 쓴 점수가 정확히 반영되도록 서버에도 동기화
+      if (session?.user?.id) {
+        supabase.from('profiles').update({ point_adjustment: next }).eq('id', session.user.id).then(({ error }) => {
+          if (error) console.error('Failed to sync point adjustment to server:', error);
+        });
+      }
       return next;
     });
   };
@@ -153,14 +169,9 @@ function App() {
   // 실제 복습 없이 점수가 부풀어 오르는 문제가 있었다.
   const completedReviewCount = mistakes.filter(m => m.reviews?.filter(r => r === 'O').length === 3).length;
   let allTimeEarnedPoints = completedReviewCount * 10;
-  // 🎟️ 콤보 부스터(포인트 2배권) 보유 시 완료 점수 2배 지급
-  try {
-    const unlockedItemIds: string[] = JSON.parse(localStorage.getItem('reviewnote_unlocked_items') || '[]');
-    if (unlockedItemIds.includes('item_point_booster')) {
-      allTimeEarnedPoints *= 2;
-    }
-  } catch (e) {
-    console.error(e);
+  // 🎟️ 콤보 부스터(포인트 2배권) 보유 시 완료 점수 2배 지급 (hasPointBooster는 Supabase user_items 기준)
+  if (hasPointBooster) {
+    allTimeEarnedPoints *= 2;
   }
 
   // 현재 표시 가능한 럭키상점 보유 콤보 점수 (누적 전체 점수 + DB 보너스 점수 + 상점 사용 차감치)
@@ -469,7 +480,7 @@ function App() {
       if (targetId) {
         const { data: myProfile } = await supabase
           .from('profiles')
-          .select('nickname, display_name, bonus_points, equipped_title, equipped_stamp, equipped_theme, equipped_ai_voice, current_streak, streak_last_review_date, streak_shields, streak_milestone_claimed')
+          .select('nickname, display_name, bonus_points, point_adjustment, equipped_title, equipped_stamp, equipped_theme, equipped_ai_voice, current_streak, streak_last_review_date, streak_shields, streak_milestone_claimed')
           .eq('id', targetId)
           .maybeSingle();
         if (myProfile) {
@@ -480,15 +491,15 @@ function App() {
             theme: myProfile.equipped_theme || undefined,
             aiVoice: myProfile.equipped_ai_voice || undefined,
           });
-          const bonus = myProfile.bonus_points || 0;
-          setMyBonusPoints(bonus);
-          if (bonus > 0) {
-            setPointAdjustment(0);
-            try {
-              localStorage.removeItem('reviewnote_point_adj');
-            } catch (e) {
-              console.error(e);
-            }
+          setMyBonusPoints(myProfile.bonus_points || 0);
+
+          // 🎟️ 럭키상점에서 쓴 점수(포인트 차감치)를 서버 기준으로 복원 — 기기를 바꿔도 잔액이 정확하게 유지됨
+          const dbPointAdjustment = myProfile.point_adjustment ?? 0;
+          setPointAdjustment(dbPointAdjustment);
+          try {
+            localStorage.setItem('reviewnote_point_adj', String(dbPointAdjustment));
+          } catch (e) {
+            console.error(e);
           }
 
           // 🔥 연속 복습 스트릭: 기기를 바꿔도 안 끊기도록 서버 값과 로컬(localStorage) 값을 합쳐 반영
@@ -504,6 +515,8 @@ function App() {
         }
         // 닉네임 변경권 보유 여부 확인 (Header에 버튼 노출 제어)
         checkNameChangeTicket(targetId);
+        // 콤보 부스터(포인트 2배권) 보유 여부 확인 (Supabase user_items 기준 실시간 조회)
+        checkPointBooster(targetId);
       }
 
       // Fetch all profiles for admin name mapping (display_name, school_grade, equipped_stamp 포함)
@@ -611,6 +624,19 @@ function App() {
       .eq('item_id', 'item_name_change')
       .maybeSingle();
     setHasNameChangeTicket(!!(data && data.quantity > 0));
+  };
+
+  // 콤보 부스터(포인트 2배권) 보유 여부 확인 (Supabase user_items 기준 — localStorage 구 인벤토리 키는 더 이상 쓰이지 않음)
+  const checkPointBooster = async (targetUserId?: string) => {
+    const targetId = targetUserId || session?.user?.id;
+    if (!targetId) return;
+    const { data } = await supabase
+      .from('user_items')
+      .select('quantity')
+      .eq('user_id', targetId)
+      .eq('item_id', 'item_point_booster')
+      .maybeSingle();
+    setHasPointBooster(!!(data && data.quantity > 0));
   };
 
   // Fetch recent peer review activities from read-only VIEW
@@ -1068,15 +1094,18 @@ function App() {
       setSelectedEntry(prev => prev && prev.id === id ? updatedEntry : prev);
       
       // 매일 연속 복습 스트릭 갱신 (🔥 Daily Streak)
-      const unlockedItemIds: string[] = (() => {
-        try {
-          const saved = localStorage.getItem('reviewnote_unlocked_items');
-          return saved ? JSON.parse(saved) : [];
-        } catch {
-          return [];
-        }
-      })();
-      const hasShieldItem = unlockedItemIds.includes('item_streak_shield');
+      // 방어권 보유 여부는 Supabase user_items에서 실시간 조회 (인벤토리가 이전되면서
+      // localStorage 'reviewnote_unlocked_items' 키는 더 이상 채워지지 않는 죽은 키였음)
+      let hasShieldItem = false;
+      if (session?.user?.id) {
+        const { data: shieldRow } = await supabase
+          .from('user_items')
+          .select('quantity')
+          .eq('user_id', session.user.id)
+          .eq('item_id', 'item_streak_shield')
+          .maybeSingle();
+        hasShieldItem = !!(shieldRow && shieldRow.quantity > 0);
+      }
       const { updatedState, shieldUsed } = recordReviewStreak(streakState, hasShieldItem);
       setStreakState(updatedState);
 

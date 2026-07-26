@@ -117,6 +117,9 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
       });
       return next;
     });
+
+    // 방어권/콤보 부스터처럼 App 상단 로직이 참조하는 아이템 보유 여부를 즉시 재확인하도록 알림
+    window.dispatchEvent(new CustomEvent('reviewnote_inventory_updated'));
   };
 
   // 보유 아이템 id 목록 (quantity > 0)
