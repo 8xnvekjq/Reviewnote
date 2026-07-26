@@ -9,6 +9,22 @@ export interface ExtendedGachaItem extends GachaItem {
   refundPoints?: number;
 }
 
+export interface GachaLogEntry {
+  id: string;
+  user_id: string;
+  item_name: string;
+  item_icon: string;
+  rarity: string;
+  created_at: string;
+  profiles?: {
+    nickname?: string;
+    display_name?: string;
+    equipped_title?: string;
+    email?: string;
+    is_admin?: boolean;
+  };
+}
+
 const getRefundPointsForRarity = (rarity: string): number => {
   switch (rarity) {
     case 'UR': return 50;
@@ -61,6 +77,9 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
   const [drawnItemsResult, setDrawnItemsResult] = useState<ExtendedGachaItem[]>([]);
   const [currentResultIndex, setCurrentResultIndex] = useState(0);
 
+  // 실시간 SSR/UR 전광판 전용 로그 상태
+  const [recentLogs, setRecentLogs] = useState<GachaLogEntry[]>([]);
+
   // 무료 뽑기 사용 이력 (서버 기준 — 기기를 바꿔도 중복 수령 못 하도록)
   const [lastFreeDrawDate, setLastFreeDrawDate] = useState<string | null>(null);
   const [lastFreeWeeklyDrawDate, setLastFreeWeeklyDrawDate] = useState<string | null>(null);
@@ -70,6 +89,33 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
   const canFreeDraw10 = lastFreeWeeklyDrawDate !== mondayKst;
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // ── 최근 SSR/UR 전광판 피드 로드 ──────────────────────────
+  const fetchRecentLogs = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('gacha_logs')
+        .select('id, user_id, item_name, item_icon, rarity, created_at, profiles(nickname, display_name, equipped_title, email, is_admin)')
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+
+      // 어드민 및 test/8xnvekjq 계정 필터링
+      const filtered = (data || []).filter((log: any) => {
+        const p = log.profiles;
+        if (!p) return true;
+        if (p.is_admin) return false;
+        const email = (p.email || '').toLowerCase();
+        if (email.startsWith('test') || email.startsWith('8xnvekjq')) return false;
+        return true;
+      });
+
+      setRecentLogs(filtered as unknown as GachaLogEntry[]);
+    } catch (err) {
+      console.error('전광판 피드 로드 실패:', err);
+    }
+  };
 
   // ── 인벤토리 Supabase 로드 ──────────────────────────────
   const loadInventory = async () => {
@@ -111,9 +157,11 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
     localStorage.removeItem('reviewnote_unlocked_items');
     loadInventory();
     loadFreeDrawStatus();
+    fetchRecentLogs();
 
     const handleInventoryUpdate = () => {
       loadInventory();
+      fetchRecentLogs();
     };
     window.addEventListener('reviewnote_inventory_updated', handleInventoryUpdate);
     return () => {
@@ -121,7 +169,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
     };
   }, [userId]);
 
-  // ── 아이템 추가 (뽑기 결과 → DB 저장) ──────────────────
+  // ── 아이템 추가 (뽑기 결과 → DB 저장 및 SSR/UR 전광판 로깅) ──────
   const addItemsToInventory = async (items: GachaItem[]) => {
     if (!userId) return;
     // 아이템별 카운트
@@ -143,6 +191,35 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
       .upsert(upserts, { onConflict: 'user_id,item_id' });
 
     if (error) { console.error('아이템 저장 실패:', error); return; }
+
+    // 희귀 아이템 (SSR / UR) 당첨 시 전광판 로그 기록 (어드민/테스트 계정 제외)
+    const rareItems = items.filter(i => i.rarity === 'SSR' || i.rarity === 'UR');
+    if (rareItems.length > 0) {
+      try {
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('email, is_admin')
+          .eq('id', userId)
+          .maybeSingle();
+
+        const email = (prof?.email || '').toLowerCase();
+        const isTestOrAdmin = prof?.is_admin || email.startsWith('test') || email.startsWith('8xnvekjq');
+
+        if (!isTestOrAdmin) {
+          const logInserts = rareItems.map(item => ({
+            user_id: userId,
+            item_id: item.id,
+            item_name: item.name,
+            item_icon: item.icon,
+            rarity: item.rarity,
+          }));
+          await supabase.from('gacha_logs').insert(logInserts);
+          fetchRecentLogs();
+        }
+      } catch (logErr) {
+        console.error('전광판 피드 저장 실패:', logErr);
+      }
+    }
 
     // 로컬 상태 갱신
     setInventory(prev => {
@@ -489,6 +566,87 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                 <span className="text-purple-400 bg-purple-500/10 py-1 rounded-lg border border-purple-500/20">SR 22%</span>
                 <span className="text-sky-400 bg-sky-500/10 py-1 rounded-lg border border-sky-500/20">R 70%</span>
               </div>
+            </div>
+
+            {/* 🌟 실시간 SSR / UR 전설 획득 전광판 피드 */}
+            <div className="w-full max-w-sm bg-slate-900/90 border border-amber-500/30 rounded-2xl p-4 space-y-3 shadow-xl">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                <h3 className="text-xs font-black text-amber-300 flex items-center space-x-1.5 uppercase tracking-wider">
+                  <span>🎉</span>
+                  <span>실시간 SSR / UR 획득 전광판</span>
+                </h3>
+                <span className="text-[9.5px] text-slate-500 font-bold">라이브 피드</span>
+              </div>
+
+              {recentLogs.length === 0 ? (
+                <div className="text-center py-4 text-[11px] text-slate-500 font-medium">
+                  아직 SSR/UR 희귀 보물 획득 소식이 없습니다. 럭키 행운의 주인공이 되어보세요! ✨
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1 no-scrollbar">
+                  {recentLogs.map(log => {
+                    const p = log.profiles;
+                    const userName = p?.nickname || p?.display_name || '익명 학생';
+                    const title = p?.equipped_title;
+                    const isUR = log.rarity === 'UR';
+
+                    const formatRelativeTime = (isoString: string) => {
+                      try {
+                        const date = new Date(isoString);
+                        const now = new Date();
+                        const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
+                        if (diffSec < 60) return '방금 전';
+                        const diffMin = Math.floor(diffSec / 60);
+                        if (diffMin < 60) return `${diffMin}분 전`;
+                        const diffHour = Math.floor(diffMin / 60);
+                        if (diffHour < 24) return `${diffHour}시간 전`;
+                        const diffDay = Math.floor(diffHour / 24);
+                        return `${diffDay}일 전`;
+                      } catch {
+                        return '방금 전';
+                      }
+                    };
+
+                    return (
+                      <div
+                        key={log.id}
+                        className={`p-2.5 rounded-xl border flex items-center justify-between text-xs transition-all ${
+                          isUR
+                            ? 'bg-gradient-to-r from-amber-500/15 via-purple-500/15 to-pink-500/15 border-amber-400/50 shadow-md'
+                            : 'bg-slate-955/80 border-slate-850'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-1.5 min-w-0 flex-1 mr-1.5 overflow-hidden">
+                          <span className={`text-[9px] font-black px-1.5 py-0.2 rounded flex-none ${
+                            isUR ? 'bg-gradient-to-r from-amber-400 via-pink-500 to-purple-500 text-white animate-pulse' : 'bg-gradient-to-r from-amber-300 to-amber-500 text-slate-950'
+                          }`}>
+                            {log.rarity}
+                          </span>
+
+                          {/* 장착 칭호 배지 */}
+                          {title && (
+                            <span className="text-[8px] font-black bg-slate-800 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded-full truncate max-w-[75px] flex-none">
+                              👑 {title}
+                            </span>
+                          )}
+
+                          {/* 유저 이름 및 아이템 */}
+                          <span className="font-black text-white truncate flex-none max-w-[80px]">
+                            {userName}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-bold truncate">
+                            {log.item_icon} {log.item_name}
+                          </span>
+                        </div>
+
+                        <span className="text-[9px] text-slate-500 font-bold whitespace-nowrap flex-none">
+                          {formatRelativeTime(log.created_at)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         )}
