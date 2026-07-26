@@ -1439,7 +1439,7 @@ function App() {
 
                     const nameToDisplay = champ?.nickname || champ?.display_name;
                     const studentDisplayName = champ
-                      ? (nameToDisplay ? `${nameToDisplay} 학생` : `${maskId(champ.username)} 학생`)
+                      ? (nameToDisplay ? nameToDisplay : maskId(champ.username))
                       : null;
 
                     return (
