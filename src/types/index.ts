@@ -43,6 +43,7 @@ export interface AdminUserStat {
   equippedTheme?: string;   // 장착 중인 테마 (effectValue, hex)
   equippedAiVoice?: string; // 장착 중인 AI 말투 (effectValue)
   lastReviewDate?: string | null; // 마지막 복습 일자
+  comboPoints?: number;      // 럭키상점 콤보 포인트 잔액
 }
 
 // 5대 실수 원인 유형 (체크박스)

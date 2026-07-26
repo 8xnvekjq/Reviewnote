@@ -58,7 +58,7 @@ export const AdminPanel: React.FC = () => {
       // Fetch all profiles (display_name, school_grade, equipped_title 포함)
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, email, is_admin, display_name, school_grade, equipped_title, equipped_stamp, equipped_theme, equipped_ai_voice')
+        .select('id, email, is_admin, display_name, school_grade, equipped_title, equipped_stamp, equipped_theme, equipped_ai_voice, bonus_points, point_adjustment')
         .order('email', { ascending: true });
 
       if (profilesError) throw profilesError;
@@ -103,6 +103,8 @@ export const AdminPanel: React.FC = () => {
           equippedTheme: p.equipped_theme || undefined,
           equippedAiVoice: p.equipped_ai_voice || undefined,
           lastReviewDate: null,
+          // 럭키상점 콤보 포인트 잔액 (App.tsx의 currentDisplayPoints와 동일 공식)
+          comboPoints: Math.max(0, (p.bonus_points || 0) + (p.point_adjustment || 0)),
         });
       });
 
@@ -433,6 +435,12 @@ export const AdminPanel: React.FC = () => {
                         </span>
                         <span className="text-[8px] text-slate-500 block leading-none mt-0.5">
                           ({user.weeklyCompletedCount}개 완료 / {user.weeklyTotalCount}개 등록)
+                        </span>
+                      </div>
+                      <div className="pt-1 border-t border-slate-850">
+                        <span className="text-[9px] text-slate-500 block leading-none">콤보 포인트</span>
+                        <span className="text-xs font-black text-emerald-400 leading-tight block">
+                          ⚡ {user.comboPoints ?? 0}점
                         </span>
                       </div>
                       <div className="pt-1 border-t border-slate-850">
