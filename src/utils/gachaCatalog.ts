@@ -42,8 +42,28 @@ export const GACHA_ITEMS: GachaItem[] = [
     effectValue: '🚀',
     color: 'from-orange-400 via-red-500 to-purple-600'
   },
+  {
+    id: 'charm_score_hundred',
+    name: '🎴 부적: 시험 100점 선택권',
+    description: '시험지 답안 채점 시 언제든 전과목 100점 대박을 끌어당기는 신비한 기운의 부적입니다.',
+    rarity: 'UR',
+    category: 'CHARM',
+    icon: '🎴',
+    effectValue: '시험 100점 선택',
+    color: 'from-amber-300 via-pink-400 to-purple-600'
+  },
 
   // SSR (5~7%) - Super Special Rare (황금 빛)
+  {
+    id: 'charm_grade_one',
+    name: '🎴 부적: 1등급 선택권',
+    description: '원하는 핵심 시험에서 당당히 1등급을 쟁취할 수 있는 행운의 전설 부적입니다.',
+    rarity: 'SSR',
+    category: 'CHARM',
+    icon: '🎴',
+    effectValue: '1등급 선택',
+    color: 'from-amber-400 to-rose-500'
+  },
   {
     id: 'stamp_cat_paw',
     name: '🐾 참잘했어요 냥발',
@@ -126,6 +146,16 @@ export const GACHA_ITEMS: GachaItem[] = [
   },
 
   // SR (20%) - Special Rare (보라빛)
+  {
+    id: 'item_name_change',
+    name: '🏷️ 닉네임 변경권',
+    description: '언제든 닉네임(표시 이름)을 변경할 수 있는 커스텀 티켓입니다.',
+    rarity: 'SR',
+    category: 'SHIELD',
+    icon: '🏷️',
+    effectValue: 'name_change',
+    color: 'from-slate-400 to-slate-600'
+  },
   {
     id: 'theme_emerald',
     name: '🎨 네온 에메랄드 테마',
@@ -219,6 +249,26 @@ export const GACHA_ITEMS: GachaItem[] = [
 
   // R (70%) - Rare (파란/일반 빛)
   {
+    id: 'charm_luck_exam',
+    name: '🎴 부적: 찍기 신공 부적',
+    description: '시험날 헷갈리는 객관식 문제를 찍을 때 정답률이 솟구치는 기운의 부적입니다.',
+    rarity: 'R',
+    category: 'CHARM',
+    icon: '🎴',
+    effectValue: '찍기 신공',
+    color: 'from-sky-400 to-blue-600'
+  },
+  {
+    id: 'charm_no_mistake',
+    name: '🎴 부적: 연산 실수 퇴치 부적',
+    description: '부호 실수, 덧셈 실수를 싹 막아주는 시험 대박 예방 부적입니다.',
+    rarity: 'R',
+    category: 'CHARM',
+    icon: '🧧',
+    effectValue: '실수 퇴치',
+    color: 'from-blue-400 to-indigo-500'
+  },
+  {
     id: 'ai_sergeant',
     name: '🎭 AI 말투: 유쾌한 말년 병장',
     description: 'AI 밤티 쌤이 전역을 앞둔 말년 병장처럼 친근하고 유쾌하게 해설합니다.',
@@ -267,36 +317,6 @@ export const GACHA_ITEMS: GachaItem[] = [
     icon: '📐',
     effectValue: '피타고라스의 후예',
     color: 'from-blue-400 to-teal-500'
-  },
-  {
-    id: 'charm_luck_exam',
-    name: '🎴 부적: 찍기 신공 부적',
-    description: '시험날 헷갈리는 객관식 문제를 찍을 때 정답률이 솟구치는 기운의 부적입니다.',
-    rarity: 'R',
-    category: 'CHARM',
-    icon: '🎴',
-    effectValue: '찍기 신공',
-    color: 'from-sky-400 to-blue-600'
-  },
-  {
-    id: 'charm_no_mistake',
-    name: '🎴 부적: 연산 실수 퇴치 부적',
-    description: '부호 실수, 덧셈 실수를 싹 막아주는 시험 대박 예방 부적입니다.',
-    rarity: 'R',
-    category: 'CHARM',
-    icon: '🧧',
-    effectValue: '실수 퇴치',
-    color: 'from-blue-400 to-indigo-500'
-  },
-  {
-    id: 'item_name_change',
-    name: '🏷️ 닉네임 변경권',
-    description: '언제든 닉네임(표시 이름)을 변경할 수 있는 커스텀 티켓입니다.',
-    rarity: 'R',
-    category: 'SHIELD',
-    icon: '🏷️',
-    effectValue: 'name_change',
-    color: 'from-slate-400 to-slate-600'
   },
   {
     id: 'stamp_fire',
