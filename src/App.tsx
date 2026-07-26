@@ -165,19 +165,12 @@ function App() {
   const [myBonusPoints, setMyBonusPoints] = useState<number>(0);
   const [streakMilestoneClaimed, setStreakMilestoneClaimed] = useState<number>(0); // 이번 스트릭 런에서 이미 지급받은 콤보 보너스 마일스톤 (0/3/7/14)
 
-  // 내 전체 누적 복습 적립 점수 (Cumulative Score — 럭키상점 포인트는 주간 리셋 없이 연속 모음)
-  // 완료 오답 개수 * 10점 고정 기준만 사용한다. 이전에는 완료율(rate)에도 가중치를 줬는데,
-  // rate의 분모가 "현재 남아있는 오답 개수"라서 미완료 오답을 지우기만 해도 완료율이 올라가
-  // 실제 복습 없이 점수가 부풀어 오르는 문제가 있었다.
-  const completedReviewCount = mistakes.filter(m => m.reviews?.filter(r => r === 'O').length === 3).length;
-  let allTimeEarnedPoints = completedReviewCount * 10;
-  // 🎟️ 콤보 부스터(포인트 2배권) 보유 시 완료 점수 2배 지급 (hasPointBooster는 Supabase user_items 기준)
-  if (hasPointBooster) {
-    allTimeEarnedPoints *= 2;
-  }
-
-  // 현재 표시 가능한 럭키상점 보유 콤보 점수 (누적 전체 점수 + DB 보너스 점수 + 상점 사용 차감치)
-  const currentDisplayPoints = Math.max(0, allTimeEarnedPoints + (myBonusPoints || 0) + pointAdjustment);
+  // 현재 표시 가능한 럭키상점 보유 콤보 점수.
+  // 예전엔 "완료 오답 개수 * 10점"을 매번 mistakes 배열에서 실시간으로 다시 계산했는데,
+  // 이제는 handleUpdateReviews에서 복습 단계(O/X/★)가 바뀔 때마다 그 자리에서 bonus_points에
+  // 실시간·영구 적립하는 방식으로 바꿨다 (자세한 배점은 handleUpdateReviews의 pointsForStage 참고).
+  // 그래서 여기서는 mistakes를 다시 훑지 않고 bonus_points를 그대로 잔액으로 쓴다.
+  const currentDisplayPoints = Math.max(0, (myBonusPoints || 0) + pointAdjustment);
   
   const prevTabRef = useRef(activeTab);
 
@@ -1136,7 +1129,30 @@ function App() {
 
       setMistakes(prev => prev.map(m => m.id === id ? updatedEntry : m));
       setSelectedEntry(prev => prev && prev.id === id ? updatedEntry : prev);
-      
+
+      // 🎯 복습 단계별 콤보 포인트 실시간·영구 적립 (1차 O=3, 2차 O=7, 3차 O=15, X/★=참여점수 1점).
+      // 이전 상태와 새 상태를 단계별로 비교해서 "차이(delta)"만 반영한다 — 그래야 O↔X↔빈칸을
+      // 왔다갔다 해도 매번 다시 지급되지 않고(악용 방지), 반대로 되돌리면 정확히 그만큼 회수된다.
+      const pointsForStage = (state: ReviewState, stageIndex: number): number => {
+        if (state === 'O') return [3, 7, 15][stageIndex];
+        if (state === 'X' || state === 'star') return 1;
+        return 0;
+      };
+      let reviewPointDelta = 0;
+      for (let i = 0; i < 3; i++) {
+        reviewPointDelta += pointsForStage(newReviews[i], i) - pointsForStage(oldReviews[i], i);
+      }
+      if (hasPointBooster) {
+        reviewPointDelta *= 2;
+      }
+      if (reviewPointDelta !== 0 && session?.user?.id) {
+        const newBonusTotal = Math.max(0, (myBonusPoints || 0) + reviewPointDelta);
+        setMyBonusPoints(newBonusTotal);
+        supabase.from('profiles').update({ bonus_points: newBonusTotal }).eq('id', session.user.id).then(({ error: bonusError }) => {
+          if (bonusError) console.error('Failed to sync review combo points:', bonusError);
+        });
+      }
+
       // 매일 연속 복습 스트릭 갱신 (🔥 Daily Streak)
       // 방어권 보유 여부는 Supabase user_items에서 실시간 조회 (인벤토리가 이전되면서
       // localStorage 'reviewnote_unlocked_items' 키는 더 이상 채워지지 않는 죽은 키였음)
