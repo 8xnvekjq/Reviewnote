@@ -37,19 +37,6 @@ const getRefundPointsForRarity = (rarity: string): number => {
   }
 };
 
-// 이번 주 월요일(한국시간 기준) 날짜 문자열 — weekly_leaderboard SQL 뷰의 date_trunc('week', ...)와 동일한 주 경계 사용
-const getKSTMondayDateString = (date: Date = new Date()): string => {
-  const utc = date.getTime() + date.getTimezoneOffset() * 60000;
-  const kst = new Date(utc + 9 * 3600000);
-  const day = kst.getDay(); // 0=일 ~ 6=토
-  const diffToMonday = day === 0 ? 6 : day - 1;
-  kst.setDate(kst.getDate() - diffToMonday);
-  const year = kst.getFullYear();
-  const month = String(kst.getMonth() + 1).padStart(2, '0');
-  const d = String(kst.getDate()).padStart(2, '0');
-  return `${year}-${month}-${d}`;
-};
-
 interface GachaStoreProps {
   userId: string;
   userPoints: number;
@@ -86,9 +73,8 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
   const [lastFreeDrawDate, setLastFreeDrawDate] = useState<string | null>(null);
   const [lastFreeWeeklyDrawDate, setLastFreeWeeklyDrawDate] = useState<string | null>(null);
   const todayKst = getKSTDateString();
-  const mondayKst = getKSTMondayDateString();
   const canFreeDraw1 = lastFreeDrawDate !== todayKst;
-  const canFreeDraw10 = lastFreeWeeklyDrawDate !== mondayKst;
+  const canFreeDraw10 = !lastFreeWeeklyDrawDate || lastFreeWeeklyDrawDate === '';
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -319,7 +305,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
         return;
       }
       if (count === 10 && !canFreeDraw10) {
-        alert('🔥 이번 주 무료 10회 뽑기는 이미 사용했어요! 다음 주 월요일에 다시 열려요.');
+        alert('🎁 최초 1회 무료 10연속 뽑기는 이미 사용하셨습니다!');
         return;
       }
     } else if (userPoints < cost) {
@@ -328,7 +314,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
     }
 
     if (isFree) {
-      // 무료 뽑기 사용 처리 — 서버에 사용 날짜를 기록해서 기기를 바꿔도 중복 수령 못 하게 함
+      // 무료 뽑기 사용 처리 — 서버에 기록해서 기기를 바꿔도 중복 수령 못 하게 함
       if (count === 1) {
         setLastFreeDrawDate(todayKst);
         if (userId) {
@@ -337,10 +323,10 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
           });
         }
       } else {
-        setLastFreeWeeklyDrawDate(mondayKst);
+        setLastFreeWeeklyDrawDate('CLAIMED');
         if (userId) {
-          supabase.from('profiles').update({ last_free_weekly_draw_date: mondayKst }).eq('id', userId).then(({ error }) => {
-            if (error) console.error('무료 10회 뽑기 기록 실패:', error);
+          supabase.from('profiles').update({ last_free_weekly_draw_date: 'CLAIMED' }).eq('id', userId).then(({ error }) => {
+            if (error) console.error('최초 1회 무료 10회 뽑기 기록 실패:', error);
           });
         }
       }
@@ -459,13 +445,24 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
           </div>
         </div>
 
-        {/* 내 보유 점수 통장 */}
-        <div className="bg-slate-950/80 border border-amber-500/30 px-3.5 py-2 rounded-2xl flex flex-col items-end shadow-inner">
-          <span className="text-[9px] text-slate-400 font-bold">보유 콤보 점수</span>
-          <span className="text-sm font-black text-amber-400 flex items-center space-x-1">
-            <span>⚡</span>
-            <span>{userPoints}점</span>
-          </span>
+        {/* 내 보유 점수 통장 & 이용 가이드 버튼 */}
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent('reviewnote_open_store_guide'))}
+            className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 px-2.5 py-1.5 rounded-2xl text-[10.5px] font-extrabold flex items-center space-x-1 transition-all shadow-sm whitespace-nowrap flex-none shrink-0"
+            title="럭키상점 활용법 가이드 열기"
+          >
+            <span>🎁</span>
+            <span>가이드</span>
+          </button>
+
+          <div className="bg-slate-955/80 border border-amber-500/30 px-3.5 py-2 rounded-2xl flex flex-col items-end shadow-inner">
+            <span className="text-[9px] text-slate-400 font-bold">보유 콤보 점수</span>
+            <span className="text-sm font-black text-amber-400 flex items-center space-x-1">
+              <span>⚡</span>
+              <span>{userPoints}점</span>
+            </span>
+          </div>
         </div>
       </div>
 
@@ -552,10 +549,10 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
               >
                 <div className="absolute -right-6 -top-6 w-12 h-12 bg-amber-400/20 rotate-45" />
                 <span className="text-sm font-black flex items-center space-x-1">
-                  <span>{canFreeDraw10 ? '🔥 주간 무료 10회' : '🔥 10회 연속 뽑기'}</span>
+                  <span>{canFreeDraw10 ? '🎁 최초 1회 무료 10연속' : '🔥 10회 연속 뽑기'}</span>
                 </span>
                 <span className="text-xs font-bold text-amber-200 mt-1 flex items-center space-x-1">
-                  <span>{canFreeDraw10 ? '무료' : '⚡ 100점'}</span>
+                  <span>{canFreeDraw10 ? '무료 (신규 혜택)' : '⚡ 100점'}</span>
                 </span>
               </button>
             </div>

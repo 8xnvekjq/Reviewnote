@@ -17,6 +17,7 @@ import { StudentGuide } from './components/StudentGuide';
 import { LaTeXRenderer } from './components/LaTeXRenderer';
 import { SlideListModal } from './components/SlideListModal';
 import { GachaStore } from './components/GachaStore';
+import { StoreGuideModal } from './components/StoreGuideModal';
 import { getTitleBadgeStyle } from './utils/gachaCatalog';
 import type { EquippedItems } from './types';
 import { applyThemeColor } from './utils/theme';
@@ -194,6 +195,39 @@ function App() {
 
   // State for image cropping flow
   const [tempCapturedImage, setTempCapturedImage] = useState<string | null>(null);
+
+  // 🎁 럭키상점 활용법 안내 모달 상태
+  const [isStoreGuideOpen, setIsStoreGuideOpen] = useState(false);
+
+  // 접속/로그인 시 럭키상점 활용 가이드 팝업 자동 노출 (v1.16 기준 최초 1회)
+  useEffect(() => {
+    if (session?.user) {
+      const seen = localStorage.getItem('reviewnote_seen_store_guide_v16');
+      if (!seen) {
+        setIsStoreGuideOpen(true);
+      }
+    }
+  }, [session?.user]);
+
+  // 상점 활용 가이드 열기 이벤트 수신
+  useEffect(() => {
+    const handleOpenGuide = () => {
+      setIsStoreGuideOpen(true);
+    };
+    window.addEventListener('reviewnote_open_store_guide', handleOpenGuide);
+    return () => {
+      window.removeEventListener('reviewnote_open_store_guide', handleOpenGuide);
+    };
+  }, []);
+
+  const handleCloseStoreGuide = () => {
+    setIsStoreGuideOpen(false);
+    try {
+      localStorage.setItem('reviewnote_seen_store_guide_v16', 'true');
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   // 주간 최다 오답 완료 챔피언 정보 로드 + 내 점수 동시 갱신 (하이브리드 1주 이월 및 리셋 롤오버)
   const loadWeeklyChampions = async () => {
@@ -1883,6 +1917,13 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* 🎁 럭키상점 활용 가이드 모달 팝업 창 */}
+      <StoreGuideModal
+        isOpen={isStoreGuideOpen}
+        onClose={handleCloseStoreGuide}
+        onGoToStore={() => setActiveTab('store')}
+      />
 
     </div>
   );
