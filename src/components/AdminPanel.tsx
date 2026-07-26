@@ -2,46 +2,20 @@ import React, { useEffect, useState } from 'react';
 import type { AdminUserStat } from '../types';
 import { supabase } from '../services/supabase';
 import { formatDate } from '../utils/date';
-import { CHRONOLOGICAL_CHANGELOGS } from './StudentGuide';
 import { GACHA_ITEMS, getTitleBadgeStyle } from '../utils/gachaCatalog';
+import { RecentActivityFeed } from './RecentActivityFeed';
 
-const GUIDE_ITEMS = [
-  {
-    step: '01',
-    emoji: '📷',
-    title: '오답 사진 등록',
-    desc: '하단 카메라 버튼을 누르고 오답을 정밀 촬영한 뒤, 원하는 문제 영역만 깔끔하게 사각형으로 조절해 오려내어 저장하세요.',
-    colorClass: 'from-indigo-500/20 via-indigo-500/5 to-slate-900/40 border-indigo-500/30 text-indigo-400 bg-indigo-950/60 shadow-indigo-950/50'
-  },
-  {
-    step: '02',
-    emoji: '🤖',
-    title: 'AI 수학 클리닉 진단',
-    desc: '등록된 오답을 터치하고 [AI 분석 시작하기]를 누르면 수식 인식과 분류를 거쳐 정석 풀이, 실수 요인, 대책이 자동 처방됩니다.',
-    colorClass: 'from-purple-500/20 via-purple-500/5 to-slate-900/40 border-purple-500/30 text-purple-400 bg-purple-950/60 shadow-purple-950/50'
-  },
-  {
-    step: '03',
-    emoji: '📺',
-    title: '선생님 추천 강의 딥링크',
-    desc: '진단된 단원에 매핑되는 선생님의 개념 강의 유튜브 영상 및 정확한 챕터 시작점(타임라인) 바로가기가 매칭되어 제공됩니다.',
-    colorClass: 'from-amber-500/20 via-amber-500/5 to-slate-900/40 border-amber-500/30 text-amber-400 bg-amber-950/60 shadow-amber-950/50'
-  },
-  {
-    step: '04',
-    emoji: '✏️',
-    title: '3단계 누적 복습 시스템',
-    desc: '기억이 흐려질 때마다 O/X/★ 버튼으로 복습 성공 여부를 체크하세요. 3회 완료(O 세 번) 시 자동으로 복습 완료함으로 안전하게 분리 보관됩니다.',
-    colorClass: 'from-emerald-500/20 via-emerald-500/5 to-slate-900/40 border-emerald-500/30 text-emerald-400 bg-emerald-950/60 shadow-emerald-950/50'
-  }
-];
+interface AdminPanelProps {
+  onBack?: () => void;
+  onRefresh?: () => void;
+}
 
-export const AdminPanel: React.FC = () => {
+export const AdminPanel: React.FC<AdminPanelProps> = () => {
   const [stats, setStats] = useState<AdminUserStat[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
-  const [activeSubTab, setActiveSubTab] = useState<'stats' | 'changelog'>('stats');
+  const [activeSubTab, setActiveSubTab] = useState<'stats' | 'activity'>('stats');
   const [gradeFilter, setGradeFilter] = useState<string>('all');
 
   // 학생 카드 클릭 시 장착 아이템 조회용 상태 (보유 전체가 아닌 "현재 장착 중"인 것만 표시)
@@ -282,15 +256,15 @@ export const AdminPanel: React.FC = () => {
             <span>가입자 현황</span>
           </button>
           <button
-            onClick={() => setActiveSubTab('changelog')}
+            onClick={() => setActiveSubTab('activity')}
             className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center space-x-1.5 ${
-              activeSubTab === 'changelog' 
-                ? 'bg-slate-800 text-indigo-400 shadow-sm font-black' 
+              activeSubTab === 'activity' 
+                ? 'bg-slate-800 text-purple-400 shadow-sm font-black' 
                 : 'text-slate-500 hover:text-slate-300'
             }`}
           >
-            <span>📜</span>
-            <span>변경 이력 (Change Log)</span>
+            <span>🕘</span>
+            <span>최근 활동기록</span>
           </button>
         </div>
       )}
@@ -500,66 +474,10 @@ export const AdminPanel: React.FC = () => {
       );
     })()}
 
-      {/* ── 탭 2: 변경 이력 (Change Log) 탭 ── */}
-      {activeSubTab === 'changelog' && (
-        <div className="space-y-6 animate-scale-up">
-
-          {/* 오답클리닉 이용방법 (큰 이모지 디자인) */}
-          <div className="space-y-4 pt-2">
-            <h3 className="text-xs font-black text-indigo-400 uppercase tracking-wider pl-1 text-left">오답클리닉 이용방법</h3>
-            <div className="grid gap-4">
-              {GUIDE_ITEMS.map((item, idx) => (
-                <div 
-                  key={idx} 
-                  className={`relative bg-gradient-to-br ${item.colorClass} border rounded-3xl p-5 flex items-center space-x-5 shadow-lg backdrop-blur-sm hover:-translate-y-0.5 hover:shadow-xl transition-all duration-300 group text-left`}
-                >
-                  {/* 우상단 네온 스타일 스텝 인덱스 배지 */}
-                  <span className="absolute top-4 right-5 text-2xl font-black text-slate-800/50 select-none tracking-tighter group-hover:text-slate-700/60 transition-colors font-mono">
-                    {item.step}
-                  </span>
-                  
-                  {/* 커다란 이모지 블록 */}
-                  <span className="text-4xl flex-none w-16 h-16 rounded-2xl flex items-center justify-center border border-slate-800/60 bg-slate-950/80 shadow-inner group-hover:scale-105 transition-transform duration-300 select-none">
-                    {item.emoji}
-                  </span>
-                  
-                  {/* 텍스트 설명 영역 */}
-                  <div className="space-y-1.5 min-w-0 pr-6">
-                    <h4 className="text-sm font-extrabold text-white tracking-tight">{item.title}</h4>
-                    <p className="text-xs text-slate-300 leading-relaxed font-medium">{item.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 더쿠키수학 오답클리닉 변경 이력 */}
-          <div className="space-y-4 pt-6 border-t border-slate-800">
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider pl-1 text-left">더쿠키수학 오답클리닉 변경 이력</h3>
-            <div className="relative border-l border-slate-800 pl-6 ml-3 space-y-8">
-              {CHRONOLOGICAL_CHANGELOGS.map((log, idx) => (
-                <div key={idx} className="relative">
-                  <div className={`absolute -left-[33px] top-1.5 w-4 h-4 rounded-full ${idx === 0 ? 'bg-indigo-500' : 'bg-slate-800'} border-4 border-slate-950`} />
-                  <div className="space-y-2 text-left">
-                    <div className="flex items-center space-x-2">
-                      <span className={`text-xs font-black px-2 py-0.5 rounded ${idx === 0 ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-slate-850 text-slate-400 border border-slate-700'}`}>
-                        {log.version}
-                      </span>
-                      <span className="text-[10px] text-slate-500 font-bold">{log.date}</span>
-                    </div>
-                    <ul className="text-xs text-slate-400 list-disc list-inside space-y-1.5 pl-1 leading-relaxed">
-                      {log.changes.map((change, cIdx) => (
-                        <li key={cIdx} className="pl-1.5 -indent-4 list-none flex items-start">
-                          <span className="text-emerald-500/80 mr-1.5 select-none">•</span>
-                          <span>{change}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+      {/* ── 탭 2: 최근 활동기록 (Recent Activity Feed) 탭 ── */}
+      {activeSubTab === 'activity' && (
+        <div className="space-y-4 animate-scale-up">
+          <RecentActivityFeed />
         </div>
       )}
 

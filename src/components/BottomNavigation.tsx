@@ -111,15 +111,15 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         ) : (
           <button
             onClick={() => {
-              setActiveTab('guide');
+              setActiveTab('activity');
               setShowRightDrawer(false);
             }}
             className={`flex flex-col items-center justify-center w-14 h-11 rounded-xl transition-all ${
-              activeTab === 'guide' ? 'text-amber-400 scale-105 font-black' : 'text-slate-500 hover:text-slate-300'
+              activeTab === 'activity' ? 'text-purple-400 scale-105 font-black' : 'text-slate-500 hover:text-slate-300'
             }`}
           >
-            <span className="text-lg">💡</span>
-            <span className="text-[9.5px] mt-0.5">이용안내</span>
+            <span className="text-lg">🕘</span>
+            <span className="text-[9.5px] mt-0.5">최근활동</span>
           </button>
         )}
 
@@ -170,7 +170,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         <button
           onClick={() => setShowRightDrawer(!showRightDrawer)}
           className={`flex flex-col items-center justify-center w-14 h-11 rounded-xl transition-all ${
-            showRightDrawer || ['stats', 'completed', 'activity'].includes(activeTab)
+            showRightDrawer || ['stats', 'completed', 'guide'].includes(activeTab)
               ? 'text-purple-400 scale-105 font-black'
               : 'text-slate-500 hover:text-slate-300'
           }`}
@@ -249,19 +249,19 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                 </div>
               </button>
 
-              {/* 3. 🕘 최근 활동기록 */}
+              {/* 3. 💡 이용안내 (전체메뉴로 이동) */}
               <button
-                onClick={() => handleSelectMenu('activity')}
+                onClick={() => handleSelectMenu('guide')}
                 className={`w-full p-3.5 rounded-2xl border flex items-center space-x-3.5 transition-all text-left group ${
-                  activeTab === 'activity'
-                    ? 'bg-purple-500/10 border-purple-500/50 text-purple-300 font-bold shadow-lg shadow-purple-500/5'
+                  activeTab === 'guide'
+                    ? 'bg-amber-500/10 border-amber-500/50 text-amber-300 font-bold shadow-lg shadow-amber-500/5'
                     : 'bg-slate-955/60 border-slate-850 hover:border-slate-700 text-slate-300 hover:bg-slate-850'
                 }`}
               >
-                <span className="text-2xl group-hover:scale-110 transition-transform">🕘</span>
+                <span className="text-2xl group-hover:scale-110 transition-transform">💡</span>
                 <div>
-                  <div className="text-xs font-black text-purple-400">최근 활동기록</div>
-                  <div className="text-[9.5px] text-slate-500 mt-0.5">친구들의 오답 등록 & 복습 소식</div>
+                  <div className="text-xs font-black text-amber-400">이용안내</div>
+                  <div className="text-[9.5px] text-slate-500 mt-0.5">오답클리닉 & 럭키상점 가이드</div>
                 </div>
               </button>
 
