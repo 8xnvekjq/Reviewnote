@@ -1447,8 +1447,8 @@ function App() {
                         key={idx}
                         className={`p-1.5 px-2.5 rounded-xl border flex items-center justify-between space-x-2 whitespace-nowrap overflow-x-auto no-scrollbar transition-all ${rowBg}`}
                       >
-                        {/* Left: 메달 + 칭호 + 학생 이름 (단일 행 고정) */}
-                        <div className="flex items-center space-x-1.5 flex-none min-w-0">
+                        {/* Left: 메달 + 칭호 + 학생 이름 (말줄임 truncate 처리) */}
+                        <div className="flex items-center space-x-1.5 min-w-0 flex-1">
                           <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full border flex-none ${medalStyle}`}>
                             {medal}
                           </span>
@@ -1463,8 +1463,11 @@ function App() {
                                 </span>
                               )}
 
-                              {/* 풀 네임 (단일 행 표출) */}
-                              <span className={`font-black flex-none ${isFirst ? 'text-white text-[11px]' : 'text-slate-200 text-[10px]'}`}>
+                              {/* 긴 이름 말줄임(...) 표출 */}
+                              <span 
+                                className={`font-black truncate max-w-[85px] sm:max-w-[140px] ${isFirst ? 'text-white text-[11px]' : 'text-slate-200 text-[10px]'}`}
+                                title={studentDisplayName || ''}
+                              >
                                 {studentDisplayName}
                               </span>
                             </>
