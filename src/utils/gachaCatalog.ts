@@ -304,7 +304,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     description: '부호 실수, 덧셈 실수를 싹 막아주는 시험 대박 예방 부적입니다.',
     rarity: 'R',
     category: 'CHARM',
-    icon: '<ctrl42>',
+    icon: '🚫',
     effectValue: '실수 퇴치',
     color: 'from-sky-400 via-blue-400 to-indigo-500'
   },
