@@ -1,6 +1,7 @@
 import React from 'react';
 import type { MistakeEntry } from '../types';
 import { formatDate, formatDateTime } from '../utils/date';
+import { GACHA_ITEMS, getRarityTheme } from '../utils/gachaCatalog';
 
 import { LaTeXRenderer } from './LaTeXRenderer';
 
@@ -16,6 +17,12 @@ interface MistakeCardProps {
 export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDelete, studentName, isOwnNote = true, equippedStamp }) => {
   const struggleCount = entry.reviews ? entry.reviews.filter(r => r === 'X' || r === 'star').length : 0;
   const isCompleted = entry.reviews && entry.reviews.filter(r => r === 'O').length === 3;
+
+  // 장착한 스탬프의 실제 뽑기 등급(UR/SSR/SR/R)에 맞는 테두리 클래스
+  const stampCatalogItem = equippedStamp
+    ? GACHA_ITEMS.find(g => g.category === 'STAMP' && g.effectValue === equippedStamp)
+    : undefined;
+  const stampBorderClass = stampCatalogItem ? getRarityTheme(stampCatalogItem.rarity).border : 'border-transparent';
 
   return (
     <div 
@@ -120,7 +127,7 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
               let symbol = idx + 1;
               if (state === 'O') {
                 badgeStyle = equippedStamp
-                  ? "bg-transparent border-transparent text-[11.5px] font-black flex items-center justify-center"
+                  ? `bg-transparent ${stampBorderClass} text-[11.5px] font-black flex items-center justify-center`
                   : "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-extrabold";
               } else if (state === 'X') {
                 badgeStyle = "bg-red-500/15 text-red-400 border-red-500/30 font-extrabold";

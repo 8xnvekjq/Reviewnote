@@ -4,6 +4,7 @@ import { ROOT_CAUSE_OPTIONS, MATH_CURRICULUM, GRADE_LIST, SOLVING_PLACEHOLDER_TE
 import { LaTeXRenderer } from './LaTeXRenderer';
 import { formatDate } from '../utils/date';
 import { supabase } from '../services/supabase';
+import { GACHA_ITEMS, getRarityTheme } from '../utils/gachaCatalog';
 
 interface MistakeDetailModalProps {
   selectedEntry: MistakeEntry;
@@ -46,6 +47,11 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   profilesStampMap = {},
 }) => {
   const authorStamp = selectedEntry.userId ? (profilesStampMap[selectedEntry.userId] || equippedStamp) : equippedStamp;
+  // 장착한 스탬프의 실제 뽑기 등급(UR/SSR/SR/R)에 맞는 테두리 클래스
+  const authorStampCatalogItem = authorStamp
+    ? GACHA_ITEMS.find(g => g.category === 'STAMP' && g.effectValue === authorStamp)
+    : undefined;
+  const authorStampBorderClass = authorStampCatalogItem ? getRarityTheme(authorStampCatalogItem.rarity).border : '';
   const [loadingText, setLoadingText] = React.useState('수학 문제 분석을 시작합니다...');
   const [progress, setProgress] = React.useState(0);
   const [elapsedMs, setElapsedMs] = React.useState(0);
@@ -717,7 +723,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                               <div className="animate-scale-up flex flex-col items-center">
                                 {state === 'O' && (
                                   authorStamp ? (
-                                    <span className="w-9 h-9 flex items-center justify-center text-[26px] drop-shadow-[0_2px_8px_rgba(245,158,11,0.25)] animate-scale-up">
+                                    <span className={`w-9 h-9 rounded-full flex items-center justify-center text-[26px] drop-shadow-[0_2px_8px_rgba(245,158,11,0.25)] animate-scale-up ${authorStampCatalogItem ? `border-2 ${authorStampBorderClass}` : ''}`}>
                                       {authorStamp}
                                     </span>
                                   ) : (

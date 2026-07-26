@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../services/supabase';
-import { getTitleBadgeStyle } from '../utils/gachaCatalog';
+import { GACHA_ITEMS, getTitleBadgeStyle, getRarityTheme } from '../utils/gachaCatalog';
 
 interface ActivityEvent {
   mistake_id: string;
@@ -104,6 +104,11 @@ export const RecentActivityFeed: React.FC = () => {
               backgroundColor: hexToRgba(themeHex, 0.08),
             };
             const reviewIcon = ev.equipped_stamp || '✅';
+            // 장착한 스탬프의 실제 뽑기 등급(UR/SSR/SR/R)에 맞는 테두리를 찾아 적용
+            const stampCatalogItem = ev.equipped_stamp
+              ? GACHA_ITEMS.find(g => g.category === 'STAMP' && g.effectValue === ev.equipped_stamp)
+              : undefined;
+            const iconBorderClass = stampCatalogItem ? getRarityTheme(stampCatalogItem.rarity).border : '';
 
             return (
               <div
@@ -111,7 +116,9 @@ export const RecentActivityFeed: React.FC = () => {
                 className="p-3.5 rounded-2xl border border-slate-800 bg-slate-900/60 flex items-center space-x-3"
                 style={cardStyle}
               >
-                <span className="text-2xl flex-none">{ev.event_type === 'register' ? '📝' : reviewIcon}</span>
+                <span className={`text-2xl flex-none w-10 h-10 flex items-center justify-center rounded-full ${ev.event_type === 'review' && stampCatalogItem ? `border-2 ${iconBorderClass}` : ''}`}>
+                  {ev.event_type === 'register' ? '📝' : reviewIcon}
+                </span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center space-x-1.5 flex-wrap gap-y-0.5">
                     <span className="text-xs font-black text-white truncate">{ev.name}</span>
