@@ -83,11 +83,15 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
     const counts: Record<string, number> = {};
     items.forEach(item => { counts[item.id] = (counts[item.id] || 0) + 1; });
 
-    const upserts = Object.entries(counts).map(([item_id, qty]) => ({
-      user_id: userId,
-      item_id,
-      quantity: (inventory[item_id] || 0) + qty,
-    }));
+    const upserts = Object.entries(counts).map(([item_id, qty]) => {
+      const gachaObj = GACHA_ITEMS.find(g => g.id === item_id);
+      const isConsumable = gachaObj?.category === 'SHIELD' || gachaObj?.category === 'CHARM';
+      return {
+        user_id: userId,
+        item_id,
+        quantity: isConsumable ? (inventory[item_id] || 0) + qty : 1,
+      };
+    });
 
     const { error } = await supabase
       .from('user_items')
@@ -98,7 +102,11 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
     // 로컬 상태 갱신
     setInventory(prev => {
       const next = { ...prev };
-      Object.entries(counts).forEach(([id, qty]) => { next[id] = (next[id] || 0) + qty; });
+      Object.entries(counts).forEach(([id, qty]) => {
+        const gachaObj = GACHA_ITEMS.find(g => g.id === id);
+        const isConsumable = gachaObj?.category === 'SHIELD' || gachaObj?.category === 'CHARM';
+        next[id] = isConsumable ? (next[id] || 0) + qty : 1;
+      });
       return next;
     });
   };
@@ -458,7 +466,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                       <div className="flex items-center space-x-3 min-w-0">
                         <div className="relative flex-none">
                           <span className="text-3xl">{item.icon}</span>
-                          {qty > 1 && (
+                          {(item.category === 'SHIELD' || item.category === 'CHARM') && qty > 1 && (
                             <span className="absolute -top-1 -right-1 text-[9px] bg-indigo-600 text-white rounded-full w-4 h-4 flex items-center justify-center font-black">
                               {qty}
                             </span>
