@@ -586,7 +586,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                   아직 SR 이상 희귀 보물 획득 소식이 없습니다. 럭키 행운의 주인공이 되어보세요! ✨
                 </div>
               ) : (
-                <div className="space-y-2 max-h-56 overflow-y-auto pr-1 no-scrollbar">
+                <div className="space-y-2">
                   {recentLogs.map(log => {
                     const p = log.profiles;
                     const userName = log.user_name || p?.nickname || p?.display_name || '학생';
