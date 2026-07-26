@@ -41,19 +41,6 @@
   border-color: rgb(var(--theme-border) / 0.8);
 }
 
-/* 테마 연동: 패널 내부 아이콘/글자 색상은 100% 원본 유지하고, 모든 패널 배경과 테두리 프레임 선만 테마와 연동 */
-.bg-slate-900 {
-  background-color: rgb(var(--theme-bg-surface) / var(--tw-bg-opacity, 1));
-}
-
-.bg-slate-955, .bg-slate-950 {
-  background-color: rgb(var(--theme-bg-main) / var(--tw-bg-opacity, 1));
-}
-
-.border-slate-800 {
-  border-color: rgb(var(--theme-border) / var(--tw-border-opacity, 0.8));
-}
-
 @layer base {
   body {
     @apply bg-slate-950 text-slate-100 font-sans antialiased select-none;

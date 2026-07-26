@@ -25,6 +25,13 @@ export default {
           900: 'rgb(var(--color-indigo-900) / <alpha-value>)',
           950: 'rgb(var(--color-indigo-950) / <alpha-value>)',
         },
+        // 오답 문제 카드 겉/속 및 모든 패널 배경/테두리를 테마 변동 변수에 100% 연동
+        slate: {
+          800: 'rgb(var(--theme-border) / <alpha-value>)',
+          900: 'rgb(var(--theme-bg-surface) / <alpha-value>)',
+          950: 'rgb(var(--theme-bg-main) / <alpha-value>)',
+          955: 'rgb(var(--theme-bg-main) / <alpha-value>)',
+        },
         primary: {
           50: '#f0f3ff',
           100: '#e1e7ff',
