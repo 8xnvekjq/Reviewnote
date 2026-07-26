@@ -25,6 +25,23 @@ import type { EquippedItems } from './types';
 import { applyThemeColor } from './utils/theme';
 import { loadStreakState, recordReviewStreak, reconcileStreakState, getNewlyReachedMilestones, type StreakState } from './utils/streak';
 
+// DB의 mistakes row(snake_case) -> 클라이언트 MistakeEntry(camelCase) 매핑.
+// fetchUserData(전체 로드)와 refreshMistakesLight(실시간 경량 갱신)가 공유해서 로직이 갈라지지 않게 한다.
+const mapDbMistakeRow = (m: any): MistakeEntry => ({
+  id: m.id,
+  userId: m.user_id,
+  title: m.title,
+  imageUrl: m.image_url,
+  date: m.date,
+  updatedAt: m.updated_at,
+  analysis: m.analysis || undefined,
+  reviews: m.reviews || ['', '', ''],
+  grade: m.grade || undefined,
+  chapter: m.chapter || undefined,
+  rootCauses: m.root_causes || [],
+  userActionPlan: m.user_action_plan || undefined,
+});
+
 function App() {
   // If Supabase credentials are not configured, block and show the setup guide
   if (!isSupabaseConfigured) {
@@ -590,23 +607,30 @@ function App() {
         .select('mistake_id');
       setScaffoldedMistakeIds(new Set((scaffoldingRows || []).map((r: any) => r.mistake_id)));
 
-      const mappedMistakes: MistakeEntry[] = (dbMistakes || []).map((m: any) => ({
-        id: m.id,
-        userId: m.user_id,
-        title: m.title,
-        imageUrl: m.image_url,
-        date: m.date,
-        updatedAt: m.updated_at,
-        analysis: m.analysis || undefined,
-        reviews: m.reviews || ['', '', ''],
-        grade: m.grade || undefined,
-        chapter: m.chapter || undefined,
-        rootCauses: m.root_causes || [],
-        userActionPlan: m.user_action_plan || undefined,
-      }));
-      setMistakes(mappedMistakes);
+      setMistakes((dbMistakes || []).map(mapDbMistakeRow));
     } catch (err) {
       console.error('Error loading Supabase user data:', err);
+    }
+  };
+
+  // 🔄 오답노트/스캐폴딩 실시간 동기화 전용 경량 새로고침. fetchUserData는 프로필·전체 학생
+  // 이름맵·스트릭·티켓 등을 전부 다시 조회해서 무거운데, mistakes 테이블 변화 하나에는 그 중
+  // mistakes와 스캐폴딩 초록마크만 실제로 영향을 받으므로 그 두 개만 가볍게 다시 불러온다.
+  const refreshMistakesLight = async () => {
+    try {
+      const { data: dbMistakes, error } = await supabase
+        .from('mistakes')
+        .select('*')
+        .order('date', { ascending: false });
+      if (error) throw error;
+      setMistakes((dbMistakes || []).map(mapDbMistakeRow));
+
+      const { data: scaffoldingRows } = await supabase
+        .from('mistake_scaffoldings')
+        .select('mistake_id');
+      setScaffoldedMistakeIds(new Set((scaffoldingRows || []).map((r: any) => r.mistake_id)));
+    } catch (err) {
+      console.error('Error refreshing mistakes:', err);
     }
   };
   // 내 닉네임 수정 함수 (실제 이름 display_name은 변경되지 않고 nickname 컬럼만 업데이트)
@@ -709,17 +733,18 @@ function App() {
 
   // 🔄 오답노트 실시간 동기화: mistakes 또는 mistake_scaffoldings(선생님 힌트 첨부)에 변화가
   // 생기면 새로고침 없이 자동으로 다시 불러온다. RLS가 이미 본인 것만/관리자는 전체를 걸러주므로
-  // 여기서는 그냥 항상 fetchUserData를 다시 호출하면 된다 (mistakes와 스캐폴딩 초록마크를 함께 갱신).
+  // 여기서는 그냥 항상 다시 조회하면 되는데, 프로필·전체 학생 이름맵까지 전부 다시 읽는 무거운
+  // fetchUserData 대신 mistakes/스캐폴딩만 다시 읽는 refreshMistakesLight를 쓴다 (같은 값이 반복
+  // 갱신될 때마다 필요 이상으로 여러 테이블을 다시 조회하지 않도록).
   useEffect(() => {
     if (!session?.user?.id) return;
-    const userId = session.user.id;
     const channel = supabase
       .channel('mistakes_live_sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'mistakes' }, () => {
-        fetchUserData(userId);
+        refreshMistakesLight();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'mistake_scaffoldings' }, () => {
-        fetchUserData(userId);
+        refreshMistakesLight();
       })
       .subscribe();
 
