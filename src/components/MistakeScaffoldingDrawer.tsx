@@ -31,6 +31,15 @@ export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> =
   const [caption, setCaption] = useState('');
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
+  // 📍 이미지 풀스크린 확대 (문제 사진과 동일한 pinch-to-zoom 방식)
+  const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null);
+  const [scale, setScale] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const touchStartRef = useRef({ x: 0, y: 0 });
+  const initialDistanceRef = useRef(0);
+  const initialScaleRef = useRef(1);
+  const isDraggingRef = useRef(false);
+
   const drawerTopRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -87,6 +96,66 @@ export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> =
   };
 
   // 선생님 전용: 스캐폴딩 사진 업로드 (SQL 데이터베이스 전송)
+  // ── 핀치 줌 및 터치 드래그 제스처 핸들러 (문제 사진과 동일) ──
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 1) {
+      isDraggingRef.current = scale > 1;
+      const touch = e.touches[0];
+      touchStartRef.current = { x: touch.clientX - position.x, y: touch.clientY - position.y };
+    } else if (e.touches.length === 2) {
+      isDraggingRef.current = false;
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const distance = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+      initialDistanceRef.current = distance;
+      initialScaleRef.current = scale;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 1 && isDraggingRef.current) {
+      const touch = e.touches[0];
+      const dx = touch.clientX - touchStartRef.current.x;
+      const dy = touch.clientY - touchStartRef.current.y;
+      const maxDragX = (scale - 1) * 200;
+      const maxDragY = (scale - 1) * 300;
+      const boundedX = Math.max(-maxDragX, Math.min(maxDragX, dx));
+      const boundedY = Math.max(-maxDragY, Math.min(maxDragY, dy));
+      setPosition({ x: boundedX, y: boundedY });
+    } else if (e.touches.length === 2) {
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const distance = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+      if (initialDistanceRef.current > 0) {
+        const factor = distance / initialDistanceRef.current;
+        let newScale = initialScaleRef.current * factor;
+        newScale = Math.max(1, Math.min(4.5, newScale));
+        setScale(newScale);
+        if (newScale === 1) setPosition({ x: 0, y: 0 });
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    isDraggingRef.current = false;
+    if (scale <= 1) {
+      setScale(1);
+      setPosition({ x: 0, y: 0 });
+    }
+  };
+
+  const openZoom = (url: string) => {
+    setZoomImageUrl(url);
+    setScale(1);
+    setPosition({ x: 0, y: 0 });
+  };
+
+  const closeZoom = () => {
+    setZoomImageUrl(null);
+    setScale(1);
+    setPosition({ x: 0, y: 0 });
+  };
+
   // 선생님 전용: 스캐폴딩 삭제
   const handleDeleteScaffolding = async (scaffoldingId: string) => {
     if (!isAdmin) return;
@@ -217,14 +286,19 @@ export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> =
                     </p>
                   )}
 
-                  {/* 힌트 사진 클릭 시 확대 */}
-                  <div className="rounded-xl overflow-hidden border border-slate-800 bg-black flex justify-center">
+                  {/* 힌트 사진 — 탭 시 풀스크린 확대 (문제사진과 동일) */}
+                  <div
+                    onClick={() => openZoom(sc.image_url)}
+                    className="rounded-xl overflow-hidden border border-slate-800 bg-black flex justify-center relative cursor-zoom-in group/scimg"
+                  >
                     <img
                       src={sc.image_url}
                       alt={`Scaffolding Hint #${idx + 1}`}
-                      className="max-h-80 w-auto object-contain hover:scale-105 transition-transform duration-300 cursor-pointer"
-                      onClick={() => window.open(sc.image_url, '_blank')}
+                      className="max-h-80 w-auto object-contain group-hover/scimg:opacity-90 transition-opacity"
                     />
+                    <div className="absolute bottom-2 left-2 bg-slate-950/85 border border-slate-800/60 rounded-lg px-2 py-0.5 text-[9px] font-black text-amber-400 flex items-center space-x-1 shadow backdrop-blur select-none">
+                      <span>💡 누르면 확대돼요!</span>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -287,6 +361,37 @@ export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> =
               )}
             </form>
           )}
+        </div>
+      )}
+
+      {/* 풀스크린 이미지 확대 모달 (문제 사진과 동일 — pinch-to-zoom + 터치 드래그 지원) */}
+      {zoomImageUrl && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/98 flex items-center justify-center animate-fade-in cursor-zoom-out"
+          onClick={closeZoom}
+        >
+          <div
+            className="absolute inset-0 flex items-center justify-center touch-none select-none"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
+            <img
+              src={zoomImageUrl}
+              alt="확대된 스캐폴딩 힌트 이미지"
+              className="max-w-full max-h-full object-contain pointer-events-none select-none"
+              style={{
+                transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+              }}
+            />
+          </div>
+
+          {/* 배율 표시 + 닫기 가이드 */}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 select-none pointer-events-none">
+            <span className="text-[9.5px] text-slate-400 font-extrabold bg-slate-950/85 px-4 py-1.5 rounded-full border border-slate-850 shadow-lg backdrop-blur-md">
+              배율: {scale.toFixed(1)}x　·　탭하면 닫혀요
+            </span>
+          </div>
         </div>
       )}
     </div>
