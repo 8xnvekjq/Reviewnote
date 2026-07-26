@@ -145,6 +145,26 @@ export const GACHA_ITEMS: GachaItem[] = [
     color: 'from-amber-400 via-yellow-400 to-amber-500'
   },
   {
+    id: 'theme_crimson',
+    name: '🎨 크림슨 레드 테마',
+    description: '앱 전체 배경 및 프레임이 강렬한 크림슨 레드 톤으로 변환됩니다.',
+    rarity: 'SSR',
+    category: 'THEME',
+    icon: '❤️',
+    effectValue: '#DC2626',
+    color: 'from-amber-400 via-yellow-400 to-amber-500'
+  },
+  {
+    id: 'theme_charcoal',
+    name: '🎨 차콜 그래파이트 테마',
+    description: '앱 전체 배경 및 프레임이 색을 절제한 고급스러운 차콜 그레이 톤으로 변환됩니다.',
+    rarity: 'SSR',
+    category: 'THEME',
+    icon: '⚫',
+    effectValue: '#475569',
+    color: 'from-amber-400 via-yellow-400 to-amber-500'
+  },
+  {
     id: 'ai_tsundere',
     name: '🤖 AI 말투: 츤데레 쌤',
     description: 'AI 밤티 쌤이 툴툴대면서도 따뜻하게 챙겨주는 츤데레 톤으로 풀이해줍니다.',
@@ -244,6 +264,26 @@ export const GACHA_ITEMS: GachaItem[] = [
     category: 'THEME',
     icon: '🌅',
     effectValue: '#F43F5E',
+    color: 'from-purple-400 via-indigo-400 to-purple-600'
+  },
+  {
+    id: 'theme_forest',
+    name: '🎨 포레스트 그린 테마',
+    description: '앱 전체 배경 및 프레임이 차분하고 깊은 포레스트 그린 톤으로 변환됩니다.',
+    rarity: 'SR',
+    category: 'THEME',
+    icon: '🌲',
+    effectValue: '#16A34A',
+    color: 'from-purple-400 via-indigo-400 to-purple-600'
+  },
+  {
+    id: 'theme_burgundy',
+    name: '🎨 버건디 와인 테마',
+    description: '앱 전체 배경 및 프레임이 고급스러운 버건디 와인 톤으로 변환됩니다.',
+    rarity: 'SR',
+    category: 'THEME',
+    icon: '🍷',
+    effectValue: '#9F1239',
     color: 'from-purple-400 via-indigo-400 to-purple-600'
   },
   {
