@@ -218,11 +218,15 @@ export const ScaffoldingListPanel: React.FC<ScaffoldingListPanelProps> = ({
                 </span>
               </div>
 
-              {/* 문제 정보 & 힌트 사진 섬네일 */}
+              {/* 문제 정보 & 힌트 사진/이모지 섬네일 */}
               <div className="flex items-center space-x-3">
-                {/* 힌트 사진 썸네일 */}
+                {/* 힌트 사진/이모지 썸네일 */}
                 <div className="w-14 h-14 rounded-xl overflow-hidden border border-slate-800 bg-black flex-none flex items-center justify-center">
-                  <img src={t.latestImageUrl} alt="Thumbnail" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                  {t.latestImageUrl ? (
+                    <img src={t.latestImageUrl} alt="Thumbnail" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                  ) : (
+                    <span className="text-2xl select-none">🐶</span>
+                  )}
                 </div>
 
                 <div className="min-w-0 flex-1 space-y-1">
@@ -238,7 +242,9 @@ export const ScaffoldingListPanel: React.FC<ScaffoldingListPanelProps> = ({
                   </div>
 
                   <p className="text-[11.5px] text-slate-400 truncate">
-                    <span className="text-amber-300 font-semibold">{t.latestCaption}</span>
+                    <span className="text-amber-300 font-semibold">
+                      {t.latestCaption ? `🐶 : ${t.latestCaption}` : '🧩 손글씨 힌트 첨부됨'}
+                    </span>
                   </p>
                 </div>
 

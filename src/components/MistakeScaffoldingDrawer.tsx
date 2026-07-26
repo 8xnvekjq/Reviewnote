@@ -12,6 +12,8 @@ export interface MistakeScaffolding {
   created_at: string;
 }
 
+const CUTE_ANIMAL_EMOJIS = ['🐶', '🐱', '🐰', '🦊', '🐼', '🐨', '🐥', '🐯', '🦁', '🐻', '🐹', '🐧', '🐙', '🐬'];
+
 interface MistakeScaffoldingDrawerProps {
   mistakeId: string;
   studentId: string;
@@ -177,7 +179,8 @@ export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> =
 
   const handleUploadScaffolding = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!previewImage || uploading || !currentUserId || !mistakeId || !studentId) return;
+    const trimmedCaption = caption.trim();
+    if ((!previewImage && !trimmedCaption) || uploading || !currentUserId || !mistakeId || !studentId) return;
 
     try {
       setUploading(true);
@@ -186,8 +189,8 @@ export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> =
         mistake_id: mistakeId,
         student_id: studentId,
         teacher_id: currentUserId,
-        image_url: previewImage,
-        caption: caption.trim() || '선생님 풀이 힌트',
+        image_url: previewImage || '',
+        caption: trimmedCaption,
       };
 
       const { data, error } = await supabase
@@ -206,7 +209,7 @@ export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> =
       }
     } catch (err) {
       console.error('Failed to upload scaffolding:', err);
-      alert('스캐폴딩 사진 업로드에 실패했습니다. 다시 시도해 주세요.');
+      alert('스캐폴딩 힌트 등록에 실패했습니다. 다시 시도해 주세요.');
     } finally {
       setUploading(false);
     }
@@ -254,66 +257,73 @@ export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> =
             <div className="text-center py-6 text-slate-500 text-xs">스캐폴딩 힌트를 불러오는 중...</div>
           ) : scaffoldings.length === 0 ? (
             <div className="text-center py-6 text-slate-500 text-xs space-y-1">
-              <p>등록된 선생님 힌트 사진이 없습니다.</p>
+              <p>등록된 선생님 힌트가 없습니다.</p>
               <p className="text-[11px] text-slate-600">선생님이 추가 손글씨 풀이나 단계별 스캐폴딩 힌트를 남기면 이곳에 표시됩니다. 🧩</p>
             </div>
           ) : (
             <div className="grid gap-3">
-              {scaffoldings.map((sc, idx) => (
-                <div key={sc.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-2 shadow-sm">
-                  <div className="flex items-center justify-between text-[10px] text-slate-400">
-                    <span className="font-black text-amber-400 flex items-center space-x-1">
-                      <span>🧩</span>
-                      <span>스캐폴딩 힌트 #{idx + 1}</span>
-                    </span>
-                    <div className="flex items-center space-x-2">
-                      <span className="font-mono text-slate-500">{formatDateString(sc.created_at)}</span>
-                      {isAdmin && (
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteScaffolding(sc.id)}
-                          className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-red-900/40 text-red-400 border border-red-700/40 hover:bg-red-700/60 hover:text-red-100 transition-all active:scale-95"
-                        >
-                          🗑 삭제
-                        </button>
-                      )}
+              {scaffoldings.map((sc, idx) => {
+                const animalEmoji = CUTE_ANIMAL_EMOJIS[idx % CUTE_ANIMAL_EMOJIS.length];
+                return (
+                  <div key={sc.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-2.5 shadow-sm">
+                    <div className="flex items-center justify-between text-[10px] text-slate-400">
+                      <span className="font-black text-amber-400 flex items-center space-x-1">
+                        <span>🧩</span>
+                        <span>스캐폴딩 힌트 #{idx + 1}</span>
+                      </span>
+                      <div className="flex items-center space-x-2">
+                        <span className="font-mono text-slate-500">{formatDateString(sc.created_at)}</span>
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteScaffolding(sc.id)}
+                            className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-red-900/40 text-red-400 border border-red-700/40 hover:bg-red-700/60 hover:text-red-100 transition-all active:scale-95"
+                          >
+                            🗑 삭제
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* 힌트 메모 (caption) */}
-                  {sc.caption && (
-                    <p className="text-xs font-semibold text-slate-200 bg-slate-950/60 p-2 rounded-xl border border-slate-850">
-                      {sc.caption}
-                    </p>
-                  )}
+                    {/* 말로 된 힌트 ("귀여운 동물 이모지 : 말로 된 힌트" 구성) */}
+                    {sc.caption && (
+                      <div className="text-xs font-semibold text-slate-100 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/80 flex items-start space-x-1.5 shadow-inner">
+                        <span className="text-base leading-none flex-none select-none">{animalEmoji}</span>
+                        <span className="text-amber-400 font-extrabold flex-none">:</span>
+                        <span className="text-slate-200 font-bold leading-relaxed flex-1 break-words">{sc.caption}</span>
+                      </div>
+                    )}
 
-                  {/* 힌트 사진 — 탭 시 풀스크린 확대 (문제사진과 동일) */}
-                  <div
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openZoom(sc.image_url);
-                    }}
-                    className="rounded-xl overflow-hidden border border-slate-800 bg-black flex justify-center relative cursor-zoom-in group/scimg"
-                  >
-                    <img
-                      src={sc.image_url}
-                      alt={`Scaffolding Hint #${idx + 1}`}
-                      className="max-h-80 w-auto object-contain group-hover/scimg:opacity-90 transition-opacity"
-                    />
-                    <div className="absolute bottom-2 left-2 bg-slate-950/85 border border-slate-800/60 rounded-lg px-2 py-0.5 text-[9px] font-black text-amber-400 flex items-center space-x-1 shadow backdrop-blur select-none">
-                      <span>💡 누르면 확대돼요!</span>
-                    </div>
+                    {/* 힌트 사진 — 탭 시 풀스크린 확대 (사진이 등록된 경우에만 노출) */}
+                    {sc.image_url && (
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openZoom(sc.image_url);
+                        }}
+                        className="rounded-xl overflow-hidden border border-slate-800 bg-black flex justify-center relative cursor-zoom-in group/scimg"
+                      >
+                        <img
+                          src={sc.image_url}
+                          alt={`Scaffolding Hint #${idx + 1}`}
+                          className="max-h-80 w-auto object-contain group-hover/scimg:opacity-90 transition-opacity"
+                        />
+                        <div className="absolute bottom-2 left-2 bg-slate-950/85 border border-slate-800/60 rounded-lg px-2 py-0.5 text-[9px] font-black text-amber-400 flex items-center space-x-1 shadow backdrop-blur select-none">
+                          <span>💡 누르면 확대돼요!</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
-          {/* 선생님(어드민) 전용: 스캐폴딩 힌트 사진 업로드 폼 */}
+          {/* 선생님(어드민) 전용: 스캐폴딩 힌트 등록 폼 */}
           {isAdmin && (
             <form onSubmit={handleUploadScaffolding} className="space-y-3 pt-3 border-t border-slate-850">
               <span className="text-xs font-black text-amber-400 block">
-                📷 힌트 사진 첨부 (스캐폴딩)
+                🧩 힌트 작성 (말로 된 힌트 / 사진 선택)
               </span>
 
               <div className="flex items-center space-x-2">
@@ -329,40 +339,41 @@ export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> =
                   htmlFor={`scaffolding-file-input-${mistakeId}`}
                   className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 text-xs font-bold transition-all cursor-pointer flex-none"
                 >
-                  {previewImage ? '🖼️ 사진 변경' : '📷 힌트 사진 선택'}
+                  {previewImage ? '🖼️ 사진 변경' : '📷 사진 선택(선택)'}
                 </label>
                 <input
                   type="text"
                   value={caption}
                   onChange={e => setCaption(e.target.value)}
-                  placeholder="힌트 메모 (예: 1단계 공식 적용)"
+                  placeholder="말로 된 힌트 입력 (예: 1단계 공식 적용)"
                   className="flex-1 bg-slate-900 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 outline-none transition-colors"
                 />
               </div>
 
-              {/* 이미지 미리보기 및 전송 버튼 */}
+              {/* 선택된 이미지 미리보기 */}
               {previewImage && (
-                <div className="space-y-2 pt-1 animate-fade-in">
-                  <div className="relative w-32 h-32 rounded-xl overflow-hidden border border-amber-500/40 bg-black">
+                <div className="pt-1 animate-fade-in">
+                  <div className="relative w-28 h-28 rounded-xl overflow-hidden border border-amber-500/40 bg-black">
                     <img src={previewImage} alt="Preview" className="w-full h-full object-cover" />
                     <button
                       type="button"
                       onClick={() => setPreviewImage(null)}
-                      className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-600 text-white text-xs font-bold flex items-center justify-center shadow"
+                      className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-600 text-white text-xs font-bold flex items-center justify-center shadow"
                     >
                       ✕
                     </button>
                   </div>
-
-                  <button
-                    type="submit"
-                    disabled={uploading}
-                    className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 disabled:opacity-40 text-slate-950 font-black text-xs transition-all shadow-md active:scale-95"
-                  >
-                    {uploading ? '스캐폴딩 전송 중...' : '🧩 스캐폴딩 힌트 전송하기 (SQL 서버 저장)'}
-                  </button>
                 </div>
               )}
+
+              {/* 전송 버튼 */}
+              <button
+                type="submit"
+                disabled={uploading || (!previewImage && !caption.trim())}
+                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 disabled:opacity-40 text-slate-950 font-black text-xs transition-all shadow-md active:scale-95"
+              >
+                {uploading ? '스캐폴딩 힌트 전송 중...' : '🧩 스캐폴딩 힌트 등록하기'}
+              </button>
             </form>
           )}
         </div>
