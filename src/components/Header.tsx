@@ -35,10 +35,13 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ currentUser, nickname, onLogout, onUpdateNickname, myScore, onOpenStore, equippedTitle, streakDays }) => {
   const [showUserMenu, setShowUserMenu] = React.useState(false);
+  const [isNicknameModalOpen, setIsNicknameModalOpen] = React.useState(false);
+  const [nicknameInput, setNicknameInput] = React.useState('');
   const buildLabel = `v${__APP_VERSION__} (${formatBuildTime(__BUILD_TIME__)})`;
 
 
   return (
+    <>
     <header className="safe-top flex-none border-b border-app-theme bg-app-surface backdrop-blur-md px-4 py-3 flex items-center justify-between sticky top-0 z-30 transition-colors duration-300">
       <div className="flex items-center space-x-2.5 min-w-0 flex-1 mr-2">
         <img 
@@ -81,7 +84,7 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, nickname, onLogout,
           >
             <span>👤</span>
             <span className="truncate">{currentUser}</span>
-            <span className="text-[8px] text-slate-500 ml-0.5">▼</span>
+            <span className="text-[8px] opacity-70">▼</span>
           </button>
 
           {showUserMenu && (
@@ -93,10 +96,8 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, nickname, onLogout,
               />
 
               {/* 우측 상단 팝업 드롭다운 */}
-              <div className="absolute right-0 mt-1.5 w-40 bg-slate-900/95 border border-slate-800 rounded-xl p-2 shadow-2xl z-50 backdrop-blur-md animate-fade-in space-y-1.5">
-                <div className="px-2 py-1 border-b border-slate-800">
-                  <p className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">아이디</p>
-                  <p className="text-[9px] text-slate-400 truncate mb-0.5">{currentUser}</p>
+              <div className="absolute right-0 mt-2 w-48 rounded-xl bg-slate-900 border border-slate-800 shadow-2xl p-2 z-50 space-y-1.5 animate-fade-in">
+                <div className="px-2.5 py-1.5 border-b border-slate-800/80">
                   <p className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">닉네임</p>
                   <p className="text-[10.5px] font-black text-slate-200 truncate">{nickname || currentUser}</p>
                 </div>
@@ -116,16 +117,13 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, nickname, onLogout,
                   </button>
                 )}
 
-                {/* 닉네임 변경 버튼 (로그아웃 바로 위) */}
+                {/* 닉네임 변경 버튼 (중앙 모달 팝업 호출) */}
                 {onUpdateNickname && (
                   <button
-                    onClick={async () => {
-                      // 프롬프트 기본값은 현재 닉네임만 (아이디 절대 표시 안 함)
-                      const input = prompt("새로운 닉네임을 입력하세요 (실제 이름은 변경되지 않습니다):", nickname || '');
-                      if (input !== null && input.trim()) {
-                        await onUpdateNickname(input.trim());
-                        setShowUserMenu(false);
-                      }
+                    onClick={() => {
+                      setNicknameInput(nickname || '');
+                      setIsNicknameModalOpen(true);
+                      setShowUserMenu(false);
                     }}
                     className="w-full text-left px-2.5 py-1.5 rounded-lg bg-indigo-950/30 hover:bg-indigo-900/40 text-indigo-300 hover:text-indigo-200 text-[10.5px] font-bold flex items-center space-x-1.5 transition-colors border border-indigo-900/30"
                   >
@@ -151,5 +149,71 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, nickname, onLogout,
         </div>
       </div>
     </header>
+
+    {/* ── 닉네임 변경 화면 중앙 모달 팝업 ───────────────── */}
+    {isNicknameModalOpen && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+        <div className="w-full max-w-xs bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-2xl space-y-4 animate-scale-up">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+            <h3 className="text-sm font-extrabold text-white flex items-center space-x-2">
+              <span>✏️</span>
+              <span>닉네임 변경</span>
+            </h3>
+            <button
+              onClick={() => setIsNicknameModalOpen(false)}
+              className="text-slate-400 hover:text-white text-xs font-bold px-2 py-1 rounded-lg"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-bold text-slate-300">
+              변경할 닉네임
+            </label>
+            <input
+              type="text"
+              value={nicknameInput}
+              onChange={(e) => setNicknameInput(e.target.value)}
+              placeholder="새 닉네임을 입력하세요 (최대 16자)"
+              maxLength={16}
+              className="w-full px-3.5 py-2.5 bg-slate-955 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 outline-none focus:border-indigo-500 transition-colors"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && nicknameInput.trim() && onUpdateNickname) {
+                  onUpdateNickname(nicknameInput.trim());
+                  setIsNicknameModalOpen(false);
+                }
+              }}
+              autoFocus
+            />
+            <p className="text-[10px] text-slate-500">
+              * 닉네임 변경권을 1개 소모하여 즉시 변경됩니다.
+            </p>
+          </div>
+
+          <div className="flex items-center space-x-2 pt-2">
+            <button
+              onClick={() => setIsNicknameModalOpen(false)}
+              className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all"
+            >
+              취소
+            </button>
+            <button
+              onClick={async () => {
+                if (nicknameInput.trim() && onUpdateNickname) {
+                  await onUpdateNickname(nicknameInput.trim());
+                  setIsNicknameModalOpen(false);
+                }
+              }}
+              disabled={!nicknameInput.trim()}
+              className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-550 text-white text-xs font-black transition-all disabled:opacity-50 shadow-md shadow-indigo-600/20"
+            >
+              완료
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 };

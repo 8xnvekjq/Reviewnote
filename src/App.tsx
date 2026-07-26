@@ -149,8 +149,16 @@ function App() {
   const [myBonusPoints, setMyBonusPoints] = useState<number>(0);
   const [streakMilestoneClaimed, setStreakMilestoneClaimed] = useState<number>(0); // 이번 스트릭 런에서 이미 지급받은 콤보 보너스 마일스톤 (0/3/7/14)
 
-  // 현재 표시 가능한 복습 콤보 보유 점수 (DB 뷰 점수 + DB 보너스 점수 + 상점 사용 포인트 차감치)
-  const currentDisplayPoints = Math.max(0, (myWeeklyScoreFromDB || 0) + (myBonusPoints || 0) + pointAdjustment);
+  // 내 전체 누적 복습 적립 점수 (Cumulative Score — 럭키상점 포인트는 주간 리셋 없이 연속 모음)
+  const allTimeEarnedPoints = useMemo(() => {
+    if (!mistakes || mistakes.length === 0) return 0;
+    const completedCount = mistakes.filter(m => m.reviews?.filter(r => r === 'O').length === 3).length;
+    const rate = (completedCount / mistakes.length) * 100;
+    return Math.round((completedCount * 10) + (rate * 100));
+  }, [mistakes]);
+
+  // 현재 표시 가능한 럭키상점 보유 콤보 점수 (누적 전체 점수 + DB 보너스 점수 + 상점 사용 차감치)
+  const currentDisplayPoints = Math.max(0, (allTimeEarnedPoints || myWeeklyScoreFromDB || 0) + (myBonusPoints || 0) + pointAdjustment);
   
   const prevTabRef = useRef(activeTab);
 
