@@ -574,7 +574,7 @@ function App() {
       if (error) throw error;
 
       // 변경권 1개 차감
-      const newQty = ticketRow.quantity - 1;
+      const newQty = Math.max(0, ticketRow.quantity - 1);
       await supabase
         .from('user_items')
         .update({ quantity: newQty })
@@ -583,6 +583,7 @@ function App() {
 
       setMyNickname(trimmed);
       setHasNameChangeTicket(newQty > 0);
+      window.dispatchEvent(new CustomEvent('reviewnote_inventory_updated'));
       loadWeeklyChampions();
       alert(`✅ 닉네임이 '${trimmed}'(으)로 변경되었습니다!\n(잔여 변경권: ${newQty}개)`);
     } catch (err: any) {

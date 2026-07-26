@@ -74,6 +74,14 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
     // localStorage 구 데이터 제거
     localStorage.removeItem('reviewnote_unlocked_items');
     loadInventory();
+
+    const handleInventoryUpdate = () => {
+      loadInventory();
+    };
+    window.addEventListener('reviewnote_inventory_updated', handleInventoryUpdate);
+    return () => {
+      window.removeEventListener('reviewnote_inventory_updated', handleInventoryUpdate);
+    };
   }, [userId]);
 
   // ── 아이템 추가 (뽑기 결과 → DB 저장) ──────────────────
