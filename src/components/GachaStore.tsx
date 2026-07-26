@@ -180,8 +180,8 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
 
     if (error) { console.error('아이템 저장 실패:', error); return; }
 
-    // 희귀 아이템 (SSR / UR) 당첨 시 전광판 로그 기록 (어드민/테스트 계정 제외)
-    const rareItems = items.filter(i => i.rarity === 'SSR' || i.rarity === 'UR');
+    // 희귀 아이템 (SR / SSR / UR) 당첨 시 전광판 로그 기록 (어드민/테스트 계정 제외)
+    const rareItems = items.filter(i => i.rarity === 'SR' || i.rarity === 'SSR' || i.rarity === 'UR');
     if (rareItems.length > 0) {
       try {
         const { data: prof } = await supabase
@@ -571,19 +571,19 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
               </div>
             </div>
 
-            {/* 🌟 실시간 SSR / UR 전설 획득 전광판 피드 */}
+            {/* 🌟 실시간 SR / SSR / UR 전설 획득 전광판 피드 */}
             <div className="w-full max-w-sm bg-slate-900/90 border border-amber-500/30 rounded-2xl p-4 space-y-3 shadow-xl">
               <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
                 <h3 className="text-xs font-black text-amber-300 flex items-center space-x-1.5 uppercase tracking-wider">
                   <span>🎉</span>
-                  <span>실시간 SSR / UR 획득 전광판</span>
+                  <span>실시간 SR / SSR / UR 획득 전광판</span>
                 </h3>
                 <span className="text-[9.5px] text-slate-500 font-bold">라이브 피드</span>
               </div>
 
               {recentLogs.length === 0 ? (
                 <div className="text-center py-4 text-[11px] text-slate-500 font-medium">
-                  아직 SSR/UR 희귀 보물 획득 소식이 없습니다. 럭키 행운의 주인공이 되어보세요! ✨
+                  아직 SR 이상 희귀 보물 획득 소식이 없습니다. 럭키 행운의 주인공이 되어보세요! ✨
                 </div>
               ) : (
                 <div className="space-y-2 max-h-56 overflow-y-auto pr-1 no-scrollbar">
