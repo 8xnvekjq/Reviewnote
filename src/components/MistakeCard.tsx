@@ -123,21 +123,21 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
           {/* 복습 진척사항 배지 목록 */}
           <div className="flex items-center space-x-1">
             {(entry.reviews || ['', '', '']).slice(0, 3).map((state, idx) => {
-              let badgeStyle = "bg-slate-800 text-slate-600 border-slate-700/40";
+              let badgeStyle = "w-[17px] h-[17px] bg-slate-800 text-slate-600 border border-slate-700/40 text-[9px]";
               let symbol = idx + 1;
               if (state === 'O') {
                 badgeStyle = equippedStamp
-                  ? `bg-transparent ${stampBorderClass} text-[11.5px] font-black flex items-center justify-center`
-                  : "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-extrabold";
+                  ? `w-[19px] h-[19px] bg-transparent border-2 ${stampBorderClass} text-[11px] font-black`
+                  : "w-[17px] h-[17px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-extrabold text-[9px]";
               } else if (state === 'X') {
-                badgeStyle = "bg-red-500/15 text-red-400 border-red-500/30 font-extrabold";
+                badgeStyle = "w-[17px] h-[17px] bg-red-500/15 text-red-400 border border-red-500/30 font-extrabold text-[9px]";
               } else if (state === 'star') {
-                badgeStyle = "bg-amber-500/15 text-amber-400 border-amber-500/30 font-extrabold";
+                badgeStyle = "w-[17px] h-[17px] bg-amber-500/15 text-amber-400 border border-amber-500/30 font-extrabold text-[9px]";
               }
               return (
                 <span
                   key={idx}
-                  className={`w-[17px] h-[17px] rounded-full border text-[9px] flex items-center justify-center transition-all ${badgeStyle}`}
+                  className={`rounded-full flex items-center justify-center transition-all ${badgeStyle}`}
                 >
                   {state === 'star' ? '★' : (state === 'O' ? (equippedStamp || 'O') : (state || symbol))}
                 </span>

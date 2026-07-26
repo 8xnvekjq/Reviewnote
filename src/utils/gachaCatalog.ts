@@ -518,22 +518,22 @@ export const getRarityTheme = (rarity: GachaRarity) => {
   switch (rarity) {
     case 'UR':
       return {
-        badge: 'bg-gradient-to-r from-amber-400 via-pink-500 to-purple-500 text-white font-black animate-pulse shadow-md shadow-amber-500/20',
-        border: 'border-amber-400/60 shadow-[0_0_12px_rgba(245,158,11,0.25)]',
+        badge: 'bg-gradient-to-r from-amber-400 via-pink-500 to-purple-500 text-white font-black animate-pulse shadow-md shadow-pink-500/30',
+        border: 'border-pink-500 shadow-[0_0_14px_rgba(236,72,153,0.5)] ring-2 ring-purple-400/60 animate-pulse',
         bgGradient: 'from-amber-400 via-pink-500 to-purple-500',
-        textColor: 'text-amber-300',
+        textColor: 'text-pink-300',
       };
     case 'SSR':
       return {
         badge: 'bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-slate-950 font-black shadow-sm',
-        border: 'border-amber-400/50 shadow-[0_0_8px_rgba(251,191,36,0.2)]',
+        border: 'border-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.4)] ring-1 ring-amber-300/40',
         bgGradient: 'from-amber-400 via-yellow-400 to-amber-500',
         textColor: 'text-amber-400',
       };
     case 'SR':
       return {
         badge: 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-black shadow-sm',
-        border: 'border-purple-500/50 shadow-[0_0_8px_rgba(168,85,247,0.2)]',
+        border: 'border-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.35)] ring-1 ring-purple-400/30',
         bgGradient: 'from-purple-400 via-indigo-400 to-purple-600',
         textColor: 'text-purple-300',
       };
@@ -541,7 +541,7 @@ export const getRarityTheme = (rarity: GachaRarity) => {
     default:
       return {
         badge: 'bg-gradient-to-r from-sky-400 to-blue-500 text-white font-black shadow-sm',
-        border: 'border-sky-500/40 shadow-[0_0_6px_rgba(56,189,248,0.15)]',
+        border: 'border-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.25)]',
         bgGradient: 'from-sky-400 via-blue-400 to-indigo-500',
         textColor: 'text-sky-300',
       };
