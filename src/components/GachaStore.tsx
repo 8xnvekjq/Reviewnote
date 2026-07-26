@@ -535,25 +535,41 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {GACHA_ITEMS.map(item => {
                 const isUnlocked = unlockedItemIds.includes(item.id);
+                const getCategoryLabel = (category: string) => {
+                  switch (category) {
+                    case 'TITLE': return '칭호';
+                    case 'STAMP': return '스탬프';
+                    case 'THEME': return '테마';
+                    case 'AI_VOICE': return 'AI 말투';
+                    case 'SHIELD': return '기능 아이템';
+                    case 'CHARM': return '행운 부적';
+                    default: return '보물';
+                  }
+                };
+                const catLabel = getCategoryLabel(item.category);
+
                 return (
                   <div
                     key={item.id}
                     className={`p-3.5 rounded-2xl border flex items-center space-x-3 transition-all ${
                       isUnlocked
                         ? 'bg-slate-900/80 border-slate-800 text-white'
-                        : 'bg-slate-950/60 border-slate-900 text-slate-600 opacity-60'
+                        : 'bg-slate-950/60 border-slate-900 text-slate-500 opacity-70'
                     }`}
                   >
                     <span className="text-3xl flex-none select-none">{isUnlocked ? item.icon : '❓'}</span>
-                    <div className="min-w-0">
-                      <div className="flex items-center space-x-2">
-                        <span className={`text-[9px] font-black px-1.5 py-0.2 rounded ${isUnlocked ? `bg-gradient-to-r ${item.color} text-white` : 'bg-slate-800 text-slate-500'}`}>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center space-x-1.5">
+                        <span className={`text-[9px] font-black px-1.5 py-0.2 rounded flex-none ${isUnlocked ? `bg-gradient-to-r ${item.color} text-white` : 'bg-slate-800 text-slate-400'}`}>
                           {item.rarity}
                         </span>
-                        <h4 className="text-xs font-black truncate">{isUnlocked ? item.name : '미해금 보물'}</h4>
+                        <span className="text-[8.5px] font-extrabold px-1.5 py-0.2 rounded bg-slate-800/90 text-slate-300 border border-slate-700/60 flex-none">
+                          {catLabel}
+                        </span>
+                        <h4 className="text-xs font-black truncate">{isUnlocked ? item.name : `미해금 ${catLabel}`}</h4>
                       </div>
-                      <p className="text-[10px] text-slate-500 mt-0.5 truncate">
-                        {isUnlocked ? item.description : '뽑기를 통해 얻을 수 있습니다.'}
+                      <p className="text-[10px] text-slate-500 mt-1 truncate">
+                        {isUnlocked ? item.description : `뽑기를 통해 ${catLabel} 보물을 해금해보세요.`}
                       </p>
                     </div>
                   </div>
