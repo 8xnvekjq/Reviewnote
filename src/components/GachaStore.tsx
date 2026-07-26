@@ -74,8 +74,15 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
   const [lastFreeWeeklyDrawDate, setLastFreeWeeklyDrawDate] = useState<string | null>(null);
   const todayKst = getKSTDateString();
   const canFreeDraw1 = lastFreeDrawDate !== todayKst;
-  // 최초 3회까지 무료 10연속 가능 (0/1/2/3 횟수 저장, CLAIMED는 3으로 취급)
-  const freeDrawUsedCount = lastFreeWeeklyDrawDate === 'CLAIMED' ? 3 : parseInt(lastFreeWeeklyDrawDate || '0', 10) || 0;
+  // 최초 3회까지 무료 10연속 가능 (0/1/2/3 횟수 저장).
+  // 'CLAIMED'(옛 "평생 1회" 방식)나 순수 숫자가 아닌 값(더 예전의 "매주 월요일" 날짜 문자열 잔재)은
+  // 전부 "최소 1회는 이미 사용함"으로만 취급한다 — 3으로 취급하면 옛날에 1번 썼던 계정이 남은 2회를
+  // 영영 못 받게 되므로, 새로운 "계정당 3회" 정책이 기존 계정에도 공평하게 적용되도록 한다.
+  const freeDrawUsedCount = /^\d+$/.test(lastFreeWeeklyDrawDate || '')
+    ? parseInt(lastFreeWeeklyDrawDate as string, 10)
+    : lastFreeWeeklyDrawDate
+      ? 1
+      : 0;
   const FREE_DRAW10_MAX = 3;
   const canFreeDraw10 = freeDrawUsedCount < FREE_DRAW10_MAX;
   const freeDraw10Remaining = FREE_DRAW10_MAX - freeDrawUsedCount;
@@ -299,9 +306,9 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
     return () => cancelAnimationFrame(animationFrameId);
   };
 
-  // 가챠 뽑기 시작 (count: 1 또는 10, isFree: 매일 무료 1회 / 매주 월요일 무료 10회)
+  // 가챠 뽑기 시작 (count: 1 또는 10, isFree: 매일 무료 1회 / 계정당 3회 무료 10연속)
   const handleStartDraw = (count: number, isFree: boolean = false) => {
-    const cost = count * 10;
+    const cost = count === 10 ? 70 : count * 10; // 10연속 30% 할인 (100점 → 70점)
 
     if (isFree) {
       if (count === 1 && !canFreeDraw1) {
@@ -557,7 +564,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                   <span>{canFreeDraw10 ? `🎁 무료 10연속` : '🔥 10회 연속 뽑기'}</span>
                 </span>
                 <span className="text-xs font-bold text-amber-200 mt-1 flex items-center space-x-1">
-                  <span>{canFreeDraw10 ? `무료 (${freeDraw10Remaining}회 남음)` : '⚡ 100점'}</span>
+                  <span>{canFreeDraw10 ? `무료 (${freeDraw10Remaining}회 남음)` : '⚡ 70점 (-30%)'}</span>
                 </span>
               </button>
             </div>
