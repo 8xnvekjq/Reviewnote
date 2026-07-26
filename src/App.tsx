@@ -707,6 +707,27 @@ function App() {
     }
   }, [activeTab, session]);
 
+  // 🔄 오답노트 실시간 동기화: mistakes 또는 mistake_scaffoldings(선생님 힌트 첨부)에 변화가
+  // 생기면 새로고침 없이 자동으로 다시 불러온다. RLS가 이미 본인 것만/관리자는 전체를 걸러주므로
+  // 여기서는 그냥 항상 fetchUserData를 다시 호출하면 된다 (mistakes와 스캐폴딩 초록마크를 함께 갱신).
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    const userId = session.user.id;
+    const channel = supabase
+      .channel('mistakes_live_sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mistakes' }, () => {
+        fetchUserData(userId);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mistake_scaffoldings' }, () => {
+        fetchUserData(userId);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session?.user?.id]);
+
   // Start analysis trigger (유료키 전용 — 무료키는 레이트리밋으로 인한 지연/오류가 잦아 배제)
   const handleStartAnalysis = async (entry: MistakeEntry) => {
     const paidKey = paidGeminiKey;

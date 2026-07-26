@@ -48,3 +48,15 @@ CREATE POLICY "Scaffoldings delete policy"
 
 -- 5. Grant permissions to authenticated role
 GRANT ALL ON public.mistake_scaffoldings TO authenticated;
+
+-- 6. 실시간 갱신: 선생님이 힌트를 첨부/삭제하면 학생 화면의 오답카드 초록 마크가
+-- 새로고침 없이 즉시 반영되도록 Realtime 발행 목록에 추가
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'mistake_scaffoldings'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.mistake_scaffoldings;
+  END IF;
+END $$;
