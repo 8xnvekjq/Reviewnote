@@ -25,9 +25,15 @@ export default {
           900: 'rgb(var(--color-indigo-900) / <alpha-value>)',
           950: 'rgb(var(--color-indigo-950) / <alpha-value>)',
         },
-        // 오답 문제 카드 겉/속 및 모든 패널 배경/테두리를 테마 변동 변수에 100% 연동
+        // 오답 문제 카드 겉/속 및 모든 패널 배경/테두리를 테마 변동 변수에 100% 연동.
+        // slate-750/850은 Tailwind 기본 팔레트에 없는 프로젝트 커스텀 shade인데, 지금까지
+        // tailwind.config.js 어디에도 정의된 적이 없어서 bg-slate-850/border-slate-750 클래스가
+        // 실제로는 색이 전혀 적용되지 않고 있었다 (문제카드/패널 내부 박스가 테마에 반응 안 하던 원인).
+        // 이번에 처음으로 실제 값을 채워 넣으면서 동시에 테마 변수에 연결한다.
         slate: {
+          750: 'rgb(var(--theme-border) / <alpha-value>)',
           800: 'rgb(var(--theme-border) / <alpha-value>)',
+          850: 'rgb(var(--theme-bg-elevated) / <alpha-value>)',
           900: 'rgb(var(--theme-bg-surface) / <alpha-value>)',
           950: 'rgb(var(--theme-bg-main) / <alpha-value>)',
           955: 'rgb(var(--theme-bg-main) / <alpha-value>)',
