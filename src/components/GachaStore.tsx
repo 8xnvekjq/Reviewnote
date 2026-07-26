@@ -74,7 +74,11 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
   const [lastFreeWeeklyDrawDate, setLastFreeWeeklyDrawDate] = useState<string | null>(null);
   const todayKst = getKSTDateString();
   const canFreeDraw1 = lastFreeDrawDate !== todayKst;
-  const canFreeDraw10 = !lastFreeWeeklyDrawDate || lastFreeWeeklyDrawDate === '';
+  // 최초 3회까지 무료 10연속 가능 (0/1/2/3 횟수 저장, CLAIMED는 3으로 취급)
+  const freeDrawUsedCount = lastFreeWeeklyDrawDate === 'CLAIMED' ? 3 : parseInt(lastFreeWeeklyDrawDate || '0', 10) || 0;
+  const FREE_DRAW10_MAX = 3;
+  const canFreeDraw10 = freeDrawUsedCount < FREE_DRAW10_MAX;
+  const freeDraw10Remaining = FREE_DRAW10_MAX - freeDrawUsedCount;
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -305,7 +309,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
         return;
       }
       if (count === 10 && !canFreeDraw10) {
-        alert('🎁 최초 1회 무료 10연속 뽑기는 이미 사용하셨습니다!');
+        alert(`🎁 계정 무료 10연속 뽑기 ${FREE_DRAW10_MAX}회를 모두 사용하셨습니다!`);
         return;
       }
     } else if (userPoints < cost) {
@@ -323,10 +327,11 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
           });
         }
       } else {
-        setLastFreeWeeklyDrawDate('CLAIMED');
+        const nextCount = String(freeDrawUsedCount + 1);
+        setLastFreeWeeklyDrawDate(nextCount);
         if (userId) {
-          supabase.from('profiles').update({ last_free_weekly_draw_date: 'CLAIMED' }).eq('id', userId).then(({ error }) => {
-            if (error) console.error('최초 1회 무료 10회 뽑기 기록 실패:', error);
+          supabase.from('profiles').update({ last_free_weekly_draw_date: nextCount }).eq('id', userId).then(({ error }) => {
+            if (error) console.error('무료 10회 뽑기 기록 실패:', error);
           });
         }
       }
@@ -549,10 +554,10 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
               >
                 <div className="absolute -right-6 -top-6 w-12 h-12 bg-amber-400/20 rotate-45" />
                 <span className="text-sm font-black flex items-center space-x-1">
-                  <span>{canFreeDraw10 ? '🎁 최초 1회 무료 10연속' : '🔥 10회 연속 뽑기'}</span>
+                  <span>{canFreeDraw10 ? `🎁 무료 10연속` : '🔥 10회 연속 뽑기'}</span>
                 </span>
                 <span className="text-xs font-bold text-amber-200 mt-1 flex items-center space-x-1">
-                  <span>{canFreeDraw10 ? '무료 (신규 혜택)' : '⚡ 100점'}</span>
+                  <span>{canFreeDraw10 ? `무료 (${freeDraw10Remaining}회 남음)` : '⚡ 100점'}</span>
                 </span>
               </button>
             </div>
