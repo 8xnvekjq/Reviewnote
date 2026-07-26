@@ -85,7 +85,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
         .from('gacha_logs')
         .select('id, user_id, item_name, item_icon, rarity, created_at, user_name, user_title, profiles(nickname, display_name, equipped_title, email, is_admin)')
         .order('created_at', { ascending: false })
-        .limit(20);
+        .limit(10);
 
       if (error) throw error;
 
