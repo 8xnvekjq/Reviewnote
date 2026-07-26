@@ -11,7 +11,11 @@ interface ActivityEvent {
   name: string;
   equipped_title: string | null;
   equipped_theme: string | null;
+  equipped_stamp: string | null;
 }
+
+// 테마 미장착 시 기본 남색(indigo-600) 테마로 카드 색을 적용
+const DEFAULT_THEME_HEX = '#4F46E5';
 
 const hexToRgba = (hex: string, alpha: number): string => {
   const normalized = hex.replace('#', '');
@@ -94,9 +98,12 @@ export const RecentActivityFeed: React.FC = () => {
         <div className="space-y-2.5">
           {events.map((ev, idx) => {
             const titleBadge = ev.equipped_title ? getTitleBadgeStyle(ev.equipped_title) : null;
-            const cardStyle: React.CSSProperties = ev.equipped_theme
-              ? { borderColor: hexToRgba(ev.equipped_theme, 0.5), backgroundColor: hexToRgba(ev.equipped_theme, 0.08) }
-              : {};
+            const themeHex = ev.equipped_theme || DEFAULT_THEME_HEX;
+            const cardStyle: React.CSSProperties = {
+              borderColor: hexToRgba(themeHex, 0.5),
+              backgroundColor: hexToRgba(themeHex, 0.08),
+            };
+            const reviewIcon = ev.equipped_stamp || '✅';
 
             return (
               <div
@@ -104,7 +111,7 @@ export const RecentActivityFeed: React.FC = () => {
                 className="p-3.5 rounded-2xl border border-slate-800 bg-slate-900/60 flex items-center space-x-3"
                 style={cardStyle}
               >
-                <span className="text-2xl flex-none">{ev.event_type === 'register' ? '📝' : '✅'}</span>
+                <span className="text-2xl flex-none">{ev.event_type === 'register' ? '📝' : reviewIcon}</span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center space-x-1.5 flex-wrap gap-y-0.5">
                     <span className="text-xs font-black text-white truncate">{ev.name}</span>

@@ -47,7 +47,8 @@ SELECT
   ae.event_time,
   COALESCE(p.nickname, p.display_name, split_part(p.email, '@', 1)) AS name,
   p.equipped_title,
-  p.equipped_theme
+  p.equipped_theme,
+  p.equipped_stamp
 FROM all_events ae
 JOIN public.profiles p ON p.id = ae.user_id
 WHERE p.is_admin IS NOT TRUE
