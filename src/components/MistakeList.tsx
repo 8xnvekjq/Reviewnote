@@ -25,6 +25,7 @@ interface MistakeListProps {
   onToggleAllPrintSelect?: () => void;
   equippedStamp?: string;
   profilesStampMap?: Record<string, string>;
+  scaffoldedMistakeIds?: Set<string>;
 }
 
 export const MistakeList: React.FC<MistakeListProps> = ({
@@ -48,6 +49,7 @@ export const MistakeList: React.FC<MistakeListProps> = ({
   onToggleAllPrintSelect,
   equippedStamp,
   profilesStampMap = {},
+  scaffoldedMistakeIds,
 }) => {
   const [selectedStudent, setSelectedStudent] = useState<string>('all');
   const [filterGrade, setFilterGrade] = useState<string>('all');
@@ -462,6 +464,7 @@ export const MistakeList: React.FC<MistakeListProps> = ({
                   studentName={isAdmin && entry.userId ? (profilesMap[entry.userId] || entry.userId.slice(0, 8)) : undefined}
                   isOwnNote={!isAdmin || entry.userId === currentUserId}
                   equippedStamp={entry.userId ? (profilesStampMap[entry.userId] || equippedStamp) : equippedStamp}
+                  hasScaffolding={scaffoldedMistakeIds?.has(entry.id)}
                 />
               ))}
             </div>

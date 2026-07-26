@@ -12,9 +12,10 @@ interface MistakeCardProps {
   studentName?: string;   // admin 전용: 학생 이름/아이디
   isOwnNote?: boolean;    // 내 오답 여부 (admin이 타인 오답 볼 때 false)
   equippedStamp?: string; // 학생이 장착한 레어 도장 (예: 🔥, ⭐, 👑, 🐾, 💎)
+  hasScaffolding?: boolean; // 선생님이 첨부한 스캐폴딩 힌트가 있는지 여부
 }
 
-export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDelete, studentName, isOwnNote = true, equippedStamp }) => {
+export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDelete, studentName, isOwnNote = true, equippedStamp, hasScaffolding }) => {
   const struggleCount = entry.reviews ? entry.reviews.filter(r => r === 'X' || r === 'star').length : 0;
   const isCompleted = entry.reviews && entry.reviews.filter(r => r === 'O').length === 3;
 
@@ -68,11 +69,20 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
           </div>
         )}
         <div className={`absolute top-2 right-2 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-950/80 backdrop-blur-sm border ${isCompleted ? 'border-emerald-500/50 text-emerald-400' : 'border-slate-800 text-slate-300'}`}>
-          {isCompleted 
-            ? `✅ 완료: ${formatDateTime(entry.updatedAt || entry.date)}` 
+          {isCompleted
+            ? `✅ 완료: ${formatDateTime(entry.updatedAt || entry.date)}`
             : formatDate(entry.date)
           }
         </div>
+        {/* 스캐폴딩 힌트 첨부 여부 (우측 하단 초록 마크) */}
+        {hasScaffolding && (
+          <div
+            className="absolute bottom-2 right-2 w-6 h-6 rounded-full bg-emerald-500/90 border border-emerald-300/60 backdrop-blur-sm shadow-sm flex items-center justify-center text-xs z-10"
+            title="선생님이 첨부한 스캐폴딩 힌트가 있습니다"
+          >
+            🧩
+          </div>
+        )}
       </div>
       <div className="p-3 pb-2.5 space-y-1.5">
         <div className="flex items-center justify-between gap-2">

@@ -62,6 +62,7 @@ function App() {
   const [profilesGradeMap, setProfilesGradeMap] = useState<Record<string, string>>({});
   // userId -> equippedStamp map (유저별 레어 도장 표출용)
   const [profilesStampMap, setProfilesStampMap] = useState<Record<string, string>>({});
+  const [scaffoldedMistakeIds, setScaffoldedMistakeIds] = useState<Set<string>>(new Set()); // 스캐폴딩 힌트가 첨부된 오답 id 집합
   // Supabase system_config 테이블에서 로드한 Gemini API Key 상태 (무료키는 레이트리밋 문제로 배제하고 유료키만 사용)
   const [paidGeminiKey, setPaidGeminiKey] = useState<string>('');
   // AI 진단 평균 소요시간(ms) — diagnosis_stats 테이블의 전역 누적치 기반, 오답 카드 삭제와 무관하게 유지됨
@@ -582,6 +583,12 @@ function App() {
       setProfilesMap(pMap);
       setProfilesGradeMap(gMap);
       setProfilesStampMap(sMap);
+
+      // 스캐폴딩 힌트가 첨부된 오답 id 집합 (RLS가 본인 것만/관리자는 전체를 알아서 걸러줌)
+      const { data: scaffoldingRows } = await supabase
+        .from('mistake_scaffoldings')
+        .select('mistake_id');
+      setScaffoldedMistakeIds(new Set((scaffoldingRows || []).map((r: any) => r.mistake_id)));
 
       const mappedMistakes: MistakeEntry[] = (dbMistakes || []).map((m: any) => ({
         id: m.id,
@@ -1575,6 +1582,7 @@ function App() {
             currentUserId={session?.user?.id}
             equippedStamp={equippedItems.stamp}
             profilesStampMap={profilesStampMap}
+            scaffoldedMistakeIds={scaffoldedMistakeIds}
           />
           </>
         )}
@@ -1614,6 +1622,7 @@ function App() {
             onToggleAllPrintSelect={handleToggleAllPrintSelect}
             equippedStamp={equippedItems.stamp}
             profilesStampMap={profilesStampMap}
+            scaffoldedMistakeIds={scaffoldedMistakeIds}
           />
         )}
 
