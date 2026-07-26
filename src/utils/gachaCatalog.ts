@@ -1,7 +1,7 @@
 import type { GachaItem, GachaRarity } from '../types';
 
 export const GACHA_ITEMS: GachaItem[] = [
-  // UR (0.5~1%) - Ultra Rare (무지개빛 레전드)
+  // ── UR (1%) - Ultra Rare (무지개빛 레전드) ──────────────────────────
   {
     id: 'title_math_god',
     name: '👑 칭호: 수학의 신',
@@ -52,8 +52,38 @@ export const GACHA_ITEMS: GachaItem[] = [
     effectValue: '시험 100점 선택',
     color: 'from-amber-300 via-pink-400 to-purple-600'
   },
+  {
+    id: 'theme_legendary_gold',
+    name: '🎨 레전드 골드 갤럭시 테마',
+    description: '전설적인 황금빛 태양과 은하수가 어우러진 최고급 레전드 테마입니다.',
+    rarity: 'UR',
+    category: 'THEME',
+    icon: '☀️',
+    effectValue: '#F59E0B',
+    color: 'from-amber-300 via-pink-400 to-purple-600'
+  },
+  {
+    id: 'theme_nebula_pink',
+    name: '🎨 네뷸라 네온 핑크 테마',
+    description: '우주 성운의 화려한 네온 핫핑크 감성이 폭발하는 레전드 테마입니다.',
+    rarity: 'UR',
+    category: 'THEME',
+    icon: '🌸',
+    effectValue: '#EC4899',
+    color: 'from-pink-400 via-rose-500 to-purple-600'
+  },
 
-  // SSR (5~7%) - Super Special Rare (황금 빛)
+  // ── SSR (7%) - Super Special Rare (황금 빛) ────────────────────────
+  {
+    id: 'item_point_booster',
+    name: '🎟️ 콤보 부스터 (포인트 2배권)',
+    description: '오답 복습 완주 시 획득하는 콤보 포인트를 2배로 늘려줍니다.',
+    rarity: 'SSR',
+    category: 'SHIELD',
+    icon: '🎟️',
+    effectValue: 'point_booster',
+    color: 'from-amber-400 to-yellow-600'
+  },
   {
     id: 'charm_grade_one',
     name: '🎴 부적: 1등급 선택권',
@@ -93,6 +123,26 @@ export const GACHA_ITEMS: GachaItem[] = [
     icon: '🌸',
     effectValue: '🌸',
     color: 'from-pink-300 to-rose-500'
+  },
+  {
+    id: 'theme_ocean_blue',
+    name: '🎨 딥 오션 아틀란티스 테마',
+    description: '깊은 바다 속 찬란한 사파이어 블루 글로우를 선사하는 테마입니다.',
+    rarity: 'SSR',
+    category: 'THEME',
+    icon: '🌊',
+    effectValue: '#3B82F6',
+    color: 'from-blue-400 to-cyan-600'
+  },
+  {
+    id: 'theme_toxic_lime',
+    name: '🎨 네온 토식 라이믹 테마',
+    description: '톡 쏘는 사이버 라임 그린이 시선을 사로잡는 테마입니다.',
+    rarity: 'SSR',
+    category: 'THEME',
+    icon: '🧪',
+    effectValue: '#84CC16',
+    color: 'from-lime-400 to-emerald-600'
   },
   {
     id: 'ai_tsundere',
@@ -145,7 +195,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     color: 'from-red-400 to-amber-500'
   },
 
-  // SR (20%) - Special Rare (보라빛)
+  // ── SR (22%) - Special Rare (보라빛) ────────────────────────
   {
     id: 'item_name_change',
     name: '🏷️ 닉네임 변경권',
@@ -227,16 +277,6 @@ export const GACHA_ITEMS: GachaItem[] = [
     color: 'from-blue-400 to-indigo-600'
   },
   {
-    id: 'item_point_booster',
-    name: '🎟️ 콤보 부스터 (포인트 2배권)',
-    description: '오답 복습 완주 시 획득하는 콤보 포인트를 2배로 늘려줍니다.',
-    rarity: 'SR',
-    category: 'SHIELD',
-    icon: '🎟️',
-    effectValue: 'point_booster',
-    color: 'from-amber-400 to-yellow-600'
-  },
-  {
     id: 'title_calculator',
     name: '🔮 칭호: 계산의 달인',
     description: '계산 실수를 줄이고 빠른 연산력을 보여주는 칭호입니다.',
@@ -247,7 +287,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     color: 'from-indigo-400 to-purple-500'
   },
 
-  // R (70%) - Rare (파란/일반 빛)
+  // ── R (70%) - Rare (파란/일반 빛) ───────────────────────────
   {
     id: 'charm_luck_exam',
     name: '🎴 부적: 찍기 신공 부적',
@@ -267,6 +307,26 @@ export const GACHA_ITEMS: GachaItem[] = [
     icon: '🧧',
     effectValue: '실수 퇴치',
     color: 'from-blue-400 to-indigo-500'
+  },
+  {
+    id: 'theme_classic_mono',
+    name: '🎨 클래식 모노 다크 테마',
+    description: '눈이 편안하고 차분한 모노 슬레이트 다크 테마입니다.',
+    rarity: 'R',
+    category: 'THEME',
+    icon: '🖤',
+    effectValue: '#64748B',
+    color: 'from-slate-400 to-slate-600'
+  },
+  {
+    id: 'theme_warm_latte',
+    name: '🎨 웜 카페 라떼 테마',
+    description: '따스하고 차분한 브라운 라떼 감성의 스터디 테마입니다.',
+    rarity: 'R',
+    category: 'THEME',
+    icon: '☕',
+    effectValue: '#D97706',
+    color: 'from-amber-600 to-orange-700'
   },
   {
     id: 'ai_sergeant',
