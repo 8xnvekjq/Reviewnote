@@ -39,7 +39,7 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, nickname, onLogout,
 
 
   return (
-    <header className="safe-top flex-none border-b border-slate-800 bg-slate-900/90 backdrop-blur-md px-4 py-3 flex items-center justify-between sticky top-0 z-30">
+    <header className="safe-top flex-none border-b border-app-theme bg-app-surface backdrop-blur-md px-4 py-3 flex items-center justify-between sticky top-0 z-30 transition-colors duration-300">
       <div className="flex items-center space-x-2.5 min-w-0 flex-1 mr-2">
         <img 
           src={logoImg} 

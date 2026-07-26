@@ -1284,7 +1284,7 @@ function App() {
   }
 
   return (
-    <div className="h-full flex flex-col bg-slate-950 text-slate-100 select-none">
+    <div className="h-full flex flex-col bg-app-main text-slate-100 select-none transition-colors duration-300">
       
       {/* Top Header */}
       <Header 

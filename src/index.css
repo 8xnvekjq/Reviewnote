@@ -17,6 +17,28 @@
   --color-indigo-800: 55 48 163;
   --color-indigo-900: 49 46 129;
   --color-indigo-950: 30 27 75;
+
+  /* 테마 장착 시 앱 전체 메인 프레임 & 상하단 네비게이션 바 배경 기본값 (slate) */
+  --theme-bg-main: 2 6 23;        /* slate-955 */
+  --theme-bg-surface: 15 23 42;    /* slate-900 */
+  --theme-bg-elevated: 30 41 59;   /* slate-800 */
+  --theme-border: 30 41 59;       /* slate-800 */
+}
+
+.bg-app-main {
+  background-color: rgb(var(--theme-bg-main));
+}
+
+.bg-app-surface {
+  background-color: rgb(var(--theme-bg-surface) / 0.92);
+}
+
+.bg-app-elevated {
+  background-color: rgb(var(--theme-bg-elevated) / 0.7);
+}
+
+.border-app-theme {
+  border-color: rgb(var(--theme-border) / 0.8);
 }
 
 @layer base {

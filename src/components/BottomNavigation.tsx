@@ -92,7 +92,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
       </div>
 
       {/* ── 2. 스마트폰 하단 밀착형 5대 탭 네비게이션 바 ───────────────────────── */}
-      <nav className="w-full bg-slate-900/95 border-t border-slate-800/80 backdrop-blur-xl flex items-center justify-around px-2 py-1.5 shadow-2xl pb-safe">
+      <nav className="w-full bg-app-surface border-t border-app-theme backdrop-blur-xl flex items-center justify-around px-2 py-1.5 shadow-2xl pb-safe transition-colors duration-300">
 
         {/* Tab 1: 💡 이용안내 (어드민일 때 👑 어드민) */}
         {isAdmin ? (

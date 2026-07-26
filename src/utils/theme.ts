@@ -80,7 +80,7 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
 }
 
 /**
- * 장착한 테마 색상(hex, 예: '#10B981')을 앱 전체 indigo 팔레트에 즉시 반영한다.
+ * 장착한 테마 색상(hex, 예: '#8B5CF6')을 앱 전체 indigo 팔레트 및 메인 배경/상하단 네비바에 즉시 반영한다.
  * hex가 없으면(장착 해제) 커스텀 프로퍼티를 제거해서 index.css의 기본(남색) 값으로 되돌아간다.
  */
 export function applyThemeColor(hex?: string): void {
@@ -88,12 +88,30 @@ export function applyThemeColor(hex?: string): void {
 
   if (!hex) {
     SHADE_KEYS.forEach(key => root.style.removeProperty(`--color-indigo-${key}`));
+    root.style.removeProperty('--theme-bg-main');
+    root.style.removeProperty('--theme-bg-surface');
+    root.style.removeProperty('--theme-bg-elevated');
+    root.style.removeProperty('--theme-border');
     return;
   }
 
   const [h, s] = hexToHsl(hex);
+  
+  // 1) Indigo 팔레트 (강조색) 반영
   SHADE_KEYS.forEach(key => {
     const [r, g, b] = hslToRgb(h, s, LIGHTNESS_RAMP[key]);
     root.style.setProperty(`--color-indigo-${key}`, `${r} ${g} ${b}`);
   });
+
+  // 2) 앱 전체 메인 프레임, 상하단 네비게이션 바 딥 틴트 배경색 반영
+  const bgSat = Math.min(s, 60);
+  const [mR, mG, mB] = hslToRgb(h, bgSat, 4.5);
+  const [sR, sG, sB] = hslToRgb(h, bgSat, 8.5);
+  const [eR, eG, eB] = hslToRgb(h, bgSat, 13);
+  const [bR, bG, bB] = hslToRgb(h, bgSat, 18);
+
+  root.style.setProperty('--theme-bg-main', `${mR} ${mG} ${mB}`);
+  root.style.setProperty('--theme-bg-surface', `${sR} ${sG} ${sB}`);
+  root.style.setProperty('--theme-bg-elevated', `${eR} ${eG} ${eB}`);
+  root.style.setProperty('--theme-border', `${bR} ${bG} ${bB}`);
 }
