@@ -29,11 +29,11 @@ export interface GachaLogEntry {
 
 const getRefundPointsForRarity = (rarity: string): number => {
   switch (rarity) {
-    case 'UR': return 50;
-    case 'SSR': return 30;
-    case 'SR': return 15;
-    case 'R': return 5;
-    default: return 5;
+    case 'UR': return 20;
+    case 'SSR': return 12;
+    case 'SR': return 6;
+    case 'R': return 2;
+    default: return 2;
   }
 };
 
