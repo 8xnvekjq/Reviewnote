@@ -93,7 +93,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
 
     const upserts = Object.entries(counts).map(([item_id, qty]) => {
       const gachaObj = GACHA_ITEMS.find(g => g.id === item_id);
-      const isConsumable = gachaObj?.category === 'SHIELD' || gachaObj?.category === 'CHARM';
+      const isConsumable = gachaObj?.category === 'SHIELD';
       return {
         user_id: userId,
         item_id,
@@ -112,7 +112,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
       const next = { ...prev };
       Object.entries(counts).forEach(([id, qty]) => {
         const gachaObj = GACHA_ITEMS.find(g => g.id === id);
-        const isConsumable = gachaObj?.category === 'SHIELD' || gachaObj?.category === 'CHARM';
+        const isConsumable = gachaObj?.category === 'SHIELD';
         next[id] = isConsumable ? (next[id] || 0) + qty : 1;
       });
       return next;
@@ -474,7 +474,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                       <div className="flex items-center space-x-3 min-w-0">
                         <div className="relative flex-none">
                           <span className="text-3xl">{item.icon}</span>
-                          {(item.category === 'SHIELD' || item.category === 'CHARM') && qty > 1 && (
+                          {item.category === 'SHIELD' && qty > 1 && (
                             <span className="absolute -top-1 -right-1 text-[9px] bg-indigo-600 text-white rounded-full w-4 h-4 flex items-center justify-center font-black">
                               {qty}
                             </span>
