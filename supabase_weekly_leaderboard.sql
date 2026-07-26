@@ -14,6 +14,12 @@
 -- reviewDates(각 복습 단계를 실제로 표시한 시각)는 "7/20 08:31" 같은 연도 없는 문자열로
 -- 저장돼 있어서, 이를 KST 기준 timestamp로 정확히 파싱하는 parse_review_date_kst() 함수를
 -- 사용한다 (없다면 updated_at, 그마저 없으면 date로 폴백).
+--
+-- ⚠️ 타임존 버그 수정: parse_review_date_kst()/timezone(...)의 결과는 naive timestamp인데,
+-- 이걸 timestamptz인 week_start와 곧바로 비교하면 세션 타임존(UTC)으로 잘못 캐스팅되어
+-- KST 밤 11시대 기록이 실제로는 지난주인데도 이번 주로 새는 문제가 있었다 (예: 한 학생의
+-- 점수가 실제 7점이어야 하는데 버그로 54점까지 부풀려짐). COALESCE 전체를 다시
+-- timezone('Asia/Seoul', ...)로 한 번 더 감싸서 timestamptz로 정확히 변환한 뒤 비교한다.
 
 -- 1. 이번주 리더보드 뷰
 DROP VIEW IF EXISTS public.weekly_leaderboard;
@@ -25,13 +31,13 @@ WITH week_start AS (
 stage_scores AS (
   SELECT
     m.user_id,
-    (CASE WHEN COALESCE(parse_review_date_kst(m.analysis->'reviewDates'->>0), timezone('Asia/Seoul', m.updated_at), timezone('Asia/Seoul', m.date)) >= week_start.ts
+    (CASE WHEN timezone('Asia/Seoul', COALESCE(parse_review_date_kst(m.analysis->'reviewDates'->>0), timezone('Asia/Seoul', m.updated_at), timezone('Asia/Seoul', m.date))) >= week_start.ts
           THEN CASE m.reviews->>0 WHEN 'O' THEN 3 WHEN 'X' THEN 1 WHEN 'star' THEN 1 ELSE 0 END ELSE 0 END
     +
-     CASE WHEN COALESCE(parse_review_date_kst(m.analysis->'reviewDates'->>1), timezone('Asia/Seoul', m.updated_at), timezone('Asia/Seoul', m.date)) >= week_start.ts
+     CASE WHEN timezone('Asia/Seoul', COALESCE(parse_review_date_kst(m.analysis->'reviewDates'->>1), timezone('Asia/Seoul', m.updated_at), timezone('Asia/Seoul', m.date))) >= week_start.ts
           THEN CASE m.reviews->>1 WHEN 'O' THEN 7 WHEN 'X' THEN 1 WHEN 'star' THEN 1 ELSE 0 END ELSE 0 END
     +
-     CASE WHEN COALESCE(parse_review_date_kst(m.analysis->'reviewDates'->>2), timezone('Asia/Seoul', m.updated_at), timezone('Asia/Seoul', m.date)) >= week_start.ts
+     CASE WHEN timezone('Asia/Seoul', COALESCE(parse_review_date_kst(m.analysis->'reviewDates'->>2), timezone('Asia/Seoul', m.updated_at), timezone('Asia/Seoul', m.date))) >= week_start.ts
           THEN CASE m.reviews->>2 WHEN 'O' THEN 15 WHEN 'X' THEN 1 WHEN 'star' THEN 1 ELSE 0 END ELSE 0 END
     ) AS mistake_score
   FROM public.mistakes m, week_start
@@ -82,16 +88,16 @@ last_week_start AS (
 stage_scores AS (
   SELECT
     m.user_id,
-    (CASE WHEN COALESCE(parse_review_date_kst(m.analysis->'reviewDates'->>0), timezone('Asia/Seoul', m.updated_at), timezone('Asia/Seoul', m.date)) >= last_week_start.ts
-           AND COALESCE(parse_review_date_kst(m.analysis->'reviewDates'->>0), timezone('Asia/Seoul', m.updated_at), timezone('Asia/Seoul', m.date)) < week_start.ts
+    (CASE WHEN timezone('Asia/Seoul', COALESCE(parse_review_date_kst(m.analysis->'reviewDates'->>0), timezone('Asia/Seoul', m.updated_at), timezone('Asia/Seoul', m.date))) >= last_week_start.ts
+           AND timezone('Asia/Seoul', COALESCE(parse_review_date_kst(m.analysis->'reviewDates'->>0), timezone('Asia/Seoul', m.updated_at), timezone('Asia/Seoul', m.date))) < week_start.ts
           THEN CASE m.reviews->>0 WHEN 'O' THEN 3 WHEN 'X' THEN 1 WHEN 'star' THEN 1 ELSE 0 END ELSE 0 END
     +
-     CASE WHEN COALESCE(parse_review_date_kst(m.analysis->'reviewDates'->>1), timezone('Asia/Seoul', m.updated_at), timezone('Asia/Seoul', m.date)) >= last_week_start.ts
-           AND COALESCE(parse_review_date_kst(m.analysis->'reviewDates'->>1), timezone('Asia/Seoul', m.updated_at), timezone('Asia/Seoul', m.date)) < week_start.ts
+     CASE WHEN timezone('Asia/Seoul', COALESCE(parse_review_date_kst(m.analysis->'reviewDates'->>1), timezone('Asia/Seoul', m.updated_at), timezone('Asia/Seoul', m.date))) >= last_week_start.ts
+           AND timezone('Asia/Seoul', COALESCE(parse_review_date_kst(m.analysis->'reviewDates'->>1), timezone('Asia/Seoul', m.updated_at), timezone('Asia/Seoul', m.date))) < week_start.ts
           THEN CASE m.reviews->>1 WHEN 'O' THEN 7 WHEN 'X' THEN 1 WHEN 'star' THEN 1 ELSE 0 END ELSE 0 END
     +
-     CASE WHEN COALESCE(parse_review_date_kst(m.analysis->'reviewDates'->>2), timezone('Asia/Seoul', m.updated_at), timezone('Asia/Seoul', m.date)) >= last_week_start.ts
-           AND COALESCE(parse_review_date_kst(m.analysis->'reviewDates'->>2), timezone('Asia/Seoul', m.updated_at), timezone('Asia/Seoul', m.date)) < week_start.ts
+     CASE WHEN timezone('Asia/Seoul', COALESCE(parse_review_date_kst(m.analysis->'reviewDates'->>2), timezone('Asia/Seoul', m.updated_at), timezone('Asia/Seoul', m.date))) >= last_week_start.ts
+           AND timezone('Asia/Seoul', COALESCE(parse_review_date_kst(m.analysis->'reviewDates'->>2), timezone('Asia/Seoul', m.updated_at), timezone('Asia/Seoul', m.date))) < week_start.ts
           THEN CASE m.reviews->>2 WHEN 'O' THEN 15 WHEN 'X' THEN 1 WHEN 'star' THEN 1 ELSE 0 END ELSE 0 END
     ) AS mistake_score
   FROM public.mistakes m, week_start, last_week_start
