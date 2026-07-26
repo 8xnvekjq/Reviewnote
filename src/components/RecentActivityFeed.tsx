@@ -99,10 +99,19 @@ export const RecentActivityFeed: React.FC = () => {
           {events.map((ev, idx) => {
             const titleBadge = ev.equipped_title ? getTitleBadgeStyle(ev.equipped_title) : null;
             const themeHex = ev.equipped_theme || DEFAULT_THEME_HEX;
+
+            // 장착한 테마의 카탈로그 아이템 및 희귀도(UR/SSR/SR/R) 테두리 스타일
+            const themeCatalogItem = ev.equipped_theme
+              ? GACHA_ITEMS.find(g => g.category === 'THEME' && (g.id === ev.equipped_theme || g.effectValue === ev.equipped_theme))
+              : undefined;
+            const themeRarityTheme = themeCatalogItem ? getRarityTheme(themeCatalogItem.rarity) : undefined;
+            const cardBorderClass = themeRarityTheme ? `border-2 ${themeRarityTheme.border}` : 'border border-slate-800';
+
             const cardStyle: React.CSSProperties = {
-              borderColor: hexToRgba(themeHex, 0.5),
+              ...(themeCatalogItem ? {} : { borderColor: hexToRgba(themeHex, 0.5) }),
               backgroundColor: hexToRgba(themeHex, 0.08),
             };
+
             const reviewIcon = ev.equipped_stamp || '✅';
             // 장착한 스탬프의 실제 뽑기 등급(UR/SSR/SR/R)에 맞는 테두리를 찾아 적용
             const stampCatalogItem = ev.equipped_stamp
@@ -113,7 +122,7 @@ export const RecentActivityFeed: React.FC = () => {
             return (
               <div
                 key={`${ev.mistake_id}-${ev.event_type}-${ev.event_time}-${idx}`}
-                className="p-3.5 rounded-2xl border border-slate-800 bg-slate-900/60 flex items-center space-x-3"
+                className={`p-3.5 rounded-2xl flex items-center space-x-3 transition-all ${cardBorderClass} ${themeCatalogItem ? 'bg-slate-900/80 shadow-md' : 'bg-slate-900/60'}`}
                 style={cardStyle}
               >
                 <span className={`text-2xl flex-none w-10 h-10 flex items-center justify-center rounded-full ${ev.event_type === 'review' && stampCatalogItem ? `border-2 ${iconBorderClass}` : ''}`}>
