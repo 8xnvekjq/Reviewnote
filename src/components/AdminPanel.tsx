@@ -370,12 +370,15 @@ export const AdminPanel: React.FC = () => {
                         <span className="font-extrabold text-white text-sm truncate">
                           {(user as any).displayName || (user as any).username}
                         </span>
-                        {user.equippedTitle && (
-                          <span className="text-[9px] font-black bg-gradient-to-r from-amber-400 via-pink-500 to-purple-500 text-white border border-amber-300/60 px-2 py-0.2 rounded-full shadow-sm flex items-center space-x-1 flex-none">
-                            <span>👑</span>
-                            <span>{user.equippedTitle}</span>
-                          </span>
-                        )}
+                        {user.equippedTitle && (() => {
+                          const badge = getTitleBadgeStyle(user.equippedTitle);
+                          return (
+                            <span className={`text-[9px] px-2 py-0.5 rounded-full border flex items-center space-x-1 flex-none ${badge.style}`}>
+                              <span>{badge.icon}</span>
+                              <span>{user.equippedTitle}</span>
+                            </span>
+                          );
+                        })()}
                       </div>
                       <span className="text-[10px] text-slate-400 truncate block mt-0.5">
                         {(user as any).displayName ? `아이디: ${(user as any).username}` : (isEmailValid ? user.email : '(이메일 정보 없음)')}

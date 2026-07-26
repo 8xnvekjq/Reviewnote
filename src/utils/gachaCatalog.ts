@@ -496,6 +496,17 @@ export const getTitleBadgeStyle = (title: string) => {
       icon: '📐'
     };
   }
+  // 위에서 전용 스타일이 지정되지 않은 칭호(예: 새벽의 오답마스터)는 카탈로그에 등록된
+  // 실제 등급(rarity)에 맞는 색으로 자동 적용한다 — 고정된 회색 기본값 하나로 뭉뚱그리면
+  // 새 칭호가 추가될 때마다 매번 이 함수를 안 고치는 한 등급과 무관하게 똑같이 보이는 문제가 있었다.
+  const catalogItem = GACHA_ITEMS.find(g => g.category === 'TITLE' && g.effectValue === title);
+  if (catalogItem) {
+    const rarityTheme = getRarityTheme(catalogItem.rarity);
+    return {
+      style: `bg-gradient-to-r ${rarityTheme.bgGradient} text-white border-transparent font-black shadow-sm`,
+      icon: catalogItem.icon
+    };
+  }
   return {
     style: 'bg-slate-800/90 text-sky-300 border border-slate-700 font-black shadow-sm',
     icon: '🦉'
