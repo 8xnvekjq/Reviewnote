@@ -27,3 +27,15 @@ CREATE POLICY "Allow public read on gacha_logs" ON public.gacha_logs FOR SELECT 
 
 DROP POLICY IF EXISTS "Allow insert for auth users on gacha_logs" ON public.gacha_logs;
 CREATE POLICY "Allow insert for auth users on gacha_logs" ON public.gacha_logs FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- 실시간 전광판 갱신: 이 테이블에 새 행이 생기면(다른 학생이 SSR/UR을 뽑으면)
+-- 모든 접속자의 화면에 새로고침 없이 즉시 반영되도록 Realtime 복제 대상에 추가
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'gacha_logs'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.gacha_logs;
+  END IF;
+END $$;

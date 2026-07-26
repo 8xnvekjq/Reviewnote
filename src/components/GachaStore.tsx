@@ -168,6 +168,24 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
     };
   }, [userId]);
 
+  // ── 실시간 SSR/UR 전광판: 다른 학생이 뽑기를 해도 새로고침 없이 즉시 반영 ──────
+  useEffect(() => {
+    const channel = supabase
+      .channel('gacha_logs_live_feed')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'gacha_logs' },
+        () => {
+          fetchRecentLogs();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   // ── 아이템 추가 (뽑기 결과 → DB 저장 및 SSR/UR 전광판 로깅) ──────
   const addItemsToInventory = async (items: GachaItem[]) => {
     if (!userId) return;
