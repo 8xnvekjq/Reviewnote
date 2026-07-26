@@ -72,8 +72,12 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
   // 무료 뽑기 사용 이력 (서버 기준 — 기기를 바꿔도 중복 수령 못 하도록)
   const [lastFreeDrawDate, setLastFreeDrawDate] = useState<string | null>(null);
   const [lastFreeWeeklyDrawDate, setLastFreeWeeklyDrawDate] = useState<string | null>(null);
+  // 서버에서 실제 사용 이력을 확인하기 전까지는 "무료 가능"으로 잘못 보여주지 않도록 하는 로딩 가드.
+  // 이게 없으면 lastFreeDrawDate/lastFreeWeeklyDrawDate의 초기값(null)이 "아직 안 씀"으로 잘못
+  // 해석되어, 로딩이 끝나기 전 짧은 순간에 빠르게 클릭하면 이미 다 쓴 무료 뽑기를 다시 받아갈 수 있었다.
+  const [freeDrawStatusLoaded, setFreeDrawStatusLoaded] = useState(false);
   const todayKst = getKSTDateString();
-  const canFreeDraw1 = lastFreeDrawDate !== todayKst;
+  const canFreeDraw1 = freeDrawStatusLoaded && lastFreeDrawDate !== todayKst;
   // 최초 3회까지 무료 10연속 가능 (0/1/2/3 횟수 저장).
   // 'CLAIMED'(옛 "평생 1회" 방식)나 순수 숫자가 아닌 값(더 예전의 "매주 월요일" 날짜 문자열 잔재)은
   // 전부 "최소 1회는 이미 사용함"으로만 취급한다 — 3으로 취급하면 옛날에 1번 썼던 계정이 남은 2회를
@@ -84,7 +88,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
       ? 1
       : 0;
   const FREE_DRAW10_MAX = 3;
-  const canFreeDraw10 = freeDrawUsedCount < FREE_DRAW10_MAX;
+  const canFreeDraw10 = freeDrawStatusLoaded && freeDrawUsedCount < FREE_DRAW10_MAX;
   const freeDraw10Remaining = FREE_DRAW10_MAX - freeDrawUsedCount;
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -149,6 +153,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
       setLastFreeDrawDate(data.last_free_draw_date || null);
       setLastFreeWeeklyDrawDate(data.last_free_weekly_draw_date || null);
     }
+    setFreeDrawStatusLoaded(true);
   };
 
   useEffect(() => {
