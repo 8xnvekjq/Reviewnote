@@ -87,6 +87,24 @@ export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> =
   };
 
   // 선생님 전용: 스캐폴딩 사진 업로드 (SQL 데이터베이스 전송)
+  // 선생님 전용: 스캐폴딩 삭제
+  const handleDeleteScaffolding = async (scaffoldingId: string) => {
+    if (!isAdmin) return;
+    const confirmed = window.confirm('이 스캐폴딩 힌트를 삭제하시겠습니까?');
+    if (!confirmed) return;
+    try {
+      const { error } = await supabase
+        .from('mistake_scaffoldings')
+        .delete()
+        .eq('id', scaffoldingId);
+      if (error) throw error;
+      setScaffoldings(prev => prev.filter(s => s.id !== scaffoldingId));
+    } catch (err) {
+      console.error('Failed to delete scaffolding:', err);
+      alert('삭제에 실패했습니다. 다시 시도해 주세요.');
+    }
+  };
+
   const handleUploadScaffolding = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!previewImage || uploading || !currentUserId || !mistakeId || !studentId) return;
@@ -178,7 +196,18 @@ export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> =
                       <span>🧩</span>
                       <span>스캐폴딩 힌트 #{idx + 1}</span>
                     </span>
-                    <span className="font-mono text-slate-500">{formatDateString(sc.created_at)}</span>
+                    <div className="flex items-center space-x-2">
+                      <span className="font-mono text-slate-500">{formatDateString(sc.created_at)}</span>
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteScaffolding(sc.id)}
+                          className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-red-900/40 text-red-400 border border-red-700/40 hover:bg-red-700/60 hover:text-red-100 transition-all active:scale-95"
+                        >
+                          🗑 삭제
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* 힌트 메모 (caption) */}
