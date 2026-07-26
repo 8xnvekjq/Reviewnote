@@ -62,10 +62,10 @@ export const ScaffoldingListPanel: React.FC<ScaffoldingListPanelProps> = ({
 
       const mistakeIds = Object.keys(grouped);
 
-      // Fetch mistake entries
+      // Fetch mistake entries (profiles 조인 없이 mistakes만 조회)
       const { data: mistakeRows, error: mErr } = await supabase
         .from('mistakes')
-        .select('*, profiles(nickname, display_name, email, equipped_title)')
+        .select('*')
         .in('id', mistakeIds);
 
       if (mErr) throw mErr;
@@ -77,11 +77,11 @@ export const ScaffoldingListPanel: React.FC<ScaffoldingListPanelProps> = ({
         if (scList.length === 0) return;
 
         // Sort ascending by date
-        scList.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        scList.sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
         const latest = scList[scList.length - 1];
-        const p = m.profiles;
-        const studentName = p?.nickname || p?.display_name || (p?.email || '').split('@')[0] || '학생';
+        // student_id는 mistake_scaffoldings에 있음 → 이름은 학생 ID 표시 또는 단순 '학생'으로
+        const studentName = '학생';
 
         const entry: MistakeEntry = {
           id: m.id,
