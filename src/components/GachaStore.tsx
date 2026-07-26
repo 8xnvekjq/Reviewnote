@@ -16,6 +16,8 @@ export interface GachaLogEntry {
   item_icon: string;
   rarity: string;
   created_at: string;
+  user_name?: string;
+  user_title?: string;
   profiles?: {
     nickname?: string;
     display_name?: string;
@@ -95,7 +97,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
     try {
       const { data, error } = await supabase
         .from('gacha_logs')
-        .select('id, user_id, item_name, item_icon, rarity, created_at, profiles(nickname, display_name, equipped_title, email, is_admin)')
+        .select('id, user_id, item_name, item_icon, rarity, created_at, user_name, user_title, profiles(nickname, display_name, equipped_title, email, is_admin)')
         .order('created_at', { ascending: false })
         .limit(20);
 
@@ -198,7 +200,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
       try {
         const { data: prof } = await supabase
           .from('profiles')
-          .select('email, is_admin')
+          .select('email, nickname, display_name, equipped_title, is_admin')
           .eq('id', userId)
           .maybeSingle();
 
@@ -206,12 +208,16 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
         const isTestOrAdmin = prof?.is_admin || email.startsWith('test') || email.startsWith('8xnvekjq');
 
         if (!isTestOrAdmin) {
+          const nameToSave = prof?.nickname || prof?.display_name || '학생';
+          const titleToSave = prof?.equipped_title || null;
           const logInserts = rareItems.map(item => ({
             user_id: userId,
             item_id: item.id,
             item_name: item.name,
             item_icon: item.icon,
             rarity: item.rarity,
+            user_name: nameToSave,
+            user_title: titleToSave,
           }));
           await supabase.from('gacha_logs').insert(logInserts);
           fetchRecentLogs();
@@ -586,8 +592,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                 <div className="space-y-2 max-h-56 overflow-y-auto pr-1 no-scrollbar">
                   {recentLogs.map(log => {
                     const p = log.profiles;
-                    const userName = p?.nickname || p?.display_name || '익명 학생';
-                    const title = p?.equipped_title;
+                    const userName = log.user_name || p?.nickname || p?.display_name || '학생';
                     const isUR = log.rarity === 'UR';
 
                     const formatRelativeTime = (isoString: string) => {
@@ -610,38 +615,31 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                     return (
                       <div
                         key={log.id}
-                        className={`p-2.5 rounded-xl border flex items-center justify-between text-xs transition-all ${
+                        className={`p-2.5 px-3 rounded-xl border flex items-center justify-between text-xs whitespace-nowrap transition-all ${
                           isUR
-                            ? 'bg-gradient-to-r from-amber-500/15 via-purple-500/15 to-pink-500/15 border-amber-400/50 shadow-md'
+                            ? 'bg-slate-900/90 border-amber-500/30 shadow-sm'
                             : 'bg-slate-955/80 border-slate-850'
                         }`}
                       >
-                        <div className="flex items-center space-x-1.5 min-w-0 flex-1 mr-1.5 overflow-hidden">
-                          <span className={`text-[9px] font-black px-1.5 py-0.2 rounded flex-none ${
-                            isUR ? 'bg-gradient-to-r from-amber-400 via-pink-500 to-purple-500 text-white animate-pulse' : 'bg-gradient-to-r from-amber-300 to-amber-500 text-slate-950'
+                        {/* 좌측: 유저 이름 */}
+                        <span className="font-extrabold text-slate-200 text-xs truncate flex-none max-w-[100px] mr-2">
+                          {userName}
+                        </span>
+
+                        {/* 우측 (오른쪽 완벽 정렬): 희귀도 배지 + 획득 아이템 명칭 + 상대 시간 */}
+                        <div className="flex items-center justify-end space-x-1.5 flex-1 min-w-0 text-right overflow-hidden">
+                          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded flex-none ${
+                            isUR ? 'bg-gradient-to-r from-amber-400 via-pink-500 to-purple-500 text-white' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                           }`}>
                             {log.rarity}
                           </span>
-
-                          {/* 장착 칭호 배지 */}
-                          {title && (
-                            <span className="text-[8px] font-black bg-slate-800 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded-full truncate max-w-[75px] flex-none">
-                              👑 {title}
-                            </span>
-                          )}
-
-                          {/* 유저 이름 및 아이템 */}
-                          <span className="font-black text-white truncate flex-none max-w-[80px]">
-                            {userName}
+                          <span className="text-xs font-extrabold text-amber-200 truncate text-right min-w-0">
+                            {log.item_name}
                           </span>
-                          <span className="text-[10px] text-slate-400 font-bold truncate">
-                            {log.item_icon} {log.item_name}
+                          <span className="text-[9.5px] text-slate-500 font-bold whitespace-nowrap flex-none text-right pl-1">
+                            {formatRelativeTime(log.created_at)}
                           </span>
                         </div>
-
-                        <span className="text-[9px] text-slate-500 font-bold whitespace-nowrap flex-none">
-                          {formatRelativeTime(log.created_at)}
-                        </span>
                       </div>
                     );
                   })}
