@@ -430,12 +430,12 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
 
       {/* 헤더 안내 및 내 점수 */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border-b border-slate-800 p-5 shadow-lg flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <span className="text-3xl animate-bounce">🎁</span>
-          <div>
-            <h2 className="text-base font-black text-white flex items-center space-x-1.5">
+        <div className="flex items-center space-x-3 min-w-0">
+          <span className="text-3xl animate-bounce flex-none">🎁</span>
+          <div className="min-w-0">
+            <h2 className="text-base font-black text-white flex items-center space-x-1.5 whitespace-nowrap">
               <span>행운의 럭키 상점</span>
-              <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-mono">
+              <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-mono flex-none">
                 BETA
               </span>
             </h2>
