@@ -15,6 +15,10 @@ CREATE TABLE IF NOT EXISTS public.gacha_logs (
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- 전광판에 표시할 획득 당시의 닉네임/칭호 스냅샷 (나중에 닉네임을 바꿔도 로그는 그대로 남도록)
+ALTER TABLE public.gacha_logs ADD COLUMN IF NOT EXISTS user_name text;
+ALTER TABLE public.gacha_logs ADD COLUMN IF NOT EXISTS user_title text;
+
 -- RLS 보안 정책 설정: 모든 유저는 피드를 읽을 수 있고, 본인 유저 ID로 기록을 생성할 수 있음
 ALTER TABLE public.gacha_logs ENABLE ROW LEVEL SECURITY;
 
