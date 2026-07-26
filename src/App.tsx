@@ -1628,7 +1628,7 @@ function App() {
           <AdminPanel />
         )}
 
-        {activeTab === 'guide' && !isAdmin && (
+        {activeTab === 'guide' && (
           <StudentGuide />
         )}
 
