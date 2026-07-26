@@ -39,6 +39,9 @@ export interface AdminUserStat {
   weeklyCompletedCount: number; // 이번주 복습완료(O 3회) 수
   schoolGrade?: string;      // 학년 정보 (예: 중3, 고1)
   equippedTitle?: string;   // 장착 중인 칭호 (예: 수학의 신)
+  equippedStamp?: string;   // 장착 중인 스탬프 (effectValue)
+  equippedTheme?: string;   // 장착 중인 테마 (effectValue, hex)
+  equippedAiVoice?: string; // 장착 중인 AI 말투 (effectValue)
   lastReviewDate?: string | null; // 마지막 복습 일자
 }
 

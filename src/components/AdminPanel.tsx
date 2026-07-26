@@ -44,36 +44,11 @@ export const AdminPanel: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = useState<'stats' | 'changelog'>('stats');
   const [gradeFilter, setGradeFilter] = useState<string>('all');
 
-  // 학생 카드 클릭 시 보유 아이템 조회용 상태
+  // 학생 카드 클릭 시 장착 아이템 조회용 상태 (보유 전체가 아닌 "현재 장착 중"인 것만 표시)
   const [selectedStudent, setSelectedStudent] = useState<AdminUserStat | null>(null);
-  const [studentItems, setStudentItems] = useState<{ item_id: string; quantity: number }[]>([]);
-  const [studentItemsLoading, setStudentItemsLoading] = useState(false);
-  const [studentItemsError, setStudentItemsError] = useState<string | null>(null);
-
-  // 특정 학생의 럭키상점 보유 아이템 목록 조회 (user_items 테이블)
-  const fetchStudentItems = async (userId: string) => {
-    setStudentItemsLoading(true);
-    setStudentItemsError(null);
-    try {
-      const { data, error } = await supabase
-        .from('user_items')
-        .select('item_id, quantity')
-        .eq('user_id', userId)
-        .gt('quantity', 0);
-
-      if (error) throw error;
-      setStudentItems(data || []);
-    } catch (err: any) {
-      setStudentItemsError(err.message || '아이템 목록을 불러오지 못했습니다.');
-      setStudentItems([]);
-    } finally {
-      setStudentItemsLoading(false);
-    }
-  };
 
   const handleOpenStudentItems = (user: AdminUserStat) => {
     setSelectedStudent(user);
-    fetchStudentItems(user.userId);
   };
 
   const fetchAdminStats = async () => {
@@ -83,7 +58,7 @@ export const AdminPanel: React.FC = () => {
       // Fetch all profiles (display_name, school_grade, equipped_title 포함)
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, email, is_admin, display_name, school_grade, equipped_title')
+        .select('id, email, is_admin, display_name, school_grade, equipped_title, equipped_stamp, equipped_theme, equipped_ai_voice')
         .order('email', { ascending: true });
 
       if (profilesError) throw profilesError;
@@ -124,6 +99,9 @@ export const AdminPanel: React.FC = () => {
           username: username,
           schoolGrade: p.school_grade || '',
           equippedTitle: p.equipped_title || undefined,
+          equippedStamp: p.equipped_stamp || undefined,
+          equippedTheme: p.equipped_theme || undefined,
+          equippedAiVoice: p.equipped_ai_voice || undefined,
           lastReviewDate: null,
         });
       });
@@ -566,72 +544,75 @@ export const AdminPanel: React.FC = () => {
         </div>
       )}
 
-      {/* ── 학생 카드 클릭 시: 럭키상점 보유 아이템 조회 모달 ── */}
-      {selectedStudent && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in"
-          onClick={() => setSelectedStudent(null)}
-        >
-          <div
-            className="w-full max-w-sm max-h-[80vh] bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-2xl space-y-4 animate-scale-up flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2.5 flex-none">
-              <h3 className="text-sm font-extrabold text-white flex items-center space-x-2 min-w-0">
-                <span>🎒</span>
-                <span className="truncate">
-                  {(selectedStudent as any).displayName || (selectedStudent as any).username} 보유 아이템
-                </span>
-              </h3>
-              <button
-                onClick={() => setSelectedStudent(null)}
-                className="text-slate-400 hover:text-white text-xs font-bold px-2 py-1 rounded-lg flex-none"
-              >
-                ✕
-              </button>
-            </div>
+      {/* ── 학생 카드 클릭 시: 현재 장착 중인 아이템만 조회하는 모달 ── */}
+      {selectedStudent && (() => {
+        const equippedSlots: { category: string; label: string; value?: string }[] = [
+          { category: 'TITLE', label: '칭호', value: selectedStudent.equippedTitle },
+          { category: 'STAMP', label: '스탬프', value: selectedStudent.equippedStamp },
+          { category: 'THEME', label: '테마', value: selectedStudent.equippedTheme },
+          { category: 'AI_VOICE', label: 'AI 말투', value: selectedStudent.equippedAiVoice },
+        ];
 
-            <div className="overflow-y-auto flex-1 space-y-2">
-              {studentItemsLoading ? (
-                <div className="text-center py-8 text-slate-500 text-sm">로딩 중...</div>
-              ) : studentItemsError ? (
-                <div className="text-center py-8 text-red-400 text-xs">{studentItemsError}</div>
-              ) : studentItems.length === 0 ? (
-                <div className="text-center py-8 text-slate-600 text-xs">
-                  🎒 아직 보유한 아이템이 없습니다.
-                </div>
-              ) : (
-                studentItems.map(({ item_id, quantity }) => {
-                  const catalogItem = GACHA_ITEMS.find(g => g.id === item_id);
-                  if (!catalogItem) return null;
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in"
+            onClick={() => setSelectedStudent(null)}
+          >
+            <div
+              className="w-full max-w-sm max-h-[80vh] bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-2xl space-y-4 animate-scale-up flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2.5 flex-none">
+                <h3 className="text-sm font-extrabold text-white flex items-center space-x-2 min-w-0">
+                  <span>🎽</span>
+                  <span className="truncate">
+                    {(selectedStudent as any).displayName || (selectedStudent as any).username} 장착 아이템
+                  </span>
+                </h3>
+                <button
+                  onClick={() => setSelectedStudent(null)}
+                  className="text-slate-400 hover:text-white text-xs font-bold px-2 py-1 rounded-lg flex-none"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="overflow-y-auto flex-1 space-y-2">
+                {equippedSlots.map(slot => {
+                  const catalogItem = slot.value
+                    ? GACHA_ITEMS.find(g => g.category === slot.category && g.effectValue === slot.value)
+                    : undefined;
+
                   return (
                     <div
-                      key={item_id}
+                      key={slot.category}
                       className="flex items-center space-x-3 bg-slate-950 border border-slate-800 rounded-xl p-2.5"
                     >
-                      <span className="text-2xl flex-none">{catalogItem.icon}</span>
+                      <span className="text-2xl flex-none">{catalogItem?.icon || '—'}</span>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-1.5">
-                          <span className={`text-[8px] font-black px-1.5 py-0.2 rounded bg-gradient-to-r ${catalogItem.color} text-white flex-none`}>
-                            {catalogItem.rarity}
-                          </span>
-                          <span className="text-xs font-bold text-white truncate">{catalogItem.name}</span>
-                        </div>
-                        <p className="text-[10px] text-slate-500 truncate mt-0.5">{catalogItem.description}</p>
+                        <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">{slot.label}</span>
+                        {catalogItem ? (
+                          <>
+                            <div className="flex items-center space-x-1.5">
+                              <span className={`text-[8px] font-black px-1.5 py-0.2 rounded bg-gradient-to-r ${catalogItem.color} text-white flex-none`}>
+                                {catalogItem.rarity}
+                              </span>
+                              <span className="text-xs font-bold text-white truncate">{catalogItem.name}</span>
+                            </div>
+                            <p className="text-[10px] text-slate-500 truncate mt-0.5">{catalogItem.description}</p>
+                          </>
+                        ) : (
+                          <span className="text-xs text-slate-600">미장착 (기본값)</span>
+                        )}
                       </div>
-                      {quantity > 1 && (
-                        <span className="text-[10px] font-black text-indigo-300 bg-indigo-950/60 border border-indigo-800/50 rounded-full px-2 py-0.5 flex-none">
-                          x{quantity}
-                        </span>
-                      )}
                     </div>
                   );
-                })
-              )}
+                })}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };
