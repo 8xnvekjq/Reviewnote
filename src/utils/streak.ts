@@ -12,10 +12,11 @@ export const STREAK_MILESTONES: { days: number; bonus: number }[] = [
   { days: 3, bonus: 10 },
   { days: 7, bonus: 30 },
   { days: 14, bonus: 100 },
+  { days: 28, bonus: 250 },
 ];
 
 /**
- * 이전에 지급받은 마일스톤(previousClaimed, 0/3/7/14)보다 높으면서
+ * 이전에 지급받은 마일스톤(previousClaimed, 0/3/7/14/28)보다 높으면서
  * 현재 스트릭 일수로 새로 도달한 마일스톤들을 전부 반환한다 (보통 1개, 값이 어긋나 있으면 여러 개일 수도 있음).
  */
 export function getNewlyReachedMilestones(previousClaimed: number, currentStreak: number): { days: number; bonus: number }[] {

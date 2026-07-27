@@ -186,7 +186,7 @@ function App() {
 
   // DB 지정 보너스 점수 (어드민 또는 이벤트 적립)
   const [myBonusPoints, setMyBonusPoints] = useState<number>(0);
-  const [streakMilestoneClaimed, setStreakMilestoneClaimed] = useState<number>(0); // 이번 스트릭 런에서 이미 지급받은 콤보 보너스 마일스톤 (0/3/7/14)
+  const [streakMilestoneClaimed, setStreakMilestoneClaimed] = useState<number>(0); // 이번 스트릭 런에서 이미 지급받은 콤보 보너스 마일스톤 (0/3/7/14/28)
 
   // 현재 표시 가능한 럭키상점 보유 콤보 점수.
   // 예전엔 "완료 오답 개수 * 10점"을 매번 mistakes 배열에서 실시간으로 다시 계산했는데,
@@ -1058,6 +1058,62 @@ function App() {
     setPrintAsTextMap(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
+  // 매일 연속 복습 스트릭 갱신 (🔥 Daily Streak). 신규 오답 등록과 복습 완료 양쪽에서
+  // 공유해서 호출한다 — 둘 중 어느 쪽을 먼저 해도 그날의 스트릭이 채워지도록.
+  // 방어권 보유 여부는 Supabase user_items에서 실시간 조회 (인벤토리가 이전되면서
+  // localStorage 'reviewnote_unlocked_items' 키는 더 이상 채워지지 않는 죽은 키였음)
+  const applyDailyStreakUpdate = async () => {
+    if (!session?.user?.id) return;
+
+    const { data: shieldRow } = await supabase
+      .from('user_items')
+      .select('quantity')
+      .eq('user_id', session.user.id)
+      .eq('item_id', 'item_streak_shield')
+      .maybeSingle();
+    const hasShieldItem = !!(shieldRow && shieldRow.quantity > 0);
+
+    const { updatedState, shieldUsed } = recordReviewStreak(streakState, hasShieldItem);
+    setStreakState(updatedState);
+
+    if (shieldUsed) {
+      alert("🛡️ [스트릭 방어 성공!] 어제 복습을 놓쳤지만, 럭키상점에서 보유한 '스트릭 방어권'이 자동으로 발동되어 🔥 연속 복습 기록이 안전하게 보호되었습니다!");
+    }
+
+    // 🔥 스트릭 서버 동기화 + 3/7/14/28일 콤보 마일스톤 보너스 지급 (콤보 포인트에만 적립, 주간 랭킹 점수는 영향 없음)
+    // 스트릭이 새로 시작된 경우(1일차) 이전에 받은 마일스톤은 리셋되어 다시 받을 수 있음
+    const previousClaimed = updatedState.currentStreak === 1 ? 0 : streakMilestoneClaimed;
+    const newMilestones = getNewlyReachedMilestones(previousClaimed, updatedState.currentStreak);
+    const bonusGained = newMilestones.reduce((sum, m) => sum + m.bonus, 0);
+    const newClaimed = newMilestones.length > 0 ? newMilestones[newMilestones.length - 1].days : previousClaimed;
+
+    const streakUpdatePayload: Record<string, number | string> = {
+      current_streak: updatedState.currentStreak,
+      streak_last_review_date: updatedState.lastReviewDate,
+      streak_shields: updatedState.shieldsCount,
+      streak_milestone_claimed: newClaimed,
+    };
+
+    supabase.from('profiles').update(streakUpdatePayload).eq('id', session.user.id).then(({ error: streakSyncError }) => {
+      if (streakSyncError) console.error('Failed to sync streak to server:', streakSyncError);
+    });
+
+    setStreakMilestoneClaimed(newClaimed);
+    if (bonusGained > 0) {
+      // 스트릭 보너스도 리뷰 콤보 포인트와 동일하게 원자적 증감 RPC로 처리 (레이스 컨디션 방지)
+      supabase.rpc('increment_bonus_points', { user_id_param: session.user.id, amount_param: bonusGained })
+        .then(({ data, error: bonusRpcError }) => {
+          if (bonusRpcError) {
+            console.error('Failed to grant streak milestone bonus:', bonusRpcError);
+          } else if (typeof data === 'number') {
+            setMyBonusPoints(data);
+          }
+        });
+      const milestoneDaysLabel = newMilestones.map(m => `${m.days}일`).join(', ');
+      alert(`🔥 [연속 복습 콤보 달성!] ${milestoneDaysLabel} 마일스톤 보너스 ${bonusGained}점이 적립되었습니다!`);
+    }
+  };
+
   // Process crop completion, upload to Storage, and insert database record
   const handleCropComplete = async (croppedBase64: string) => {
     setTempCapturedImage(null);
@@ -1115,6 +1171,7 @@ function App() {
       };
       
       setMistakes(prev => [newEntry, ...prev]);
+      applyDailyStreakUpdate(); // 신규 오답 등록도 그날의 연속 복습 스트릭으로 인정
       setActiveTab('notes');
       setSelectedEntry(newEntry); // Open modal immediately
     } catch (err: any) {
@@ -1253,60 +1310,8 @@ function App() {
           });
       }
 
-      // 매일 연속 복습 스트릭 갱신 (🔥 Daily Streak)
-      // 방어권 보유 여부는 Supabase user_items에서 실시간 조회 (인벤토리가 이전되면서
-      // localStorage 'reviewnote_unlocked_items' 키는 더 이상 채워지지 않는 죽은 키였음)
-      let hasShieldItem = false;
-      if (session?.user?.id) {
-        const { data: shieldRow } = await supabase
-          .from('user_items')
-          .select('quantity')
-          .eq('user_id', session.user.id)
-          .eq('item_id', 'item_streak_shield')
-          .maybeSingle();
-        hasShieldItem = !!(shieldRow && shieldRow.quantity > 0);
-      }
-      const { updatedState, shieldUsed } = recordReviewStreak(streakState, hasShieldItem);
-      setStreakState(updatedState);
-
-      if (shieldUsed) {
-        alert("🛡️ [스트릭 방어 성공!] 어제 복습을 놓쳤지만, 럭키상점에서 보유한 '스트릭 방어권'이 자동으로 발동되어 🔥 연속 복습 기록이 안전하게 보호되었습니다!");
-      }
-
-      // 🔥 스트릭 서버 동기화 + 3/7/14일 콤보 마일스톤 보너스 지급
-      if (session?.user?.id) {
-        // 스트릭이 새로 시작된 경우(1일차) 이전에 받은 마일스톤은 리셋되어 다시 받을 수 있음
-        const previousClaimed = updatedState.currentStreak === 1 ? 0 : streakMilestoneClaimed;
-        const newMilestones = getNewlyReachedMilestones(previousClaimed, updatedState.currentStreak);
-        const bonusGained = newMilestones.reduce((sum, m) => sum + m.bonus, 0);
-        const newClaimed = newMilestones.length > 0 ? newMilestones[newMilestones.length - 1].days : previousClaimed;
-
-        const streakUpdatePayload: Record<string, number | string> = {
-          current_streak: updatedState.currentStreak,
-          streak_last_review_date: updatedState.lastReviewDate,
-          streak_shields: updatedState.shieldsCount,
-          streak_milestone_claimed: newClaimed,
-        };
-
-        supabase.from('profiles').update(streakUpdatePayload).eq('id', session.user.id).then(({ error: streakSyncError }) => {
-          if (streakSyncError) console.error('Failed to sync streak to server:', streakSyncError);
-        });
-
-        setStreakMilestoneClaimed(newClaimed);
-        if (bonusGained > 0) {
-          // 스트릭 보너스도 리뷰 콤보 포인트와 동일하게 원자적 증감 RPC로 처리 (레이스 컨디션 방지)
-          supabase.rpc('increment_bonus_points', { user_id_param: session.user.id, amount_param: bonusGained })
-            .then(({ data, error: bonusRpcError }) => {
-              if (bonusRpcError) {
-                console.error('Failed to grant streak milestone bonus:', bonusRpcError);
-              } else if (typeof data === 'number') {
-                setMyBonusPoints(data);
-              }
-            });
-          const milestoneDaysLabel = newMilestones.map(m => `${m.days}일`).join(', ');
-          alert(`🔥 [연속 복습 콤보 달성!] ${milestoneDaysLabel} 마일스톤 보너스 ${bonusGained}점이 적립되었습니다!`);
-        }
-      }
+      // 매일 연속 복습 스트릭 갱신 (🔥 Daily Streak) — 신규 등록/복습 완료 공용 함수
+      applyDailyStreakUpdate();
 
       // Refresh peer activities locally
       fetchPeerActivities();
