@@ -85,6 +85,16 @@ export const GACHA_ITEMS: GachaItem[] = [
     color: 'from-amber-400 via-yellow-400 to-amber-500'
   },
   {
+    id: 'item_ai_name_change',
+    name: '🎭 AI 이름 변경권',
+    description: 'AI 밤티 쌤의 이름을 원하는 페르소나 이름으로 바꿀 수 있는 변경권입니다.',
+    rarity: 'SSR',
+    category: 'SHIELD',
+    icon: '🎭',
+    effectValue: 'ai_name_change',
+    color: 'from-amber-400 via-yellow-400 to-amber-500'
+  },
+  {
     id: 'charm_grade_one',
     name: '🎴 부적: 1등급 선택권',
     description: '원하는 핵심 시험에서 당당히 1등급을 쟁취할 수 있는 행운의 전설 부적입니다.',

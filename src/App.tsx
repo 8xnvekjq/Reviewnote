@@ -63,6 +63,9 @@ function App() {
   // 닉네임 변경권 보유 여부
   const [hasNameChangeTicket, setHasNameChangeTicket] = useState<boolean>(false);
   const [hasPointBooster, setHasPointBooster] = useState<boolean>(false); // 콤보 부스터(포인트 2배권) 보유 여부
+  // AI 이름 변경권으로 바꾼 커스텀 AI 페르소나 이름 (비어있으면 기본값 '밤티' 사용)
+  const [customAiName, setCustomAiName] = useState<string>('');
+  const [hasAiNameChangeTicket, setHasAiNameChangeTicket] = useState<boolean>(false);
   // userId -> displayName map (admin 전용)
   const [profilesMap, setProfilesMap] = useState<Record<string, string>>({});
   // 유튜브 매칭용 강의 마스터 리스트 상태
@@ -514,11 +517,12 @@ function App() {
       if (targetId) {
         const { data: myProfile } = await supabase
           .from('profiles')
-          .select('nickname, display_name, bonus_points, point_adjustment, equipped_title, equipped_stamp, equipped_theme, equipped_ai_voice, current_streak, streak_last_review_date, streak_shields, streak_milestone_claimed')
+          .select('nickname, display_name, bonus_points, point_adjustment, equipped_title, equipped_stamp, equipped_theme, equipped_ai_voice, current_streak, streak_last_review_date, streak_shields, streak_milestone_claimed, custom_ai_name')
           .eq('id', targetId)
           .maybeSingle();
         if (myProfile) {
           setMyNickname(myProfile.nickname || myProfile.display_name || '');
+          setCustomAiName(myProfile.custom_ai_name || '');
           setEquippedItems({
             title: myProfile.equipped_title || undefined,
             stamp: myProfile.equipped_stamp || undefined,
@@ -551,6 +555,8 @@ function App() {
         checkNameChangeTicket(targetId);
         // 콤보 부스터(포인트 2배권) 보유 여부 확인 (Supabase user_items 기준 실시간 조회)
         checkPointBooster(targetId);
+        // AI 이름 변경권 보유 여부 확인
+        checkAiNameChangeTicket(targetId);
       }
 
       // Fetch all profiles for admin name mapping (display_name, school_grade, equipped_stamp 포함)
@@ -669,6 +675,65 @@ function App() {
     setHasNameChangeTicket(!!(data && data.quantity > 0));
   };
 
+  // AI 이름 변경권을 사용해 AI 페르소나 이름을 변경 (닉네임 변경과 동일한 패턴)
+  const handleUpdateAiName = async (newName: string) => {
+    if (!session?.user?.id) return;
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+
+    const { data: ticketRow } = await supabase
+      .from('user_items')
+      .select('quantity')
+      .eq('user_id', session.user.id)
+      .eq('item_id', 'item_ai_name_change')
+      .maybeSingle();
+
+    if (!ticketRow || ticketRow.quantity < 1) {
+      alert('🎭 AI 이름 변경권이 없습니다!\n럭키 상점에서 뽑기를 통해 획득하세요.');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ custom_ai_name: trimmed })
+        .eq('id', session.user.id);
+      if (error) throw error;
+
+      const newQty = Math.max(0, ticketRow.quantity - 1);
+      await supabase
+        .from('user_items')
+        .update({ quantity: newQty })
+        .eq('user_id', session.user.id)
+        .eq('item_id', 'item_ai_name_change');
+
+      setCustomAiName(trimmed);
+      setHasAiNameChangeTicket(newQty > 0);
+      window.dispatchEvent(new CustomEvent('reviewnote_inventory_updated'));
+      alert(`✅ AI 이름이 '${trimmed}'(으)로 변경되었습니다!\n(잔여 변경권: ${newQty}개)`);
+    } catch (err: any) {
+      alert(`AI 이름 변경에 실패했습니다: ${err.message}`);
+    }
+  };
+
+  // 보물가방에서 AI 이름 변경권 사용 시 호출 (닉네임 변경과 동일한 중앙 커스텀 팝업 모달 패턴)
+  const handleUseAiNameChangeTicket = () => {
+    window.dispatchEvent(new CustomEvent('reviewnote_open_ai_name_modal'));
+  };
+
+  // AI 이름 변경권 보유 여부 확인
+  const checkAiNameChangeTicket = async (targetUserId?: string) => {
+    const targetId = targetUserId || session?.user?.id;
+    if (!targetId) return;
+    const { data } = await supabase
+      .from('user_items')
+      .select('quantity')
+      .eq('user_id', targetId)
+      .eq('item_id', 'item_ai_name_change')
+      .maybeSingle();
+    setHasAiNameChangeTicket(!!(data && data.quantity > 0));
+  };
+
   // 콤보 부스터(포인트 2배권) 보유 여부 확인 (Supabase user_items 기준 — localStorage 구 인벤토리 키는 더 이상 쓰이지 않음)
   const checkPointBooster = async (targetUserId?: string) => {
     const targetId = targetUserId || session?.user?.id;
@@ -768,7 +833,7 @@ function App() {
     studentGrade: string | undefined,
     image: { mimeType: string; base64Data: string }
   ): Promise<MistakeEntry> => {
-    const firstResult = await classifyMistakeWithGemini(image, apiKey, youtubeLectures, studentGrade);
+    const firstResult = await classifyMistakeWithGemini(image, apiKey, youtubeLectures, studentGrade, customAiName || '밤티');
 
     // 1단계 결과를 기반으로 Supabase DB에 과목, 단원, 유튜브 매칭 필드 우선 업데이트
     const partialAnalysis: MistakeAnalysis = {
@@ -861,7 +926,8 @@ function App() {
         onProgress,
         sameChapterMistakeCount,
         recurringRootCause,
-        equippedItems.aiVoice
+        equippedItems.aiVoice,
+        customAiName || '밤티'
       ),
       extractPromise
     ]);
@@ -1453,7 +1519,9 @@ function App() {
         onLogout={handleLogout} 
         onUpdateNickname={handleUpdateNickname}
         hasNameChangeTicket={hasNameChangeTicket}
-        myScore={currentDisplayPoints} 
+        onUpdateAiName={handleUpdateAiName}
+        hasAiNameChangeTicket={hasAiNameChangeTicket}
+        myScore={currentDisplayPoints}
         onOpenStore={() => setActiveTab('store')}
         equippedTitle={equippedItems.title}
         streakDays={streakState.currentStreak}
@@ -1469,6 +1537,7 @@ function App() {
             equippedItems={equippedItems}
             onEquipItem={handleEquipItem}
             onUseNameChangeTicket={handleUseNameChangeTicket}
+            onUseAiNameChangeTicket={handleUseAiNameChangeTicket}
           />
         )}
 

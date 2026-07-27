@@ -44,6 +44,7 @@ interface GachaStoreProps {
   equippedItems: EquippedItems;
   onEquipItem: (category: keyof EquippedItems, value: string | undefined) => void;
   onUseNameChangeTicket?: () => void; // 닉네임 변경권 사용 콜백
+  onUseAiNameChangeTicket?: () => void; // AI 이름 변경권 사용 콜백
 }
 
 export const GachaStore: React.FC<GachaStoreProps> = ({
@@ -53,6 +54,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
   equippedItems,
   onEquipItem,
   onUseNameChangeTicket,
+  onUseAiNameChangeTicket,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'draw' | 'inventory' | 'catalog'>('draw');
 
@@ -760,6 +762,15 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                         <button
                           onClick={onUseNameChangeTicket}
                           className="px-3 py-1.5 rounded-xl text-[10px] font-black flex-none transition-all bg-indigo-700 text-white hover:bg-indigo-600"
+                        >
+                          사용하기
+                        </button>
+                      )}
+
+                      {item.category === 'SHIELD' && item.id === 'item_ai_name_change' && onUseAiNameChangeTicket && (
+                        <button
+                          onClick={onUseAiNameChangeTicket}
+                          className="px-3 py-1.5 rounded-xl text-[10px] font-black flex-none transition-all bg-amber-600 text-white hover:bg-amber-500"
                         >
                           사용하기
                         </button>

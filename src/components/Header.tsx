@@ -32,6 +32,8 @@ interface HeaderProps {
   equippedTitle?: string;
   streakDays?: number;
   hasNameChangeTicket?: boolean;
+  onUpdateAiName?: (newName: string) => Promise<void>;
+  hasAiNameChangeTicket?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -44,10 +46,14 @@ export const Header: React.FC<HeaderProps> = ({
   equippedTitle,
   streakDays,
   hasNameChangeTicket,
+  onUpdateAiName,
+  hasAiNameChangeTicket,
 }) => {
   const [showUserMenu, setShowUserMenu] = React.useState(false);
   const [isNicknameModalOpen, setIsNicknameModalOpen] = React.useState(false);
   const [nicknameInput, setNicknameInput] = React.useState('');
+  const [isAiNameModalOpen, setIsAiNameModalOpen] = React.useState(false);
+  const [aiNameInput, setAiNameInput] = React.useState('');
   const buildLabel = `v${__APP_VERSION__} (${formatBuildTime(__BUILD_TIME__)})`;
 
   // 보물가방 또는 상단 드롭다운에서 닉네임 모달 팝업 수신 이벤트
@@ -61,6 +67,18 @@ export const Header: React.FC<HeaderProps> = ({
       window.removeEventListener('reviewnote_open_nickname_modal', handleOpenModal);
     };
   }, [nickname]);
+
+  // 보물가방에서 AI 이름 변경권 사용 시 모달 팝업 수신 이벤트
+  React.useEffect(() => {
+    const handleOpenAiNameModal = () => {
+      setAiNameInput('');
+      setIsAiNameModalOpen(true);
+    };
+    window.addEventListener('reviewnote_open_ai_name_modal', handleOpenAiNameModal);
+    return () => {
+      window.removeEventListener('reviewnote_open_ai_name_modal', handleOpenAiNameModal);
+    };
+  }, []);
 
   return (
     <>
@@ -263,6 +281,109 @@ export const Header: React.FC<HeaderProps> = ({
                     }}
                     disabled={!nicknameInput.trim()}
                     className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-550 text-white text-xs font-black transition-all disabled:opacity-50 shadow-md shadow-indigo-600/20"
+                  >
+                    완료
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── AI 이름 변경 자체 커스텀 UI 모달 팝업 창 (닉네임 변경 모달과 동일한 패턴) ── */}
+      {isAiNameModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-xs bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-2xl space-y-4 animate-scale-up">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+              <h3 className="text-sm font-extrabold text-white flex items-center space-x-2">
+                <span>{hasAiNameChangeTicket ? '🎭' : '🏷️'}</span>
+                <span>{hasAiNameChangeTicket ? 'AI 이름 변경' : 'AI 이름 변경권 필요'}</span>
+              </h3>
+              <button
+                onClick={() => setIsAiNameModalOpen(false)}
+                className="text-slate-400 hover:text-white text-xs font-bold px-2 py-1 rounded-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            {!hasAiNameChangeTicket ? (
+              /* 변경권 0개 보유 시 커스텀 UI 안내 모달 창 */
+              <div className="space-y-4 text-center py-2">
+                <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto text-2xl">
+                  🏷️
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-extrabold text-white">
+                    AI 이름 변경권이 없습니다!
+                  </p>
+                  <p className="text-[11px] font-bold text-slate-400 leading-relaxed">
+                    럭키상점에서 AI 이름 변경권을 획득한 후 변경해 주세요.
+                  </p>
+                </div>
+                <div className="flex items-center space-x-2 pt-2">
+                  <button
+                    onClick={() => setIsAiNameModalOpen(false)}
+                    className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all"
+                  >
+                    닫기
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsAiNameModalOpen(false);
+                      onOpenStore?.();
+                    }}
+                    className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-350 hover:to-amber-450 text-slate-950 text-xs font-black transition-all shadow-md shadow-amber-500/20 flex items-center justify-center space-x-1"
+                  >
+                    <span>🎁</span>
+                    <span>상점으로 이동</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* 변경권 1개 이상 보유 시 커스텀 UI 입력 모달 창 */
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-bold text-slate-300">
+                    AI 페르소나 이름
+                  </label>
+                  <input
+                    type="text"
+                    value={aiNameInput}
+                    onChange={(e) => setAiNameInput(e.target.value)}
+                    placeholder="새 AI 이름을 입력하세요 (최대 10자)"
+                    maxLength={10}
+                    className="w-full px-3.5 py-2.5 bg-slate-955 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 outline-none focus:border-amber-500 transition-colors"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && aiNameInput.trim() && onUpdateAiName) {
+                        onUpdateAiName(aiNameInput.trim());
+                        setIsAiNameModalOpen(false);
+                      }
+                    }}
+                    autoFocus
+                  />
+                  <p className="text-[10px] text-slate-500">
+                    * AI 이름 변경권 1개가 즉시 소모됩니다.
+                  </p>
+                </div>
+
+                <div className="flex items-center space-x-2 pt-1">
+                  <button
+                    onClick={() => setIsAiNameModalOpen(false)}
+                    className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all"
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (aiNameInput.trim() && onUpdateAiName) {
+                        await onUpdateAiName(aiNameInput.trim());
+                        setIsAiNameModalOpen(false);
+                      }
+                    }}
+                    disabled={!aiNameInput.trim()}
+                    className="flex-1 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-550 text-white text-xs font-black transition-all disabled:opacity-50 shadow-md shadow-amber-600/20"
                   >
                     완료
                   </button>
