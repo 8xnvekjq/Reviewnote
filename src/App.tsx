@@ -245,7 +245,9 @@ function App() {
   // 주간 최다 오답 완료 챔피언 정보 로드 + 내 점수 동시 갱신 (하이브리드 1주 이월 및 리셋 롤오버)
   const loadWeeklyChampions = async () => {
     try {
-      // 1. 이번 주 랭킹 뷰 전체 조회
+      // 이번 주 랭킹 뷰 조회. 지난주 점수를 이월해서 채워 넣지 않는다 — 이번 주에 아무것도
+      // 안 한 학생이 지난주 성적 덕에 명예의전당에 끼어 있으면 "이번 주 노력"의 의미가 없어진다.
+      // 실제로 이번 주 활동한 사람만, 그 인원이 1~2명뿐이어도 그대로 보여준다.
       const { data, error } = await supabase
         .from('weekly_leaderboard')
         .select('*')
@@ -253,37 +255,8 @@ function App() {
 
       if (error) throw error;
 
-      // 이번주 점수가 0 초과인 데이터만 추출
-      const activeThisWeek = (data || []).filter((item: any) => item.score > 0).map((item: any) => ({ ...item, isLastWeek: false }));
-
-      if (activeThisWeek.length >= 3) {
-        setWeeklyChampions(activeThisWeek.slice(0, 3));
-        return;
-      }
-
-      // 이번 주 복습 완료자가 3명 미만이면 지난주 랭킹(RLS 우회)에서 부족한 인원을 이월 보충
-      const { data: lastWeekData, error: lastWeekError } = await supabase
-        .from('last_weekly_leaderboard')
-        .select('*')
-        .order('score', { ascending: false });
-
-      if (!lastWeekError && lastWeekData) {
-        const activeLastWeek = lastWeekData
-          .filter((item: any) => item.score > 0)
-          .map((item: any) => ({ ...item, isLastWeek: true }));
-
-        // 이미 이번 주 랭킹에 들어있는 유저는 중복 제거
-        const existingUserIds = new Set(activeThisWeek.map(u => u.user_id));
-        const fillFromLastWeek = activeLastWeek.filter(u => !existingUserIds.has(u.user_id));
-
-        const combined = [...activeThisWeek, ...fillFromLastWeek].slice(0, 3);
-        setWeeklyChampions(combined);
-      } else if (activeThisWeek.length > 0) {
-        setWeeklyChampions(activeThisWeek);
-      } else {
-        // 3. 지난주마저 점수가 없으면 배너를 비워 동기부여 유도
-        setWeeklyChampions([]);
-      }
+      const activeThisWeek = (data || []).filter((item: any) => item.score > 0);
+      setWeeklyChampions(activeThisWeek.slice(0, 3));
     } catch (err) {
       console.error('loadWeeklyChampions failed:', err);
       setWeeklyChampions([]);
