@@ -102,6 +102,21 @@
   animation: scaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* 닉네임 텍스트에 무지개색이 흘러가는 웨이브 효과 (글로우/그림자와 별개, 텍스트 자체 색이 움직임) */
+@keyframes rainbowWave {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 300% 50%; }
+}
+
+.text-rainbow-wave {
+  background: linear-gradient(90deg, #ff3b3b, #ff9d3b, #ffe93b, #4dff3b, #3bd6ff, #6b3bff, #ff3bd6, #ff3b3b);
+  background-size: 300% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: rainbowWave 3s linear infinite;
+}
+
 /* Scrollbar styling for modal sheets */
 ::-webkit-scrollbar {
   width: 6px;

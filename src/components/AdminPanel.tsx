@@ -351,7 +351,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = () => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-2 flex-wrap gap-y-1">
-                        <span className="font-extrabold text-white text-sm truncate">
+                        {/* 🌈 무지개 웨이브 텍스트 효과 테스트 — test 계정에만 우선 적용해봄 */}
+                        <span className={`font-extrabold text-sm truncate ${user.email?.toLowerCase().startsWith('test') ? 'text-rainbow-wave' : 'text-white'}`}>
                           {(user as any).displayName || (user as any).username}
                         </span>
                         {user.equippedTitle && (() => {
