@@ -1538,6 +1538,7 @@ function App() {
             onEquipItem={handleEquipItem}
             onUseNameChangeTicket={handleUseNameChangeTicket}
             onUseAiNameChangeTicket={handleUseAiNameChangeTicket}
+            aiPersonaName={customAiName || '밤티'}
           />
         )}
 
@@ -1985,6 +1986,7 @@ function App() {
           profilesStampMap={profilesStampMap}
           currentUserId={session?.user?.id || currentUser || ''}
           isAdmin={isAdmin}
+          aiPersonaName={customAiName || '밤티'}
         />
       )}
 

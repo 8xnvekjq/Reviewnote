@@ -25,11 +25,12 @@ interface MistakeDetailModalProps {
   profilesStampMap?: Record<string, string>;
   currentUserId?: string;
   isAdmin?: boolean;
+  aiPersonaName?: string; // AI 이름 변경권으로 바꾼 커스텀 AI 페르소나 이름 (없으면 기본값 '밤티')
 }
 
-const INITIAL_PHRASES = [
-  '밤티가 문제 이미지를 열심히 판독하고 있어요... 🔍',
-  '밤티가 수학 수식과 기호들을 꼼꼼하게 정리하고 있어요. ✍️'
+const getInitialPhrases = (personaName: string) => [
+  `${personaName}가 문제 이미지를 열심히 판독하고 있어요... 🔍`,
+  `${personaName}가 수학 수식과 기호들을 꼼꼼하게 정리하고 있어요. ✍️`
 ];
 
 export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
@@ -50,6 +51,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   profilesStampMap = {},
   currentUserId = '',
   isAdmin = false,
+  aiPersonaName = '밤티',
 }) => {
   const authorStamp = selectedEntry.userId ? (profilesStampMap[selectedEntry.userId] || equippedStamp) : equippedStamp;
   // 장착한 스탬프의 실제 뽑기 등급(UR/SSR/SR/R)에 맞는 테두리 클래스
@@ -442,7 +444,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
         const option = ROOT_CAUSE_OPTIONS.find(opt => opt.id === topCause);
         if (option) {
           const ratio = Math.round((topCount / totalCauses) * 100);
-          repeatPhrases.push(`최근에는 '${option.label}' 유형(${ratio}%)의 오답률이 높은 편이에요. 밤티와 함께 집중 공략해 봐요! 🎯`);
+          repeatPhrases.push(`최근에는 '${option.label}' 유형(${ratio}%)의 오답률이 높은 편이에요. ${aiPersonaName}와 함께 집중 공략해 봐요! 🎯`);
         }
       }
     }
@@ -477,13 +479,14 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     }
 
     // 최초 0초 시작 문구 노출 (첫 번째 정적 문구)
-    setLoadingText(INITIAL_PHRASES[0]);
+    const initialPhrases = getInitialPhrases(aiPersonaName);
+    setLoadingText(initialPhrases[0]);
 
     let count = 1;
     const interval = setInterval(() => {
-      if (count < INITIAL_PHRASES.length) {
+      if (count < initialPhrases.length) {
         // 초반 3초 시점에는 INITIAL_PHRASES 순서대로 1회성 출력
-        setLoadingText(INITIAL_PHRASES[count]);
+        setLoadingText(initialPhrases[count]);
       } else {
         // 초반 정적 문구 노출이 끝나면, 동적 멘트 풀(repeatPhrases)에서 무작위(Random)로 롤링 출력
         const randomIndex = Math.floor(Math.random() * repeatPhrases.length);
@@ -493,7 +496,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     }, 3000); // 3초 주기
 
     return () => clearInterval(interval);
-  }, [isAnalyzing, allEntries, peerActivities, selectedEntry.grade, selectedEntry.chapter]);
+  }, [isAnalyzing, allEntries, peerActivities, selectedEntry.grade, selectedEntry.chapter, aiPersonaName]);
 
   // 3. 사진 업로드 후 AI 진단 카드로 부드럽게 스크롤 이동
   React.useEffect(() => {
@@ -988,7 +991,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                   <h4 className="text-sm font-extrabold text-indigo-400 flex items-center group-hover:text-indigo-300 transition-colors">
                     <span className="mr-1.5 text-base">💡</span> 정석 풀이 과정
                     {isAnalyzing && (
-                      <span className="ml-2 text-[10px] font-bold text-indigo-300 animate-pulse">✍️ 밤티가 실시간으로 작성 중...</span>
+                      <span className="ml-2 text-[10px] font-bold text-indigo-300 animate-pulse">✍️ {aiPersonaName}가 실시간으로 작성 중...</span>
                     )}
                   </h4>
                   <span className="text-xs text-slate-500 font-bold mr-1 group-hover:text-slate-400 transition-colors">

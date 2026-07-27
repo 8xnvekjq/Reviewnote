@@ -45,6 +45,7 @@ interface GachaStoreProps {
   onEquipItem: (category: keyof EquippedItems, value: string | undefined) => void;
   onUseNameChangeTicket?: () => void; // 닉네임 변경권 사용 콜백
   onUseAiNameChangeTicket?: () => void; // AI 이름 변경권 사용 콜백
+  aiPersonaName?: string; // AI 이름 변경권으로 바꾼 커스텀 AI 페르소나 이름 (없으면 기본값 '밤티')
 }
 
 export const GachaStore: React.FC<GachaStoreProps> = ({
@@ -55,6 +56,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
   onEquipItem,
   onUseNameChangeTicket,
   onUseAiNameChangeTicket,
+  aiPersonaName,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'draw' | 'inventory' | 'catalog'>('draw');
 
@@ -707,7 +709,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                 </div>
                 <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
                   <span className="text-slate-500 text-[10px]">AI 말투</span>
-                  <span className="text-purple-400 font-extrabold">{equippedItems.aiVoice || '기본 밤티 쌤'}</span>
+                  <span className="text-purple-400 font-extrabold">{equippedItems.aiVoice || `기본 ${aiPersonaName || '밤티'} 쌤`}</span>
                 </div>
               </div>
             </div>
