@@ -53,6 +53,16 @@ export const GACHA_ITEMS: GachaItem[] = [
     color: 'from-amber-400 via-pink-500 to-purple-500'
   },
   {
+    id: 'item_homework_exempt',
+    name: '📝 숙제 면제권',
+    description: '숙제 1회를 면제받을 수 있는 티켓입니다. 사용 후 선생님께 보여주세요.',
+    rarity: 'UR',
+    category: 'SHIELD',
+    icon: '📝',
+    effectValue: 'homework_exempt',
+    color: 'from-amber-400 via-pink-500 to-purple-500'
+  },
+  {
     id: 'theme_legendary_gold',
     name: '🎨 레전드 골드 갤럭시 테마',
     description: '전설적인 황금빛 태양과 은하수가 어우러진 최고급 레전드 테마입니다.',

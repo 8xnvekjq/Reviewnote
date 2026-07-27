@@ -445,6 +445,27 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
     setDrawnItemsResult([]);
   };
 
+  // 숙제 면제권 사용 (입력이 필요 없어 App/Header까지 갈 것 없이 여기서 바로 소모)
+  const handleUseHomeworkExemptTicket = async () => {
+    const currentQty = inventory['item_homework_exempt'] || 0;
+    if (currentQty < 1) return;
+
+    const newQty = currentQty - 1;
+    const { error } = await supabase
+      .from('user_items')
+      .update({ quantity: newQty })
+      .eq('user_id', userId)
+      .eq('item_id', 'item_homework_exempt');
+
+    if (error) {
+      alert(`숙제 면제권 사용에 실패했습니다: ${error.message}`);
+      return;
+    }
+
+    setInventory(prev => ({ ...prev, item_homework_exempt: newQty }));
+    alert(`📝 숙제 면제권을 사용했습니다!\n이 화면을 선생님께 보여주세요. (잔여 ${newQty}개)`);
+  };
+
   // 아이템 장착/해제 토글
   const handleToggleEquip = (item: GachaItem) => {
     if (item.category === 'STAMP') {
@@ -773,6 +794,15 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                         <button
                           onClick={onUseAiNameChangeTicket}
                           className="px-3 py-1.5 rounded-xl text-[10px] font-black flex-none transition-all bg-amber-600 text-white hover:bg-amber-500"
+                        >
+                          사용하기
+                        </button>
+                      )}
+
+                      {item.category === 'SHIELD' && item.id === 'item_homework_exempt' && (
+                        <button
+                          onClick={handleUseHomeworkExemptTicket}
+                          className="px-3 py-1.5 rounded-xl text-[10px] font-black flex-none transition-all bg-gradient-to-r from-amber-400 to-pink-500 text-slate-950 hover:brightness-110"
                         >
                           사용하기
                         </button>
