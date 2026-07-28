@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../services/supabase';
 import { GACHA_ITEMS, getTitleBadgeStyle, getRarityTheme } from '../utils/gachaCatalog';
+import { CatPawIcon } from './CatPawIcon';
 
 interface ActivityEvent {
   mistake_id: string;
@@ -131,7 +132,7 @@ export const RecentActivityFeed: React.FC = () => {
                 style={cardStyle}
               >
                 <span className={`text-2xl flex-none w-10 h-10 flex items-center justify-center rounded-full ${ev.event_type === 'review' && stampCatalogItem ? `border-2 ${iconBorderClass}` : ''}`}>
-                  {ev.event_type === 'register' ? '📝' : reviewIcon}
+                  {ev.event_type === 'register' ? '📝' : (reviewIcon === '🐾' ? <CatPawIcon className="w-6 h-6" /> : reviewIcon)}
                 </span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center space-x-1.5 flex-wrap gap-y-0.5">
