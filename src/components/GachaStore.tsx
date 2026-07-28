@@ -218,8 +218,8 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
 
     if (error) { console.error('아이템 저장 실패:', error); return; }
 
-    // 희귀 아이템 (SR / SSR / UR) 당첨 시 전광판 로그 기록 (어드민/테스트 계정 제외)
-    const rareItems = items.filter(i => i.rarity === 'SR' || i.rarity === 'SSR' || i.rarity === 'UR');
+    // 희귀 아이템 (SR / SSR / UR / MR) 당첨 시 전광판 로그 기록 (어드민/테스트 계정 제외)
+    const rareItems = items.filter(i => i.rarity === 'SR' || i.rarity === 'SSR' || i.rarity === 'UR' || i.rarity === 'MR');
     if (rareItems.length > 0) {
       try {
         const { data: prof } = await supabase

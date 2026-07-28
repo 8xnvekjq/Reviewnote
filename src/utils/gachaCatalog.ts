@@ -476,14 +476,16 @@ export function drawGachaItem(): GachaItem {
   const rand = Math.random() * 100; // 0 ~ 100
 
   let targetRarity: GachaRarity;
-  if (rand < 1.0) {
-    targetRarity = 'UR';       // 1%
+  if (rand < 0.1) {
+    targetRarity = 'MR';       // 0.1% (신화급 극악의 확률)
+  } else if (rand < 1.0) {
+    targetRarity = 'UR';       // 0.9% (전설급)
   } else if (rand < 8.0) {
-    targetRarity = 'SSR';      // 7%
+    targetRarity = 'SSR';      // 7.0% (슈퍼레어)
   } else if (rand < 30.0) {
-    targetRarity = 'SR';       // 22%
+    targetRarity = 'SR';       // 22.0% (레어)
   } else {
-    targetRarity = 'R';        // 70%
+    targetRarity = 'R';        // 70.0% (일반)
   }
 
   const pool = GACHA_ITEMS.filter(item => item.rarity === targetRarity);
