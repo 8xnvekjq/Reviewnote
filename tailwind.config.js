@@ -30,9 +30,15 @@ export default {
         // tailwind.config.js 어디에도 정의된 적이 없어서 bg-slate-850/border-slate-750 클래스가
         // 실제로는 색이 전혀 적용되지 않고 있었다 (문제카드/패널 내부 박스가 테마에 반응 안 하던 원인).
         // 이번에 처음으로 실제 값을 채워 넣으면서 동시에 테마 변수에 연결한다.
+        //
+        // slate-750/800은 원래 --theme-border에 연결돼 있었는데, UR 레전드 테마가 테두리 색을
+        // 아주 밝고 쨍하게 바꾸도록 리워크되면서 앱 전체에서 "무난한 어두운 표면" 용도로 159곳
+        // 넘게 쓰이던 bg-slate-800(예: 미착용 "장착하기" 버튼)이 전부 밝은 금색으로 바뀌어
+        // 텍스트가 안 보이는 문제가 생겼다. --theme-border는 실제 테두리/글로우 전용으로 남기고,
+        // slate-750/800은 항상 차분하게 유지되는 --theme-bg-elevated로 옮겨서 분리했다.
         slate: {
-          750: 'rgb(var(--theme-border) / <alpha-value>)',
-          800: 'rgb(var(--theme-border) / <alpha-value>)',
+          750: 'rgb(var(--theme-bg-elevated) / <alpha-value>)',
+          800: 'rgb(var(--theme-bg-elevated) / <alpha-value>)',
           850: 'rgb(var(--theme-bg-elevated) / <alpha-value>)',
           900: 'rgb(var(--theme-bg-surface) / <alpha-value>)',
           950: 'rgb(var(--theme-bg-main) / <alpha-value>)',
