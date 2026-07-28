@@ -26,7 +26,6 @@ export const SlideListModal: React.FC<SlideListModalProps> = ({ isOpen, onClose 
 
     // 🏫 고2 (수학Ⅰ, 수학Ⅱ, 미적분1)
     { title: "개념원리 미적분1 - 03. 도함수 (p72~82)", filename: "calculus1_derivative_function_p72_82.html", date: "2026-07-29", grade: "고2" },
-    { title: "개념원리 미적분1 - 04. 도함수 (p72~81)", filename: "calculus1_derivative_04.html", date: "2026-07-25", grade: "고2" },
     { title: "개념원리 미적분1 - 01. 함수의 극한과 연속 (p31~47)", filename: "calculus1_limit_continuity_01.html", date: "2026-07-22", grade: "고2" },
     { title: "개념원리 미적분1 - 02. 연속함수의 성질 (p51~55)", filename: "calculus1_continuous_functions_02.html", date: "2026-07-22", grade: "고2" },
     { title: "개념원리 미적분1 - 03. 미분계수 (p58~68)", filename: "calculus1_derivative_03.html", date: "2026-07-22", grade: "고2" },
