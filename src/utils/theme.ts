@@ -81,7 +81,8 @@ export function applyThemeColor(hex?: string): void {
   const isMonochrome = s < 35;
 
   // 높은 채도를 확보하여 테마 고유 색상 톤이 또렷하게 살아나도록 함
-  const bgSat = isMonochrome ? s : Math.max(s, 70);
+  // (기존 70/85/90% 바닥값이 특히 테두리·액센트에서 너무 쨍하고 눈이 아프다는 피드백을 받아 완화함)
+  const bgSat = isMonochrome ? s : Math.max(s, 55);
 
   // 1. 메인 앱 배경: 딥 톤 (7% 명도)
   const [mR, mG, mB] = hslToRgb(h, bgSat, 7);
@@ -95,11 +96,11 @@ export function applyThemeColor(hex?: string): void {
   // 4. 상단 헤더: 진하고 그윽한 헤더 톤 (15% 명도)
   const [hR, hG, hB] = hslToRgb(h, bgSat, 15);
 
-  // 5. 프레임 테두리 선: 톡 쏘는 선명한 테마 포인트 색상 (48% 명도, 95% 채도!)
-  const [bR, bG, bB] = hslToRgb(h, isMonochrome ? s : Math.max(s, 85), 48);
+  // 5. 프레임 테두리 선: 테마 포인트 색상 (40% 명도)
+  const [bR, bG, bB] = hslToRgb(h, isMonochrome ? s : Math.max(s, 65), 40);
 
-  // 6. 테마 대표 액센트 색상 (60% 명도)
-  const [aR, aG, aB] = hslToRgb(h, isMonochrome ? s : Math.max(s, 90), 60);
+  // 6. 테마 대표 액센트 색상 (52% 명도)
+  const [aR, aG, aB] = hslToRgb(h, isMonochrome ? s : Math.max(s, 70), 52);
 
   root.style.setProperty('--theme-bg-main', `${mR} ${mG} ${mB}`);
   root.style.setProperty('--theme-bg-surface', `${sR} ${sG} ${sB}`);

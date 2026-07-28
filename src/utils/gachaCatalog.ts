@@ -395,11 +395,11 @@ export const GACHA_ITEMS: GachaItem[] = [
   {
     id: 'theme_classic_mono',
     name: '🎨 클래식 모노 다크 테마',
-    description: '눈이 편안하고 차분한 모노 슬레이트 다크 테마입니다.',
+    description: '색조가 거의 없는 순수 무채색 그레이 다크 테마입니다.',
     rarity: 'R',
     category: 'THEME',
     icon: '🖤',
-    effectValue: '#64748B',
+    effectValue: '#737373',
     color: 'from-sky-400 via-blue-400 to-indigo-500'
   },
   {
