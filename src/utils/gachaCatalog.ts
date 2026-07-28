@@ -1,6 +1,17 @@
 import type { GachaItem, GachaRarity } from '../types';
 
 export const GACHA_ITEMS: GachaItem[] = [
+  // ── MR (0.1%) - Mythic Rare (신화급 강렬한 크림슨 불꽃) ───────────────
+  {
+    id: 'title_160h_time_lord',
+    name: '⏱️ 칭호: 160시간 시간의 지배자',
+    description: '한 달 160시간이라는 경이로운 몰입으로 한계를 돌파한 전설의 명예 칭호입니다.',
+    rarity: 'MR',
+    category: 'TITLE',
+    icon: '⏱️',
+    effectValue: '160시간 시간의 지배자',
+    color: 'from-red-600 via-rose-500 to-amber-500'
+  },
   // ── UR (1%) - Ultra Rare (무지개빛 레전드) ──────────────────────────
   {
     id: 'title_math_god',
@@ -486,6 +497,12 @@ export function drawGachaItem(): GachaItem {
 
 // ── 칭호 희귀도별 화려한 이펙트 스타일 공통 반환 함수 ─────────────────
 export const getTitleBadgeStyle = (title: string) => {
+  if (title.includes('시간의 지배자') || title.includes('160시간')) {
+    return {
+      style: 'bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 text-white border-red-400 shadow-[0_0_18px_rgba(244,63,94,0.95)] ring-2 ring-rose-500/80 animate-pulse font-black',
+      icon: '⏱️'
+    };
+  }
   if (title.includes('수학의 신')) {
     return {
       style: 'bg-gradient-to-r from-amber-400 via-pink-500 to-purple-500 text-white border-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.6)] animate-pulse font-black',
@@ -536,6 +553,13 @@ export const getTitleBadgeStyle = (title: string) => {
 // ── 등급별(UR/SSR/SR/R) 100% 통일된 테마 스타일 반환 함수 ─────────────
 export const getRarityTheme = (rarity: GachaRarity) => {
   switch (rarity) {
+    case 'MR':
+      return {
+        badge: 'bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 text-white font-black animate-pulse shadow-lg shadow-red-500/60 ring-2 ring-rose-500/80',
+        border: 'border-red-500 shadow-[0_0_20px_rgba(244,63,94,0.85)] ring-2 ring-rose-500/90 animate-pulse',
+        bgGradient: 'from-red-600 via-rose-500 to-amber-500',
+        textColor: 'text-rose-400',
+      };
     case 'UR':
       return {
         badge: 'bg-gradient-to-r from-amber-400 via-pink-500 to-purple-500 text-white font-black animate-pulse shadow-md shadow-pink-500/30',

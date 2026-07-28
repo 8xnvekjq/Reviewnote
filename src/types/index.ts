@@ -90,7 +90,7 @@ export interface MistakeEntry {
 
 export type ActiveTab = 'notes' | 'completed' | 'camera' | 'stats' | 'admin' | 'guide' | 'store' | 'activity' | 'scaffolding';
 
-export type GachaRarity = 'UR' | 'SSR' | 'SR' | 'R';
+export type GachaRarity = 'MR' | 'UR' | 'SSR' | 'SR' | 'R';
 export type GachaCategory = 'STAMP' | 'TITLE' | 'THEME' | 'SHIELD' | 'AI_VOICE' | 'CHARM';
 
 export interface GachaItem {
