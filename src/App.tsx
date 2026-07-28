@@ -20,7 +20,7 @@ import { GachaStore } from './components/GachaStore';
 import { RecentActivityFeed } from './components/RecentActivityFeed';
 import { ScaffoldingListPanel } from './components/ScaffoldingListPanel';
 import { StoreGuideModal } from './components/StoreGuideModal';
-import { getTitleBadgeStyle } from './utils/gachaCatalog';
+import { getTitleBadgeStyle, GACHA_ITEMS } from './utils/gachaCatalog';
 import type { EquippedItems } from './types';
 import { applyThemeColor } from './utils/theme';
 import { loadStreakState, recordReviewStreak, reconcileStreakState, getNewlyReachedMilestones, type StreakState } from './utils/streak';
@@ -112,9 +112,11 @@ function App() {
     }
   });
 
-  // 장착한 테마(hex)가 바뀔 때마다(최초 로드 복원 포함) 앱 전체 indigo 배색에 즉시 반영
+  // 장착한 테마(hex)가 바뀔 때마다(최초 로드 복원 포함) 앱 전체 indigo 배색에 즉시 반영.
+  // UR 등급처럼 두 색을 함께 묘사하는 테마는 카탈로그의 themeAccentValue를 테두리/액센트에 추가로 입힌다.
   useEffect(() => {
-    applyThemeColor(equippedItems.theme);
+    const matchedTheme = GACHA_ITEMS.find(item => item.category === 'THEME' && item.effectValue === equippedItems.theme);
+    applyThemeColor(equippedItems.theme, matchedTheme?.themeAccentValue);
   }, [equippedItems.theme]);
 
   // 럭키상점에서 뽑기/아이템 소모로 인벤토리가 바뀔 때마다 콤보 부스터 보유 여부 재확인
