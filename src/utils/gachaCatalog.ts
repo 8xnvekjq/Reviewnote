@@ -5,12 +5,13 @@ export const GACHA_ITEMS: GachaItem[] = [
   {
     id: 'title_160h_time_lord',
     name: '⏱️ 칭호: 160시간 시간의 지배자',
-    description: '한 달 160시간이라는 경이로운 몰입으로 한계를 돌파한 전설의 명예 칭호입니다.',
+    description: '🔒 [한정판 - 일반 뽑기 불가] 한 달 160시간이라는 경이로운 몰입으로 한계를 돌파한 전설의 명예 칭호입니다.',
     rarity: 'MR',
     category: 'TITLE',
     icon: '⏱️',
     effectValue: '160시간 시간의 지배자',
-    color: 'from-red-600 via-rose-500 to-amber-500'
+    color: 'from-red-600 via-rose-500 to-amber-500',
+    isLimited: true,
   },
   // ── UR (1%) - Ultra Rare (무지개빛 레전드) ──────────────────────────
   {
@@ -488,9 +489,11 @@ export function drawGachaItem(): GachaItem {
     targetRarity = 'R';        // 70.0% (일반)
   }
 
-  const pool = GACHA_ITEMS.filter(item => item.rarity === targetRarity);
+  // 🔒 한정판(isLimited: true) 아이템은 일반 가챠 뽑기 Pool에서 100% 제외
+  const pool = GACHA_ITEMS.filter(item => item.rarity === targetRarity && !item.isLimited);
   if (pool.length === 0) {
-    return GACHA_ITEMS[GACHA_ITEMS.length - 1]; // fallback
+    const fallbackPool = GACHA_ITEMS.filter(item => !item.isLimited);
+    return fallbackPool[Math.floor(Math.random() * fallbackPool.length)];
   }
 
   const selectedIndex = Math.floor(Math.random() * pool.length);

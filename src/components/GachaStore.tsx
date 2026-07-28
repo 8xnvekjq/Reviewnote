@@ -870,6 +870,11 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                         <span className={`text-[9px] font-black px-1.5 py-0.2 rounded flex-none ${isUnlocked ? `bg-gradient-to-r ${item.color} text-white` : 'bg-slate-800 text-slate-400'}`}>
                           {item.rarity}
                         </span>
+                        {item.isLimited && (
+                          <span className="text-[8.5px] font-extrabold px-1.5 py-0.2 rounded bg-red-950/80 text-rose-300 border border-rose-500/40 flex-none animate-pulse">
+                            🔒 한정판
+                          </span>
+                        )}
                         <span className="text-[8.5px] font-extrabold px-1.5 py-0.2 rounded bg-slate-800/90 text-slate-300 border border-slate-700/60 flex-none">
                           {catLabel}
                         </span>

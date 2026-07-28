@@ -102,6 +102,7 @@ export interface GachaItem {
   icon: string;
   effectValue?: string; // e.g. '#10B981', '🐾', '수학의 연금술사'
   color: string;
+  isLimited?: boolean; // 🔒 한정판/특수지급 전용 (가챠 뽑기Pool 제외 여부)
 }
 
 export interface EquippedItems {
