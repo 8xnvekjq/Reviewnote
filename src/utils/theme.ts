@@ -73,9 +73,15 @@ export function applyThemeColor(hex?: string): void {
   }
 
   const [h, s] = hexToHsl(hex);
-  
+
+  // 차콜 그레이, 클래식 모노 같은 무채색 테마는 원래 채도가 아주 낮다(슬레이트 계열이라 미세한
+  // 파란기가 있는 정도). 아래에서 채도를 강제로 끌어올리면 그 미세한 색조가 도드라져서
+  // "회색"이 아니라 선명한 파란/보라로 보이는 문제가 있었다. 원래 채도가 낮은 무채색 테마는
+  // 그대로 저채도를 유지하고, 색이 뚜렷한 테마만 채도를 부스트한다.
+  const isMonochrome = s < 35;
+
   // 높은 채도를 확보하여 테마 고유 색상 톤이 또렷하게 살아나도록 함
-  const bgSat = Math.max(s, 70);
+  const bgSat = isMonochrome ? s : Math.max(s, 70);
 
   // 1. 메인 앱 배경: 딥 톤 (7% 명도)
   const [mR, mG, mB] = hslToRgb(h, bgSat, 7);
@@ -90,10 +96,10 @@ export function applyThemeColor(hex?: string): void {
   const [hR, hG, hB] = hslToRgb(h, bgSat, 15);
 
   // 5. 프레임 테두리 선: 톡 쏘는 선명한 테마 포인트 색상 (48% 명도, 95% 채도!)
-  const [bR, bG, bB] = hslToRgb(h, Math.max(s, 85), 48);
+  const [bR, bG, bB] = hslToRgb(h, isMonochrome ? s : Math.max(s, 85), 48);
 
   // 6. 테마 대표 액센트 색상 (60% 명도)
-  const [aR, aG, aB] = hslToRgb(h, Math.max(s, 90), 60);
+  const [aR, aG, aB] = hslToRgb(h, isMonochrome ? s : Math.max(s, 90), 60);
 
   root.style.setProperty('--theme-bg-main', `${mR} ${mG} ${mB}`);
   root.style.setProperty('--theme-bg-surface', `${sR} ${sG} ${sB}`);
