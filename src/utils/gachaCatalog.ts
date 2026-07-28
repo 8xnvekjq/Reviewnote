@@ -570,6 +570,13 @@ export const getTitleBadgeStyle = (title: string) => {
 };
 
 // ── 등급별(UR/SSR/SR/R) 100% 통일된 테마 스타일 반환 함수 ─────────────
+// 등급 배지(item.color 그라데이션) 위에 올릴 텍스트 색상. UR/SSR는 밝은 amber-400에서
+// 그라데이션이 시작해서 흰 글씨가 거의 안 보이므로 어두운 텍스트를, 나머지는 배경이 어두워
+// 흰 텍스트를 쓴다. GachaStore.tsx의 인벤토리/도감/뽑기결과 배지 3곳이 공유해서 쓴다.
+export const getRarityBadgeTextColor = (rarity: GachaRarity): string => {
+  return rarity === 'UR' || rarity === 'SSR' ? 'text-slate-950' : 'text-white';
+};
+
 export const getRarityTheme = (rarity: GachaRarity) => {
   switch (rarity) {
     case 'MR':
@@ -581,7 +588,8 @@ export const getRarityTheme = (rarity: GachaRarity) => {
       };
     case 'UR':
       return {
-        badge: 'bg-gradient-to-r from-amber-400 via-pink-500 to-purple-500 text-white font-black animate-pulse shadow-md shadow-pink-500/30',
+        // 그라데이션이 밝은 amber-400에서 시작해서 SSR과 마찬가지로 흰색 텍스트는 대비가 안 나온다
+        badge: 'bg-gradient-to-r from-amber-400 via-pink-500 to-purple-500 text-slate-950 font-black animate-pulse shadow-md shadow-pink-500/30',
         border: 'border-pink-500 shadow-[0_0_14px_rgba(236,72,153,0.5)] ring-2 ring-purple-400/60 animate-pulse',
         bgGradient: 'from-amber-400 via-pink-500 to-purple-500',
         textColor: 'text-pink-300',

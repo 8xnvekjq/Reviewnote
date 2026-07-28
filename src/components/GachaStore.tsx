@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { GachaItem, EquippedItems } from '../types';
-import { GACHA_ITEMS, drawGachaItem, getRarityTheme, getTitleBadgeStyle } from '../utils/gachaCatalog';
+import { GACHA_ITEMS, drawGachaItem, getRarityTheme, getRarityBadgeTextColor, getTitleBadgeStyle } from '../utils/gachaCatalog';
 import { CatPawIcon } from './CatPawIcon';
 import { supabase } from '../services/supabase';
 import { getKSTDateString } from '../utils/streak';
@@ -772,7 +772,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center space-x-2">
-                            <span className={`text-[9px] font-black px-1.5 py-0.2 rounded bg-gradient-to-r ${item.color} text-white`}>
+                            <span className={`text-[9px] font-black px-1.5 py-0.2 rounded bg-gradient-to-r ${item.color} ${getRarityBadgeTextColor(item.rarity)}`}>
                               {item.rarity}
                             </span>
                             <h4 className="text-xs font-black text-white truncate">{item.name}</h4>
@@ -870,7 +870,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center space-x-1.5">
-                        <span className={`text-[9px] font-black px-1.5 py-0.2 rounded flex-none ${isUnlocked ? `bg-gradient-to-r ${item.color} text-white` : 'bg-slate-800 text-slate-400'}`}>
+                        <span className={`text-[9px] font-black px-1.5 py-0.2 rounded flex-none ${isUnlocked ? `bg-gradient-to-r ${item.color} ${getRarityBadgeTextColor(item.rarity)}` : 'bg-slate-800 text-slate-400'}`}>
                           {item.rarity}
                         </span>
                         {item.isLimited && (
@@ -944,7 +944,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                   </span>
 
                   <div className="flex items-center space-x-1.5 justify-center flex-wrap gap-y-1 relative z-10">
-                    <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full text-white bg-gradient-to-r ${drawnItemsResult[currentResultIndex].color}`}>
+                    <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full ${getRarityBadgeTextColor(drawnItemsResult[currentResultIndex].rarity)} bg-gradient-to-r ${drawnItemsResult[currentResultIndex].color}`}>
                       {drawnItemsResult[currentResultIndex].rarity} 등급
                     </span>
                     {drawnItemsResult[currentResultIndex].isDuplicate && (
