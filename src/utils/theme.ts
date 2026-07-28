@@ -1,4 +1,4 @@
-// 럭키상점에서 장착한 테마(단일 hex 색상)를 앱 전체 메인 배경 및 각 패널 프레임에 반영하는 유틸리티
+// 럭키상점에서 장착한 테마(단일 hex 색상)를 앱 전체 메인 배경, 상/하단 바, 패널 프레임 테두리에 파격적으로 반영하는 유틸리티
 
 function hexToHsl(hex: string): [number, number, number] {
   const normalized = hex.replace('#', '');
@@ -56,31 +56,49 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
 }
 
 /**
- * 장착한 테마 색상(hex, 예: '#8B5CF6')을 앱 전체 메인 배경, 패널 배경, 프레임 테두리 선에 즉시 반영한다.
- * 패널 내부의 아이콘이나 텍스트 색상은 건드리지 않고 오직 배경과 프레임 선만 테마와 연동된다.
+ * 장착한 테마 색상(hex, 예: '#06B6D4' 오로라, '#10B981' 네온 에메랄드, '#166534' 포레스트, '#DC2626' 크림슨 등)을
+ * 앱 전체 메인 배경, 상단 헤더, 하단 네비게이션 바, 각 패널 프레임 테두리 선에 깊이감 있게 반영한다.
  */
 export function applyThemeColor(hex?: string): void {
   const root = document.documentElement;
 
-  if (!hex) {
+  if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) {
     root.style.removeProperty('--theme-bg-main');
     root.style.removeProperty('--theme-bg-surface');
     root.style.removeProperty('--theme-bg-elevated');
+    root.style.removeProperty('--theme-header');
     root.style.removeProperty('--theme-border');
+    root.style.removeProperty('--theme-accent');
     return;
   }
 
   const [h, s] = hexToHsl(hex);
-  const bgSat = Math.min(s, 60);
+  
+  // 높은 채도를 확보하여 테마 고유 색상 톤이 또렷하게 살아나도록 함
+  const bgSat = Math.max(s, 70);
 
-  // 메인 배경(4.5%), 패널 배경(8.5%), 카드 배경(13%), 프레임 테두리 선(22%)
-  const [mR, mG, mB] = hslToRgb(h, bgSat, 4.5);
-  const [sR, sG, sB] = hslToRgb(h, bgSat, 8.5);
-  const [eR, eG, eB] = hslToRgb(h, bgSat, 13);
-  const [bR, bG, bB] = hslToRgb(h, bgSat, 22);
+  // 1. 메인 앱 배경: 딥 톤 (7% 명도)
+  const [mR, mG, mB] = hslToRgb(h, bgSat, 7);
+
+  // 2. 패널 서피스 & 하단 네비게이션: 풍부한 테마 딥 톤 (12% 명도)
+  const [sR, sG, sB] = hslToRgb(h, bgSat, 12);
+
+  // 3. 카드/엘리베이티드 서피스: (17% 명도)
+  const [eR, eG, eB] = hslToRgb(h, bgSat, 17);
+
+  // 4. 상단 헤더: 진하고 그윽한 헤더 톤 (15% 명도)
+  const [hR, hG, hB] = hslToRgb(h, bgSat, 15);
+
+  // 5. 프레임 테두리 선: 톡 쏘는 선명한 테마 포인트 색상 (48% 명도, 95% 채도!)
+  const [bR, bG, bB] = hslToRgb(h, Math.max(s, 85), 48);
+
+  // 6. 테마 대표 액센트 색상 (60% 명도)
+  const [aR, aG, aB] = hslToRgb(h, Math.max(s, 90), 60);
 
   root.style.setProperty('--theme-bg-main', `${mR} ${mG} ${mB}`);
   root.style.setProperty('--theme-bg-surface', `${sR} ${sG} ${sB}`);
   root.style.setProperty('--theme-bg-elevated', `${eR} ${eG} ${eB}`);
+  root.style.setProperty('--theme-header', `${hR} ${hG} ${hB}`);
   root.style.setProperty('--theme-border', `${bR} ${bG} ${bB}`);
+  root.style.setProperty('--theme-accent', `${aR} ${aG} ${aB}`);
 }

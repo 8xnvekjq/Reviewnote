@@ -22,7 +22,9 @@
   --theme-bg-main: 2 6 23;        /* slate-955 */
   --theme-bg-surface: 15 23 42;    /* slate-900 */
   --theme-bg-elevated: 30 41 59;   /* slate-800 */
-  --theme-border: 30 41 59;       /* slate-800 */
+  --theme-header: 15 23 42;       /* slate-900 */
+  --theme-border: 49 46 129;      /* indigo-900 border */
+  --theme-accent: 99 102 241;     /* indigo-500 accent */
 }
 
 .bg-app-main {
@@ -30,15 +32,20 @@
 }
 
 .bg-app-surface {
-  background-color: rgb(var(--theme-bg-surface) / 0.92);
+  background-color: rgb(var(--theme-bg-surface) / 0.95);
+}
+
+.bg-app-header {
+  background-color: rgb(var(--theme-header) / 0.96);
 }
 
 .bg-app-elevated {
-  background-color: rgb(var(--theme-bg-elevated) / 0.7);
+  background-color: rgb(var(--theme-bg-elevated) / 0.85);
 }
 
 .border-app-theme {
-  border-color: rgb(var(--theme-border) / 0.8);
+  border-color: rgb(var(--theme-border) / 0.85);
+  box-shadow: 0 0 12px rgb(var(--theme-border) / 0.18);
 }
 
 @layer base {
