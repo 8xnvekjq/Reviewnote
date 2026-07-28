@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { GachaItem, EquippedItems } from '../types';
 import { GACHA_ITEMS, drawGachaItem, getRarityTheme, getTitleBadgeStyle } from '../utils/gachaCatalog';
+import { CatPawIcon } from './CatPawIcon';
 import { supabase } from '../services/supabase';
 import { getKSTDateString } from '../utils/streak';
 
@@ -761,8 +762,8 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                       }`}
                     >
                       <div className="flex items-center space-x-3 min-w-0">
-                        <div className="relative flex-none">
-                          <span className="text-3xl">{item.icon}</span>
+                        <div className="relative flex-none flex items-center justify-center">
+                          {item.icon === '🐾' ? <CatPawIcon className="w-7 h-7" /> : <span className="text-3xl">{item.icon}</span>}
                           {item.category === 'SHIELD' && qty > 1 && (
                             <span className="absolute -top-1 -right-1 text-[9px] bg-indigo-600 text-white rounded-full w-4 h-4 flex items-center justify-center font-black">
                               {qty}
@@ -864,7 +865,9 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                         : 'bg-slate-950/60 border-slate-900 text-slate-500 opacity-70'
                     }`}
                   >
-                    <span className="text-3xl flex-none select-none">{isUnlocked ? item.icon : '❓'}</span>
+                    <div className="text-3xl flex-none select-none flex items-center justify-center">
+                      {isUnlocked ? (item.icon === '🐾' ? <CatPawIcon className="w-7 h-7" /> : item.icon) : '❓'}
+                    </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center space-x-1.5">
                         <span className={`text-[9px] font-black px-1.5 py-0.2 rounded flex-none ${isUnlocked ? `bg-gradient-to-r ${item.color} text-white` : 'bg-slate-800 text-slate-400'}`}>

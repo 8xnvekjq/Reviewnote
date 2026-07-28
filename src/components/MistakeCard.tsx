@@ -4,6 +4,7 @@ import { formatDate, formatDateTime } from '../utils/date';
 import { GACHA_ITEMS, getRarityTheme } from '../utils/gachaCatalog';
 
 import { LaTeXRenderer } from './LaTeXRenderer';
+import { CatPawIcon } from './CatPawIcon';
 
 interface MistakeCardProps {
   entry: MistakeEntry;
@@ -149,7 +150,7 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
                   key={idx}
                   className={`rounded-full flex items-center justify-center transition-all ${badgeStyle}`}
                 >
-                  {state === 'star' ? '★' : (state === 'O' ? (equippedStamp || 'O') : (state || symbol))}
+                  {state === 'star' ? '★' : (state === 'O' ? (equippedStamp === '🐾' ? <CatPawIcon className="w-3.5 h-3.5" /> : (equippedStamp || 'O')) : (state || symbol))}
                 </span>
               );
             })}

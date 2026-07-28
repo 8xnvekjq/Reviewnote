@@ -5,6 +5,7 @@ import { LaTeXRenderer } from './LaTeXRenderer';
 import { formatDate } from '../utils/date';
 import { supabase } from '../services/supabase';
 import { GACHA_ITEMS, getRarityTheme } from '../utils/gachaCatalog';
+import { CatPawIcon } from './CatPawIcon';
 import { MistakeScaffoldingDrawer } from './MistakeScaffoldingDrawer';
 
 interface MistakeDetailModalProps {
@@ -732,7 +733,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                                 {state === 'O' && (
                                   authorStamp ? (
                                     <span className={`w-9 h-9 rounded-full flex items-center justify-center text-[26px] drop-shadow-[0_2px_8px_rgba(245,158,11,0.25)] animate-scale-up ${authorStampCatalogItem ? `border-2 ${authorStampBorderClass}` : ''}`}>
-                                      {authorStamp}
+                                      {authorStamp === '🐾' ? <CatPawIcon className="w-6 h-6" /> : authorStamp}
                                     </span>
                                   ) : (
                                     <span className="w-9 h-9 rounded-full bg-emerald-500 text-slate-950 font-black text-sm flex items-center justify-center shadow-lg shadow-emerald-500/10">

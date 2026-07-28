@@ -81,7 +81,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     rarity: 'UR',
     category: 'THEME',
     icon: '☀️',
-    effectValue: '#F59E0B',
+    effectValue: 'linear-gradient(135deg, #F59E0B 0%, #EC4899 50%, #8B5CF6 100%)',
     color: 'from-amber-400 via-pink-500 to-purple-500'
   },
   {
@@ -91,7 +91,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     rarity: 'UR',
     category: 'THEME',
     icon: '🌸',
-    effectValue: '#EC4899',
+    effectValue: 'linear-gradient(135deg, #EC4899 0%, #831843 50%, #F43F5E 100%)',
     color: 'from-amber-400 via-pink-500 to-purple-500'
   },
 
@@ -147,13 +147,23 @@ export const GACHA_ITEMS: GachaItem[] = [
     color: 'from-amber-400 via-yellow-400 to-amber-500'
   },
   {
+    id: 'theme_emerald',
+    name: '🎨 사이버 네온 에메랄드 테마',
+    description: '강렬한 사이버 에메랄드 & 네온 민트의 화려한 그라데이션 매트릭스 테마입니다.',
+    rarity: 'SSR',
+    category: 'THEME',
+    icon: '🟢',
+    effectValue: 'linear-gradient(135deg, #10B981 0%, #047857 50%, #6EE7B7 100%)',
+    color: 'from-amber-400 via-yellow-400 to-amber-500'
+  },
+  {
     id: 'theme_ocean_blue',
     name: '🎨 딥 오션 아틀란티스 테마',
     description: '깊은 바다 속 찬란한 사파이어 블루 글로우를 선사하는 테마입니다.',
     rarity: 'SSR',
     category: 'THEME',
     icon: '🌊',
-    effectValue: '#3B82F6',
+    effectValue: 'linear-gradient(135deg, #1E40AF 0%, #1E3A8A 50%, #3B82F6 100%)',
     color: 'from-amber-400 via-yellow-400 to-amber-500'
   },
   {
@@ -163,7 +173,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     rarity: 'SSR',
     category: 'THEME',
     icon: '🧪',
-    effectValue: '#84CC16',
+    effectValue: 'linear-gradient(135deg, #65A30D 0%, #365314 50%, #A3E635 100%)',
     color: 'from-amber-400 via-yellow-400 to-amber-500'
   },
   {
@@ -173,7 +183,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     rarity: 'SSR',
     category: 'THEME',
     icon: '❤️',
-    effectValue: '#DC2626',
+    effectValue: 'linear-gradient(135deg, #B91C1C 0%, #991B1B 50%, #F43F5E 100%)',
     color: 'from-amber-400 via-yellow-400 to-amber-500'
   },
   {
@@ -183,13 +193,13 @@ export const GACHA_ITEMS: GachaItem[] = [
     rarity: 'SSR',
     category: 'THEME',
     icon: '⚫',
-    effectValue: '#475569',
+    effectValue: 'linear-gradient(135deg, #334155 0%, #1E293B 100%)',
     color: 'from-amber-400 via-yellow-400 to-amber-500'
   },
   {
     id: 'ai_tsundere',
     name: '🤖 AI 말투: 츤데레 쌤',
-    description: 'AI 밤티 쌤이 툴툴대면서도 따뜻하게 챙겨주는 츤데레 톤으로 풀이해줍니다.',
+    description: 'AI 밤티 쌤이 툴툴대면서도 따뜻하게 챙겨주는 츤데레 톤으로 풀이해줍니다.\n💬 "흥, 딱히 너한테 알려주는 건 아니거든? 이 공식이나 똑바로 외워!"',
     rarity: 'SSR',
     category: 'AI_VOICE',
     icon: '😼',
@@ -199,7 +209,7 @@ export const GACHA_ITEMS: GachaItem[] = [
   {
     id: 'ai_seonbi',
     name: '👑 AI 말투: 한림학사 훈장님',
-    description: 'AI 밤티 쌤이 조선시대 훈장님처럼 엄숙하면서도 자상하게 풀이해줍니다.',
+    description: 'AI 밤티 쌤이 조선시대 훈장님처럼 엄숙하면서도 자상하게 풀이해줍니다.\n💬 "허허, 유생이여! 무릇 이 개념의 이치를 깨닫지 못하면 낭패를 면치 못할 것이니라."',
     rarity: 'SSR',
     category: 'AI_VOICE',
     icon: '📜',
@@ -209,7 +219,7 @@ export const GACHA_ITEMS: GachaItem[] = [
   {
     id: 'ai_sherlock',
     name: '🕵️ AI 말투: 명탐정 셜록 밤티',
-    description: 'AI 밤티 쌤이 오답의 범인(실수 원인)을 파헤치는 명탐정 톤으로 해설합니다.',
+    description: 'AI 밤티 쌤이 오답의 범인(실수 원인)을 파헤치는 명탐정 톤으로 해설합니다.\n💬 "요왓슨, 이 오답의 범인은 3단계 부호 실수입니다. 자, 증거를 추리해봅시다."',
     rarity: 'SSR',
     category: 'AI_VOICE',
     icon: '🕵️',
@@ -219,7 +229,7 @@ export const GACHA_ITEMS: GachaItem[] = [
   {
     id: 'ai_knight',
     name: '🏰 AI 말투: 중세 기사단장',
-    description: 'AI 밤티 쌤이 꺾이지 않는 용기와 기사도 정신으로 풀이를 전수합니다.',
+    description: 'AI 밤티 쌤이 꺾이지 않는 용기와 기사도 정신으로 풀이를 전수합니다.\n💬 "주군이시여! 아무리 험난한 킬러 문제라 한들, 제 수식의 칼날로 베어내어 승리를 바치겠나이다!"',
     rarity: 'SSR',
     category: 'AI_VOICE',
     icon: '🛡️',
@@ -259,33 +269,23 @@ export const GACHA_ITEMS: GachaItem[] = [
     color: 'from-purple-400 via-indigo-400 to-purple-600'
   },
   {
-    id: 'theme_emerald',
-    name: '🎨 네온 에메랄드 테마',
-    description: '오답노트 포인트 컬러가 생기 넘치는 사이버 에메랄드로 변경됩니다.',
-    rarity: 'SR',
-    category: 'THEME',
-    icon: '🟢',
-    effectValue: '#10B981',
-    color: 'from-purple-400 via-indigo-400 to-purple-600'
-  },
-  {
     id: 'theme_cyber_purple',
     name: '🎨 사이버 딥 퍼플 테마',
     description: '오답노트 배경 세부 컬러가 고급스러운 딥 퍼플 글로우로 변경됩니다.',
     rarity: 'SR',
     category: 'THEME',
     icon: '🟣',
-    effectValue: '#8B5CF6',
+    effectValue: 'linear-gradient(135deg, #7C3AED 0%, #4C1D95 100%)',
     color: 'from-purple-400 via-indigo-400 to-purple-600'
   },
   {
     id: 'theme_aurora',
     name: '🎨 미드나잇 오로라 테마',
-    description: '앱 전체 배경 및 프레임이 몽환적인 오로라 시안/민트 톤으로 변환됩니다.',
+    description: '몽환적인 딥 바이올렛 & 시안 펄스 오로라 그라데이션이 앱 전체를 휘감습니다.',
     rarity: 'SR',
     category: 'THEME',
     icon: '🌌',
-    effectValue: '#06B6D4',
+    effectValue: 'linear-gradient(135deg, #059669 0%, #06B6D4 50%, #7C3AED 100%)',
     color: 'from-purple-400 via-indigo-400 to-purple-600'
   },
   {
@@ -295,17 +295,17 @@ export const GACHA_ITEMS: GachaItem[] = [
     rarity: 'SR',
     category: 'THEME',
     icon: '🌅',
-    effectValue: '#F43F5E',
+    effectValue: 'linear-gradient(135deg, #E11D48 0%, #9F1239 100%)',
     color: 'from-purple-400 via-indigo-400 to-purple-600'
   },
   {
     id: 'theme_forest',
     name: '🎨 포레스트 그린 테마',
-    description: '앱 전체 배경 및 프레임이 차분하고 깊은 포레스트 그린 톤으로 변환됩니다.',
+    description: '눈이 편안하고 차분한 딥 파인 포레스트 그린 테마입니다.',
     rarity: 'SR',
     category: 'THEME',
     icon: '🌲',
-    effectValue: '#16A34A',
+    effectValue: 'linear-gradient(135deg, #166534 0%, #14532D 100%)',
     color: 'from-purple-400 via-indigo-400 to-purple-600'
   },
   {
@@ -315,13 +315,13 @@ export const GACHA_ITEMS: GachaItem[] = [
     rarity: 'SR',
     category: 'THEME',
     icon: '🍷',
-    effectValue: '#9F1239',
+    effectValue: 'linear-gradient(135deg, #881337 0%, #4C0519 100%)',
     color: 'from-purple-400 via-indigo-400 to-purple-600'
   },
   {
     id: 'ai_healing',
     name: '🧘 AI 말투: 힐링 멘토',
-    description: 'AI 밤티 쌤이 마음을 다독이며 따뜻하고 차분하게 풀이해줍니다.',
+    description: 'AI 밤티 쌤이 마음을 다독이며 따뜻하고 차분하게 풀이해줍니다.\n💬 "괜찮아요, 틀려도 괜찮아. 이 고비를 넘어설수록 너는 더 멋지게 성장하고 있으니까."',
     rarity: 'SR',
     category: 'AI_VOICE',
     icon: '🧘',
@@ -331,7 +331,7 @@ export const GACHA_ITEMS: GachaItem[] = [
   {
     id: 'ai_cyberpunk',
     name: '🌌 AI 말투: 사이버펑크 AI',
-    description: 'AI 밤티 쌤이 미래 지향적 정밀 알고리즘 톤으로 풀이 프로세스를 제공합니다.',
+    description: 'AI 밤티 쌤이 미래 지향적 정밀 알고리즘 톤으로 풀이 프로세스를 제공합니다.\n💬 "[System Alert] 오답 프로세스 감지. 0.001초 만에 최적의 해법 알고리즘을 로딩합니다."',
     rarity: 'SR',
     category: 'AI_VOICE',
     icon: '🤖',
@@ -403,7 +403,7 @@ export const GACHA_ITEMS: GachaItem[] = [
   {
     id: 'ai_sergeant',
     name: '🎭 AI 말투: 유쾌한 말년 병장',
-    description: 'AI 밤티 쌤이 전역을 앞둔 말년 병장처럼 친근하고 유쾌하게 해설합니다.',
+    description: 'AI 밤티 쌤이 전역을 앞둔 말년 병장처럼 친근하고 유쾌하게 해설합니다.\n💬 "아~ 말년에 수풀이라니! 행석아, 편하게 들어라. 1단계 공식만 딱 넣으면 끝나는 거다~"',
     rarity: 'R',
     category: 'AI_VOICE',
     icon: '🎖️',
@@ -413,7 +413,7 @@ export const GACHA_ITEMS: GachaItem[] = [
   {
     id: 'ai_poet',
     name: '☕ AI 말투: 셰익스피어 낭만시인',
-    description: 'AI 밤티 쌤이 감성적인 시처럼 아름답고 낭만적으로 수식을 읊어줍니다.',
+    description: 'AI 밤티 쌤이 감성적인 시처럼 아름답고 낭만적으로 수식을 읊어줍니다.\n💬 "오, 그대 눈동자 속 차이함수의 아름다움이여... 이 적분의 물결이 미지의 X를 완성하리라."',
     rarity: 'R',
     category: 'AI_VOICE',
     icon: '☕',
@@ -423,7 +423,7 @@ export const GACHA_ITEMS: GachaItem[] = [
   {
     id: 'ai_vampire',
     name: '🧛 AI 말투: 밤의 뱀파이어 백작',
-    description: 'AI 밤티 쌤이 몽환적인 다크 판타지 백작 톤으로 풀이의 비밀을 파헤칩니다.',
+    description: 'AI 밤티 쌤이 몽환적인 다크 판타지 백작 톤으로 풀이의 비밀을 파헤칩니다.\n💬 "크크크... 어둠 속에서 피어나는 달콤한 정답의 향기... 그대의 오답에 영원한 쉼을 주마."',
     rarity: 'R',
     category: 'AI_VOICE',
     icon: '🧛',
