@@ -81,7 +81,8 @@ export const GACHA_ITEMS: GachaItem[] = [
     rarity: 'UR',
     category: 'THEME',
     icon: '☀️',
-    effectValue: 'linear-gradient(135deg, #F59E0B 0%, #EC4899 50%, #8B5CF6 100%)',
+    effectValue: '#F59E0B',
+    gradient: 'linear-gradient(135deg, #F59E0B 0%, #EC4899 50%, #8B5CF6 100%)',
     color: 'from-amber-400 via-pink-500 to-purple-500'
   },
   {
@@ -91,7 +92,8 @@ export const GACHA_ITEMS: GachaItem[] = [
     rarity: 'UR',
     category: 'THEME',
     icon: '🌸',
-    effectValue: 'linear-gradient(135deg, #EC4899 0%, #831843 50%, #F43F5E 100%)',
+    effectValue: '#EC4899',
+    gradient: 'linear-gradient(135deg, #EC4899 0%, #831843 50%, #F43F5E 100%)',
     color: 'from-amber-400 via-pink-500 to-purple-500'
   },
 
@@ -153,7 +155,8 @@ export const GACHA_ITEMS: GachaItem[] = [
     rarity: 'SSR',
     category: 'THEME',
     icon: '🟢',
-    effectValue: 'linear-gradient(135deg, #10B981 0%, #047857 50%, #6EE7B7 100%)',
+    effectValue: '#10B981',
+    gradient: 'linear-gradient(135deg, #10B981 0%, #047857 50%, #6EE7B7 100%)',
     color: 'from-amber-400 via-yellow-400 to-amber-500'
   },
   {
@@ -163,7 +166,8 @@ export const GACHA_ITEMS: GachaItem[] = [
     rarity: 'SSR',
     category: 'THEME',
     icon: '🌊',
-    effectValue: 'linear-gradient(135deg, #1E40AF 0%, #1E3A8A 50%, #3B82F6 100%)',
+    effectValue: '#3B82F6',
+    gradient: 'linear-gradient(135deg, #1E40AF 0%, #1E3A8A 50%, #3B82F6 100%)',
     color: 'from-amber-400 via-yellow-400 to-amber-500'
   },
   {
@@ -173,7 +177,8 @@ export const GACHA_ITEMS: GachaItem[] = [
     rarity: 'SSR',
     category: 'THEME',
     icon: '🧪',
-    effectValue: 'linear-gradient(135deg, #65A30D 0%, #365314 50%, #A3E635 100%)',
+    effectValue: '#84CC16',
+    gradient: 'linear-gradient(135deg, #65A30D 0%, #365314 50%, #A3E635 100%)',
     color: 'from-amber-400 via-yellow-400 to-amber-500'
   },
   {
@@ -183,7 +188,8 @@ export const GACHA_ITEMS: GachaItem[] = [
     rarity: 'SSR',
     category: 'THEME',
     icon: '❤️',
-    effectValue: 'linear-gradient(135deg, #B91C1C 0%, #991B1B 50%, #F43F5E 100%)',
+    effectValue: '#DC2626',
+    gradient: 'linear-gradient(135deg, #B91C1C 0%, #991B1B 50%, #F43F5E 100%)',
     color: 'from-amber-400 via-yellow-400 to-amber-500'
   },
   {
@@ -193,7 +199,8 @@ export const GACHA_ITEMS: GachaItem[] = [
     rarity: 'SSR',
     category: 'THEME',
     icon: '⚫',
-    effectValue: 'linear-gradient(135deg, #334155 0%, #1E293B 100%)',
+    effectValue: '#475569',
+    gradient: 'linear-gradient(135deg, #334155 0%, #1E293B 100%)',
     color: 'from-amber-400 via-yellow-400 to-amber-500'
   },
   {
@@ -275,7 +282,8 @@ export const GACHA_ITEMS: GachaItem[] = [
     rarity: 'SR',
     category: 'THEME',
     icon: '🟣',
-    effectValue: 'linear-gradient(135deg, #7C3AED 0%, #4C1D95 100%)',
+    effectValue: '#8B5CF6',
+    gradient: 'linear-gradient(135deg, #7C3AED 0%, #4C1D95 100%)',
     color: 'from-purple-400 via-indigo-400 to-purple-600'
   },
   {
@@ -285,7 +293,8 @@ export const GACHA_ITEMS: GachaItem[] = [
     rarity: 'SR',
     category: 'THEME',
     icon: '🌌',
-    effectValue: 'linear-gradient(135deg, #059669 0%, #06B6D4 50%, #7C3AED 100%)',
+    effectValue: '#06B6D4',
+    gradient: 'linear-gradient(135deg, #059669 0%, #06B6D4 50%, #7C3AED 100%)',
     color: 'from-purple-400 via-indigo-400 to-purple-600'
   },
   {
@@ -295,7 +304,8 @@ export const GACHA_ITEMS: GachaItem[] = [
     rarity: 'SR',
     category: 'THEME',
     icon: '🌅',
-    effectValue: 'linear-gradient(135deg, #E11D48 0%, #9F1239 100%)',
+    effectValue: '#F43F5E',
+    gradient: 'linear-gradient(135deg, #E11D48 0%, #9F1239 100%)',
     color: 'from-purple-400 via-indigo-400 to-purple-600'
   },
   {
@@ -305,7 +315,8 @@ export const GACHA_ITEMS: GachaItem[] = [
     rarity: 'SR',
     category: 'THEME',
     icon: '🌲',
-    effectValue: 'linear-gradient(135deg, #166534 0%, #14532D 100%)',
+    effectValue: '#166534',
+    gradient: 'linear-gradient(135deg, #166534 0%, #14532D 100%)',
     color: 'from-purple-400 via-indigo-400 to-purple-600'
   },
   {
@@ -315,7 +326,8 @@ export const GACHA_ITEMS: GachaItem[] = [
     rarity: 'SR',
     category: 'THEME',
     icon: '🍷',
-    effectValue: 'linear-gradient(135deg, #881337 0%, #4C0519 100%)',
+    effectValue: '#9F1239',
+    gradient: 'linear-gradient(135deg, #881337 0%, #4C0519 100%)',
     color: 'from-purple-400 via-indigo-400 to-purple-600'
   },
   {

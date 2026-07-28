@@ -18,10 +18,15 @@ interface ActivityEvent {
 const DEFAULT_THEME_HEX = '#4F46E5';
 
 const hexToRgba = (hex: string, alpha: number): string => {
-  const normalized = hex.replace('#', '');
+  if (!hex || typeof hex !== 'string' || hex.includes('gradient')) {
+    return `rgba(79, 70, 229, ${alpha})`; // fallback indigo
+  }
+  const normalized = hex.replace('#', '').trim();
+  if (normalized.length < 6) return `rgba(79, 70, 229, ${alpha})`;
   const r = parseInt(normalized.slice(0, 2), 16);
   const g = parseInt(normalized.slice(2, 4), 16);
   const b = parseInt(normalized.slice(4, 6), 16);
+  if (isNaN(r) || isNaN(g) || isNaN(b)) return `rgba(79, 70, 229, ${alpha})`;
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
