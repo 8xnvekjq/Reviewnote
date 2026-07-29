@@ -89,14 +89,19 @@ export function applyThemeColor(hex?: string, accentHex?: string): void {
   // 그대로 저채도를 유지하고, 색이 뚜렷한 테마만 채도를 부스트한다.
   const isMonochrome = s < 35;
 
+  // 채도가 정확히 0%인(#737373처럼 진짜 무채색 그레이 hex) 테마는 "클래식 모노 다크" 전용
+  // 취급 — 표준 명도(7/12/17/15%)로는 차콜 그레이(채도 19%)와 명도가 거의 같아서 구분이
+  // 안 됐다. 진짜 검정에 가깝게 명도를 확 낮춰서 차콜과 뚜렷하게 다른 "블랙 베이스" 테마로 만든다.
+  const isPureBlack = s === 0;
+
   // 배경 채도/명도: 일반 테마는 색감 있게(기존 70% 바닥이 너무 쨍해서 55%로 완화),
   // 레전드(UR) 테마는 반대로 배경을 거의 블랙으로 죽여서 "프리미엄 검은 캔버스" 느낌을 내고
-  // 화려함은 전부 테두리·액센트로 몰아준다.
+  // 화려함은 전부 테두리·액센트로 몰아준다. 순수 무채색(모노 다크)은 그보다 더 어두운 진짜 블랙.
   const bgSat = isMonochrome ? s : (isLegendary ? Math.min(s, 25) : Math.max(s, 55));
-  const bgLightMain = isLegendary ? 4 : 7;
-  const bgLightSurface = isLegendary ? 8 : 12;
-  const bgLightElevated = isLegendary ? 12 : 17;
-  const bgLightHeader = isLegendary ? 10 : 15;
+  const bgLightMain = isPureBlack ? 1.5 : (isLegendary ? 4 : 7);
+  const bgLightSurface = isPureBlack ? 4 : (isLegendary ? 8 : 12);
+  const bgLightElevated = isPureBlack ? 7 : (isLegendary ? 12 : 17);
+  const bgLightHeader = isPureBlack ? 3 : (isLegendary ? 10 : 15);
 
   // 1. 메인 앱 배경
   const [mR, mG, mB] = hslToRgb(h, bgSat, bgLightMain);
