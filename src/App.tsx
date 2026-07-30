@@ -346,24 +346,14 @@ function App() {
     }
   };
 
-  // Monitor Supabase Authentication States
+  // Monitor Supabase Authentication States.
+  // Supabase는 onAuthStateChange를 구독하는 즉시 현재 세션으로 한 번 콜백을 실행해준다
+  // ('INITIAL_SESSION' 이벤트). 그런데 여기서 별도로 getSession().then(...)도 같은 로직을
+  // 중복 실행하고 있어서, 로그인 상태로 앱을 켤 때마다 fetchUserData(내부에서 순차 DB
+  // 조회 4번) + fetchAdminStatus + loadYoutubeLectures + loadWeeklyChampions +
+  // fetchGeminiApiKeys + fetchDiagnosisStats가 전부 두 번씩 실행되고 있었다 — 로딩이
+  // 느려진 원인 중 하나. onAuthStateChange 하나로 통합해서 중복 요청을 없앤다.
   useEffect(() => {
-    // 1. Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session?.user) {
-        const username = session.user.email?.split('@')[0] || 'User';
-        setCurrentUser(username);
-        fetchUserData(session.user.id);
-        fetchAdminStatus(session.user.id);
-        loadYoutubeLectures(); // 유튜브 강의 데이터 로드
-        loadWeeklyChampions(); // 주간 챔피언 로드
-        fetchGeminiApiKeys(); // 동적 API 키 로드
-        fetchDiagnosisStats(); // 평균 진단 소요시간 조회
-      }
-    });
-
-    // 2. Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (session?.user) {
@@ -505,23 +495,34 @@ function App() {
     try {
       loadWeeklyChampions(); // 최신 챔피언 정보 동기화
       fetchPeerActivities(); // 실시간 친구들 복습 현황 로드
-      // Fetch all mistakes (RLS handles filtering: normal users see own, admin sees all)
-      const { data: dbMistakes, error: mistakesError } = await supabase
-        .from('mistakes')
-        .select('*')
-        .order('date', { ascending: false });
-
-      if (mistakesError) throw mistakesError;
 
       const targetId = targetUserId || session?.user?.id;
 
+      // 서로 결과에 의존하지 않는 4개의 조회를 순차 대기가 아니라 동시에 실행 — 로그인 유저
+      // 프로필/전체 오답/전체 학생 이름맵/스캐폴딩을 하나씩 기다렸다가 다음 걸 시작하던 게
+      // 로딩을 4배 가까이 느리게 만들던 원인이었다.
+      const [mistakesRes, profileRes, allProfilesRes, scaffoldingRes] = await Promise.all([
+        // Fetch all mistakes (RLS handles filtering: normal users see own, admin sees all)
+        supabase.from('mistakes').select('*').order('date', { ascending: false }),
+        targetId
+          ? supabase
+              .from('profiles')
+              .select('nickname, display_name, bonus_points, point_adjustment, equipped_title, equipped_stamp, equipped_theme, equipped_ai_voice, current_streak, streak_last_review_date, streak_shields, streak_milestone_claimed, custom_ai_name')
+              .eq('id', targetId)
+              .maybeSingle()
+          : Promise.resolve({ data: null } as { data: null }),
+        // Fetch all profiles for admin name mapping (display_name, school_grade, equipped_stamp 포함)
+        supabase.from('profiles').select('id, email, display_name, school_grade, equipped_stamp'),
+        // 스캐폴딩 힌트가 첨부된 오답 id 집합 (RLS가 본인 것만/관리자는 전체를 알아서 걸러줌)
+        supabase.from('mistake_scaffoldings').select('mistake_id'),
+      ]);
+
+      if (mistakesRes.error) throw mistakesRes.error;
+      const dbMistakes = mistakesRes.data;
+
       // 로그인 유저의 닉네임 및 보너스 점수 로드
       if (targetId) {
-        const { data: myProfile } = await supabase
-          .from('profiles')
-          .select('nickname, display_name, bonus_points, point_adjustment, equipped_title, equipped_stamp, equipped_theme, equipped_ai_voice, current_streak, streak_last_review_date, streak_shields, streak_milestone_claimed, custom_ai_name')
-          .eq('id', targetId)
-          .maybeSingle();
+        const myProfile = profileRes.data;
         if (myProfile) {
           setMyNickname(myProfile.nickname || myProfile.display_name || '');
           setCustomAiName(myProfile.custom_ai_name || '');
@@ -561,11 +562,7 @@ function App() {
         checkAiNameChangeTicket(targetId);
       }
 
-      // Fetch all profiles for admin name mapping (display_name, school_grade, equipped_stamp 포함)
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, email, display_name, school_grade, equipped_stamp');
-
+      const profiles = allProfilesRes.data;
       const pMap: Record<string, string> = {};
       const gMap: Record<string, string> = {};
       const sMap: Record<string, string> = {};
@@ -582,10 +579,7 @@ function App() {
       setProfilesGradeMap(gMap);
       setProfilesStampMap(sMap);
 
-      // 스캐폴딩 힌트가 첨부된 오답 id 집합 (RLS가 본인 것만/관리자는 전체를 알아서 걸러줌)
-      const { data: scaffoldingRows } = await supabase
-        .from('mistake_scaffoldings')
-        .select('mistake_id');
+      const scaffoldingRows = scaffoldingRes.data;
       setScaffoldedMistakeIds(new Set((scaffoldingRows || []).map((r: any) => r.mistake_id)));
 
       setMistakes((dbMistakes || []).map(mapDbMistakeRow));
