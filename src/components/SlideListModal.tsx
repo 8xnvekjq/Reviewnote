@@ -33,6 +33,7 @@ export const SlideListModal: React.FC<SlideListModalProps> = ({ isOpen, onClose 
     { title: "II. 함수의 극한과 연속 - 01. 함수의 연속", filename: "math_continuity_01.html", date: "2026-07-18", grade: "고2" },
 
     // 🎓 고3 / N수 (수능 파이널 & 준킬러 특강)
+    { title: "고3 준킬러 스피드 & 숏컷 클리닉 특강 (2탄)", filename: "g3_speedcut_clinic_special_2.html", date: "2026-07-30", grade: "고3" },
     { title: "고3 준킬러 스피드 & 숏컷 클리닉 (수능 특강)", filename: "g3_speedcut_clinic_special.html", date: "2026-07-28", grade: "고3" },
     { title: "2025학년도 수능 수학 15, 20, 21, 22번 및 변형문제", filename: "2025_suneung_math_15_20_21_22.html", date: "2026-07-25", grade: "고3" },
     { title: "고3 준킬러 스피드 & 숏컷 클리닉", filename: "g3_speedcut_clinic.html", date: "2026-07-23", grade: "고3" },
