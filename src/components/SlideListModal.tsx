@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 
-export type GradeLevel = '고1' | '고2' | '고3';
+export type GradeLevel = '예비고1' | '고1' | '고2' | '고3';
 
 interface SlideItem {
   title: string;
@@ -19,6 +19,9 @@ export const SlideListModal: React.FC<SlideListModalProps> = ({ isOpen, onClose 
 
   // ── 학년별 수업 슬라이드 마스터 리스트 ──────────────────────────────────────
   const SLIDE_LIST: SlideItem[] = [
+    // 🐣 예비고1 (공통수학1, 공통수학2)
+    { title: "베이직쎈 공통수학1 - 10. 순열과 조합 (조합의 활용) (p163~172)", filename: "math1_combination_usage_10.html", date: "2026-07-31", grade: "예비고1" },
+
     // 🏫 고1 (공통수학1, 공통수학2)
     { title: "개념원리 공통수학2 - 03.원의 방정식 (p66~96)", filename: "math2_circle_equation_03.html", date: "2026-07-28", grade: "고1" },
     { title: "개념원리 공통수학2 - 02. 직선의 방정식 (p34~62)", filename: "math2_linear_equation_02.html", date: "2026-07-22", grade: "고1" },
@@ -42,11 +45,12 @@ export const SlideListModal: React.FC<SlideListModalProps> = ({ isOpen, onClose 
     { title: "2024학년도 수능 수학 확률과 통계 30번 및 변형문제", filename: "2024_suneung_prob_stat_30.html", date: "2026-07-18", grade: "고3" },
   ];
 
-  // 탭 선택 상태 ('ALL' | '고1' | '고2' | '고3')
+  // 탭 선택 상태 ('ALL' | '예비고1' | '고1' | '고2' | '고3')
   const [selectedGradeTab, setSelectedGradeTab] = useState<'ALL' | GradeLevel>('ALL');
 
-  // 각 학년별 '더 보기' 전개 상태 (기본값: false -> 5개만 표출)
+  // 각 학년별 '더 보기' 전개 상태 (기본값: false -> 상위 3개만 표출)
   const [expandedGrades, setExpandedGrades] = useState<Record<GradeLevel, boolean>>({
+    '예비고1': false,
     '고1': false,
     '고2': false,
     '고3': false,
@@ -56,12 +60,13 @@ export const SlideListModal: React.FC<SlideListModalProps> = ({ isOpen, onClose 
     setExpandedGrades(prev => ({ ...prev, [grade]: !prev[grade] }));
   };
 
-  // 학년순(고1 -> 고2 -> 고3)으로 그루핑
-  const gradeOrder: GradeLevel[] = ['고1', '고2', '고3'];
+  // 학년순(예비고1 -> 고1 -> 고2 -> 고3)으로 그루핑
+  const gradeOrder: GradeLevel[] = ['예비고1', '고1', '고2', '고3'];
 
   const groupedByGrade = useMemo(() => {
     const sorted = [...SLIDE_LIST].sort((a, b) => b.date.localeCompare(a.date));
     const groups: Record<GradeLevel, SlideItem[]> = {
+      '예비고1': [],
       '고1': [],
       '고2': [],
       '고3': [],
@@ -81,6 +86,12 @@ export const SlideListModal: React.FC<SlideListModalProps> = ({ isOpen, onClose 
 
   // 학년별 테마 색상 맵
   const gradeThemeMap: Record<GradeLevel, { badgeBg: string; text: string; border: string; icon: string }> = {
+    '예비고1': {
+      badgeBg: 'bg-purple-500/15 text-purple-300 border-purple-500/30',
+      text: 'text-purple-400',
+      border: 'border-purple-500/40',
+      icon: '🐣',
+    },
     '고1': {
       badgeBg: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
       text: 'text-amber-400',
@@ -121,13 +132,13 @@ export const SlideListModal: React.FC<SlideListModalProps> = ({ isOpen, onClose 
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-950/60 hover:bg-slate-950 hover:text-white border border-slate-800 flex items-center justify-center text-slate-400 transition-colors text-xs font-bold"
+            className="w-8 h-8 rounded-full bg-slate-955/60 hover:bg-slate-950 hover:text-white border border-slate-800 flex items-center justify-center text-slate-400 transition-colors text-xs font-bold"
           >
             ✕
           </button>
         </div>
 
-        {/* 학년 선택 필터 탭 (전체 / 고1 / 고2 / 고3) */}
+        {/* 학년 선택 필터 탭 (전체 / 예비고1 / 고1 / 고2 / 고3) */}
         <div className="px-4 pt-3 pb-2 bg-slate-950/40 border-b border-slate-850 flex items-center space-x-2 overflow-x-auto no-scrollbar">
           <button
             onClick={() => setSelectedGradeTab('ALL')}
@@ -160,7 +171,7 @@ export const SlideListModal: React.FC<SlideListModalProps> = ({ isOpen, onClose 
           })}
         </div>
 
-        {/* Body: 학년별 그룹 및 5개 제한 + 더 보기 */}
+        {/* Body: 학년별 그룹 및 상위 3개 제한 + 더 보기 */}
         <div className="p-4 overflow-y-auto space-y-5 flex-1 min-h-0 scrollbar-thin scrollbar-thumb-slate-800">
           {groupedByGrade
             .filter(g => selectedGradeTab === 'ALL' || selectedGradeTab === g.grade)
@@ -168,9 +179,9 @@ export const SlideListModal: React.FC<SlideListModalProps> = ({ isOpen, onClose 
               const theme = gradeThemeMap[group.grade];
               const isExpanded = expandedGrades[group.grade];
               const totalCount = group.items.length;
-              // 📍 기본 5개 표시, '더 보기' 활성화 시 전체 표출
-              const visibleItems = isExpanded ? group.items : group.items.slice(0, 5);
-              const remainingCount = totalCount - 5;
+              // 📍 기본 상위 3개 표시, '더 보기' 활성화 시 전체 표출
+              const visibleItems = isExpanded ? group.items : group.items.slice(0, 3);
+              const remainingCount = totalCount - 3;
 
               return (
                 <div key={group.grade} className="space-y-2.5 animate-fade-in">
@@ -186,7 +197,7 @@ export const SlideListModal: React.FC<SlideListModalProps> = ({ isOpen, onClose 
                       </span>
                     </div>
 
-                    {totalCount > 5 && (
+                    {totalCount > 3 && (
                       <button
                         onClick={() => toggleGradeExpand(group.grade)}
                         className={`text-[10.5px] font-extrabold ${theme.text} hover:underline flex items-center space-x-1`}
@@ -204,7 +215,7 @@ export const SlideListModal: React.FC<SlideListModalProps> = ({ isOpen, onClose 
                         href={`/slides/${slide.filename}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center justify-between p-3.5 bg-slate-950/60 hover:bg-slate-900 border border-slate-850 hover:border-slate-700 rounded-2xl transition-all duration-200 group active:scale-[0.99] shadow-sm"
+                        className="flex items-center justify-between p-3.5 bg-slate-955/60 hover:bg-slate-900 border border-slate-850 hover:border-slate-700 rounded-2xl transition-all duration-200 group active:scale-[0.99] shadow-sm"
                       >
                         <div className="flex items-center space-x-3 min-w-0">
                           <span className="text-xl flex-none select-none group-hover:scale-110 transition-transform">
@@ -235,11 +246,11 @@ export const SlideListModal: React.FC<SlideListModalProps> = ({ isOpen, onClose 
                     ))}
                   </div>
 
-                  {/* 5개 초과 시 섹션 하단 '더 보기' 확장 버튼 */}
-                  {totalCount > 5 && (
+                  {/* 3개 초과 시 섹션 하단 '더 보기' 확장 버튼 */}
+                  {totalCount > 3 && (
                     <button
                       onClick={() => toggleGradeExpand(group.grade)}
-                      className="w-full py-2 rounded-xl bg-slate-950/40 hover:bg-slate-900 border border-slate-850 hover:border-slate-750 text-slate-400 hover:text-slate-200 text-[11px] font-bold transition-all flex items-center justify-center space-x-1.5 active:scale-98"
+                      className="w-full py-2 rounded-xl bg-slate-955/40 hover:bg-slate-900 border border-slate-850 hover:border-slate-750 text-slate-400 hover:text-slate-200 text-[11px] font-bold transition-all flex items-center justify-center space-x-1.5 active:scale-98"
                     >
                       {isExpanded ? (
                         <>
