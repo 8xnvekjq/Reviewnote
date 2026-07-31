@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>수학Ⅱ - 함수의 극한 존재조건 활용 (정규수업)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true
+            },
+            options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'] }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        .presentation-deck { position: relative; width: 1280px; height: 720px; background: radial-gradient(circle at 10% 20%, #311c20 0%, #0f172a 100%); border: 1px solid rgba(255, 255, 255, 0.08); margin: 20px auto; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); border-left: 10px solid #e11d48; }
+        .slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 40px 65px; display: none; flex-direction: column; justify-content: space-between; z-index: 1; background: transparent; box-sizing: border-box; }
+        .slide.active { display: flex; z-index: 10; }
+
+        .concept-card { background: rgba(15, 30, 41, 0.75); backdrop-filter: blur(10px); border: 1px solid rgba(225, 29, 72, 0.25); border-radius: 16px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); }
+        .step-box { background: rgba(225, 29, 72, 0.08); border: 1px solid rgba(225, 29, 72, 0.2); border-radius: 12px; }
+        .problem-box { background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(23, 42, 51, 0.85) 100%); border-left: 8px solid #e11d48; border-top: 1px solid rgba(225, 29, 72, 0.2); border-right: 1px solid rgba(255, 255, 255, 0.05); border-bottom: 1px solid rgba(255, 255, 255, 0.05); border-radius: 0 16px 16px 0; }
+        .problem-text { font-size: 1.15rem; font-weight: 700; color: #f1f5f9; line-height: 1.7; word-break: keep-all; }
+
+        @media print {
+            body { background-color: #ffffff !important; margin: 0 !important; padding: 0 !important; }
+            .presentation-deck { width: 1280px !important; height: auto !important; box-shadow: none !important; border: none !important; margin: 0 !important; overflow: visible !important; display: block !important; }
+            .slide { position: relative !important; display: flex !important; width: 1280px !important; height: 720px !important; page-break-after: always !important; page-break-inside: avoid !important; background: #0f172a !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="presentation-deck" id="deck">
+        <div class="flex justify-between items-center z-20 pb-3 border-b border-rose-900/40 mx-8 mt-6 no-print">
+            <div class="flex items-center gap-3">
+                <span class="bg-rose-600 text-white text-xs font-black px-3 py-1 rounded-md uppercase">수학Ⅱ | 정규수업</span>
+                <span class="text-slate-300 text-sm font-medium">함수의 극한과 연속 &gt; 극한의 존재조건 활용</span>
+            </div>
+            <div class="text-right flex items-center gap-4">
+                <span class="text-xs text-rose-400 font-bold uppercase tracking-wider" id="slide-category">단원 소개</span>
+                <span class="text-xs text-slate-400 font-semibold bg-slate-800/80 px-2.5 py-1 rounded-md border border-slate-700" id="slide-counter">1 / 17</span>
+            </div>
+        </div>
+
+        <div class="relative flex-grow my-2 overflow-hidden" id="slide-container">
+
+            <!-- Slide 1: Cover -->
+            <div class="slide active" data-category="단원 소개">
+                <div class="flex-grow flex flex-col justify-center items-start">
+                    <span class="text-rose-400 font-bold text-lg tracking-widest mb-4">수학Ⅱ &nbsp;|&nbsp; 함수의 극한과 연속</span>
+                    <h1 class="text-6xl font-black text-white leading-tight mb-6">극한의 존재조건 활용</h1>
+                    <div class="h-2 w-40 bg-rose-500 rounded-full mb-8"></div>
+                    <p class="text-2xl text-slate-300 font-medium">"분모가 0이 되는 점에서는 분자도 0이어야 한다" &mdash; 평가원 기출 5문항</p>
+                    <p class="text-lg text-slate-500 font-medium mt-2">각 문항: 문제 원문 &rarr; Polya 4단계 사고법 &amp; 풀이 &rarr; 구조 변형 문제</p>
+                </div>
+            </div>
+
+            <!-- ===================== 문항 01 ===================== -->
+            <div class="slide" data-category="문항 01 | 원문">
+                <div class="flex items-center gap-4 mb-2">
+                    <span class="bg-rose-600 text-white text-sm font-black px-4 py-1.5 rounded-full">문항 01</span>
+                    <span class="text-rose-400 text-base font-bold">2027학년도 6월 모의평가 11번</span>
+                </div>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Original Question</div>
+                        <h3 class="problem-text text-lg leading-relaxed">
+                            일차함수 $f(x)$에 대하여 $\displaystyle\lim_{x\to a}\dfrac{f(x+2)}{x(f(x)-3)}$의 값이 $a=0$일 때 존재하고 $a=3$일 때 존재하지 않는다. $f(4)$의 값은?<br><br>
+                            ① 6 &nbsp; ② 7 &nbsp; ③ 8 &nbsp; ④ 9 &nbsp; ⑤ 10
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="slide" data-category="문항 01 | Polya &amp; 풀이">
+                <h2 class="text-xl font-extrabold text-white mb-3">문항 01 &nbsp;<span class="text-rose-400 text-base font-bold">Polya의 4단계 사고법 &amp; 간단한 풀이</span></h2>
+                <div class="grid grid-cols-2 gap-5 flex-grow items-stretch">
+                    <div class="concept-card p-5 flex flex-col gap-3 justify-center">
+                        <div class="step-box p-3"><span class="text-rose-300 font-bold text-sm">1단계 · 문제 이해</span><p class="text-sm text-slate-200 mt-1">분모가 0이 되는 두 지점($x=0,\,3$)에서 극한의 존재·비존재로 일차함수 $f$를 결정하는 문제이다.</p></div>
+                        <div class="step-box p-3"><span class="text-rose-300 font-bold text-sm">2단계 · 계획 수립</span><p class="text-sm text-slate-200 mt-1">극한이 존재하려면 분자도 함께 0, 존재하지 않으려면 분자가 0이 아니어야 한다는 원리를 사용한다.</p></div>
+                        <div class="step-box p-3"><span class="text-rose-300 font-bold text-sm">3단계 · 계획 실행</span><p class="text-sm text-slate-200 mt-1">$f(x)=px+q$로 놓고 $f(2)=0$, $f(3)=3$, $f(5)\ne0$을 연립해 $p,q$를 구한다.</p></div>
+                        <div class="step-box p-3"><span class="text-rose-300 font-bold text-sm">4단계 · 반성</span><p class="text-sm text-slate-200 mt-1">구한 $f$로 두 극한을 직접 계산해 존재·발산이 실제로 성립하는지 검산한다.</p></div>
+                    </div>
+                    <div class="concept-card p-6 flex flex-col justify-center border-t-4 border-rose-500">
+                        <span class="text-xs text-rose-400 font-bold uppercase tracking-wider block mb-2">간단한 풀이</span>
+                        <div class="text-sm text-slate-100 leading-relaxed space-y-2">
+                            <p>$f(x)=px+q$라 하자. $a=0$에서 존재 $\Rightarrow$ 분자 $f(2)=0 \Rightarrow 2p+q=0$.</p>
+                            <p>$a=3$에서 비존재 $\Rightarrow$ 분모근이 $x=3$ $\Rightarrow f(3)=3 \Rightarrow 3p+q=3$.</p>
+                            <p>연립하면 $p=3,\ q=-6$, 즉 $f(x)=3x-6$ ($f(5)=9\ne0$으로 발산 확인).</p>
+                            <p class="text-rose-200 font-bold pt-1">따라서 $f(4)=6$. &nbsp;최종 답: 6 (①)</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="slide" data-category="문항 01 | 구조 변형">
+                <div class="flex items-center gap-4 mb-2">
+                    <span class="bg-rose-600 text-white text-sm font-black px-4 py-1.5 rounded-full">문항 01 구조 변형</span>
+                </div>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Structure Extension</div>
+                        <h3 class="problem-text text-lg leading-relaxed">
+                            일차함수 $f(x)$에 대하여 $\displaystyle\lim_{x\to a}\dfrac{f(x+1)}{x(f(x)-4)}$의 값이 $a=0$일 때 존재하고 $a=2$일 때 존재하지 않는다.<br><br>
+                            $f(3)$의 값을 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===================== 문항 02 ===================== -->
+            <div class="slide" data-category="문항 02 | 원문">
+                <div class="flex items-center gap-4 mb-2">
+                    <span class="bg-rose-600 text-white text-sm font-black px-4 py-1.5 rounded-full">문항 02</span>
+                    <span class="text-rose-400 text-base font-bold">2026학년도 9월 모의평가 13번 &middot; [4점]</span>
+                </div>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Original Question</div>
+                        <h3 class="problem-text text-base leading-relaxed">
+                            함수 $f(x)=x^2+6x+12$에 대하여 다음 조건을 만족시키는 모든 정수 $k$의 개수는?<br><br>
+                            모든 실수 $a$에 대하여 $\displaystyle\lim_{x\to a}\dfrac{x^2}{\{f(x)\}^2-k(x+2)f(x)}$의 값이 존재한다.<br><br>
+                            ① 5 &nbsp; ② 6 &nbsp; ③ 7 &nbsp; ④ 8 &nbsp; ⑤ 9
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="slide" data-category="문항 02 | Polya &amp; 풀이">
+                <h2 class="text-xl font-extrabold text-white mb-3">문항 02 &nbsp;<span class="text-rose-400 text-base font-bold">Polya의 4단계 사고법 &amp; 간단한 풀이</span></h2>
+                <div class="grid grid-cols-2 gap-5 flex-grow items-stretch">
+                    <div class="concept-card p-5 flex flex-col gap-3 justify-center">
+                        <div class="step-box p-3"><span class="text-rose-300 font-bold text-sm">1단계 · 문제 이해</span><p class="text-sm text-slate-200 mt-1">$f$는 고정, 정수 $k$를 미지수로 하여 모든 $a$에서 극한이 존재하게 하는 $k$의 개수를 센다.</p></div>
+                        <div class="step-box p-3"><span class="text-rose-300 font-bold text-sm">2단계 · 계획 수립</span><p class="text-sm text-slate-200 mt-1">$f(x)>0$이므로 분모를 $f(x)\{f(x)-k(x+2)\}$로 인수분해하고, $D(x)=f(x)-k(x+2)$의 실근이 분자의 영점($x=0$)이 아니면 존재성이 깨진다.</p></div>
+                        <div class="step-box p-3"><span class="text-rose-300 font-bold text-sm">3단계 · 계획 실행</span><p class="text-sm text-slate-200 mt-1">$D(x)=0$의 판별식이 음수인 정수 $k$를 세고, $D(0)=0$이면서 중근인 예외적 $k$를 따로 확인한다.</p></div>
+                        <div class="step-box p-3"><span class="text-rose-300 font-bold text-sm">4단계 · 반성</span><p class="text-sm text-slate-200 mt-1">경계값 $k$를 대입해 $D(x)$가 실제로 $x^2$ 형태로 완전히 소거되는지 검산한다.</p></div>
+                    </div>
+                    <div class="concept-card p-6 flex flex-col justify-center border-t-4 border-rose-500">
+                        <span class="text-xs text-rose-400 font-bold uppercase tracking-wider block mb-2">간단한 풀이</span>
+                        <div class="text-sm text-slate-100 leading-relaxed space-y-2">
+                            <p>$D(x)=x^2+(6-k)x+(12-2k)$. 판별식 $\lt0$: $k^2-4k-12\lt0 \Rightarrow -2\lt k\lt6$, 정수 7개.</p>
+                            <p>경계: $k=6$이면 $D(x)=x^2$으로 분자와 완전히 일치해 극한값 $1$로 존재(유효). $k=-2$는 $D(0)\ne0$이라 무효.</p>
+                            <p class="text-rose-200 font-bold pt-1">따라서 $7+1=8$개. &nbsp;최종 답: 8 (④)</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="slide" data-category="문항 02 | 구조 변형">
+                <div class="flex items-center gap-4 mb-2">
+                    <span class="bg-rose-600 text-white text-sm font-black px-4 py-1.5 rounded-full">문항 02 구조 변형</span>
+                </div>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Structure Extension</div>
+                        <h3 class="problem-text text-lg leading-relaxed">
+                            함수 $f(x)=x^2+2x+6$에 대하여 다음 조건을 만족시키는 모든 정수 $k$의 개수를 구하시오.<br><br>
+                            모든 실수 $a$에 대하여 $\displaystyle\lim_{x\to a}\dfrac{x^2}{\{f(x)\}^2-k(x+3)f(x)}$의 값이 존재한다.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===================== 문항 03 ===================== -->
+            <div class="slide" data-category="문항 03 | 원문">
+                <div class="flex items-center gap-4 mb-2">
+                    <span class="bg-rose-600 text-white text-sm font-black px-4 py-1.5 rounded-full">문항 03</span>
+                    <span class="text-rose-400 text-base font-bold">2025학년도 대학수학능력시험 21번 &middot; [4점]</span>
+                </div>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Original Question (단답형)</div>
+                        <h3 class="problem-text text-base leading-relaxed">
+                            함수 $f(x)=x^3+ax^2+bx+4$가 다음 조건을 만족시키도록 하는 두 정수 $a$, $b$에 대하여 $f(1)$의 최댓값을 구하시오.<br><br>
+                            모든 실수 $\alpha$에 대하여 $\displaystyle\lim_{x\to\alpha}\dfrac{f(2x+1)}{f(x)}$의 값이 존재한다.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="slide" data-category="문항 03 | Polya &amp; 풀이">
+                <h2 class="text-xl font-extrabold text-white mb-3">문항 03 &nbsp;<span class="text-rose-400 text-base font-bold">Polya의 4단계 사고법 &amp; 간단한 풀이</span></h2>
+                <div class="grid grid-cols-2 gap-5 flex-grow items-stretch">
+                    <div class="concept-card p-5 flex flex-col gap-3 justify-center">
+                        <div class="step-box p-3"><span class="text-rose-300 font-bold text-sm">1단계 · 문제 이해</span><p class="text-sm text-slate-200 mt-1">정수 $a,b$를 미지수로 하여 $f(1)$이 최대가 되는 경우를 찾는 문제이다.</p></div>
+                        <div class="step-box p-3"><span class="text-rose-300 font-bold text-sm">2단계 · 계획 수립</span><p class="text-sm text-slate-200 mt-1">$f$의 모든 실근 $r$에 대해 $2r+1$도 실근이어야 하는데, 유한 근집합이 이 변환에 닫혀 있으려면 고정점 $r=-1$ 외의 실근은 존재할 수 없다.</p></div>
+                        <div class="step-box p-3"><span class="text-rose-300 font-bold text-sm">3단계 · 계획 실행</span><p class="text-sm text-slate-200 mt-1">$f(-1)=0$에서 $b=a+3$을 얻어 인수분해하고, 이차식이 허근을 갖도록 판별식 조건으로 $a$의 범위를 구해 $f(1)$을 최대화한다.</p></div>
+                        <div class="step-box p-3"><span class="text-rose-300 font-bold text-sm">4단계 · 반성</span><p class="text-sm text-slate-200 mt-1">얻어진 $a$에서 이차식의 판별식이 실제로 음수인지 검산하고 $f(1)$을 계산한다.</p></div>
+                    </div>
+                    <div class="concept-card p-6 flex flex-col justify-center border-t-4 border-rose-500">
+                        <span class="text-xs text-rose-400 font-bold uppercase tracking-wider block mb-2">간단한 풀이</span>
+                        <div class="text-sm text-slate-100 leading-relaxed space-y-2">
+                            <p>$2x+1=x$의 고정점은 $x=-1$뿐. $f(-1)=0 \Rightarrow b=a+3$, $f(x)=(x+1)(x^2+(a-1)x+4)$.</p>
+                            <p>이차식이 허근: $(a-1)^2-16\lt0 \Rightarrow -3\lt a\lt5$, 정수 $a\in\{-2,\dots,4\}$.</p>
+                            <p>$f(1)=5+a+b=2a+8$이므로 $a=4$에서 최대 (이때 $x^2+3x+4$, 판별식 $-7\lt0$으로 유효).</p>
+                            <p class="text-rose-200 font-bold pt-1">최종 답: 16</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="slide" data-category="문항 03 | 구조 변형">
+                <div class="flex items-center gap-4 mb-2">
+                    <span class="bg-rose-600 text-white text-sm font-black px-4 py-1.5 rounded-full">문항 03 구조 변형</span>
+                </div>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Structure Extension</div>
+                        <h3 class="problem-text text-lg leading-relaxed">
+                            함수 $f(x)=x^3+ax^2+bx-2$가 다음 조건을 만족시키도록 하는 두 정수 $a$, $b$에 대하여 $f(2)$의 최댓값을 구하시오.<br><br>
+                            모든 실수 $\alpha$에 대하여 $\displaystyle\lim_{x\to\alpha}\dfrac{f(3x-2)}{f(x)}$의 값이 존재한다.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===================== 문항 04 ===================== -->
+            <div class="slide" data-category="문항 04 | 원문">
+                <div class="flex items-center gap-4 mb-2">
+                    <span class="bg-rose-600 text-white text-sm font-black px-4 py-1.5 rounded-full">문항 04</span>
+                    <span class="text-rose-400 text-base font-bold">2026학년도 6월 모의평가 21번 &middot; [4점]</span>
+                </div>
+                <div class="problem-box p-7 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-2">Original Question (단답형)</div>
+                        <h3 class="problem-text text-sm leading-relaxed">
+                            함수 $f(x)=(x-1)(x-2)$와 최고차항의 계수가 $1$인 사차함수 $g(x)$가 다음 조건을 만족시킨다.<br><br>
+                            모든 실수 $a$에 대하여 $\displaystyle\lim_{x\to a}\dfrac{g(x)\times|f(x)|}{f(x)}$의 값과 $\displaystyle\lim_{x\to a}\dfrac{|g(x)-f(x)|}{g(x)}$의 값이 모두 존재한다.<br><br>
+                            $g(-1)$의 값을 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="slide" data-category="문항 04 | Polya &amp; 풀이">
+                <h2 class="text-xl font-extrabold text-white mb-3">문항 04 &nbsp;<span class="text-rose-400 text-base font-bold">Polya의 4단계 사고법 &amp; 간단한 풀이</span></h2>
+                <div class="grid grid-cols-2 gap-5 flex-grow items-stretch">
+                    <div class="concept-card p-5 flex flex-col gap-3 justify-center">
+                        <div class="step-box p-3"><span class="text-rose-300 font-bold text-sm">1단계 · 문제 이해</span><p class="text-sm text-slate-200 mt-1">두 극한 조건을 모두 만족시키는 사차함수 $g$를 결정해 $g(-1)$을 구하는 문제이다.</p></div>
+                        <div class="step-box p-3"><span class="text-rose-300 font-bold text-sm">2단계 · 계획 수립</span><p class="text-sm text-slate-200 mt-1">첫째 조건은 $f$의 부호가 바뀌는 $x=1,2$에서 $g(1)=g(2)=0$을, 둘째 조건은 $g$의 실근에서 $f'$과 접선 기울기까지 같아야 함을 요구한다.</p></div>
+                        <div class="step-box p-3"><span class="text-rose-300 font-bold text-sm">3단계 · 계획 실행</span><p class="text-sm text-slate-200 mt-1">$g(x)=(x-1)(x-2)(x^2+px+q)$로 놓고 $g'(1)=f'(1)$, $g'(2)=f'(2)$ 조건으로 $p,q$를 구한다.</p></div>
+                        <div class="step-box p-3"><span class="text-rose-300 font-bold text-sm">4단계 · 반성</span><p class="text-sm text-slate-200 mt-1">완성된 $g$를 전개해 $g(1)=g(2)=0$과 두 미분계수 조건을 모두 만족하는지 검산한다.</p></div>
+                    </div>
+                    <div class="concept-card p-6 flex flex-col justify-center border-t-4 border-rose-500">
+                        <span class="text-xs text-rose-400 font-bold uppercase tracking-wider block mb-2">간단한 풀이</span>
+                        <div class="text-sm text-slate-100 leading-relaxed space-y-2">
+                            <p>$g(1)=g(2)=0$이고 $f'(x)=2x-3$에서 $g'(1)=f'(1)=-1$, $g'(2)=f'(2)=1$.</p>
+                            <p>$g(x)=(x-1)(x-2)(x^2+px+q)$에서 $g'(1)=-(1+p+q)=-1$, $g'(2)=4+2p+q=1$ 연립: $p=-3,\ q=3$ (판별식 $-3\lt0$으로 유효).</p>
+                            <p>전개: $g(x)=x^4-6x^3+14x^2-15x+6$.</p>
+                            <p class="text-rose-200 font-bold pt-1">$g(-1)=1+6+14+15+6=42$. &nbsp;최종 답: 42</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="slide" data-category="문항 04 | 구조 변형">
+                <div class="flex items-center gap-4 mb-2">
+                    <span class="bg-rose-600 text-white text-sm font-black px-4 py-1.5 rounded-full">문항 04 구조 변형</span>
+                </div>
+                <div class="problem-box p-7 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Structure Extension</div>
+                        <h3 class="problem-text text-base leading-relaxed">
+                            함수 $f(x)=x(x-1)$과 최고차항의 계수가 $1$인 사차함수 $g(x)$가 다음 조건을 만족시킨다.<br><br>
+                            모든 실수 $a$에 대하여 $\displaystyle\lim_{x\to a}\dfrac{g(x)\times|f(x)|}{f(x)}$의 값과 $\displaystyle\lim_{x\to a}\dfrac{|g(x)-f(x)|}{g(x)}$의 값이 모두 존재한다.<br><br>
+                            $g(-1)$의 값을 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===================== 문항 05 ===================== -->
+            <div class="slide" data-category="문항 05 | 원문">
+                <div class="flex items-center gap-4 mb-2">
+                    <span class="bg-rose-600 text-white text-sm font-black px-4 py-1.5 rounded-full">문항 05</span>
+                    <span class="text-rose-400 text-base font-bold">2026학년도 대학수학능력시험 21번 &middot; [4점]</span>
+                </div>
+                <div class="problem-box p-6 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-2">Original Question (단답형)</div>
+                        <h3 class="problem-text text-sm leading-relaxed">
+                            최고차항의 계수가 양수인 삼차함수 $f(x)$와 실수 $t$에 대하여 함수
+                            $$g(x)=\begin{cases}-f(x) & (x \lt t) \\ f(x) & (x\ge t)\end{cases}$$
+                            는 실수 전체의 집합에서 연속이고 다음 조건을 만족시킨다.<br><br>
+                            (가) 모든 실수 $a$에 대하여 $\displaystyle\lim_{x\to a+}\dfrac{g(x)}{x(x-2)}$의 값이 존재한다.<br>
+                            (나) $\displaystyle\lim_{x\to m+}\dfrac{g(x)}{x(x-2)}$의 값이 음수가 되도록 하는 자연수 $m$의 집합은 $\left\{g(-1),\ -\dfrac{7}{2}g(1)\right\}$이다.<br><br>
+                            $g(-5)$의 값을 구하시오. (단, $g(-1)\ne-\dfrac{7}{2}g(1)$)
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="slide" data-category="문항 05 | Polya &amp; 풀이">
+                <h2 class="text-xl font-extrabold text-white mb-3">문항 05 &nbsp;<span class="text-rose-400 text-base font-bold">Polya의 4단계 사고법 &amp; 간단한 풀이</span></h2>
+                <div class="grid grid-cols-2 gap-5 flex-grow items-stretch">
+                    <div class="concept-card p-5 flex flex-col gap-3 justify-center">
+                        <div class="step-box p-3"><span class="text-rose-300 font-bold text-sm">1단계 · 문제 이해</span><p class="text-sm text-slate-200 mt-1">조건 (가), (나)를 모두 만족시키는 $f$와 $t$를 결정하여 $g(-5)$를 구하는 문제이다.</p></div>
+                        <div class="step-box p-3"><span class="text-rose-300 font-bold text-sm">2단계 · 계획 수립</span><p class="text-sm text-slate-200 mt-1">연속조건에서 $f(t)=0$, (가)에서 $f(0)=f(2)=0$이 필요하므로 $f$는 세 근 $0,2,r$을 가진다는 성질을 이용한다.</p></div>
+                        <div class="step-box p-3"><span class="text-rose-300 font-bold text-sm">3단계 · 계획 실행</span><p class="text-sm text-slate-200 mt-1">$t$와 $r$의 범위를 (나)의 자연수 집합 $\{2,3\}$에 맞춰 좁힌 뒤, $g(-1)$과 $g(1)$의 식을 연립해 $r,k$를 구한다.</p></div>
+                        <div class="step-box p-3"><span class="text-rose-300 font-bold text-sm">4단계 · 반성</span><p class="text-sm text-slate-200 mt-1">구한 $f$로 조건 (나)의 자연수 집합이 정확히 일치하는지 검산한 뒤 $g(-5)$를 계산한다.</p></div>
+                    </div>
+                    <div class="concept-card p-6 flex flex-col justify-center border-t-4 border-rose-500">
+                        <span class="text-xs text-rose-400 font-bold uppercase tracking-wider block mb-2">간단한 풀이</span>
+                        <div class="text-sm text-slate-100 leading-relaxed space-y-2">
+                            <p>$f(x)=kx(x-2)(x-r)$ ($k>0$), $t=2$이고 $3\lt r\le4$일 때만 음수인 자연수가 정확히 $\{2,3\}$이 된다.</p>
+                            <p>$g(-1)=3k(1+r)$, $g(1)=k(1-r)$이며 $\{g(-1),-\frac72g(1)\}=\{2,3\}$에서 $r=\dfrac{11}{3}$, $k=\dfrac{3}{14}$.</p>
+                            <p>$-5\lt t=2$이므로 $g(-5)=-f(-5)=-k(-5)(-7)\left(-5-\dfrac{11}{3}\right)=\dfrac{910}{3}k$.</p>
+                            <p class="text-rose-200 font-bold pt-1">최종 답: 65</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="slide" data-category="문항 05 | 구조 변형">
+                <div class="flex items-center gap-4 mb-2">
+                    <span class="bg-rose-600 text-white text-sm font-black px-4 py-1.5 rounded-full">문항 05 구조 변형</span>
+                </div>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Structure Extension</div>
+                        <h3 class="problem-text text-lg leading-relaxed">
+                            문항 05와 동일한 조건에서 $g(9)$의 값을 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 17: 정답표 -->
+            <div class="slide" data-category="정답표 (Answer Key)">
+                <h2 class="text-2xl font-extrabold text-white mb-4">함수의 극한 존재조건 활용 &nbsp;<span class="text-rose-400 text-lg">전체 정답표 (Answer Key)</span></h2>
+                <div class="concept-card p-8 flex-grow flex flex-col justify-between">
+                    <div>
+                        <span class="text-xs text-rose-400 font-bold uppercase tracking-wider block mb-4">원문 기출 &amp; 구조 변형 문제 정답 종합</span>
+                        <div class="overflow-hidden rounded-xl border border-slate-700/60">
+                            <table class="w-full text-left text-sm text-slate-200">
+                                <thead class="bg-slate-800/90 text-rose-300 font-bold text-xs uppercase border-b border-slate-700">
+                                    <tr>
+                                        <th class="py-3.5 px-6">문항 번호</th>
+                                        <th class="py-3.5 px-6">출처</th>
+                                        <th class="py-3.5 px-6 text-center">원문 기출 정답</th>
+                                        <th class="py-3.5 px-6 text-center">구조 변형 문제 정답</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-800 text-xs">
+                                    <tr class="hover:bg-slate-800/40">
+                                        <td class="py-3.5 px-6 font-bold text-white">문항 01</td>
+                                        <td class="py-3.5 px-6 text-slate-300">2027학년도 6월 모의평가 11번</td>
+                                        <td class="py-3.5 px-6 text-center font-bold text-rose-400">$f(4)=6$ (①)</td>
+                                        <td class="py-3.5 px-6 text-center font-bold text-emerald-400">$f(3)=8$</td>
+                                    </tr>
+                                    <tr class="hover:bg-slate-800/40">
+                                        <td class="py-3.5 px-6 font-bold text-white">문항 02</td>
+                                        <td class="py-3.5 px-6 text-slate-300">2026학년도 9월 모의평가 13번</td>
+                                        <td class="py-3.5 px-6 text-center font-bold text-rose-400">$8$개 (④)</td>
+                                        <td class="py-3.5 px-6 text-center font-bold text-emerald-400">$12$개</td>
+                                    </tr>
+                                    <tr class="hover:bg-slate-800/40">
+                                        <td class="py-3.5 px-6 font-bold text-white">문항 03</td>
+                                        <td class="py-3.5 px-6 text-slate-300">2025학년도 대학수학능력시험 21번</td>
+                                        <td class="py-3.5 px-6 text-center font-bold text-rose-400">$f(1)=16$</td>
+                                        <td class="py-3.5 px-6 text-center font-bold text-emerald-400">$f(2)=10$</td>
+                                    </tr>
+                                    <tr class="hover:bg-slate-800/40">
+                                        <td class="py-3.5 px-6 font-bold text-white">문항 04</td>
+                                        <td class="py-3.5 px-6 text-slate-300">2026학년도 6월 모의평가 21번</td>
+                                        <td class="py-3.5 px-6 text-center font-bold text-rose-400">$g(-1)=42$</td>
+                                        <td class="py-3.5 px-6 text-center font-bold text-emerald-400">$g(-1)=6$</td>
+                                    </tr>
+                                    <tr class="hover:bg-slate-800/40">
+                                        <td class="py-3.5 px-6 font-bold text-white">문항 05</td>
+                                        <td class="py-3.5 px-6 text-slate-300">2026학년도 대학수학능력시험 21번</td>
+                                        <td class="py-3.5 px-6 text-center font-bold text-rose-400">$g(-5)=65$</td>
+                                        <td class="py-3.5 px-6 text-center font-bold text-emerald-400">$g(9)=72$</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="text-center text-xs text-slate-400 border-t border-slate-700/60 pt-4">
+                        수학Ⅱ &middot; 함수의 극한 존재조건 활용 정규수업 자료
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="flex justify-between items-center z-20 pt-3 border-t border-rose-900/40 mx-8 mb-6 no-print">
+            <button onclick="prevSlide()" class="bg-slate-800/80 hover:bg-rose-600 text-slate-200 hover:text-white font-bold text-sm px-5 py-2 rounded-xl transition border border-slate-700">
+                <i class="fa-solid fa-chevron-left"></i> 이전 슬라이드
+            </button>
+            <div class="text-slate-400 text-xs font-semibold tracking-wider">
+                HIGH SCHOOL MATH CLASS PPT
+            </div>
+            <button onclick="nextSlide()" class="bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm px-5 py-2 rounded-xl transition shadow-md">
+                다음 슬라이드 <i class="fa-solid fa-chevron-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const counterEl = document.getElementById('slide-counter');
+        const categoryEl = document.getElementById('slide-category');
+
+        function updateSlide() {
+            slides.forEach((slide, idx) => slide.classList.toggle('active', idx === currentSlide));
+            if (counterEl) counterEl.textContent = `${currentSlide + 1} / ${slides.length}`;
+            if (categoryEl && slides[currentSlide]) categoryEl.textContent = slides[currentSlide].getAttribute('data-category') || '수업 자료';
+            if (window.MathJax && window.MathJax.typesetPromise) window.MathJax.typesetPromise();
+        }
+        function prevSlide() { if (currentSlide > 0) { currentSlide--; updateSlide(); } }
+        function nextSlide() { if (currentSlide < slides.length - 1) { currentSlide++; updateSlide(); } }
+        updateSlide();
+    </script>
+</body>
+</html>
