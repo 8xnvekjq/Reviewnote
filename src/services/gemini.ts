@@ -643,6 +643,7 @@ export async function extractProblemWithGemini(
  * 2차 API 호출: 확정된 과목/단원을 엄격한 가이드로 삼아 해설 정밀 생성 (스트리밍)
  */
 const MISTAKE_SUMMARY_DELIMITER = '%%MISTAKE_SUMMARY%%';
+const FINAL_ANSWER_DELIMITER = '%%FINAL_ANSWER%%';
 
 export async function solveMistakeWithGemini(
   image: { mimeType: string; base64Data: string },
@@ -658,6 +659,7 @@ export async function solveMistakeWithGemini(
 ): Promise<{
   solvingProcess: string;
   mistakeSummary: string;
+  finalAnswer: string;
 }> {
   const { mimeType, base64Data } = image;
 
@@ -736,7 +738,10 @@ ${studentInfoPrompt}${chapterStatsPrompt}${recurringRootCausePrompt}
 ★ [출력 형식 - 매우 중요, 반드시 그대로 따를 것] ★
 JSON이나 코드블록 없이 위 4개 헤더가 포함된 해설 리포트를 순수 텍스트로 작성하십시오.
 리포트를 모두 작성한 다음, 맨 마지막 줄에 정확히 "${MISTAKE_SUMMARY_DELIMITER}" 라는 구분자를 한 줄 쓰고,
-그 다음 줄에 학생 풀이 기반 틀린 이유를 30자 이내로 요약한 한 문장(mistakeSummary)만 적으십시오.`;
+그 다음 줄에 학생 풀이 기반 틀린 이유를 30자 이내로 요약한 한 문장(mistakeSummary)만 적으십시오.
+그 다음 줄에 정확히 "${FINAL_ANSWER_DELIMITER}" 라는 구분자를 한 줄 쓰고,
+그 다음 줄에 이 문제의 최종 정답만 적으십시오(finalAnswer). 풀이 과정, 단위 설명, 부가 설명 없이
+"x = 3", "15", "① 33"처럼 답 자체만 아주 간결하게 한 줄로 적으십시오. 객관식이면 보기 번호와 값을 함께 적으십시오.`;
 
   const requestBody = {
     contents: [
@@ -772,13 +777,25 @@ JSON이나 코드블록 없이 위 4개 헤더가 포함된 해설 리포트를 
 
     const delimIdx = fullText.indexOf(MISTAKE_SUMMARY_DELIMITER);
     if (delimIdx === -1) {
-      // 구분자를 못 찾은 예외적인 경우, 전체를 해설로 취급하고 요약은 비워둠 (안전한 폴백)
-      return { solvingProcess: fullText.trim(), mistakeSummary: '' };
+      // 구분자를 못 찾은 예외적인 경우, 전체를 해설로 취급하고 요약/정답은 비워둠 (안전한 폴백)
+      return { solvingProcess: fullText.trim(), mistakeSummary: '', finalAnswer: '' };
+    }
+
+    const afterSummaryDelim = fullText.slice(delimIdx + MISTAKE_SUMMARY_DELIMITER.length);
+    const answerDelimIdx = afterSummaryDelim.indexOf(FINAL_ANSWER_DELIMITER);
+    if (answerDelimIdx === -1) {
+      // 정답 구분자를 못 찾은 예외적인 경우, 정답만 비워둠 (안전한 폴백)
+      return {
+        solvingProcess: fullText.slice(0, delimIdx).trim(),
+        mistakeSummary: afterSummaryDelim.trim(),
+        finalAnswer: ''
+      };
     }
 
     return {
       solvingProcess: fullText.slice(0, delimIdx).trim(),
-      mistakeSummary: fullText.slice(delimIdx + MISTAKE_SUMMARY_DELIMITER.length).trim()
+      mistakeSummary: afterSummaryDelim.slice(0, answerDelimIdx).trim(),
+      finalAnswer: afterSummaryDelim.slice(answerDelimIdx + FINAL_ANSWER_DELIMITER.length).trim()
     };
   } catch (error: any) {
     console.error('Gemini solving failed:', error);

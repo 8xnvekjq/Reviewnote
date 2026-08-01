@@ -85,6 +85,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
   // Accordion toggle states
   const [showProblemText, setShowProblemText] = React.useState(false);
+  const [showQuickAnswer, setShowQuickAnswer] = React.useState(false); // 복습 체크 전 스크롤 없이 정답만 바로 확인 (기본 접힘 — 실수로 먼저 보는 것 방지)
   const [showSolvingProcess, setShowSolvingProcess] = React.useState(true); // Default open for study
   const [showMistakeSummary, setShowMistakeSummary] = React.useState(false); // Default collapsed for self-study
 
@@ -689,6 +690,26 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 )}
               </div>
             </div>
+
+            {/* 정답 바로 확인 (아래 정석 풀이 과정까지 스크롤 안 해도 여기서 바로 체크 가능) */}
+            {selectedEntry.analysis?.finalAnswer && (
+              <button
+                onClick={() => setShowQuickAnswer(!showQuickAnswer)}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20 transition-all"
+              >
+                <span className="text-[11px] font-bold text-amber-400 flex items-center space-x-1.5 min-w-0">
+                  <span className="flex-none">🎯</span>
+                  {showQuickAnswer ? (
+                    <LaTeXRenderer text={selectedEntry.analysis.finalAnswer} className="truncate" />
+                  ) : (
+                    <span>정답 확인하기</span>
+                  )}
+                </span>
+                <span className="text-[9px] text-amber-500/70 font-bold">
+                  {showQuickAnswer ? '▲ 가리기' : '▼ 보기'}
+                </span>
+              </button>
+            )}
 
             {/* 단계별 유기적 활성화 영역 (3열 구조 복원 및 포커싱 강화) */}
             {(() => {

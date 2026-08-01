@@ -933,6 +933,7 @@ function App() {
       problemText: extractResult.problemText,
       problemBox: extractResult.problemBox,
       mistakeSummary: secondResult.mistakeSummary || undefined,
+      finalAnswer: secondResult.finalAnswer || undefined,
       modelUsed: 'gemini-2.5-flash',
       durationMs: Date.now() - analysisStartTime
     };
