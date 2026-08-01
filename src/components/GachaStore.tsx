@@ -719,7 +719,9 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
               <div className="grid grid-cols-2 gap-2 text-xs font-bold">
                 <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
                   <span className="text-slate-500 text-[10px]">스탬프</span>
-                  <span className="text-amber-300 font-extrabold">{equippedItems.stamp || '기존 O 스탬프'}</span>
+                  <span className="text-amber-300 font-extrabold flex items-center">
+                    {equippedItems.stamp === '🐾' ? <CatPawIcon className="w-5 h-5" /> : (equippedItems.stamp || '기존 O 스탬프')}
+                  </span>
                 </div>
                 <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
                   <span className="text-slate-500 text-[10px]">칭호</span>
@@ -939,8 +941,10 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                 <div className="bg-slate-955 border border-slate-800 rounded-2xl p-6 flex flex-col items-center space-y-3 shadow-inner relative overflow-hidden">
                   <div className={`absolute inset-0 opacity-15 bg-gradient-to-b ${drawnItemsResult[currentResultIndex].color}`} />
                   
-                  <span className="text-6xl relative z-10 animate-bounce">
-                    {drawnItemsResult[currentResultIndex].icon}
+                  <span className="text-6xl relative z-10 animate-bounce flex items-center justify-center">
+                    {drawnItemsResult[currentResultIndex].icon === '🐾'
+                      ? <CatPawIcon className="w-14 h-14" />
+                      : drawnItemsResult[currentResultIndex].icon}
                   </span>
 
                   <div className="flex items-center space-x-1.5 justify-center flex-wrap gap-y-1 relative z-10">

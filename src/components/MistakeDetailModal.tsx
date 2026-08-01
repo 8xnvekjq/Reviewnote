@@ -54,7 +54,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   isAdmin = false,
   aiPersonaName = '밤티',
 }) => {
-  const authorStamp = selectedEntry.userId ? (profilesStampMap[selectedEntry.userId] || equippedStamp) : equippedStamp;
+  const authorStamp = selectedEntry.userId ? profilesStampMap[selectedEntry.userId] : equippedStamp;
   // 장착한 스탬프의 실제 뽑기 등급(UR/SSR/SR/R)에 맞는 테두리 클래스
   const authorStampCatalogItem = authorStamp
     ? GACHA_ITEMS.find(g => g.category === 'STAMP' && g.effectValue === authorStamp)

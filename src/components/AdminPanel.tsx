@@ -4,6 +4,7 @@ import { supabase } from '../services/supabase';
 import { formatDate } from '../utils/date';
 import { GACHA_ITEMS, getTitleBadgeStyle } from '../utils/gachaCatalog';
 import { RecentActivityFeed } from './RecentActivityFeed';
+import { CatPawIcon } from './CatPawIcon';
 
 interface AdminPanelProps {
   onBack?: () => void;
@@ -526,7 +527,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = () => {
                       key={slot.category}
                       className="flex items-center space-x-3 bg-slate-950 border border-slate-800 rounded-xl p-2.5"
                     >
-                      <span className="text-2xl flex-none">{catalogItem?.icon || '—'}</span>
+                      <span className="text-2xl flex-none flex items-center justify-center">
+                        {catalogItem?.icon === '🐾' ? <CatPawIcon className="w-6 h-6" /> : (catalogItem?.icon || '—')}
+                      </span>
                       <div className="flex-1 min-w-0">
                         <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">{slot.label}</span>
                         {catalogItem ? (

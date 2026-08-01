@@ -463,7 +463,7 @@ export const MistakeList: React.FC<MistakeListProps> = ({
                   onDelete={onDeleteMistake}
                   studentName={isAdmin && entry.userId ? (profilesMap[entry.userId] || entry.userId.slice(0, 8)) : undefined}
                   isOwnNote={!isAdmin || entry.userId === currentUserId}
-                  equippedStamp={entry.userId ? (profilesStampMap[entry.userId] || equippedStamp) : equippedStamp}
+                  equippedStamp={entry.userId ? profilesStampMap[entry.userId] : equippedStamp}
                   hasScaffolding={scaffoldedMistakeIds?.has(entry.id)}
                 />
               ))}
