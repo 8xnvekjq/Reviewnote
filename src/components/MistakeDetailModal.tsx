@@ -808,7 +808,10 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                         onClick={() => {
                           if (confirm('틀리거나 보류한 기록을 정리하고 맞춘(O) 기록만 앞으로 정렬하여 다시 복습하시겠습니까?')) {
                             const oReviews = (selectedEntry.reviews || []).filter(r => r === 'O');
-                            const newReviews = [...oReviews, '', ''].slice(0, 3) as ReviewState[];
+                            // O가 하나도 없으면(전부 X/★) ''를 2개만 이어붙여선 배열 길이가 2에
+                            // 그쳐서 3번째 칸이 undefined가 되어 버튼도 안 뜨고 잠기지도 않는
+                            // "고정" 상태로 망가졌다. 항상 최소 3칸이 되도록 ''를 3개 붙인다.
+                            const newReviews = [...oReviews, '', '', ''].slice(0, 3) as ReviewState[];
                             onUpdateReviews(selectedEntry.id, newReviews);
                           }
                         }}
