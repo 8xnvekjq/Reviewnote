@@ -359,10 +359,9 @@ function App() {
       if (session?.user) {
         const username = session.user.email?.split('@')[0] || 'User';
         setCurrentUser(username);
-        fetchUserData(session.user.id);
+        fetchUserData(session.user.id); // 내부에서 loadWeeklyChampions/fetchPeerActivities도 같이 호출함
         fetchAdminStatus(session.user.id);
         loadYoutubeLectures(); // 유튜브 강의 데이터 로드
-        loadWeeklyChampions(); // 주간 챔피언 로드
         fetchGeminiApiKeys(); // 동적 API 키 로드
         fetchDiagnosisStats(); // 평균 진단 소요시간 조회
       } else {
