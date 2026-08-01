@@ -1183,12 +1183,16 @@ function App() {
     e.stopPropagation();
     if (confirm('이 오답 기록을 삭제하시겠습니까?')) {
       try {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('mistakes')
           .delete()
-          .eq('id', id);
+          .eq('id', id)
+          .select('id');
 
         if (error) throw error;
+        if (!data || data.length === 0) {
+          throw new Error('삭제 권한이 없거나 이미 삭제된 기록입니다.');
+        }
 
         setMistakes(prev => prev.filter(m => m.id !== id));
         setSelectedEntry(null);
