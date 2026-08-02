@@ -64,7 +64,6 @@ function App() {
   const [myNickname, setMyNickname] = useState<string>('');
   // 닉네임 변경권 보유 여부
   const [hasNameChangeTicket, setHasNameChangeTicket] = useState<boolean>(false);
-  const [hasPointBooster, setHasPointBooster] = useState<boolean>(false); // 콤보 부스터(포인트 2배권) 보유 여부
   // AI 이름 변경권으로 바꾼 커스텀 AI 페르소나 이름 (비어있으면 기본값 '밤티' 사용)
   const [customAiName, setCustomAiName] = useState<string>('');
   const [hasAiNameChangeTicket, setHasAiNameChangeTicket] = useState<boolean>(false);
@@ -122,14 +121,7 @@ function App() {
     applyThemeColor(equippedItems.theme, matchedTheme?.themeAccentValue);
   }, [equippedItems.theme]);
 
-  // 럭키상점에서 뽑기/아이템 소모로 인벤토리가 바뀔 때마다 콤보 부스터 보유 여부 재확인
-  useEffect(() => {
-    const handleInventoryUpdate = () => {
-      if (session?.user?.id) checkPointBooster(session.user.id);
-    };
-    window.addEventListener('reviewnote_inventory_updated', handleInventoryUpdate);
-    return () => window.removeEventListener('reviewnote_inventory_updated', handleInventoryUpdate);
-  }, [session?.user?.id]);
+
 
   const [pointAdjustment, setPointAdjustment] = useState<number>(() => {
     try {
@@ -665,8 +657,6 @@ function App() {
         }
         // 닉네임 변경권 보유 여부 확인 (Header에 버튼 노출 제어)
         checkNameChangeTicket(targetId);
-        // 콤보 부스터(포인트 2배권) 보유 여부 확인 (Supabase user_items 기준 실시간 조회)
-        checkPointBooster(targetId);
         // AI 이름 변경권 보유 여부 확인
         checkAiNameChangeTicket(targetId);
       }
@@ -869,18 +859,7 @@ function App() {
     setHasAiNameChangeTicket(!!(data && data.quantity > 0));
   };
 
-  // 콤보 부스터(포인트 2배권) 보유 여부 확인 (Supabase user_items 기준 — localStorage 구 인벤토리 키는 더 이상 쓰이지 않음)
-  const checkPointBooster = async (targetUserId?: string) => {
-    const targetId = targetUserId || session?.user?.id;
-    if (!targetId) return;
-    const { data } = await supabase
-      .from('user_items')
-      .select('quantity')
-      .eq('user_id', targetId)
-      .eq('item_id', 'item_point_booster')
-      .maybeSingle();
-    setHasPointBooster(!!(data && data.quantity > 0));
-  };
+
 
   // Fetch recent peer review activities from read-only VIEW
   const fetchPeerActivities = async () => {
@@ -1454,20 +1433,27 @@ function App() {
       for (let i = 0; i < 3; i++) {
         reviewPointDelta += pointsForStage(newReviews[i], i) - pointsForStage(oldReviews[i], i);
       }
-      // 콤보 부스터(SSR): 이번 갱신으로 이 오답 카드의 3단계 복습이 "방금" 전부 채워졌다면
-      // (이전엔 3단계 중 일부가 빈칸이었다가 지금 전부 채워진 순간에만) 콤보 포인트 +70을 추가로
-      // 얹어주고 1회 소모한다. 매 리뷰마다 조용히 배로 불려주던 이전 방식은 SSR 등급 대비 체감
-      // 효과가 미미하고, 아이템을 쥐고 있는 한 영구 적용돼서 포인트가 계속 복제되는 문제도 있었다.
-      const wasFullyReviewed = oldReviews.every(r => r !== '');
-      const isFullyReviewed = newReviews.every(r => r !== '');
-      const boosterApplied = hasPointBooster && !wasFullyReviewed && isFullyReviewed;
-      if (boosterApplied) {
-        reviewPointDelta += 70;
+
+      // ⚡ 콤보 부스터 3시간 5배 버프 적용 (사용 후 3시간 동안 모든 복습 획득 포인트 5배!)
+      const userId = session?.user?.id;
+      let isBoosterActive = false;
+      if (userId) {
+        const storageKey = `reviewnote_combo_booster_expires_${userId}`;
+        const expiresRaw = localStorage.getItem(storageKey);
+        if (expiresRaw) {
+          const expiresAt = parseInt(expiresRaw, 10);
+          if (!isNaN(expiresAt) && Date.now() < expiresAt) {
+            isBoosterActive = true;
+          }
+        }
       }
+
+      if (reviewPointDelta > 0 && isBoosterActive) {
+        reviewPointDelta = reviewPointDelta * 5; // 복습 획득 포인트 5배 곱하기 적용
+      }
+
       if (reviewPointDelta !== 0 && session?.user?.id) {
-        // 클라이언트에서 "현재값 + 델타"를 계산해 절대값으로 쓰면 동시 요청(빠른 연속 클릭,
-        // 실시간 동기화 재조회 등)이 겹칠 때 레이스 컨디션으로 포인트가 유실/오적용될 수 있어서,
-        // 서버 측 원자적 증감 RPC로 처리하고 그 응답값을 그대로 신뢰한다.
+        // 서버 측 원자적 증감 RPC로 처리
         supabase.rpc('increment_bonus_points', { user_id_param: session.user.id, amount_param: reviewPointDelta })
           .then(({ data, error: bonusError }) => {
             if (bonusError) {
@@ -1475,12 +1461,6 @@ function App() {
             } else if (typeof data === 'number') {
               setMyBonusPoints(data);
             }
-          });
-      }
-      if (boosterApplied && session?.user?.id) {
-        supabase.rpc('decrement_item_quantity', { user_id_param: session.user.id, item_id_param: 'item_point_booster' })
-          .then(() => {
-            window.dispatchEvent(new Event('reviewnote_inventory_updated'));
           });
       }
 

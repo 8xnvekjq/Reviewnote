@@ -512,6 +512,44 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
     });
   };
 
+  // ⚡ 콤보 부스터 (5배 버프 3시간권) 사용
+  const handleUsePointBoosterTicket = async () => {
+    const currentQty = inventory['item_point_booster'] || 0;
+    if (currentQty < 1) return;
+
+    const newQty = currentQty - 1;
+    const { error } = await supabase
+      .from('user_items')
+      .update({ quantity: newQty })
+      .eq('user_id', userId)
+      .eq('item_id', 'item_point_booster');
+
+    if (error) {
+      showNoticeModal({
+        title: '사용 실패',
+        message: `콤보 부스터 사용에 실패했습니다: ${error.message}`,
+        badge: '오류',
+        icon: '⚠️',
+      });
+      return;
+    }
+
+    // 3시간 5배 버프 만료 시각 설정 (현재 시각 + 3시간)
+    const expiresAt = Date.now() + 3 * 3600 * 1000;
+    const storageKey = `reviewnote_combo_booster_expires_${userId}`;
+    localStorage.setItem(storageKey, expiresAt.toString());
+
+    setInventory(prev => ({ ...prev, item_point_booster: newQty }));
+    window.dispatchEvent(new Event('reviewnote_booster_updated'));
+
+    showNoticeModal({
+      title: '⚡ 콤보 부스터 5배 버프 발동!',
+      message: '지금부터 3시간 동안 모든 복습 완료 시 얻는 콤보 포인트를 5배로 획득합니다! 🔥',
+      badge: '3시간 5배 버프 발동',
+      icon: '⚡',
+    });
+  };
+
   // 아이템 장착/해제 토글
   const handleToggleEquip = (item: GachaItem) => {
     if (item.category === 'STAMP') {
@@ -529,8 +567,24 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
     }
   };
 
+  // ⚡ 콤보 부스터 잔여 시간 계산
+  const getBoosterRemainingTimeStr = () => {
+    if (!userId) return null;
+    const expiresRaw = localStorage.getItem(`reviewnote_combo_booster_expires_${userId}`);
+    if (!expiresRaw) return null;
+    const expiresAt = parseInt(expiresRaw, 10);
+    if (isNaN(expiresAt) || Date.now() >= expiresAt) return null;
+
+    const remainingMs = expiresAt - Date.now();
+    const hours = Math.floor(remainingMs / (1000 * 60 * 60));
+    const mins = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours > 0 ? `${hours}시간 ` : ''}${mins}분 남음`;
+  };
+
+  const boosterRemainingStr = getBoosterRemainingTimeStr();
+
   return (
-    <div className="flex-1 flex flex-col bg-slate-950 text-slate-100 min-h-full pb-32 animate-fade-in select-none">
+    <div className="flex-1 flex flex-col bg-slate-955 text-slate-100 min-h-full pb-32 animate-fade-in select-none">
       {/* 캔버스 파티클 레이어 */}
       <canvas ref={canvasRef} className="pointer-events-none fixed inset-0 z-50" />
 
@@ -553,6 +607,13 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
 
         {/* 내 보유 점수 통장 & 이용 가이드 버튼 */}
         <div className="flex items-center space-x-2">
+          {boosterRemainingStr && (
+            <div className="bg-amber-500/20 border border-amber-400/50 px-2.5 py-1.5 rounded-2xl flex flex-col items-center shadow-sm animate-pulse flex-none">
+              <span className="text-[8.5px] font-black text-amber-300">⚡ 5배 부스터 발동중</span>
+              <span className="text-[9.5px] font-extrabold text-amber-400 font-mono">{boosterRemainingStr}</span>
+            </div>
+          )}
+
           <button
             onClick={() => window.dispatchEvent(new CustomEvent('reviewnote_open_store_guide'))}
             className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 px-2.5 py-1.5 rounded-2xl text-[10.5px] font-extrabold flex items-center space-x-1 transition-all shadow-sm whitespace-nowrap flex-none shrink-0"
@@ -562,7 +623,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
             <span>가이드</span>
           </button>
 
-          <div className="bg-slate-955/80 border border-amber-500/30 px-3.5 py-2 rounded-2xl flex flex-col items-end shadow-inner">
+          <div className="bg-slate-955/80 border border-amber-500/30 px-3.5 py-2 rounded-2xl flex flex-col items-end shadow-inner flex-none">
             <span className="text-[9px] text-slate-400 font-bold">보유 콤보 점수</span>
             <span className="text-sm font-black text-amber-400 flex items-center space-x-1">
               <span>⚡</span>
@@ -870,6 +931,15 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                         <button
                           onClick={handleUseHomeworkExemptTicket}
                           className="px-3 py-1.5 rounded-xl text-[10px] font-black flex-none transition-all bg-gradient-to-r from-amber-400 to-pink-500 text-slate-950 hover:brightness-110"
+                        >
+                          사용하기
+                        </button>
+                      )}
+
+                      {item.category === 'SHIELD' && item.id === 'item_point_booster' && (
+                        <button
+                          onClick={handleUsePointBoosterTicket}
+                          className="px-3 py-1.5 rounded-xl text-[10px] font-black flex-none transition-all bg-gradient-to-r from-amber-400 to-yellow-400 text-slate-950 hover:brightness-110 shadow"
                         >
                           사용하기
                         </button>

@@ -102,8 +102,8 @@ export const GACHA_ITEMS: GachaItem[] = [
   // ── SSR (7%) - Super Special Rare (황금 빛) ────────────────────────
   {
     id: 'item_point_booster',
-    name: '🎟️ 콤보 부스터 (복습 완주 보너스)',
-    description: '오답 하나를 3단계까지 복습 완료하는 순간 콤보 포인트 +70점을 즉시 지급하고 사라지는 1회용 아이템입니다.',
+    name: '🎟️ 콤보 부스터 (5배 버프 3시간권)',
+    description: '보물가방에서 사용 시 3시간 동안 복습 완료할 때 얻는 모든 콤보 포인트를 5배로 획득하는 강력한 주문서입니다.',
     rarity: 'SSR',
     category: 'SHIELD',
     icon: '🎟️',
