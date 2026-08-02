@@ -1042,6 +1042,10 @@ function App() {
 
     if (shieldUsed) {
       alert("🛡️ [스트릭 방어 성공!] 어제 복습을 놓쳤지만, 럭키상점에서 보유한 '스트릭 방어권'이 자동으로 발동되어 🔥 연속 복습 기록이 안전하게 보호되었습니다!");
+      // '1회용' 아이템이므로 실제로 방어에 쓰인 순간 인벤토리에서 1개 소모 (이전에는 profiles.streak_shields
+      // 카운터만 갱신하고 user_items 수량은 건드리지 않아서, 아이템을 갖고 있는 한 무한정 재사용되는 버그가 있었음)
+      supabase.rpc('decrement_item_quantity', { user_id_param: session.user.id, item_id_param: 'item_streak_shield' })
+        .then(() => window.dispatchEvent(new Event('reviewnote_inventory_updated')));
     }
 
     // 🔥 스트릭 서버 동기화 + 3/7/14/28일 콤보 마일스톤 보너스 지급 (콤보 포인트에만 적립, 주간 랭킹 점수는 영향 없음)
@@ -1261,7 +1265,10 @@ function App() {
       for (let i = 0; i < 3; i++) {
         reviewPointDelta += pointsForStage(newReviews[i], i) - pointsForStage(oldReviews[i], i);
       }
-      if (hasPointBooster) {
+      // '2배권'은 실제로 점수를 벌어들일 때(양수 델타)만 배로 불려주고, 이때 1회 소모한다.
+      // (이전에는 아이템을 갖고 있는 한 영구히 매번 2배가 적용되어서 포인트가 무한정 복제되는 문제가 있었음)
+      const boosterApplied = hasPointBooster && reviewPointDelta > 0;
+      if (boosterApplied) {
         reviewPointDelta *= 2;
       }
       if (reviewPointDelta !== 0 && session?.user?.id) {
@@ -1275,6 +1282,12 @@ function App() {
             } else if (typeof data === 'number') {
               setMyBonusPoints(data);
             }
+          });
+      }
+      if (boosterApplied && session?.user?.id) {
+        supabase.rpc('decrement_item_quantity', { user_id_param: session.user.id, item_id_param: 'item_point_booster' })
+          .then(() => {
+            window.dispatchEvent(new Event('reviewnote_inventory_updated'));
           });
       }
 
