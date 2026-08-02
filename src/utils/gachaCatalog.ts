@@ -98,6 +98,18 @@ export const GACHA_ITEMS: GachaItem[] = [
     gradient: 'linear-gradient(135deg, #FF4FA7 0%, #22D3EE 100%)',
     color: 'from-amber-400 via-pink-500 to-purple-500'
   },
+  {
+    id: 'theme_angelic_white',
+    name: '🎨 하이퍼 블라인딩 화이트 테마',
+    description: '눈부신 퓨어 순백의 광채와 다이아몬드 네온이 폭발하는 극강의 눈뽕 라이트 테마입니다.',
+    rarity: 'UR',
+    category: 'THEME',
+    icon: '🤍',
+    effectValue: '#FFFFFF',
+    themeAccentValue: '#00F0FF',
+    gradient: 'linear-gradient(135deg, #FFFFFF 0%, #E2E8F0 50%, #00F0FF 100%)',
+    color: 'from-amber-400 via-pink-500 to-purple-500'
+  },
 
   // ── SSR (7%) - Super Special Rare (황금 빛) ────────────────────────
   {

@@ -80,6 +80,19 @@ export function applyThemeColor(hex?: string, accentHex?: string): void {
     return;
   }
 
+  const isPureWhite = hex.toUpperCase() === '#FFFFFF';
+  if (isPureWhite) {
+    // 🤍 눈부신 하이퍼 블라인딩 화이트 테마 전용 (초고휘도 백색 캔버스 + 다이아몬드 네온 시안)
+    root.style.setProperty('--theme-bg-main', '248 250 252');       // slate-50 (초고휘도 화이트)
+    root.style.setProperty('--theme-bg-surface', '241 245 249');    // slate-100 (순백 서피스)
+    root.style.setProperty('--theme-bg-elevated', '226 232 240');   // slate-200 (플래티넘 카드)
+    root.style.setProperty('--theme-header', '255 255 255');        // 퓨어 255 255 255
+    root.style.setProperty('--theme-border', '56 189 248');         // sky-400 다이아몬드 테두리
+    root.style.setProperty('--theme-accent', '0 240 255');          // 네온 시안 스파클
+    root.style.setProperty('--theme-glow-opacity', '0.6');          // 강력한 하이퍼 글로우
+    return;
+  }
+
   const [h, s] = hexToHsl(hex);
   const isLegendary = !!(accentHex && accentHex.startsWith('#'));
 
