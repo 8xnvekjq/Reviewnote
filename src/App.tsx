@@ -1589,9 +1589,12 @@ function App() {
                     const activeTitle = (isMe && equippedItems.title) ? equippedItems.title : (champ?.title || undefined);
                     const titleBadge = activeTitle ? getTitleBadgeStyle(activeTitle) : null;
 
-                    const nameToDisplay = champ?.nickname || champ?.display_name;
+                    const nick = champ?.nickname || champ?.display_name || (champ?.username ? maskId(champ.username) : '');
+                    const realName = champ?.display_name;
+                    const hasCustomNick = nick && realName && nick !== realName;
+
                     const studentDisplayName = champ
-                      ? (nameToDisplay ? nameToDisplay : maskId(champ.username))
+                      ? (isAdmin && hasCustomNick ? `${nick} (${realName})` : nick)
                       : null;
 
                     return (
@@ -1617,7 +1620,7 @@ function App() {
 
                               {/* 긴 이름 말줄임(...) 표출 */}
                               <span 
-                                className={`font-black truncate max-w-[85px] sm:max-w-[140px] ${isFirst ? 'text-white text-[11px]' : 'text-slate-200 text-[10px]'}`}
+                                className={`font-black truncate max-w-[120px] sm:max-w-[200px] ${isFirst ? 'text-white text-[11px]' : 'text-slate-200 text-[10px]'}`}
                                 title={studentDisplayName || ''}
                               >
                                 {studentDisplayName}

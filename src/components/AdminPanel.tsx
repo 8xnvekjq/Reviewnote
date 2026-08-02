@@ -30,10 +30,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = () => {
     setIsLoading(true);
     setError(null);
     try {
-      // Fetch all profiles (display_name, school_grade, equipped_title 포함)
+      // Fetch all profiles (display_name, nickname, school_grade, equipped_title 포함)
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, email, is_admin, display_name, school_grade, equipped_title, equipped_stamp, equipped_theme, equipped_ai_voice, bonus_points, point_adjustment')
+        .select('id, email, is_admin, display_name, nickname, school_grade, equipped_title, equipped_stamp, equipped_theme, equipped_ai_voice, bonus_points, point_adjustment')
         .order('email', { ascending: true });
 
       if (profilesError) throw profilesError;
@@ -71,6 +71,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = () => {
           weeklyTotalCount: 0,
           weeklyCompletedCount: 0,
           displayName: p.display_name?.trim() || undefined,
+          nickname: p.nickname?.trim() || undefined,
           username: username,
           schoolGrade: p.school_grade || '',
           equippedTitle: p.equipped_title || undefined,
@@ -352,10 +353,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = () => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-2 flex-wrap gap-y-1">
-                        {/* 🌈 무지개 웨이브 텍스트 효과 테스트 — test 계정에만 우선 적용해봄 */}
-                        <span className={`font-extrabold text-sm truncate ${user.email?.toLowerCase().startsWith('test') ? 'text-rainbow-wave' : 'text-white'}`}>
-                          {(user as any).displayName || (user as any).username}
-                        </span>
+                        {/* 이름 (어드민에게는 이름 옆에 닉네임 병기) */}
+                        {(() => {
+                          const realName = (user as any).displayName || (user as any).username;
+                          const nick = user.nickname;
+                          const hasCustomNick = nick && nick !== realName;
+
+                          return (
+                            <span className={`font-extrabold text-sm truncate ${user.email?.toLowerCase().startsWith('test') ? 'text-rainbow-wave' : 'text-white'}`}>
+                              {realName} {hasCustomNick && <span className="text-amber-400 font-bold text-xs ml-1">({nick})</span>}
+                            </span>
+                          );
+                        })()}
                         {user.equippedTitle && (() => {
                           const badge = getTitleBadgeStyle(user.equippedTitle);
                           return (
@@ -505,7 +514,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = () => {
                 <h3 className="text-sm font-extrabold text-white flex items-center space-x-2 min-w-0">
                   <span>🎽</span>
                   <span className="truncate">
-                    {(selectedStudent as any).displayName || (selectedStudent as any).username} 장착 아이템
+                    {(() => {
+                      const realName = (selectedStudent as any).displayName || (selectedStudent as any).username;
+                      const nick = selectedStudent.nickname;
+                      const hasCustomNick = nick && nick !== realName;
+                      return `${realName}${hasCustomNick ? ` (${nick})` : ''} 장착 아이템`;
+                    })()}
                   </span>
                 </h3>
                 <button
