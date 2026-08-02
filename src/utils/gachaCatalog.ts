@@ -268,6 +268,16 @@ export const GACHA_ITEMS: GachaItem[] = [
     color: 'from-amber-400 via-yellow-400 to-amber-500'
   },
   {
+    id: 'ai_gyaru',
+    name: '🤖 AI 말투: 하이텐션 갸루 쌤',
+    description: 'AI 밤티 쌤이 콧소리 억양과 쵸베리구/쵸베리바 갸루 용어로 수학 오답을 신나게 해설해줍니다.\n💬 "공통인수 묶어서 풀면 마지데(マジで) 쵸베리구(超VeryGood)잖아?! 미분 야호~!"',
+    rarity: 'SSR',
+    category: 'AI_VOICE',
+    icon: '✌️',
+    effectValue: 'gyaru',
+    color: 'from-amber-400 via-yellow-400 to-amber-500'
+  },
+  {
     id: 'title_22_killer',
     name: '⚔️ 칭호: 킬러문항 포식자',
     description: '어려운 준킬러/킬러 문제도 씹어먹는 열공 마스터의 증표입니다.',
