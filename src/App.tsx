@@ -20,6 +20,7 @@ import { GachaStore } from './components/GachaStore';
 import { RecentActivityFeed } from './components/RecentActivityFeed';
 import { ScaffoldingListPanel } from './components/ScaffoldingListPanel';
 import { StoreGuideModal } from './components/StoreGuideModal';
+import { NewScaffoldingModal, UnseenScaffoldingItem } from './components/NewScaffoldingModal';
 import { getTitleBadgeStyle, GACHA_ITEMS } from './utils/gachaCatalog';
 import type { EquippedItems } from './types';
 import { applyThemeColor } from './utils/theme';
@@ -246,6 +247,100 @@ function App() {
     } catch (e) {
       console.error(e);
     }
+  };
+
+  // 💡 신규 스캐폴딩(선생님 맞춤 힌트) 안내 모달 상태
+  const [unseenScaffoldings, setUnseenScaffoldings] = useState<UnseenScaffoldingItem[]>([]);
+  const [isNewScaffoldingModalOpen, setIsNewScaffoldingModalOpen] = useState(false);
+
+  // 💡 DB 기반 미확인 신규 스캐폴딩 힌트 조회 (is_read === false)
+  const checkUnseenScaffoldings = async () => {
+    const userId = session?.user?.id;
+    if (!userId || isAdmin) return;
+
+    try {
+      const { data: rows, error } = await supabase
+        .from('mistake_scaffoldings')
+        .select('*')
+        .eq('student_id', userId)
+        .or('is_read.is.null,is_read.eq.false')
+        .order('created_at', { ascending: false });
+
+      if (error || !rows || rows.length === 0) return;
+
+      const mistakeIds = Array.from(new Set(rows.map((r: any) => r.mistake_id)));
+      const { data: mistakeRows } = await supabase
+        .from('mistakes')
+        .select('*')
+        .in('id', mistakeIds);
+
+      const mistakeMap: Record<string, any> = {};
+      (mistakeRows || []).forEach((m: any) => {
+        mistakeMap[m.id] = m;
+      });
+
+      const items: UnseenScaffoldingItem[] = [];
+      rows.forEach((r: any) => {
+        const m = mistakeMap[r.mistake_id];
+        if (!m) return;
+        const entry: MistakeEntry = {
+          id: m.id,
+          title: m.title,
+          imageUrl: m.image_url,
+          userId: m.user_id,
+          date: m.date,
+          updatedAt: m.updated_at,
+          analysis: m.analysis,
+          reviews: m.reviews,
+          grade: m.grade,
+          chapter: m.chapter,
+          rootCauses: m.root_causes,
+          userActionPlan: m.user_action_plan,
+        };
+
+        items.push({
+          id: r.id,
+          mistakeId: r.mistake_id,
+          mistakeTitle: m.title,
+          grade: m.grade,
+          chapter: m.chapter,
+          latestCaption: r.caption || '선생님 풀이 힌트',
+          created_at: r.created_at,
+          mistakeEntry: entry,
+        });
+      });
+
+      if (items.length > 0) {
+        setUnseenScaffoldings(items);
+        setIsNewScaffoldingModalOpen(true);
+      }
+    } catch (err) {
+      console.error('Failed to check unseen scaffoldings:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (session?.user?.id && !isAdmin) {
+      checkUnseenScaffoldings();
+    }
+  }, [session?.user?.id, isAdmin]);
+
+  const handleCloseNewScaffoldingModal = async () => {
+    setIsNewScaffoldingModalOpen(false);
+    const userId = session?.user?.id;
+    if (!userId || unseenScaffoldings.length === 0) return;
+
+    try {
+      const targetIds = unseenScaffoldings.map((item) => item.id);
+      // 수파베이스 DB 상에서 읽음(is_read = true) 처리하여 기기가 달라져도 중복 팝업 안 뜸
+      await supabase
+        .from('mistake_scaffoldings')
+        .update({ is_read: true })
+        .in('id', targetIds);
+    } catch (e) {
+      console.error('Failed to mark scaffoldings as read:', e);
+    }
+    setUnseenScaffoldings([]);
   };
 
   // 주간 최다 오답 완료 챔피언 정보 로드 + 내 점수 동시 갱신 (하이브리드 1주 이월 및 리셋 롤오버)
@@ -774,6 +869,7 @@ function App() {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'mistake_scaffoldings' }, () => {
         refreshMistakesLight();
+        checkUnseenScaffoldings();
       })
       .subscribe();
 
@@ -2075,6 +2171,17 @@ function App() {
         isOpen={isStoreGuideOpen}
         onClose={handleCloseStoreGuide}
         onGoToStore={() => setActiveTab('store')}
+      />
+
+      {/* 💡 선생님의 신규 스캐폴딩 힌트 안내 모달 팝업 창 */}
+      <NewScaffoldingModal
+        isOpen={isNewScaffoldingModalOpen}
+        unseenItems={unseenScaffoldings}
+        onClose={handleCloseNewScaffoldingModal}
+        onSelectMistake={(entry) => {
+          setSelectedEntry(entry);
+        }}
+        onGoToClinic={() => setActiveTab('scaffolding')}
       />
 
     </div>
