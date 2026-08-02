@@ -70,6 +70,8 @@ function App() {
   const [profilesMap, setProfilesMap] = useState<Record<string, string>>({});
   // 유튜브 매칭용 강의 마스터 리스트 상태
   const [youtubeLectures, setYoutubeLectures] = useState<any[]>([]);
+  // 단원별 선생님 실제 강의 접근법 가이드 카탈로그 (solve 프롬프트 보강용)
+  const [teacherApproachGuides, setTeacherApproachGuides] = useState<{ grade: string; chapter: string; guideText: string }[]>([]);
   // 주간 최다 오답 완료 챔피언 상태 (1~3위)
   const [weeklyChampions, setWeeklyChampions] = useState<any[]>([]);
   // 분석통계 탭 학생 필터 상태 (어드민 전용)
@@ -345,6 +347,20 @@ function App() {
     }
   };
 
+  // 단원별 선생님 실제 강의 접근법 가이드 카탈로그 로드 (검증된 소수 단원만 등록됨 — 없으면 매칭 안 되고 넘어감)
+  const loadTeacherApproachGuides = async () => {
+    try {
+      const { data } = await supabase.from('teacher_approach_guides').select('grade, chapter, guide_text');
+      setTeacherApproachGuides((data || []).map(row => ({
+        grade: row.grade,
+        chapter: row.chapter,
+        guideText: row.guide_text
+      })));
+    } catch (err) {
+      console.error('Error loading teacher approach guides:', err);
+    }
+  };
+
   // Monitor Supabase Authentication States.
   // Supabase는 onAuthStateChange를 구독하는 즉시 현재 세션으로 한 번 콜백을 실행해준다
   // ('INITIAL_SESSION' 이벤트). 그런데 여기서 별도로 getSession().then(...)도 같은 로직을
@@ -361,12 +377,14 @@ function App() {
         fetchUserData(session.user.id); // 내부에서 loadWeeklyChampions/fetchPeerActivities도 같이 호출함
         fetchAdminStatus(session.user.id);
         loadYoutubeLectures(); // 유튜브 강의 데이터 로드
+        loadTeacherApproachGuides(); // 단원별 선생님 강의 접근법 가이드 로드
         fetchDiagnosisStats(); // 평균 진단 소요시간 조회
       } else {
         setCurrentUser('');
         setIsAdmin(false);
         setMistakes([]);
         setYoutubeLectures([]);
+        setTeacherApproachGuides([]);
         setWeeklyChampions([]);
         setEquippedItems({});
         setMyNickname('');
@@ -890,7 +908,8 @@ function App() {
         sameChapterMistakeCount,
         recurringRootCause,
         equippedItems.aiVoice,
-        customAiName || '밤티'
+        customAiName || '밤티',
+        teacherApproachGuides
       ),
       extractPromise
     ]);

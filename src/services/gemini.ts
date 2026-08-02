@@ -669,7 +669,8 @@ export async function solveMistakeWithGemini(
   sameChapterMistakeCount?: number,
   recurringRootCause?: { label: string; count: number },
   aiVoice?: string,
-  personaName: string = '밤티'
+  personaName: string = '밤티',
+  teacherApproachGuides: { grade: string; chapter: string; guideText: string }[] = []
 ): Promise<{
   solvingProcess: string;
   mistakeSummary: string;
@@ -701,6 +702,15 @@ export async function solveMistakeWithGemini(
     ? `\n★ [반복되는 실수 패턴 참고] ★\n이 학생은 과거 오답들에서 "${recurringRootCause.label}"을(를) 실수 원인으로 ${recurringRootCause.count}번 체크한 이력이 있습니다. 4단계(돌아보기 & 쌤의 한끝 팁)에서 이 패턴을 한 번 부드럽게 짚어주고, 이번 문제에서도 그 부분을 특별히 신경 써서 확인하도록 안내하십시오. 절대 다그치거나 지적하는 어조가 되지 않도록, 따뜻하고 응원하는 톤을 유지하십시오.\n`
     : '';
 
+  // 검증된 소수 단원에 한해서만, 선생님 실제 강의 대본에서 증류한 접근 순서를 참고 자료로 제공.
+  // (DB 카탈로그에 없는 단원은 그냥 기존 방식대로 진행 — 전체 단원에 일괄 적용하지 않음)
+  const matchedApproachGuide = teacherApproachGuides.find(
+    g => g.grade === resolvedGrade && g.chapter === resolvedChapter
+  );
+  const teacherApproachPrompt = matchedApproachGuide
+    ? `\n★ [선생님 실제 강의 접근법 참고] ★\n${matchedApproachGuide.guideText}\n이 참고 자료는 어떤 개념/공식을 어떤 순서로 적용할지에 대한 접근 방식 참고용일 뿐입니다. 최종 수치 계산과 정답은 반드시 이 문제 고유의 조건에 맞게 독립적으로 정확하게 계산하십시오.\n`
+    : '';
+
   // 럭키상점에서 장착한 "AI 말투" 아이템에 따라 밤티의 어조만 바꾼다 (정체성/설명 품질은 항상 고정).
   // 장착한 아이템이 없거나 알 수 없는 값이면 항상 기존 기본 톤(정중하고 다정한 해요체)을 유지한다.
   const AI_VOICE_TONES: Record<string, string> = {
@@ -721,7 +731,7 @@ export async function solveMistakeWithGemini(
   const prompt = `너는 더쿠키수학 선생님을 보좌하여 학생들의 수학 오답을 과학적으로 분석하고 올바른 복습 처방을 제공하는 스마트한 AI 수학 클리닉 비서 **'${personaName}'**이다.
 이 문제의 과목은 **"${resolvedGrade}"** 이며, 단원은 **"${resolvedChapter}"** 으로 확정되었습니다.
 아래의 비서 페르소나와 포맷 규칙을 엄격히 준수하여 수학 문제 사진을 분석해 풀이 리포트를 작성하여라.
-${studentInfoPrompt}${chapterStatsPrompt}${recurringRootCausePrompt}
+${studentInfoPrompt}${chapterStatsPrompt}${recurringRootCausePrompt}${teacherApproachPrompt}
 
 ★ [AI 비서 ${personaName} 가이드라인] ★
 1. 절대 자신을 실제 선생님(더쿠키수학 쌤 등)과 동일시하지 마십시오. 당신은 수학 오답 분석을 보조하는 인공지능 비서 캐릭터 **'${personaName}'**입니다. ${toneInstruction}
