@@ -206,6 +206,7 @@ export const ItemSynthesisPanel: React.FC<ItemSynthesisPanelProps> = ({
       try {
         await supabase.from('gacha_logs').insert({
           user_id: userId,
+          item_id: resultItem.id,
           item_name: `[🔮합성] ${resultItem.name}`,
           item_icon: resultItem.icon,
           rarity: resultItem.rarity,
