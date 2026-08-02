@@ -247,7 +247,7 @@ export const GACHA_ITEMS: GachaItem[] = [
   },
   {
     id: 'ai_mentor',
-    name: '👨‍🏫 AI 말투: 찐쌤 스타일',
+    name: '👨‍🏫 AI 말투: 민수쌤 스타일',
     description: 'AI 밤티 쌤이 실제 수업처럼 질문으로 유도하고 왜 그런지 증명해가며 설명해줍니다.\n💬 "자, 여기서 뭐가 나올까요? 그렇지, 나이스! 이제 왜 그런지 증명해볼까요?"',
     rarity: 'SSR',
     category: 'AI_VOICE',
