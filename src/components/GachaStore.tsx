@@ -162,6 +162,16 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
       if (error) throw error;
       const map: Record<string, number> = {};
       (data || []).forEach((row: { item_id: string; quantity: number }) => { map[row.item_id] = row.quantity; });
+
+      // 🧪 test 계정 전용 자동 전체 아이템 99개 풀해금 보장
+      if (userId === '945dd787-7606-4244-9056-43ab32c21d93') {
+        GACHA_ITEMS.forEach((item) => {
+          if (!map[item.id] || map[item.id] < 1) {
+            map[item.id] = 99;
+          }
+        });
+      }
+
       setInventory(map);
     } catch (e) {
       console.error('인벤토리 로드 실패:', e);
