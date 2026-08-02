@@ -571,8 +571,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
       // 동일 문제 카드에 한해 마지막 복습 체크 후 60초(1분)가 지나지 않은 경우 차단
       if (lastTime > 0 && diffSec < 60) {
-        const remainingSec = 60 - diffSec;
-        alert(`⏳ 방금 이 문제의 복습을 체크하셨습니다!\n문제 해설을 천천히 읽어보신 후 ${remainingSec}초 뒤에 다음 복습을 진행해 주세요.`);
+        alert('⏳ 방금 이 문제의 복습을 체크하셨습니다!');
         return;
       }
 
