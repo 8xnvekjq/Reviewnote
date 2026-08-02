@@ -5,6 +5,7 @@ import { CatPawIcon } from './CatPawIcon';
 import { supabase } from '../services/supabase';
 import { getKSTDateString } from '../utils/streak';
 import { CustomNoticeModal, type NoticeModalState } from './CustomNoticeModal';
+import { ItemSynthesisPanel } from './ItemSynthesisPanel';
 
 export interface ExtendedGachaItem extends GachaItem {
   isDuplicate?: boolean;
@@ -60,7 +61,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
   onUseAiNameChangeTicket,
   aiPersonaName,
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'draw' | 'inventory' | 'catalog'>('draw');
+  const [activeSubTab, setActiveSubTab] = useState<'draw' | 'synthesis' | 'inventory' | 'catalog'>('draw');
 
   // Supabase 기반 인벤토리: { item_id: quantity }
   const [inventory, setInventory] = useState<Record<string, number>>({});
@@ -585,6 +586,16 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
             🎰 뽑기 머신
           </button>
           <button
+            onClick={() => setActiveSubTab('synthesis')}
+            className={`px-3 py-2 rounded-xl text-[11px] font-extrabold transition-all whitespace-nowrap ${
+              activeSubTab === 'synthesis'
+                ? 'bg-gradient-to-r from-amber-500 via-purple-600 to-pink-500 text-white shadow-md scale-105 border border-amber-300'
+                : 'text-amber-400 hover:text-amber-200 bg-amber-500/10 border border-amber-500/20'
+            }`}
+          >
+            🔮 합성!
+          </button>
+          <button
             onClick={() => setActiveSubTab('inventory')}
             className={`px-3 py-2 rounded-xl text-[11px] font-extrabold transition-all relative whitespace-nowrap ${
               activeSubTab === 'inventory'
@@ -748,6 +759,15 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
               )}
             </div>
           </div>
+        )}
+
+        {/* TAB 1.5: 🔮 보물 합성 (UR / SSR 2->1 합성) */}
+        {activeSubTab === 'synthesis' && (
+          <ItemSynthesisPanel
+            userId={userId || ''}
+            inventory={inventory}
+            onInventoryUpdate={loadInventory}
+          />
         )}
 
         {/* TAB 2: 🎒 내 보물가방 (획득한 아이템 장착) */}
