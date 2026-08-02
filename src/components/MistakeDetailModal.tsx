@@ -89,6 +89,9 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   const [showSolvingProcess, setShowSolvingProcess] = React.useState(true); // Default open for study
   const [showMistakeSummary, setShowMistakeSummary] = React.useState(false); // Default collapsed for self-study
 
+  // 💡 동일 문제 연속 클릭 쿨다운 커스텀 알림 모달 상태
+  const [isCooldownNoticeOpen, setIsCooldownNoticeOpen] = React.useState(false);
+
   // ── 다음 오답 이동을 위한 미완료 정렬 목록 연산 ──────────────────────────────
   const uncompletedSorted = React.useMemo(() => {
     return allEntries
@@ -571,7 +574,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
       // 동일 문제 카드에 한해 마지막 복습 체크 후 60초(1분)가 지나지 않은 경우 차단
       if (lastTime > 0 && diffSec < 60) {
-        alert('⏳ 방금 이 문제의 복습을 체크하셨습니다!');
+        setIsCooldownNoticeOpen(true);
         return;
       }
 
@@ -1229,6 +1232,33 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
           <span className="text-base sm:text-lg font-bold group-hover:translate-x-0.5 transition-transform">&rarr;</span>
           <span className="text-[7.5px] sm:text-[8px] font-black uppercase tracking-wider mt-0.5 select-none">Next</span>
         </button>
+      )}
+
+      {/* ⏳ 복습 연속 클릭 방지 쿨다운 알림 커스텀 모달 (스캐폴딩 알림창 디자인 톤앤매너 통일) */}
+      {isCooldownNoticeOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-xs bg-slate-900 border border-amber-500/40 rounded-3xl p-5 shadow-2xl space-y-4 text-center animate-scale-up">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto">
+              <span className="text-2xl animate-bounce">⏳</span>
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="text-sm font-black text-white">
+                방금 이 문제의 복습을 체크하셨습니다!
+              </h3>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                해설을 천천히 읽어보신 후 잠시 뒤에 다음 복습을 체크해 주세요. ✨
+              </p>
+            </div>
+
+            <button
+              onClick={() => setIsCooldownNoticeOpen(false)}
+              className="w-full py-2.5 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-350 hover:to-amber-450 text-slate-950 font-black text-xs transition-all shadow-lg shadow-amber-500/20"
+            >
+              확인
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
