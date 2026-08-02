@@ -274,6 +274,7 @@ export const GACHA_ITEMS: GachaItem[] = [
     rarity: 'SSR',
     category: 'AI_VOICE',
     icon: '✌️',
+    imageUrl: '/assets/gyaru_teacher_avatar.jpg',
     effectValue: 'gyaru',
     color: 'from-amber-400 via-yellow-400 to-amber-500'
   },

@@ -102,6 +102,7 @@ export interface GachaItem {
   rarity: GachaRarity;
   category: GachaCategory;
   icon: string;
+  imageUrl?: string;
   effectValue?: string; // e.g. '#10B981', '🐾', '수학의 연금술사'
   gradient?: string; // e.g. 'linear-gradient(135deg, #10B981 0%, #047857 50%, #6EE7B7 100%)'
   themeAccentValue?: string; // THEME 전용: 테두리/액센트에 별도로 쓰이는 2번째 hex (예: 골드 배경 + 은하수 보라 테두리)

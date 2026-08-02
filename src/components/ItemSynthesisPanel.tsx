@@ -418,8 +418,12 @@ export const ItemSynthesisPanel: React.FC<ItemSynthesisPanelProps> = ({
                   }`}
                 >
                   {/* Icon */}
-                  <div className="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center text-xl flex-none group-hover:scale-105 transition-transform">
-                    {item.icon}
+                  <div className="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center text-xl flex-none group-hover:scale-105 transition-transform overflow-hidden">
+                    {item.imageUrl ? (
+                      <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                    ) : (
+                      item.icon
+                    )}
                   </div>
 
                   {/* Info */}

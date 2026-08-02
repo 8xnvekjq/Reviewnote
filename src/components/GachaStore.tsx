@@ -898,7 +898,13 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                     >
                       <div className="flex items-center space-x-3 min-w-0">
                         <div className="relative flex-none flex items-center justify-center">
-                          {item.icon === '🐾' ? <CatPawIcon className="w-7 h-7" /> : <span className="text-3xl">{item.icon}</span>}
+                          {item.imageUrl ? (
+                            <img src={item.imageUrl} alt={item.name} className="w-8 h-8 rounded-full object-cover border border-amber-400/60 shadow" />
+                          ) : item.icon === '🐾' ? (
+                            <CatPawIcon className="w-7 h-7" />
+                          ) : (
+                            <span className="text-3xl">{item.icon}</span>
+                          )}
                           {item.category === 'SHIELD' && qty > 1 && (
                             <span className="absolute -top-1 -right-1 text-[9px] bg-indigo-600 text-white rounded-full w-4 h-4 flex items-center justify-center font-black">
                               {qty}
@@ -1010,7 +1016,17 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                     }`}
                   >
                     <div className="text-3xl flex-none select-none flex items-center justify-center">
-                      {isUnlocked ? (item.icon === '🐾' ? <CatPawIcon className="w-7 h-7" /> : item.icon) : '❓'}
+                      {isUnlocked ? (
+                        item.imageUrl ? (
+                          <img src={item.imageUrl} alt={item.name} className="w-8 h-8 rounded-full object-cover border border-amber-400/60 shadow" />
+                        ) : item.icon === '🐾' ? (
+                          <CatPawIcon className="w-7 h-7" />
+                        ) : (
+                          item.icon
+                        )
+                      ) : (
+                        '❓'
+                      )}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center space-x-1.5">
