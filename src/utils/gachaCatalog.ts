@@ -246,6 +246,16 @@ export const GACHA_ITEMS: GachaItem[] = [
     color: 'from-amber-400 via-yellow-400 to-amber-500'
   },
   {
+    id: 'ai_mentor',
+    name: '👨‍🏫 AI 말투: 찐쌤 스타일',
+    description: 'AI 밤티 쌤이 실제 수업처럼 질문으로 유도하고 왜 그런지 증명해가며 설명해줍니다.\n💬 "자, 여기서 뭐가 나올까요? 그렇지, 나이스! 이제 왜 그런지 증명해볼까요?"',
+    rarity: 'SSR',
+    category: 'AI_VOICE',
+    icon: '👨‍🏫',
+    effectValue: 'mentor',
+    color: 'from-amber-400 via-yellow-400 to-amber-500'
+  },
+  {
     id: 'title_22_killer',
     name: '⚔️ 칭호: 킬러문항 포식자',
     description: '어려운 준킬러/킬러 문제도 씹어먹는 열공 마스터의 증표입니다.',
