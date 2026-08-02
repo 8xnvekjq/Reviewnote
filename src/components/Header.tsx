@@ -35,11 +35,11 @@ interface HeaderProps {
   hasNameChangeTicket?: boolean;
   onUpdateAiName?: (newName: string) => Promise<void>;
   hasAiNameChangeTicket?: boolean;
+  comboBoosterExpiresAt?: string | null; // 콤보 부스터 5배 버프 만료시각 (서버 profiles 기준)
 }
 
 export const Header: React.FC<HeaderProps> = ({
   currentUser,
-  userId,
   nickname,
   onLogout,
   onUpdateNickname,
@@ -50,6 +50,7 @@ export const Header: React.FC<HeaderProps> = ({
   hasNameChangeTicket,
   onUpdateAiName,
   hasAiNameChangeTicket,
+  comboBoosterExpiresAt,
 }) => {
   const [showUserMenu, setShowUserMenu] = React.useState(false);
   const [isNicknameModalOpen, setIsNicknameModalOpen] = React.useState(false);
@@ -82,12 +83,10 @@ export const Header: React.FC<HeaderProps> = ({
     };
   }, []);
 
-  // ⚡ 콤보 부스터 잔여 시간 계산
+  // ⚡ 콤보 부스터 잔여 시간 계산 (서버 profiles.combo_booster_expires_at 기준 — App.tsx에서 전달받음)
   const getBoosterRemainingStr = () => {
-    if (!userId) return null;
-    const expiresRaw = localStorage.getItem(`reviewnote_combo_booster_expires_${userId}`);
-    if (!expiresRaw) return null;
-    const expiresAt = parseInt(expiresRaw, 10);
+    if (!comboBoosterExpiresAt) return null;
+    const expiresAt = new Date(comboBoosterExpiresAt).getTime();
     if (isNaN(expiresAt) || Date.now() >= expiresAt) return null;
 
     const remainingMs = expiresAt - Date.now();

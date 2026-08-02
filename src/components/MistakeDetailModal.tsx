@@ -27,6 +27,7 @@ interface MistakeDetailModalProps {
   currentUserId?: string;
   isAdmin?: boolean;
   aiPersonaName?: string; // AI 이름 변경권으로 바꾼 커스텀 AI 페르소나 이름 (없으면 기본값 '밤티')
+  comboBoosterExpiresAt?: string | null; // 콤보 부스터 5배 버프 만료시각 (서버 profiles 기준)
 }
 
 const getInitialPhrases = (personaName: string) => [
@@ -51,6 +52,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   equippedStamp,
   profilesStampMap = {},
   currentUserId = '',
+  comboBoosterExpiresAt,
   isAdmin = false,
   aiPersonaName = '밤티',
 }) => {
@@ -602,18 +604,8 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
       const basePoints = state === 'O' ? [3, 7, 15][index] : (state === 'X' || state === 'star') ? 1 : 0;
 
-      // 3시간 5배 부스터 여부 확인
-      let isBoosterActive = false;
-      if (currentUserId) {
-        const boosterRaw = localStorage.getItem(`reviewnote_combo_booster_expires_${currentUserId}`);
-        if (boosterRaw) {
-          const expiresAt = parseInt(boosterRaw, 10);
-          if (!isNaN(expiresAt) && Date.now() < expiresAt) {
-            isBoosterActive = true;
-          }
-        }
-      }
-
+      // 3시간 5배 부스터 여부 확인 (서버 profiles.combo_booster_expires_at 기준 — App.tsx에서 전달)
+      const isBoosterActive = !!comboBoosterExpiresAt && Date.now() < new Date(comboBoosterExpiresAt).getTime();
       const finalPoints = isBoosterActive ? basePoints * 5 : basePoints;
 
       window.dispatchEvent(

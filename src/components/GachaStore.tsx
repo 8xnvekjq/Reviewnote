@@ -49,6 +49,7 @@ interface GachaStoreProps {
   onUseNameChangeTicket?: () => void; // 닉네임 변경권 사용 콜백
   onUseAiNameChangeTicket?: () => void; // AI 이름 변경권 사용 콜백
   aiPersonaName?: string; // AI 이름 변경권으로 바꾼 커스텀 AI 페르소나 이름 (없으면 기본값 '밤티')
+  comboBoosterExpiresAt?: string | null; // 콤보 부스터 5배 버프 만료시각 (서버 profiles 기준, App.tsx에서 전달)
 }
 
 export const GachaStore: React.FC<GachaStoreProps> = ({
@@ -60,6 +61,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
   onUseNameChangeTicket,
   onUseAiNameChangeTicket,
   aiPersonaName,
+  comboBoosterExpiresAt,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'draw' | 'synthesis' | 'inventory' | 'catalog'>('draw');
 
@@ -513,34 +515,27 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
   };
 
   // ⚡ 콤보 부스터 (5배 버프 3시간권) 사용
+  // "실제로 아이템을 소유했는지"와 "만료시각 설정"을 서버 RPC(activate_combo_booster) 하나로
+  // 원자적으로 처리한다 — 클라이언트가 localStorage 등으로 만료시각을 직접 조작해서 아이템 없이도
+  // 버프를 위조하는 것을 막기 위함 (profiles.combo_booster_expires_at은 이 RPC로만 설정 가능).
   const handleUsePointBoosterTicket = async () => {
     const currentQty = inventory['item_point_booster'] || 0;
     if (currentQty < 1) return;
 
-    const newQty = currentQty - 1;
-    const { error } = await supabase
-      .from('user_items')
-      .update({ quantity: newQty })
-      .eq('user_id', userId)
-      .eq('item_id', 'item_point_booster');
+    const { data, error } = await supabase.rpc('activate_combo_booster', { user_id_param: userId });
 
-    if (error) {
+    if (error || !data) {
       showNoticeModal({
         title: '사용 실패',
-        message: `콤보 부스터 사용에 실패했습니다: ${error.message}`,
+        message: `콤보 부스터 사용에 실패했습니다: ${error?.message || '보유 수량을 확인해 주세요.'}`,
         badge: '오류',
         icon: '⚠️',
       });
       return;
     }
 
-    // 3시간 5배 버프 만료 시각 설정 (현재 시각 + 3시간)
-    const expiresAt = Date.now() + 3 * 3600 * 1000;
-    const storageKey = `reviewnote_combo_booster_expires_${userId}`;
-    localStorage.setItem(storageKey, expiresAt.toString());
-
-    setInventory(prev => ({ ...prev, item_point_booster: newQty }));
-    window.dispatchEvent(new Event('reviewnote_booster_updated'));
+    setInventory(prev => ({ ...prev, item_point_booster: currentQty - 1 }));
+    window.dispatchEvent(new Event('reviewnote_inventory_updated'));
 
     showNoticeModal({
       title: '⚡ 콤보 부스터 5배 버프 발동!',
@@ -567,12 +562,10 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
     }
   };
 
-  // ⚡ 콤보 부스터 잔여 시간 계산
+  // ⚡ 콤보 부스터 잔여 시간 계산 (App.tsx가 서버 profiles.combo_booster_expires_at에서 전달한 값 기준)
   const getBoosterRemainingTimeStr = () => {
-    if (!userId) return null;
-    const expiresRaw = localStorage.getItem(`reviewnote_combo_booster_expires_${userId}`);
-    if (!expiresRaw) return null;
-    const expiresAt = parseInt(expiresRaw, 10);
+    if (!comboBoosterExpiresAt) return null;
+    const expiresAt = new Date(comboBoosterExpiresAt).getTime();
     if (isNaN(expiresAt) || Date.now() >= expiresAt) return null;
 
     const remainingMs = expiresAt - Date.now();

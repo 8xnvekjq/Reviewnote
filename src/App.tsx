@@ -68,6 +68,9 @@ function App() {
   // AI 이름 변경권으로 바꾼 커스텀 AI 페르소나 이름 (비어있으면 기본값 '밤티' 사용)
   const [customAiName, setCustomAiName] = useState<string>('');
   const [hasAiNameChangeTicket, setHasAiNameChangeTicket] = useState<boolean>(false);
+  // ⚡ 콤보 부스터 5배 버프 만료 시각 (서버 profiles.combo_booster_expires_at 기준 — 클라이언트가
+  // 임의로 조작할 수 없도록 activate_combo_booster RPC로만 값이 설정됨)
+  const [comboBoosterExpiresAt, setComboBoosterExpiresAt] = useState<string | null>(null);
   // userId -> displayName map (admin 전용)
   const [profilesMap, setProfilesMap] = useState<Record<string, string>>({});
   // 유튜브 매칭용 강의 마스터 리스트 상태
@@ -494,6 +497,7 @@ function App() {
         setTeacherApproachGuides([]);
         setWeeklyChampions([]);
         setEquippedItems({});
+        setComboBoosterExpiresAt(null);
         setMyNickname('');
         try {
           localStorage.removeItem('reviewnote_equipped_items');
@@ -507,11 +511,19 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // 인벤토리 상태 변경 시 (가챠 보물 획득/사용 시) 닉네임 변경권 수량 실시간 재조회
+  // 인벤토리 상태 변경 시 (가챠 보물 획득/사용 시) 닉네임 변경권 수량 및 콤보 부스터 만료시각 실시간 재조회
   useEffect(() => {
     const handleInvUpdated = () => {
       if (session?.user?.id) {
         checkNameChangeTicket(session.user.id);
+        supabase
+          .from('profiles')
+          .select('combo_booster_expires_at')
+          .eq('id', session.user.id)
+          .maybeSingle()
+          .then(({ data }) => {
+            if (data) setComboBoosterExpiresAt(data.combo_booster_expires_at || null);
+          });
       }
     };
     window.addEventListener('reviewnote_inventory_updated', handleInvUpdated);
@@ -609,7 +621,7 @@ function App() {
         targetId
           ? supabase
               .from('profiles')
-              .select('nickname, display_name, bonus_points, point_adjustment, equipped_title, equipped_stamp, equipped_theme, equipped_ai_voice, current_streak, streak_last_review_date, streak_shields, streak_milestone_claimed, custom_ai_name')
+              .select('nickname, display_name, bonus_points, point_adjustment, equipped_title, equipped_stamp, equipped_theme, equipped_ai_voice, current_streak, streak_last_review_date, streak_shields, streak_milestone_claimed, custom_ai_name, combo_booster_expires_at')
               .eq('id', targetId)
               .maybeSingle()
           : Promise.resolve({ data: null } as { data: null }),
@@ -635,6 +647,7 @@ function App() {
             aiVoice: myProfile.equipped_ai_voice || undefined,
           });
           setMyBonusPoints(myProfile.bonus_points || 0);
+          setComboBoosterExpiresAt(myProfile.combo_booster_expires_at || null);
 
           // 🎟️ 럭키상점에서 쓴 점수(포인트 차감치)를 서버 기준으로 복원 — 기기를 바꿔도 잔액이 정확하게 유지됨
           const dbPointAdjustment = myProfile.point_adjustment ?? 0;
@@ -1436,18 +1449,9 @@ function App() {
       }
 
       // ⚡ 콤보 부스터 3시간 5배 버프 적용 (사용 후 3시간 동안 모든 복습 획득 포인트 5배!)
-      const userId = session?.user?.id;
-      let isBoosterActive = false;
-      if (userId) {
-        const storageKey = `reviewnote_combo_booster_expires_${userId}`;
-        const expiresRaw = localStorage.getItem(storageKey);
-        if (expiresRaw) {
-          const expiresAt = parseInt(expiresRaw, 10);
-          if (!isNaN(expiresAt) && Date.now() < expiresAt) {
-            isBoosterActive = true;
-          }
-        }
-      }
+      // 서버(profiles.combo_booster_expires_at, activate_combo_booster RPC로만 설정됨)를 신뢰
+      // 근거로 삼는다 — 클라이언트가 임의로 localStorage 값을 조작해서 버프를 위조할 수 없다.
+      const isBoosterActive = !!comboBoosterExpiresAt && Date.now() < new Date(comboBoosterExpiresAt).getTime();
 
       if (reviewPointDelta > 0 && isBoosterActive) {
         reviewPointDelta = reviewPointDelta * 5; // 복습 획득 포인트 5배 곱하기 적용
@@ -1691,6 +1695,7 @@ function App() {
         onOpenStore={() => setActiveTab('store')}
         equippedTitle={equippedItems.title}
         streakDays={streakState.currentStreak}
+        comboBoosterExpiresAt={comboBoosterExpiresAt}
       />
 
       {/* Main Content Area */}
@@ -1705,6 +1710,7 @@ function App() {
             onUseNameChangeTicket={handleUseNameChangeTicket}
             onUseAiNameChangeTicket={handleUseAiNameChangeTicket}
             aiPersonaName={customAiName || '밤티'}
+            comboBoosterExpiresAt={comboBoosterExpiresAt}
           />
         )}
 
@@ -2153,6 +2159,7 @@ function App() {
           currentUserId={session?.user?.id || currentUser || ''}
           isAdmin={isAdmin}
           aiPersonaName={customAiName || '밤티'}
+          comboBoosterExpiresAt={comboBoosterExpiresAt}
         />
       )}
 
