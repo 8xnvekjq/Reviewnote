@@ -264,3 +264,84 @@
 .animate-float-up-fade {
   animation: floatUpFade 2.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* 🤍 라이트 / 화이트 테마 전용 동적 텍스트 & 카드 자동 반전 시스템 */
+.theme-light {
+  color: #0f172a !important;
+}
+
+.theme-light .text-white,
+.theme-light .text-slate-100,
+.theme-light .text-slate-200 {
+  color: #0f172a !important; /* 딥 네이비 블랙 */
+}
+
+.theme-light .text-slate-300,
+.theme-light .text-slate-400 {
+  color: #334155 !important; /* 딥 묵직한 슬레이트 */
+}
+
+.theme-light .text-slate-500 {
+  color: #475569 !important;
+}
+
+.theme-light .bg-slate-950,
+.theme-light .bg-slate-900,
+.theme-light .bg-slate-955 {
+  background-color: #ffffff !important;
+}
+
+.theme-light .bg-slate-900\/60,
+.theme-light .bg-slate-900\/80,
+.theme-light .bg-slate-900\/90,
+.theme-light .bg-slate-955\/80,
+.theme-light .bg-slate-950\/80 {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+}
+
+.theme-light .bg-slate-800 {
+  background-color: #f1f5f9 !important;
+}
+
+.theme-light .border-slate-800,
+.theme-light .border-slate-700 {
+  border-color: #cbd5e1 !important;
+}
+
+/* 🌈 프레임 & 테두리 무지개 그라데이션 웨이브 애니메이션 */
+@keyframes rainbowWave {
+  0% {
+    border-color: #ff0055;
+    box-shadow: 0 0 15px rgba(255, 0, 85, 0.6);
+  }
+  16% {
+    border-color: #ff7300;
+    box-shadow: 0 0 15px rgba(255, 115, 0, 0.6);
+  }
+  33% {
+    border-color: #ffeb00;
+    box-shadow: 0 0 15px rgba(255, 235, 0, 0.6);
+  }
+  50% {
+    border-color: #00ff66;
+    box-shadow: 0 0 15px rgba(0, 255, 102, 0.6);
+  }
+  66% {
+    border-color: #00e5ff;
+    box-shadow: 0 0 15px rgba(0, 229, 255, 0.6);
+  }
+  83% {
+    border-color: #9d00ff;
+    box-shadow: 0 0 15px rgba(157, 0, 255, 0.6);
+  }
+  100% {
+    border-color: #ff0055;
+    box-shadow: 0 0 15px rgba(255, 0, 85, 0.6);
+  }
+}
+
+.theme-rainbow-frame header,
+.theme-rainbow-frame .border-app-theme,
+.theme-rainbow-frame main > div {
+  animation: rainbowWave 4s linear infinite !important;
+}
