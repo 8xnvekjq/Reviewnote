@@ -1,5 +1,6 @@
 import type { ProblemBox } from '../types';
 import { MATH_CURRICULUM } from '../types';
+import { supabase } from './supabase';
 
 /**
  * 브라우저 Canvas를 이용하여 이미지를 최대 가로/세로 1200px 크기로 축소하고,
@@ -62,6 +63,25 @@ function parseBase64Image(dataUrl: string): { mimeType: string; base64Data: stri
   return {
     mimeType: matches[1],
     base64Data: matches[2]
+  };
+}
+
+/**
+ * Gemini API 키는 서버(Supabase Edge Function)에만 보관되고 클라이언트에는 절대 내려오지 않는다.
+ * 브라우저는 이 프록시 함수만 호출하며, 요청은 로그인 세션의 JWT로 인증된다 (verify_jwt=true 배포).
+ */
+const GEMINI_PROXY_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gemini-proxy`;
+
+async function getGeminiProxyHeaders(): Promise<Record<string, string>> {
+  const { data } = await supabase.auth.getSession();
+  const accessToken = data.session?.access_token;
+  if (!accessToken) {
+    throw new Error('로그인 세션이 만료되었습니다. 다시 로그인해 주세요.');
+  }
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${accessToken}`,
+    'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || '',
   };
 }
 
@@ -271,18 +291,16 @@ function normalizeGradeAndChapter(
  * Helper to escape LaTeX backslashes inside the raw JSON response text.
  * Prevents double-JSON parsing from stripping backslashes (e.g. converting \times to [tab]imes, \text to [tab]ext).
  */
-async function callGeminiApi(modelName: string, requestBody: any, apiKey: string): Promise<any> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+async function callGeminiApi(modelName: string, requestBody: any): Promise<any> {
+  const headers = await getGeminiProxyHeaders();
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     let response: Response;
     try {
-      response = await fetchWithTimeout(url, {
+      response = await fetchWithTimeout(GEMINI_PROXY_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
+        headers,
+        body: JSON.stringify({ model: modelName, requestBody, stream: false })
       }, 90000); // solve 단계 정상 응답이 1분 안팎으로 걸리는 경우가 있어, 정상 응답을 오탐하지 않도록 90초로 넉넉히 설정
     } catch (err: any) {
       if (err?.name === 'AbortError') {
@@ -326,10 +344,9 @@ async function callGeminiApi(modelName: string, requestBody: any, apiKey: string
 async function streamGeminiApi(
   modelName: string,
   requestBody: any,
-  apiKey: string,
   onProgress: (accumulatedText: string) => void
 ): Promise<string> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:streamGenerateContent?alt=sse&key=${apiKey}`;
+  const headers = await getGeminiProxyHeaders();
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const controller = new AbortController();
@@ -337,10 +354,10 @@ async function streamGeminiApi(
 
     let response: Response;
     try {
-      response = await fetch(url, {
+      response = await fetch(GEMINI_PROXY_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
+        headers,
+        body: JSON.stringify({ model: modelName, requestBody, stream: true }),
         signal: controller.signal
       });
     } catch (err: any) {
@@ -424,7 +441,6 @@ async function streamGeminiApi(
  */
 export async function classifyMistakeWithGemini(
   image: { mimeType: string; base64Data: string },
-  apiKey: string,
   youtubeLectures: any[] = [],
   studentGrade?: string,
   personaName: string = '밤티'
@@ -548,7 +564,7 @@ ${syllabusText || '등록된 강의가 없습니다.'}
 
   try {
     const resolvedModel = 'gemini-2.5-flash';
-    const parsedJson = await callGeminiApi(resolvedModel, requestBody, apiKey);
+    const parsedJson = await callGeminiApi(resolvedModel, requestBody);
 
     // 단원명 보정 및 보정 로직 (통합 Fuzzy Matching 및 선행 확장 보정)
     const { grade: resolvedGrade, chapter: resolvedChapter } = normalizeGradeAndChapter(
@@ -577,8 +593,7 @@ ${syllabusText || '등록된 강의가 없습니다.'}
  * 호출 안에 함께 묶여 있어서 실제 풀이 계산과 순차적으로 처리되며 solve의 출력량/시간을 늘리고 있었음)
  */
 export async function extractProblemWithGemini(
-  image: { mimeType: string; base64Data: string },
-  apiKey: string
+  image: { mimeType: string; base64Data: string }
 ): Promise<{ problemText: string; problemBox: ProblemBox }> {
   const { mimeType, base64Data } = image;
 
@@ -627,7 +642,7 @@ export async function extractProblemWithGemini(
 
   try {
     const resolvedModel = 'gemini-2.5-flash';
-    const parsedJson = await callGeminiApi(resolvedModel, requestBody, apiKey);
+    const parsedJson = await callGeminiApi(resolvedModel, requestBody);
 
     return {
       problemText: parsedJson.problemText,
@@ -647,7 +662,6 @@ const FINAL_ANSWER_DELIMITER = '%%FINAL_ANSWER%%';
 
 export async function solveMistakeWithGemini(
   image: { mimeType: string; base64Data: string },
-  apiKey: string,
   resolvedGrade: string,
   resolvedChapter: string,
   studentGrade?: string,
@@ -769,7 +783,7 @@ JSON이나 코드블록 없이 위 4개 헤더가 포함된 해설 리포트를 
 
   try {
     const resolvedModel = 'gemini-2.5-flash';
-    const fullText = await streamGeminiApi(resolvedModel, requestBody, apiKey, (accumulatedText) => {
+    const fullText = await streamGeminiApi(resolvedModel, requestBody, (accumulatedText) => {
       const delimIdx = accumulatedText.indexOf(MISTAKE_SUMMARY_DELIMITER);
       const visibleSoFar = delimIdx === -1 ? accumulatedText : accumulatedText.slice(0, delimIdx);
       onProgress?.(visibleSoFar.trim());

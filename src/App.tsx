@@ -84,7 +84,6 @@ function App() {
   const [profilesStampMap, setProfilesStampMap] = useState<Record<string, string>>({});
   const [scaffoldedMistakeIds, setScaffoldedMistakeIds] = useState<Set<string>>(new Set()); // 스캐폴딩 힌트가 첨부된 오답 id 집합
   // Supabase system_config 테이블에서 로드한 Gemini API Key 상태 (무료키는 레이트리밋 문제로 배제하고 유료키만 사용)
-  const [paidGeminiKey, setPaidGeminiKey] = useState<string>('');
   // AI 진단 평균 소요시간(ms) — diagnosis_stats 테이블의 전역 누적치 기반, 오답 카드 삭제와 무관하게 유지됨
   const [averageWaitMs, setAverageWaitMs] = useState<number | null>(null);
   // 다른 학생들의 실시간 복습 현황 목록
@@ -351,7 +350,7 @@ function App() {
   // ('INITIAL_SESSION' 이벤트). 그런데 여기서 별도로 getSession().then(...)도 같은 로직을
   // 중복 실행하고 있어서, 로그인 상태로 앱을 켤 때마다 fetchUserData(내부에서 순차 DB
   // 조회 4번) + fetchAdminStatus + loadYoutubeLectures + loadWeeklyChampions +
-  // fetchGeminiApiKeys + fetchDiagnosisStats가 전부 두 번씩 실행되고 있었다 — 로딩이
+  // fetchDiagnosisStats가 전부 두 번씩 실행되고 있었다 — 로딩이
   // 느려진 원인 중 하나. onAuthStateChange 하나로 통합해서 중복 요청을 없앤다.
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -362,7 +361,6 @@ function App() {
         fetchUserData(session.user.id); // 내부에서 loadWeeklyChampions/fetchPeerActivities도 같이 호출함
         fetchAdminStatus(session.user.id);
         loadYoutubeLectures(); // 유튜브 강의 데이터 로드
-        fetchGeminiApiKeys(); // 동적 API 키 로드
         fetchDiagnosisStats(); // 평균 진단 소요시간 조회
       } else {
         setCurrentUser('');
@@ -370,7 +368,6 @@ function App() {
         setMistakes([]);
         setYoutubeLectures([]);
         setWeeklyChampions([]);
-        setPaidGeminiKey('');
         setEquippedItems({});
         setMyNickname('');
         try {
@@ -453,25 +450,6 @@ function App() {
     const interval = setInterval(fetchOnlineUsers, 30000); // 30초 폴링
     return () => clearInterval(interval);
   }, [session]);
-
-  // Supabase system_config 로부터 Gemini API Key들을 로드
-  const fetchGeminiApiKeys = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('system_config')
-        .select('key, value');
-      if (error) throw error;
-      
-      (data || []).forEach((row: any) => {
-        // 무료키(gemini_api_key)는 레이트리밋으로 인한 지연/오류 문제로 더 이상 사용하지 않고, 유료키만 사용합니다.
-        if (row.key === 'gemini_api_key_paid') {
-          setPaidGeminiKey(row.value || '');
-        }
-      });
-    } catch (err) {
-      console.error('Failed to load Gemini API Keys from Supabase config:', err);
-    }
-  };
 
   // diagnosis_stats 테이블(전역 누적, 오답 카드 삭제와 무관하게 유지됨)에서 평균 진단 소요시간 조회
   const fetchDiagnosisStats = async () => {
@@ -786,15 +764,8 @@ function App() {
     };
   }, [session?.user?.id]);
 
-  // Start analysis trigger (유료키 전용 — 무료키는 레이트리밋으로 인한 지연/오류가 잦아 배제)
+  // Start analysis trigger (Gemini API 키는 서버(Edge Function)에서만 다루므로 클라이언트는 신경쓸 필요 없음)
   const handleStartAnalysis = async (entry: MistakeEntry) => {
-    const paidKey = paidGeminiKey;
-
-    if (!paidKey) {
-      alert('Supabase 보안 테이블(system_config)에 유료 API 키(gemini_api_key_paid)가 등록되지 않았습니다. Supabase 대시보드에서 키 설정을 완료해 주세요.');
-      return;
-    }
-
     setIsAnalyzing(true);
     // 진단 전체(classify+extract+solve) 소요 시간을 재서 평균 대기시간 계산에 사용
     const analysisStartTime = Date.now();
@@ -806,13 +777,13 @@ function App() {
       const image = await prepareGeminiImage(entry.imageUrl);
 
       // 문제 지문(OCR)/바운딩박스 추출은 과목·단원과 무관한 작업이라 classify와 완전히 동시에 시작합니다.
-      const extractPromise = extractProblemWithGemini(image, paidKey);
+      const extractPromise = extractProblemWithGemini(image);
       // classify가 끝날 때까지 extractPromise를 아직 await하지 않으므로, 그 사이 실패하더라도
       // "unhandled promise rejection" 경고가 뜨지 않도록 별도 채널로 미리 캐치해둔다 (실제 처리는 solveStep에서).
       extractPromise.catch(() => {});
 
-      const updated = await classifyStep(entry, paidKey, studentGrade, image);
-      await solveStep(updated, paidKey, studentGrade, image, extractPromise, analysisStartTime);
+      const updated = await classifyStep(entry, studentGrade, image);
+      await solveStep(updated, studentGrade, image, extractPromise, analysisStartTime);
     } catch (err: any) {
       console.error(err);
       alert(err.message || 'AI 분석 실행 중 오류가 발생했습니다.');
@@ -824,11 +795,10 @@ function App() {
   // --- 1단계: 과목/단원 및 유튜브 딥링크 1차 판단 + DB/로컬 상태 갱신 ---
   const classifyStep = async (
     entry: MistakeEntry,
-    apiKey: string,
     studentGrade: string | undefined,
     image: { mimeType: string; base64Data: string }
   ): Promise<MistakeEntry> => {
-    const firstResult = await classifyMistakeWithGemini(image, apiKey, youtubeLectures, studentGrade, customAiName || '밤티');
+    const firstResult = await classifyMistakeWithGemini(image, youtubeLectures, studentGrade, customAiName || '밤티');
 
     // 1단계 결과를 기반으로 Supabase DB에 과목, 단원, 유튜브 매칭 필드 우선 업데이트
     const partialAnalysis: MistakeAnalysis = {
@@ -870,7 +840,6 @@ function App() {
   // --- 2단계: 문제 풀이(스트리밍) + 문제 지문/바운딩박스 추출을 동시 진행 + DB/로컬 상태 갱신 ---
   const solveStep = async (
     updatedEntry: MistakeEntry,
-    apiKey: string,
     studentGrade: string | undefined,
     image: { mimeType: string; base64Data: string },
     extractPromise: ReturnType<typeof extractProblemWithGemini>,
@@ -914,7 +883,6 @@ function App() {
     const [secondResult, extractResult] = await Promise.all([
       solveMistakeWithGemini(
         image,
-        apiKey,
         updatedEntry.grade || '',
         updatedEntry.chapter || '',
         studentGrade,
