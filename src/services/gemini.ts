@@ -655,65 +655,6 @@ export async function extractProblemWithGemini(
 }
 
 /**
- * 촬영 직후 크롭 화면에서 문제 영역을 자동으로 찾기 위한 4개 꼭짓점 검출 호출.
- * problemBox(축에 평행한 바운딩 박스)와 달리, 사진이 기울어지거나 원근감 있게 찍혔을 때도
- * 실제 종이/문제 영역 그대로의 사각형(quad) 꼭짓점을 찾아서 원근 보정(warp)에 사용한다.
- * 실패해도 크롭 자체는 계속 진행할 수 있어야 하므로 예외를 던지지 않고 null을 반환한다.
- */
-export async function detectProblemCornersWithGemini(
-  image: { mimeType: string; base64Data: string }
-): Promise<{
-  tl: { x: number; y: number };
-  tr: { x: number; y: number };
-  br: { x: number; y: number };
-  bl: { x: number; y: number };
-} | null> {
-  const { mimeType, base64Data } = image;
-
-  const prompt = `주어진 사진에서, 학생이 손으로 쓴 풀이나 낙서를 제외한 인쇄된 수학 문제 본문(지문+보기)이 차지하는 사각형 영역의 네 꼭짓점 좌표를 찾아라.
-사진이 기울어지거나 원근감 있게 촬영되었다면, 축에 평행한 바운딩 박스가 아니라 실제 종이/문제 영역 그대로 기울어진 사각형의 네 꼭짓점을 찾아야 한다.
-각 좌표는 사진 전체 가로/세로 크기 대비 백분율(0~100, 소수 가능)로, tl(좌상단), tr(우상단), br(우하단), bl(좌하단) 순서로 반환하여라.
-인쇄된 문제 영역을 찾을 수 없으면 null을 반환하여라.`;
-
-  const requestBody = {
-    contents: [
-      {
-        parts: [
-          { text: prompt },
-          { inlineData: { mimeType, data: base64Data } }
-        ]
-      }
-    ],
-    generationConfig: {
-      // problemBox와 동일하게 공간 추론이 필요한 작업이라 thinking을 끄지 않는다.
-      maxOutputTokens: 65536,
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: 'OBJECT',
-        properties: {
-          tl: { type: 'OBJECT', properties: { x: { type: 'NUMBER' }, y: { type: 'NUMBER' } }, required: ['x', 'y'], nullable: true },
-          tr: { type: 'OBJECT', properties: { x: { type: 'NUMBER' }, y: { type: 'NUMBER' } }, required: ['x', 'y'], nullable: true },
-          br: { type: 'OBJECT', properties: { x: { type: 'NUMBER' }, y: { type: 'NUMBER' } }, required: ['x', 'y'], nullable: true },
-          bl: { type: 'OBJECT', properties: { x: { type: 'NUMBER' }, y: { type: 'NUMBER' } }, required: ['x', 'y'], nullable: true }
-        }
-      }
-    }
-  };
-
-  try {
-    const resolvedModel = 'gemini-2.5-flash';
-    const parsedJson = await callGeminiApi(resolvedModel, requestBody);
-    if (!parsedJson?.tl || !parsedJson?.tr || !parsedJson?.br || !parsedJson?.bl) {
-      return null;
-    }
-    return parsedJson;
-  } catch (error) {
-    console.error('Gemini corner detection failed (falling back to manual crop):', error);
-    return null;
-  }
-}
-
-/**
  * 2차 API 호출: 확정된 과목/단원을 엄격한 가이드로 삼아 해설 정밀 생성 (스트리밍)
  */
 const MISTAKE_SUMMARY_DELIMITER = '%%MISTAKE_SUMMARY%%';
