@@ -21,6 +21,7 @@ import { RecentActivityFeed } from './components/RecentActivityFeed';
 import { ScaffoldingListPanel } from './components/ScaffoldingListPanel';
 import { StoreGuideModal } from './components/StoreGuideModal';
 import { NewScaffoldingModal, type UnseenScaffoldingItem } from './components/NewScaffoldingModal';
+import { CustomNoticeModal, type NoticeModalState } from './components/CustomNoticeModal';
 import { getTitleBadgeStyle, GACHA_ITEMS } from './utils/gachaCatalog';
 import type { EquippedItems } from './types';
 import { applyThemeColor } from './utils/theme';
@@ -247,6 +248,24 @@ function App() {
     } catch (e) {
       console.error(e);
     }
+  };
+
+  // 🔔 전역 커스텀 알림 모달 상태 (웹 브라우저 native alert 완전 대체)
+  const [noticeModal, setNoticeModal] = useState<NoticeModalState>({
+    isOpen: false,
+    title: '',
+    message: '',
+  });
+
+  const showNoticeModal = (info: Omit<NoticeModalState, 'isOpen'>) => {
+    setNoticeModal({
+      isOpen: true,
+      ...info,
+    });
+  };
+
+  const closeNoticeModal = () => {
+    setNoticeModal((prev) => ({ ...prev, isOpen: false }));
   };
 
   // 💡 신규 스캐폴딩(선생님 맞춤 힌트) 안내 모달 상태
@@ -713,7 +732,12 @@ function App() {
       .maybeSingle();
 
     if (!ticketRow || ticketRow.quantity < 1) {
-      alert('🏷️ 닉네임 변경권이 없습니다!\n럭키 상점에서 뽑기를 통해 획득하세요.');
+      showNoticeModal({
+        title: '🏷️ 닉네임 변경권이 없습니다!',
+        message: '럭키 상점에서 뽑기를 통해 획득하세요.',
+        badge: '럭키상점',
+        icon: '🏷️',
+      });
       return;
     }
 
@@ -737,9 +761,19 @@ function App() {
       setHasNameChangeTicket(newQty > 0);
       window.dispatchEvent(new CustomEvent('reviewnote_inventory_updated'));
       loadWeeklyChampions();
-      alert(`✅ 닉네임이 '${trimmed}'(으)로 변경되었습니다!\n(잔여 변경권: ${newQty}개)`);
+      showNoticeModal({
+        title: '✅ 닉네임 변경 완료!',
+        message: `'${trimmed}'(으)로 닉네임이 성공적으로 변경되었습니다.\n(잔여 변경권: ${newQty}개)`,
+        badge: '닉네임 변경',
+        icon: '✨',
+      });
     } catch (err: any) {
-      alert(`닉네임 변경에 실패했습니다: ${err.message}`);
+      showNoticeModal({
+        title: '닉네임 변경 실패',
+        message: err.message,
+        badge: '오류',
+        icon: '⚠️',
+      });
     }
   };
 
@@ -775,7 +809,12 @@ function App() {
       .maybeSingle();
 
     if (!ticketRow || ticketRow.quantity < 1) {
-      alert('🎭 AI 이름 변경권이 없습니다!\n럭키 상점에서 뽑기를 통해 획득하세요.');
+      showNoticeModal({
+        title: '🎭 AI 이름 변경권이 없습니다!',
+        message: '럭키 상점에서 뽑기를 통해 획득하세요.',
+        badge: '럭키상점',
+        icon: '🎭',
+      });
       return;
     }
 
@@ -796,9 +835,19 @@ function App() {
       setCustomAiName(trimmed);
       setHasAiNameChangeTicket(newQty > 0);
       window.dispatchEvent(new CustomEvent('reviewnote_inventory_updated'));
-      alert(`✅ AI 이름이 '${trimmed}'(으)로 변경되었습니다!\n(잔여 변경권: ${newQty}개)`);
+      showNoticeModal({
+        title: '✅ AI 이름 변경 완료!',
+        message: `'${trimmed}'(으)로 AI 이름이 성공적으로 변경되었습니다.\n(잔여 변경권: ${newQty}개)`,
+        badge: 'AI 이름 변경',
+        icon: '🤖',
+      });
     } catch (err: any) {
-      alert(`AI 이름 변경에 실패했습니다: ${err.message}`);
+      showNoticeModal({
+        title: 'AI 이름 변경 실패',
+        message: err.message,
+        badge: '오류',
+        icon: '⚠️',
+      });
     }
   };
 
@@ -900,7 +949,12 @@ function App() {
       await solveStep(updated, studentGrade, image, extractPromise, analysisStartTime);
     } catch (err: any) {
       console.error(err);
-      alert(err.message || 'AI 분석 실행 중 오류가 발생했습니다.');
+      showNoticeModal({
+        title: 'AI 분석 오류',
+        message: err.message || 'AI 분석 실행 중 오류가 발생했습니다.',
+        badge: '오류',
+        icon: '⚠️',
+      });
     } finally {
       setIsAnalyzing(false);
     }
@@ -1156,7 +1210,12 @@ function App() {
     setStreakState(updatedState);
 
     if (shieldUsed) {
-      alert("🛡️ [스트릭 방어 성공!] 어제 복습을 놓쳤지만, 럭키상점에서 보유한 '스트릭 방어권'이 자동으로 발동되어 🔥 연속 복습 기록이 안전하게 보호되었습니다!");
+      showNoticeModal({
+        title: '🛡️ 스트릭 방어 성공!',
+        message: "어제 복습을 놓쳤지만, 럭키상점에서 보유한 '스트릭 방어권'이 자동으로 발동되어 🔥 연속 복습 기록이 안전하게 보호되었습니다!",
+        badge: '스트릭 방어권 발동',
+        icon: '🛡️',
+      });
       // '1회용' 아이템이므로 실제로 방어에 쓰인 순간 인벤토리에서 1개 소모 (이전에는 profiles.streak_shields
       // 카운터만 갱신하고 user_items 수량은 건드리지 않아서, 아이템을 갖고 있는 한 무한정 재사용되는 버그가 있었음)
       supabase.rpc('decrement_item_quantity', { user_id_param: session.user.id, item_id_param: 'item_streak_shield' })
@@ -1193,7 +1252,12 @@ function App() {
           }
         });
       const milestoneDaysLabel = newMilestones.map(m => `${m.days}일`).join(', ');
-      alert(`🔥 [연속 복습 콤보 달성!] ${milestoneDaysLabel} 마일스톤 보너스 ${bonusGained}점이 적립되었습니다!`);
+      showNoticeModal({
+        title: '🔥 연속 복습 콤보 달성!',
+        message: `${milestoneDaysLabel} 마일스톤 보너스 ${bonusGained}점이 적립되었습니다! 🐱`,
+        badge: '콤보 마일스톤 달성',
+        icon: '🔥',
+      });
     }
   };
 
@@ -1259,7 +1323,12 @@ function App() {
       setSelectedEntry(newEntry); // Open modal immediately
     } catch (err: any) {
       console.error(err);
-      alert('스캔 이미지 클라우드 업로드 실패: ' + err.message);
+      showNoticeModal({
+        title: '업로드 실패',
+        message: '스캔 이미지 클라우드 업로드 실패: ' + err.message,
+        badge: '오류',
+        icon: '⚠️',
+      });
     } finally {
       setIsAnalyzing(false);
     }
@@ -1286,7 +1355,12 @@ function App() {
         loadWeeklyChampions(); // MVP 챔피언 배너 즉각 갱신
       } catch (err: any) {
         console.error(err);
-        alert('삭제 실패: ' + err.message);
+        showNoticeModal({
+          title: '삭제 실패',
+          message: err.message,
+          badge: '오류',
+          icon: '⚠️',
+        });
       }
     }
   };
@@ -1459,7 +1533,12 @@ function App() {
     });
 
     if (uncompleted.length === 0) {
-      alert('🎉 완벽합니다! 현재 복습할 남은 오답이 없습니다. 모두 완료했습니다! 🐱');
+      showNoticeModal({
+        title: '🎉 완벽합니다!',
+        message: '현재 복습할 남은 오답이 없습니다. 모든 복습을 완주하셨습니다! 🐱',
+        badge: '복습 완주',
+        icon: '🎉',
+      });
       return;
     }
 
@@ -2182,6 +2261,12 @@ function App() {
           setSelectedEntry(entry);
         }}
         onGoToClinic={() => setActiveTab('scaffolding')}
+      />
+
+      {/* 🔔 전역 커스텀 알림 모달 (웹 브라우저 native alert 완전 대체) */}
+      <CustomNoticeModal
+        notice={noticeModal}
+        onClose={closeNoticeModal}
       />
 
     </div>

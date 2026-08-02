@@ -633,8 +633,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
         userActionPlan: editActionPlan || undefined,
       });
 
-      alert('성공적으로 저장되었습니다! 🎉');
-      onClose(); // 저장 완료 후 모달창을 자동으로 닫아 위화감을 없앱니다.
+      onClose(); // 저장 완료 후 모달창을 자동으로 닫아 깔끔하게 처리합니다.
     } catch (err: any) {
       alert('저장 실패: ' + err.message);
     } finally {

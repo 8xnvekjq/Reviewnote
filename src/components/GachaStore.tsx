@@ -4,6 +4,7 @@ import { GACHA_ITEMS, drawGachaItem, getRarityTheme, getRarityBadgeTextColor, ge
 import { CatPawIcon } from './CatPawIcon';
 import { supabase } from '../services/supabase';
 import { getKSTDateString } from '../utils/streak';
+import { CustomNoticeModal, type NoticeModalState } from './CustomNoticeModal';
 
 export interface ExtendedGachaItem extends GachaItem {
   isDuplicate?: boolean;
@@ -97,6 +98,24 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
   const freeDraw10Remaining = FREE_DRAW10_MAX - freeDrawUsedCount;
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // 🔔 커스텀 알림 모달 상태
+  const [noticeModal, setNoticeModal] = useState<NoticeModalState>({
+    isOpen: false,
+    title: '',
+    message: '',
+  });
+
+  const showNoticeModal = (info: Omit<NoticeModalState, 'isOpen'>) => {
+    setNoticeModal({
+      isOpen: true,
+      ...info,
+    });
+  };
+
+  const closeNoticeModal = () => {
+    setNoticeModal((prev) => ({ ...prev, isOpen: false }));
+  };
 
   // ── 최근 SSR/UR 전광판 피드 로드 ──────────────────────────
   const fetchRecentLogs = async () => {
@@ -340,15 +359,30 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
 
     if (isFree) {
       if (count === 1 && !canFreeDraw1) {
-        alert('🎁 오늘의 무료 1회 뽑기는 이미 사용했어요! 내일 다시 도전해보세요.');
+        showNoticeModal({
+          title: '🎁 무료 1회 뽑기 완료',
+          message: '오늘의 무료 1회 뽑기는 이미 사용했어요! 내일 다시 도전해보세요.',
+          badge: '무료 뽑기',
+          icon: '🎁',
+        });
         return;
       }
       if (count === 10 && !canFreeDraw10) {
-        alert(`🎁 계정 무료 10연속 뽑기 ${FREE_DRAW10_MAX}회를 모두 사용하셨습니다!`);
+        showNoticeModal({
+          title: '🎁 웰컴 10연속 무료 뽑기 완료',
+          message: `계정 무료 10연속 뽑기 ${FREE_DRAW10_MAX}회를 모두 사용하셨습니다!`,
+          badge: '무료 뽑기',
+          icon: '🎁',
+        });
         return;
       }
     } else if (userPoints < cost) {
-      alert(`⚡ 복습 점수가 부족합니다! (필요: ${cost}점, 현재: ${userPoints}점)\n오답 노트를 복습해서 콤보 점수를 쌓아보세요! 🐱`);
+      showNoticeModal({
+        title: '⚡ 콤보 점수 부족',
+        message: `복습 점수가 부족합니다! (필요: ${cost}점, 현재: ${userPoints}점)\n오답 노트를 복습해서 콤보 점수를 쌓아보세요! 🐱`,
+        badge: '점수 부족',
+        icon: '⚡',
+      });
       return;
     }
 
@@ -459,12 +493,22 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
       .eq('item_id', 'item_homework_exempt');
 
     if (error) {
-      alert(`숙제 면제권 사용에 실패했습니다: ${error.message}`);
+      showNoticeModal({
+        title: '사용 실패',
+        message: `숙제 면제권 사용에 실패했습니다: ${error.message}`,
+        badge: '오류',
+        icon: '⚠️',
+      });
       return;
     }
 
     setInventory(prev => ({ ...prev, item_homework_exempt: newQty }));
-    alert(`📝 숙제 면제권을 사용했습니다!\n이 화면을 선생님께 보여주세요. (잔여 ${newQty}개)`);
+    showNoticeModal({
+      title: '📝 숙제 면제권 사용 완료!',
+      message: `이 화면을 선생님께 보여주세요.\n(잔여 ${newQty}개)`,
+      badge: '숙제 면제권 사용',
+      icon: '📝',
+    });
   };
 
   // 아이템 장착/해제 토글
@@ -1000,6 +1044,12 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
           </div>
         </div>
       )}
+
+      {/* 🔔 커스텀 알림 모달 */}
+      <CustomNoticeModal
+        notice={noticeModal}
+        onClose={closeNoticeModal}
+      />
     </div>
   );
 };
