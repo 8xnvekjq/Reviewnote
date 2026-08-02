@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { GachaItem, EquippedItems } from '../types';
 import { GACHA_ITEMS, drawGachaItem, getRarityTheme, getRarityBadgeTextColor, getTitleBadgeStyle } from '../utils/gachaCatalog';
+import { getRandomCheer } from '../utils/aiVoiceCheers';
 import { CatPawIcon } from './CatPawIcon';
 import { supabase } from '../services/supabase';
 import { getKSTDateString } from '../utils/streak';
@@ -576,6 +577,9 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
 
   const boosterRemainingStr = getBoosterRemainingTimeStr();
 
+  // 장착 중인 AI 말투에 맞춘 응원 한 줄 (말투가 바뀔 때만 새로 고름 — 매 리렌더마다 바뀌지 않도록)
+  const cheerLine = useMemo(() => getRandomCheer(equippedItems.aiVoice), [equippedItems.aiVoice]);
+
   return (
     <div className="flex-1 flex flex-col bg-slate-955 text-slate-100 min-h-full pb-32 animate-fade-in select-none">
       {/* 캔버스 파티클 레이어 */}
@@ -616,11 +620,14 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
             <span>가이드</span>
           </button>
 
-          <div className="bg-slate-955/80 border border-amber-500/30 px-3.5 py-2 rounded-2xl flex flex-col items-end shadow-inner flex-none">
+          <div className="bg-slate-955/80 border border-amber-500/30 px-3.5 py-2 rounded-2xl flex flex-col items-end shadow-inner flex-none max-w-[160px] sm:max-w-[220px]">
             <span className="text-[9px] text-slate-400 font-bold">보유 콤보 점수</span>
             <span className="text-sm font-black text-amber-400 flex items-center space-x-1">
               <span>⚡</span>
               <span>{userPoints}점</span>
+            </span>
+            <span className="text-[9px] text-slate-400 font-semibold mt-0.5 text-right leading-snug line-clamp-2">
+              {cheerLine}
             </span>
           </div>
         </div>

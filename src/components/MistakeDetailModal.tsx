@@ -843,19 +843,19 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                               /* 활성 상태: 클릭 가능한 입력 버튼 활성화 */
                               <div className="flex items-center space-x-1.5 animate-fade-in">
                                 <button
-                                  onClick={() => handleReviewToggle(index, 'O')}
+                                  onClick={(e) => handleReviewToggle(index, 'O', e)}
                                   className="w-7 h-7 rounded-full text-xs font-black bg-slate-800 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 transition-all active:scale-90 border border-slate-700/60"
                                 >
                                   O
                                 </button>
                                 <button
-                                  onClick={() => handleReviewToggle(index, 'X')}
+                                  onClick={(e) => handleReviewToggle(index, 'X', e)}
                                   className="w-7 h-7 rounded-full text-xs font-black bg-slate-800 text-red-400 hover:bg-red-500 hover:text-white transition-all active:scale-90 border border-slate-700/60"
                                 >
                                   X
                                 </button>
                                 <button
-                                  onClick={() => handleReviewToggle(index, 'star')}
+                                  onClick={(e) => handleReviewToggle(index, 'star', e)}
                                   className="w-7 h-7 rounded-full text-xs font-black bg-slate-800 text-amber-400 hover:bg-amber-400 hover:text-slate-950 transition-all active:scale-90 border border-slate-700/60"
                                 >
                                   ★

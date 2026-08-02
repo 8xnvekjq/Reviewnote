@@ -26,10 +26,10 @@ export const FloatingPointsContainer: React.FC = () => {
 
       setItems((prev) => [...prev, newItem]);
 
-      // 1초 후 자동 제거
+      // 애니메이션(2.5초) 종료 후 자동 제거
       setTimeout(() => {
         setItems((prev) => prev.filter((item) => item.id !== newItem.id));
-      }, 1000);
+      }, 2500);
     };
 
     window.addEventListener('reviewnote_show_floating_points' as any, handleShowFloating as EventListener);
