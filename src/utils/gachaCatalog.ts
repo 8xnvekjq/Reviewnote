@@ -240,7 +240,7 @@ export const GACHA_ITEMS: GachaItem[] = [
   {
     id: 'ai_sherlock',
     name: '🕵️ AI 말투: 명탐정 셜록 밤티',
-    description: 'AI 밤티 쌤이 오답의 범인(실수 원인)을 파헤치는 명탐정 톤으로 해설합니다.\n💬 "요왓슨, 이 오답의 범인은 3단계 부호 실수입니다. 자, 증거를 추리해봅시다."',
+    description: 'AI 밤티 쌤이 셜록 홈즈 본인의 기품과 관찰력으로 오답의 범인을 파헤칩니다.\n💬 "기초적인 걸세! 이 오답의 범인은 3단계 부호 실수라네. 자, 관찰과 논리로 해결해볼까!"',
     rarity: 'SSR',
     category: 'AI_VOICE',
     icon: '🕵️',
