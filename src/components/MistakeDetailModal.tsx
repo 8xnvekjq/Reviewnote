@@ -615,6 +615,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             y: clientY,
             points: finalPoints,
             isBooster: isBoosterActive,
+            reviewState: state,
           },
         })
       );

@@ -24,6 +24,7 @@ import { NewScaffoldingModal, type UnseenScaffoldingItem } from './components/Ne
 import { CustomNoticeModal, type NoticeModalState } from './components/CustomNoticeModal';
 import { FloatingPointsContainer } from './components/FloatingPointsContainer';
 import { getTitleBadgeStyle, GACHA_ITEMS } from './utils/gachaCatalog';
+import { getRandomCheer } from './utils/aiVoiceCheers';
 import type { EquippedItems } from './types';
 import { applyThemeColor } from './utils/theme';
 import { loadStreakState, recordReviewStreak, reconcileStreakState, getNewlyReachedMilestones, type StreakState } from './utils/streak';
@@ -71,6 +72,8 @@ function App() {
   // ⚡ 콤보 부스터 5배 버프 만료 시각 (서버 profiles.combo_booster_expires_at 기준 — 클라이언트가
   // 임의로 조작할 수 없도록 activate_combo_booster RPC로만 값이 설정됨)
   const [comboBoosterExpiresAt, setComboBoosterExpiresAt] = useState<string | null>(null);
+  // 럭키상점 점수 아래에 보여줄 AI 말투 응원 한 줄 (가장 최근 복습 체크의 O/X/★ 결과에 맞춰 매번 새로 뽑음)
+  const [currentCheerLine, setCurrentCheerLine] = useState<string>(() => getRandomCheer());
   // userId -> displayName map (admin 전용)
   const [profilesMap, setProfilesMap] = useState<Record<string, string>>({});
   // 유튜브 매칭용 강의 마스터 리스트 상태
@@ -125,7 +128,17 @@ function App() {
     applyThemeColor(equippedItems.theme, matchedTheme?.themeAccentValue);
   }, [equippedItems.theme]);
 
-
+  // 복습 O/X/★ 체크할 때마다(플로팅 포인트 이벤트와 동일 시점) 장착 중인 AI 말투 + 그 결과에 맞는
+  // 응원 한 줄을 새로 뽑아서 럭키상점 점수 아래에 보여준다. 매번 새로 뽑으므로 같은 결과가
+  // 반복돼도 문구가 겹치지 않는다 (사전에 준비해둔 문구 풀에서 무작위 선택 — API 호출 없음).
+  useEffect(() => {
+    const handleReviewCheck = (e: Event) => {
+      const detail = (e as CustomEvent<{ reviewState?: string }>).detail;
+      setCurrentCheerLine(getRandomCheer(equippedItems.aiVoice, detail?.reviewState as any));
+    };
+    window.addEventListener('reviewnote_show_floating_points', handleReviewCheck);
+    return () => window.removeEventListener('reviewnote_show_floating_points', handleReviewCheck);
+  }, [equippedItems.aiVoice]);
 
   const [pointAdjustment, setPointAdjustment] = useState<number>(() => {
     try {
@@ -1711,6 +1724,7 @@ function App() {
             onUseAiNameChangeTicket={handleUseAiNameChangeTicket}
             aiPersonaName={customAiName || '밤티'}
             comboBoosterExpiresAt={comboBoosterExpiresAt}
+            cheerLine={currentCheerLine}
           />
         )}
 

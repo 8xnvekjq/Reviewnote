@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { GachaItem, EquippedItems } from '../types';
 import { GACHA_ITEMS, drawGachaItem, getRarityTheme, getRarityBadgeTextColor, getTitleBadgeStyle } from '../utils/gachaCatalog';
-import { getRandomCheer } from '../utils/aiVoiceCheers';
 import { CatPawIcon } from './CatPawIcon';
 import { supabase } from '../services/supabase';
 import { getKSTDateString } from '../utils/streak';
@@ -51,6 +50,7 @@ interface GachaStoreProps {
   onUseAiNameChangeTicket?: () => void; // AI 이름 변경권 사용 콜백
   aiPersonaName?: string; // AI 이름 변경권으로 바꾼 커스텀 AI 페르소나 이름 (없으면 기본값 '밤티')
   comboBoosterExpiresAt?: string | null; // 콤보 부스터 5배 버프 만료시각 (서버 profiles 기준, App.tsx에서 전달)
+  cheerLine?: string; // 최근 복습 체크(O/X/★) 결과 + 장착 AI 말투에 맞춘 응원 한 줄 (App.tsx에서 전달)
 }
 
 export const GachaStore: React.FC<GachaStoreProps> = ({
@@ -63,6 +63,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
   onUseAiNameChangeTicket,
   aiPersonaName,
   comboBoosterExpiresAt,
+  cheerLine,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'draw' | 'synthesis' | 'inventory' | 'catalog'>('draw');
 
@@ -576,9 +577,6 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
   };
 
   const boosterRemainingStr = getBoosterRemainingTimeStr();
-
-  // 장착 중인 AI 말투에 맞춘 응원 한 줄 (말투가 바뀔 때만 새로 고름 — 매 리렌더마다 바뀌지 않도록)
-  const cheerLine = useMemo(() => getRandomCheer(equippedItems.aiVoice), [equippedItems.aiVoice]);
 
   return (
     <div className="flex-1 flex flex-col bg-slate-955 text-slate-100 min-h-full pb-32 animate-fade-in select-none">
