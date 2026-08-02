@@ -20,7 +20,7 @@ import { GachaStore } from './components/GachaStore';
 import { RecentActivityFeed } from './components/RecentActivityFeed';
 import { ScaffoldingListPanel } from './components/ScaffoldingListPanel';
 import { StoreGuideModal } from './components/StoreGuideModal';
-import { NewScaffoldingModal, UnseenScaffoldingItem } from './components/NewScaffoldingModal';
+import { NewScaffoldingModal, type UnseenScaffoldingItem } from './components/NewScaffoldingModal';
 import { getTitleBadgeStyle, GACHA_ITEMS } from './utils/gachaCatalog';
 import type { EquippedItems } from './types';
 import { applyThemeColor } from './utils/theme';
