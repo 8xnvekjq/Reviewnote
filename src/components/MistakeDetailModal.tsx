@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import type { MistakeEntry, ReviewState } from '../types';
 import { ROOT_CAUSE_OPTIONS, MATH_CURRICULUM, GRADE_LIST, SOLVING_PLACEHOLDER_TEXT } from '../types';
 import { LaTeXRenderer } from './LaTeXRenderer';
@@ -556,8 +556,30 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
 
 
+  // 동일한 문제 카드(id)별 마지막 복습 완료 시각 기록 (연속 1분 이내 어뷰징 클릭 방지용)
+  const lastReviewTimesRef = useRef<Record<string, number>>({});
+
   const handleReviewToggle = (index: number, state: ReviewState) => {
     const currentReviews = [...(selectedEntry.reviews || ['', '', ''])];
+    const isAddingCheck = state !== '' && currentReviews[index] !== state;
+
+    // 복습 체크('O', 'X', 'star')를 새로 등록하는 경우 쿨다운 검증 (동일 문제 카드 기준)
+    if (isAddingCheck) {
+      const now = Date.now();
+      const lastTime = lastReviewTimesRef.current[selectedEntry.id] || 0;
+      const diffSec = Math.floor((now - lastTime) / 1000);
+
+      // 동일 문제 카드에 한해 마지막 복습 체크 후 60초(1분)가 지나지 않은 경우 차단
+      if (lastTime > 0 && diffSec < 60) {
+        const remainingSec = 60 - diffSec;
+        alert(`⏳ 방금 이 문제의 복습을 체크하셨습니다!\n문제 해설을 천천히 읽어보신 후 ${remainingSec}초 뒤에 다음 복습을 진행해 주세요.`);
+        return;
+      }
+
+      // 타임스탬프 업데이트
+      lastReviewTimesRef.current[selectedEntry.id] = now;
+    }
+
     currentReviews[index] = currentReviews[index] === state ? '' : state;
     onUpdateReviews(selectedEntry.id, currentReviews as ReviewState[]);
   };
