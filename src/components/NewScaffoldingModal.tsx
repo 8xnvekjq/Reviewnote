@@ -52,7 +52,7 @@ export const NewScaffoldingModal: React.FC<NewScaffoldingModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-      <div className="w-full max-w-sm bg-slate-900 border border-amber-500/40 rounded-3xl p-5 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto no-scrollbar animate-scale-up">
+      <div className="w-full max-w-sm bg-slate-900 border border-amber-500/40 rounded-3xl p-5 shadow-2xl space-y-3.5 max-h-[85vh] overflow-y-auto no-scrollbar animate-scale-up">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div className="flex items-center space-x-2.5">
@@ -75,13 +75,34 @@ export const NewScaffoldingModal: React.FC<NewScaffoldingModalProps> = ({
           </button>
         </div>
 
-        {/* 안내 문구 */}
-        <p className="text-[11px] text-slate-300 bg-slate-955 p-2.5 rounded-xl border border-slate-850 leading-relaxed">
-          선생님이 막히던 문제에 맞춤 풀이 힌트를 남겨두셨습니다. 확인하고 막힌 부분을 풀어보세요! ✨
-        </p>
+        {/* 📌 이모지 기반 스캐폴딩 힌트 보는 법 쉬운 안내 가이드 */}
+        <div className="bg-slate-955 p-3.5 rounded-2xl border border-slate-800 space-y-2 text-[11px] text-slate-300 leading-relaxed shadow-inner">
+          <div className="flex items-center space-x-1.5 text-amber-400 font-extrabold text-xs">
+            <span>✨</span>
+            <span>선생님 힌트(스캐폴딩) 어떻게 보나요?</span>
+          </div>
+          <ul className="space-y-1.5 text-[10.5px] text-slate-300 pl-0.5">
+            <li className="flex items-start space-x-1.5">
+              <span className="flex-none">1️⃣</span>
+              <span>아래 목록의 <strong>[보기 ➔]</strong> 버튼을 누르면 문제가 열리고 풀이 힌트가 바로 펼쳐집니다!</span>
+            </li>
+            <li className="flex items-start space-x-1.5">
+              <span className="flex-none">2️⃣</span>
+              <span>오답 문제 카드 아래쪽 <strong>초록색 🧩 [힌트보기]</strong> 버튼을 눌러도 언제든 확인할 수 있어요!</span>
+            </li>
+            <li className="flex items-start space-x-1.5">
+              <span className="flex-none">3️⃣</span>
+              <span>하단 탭 <strong>🧩 오답클리닉</strong> 메뉴에서 선생님이 남겨주신 전체 힌트 모음을 모아볼 수 있습니다!</span>
+            </li>
+          </ul>
+        </div>
 
-        {/* 최근 최대 3개 텍스트 기반 콤팩트 카드 목록 (이미지 로딩 없이 빠름) */}
+        {/* 최근 최대 3개 텍스트 기반 콤팩트 카드 목록 */}
         <div className="space-y-2">
+          <div className="text-[10.5px] font-black text-slate-400 pl-1 flex items-center justify-between">
+            <span>📬 최근 도착한 맞춤 힌트 목록</span>
+            <span className="text-[9.5px] text-amber-400 font-bold">최대 3개 표출</span>
+          </div>
           {displayItems.map((item) => (
             <div
               key={item.id}
@@ -106,7 +127,7 @@ export const NewScaffoldingModal: React.FC<NewScaffoldingModalProps> = ({
                 </div>
                 
                 <div className="flex items-center justify-between pr-1">
-                  <p className="text-[10.5px] text-amber-300/90 truncate max-w-[180px]">
+                  <p className="text-[10.5px] text-amber-300/90 truncate max-w-[170px]">
                     {item.latestCaption ? `🐶 : ${item.latestCaption}` : '손글씨/자료 힌트 첨부됨'}
                   </p>
                   <span className="text-[9px] text-slate-500 flex-none">
@@ -125,7 +146,7 @@ export const NewScaffoldingModal: React.FC<NewScaffoldingModalProps> = ({
 
         {/* 3개 초과시 안내 */}
         {extraCount > 0 && (
-          <div className="text-center py-1 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+          <div className="text-center py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-xl">
             <span className="text-[11px] font-bold text-amber-300">
               + 외 {extraCount}개의 맞춤 힌트가 더 기다리고 있습니다!
             </span>
