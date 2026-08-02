@@ -562,7 +562,11 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   // 동일한 문제 카드(id)별 마지막 복습 완료 시각 기록 (연속 1분 이내 어뷰징 클릭 방지용)
   const lastReviewTimesRef = useRef<Record<string, number>>({});
 
-  const handleReviewToggle = (index: number, state: ReviewState) => {
+  const handleReviewToggle = (
+    index: number,
+    state: ReviewState,
+    e?: React.MouseEvent<HTMLButtonElement> | React.TouchEvent<HTMLButtonElement>
+  ) => {
     const currentReviews = [...(selectedEntry.reviews || ['', '', ''])];
     const isAddingCheck = state !== '' && currentReviews[index] !== state;
 
@@ -580,6 +584,48 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
       // 타임스탬프 업데이트
       lastReviewTimesRef.current[selectedEntry.id] = now;
+
+      // 터치/클릭한 자리 위치 추출하여 플로팅 포인트 팝업 디스패치
+      let clientX = window.innerWidth / 2;
+      let clientY = window.innerHeight / 2;
+      if (e) {
+        const mouseEvt = e as React.MouseEvent<HTMLButtonElement>;
+        const touchEvt = e as React.TouchEvent<HTMLButtonElement>;
+        if (mouseEvt.clientX && mouseEvt.clientX > 0) {
+          clientX = mouseEvt.clientX;
+          clientY = mouseEvt.clientY;
+        } else if (touchEvt.touches && touchEvt.touches[0]) {
+          clientX = touchEvt.touches[0].clientX;
+          clientY = touchEvt.touches[0].clientY;
+        }
+      }
+
+      const basePoints = state === 'O' ? [3, 7, 15][index] : (state === 'X' || state === 'star') ? 1 : 0;
+
+      // 3시간 5배 부스터 여부 확인
+      let isBoosterActive = false;
+      if (currentUserId) {
+        const boosterRaw = localStorage.getItem(`reviewnote_combo_booster_expires_${currentUserId}`);
+        if (boosterRaw) {
+          const expiresAt = parseInt(boosterRaw, 10);
+          if (!isNaN(expiresAt) && Date.now() < expiresAt) {
+            isBoosterActive = true;
+          }
+        }
+      }
+
+      const finalPoints = isBoosterActive ? basePoints * 5 : basePoints;
+
+      window.dispatchEvent(
+        new CustomEvent('reviewnote_show_floating_points', {
+          detail: {
+            x: clientX,
+            y: clientY,
+            points: finalPoints,
+            isBooster: isBoosterActive,
+          },
+        })
+      );
     }
 
     currentReviews[index] = currentReviews[index] === state ? '' : state;

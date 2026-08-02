@@ -22,6 +22,7 @@ import { ScaffoldingListPanel } from './components/ScaffoldingListPanel';
 import { StoreGuideModal } from './components/StoreGuideModal';
 import { NewScaffoldingModal, type UnseenScaffoldingItem } from './components/NewScaffoldingModal';
 import { CustomNoticeModal, type NoticeModalState } from './components/CustomNoticeModal';
+import { FloatingPointsContainer } from './components/FloatingPointsContainer';
 import { getTitleBadgeStyle, GACHA_ITEMS } from './utils/gachaCatalog';
 import type { EquippedItems } from './types';
 import { applyThemeColor } from './utils/theme';
@@ -2249,6 +2250,9 @@ function App() {
         notice={noticeModal}
         onClose={closeNoticeModal}
       />
+
+      {/* ⚡ 클릭/터치 위치 플로팅 획득 포인트 애니메이션 */}
+      <FloatingPointsContainer />
 
     </div>
   );
