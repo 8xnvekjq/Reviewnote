@@ -1265,11 +1265,15 @@ function App() {
       for (let i = 0; i < 3; i++) {
         reviewPointDelta += pointsForStage(newReviews[i], i) - pointsForStage(oldReviews[i], i);
       }
-      // '2배권'은 실제로 점수를 벌어들일 때(양수 델타)만 배로 불려주고, 이때 1회 소모한다.
-      // (이전에는 아이템을 갖고 있는 한 영구히 매번 2배가 적용되어서 포인트가 무한정 복제되는 문제가 있었음)
-      const boosterApplied = hasPointBooster && reviewPointDelta > 0;
+      // 콤보 부스터(SSR): 이번 갱신으로 이 오답 카드의 3단계 복습이 "방금" 전부 채워졌다면
+      // (이전엔 3단계 중 일부가 빈칸이었다가 지금 전부 채워진 순간에만) 콤보 포인트 +70을 추가로
+      // 얹어주고 1회 소모한다. 매 리뷰마다 조용히 배로 불려주던 이전 방식은 SSR 등급 대비 체감
+      // 효과가 미미하고, 아이템을 쥐고 있는 한 영구 적용돼서 포인트가 계속 복제되는 문제도 있었다.
+      const wasFullyReviewed = oldReviews.every(r => r !== '');
+      const isFullyReviewed = newReviews.every(r => r !== '');
+      const boosterApplied = hasPointBooster && !wasFullyReviewed && isFullyReviewed;
       if (boosterApplied) {
-        reviewPointDelta *= 2;
+        reviewPointDelta += 70;
       }
       if (reviewPointDelta !== 0 && session?.user?.id) {
         // 클라이언트에서 "현재값 + 델타"를 계산해 절대값으로 쓰면 동시 요청(빠른 연속 클릭,
