@@ -2273,7 +2273,7 @@ function App() {
       />
 
       {/* ⚡ 클릭/터치 위치 플로팅 획득 포인트 애니메이션 */}
-      <FloatingPointsContainer />
+      <FloatingPointsContainer aiVoice={equippedItems.aiVoice} />
 
     </div>
   );
