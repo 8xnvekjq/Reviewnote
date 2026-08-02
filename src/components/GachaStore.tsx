@@ -129,12 +129,9 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
 
       if (error) throw error;
 
-      // 어드민 및 test/8xnvekjq 계정 필터링 (단, user_name이 '밤티'이거나 닉네임이 '밤티'인 예외는 띄워줌)
+      // 어드민 및 test/8xnvekjq 계정 필터링
       const filtered = (data || []).filter((log: any) => {
         const p = log.profiles;
-        if (log.user_name === '밤티' || (p && (p.nickname === '밤티' || p.display_name === '밤티'))) {
-          return true;
-        }
         if (!p) return true;
         if (p.is_admin) return false;
         const email = (p.email || '').toLowerCase();
