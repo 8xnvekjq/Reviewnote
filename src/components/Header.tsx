@@ -24,6 +24,7 @@ const formatBuildTime = (iso: string): string => {
 
 interface HeaderProps {
   currentUser: string;
+  userId?: string;
   nickname?: string;
   onLogout: () => void;
   onUpdateNickname?: (newNickname: string) => Promise<void>;
@@ -38,6 +39,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({
   currentUser,
+  userId,
   nickname,
   onLogout,
   onUpdateNickname,
@@ -80,6 +82,22 @@ export const Header: React.FC<HeaderProps> = ({
     };
   }, []);
 
+  // ⚡ 콤보 부스터 잔여 시간 계산
+  const getBoosterRemainingStr = () => {
+    if (!userId) return null;
+    const expiresRaw = localStorage.getItem(`reviewnote_combo_booster_expires_${userId}`);
+    if (!expiresRaw) return null;
+    const expiresAt = parseInt(expiresRaw, 10);
+    if (isNaN(expiresAt) || Date.now() >= expiresAt) return null;
+
+    const remainingMs = expiresAt - Date.now();
+    const hours = Math.floor(remainingMs / (1000 * 60 * 60));
+    const mins = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours > 0 ? `${hours}h ` : ''}${mins}m`;
+  };
+
+  const boosterStr = getBoosterRemainingStr();
+
   return (
     <>
       <header className="safe-top flex-none border-b-2 border-app-theme bg-app-header backdrop-blur-md px-4 py-3 flex items-center justify-between sticky top-0 z-30 transition-colors duration-300 shadow-md">
@@ -100,6 +118,18 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         <div className="flex items-center space-x-2 flex-none min-w-0 whitespace-nowrap">
+          {/* ⚡ 5배 부스터 발동중 배지 (상단 네비바 노출) */}
+          {boosterStr && (
+            <button
+              onClick={() => onOpenStore?.()}
+              className="text-[9.5px] text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-400/50 font-black flex items-center space-x-1 flex-none animate-pulse shadow-sm shadow-amber-500/20"
+              title="5배 콤보 부스터 버프 발동 중"
+            >
+              <span>⚡</span>
+              <span>5배 {boosterStr}</span>
+            </button>
+          )}
+
           {/* 연속 복습 일수 (🔥 Streak 배지) */}
           {streakDays !== undefined && streakDays > 0 && (
             <span className="text-[9.5px] text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-full border border-orange-500/30 font-black flex items-center space-x-0.5 flex-none">

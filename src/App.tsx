@@ -1679,6 +1679,7 @@ function App() {
       {/* Top Header */}
       <Header 
         currentUser={currentUser} 
+        userId={session?.user?.id}
         nickname={myNickname}
         onLogout={handleLogout} 
         onUpdateNickname={handleUpdateNickname}
