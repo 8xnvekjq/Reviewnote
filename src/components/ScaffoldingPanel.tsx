@@ -10,12 +10,21 @@ interface ProfileInfo {
   email?: string;
 }
 
+interface ScaffoldingImageItem {
+  id: string;
+  mistake_id: string;
+  image_url: string;
+  caption?: string;
+  created_at?: string;
+}
+
 interface ExtendedMistakeEntry extends MistakeEntry {
   studentName: string;
   studentEmail: string;
   xCount: number;
   starCount: number;
   weakCount: number; // xCount + starCount
+  imageHints?: ScaffoldingImageItem[];
 }
 
 interface ScaffoldingPanelProps {
@@ -66,6 +75,17 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
 
       if (error) throw error;
 
+      // 2-2. 스캐폴딩 이미지 힌트 테이블 전체 조회
+      const { data: scafData } = await supabase
+        .from('mistake_scaffoldings')
+        .select('*');
+
+      const scafMap: Record<string, ScaffoldingImageItem[]> = {};
+      (scafData || []).forEach((item: any) => {
+        if (!scafMap[item.mistake_id]) scafMap[item.mistake_id] = [];
+        scafMap[item.mistake_id].push(item);
+      });
+
       // 3. 취약 오답 (X + ★ >= minWeakCount) 계산 및 확장 정보 가공
       const processed: ExtendedMistakeEntry[] = (mData || []).map((row: any) => {
         const reviewsArr: string[] = Array.isArray(row.reviews) ? row.reviews : [];
@@ -95,6 +115,7 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
           rootCauses: row.root_causes,
           userActionPlan: row.user_action_plan,
           teacherScaffoldingHint: row.teacher_scaffolding_hint,
+          imageHints: scafMap[row.id] || [],
           studentName,
           studentEmail: studentProf.email || '',
           xCount,
@@ -484,11 +505,16 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
                       </div>
                     )}
 
-                    {/* 👨‍🏫 선생님이 전수하는 스캐폴딩 힌트 박스 */}
-                    <div className="bg-gradient-to-r from-purple-950/40 via-slate-950/70 to-indigo-950/40 border border-purple-500/30 rounded-2xl p-3.5 space-y-1.5 shadow-md">
+                    {/* 👨‍🏫 선생님이 전수하는 스캐폴딩 힌트 박스 (텍스트 + 이미지 힌트 통합 표출) */}
+                    <div className="bg-gradient-to-r from-purple-950/40 via-slate-950/70 to-indigo-950/40 border border-purple-500/30 rounded-2xl p-3.5 space-y-2 shadow-md">
                       <div className="flex items-center justify-between text-xs font-extrabold">
                         <span className="text-purple-300 flex items-center space-x-1.5">
                           <span>💡 👨‍🏫 선생님 전수 스캐폴딩 힌트</span>
+                          {item.imageHints && item.imageHints.length > 0 && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                              📷 이미지 힌트 {item.imageHints.length}개
+                            </span>
+                          )}
                         </span>
                         <button
                           onClick={() => handleOpenHintModal(item)}
@@ -497,8 +523,37 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
                           {item.teacherScaffoldingHint ? '✍️ 힌트 수정하기' : '✍️ 힌트 작성하기'}
                         </button>
                       </div>
+
+                      {/* 이미지 스캐폴딩 힌트 갤러리 썸네일 목록 */}
+                      {item.imageHints && item.imageHints.length > 0 && (
+                        <div className="flex flex-wrap gap-2 pt-1 border-b border-slate-800/80 pb-2">
+                          {item.imageHints.map((scaf) => (
+                            <div
+                              key={scaf.id}
+                              className="relative bg-slate-950 border border-slate-800 rounded-xl overflow-hidden p-1 max-w-[140px]"
+                            >
+                              <img
+                                src={scaf.image_url}
+                                alt="스캐폴딩 이미지 힌트"
+                                className="w-full h-16 object-cover rounded-lg"
+                              />
+                              {scaf.caption && (
+                                <p className="text-[9.5px] text-purple-300 font-bold truncate mt-1 px-1">
+                                  {scaf.caption}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* 텍스트 힌트 또는 안내 멘트 */}
                       <p className="text-xs text-slate-200 leading-relaxed font-sans whitespace-pre-wrap">
-                        {item.teacherScaffoldingHint || '아직 전달된 힌트가 없습니다. [✍️ 힌트 작성하기]를 눌러 학생에게 스캐폴딩 접근 힌트를 전수해 보세요!'}
+                        {item.teacherScaffoldingHint
+                          ? item.teacherScaffoldingHint
+                          : item.imageHints && item.imageHints.length > 0
+                          ? '📷 위에 이미지 힌트가 첨부되어 있습니다.'
+                          : '아직 전달된 힌트가 없습니다. [✍️ 힌트 작성하기]를 눌러 학생에게 스캐폴딩 접근 힌트를 전수해 보세요!'}
                       </p>
                     </div>
                   </div>
