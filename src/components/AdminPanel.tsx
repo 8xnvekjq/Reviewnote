@@ -27,8 +27,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
     setSelectedStudent(user);
   };
 
-  const fetchAdminStats = async () => {
-    setIsLoading(true);
+  const fetchAdminStats = async (isInitial = false) => {
+    if (isInitial) {
+      setIsLoading(true);
+    }
     setError(null);
     try {
       // Fetch all profiles (display_name, nickname, school_grade, equipped_title 포함)
@@ -197,23 +199,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
   };
 
   useEffect(() => {
-    fetchAdminStats();
+    fetchAdminStats(true);
 
-    // ⚡ Realtime 실시간 동기화: profiles 및 mistakes 테이블 변경 시 즉시 갱신
+    // ⚡ Realtime 실시간 동기화: profiles 및 mistakes 테이블 변경 시 즉시 배경 갱신 (깜빡임 0건)
     const channel = supabase
       .channel('admin-dashboard-realtime')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'profiles' },
         () => {
-          fetchAdminStats();
+          fetchAdminStats(false);
         }
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'mistakes' },
         () => {
-          fetchAdminStats();
+          fetchAdminStats(false);
         }
       )
       .subscribe();
