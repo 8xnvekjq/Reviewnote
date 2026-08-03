@@ -1,4 +1,5 @@
 import React from 'react';
+import type { ActiveTab } from '../types';
 import logoImg from '../assets/logo.jpg';
 import { getTitleBadgeStyle } from '../utils/gachaCatalog';
 
@@ -36,6 +37,8 @@ interface HeaderProps {
   onUpdateAiName?: (newName: string) => Promise<void>;
   hasAiNameChangeTicket?: boolean;
   comboBoosterExpiresAt?: string | null; // 콤보 부스터 5배 버프 만료시각 (서버 profiles 기준)
+  isAdmin?: boolean;
+  onSelectTab?: (tab: ActiveTab) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -51,6 +54,8 @@ export const Header: React.FC<HeaderProps> = ({
   onUpdateAiName,
   hasAiNameChangeTicket,
   comboBoosterExpiresAt,
+  isAdmin,
+  onSelectTab,
 }) => {
   const [showUserMenu, setShowUserMenu] = React.useState(false);
   const [isNicknameModalOpen, setIsNicknameModalOpen] = React.useState(false);
@@ -199,6 +204,20 @@ export const Header: React.FC<HeaderProps> = ({
                     <span>✏️</span>
                     <span>닉네임 변경</span>
                   </button>
+
+                  {/* 🧩 취약 오답 클리닉 (스캐폴딩 탐색기) 어드민 바로가기 */}
+                  {isAdmin && (
+                    <button
+                      onClick={() => {
+                        setShowUserMenu(false);
+                        onSelectTab?.('scaffolding');
+                      }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg bg-purple-950/40 hover:bg-purple-900/50 text-purple-300 hover:text-purple-200 text-[10.5px] font-bold flex items-center space-x-1.5 transition-colors border border-purple-800/40"
+                    >
+                      <span>🧩</span>
+                      <span>취약 오답 클리닉</span>
+                    </button>
+                  )}
 
                   <button
                     onClick={() => {

@@ -9,9 +9,10 @@ import { CatPawIcon } from './CatPawIcon';
 interface AdminPanelProps {
   onBack?: () => void;
   onRefresh?: () => void;
+  onSelectTab?: (tab: any) => void;
 }
 
-export const AdminPanel: React.FC<AdminPanelProps> = () => {
+export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
   const [stats, setStats] = useState<AdminUserStat[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -215,14 +216,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = () => {
             마지막 갱신: {lastRefreshed.toLocaleTimeString('ko-KR')}
           </p>
         </div>
-        <button
-          onClick={fetchAdminStats}
-          disabled={isLoading}
-          className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-700 text-xs font-bold text-slate-300 transition-all disabled:opacity-50 flex items-center space-x-1.5"
-        >
-          <span className={isLoading ? 'animate-spin' : ''}>🔄</span>
-          <span>새로고침</span>
-        </button>
+        <div className="flex items-center space-x-2">
+          {onSelectTab && (
+            <button
+              onClick={() => onSelectTab('scaffolding')}
+              className="px-3 py-1.5 rounded-xl bg-purple-950/60 hover:bg-purple-900/80 border border-purple-500/40 text-xs font-black text-purple-300 transition-all flex items-center space-x-1.5 shadow-md shadow-purple-500/10"
+            >
+              <span>🧩</span>
+              <span>취약 오답 클리닉</span>
+            </button>
+          )}
+          <button
+            onClick={fetchAdminStats}
+            disabled={isLoading}
+            className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-700 text-xs font-bold text-slate-300 transition-all disabled:opacity-50 flex items-center space-x-1.5"
+          >
+            <span className={isLoading ? 'animate-spin' : ''}>🔄</span>
+            <span>새로고침</span>
+          </button>
+        </div>
       </div>
 
       {/* Summary Cards */}

@@ -19,6 +19,7 @@ import { SlideListModal } from './components/SlideListModal';
 import { GachaStore } from './components/GachaStore';
 import { RecentActivityFeed } from './components/RecentActivityFeed';
 import { ScaffoldingListPanel } from './components/ScaffoldingListPanel';
+import { ScaffoldingPanel } from './components/ScaffoldingPanel';
 import { StoreGuideModal } from './components/StoreGuideModal';
 import { NewScaffoldingModal, type UnseenScaffoldingItem } from './components/NewScaffoldingModal';
 import { CustomNoticeModal, type NoticeModalState } from './components/CustomNoticeModal';
@@ -1709,6 +1710,8 @@ function App() {
         equippedTitle={equippedItems.title}
         streakDays={streakState.currentStreak}
         comboBoosterExpiresAt={comboBoosterExpiresAt}
+        isAdmin={isAdmin}
+        onSelectTab={(tab) => setActiveTab(tab)}
       />
 
       {/* Main Content Area */}
@@ -1920,7 +1923,7 @@ function App() {
         )}
 
         {activeTab === 'admin' && isAdmin && (
-          <AdminPanel />
+          <AdminPanel onSelectTab={(tab) => setActiveTab(tab)} />
         )}
 
         {activeTab === 'guide' && (
@@ -2136,13 +2139,20 @@ function App() {
           </div>
         )}
 
-        {/* Tab: 🧩 힌트 모음 (스캐폴딩) */}
+        {/* Tab: 🧩 힌트 모음 (스캐폴딩 탐색기) */}
         {activeTab === 'scaffolding' && (
-          <ScaffoldingListPanel
-            currentUserId={session?.user?.id || currentUser || ''}
-            isAdmin={isAdmin}
-            onSelectMistake={(entry) => setSelectedEntry(entry)}
-          />
+          isAdmin ? (
+            <ScaffoldingPanel
+              isAdmin={isAdmin}
+              onOpenDetailModal={(entry) => setSelectedEntry(entry)}
+            />
+          ) : (
+            <ScaffoldingListPanel
+              currentUserId={session?.user?.id || currentUser || ''}
+              isAdmin={isAdmin}
+              onSelectMistake={(entry) => setSelectedEntry(entry)}
+            />
+          )
         )}
       </main>
 
