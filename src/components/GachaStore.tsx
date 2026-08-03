@@ -118,12 +118,13 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
     setShowSynthesisNotice(false);
     if (!userId) return;
     try {
-      await supabase
+      const { error } = await supabase
         .from('profiles')
         .update({ has_seen_synthesis_notice: true })
         .eq('id', userId);
+      if (error) console.error('연성 알림 이력 DB 저장 오류:', error);
     } catch (e) {
-      console.error('연성 알림 이력 DB 저장 오류:', e);
+      console.error('연성 알림 이력 DB 저장 예외:', e);
     } finally {
       if (shouldNavigateToSynthesis) {
         setActiveSubTab('synthesis');
@@ -205,12 +206,17 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
     if (!userId) return;
     const { data, error } = await supabase
       .from('profiles')
-      .select('last_free_draw_date, last_free_weekly_draw_date')
+      .select('last_free_draw_date, last_free_weekly_draw_date, has_seen_synthesis_notice')
       .eq('id', userId)
       .maybeSingle();
+
     if (!error && data) {
       setLastFreeDrawDate(data.last_free_draw_date || null);
       setLastFreeWeeklyDrawDate(data.last_free_weekly_draw_date || null);
+      // 서버 DB 기준 최초 1회 연성 안내 모달 노출 판단 (어떤 기기든 딱 1회만 노출)
+      if (!data.has_seen_synthesis_notice) {
+        setShowSynthesisNotice(true);
+      }
     }
     setFreeDrawStatusLoaded(true);
   };
