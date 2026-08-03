@@ -45,6 +45,9 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
   // 🚀 5개씩 더보기 렌더링 제한
   const [displayLimit, setDisplayLimit] = useState<number>(5);
 
+  // 📷 핀포인트 로드된 이미지 힌트 맵 상태
+  const [scaffoldingsMap, setScaffoldingsMap] = useState<Record<string, ScaffoldingImageItem[]>>({});
+
   // ✍️ 힌트 작성 모달 상태
   const [hintModalTarget, setHintModalTarget] = useState<ExtendedMistakeEntry | null>(null);
   const [hintInput, setHintInput] = useState<string>('');
@@ -75,17 +78,6 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
 
       if (error) throw error;
 
-      // 2-2. 스캐폴딩 이미지 힌트 테이블 전체 조회
-      const { data: scafData } = await supabase
-        .from('mistake_scaffoldings')
-        .select('*');
-
-      const scafMap: Record<string, ScaffoldingImageItem[]> = {};
-      (scafData || []).forEach((item: any) => {
-        if (!scafMap[item.mistake_id]) scafMap[item.mistake_id] = [];
-        scafMap[item.mistake_id].push(item);
-      });
-
       // 3. 취약 오답 (X + ★ >= minWeakCount) 계산 및 확장 정보 가공
       const processed: ExtendedMistakeEntry[] = (mData || []).map((row: any) => {
         const reviewsArr: string[] = Array.isArray(row.reviews) ? row.reviews : [];
@@ -115,7 +107,6 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
           rootCauses: row.root_causes,
           userActionPlan: row.user_action_plan,
           teacherScaffoldingHint: row.teacher_scaffolding_hint,
-          imageHints: scafMap[row.id] || [],
           studentName,
           studentEmail: studentProf.email || '',
           xCount,
@@ -176,6 +167,29 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
   const visibleMistakes = useMemo(() => {
     return filteredMistakes.slice(0, displayLimit);
   }, [filteredMistakes, displayLimit]);
+
+  // ── ⚡ 핀포인트 이미지 힌트 쾌속 조회 (현재 화면 5개 카드 전용) ──
+  useEffect(() => {
+    const fetchVisibleScaffoldings = async () => {
+      const visibleIds = visibleMistakes.map((m) => m.id);
+      if (visibleIds.length === 0) return;
+
+      const { data } = await supabase
+        .from('mistake_scaffoldings')
+        .select('*')
+        .in('mistake_id', visibleIds);
+
+      const map: Record<string, ScaffoldingImageItem[]> = {};
+      (data || []).forEach((item: any) => {
+        if (!map[item.mistake_id]) map[item.mistake_id] = [];
+        map[item.mistake_id].push(item);
+      });
+
+      setScaffoldingsMap((prev) => ({ ...prev, ...map }));
+    };
+
+    fetchVisibleScaffoldings();
+  }, [visibleMistakes]);
 
   // 학년 목록 추출
   const availableGrades = useMemo(() => {
@@ -415,151 +429,158 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
       ) : (
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4">
-            {visibleMistakes.map((item) => (
-              <div
-                key={item.id}
-                className="bg-slate-900/80 border border-slate-800 hover:border-purple-500/40 rounded-3xl p-5 shadow-xl transition-all space-y-4 relative group"
-              >
-                {/* 상단 프로필 및 헤더 */}
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/70 pb-3">
-                  <div className="flex items-center space-x-2.5">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-xs font-black text-white shadow">
-                      {item.studentName.slice(0, 1)}
-                    </div>
-                    <div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm font-black text-white">{item.studentName}</span>
-                        {item.grade && (
-                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
-                            {item.grade}
-                          </span>
-                        )}
+            {visibleMistakes.map((item) => {
+              const currentImageHints = scaffoldingsMap[item.id] || item.imageHints || [];
+              return (
+                <div
+                  key={item.id}
+                  className="bg-slate-900/80 border border-slate-800 hover:border-purple-500/40 rounded-3xl p-5 shadow-xl transition-all space-y-4 relative group"
+                >
+                  {/* 상단 프로필 및 헤더 */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/70 pb-3">
+                    <div className="flex items-center space-x-2.5">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-xs font-black text-white shadow">
+                        {item.studentName.slice(0, 1)}
                       </div>
-                      <span className="text-[10px] text-slate-500">{item.date?.slice(0, 10)}</span>
-                    </div>
-                  </div>
-
-                  {/* 취약도 뱃지 */}
-                  <div className="flex items-center space-x-2">
-                    <div className="bg-rose-500/10 border border-rose-500/30 px-3 py-1 rounded-xl text-xs font-black text-rose-400 flex items-center space-x-1.5">
-                      <span>⚠️ 취약도:</span>
-                      <span className="font-mono text-sm">{item.weakCount}회</span>
-                      <span className="text-[10px] text-rose-300/80 font-normal">
-                        (X: {item.xCount}, ★: {item.starCount})
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 메인 내용: 문제 제목 & 이미지 & 힌트 */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-                  {/* 문제 이미지 (클릭 시 원본 상세보기) */}
-                  <div
-                    onClick={() => onOpenDetailModal && onOpenDetailModal(item)}
-                    className="md:col-span-1 aspect-video md:aspect-square bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden relative cursor-pointer group/img"
-                  >
-                    <img
-                      src={item.imageUrl}
-                      alt={item.title}
-                      className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-300"
-                    />
-                    <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-xs font-black text-white">
-                      🔍 문제 돋보기 확대
-                    </div>
-                  </div>
-
-                  {/* 오답 상세 분석 & 스캐폴딩 힌트 */}
-                  <div className="md:col-span-2 space-y-3">
-                    <div>
-                      <h4 className="text-base font-black text-white group-hover:text-purple-300 transition-colors">
-                        {item.title}
-                      </h4>
-                      {item.chapter && (
-                        <p className="text-xs text-indigo-400 font-extrabold mt-0.5">단원: {item.chapter}</p>
-                      )}
-                    </div>
-
-                    {/* 실수원인 태그 */}
-                    {item.rootCauses && item.rootCauses.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5">
-                        {item.rootCauses.map((rc, idx) => (
-                          <span
-                            key={idx}
-                            className="text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-slate-800 text-slate-300 border border-slate-700"
-                          >
-                            {rc}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* 🎓 학생이 적은 반성/실수 대책 박스 */}
-                    {item.userActionPlan && (
-                      <div className="bg-slate-950/40 border border-slate-800/60 rounded-2xl p-3 space-y-1">
-                        <div className="text-[11px] font-extrabold text-slate-400 flex items-center space-x-1">
-                          <span>🎓 학생의 반성/실수 대책:</span>
-                        </div>
-                        <p className="text-xs text-slate-300 leading-relaxed font-sans whitespace-pre-wrap">
-                          {item.userActionPlan}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* 👨‍🏫 선생님이 전수하는 스캐폴딩 힌트 박스 (텍스트 + 이미지 힌트 통합 표출) */}
-                    <div className="bg-gradient-to-r from-purple-950/40 via-slate-950/70 to-indigo-950/40 border border-purple-500/30 rounded-2xl p-3.5 space-y-2 shadow-md">
-                      <div className="flex items-center justify-between text-xs font-extrabold">
-                        <span className="text-purple-300 flex items-center space-x-1.5">
-                          <span>💡 👨‍🏫 선생님 전수 스캐폴딩 힌트</span>
-                          {item.imageHints && item.imageHints.length > 0 && (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40">
-                              📷 이미지 힌트 {item.imageHints.length}개
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm font-black text-white">{item.studentName}</span>
+                          {item.grade && (
+                            <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                              {item.grade}
                             </span>
                           )}
+                        </div>
+                        <span className="text-[10px] text-slate-500">{item.date?.slice(0, 10)}</span>
+                      </div>
+                    </div>
+
+                    {/* 취약도 뱃지 */}
+                    <div className="flex items-center space-x-2">
+                      <div className="bg-rose-500/10 border border-rose-500/30 px-3 py-1 rounded-xl text-xs font-black text-rose-400 flex items-center space-x-1.5">
+                        <span>⚠️ 취약도:</span>
+                        <span className="font-mono text-sm">{item.weakCount}회</span>
+                        <span className="text-[10px] text-rose-300/80 font-normal">
+                          (X: {item.xCount}, ★: {item.starCount})
                         </span>
-                        <button
-                          onClick={() => handleOpenHintModal(item)}
-                          className="text-[11px] font-black text-purple-400 hover:text-purple-300 underline"
-                        >
-                          {item.teacherScaffoldingHint ? '✍️ 힌트 수정하기' : '✍️ 힌트 작성하기'}
-                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 메인 내용: 문제 제목 & 이미지 & 힌트 */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                    {/* 문제 이미지 (클릭 시 원본 상세보기 - lazy loading 적용) */}
+                    <div
+                      onClick={() => onOpenDetailModal && onOpenDetailModal(item)}
+                      className="md:col-span-1 aspect-video md:aspect-square bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden relative cursor-pointer group/img"
+                    >
+                      <img
+                        src={item.imageUrl}
+                        alt={item.title}
+                        loading="lazy"
+                        decoding="async"
+                        className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-300"
+                      />
+                      <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-xs font-black text-white">
+                        🔍 문제 돋보기 확대
+                      </div>
+                    </div>
+
+                    {/* 오답 상세 분석 & 스캐폴딩 힌트 */}
+                    <div className="md:col-span-2 space-y-3">
+                      <div>
+                        <h4 className="text-base font-black text-white group-hover:text-purple-300 transition-colors">
+                          {item.title}
+                        </h4>
+                        {item.chapter && (
+                          <p className="text-xs text-indigo-400 font-extrabold mt-0.5">단원: {item.chapter}</p>
+                        )}
                       </div>
 
-                      {/* 이미지 스캐폴딩 힌트 갤러리 썸네일 목록 */}
-                      {item.imageHints && item.imageHints.length > 0 && (
-                        <div className="flex flex-wrap gap-2 pt-1 border-b border-slate-800/80 pb-2">
-                          {item.imageHints.map((scaf) => (
-                            <div
-                              key={scaf.id}
-                              className="relative bg-slate-950 border border-slate-800 rounded-xl overflow-hidden p-1 max-w-[140px]"
+                      {/* 실수원인 태그 */}
+                      {item.rootCauses && item.rootCauses.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {item.rootCauses.map((rc, idx) => (
+                            <span
+                              key={idx}
+                              className="text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-slate-800 text-slate-300 border border-slate-700"
                             >
-                              <img
-                                src={scaf.image_url}
-                                alt="스캐폴딩 이미지 힌트"
-                                className="w-full h-16 object-cover rounded-lg"
-                              />
-                              {scaf.caption && (
-                                <p className="text-[9.5px] text-purple-300 font-bold truncate mt-1 px-1">
-                                  {scaf.caption}
-                                </p>
-                              )}
-                            </div>
+                              {rc}
+                            </span>
                           ))}
                         </div>
                       )}
 
-                      {/* 텍스트 힌트 또는 안내 멘트 */}
-                      <p className="text-xs text-slate-200 leading-relaxed font-sans whitespace-pre-wrap">
-                        {item.teacherScaffoldingHint
-                          ? item.teacherScaffoldingHint
-                          : item.imageHints && item.imageHints.length > 0
-                          ? '📷 위에 이미지 힌트가 첨부되어 있습니다.'
-                          : '아직 전달된 힌트가 없습니다. [✍️ 힌트 작성하기]를 눌러 학생에게 스캐폴딩 접근 힌트를 전수해 보세요!'}
-                      </p>
+                      {/* 🎓 학생이 적은 반성/실수 대책 박스 */}
+                      {item.userActionPlan && (
+                        <div className="bg-slate-950/40 border border-slate-800/60 rounded-2xl p-3 space-y-1">
+                          <div className="text-[11px] font-extrabold text-slate-400 flex items-center space-x-1">
+                            <span>🎓 학생의 반성/실수 대책:</span>
+                          </div>
+                          <p className="text-xs text-slate-300 leading-relaxed font-sans whitespace-pre-wrap">
+                            {item.userActionPlan}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* 👨‍🏫 선생님이 전수하는 스캐폴딩 힌트 박스 (텍스트 + 이미지 힌트 통합 표출) */}
+                      <div className="bg-gradient-to-r from-purple-950/40 via-slate-950/70 to-indigo-950/40 border border-purple-500/30 rounded-2xl p-3.5 space-y-2 shadow-md">
+                        <div className="flex items-center justify-between text-xs font-extrabold">
+                          <span className="text-purple-300 flex items-center space-x-1.5">
+                            <span>💡 👨‍🏫 선생님 전수 스캐폴딩 힌트</span>
+                            {currentImageHints.length > 0 && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                                📷 이미지 힌트 {currentImageHints.length}개
+                              </span>
+                            )}
+                          </span>
+                          <button
+                            onClick={() => handleOpenHintModal(item)}
+                            className="text-[11px] font-black text-purple-400 hover:text-purple-300 underline"
+                          >
+                            {item.teacherScaffoldingHint ? '✍️ 힌트 수정하기' : '✍️ 힌트 작성하기'}
+                          </button>
+                        </div>
+
+                        {/* 이미지 스캐폴딩 힌트 갤러리 썸네일 목록 */}
+                        {currentImageHints.length > 0 && (
+                          <div className="flex flex-wrap gap-2 pt-1 border-b border-slate-800/80 pb-2">
+                            {currentImageHints.map((scaf) => (
+                              <div
+                                key={scaf.id}
+                                className="relative bg-slate-950 border border-slate-800 rounded-xl overflow-hidden p-1 max-w-[140px]"
+                              >
+                                <img
+                                  src={scaf.image_url}
+                                  alt="스캐폴딩 이미지 힌트"
+                                  loading="lazy"
+                                  decoding="async"
+                                  className="w-full h-16 object-cover rounded-lg"
+                                />
+                                {scaf.caption && (
+                                  <p className="text-[9.5px] text-purple-300 font-bold truncate mt-1 px-1">
+                                    {scaf.caption}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* 텍스트 힌트 또는 안내 멘트 */}
+                        <p className="text-xs text-slate-200 leading-relaxed font-sans whitespace-pre-wrap">
+                          {item.teacherScaffoldingHint
+                            ? item.teacherScaffoldingHint
+                            : currentImageHints.length > 0
+                            ? '📷 위에 이미지 힌트가 첨부되어 있습니다.'
+                            : '아직 전달된 힌트가 없습니다. [✍️ 힌트 작성하기]를 눌러 학생에게 스캐폴딩 접근 힌트를 전수해 보세요!'}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* 🚀 5개씩 더보기 버튼 */}
