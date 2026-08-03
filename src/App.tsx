@@ -45,6 +45,7 @@ const mapDbMistakeRow = (m: any): MistakeEntry => ({
   chapter: m.chapter || undefined,
   rootCauses: m.root_causes || [],
   userActionPlan: m.user_action_plan || undefined,
+  teacherScaffoldingHint: m.teacher_scaffolding_hint || undefined,
 });
 
 function App() {

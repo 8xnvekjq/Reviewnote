@@ -94,6 +94,7 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
           chapter: row.chapter,
           rootCauses: row.root_causes,
           userActionPlan: row.user_action_plan,
+          teacherScaffoldingHint: row.teacher_scaffolding_hint,
           studentName,
           studentEmail: studentProf.email || '',
           xCount,
@@ -192,7 +193,7 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
   // ── 4. 스캐폴딩 힌트 저장 처리 ──────────────────────────────────
   const handleOpenHintModal = (item: ExtendedMistakeEntry) => {
     setHintModalTarget(item);
-    setHintInput(item.userActionPlan || '');
+    setHintInput(item.teacherScaffoldingHint || '');
     setHintSaveNotice(null);
   };
 
@@ -202,14 +203,14 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
     try {
       const { error } = await supabase
         .from('mistakes')
-        .update({ user_action_plan: hintInput })
+        .update({ teacher_scaffolding_hint: hintInput })
         .eq('id', hintModalTarget.id);
 
       if (error) throw error;
 
       // 메모리 내 상태 즉시 업데이트
       setMistakes((prev) =>
-        prev.map((m) => (m.id === hintModalTarget.id ? { ...m, userActionPlan: hintInput } : m))
+        prev.map((m) => (m.id === hintModalTarget.id ? { ...m, teacherScaffoldingHint: hintInput } : m))
       );
 
       setHintSaveNotice('✅ 스캐폴딩 힌트가 학생에게 전달되었습니다!');
@@ -471,21 +472,33 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
                       </div>
                     )}
 
-                    {/* 💡 전달된 스캐폴딩 힌트 박스 */}
-                    <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-3.5 space-y-1.5">
+                    {/* 🎓 학생이 적은 반성/실수 대책 박스 */}
+                    {item.userActionPlan && (
+                      <div className="bg-slate-950/40 border border-slate-800/60 rounded-2xl p-3 space-y-1">
+                        <div className="text-[11px] font-extrabold text-slate-400 flex items-center space-x-1">
+                          <span>🎓 학생의 반성/실수 대책:</span>
+                        </div>
+                        <p className="text-xs text-slate-300 leading-relaxed font-sans whitespace-pre-wrap">
+                          {item.userActionPlan}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* 👨‍🏫 선생님이 전수하는 스캐폴딩 힌트 박스 */}
+                    <div className="bg-gradient-to-r from-purple-950/40 via-slate-950/70 to-indigo-950/40 border border-purple-500/30 rounded-2xl p-3.5 space-y-1.5 shadow-md">
                       <div className="flex items-center justify-between text-xs font-extrabold">
-                        <span className="text-amber-400 flex items-center space-x-1">
-                          <span>💡 전달된 스캐폴딩 힌트</span>
+                        <span className="text-purple-300 flex items-center space-x-1.5">
+                          <span>💡 👨‍🏫 선생님 전수 스캐폴딩 힌트</span>
                         </span>
                         <button
                           onClick={() => handleOpenHintModal(item)}
                           className="text-[11px] font-black text-purple-400 hover:text-purple-300 underline"
                         >
-                          {item.userActionPlan ? '✍️ 힌트 수정하기' : '✍️ 힌트 추가하기'}
+                          {item.teacherScaffoldingHint ? '✍️ 힌트 수정하기' : '✍️ 힌트 작성하기'}
                         </button>
                       </div>
-                      <p className="text-xs text-slate-300 leading-relaxed font-sans whitespace-pre-wrap">
-                        {item.userActionPlan || '아직 전달된 힌트가 없습니다. [✍️ 힌트 추가하기]를 눌러 학생에게 스캐폴딩 가이드를 입력해 보세요!'}
+                      <p className="text-xs text-slate-200 leading-relaxed font-sans whitespace-pre-wrap">
+                        {item.teacherScaffoldingHint || '아직 전달된 힌트가 없습니다. [✍️ 힌트 작성하기]를 눌러 학생에게 스캐폴딩 접근 힌트를 전수해 보세요!'}
                       </p>
                     </div>
                   </div>

@@ -102,11 +102,16 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
 
         {/* 대책 내용(좌) & AI분석 요약/미완료(우) 단일 행 병합 */}
         <div className="flex items-center justify-between text-[10px] text-slate-500 min-w-0 space-x-3">
-          {/* Left: Action Plan */}
+          {/* Left: Teacher Scaffolding Hint or Student Action Plan */}
           <div className="flex-1 min-w-0 truncate">
-            {entry.userActionPlan && entry.userActionPlan.trim() ? (
+            {entry.teacherScaffoldingHint && entry.teacherScaffoldingHint.trim() ? (
               <span className="truncate block text-[9.5px]">
-                <span className="text-indigo-400 font-bold mr-1">💡대책:</span>
+                <span className="text-purple-400 font-bold mr-1">👨‍🏫 힌트:</span>
+                {entry.teacherScaffoldingHint.slice(0, 18).trim()}{entry.teacherScaffoldingHint.length > 18 ? '...' : ''}
+              </span>
+            ) : entry.userActionPlan && entry.userActionPlan.trim() ? (
+              <span className="truncate block text-[9.5px]">
+                <span className="text-indigo-400 font-bold mr-1">🎓대책:</span>
                 {entry.userActionPlan.slice(0, 18).trim()}{entry.userActionPlan.length > 18 ? '...' : ''}
               </span>
             ) : (

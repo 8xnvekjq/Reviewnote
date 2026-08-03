@@ -1222,6 +1222,19 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
           </button>
         </div>
 
+        {/* 💡 👨‍🏫 선생님이 전달해 준 스캐폴딩 힌트 가이드 카드 */}
+        {selectedEntry.teacherScaffoldingHint && (
+          <div className="bg-gradient-to-r from-purple-950/60 via-slate-900 to-indigo-950/60 border border-purple-500/40 rounded-2xl p-4 space-y-2 shadow-lg animate-fade-in mt-4">
+            <div className="flex items-center space-x-2">
+              <span className="text-base">💡</span>
+              <h4 className="text-xs font-black text-purple-300">👨‍🏫 선생님의 스캐폴딩 처방 힌트</h4>
+            </div>
+            <p className="text-xs text-slate-200 leading-relaxed font-sans whitespace-pre-wrap pl-6">
+              {selectedEntry.teacherScaffoldingHint}
+            </p>
+          </div>
+        )}
+
       </div>
 
       {/* 이미지 전체화면 확대 모달 (두 손가락 Pinch-to-zoom 제스처 지원 + 풀스크린 오버레이 방식) */}

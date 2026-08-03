@@ -88,6 +88,7 @@ export interface MistakeEntry {
   chapter?: string;
   rootCauses?: string[];
   userActionPlan?: string;
+  teacherScaffoldingHint?: string;
 }
 
 export type ActiveTab = 'notes' | 'completed' | 'camera' | 'stats' | 'admin' | 'guide' | 'store' | 'activity' | 'scaffolding';
