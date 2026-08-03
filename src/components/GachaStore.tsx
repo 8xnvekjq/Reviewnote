@@ -111,6 +111,22 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
     message: '',
   });
 
+  // 🔮 최초 1회 보물 연성 합성 안내 모달 상태
+  const [showSynthesisNotice, setShowSynthesisNotice] = useState(false);
+
+  useEffect(() => {
+    // 럭키상점 최초 진입 시 연성 합성 시스템 안내 팝업 (1회 한정)
+    const hasSeenNotice = localStorage.getItem('reviewnote_synthesis_notice_seen_v1');
+    if (!hasSeenNotice) {
+      setShowSynthesisNotice(true);
+    }
+  }, []);
+
+  const closeSynthesisNotice = () => {
+    localStorage.setItem('reviewnote_synthesis_notice_seen_v1', 'true');
+    setShowSynthesisNotice(false);
+  };
+
   const showNoticeModal = (info: Omit<NoticeModalState, 'isOpen'>) => {
     setNoticeModal({
       isOpen: true,
@@ -1155,6 +1171,52 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* 🔮 최초 1회 보물 연성 합성 안내 모달 */}
+      {showSynthesisNotice && (
+        <div className="fixed inset-0 z-50 bg-slate-955/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-purple-500/50 rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl animate-fade-in text-center relative overflow-hidden">
+            {/* 오로라 글로우 배경 */}
+            <div className="absolute -top-12 -left-12 w-32 h-32 bg-purple-500/20 rounded-full blur-2xl pointer-events-none" />
+            <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none" />
+
+            {/* 헤더 아이콘 */}
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-3xl shadow-lg shadow-purple-500/30">
+              🔮
+            </div>
+
+            <div className="space-y-1.5">
+              <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/20 inline-block">
+                NEW FEATURE
+              </span>
+              <h3 className="text-lg font-black text-white">보물 연성 합성 시스템 오픈!</h3>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800 text-left">
+              잠자고 있는 중복 보물 2개를 합쳐서 <strong className="text-purple-300">상위 등급(UR / SSR) 보물 1개</strong>로 새로 연성할 수 있습니다!
+              <br /><br />
+              상점의 <strong className="text-amber-400">[🔮 합성!]</strong> 서브 탭에서 지금 바로 연성해 보세요!
+            </p>
+
+            <button
+              onClick={() => {
+                closeSynthesisNotice();
+                setActiveSubTab('synthesis');
+              }}
+              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-black text-sm hover:from-purple-400 hover:to-indigo-500 transition-all shadow-lg shadow-purple-500/25 flex items-center justify-center space-x-2"
+            >
+              <span>🔮 보물 합성하러 가기</span>
+            </button>
+
+            <button
+              onClick={closeSynthesisNotice}
+              className="text-[11px] font-bold text-slate-400 hover:text-slate-300 transition-colors block mx-auto underline pt-1"
+            >
+              다음에 보기
+            </button>
           </div>
         </div>
       )}
