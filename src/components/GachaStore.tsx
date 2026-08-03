@@ -111,20 +111,24 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
     message: '',
   });
 
-  // 🔮 최초 1회 보물 연성 합성 안내 모달 상태
+  // 🔮 최초 1회 보물 연성 합성 안내 모달 상태 (서버 DB 기준)
   const [showSynthesisNotice, setShowSynthesisNotice] = useState(false);
 
-  useEffect(() => {
-    // 럭키상점 최초 진입 시 연성 합성 시스템 안내 팝업 (1회 한정)
-    const hasSeenNotice = localStorage.getItem('reviewnote_synthesis_notice_seen_v1');
-    if (!hasSeenNotice) {
-      setShowSynthesisNotice(true);
-    }
-  }, []);
-
-  const closeSynthesisNotice = () => {
-    localStorage.setItem('reviewnote_synthesis_notice_seen_v1', 'true');
+  const closeSynthesisNotice = async (shouldNavigateToSynthesis = false) => {
     setShowSynthesisNotice(false);
+    if (!userId) return;
+    try {
+      await supabase
+        .from('profiles')
+        .update({ has_seen_synthesis_notice: true })
+        .eq('id', userId);
+    } catch (e) {
+      console.error('연성 알림 이력 DB 저장 오류:', e);
+    } finally {
+      if (shouldNavigateToSynthesis) {
+        setActiveSubTab('synthesis');
+      }
+    }
   };
 
   const showNoticeModal = (info: Omit<NoticeModalState, 'isOpen'>) => {
@@ -196,7 +200,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
     }
   };
 
-  // ── 무료 뽑기(일일 1회/주간 10회) 사용 이력 Supabase 로드 ──────
+  // ── 무료 뽑기 및 프로필 알림 이력 Supabase 로드 ──────
   const loadFreeDrawStatus = async () => {
     if (!userId) return;
     const { data, error } = await supabase
@@ -1202,17 +1206,14 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
             </p>
 
             <button
-              onClick={() => {
-                closeSynthesisNotice();
-                setActiveSubTab('synthesis');
-              }}
+              onClick={() => closeSynthesisNotice(true)}
               className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-black text-sm hover:from-purple-400 hover:to-indigo-500 transition-all shadow-lg shadow-purple-500/25 flex items-center justify-center space-x-2"
             >
               <span>🔮 보물 합성하러 가기</span>
             </button>
 
             <button
-              onClick={closeSynthesisNotice}
+              onClick={() => closeSynthesisNotice(false)}
               className="text-[11px] font-bold text-slate-400 hover:text-slate-300 transition-colors block mx-auto underline pt-1"
             >
               다음에 보기
