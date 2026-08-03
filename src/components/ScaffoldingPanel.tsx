@@ -167,6 +167,11 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
         if (!item.userId || !selectedStudentIds.includes(item.userId)) return false;
       }
 
+      // 3) 학년/과목 선택 필터 (비어있으면 전체 선택 취급)
+      if (selectedGrades.length > 0) {
+        if (!item.grade || !selectedGrades.includes(item.grade)) return false;
+      }
+
       // 4) 선생님 힌트 작성 여부 필터 (속도 저하 0ms 경량 Set 연산)
       const hasTextHint = !!(item.teacherScaffoldingHint && item.teacherScaffoldingHint.trim());
       const hasImgHint = scaffoldedMistakeIdsSet.has(item.id);
