@@ -172,11 +172,8 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
         if (!item.grade || !selectedGrades.includes(item.grade)) return false;
       }
 
-      // 4) 선생님 힌트 작성 여부 필터 (신규 teacherScaffoldingHint + 기존 userActionPlan 하이브리드 감지 보장)
-      const hasTextHint = !!(
-        (item.teacherScaffoldingHint && item.teacherScaffoldingHint.trim()) ||
-        (item.userActionPlan && item.userActionPlan.trim())
-      );
+      // 4) 선생님 힌트 작성 여부 필터 (선생님 텍스트 힌트 + 이미지 힌트 정밀 판정)
+      const hasTextHint = !!(item.teacherScaffoldingHint && item.teacherScaffoldingHint.trim());
       const hasImgHint = scaffoldedMistakeIdsSet.has(item.id);
       const hasAnyHint = hasTextHint || hasImgHint;
 
