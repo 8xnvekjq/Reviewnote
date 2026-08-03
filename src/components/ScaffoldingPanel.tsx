@@ -41,12 +41,14 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
   const [minWeakCount, setMinWeakCount] = useState<number>(2); // 기본 X+★ 2개 이상
+  const [hintFilterStatus, setHintFilterStatus] = useState<'all' | 'has_hint' | 'no_hint'>('all'); // 💡 힌트 작성 여부 필터
 
   // 🚀 5개씩 더보기 렌더링 제한
   const [displayLimit, setDisplayLimit] = useState<number>(5);
 
-  // 📷 핀포인트 로드된 이미지 힌트 맵 상태
+  // 📷 핀포인트 로드된 이미지 힌트 맵 상태 및 경량 ID 집합
   const [scaffoldingsMap, setScaffoldingsMap] = useState<Record<string, ScaffoldingImageItem[]>>({});
+  const [scaffoldedMistakeIdsSet, setScaffoldedMistakeIdsSet] = useState<Set<string>>(new Set());
 
   // ✍️ 힌트 작성 모달 상태
   const [hintModalTarget, setHintModalTarget] = useState<ExtendedMistakeEntry | null>(null);
@@ -77,6 +79,17 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
         .order('date', { ascending: false });
 
       if (error) throw error;
+
+      // 2-2. ⚡ 경량 ID 쿼리: 이미지 힌트가 있는 mistake_id 집합만 쾌속 조회 (속도 저하 0ms 보장)
+      const { data: scafIdsData } = await supabase
+        .from('mistake_scaffoldings')
+        .select('mistake_id');
+
+      const scafIdSet = new Set<string>();
+      (scafIdsData || []).forEach((s: any) => {
+        if (s.mistake_id) scafIdSet.add(s.mistake_id);
+      });
+      setScaffoldedMistakeIdsSet(scafIdSet);
 
       // 3. 취약 오답 (X + ★ >= minWeakCount) 계산 및 확장 정보 가공
       const processed: ExtendedMistakeEntry[] = (mData || []).map((row: any) => {
@@ -154,14 +167,17 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
         if (!item.userId || !selectedStudentIds.includes(item.userId)) return false;
       }
 
-      // 3) 학년/과목 선택 필터 (비어있으면 전체 선택 취급)
-      if (selectedGrades.length > 0) {
-        if (!item.grade || !selectedGrades.includes(item.grade)) return false;
-      }
+      // 4) 선생님 힌트 작성 여부 필터 (속도 저하 0ms 경량 Set 연산)
+      const hasTextHint = !!(item.teacherScaffoldingHint && item.teacherScaffoldingHint.trim());
+      const hasImgHint = scaffoldedMistakeIdsSet.has(item.id);
+      const hasAnyHint = hasTextHint || hasImgHint;
+
+      if (hintFilterStatus === 'has_hint' && !hasAnyHint) return false;
+      if (hintFilterStatus === 'no_hint' && hasAnyHint) return false;
 
       return true;
     });
-  }, [mistakes, minWeakCount, selectedStudentIds, selectedGrades]);
+  }, [mistakes, minWeakCount, selectedStudentIds, selectedGrades, hintFilterStatus, scaffoldedMistakeIdsSet]);
 
   // 5개씩 잘라낸 현재 렌더링 카드들
   const visibleMistakes = useMemo(() => {
@@ -390,7 +406,37 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
           </div>
         </div>
 
-        {/* 3. 취약 기준 조절 */}
+        {/* 3. 선생님 힌트 작성 여부 필터 */}
+        <div className="pt-2.5 border-t border-slate-800/60 flex flex-wrap items-center justify-between gap-2 text-xs font-bold">
+          <span className="text-slate-300 flex items-center space-x-1.5">
+            <span>💡 힌트 작성 상태 필터:</span>
+          </span>
+          <div className="flex items-center space-x-1.5 flex-wrap">
+            {[
+              { id: 'all', label: '전체 보기', icon: '📋' },
+              { id: 'has_hint', label: '💡 힌트 작성 완료', icon: '✅' },
+              { id: 'no_hint', label: '⏳ 힌트 미작성 (작성 필요)', icon: '⚠️' },
+            ].map((st) => (
+              <button
+                key={st.id}
+                onClick={() => {
+                  setHintFilterStatus(st.id as any);
+                  setDisplayLimit(5);
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all flex items-center space-x-1.5 ${
+                  hintFilterStatus === st.id
+                    ? 'bg-purple-500/20 text-purple-300 border-purple-500/60 shadow-md shadow-purple-500/10 font-black'
+                    : 'bg-slate-950/70 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-slate-300'
+                }`}
+              >
+                <span>{st.icon}</span>
+                <span>{st.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 4. 취약 기준 조절 */}
         <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-xs font-bold">
           <span className="text-slate-400">취약 감지 기준 (X+★ 최소 누적):</span>
           <div className="flex items-center space-x-2">
