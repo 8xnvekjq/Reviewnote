@@ -62,7 +62,7 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
       const { data: mData, error } = await supabase
         .from('mistakes')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('date', { ascending: false });
 
       if (error) throw error;
 
@@ -86,7 +86,7 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
           userId: row.user_id,
           title: row.title || '무제 오답',
           imageUrl: row.image_url,
-          date: row.created_at || row.date,
+          date: row.date,
           updatedAt: row.updated_at,
           analysis: row.analysis,
           reviews: reviewsArr as any,
