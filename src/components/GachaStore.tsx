@@ -619,29 +619,29 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
       {/* 캔버스 파티클 레이어 */}
       <canvas ref={canvasRef} className="pointer-events-none fixed inset-0 z-50" />
 
-      {/* 헤더 안내 및 내 점수 */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border-b border-slate-800 p-5 shadow-lg flex items-center justify-between">
+      {/* 헤더 안내 및 내 점수 (모바일 반응형 랩핑 적용) */}
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border-b border-slate-800 p-3.5 sm:p-5 shadow-lg flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <div className="flex items-center space-x-3 min-w-0">
-          <span className="text-3xl animate-bounce flex-none">🎁</span>
+          <span className="text-2xl sm:text-3xl animate-bounce flex-none">🎁</span>
           <div className="min-w-0">
-            <h2 className="text-base font-black text-white flex items-center space-x-1.5 whitespace-nowrap">
+            <h2 className="text-sm sm:text-base font-black text-white flex items-center space-x-1.5 whitespace-nowrap">
               <span>행운의 럭키 상점</span>
               <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-mono flex-none">
                 BETA
               </span>
             </h2>
-            <p className="text-[11px] text-slate-400 mt-0.5">
+            <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate sm:whitespace-normal">
               복습으로 모은 콤보 점수로 레어 스탬프, 칭호, 테마를 뽑아보세요!
             </p>
           </div>
         </div>
 
-        {/* 내 보유 점수 통장 & 이용 가이드 버튼 */}
-        <div className="flex items-center space-x-2">
+        {/* 내 보유 점수 통장 & 이용 가이드 버튼 (모바일 폭 대응) */}
+        <div className="flex items-center justify-between sm:justify-end space-x-2 flex-wrap sm:flex-nowrap gap-y-1.5">
           {boosterRemainingStr && (
-            <div className="bg-amber-500/20 border border-amber-400/50 px-2.5 py-1.5 rounded-2xl flex flex-col items-center shadow-sm animate-pulse flex-none">
-              <span className="text-[8.5px] font-black text-amber-300">⚡ 5배 부스터 발동중</span>
-              <span className="text-[9.5px] font-extrabold text-amber-400 font-mono">{boosterRemainingStr}</span>
+            <div className="bg-amber-500/20 border border-amber-400/50 px-2.5 py-1 rounded-2xl flex flex-col items-center shadow-sm animate-pulse flex-none">
+              <span className="text-[8px] sm:text-[8.5px] font-black text-amber-300">⚡ 5배 부스터 발동중</span>
+              <span className="text-[9px] sm:text-[9.5px] font-extrabold text-amber-400 font-mono">{boosterRemainingStr}</span>
             </div>
           )}
 
@@ -654,22 +654,22 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
             <span>가이드</span>
           </button>
 
-          <div className="bg-slate-955/80 border border-amber-500/30 px-3.5 py-2 rounded-2xl flex flex-col items-end shadow-inner flex-none max-w-[160px] sm:max-w-[220px]">
-            <span className="text-[9px] text-slate-400 font-bold">보유 콤보 점수</span>
-            <span className="text-sm font-black text-amber-400 flex items-center space-x-1">
+          <div className="bg-slate-955/80 border border-amber-500/30 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-2xl flex flex-col items-end shadow-inner flex-1 sm:flex-none max-w-none sm:max-w-[220px]">
+            <span className="text-[8.5px] sm:text-[9px] text-slate-400 font-bold">보유 콤보 점수</span>
+            <span className="text-xs sm:text-sm font-black text-amber-400 flex items-center space-x-1">
               <span>⚡</span>
               <span>{userPoints}점</span>
             </span>
-            <span className="text-[9px] text-slate-400 font-semibold mt-0.5 text-right leading-snug line-clamp-2">
+            <span className="text-[8.5px] sm:text-[9px] text-slate-400 font-semibold mt-0.5 text-right leading-snug line-clamp-1 sm:line-clamp-2">
               {cheerLine}
             </span>
           </div>
         </div>
       </div>
 
-      {/* 서브 탭 서브 네비게이션 */}
-      <div className="flex items-center justify-center p-3 border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md">
-        <div className="flex space-x-1 bg-slate-950 p-1 rounded-2xl border border-slate-800">
+      {/* 서브 탭 서브 네비게이션 (모바일 가로 스크롤 overflow-x-auto) */}
+      <div className="flex items-center justify-start sm:justify-center p-2.5 sm:p-3 border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md overflow-x-auto no-scrollbar">
+        <div className="flex space-x-1 bg-slate-950 p-1 rounded-2xl border border-slate-800 flex-nowrap shrink-0">
           <button
             onClick={() => setActiveSubTab('draw')}
             className={`px-3 py-2 rounded-xl text-[11px] font-extrabold transition-all whitespace-nowrap ${

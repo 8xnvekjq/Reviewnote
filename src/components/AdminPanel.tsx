@@ -198,6 +198,29 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
 
   useEffect(() => {
     fetchAdminStats();
+
+    // ⚡ Realtime 실시간 동기화: profiles 및 mistakes 테이블 변경 시 즉시 갱신
+    const channel = supabase
+      .channel('admin-dashboard-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'profiles' },
+        () => {
+          fetchAdminStats();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'mistakes' },
+        () => {
+          fetchAdminStats();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const totalMistakes = stats.reduce((s, u) => s + u.mistakeCount, 0);
@@ -212,8 +235,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
           <h2 className="text-lg font-extrabold text-white flex items-center">
             <span className="mr-2">👑</span> 어드민 대시보드
           </h2>
-          <p className="text-[11px] text-slate-500 mt-0.5">
-            마지막 갱신: {lastRefreshed.toLocaleTimeString('ko-KR')}
+          <p className="text-[11px] text-slate-400 mt-0.5 flex items-center space-x-1.5">
+            <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold flex items-center space-x-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+              <span>⚡ 실시간 동기화 중</span>
+            </span>
+            <span>마지막 갱신: {lastRefreshed.toLocaleTimeString('ko-KR')}</span>
           </p>
         </div>
         <div className="flex items-center space-x-2">
@@ -226,14 +253,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
               <span>취약 오답 클리닉</span>
             </button>
           )}
-          <button
-            onClick={fetchAdminStats}
-            disabled={isLoading}
-            className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-700 text-xs font-bold text-slate-300 transition-all disabled:opacity-50 flex items-center space-x-1.5"
-          >
-            <span className={isLoading ? 'animate-spin' : ''}>🔄</span>
-            <span>새로고침</span>
-          </button>
         </div>
       </div>
 
