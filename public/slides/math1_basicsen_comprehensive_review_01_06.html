@@ -1,0 +1,2157 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>베이직쎈 공통수학1 - 01~06 종합 복습</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true
+            },
+            options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'] }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        .presentation-deck { position: relative; width: 1280px; height: 720px; background: radial-gradient(circle at 10% 20%, #292524 0%, #0f172a 100%); border: 1px solid rgba(255, 255, 255, 0.08); margin: 20px auto; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); border-left: 10px solid #f59e0b; }
+
+        /* 슬라이드: 모두 겹쳐 놓고 opacity/transform으로 확대·축소 전환한다 */
+        .slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 42px 70px; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; background: transparent; opacity: 0; pointer-events: none; transform: scale(1); transform-origin: 50% 50%; z-index: 1; }
+        .slide.active { opacity: 1; pointer-events: auto; z-index: 10; }
+
+        .concept-card { background: rgba(41, 37, 36, 0.75); backdrop-filter: blur(10px); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 18px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); }
+        .formula-box { background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.22); border-radius: 14px; }
+        .idea-box { background: linear-gradient(135deg, rgba(120, 53, 15, 0.35) 0%, rgba(41, 37, 36, 0.6) 100%); border: 1px solid rgba(251, 191, 36, 0.35); border-radius: 14px; }
+        .num-badge { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background: #d97706; color: white; font-weight: 900; font-size: 1.1rem; flex-shrink: 0; }
+
+        /* 허브 카드 */
+        .hub-card { border-radius: 20px; border: 2px solid rgba(245, 158, 11, 0.3); background: rgba(41, 37, 36, 0.7); transition: border-color 0.3s; position: relative; }
+        .hub-card .check { position: absolute; top: -14px; right: -14px; width: 34px; height: 34px; border-radius: 50%; background: #16a34a; display: flex; align-items: center; justify-content: center; color: white; font-size: 1rem; box-shadow: 0 4px 10px rgba(0,0,0,0.4); }
+
+        @media print {
+            body { background-color: #ffffff !important; margin: 0 !important; padding: 0 !important; }
+            .presentation-deck { width: 1280px !important; height: auto !important; box-shadow: none !important; border: none !important; margin: 0 !important; overflow: visible !important; display: block !important; }
+            .slide { position: relative !important; display: flex !important; width: 1280px !important; height: 720px !important; page-break-after: always !important; page-break-inside: avoid !important; background: #0f172a !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; opacity: 1 !important; transform: none !important; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="presentation-deck" id="deck">
+        <!-- Top Bar -->
+        <div class="flex justify-between items-center z-20 pb-3 border-b border-amber-900/40 mx-8 mt-6 no-print">
+            <div class="flex items-center gap-3">
+                <span class="bg-amber-600 text-white text-xs font-black px-3 py-1 rounded-md uppercase">베이직쎈 | 예비고1</span>
+                <span class="text-slate-300 text-sm font-medium" id="slide-breadcrumb">Ⅰ. 다항식 &gt; 01. 다항식의 연산</span>
+            </div>
+            <div class="text-right flex items-center gap-4">
+                <span class="text-xs text-amber-400 font-bold uppercase tracking-wider" id="slide-category">복습</span>
+                <span class="text-xs text-slate-400 font-semibold bg-slate-800/80 px-2.5 py-1 rounded-md border border-slate-700" id="slide-counter">1 / 71</span>
+            </div>
+        </div>
+
+        <!-- Slide Container -->
+        <div class="relative flex-grow my-2 overflow-hidden" id="slide-container">
+
+            <!-- ================= MASTER HUB: 인트로 ================= -->
+            <div class="slide active" data-category="전체 흐름 · 단원 목록" data-master="true" data-breadcrumb="전체 단원 목록">
+                <div class="flex-grow flex flex-col justify-center items-center gap-6">
+                    <div class="text-center">
+                        <span class="text-amber-400 font-bold text-base tracking-widest">전체적인 흐름을 한눈에</span>
+                        <h1 class="text-5xl font-black text-white leading-tight mt-2">공통수학1 종합 복습</h1>
+                        <p class="text-slate-400 text-base mt-3">6개 단원의 핵심을 순서대로 확대해서 복습합니다. 다음 슬라이드 ▶ 버튼을 누르면 &lsquo;다항식의 연산&rsquo;부터 확대됩니다.</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-5 w-full max-w-5xl">
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center">
+                            
+                            <i class="fa-solid fa-calculator text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">다항식의 연산</h3>
+                            <p class="text-xs text-slate-400">사칙연산</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center">
+                            
+                            <i class="fa-solid fa-equals text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">나머지 정리</h3>
+                            <p class="text-xs text-slate-400">항등식·조립제법</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center">
+                            
+                            <i class="fa-solid fa-shapes text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">인수분해</h3>
+                            <p class="text-xs text-slate-400">공식과 치환</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center">
+                            
+                            <i class="fa-solid fa-i text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">복소수</h3>
+                            <p class="text-xs text-slate-400">사칙연산·켤레</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center">
+                            
+                            <i class="fa-solid fa-square-root-variable text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">이차방정식</h3>
+                            <p class="text-xs text-slate-400">판별·근과 계수</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center">
+                            
+                            <i class="fa-solid fa-chart-line text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">이차방정식과<br>이차함수</h3>
+                            <p class="text-xs text-slate-400">그래프·최대최소</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= CHAPTER 1: Ⅰ. 다항식 &gt; 01. 다항식의 연산 ================= -->
+
+            <!-- Slide 1: HUB -->
+            <div class="slide" data-category="복습 · 다항식의 연산" data-chapter-origin="17% 40%" data-breadcrumb="Ⅰ. 다항식 &gt; 01. 다항식의 연산" data-hub="true">
+                <div class="flex-grow flex flex-col justify-center items-center gap-10">
+                    <div class="text-center">
+                        <span class="text-amber-400 font-bold text-base tracking-widest">지난 시간 복습</span>
+                        <h1 class="text-6xl font-black text-white leading-tight mt-2">다항식의 연산</h1>
+                        <p class="text-slate-400 text-base mt-3">항 · 차수 · 계수 · 동류항을 이용해 <span class="text-amber-300 font-semibold">내림차순 / 오름차순</span>으로 정리한 다항식을 더하고, 빼고, 곱하고, 나눠봅니다.</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-6 w-full max-w-4xl">
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center">
+                            <i class="fa-solid fa-plus-minus text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">덧셈과 뺄셈</h3>
+                            <p class="text-sm text-slate-400">동류항끼리 정리</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center">
+                            <i class="fa-solid fa-xmark text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">곱셈</h3>
+                            <p class="text-sm text-slate-400">분배법칙으로 전개</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center">
+                            <i class="fa-solid fa-divide text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">나눗셈</h3>
+                            <p class="text-sm text-slate-400">장제법으로 계산</p>
+                        </div>
+                    </div>
+                    <p class="text-slate-500 text-sm">다음 슬라이드 ▶ 버튼을 누르면 &lsquo;덧셈과 뺄셈&rsquo;부터 확대해서 살펴봅니다</p>
+                </div>
+            </div>
+
+            <!-- Slide 2: 덧셈과 뺄셈 개념 -->
+            <div class="slide" data-category="개념 02 · 덧셈과 뺄셈" data-breadcrumb="Ⅰ. 다항식 &gt; 01. 다항식의 연산" data-parent="hub" data-origin="17% 62%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">02</span>
+                        <h2 class="text-3xl font-black text-white">다항식의 덧셈과 뺄셈</h2>
+                    </div>
+                    <div class="formula-box py-4 px-8 text-lg text-white font-bold leading-loose">
+                        <p>① 덧셈: <span class="text-amber-300">동류항끼리 모아서</span> 정리한다.</p>
+                        <p>② 뺄셈: 빼는 식의 <span class="text-amber-300">각 항의 부호를 바꾸어</span> 더한다.</p>
+                    </div>
+                    <div class="idea-box p-4">
+                        <p class="text-base text-amber-100 leading-relaxed"><b class="text-amber-300">방법 2 · 계수만 써서 세로로 계산하기</b> — 차수가 높은 항부터 계수만 순서대로 적고 차수(자리)를 맞춘 뒤, 정수의 세로셈처럼 같은 자리끼리 더하거나 뺀다. 이때 없는 차수의 계수는 $0$으로 채운다.</p>
+                    </div>
+                    <p class="text-base text-slate-300">덧셈에 대한 성질 (세 다항식 $A,B,C$): 교환법칙 $A+B=B+A$, &nbsp; 결합법칙 $(A+B)+C=A+(B+C)$</p>
+                </div>
+            </div>
+
+            <!-- Slide 3: 덧셈과 뺄셈 예시 -->
+            <div class="slide" data-category="개념 02 · 바로 계산해보기" data-breadcrumb="Ⅰ. 다항식 &gt; 01. 다항식의 연산" data-parent="hub" data-origin="17% 62%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-5">
+                    <h2 class="text-2xl font-black text-white">계수만 써서 세로로 계산하기</h2>
+                    <p class="text-lg text-slate-200">두 다항식 $A=2x^3-3x^2+x-6,\ \ B=4x^2-2x+1$에 대하여 $A+B$와 $A-B$를 계산하면?</p>
+                    <div class="grid grid-cols-2 gap-12 justify-items-center">
+                        <div class="flex flex-col items-center gap-2">
+                            <span class="text-sm text-amber-300 font-bold">$A+B$</span>
+                            <div class="grid gap-x-4 gap-y-1 text-center font-mono" style="grid-template-columns: 22px repeat(4, 44px);">
+                                <div></div>
+                                <div class="text-xs text-slate-500">$x^3$</div>
+                                <div class="text-xs text-slate-500">$x^2$</div>
+                                <div class="text-xs text-slate-500">$x^1$</div>
+                                <div class="text-xs text-slate-500">$x^0$</div>
+
+                                <div></div>
+                                <div class="text-xl text-white font-bold">2</div>
+                                <div class="text-xl text-white font-bold">-3</div>
+                                <div class="text-xl text-white font-bold">1</div>
+                                <div class="text-xl text-white font-bold">-6</div>
+
+                                <div class="text-xl text-amber-300 font-bold">+</div>
+                                <div class="text-xl text-white font-bold">0</div>
+                                <div class="text-xl text-white font-bold">4</div>
+                                <div class="text-xl text-white font-bold">-2</div>
+                                <div class="text-xl text-white font-bold">1</div>
+
+                                <div class="col-span-5 border-t border-amber-400/60 my-1"></div>
+
+                                <div></div>
+                                <div class="text-xl text-amber-200 font-black">2</div>
+                                <div class="text-xl text-amber-200 font-black">1</div>
+                                <div class="text-xl text-amber-200 font-black">-1</div>
+                                <div class="text-xl text-amber-200 font-black">-5</div>
+                            </div>
+                            <span class="text-base text-white font-bold mt-1">$=2x^3+x^2-x-5$</span>
+                        </div>
+                        <div class="flex flex-col items-center gap-2">
+                            <span class="text-sm text-amber-300 font-bold">$A-B\ \left(=A+(-B)\right)$</span>
+                            <div class="grid gap-x-4 gap-y-1 text-center font-mono" style="grid-template-columns: 22px repeat(4, 44px);">
+                                <div></div>
+                                <div class="text-xs text-slate-500">$x^3$</div>
+                                <div class="text-xs text-slate-500">$x^2$</div>
+                                <div class="text-xs text-slate-500">$x^1$</div>
+                                <div class="text-xs text-slate-500">$x^0$</div>
+
+                                <div></div>
+                                <div class="text-xl text-white font-bold">2</div>
+                                <div class="text-xl text-white font-bold">-3</div>
+                                <div class="text-xl text-white font-bold">1</div>
+                                <div class="text-xl text-white font-bold">-6</div>
+
+                                <div class="text-xl text-amber-300 font-bold">+</div>
+                                <div class="text-xl text-white font-bold">0</div>
+                                <div class="text-xl text-white font-bold">-4</div>
+                                <div class="text-xl text-white font-bold">2</div>
+                                <div class="text-xl text-white font-bold">-1</div>
+
+                                <div class="col-span-5 border-t border-amber-400/60 my-1"></div>
+
+                                <div></div>
+                                <div class="text-xl text-amber-200 font-black">2</div>
+                                <div class="text-xl text-amber-200 font-black">-7</div>
+                                <div class="text-xl text-amber-200 font-black">3</div>
+                                <div class="text-xl text-amber-200 font-black">-7</div>
+                            </div>
+                            <span class="text-base text-white font-bold mt-1">$=2x^3-7x^2+3x-7$</span>
+                        </div>
+                    </div>
+                    <p class="text-sm text-amber-200"><i class="fa-solid fa-circle-check mr-1"></i> $B$ 자리에 $-B$의 계수(부호를 바꾼 값)를 넣으면, 뺄셈도 그대로 세로 덧셈이 된다. 비어 있는 차수는 $0$으로 채워 자리를 맞춘다.</p>
+                </div>
+            </div>
+
+            <!-- Slide 4: HUB (재방문) -->
+            <div class="slide" data-category="복습 · 다항식의 연산" data-breadcrumb="Ⅰ. 다항식 &gt; 01. 다항식의 연산" data-hub="true">
+                <div class="flex-grow flex flex-col justify-center items-center gap-10">
+                    <div class="text-center">
+                        <span class="text-amber-400 font-bold text-base tracking-widest">이제 곱셈으로!</span>
+                        <h1 class="text-6xl font-black text-white leading-tight mt-2">다항식의 연산</h1>
+                        <p class="text-slate-400 text-base mt-3">덧셈·뺄셈을 정리했으니, 이번에는 <span class="text-amber-300 font-semibold">다항식의 곱셈</span>을 확대해서 살펴봅니다.</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-6 w-full max-w-4xl">
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-plus-minus text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">덧셈과 뺄셈</h3>
+                            <p class="text-sm text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center">
+                            <i class="fa-solid fa-xmark text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">곱셈</h3>
+                            <p class="text-sm text-slate-400">분배법칙으로 전개</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center">
+                            <i class="fa-solid fa-divide text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">나눗셈</h3>
+                            <p class="text-sm text-slate-400">장제법으로 계산</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 5: 곱셈 개념 -->
+            <div class="slide" data-category="개념 03 · 곱셈" data-breadcrumb="Ⅰ. 다항식 &gt; 01. 다항식의 연산" data-parent="hub" data-origin="50% 62%">
+                <div class="concept-card flex-grow p-10 flex flex-col justify-center gap-6">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">03</span>
+                        <h2 class="text-3xl font-black text-white">다항식의 곱셈</h2>
+                    </div>
+                    <p class="text-xl text-slate-100 leading-relaxed">다항식의 곱셈은 <span class="text-amber-300 font-bold">분배법칙</span>을 이용하여 식을 전개한 다음 <span class="text-amber-300 font-bold">동류항끼리 모아서</span> 정리한다.</p>
+                    <div class="formula-box py-6 px-10 text-xl text-white font-bold leading-loose">
+                        <p>① 교환법칙: $AB=BA$</p>
+                        <p>② 결합법칙: $(AB)C=A(BC)$</p>
+                        <p>③ 분배법칙: $A(B+C)=AB+AC,\quad (A+B)C=AC+BC$</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 6: 곱셈 예시 -->
+            <div class="slide" data-category="개념 03 · 바로 계산해보기" data-breadcrumb="Ⅰ. 다항식 &gt; 01. 다항식의 연산" data-parent="hub" data-origin="50% 62%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-5">
+                    <h2 class="text-2xl font-black text-white">계수만 써서 세로로 계산하기</h2>
+                    <p class="text-lg text-slate-200">$(x^2+3x-1)(x-1)$을 전개하면?</p>
+                    <div class="flex justify-center">
+                        <div class="grid gap-x-4 gap-y-1 text-center font-mono" style="grid-template-columns: 22px repeat(4, 44px);">
+                            <div></div>
+                            <div class="text-xs text-slate-500">$x^3$</div>
+                            <div class="text-xs text-slate-500">$x^2$</div>
+                            <div class="text-xs text-slate-500">$x^1$</div>
+                            <div class="text-xs text-slate-500">$x^0$</div>
+
+                            <div></div>
+                            <div></div>
+                            <div class="text-xl text-white font-bold">1</div>
+                            <div class="text-xl text-white font-bold">3</div>
+                            <div class="text-xl text-white font-bold">-1</div>
+
+                            <div class="text-xl text-amber-300 font-bold">&times;</div>
+                            <div class="text-xl text-white font-bold border-b border-amber-400/60 pb-1"></div>
+                            <div class="text-xl text-white font-bold border-b border-amber-400/60 pb-1"></div>
+                            <div class="text-xl text-white font-bold border-b border-amber-400/60 pb-1">1</div>
+                            <div class="text-xl text-white font-bold border-b border-amber-400/60 pb-1">-1</div>
+
+                            <div></div>
+                            <div></div>
+                            <div class="text-xl text-slate-300 font-bold">-1</div>
+                            <div class="text-xl text-slate-300 font-bold">-3</div>
+                            <div class="text-xl text-slate-300 font-bold">1</div>
+
+                            <div></div>
+                            <div class="text-xl text-slate-300 font-bold border-b border-amber-400/60 pb-1">1</div>
+                            <div class="text-xl text-slate-300 font-bold border-b border-amber-400/60 pb-1">3</div>
+                            <div class="text-xl text-slate-300 font-bold border-b border-amber-400/60 pb-1">-1</div>
+                            <div class="text-xl text-slate-300 font-bold border-b border-amber-400/60 pb-1"></div>
+
+                            <div></div>
+                            <div class="text-xl text-amber-200 font-black">1</div>
+                            <div class="text-xl text-amber-200 font-black">2</div>
+                            <div class="text-xl text-amber-200 font-black">-4</div>
+                            <div class="text-xl text-amber-200 font-black">1</div>
+                        </div>
+                    </div>
+                    <p class="text-base text-white font-bold text-center">$(x^2+3x-1)(x-1)=x^3+2x^2-4x+1$</p>
+                    <p class="text-sm text-amber-200"><i class="fa-solid fa-circle-check mr-1"></i> 두 번째 줄(곱하는 식의 계수)을 한 자리씩 왼쪽으로 밀어가며 곱한 뒤, 같은 자리(같은 차수)끼리 세로로 더하면 끝난다 — 정수의 세로 곱셈과 완전히 같다.</p>
+                </div>
+            </div>
+
+            <!-- Slide 7: HUB (재방문 2, 곱셈 완료) -->
+            <div class="slide" data-category="복습 · 다항식의 연산" data-breadcrumb="Ⅰ. 다항식 &gt; 01. 다항식의 연산" data-hub="true">
+                <div class="flex-grow flex flex-col justify-center items-center gap-10">
+                    <div class="text-center">
+                        <span class="text-amber-400 font-bold text-base tracking-widest">마지막은 나눗셈!</span>
+                        <h1 class="text-6xl font-black text-white leading-tight mt-2">다항식의 연산</h1>
+                        <p class="text-slate-400 text-base mt-3">덧셈·뺄셈·곱셈을 정리했으니, 이번에는 <span class="text-amber-300 font-semibold">다항식의 나눗셈(장제법)</span>을 확대해서 살펴봅니다.</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-6 w-full max-w-4xl">
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-plus-minus text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">덧셈과 뺄셈</h3>
+                            <p class="text-sm text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-xmark text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">곱셈</h3>
+                            <p class="text-sm text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center">
+                            <i class="fa-solid fa-divide text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">나눗셈</h3>
+                            <p class="text-sm text-slate-400">장제법으로 계산</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 8: 나눗셈 개념 -->
+            <div class="slide" data-category="개념 07 · 나눗셈" data-breadcrumb="Ⅰ. 다항식 &gt; 01. 다항식의 연산" data-parent="hub" data-origin="83% 62%">
+                <div class="concept-card flex-grow p-10 flex flex-col justify-center gap-6">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">07</span>
+                        <h2 class="text-3xl font-black text-white">다항식의 나눗셈 &ndash; 장제법</h2>
+                    </div>
+                    <div class="formula-box py-6 px-10 text-xl text-white font-bold leading-loose">
+                        <p>① 각 다항식을 <span class="text-amber-300">내림차순</span>으로 정리한다.</p>
+                        <p>② <span class="text-amber-300">자연수의 나눗셈과 같은 방법(장제법)</span>으로 계산한다.</p>
+                    </div>
+                    <p class="text-xl text-slate-100 leading-relaxed">다항식 $A$를 다항식 $B\,(B\neq0)$로 나누었을 때의 몫을 $Q$, 나머지를 $R$이라 하면</p>
+                    <div class="formula-box py-5 px-10 text-center text-2xl text-white font-bold">
+                        $$A=BQ+R\quad(R=0 \text{ 또는 } (R\text{의 차수})<(B\text{의 차수}))$$
+                    </div>
+                    <p class="text-lg text-slate-300">특히 $R=0$이면 $A$는 $B$로 <span class="text-amber-300 font-bold">나누어떨어진다</span>고 한다.</p>
+                </div>
+            </div>
+
+            <!-- Slide 9: 나눗셈 예시 1 (장제법, 다항식 그대로) -->
+            <div class="slide" data-category="개념 07 · 장제법으로 직접 나누기" data-breadcrumb="Ⅰ. 다항식 &gt; 01. 다항식의 연산" data-parent="hub" data-origin="83% 62%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-5">
+                    <h2 class="text-2xl font-black text-white">장제법으로 직접 나누기</h2>
+                    <p class="text-lg text-slate-200">다항식 $x^3+2x^2-5x+6$을 $x-1$로 나누면?</p>
+                    <div class="flex justify-center">
+                        <div class="inline-flex items-start gap-4 font-mono">
+                            <div class="text-xl text-white font-bold pt-9 pr-4 border-r-2 border-white/60 self-stretch">$x-1$</div>
+                            <div class="flex flex-col">
+                                <div class="text-xl text-white font-bold pl-11 pb-1 border-b-2 border-white/70">$x^2+3x-2$</div>
+                                <div class="text-xl text-white font-bold pt-1">$x^3+2x^2-5x+6$</div>
+                                <div class="text-lg text-slate-400 font-bold">$-\,(x^3-x^2)$</div>
+                                <div class="text-xl text-white font-bold border-b border-white/40 pl-11 mt-1 pb-1">$3x^2-5x$</div>
+                                <div class="text-lg text-slate-400 font-bold pl-11">$-\,(3x^2-3x)$</div>
+                                <div class="text-xl text-white font-bold border-b border-white/40 pl-24 mt-1 pb-1">$-2x+6$</div>
+                                <div class="text-lg text-slate-400 font-bold pl-24">$-\,(-2x+2)$</div>
+                                <div class="text-xl text-amber-200 font-black pl-36 mt-1">$4$</div>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-base text-white font-bold text-center">몫 $Q(x)=x^2+3x-2$, &nbsp; 나머지 $R=4$</p>
+                    <p class="text-sm text-amber-200"><i class="fa-solid fa-circle-check mr-1"></i> 검산: $x^3+2x^2-5x+6=(x-1)(x^2+3x-2)+4$</p>
+                </div>
+            </div>
+
+            <!-- Slide 10: 나눗셈 예시 2 (장제법, 숫자만) -->
+            <div class="slide" data-category="개념 07 · 계수만 써서 장제법" data-breadcrumb="Ⅰ. 다항식 &gt; 01. 다항식의 연산" data-parent="hub" data-origin="83% 62%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-5">
+                    <h2 class="text-2xl font-black text-white">이번엔 계수만 써서 장제법</h2>
+                    <p class="text-lg text-slate-200">같은 나눗셈을 계수만으로: 나누는 식 $x-1$ &rarr; 계수 $1,\,-1$</p>
+                    <div class="flex justify-center">
+                        <div class="grid gap-x-4 gap-y-1 text-center font-mono" style="grid-template-columns: 22px repeat(4, 44px);">
+                            <div></div>
+                            <div class="text-xs text-slate-500">$x^3$</div>
+                            <div class="text-xs text-slate-500">$x^2$</div>
+                            <div class="text-xs text-slate-500">$x^1$</div>
+                            <div class="text-xs text-slate-500">$x^0$</div>
+
+                            <div class="border-b border-amber-400/60"></div>
+                            <div class="border-b border-amber-400/60"></div>
+                            <div class="text-xl text-white font-bold border-b border-amber-400/60">1</div>
+                            <div class="text-xl text-white font-bold border-b border-amber-400/60">3</div>
+                            <div class="text-xl text-white font-bold border-b border-amber-400/60">-2</div>
+
+                            <div></div>
+                            <div class="text-xl text-white font-bold">1</div>
+                            <div class="text-xl text-white font-bold">2</div>
+                            <div class="text-xl text-white font-bold">-5</div>
+                            <div class="text-xl text-white font-bold">6</div>
+
+                            <div class="text-lg text-amber-300 font-bold">&minus;</div>
+                            <div class="text-lg text-slate-300 font-bold border-b border-white/40">1</div>
+                            <div class="text-lg text-slate-300 font-bold border-b border-white/40">-1</div>
+                            <div></div>
+                            <div></div>
+
+                            <div></div>
+                            <div></div>
+                            <div class="text-xl text-white font-bold">3</div>
+                            <div class="text-xl text-white font-bold">-5</div>
+                            <div></div>
+
+                            <div class="text-lg text-amber-300 font-bold">&minus;</div>
+                            <div></div>
+                            <div class="text-lg text-slate-300 font-bold border-b border-white/40">3</div>
+                            <div class="text-lg text-slate-300 font-bold border-b border-white/40">-3</div>
+                            <div></div>
+
+                            <div></div>
+                            <div></div>
+                            <div></div>
+                            <div class="text-xl text-white font-bold">-2</div>
+                            <div class="text-xl text-white font-bold">6</div>
+
+                            <div class="text-lg text-amber-300 font-bold">&minus;</div>
+                            <div></div>
+                            <div></div>
+                            <div class="text-lg text-slate-300 font-bold border-b border-white/40">-2</div>
+                            <div class="text-lg text-slate-300 font-bold border-b border-white/40">2</div>
+
+                            <div></div>
+                            <div></div>
+                            <div></div>
+                            <div></div>
+                            <div class="text-xl text-amber-200 font-black">4</div>
+                        </div>
+                    </div>
+                    <p class="text-base text-white font-bold text-center">몫의 계수 $1,\,3,\,-2\ \Rightarrow\ Q(x)=x^2+3x-2$, &nbsp; 나머지 $R=4$</p>
+                    <p class="text-sm text-amber-200"><i class="fa-solid fa-circle-check mr-1"></i> 정수의 나눗셈처럼, 몫 자리 숫자를 하나씩 정하며 곱해서 빼고 다음 자리를 내려쓰기만 하면 된다.</p>
+                </div>
+            </div>
+
+            <!-- Slide 11: HUB (마무리) -->
+            <div class="slide" data-category="복습 완료" data-breadcrumb="Ⅰ. 다항식 &gt; 01. 다항식의 연산" data-hub="true">
+                <div class="flex-grow flex flex-col justify-center items-center gap-10">
+                    <div class="text-center">
+                        <span class="text-emerald-400 font-bold text-base tracking-widest">복습 완료!</span>
+                        <h1 class="text-6xl font-black text-white leading-tight mt-2">다항식의 연산</h1>
+                        <p class="text-slate-400 text-base mt-3">덧셈·뺄셈은 <span class="text-amber-300 font-semibold">부호만 바꾸는 덧셈</span>, 곱셈은 <span class="text-amber-300 font-semibold">모든 항 짝짓기</span>, 나눗셈은 <span class="text-amber-300 font-semibold">장제법</span>이었습니다.</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-6 w-full max-w-4xl">
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-plus-minus text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">덧셈과 뺄셈</h3>
+                            <p class="text-sm text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-xmark text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">곱셈</h3>
+                            <p class="text-sm text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-divide text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">나눗셈</h3>
+                            <p class="text-sm text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- ================= MASTER HUB: 다항식의 연산 완료 지점 ================= -->
+            <div class="slide" data-category="전체 흐름 · 단원 목록" data-chapter-origin="17% 40%" data-master="true" data-breadcrumb="전체 단원 목록">
+                <div class="flex-grow flex flex-col justify-center items-center gap-6">
+                    <div class="text-center">
+                        <span class="text-amber-400 font-bold text-base tracking-widest">다항식의 연산 완료! 다음은 나머지 정리</span>
+                        <h1 class="text-5xl font-black text-white leading-tight mt-2">공통수학1 종합 복습</h1>
+                        <p class="text-slate-400 text-base mt-3">전체 흐름에서 지금 어디까지 왔는지 확인하고, 다음 단원으로 확대해서 넘어갑니다.</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-5 w-full max-w-5xl">
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-calculator text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">다항식의 연산</h3>
+                            <p class="text-xs text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center">
+                            
+                            <i class="fa-solid fa-equals text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">나머지 정리</h3>
+                            <p class="text-xs text-slate-400">항등식·조립제법</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center">
+                            
+                            <i class="fa-solid fa-shapes text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">인수분해</h3>
+                            <p class="text-xs text-slate-400">공식과 치환</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center">
+                            
+                            <i class="fa-solid fa-i text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">복소수</h3>
+                            <p class="text-xs text-slate-400">사칙연산·켤레</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center">
+                            
+                            <i class="fa-solid fa-square-root-variable text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">이차방정식</h3>
+                            <p class="text-xs text-slate-400">판별·근과 계수</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center">
+                            
+                            <i class="fa-solid fa-chart-line text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">이차방정식과<br>이차함수</h3>
+                            <p class="text-xs text-slate-400">그래프·최대최소</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- ================= CHAPTER 2: Ⅰ. 다항식 &gt; 02. 나머지 정리 ================= -->
+
+            <!-- Slide 1: HUB -->
+            <div class="slide" data-category="복습 · 나머지 정리" data-chapter-origin="50% 40%" data-breadcrumb="Ⅰ. 다항식 &gt; 02. 나머지 정리" data-hub="true">
+                <div class="flex-grow flex flex-col justify-center items-center gap-10">
+                    <div class="text-center">
+                        <span class="text-amber-400 font-bold text-base tracking-widest">지난 시간 복습</span>
+                        <h1 class="text-6xl font-black text-white leading-tight mt-2">나머지 정리</h1>
+                        <p class="text-slate-400 text-base mt-3">항등식의 뜻부터 나머지 정리 · 인수 정리, 그리고 <span class="text-amber-300 font-semibold">조립제법</span>까지 이어서 살펴봅니다.</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-6 w-full max-w-4xl">
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center">
+                            <i class="fa-solid fa-equals text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">항등식과<br>미정계수법</h3>
+                            <p class="text-sm text-slate-400">계수비교법 · 수치대입법</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center">
+                            <i class="fa-solid fa-divide text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">나머지 정리와<br>인수 정리</h3>
+                            <p class="text-sm text-slate-400">$R=P(a)$</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center">
+                            <i class="fa-solid fa-table-cells text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">조립제법</h3>
+                            <p class="text-sm text-slate-400">계수만 써서 나누기</p>
+                        </div>
+                    </div>
+                    <p class="text-slate-500 text-sm">다음 슬라이드 ▶ 버튼을 누르면 &lsquo;항등식과 미정계수법&rsquo;부터 확대해서 살펴봅니다</p>
+                </div>
+            </div>
+
+            <!-- Slide 2: 항등식·미정계수법 개념 -->
+            <div class="slide" data-category="개념 08·09 · 항등식과 미정계수법" data-breadcrumb="Ⅰ. 다항식 &gt; 02. 나머지 정리" data-parent="hub" data-origin="17% 62%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">08</span>
+                        <h2 class="text-2xl font-black text-white">항등식</h2>
+                    </div>
+                    <p class="text-lg text-slate-100">문자에 <span class="text-amber-300 font-bold">어떤 값을 대입해도 항상 성립</span>하는 등식.</p>
+                    <div class="formula-box py-3 px-8 text-lg text-white font-bold leading-loose">
+                        <p>$ax^2+bx+c=0$이 항등식 $\iff a=b=c=0$</p>
+                        <p>$ax^2+bx+c=a'x^2+b'x+c'$가 항등식 $\iff a=a',\,b=b',\,c=c'$</p>
+                    </div>
+                    <div class="flex items-center gap-4 mt-2">
+                        <span class="num-badge">09</span>
+                        <h2 class="text-2xl font-black text-white">미정계수법</h2>
+                    </div>
+                    <p class="text-lg text-slate-100">항등식의 성질을 이용해 미지의 계수를 구하는 방법 &mdash; ① <span class="text-amber-300 font-bold">계수비교법</span>(전개 후 동류항 계수 비교) &nbsp; ② <span class="text-amber-300 font-bold">수치대입법</span>(적당한 수를 대입)</p>
+                </div>
+            </div>
+
+            <!-- Slide 3: 항등식·미정계수법 예시 -->
+            <div class="slide" data-category="개념 09 · 바로 계산해보기" data-breadcrumb="Ⅰ. 다항식 &gt; 02. 나머지 정리" data-parent="hub" data-origin="17% 62%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-5">
+                    <h2 class="text-2xl font-black text-white">두 가지 방법으로 풀어보기</h2>
+                    <p class="text-lg text-slate-200">등식 $ax+b(x-4)=3x+4$가 $x$에 대한 항등식이 되도록 하는 상수 $a,\,b$의 값은?</p>
+                    <div class="grid grid-cols-2 gap-8">
+                        <div class="formula-box py-4 px-6 leading-loose">
+                            <p class="text-sm text-amber-300 font-bold mb-1">① 계수비교법</p>
+                            <p class="text-base text-slate-100">$(a+b)x-4b=3x+4$</p>
+                            <p class="text-base text-slate-100">$a+b=3,\ \ -4b=4$</p>
+                        </div>
+                        <div class="formula-box py-4 px-6 leading-loose">
+                            <p class="text-sm text-amber-300 font-bold mb-1">② 수치대입법</p>
+                            <p class="text-base text-slate-100">$x=0$ 대입: $-4b=4$</p>
+                            <p class="text-base text-slate-100">$x=4$ 대입: $4a=16$</p>
+                        </div>
+                    </div>
+                    <p class="text-base text-white font-bold text-center">두 방법 모두 &nbsp;$a=4,\ \ b=-1$</p>
+                    <p class="text-sm text-amber-200"><i class="fa-solid fa-circle-check mr-1"></i> 문자가 적을 땐 수치대입법이, 식이 복잡할 땐 계수비교법이 더 편할 때가 많다.</p>
+                </div>
+            </div>
+
+            <!-- Slide 4: HUB (재방문 1) -->
+            <div class="slide" data-category="복습 · 나머지 정리" data-breadcrumb="Ⅰ. 다항식 &gt; 02. 나머지 정리" data-hub="true">
+                <div class="flex-grow flex flex-col justify-center items-center gap-10">
+                    <div class="text-center">
+                        <span class="text-amber-400 font-bold text-base tracking-widest">이제 나머지 정리로!</span>
+                        <h1 class="text-6xl font-black text-white leading-tight mt-2">나머지 정리</h1>
+                        <p class="text-slate-400 text-base mt-3">항등식을 정리했으니, 이번에는 <span class="text-amber-300 font-semibold">나머지 정리와 인수 정리</span>를 확대해서 살펴봅니다.</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-6 w-full max-w-4xl">
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-equals text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">항등식과<br>미정계수법</h3>
+                            <p class="text-sm text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center">
+                            <i class="fa-solid fa-divide text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">나머지 정리와<br>인수 정리</h3>
+                            <p class="text-sm text-slate-400">$R=P(a)$</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center">
+                            <i class="fa-solid fa-table-cells text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">조립제법</h3>
+                            <p class="text-sm text-slate-400">계수만 써서 나누기</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 5: 나머지정리·인수정리 개념 -->
+            <div class="slide" data-category="개념 10·11 · 나머지 정리와 인수 정리" data-breadcrumb="Ⅰ. 다항식 &gt; 02. 나머지 정리" data-parent="hub" data-origin="50% 62%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">10</span>
+                        <h2 class="text-2xl font-black text-white">나머지 정리</h2>
+                    </div>
+                    <div class="formula-box py-3 px-8 text-center text-xl text-white font-bold">
+                        $$P(x)\div(x-a)\text{의 나머지 } R=P(a) \qquad P(x)\div(ax+b)\text{의 나머지 } R=P\!\left(-\dfrac{b}{a}\right)$$
+                    </div>
+                    <div class="flex items-center gap-4 mt-1">
+                        <span class="num-badge">11</span>
+                        <h2 class="text-2xl font-black text-white">인수 정리</h2>
+                    </div>
+                    <div class="formula-box py-3 px-8 text-center text-xl text-white font-bold">
+                        $$P(a)=0 \iff x-a\text{는 }P(x)\text{의 인수이다}$$
+                    </div>
+                    <p class="text-base text-amber-100"><i class="fa-solid fa-lightbulb mr-1 text-amber-300"></i> 인수 정리는 나머지 정리에서 <span class="text-amber-300 font-bold">나머지가 $0$인 특수한 경우</span>일 뿐이다 &mdash; 같은 식 $R=P(a)$를 계속 쓰면 된다.</p>
+                </div>
+            </div>
+
+            <!-- Slide 6: 나머지정리·인수정리 예시 -->
+            <div class="slide" data-category="개념 10·11 · 바로 계산해보기" data-breadcrumb="Ⅰ. 다항식 &gt; 02. 나머지 정리" data-parent="hub" data-origin="50% 62%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-5">
+                    <h2 class="text-2xl font-black text-white">바로 계산해보기</h2>
+                    <div class="formula-box py-4 px-6">
+                        <p class="text-sm text-amber-300 font-bold mb-1">나머지 정리</p>
+                        <p class="text-lg text-slate-100">$P(x)=4x^2+x-5$를 $x-2$로 나눈 나머지는?</p>
+                        <p class="text-lg text-white font-bold mt-1">$R=P(2)=4(2)^2+2-5=16+2-5=9$</p>
+                    </div>
+                    <div class="formula-box py-4 px-6">
+                        <p class="text-sm text-amber-300 font-bold mb-1">인수 정리</p>
+                        <p class="text-lg text-slate-100">$P(x)=x^3-2x^2-5x+6$에서 $x-1$, $x+1$은 각각 $P(x)$의 인수인가?</p>
+                        <p class="text-lg text-white font-bold mt-1">$P(1)=1-2-5+6=0\ \Rightarrow x-1$은 인수 (○)</p>
+                        <p class="text-lg text-white font-bold">$P(-1)=-1-2+5+6=8\neq0\ \Rightarrow x+1$은 인수 아님 (&times;)</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 7: HUB (재방문 2) -->
+            <div class="slide" data-category="복습 · 나머지 정리" data-breadcrumb="Ⅰ. 다항식 &gt; 02. 나머지 정리" data-hub="true">
+                <div class="flex-grow flex flex-col justify-center items-center gap-10">
+                    <div class="text-center">
+                        <span class="text-amber-400 font-bold text-base tracking-widest">마지막은 조립제법!</span>
+                        <h1 class="text-6xl font-black text-white leading-tight mt-2">나머지 정리</h1>
+                        <p class="text-slate-400 text-base mt-3">이제 다항식을 $x-a$로 나눌 때 <span class="text-amber-300 font-semibold">계수만으로 빠르게 나누는 조립제법</span>을 확대해서 살펴봅니다.</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-6 w-full max-w-4xl">
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-equals text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">항등식과<br>미정계수법</h3>
+                            <p class="text-sm text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-divide text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">나머지 정리와<br>인수 정리</h3>
+                            <p class="text-sm text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center">
+                            <i class="fa-solid fa-table-cells text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">조립제법</h3>
+                            <p class="text-sm text-slate-400">계수만 써서 나누기</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 8: 조립제법 개념 -->
+            <div class="slide" data-category="개념 12 · 조립제법" data-breadcrumb="Ⅰ. 다항식 &gt; 02. 나머지 정리" data-parent="hub" data-origin="83% 62%">
+                <div class="concept-card flex-grow p-10 flex flex-col justify-center gap-6">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">12</span>
+                        <h2 class="text-3xl font-black text-white">조립제법</h2>
+                    </div>
+                    <p class="text-xl text-slate-100 leading-relaxed">다항식을 일차식 $x-a$로 나눌 때, <span class="text-amber-300 font-bold">계수만 사용</span>하여 몫과 나머지를 구하는 방법.</p>
+                    <div class="formula-box py-6 px-10 text-xl text-white font-bold">
+                        <p>계수는 <span class="text-amber-300">내림차순</span>으로 빠짐없이 나열한다 (없는 차수의 계수는 $0$).</p>
+                    </div>
+                    <p class="text-lg text-slate-300">장제법과 결과는 완전히 같지만, $x$를 한 번도 쓰지 않고 <span class="text-amber-300 font-bold">덧셈과 곱셈만으로</span> 몫과 나머지를 구할 수 있다.</p>
+                </div>
+            </div>
+
+            <!-- Slide 9: 조립제법 예시 (장제법 vs 조립제법) -->
+            <div class="slide" data-category="개념 12 · 장제법 vs 조립제법" data-breadcrumb="Ⅰ. 다항식 &gt; 02. 나머지 정리" data-parent="hub" data-origin="83% 62%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-5">
+                    <h2 class="text-2xl font-black text-white">장제법 vs 조립제법</h2>
+                    <p class="text-lg text-slate-200">$2x^3-x^2-3x+5$를 $x-2$로 나눈 몫과 나머지는?</p>
+                    <div class="grid grid-cols-2 gap-10 items-center">
+                        <div class="flex flex-col items-center gap-2">
+                            <span class="text-sm text-amber-300 font-bold">장제법</span>
+                            <div class="inline-flex items-start gap-3 font-mono">
+                                <div class="text-lg text-white font-bold pt-8 pr-3 border-r-2 border-white/60 self-stretch">$x-2$</div>
+                                <div class="flex flex-col">
+                                    <div class="text-lg text-white font-bold pl-9 pb-1 border-b-2 border-white/70">$2x^2+3x+3$</div>
+                                    <div class="text-lg text-white font-bold pt-1">$2x^3-x^2-3x+5$</div>
+                                    <div class="text-base text-slate-400 font-bold">$-\,(2x^3-4x^2)$</div>
+                                    <div class="text-lg text-white font-bold border-b border-white/40 pl-9 mt-1 pb-1">$3x^2-3x$</div>
+                                    <div class="text-base text-slate-400 font-bold pl-9">$-\,(3x^2-6x)$</div>
+                                    <div class="text-lg text-white font-bold border-b border-white/40 pl-20 mt-1 pb-1">$3x+5$</div>
+                                    <div class="text-base text-slate-400 font-bold pl-20">$-\,(3x-6)$</div>
+                                    <div class="text-lg text-amber-200 font-black pl-32 mt-1">$11$</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-center gap-2">
+                            <span class="text-sm text-amber-300 font-bold">조립제법 (계수만!)</span>
+                            <div class="grid gap-x-5 gap-y-2 text-center font-mono" style="grid-template-columns: 32px repeat(4, 40px);">
+                                <div class="text-lg text-amber-300 font-bold self-center">2</div>
+                                <div class="text-lg text-white font-bold border-b border-white/50 pb-1">2</div>
+                                <div class="text-lg text-white font-bold border-b border-white/50 pb-1">-1</div>
+                                <div class="text-lg text-white font-bold border-b border-white/50 pb-1">-3</div>
+                                <div class="text-lg text-white font-bold border-b border-white/50 pb-1">5</div>
+
+                                <div></div>
+                                <div></div>
+                                <div class="text-lg text-slate-300 font-bold">4</div>
+                                <div class="text-lg text-slate-300 font-bold">6</div>
+                                <div class="text-lg text-slate-300 font-bold">6</div>
+
+                                <div></div>
+                                <div class="text-lg text-amber-200 font-black border-t border-white/50 pt-1">2</div>
+                                <div class="text-lg text-amber-200 font-black border-t border-white/50 pt-1">3</div>
+                                <div class="text-lg text-amber-200 font-black border-t border-white/50 pt-1">3</div>
+                                <div class="text-lg text-amber-200 font-black border-t border-white/50 pt-1">11</div>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-base text-white font-bold text-center">몫 $Q(x)=2x^2+3x+3$, &nbsp; 나머지 $R=11$</p>
+                    <p class="text-sm text-amber-200"><i class="fa-solid fa-circle-check mr-1"></i> 조립제법: 첫 계수를 내려쓰고, <b>$\times a$ 해서 다음 계수에 더하기</b>를 반복하면 끝 &mdash; 같은 결과를 훨씬 빠르게 얻는다.</p>
+                </div>
+            </div>
+
+            <!-- Slide 10: HUB (마무리) -->
+            <div class="slide" data-category="복습 완료" data-breadcrumb="Ⅰ. 다항식 &gt; 02. 나머지 정리" data-hub="true">
+                <div class="flex-grow flex flex-col justify-center items-center gap-10">
+                    <div class="text-center">
+                        <span class="text-emerald-400 font-bold text-base tracking-widest">복습 완료!</span>
+                        <h1 class="text-6xl font-black text-white leading-tight mt-2">나머지 정리</h1>
+                        <p class="text-slate-400 text-base mt-3">미정계수법은 <span class="text-amber-300 font-semibold">계수비교·수치대입</span>, 나머지·인수 정리는 <span class="text-amber-300 font-semibold">$R=P(a)$</span>, 조립제법은 <span class="text-amber-300 font-semibold">계수만으로 나누기</span>였습니다.</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-6 w-full max-w-4xl">
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-equals text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">항등식과<br>미정계수법</h3>
+                            <p class="text-sm text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-divide text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">나머지 정리와<br>인수 정리</h3>
+                            <p class="text-sm text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-table-cells text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">조립제법</h3>
+                            <p class="text-sm text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- ================= MASTER HUB: 나머지 정리 완료 지점 ================= -->
+            <div class="slide" data-category="전체 흐름 · 단원 목록" data-chapter-origin="50% 40%" data-master="true" data-breadcrumb="전체 단원 목록">
+                <div class="flex-grow flex flex-col justify-center items-center gap-6">
+                    <div class="text-center">
+                        <span class="text-amber-400 font-bold text-base tracking-widest">나머지 정리 완료! 다음은 인수분해</span>
+                        <h1 class="text-5xl font-black text-white leading-tight mt-2">공통수학1 종합 복습</h1>
+                        <p class="text-slate-400 text-base mt-3">전체 흐름에서 지금 어디까지 왔는지 확인하고, 다음 단원으로 확대해서 넘어갑니다.</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-5 w-full max-w-5xl">
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-calculator text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">다항식의 연산</h3>
+                            <p class="text-xs text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-equals text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">나머지 정리</h3>
+                            <p class="text-xs text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center">
+                            
+                            <i class="fa-solid fa-shapes text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">인수분해</h3>
+                            <p class="text-xs text-slate-400">공식과 치환</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center">
+                            
+                            <i class="fa-solid fa-i text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">복소수</h3>
+                            <p class="text-xs text-slate-400">사칙연산·켤레</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center">
+                            
+                            <i class="fa-solid fa-square-root-variable text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">이차방정식</h3>
+                            <p class="text-xs text-slate-400">판별·근과 계수</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center">
+                            
+                            <i class="fa-solid fa-chart-line text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">이차방정식과<br>이차함수</h3>
+                            <p class="text-xs text-slate-400">그래프·최대최소</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- ================= CHAPTER 3: Ⅰ. 다항식 &gt; 03. 인수분해 ================= -->
+
+            <!-- Slide 1: HUB -->
+            <div class="slide" data-category="복습 · 인수분해" data-chapter-origin="83% 40%" data-breadcrumb="Ⅰ. 다항식 &gt; 03. 인수분해" data-hub="true">
+                <div class="flex-grow flex flex-col justify-center items-center gap-10">
+                    <div class="text-center">
+                        <span class="text-amber-400 font-bold text-base tracking-widest">지난 시간 복습</span>
+                        <h1 class="text-6xl font-black text-white leading-tight mt-2">인수분해</h1>
+                        <p class="text-slate-400 text-base mt-3">인수분해 공식부터 치환·문자 정리, 인수정리를 이용한 인수분해까지 이어서 살펴봅니다.</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-6 w-full max-w-4xl">
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center">
+                            <i class="fa-solid fa-shapes text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">인수분해 공식</h3>
+                            <p class="text-sm text-slate-400">곱셈 공식을 거꾸로</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center">
+                            <i class="fa-solid fa-arrows-turn-to-dots text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">여러 가지 식의<br>인수분해</h3>
+                            <p class="text-sm text-slate-400">치환 · 문자 정리</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center">
+                            <i class="fa-solid fa-magnifying-glass text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">인수정리의 활용</h3>
+                            <p class="text-sm text-slate-400">조립제법 + 응용</p>
+                        </div>
+                    </div>
+                    <p class="text-slate-500 text-sm">다음 슬라이드 ▶ 버튼을 누르면 &lsquo;인수분해 공식&rsquo;부터 확대해서 살펴봅니다</p>
+                </div>
+            </div>
+
+            <!-- Slide 2: 인수분해 공식 개념 -->
+            <div class="slide" data-category="개념 13·14 · 인수분해 공식" data-breadcrumb="Ⅰ. 다항식 &gt; 03. 인수분해" data-parent="hub" data-origin="17% 62%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">13</span>
+                        <span class="num-badge">14</span>
+                        <h2 class="text-2xl font-black text-white">인수분해 공식</h2>
+                    </div>
+                    <p class="text-base text-slate-300">인수분해는 <span class="text-amber-300 font-bold">곱셈 공식의 좌변과 우변을 바꾸어 놓은 것</span>과 같다.</p>
+                    <div class="formula-box py-4 px-8 text-lg text-white font-bold leading-loose">
+                        <p>$a^2\pm2ab+b^2=(a\pm b)^2, \quad a^2-b^2=(a+b)(a-b)$</p>
+                        <p>$x^2+(a+b)x+ab=(x+a)(x+b)$</p>
+                        <p>$acx^2+(ad+bc)x+bd=(ax+b)(cx+d)$</p>
+                    </div>
+                    <div class="formula-box py-4 px-8 text-lg text-white font-bold leading-loose">
+                        <p>$a^3\pm3a^2b+3ab^2\pm b^3=(a\pm b)^3$</p>
+                        <p>$a^3\pm b^3=(a\pm b)(a^2\mp ab+b^2)$</p>
+                        <p>$a^3+b^3+c^3-3abc=(a+b+c)(a^2+b^2+c^2-ab-bc-ca)$</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 3: 인수분해 공식 예시 -->
+            <div class="slide" data-category="개념 13·14 · 바로 계산해보기" data-breadcrumb="Ⅰ. 다항식 &gt; 03. 인수분해" data-parent="hub" data-origin="17% 62%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-6">
+                    <h2 class="text-2xl font-black text-white">바로 계산해보기</h2>
+                    <div class="formula-box py-5 px-8">
+                        <p class="text-lg text-slate-200">$a^2-12a+36$ 을 인수분해하면?</p>
+                        <p class="text-lg text-white font-bold mt-2">$a^2-2\cdot a\cdot6+6^2=(a-6)^2$</p>
+                    </div>
+                    <div class="formula-box py-5 px-8">
+                        <p class="text-lg text-slate-200">$x^3+8$ 을 인수분해하면?</p>
+                        <p class="text-lg text-white font-bold mt-2">$x^3+2^3=(x+2)(x^2-2x+4)$</p>
+                    </div>
+                    <p class="text-sm text-amber-200"><i class="fa-solid fa-circle-check mr-1"></i> 두 식 모두 곱셈 공식과 똑같은 패턴 &mdash; $a,b$ 자리에 무엇이 들어가는지만 찾으면 끝난다.</p>
+                </div>
+            </div>
+
+            <!-- Slide 4: HUB (재방문 1) -->
+            <div class="slide" data-category="복습 · 인수분해" data-breadcrumb="Ⅰ. 다항식 &gt; 03. 인수분해" data-hub="true">
+                <div class="flex-grow flex flex-col justify-center items-center gap-10">
+                    <div class="text-center">
+                        <span class="text-amber-400 font-bold text-base tracking-widest">이제 응용 인수분해로!</span>
+                        <h1 class="text-6xl font-black text-white leading-tight mt-2">인수분해</h1>
+                        <p class="text-slate-400 text-base mt-3">인수분해 공식을 정리했으니, 이번에는 <span class="text-amber-300 font-semibold">치환과 문자 정리를 이용한 인수분해</span>를 확대해서 살펴봅니다.</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-6 w-full max-w-4xl">
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-shapes text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">인수분해 공식</h3>
+                            <p class="text-sm text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center">
+                            <i class="fa-solid fa-arrows-turn-to-dots text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">여러 가지 식의<br>인수분해</h3>
+                            <p class="text-sm text-slate-400">치환 · 문자 정리</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center">
+                            <i class="fa-solid fa-magnifying-glass text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">인수정리의 활용</h3>
+                            <p class="text-sm text-slate-400">조립제법 + 응용</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 5: 여러 가지 식의 인수분해 개념 -->
+            <div class="slide" data-category="개념 15 · 여러 가지 식의 인수분해" data-breadcrumb="Ⅰ. 다항식 &gt; 03. 인수분해" data-parent="hub" data-origin="50% 62%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">15</span>
+                        <h2 class="text-2xl font-black text-white">여러 가지 식의 인수분해</h2>
+                    </div>
+                    <div class="formula-box py-3 px-8 text-lg text-white font-bold leading-loose">
+                        <p>① <span class="text-amber-300">공통부분</span>이 있으면 한 문자로 치환하여 인수분해한다.</p>
+                        <p>② $x^4+ax^2+b$ 꼴: (i) $x^2=t$로 치환 &nbsp; 또는 &nbsp; (ii) $A^2-B^2$ 꼴로 변형</p>
+                        <p>③ 문자가 여러 개면 <span class="text-amber-300">차수가 가장 낮은 문자</span>에 대해 내림차순 정리한다.</p>
+                    </div>
+                    <p class="text-base text-amber-100"><i class="fa-solid fa-lightbulb mr-1 text-amber-300"></i> $x^4+ax^2+b$ 꼴은 치환이 안 먹히면(홀수 차수의 $x^2$항이 없으면) $A^2-B^2$ 꼴로 <span class="text-amber-300 font-bold">억지로 완전제곱을 만들어</span> 인수분해한다.</p>
+                </div>
+            </div>
+
+            <!-- Slide 6: 여러 가지 식의 인수분해 예시 -->
+            <div class="slide" data-category="개념 15 · 바로 계산해보기" data-breadcrumb="Ⅰ. 다항식 &gt; 03. 인수분해" data-parent="hub" data-origin="50% 62%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-6">
+                    <h2 class="text-2xl font-black text-white">바로 계산해보기</h2>
+                    <div class="formula-box py-4 px-8">
+                        <p class="text-sm text-amber-300 font-bold mb-1">① 공통부분 치환</p>
+                        <p class="text-lg text-slate-200">$(x-y)^2+(x-y)-2$ 를 인수분해하면?</p>
+                        <p class="text-lg text-white font-bold mt-1">$x-y=t$로 치환: $t^2+t-2=(t+2)(t-1)$</p>
+                        <p class="text-lg text-white font-bold">$\therefore(x-y+2)(x-y-1)$</p>
+                    </div>
+                    <div class="formula-box py-4 px-8">
+                        <p class="text-sm text-amber-300 font-bold mb-1">② $x^4+ax^2+b$ 꼴: $A^2-B^2$로 변형</p>
+                        <p class="text-lg text-slate-200">$x^4+3x^2+4$ 를 인수분해하면? (치환이 안 통하는 경우)</p>
+                        <p class="text-lg text-white font-bold mt-1">$(x^4+4x^2+4)-x^2=(x^2+2)^2-x^2$</p>
+                        <p class="text-lg text-white font-bold">$\therefore(x^2+x+2)(x^2-x+2)$</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 7: HUB (재방문 2) -->
+            <div class="slide" data-category="복습 · 인수분해" data-breadcrumb="Ⅰ. 다항식 &gt; 03. 인수분해" data-hub="true">
+                <div class="flex-grow flex flex-col justify-center items-center gap-10">
+                    <div class="text-center">
+                        <span class="text-amber-400 font-bold text-base tracking-widest">마지막은 인수정리의 활용!</span>
+                        <h1 class="text-6xl font-black text-white leading-tight mt-2">인수분해</h1>
+                        <p class="text-slate-400 text-base mt-3">이제 <span class="text-amber-300 font-semibold">인수정리·조립제법을 이용한 인수분해와 그 활용</span>을 확대해서 살펴봅니다.</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-6 w-full max-w-4xl">
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-shapes text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">인수분해 공식</h3>
+                            <p class="text-sm text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-arrows-turn-to-dots text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">여러 가지 식의<br>인수분해</h3>
+                            <p class="text-sm text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center">
+                            <i class="fa-solid fa-magnifying-glass text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">인수정리의 활용</h3>
+                            <p class="text-sm text-slate-400">조립제법 + 응용</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 8: 인수정리 활용 개념 -->
+            <div class="slide" data-category="개념 16·17 · 인수정리의 활용" data-breadcrumb="Ⅰ. 다항식 &gt; 03. 인수분해" data-parent="hub" data-origin="83% 62%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">16</span>
+                        <h2 class="text-2xl font-black text-white">인수정리를 이용한 인수분해</h2>
+                    </div>
+                    <div class="formula-box py-3 px-8 text-lg text-white font-bold leading-loose">
+                        <p>① $P(\alpha)=0$을 만족시키는 $\alpha$를 찾는다.</p>
+                        <p>② <span class="text-amber-300">조립제법</span>으로 $P(x)=(x-\alpha)Q(x)$ 꼴로 나타낸다.</p>
+                        <p>③ $Q(x)$가 더 이상 인수분해되지 않을 때까지 반복한다.</p>
+                    </div>
+                    <p class="text-base text-slate-300">$\alpha$ 후보: $\pm\dfrac{(\text{상수항의 약수})}{(\text{최고차항 계수의 약수})}$ 중에서 찾는다.</p>
+                    <div class="flex items-center gap-4 mt-1">
+                        <span class="num-badge">17</span>
+                        <h2 class="text-2xl font-black text-white">인수분해의 활용</h2>
+                    </div>
+                    <p class="text-base text-slate-300">반복되는 수를 <span class="text-amber-300 font-bold">문자로 치환</span> &rarr; 인수분해 &rarr; <span class="text-amber-300 font-bold">다시 수를 대입</span>하면 복잡한 수의 계산도 빨라진다.</p>
+                </div>
+            </div>
+
+            <!-- Slide 9: 인수정리 활용 예시 -->
+            <div class="slide" data-category="개념 16·17 · 바로 계산해보기" data-breadcrumb="Ⅰ. 다항식 &gt; 03. 인수분해" data-parent="hub" data-origin="83% 62%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-6">
+                    <h2 class="text-2xl font-black text-white">바로 계산해보기</h2>
+                    <div class="formula-box py-4 px-8">
+                        <p class="text-sm text-amber-300 font-bold mb-1">인수정리 + 조립제법</p>
+                        <p class="text-lg text-slate-200">$P(x)=x^3-2x^2-x+2$ 를 인수분해하면?</p>
+                        <p class="text-lg text-white font-bold mt-1">$P(1)=1-2-1+2=0 \Rightarrow P(x)=(x-1)(x^2-x-2)$</p>
+                        <p class="text-lg text-white font-bold">$\therefore(x-1)(x+1)(x-2)$</p>
+                    </div>
+                    <div class="formula-box py-4 px-8">
+                        <p class="text-sm text-amber-300 font-bold mb-1">인수분해의 활용</p>
+                        <p class="text-lg text-slate-200">$199^2+2\times199+1$ 을 계산하면?</p>
+                        <p class="text-lg text-white font-bold mt-1">$199=a$로 보면 $a^2+2a+1=(a+1)^2=200^2$</p>
+                        <p class="text-lg text-white font-bold">$\therefore 40000$</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 10: HUB (마무리) -->
+            <div class="slide" data-category="복습 완료" data-breadcrumb="Ⅰ. 다항식 &gt; 03. 인수분해" data-hub="true">
+                <div class="flex-grow flex flex-col justify-center items-center gap-10">
+                    <div class="text-center">
+                        <span class="text-emerald-400 font-bold text-base tracking-widest">복습 완료!</span>
+                        <h1 class="text-6xl font-black text-white leading-tight mt-2">인수분해</h1>
+                        <p class="text-slate-400 text-base mt-3">공식은 <span class="text-amber-300 font-semibold">곱셈 공식을 거꾸로</span>, 복잡한 식은 <span class="text-amber-300 font-semibold">치환</span>, 삼차 이상은 <span class="text-amber-300 font-semibold">인수정리+조립제법</span>이었습니다.</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-6 w-full max-w-4xl">
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-shapes text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">인수분해 공식</h3>
+                            <p class="text-sm text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-arrows-turn-to-dots text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">여러 가지 식의<br>인수분해</h3>
+                            <p class="text-sm text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-magnifying-glass text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">인수정리의 활용</h3>
+                            <p class="text-sm text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- ================= MASTER HUB: 인수분해 완료 지점 ================= -->
+            <div class="slide" data-category="전체 흐름 · 단원 목록" data-chapter-origin="83% 40%" data-master="true" data-breadcrumb="전체 단원 목록">
+                <div class="flex-grow flex flex-col justify-center items-center gap-6">
+                    <div class="text-center">
+                        <span class="text-amber-400 font-bold text-base tracking-widest">인수분해 완료! 다음은 복소수</span>
+                        <h1 class="text-5xl font-black text-white leading-tight mt-2">공통수학1 종합 복습</h1>
+                        <p class="text-slate-400 text-base mt-3">전체 흐름에서 지금 어디까지 왔는지 확인하고, 다음 단원으로 확대해서 넘어갑니다.</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-5 w-full max-w-5xl">
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-calculator text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">다항식의 연산</h3>
+                            <p class="text-xs text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-equals text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">나머지 정리</h3>
+                            <p class="text-xs text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-shapes text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">인수분해</h3>
+                            <p class="text-xs text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center">
+                            
+                            <i class="fa-solid fa-i text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">복소수</h3>
+                            <p class="text-xs text-slate-400">사칙연산·켤레</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center">
+                            
+                            <i class="fa-solid fa-square-root-variable text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">이차방정식</h3>
+                            <p class="text-xs text-slate-400">판별·근과 계수</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center">
+                            
+                            <i class="fa-solid fa-chart-line text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">이차방정식과<br>이차함수</h3>
+                            <p class="text-xs text-slate-400">그래프·최대최소</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- ================= CHAPTER 4: Ⅱ. 방정식 &gt; 04. 복소수 ================= -->
+
+            <!-- Slide 1: HUB -->
+            <div class="slide" data-category="복습 · 복소수" data-chapter-origin="17% 75%" data-breadcrumb="Ⅱ. 방정식 &gt; 04. 복소수" data-hub="true">
+                <div class="flex-grow flex flex-col justify-center items-center gap-8">
+                    <div class="text-center">
+                        <span class="text-amber-400 font-bold text-base tracking-widest">지난 시간 복습</span>
+                        <h1 class="text-6xl font-black text-white leading-tight mt-2">복소수</h1>
+                        <p class="text-slate-400 text-base mt-3">복소수의 뜻부터 사칙연산, 켤레복소수, 거듭제곱과 음수의 제곱근까지 이어서 살펴봅니다.</p>
+                    </div>
+                    <div class="grid grid-cols-4 gap-4 w-full max-w-5xl">
+                        <div class="hub-card p-4 flex flex-col items-center gap-2 text-center">
+                            <i class="fa-solid fa-i text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">복소수의 뜻과<br>같을 조건</h3>
+                        </div>
+                        <div class="hub-card p-4 flex flex-col items-center gap-2 text-center">
+                            <i class="fa-solid fa-calculator text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">복소수의<br>사칙연산</h3>
+                        </div>
+                        <div class="hub-card p-4 flex flex-col items-center gap-2 text-center">
+                            <i class="fa-solid fa-arrows-left-right text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">켤레복소수와<br>그 성질</h3>
+                        </div>
+                        <div class="hub-card p-4 flex flex-col items-center gap-2 text-center">
+                            <i class="fa-solid fa-rotate text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">거듭제곱과<br>음수의 제곱근</h3>
+                        </div>
+                    </div>
+                    <p class="text-slate-500 text-sm">다음 슬라이드 ▶ 버튼을 누르면 &lsquo;복소수의 뜻&rsquo;부터 확대해서 살펴봅니다</p>
+                </div>
+            </div>
+
+            <!-- Slide 2: 복소수의 뜻 개념 -->
+            <div class="slide" data-category="개념 18·19 · 복소수의 뜻과 같을 조건" data-breadcrumb="Ⅱ. 방정식 &gt; 04. 복소수" data-parent="hub" data-origin="12% 60%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">18</span>
+                        <h2 class="text-2xl font-black text-white">복소수</h2>
+                    </div>
+                    <div class="formula-box py-3 px-8 text-lg text-white font-bold leading-loose">
+                        <p>$i=\sqrt{-1},\quad i^2=-1$ &nbsp; (허수단위)</p>
+                        <p>$z=a+bi\ (a,b\text{는 실수})$: $a$는 <span class="text-amber-300">실수부분</span>, $b$는 <span class="text-amber-300">허수부분</span></p>
+                        <p>$b=0$이면 실수, &nbsp; $b\neq0$이면 허수</p>
+                    </div>
+                    <div class="flex items-center gap-4 mt-1">
+                        <span class="num-badge">19</span>
+                        <h2 class="text-2xl font-black text-white">복소수가 서로 같을 조건</h2>
+                    </div>
+                    <div class="formula-box py-3 px-8 text-center text-xl text-white font-bold">
+                        $$a+bi=c+di \iff a=c,\ b=d \qquad\quad a+bi=0 \iff a=0,\ b=0$$
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 3: 복소수의 뜻 예시 -->
+            <div class="slide" data-category="개념 18·19 · 바로 계산해보기" data-breadcrumb="Ⅱ. 방정식 &gt; 04. 복소수" data-parent="hub" data-origin="12% 60%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-6">
+                    <h2 class="text-2xl font-black text-white">바로 계산해보기</h2>
+                    <div class="formula-box py-5 px-8">
+                        <p class="text-lg text-slate-200">$1+2i$ 의 실수부분과 허수부분은?</p>
+                        <p class="text-lg text-white font-bold mt-2">실수부분 $=1$, &nbsp; 허수부분 $=2$</p>
+                    </div>
+                    <div class="formula-box py-5 px-8">
+                        <p class="text-lg text-slate-200">$a,b$가 실수일 때 $a+bi=2-3i$ 이면?</p>
+                        <p class="text-lg text-white font-bold mt-2">실수부분·허수부분을 각각 비교: $a=2,\ \ b=-3$</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 4: HUB (재방문 1) -->
+            <div class="slide" data-category="복습 · 복소수" data-breadcrumb="Ⅱ. 방정식 &gt; 04. 복소수" data-hub="true">
+                <div class="flex-grow flex flex-col justify-center items-center gap-8">
+                    <div class="text-center">
+                        <span class="text-amber-400 font-bold text-base tracking-widest">이제 사칙연산으로!</span>
+                        <h1 class="text-6xl font-black text-white leading-tight mt-2">복소수</h1>
+                        <p class="text-slate-400 text-base mt-3">복소수의 뜻을 정리했으니, 이번에는 <span class="text-amber-300 font-semibold">사칙연산</span>을 확대해서 살펴봅니다.</p>
+                    </div>
+                    <div class="grid grid-cols-4 gap-4 w-full max-w-5xl">
+                        <div class="hub-card p-4 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-i text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">복소수의 뜻과<br>같을 조건</h3>
+                        </div>
+                        <div class="hub-card p-4 flex flex-col items-center gap-2 text-center">
+                            <i class="fa-solid fa-calculator text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">복소수의<br>사칙연산</h3>
+                        </div>
+                        <div class="hub-card p-4 flex flex-col items-center gap-2 text-center">
+                            <i class="fa-solid fa-arrows-left-right text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">켤레복소수와<br>그 성질</h3>
+                        </div>
+                        <div class="hub-card p-4 flex flex-col items-center gap-2 text-center">
+                            <i class="fa-solid fa-rotate text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">거듭제곱과<br>음수의 제곱근</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 5: 사칙연산 개념 -->
+            <div class="slide" data-category="개념 21·22 · 복소수의 사칙연산" data-breadcrumb="Ⅱ. 방정식 &gt; 04. 복소수" data-parent="hub" data-origin="37% 60%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">21</span>
+                        <h2 class="text-2xl font-black text-white">복소수의 덧셈과 뺄셈</h2>
+                    </div>
+                    <div class="formula-box py-3 px-8 text-center text-xl text-white font-bold">
+                        $$(a+bi)\pm(c+di)=(a\pm c)+(b\pm d)i$$
+                    </div>
+                    <div class="flex items-center gap-4 mt-1">
+                        <span class="num-badge">22</span>
+                        <h2 class="text-2xl font-black text-white">복소수의 곱셈과 나눗셈</h2>
+                    </div>
+                    <div class="formula-box py-3 px-8 text-lg text-white font-bold leading-loose">
+                        <p>$(a+bi)(c+di)=(ac-bd)+(ad+bc)i$</p>
+                        <p>나눗셈은 분모의 <span class="text-amber-300">켤레복소수</span>를 분자·분모에 곱해 분모를 실수화한다.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 6: 사칙연산 예시 -->
+            <div class="slide" data-category="개념 21·22 · 바로 계산해보기" data-breadcrumb="Ⅱ. 방정식 &gt; 04. 복소수" data-parent="hub" data-origin="37% 60%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-6">
+                    <h2 class="text-2xl font-black text-white">바로 계산해보기</h2>
+                    <div class="formula-box py-5 px-8">
+                        <p class="text-lg text-slate-200">$(4+3i)+(2+i)$ 를 계산하면?</p>
+                        <p class="text-lg text-white font-bold mt-2">$(4+2)+(3+1)i=6+4i$</p>
+                    </div>
+                    <div class="formula-box py-5 px-8">
+                        <p class="text-lg text-slate-200">$(2+i)(5+6i)$ 를 계산하면?</p>
+                        <p class="text-lg text-white font-bold mt-2">$10+12i+5i+6i^2=10+17i-6=4+17i$</p>
+                    </div>
+                    <p class="text-sm text-amber-200"><i class="fa-solid fa-circle-check mr-1"></i> $i$를 문자처럼 취급해 다항식처럼 전개한 뒤, $i^2=-1$만 마지막에 대입하면 된다.</p>
+                </div>
+            </div>
+
+            <!-- Slide 7: HUB (재방문 2) -->
+            <div class="slide" data-category="복습 · 복소수" data-breadcrumb="Ⅱ. 방정식 &gt; 04. 복소수" data-hub="true">
+                <div class="flex-grow flex flex-col justify-center items-center gap-8">
+                    <div class="text-center">
+                        <span class="text-amber-400 font-bold text-base tracking-widest">이제 켤레복소수로!</span>
+                        <h1 class="text-6xl font-black text-white leading-tight mt-2">복소수</h1>
+                        <p class="text-slate-400 text-base mt-3">사칙연산을 정리했으니, 이번에는 <span class="text-amber-300 font-semibold">켤레복소수와 그 성질</span>을 확대해서 살펴봅니다.</p>
+                    </div>
+                    <div class="grid grid-cols-4 gap-4 w-full max-w-5xl">
+                        <div class="hub-card p-4 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-i text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">복소수의 뜻과<br>같을 조건</h3>
+                        </div>
+                        <div class="hub-card p-4 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-calculator text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">복소수의<br>사칙연산</h3>
+                        </div>
+                        <div class="hub-card p-4 flex flex-col items-center gap-2 text-center">
+                            <i class="fa-solid fa-arrows-left-right text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">켤레복소수와<br>그 성질</h3>
+                        </div>
+                        <div class="hub-card p-4 flex flex-col items-center gap-2 text-center">
+                            <i class="fa-solid fa-rotate text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">거듭제곱과<br>음수의 제곱근</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 8: 켤레복소수 개념 -->
+            <div class="slide" data-category="개념 20·23 · 켤레복소수와 그 성질" data-breadcrumb="Ⅱ. 방정식 &gt; 04. 복소수" data-parent="hub" data-origin="63% 60%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">20</span>
+                        <h2 class="text-2xl font-black text-white">켤레복소수</h2>
+                    </div>
+                    <div class="formula-box py-3 px-8 text-center text-xl text-white font-bold">
+                        $$\overline{a+bi}=a-bi$$
+                    </div>
+                    <div class="flex items-center gap-4 mt-1">
+                        <span class="num-badge">23</span>
+                        <h2 class="text-2xl font-black text-white">켤레복소수의 성질</h2>
+                    </div>
+                    <div class="formula-box py-3 px-8 text-lg text-white font-bold leading-loose">
+                        <p>$z=a+bi$일 때 &nbsp; $z+\overline{z}=2a$, &nbsp; $z\overline{z}=a^2+b^2$ &nbsp; &mdash; <span class="text-amber-300">둘 다 항상 실수!</span></p>
+                        <p>$\overline{z_1\pm z_2}=\overline{z_1}\pm\overline{z_2}, \quad \overline{z_1z_2}=\overline{z_1}\cdot\overline{z_2}$</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 9: 켤레복소수 예시 -->
+            <div class="slide" data-category="개념 20·23 · 바로 계산해보기" data-breadcrumb="Ⅱ. 방정식 &gt; 04. 복소수" data-parent="hub" data-origin="63% 60%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-6">
+                    <h2 class="text-2xl font-black text-white">바로 계산해보기</h2>
+                    <div class="formula-box py-5 px-8">
+                        <p class="text-lg text-slate-200">$1+5i$ 의 켤레복소수는?</p>
+                        <p class="text-lg text-white font-bold mt-2">허수부분 부호만 반대로: $\overline{1+5i}=1-5i$</p>
+                    </div>
+                    <div class="formula-box py-5 px-8">
+                        <p class="text-lg text-slate-200">$z=3-7i$ 일 때 $\overline{z}$ 는? 또 $z+\overline{z}$, $z\overline{z}$ 는?</p>
+                        <p class="text-lg text-white font-bold mt-2">$\overline{z}=3+7i$, &nbsp; $z+\overline{z}=6$, &nbsp; $z\overline{z}=9+49=58$ &nbsp; (모두 실수)</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 10: HUB (재방문 3) -->
+            <div class="slide" data-category="복습 · 복소수" data-breadcrumb="Ⅱ. 방정식 &gt; 04. 복소수" data-hub="true">
+                <div class="flex-grow flex flex-col justify-center items-center gap-8">
+                    <div class="text-center">
+                        <span class="text-amber-400 font-bold text-base tracking-widest">마지막은 거듭제곱과 음수의 제곱근!</span>
+                        <h1 class="text-6xl font-black text-white leading-tight mt-2">복소수</h1>
+                        <p class="text-slate-400 text-base mt-3">이제 <span class="text-amber-300 font-semibold">$i$의 거듭제곱과 음수의 제곱근</span>을 확대해서 살펴봅니다.</p>
+                    </div>
+                    <div class="grid grid-cols-4 gap-4 w-full max-w-5xl">
+                        <div class="hub-card p-4 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-i text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">복소수의 뜻과<br>같을 조건</h3>
+                        </div>
+                        <div class="hub-card p-4 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-calculator text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">복소수의<br>사칙연산</h3>
+                        </div>
+                        <div class="hub-card p-4 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-arrows-left-right text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">켤레복소수와<br>그 성질</h3>
+                        </div>
+                        <div class="hub-card p-4 flex flex-col items-center gap-2 text-center">
+                            <i class="fa-solid fa-rotate text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">거듭제곱과<br>음수의 제곱근</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 11: 거듭제곱·음수의 제곱근 개념 -->
+            <div class="slide" data-category="개념 24·25·26 · 거듭제곱과 음수의 제곱근" data-breadcrumb="Ⅱ. 방정식 &gt; 04. 복소수" data-parent="hub" data-origin="88% 60%">
+                <div class="concept-card flex-grow p-7 flex flex-col justify-center gap-3">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">24</span>
+                        <h2 class="text-xl font-black text-white">$i$의 거듭제곱</h2>
+                    </div>
+                    <div class="formula-box py-2 px-8 text-center text-lg text-white font-bold">
+                        $$i^{4k}=1,\ \ i^{4k+1}=i,\ \ i^{4k+2}=-1,\ \ i^{4k+3}=-i \quad(\text{주기}4:\ i,-1,-i,1)$$
+                    </div>
+                    <div class="flex items-center gap-4 mt-1">
+                        <span class="num-badge">25</span>
+                        <h2 class="text-xl font-black text-white">음수의 제곱근</h2>
+                    </div>
+                    <div class="formula-box py-2 px-8 text-center text-lg text-white font-bold">
+                        $$a>0 \text{일 때 } \sqrt{-a}=\sqrt{a}\,i$$
+                    </div>
+                    <div class="flex items-center gap-4 mt-1">
+                        <span class="num-badge">26</span>
+                        <h2 class="text-xl font-black text-white">음수의 제곱근의 성질</h2>
+                    </div>
+                    <div class="formula-box py-2 px-8 text-lg text-white font-bold leading-relaxed">
+                        <p>$a,b$ 모두 음수이면 &nbsp; $\sqrt{a}\sqrt{b}=-\sqrt{ab}$</p>
+                        <p>$a>0,\,b$가 음수이면 &nbsp; $\dfrac{\sqrt{a}}{\sqrt{b}}=-\sqrt{\dfrac{a}{b}}$</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 12: 거듭제곱·음수의 제곱근 예시 -->
+            <div class="slide" data-category="개념 24·25·26 · 바로 계산해보기" data-breadcrumb="Ⅱ. 방정식 &gt; 04. 복소수" data-parent="hub" data-origin="88% 60%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-6">
+                    <h2 class="text-2xl font-black text-white">바로 계산해보기</h2>
+                    <div class="formula-box py-5 px-8">
+                        <p class="text-lg text-slate-200">$i^{13}$ 을 $a+bi$ 꼴로 나타내면?</p>
+                        <p class="text-lg text-white font-bold mt-2">$i^{13}=i^{4\times3+1}=i$</p>
+                    </div>
+                    <div class="formula-box py-5 px-8">
+                        <p class="text-lg text-slate-200">$\sqrt{-1}\,\sqrt{-2}$ 를 계산하면? (둘 다 음수의 제곱근)</p>
+                        <p class="text-lg text-white font-bold mt-2">$=i\cdot\sqrt{2}\,i=\sqrt{2}\,i^2=-\sqrt{2}$</p>
+                    </div>
+                    <p class="text-sm text-amber-200"><i class="fa-solid fa-circle-check mr-1"></i> $\sqrt{a}\sqrt{b}=\sqrt{ab}$ 공식은 $a,b$가 모두 음수일 땐 그대로 못 쓴다 &mdash; 부호가 하나 더 붙는다는 점을 꼭 기억할 것.</p>
+                </div>
+            </div>
+
+            <!-- Slide 13: HUB (마무리) -->
+            <div class="slide" data-category="복습 완료" data-breadcrumb="Ⅱ. 방정식 &gt; 04. 복소수" data-hub="true">
+                <div class="flex-grow flex flex-col justify-center items-center gap-8">
+                    <div class="text-center">
+                        <span class="text-emerald-400 font-bold text-base tracking-widest">복습 완료!</span>
+                        <h1 class="text-6xl font-black text-white leading-tight mt-2">복소수</h1>
+                        <p class="text-slate-400 text-base mt-3">사칙연산은 <span class="text-amber-300 font-semibold">$i$를 문자처럼</span>, 켤레는 <span class="text-amber-300 font-semibold">부호만 반대로</span>, 거듭제곱은 <span class="text-amber-300 font-semibold">주기 4</span>였습니다.</p>
+                    </div>
+                    <div class="grid grid-cols-4 gap-4 w-full max-w-5xl">
+                        <div class="hub-card p-4 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-i text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">복소수의 뜻과<br>같을 조건</h3>
+                        </div>
+                        <div class="hub-card p-4 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-calculator text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">복소수의<br>사칙연산</h3>
+                        </div>
+                        <div class="hub-card p-4 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-arrows-left-right text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">켤레복소수와<br>그 성질</h3>
+                        </div>
+                        <div class="hub-card p-4 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-rotate text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">거듭제곱과<br>음수의 제곱근</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- ================= MASTER HUB: 복소수 완료 지점 ================= -->
+            <div class="slide" data-category="전체 흐름 · 단원 목록" data-chapter-origin="17% 75%" data-master="true" data-breadcrumb="전체 단원 목록">
+                <div class="flex-grow flex flex-col justify-center items-center gap-6">
+                    <div class="text-center">
+                        <span class="text-amber-400 font-bold text-base tracking-widest">복소수 완료! 다음은 이차방정식</span>
+                        <h1 class="text-5xl font-black text-white leading-tight mt-2">공통수학1 종합 복습</h1>
+                        <p class="text-slate-400 text-base mt-3">전체 흐름에서 지금 어디까지 왔는지 확인하고, 다음 단원으로 확대해서 넘어갑니다.</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-5 w-full max-w-5xl">
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-calculator text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">다항식의 연산</h3>
+                            <p class="text-xs text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-equals text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">나머지 정리</h3>
+                            <p class="text-xs text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-shapes text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">인수분해</h3>
+                            <p class="text-xs text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-i text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">복소수</h3>
+                            <p class="text-xs text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center">
+                            
+                            <i class="fa-solid fa-square-root-variable text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">이차방정식</h3>
+                            <p class="text-xs text-slate-400">판별·근과 계수</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center">
+                            
+                            <i class="fa-solid fa-chart-line text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">이차방정식과<br>이차함수</h3>
+                            <p class="text-xs text-slate-400">그래프·최대최소</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- ================= CHAPTER 5: Ⅱ. 방정식 &gt; 05. 이차방정식 ================= -->
+
+            <!-- Slide 1: HUB -->
+            <div class="slide" data-category="복습 · 이차방정식" data-chapter-origin="50% 75%" data-breadcrumb="Ⅱ. 방정식 &gt; 05. 이차방정식" data-hub="true">
+                <div class="flex-grow flex flex-col justify-center items-center gap-10">
+                    <div class="text-center">
+                        <span class="text-amber-400 font-bold text-base tracking-widest">지난 시간 복습</span>
+                        <h1 class="text-6xl font-black text-white leading-tight mt-2">이차방정식</h1>
+                        <p class="text-slate-400 text-base mt-3">근의 공식과 판별식부터 근과 계수의 관계, 켤레근까지 이어서 살펴봅니다.</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-6 w-full max-w-4xl">
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center">
+                            <i class="fa-solid fa-square-root-variable text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">근의 공식과<br>판별</h3>
+                            <p class="text-sm text-slate-400">$D=b^2-4ac$</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center">
+                            <i class="fa-solid fa-scale-balanced text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">근과 계수의<br>관계 · 작성</h3>
+                            <p class="text-sm text-slate-400">$\alpha+\beta,\ \alpha\beta$</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center">
+                            <i class="fa-solid fa-yin-yang text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">켤레근</h3>
+                            <p class="text-sm text-slate-400">짝으로 다니는 근</p>
+                        </div>
+                    </div>
+                    <p class="text-slate-500 text-sm">다음 슬라이드 ▶ 버튼을 누르면 &lsquo;근의 공식과 판별&rsquo;부터 확대해서 살펴봅니다</p>
+                </div>
+            </div>
+
+            <!-- Slide 2: 근의 공식·판별 개념 -->
+            <div class="slide" data-category="개념 27·28 · 근의 공식과 판별" data-breadcrumb="Ⅱ. 방정식 &gt; 05. 이차방정식" data-parent="hub" data-origin="17% 62%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">27</span>
+                        <h2 class="text-2xl font-black text-white">이차방정식의 근</h2>
+                    </div>
+                    <div class="formula-box py-3 px-8 text-center text-xl text-white font-bold">
+                        $$ax^2+bx+c=0\ (a\neq0) \ \Rightarrow\ x=\frac{-b\pm\sqrt{b^2-4ac}}{2a}$$
+                    </div>
+                    <p class="text-base text-slate-300">$x$의 계수가 짝수 $2b'$이면: &nbsp; $x=\dfrac{-b'\pm\sqrt{b'^2-ac}}{a}$ (계산이 더 짧아진다)</p>
+                    <div class="flex items-center gap-4 mt-1">
+                        <span class="num-badge">28</span>
+                        <h2 class="text-2xl font-black text-white">근의 판별</h2>
+                    </div>
+                    <p class="text-lg text-slate-100">판별식 $D=b^2-4ac$: &nbsp; $D>0$ 서로 다른 두 실근, &nbsp; $D=0$ 중근, &nbsp; $D<0$ 서로 다른 두 허근</p>
+                </div>
+            </div>
+
+            <!-- Slide 3: 근의 공식·판별 예시 -->
+            <div class="slide" data-category="개념 27·28 · 바로 계산해보기" data-breadcrumb="Ⅱ. 방정식 &gt; 05. 이차방정식" data-parent="hub" data-origin="17% 62%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-6">
+                    <h2 class="text-2xl font-black text-white">바로 계산해보기</h2>
+                    <div class="formula-box py-5 px-8">
+                        <p class="text-lg text-slate-200">$x^2+1=0$ 을 풀면?</p>
+                        <p class="text-lg text-white font-bold mt-2">$x^2=-1 \ \Rightarrow\ x=\pm\sqrt{-1}=\pm i$ &nbsp; (서로 다른 두 허근)</p>
+                    </div>
+                    <div class="formula-box py-5 px-8">
+                        <p class="text-lg text-slate-200">$x^2-3x+6=0$ 의 근을 판별하면?</p>
+                        <p class="text-lg text-white font-bold mt-2">$D=(-3)^2-4\cdot1\cdot6=9-24=-15<0$ &nbsp; $\Rightarrow$ 서로 다른 두 허근</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 4: HUB (재방문 1) -->
+            <div class="slide" data-category="복습 · 이차방정식" data-breadcrumb="Ⅱ. 방정식 &gt; 05. 이차방정식" data-hub="true">
+                <div class="flex-grow flex flex-col justify-center items-center gap-10">
+                    <div class="text-center">
+                        <span class="text-amber-400 font-bold text-base tracking-widest">이제 근과 계수의 관계로!</span>
+                        <h1 class="text-6xl font-black text-white leading-tight mt-2">이차방정식</h1>
+                        <p class="text-slate-400 text-base mt-3">근의 공식과 판별을 정리했으니, 이번에는 <span class="text-amber-300 font-semibold">근과 계수의 관계 · 방정식의 작성</span>을 확대해서 살펴봅니다.</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-6 w-full max-w-4xl">
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-square-root-variable text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">근의 공식과<br>판별</h3>
+                            <p class="text-sm text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center">
+                            <i class="fa-solid fa-scale-balanced text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">근과 계수의<br>관계 · 작성</h3>
+                            <p class="text-sm text-slate-400">$\alpha+\beta,\ \alpha\beta$</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center">
+                            <i class="fa-solid fa-yin-yang text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">켤레근</h3>
+                            <p class="text-sm text-slate-400">짝으로 다니는 근</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 5: 근과 계수의 관계·작성 개념 -->
+            <div class="slide" data-category="개념 29·30 · 근과 계수의 관계, 방정식의 작성" data-breadcrumb="Ⅱ. 방정식 &gt; 05. 이차방정식" data-parent="hub" data-origin="50% 62%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">29</span>
+                        <h2 class="text-2xl font-black text-white">근과 계수의 관계</h2>
+                    </div>
+                    <p class="text-base text-slate-300">$ax^2+bx+c=0$의 두 근을 $\alpha,\beta$라 하면 &mdash; <span class="text-amber-300 font-bold">두 근을 직접 구하지 않고도</span> 합과 곱을 알 수 있다.</p>
+                    <div class="formula-box py-3 px-8 text-center text-2xl text-white font-bold">
+                        $$\alpha+\beta=-\frac{b}{a}, \qquad \alpha\beta=\frac{c}{a}$$
+                    </div>
+                    <div class="flex items-center gap-4 mt-1">
+                        <span class="num-badge">30</span>
+                        <h2 class="text-2xl font-black text-white">이차방정식의 작성</h2>
+                    </div>
+                    <p class="text-lg text-slate-100">두 수 $\alpha,\beta$를 근으로 하고 $x^2$의 계수가 $1$인 이차방정식: &nbsp; $x^2-(\alpha+\beta)x+\alpha\beta=0$</p>
+                </div>
+            </div>
+
+            <!-- Slide 6: 근과 계수의 관계·작성 예시 -->
+            <div class="slide" data-category="개념 29·30 · 바로 계산해보기" data-breadcrumb="Ⅱ. 방정식 &gt; 05. 이차방정식" data-parent="hub" data-origin="50% 62%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-6">
+                    <h2 class="text-2xl font-black text-white">바로 계산해보기</h2>
+                    <div class="formula-box py-5 px-8">
+                        <p class="text-lg text-slate-200">$2x^2+3x+1=0$ 의 두 근을 $\alpha,\beta$라 할 때 $\alpha+\beta$, $\alpha\beta$는?</p>
+                        <p class="text-lg text-white font-bold mt-2">$\alpha+\beta=-\dfrac32, \quad \alpha\beta=\dfrac12$</p>
+                    </div>
+                    <div class="formula-box py-5 px-8">
+                        <p class="text-lg text-slate-200">두 수 $-1,\,2$를 근으로 하고 $x^2$의 계수가 $1$인 이차방정식은?</p>
+                        <p class="text-lg text-white font-bold mt-2">$x^2-(-1+2)x+(-1)(2)=0 \ \Rightarrow\ x^2-x-2=0$</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 7: HUB (재방문 2) -->
+            <div class="slide" data-category="복습 · 이차방정식" data-breadcrumb="Ⅱ. 방정식 &gt; 05. 이차방정식" data-hub="true">
+                <div class="flex-grow flex flex-col justify-center items-center gap-10">
+                    <div class="text-center">
+                        <span class="text-amber-400 font-bold text-base tracking-widest">마지막은 켤레근!</span>
+                        <h1 class="text-6xl font-black text-white leading-tight mt-2">이차방정식</h1>
+                        <p class="text-slate-400 text-base mt-3">이제 <span class="text-amber-300 font-semibold">한 근을 알면 다른 근도 저절로 정해지는 켤레근</span>을 확대해서 살펴봅니다.</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-6 w-full max-w-4xl">
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-square-root-variable text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">근의 공식과<br>판별</h3>
+                            <p class="text-sm text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-scale-balanced text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">근과 계수의<br>관계 · 작성</h3>
+                            <p class="text-sm text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center">
+                            <i class="fa-solid fa-yin-yang text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">켤레근</h3>
+                            <p class="text-sm text-slate-400">짝으로 다니는 근</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 8: 켤레근 개념 -->
+            <div class="slide" data-category="개념 31 · 이차방정식의 켤레근" data-breadcrumb="Ⅱ. 방정식 &gt; 05. 이차방정식" data-parent="hub" data-origin="83% 62%">
+                <div class="concept-card flex-grow p-10 flex flex-col justify-center gap-6">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">31</span>
+                        <h2 class="text-3xl font-black text-white">이차방정식의 켤레근</h2>
+                    </div>
+                    <p class="text-xl text-slate-100 leading-relaxed">이차방정식 $ax^2+bx+c=0$에서:</p>
+                    <div class="formula-box py-5 px-10 text-lg text-white font-bold leading-loose">
+                        <p>① 계수가 <span class="text-amber-300">유리수</span>일 때, $p+q\sqrt{m}$이 근이면 &nbsp; $p-q\sqrt{m}$ 도 근이다.</p>
+                        <p>② 계수가 <span class="text-amber-300">실수</span>일 때, $p+qi$가 근이면 &nbsp; $p-qi$ 도 근이다.</p>
+                    </div>
+                    <p class="text-lg text-slate-300">무리수 부분 또는 허수 부분의 <span class="text-amber-300 font-bold">부호만 반대로 바꾸면</span> 나머지 한 근이다.</p>
+                </div>
+            </div>
+
+            <!-- Slide 9: 켤레근 예시 -->
+            <div class="slide" data-category="개념 31 · 바로 계산해보기" data-breadcrumb="Ⅱ. 방정식 &gt; 05. 이차방정식" data-parent="hub" data-origin="83% 62%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-6">
+                    <h2 class="text-2xl font-black text-white">바로 계산해보기</h2>
+                    <p class="text-lg text-slate-200">이차방정식 $x^2+ax+b=0$ (유리수 $a,b$)의 한 근이 $1+\sqrt2$일 때, 다른 근과 $a,b$는?</p>
+                    <div class="formula-box py-5 px-8 leading-loose">
+                        <p class="text-lg text-white font-bold">계수가 유리수이므로 다른 근은 켤레근 $1-\sqrt2$</p>
+                        <p class="text-lg text-white font-bold">두 근의 합 $=2=-a \ \Rightarrow\ a=-2$</p>
+                        <p class="text-lg text-white font-bold">두 근의 곱 $=(1+\sqrt2)(1-\sqrt2)=1-2=-1=b$</p>
+                    </div>
+                    <p class="text-base text-white font-bold text-center">다른 근 $1-\sqrt2$, &nbsp; $a=-2$, &nbsp; $b=-1$</p>
+                    <p class="text-sm text-amber-200"><i class="fa-solid fa-circle-check mr-1"></i> 다른 근을 켤레근으로 바로 알아내면, 근과 계수의 관계로 $a,b$까지 한 번에 끝낼 수 있다.</p>
+                </div>
+            </div>
+
+            <!-- Slide 10: HUB (마무리) -->
+            <div class="slide" data-category="복습 완료" data-breadcrumb="Ⅱ. 방정식 &gt; 05. 이차방정식" data-hub="true">
+                <div class="flex-grow flex flex-col justify-center items-center gap-10">
+                    <div class="text-center">
+                        <span class="text-emerald-400 font-bold text-base tracking-widest">복습 완료!</span>
+                        <h1 class="text-6xl font-black text-white leading-tight mt-2">이차방정식</h1>
+                        <p class="text-slate-400 text-base mt-3">판별은 <span class="text-amber-300 font-semibold">$D$의 부호</span>, 근과 계수의 관계는 <span class="text-amber-300 font-semibold">$-b/a,\ c/a$</span>, 켤레근은 <span class="text-amber-300 font-semibold">부호만 반대로</span>였습니다.</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-6 w-full max-w-4xl">
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-square-root-variable text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">근의 공식과<br>판별</h3>
+                            <p class="text-sm text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-scale-balanced text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">근과 계수의<br>관계 · 작성</h3>
+                            <p class="text-sm text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-yin-yang text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">켤레근</h3>
+                            <p class="text-sm text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- ================= MASTER HUB: 이차방정식 완료 지점 ================= -->
+            <div class="slide" data-category="전체 흐름 · 단원 목록" data-chapter-origin="50% 75%" data-master="true" data-breadcrumb="전체 단원 목록">
+                <div class="flex-grow flex flex-col justify-center items-center gap-6">
+                    <div class="text-center">
+                        <span class="text-amber-400 font-bold text-base tracking-widest">이차방정식 완료! 다음은 이차방정식과 이차함수</span>
+                        <h1 class="text-5xl font-black text-white leading-tight mt-2">공통수학1 종합 복습</h1>
+                        <p class="text-slate-400 text-base mt-3">전체 흐름에서 지금 어디까지 왔는지 확인하고, 다음 단원으로 확대해서 넘어갑니다.</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-5 w-full max-w-5xl">
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-calculator text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">다항식의 연산</h3>
+                            <p class="text-xs text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-equals text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">나머지 정리</h3>
+                            <p class="text-xs text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-shapes text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">인수분해</h3>
+                            <p class="text-xs text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-i text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">복소수</h3>
+                            <p class="text-xs text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-square-root-variable text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">이차방정식</h3>
+                            <p class="text-xs text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center">
+                            
+                            <i class="fa-solid fa-chart-line text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">이차방정식과<br>이차함수</h3>
+                            <p class="text-xs text-slate-400">그래프·최대최소</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- ================= CHAPTER 6: Ⅱ. 방정식 &gt; 06. 이차방정식과 이차함수 ================= -->
+
+            <!-- Slide 1: HUB -->
+            <div class="slide" data-category="복습 · 이차방정식과 이차함수" data-chapter-origin="83% 75%" data-breadcrumb="Ⅱ. 방정식 &gt; 06. 이차방정식과 이차함수" data-hub="true">
+                <div class="flex-grow flex flex-col justify-center items-center gap-10">
+                    <div class="text-center">
+                        <span class="text-amber-400 font-bold text-base tracking-widest">지난 시간 복습</span>
+                        <h1 class="text-5xl font-black text-white leading-tight mt-2">이차방정식과 이차함수</h1>
+                        <p class="text-slate-400 text-base mt-3">그래프와 방정식의 관계부터 직선과의 위치 관계, 최대·최소까지 이어서 살펴봅니다.</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-6 w-full max-w-4xl">
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center">
+                            <i class="fa-solid fa-chart-line text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">그래프와<br>방정식의 관계</h3>
+                            <p class="text-sm text-slate-400">교점 개수 = 실근 개수</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center">
+                            <i class="fa-solid fa-slash text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">그래프와<br>직선의 위치 관계</h3>
+                            <p class="text-sm text-slate-400">판별식 재사용</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center">
+                            <i class="fa-solid fa-arrows-up-down text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">최대와 최소</h3>
+                            <p class="text-sm text-slate-400">전 구간 · 제한된 범위</p>
+                        </div>
+                    </div>
+                    <p class="text-slate-500 text-sm">다음 슬라이드 ▶ 버튼을 누르면 &lsquo;그래프와 방정식의 관계&rsquo;부터 확대해서 살펴봅니다</p>
+                </div>
+            </div>
+
+            <!-- Slide 2: 그래프·방정식 관계 개념 -->
+            <div class="slide" data-category="개념 32·33 · 그래프와 방정식의 관계" data-breadcrumb="Ⅱ. 방정식 &gt; 06. 이차방정식과 이차함수" data-parent="hub" data-origin="17% 62%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">32</span>
+                        <h2 class="text-2xl font-black text-white">이차함수의 그래프</h2>
+                    </div>
+                    <p class="text-lg text-slate-100">표준형 $y=a(x-p)^2+q$: 꼭짓점 $(p,q)$, 축 $x=p$. 일반형은 <span class="text-amber-300 font-bold">완전제곱꼴로 변형</span>해서 그린다.</p>
+                    <div class="flex items-center gap-4 mt-1">
+                        <span class="num-badge">33</span>
+                        <h2 class="text-2xl font-black text-white">이차방정식과 이차함수의 관계</h2>
+                    </div>
+                    <p class="text-lg text-slate-100">(그래프와 $x$축 교점의 개수) $=$ ($ax^2+bx+c=0$의 서로 다른 실근의 개수)</p>
+                    <div class="formula-box py-3 px-8 text-center text-lg text-white font-bold">
+                        $$D>0 \Rightarrow 2\text{개}, \qquad D=0 \Rightarrow 1\text{개(접함)}, \qquad D<0 \Rightarrow 0\text{개}$$
+                    </div>
+                    <p class="text-sm text-amber-200"><i class="fa-solid fa-lightbulb mr-1"></i> $x$의 계수가 짝수면 $D$ 대신 $\dfrac{D}{4}=b'^2-ac$ 로 계산량을 줄인다.</p>
+                </div>
+            </div>
+
+            <!-- Slide 3: 그래프·방정식 관계 예시 -->
+            <div class="slide" data-category="개념 32·33 · 바로 계산해보기" data-breadcrumb="Ⅱ. 방정식 &gt; 06. 이차방정식과 이차함수" data-parent="hub" data-origin="17% 62%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-6">
+                    <h2 class="text-2xl font-black text-white">바로 계산해보기</h2>
+                    <div class="formula-box py-5 px-8">
+                        <p class="text-lg text-slate-200">$f(x)=x^2+2x-3$ 을 $y=a(x-p)^2+q$ 꼴로 나타내면?</p>
+                        <p class="text-lg text-white font-bold mt-2">$(x^2+2x)-3=(x+1)^2-1-3=(x+1)^2-4$</p>
+                    </div>
+                    <div class="formula-box py-5 px-8">
+                        <p class="text-lg text-slate-200">$y=2x^2-8x$ 의 그래프와 $x$축의 교점의 좌표는?</p>
+                        <p class="text-lg text-white font-bold mt-2">$2x^2-8x=0 \Rightarrow 2x(x-4)=0 \Rightarrow x=0,\,4 \ \Rightarrow (0,0),\,(4,0)$</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 4: HUB (재방문 1) -->
+            <div class="slide" data-category="복습 · 이차방정식과 이차함수" data-breadcrumb="Ⅱ. 방정식 &gt; 06. 이차방정식과 이차함수" data-hub="true">
+                <div class="flex-grow flex flex-col justify-center items-center gap-10">
+                    <div class="text-center">
+                        <span class="text-amber-400 font-bold text-base tracking-widest">이제 직선과의 관계로!</span>
+                        <h1 class="text-5xl font-black text-white leading-tight mt-2">이차방정식과 이차함수</h1>
+                        <p class="text-slate-400 text-base mt-3">$x$축과의 관계를 정리했으니, 이번에는 <span class="text-amber-300 font-semibold">일반 직선과의 위치 관계</span>를 확대해서 살펴봅니다.</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-6 w-full max-w-4xl">
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-chart-line text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">그래프와<br>방정식의 관계</h3>
+                            <p class="text-sm text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center">
+                            <i class="fa-solid fa-slash text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">그래프와<br>직선의 위치 관계</h3>
+                            <p class="text-sm text-slate-400">판별식 재사용</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center">
+                            <i class="fa-solid fa-arrows-up-down text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">최대와 최소</h3>
+                            <p class="text-sm text-slate-400">전 구간 · 제한된 범위</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 5: 그래프·직선 위치관계 개념 -->
+            <div class="slide" data-category="개념 34 · 그래프와 직선의 위치 관계" data-breadcrumb="Ⅱ. 방정식 &gt; 06. 이차방정식과 이차함수" data-parent="hub" data-origin="50% 62%">
+                <div class="concept-card flex-grow p-10 flex flex-col justify-center gap-6">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">34</span>
+                        <h2 class="text-3xl font-black text-white">이차함수의 그래프와 직선의 위치 관계</h2>
+                    </div>
+                    <p class="text-xl text-slate-100 leading-relaxed">$y=ax^2+bx+c$ 와 $y=mx+n$ 의 교점의 $x$좌표는 &nbsp; $ax^2+(b-m)x+(c-n)=0$ 의 실근.</p>
+                    <div class="formula-box py-6 px-10 text-center text-xl text-white font-bold">
+                        $$D>0 \Rightarrow \text{두 점에서 만남} \quad D=0 \Rightarrow \text{한 점에서 접함} \quad D<0 \Rightarrow \text{만나지 않음}$$
+                    </div>
+                    <p class="text-lg text-slate-300">두 그래프의 교점 문제는 결국 <span class="text-amber-300 font-bold">두 식을 연립해 만든 이차방정식의 판별식</span> 문제다.</p>
+                </div>
+            </div>
+
+            <!-- Slide 6: 그래프·직선 위치관계 예시 -->
+            <div class="slide" data-category="개념 34 · 바로 계산해보기" data-breadcrumb="Ⅱ. 방정식 &gt; 06. 이차방정식과 이차함수" data-parent="hub" data-origin="50% 62%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-6">
+                    <h2 class="text-2xl font-black text-white">바로 계산해보기</h2>
+                    <p class="text-lg text-slate-200">$y=x^2-4x+7$ 의 그래프와 직선 $y=x+1$ 의 교점의 좌표는?</p>
+                    <div class="formula-box py-5 px-8 leading-loose">
+                        <p class="text-lg text-white font-bold">$x^2-4x+7=x+1 \Rightarrow x^2-5x+6=0 \Rightarrow (x-2)(x-3)=0$</p>
+                        <p class="text-lg text-white font-bold">$x=2 \Rightarrow y=3, \qquad x=3 \Rightarrow y=4$</p>
+                    </div>
+                    <p class="text-base text-white font-bold text-center">교점 $(2,3)$, $(3,4)$</p>
+                </div>
+            </div>
+
+            <!-- Slide 7: HUB (재방문 2) -->
+            <div class="slide" data-category="복습 · 이차방정식과 이차함수" data-breadcrumb="Ⅱ. 방정식 &gt; 06. 이차방정식과 이차함수" data-hub="true">
+                <div class="flex-grow flex flex-col justify-center items-center gap-10">
+                    <div class="text-center">
+                        <span class="text-amber-400 font-bold text-base tracking-widest">마지막은 최대·최소!</span>
+                        <h1 class="text-5xl font-black text-white leading-tight mt-2">이차방정식과 이차함수</h1>
+                        <p class="text-slate-400 text-base mt-3">이제 <span class="text-amber-300 font-semibold">이차함수의 최댓값·최솟값</span>을 확대해서 살펴봅니다.</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-6 w-full max-w-4xl">
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-chart-line text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">그래프와<br>방정식의 관계</h3>
+                            <p class="text-sm text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-slash text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">그래프와<br>직선의 위치 관계</h3>
+                            <p class="text-sm text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center">
+                            <i class="fa-solid fa-arrows-up-down text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">최대와 최소</h3>
+                            <p class="text-sm text-slate-400">전 구간 · 제한된 범위</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 8: 최대·최소 개념 -->
+            <div class="slide" data-category="개념 35·36·37 · 이차함수의 최대, 최소" data-breadcrumb="Ⅱ. 방정식 &gt; 06. 이차방정식과 이차함수" data-parent="hub" data-origin="83% 62%">
+                <div class="concept-card flex-grow p-7 flex flex-col justify-center gap-3">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">35</span>
+                        <h2 class="text-xl font-black text-white">전 구간에서의 최대, 최소</h2>
+                    </div>
+                    <p class="text-base text-slate-200">$x$가 실수 전체일 때 $y=a(x-p)^2+q$: &nbsp; $a>0$이면 $x=p$에서 <span class="text-amber-300 font-bold">최솟값</span> $q$ (최댓값 없음), &nbsp; $a<0$이면 반대.</p>
+                    <div class="flex items-center gap-4 mt-1">
+                        <span class="num-badge">36</span>
+                        <h2 class="text-xl font-black text-white">제한된 범위에서의 최대, 최소</h2>
+                    </div>
+                    <p class="text-base text-slate-200">$\alpha\le x\le\beta$: 꼭짓점이 구간 <span class="text-amber-300 font-bold">안</span>에 있으면 $f(\alpha),f(p),f(\beta)$를 비교, 구간 <span class="text-amber-300 font-bold">밖</span>에 있으면 $f(\alpha),f(\beta)$만 비교.</p>
+                    <div class="flex items-center gap-4 mt-1">
+                        <span class="num-badge">37</span>
+                        <h2 class="text-xl font-black text-white">최대, 최소의 활용</h2>
+                    </div>
+                    <p class="text-base text-slate-200">① 변수 $x$ 정하기 &rarr; ② $x$의 범위 구하기 &rarr; ③ 이차식으로 나타내기 &rarr; ④ 완전제곱식으로 최대·최소 구하기</p>
+                </div>
+            </div>
+
+            <!-- Slide 9: 최대·최소 예시 -->
+            <div class="slide" data-category="개념 35·36 · 바로 계산해보기" data-breadcrumb="Ⅱ. 방정식 &gt; 06. 이차방정식과 이차함수" data-parent="hub" data-origin="83% 62%">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-6">
+                    <h2 class="text-2xl font-black text-white">바로 계산해보기</h2>
+                    <div class="formula-box py-4 px-8">
+                        <p class="text-sm text-amber-300 font-bold mb-1">전 구간</p>
+                        <p class="text-lg text-slate-200">$y=x^2-6x+10$ 의 최댓값과 최솟값은?</p>
+                        <p class="text-lg text-white font-bold mt-1">$(x-3)^2+1$, &nbsp; $a=1>0$이므로 $x=3$에서 최솟값 $1$, 최댓값 없음</p>
+                    </div>
+                    <div class="formula-box py-4 px-8">
+                        <p class="text-sm text-amber-300 font-bold mb-1">제한된 범위 $0\le x\le3$</p>
+                        <p class="text-lg text-slate-200">$f(x)=x^2-4x+1=(x-2)^2-3$ 의 최댓값과 최솟값은?</p>
+                        <p class="text-lg text-white font-bold mt-1">꼭짓점 $x=2\in[0,3]$: &nbsp; $f(0)=1,\ f(2)=-3,\ f(3)=-2$ &nbsp;&rArr;&nbsp; 최댓값 $1$, 최솟값 $-3$</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 10: HUB (마무리) -->
+            <div class="slide" data-category="복습 완료" data-breadcrumb="Ⅱ. 방정식 &gt; 06. 이차방정식과 이차함수" data-hub="true">
+                <div class="flex-grow flex flex-col justify-center items-center gap-10">
+                    <div class="text-center">
+                        <span class="text-emerald-400 font-bold text-base tracking-widest">복습 완료!</span>
+                        <h1 class="text-5xl font-black text-white leading-tight mt-2">이차방정식과 이차함수</h1>
+                        <p class="text-slate-400 text-base mt-3">교점은 <span class="text-amber-300 font-semibold">판별식</span>, 최대·최소는 <span class="text-amber-300 font-semibold">완전제곱꼴의 꼭짓점</span>이었습니다.</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-6 w-full max-w-4xl">
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-chart-line text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">그래프와<br>방정식의 관계</h3>
+                            <p class="text-sm text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-slash text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">그래프와<br>직선의 위치 관계</h3>
+                            <p class="text-sm text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-6 flex flex-col items-center gap-3 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-arrows-up-down text-amber-400 text-3xl"></i>
+                            <h3 class="text-xl font-black text-white">최대와 최소</h3>
+                            <p class="text-sm text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= MASTER HUB: 최종 완료 ================= -->
+            <div class="slide" data-category="전체 흐름 · 단원 목록" data-chapter-origin="83% 75%" data-master="true" data-breadcrumb="전체 단원 목록">
+                <div class="flex-grow flex flex-col justify-center items-center gap-6">
+                    <div class="text-center">
+                        <span class="text-amber-400 font-bold text-base tracking-widest">전체 복습 완료!</span>
+                        <h1 class="text-5xl font-black text-white leading-tight mt-2">공통수학1 종합 복습</h1>
+                        <p class="text-slate-400 text-base mt-3">6개 단원을 모두 확대해서 살펴봤습니다. 수고하셨습니다!</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-5 w-full max-w-5xl">
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-calculator text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">다항식의 연산</h3>
+                            <p class="text-xs text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-equals text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">나머지 정리</h3>
+                            <p class="text-xs text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-shapes text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">인수분해</h3>
+                            <p class="text-xs text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-i text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">복소수</h3>
+                            <p class="text-xs text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-square-root-variable text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">이차방정식</h3>
+                            <p class="text-xs text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                        <div class="hub-card p-5 flex flex-col items-center gap-2 text-center border-emerald-500/60">
+                            <div class="check"><i class="fa-solid fa-check"></i></div>
+                            <i class="fa-solid fa-chart-line text-amber-400 text-2xl"></i>
+                            <h3 class="text-base font-black text-white">이차방정식과<br>이차함수</h3>
+                            <p class="text-xs text-emerald-400 font-semibold">완료!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer Control -->
+        <div class="flex justify-between items-center z-20 pt-3 border-t border-amber-900/40 mx-8 mb-6 no-print">
+            <button onclick="prevSlide()" class="bg-slate-800/80 hover:bg-amber-600 text-slate-200 hover:text-white font-bold text-sm px-5 py-2 rounded-xl transition border border-slate-700">
+                <i class="fa-solid fa-chevron-left"></i> 이전 슬라이드
+            </button>
+            <div class="text-slate-400 text-xs font-semibold tracking-wider">
+                HIGH SCHOOL MATH CLASS PPT
+            </div>
+            <button onclick="nextSlide()" class="bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm px-5 py-2 rounded-xl transition shadow-md">
+                다음 슬라이드 <i class="fa-solid fa-chevron-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const counterEl = document.getElementById('slide-counter');
+        const categoryEl = document.getElementById('slide-category');
+        const breadcrumbEl = document.getElementById('slide-breadcrumb');
+        const DURATION = 550;
+        let animating = false;
+
+        function updateChrome() {
+            if (counterEl) counterEl.textContent = `${currentSlide + 1} / ${slides.length}`;
+            if (categoryEl && slides[currentSlide]) categoryEl.textContent = slides[currentSlide].getAttribute('data-category') || '수업 자료';
+            if (breadcrumbEl && slides[currentSlide]) breadcrumbEl.textContent = (slides[currentSlide].getAttribute('data-breadcrumb') || '').replace('&gt;', '>');
+        }
+
+        function goTo(nextIndex) {
+            if (animating || nextIndex < 0 || nextIndex >= slides.length || nextIndex === currentSlide) return;
+            const from = slides[currentSlide];
+            const to = slides[nextIndex];
+
+            const fromIsHub = from.dataset.hub === 'true';
+            const toIsHub = to.dataset.hub === 'true';
+
+            const fromIsMaster = from.dataset.master === 'true';
+            const toIsMaster = to.dataset.master === 'true';
+
+            let zoom = false;
+            let origin = '50% 50%';
+
+            if (fromIsHub && !toIsHub && to.dataset.parent === 'hub') {
+                zoom = true;
+                origin = to.dataset.origin || origin;
+            } else if (!fromIsHub && toIsHub && from.dataset.parent === 'hub') {
+                zoom = true;
+                origin = from.dataset.origin || origin;
+            } else if (fromIsMaster && !toIsMaster && to.dataset.chapterOrigin) {
+                zoom = true;
+                origin = to.dataset.chapterOrigin;
+            } else if (!fromIsMaster && toIsMaster && from.dataset.chapterOrigin) {
+                zoom = true;
+                origin = from.dataset.chapterOrigin;
+            }
+
+            animating = true;
+            from.style.transformOrigin = origin;
+            to.style.transformOrigin = origin;
+
+            to.style.transition = 'none';
+            to.style.transform = zoom ? 'scale(0.55)' : 'scale(1)';
+            to.style.opacity = '0';
+            to.style.zIndex = '20';
+            from.style.zIndex = '10';
+            to.classList.add('active');
+
+            if (window.MathJax && window.MathJax.typesetPromise) window.MathJax.typesetPromise([to]);
+
+            void to.offsetWidth; // force reflow so the transition below actually animates
+
+            requestAnimationFrame(() => {
+                const ease = 'cubic-bezier(0.4, 0, 0.2, 1)';
+                to.style.transition = `opacity ${DURATION}ms ${ease}, transform ${DURATION}ms ${ease}`;
+                to.style.transform = 'scale(1)';
+                to.style.opacity = '1';
+
+                from.style.transition = `opacity ${DURATION}ms ${ease}, transform ${DURATION}ms ${ease}`;
+                from.style.transform = zoom ? 'scale(1.5)' : 'scale(1)';
+                from.style.opacity = '0';
+            });
+
+            setTimeout(() => {
+                from.classList.remove('active');
+                from.style.transition = '';
+                from.style.transform = '';
+                from.style.opacity = '';
+                from.style.zIndex = '';
+                to.style.transition = '';
+                to.style.zIndex = '';
+                currentSlide = nextIndex;
+                animating = false;
+                updateChrome();
+            }, DURATION + 30);
+        }
+
+        function prevSlide() { goTo(currentSlide - 1); }
+        function nextSlide() { goTo(currentSlide + 1); }
+
+        updateChrome();
+        if (window.MathJax && window.MathJax.typesetPromise) window.MathJax.typesetPromise();
+    </script>
+</body>
+</html>

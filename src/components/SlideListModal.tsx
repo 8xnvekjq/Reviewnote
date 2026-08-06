@@ -20,6 +20,7 @@ export const SlideListModal: React.FC<SlideListModalProps> = ({ isOpen, onClose 
   // ── 학년별 수업 슬라이드 마스터 리스트 ──────────────────────────────────────
   const SLIDE_LIST: SlideItem[] = [
     // 🐣 예비고1 (공통수학1, 공통수학2)
+    { title: "베이직쎈 공통수학1 - 01~06단원 종합 복습 (전체 흐름) (p8~99)", filename: "math1_basicsen_comprehensive_review_01_06.html", date: "2026-08-07", grade: "예비고1" },
     { title: "베이직쎈 공통수학1 - 10. 순열과 조합 (조합의 활용) (p163~172)", filename: "math1_combination_usage_10.html", date: "2026-07-31", grade: "예비고1" },
 
     // 🏫 고1 (공통수학1, 공통수학2)
