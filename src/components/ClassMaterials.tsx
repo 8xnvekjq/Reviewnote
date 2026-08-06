@@ -28,11 +28,7 @@ const MATERIAL_LIST: MaterialItem[] = [
   }
 ];
 
-interface ClassMaterialsProps {
-  studentGrade?: string;
-}
-
-export const ClassMaterials: React.FC<ClassMaterialsProps> = ({ studentGrade }) => {
+export const ClassMaterials: React.FC = () => {
   const [selectedGrade, setSelectedGrade] = useState<string>('all');
   const [activeViewerItem, setActiveViewerItem] = useState<MaterialItem | null>(null);
 

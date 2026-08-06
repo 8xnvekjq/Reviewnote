@@ -1933,7 +1933,7 @@ function App() {
         )}
 
         {activeTab === 'materials' && (
-          <ClassMaterials studentGrade={studentGrade} />
+          <ClassMaterials />
         )}
 
         {activeTab === 'activity' && (

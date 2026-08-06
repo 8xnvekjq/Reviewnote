@@ -91,7 +91,7 @@ export interface MistakeEntry {
   teacherScaffoldingHint?: string;
 }
 
-export type ActiveTab = 'notes' | 'completed' | 'camera' | 'stats' | 'admin' | 'guide' | 'store' | 'activity' | 'scaffolding';
+export type ActiveTab = 'notes' | 'completed' | 'camera' | 'stats' | 'admin' | 'guide' | 'store' | 'activity' | 'scaffolding' | 'materials';
 
 export type GachaRarity = 'MR' | 'UR' | 'SSR' | 'SR' | 'R';
 export type GachaCategory = 'STAMP' | 'TITLE' | 'THEME' | 'SHIELD' | 'AI_VOICE' | 'CHARM';
@@ -118,4 +118,3 @@ export interface EquippedItems {
   aiVoice?: string;   // AI persona type e.g. 'tsundere'
 }
 
-export type ActiveTab = 'notes' | 'completed' | 'camera' | 'stats' | 'admin' | 'guide' | 'materials';
