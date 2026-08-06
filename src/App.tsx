@@ -14,6 +14,7 @@ import { BottomNavigation } from './components/BottomNavigation';
 import { ImageCropper } from './components/ImageCropper';
 import { AdminPanel } from './components/AdminPanel';
 import { StudentGuide } from './components/StudentGuide';
+import { ClassMaterials } from './components/ClassMaterials';
 import { LaTeXRenderer } from './components/LaTeXRenderer';
 
 function App() {
@@ -1021,6 +1022,10 @@ function App() {
 
         {activeTab === 'guide' && !isAdmin && (
           <StudentGuide />
+        )}
+
+        {activeTab === 'materials' && (
+          <ClassMaterials studentGrade={studentGrade} />
         )}
 
         {/* ── 분석통계 탭 ── */}

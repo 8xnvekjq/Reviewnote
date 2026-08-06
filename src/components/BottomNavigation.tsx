@@ -30,10 +30,19 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, s
         </button>
       )}
 
+      {/* Tab: Class Materials */}
+      <button 
+        onClick={() => setActiveTab('materials')}
+        className={`flex flex-col items-center justify-center w-14 h-12 rounded-xl transition-all ${activeTab === 'materials' ? 'text-indigo-400 scale-105 font-bold' : 'text-slate-500 hover:text-slate-300'}`}
+      >
+        <span className="text-lg">📚</span>
+        <span className="text-[10px] mt-0.5">수업자료</span>
+      </button>
+
       {/* Tab 1: Notes List */}
       <button 
         onClick={() => setActiveTab('notes')}
-        className={`flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all ${activeTab === 'notes' ? 'text-indigo-400 scale-105 font-bold' : 'text-slate-500 hover:text-slate-300'}`}
+        className={`flex flex-col items-center justify-center w-14 h-12 rounded-xl transition-all ${activeTab === 'notes' ? 'text-indigo-400 scale-105 font-bold' : 'text-slate-500 hover:text-slate-300'}`}
       >
         <span className="text-lg">📓</span>
         <span className="text-[10px] mt-0.5">오답노트</span>
@@ -50,7 +59,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, s
       {/* Tab 3: Stats */}
       <button 
         onClick={() => setActiveTab('stats')}
-        className={`flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all ${activeTab === 'stats' ? 'text-emerald-400 scale-105 font-bold' : 'text-slate-500 hover:text-slate-300'}`}
+        className={`flex flex-col items-center justify-center w-14 h-12 rounded-xl transition-all ${activeTab === 'stats' ? 'text-emerald-400 scale-105 font-bold' : 'text-slate-500 hover:text-slate-300'}`}
       >
         <span className="text-lg">📊</span>
         <span className="text-[10px] mt-0.5">분석통계</span>
@@ -59,7 +68,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, s
       {/* Tab 4: Completed Reviews */}
       <button 
         onClick={() => setActiveTab('completed')}
-        className={`flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all ${activeTab === 'completed' ? 'text-teal-400 scale-105 font-bold' : 'text-slate-500 hover:text-slate-300'}`}
+        className={`flex flex-col items-center justify-center w-14 h-12 rounded-xl transition-all ${activeTab === 'completed' ? 'text-teal-400 scale-105 font-bold' : 'text-slate-500 hover:text-slate-300'}`}
       >
         <span className="text-lg">✅</span>
         <span className="text-[10px] mt-0.5">복습완료</span>

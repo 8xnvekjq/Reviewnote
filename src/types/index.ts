@@ -79,4 +79,4 @@ export interface MistakeEntry {
   userActionPlan?: string;
 }
 
-export type ActiveTab = 'notes' | 'completed' | 'camera' | 'stats' | 'admin' | 'guide';
+export type ActiveTab = 'notes' | 'completed' | 'camera' | 'stats' | 'admin' | 'guide' | 'materials';

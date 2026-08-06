@@ -195,33 +195,35 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onCapture, onClose
   };
 
   return (
-    <div className="fixed inset-0 bg-black z-50 flex flex-col landscape:flex-row justify-between overflow-hidden">
+    <div className="fixed inset-0 h-[100dvh] w-screen bg-black z-50 flex flex-col landscape:flex-row justify-between overflow-hidden select-none">
       {/* Hidden canvas for capturing images */}
       <canvas ref={canvasRef} className="hidden" />
 
       {/* Camera Top Bar */}
-      <div className="absolute top-0 inset-x-0 landscape:right-24 z-50 safe-top bg-gradient-to-b from-black/80 to-transparent p-4 flex items-center justify-between">
+      <div className="absolute top-0 inset-x-0 landscape:right-24 z-50 safe-top bg-gradient-to-b from-black/90 via-black/40 to-transparent p-4 pt-[max(1rem,env(safe-area-inset-top))] flex items-center justify-between pointer-events-auto">
         <button
           onClick={() => {
             stopStream(streamRef.current);
             streamRef.current = null;
             onClose();
           }}
-          className="w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center text-white text-lg active:scale-90 transition-transform animate-scale-up"
+          className="w-10 h-10 rounded-full bg-black/50 hover:bg-black/80 border border-white/20 flex items-center justify-center text-white text-lg active:scale-90 transition-transform animate-scale-up shadow-lg backdrop-blur-md"
         >
           ✕
         </button>
-        <h2 className="text-sm font-bold text-white tracking-wider">문제 스캔</h2>
+        <h2 className="text-sm font-extrabold text-white tracking-wider bg-black/40 px-3 py-1 rounded-full border border-white/10 backdrop-blur-md">
+          문제 스캔
+        </h2>
         <button
           onClick={() => setAutoCapture(!autoCapture)}
-          className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all active:scale-95 ${autoCapture ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+          className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all active:scale-95 backdrop-blur-md ${autoCapture ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20' : 'bg-slate-800/80 border border-white/10 text-slate-300 hover:bg-slate-700'}`}
         >
           {autoCapture ? '자동 촬영 ON (5초)' : '자동 촬영 OFF'}
         </button>
       </div>
 
       {/* Video Viewfinder with Custom Scanning Reticle */}
-      <div className="relative flex-1 bg-black flex items-center justify-center landscape:h-full">
+      <div className="relative flex-1 min-h-0 min-w-0 bg-black flex items-center justify-center landscape:h-full overflow-hidden">
         {loading && (
           <div className="absolute inset-0 flex flex-col items-center justify-center space-y-3 z-20 bg-slate-950">
             <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
@@ -267,8 +269,8 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onCapture, onClose
             )}
 
             {/* Target Reticle Overlay */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-6">
-              <div className="w-full max-w-sm aspect-[4/3] border border-white/20 rounded-2xl relative shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-4 sm:p-6">
+              <div className="w-full max-w-sm max-h-[55vh] aspect-[4/3] border border-white/20 rounded-2xl relative shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
                 {/* Glowing corners */}
                 <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-emerald-400 rounded-tl-xl animate-pulse"></div>
                 <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-emerald-400 rounded-tr-xl animate-pulse"></div>
@@ -293,12 +295,13 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onCapture, onClose
       </div>
 
       {/* Camera Action Controls */}
-      <div className="safe-bottom bg-slate-950 p-6 pb-8 landscape:pb-6 landscape:py-8 landscape:px-4 flex items-center justify-between landscape:flex-col landscape:h-full landscape:w-24 landscape:justify-center landscape:space-y-12 landscape:space-x-0 landscape:border-t-0 landscape:border-l landscape:border-slate-900/60 landscape:pr-[calc(16px+env(safe-area-inset-right))] z-10">
+      <div className="safe-bottom bg-slate-950/95 backdrop-blur-md px-6 py-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] landscape:pb-6 landscape:py-8 landscape:px-4 flex items-center justify-around sm:justify-center sm:space-x-12 landscape:flex-col landscape:h-full landscape:w-24 landscape:justify-center landscape:space-y-12 landscape:space-x-0 landscape:border-t-0 landscape:border-l landscape:border-slate-900/60 z-10 flex-none border-t border-slate-900/80">
         {/* Toggle Front/Back Camera */}
         <button
           onClick={toggleCamera}
           disabled={!!error || loading}
-          className="w-12 h-12 rounded-full bg-slate-900 border border-slate-800 disabled:opacity-40 hover:bg-slate-800 active:scale-90 flex items-center justify-center text-white transition-all flex-none"
+          className="w-12 h-12 rounded-full bg-slate-900 border border-slate-800 disabled:opacity-40 hover:bg-slate-800 active:scale-90 flex items-center justify-center text-white transition-all flex-none shadow-md"
+          title="카메라 전환"
         >
           🔄
         </button>
@@ -307,13 +310,17 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onCapture, onClose
         <button
           onClick={handleCapture}
           disabled={!!error || loading}
-          className="w-16 h-16 rounded-full border-4 border-white p-1 hover:scale-105 active:scale-95 disabled:opacity-40 transition-all flex items-center justify-center flex-none"
+          className="w-16 h-16 rounded-full border-4 border-white p-1 hover:scale-105 active:scale-95 disabled:opacity-40 transition-all flex items-center justify-center flex-none shadow-xl shadow-white/10"
+          title="촬영하기"
         >
           <div className="w-full h-full rounded-full bg-white shadow-lg"></div>
         </button>
 
         {/* Gallery Upload Alternate */}
-        <label className="w-12 h-12 rounded-full bg-slate-900 border border-slate-800 hover:bg-slate-800 active:scale-90 flex items-center justify-center text-white cursor-pointer transition-all flex-none">
+        <label
+          className="w-12 h-12 rounded-full bg-slate-900 border border-slate-800 hover:bg-slate-800 active:scale-90 flex items-center justify-center text-white cursor-pointer transition-all flex-none shadow-md"
+          title="갤러리 사진 불러오기"
+        >
           🖼️
           <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
         </label>
