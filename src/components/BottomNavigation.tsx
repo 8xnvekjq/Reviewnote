@@ -351,6 +351,6 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         <span className="text-lg">✅</span>
         <span className="text-[10px] mt-0.5">복습완료</span>
       </button>
-    </nav>
+    </div>
   );
 };
