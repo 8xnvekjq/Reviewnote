@@ -14,7 +14,6 @@ import { BottomNavigation } from './components/BottomNavigation';
 import { ImageCropper } from './components/ImageCropper';
 import { AdminPanel } from './components/AdminPanel';
 import { StudentGuide } from './components/StudentGuide';
-import { ClassMaterials } from './components/ClassMaterials';
 import { LaTeXRenderer } from './components/LaTeXRenderer';
 import { SlideListModal } from './components/SlideListModal';
 import { GachaStore } from './components/GachaStore';
@@ -1930,10 +1929,6 @@ function App() {
 
         {activeTab === 'guide' && (
           <StudentGuide />
-        )}
-
-        {activeTab === 'materials' && (
-          <ClassMaterials />
         )}
 
         {activeTab === 'activity' && (

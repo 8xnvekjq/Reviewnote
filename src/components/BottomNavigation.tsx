@@ -69,12 +69,8 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         {/* 수업자료실 배지 버튼 (화면 우측 복습하기 왼편 플로팅) */}
         <div className="absolute -top-3.5 right-[90px] z-50">
           <button
-            onClick={() => handleSelectMenu('materials')}
-            className={`px-3 py-0.5 rounded-full border-2 text-[8.5px] font-black text-white flex items-center space-x-1 hover:scale-105 active:scale-95 transition-all backdrop-blur-md ${
-              activeTab === 'materials'
-                ? 'bg-indigo-600 border-indigo-300 shadow-[0_0_12px_rgba(99,102,241,0.8)]'
-                : 'bg-emerald-700 hover:bg-emerald-650 border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.65)]'
-            }`}
+            onClick={() => onOpenSlideList?.()}
+            className="px-3 py-0.5 rounded-full border-2 text-[8.5px] font-black text-white flex items-center space-x-1 hover:scale-105 active:scale-95 transition-all backdrop-blur-md bg-emerald-700 hover:bg-emerald-650 border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.65)]"
           >
             <span>📚 수업자료</span>
           </button>
@@ -283,23 +279,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                 </div>
               </button>
 
-              {/* 5. 📚 특강 & 수업자료실 (고3 특강 HTML & 슬라이드) */}
-              <button
-                onClick={() => handleSelectMenu('materials')}
-                className={`w-full p-3.5 rounded-2xl border flex items-center space-x-3.5 transition-all text-left group ${
-                  activeTab === 'materials'
-                    ? 'bg-indigo-500/10 border-indigo-500/50 text-indigo-300 font-bold shadow-lg shadow-indigo-500/5'
-                    : 'bg-slate-955/60 border-slate-850 hover:border-slate-700 text-slate-300 hover:bg-slate-850'
-                }`}
-              >
-                <span className="text-2xl group-hover:scale-110 transition-transform">📚</span>
-                <div>
-                  <div className="text-xs font-black text-indigo-400">수업자료실</div>
-                  <div className="text-[9.5px] text-slate-500 mt-0.5">고3 특강 HTML & 스피드 숏컷 클리닉</div>
-                </div>
-              </button>
-
-              {/* 6. 더쿠키수학 핵심 수업자료 */}
+              {/* 5. 더쿠키수학 핵심 수업자료 */}
               {onOpenSlideList && (
                 <button
                   onClick={() => {
