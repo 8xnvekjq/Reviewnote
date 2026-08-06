@@ -1,8 +1,10 @@
 import React from 'react';
 import type { MistakeEntry } from '../types';
 import { formatDate, formatDateTime } from '../utils/date';
+import { GACHA_ITEMS, getRarityTheme } from '../utils/gachaCatalog';
 
 import { LaTeXRenderer } from './LaTeXRenderer';
+import { CatPawIcon } from './CatPawIcon';
 
 interface MistakeCardProps {
   entry: MistakeEntry;
@@ -10,11 +12,19 @@ interface MistakeCardProps {
   onDelete: (id: string, e: React.MouseEvent) => void;
   studentName?: string;   // admin 전용: 학생 이름/아이디
   isOwnNote?: boolean;    // 내 오답 여부 (admin이 타인 오답 볼 때 false)
+  equippedStamp?: string; // 학생이 장착한 레어 도장 (예: 🔥, ⭐, 👑, 🐾, 💎)
+  hasScaffolding?: boolean; // 선생님이 첨부한 스캐폴딩 힌트가 있는지 여부
 }
 
-export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDelete, studentName, isOwnNote = true }) => {
+export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDelete, studentName, isOwnNote = true, equippedStamp, hasScaffolding }) => {
   const struggleCount = entry.reviews ? entry.reviews.filter(r => r === 'X' || r === 'star').length : 0;
   const isCompleted = entry.reviews && entry.reviews.filter(r => r === 'O').length === 3;
+
+  // 장착한 스탬프의 실제 뽑기 등급(UR/SSR/SR/R)에 맞는 테두리 클래스
+  const stampCatalogItem = equippedStamp
+    ? GACHA_ITEMS.find(g => g.category === 'STAMP' && g.effectValue === equippedStamp)
+    : undefined;
+  const stampBorderClass = stampCatalogItem ? getRarityTheme(stampCatalogItem.rarity).border : 'border-transparent';
 
   return (
     <div 
@@ -60,11 +70,20 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
           </div>
         )}
         <div className={`absolute top-2 right-2 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-950/80 backdrop-blur-sm border ${isCompleted ? 'border-emerald-500/50 text-emerald-400' : 'border-slate-800 text-slate-300'}`}>
-          {isCompleted 
-            ? `✅ 완료: ${formatDateTime(entry.updatedAt || entry.date)}` 
+          {isCompleted
+            ? `✅ 완료: ${formatDateTime(entry.updatedAt || entry.date)}`
             : formatDate(entry.date)
           }
         </div>
+        {/* 스캐폴딩 힌트 첨부 여부 (우측 하단 초록 마크) */}
+        {hasScaffolding && (
+          <div
+            className="absolute bottom-2 right-2 w-6 h-6 rounded-full bg-emerald-500/90 border border-emerald-300/60 backdrop-blur-sm shadow-sm flex items-center justify-center text-xs z-10"
+            title="선생님이 첨부한 스캐폴딩 힌트가 있습니다"
+          >
+            🧩
+          </div>
+        )}
       </div>
       <div className="p-3 pb-2.5 space-y-1.5">
         <div className="flex items-center justify-between gap-2">
@@ -83,11 +102,16 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
 
         {/* 대책 내용(좌) & AI분석 요약/미완료(우) 단일 행 병합 */}
         <div className="flex items-center justify-between text-[10px] text-slate-500 min-w-0 space-x-3">
-          {/* Left: Action Plan */}
+          {/* Left: Teacher Scaffolding Hint or Student Action Plan */}
           <div className="flex-1 min-w-0 truncate">
-            {entry.userActionPlan && entry.userActionPlan.trim() ? (
+            {entry.teacherScaffoldingHint && entry.teacherScaffoldingHint.trim() ? (
               <span className="truncate block text-[9.5px]">
-                <span className="text-indigo-400 font-bold mr-1">💡대책:</span>
+                <span className="text-purple-400 font-bold mr-1">👨‍🏫 힌트:</span>
+                {entry.teacherScaffoldingHint.slice(0, 18).trim()}{entry.teacherScaffoldingHint.length > 18 ? '...' : ''}
+              </span>
+            ) : entry.userActionPlan && entry.userActionPlan.trim() ? (
+              <span className="truncate block text-[9.5px]">
+                <span className="text-indigo-400 font-bold mr-1">🎓대책:</span>
                 {entry.userActionPlan.slice(0, 18).trim()}{entry.userActionPlan.length > 18 ? '...' : ''}
               </span>
             ) : (
@@ -115,21 +139,23 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
           {/* 복습 진척사항 배지 목록 */}
           <div className="flex items-center space-x-1">
             {(entry.reviews || ['', '', '']).slice(0, 3).map((state, idx) => {
-              let badgeStyle = "bg-slate-800 text-slate-600 border-slate-700/40";
+              let badgeStyle = "w-[17px] h-[17px] bg-slate-800 text-slate-600 border border-slate-700/40 text-[9px]";
               let symbol = idx + 1;
               if (state === 'O') {
-                badgeStyle = "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-extrabold";
+                badgeStyle = equippedStamp
+                  ? `w-[19px] h-[19px] bg-transparent border-2 ${stampBorderClass} text-[11px] font-black`
+                  : "w-[17px] h-[17px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-extrabold text-[9px]";
               } else if (state === 'X') {
-                badgeStyle = "bg-red-500/15 text-red-400 border-red-500/30 font-extrabold";
+                badgeStyle = "w-[17px] h-[17px] bg-red-500/15 text-red-400 border border-red-500/30 font-extrabold text-[9px]";
               } else if (state === 'star') {
-                badgeStyle = "bg-amber-500/15 text-amber-400 border-amber-500/30 font-extrabold";
+                badgeStyle = "w-[17px] h-[17px] bg-amber-500/15 text-amber-400 border border-amber-500/30 font-extrabold text-[9px]";
               }
               return (
                 <span
                   key={idx}
-                  className={`w-[17px] h-[17px] rounded-full border text-[9px] flex items-center justify-center transition-all ${badgeStyle}`}
+                  className={`rounded-full flex items-center justify-center transition-all ${badgeStyle}`}
                 >
-                  {state === 'star' ? '★' : (state || symbol)}
+                  {state === 'star' ? '★' : (state === 'O' ? (equippedStamp === '🐾' ? <CatPawIcon className="w-3.5 h-3.5" /> : (equippedStamp || 'O')) : (state || symbol))}
                 </span>
               );
             })}

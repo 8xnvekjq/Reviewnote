@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>고3 준킬러 스피드 &amp; 숏컷 클리닉 (특강)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true
+            },
+            options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'] }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        .presentation-deck { position: relative; width: 1280px; height: 720px; background: radial-gradient(circle at 10% 20%, #2e1014 0%, #0f172a 100%); border: 1px solid rgba(255, 255, 255, 0.08); margin: 20px auto; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+        .slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 45px 70px; display: none; flex-direction: column; justify-content: space-between; z-index: 1; background: transparent; box-sizing: border-box; }
+        .slide.active { display: flex; z-index: 10; }
+        
+        .concept-card { background: rgba(30, 41, 59, 0.75); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.25); }
+        .problem-box { background: linear-gradient(135deg, rgba(30, 20, 25, 0.9) 0%, rgba(15, 23, 42, 0.8) 100%); border-left: 8px solid #f43f5e; border-top: 1px solid rgba(255, 255, 255, 0.05); border-right: 1px solid rgba(255, 255, 255, 0.05); border-bottom: 1px solid rgba(255, 255, 255, 0.05); border-radius: 0 16px 16px 0; }
+        .problem-text { font-size: 1.25rem; font-weight: 700; color: #f1f5f9; line-height: 1.6; }
+
+        @media print {
+            body { background-color: #ffffff !important; margin: 0 !important; padding: 0 !important; }
+            .presentation-deck { width: 1280px !important; height: auto !important; box-shadow: none !important; border: none !important; margin: 0 !important; overflow: visible !important; display: block !important; }
+            .slide { position: relative !important; display: flex !important; width: 1280px !important; height: 720px !important; page-break-after: always !important; page-break-inside: avoid !important; background: #0f172a !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="presentation-deck" id="deck">
+        <!-- Header -->
+        <div class="flex justify-between items-center z-20 pb-3 border-b border-slate-700/50 mx-8 mt-6 no-print">
+            <div class="flex items-center gap-3">
+                <span class="bg-rose-600 text-white text-xs font-black px-2.5 py-1 rounded-md tracking-wider">고3 수능 특강</span>
+                <span class="text-slate-400 text-sm font-medium">준킬러 스피드 &amp; 숏컷 클리닉</span>
+            </div>
+            <div class="text-right">
+                <span class="text-xs text-rose-400 font-semibold uppercase tracking-wider" id="slide-category">Intro</span>
+            </div>
+        </div>
+
+        <!-- 슬라이드 본문 영역 -->
+        <div class="relative flex-grow my-2 overflow-hidden" id="slide-container">
+            
+            <!-- Slide 1: 표지 -->
+            <div class="slide active" data-category="Intro">
+                <div class="flex flex-col items-center justify-center h-full text-center">
+                    <span class="bg-rose-600 text-white text-xs font-black px-3.5 py-1.5 rounded-full tracking-wider mb-4 uppercase">
+                        고3 수능 대비 파이널 특강
+                    </span>
+                    <h1 class="text-5xl font-black text-white tracking-tight leading-tight mb-5 drop-shadow-md">
+                        준킬러 스피드 &amp; 숏컷 클리닉
+                    </h1>
+                    <div class="h-1.5 w-32 bg-rose-600 rounded-full mb-6"></div>
+                    <h2 class="text-2xl font-bold text-rose-400">
+                        풀이 시간 1/3 단축: 기하학적 직관, 차이함수, 매클로린 근사
+                    </h2>
+                    <p class="text-slate-400 mt-6 text-base max-w-2xl font-light leading-relaxed">
+                        평가원 기출 준킬러 5문항 클리닉<br>
+                        <span class="text-rose-300 font-medium">[원문 → 정석/숏컷 → 함정/스킵시그널 → 구조변형문제]</span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Slide 2: [문항 01] 원문 -->
+            <div class="slide" data-category="문항 01 | 원문">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 01 [원문] &nbsp;<span class="text-rose-400 text-lg">수학Ⅱ | 정적분과 넓이 | 2024학년도 6월 모의평가 공통 10번</span></h2>
+                <div class="grid grid-cols-12 gap-6 flex-grow items-center">
+                    <!-- 문제 지문 -->
+                    <div class="col-span-7 problem-box p-6 flex flex-col justify-center h-full">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-2">Original Question</div>
+                        <h3 class="problem-text text-base leading-relaxed">
+                            양수 $k$에 대하여 함수 $f(x) = kx(x-2)(x-3)$이다. 곡선 $y=f(x)$와 $x$축이 원점 $\text{O}$와 두 점 $\text{P, Q}$ $(\text{OP} < \text{OQ})$에서 만난다. <br><br>
+                            곡선 $y=f(x)$와 선분 $\text{OP}$로 둘러싸인 영역을 $A$, 곡선 $y=f(x)$와 선분 $\text{PQ}$로 둘러싸인 영역을 $B$라 하자. <br><br>
+                            $(A\text{의 넓이}) - (B\text{의 넓이}) = 3$일 때, $k$의 값은?
+                        </h3>
+                    </div>
+                    <!-- SVG 그래프 -->
+                    <div class="col-span-5 concept-card p-4 h-full flex flex-col items-center justify-center">
+                        <span class="text-xs text-rose-400 font-bold mb-2">함수 $y=f(x)$와 넓이 $A, B$ 시각화</span>
+                        <svg viewBox="0 0 320 220" class="w-full h-48">
+                            <!-- 축 -->
+                            <line x1="20" y1="140" x2="300" y2="140" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+                            <line x1="50" y1="200" x2="50" y2="20" stroke="#64748b" stroke-width="2"/>
+                            
+                            <!-- A 영역 (0~2) 채우기 -->
+                            <path d="M 50 140 C 70 40, 130 40, 170 140 Z" fill="rgba(244, 63, 94, 0.3)" stroke="none"/>
+                            <!-- B 영역 (2~3) 채우기 -->
+                            <path d="M 170 140 C 190 190, 210 190, 230 140 Z" fill="rgba(239, 68, 68, 0.4)" stroke="none"/>
+                            
+                            <!-- f(x) 곡선 -->
+                            <path d="M 35 180 Q 42 160 50 140 C 70 40, 130 40, 170 140 C 190 190, 210 190, 230 140 C 245 100, 260 50, 275 10" fill="none" stroke="#f43f5e" stroke-width="3"/>
+                            
+                            <!-- 점 및 좌표 -->
+                            <circle cx="50" cy="140" r="4" fill="#ffffff"/>
+                            <text x="40" y="158" fill="#f8fafc" font-size="12" font-weight="bold">O(0)</text>
+                            
+                            <circle cx="170" cy="140" r="4" fill="#ffffff"/>
+                            <text x="165" y="158" fill="#f8fafc" font-size="12" font-weight="bold">P(2)</text>
+                            
+                            <circle cx="230" cy="140" r="4" fill="#ffffff"/>
+                            <text x="225" y="158" fill="#f8fafc" font-size="12" font-weight="bold">Q(3)</text>
+                            
+                            <!-- 영역 라벨 -->
+                            <text x="105" y="105" fill="#fecdd3" font-size="15" font-weight="900">영역 A</text>
+                            <text x="190" y="168" fill="#fca5a5" font-size="14" font-weight="900">영역 B</text>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 3: [문항 01] 원문 해설 -->
+            <div class="slide" data-category="문항 01 | 원문 해설">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 01 [원문 해설] &nbsp;<span class="text-rose-400 text-lg">정석 vs 숏컷 풀이 비교</span></h2>
+                <div class="grid grid-cols-2 gap-6 flex-grow items-stretch">
+                    <!-- 정석 풀이 -->
+                    <div class="concept-card p-5 border-t-4 border-slate-500 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-slate-400 font-bold uppercase tracking-wider block mb-1">학생들의 돌아가는 정석 풀이</span>
+                            <h3 class="text-base font-bold text-white mb-2">영역 분할 후 개별 넓이 적분</h3>
+                            <div class="text-xs text-slate-300 space-y-2 leading-relaxed">
+                                <p>1. 근 $x=0, 2, 3$ 확인 및 넓이 식 세우기:<br>
+                                &nbsp;&nbsp;&nbsp;$A = \int_0^2 f(x)dx$, &nbsp;$B = -\int_2^3 f(x)dx$</p>
+                                <p>2. 개별 4차식 적분 계산:<br>
+                                &nbsp;&nbsp;&nbsp;$f(x) = k(x^3 - 5x^2 + 6x)$<br>
+                                &nbsp;&nbsp;&nbsp;$A = k\left[\frac{1}{4}x^4 - \frac{5}{3}x^3 + 3x^2\right]_0^2 = k\left(4 - \frac{40}{3} + 12\right) = \frac{8}{3}k$</p>
+                                <p>3. $B$ 영역 계산 후 $A - B = 3$ 방정식 풀이:<br>
+                                &nbsp;&nbsp;&nbsp;$B = -k\left[\frac{1}{4}x^4 - \frac{5}{3}x^3 + 3x^2\right]_2^3 = \frac{5}{12}k \implies \frac{8}{3}k - \frac{5}{12}k = 3$</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-slate-400 bg-slate-800/60 p-2 rounded mt-2">
+                            <i class="fa-solid fa-triangle-exclamation text-amber-400 mr-1"></i> 분수 통분 및 이중 적분 계산으로 3~4분 소요 &amp; 계산 실수 유발
+                        </div>
+                    </div>
+
+                    <!-- 숏컷 풀이 -->
+                    <div class="concept-card p-5 border-t-4 border-rose-500 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-rose-400 font-bold uppercase tracking-wider block mb-1">강사의 숏컷 풀이</span>
+                            <h3 class="text-base font-bold text-rose-300 mb-2">"넓이의 차이는 정적분 그 자체다!"</h3>
+                            <div class="text-xs text-slate-200 space-y-3 leading-relaxed">
+                                <p class="bg-rose-950/40 p-2.5 rounded-lg border border-rose-800/40">
+                                    <b>핵심 개념:</b> $x$축 위 넓이 $A$와 아래 넓이 $B$의 차이 $A-B$는 구간을 나누지 않고 <b>$0$부터 $3$까지의 한 번의 정적분</b>과 완전히 동일합니다!
+                                </p>
+                                <p><b>한 줄 식 세우기:</b><br>
+                                $$\int_0^3 kx(x-2)(x-3)dx = 3$$</p>
+                                <p><b>원샷 계산:</b><br>
+                                $$k\left[\frac{1}{4}x^4 - \frac{5}{3}x^3 + 3x^2\right]_0^3 = k\left(\frac{81}{4} - 45 + 27\right) = \frac{9}{4}k = 3$$
+                                $$\therefore k = \frac{4}{3}$$</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-rose-300 bg-rose-900/40 p-2 rounded mt-2">
+                            <i class="fa-solid fa-bolt text-yellow-300 mr-1"></i> 계산량 70% 감소, 단 40초 만에 정답 도출!
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 4: [문항 01] 함정 & 스킵 시그널 -->
+            <div class="slide" data-category="문항 01 | 함정 &amp; 스킵 시그널">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 01 [클리닉] &nbsp;<span class="text-rose-400 text-lg">함정 포인트 &amp; 30초 스킵 시그널</span></h2>
+                <div class="grid grid-cols-2 gap-6 flex-grow items-stretch">
+                    <!-- 함정 포인트 -->
+                    <div class="concept-card p-6 border-t-4 border-amber-500 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="bg-amber-500/20 text-amber-300 p-2 rounded-lg"><i class="fa-solid fa-skull-crossbones text-xl"></i></span>
+                                <h3 class="text-lg font-bold text-amber-300">함정 포인트 (Trap Point)</h3>
+                            </div>
+                            <div class="text-sm text-slate-200 space-y-3 leading-relaxed">
+                                <p class="bg-amber-950/30 p-3 rounded-lg border border-amber-800/30">
+                                    영역 $B$가 $x$축 아래에 위치한다는 기하학적 사실에 매몰되어, 무의식적으로 절댓값을 씌워 양수로 만든 후 다시 빼는 <b>불필요한 이중 작업</b>을 수행하는 습관.
+                                </p>
+                                <ul class="list-disc list-inside text-xs text-slate-300 space-y-1.5 pt-2">
+                                    <li>$A = \int_0^2 f(x)dx$ (양수)</li>
+                                    <li>$B = -\int_2^3 f(x)dx$ (넓이로 환산)</li>
+                                    <li>$A - B = \int_0^2 f(x)dx - \left(-\int_2^3 f(x)dx\right) = \int_0^3 f(x)dx$ 임을 식으로 돌아가서 깨닫는 우를 범함.</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="text-xs text-amber-200 font-semibold bg-amber-900/40 p-2.5 rounded-lg">
+                            <i class="fa-solid fa-lightbulb mr-1"></i> 넓이의 '차' $A-B$는 정적분 정의 $\int_a^b f(x)dx$ 그 자체임을 직관적으로 기억할 것!
+                        </div>
+                    </div>
+
+                    <!-- 30초 스킵 시그널 -->
+                    <div class="concept-card p-6 border-t-4 border-rose-500 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="bg-rose-500/20 text-rose-300 p-2 rounded-lg"><i class="fa-solid fa-hand text-xl"></i></span>
+                                <h3 class="text-lg font-bold text-rose-300">30초 스킵 시그널 (Skip Signal)</h3>
+                            </div>
+                            <div class="text-sm text-slate-200 space-y-3 leading-relaxed">
+                                <p class="bg-rose-950/40 p-3 rounded-lg border border-rose-800/40 font-semibold text-rose-200">
+                                    "문제를 읽고 $\int_0^2$와 $\int_2^3$ 구간을 나누어 각각 계산하려는 손놀림이 시작되었다면, 당장 펜을 멈추고 넘어가라!"
+                                </p>
+                                <div class="text-xs text-slate-300 space-y-2 pt-1">
+                                    <p><b>[스피드 체크리스트]</b></p>
+                                    <p>✔ $x$축 위/아래 영역 넓이의 차를 묻는가? $\rightarrow$ <b>한 번의 정적분!</b></p>
+                                    <p>✔ 구간 나누는 순간 최소 2분 이상 손해 본다!</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-xs text-rose-200 font-semibold bg-rose-900/50 p-2.5 rounded-lg">
+                            <i class="fa-solid fa-stopwatch mr-1"></i> 정적분의 기하학적 의미를 활용하지 못하면 30초 내 스킵 대상.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 5: [문항 01] 구조 변형 문제 -->
+            <div class="slide" data-category="문항 01 | 구조 변형">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 01 [구조 변형] &nbsp;<span class="text-rose-400 text-lg">실전 응용 문제</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Structure Extension</div>
+                        <h3 class="problem-text text-lg leading-relaxed mb-6">
+                            최고차항의 계수가 $a \;(a>0)$인 삼차함수 $g(x) = ax(x-3)(x-4)$가 있다. <br><br>
+                            곡선 $y=g(x)$와 $x$축으로 둘러싸인 두 영역 중 $x$축 위쪽 영역의 넓이를 $S_1$, $x$축 아래쪽 영역의 넓이를 $S_2$라 하자. <br><br>
+                            $(S_1\text{의 넓이}) - (S_2\text{의 넓이}) = 16$일 때, 양수 $a$의 값은?
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 6: [문항 02] 원문 -->
+            <div class="slide" data-category="문항 02 | 원문">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 02 [원문] &nbsp;<span class="text-rose-400 text-lg">수학Ⅱ | 미분과 차이함수 | 2024학년도 9월 모의평가 공통 10번</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Original Question</div>
+                        <h3 class="problem-text text-lg leading-relaxed">
+                            최고차항의 계수가 1인 삼차함수 $f(x)$에 대하여 곡선 $y=f(x)$ 위의 점 $(-2, f(-2))$에서의 접선과 곡선 $y=f(x)$ 위의 점 $(2, 3)$에서의 접선이 점 $(1, 3)$에서 만날 때, $f(0)$의 값은?
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 7: [문항 02] 원문 해설 -->
+            <div class="slide" data-category="문항 02 | 원문 해설">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 02 [원문 해설] &nbsp;<span class="text-rose-400 text-lg">정석 vs 숏컷 풀이 비교</span></h2>
+                <div class="grid grid-cols-2 gap-6 flex-grow items-stretch">
+                    <!-- 정석 풀이 -->
+                    <div class="concept-card p-5 border-t-4 border-slate-500 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-slate-400 font-bold uppercase tracking-wider block mb-1">학생들의 돌아가는 정석 풀이</span>
+                            <h3 class="text-base font-bold text-white mb-2">미지수 3개 전개 &amp; 연립방정식</h3>
+                            <div class="text-xs text-slate-300 space-y-2 leading-relaxed">
+                                <p>1. $f(x) = x^3 + ax^2 + bx + c$ 로 미지수 3개 세팅</p>
+                                <p>2. 점 $(2,3)$과 $(1,3)$을 지나는 접선 $\rightarrow$ 기울기 $0$<br>
+                                &nbsp;&nbsp;&nbsp;$f'(2) = 0, \; f(2) = 3$ 조건 대입</p>
+                                <p>3. $(-2, f(-2))$에서의 접선 방정식 작성:<br>
+                                &nbsp;&nbsp;&nbsp;$y - f(-2) = f'(-2)(x + 2)$</p>
+                                <p>4. 점 $(1,3)$ 대입하여 $a, b, c$ 복잡한 연립방정식 풀이</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-slate-400 bg-slate-800/60 p-2 rounded mt-2">
+                            <i class="fa-solid fa-triangle-exclamation text-amber-400 mr-1"></i> 미지수 3개 세팅 시 대입 및 계산 과정에서 5분 이상 소요
+                        </div>
+                    </div>
+
+                    <!-- 숏컷 풀이 -->
+                    <div class="concept-card p-5 border-t-4 border-rose-500 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-rose-400 font-bold uppercase tracking-wider block mb-1">강사의 숏컷 풀이</span>
+                            <h3 class="text-base font-bold text-rose-300 mb-2">"수평 접선은 곧바로 차이함수로 세팅하라!"</h3>
+                            <div class="text-xs text-slate-200 space-y-2.5 leading-relaxed">
+                                <p class="bg-rose-950/40 p-2 rounded border border-rose-800/40">
+                                    <b>1. 수평접선 차이함수 세팅:</b><br>
+                                    $(2,3)$과 $(1,3)$을 지나는 접선은 $y=3$ 수평선!<br>
+                                    $\implies \mathbf{f(x) - 3 = (x-2)^2(x-\alpha)}$
+                                </p>
+                                <p><b>2. 평균변화율 = 미분계수 조건:</b><br>
+                                $(-2, f(-2))$와 $(1,3)$을 잇는 평균변화율이 $f'(-2)$와 같음!<br>
+                                $$\frac{3 - f(-2)}{1 - (-2)} = f'(-2)$$</p>
+                                <p><b>3. 대입 30초 컷:</b><br>
+                                $f(-2) = 3 - 16(2+\alpha) \implies \frac{16(2+\alpha)}{3} = 4(8+2\alpha) \implies \mathbf{\alpha = -8}$<br>
+                                $f(x) = (x-2)^2(x+8) + 3 \implies \mathbf{f(0) = 35}$</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-rose-300 bg-rose-900/40 p-2 rounded mt-2">
+                            <i class="fa-solid fa-bolt text-yellow-300 mr-1"></i> 인수분해 차이함수 세팅으로 연립방정식 증발!
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 8: [문항 02] 함정 & 스킵 시그널 -->
+            <div class="slide" data-category="문항 02 | 함정 &amp; 스킵 시그널">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 02 [클리닉] &nbsp;<span class="text-rose-400 text-lg">함정 포인트 &amp; 30초 스킵 시그널</span></h2>
+                <div class="grid grid-cols-2 gap-6 flex-grow items-stretch">
+                    <!-- 함정 포인트 -->
+                    <div class="concept-card p-6 border-t-4 border-amber-500 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="bg-amber-500/20 text-amber-300 p-2 rounded-lg"><i class="fa-solid fa-skull-crossbones text-xl"></i></span>
+                                <h3 class="text-lg font-bold text-amber-300">함정 포인트 (Trap Point)</h3>
+                            </div>
+                            <div class="text-sm text-slate-200 space-y-3 leading-relaxed">
+                                <p class="bg-amber-950/30 p-3 rounded-lg border border-amber-800/30">
+                                    '접선이 $(1,3)$을 지나고 $(2,3)$을 지난다'는 문장을 보자마자 기계적으로 $y-f(-2) = f'(-2)(x+2)$라는 <b>긴 접선 방정식부터 써 내려가는 습관</b>.
+                                </p>
+                                <ul class="list-disc list-inside text-xs text-slate-300 space-y-1.5 pt-2">
+                                    <li>$y$좌표가 $3$으로 동일함($(2,3)$, $(1,3)$)을 간과하고 기울기를 $m$으로 구하려 함.</li>
+                                    <li>수평접선의 특수성($y=3$)을 놓치고 일반 접선으로 다루다 풀이가 꼬임.</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="text-xs text-amber-200 font-semibold bg-amber-900/40 p-2.5 rounded-lg">
+                            <i class="fa-solid fa-lightbulb mr-1"></i> 두 점의 $y$좌표가 같으면 접선은 수평선($y=c$)이며, 이는 최고 조건의 인수분해 힌트다!
+                        </div>
+                    </div>
+
+                    <!-- 30초 스킵 시그널 -->
+                    <div class="concept-card p-6 border-t-4 border-rose-500 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="bg-rose-500/20 text-rose-300 p-2 rounded-lg"><i class="fa-solid fa-hand text-xl"></i></span>
+                                <h3 class="text-lg font-bold text-rose-300">30초 스킵 시그널 (Skip Signal)</h3>
+                            </div>
+                            <div class="text-sm text-slate-200 space-y-3 leading-relaxed">
+                                <p class="bg-rose-950/40 p-3 rounded-lg border border-rose-800/40 font-semibold text-rose-200">
+                                    "$f(x) = x^3 + ax^2 + bx + c$를 시험지에 적는 순간 이 문제는 늪이 됩니다!"
+                                </p>
+                                <div class="text-xs text-slate-300 space-y-2 pt-1">
+                                    <p><b>[스피드 체크리스트]</b></p>
+                                    <p>✔ 수평 접선 $y=3$을 보고 차이함수 $f(x)-3 = (x-2)^2(x-\alpha)$를 30초 안에 세우지 못하면 즉시 패스!</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-xs text-rose-200 font-semibold bg-rose-900/50 p-2.5 rounded-lg">
+                            <i class="fa-solid fa-stopwatch mr-1"></i> 차이함수 인수분해 세팅 불가능 시 30초 내 스킵 대상.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 9: [문항 02] 구조 변형 문제 -->
+            <div class="slide" data-category="문항 02 | 구조 변형">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 02 [구조 변형] &nbsp;<span class="text-rose-400 text-lg">실전 응용 문제</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Structure Extension</div>
+                        <h3 class="problem-text text-lg leading-relaxed mb-6">
+                            최고차항의 계수가 1인 삼차함수 $f(x)$에 대하여 곡선 $y=f(x)$ 위의 점 $(3, 5)$에서의 접선과 곡선 $y=f(x)$ 위의 점 $(-1, f(-1))$에서의 접선이 점 $(0, 5)$에서 만난다. <br><br>
+                            $f(1)$의 값을 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 10: [문항 03] 원문 -->
+            <div class="slide" data-category="문항 03 | 원문">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 03 [원문] &nbsp;<span class="text-rose-400 text-lg">수학Ⅰ | 지수로그함수와 도형 | 2026학년도 6월 모의평가 공통 10번</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Original Question</div>
+                        <h3 class="problem-text text-base leading-relaxed">
+                            실수 $a \;(a>1)$에 대하여 곡선 $y=\log_a(x+3)$이 곡선 $y=\log_a(-x+3)$과 만나는 점을 $\text{A}$, 곡선 $y=\log_a(x+3)$이 $x$축과 만나는 점을 $\text{B}$, 곡선 $y=\log_a(-x+3)$이 $x$축과 만나는 점을 $\text{C}$라 하자. <br><br>
+                            삼각형 $\text{ABC}$가 정삼각형일 때, $a$의 값은?
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 11: [문항 03] 원문 해설 -->
+            <div class="slide" data-category="문항 03 | 원문 해설">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 03 [원문 해설] &nbsp;<span class="text-rose-400 text-lg">정석 vs 숏컷 풀이 비교</span></h2>
+                <div class="grid grid-cols-2 gap-6 flex-grow items-stretch">
+                    <!-- 정석 풀이 -->
+                    <div class="concept-card p-5 border-t-4 border-slate-500 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-slate-400 font-bold uppercase tracking-wider block mb-1">학생들의 돌아가는 정석 풀이</span>
+                            <h3 class="text-base font-bold text-white mb-2">점과 점 사이 거리 공식 대입</h3>
+                            <div class="text-xs text-slate-300 space-y-2 leading-relaxed">
+                                <p>1. 좌표 탐색:<br>
+                                &nbsp;&nbsp;&nbsp;$\text{B}(-2,0), \; \text{C}(2,0) \implies \overline{\text{BC}} = 4$<br>
+                                &nbsp;&nbsp;&nbsp;교점 $\text{A}(0, \log_a 3)$</p>
+                                <p>2. 두 점 $\text{A, B}$ 사이 점과 점 사이 거리 공식 적용:<br>
+                                &nbsp;&nbsp;&nbsp;$\sqrt{(0 - (-2))^2 + (\log_a 3 - 0)^2} = 4$</p>
+                                <p>3. 양변 제곱 연산:<br>
+                                &nbsp;&nbsp;&nbsp;$4 + (\log_a 3)^2 = 16 \implies (\log_a 3)^2 = 12 \implies \log_a 3 = 2\sqrt{3}$</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-slate-400 bg-slate-800/60 p-2 rounded mt-2">
+                            <i class="fa-solid fa-triangle-exclamation text-amber-400 mr-1"></i> 피타고라스 루트 연산으로 불필요한 단계 추가
+                        </div>
+                    </div>
+
+                    <!-- 숏컷 풀이 -->
+                    <div class="concept-card p-5 border-t-4 border-rose-500 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-rose-400 font-bold uppercase tracking-wider block mb-1">강사의 숏컷 풀이</span>
+                            <h3 class="text-base font-bold text-rose-300 mb-2">"정삼각형 = 특수각 비율 ($1:\sqrt{3}:2$)!"</h3>
+                            <div class="text-xs text-slate-200 space-y-3 leading-relaxed">
+                                <p class="bg-rose-950/40 p-2 rounded border border-rose-800/40">
+                                    <b>1. 밑변 길이 측정:</b> $\text{B}(-2,0), \text{C}(2,0) \implies \text{밑변 } = 4$
+                                </p>
+                                <p><b>2. 높이 즉시 도출:</b><br>
+                                정삼각형 밑변이 $4$이면 높이는 $2\sqrt{3}$!<br>
+                                교점 $\text{A}$가 $y$축 위에 있으므로 $\mathbf{y\text{좌표} = 2\sqrt{3}}$</p>
+                                <p><b>3. 지수 전환 20초 컷:</b><br>
+                                $$\log_a 3 = 2\sqrt{3} \implies a^{2\sqrt{3}} = 3 \implies \mathbf{a = 3^{\frac{\sqrt{3}}{6}}}$$</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-rose-300 bg-rose-900/40 p-2 rounded mt-2">
+                            <i class="fa-solid fa-bolt text-yellow-300 mr-1"></i> 거리 공식 없이 정삼각형 비율 관계로 좌표 다이렉트 획득!
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 12: [문항 03] 함정 & 스킵 시그널 -->
+            <div class="slide" data-category="문항 03 | 함정 &amp; 스킵 시그널">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 03 [클리닉] &nbsp;<span class="text-rose-400 text-lg">함정 포인트 &amp; 30초 스킵 시그널</span></h2>
+                <div class="grid grid-cols-2 gap-6 flex-grow items-stretch">
+                    <!-- 함정 포인트 -->
+                    <div class="concept-card p-6 border-t-4 border-amber-500 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="bg-amber-500/20 text-amber-300 p-2 rounded-lg"><i class="fa-solid fa-skull-crossbones text-xl"></i></span>
+                                <h3 class="text-lg font-bold text-amber-300">함정 포인트 (Trap Point)</h3>
+                            </div>
+                            <div class="text-sm text-slate-200 space-y-3 leading-relaxed">
+                                <p class="bg-amber-950/30 p-3 rounded-lg border border-amber-800/30">
+                                    $\text{A, B, C}$ 좌표를 다 구해놓고도 '정삼각형의 높이' 성질을 까먹고 기계적으로 <b>점과 점 사이의 거리 공식(루트 계산)</b>으로 진입하는 습관.
+                                </p>
+                                <ul class="list-disc list-inside text-xs text-slate-300 space-y-1.5 pt-2">
+                                    <li>대칭축이 $y$축임을 알아챘으면서도 높이 = $y$좌표 관계를 쓰지 않는 계산 낭비.</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="text-xs text-amber-200 font-semibold bg-amber-900/40 p-2.5 rounded-lg">
+                            <i class="fa-solid fa-lightbulb mr-1"></i> 도형 문제에서 정삼각형, 직각이등변 삼각형이 나오면 피타고라스 공식 전에 특수각 비율부터 써라!
+                        </div>
+                    </div>
+
+                    <!-- 30초 스킵 시그널 -->
+                    <div class="concept-card p-6 border-t-4 border-rose-500 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="bg-rose-500/20 text-rose-300 p-2 rounded-lg"><i class="fa-solid fa-hand text-xl"></i></span>
+                                <h3 class="text-lg font-bold text-rose-300">30초 스킵 시그널 (Skip Signal)</h3>
+                            </div>
+                            <div class="text-sm text-slate-200 space-y-3 leading-relaxed">
+                                <p class="bg-rose-950/40 p-3 rounded-lg border border-rose-800/40 font-semibold text-rose-200">
+                                    "$x$축 위 두 점 거리가 4인 것을 구했는데 '높이 = $2\sqrt{3}$' 비율이 떠오르지 않는다면 잠시 패스하라!"
+                                </p>
+                                <div class="text-xs text-slate-300 space-y-2 pt-1">
+                                    <p><b>[스피드 체크리스트]</b></p>
+                                    <p>✔ 정삼각형 한 변의 길이 $a \implies$ 높이 $h = \frac{\sqrt{3}}{2}a$ 자동 반사!</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-xs text-rose-200 font-semibold bg-rose-900/50 p-2.5 rounded-lg">
+                            <i class="fa-solid fa-stopwatch mr-1"></i> 특수각 비율 미연상 시 30초 내 스킵 대상.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 13: [문항 03] 구조 변형 문제 -->
+            <div class="slide" data-category="문항 03 | 구조 변형">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 03 [구조 변형] &nbsp;<span class="text-rose-400 text-lg">실전 응용 문제</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Structure Extension</div>
+                        <h3 class="problem-text text-lg leading-relaxed mb-6">
+                            실수 $a \;(a>1)$에 대하여 두 곡선 $y=\log_a(x+4)$와 $y=\log_a(-x+4)$가 만나는 점을 $\text{A}$, 두 곡선이 각각 $x$축과 만나는 점을 $\text{B, C}$라 하자. <br><br>
+                            삼각형 $\text{ABC}$가 정삼각형일 때, $a$의 값은?
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 14: [문항 04] 원문 -->
+            <div class="slide" data-category="문항 04 | 원문">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 04 [원문] &nbsp;<span class="text-rose-400 text-lg">미적분 | 함수의 극한과 도형 | 2025학년도 6월 모의평가 미적분 26번</span></h2>
+                <div class="grid grid-cols-12 gap-6 flex-grow items-center">
+                    <!-- 문제 지문 -->
+                    <div class="col-span-7 problem-box p-6 flex flex-col justify-center h-full">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-2">Original Question</div>
+                        <h3 class="problem-text text-base leading-relaxed">
+                            양수 $t$에 대하여 곡선 $y=e^{x^2}-1 \;(x \ge 0)$이 두 직선 $y=t$, $y=5t$와 만나는 점을 각각 $\text{A, B}$라 하고, 점 $\text{B}$에서 $x$축에 내린 수선의 발을 $\text{C}$라 하자. <br><br>
+                            삼각형 $\text{ABC}$의 넓이를 $S(t)$라 할 때, $\lim_{t\to 0+} \dfrac{S(t)}{t\sqrt{t}}$ 의 값은?
+                        </h3>
+                    </div>
+                    <!-- SVG 그래프 -->
+                    <div class="col-span-5 concept-card p-4 h-full flex flex-col items-center justify-center">
+                        <span class="text-xs text-rose-400 font-bold mb-2">곡선 $y=e^{x^2}-1$과 $\triangle\text{ABC}$ 시각화</span>
+                        <svg viewBox="0 0 320 220" class="w-full h-48">
+                            <!-- 축 -->
+                            <line x1="30" y1="190" x2="300" y2="190" stroke="#64748b" stroke-width="2"/>
+                            <line x1="50" y1="205" x2="50" y2="15" stroke="#64748b" stroke-width="2"/>
+                            
+                            <!-- y=t 및 y=5t 수평선 -->
+                            <line x1="50" y1="145" x2="280" y2="145" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,4"/>
+                            <text x="285" y="148" fill="#94a3b8" font-size="11">y=t</text>
+                            
+                            <line x1="50" y1="55" x2="280" y2="55" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,4"/>
+                            <text x="285" y="58" fill="#94a3b8" font-size="11">y=5t</text>
+                            
+                            <!-- y = e^(x^2) - 1 곡선 (x>=0) -->
+                            <path d="M 50 190 Q 120 185 150 145 T 230 55" fill="none" stroke="#f43f5e" stroke-width="3"/>
+                            
+                            <!-- 점 A (150, 145), 점 B (230, 55), 점 C (230, 190) -->
+                            <!-- 수선 B-C -->
+                            <line x1="230" y1="55" x2="230" y2="190" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="3,3"/>
+                            
+                            <!-- 삼각형 ABC 영역 채우기 -->
+                            <polygon points="150,145 230,55 230,190" fill="rgba(244, 63, 94, 0.25)" stroke="#f43f5e" stroke-width="1.5"/>
+                            
+                            <!-- 점 표기 -->
+                            <circle cx="150" cy="145" r="4" fill="#ffffff"/>
+                            <text x="135" y="140" fill="#f8fafc" font-size="12" font-weight="bold">A</text>
+                            
+                            <circle cx="230" cy="55" r="4" fill="#ffffff"/>
+                            <text x="235" y="50" fill="#f8fafc" font-size="12" font-weight="bold">B</text>
+                            
+                            <circle cx="230" cy="190" r="4" fill="#ffffff"/>
+                            <text x="235" y="205" fill="#f8fafc" font-size="12" font-weight="bold">C</text>
+                            
+                            <!-- 넓이 라벨 -->
+                            <text x="190" y="140" fill="#fca5a5" font-size="13" font-weight="900">S(t)</text>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 15: [문항 04] 원문 해설 -->
+            <div class="slide" data-category="문항 04 | 원문 해설">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 04 [원문 해설] &nbsp;<span class="text-rose-400 text-lg">정석 vs 숏컷 풀이 비교</span></h2>
+                <div class="grid grid-cols-2 gap-6 flex-grow items-stretch">
+                    <!-- 정석 풀이 -->
+                    <div class="concept-card p-5 border-t-4 border-slate-500 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-slate-400 font-bold uppercase tracking-wider block mb-1">학생들의 돌아가는 정석 풀이</span>
+                            <h3 class="text-base font-bold text-white mb-2">로그 식 식조작 &amp; 무리식 유리화</h3>
+                            <div class="text-xs text-slate-300 space-y-2 leading-relaxed">
+                                <p>1. 좌표 설정:<br>
+                                &nbsp;&nbsp;&nbsp;$x_A = \sqrt{\ln(t+1)}, \; x_B = \sqrt{\ln(5t+1)}$</p>
+                                <p>2. 넓이 식 $S(t)$ 작성:<br>
+                                &nbsp;&nbsp;&nbsp;$S(t) = \frac{1}{2} \cdot 4t \cdot (\sqrt{\ln(5t+1)} - \sqrt{\ln(t+1)})$</p>
+                                <p>3. $\lim_{t\to 0+} \frac{2t(\sqrt{\ln(5t+1)} - \sqrt{\ln(t+1)})}{t\sqrt{t}}$ 의 무리식 켤레 곱하기(유리화) 시도하다 식이 대폭발!</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-slate-400 bg-slate-800/60 p-2 rounded mt-2">
+                            <i class="fa-solid fa-triangle-exclamation text-amber-400 mr-1"></i> 로그 극한 공식 변형 시 분모/분자 차수 혼동으로 낭패
+                        </div>
+                    </div>
+
+                    <!-- 숏컷 풀이 -->
+                    <div class="concept-card p-5 border-t-4 border-rose-500 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-rose-400 font-bold uppercase tracking-wider block mb-1">강사의 숏컷 풀이</span>
+                            <h3 class="text-base font-bold text-rose-300 mb-2">"초월함수 극한은 테일러/매클로린 1차 근사!"</h3>
+                            <div class="text-xs text-slate-200 space-y-2.5 leading-relaxed">
+                                <p class="bg-rose-950/40 p-2 rounded border border-rose-800/40">
+                                    <b>근사 공식:</b> $t \to 0$ 일 때 $\mathbf{\ln(1+x) \approx x}$
+                                </p>
+                                <p><b>1. 좌표 다이렉트 근사:</b><br>
+                                $x_A = \sqrt{\ln(t+1)} \mathbf{\approx \sqrt{t}}$<br>
+                                $x_B = \sqrt{\ln(5t+1)} \mathbf{\approx \sqrt{5t}}$</p>
+                                <p><b>2. 넓이 $S(t)$ 근사 식 30초 작성:</b><br>
+                                $$S(t) \approx \frac{1}{2} \cdot 4t \cdot (\sqrt{5t} - \sqrt{t}) = 2t\sqrt{t}(\sqrt{5}-1)$$</p>
+                                <p><b>3. 극한값 직행:</b><br>
+                                $$\lim_{t\to 0+} \frac{2t\sqrt{t}(\sqrt{5}-1)}{t\sqrt{t}} = \mathbf{2(\sqrt{5}-1)}$$</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-rose-300 bg-rose-900/40 p-2 rounded mt-2">
+                            <i class="fa-solid fa-bolt text-yellow-300 mr-1"></i> 루트 켤레 유리화 제로, 단 30초 만에 정답!
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 16: [문항 04] 함정 & 스킵 시그널 -->
+            <div class="slide" data-category="문항 04 | 함정 &amp; 스킵 시그널">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 04 [클리닉] &nbsp;<span class="text-rose-400 text-lg">함정 포인트 &amp; 30초 스킵 시그널</span></h2>
+                <div class="grid grid-cols-2 gap-6 flex-grow items-stretch">
+                    <!-- 함정 포인트 -->
+                    <div class="concept-card p-6 border-t-4 border-amber-500 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="bg-amber-500/20 text-amber-300 p-2 rounded-lg"><i class="fa-solid fa-skull-crossbones text-xl"></i></span>
+                                <h3 class="text-lg font-bold text-amber-300">함정 포인트 (Trap Point)</h3>
+                            </div>
+                            <div class="text-sm text-slate-200 space-y-3 leading-relaxed">
+                                <p class="bg-amber-950/30 p-3 rounded-lg border border-amber-800/30">
+                                    $\lim_{x\to 0} \frac{\ln(1+x)}{x} = 1$ 공식을 맞추려고 $\sqrt{\ln(5t+1)}$ 내부를 $5t$로 나누고 곱하다가 <b>루트 밖 차수 계산 실수</b>를 일으키는 습관.
+                                </p>
+                                <ul class="list-disc list-inside text-xs text-slate-300 space-y-1.5 pt-2">
+                                    <li>무리식 뺄셈이 나왔을 때 억지로 켤레식을 분모/분자에 곱하느라 계산량 폭발.</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="text-xs text-amber-200 font-semibold bg-amber-900/40 p-2.5 rounded-lg">
+                            <i class="fa-solid fa-lightbulb mr-1"></i> $t\to 0$ 극한에서 초월함수는 근사식을 대입한 후 차수를 비교하는 것이 가장 안전하다!
+                        </div>
+                    </div>
+
+                    <!-- 30초 스킵 시그널 -->
+                    <div class="concept-card p-6 border-t-4 border-rose-500 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="bg-rose-500/20 text-rose-300 p-2 rounded-lg"><i class="fa-solid fa-hand text-xl"></i></span>
+                                <h3 class="text-lg font-bold text-rose-300">30초 스킵 시그널 (Skip Signal)</h3>
+                            </div>
+                            <div class="text-sm text-slate-200 space-y-3 leading-relaxed">
+                                <p class="bg-rose-950/40 p-3 rounded-lg border border-rose-800/40 font-semibold text-rose-200">
+                                    "식을 세웠으나 무리식 뺄셈이 나와서 분자/분모 유리화를 하려고 켤레식을 적기 시작했다면 당장 끊어라!"
+                                </p>
+                                <div class="text-xs text-slate-300 space-y-2 pt-1">
+                                    <p><b>[스피드 체크리스트]</b></p>
+                                    <p>✔ $\ln(1+x) \approx x$, $e^x - 1 \approx x$ 근사 치환 30초 내 적용 불가능 시 즉시 스킵!</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-xs text-rose-200 font-semibold bg-rose-900/50 p-2.5 rounded-lg">
+                            <i class="fa-solid fa-stopwatch mr-1"></i> 1차 근사미적용 시 유리화 늪 진입 $\rightarrow$ 스킵 대상.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 17: [문항 04] 구조 변형 문제 -->
+            <div class="slide" data-category="문항 04 | 구조 변형">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 04 [구조 변형] &nbsp;<span class="text-rose-400 text-lg">실전 응용 문제</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Structure Extension</div>
+                        <h3 class="problem-text text-lg leading-relaxed mb-6">
+                            양수 $t$에 대하여 곡선 $y=e^{2x^2}-1 \;(x \ge 0)$이 두 직선 $y=t$, $y=3t$와 만나는 점을 각각 $\text{A, B}$라 하고, 점 $\text{B}$에서 $x$축에 내린 수선의 발을 $\text{C}$라 하자. <br><br>
+                            삼각형 $\text{ABC}$의 넓이를 $S(t)$라 할 때, $\lim_{t\to 0+} \dfrac{S(t)}{t\sqrt{t}}$ 의 값을 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 18: [문항 05] 원문 -->
+            <div class="slide" data-category="문항 05 | 원문">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 05 [원문] &nbsp;<span class="text-rose-400 text-lg">수학Ⅱ | 함수의 극한과 연속 | 2024학년도 수능 공통 14번</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Original Question</div>
+                        <h3 class="problem-text text-base leading-relaxed">
+                            두 자연수 $a, b$에 대하여 함수 $f(x)$는 <br>
+                            $x \le 2$일 때 $f(x) = 2x^3 - 6x + 1$, <br>
+                            $x > 2$일 때 $f(x) = a(x-2)(x-b) + 9$이다. <br><br>
+                            실수 $t$에 대하여 $y=f(x)$와 $y=t$가 만나는 점의 개수를 $g(t)$라 하자. <br>
+                            $g(k) + \lim_{t\to k-}g(t) + \lim_{t\to k+}g(t) = 9$를 만족시키는 실수 $k$의 개수가 1이 되도록 하는 두 자연수 $a,b$ 순서쌍에 대해 $a+b$의 최댓값은?
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 19: [문항 05] 원문 해설 -->
+            <div class="slide" data-category="문항 05 | 원문 해설">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 05 [원문 해설] &nbsp;<span class="text-rose-400 text-lg">정석 vs 숏컷 풀이 비교</span></h2>
+                <div class="grid grid-cols-2 gap-6 flex-grow items-stretch">
+                    <!-- 정석 풀이 -->
+                    <div class="concept-card p-5 border-t-4 border-slate-500 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-slate-400 font-bold uppercase tracking-wider block mb-1">학생들의 돌아가는 정석 풀이</span>
+                            <h3 class="text-base font-bold text-white mb-2">그래프 케이스 전수조사</h3>
+                            <div class="text-xs text-slate-300 space-y-2 leading-relaxed">
+                                <p>1. $x \le 2$ 삼차함수 극대 $( -1, 5 )$, 극소 $( 1, -3 )$ 파악</p>
+                                <p>2. $x > 2$ 이차함수 꼭짓점 축의 위치($b$의 범위) 분류:<br>
+                                &nbsp;&nbsp;&nbsp;• 축 $\le 2$ 인 경우, 축 $> 2$ 인 경우 나누기</p>
+                                <p>3. $t$값 움직이며 좌극한, 우극한, 함숫값 합이 9인 조합 전수조사하며 표 작성</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-slate-400 bg-slate-800/60 p-2 rounded mt-2">
+                            <i class="fa-solid fa-triangle-exclamation text-amber-400 mr-1"></i> 전수조사 시 7~10분 소요 및 실수 가능성 극대
+                        </div>
+                    </div>
+
+                    <!-- 숏컷 풀이 -->
+                    <div class="concept-card p-5 border-t-4 border-rose-500 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-rose-400 font-bold uppercase tracking-wider block mb-1">강사의 숏컷 풀이</span>
+                            <h3 class="text-base font-bold text-rose-300 mb-2">"불연속 극한 합 특이점 = 무조건 극값 높이 일치!"</h3>
+                            <div class="text-xs text-slate-200 space-y-2 leading-relaxed">
+                                <p class="bg-rose-950/40 p-2 rounded border border-rose-800/40">
+                                    교점 개수의 합이 9가 되는 $k$가 <b>'오직 1개'</b> 존재하려면 이차함수 꼭짓점 최소 높이가 삼차함수의 기존 극값 높이 <b>$y=5$ 또는 $y=-3$과 정확히 일치</b>해야 불연속점이 병합됨!
+                                </p>
+                                <p><b>꼭짓점 높이 식:</b> $9 - \frac{a(b-2)^2}{4}$</p>
+                                <p><b>Case 1 (높이 5):</b> $a(b-2)^2 = 16 \implies b=3, a=16 \implies a+b = 19$</p>
+                                <p><b>Case 2 (높이 -3):</b> $a(b-2)^2 = 48 \implies b=3, a=48 \implies \mathbf{a+b = 51}$</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-rose-300 bg-rose-900/40 p-2 rounded mt-2">
+                            <i class="fa-solid fa-bolt text-yellow-300 mr-1"></i> 극값 높이 병합 조건으로 계산량 1/3 축소!
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 20: [문항 05] 함정 & 스킵 시그널 -->
+            <div class="slide" data-category="문항 05 | 함정 &amp; 스킵 시그널">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 05 [클리닉] &nbsp;<span class="text-rose-400 text-lg">함정 포인트 &amp; 30초 스킵 시그널</span></h2>
+                <div class="grid grid-cols-2 gap-6 flex-grow items-stretch">
+                    <!-- 함정 포인트 -->
+                    <div class="concept-card p-6 border-t-4 border-amber-500 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="bg-amber-500/20 text-amber-300 p-2 rounded-lg"><i class="fa-solid fa-skull-crossbones text-xl"></i></span>
+                                <h3 class="text-lg font-bold text-amber-300">함정 포인트 (Trap Point)</h3>
+                            </div>
+                            <div class="text-sm text-slate-200 space-y-3 leading-relaxed">
+                                <p class="bg-amber-950/30 p-3 rounded-lg border border-amber-800/30">
+                                    이차함수의 축 위치가 $2$보다 작은 경우와 큰 경우를 세분화하여, <b>나오지도 않을 불필요한 그래프 개형까지 전부 확인</b>하며 시험 시간을 탕진하는 습관.
+                                </p>
+                                <ul class="list-disc list-inside text-xs text-slate-300 space-y-1.5 pt-2">
+                                    <li>'실수 $k$의 개수가 1'이라는 유일성 조건이 극값 일치(높이 공유)를 의미한다는 기하적 구조를 보지 못함.</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="text-xs text-amber-200 font-semibold bg-amber-900/40 p-2.5 rounded-lg">
+                            <i class="fa-solid fa-lightbulb mr-1"></i> 개수 합 조건 문제에서 '유일한 $k$' 조건은 극값 높이의 중복(일치)에서 발생한다!
+                        </div>
+                    </div>
+
+                    <!-- 30초 스킵 시그널 -->
+                    <div class="concept-card p-6 border-t-4 border-rose-500 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="bg-rose-500/20 text-rose-300 p-2 rounded-lg"><i class="fa-solid fa-hand text-xl"></i></span>
+                                <h3 class="text-lg font-bold text-rose-300">30초 스킵 시그널 (Skip Signal)</h3>
+                            </div>
+                            <div class="text-sm text-slate-200 space-y-3 leading-relaxed">
+                                <p class="bg-rose-950/40 p-3 rounded-lg border border-rose-800/40 font-semibold text-rose-200">
+                                    "교점 개수 합이 9가 나오는 상황을 시각적으로 상상하지 못하고, $t$값의 범위를 수식으로 쪼개서 개수를 세려고 한다면 과감히 패스하라!"
+                                </p>
+                                <div class="text-xs text-slate-300 space-y-2 pt-1">
+                                    <p><b>[스피드 체크리스트]</b></p>
+                                    <p>✔ 극값에서의 교점 개수 변화 특이점 직관 미발동 시 스킵!</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-xs text-rose-200 font-semibold bg-rose-900/50 p-2.5 rounded-lg">
+                            <i class="fa-solid fa-stopwatch mr-1"></i> 극값 높이 병합 직관 미발동 시 30초 내 스킵 대상.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 21: [문항 05] 구조 변형 문제 -->
+            <div class="slide" data-category="문항 05 | 구조 변형">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 05 [구조 변형] &nbsp;<span class="text-rose-400 text-lg">실전 응용 문제</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Structure Extension</div>
+                        <h3 class="problem-text text-lg leading-relaxed mb-6">
+                            두 자연수 $a, b$에 대하여 함수 $f(x)$가 <br>
+                            $x \le 2$일 때 $f(x) = x^3 - 3x + 2$, <br>
+                            $x > 2$일 때 $f(x) = a(x-2)(x-b) + 6$이다. <br><br>
+                            실수 $t$에 대하여 $y=f(x)$와 $y=t$가 만나는 점의 개수를 $g(t)$라 하자. <br>
+                            $g(k) + \lim_{t\to k-}g(t) + \lim_{t\to k+}g(t) = 9$를 만족시키는 실수 $k$의 개수가 1이 되도록 하는 두 자연수 $a, b$의 순서쌍 $(a, b)$에 대하여 $a+b$의 최댓값을 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 22: 정답표 (Answer Key) -->
+            <div class="slide" data-category="정답표 (Answer Key)">
+                <h2 class="text-2xl font-extrabold text-white mb-4">준킬러 특강 클리닉 &nbsp;<span class="text-rose-400 text-lg">전체 정답표 (Answer Key)</span></h2>
+                <div class="concept-card p-8 flex-grow flex flex-col justify-between">
+                    <div>
+                        <span class="text-xs text-rose-400 font-bold uppercase tracking-wider block mb-4">원문 기출 &amp; 구조 변형 문제 정답 종합</span>
+                        <div class="overflow-hidden rounded-xl border border-slate-700/60">
+                            <table class="w-full text-left text-sm text-slate-200">
+                                <thead class="bg-slate-800/90 text-rose-300 font-bold text-xs uppercase border-b border-slate-700">
+                                    <tr>
+                                        <th class="py-3.5 px-6">문항 번호</th>
+                                        <th class="py-3.5 px-6">단원 / 출처</th>
+                                        <th class="py-3.5 px-6 text-center">원문 기출 정답</th>
+                                        <th class="py-3.5 px-6 text-center">구조 변형 문제 정답</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-800 text-xs">
+                                    <tr class="hover:bg-slate-800/40">
+                                        <td class="py-3.5 px-6 font-bold text-white">문항 01</td>
+                                        <td class="py-3.5 px-6 text-slate-300">수학Ⅱ (정적분과 넓이)</td>
+                                        <td class="py-3.5 px-6 text-center font-bold text-rose-400">$k = \dfrac{4}{3}$</td>
+                                        <td class="py-3.5 px-6 text-center font-bold text-emerald-400">$a = \dfrac{3}{2}$</td>
+                                    </tr>
+                                    <tr class="hover:bg-slate-800/40">
+                                        <td class="py-3.5 px-6 font-bold text-white">문항 02</td>
+                                        <td class="py-3.5 px-6 text-slate-300">수학Ⅱ (미분과 차이함수)</td>
+                                        <td class="py-3.5 px-6 text-center font-bold text-rose-400">$f(0) = 35$</td>
+                                        <td class="py-3.5 px-6 text-center font-bold text-emerald-400">$f(1) = 5$</td>
+                                    </tr>
+                                    <tr class="hover:bg-slate-800/40">
+                                        <td class="py-3.5 px-6 font-bold text-white">문항 03</td>
+                                        <td class="py-3.5 px-6 text-slate-300">수학Ⅰ (지수로그함수와 도형)</td>
+                                        <td class="py-3.5 px-6 text-center font-bold text-rose-400">$a = 3^{\frac{\sqrt{3}}{6}}$</td>
+                                        <td class="py-3.5 px-6 text-center font-bold text-emerald-400">$a = 2^{\frac{2\sqrt{3}}{9}}$</td>
+                                    </tr>
+                                    <tr class="hover:bg-slate-800/40">
+                                        <td class="py-3.5 px-6 font-bold text-white">문항 04</td>
+                                        <td class="py-3.5 px-6 text-slate-300">미적분 (함수의 극한과 도형)</td>
+                                        <td class="py-3.5 px-6 text-center font-bold text-rose-400">$2(\sqrt{5}-1)$</td>
+                                        <td class="py-3.5 px-6 text-center font-bold text-emerald-400 font-mono">\(\frac{\sqrt{6}-\sqrt{2}}{2}\)</td>
+                                    </tr>
+                                    <tr class="hover:bg-slate-800/40">
+                                        <td class="py-3.5 px-6 font-bold text-white">문항 05</td>
+                                        <td class="py-3.5 px-6 text-slate-300">수학Ⅱ (함수의 극한과 연속)</td>
+                                        <td class="py-3.5 px-6 text-center font-bold text-rose-400">$a+b = 51$</td>
+                                        <td class="py-3.5 px-6 text-center font-bold text-emerald-400">$a+b = 27$</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="text-center text-xs text-slate-400 border-t border-slate-700/60 pt-4">
+                        수능 수학 고득점을 위한 준킬러 스피드 &amp; 숏컷 클리닉 특강 자료
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer / Controls -->
+        <div class="flex justify-between items-center z-20 pt-3 border-t border-slate-700/50 mx-8 mb-5 no-print text-xs">
+            <button onclick="prevSlide()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg font-bold transition">
+                <i class="fa-solid fa-chevron-left mr-1.5"></i> 이전 슬라이드
+            </button>
+            <div class="text-slate-400 font-medium">
+                <span id="current-slide-num" class="text-rose-400 font-bold">1</span> / <span id="total-slide-num">22</span>
+            </div>
+            <button onclick="nextSlide()" class="bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-lg font-bold transition">
+                다음 슬라이드 <i class="fa-solid fa-chevron-right ml-1.5"></i>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const totalSlides = slides.length;
+        const currentSlideNumEl = document.getElementById('current-slide-num');
+        const totalSlideNumEl = document.getElementById('total-slide-num');
+        const categoryEl = document.getElementById('slide-category');
+
+        totalSlideNumEl.textContent = totalSlides;
+
+        function showSlide(index) {
+            if (index < 0) index = 0;
+            if (index >= totalSlides) index = totalSlides - 1;
+
+            slides.forEach((slide, idx) => {
+                if (idx === index) {
+                    slide.classList.add('active');
+                } else {
+                    slide.classList.remove('active');
+                }
+            });
+
+            currentSlide = index;
+            currentSlideNumEl.textContent = currentSlide + 1;
+            
+            const category = slides[currentSlide].getAttribute('data-category') || '';
+            categoryEl.textContent = category;
+
+            // MathJax 타입셋 리렌더링
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                window.MathJax.typesetPromise([slides[currentSlide]]);
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 0) {
+                showSlide(currentSlide - 1);
+            }
+        }
+
+        function nextSlide() {
+            if (currentSlide < totalSlides - 1) {
+                showSlide(currentSlide + 1);
+            }
+        }
+
+        // 초기 슬라이드 렌더링
+        showSlide(0);
+    </script>
+</body>
+</html>

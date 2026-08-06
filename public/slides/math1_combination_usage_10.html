@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>베이직쎈 공통수학1 - 10.순열과 조합(조합의 활용)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true
+            },
+            options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'] }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        .presentation-deck { position: relative; width: 1280px; height: 720px; background: radial-gradient(circle at 10% 20%, #292524 0%, #0f172a 100%); border: 1px solid rgba(255, 255, 255, 0.08); margin: 20px auto; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); border-left: 10px solid #f59e0b; }
+        .slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 42px 70px; display: none; flex-direction: column; justify-content: space-between; z-index: 1; background: transparent; box-sizing: border-box; }
+        .slide.active { display: flex; z-index: 10; }
+
+        .concept-card { background: rgba(41, 37, 36, 0.75); backdrop-filter: blur(10px); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 18px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); }
+        .formula-box { background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.22); border-radius: 14px; }
+        .idea-box { background: linear-gradient(135deg, rgba(120, 53, 15, 0.35) 0%, rgba(41, 37, 36, 0.6) 100%); border: 1px solid rgba(251, 191, 36, 0.35); border-radius: 14px; }
+        .problem-box { background: linear-gradient(135deg, rgba(24, 24, 27, 0.95) 0%, rgba(41, 37, 36, 0.85) 100%); border-left: 8px solid #f59e0b; border-top: 1px solid rgba(245, 158, 11, 0.2); border-right: 1px solid rgba(255, 255, 255, 0.05); border-bottom: 1px solid rgba(255, 255, 255, 0.05); border-radius: 0 18px 18px 0; }
+        .problem-text { font-size: 1.35rem; font-weight: 700; color: #fef3c7; line-height: 1.75; word-break: keep-all; }
+        .num-badge { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background: #d97706; color: white; font-weight: 900; font-size: 1.1rem; flex-shrink: 0; }
+        .type-badge { display: inline-flex; align-items: center; gap: 6px; background: #78350f; color: #fde68a; font-weight: 800; font-size: 0.75rem; padding: 4px 12px; border-radius: 9999px; letter-spacing: 0.03em; }
+
+        @media print {
+            body { background-color: #ffffff !important; margin: 0 !important; padding: 0 !important; }
+            .presentation-deck { width: 1280px !important; height: auto !important; box-shadow: none !important; border: none !important; margin: 0 !important; overflow: visible !important; display: block !important; }
+            .slide { position: relative !important; display: flex !important; width: 1280px !important; height: 720px !important; page-break-after: always !important; page-break-inside: avoid !important; background: #0f172a !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="presentation-deck" id="deck">
+        <!-- Top Bar -->
+        <div class="flex justify-between items-center z-20 pb-3 border-b border-amber-900/40 mx-8 mt-6 no-print">
+            <div class="flex items-center gap-3">
+                <span class="bg-amber-600 text-white text-xs font-black px-3 py-1 rounded-md uppercase">베이직쎈 | 예비고1</span>
+                <span class="text-slate-300 text-sm font-medium">Ⅳ. 순열과 조합 &gt; 10. 순열과 조합 &gt; 조합의 활용</span>
+            </div>
+            <div class="text-right flex items-center gap-4">
+                <span class="text-xs text-amber-400 font-bold uppercase tracking-wider" id="slide-category">단원 소개</span>
+                <span class="text-xs text-slate-400 font-semibold bg-slate-800/80 px-2.5 py-1 rounded-md border border-slate-700" id="slide-counter">1 / 11</span>
+            </div>
+        </div>
+
+        <!-- Slide Container -->
+        <div class="relative flex-grow my-2 overflow-hidden" id="slide-container">
+
+            <!-- Slide 1: Cover -->
+            <div class="slide active" data-category="단원 소개">
+                <div class="flex-grow flex flex-col justify-center items-start">
+                    <span class="text-amber-400 font-bold text-lg tracking-widest mb-4">베이직쎈 공통수학1 &nbsp;|&nbsp; Ⅳ. 순열과 조합</span>
+                    <h1 class="text-7xl font-black text-white leading-tight mb-6">조합의 활용</h1>
+                    <div class="h-2 w-40 bg-amber-500 rounded-full mb-8"></div>
+                    <p class="text-2xl text-slate-300 font-medium">조합의 뜻과 공식부터 특정 조건, 도형의 개수까지</p>
+                    <p class="text-lg text-slate-500 font-medium mt-2">개념 62 ~ 64 · 교재 p.163 ~ p.172 · 대표유형 098 ~ 104</p>
+                </div>
+            </div>
+
+            <!-- Slide 2: 개념 62 - 조합 -->
+            <div class="slide" data-category="개념 이해">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">62</span>
+                        <h2 class="text-3xl font-black text-white">조합</h2>
+                    </div>
+                    <p class="text-lg text-slate-100 leading-relaxed">서로 다른 $n$개에서 순서를 생각하지 않고 $r\,(0 \lt r\le n)$개를 택하는 것을 $n$개에서 $r$개를 택하는 <span class="text-amber-300 font-bold">조합</span>이라 하고, 이 조합의 수를 기호로 ${}_n\mathrm{C}_r$와 같이 나타낸다.</p>
+                    <div class="formula-box py-4 px-8 text-center">
+                        <p class="text-2xl text-white font-bold">$${}_n\mathrm{C}_r=\dfrac{{}_n\mathrm{P}_r}{r!}=\dfrac{n!}{r!(n-r)!}\ (0\le r\le n),\quad {}_n\mathrm{C}_0=1,\ {}_n\mathrm{C}_n=1$$</p>
+                    </div>
+                    <p class="text-lg text-slate-100">조합의 수의 성질: ${}_n\mathrm{C}_r={}_n\mathrm{C}_{n-r}\ (0\le r\le n)$, &nbsp; ${}_n\mathrm{C}_r={}_{n-1}\mathrm{C}_r+{}_{n-1}\mathrm{C}_{r-1}\ (1\le r \lt n)$</p>
+                    <div class="idea-box p-4 flex items-start gap-3">
+                        <i class="fa-solid fa-lightbulb text-amber-300 text-xl mt-1"></i>
+                        <p class="text-base text-amber-100 leading-relaxed"><b>직관적 아이디어</b> — 조합은 "순열에서 순서 차이를 나눠준 것"이다. $r$개를 뽑아 일렬로 세우면 $r!$가지 순서가 생기는데, 조합은 그 순서를 무시하므로 ${}_n\mathrm{P}_r$을 $r!$로 나누면 된다. 또 ${}_n\mathrm{C}_r={}_n\mathrm{C}_{n-r}$은 "$r$개를 뽑는 것 = 나머지 $(n-r)$개를 남기는 것"과 같다는 뜻이므로, 예를 들어 $10$개 중 $8$개를 뽑는 경우의 수는 계산 없이 곧장 $10$개 중 $2$개를 안 뽑는 경우의 수 ${}_{10}\mathrm{C}_2=45$로 바꿔 풀면 된다.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 3: 개념 63 - 특정한 조건이 있는 조합의 수 -->
+            <div class="slide" data-category="개념 이해">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">63</span>
+                        <h2 class="text-3xl font-black text-white">특정한 조건이 있는 조합의 수</h2>
+                    </div>
+                    <div class="formula-box py-4 px-8 text-lg text-white font-bold leading-loose">
+                        <p>① 특정한 것을 포함하는 경우 &rArr; 특정한 것을 이미 뽑았다고 생각하고 나머지에서 필요한 것을 뽑는다.</p>
+                        <p>② 특정한 것을 포함하지 않는 경우 &rArr; 전체에서 특정한 것을 제외하고 뽑는다.</p>
+                    </div>
+                    <p class="text-lg text-slate-100">뽑아서 나열하는 경우의 수: 서로 다른 $m$개 중에서 $r$개, 서로 다른 $n$개 중에서 $s$개를 뽑아서 일렬로 나열하는 경우의 수는</p>
+                    <div class="formula-box py-3 px-8 text-center text-2xl text-white font-bold">
+                        $${}_m\mathrm{C}_r\cdot{}_n\mathrm{C}_s\cdot(r+s)!$$
+                    </div>
+                    <div class="idea-box p-4 flex items-start gap-3">
+                        <i class="fa-solid fa-lightbulb text-amber-300 text-xl mt-1"></i>
+                        <p class="text-base text-amber-100 leading-relaxed"><b>직관적 아이디어</b> — "확정된 자리는 계산에서 아예 빼버려라." 특정 인물을 반드시 포함시킨다는 것은 그 사람의 자리가 이미 결정되어 있다는 뜻이므로, 남은 인원·자리 수만 조합으로 세면 된다. 반대로 제외 조건은 애초에 후보군 명단에서 그 사람을 지우고 시작하면 그만이다. "뽑기(조합)"와 "줄세우기(순열)"는 완전히 다른 단계이므로, 뽑는 수(${}_m\mathrm{C}_r\cdot{}_n\mathrm{C}_s$)와 나열하는 수($(r+s)!$)를 곱하는 순간까지 절대 헷갈리지 말 것.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 4: 개념 64 - 도형의 개수 -->
+            <div class="slide" data-category="개념 이해">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">64</span>
+                        <h2 class="text-3xl font-black text-white">도형의 개수</h2>
+                    </div>
+                    <p class="text-base text-slate-300">서로 다른 $n$개의 점 중에서 어느 세 점도 한 직선 위에 있지 않을 때, 주어진 점을 이어서 만들 수 있는</p>
+                    <div class="formula-box py-3 px-8 text-lg text-white font-bold leading-loose">
+                        <p>① 직선의 개수 &rArr; $n$개의 점 중에서 서로 다른 $2$개의 점을 택한다 &rArr; ${}_n\mathrm{C}_2$</p>
+                        <p>② 삼각형의 개수 &rArr; ${}_n\mathrm{C}_3$, &nbsp; 사각형의 개수 &rArr; ${}_n\mathrm{C}_4$</p>
+                    </div>
+                    <p class="text-base text-slate-300">$m$개의 평행한 직선과 $n$개의 평행한 직선이 만날 때, 만들 수 있는 평행사변형의 개수:</p>
+                    <div class="formula-box py-3 px-8 text-center text-2xl text-white font-bold">
+                        $${}_m\mathrm{C}_2\cdot{}_n\mathrm{C}_2$$
+                    </div>
+                    <div class="idea-box p-4 flex items-start gap-3">
+                        <i class="fa-solid fa-lightbulb text-amber-300 text-xl mt-1"></i>
+                        <p class="text-sm text-amber-100 leading-relaxed"><b>직관적 아이디어</b> — 도형을 일일이 그리지 말고 "꼭짓점을 몇 개 뽑을까"만 생각하라. 직선은 점 2개, 삼각형은 점 3개, 사각형은 점 4개를 뽑는 순간 도형 하나가 자동으로 정해지는 조합 문제일 뿐이다. 평행사변형도 마찬가지: 가로 평행선 중 2개 + 세로 평행선 중 2개를 고르는 순간 네 변이 자동으로 완성되므로, 공식이 왜 곱셈(${}_m\mathrm{C}_2\times{}_n\mathrm{C}_2$)인지 그림 한 번이면 바로 납득된다.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 5: 유형 098 대표문제 -->
+            <div class="slide" data-category="대표문제 · 유형098">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">01</span>
+                        <div class="flex flex-col gap-1">
+                            <span class="type-badge">유형 098 · ${}_n\mathrm{C}_r$의 계산</span>
+                            <h2 class="text-2xl font-black text-white">대표문제</h2>
+                        </div>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">등식 ${}_{n+1}\mathrm{C}_2-{}_n\mathrm{C}_2=8$을 만족시키는 자연수 $n$의 값을 구하시오.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 6: 유형 099 대표문제 -->
+            <div class="slide" data-category="대표문제 · 유형099">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">04</span>
+                        <div class="flex flex-col gap-1">
+                            <span class="type-badge">유형 099 · 조합의 수</span>
+                            <h2 class="text-2xl font-black text-white">대표문제</h2>
+                        </div>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">테니스 대회에 참가한 $9$명의 선수가 각각 다른 선수와 서로 한 번씩 겨루는 리그전 방식으로 경기를 할 때, 이 대회의 전체 경기 수를 구하시오.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 7: 유형 100 대표문제 -->
+            <div class="slide" data-category="대표문제 · 유형100">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">08</span>
+                        <div class="flex flex-col gap-1">
+                            <span class="type-badge">유형 100 · 특정한 것을 포함하거나 포함하지 않는 조합의 수</span>
+                            <h2 class="text-2xl font-black text-white">대표문제</h2>
+                        </div>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">지아와 형기를 포함한 $10$명의 학생 중에서 $4$명의 대표를 뽑을 때, 지아와 형기를 반드시 포함하여 뽑는 경우의 수를 구하시오.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 8: 유형 101 대표문제 -->
+            <div class="slide" data-category="대표문제 · 유형101">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">11</span>
+                        <div class="flex flex-col gap-1">
+                            <span class="type-badge">유형 101 · '적어도'의 조건이 있는 조합의 수</span>
+                            <h2 class="text-2xl font-black text-white">대표문제</h2>
+                        </div>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">선생님 $4$명과 학생 $5$명 중에서 $3$명을 뽑을 때, 선생님이 적어도 $1$명 포함되도록 뽑는 경우의 수를 구하시오.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 9: 유형 102 대표문제 -->
+            <div class="slide" data-category="대표문제 · 유형102">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">14</span>
+                        <div class="flex flex-col gap-1">
+                            <span class="type-badge">유형 102 · 뽑아서 나열하는 경우의 수</span>
+                            <h2 class="text-2xl font-black text-white">대표문제</h2>
+                        </div>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">서로 다른 자두 $3$개, 참외 $2$개, 키위 $3$개 중에서 자두 $2$개, 참외 $1$개, 키위 $2$개를 골라서 $5$명의 학생에게 각각 하나씩 나누어주는 경우의 수를 구하시오.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 10: 유형 103 대표문제 -->
+            <div class="slide" data-category="대표문제 · 유형103">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">17</span>
+                        <div class="flex flex-col gap-1">
+                            <span class="type-badge">유형 103 · 직선의 개수</span>
+                            <h2 class="text-2xl font-black text-white">대표문제</h2>
+                        </div>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">한 평면 위에 있는 서로 다른 $7$개의 점 중에서 어느 세 점도 한 직선 위에 있지 않을 때, 주어진 점을 이어서 만들 수 있는 서로 다른 직선의 개수를 구하시오.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 11: 유형 104 대표문제 -->
+            <div class="slide" data-category="대표문제 · 유형104">
+                <div class="flex-grow flex flex-col justify-center gap-6">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">20</span>
+                        <div class="flex flex-col gap-1">
+                            <span class="type-badge">유형 104 · 다각형의 개수</span>
+                            <h2 class="text-2xl font-black text-white">대표문제</h2>
+                        </div>
+                    </div>
+                    <div class="problem-box p-8">
+                        <div class="grid grid-cols-12 gap-6 items-center">
+                            <div class="col-span-8">
+                                <p class="problem-text">오른쪽 그림과 같이 원 위에 $6$개의 점이 있을 때, 이 중에서 $4$개의 점을 꼭짓점으로 하는 사각형의 개수는?</p>
+                                <p class="problem-text mt-4">① $6$ &nbsp; ② $9$ &nbsp; ③ $12$ &nbsp; ④ $15$ &nbsp; ⑤ $18$</p>
+                            </div>
+                            <div class="col-span-4 flex items-center justify-center">
+                                <svg viewBox="0 0 200 200" class="w-40 h-40">
+                                    <circle cx="100" cy="100" r="75" fill="none" stroke="#78716c" stroke-width="2"/>
+                                    <circle cx="175" cy="100" r="5" fill="#fbbf24"/>
+                                    <circle cx="137.5" cy="35.1" r="5" fill="#fbbf24"/>
+                                    <circle cx="62.5" cy="35.1" r="5" fill="#fbbf24"/>
+                                    <circle cx="25" cy="100" r="5" fill="#fbbf24"/>
+                                    <circle cx="62.5" cy="164.9" r="5" fill="#fbbf24"/>
+                                    <circle cx="137.5" cy="164.9" r="5" fill="#fbbf24"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer Control -->
+        <div class="flex justify-between items-center z-20 pt-3 border-t border-amber-900/40 mx-8 mb-6 no-print">
+            <button onclick="prevSlide()" class="bg-slate-800/80 hover:bg-amber-600 text-slate-200 hover:text-white font-bold text-sm px-5 py-2 rounded-xl transition border border-slate-700">
+                <i class="fa-solid fa-chevron-left"></i> 이전 슬라이드
+            </button>
+            <div class="text-slate-400 text-xs font-semibold tracking-wider">
+                HIGH SCHOOL MATH CLASS PPT
+            </div>
+            <button onclick="nextSlide()" class="bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm px-5 py-2 rounded-xl transition shadow-md">
+                다음 슬라이드 <i class="fa-solid fa-chevron-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const counterEl = document.getElementById('slide-counter');
+        const categoryEl = document.getElementById('slide-category');
+
+        function updateSlide() {
+            slides.forEach((slide, idx) => slide.classList.toggle('active', idx === currentSlide));
+            if (counterEl) counterEl.textContent = `${currentSlide + 1} / ${slides.length}`;
+            if (categoryEl && slides[currentSlide]) categoryEl.textContent = slides[currentSlide].getAttribute('data-category') || '수업 자료';
+            if (window.MathJax && window.MathJax.typesetPromise) window.MathJax.typesetPromise();
+        }
+        function prevSlide() { if (currentSlide > 0) { currentSlide--; updateSlide(); } }
+        function nextSlide() { if (currentSlide < slides.length - 1) { currentSlide++; updateSlide(); } }
+        updateSlide();
+    </script>
+</body>
+</html>

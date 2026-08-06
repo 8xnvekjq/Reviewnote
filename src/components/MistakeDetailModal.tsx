@@ -1,26 +1,38 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import type { MistakeEntry, ReviewState } from '../types';
-import { ROOT_CAUSE_OPTIONS, MATH_CURRICULUM, GRADE_LIST } from '../types';
+import { ROOT_CAUSE_OPTIONS, MATH_CURRICULUM, GRADE_LIST, SOLVING_PLACEHOLDER_TEXT } from '../types';
 import { LaTeXRenderer } from './LaTeXRenderer';
 import { formatDate } from '../utils/date';
 import { supabase } from '../services/supabase';
+import { GACHA_ITEMS, getRarityTheme } from '../utils/gachaCatalog';
+import { CatPawIcon } from './CatPawIcon';
+import { MistakeScaffoldingDrawer } from './MistakeScaffoldingDrawer';
 
 interface MistakeDetailModalProps {
   selectedEntry: MistakeEntry;
   allEntries?: MistakeEntry[];
   peerActivities?: any[];
   isAnalyzing: boolean;
+  averageWaitMs?: number | null; // diagnosis_stats 테이블 기반 평균 진단 소요시간(ms) — 오답 카드 삭제와 무관하게 유지됨
   youtubeLectures?: any[]; // DB로부터 가져온 55개 강의 마스터 리스트
   onClose: () => void;
   onDeleteMistake: (id: string, e: React.MouseEvent) => void;
   onStartAnalysis: (entry: MistakeEntry) => void;
   onUpdateReviews: (id: string, newReviews: ReviewState[]) => void;
   onUpdateEntry: (updated: MistakeEntry) => void;
+  onSelectEntry?: (entry: MistakeEntry | null) => void;
+  isReviewSession?: boolean;
+  equippedStamp?: string;
+  profilesStampMap?: Record<string, string>;
+  currentUserId?: string;
+  isAdmin?: boolean;
+  aiPersonaName?: string; // AI 이름 변경권으로 바꾼 커스텀 AI 페르소나 이름 (없으면 기본값 '밤티')
+  comboBoosterExpiresAt?: string | null; // 콤보 부스터 5배 버프 만료시각 (서버 profiles 기준)
 }
 
-const INITIAL_PHRASES = [
-  '밤티가 문제 이미지를 열심히 판독하고 있어요... 🔍',
-  '밤티가 수학 수식과 기호들을 꼼꼼하게 정리하고 있어요. ✍️'
+const getInitialPhrases = (personaName: string) => [
+  `${personaName}가 문제 이미지를 열심히 판독하고 있어요... 🔍`,
+  `${personaName}가 수학 수식과 기호들을 꼼꼼하게 정리하고 있어요. ✍️`
 ];
 
 export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
@@ -28,16 +40,31 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   allEntries = [],
   peerActivities = [],
   isAnalyzing,
+  averageWaitMs = null,
   youtubeLectures = [],
   onClose,
   onDeleteMistake,
   onStartAnalysis,
   onUpdateReviews,
   onUpdateEntry,
+  onSelectEntry,
+  isReviewSession = false,
+  equippedStamp,
+  profilesStampMap = {},
+  currentUserId = '',
+  comboBoosterExpiresAt,
+  isAdmin = false,
+  aiPersonaName = '밤티',
 }) => {
-  const [revealedHintCount, setRevealedHintCount] = React.useState(0);
+  const authorStamp = selectedEntry.userId ? profilesStampMap[selectedEntry.userId] : equippedStamp;
+  // 장착한 스탬프의 실제 뽑기 등급(UR/SSR/SR/R)에 맞는 테두리 클래스
+  const authorStampCatalogItem = authorStamp
+    ? GACHA_ITEMS.find(g => g.category === 'STAMP' && g.effectValue === authorStamp)
+    : undefined;
+  const authorStampBorderClass = authorStampCatalogItem ? getRarityTheme(authorStampCatalogItem.rarity).border : '';
   const [loadingText, setLoadingText] = React.useState('수학 문제 분석을 시작합니다...');
   const [progress, setProgress] = React.useState(0);
+  const [elapsedMs, setElapsedMs] = React.useState(0);
   const [showResult, setShowResult] = React.useState(!isAnalyzing && !!selectedEntry.analysis);
   const analysisCardRef = React.useRef<HTMLDivElement>(null);
   const wasAnalyzingRef = React.useRef(isAnalyzing);
@@ -49,14 +76,106 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   const [editActionPlan, setEditActionPlan] = React.useState(selectedEntry.userActionPlan || '');
   const [isSaving, setIsSaving] = React.useState(false);
 
-  // Image lightbox zoom states
+  // Image lightbox zoom states & Touch gestures (Pinch-to-zoom)
   const [isZoomOpen, setIsZoomOpen] = React.useState(false);
-  const [zoomScale, setZoomScale] = React.useState(1);
+  const [scale, setScale] = React.useState(1);
+  const [position, setPosition] = React.useState({ x: 0, y: 0 });
+  const touchStartRef = React.useRef({ x: 0, y: 0 });
+  const initialDistanceRef = React.useRef(0);
+  const initialScaleRef = React.useRef(1);
+  const isDraggingRef = React.useRef(false);
 
   // Accordion toggle states
   const [showProblemText, setShowProblemText] = React.useState(false);
+  const [showQuickAnswer, setShowQuickAnswer] = React.useState(false); // 복습 체크 전 스크롤 없이 정답만 바로 확인 (기본 접힘 — 실수로 먼저 보는 것 방지)
   const [showSolvingProcess, setShowSolvingProcess] = React.useState(true); // Default open for study
   const [showMistakeSummary, setShowMistakeSummary] = React.useState(false); // Default collapsed for self-study
+
+  // 💡 동일 문제 연속 클릭 쿨다운 커스텀 알림 모달 상태
+  const [isCooldownNoticeOpen, setIsCooldownNoticeOpen] = React.useState(false);
+
+  // ── 다음 오답 이동을 위한 미완료 정렬 목록 연산 ──────────────────────────────
+  const uncompletedSorted = React.useMemo(() => {
+    return allEntries
+      .filter(m => {
+        const oCount = m.reviews?.filter(r => r === 'O').length || 0;
+        return oCount < 3;
+      })
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [allEntries]);
+
+  const currentIndex = React.useMemo(() => {
+    return uncompletedSorted.findIndex(m => m.id === selectedEntry.id);
+  }, [uncompletedSorted, selectedEntry.id]);
+
+  const hasNextEntry = onSelectEntry && currentIndex !== -1 && currentIndex < uncompletedSorted.length - 1;
+  const nextEntry = hasNextEntry ? uncompletedSorted[currentIndex + 1] : null;
+
+  // 카드가 다음 카드로 전환될 때 모달 내부 편집 폼 상태값 동기화
+  // 주의: rootCauses/userActionPlan은 학생이 직접 작성하는 필드라, AI 분석(isAnalyzing) 완료로
+  // 이 effect가 재실행되면서 분석 대기 중 입력하던 내용을 덮어써버리는 버그가 있었음.
+  // 이 두 필드는 selectedEntry.id가 바뀔 때(다른 카드로 전환할 때)만 동기화하는 아래 effect에서 처리하고,
+  // 여기서는 AI가 직접 판정하는 grade/chapter만 동기화한다.
+  React.useEffect(() => {
+    setEditGrade(selectedEntry.grade || '');
+    setEditChapter(selectedEntry.chapter || '');
+    setShowResult(!isAnalyzing && !!selectedEntry.analysis);
+  }, [selectedEntry.id, selectedEntry.grade, selectedEntry.chapter, isAnalyzing]);
+
+  // ── 핀치 줌 및 터치 드래그 제스처 핸들러 ──────────────────────────────
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 1) {
+      isDraggingRef.current = scale > 1;
+      const touch = e.touches[0];
+      touchStartRef.current = { x: touch.clientX - position.x, y: touch.clientY - position.y };
+    } else if (e.touches.length === 2) {
+      isDraggingRef.current = false;
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const distance = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+      initialDistanceRef.current = distance;
+      initialScaleRef.current = scale;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 1 && isDraggingRef.current) {
+      const touch = e.touches[0];
+      const dx = touch.clientX - touchStartRef.current.x;
+      const dy = touch.clientY - touchStartRef.current.y;
+      
+      // 드래그 최대 범위 제한 (확대 상태에서 화면 밖으로 끝없이 사라짐 방지)
+      const maxDragX = (scale - 1) * 200;
+      const maxDragY = (scale - 1) * 300;
+      const boundedX = Math.max(-maxDragX, Math.min(maxDragX, dx));
+      const boundedY = Math.max(-maxDragY, Math.min(maxDragY, dy));
+
+      setPosition({ x: boundedX, y: boundedY });
+    } else if (e.touches.length === 2) {
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const distance = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+      if (initialDistanceRef.current > 0) {
+        const factor = distance / initialDistanceRef.current;
+        let newScale = initialScaleRef.current * factor;
+        // 최소 1배 ~ 최대 4.5배 줌 스케일 제한
+        newScale = Math.max(1, Math.min(4.5, newScale));
+        setScale(newScale);
+
+        if (newScale === 1) {
+          setPosition({ x: 0, y: 0 });
+        }
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    isDraggingRef.current = false;
+    if (scale <= 1) {
+      setScale(1);
+      setPosition({ x: 0, y: 0 });
+    }
+  };
 
   const chaptersForGrade = editGrade ? (MATH_CURRICULUM[editGrade] || []) : [];
 
@@ -169,6 +288,18 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
           score += 3;
         }
 
+        // [특수 우선순위] 선생님의 최근 유튜브 강의(제목의 월/일 날짜가 최신인 영상) 우선 매칭
+        // 비디오 제목의 M/D(월/일) 포맷을 파싱하여 학기 선후관계(yearOffset)를 고려한 가중치 부여
+        const dateMatch = video.title.match(/^(\d{1,2})\/(\d{1,2})\s/);
+        if (dateMatch && score > 0) {
+          const month = parseInt(dateMatch[1], 10);
+          const day = parseInt(dateMatch[2], 10);
+          // 학년도 학기 흐름상 8~12월은 작년 하반기 영상, 1~7월은 올해 상반기 최신 영상으로 분류
+          const yearOffset = (month >= 8 && month <= 12) ? 0 : 1200;
+          const dateVal = yearOffset + (month * 100) + day;
+          score += dateVal * 0.05;
+        }
+
         // 점수 갱신
         if (score > maxScore) {
           maxScore = score;
@@ -193,7 +324,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
   // 1. Reset all local states when the selected mistake ID changes (opening a different mistake card)
   React.useEffect(() => {
-    setRevealedHintCount(0);
     setShowProblemText(false);
     setShowSolvingProcess(true);
     setShowMistakeSummary(false); // ID 변경 시 아코디언 닫음
@@ -321,7 +451,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
         const option = ROOT_CAUSE_OPTIONS.find(opt => opt.id === topCause);
         if (option) {
           const ratio = Math.round((topCount / totalCauses) * 100);
-          repeatPhrases.push(`최근에는 '${option.label}' 유형(${ratio}%)의 오답률이 높은 편이에요. 밤티와 함께 집중 공략해 봐요! 🎯`);
+          repeatPhrases.push(`최근에는 '${option.label}' 유형(${ratio}%)의 오답률이 높은 편이에요. ${aiPersonaName}와 함께 집중 공략해 봐요! 🎯`);
         }
       }
     }
@@ -356,13 +486,14 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     }
 
     // 최초 0초 시작 문구 노출 (첫 번째 정적 문구)
-    setLoadingText(INITIAL_PHRASES[0]);
+    const initialPhrases = getInitialPhrases(aiPersonaName);
+    setLoadingText(initialPhrases[0]);
 
     let count = 1;
     const interval = setInterval(() => {
-      if (count < INITIAL_PHRASES.length) {
+      if (count < initialPhrases.length) {
         // 초반 3초 시점에는 INITIAL_PHRASES 순서대로 1회성 출력
-        setLoadingText(INITIAL_PHRASES[count]);
+        setLoadingText(initialPhrases[count]);
       } else {
         // 초반 정적 문구 노출이 끝나면, 동적 멘트 풀(repeatPhrases)에서 무작위(Random)로 롤링 출력
         const randomIndex = Math.floor(Math.random() * repeatPhrases.length);
@@ -372,7 +503,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     }, 3000); // 3초 주기
 
     return () => clearInterval(interval);
-  }, [isAnalyzing, allEntries, peerActivities, selectedEntry.grade, selectedEntry.chapter]);
+  }, [isAnalyzing, allEntries, peerActivities, selectedEntry.grade, selectedEntry.chapter, aiPersonaName]);
 
   // 3. 사진 업로드 후 AI 진단 카드로 부드럽게 스크롤 이동
   React.useEffect(() => {
@@ -384,29 +515,24 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     }
   }, [selectedEntry.id, selectedEntry.analysis]);
 
-  // 4. 지능형 감속 가상 타이머 로직
+  // 4. 실제 평균 대기시간 기반 선형 타이머 로직
+  // (예전에는 시간대별로 가속/감속하는 연출용 곡선이었는데, 실제 경과 시간과 무관하게
+  // 움직이는 것처럼 느껴진다는 피드백에 따라 "경과시간 / 평균시간"에 정확히 비례하는
+  // 선형 진행률로 교체했습니다. 평균을 넘기면 링은 99%에서 멈추고 별도로 초과 시간을 표시합니다.)
   React.useEffect(() => {
     if (isAnalyzing) {
       setProgress(0);
+      setElapsedMs(0);
       setShowResult(false);
-      
+
       const startTime = Date.now();
+      // 실제 평균 대기시간(averageWaitMs)이 3건 이상 쌓여 있으면 그 값을 기준으로,
+      // 아직 데이터가 부족하면 기존의 20초 가정치를 기준으로 선형 계산합니다.
+      const referenceTime = averageWaitMs ?? 20000;
       const timer = setInterval(() => {
         const elapsed = Date.now() - startTime;
-        let nextProgress = 0;
-        if (elapsed <= 8000) {
-          // 0 ~ 8초: 70%까지 빠르게 상승
-          nextProgress = (elapsed / 8000) * 70;
-        } else if (elapsed <= 20000) {
-          // 8 ~ 20초: 90%까지 서서히 상승
-          const ratio = (elapsed - 8000) / 12000;
-          nextProgress = 70 + ratio * 20;
-        } else {
-          // 20초 이상: 90%에서 99.5%까지 지수함수 형태로 점근
-          const extra = elapsed - 20000;
-          nextProgress = 90 + 9.5 * (1 - Math.exp(-extra / 15000));
-        }
-        setProgress(Math.min(99.5, nextProgress));
+        setElapsedMs(elapsed);
+        setProgress(Math.min(99, (elapsed / referenceTime) * 100));
       }, 100);
 
       return () => clearInterval(timer);
@@ -435,10 +561,66 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
 
 
-  const hasStruggled = selectedEntry.reviews?.some(r => r === 'X' || r === 'star');
+  // 동일한 문제 카드(id)별 마지막 복습 완료 시각 기록 (연속 1분 이내 어뷰징 클릭 방지용)
+  const lastReviewTimesRef = useRef<Record<string, number>>({});
 
-  const handleReviewToggle = (index: number, state: ReviewState) => {
+  const handleReviewToggle = (
+    index: number,
+    state: ReviewState,
+    e?: React.MouseEvent<HTMLButtonElement> | React.TouchEvent<HTMLButtonElement>
+  ) => {
     const currentReviews = [...(selectedEntry.reviews || ['', '', ''])];
+    const isAddingCheck = state !== '' && currentReviews[index] !== state;
+
+    // 복습 체크('O', 'X', 'star')를 새로 등록하는 경우 쿨다운 검증 (동일 문제 카드 기준)
+    if (isAddingCheck) {
+      const now = Date.now();
+      const lastTime = lastReviewTimesRef.current[selectedEntry.id] || 0;
+      const diffSec = Math.floor((now - lastTime) / 1000);
+
+      // 동일 문제 카드에 한해 마지막 복습 체크 후 60초(1분)가 지나지 않은 경우 차단
+      if (lastTime > 0 && diffSec < 60) {
+        setIsCooldownNoticeOpen(true);
+        return;
+      }
+
+      // 타임스탬프 업데이트
+      lastReviewTimesRef.current[selectedEntry.id] = now;
+
+      // 터치/클릭한 자리 위치 추출하여 플로팅 포인트 팝업 디스패치
+      let clientX = window.innerWidth / 2;
+      let clientY = window.innerHeight / 2;
+      if (e) {
+        const mouseEvt = e as React.MouseEvent<HTMLButtonElement>;
+        const touchEvt = e as React.TouchEvent<HTMLButtonElement>;
+        if (mouseEvt.clientX && mouseEvt.clientX > 0) {
+          clientX = mouseEvt.clientX;
+          clientY = mouseEvt.clientY;
+        } else if (touchEvt.touches && touchEvt.touches[0]) {
+          clientX = touchEvt.touches[0].clientX;
+          clientY = touchEvt.touches[0].clientY;
+        }
+      }
+
+      const basePoints = state === 'O' ? [3, 7, 15][index] : (state === 'X' || state === 'star') ? 1 : 0;
+
+      // 3시간 5배 부스터 여부 확인 (서버 profiles.combo_booster_expires_at 기준 — App.tsx에서 전달)
+      const isBoosterActive = !!comboBoosterExpiresAt && Date.now() < new Date(comboBoosterExpiresAt).getTime();
+      const finalPoints = isBoosterActive ? basePoints * 5 : basePoints;
+
+      window.dispatchEvent(
+        new CustomEvent('reviewnote_show_floating_points', {
+          detail: {
+            x: clientX,
+            y: clientY,
+            points: finalPoints,
+            isBooster: isBoosterActive,
+            reviewState: state,
+          },
+        })
+      );
+    }
+
     currentReviews[index] = currentReviews[index] === state ? '' : state;
     onUpdateReviews(selectedEntry.id, currentReviews as ReviewState[]);
   };
@@ -490,14 +672,19 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
         userActionPlan: editActionPlan || undefined,
       });
 
-      alert('성공적으로 저장되었습니다! 🎉');
-      onClose(); // 저장 완료 후 모달창을 자동으로 닫아 위화감을 없앱니다.
+      onClose(); // 저장 완료 후 모달창을 자동으로 닫아 깔끔하게 처리합니다.
     } catch (err: any) {
       alert('저장 실패: ' + err.message);
     } finally {
       setIsSaving(false);
     }
   };
+
+  // 남은 예상 시간 / 초과 시간(+N초)을 실제 경과 시간 기준으로 정확히 1초 단위로 계산
+  const referenceTimeMs = averageWaitMs ?? 20000;
+  const remainingMs = referenceTimeMs - elapsedMs;
+  const remainingSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+  const overtimeSeconds = remainingMs < 0 ? Math.floor(-remainingMs / 1000) + 1 : 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4">
@@ -537,13 +724,18 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
               alt={selectedEntry.title} 
               className="w-full h-auto max-h-[60vh] object-contain rounded-xl group-hover/img:opacity-90 transition-opacity" 
             />
+            {/* 이미지 확대 가이드 골드 배지 (상시 노출 + 노란색/황금색 텍스트) */}
+            <div className="absolute bottom-4 left-4 bg-slate-950/85 border border-slate-800/60 rounded-lg px-2 py-0.5 text-[9px] font-black text-amber-400 flex items-center space-x-1 shadow backdrop-blur select-none">
+              <span>💡 이미지를 누르면 확대돼요!</span>
+            </div>
+            
             <div className="absolute bottom-4 right-4 bg-slate-950/80 border border-slate-800 rounded-lg px-2.5 py-1 text-[10px] text-slate-400 font-bold flex items-center space-x-1.5 shadow backdrop-blur opacity-0 group-hover/img:opacity-100 transition-opacity">
               <span>🔍 크게 보기</span>
             </div>
           </div>
 
-          {/* 3-Step Review Status Selection Card */}
-          <div className="bg-slate-950 p-4 rounded-2xl border border-slate-850 space-y-4">
+          {/* 3-Step Review Status Selection Card (이미지와 아예 밀착되도록 -mt-4.5 상단 마진 인가) */}
+          <div className="bg-slate-950 p-4 rounded-2xl border border-slate-850 space-y-4 -mt-4.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-300 flex items-center">
                 <span className="mr-1 text-sm">📋</span> 복습 상태 진단 (3회 완료 시 보관함 이동)
@@ -560,6 +752,26 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 )}
               </div>
             </div>
+
+            {/* 정답 바로 확인 (아래 정석 풀이 과정까지 스크롤 안 해도 여기서 바로 체크 가능) */}
+            {selectedEntry.analysis?.finalAnswer && (
+              <button
+                onClick={() => setShowQuickAnswer(!showQuickAnswer)}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20 transition-all"
+              >
+                <span className="text-[11px] font-bold text-amber-400 flex items-center space-x-1.5 min-w-0">
+                  <span className="flex-none">🎯</span>
+                  {showQuickAnswer ? (
+                    <LaTeXRenderer text={selectedEntry.analysis.finalAnswer} className="truncate" />
+                  ) : (
+                    <span>정답 확인하기</span>
+                  )}
+                </span>
+                <span className="text-[9px] text-amber-500/70 font-bold">
+                  {showQuickAnswer ? '▲ 가리기' : '▼ 보기'}
+                </span>
+              </button>
+            )}
 
             {/* 단계별 유기적 활성화 영역 (3열 구조 복원 및 포커싱 강화) */}
             {(() => {
@@ -602,9 +814,15 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                               /* 완료 상태: 큼직한 결과 스탬프 배지 및 아래 날짜 노출 */
                               <div className="animate-scale-up flex flex-col items-center">
                                 {state === 'O' && (
-                                  <span className="w-9 h-9 rounded-full bg-emerald-500 text-slate-950 font-black text-sm flex items-center justify-center shadow-lg shadow-emerald-500/10">
-                                    O
-                                  </span>
+                                  authorStamp ? (
+                                    <span className={`w-9 h-9 rounded-full flex items-center justify-center text-[26px] drop-shadow-[0_2px_8px_rgba(245,158,11,0.25)] animate-scale-up ${authorStampCatalogItem ? `border-2 ${authorStampBorderClass}` : ''}`}>
+                                      {authorStamp === '🐾' ? <CatPawIcon className="w-6 h-6" /> : authorStamp}
+                                    </span>
+                                  ) : (
+                                    <span className="w-9 h-9 rounded-full bg-emerald-500 text-slate-950 font-black text-sm flex items-center justify-center shadow-lg shadow-emerald-500/10">
+                                      O
+                                    </span>
+                                  )
                                 )}
                                 {state === 'X' && (
                                   <span className="w-9 h-9 rounded-full bg-red-500 text-white font-black text-sm flex items-center justify-center shadow-lg shadow-red-500/10">
@@ -626,19 +844,19 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                               /* 활성 상태: 클릭 가능한 입력 버튼 활성화 */
                               <div className="flex items-center space-x-1.5 animate-fade-in">
                                 <button
-                                  onClick={() => handleReviewToggle(index, 'O')}
+                                  onClick={(e) => handleReviewToggle(index, 'O', e)}
                                   className="w-7 h-7 rounded-full text-xs font-black bg-slate-800 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 transition-all active:scale-90 border border-slate-700/60"
                                 >
                                   O
                                 </button>
                                 <button
-                                  onClick={() => handleReviewToggle(index, 'X')}
+                                  onClick={(e) => handleReviewToggle(index, 'X', e)}
                                   className="w-7 h-7 rounded-full text-xs font-black bg-slate-800 text-red-400 hover:bg-red-500 hover:text-white transition-all active:scale-90 border border-slate-700/60"
                                 >
                                   X
                                 </button>
                                 <button
-                                  onClick={() => handleReviewToggle(index, 'star')}
+                                  onClick={(e) => handleReviewToggle(index, 'star', e)}
                                   className="w-7 h-7 rounded-full text-xs font-black bg-slate-800 text-amber-400 hover:bg-amber-400 hover:text-slate-950 transition-all active:scale-90 border border-slate-700/60"
                                 >
                                   ★
@@ -673,7 +891,10 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                         onClick={() => {
                           if (confirm('틀리거나 보류한 기록을 정리하고 맞춘(O) 기록만 앞으로 정렬하여 다시 복습하시겠습니까?')) {
                             const oReviews = (selectedEntry.reviews || []).filter(r => r === 'O');
-                            const newReviews = [...oReviews, '', ''].slice(0, 3) as ReviewState[];
+                            // O가 하나도 없으면(전부 X/★) ''를 2개만 이어붙여선 배열 길이가 2에
+                            // 그쳐서 3번째 칸이 undefined가 되어 버튼도 안 뜨고 잠기지도 않는
+                            // "고정" 상태로 망가졌다. 항상 최소 3칸이 되도록 ''를 3개 붙인다.
+                            const newReviews = [...oReviews, '', '', ''].slice(0, 3) as ReviewState[];
                             onUpdateReviews(selectedEntry.id, newReviews);
                           }
                         }}
@@ -745,44 +966,8 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             </div>
           )}
 
-
-          {hasStruggled && selectedEntry.analysis?.hints && selectedEntry.analysis.hints.length > 0 && (
-            <div className="bg-slate-950 p-4.5 rounded-2xl border border-slate-850 space-y-3 animate-scale-up">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-indigo-400 flex items-center">
-                  <span className="mr-1.5 text-sm">💡</span> 단계별 힌트
-                </span>
-                <span className="text-[10px] text-slate-500 font-bold">
-                  {revealedHintCount} / 3 공개됨
-                </span>
-              </div>
-
-              <div className="space-y-2.5">
-                {selectedEntry.analysis.hints.slice(0, revealedHintCount).map((hint, i) => (
-                  <div key={i} className="p-3 bg-slate-900/60 rounded-xl border border-slate-800 animate-scale-up space-y-1">
-                    <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider block">힌트 {i + 1}단계</span>
-                    <LaTeXRenderer text={hint} className="text-xs md:text-sm leading-relaxed text-slate-300" />
-                  </div>
-                ))}
-              </div>
-
-              {revealedHintCount < 3 ? (
-                <button
-                  onClick={() => setRevealedHintCount(prev => prev + 1)}
-                  className="w-full py-2.5 rounded-xl bg-indigo-600/10 hover:bg-indigo-600/20 active:scale-95 border border-indigo-500/20 text-indigo-400 font-bold text-xs transition-all flex items-center justify-center space-x-1"
-                >
-                  <span>🔍 힌트 {revealedHintCount + 1} 보기</span>
-                </button>
-              ) : (
-                <p className="text-[10px] text-slate-500 text-center font-medium py-1">
-                  모든 힌트가 공개되었습니다. 아래 풀이를 참고하여 오답을 완벽히 이해해 보세요!
-                </p>
-              )}
-            </div>
-          )}
-
           {/* AI Analysis trigger / solving process rendering */}
-          {(!showResult && (isAnalyzing || (progress > 0 && progress < 100))) ? (
+          {(!showResult && (isAnalyzing || (progress > 0 && progress < 100)) && (!selectedEntry.analysis?.solvingProcess || selectedEntry.analysis.solvingProcess === SOLVING_PLACEHOLDER_TEXT)) ? (
             <div className="py-8 px-4 flex flex-col items-center space-y-8 animate-fade-in bg-slate-900/20 rounded-3xl border border-slate-800/40 backdrop-blur-md">
               {/* 상단: 타이머와 로딩 텍스트를 담은 세련된 원형 기기 */}
               <div className="flex flex-col items-center space-y-4">
@@ -830,12 +1015,17 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                   <p className="text-[11px] text-slate-500">
                     {progress >= 100 ? (
                       <span className="text-emerald-400 font-bold animate-pulse">완료! 상세 진단을 표시합니다...</span>
-                    ) : progress >= 90 ? (
-                      <span>마지막 맞춤 처방을 다듬는 중입니다...</span>
+                    ) : overtimeSeconds > 0 ? (
+                      <span className="text-amber-400 font-bold">예상보다 오래 걸리고 있어요 (+{overtimeSeconds}초)</span>
                     ) : (
-                      <span>예상 대기 시간: 약 {Math.max(1, Math.round((30 * (100 - progress)) / 100))}초</span>
+                      <span>예상 대기 시간: 약 {remainingSeconds}초</span>
                     )}
                   </p>
+                  {averageWaitMs && (
+                    <p className="text-[10px] text-slate-600">
+                      (최근 진단 평균 소요 시간: 약 {Math.round(averageWaitMs / 1000)}초)
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -871,6 +1061,14 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 </div>
               )}
 
+              {/* Card 0.5: 선생님 힌트 (스캐폴딩) (접힘 상태 디폴트) */}
+              <MistakeScaffoldingDrawer
+                mistakeId={selectedEntry.id}
+                studentId={selectedEntry.userId || ''}
+                currentUserId={currentUserId || ''}
+                isAdmin={isAdmin}
+              />
+
               {/* Card 1: 정석 풀이 과정 */}
               <div className="space-y-2 border-l-4 border-indigo-500 pl-4 py-1">
                 <button
@@ -879,6 +1077,9 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 >
                   <h4 className="text-sm font-extrabold text-indigo-400 flex items-center group-hover:text-indigo-300 transition-colors">
                     <span className="mr-1.5 text-base">💡</span> 정석 풀이 과정
+                    {isAnalyzing && (
+                      <span className="ml-2 text-[10px] font-bold text-indigo-300 animate-pulse">✍️ {aiPersonaName}가 실시간으로 작성 중...</span>
+                    )}
                   </h4>
                   <span className="text-xs text-slate-500 font-bold mr-1 group-hover:text-slate-400 transition-colors">
                     {showSolvingProcess ? '▲ 닫기' : '▼ 보기'}
@@ -1021,59 +1222,92 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
           </button>
         </div>
 
+        {/* 💡 👨‍🏫 선생님이 전달해 준 스캐폴딩 힌트 가이드 카드 */}
+        {selectedEntry.teacherScaffoldingHint && (
+          <div className="bg-gradient-to-r from-purple-950/60 via-slate-900 to-indigo-950/60 border border-purple-500/40 rounded-2xl p-4 space-y-2 shadow-lg animate-fade-in mt-4">
+            <div className="flex items-center space-x-2">
+              <span className="text-base">💡</span>
+              <h4 className="text-xs font-black text-purple-300">👨‍🏫 선생님의 스캐폴딩 처방 힌트</h4>
+            </div>
+            <p className="text-xs text-slate-200 leading-relaxed font-sans whitespace-pre-wrap pl-6">
+              {selectedEntry.teacherScaffoldingHint}
+            </p>
+          </div>
+        )}
+
       </div>
 
-      {/* 이미지 전체화면 확대 모달 */}
+      {/* 이미지 전체화면 확대 모달 (두 손가락 Pinch-to-zoom 제스처 지원 + 풀스크린 오버레이 방식) */}
       {isZoomOpen && (
         <div 
-          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex flex-col justify-between p-4 animate-fade-in"
+          className="fixed inset-0 z-50 bg-black/98 flex items-center justify-center animate-fade-in cursor-zoom-out"
           onClick={() => {
             setIsZoomOpen(false);
-            setZoomScale(1);
+            setScale(1);
+            setPosition({ x: 0, y: 0 });
           }}
         >
-          {/* Top Bar */}
-          <div className="flex items-center justify-between z-10 w-full pl-2">
-            <span className="text-[10px] font-bold text-slate-400">
-              🔍 화면을 더블 탭(클릭)하면 2배 확대됩니다.
-            </span>
-            <button 
-              onClick={() => {
-                setIsZoomOpen(false);
-                setZoomScale(1);
-              }}
-              className="w-9 h-9 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-white hover:bg-slate-800 text-lg transition-all"
-            >
-              ✕
-            </button>
-          </div>
-
-          {/* Image Container */}
+          {/* Image Container (Touch 제스처 이벤트 바인딩 - 스크린 100% 꽉 채우기) */}
           <div 
-            className={`flex-1 w-full overflow-auto p-4 cursor-zoom-out ${
-              zoomScale === 2 ? 'block' : 'flex items-center justify-center'
-            }`}
+            className="absolute inset-0 flex items-center justify-center touch-none select-none"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
           >
             <img 
               src={selectedEntry.imageUrl} 
               alt="확대된 문제 이미지" 
-              onClick={(e) => {
-                e.stopPropagation();
-                setZoomScale(prev => (prev === 1 ? 2 : 1));
+              className="max-w-full max-h-full object-contain pointer-events-none select-none"
+              style={{
+                transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
               }}
-              className={`rounded-lg select-none transition-all duration-300 ${
-                zoomScale === 2 
-                  ? 'max-w-none w-[200%] h-auto block' 
-                  : 'max-w-full max-h-[80vh] object-contain block'
-              }`}
             />
           </div>
           
-          {/* Bottom Bar indicator */}
-          <div className="text-center z-10 py-2">
-            <span className="text-[9px] text-slate-500 font-semibold bg-slate-900/60 px-3 py-1 rounded-full border border-slate-800/40">
-              배율: {zoomScale}x
+          {/* Bottom Bar indicator Floating */}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 select-none pointer-events-none">
+            <span className="text-[9.5px] text-slate-400 font-extrabold bg-slate-950/85 px-4 py-1.5 rounded-full border border-slate-850 shadow-lg backdrop-blur-md pointer-events-auto">
+              배율: {scale.toFixed(1)}x
             </span>
+          </div>
+        </div>
+      )}
+
+      {/* Next 화살표 버튼 (복습하기 세션 때만 우측 스크린 하단에 플로팅 + 크기만 컴팩트화) */}
+      {isReviewSession && hasNextEntry && nextEntry && onSelectEntry && (
+        <button
+          onClick={() => onSelectEntry(nextEntry)}
+          className="fixed right-3 sm:right-6 top-[62%] -translate-y-1/2 z-[60] w-9 h-14 sm:w-11 sm:h-18 rounded-xl bg-indigo-600/95 hover:bg-indigo-500 border border-indigo-500/50 flex flex-col items-center justify-center text-white shadow-2xl active:scale-95 transition-all group animate-fade-in backdrop-blur-sm"
+          title="다음 미완료 오답 복습"
+        >
+          <span className="text-base sm:text-lg font-bold group-hover:translate-x-0.5 transition-transform">&rarr;</span>
+          <span className="text-[7.5px] sm:text-[8px] font-black uppercase tracking-wider mt-0.5 select-none">Next</span>
+        </button>
+      )}
+
+      {/* ⏳ 복습 연속 클릭 방지 쿨다운 알림 커스텀 모달 (스캐폴딩 알림창 디자인 톤앤매너 통일) */}
+      {isCooldownNoticeOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-xs bg-slate-900 border border-amber-500/40 rounded-3xl p-5 shadow-2xl space-y-4 text-center animate-scale-up">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto">
+              <span className="text-2xl animate-bounce">⏳</span>
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="text-sm font-black text-white">
+                방금 이 문제의 복습을 체크하셨습니다!
+              </h3>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                해설을 천천히 읽어보신 후 잠시 뒤에 다음 복습을 체크해 주세요. ✨
+              </p>
+            </div>
+
+            <button
+              onClick={() => setIsCooldownNoticeOpen(false)}
+              className="w-full py-2.5 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-350 hover:to-amber-450 text-slate-950 font-black text-xs transition-all shadow-lg shadow-amber-500/20"
+            >
+              확인
+            </button>
           </div>
         </div>
       )}

@@ -2,55 +2,41 @@ import React, { useEffect, useState } from 'react';
 import type { AdminUserStat } from '../types';
 import { supabase } from '../services/supabase';
 import { formatDate } from '../utils/date';
-import { CHRONOLOGICAL_CHANGELOGS } from './StudentGuide';
+import { GACHA_ITEMS, getTitleBadgeStyle } from '../utils/gachaCatalog';
+import { RecentActivityFeed } from './RecentActivityFeed';
+import { CatPawIcon } from './CatPawIcon';
 
-const GUIDE_ITEMS = [
-  {
-    step: '01',
-    emoji: '📷',
-    title: '오답 사진 등록',
-    desc: '하단 카메라 버튼을 누르고 오답을 정밀 촬영한 뒤, 원하는 문제 영역만 깔끔하게 사각형으로 조절해 오려내어 저장하세요.',
-    colorClass: 'from-indigo-500/20 via-indigo-500/5 to-slate-900/40 border-indigo-500/30 text-indigo-400 bg-indigo-950/60 shadow-indigo-950/50'
-  },
-  {
-    step: '02',
-    emoji: '🤖',
-    title: 'AI 수학 클리닉 진단',
-    desc: '등록된 오답을 터치하고 [AI 분석 시작하기]를 누르면 수식 인식과 분류를 거쳐 정석 풀이, 실수 요인, 대책, 3단계 힌트가 자동 처방됩니다.',
-    colorClass: 'from-purple-500/20 via-purple-500/5 to-slate-900/40 border-purple-500/30 text-purple-400 bg-purple-950/60 shadow-purple-950/50'
-  },
-  {
-    step: '03',
-    emoji: '📺',
-    title: '선생님 추천 강의 딥링크',
-    desc: '진단된 단원에 매핑되는 선생님의 개념 강의 유튜브 영상 및 정확한 챕터 시작점(타임라인) 바로가기가 매칭되어 제공됩니다.',
-    colorClass: 'from-amber-500/20 via-amber-500/5 to-slate-900/40 border-amber-500/30 text-amber-400 bg-amber-950/60 shadow-amber-950/50'
-  },
-  {
-    step: '04',
-    emoji: '✏️',
-    title: '3단계 누적 복습 시스템',
-    desc: '기억이 흐려질 때마다 O/X/★ 버튼으로 복습 성공 여부를 체크하세요. 3회 완료(O 세 번) 시 자동으로 복습 완료함으로 안전하게 분리 보관됩니다.',
-    colorClass: 'from-emerald-500/20 via-emerald-500/5 to-slate-900/40 border-emerald-500/30 text-emerald-400 bg-emerald-950/60 shadow-emerald-950/50'
-  }
-];
+interface AdminPanelProps {
+  onBack?: () => void;
+  onRefresh?: () => void;
+  onSelectTab?: (tab: any) => void;
+}
 
-export const AdminPanel: React.FC = () => {
+export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
   const [stats, setStats] = useState<AdminUserStat[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
-  const [activeSubTab, setActiveSubTab] = useState<'stats' | 'changelog'>('stats');
+  const [activeSubTab, setActiveSubTab] = useState<'stats' | 'activity'>('stats');
   const [gradeFilter, setGradeFilter] = useState<string>('all');
 
-  const fetchAdminStats = async () => {
-    setIsLoading(true);
+  // 학생 카드 클릭 시 장착 아이템 조회용 상태 (보유 전체가 아닌 "현재 장착 중"인 것만 표시)
+  const [selectedStudent, setSelectedStudent] = useState<AdminUserStat | null>(null);
+
+  const handleOpenStudentItems = (user: AdminUserStat) => {
+    setSelectedStudent(user);
+  };
+
+  const fetchAdminStats = async (isInitial = false) => {
+    if (isInitial) {
+      setIsLoading(true);
+    }
     setError(null);
     try {
-      // Fetch all profiles (display_name, school_grade 포함)
+      // Fetch all profiles (display_name, nickname, school_grade, equipped_title 포함)
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, email, is_admin, display_name, school_grade')
+        .select('id, email, is_admin, display_name, nickname, school_grade, equipped_title, equipped_stamp, equipped_theme, equipped_ai_voice, bonus_points, point_adjustment')
         .order('email', { ascending: true });
 
       if (profilesError) throw profilesError;
@@ -88,11 +74,36 @@ export const AdminPanel: React.FC = () => {
           weeklyTotalCount: 0,
           weeklyCompletedCount: 0,
           displayName: p.display_name?.trim() || undefined,
+          nickname: p.nickname?.trim() || undefined,
           username: username,
           schoolGrade: p.school_grade || '',
+          equippedTitle: p.equipped_title || undefined,
+          equippedStamp: p.equipped_stamp || undefined,
+          equippedTheme: p.equipped_theme || undefined,
+          equippedAiVoice: p.equipped_ai_voice || undefined,
           lastReviewDate: null,
+          // 럭키상점 콤보 포인트 잔액 (App.tsx의 currentDisplayPoints와 동일 공식)
+          comboPoints: Math.max(0, (p.bonus_points || 0) + (p.point_adjustment || 0)),
         });
       });
+
+      // 날짜 파싱 유틸리티 (이번 주 오답 스탬프 여부 확인용)
+      const isDateInCurrentWeek = (dateStr: string) => {
+        if (!dateStr) return false;
+        try {
+          let parsedDate: Date;
+          if (dateStr.includes('-') || dateStr.includes('T')) {
+            parsedDate = new Date(dateStr);
+          } else if (dateStr.includes('.')) {
+            parsedDate = new Date(dateStr.replace(/\./g, '/'));
+          } else {
+            parsedDate = new Date(`${new Date().getFullYear()}/${dateStr}`);
+          }
+          return !isNaN(parsedDate.getTime()) && parsedDate >= mondayDate;
+        } catch {
+          return false;
+        }
+      };
 
       (mistakes || []).forEach((m: any) => {
         const stat = statsMap.get(m.user_id);
@@ -101,6 +112,7 @@ export const AdminPanel: React.FC = () => {
         stat.mistakeCount += 1;
 
         const reviews: string[] = m.reviews || [];
+        const reviewDates: string[] = m.analysis?.reviewDates || [];
         const isCompleted = reviews.filter(r => r === 'O').length === 3;
 
         if (isCompleted) {
@@ -119,6 +131,27 @@ export const AdminPanel: React.FC = () => {
           stat.weeklyCompletedCount += 1;
         }
 
+        // 3단 콤보 점수 계산 (1차 O: 3점, 2차 O: 7점, 3차 O(최종완료): 15점, X/★: 참여점수 1점)
+        // — weekly_leaderboard SQL 뷰(명예의전당)와 완전히 동일한 공식으로 통일함
+        // reviewDates가 없거나 빈 문자열일 때 updated_at 및 date로 폴백 처리
+        const rDate0 = reviewDates[0] || m.updated_at || m.date;
+        const rDate1 = reviewDates[1] || m.updated_at || m.date;
+        const rDate2 = reviewDates[2] || m.updated_at || m.date;
+
+        const stagePoints = (state: string, oPoints: number, date: string): number => {
+          if (!isDateInCurrentWeek(date)) return 0;
+          if (state === 'O') return oPoints;
+          if (state === 'X' || state === 'star') return 1;
+          return 0;
+        };
+
+        let comboScore = 0;
+        comboScore += stagePoints(reviews[0], 3, rDate0);
+        comboScore += stagePoints(reviews[1], 7, rDate1);
+        comboScore += stagePoints(reviews[2], 15, rDate2);
+
+        stat.weeklyScore += comboScore;
+
         // Track latest activity date
         if (!stat.lastActivity || m.date > stat.lastActivity) {
           stat.lastActivity = m.date;
@@ -133,10 +166,9 @@ export const AdminPanel: React.FC = () => {
         }
       });
 
-      // 각 유저별 주간 점수 산출
+      // 각 유저별 주간 점수 산출 (콤보제 적용)
       statsMap.forEach((stat) => {
-        const rate = stat.weeklyTotalCount > 0 ? (stat.weeklyCompletedCount / stat.weeklyTotalCount) : 1.0;
-        stat.weeklyScore = (stat.weeklyCompletedCount * 10) + (rate * 100);
+        stat.weeklyScore = Math.round(stat.weeklyScore);
       });
 
       // Sort: 최근 오답 복습한 순 정렬 (복습 기록이 없는 학생은 최하단 배치)
@@ -167,7 +199,30 @@ export const AdminPanel: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchAdminStats();
+    fetchAdminStats(true);
+
+    // ⚡ Realtime 실시간 동기화: profiles 및 mistakes 테이블 변경 시 즉시 배경 갱신 (깜빡임 0건)
+    const channel = supabase
+      .channel('admin-dashboard-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'profiles' },
+        () => {
+          fetchAdminStats(false);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'mistakes' },
+        () => {
+          fetchAdminStats(false);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const totalMistakes = stats.reduce((s, u) => s + u.mistakeCount, 0);
@@ -182,18 +237,25 @@ export const AdminPanel: React.FC = () => {
           <h2 className="text-lg font-extrabold text-white flex items-center">
             <span className="mr-2">👑</span> 어드민 대시보드
           </h2>
-          <p className="text-[11px] text-slate-500 mt-0.5">
-            마지막 갱신: {lastRefreshed.toLocaleTimeString('ko-KR')}
+          <p className="text-[11px] text-slate-400 mt-0.5 flex items-center space-x-1.5">
+            <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold flex items-center space-x-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+              <span>⚡ 실시간 동기화 중</span>
+            </span>
+            <span>마지막 갱신: {lastRefreshed.toLocaleTimeString('ko-KR')}</span>
           </p>
         </div>
-        <button
-          onClick={fetchAdminStats}
-          disabled={isLoading}
-          className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-700 text-xs font-bold text-slate-300 transition-all disabled:opacity-50 flex items-center space-x-1.5"
-        >
-          <span className={isLoading ? 'animate-spin' : ''}>🔄</span>
-          <span>새로고침</span>
-        </button>
+        <div className="flex items-center space-x-2">
+          {onSelectTab && (
+            <button
+              onClick={() => onSelectTab('scaffolding')}
+              className="px-3 py-1.5 rounded-xl bg-purple-950/60 hover:bg-purple-900/80 border border-purple-500/40 text-xs font-black text-purple-300 transition-all flex items-center space-x-1.5 shadow-md shadow-purple-500/10"
+            >
+              <span>🧩</span>
+              <span>취약 오답 클리닉</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -229,15 +291,15 @@ export const AdminPanel: React.FC = () => {
             <span>가입자 현황</span>
           </button>
           <button
-            onClick={() => setActiveSubTab('changelog')}
+            onClick={() => setActiveSubTab('activity')}
             className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center space-x-1.5 ${
-              activeSubTab === 'changelog' 
-                ? 'bg-slate-800 text-indigo-400 shadow-sm font-black' 
+              activeSubTab === 'activity' 
+                ? 'bg-slate-800 text-purple-400 shadow-sm font-black' 
                 : 'text-slate-500 hover:text-slate-300'
             }`}
           >
-            <span>📜</span>
-            <span>변경 이력 (Change Log)</span>
+            <span>🕘</span>
+            <span>최근 활동기록</span>
           </button>
         </div>
       )}
@@ -311,7 +373,10 @@ export const AdminPanel: React.FC = () => {
               return (
                 <div
                   key={user.userId}
-                  className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-4 transition-all hover:border-slate-700"
+                  onClick={() => handleOpenStudentItems(user)}
+                  role="button"
+                  tabIndex={0}
+                  className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-4 transition-all hover:border-slate-700 cursor-pointer"
                 >
                   {/* User Identity Row */}
                   <div className="flex items-center space-x-3">
@@ -320,10 +385,28 @@ export const AdminPanel: React.FC = () => {
                       {((user as any).displayName || (user as any).username || 'U').charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2">
-                        <span className="font-extrabold text-white text-sm truncate">
-                          {(user as any).displayName || (user as any).username}
-                        </span>
+                      <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                        {/* 이름 (어드민에게는 이름 옆에 닉네임 병기) */}
+                        {(() => {
+                          const realName = (user as any).displayName || (user as any).username;
+                          const nick = user.nickname;
+                          const hasCustomNick = nick && nick !== realName;
+
+                          return (
+                            <span className={`font-extrabold text-sm truncate ${user.email?.toLowerCase().startsWith('test') ? 'text-rainbow-wave' : 'text-white'}`}>
+                              {realName} {hasCustomNick && <span className="text-amber-400 font-bold text-xs ml-1">({nick})</span>}
+                            </span>
+                          );
+                        })()}
+                        {user.equippedTitle && (() => {
+                          const badge = getTitleBadgeStyle(user.equippedTitle);
+                          return (
+                            <span className={`text-[9px] px-2 py-0.5 rounded-full border flex items-center space-x-1 flex-none ${badge.style}`}>
+                              <span>{badge.icon}</span>
+                              <span>{user.equippedTitle}</span>
+                            </span>
+                          );
+                        })()}
                       </div>
                       <span className="text-[10px] text-slate-400 truncate block mt-0.5">
                         {(user as any).displayName ? `아이디: ${(user as any).username}` : (isEmailValid ? user.email : '(이메일 정보 없음)')}
@@ -333,9 +416,10 @@ export const AdminPanel: React.FC = () => {
                         <span className="text-[9px] text-slate-500 font-bold">학년:</span>
                         <select
                           value={user.schoolGrade || ''}
+                          onClick={(e) => e.stopPropagation()}
                           onChange={async (e) => {
                             const newGrade = e.target.value;
-                            
+
                             try {
                               const { error } = await supabase
                                 .from('profiles')
@@ -369,6 +453,12 @@ export const AdminPanel: React.FC = () => {
                         </span>
                         <span className="text-[8px] text-slate-500 block leading-none mt-0.5">
                           ({user.weeklyCompletedCount}개 완료 / {user.weeklyTotalCount}개 등록)
+                        </span>
+                      </div>
+                      <div className="pt-1 border-t border-slate-850">
+                        <span className="text-[9px] text-slate-500 block leading-none">콤보 포인트</span>
+                        <span className="text-xs font-black text-emerald-400 leading-tight block">
+                          ⚡ {user.comboPoints ?? 0}점
                         </span>
                       </div>
                       <div className="pt-1 border-t border-slate-850">
@@ -428,68 +518,101 @@ export const AdminPanel: React.FC = () => {
       );
     })()}
 
-      {/* ── 탭 2: 변경 이력 (Change Log) 탭 ── */}
-      {activeSubTab === 'changelog' && (
-        <div className="space-y-6 animate-scale-up">
-
-          {/* 오답클리닉 이용방법 (큰 이모지 디자인) */}
-          <div className="space-y-4 pt-2">
-            <h3 className="text-xs font-black text-indigo-400 uppercase tracking-wider pl-1 text-left">오답클리닉 이용방법</h3>
-            <div className="grid gap-4">
-              {GUIDE_ITEMS.map((item, idx) => (
-                <div 
-                  key={idx} 
-                  className={`relative bg-gradient-to-br ${item.colorClass} border rounded-3xl p-5 flex items-center space-x-5 shadow-lg backdrop-blur-sm hover:-translate-y-0.5 hover:shadow-xl transition-all duration-300 group text-left`}
-                >
-                  {/* 우상단 네온 스타일 스텝 인덱스 배지 */}
-                  <span className="absolute top-4 right-5 text-2xl font-black text-slate-800/50 select-none tracking-tighter group-hover:text-slate-700/60 transition-colors font-mono">
-                    {item.step}
-                  </span>
-                  
-                  {/* 커다란 이모지 블록 */}
-                  <span className="text-4xl flex-none w-16 h-16 rounded-2xl flex items-center justify-center border border-slate-800/60 bg-slate-950/80 shadow-inner group-hover:scale-105 transition-transform duration-300 select-none">
-                    {item.emoji}
-                  </span>
-                  
-                  {/* 텍스트 설명 영역 */}
-                  <div className="space-y-1.5 min-w-0 pr-6">
-                    <h4 className="text-sm font-extrabold text-white tracking-tight">{item.title}</h4>
-                    <p className="text-xs text-slate-300 leading-relaxed font-medium">{item.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 더쿠키수학 오답클리닉 변경 이력 */}
-          <div className="space-y-4 pt-6 border-t border-slate-800">
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider pl-1 text-left">더쿠키수학 오답클리닉 변경 이력</h3>
-            <div className="relative border-l border-slate-800 pl-6 ml-3 space-y-8">
-              {CHRONOLOGICAL_CHANGELOGS.map((log, idx) => (
-                <div key={idx} className="relative">
-                  <div className={`absolute -left-[33px] top-1.5 w-4 h-4 rounded-full ${idx === 0 ? 'bg-indigo-500' : 'bg-slate-800'} border-4 border-slate-950`} />
-                  <div className="space-y-2 text-left">
-                    <div className="flex items-center space-x-2">
-                      <span className={`text-xs font-black px-2 py-0.5 rounded ${idx === 0 ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-slate-850 text-slate-400 border border-slate-700'}`}>
-                        {log.version}
-                      </span>
-                      <span className="text-[10px] text-slate-500 font-bold">{log.date}</span>
-                    </div>
-                    <ul className="text-xs text-slate-400 list-disc list-inside space-y-1.5 pl-1 leading-relaxed">
-                      {log.changes.map((change, cIdx) => (
-                        <li key={cIdx} className="pl-1.5 -indent-4 list-none flex items-start">
-                          <span className="text-emerald-500/80 mr-1.5 select-none">•</span>
-                          <span>{change}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+      {/* ── 탭 2: 최근 활동기록 (Recent Activity Feed) 탭 ── */}
+      {activeSubTab === 'activity' && (
+        <div className="space-y-4 animate-scale-up">
+          <RecentActivityFeed />
         </div>
       )}
+
+      {/* ── 학생 카드 클릭 시: 현재 장착 중인 아이템만 조회하는 모달 ── */}
+      {selectedStudent && (() => {
+        const equippedSlots: { category: string; label: string; value?: string }[] = [
+          { category: 'TITLE', label: '칭호', value: selectedStudent.equippedTitle },
+          { category: 'STAMP', label: '스탬프', value: selectedStudent.equippedStamp },
+          { category: 'THEME', label: '테마', value: selectedStudent.equippedTheme },
+          { category: 'AI_VOICE', label: 'AI 말투', value: selectedStudent.equippedAiVoice },
+        ];
+
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in"
+            onClick={() => setSelectedStudent(null)}
+          >
+            <div
+              className="w-full max-w-sm max-h-[80vh] bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-2xl space-y-4 animate-scale-up flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2.5 flex-none">
+                <h3 className="text-sm font-extrabold text-white flex items-center space-x-2 min-w-0">
+                  <span>🎽</span>
+                  <span className="truncate">
+                    {(() => {
+                      const realName = (selectedStudent as any).displayName || (selectedStudent as any).username;
+                      const nick = selectedStudent.nickname;
+                      const hasCustomNick = nick && nick !== realName;
+                      return `${realName}${hasCustomNick ? ` (${nick})` : ''} 장착 아이템`;
+                    })()}
+                  </span>
+                </h3>
+                <button
+                  onClick={() => setSelectedStudent(null)}
+                  className="text-slate-400 hover:text-white text-xs font-bold px-2 py-1 rounded-lg flex-none"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="overflow-y-auto flex-1 space-y-2">
+                {equippedSlots.map(slot => {
+                  const catalogItem = slot.value
+                    ? GACHA_ITEMS.find(g => g.category === slot.category && g.effectValue === slot.value)
+                    : undefined;
+
+                  return (
+                    <div
+                      key={slot.category}
+                      className="flex items-center space-x-3 bg-slate-950 border border-slate-800 rounded-xl p-2.5"
+                    >
+                      <span className="text-2xl flex-none flex items-center justify-center">
+                        {catalogItem?.icon === '🐾' ? <CatPawIcon className="w-6 h-6" /> : (catalogItem?.icon || '—')}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">{slot.label}</span>
+                        {catalogItem ? (
+                          <>
+                            <div className="flex items-center space-x-1.5">
+                              <span className={`text-[8px] font-black px-1.5 py-0.2 rounded bg-gradient-to-r ${catalogItem.color} text-white flex-none`}>
+                                {catalogItem.rarity}
+                              </span>
+                              <span className="text-xs font-bold text-white truncate">{catalogItem.name}</span>
+                            </div>
+                            <p className="text-[10px] text-slate-500 truncate mt-0.5">{catalogItem.description}</p>
+                            {/* 칭호는 실제 헤더에 보이는 것과 동일한 스타일로 미리보기 (희귀도별 공통 색이 아닌 실제 발광 효과) */}
+                            {slot.category === 'TITLE' && catalogItem.effectValue && (() => {
+                              const titleBadge = getTitleBadgeStyle(catalogItem.effectValue);
+                              return (
+                                <div className="mt-1.5">
+                                  <span className={`text-[9px] px-2 py-0.5 rounded-full border inline-flex items-center space-x-1 ${titleBadge.style}`}>
+                                    <span>{titleBadge.icon}</span>
+                                    <span>{catalogItem.effectValue}</span>
+                                  </span>
+                                </div>
+                              );
+                            })()}
+                          </>
+                        ) : (
+                          <span className="text-xs text-slate-600">미장착 (기본값)</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

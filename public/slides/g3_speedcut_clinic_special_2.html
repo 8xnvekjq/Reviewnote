@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>고3 준킬러 스피드 &amp; 숏컷 클리닉 (특강 2탄)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true
+            },
+            options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'] }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        .presentation-deck { position: relative; width: 1280px; height: 720px; background: radial-gradient(circle at 10% 20%, #2e1014 0%, #0f172a 100%); border: 1px solid rgba(255, 255, 255, 0.08); margin: 20px auto; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+        .slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 40px 65px; display: none; flex-direction: column; justify-content: space-between; z-index: 1; background: transparent; box-sizing: border-box; }
+        .slide.active { display: flex; z-index: 10; }
+
+        .concept-card { background: rgba(30, 41, 59, 0.75); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.25); }
+        .problem-box { background: linear-gradient(135deg, rgba(30, 20, 25, 0.9) 0%, rgba(15, 23, 42, 0.8) 100%); border-left: 8px solid #f43f5e; border-top: 1px solid rgba(255, 255, 255, 0.05); border-right: 1px solid rgba(255, 255, 255, 0.05); border-bottom: 1px solid rgba(255, 255, 255, 0.05); border-radius: 0 16px 16px 0; }
+        .problem-text { font-size: 1.15rem; font-weight: 700; color: #f1f5f9; line-height: 1.65; word-break: keep-all; }
+
+        @media print {
+            body { background-color: #ffffff !important; margin: 0 !important; padding: 0 !important; }
+            .presentation-deck { width: 1280px !important; height: auto !important; box-shadow: none !important; border: none !important; margin: 0 !important; overflow: visible !important; display: block !important; }
+            .slide { position: relative !important; display: flex !important; width: 1280px !important; height: 720px !important; page-break-after: always !important; page-break-inside: avoid !important; background: #0f172a !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="presentation-deck" id="deck">
+        <!-- Header -->
+        <div class="flex justify-between items-center z-20 pb-3 border-b border-slate-700/50 mx-8 mt-6 no-print">
+            <div class="flex items-center gap-3">
+                <span class="bg-rose-600 text-white text-xs font-black px-2.5 py-1 rounded-md tracking-wider">고3 수능 특강</span>
+                <span class="text-slate-400 text-sm font-medium">준킬러 스피드 &amp; 숏컷 클리닉 (2탄)</span>
+            </div>
+            <div class="text-right flex items-center gap-4">
+                <span class="text-xs text-rose-400 font-semibold uppercase tracking-wider" id="slide-category">Intro</span>
+                <span class="text-xs text-slate-400 font-semibold bg-slate-800/80 px-2.5 py-1 rounded-md border border-slate-700" id="slide-counter">1 / 22</span>
+            </div>
+        </div>
+
+        <!-- 슬라이드 본문 영역 -->
+        <div class="relative flex-grow my-2 overflow-hidden" id="slide-container">
+
+            <!-- Slide 1: 표지 -->
+            <div class="slide active" data-category="Intro">
+                <div class="flex flex-col items-center justify-center h-full text-center">
+                    <span class="bg-rose-600 text-white text-xs font-black px-3.5 py-1.5 rounded-full tracking-wider mb-4 uppercase">고3 수능 대비 특강 · 2탄</span>
+                    <h1 class="text-5xl font-black text-white tracking-tight leading-tight mb-5 drop-shadow-md">준킬러 스피드 &amp; 숏컷 클리닉</h1>
+                    <div class="h-1.5 w-32 bg-rose-600 rounded-full mb-6"></div>
+                    <h2 class="text-2xl font-bold text-rose-400">대칭성 · 그래프 성질 · 비율 관계로 풀이 절반 이하로 단축하기</h2>
+                    <p class="text-slate-400 mt-6 text-base max-w-2xl font-light leading-relaxed">
+                        평가원 기출 준킬러 5문항 클리닉 (수학Ⅰ 2 · 수학Ⅱ 2 · 미적분 1)<br>
+                        <span class="text-rose-300 font-medium">[원문 → 정석/숏컷 → 함정/스킵시그널 → 구조변형문제]</span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- ===================== 문항 01 : 수학Ⅰ 지수함수·역함수 ===================== -->
+            <!-- Slide 2 -->
+            <div class="slide" data-category="문항 01 | 원문">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 01 [원문] &nbsp;<span class="text-rose-400 text-lg">수학Ⅰ | 지수함수의 역함수·대칭성 | 2025학년도 대학수학능력시험 수학 20번</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Original Question (단답형)</div>
+                        <h3 class="problem-text text-base leading-relaxed">
+                            곡선 $y=\left(\dfrac{1}{5}\right)^{x-3}$과 직선 $y=x$가 만나는 점의 $x$좌표를 $k$라 하자. 실수 전체의 집합에서 정의된 함수 $f(x)$가 다음 조건을 만족시킨다.<br><br>
+                            $x>k$인 모든 실수 $x$에 대하여 $f(x)=\left(\dfrac{1}{5}\right)^{x-3}$이고 $f(f(x))=3x$이다.<br><br>
+                            $f\!\left(\dfrac{1}{k^3\times 5^{3k}}\right)$의 값을 구하시오. [4점]
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 3 -->
+            <div class="slide" data-category="문항 01 | 원문 해설">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 01 [원문 해설] &nbsp;<span class="text-rose-400 text-lg">정석 vs 숏컷 풀이 비교</span></h2>
+                <div class="grid grid-cols-2 gap-6 flex-grow items-stretch">
+                    <div class="concept-card p-5 border-t-4 border-slate-500 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-slate-400 font-bold uppercase tracking-wider block mb-1">학생들의 돌아가는 풀이</span>
+                            <h3 class="text-base font-bold text-white mb-2">$k$의 근삿값을 직접 구하려는 시도</h3>
+                            <div class="text-xs text-slate-300 space-y-2 leading-relaxed">
+                                <p>1. $5^{3-k}=k$를 만족하는 $k$를 직접 풀려 하지만 무리수라 정확한 값이 안 나온다.</p>
+                                <p>2. $f(f(x))=3x$가 "모든 실수 $x$"에 대한 조건이라 착각해 $x\le k$ 영역까지 억지로 대입한다.</p>
+                                <p>3. $\dfrac{1}{k^3\times5^{3k}}$이 $x>k$ 구간인지 $(0,k)$ 구간인지 판정하지 못한 채 계산이 꼬인다.</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-slate-400 bg-slate-800/60 p-2 rounded mt-2">
+                            <i class="fa-solid fa-triangle-exclamation text-amber-400 mr-1"></i> 무리수 근사 계산 + 구간 오판으로 시간 소모 &amp; 계산 실수 유발
+                        </div>
+                    </div>
+                    <div class="concept-card p-5 border-t-4 border-rose-500 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-rose-400 font-bold uppercase tracking-wider block mb-1">강사의 숏컷 풀이</span>
+                            <h3 class="text-base font-bold text-rose-300 mb-2">"$k$의 정의식 자체가 답으로 가는 지름길"</h3>
+                            <div class="text-xs text-slate-200 space-y-3 leading-relaxed">
+                                <p class="bg-rose-950/40 p-2.5 rounded-lg border border-rose-800/40">
+                                    <b>핵심 개념:</b> $k$는 $5^{3-k}=k$를 만족하므로, $k$의 실제 값을 몰라도 이 정의식을 <b>세제곱</b>하면 $k^3\times5^{3k}$를 항등식적으로 소거할 수 있습니다.
+                                </p>
+                                <p><b>한 줄 정리:</b> $k^3=5^{9-3k}\ \Rightarrow\ k^3\times5^{3k}=5^9$</p>
+                                <p><b>원샷 계산:</b> $\dfrac{1}{k^3\times5^{3k}}=5^{-9}\in(0,k)$이므로 역함수 치환 $f(y)=3(3-\log_5y)$를 써서
+                                $$f(5^{-9})=9-3(-9)=36$$</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-rose-300 bg-rose-900/40 p-2 rounded mt-2">
+                            <i class="fa-solid fa-bolt text-yellow-300 mr-1"></i> $k$의 근삿값 계산 없이 정의식만으로 즉시 소거!
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 4 -->
+            <div class="slide" data-category="문항 01 | 함정 &amp; 스킵 시그널">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 01 [클리닉] &nbsp;<span class="text-rose-400 text-lg">함정 포인트 &amp; 30초 스킵 시그널</span></h2>
+                <div class="grid grid-cols-2 gap-6 flex-grow items-stretch">
+                    <div class="concept-card p-6 border-t-4 border-amber-500 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="bg-amber-500/20 text-amber-300 p-2 rounded-lg"><i class="fa-solid fa-skull-crossbones text-xl"></i></span>
+                                <h3 class="text-lg font-bold text-amber-300">함정 포인트 (Trap Point)</h3>
+                            </div>
+                            <p class="text-sm text-slate-200 leading-relaxed bg-amber-950/30 p-3 rounded-lg border border-amber-800/30">
+                                $f(f(x))=3x$ 조건이 <b>$x>k$ 구간에만</b> 적용된다는 것을 놓치고, 대입할 값이 $x>k$ 영역인지 $(0,k)$ 영역인지 구간 판정을 생략한 채 무작정 대입하는 것.
+                            </p>
+                        </div>
+                        <div class="text-xs text-amber-200 font-semibold bg-amber-900/40 p-2.5 rounded-lg">
+                            <i class="fa-solid fa-lightbulb mr-1"></i> 대입 전에 반드시 "이 값이 어느 구간에 속하는가"부터 확인할 것!
+                        </div>
+                    </div>
+                    <div class="concept-card p-6 border-t-4 border-rose-500 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="bg-rose-500/20 text-rose-300 p-2 rounded-lg"><i class="fa-solid fa-hand text-xl"></i></span>
+                                <h3 class="text-lg font-bold text-rose-300">30초 스킵 시그널 (Skip Signal)</h3>
+                            </div>
+                            <p class="text-sm text-slate-200 leading-relaxed bg-rose-950/40 p-3 rounded-lg border border-rose-800/40 font-semibold">
+                                문제를 읽고 30초 안에 "$k^3\times5^{3k}$가 $k$의 정의식으로 깔끔히 정리되는가"가 보이지 않으면, 곧바로 $k$의 근삿값을 구해 직접 대입하는 정석으로 전환하라.
+                            </p>
+                        </div>
+                        <div class="text-xs text-rose-200 font-semibold bg-rose-900/50 p-2.5 rounded-lg">
+                            <i class="fa-solid fa-stopwatch mr-1"></i> 정의식의 거듭제곱 소거가 안 보이면 숏컷은 오히려 시간 손해.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 5 -->
+            <div class="slide" data-category="문항 01 | 구조 변형">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 01 [구조 변형] &nbsp;<span class="text-rose-400 text-lg">실전 응용 문제</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Structure Extension</div>
+                        <h3 class="problem-text text-lg leading-relaxed">
+                            곡선 $y=\left(\dfrac{1}{3}\right)^{x-2}$과 직선 $y=x$가 만나는 점의 $x$좌표를 $k$라 하자. 실수 전체의 집합에서 정의된 함수 $f(x)$가 $x>k$인 모든 실수 $x$에 대하여 $f(x)=\left(\dfrac{1}{3}\right)^{x-2}$이고 $f(f(x))=2x$를 만족시킨다.<br><br>
+                            $f\!\left(\dfrac{1}{k^2\times 3^{2k}}\right)$의 값을 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===================== 문항 02 : 수학Ⅰ 조각함수 ===================== -->
+            <!-- Slide 6 -->
+            <div class="slide" data-category="문항 02 | 원문">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 02 [원문] &nbsp;<span class="text-rose-400 text-lg">수학Ⅰ | 지수함수와 조각적 정의 | 2024학년도 9월 모의평가 공통 14번</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Original Question</div>
+                        <h3 class="problem-text text-base leading-relaxed">
+                            두 자연수 $a$, $b$에 대하여 함수
+                            $$f(x)=\begin{cases}2^{x+a}+b & (x\le -8) \\ -3^{x-3}+8 & (x>-8)\end{cases}$$
+                            이 다음 조건을 만족시킬 때, $a+b$의 값은? [4점]<br><br>
+                            집합 $\{f(x)\,|\,x\le k\}$의 원소 중 정수인 것의 개수가 $2$가 되도록 하는 모든 실수 $k$의 값의 범위는 $3\le k<4$이다.<br><br>
+                            ① 11 &nbsp; ② 13 &nbsp; ③ 15 &nbsp; ④ 17 &nbsp; ⑤ 19
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 7 -->
+            <div class="slide" data-category="문항 02 | 원문 해설">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 02 [원문 해설] &nbsp;<span class="text-rose-400 text-lg">정석 vs 숏컷 풀이 비교</span></h2>
+                <div class="grid grid-cols-2 gap-6 flex-grow items-stretch">
+                    <div class="concept-card p-5 border-t-4 border-slate-500 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-slate-400 font-bold uppercase tracking-wider block mb-1">학생들의 돌아가는 풀이</span>
+                            <h3 class="text-base font-bold text-white mb-2">치역을 통째로 오판 후 무작정 대입</h3>
+                            <div class="text-xs text-slate-300 space-y-2 leading-relaxed">
+                                <p>1. $x\le-8$ 조각의 치역을 $(-\infty,\,2^{a-8}+b]$로 착각한다 (하한이 $b$로 열려있음을 놓침).</p>
+                                <p>2. $\{f(x)\,|\,x\le k\}$가 $k$에 따라 두 조각이 분리·병합되는 구간을 나누지 않고 무작정 $f(3)$, $f(4)$만 계산한다.</p>
+                                <p>3. "$3\le k<4$"라는 범위의 의미를 경계값과 정확히 매칭시키지 못해 시간을 허비한다.</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-slate-400 bg-slate-800/60 p-2 rounded mt-2">
+                            <i class="fa-solid fa-triangle-exclamation text-amber-400 mr-1"></i> 치역의 열린/닫힌 경계를 놓쳐 케이스 분류가 꼬임
+                        </div>
+                    </div>
+                    <div class="concept-card p-5 border-t-4 border-rose-500 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-rose-400 font-bold uppercase tracking-wider block mb-1">강사의 숏컷 풀이</span>
+                            <h3 class="text-base font-bold text-rose-300 mb-2">"경계값 두 개만 매칭하면 끝"</h3>
+                            <div class="text-xs text-slate-200 space-y-3 leading-relaxed">
+                                <p class="bg-rose-950/40 p-2.5 rounded-lg border border-rose-800/40">
+                                    <b>핵심 개념:</b> 두 번째 조각값 $f(3)=7$, $f(4)=5$는 $a,b$와 무관하게 고정됩니다. 범위의 끝점 $k=3,4$에서 정수가 "새로 편입"되는 순간만 그래프로 짚으면 됩니다.
+                                </p>
+                                <p><b>상한 매칭:</b> $k=4$에서 정수 $5$가 새로 편입 $\Rightarrow b=f(4)=5$</p>
+                                <p><b>하한 매칭:</b> $k=3$에서 시작하려면 $f(-8)$이 $7$과 $5$ 사이의 정수 $6$과 일치해 매끄럽게 병합 $\Rightarrow 2^{a-8}+5=6\Rightarrow a=8$</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-rose-300 bg-rose-900/40 p-2 rounded mt-2">
+                            <i class="fa-solid fa-bolt text-yellow-300 mr-1"></i> 그래프 스케치 한 번으로 경계값만 확인, 케이스 분류 불필요!
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 8 -->
+            <div class="slide" data-category="문항 02 | 함정 &amp; 스킵 시그널">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 02 [클리닉] &nbsp;<span class="text-rose-400 text-lg">함정 포인트 &amp; 30초 스킵 시그널</span></h2>
+                <div class="grid grid-cols-2 gap-6 flex-grow items-stretch">
+                    <div class="concept-card p-6 border-t-4 border-amber-500 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="bg-amber-500/20 text-amber-300 p-2 rounded-lg"><i class="fa-solid fa-skull-crossbones text-xl"></i></span>
+                                <h3 class="text-lg font-bold text-amber-300">함정 포인트 (Trap Point)</h3>
+                            </div>
+                            <p class="text-sm text-slate-200 leading-relaxed bg-amber-950/30 p-3 rounded-lg border border-amber-800/30">
+                                $x\le-8$ 조각의 치역이 $(b,\,2^{a-8}+b]$로 <b>하한이 열린구간</b>이라는 점을 놓치고, 무한히 많은 정수가 포함된다고 착각하는 것.
+                            </p>
+                        </div>
+                        <div class="text-xs text-amber-200 font-semibold bg-amber-900/40 p-2.5 rounded-lg">
+                            <i class="fa-solid fa-lightbulb mr-1"></i> 지수함수 조각은 점근선 값이 치역에 포함되지 않는다는 것을 항상 체크!
+                        </div>
+                    </div>
+                    <div class="concept-card p-6 border-t-4 border-rose-500 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="bg-rose-500/20 text-rose-300 p-2 rounded-lg"><i class="fa-solid fa-hand text-xl"></i></span>
+                                <h3 class="text-lg font-bold text-rose-300">30초 스킵 시그널 (Skip Signal)</h3>
+                            </div>
+                            <p class="text-sm text-slate-200 leading-relaxed bg-rose-950/40 p-3 rounded-lg border border-rose-800/40 font-semibold">
+                                $f(3)$, $f(4)$가 30초 안에 암산으로 정수로 딱 떨어지지 않으면, 숏컷 대신 $k$값별 정수 개수를 표로 세는 정석으로 전환하라.
+                            </p>
+                        </div>
+                        <div class="text-xs text-rose-200 font-semibold bg-rose-900/50 p-2.5 rounded-lg">
+                            <i class="fa-solid fa-stopwatch mr-1"></i> 경계값이 지저분하면 숏컷보다 정석 표 작성이 더 빠르다.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 9 -->
+            <div class="slide" data-category="문항 02 | 구조 변형">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 02 [구조 변형] &nbsp;<span class="text-rose-400 text-lg">실전 응용 문제</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Structure Extension</div>
+                        <h3 class="problem-text text-lg leading-relaxed">
+                            두 자연수 $a$, $b$에 대하여 함수
+                            $$f(x)=\begin{cases}2^{x+a}+b & (x\le -9) \\ -3^{x-4}+8 & (x>-9)\end{cases}$$
+                            이 다음 조건을 만족시킬 때, $a+b$의 값은?<br><br>
+                            집합 $\{f(x)\,|\,x\le k\}$의 원소 중 정수인 것의 개수가 $2$가 되도록 하는 모든 실수 $k$의 값의 범위는 $4\le k<5$이다.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===================== 문항 03 : 수학Ⅱ 접선·원 ===================== -->
+            <!-- Slide 10 -->
+            <div class="slide" data-category="문항 03 | 원문">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 03 [원문] &nbsp;<span class="text-rose-400 text-lg">수학Ⅱ | 삼차함수의 접선과 도형 | 2024학년도 대학수학능력시험 수학 20번</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Original Question (단답형)</div>
+                        <h3 class="problem-text text-base leading-relaxed">
+                            $a>\sqrt{2}$인 실수 $a$에 대하여 함수 $f(x)=-x^3+ax^2+2x$라 하자. 곡선 $y=f(x)$ 위의 점 $\text{O}(0,0)$에서의 접선이 곡선 $y=f(x)$와 만나는 점 중 O가 아닌 점을 A라 하고, 곡선 $y=f(x)$ 위의 점 A에서의 접선이 $x$축과 만나는 점을 B라 하자.<br><br>
+                            점 A가 선분 OB를 지름으로 하는 원 위의 점일 때, $\text{OA}\times\text{AB}$의 값을 구하시오. [4점]
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 11 -->
+            <div class="slide" data-category="문항 03 | 원문 해설">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 03 [원문 해설] &nbsp;<span class="text-rose-400 text-lg">정석 vs 숏컷 풀이 비교</span></h2>
+                <div class="grid grid-cols-2 gap-6 flex-grow items-stretch">
+                    <div class="concept-card p-5 border-t-4 border-slate-500 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-slate-400 font-bold uppercase tracking-wider block mb-1">학생들의 돌아가는 풀이</span>
+                            <h3 class="text-base font-bold text-white mb-2">원의 방정식부터 세우려는 시도</h3>
+                            <div class="text-xs text-slate-300 space-y-2 leading-relaxed">
+                                <p>1. 접선 $y=2x$와 곡선을 연립해 $\text{A}=(a,2a)$를 구한다.</p>
+                                <p>2. 점 A에서의 접선식을 세워 $x$절편 B의 좌표를 분수식으로 구한다.</p>
+                                <p>3. "원 위의 점" 조건을 보고 원의 중심·반지름을 직접 구해 A를 대입 &rarr; 복잡한 분수 연립방정식으로 번짐.</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-slate-400 bg-slate-800/60 p-2 rounded mt-2">
+                            <i class="fa-solid fa-triangle-exclamation text-amber-400 mr-1"></i> 원의 방정식 전개 + 분수 연립으로 계산량 폭증
+                        </div>
+                    </div>
+                    <div class="concept-card p-5 border-t-4 border-rose-500 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-rose-400 font-bold uppercase tracking-wider block mb-1">강사의 숏컷 풀이</span>
+                            <h3 class="text-base font-bold text-rose-300 mb-2">"지름 위의 원주각은 항상 90&deg;"</h3>
+                            <div class="text-xs text-slate-200 space-y-3 leading-relaxed">
+                                <p class="bg-rose-950/40 p-2.5 rounded-lg border border-rose-800/40">
+                                    <b>핵심 개념:</b> 탈레스 정리로 원의 방정식 없이 곧바로 $\overline{\text{OA}}\perp\overline{\text{AB}}$를 얻습니다. $\overline{\text{OA}}$는 원점 접선(기울기 $f'(0)=2$) 위, $\overline{\text{AB}}$는 A의 접선(기울기 $f'(a)=2-a^2$) 위입니다.
+                                </p>
+                                <p><b>수직 조건 한 줄:</b> $2(2-a^2)=-1 \Rightarrow a^2=\dfrac52$</p>
+                                <p><b>넓이 이용:</b> $\triangle\text{OAB}$ 넓이 $=\dfrac12\overline{\text{OB}}\times(\text{A의 }y\text{좌표})=\dfrac12\overline{\text{OA}}\times\overline{\text{AB}}$이므로
+                                $$\overline{\text{OA}}\times\overline{\text{AB}}=2a\times\overline{\text{OB}}=2a\times5a=10a^2=25$$</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-rose-300 bg-rose-900/40 p-2 rounded mt-2">
+                            <i class="fa-solid fa-bolt text-yellow-300 mr-1"></i> 좌표를 일일이 구하지 않고 기울기 곱과 넓이 관계로 즉시 계산!
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 12 -->
+            <div class="slide" data-category="문항 03 | 함정 &amp; 스킵 시그널">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 03 [클리닉] &nbsp;<span class="text-rose-400 text-lg">함정 포인트 &amp; 30초 스킵 시그널</span></h2>
+                <div class="grid grid-cols-2 gap-6 flex-grow items-stretch">
+                    <div class="concept-card p-6 border-t-4 border-amber-500 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="bg-amber-500/20 text-amber-300 p-2 rounded-lg"><i class="fa-solid fa-skull-crossbones text-xl"></i></span>
+                                <h3 class="text-lg font-bold text-amber-300">함정 포인트 (Trap Point)</h3>
+                            </div>
+                            <p class="text-sm text-slate-200 leading-relaxed bg-amber-950/30 p-3 rounded-lg border border-amber-800/30">
+                                "원 위의 점"이라는 문구를 보자마자 원의 방정식(중심·반지름)부터 세우려는 것 &mdash; 실제로는 지름 위의 원주각 성질(탈레스 정리)로 수직 조건만 얻으면 충분하다.
+                            </p>
+                        </div>
+                        <div class="text-xs text-amber-200 font-semibold bg-amber-900/40 p-2.5 rounded-lg">
+                            <i class="fa-solid fa-lightbulb mr-1"></i> "지름을 보면 직각을 떠올려라" &mdash; 원의 방정식은 최후의 수단!
+                        </div>
+                    </div>
+                    <div class="concept-card p-6 border-t-4 border-rose-500 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="bg-rose-500/20 text-rose-300 p-2 rounded-lg"><i class="fa-solid fa-hand text-xl"></i></span>
+                                <h3 class="text-lg font-bold text-rose-300">30초 스킵 시그널 (Skip Signal)</h3>
+                            </div>
+                            <p class="text-sm text-slate-200 leading-relaxed bg-rose-950/40 p-3 rounded-lg border border-rose-800/40 font-semibold">
+                                문제에 "지름" 또는 "원 위의 점"이라는 단어가 나왔는데 30초 안에 탈레스 정리(반원에 대한 원주각=90&deg;)가 떠오르지 않으면, 바로 원의 방정식을 세우는 정석으로 전환하라.
+                            </p>
+                        </div>
+                        <div class="text-xs text-rose-200 font-semibold bg-rose-900/50 p-2.5 rounded-lg">
+                            <i class="fa-solid fa-stopwatch mr-1"></i> 직각 조건이 안 보이면 숏컷을 강행하지 말 것.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 13 -->
+            <div class="slide" data-category="문항 03 | 구조 변형">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 03 [구조 변형] &nbsp;<span class="text-rose-400 text-lg">실전 응용 문제</span></h2>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Structure Extension</div>
+                        <h3 class="problem-text text-lg leading-relaxed">
+                            $a>\sqrt{3}$인 실수 $a$에 대하여 함수 $f(x)=-x^3+ax^2+3x$라 하자. 곡선 $y=f(x)$ 위의 점 $\text{O}(0,0)$에서의 접선이 곡선 $y=f(x)$와 만나는 점 중 O가 아닌 점을 A라 하고, 곡선 $y=f(x)$ 위의 점 A에서의 접선이 $x$축과 만나는 점을 B라 하자.<br><br>
+                            점 A가 선분 OB를 지름으로 하는 원 위의 점일 때, $\text{OA}\times\text{AB}$의 값을 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===================== 문항 04 : 수학Ⅱ 조각함수·미분가능성 ===================== -->
+            <!-- Slide 14 -->
+            <div class="slide" data-category="문항 04 | 원문">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 04 [원문] &nbsp;<span class="text-rose-400 text-lg">수학Ⅱ | 미분가능성과 함수의 그래프 | 2026학년도 6월 모의평가 공통 15번</span></h2>
+                <div class="problem-box p-7 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-2">Original Question</div>
+                        <h3 class="problem-text text-sm leading-relaxed">
+                            상수 $k$와 $f'(0)=6$인 삼차함수 $f(x)$에 대하여 함수
+                            $$g(x)=\begin{cases}f(x)+k & (|x|>1) \\ -f(x) & (|x|\le1)\end{cases}$$
+                            이 다음 조건을 만족시킬 때, $k+f\left(\dfrac12\right)$의 값은? [4점]<br><br>
+                            (가) 모든 실수 $a$에 대하여 $\displaystyle\lim_{x\to a+}\dfrac{g(x)-g(a)}{x-a}$의 값이 존재하고 그 값은 $0$ 이하이다.<br>
+                            (나) 방정식 $g(x)=t$의 서로 다른 실근의 개수가 $2$가 되도록 하는 실수 $t$의 최댓값은 $13$이다.<br><br>
+                            ① $\dfrac{15}{4}$ &nbsp; ② $\dfrac{27}{4}$ &nbsp; ③ $\dfrac{39}{4}$ &nbsp; ④ $\dfrac{51}{4}$ &nbsp; ⑤ $\dfrac{63}{4}$
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 15 -->
+            <div class="slide" data-category="문항 04 | 원문 해설">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 04 [원문 해설] &nbsp;<span class="text-rose-400 text-lg">정석 vs 숏컷 풀이 비교</span></h2>
+                <div class="grid grid-cols-2 gap-6 flex-grow items-stretch">
+                    <div class="concept-card p-5 border-t-4 border-slate-500 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-slate-400 font-bold uppercase tracking-wider block mb-1">학생들의 돌아가는 풀이</span>
+                            <h3 class="text-base font-bold text-white mb-2">양쪽 극한을 전부 조사 + $t$ 전 구간 케이스 분류</h3>
+                            <div class="text-xs text-slate-300 space-y-2 leading-relaxed">
+                                <p>1. $x=1$, $x=-1$ 두 지점 모두에서 좌·우극한을 전부 조사하며, (가)가 <b>우극한만</b> 요구한다는 것을 놓쳐 불필요한 연립방정식을 추가로 세운다.</p>
+                                <p>2. (나)의 "실근 개수 2가 되는 $t$의 최댓값"을 구하려고 $t$의 전 구간을 여러 케이스로 쪼개 $g(x)=t$ 그래프를 처음부터 끝까지 다 그린다.</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-slate-400 bg-slate-800/60 p-2 rounded mt-2">
+                            <i class="fa-solid fa-triangle-exclamation text-amber-400 mr-1"></i> 불필요한 연립방정식 + 다구간 그래프 반복으로 시간 폭발
+                        </div>
+                    </div>
+                    <div class="concept-card p-5 border-t-4 border-rose-500 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-rose-400 font-bold uppercase tracking-wider block mb-1">강사의 숏컷 풀이</span>
+                            <h3 class="text-base font-bold text-rose-300 mb-2">"우극한 조건은 한 지점에서만 살아있다"</h3>
+                            <div class="text-xs text-slate-200 space-y-3 leading-relaxed">
+                                <p class="bg-rose-950/40 p-2.5 rounded-lg border border-rose-800/40">
+                                    <b>핵심 개념:</b> (가)는 우극한만 다루므로 $x=-1$에서는 같은 조각 안에서 우극한을 잡아 조건이 자동 만족되고, $x=1$에서만 "우극한 존재"를 위해 $k=-2f(1)$이 강제됩니다.
+                                </p>
+                                <p><b>그래프 확정:</b> 우극한 $\le0$ 조건을 부호로 스케치하면 $f'(0)=6$과 결합해 $f'(x)=6(1-x^2)$이 단번에 결정됩니다.</p>
+                                <p><b>최댓값 즉시 확정:</b> $g$는 $x=-1$에서 한 번의 도약불연속만 갖는 단조감소 그래프이므로, $t=2$근의 최댓값은 도약의 위쪽 끝값 $g(-1)=13$으로 바로 확정됩니다.</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-rose-300 bg-rose-900/40 p-2 rounded mt-2">
+                            <i class="fa-solid fa-bolt text-yellow-300 mr-1"></i> 전 구간 케이스 나열 없이 그래프 성질로 한 번에 확정!
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 16 -->
+            <div class="slide" data-category="문항 04 | 함정 &amp; 스킵 시그널">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 04 [클리닉] &nbsp;<span class="text-rose-400 text-lg">함정 포인트 &amp; 30초 스킵 시그널</span></h2>
+                <div class="grid grid-cols-2 gap-6 flex-grow items-stretch">
+                    <div class="concept-card p-6 border-t-4 border-amber-500 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="bg-amber-500/20 text-amber-300 p-2 rounded-lg"><i class="fa-solid fa-skull-crossbones text-xl"></i></span>
+                                <h3 class="text-lg font-bold text-amber-300">함정 포인트 (Trap Point)</h3>
+                            </div>
+                            <p class="text-sm text-slate-200 leading-relaxed bg-amber-950/30 p-3 rounded-lg border border-amber-800/30">
+                                $x=-1$에서도 $x=1$과 마찬가지로 연속·미분가능 조건이 필요하다고 착각해 불필요한 방정식을 세우는 것. 문제는 <b>우극한만</b> 요구하므로 $x=-1$에서는 조건이 자동으로 만족된다.
+                            </p>
+                        </div>
+                        <div class="text-xs text-amber-200 font-semibold bg-amber-900/40 p-2.5 rounded-lg">
+                            <i class="fa-solid fa-lightbulb mr-1"></i> "좌극한"인지 "우극한"인지 조건의 방향부터 정확히 읽을 것!
+                        </div>
+                    </div>
+                    <div class="concept-card p-6 border-t-4 border-rose-500 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="bg-rose-500/20 text-rose-300 p-2 rounded-lg"><i class="fa-solid fa-hand text-xl"></i></span>
+                                <h3 class="text-lg font-bold text-rose-300">30초 스킵 시그널 (Skip Signal)</h3>
+                            </div>
+                            <p class="text-sm text-slate-200 leading-relaxed bg-rose-950/40 p-3 rounded-lg border border-rose-800/40 font-semibold">
+                                조건 (가)가 "우극한"인지 "양쪽 극한"인지 30초 안에 구분이 안 되거나, $f'(x)$의 부호 패턴이 깔끔한 포물선 형태로 안 보이면 양쪽을 모두 조사하는 정석으로 전환하라.
+                            </p>
+                        </div>
+                        <div class="text-xs text-rose-200 font-semibold bg-rose-900/50 p-2.5 rounded-lg">
+                            <i class="fa-solid fa-stopwatch mr-1"></i> 조건의 방향이 헷갈리면 숏컷을 시도하지 말 것.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 17 -->
+            <div class="slide" data-category="문항 04 | 구조 변형">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 04 [구조 변형] &nbsp;<span class="text-rose-400 text-lg">실전 응용 문제</span></h2>
+                <div class="problem-box p-7 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Structure Extension</div>
+                        <h3 class="problem-text text-base leading-relaxed">
+                            상수 $k$와 $f'(0)=12$인 삼차함수 $f(x)$에 대하여 함수
+                            $$g(x)=\begin{cases}f(x)+k & (|x|>1) \\ -f(x) & (|x|\le1)\end{cases}$$
+                            이 다음 조건을 만족시킬 때, $k+f\left(\dfrac12\right)$의 값은?<br><br>
+                            (가) 모든 실수 $a$에 대하여 $\displaystyle\lim_{x\to a+}\dfrac{g(x)-g(a)}{x-a}$의 값이 존재하고 그 값은 $0$ 이하이다.<br>
+                            (나) 방정식 $g(x)=t$의 서로 다른 실근의 개수가 $2$가 되도록 하는 실수 $t$의 최댓값은 $25$이다.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===================== 문항 05 : 미적분 역함수 미분 ===================== -->
+            <!-- Slide 18 -->
+            <div class="slide" data-category="문항 05 | 원문">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 05 [원문] &nbsp;<span class="text-rose-400 text-lg">미적분 | 지수함수와 역함수의 미분 | 2025학년도 6월 모의평가 미적분 28번</span></h2>
+                <div class="problem-box p-7 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-2">Original Question</div>
+                        <h3 class="problem-text text-sm leading-relaxed">
+                            함수 $f(x)$가
+                            $$f(x)=\begin{cases}(x-a-2)^2e^x & (x\ge a) \\ e^{2a}(x-a)+4e^a & (x \lt a)\end{cases}$$
+                            일 때, 실수 $t$에 대하여 $f(x)=t$를 만족시키는 $x$의 최솟값을 $g(t)$라 하자.<br><br>
+                            함수 $g(t)$가 $t=12$에서만 불연속일 때, $\dfrac{g'(f(a+2))}{g'(f(a+6))}$의 값은? (단, $a$는 상수이다.) [4점]<br><br>
+                            ① $6e^4$ &nbsp; ② $9e^4$ &nbsp; ③ $12e^4$ &nbsp; ④ $8e^6$ &nbsp; ⑤ $10e^6$
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 19 -->
+            <div class="slide" data-category="문항 05 | 원문 해설">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 05 [원문 해설] &nbsp;<span class="text-rose-400 text-lg">정석 vs 숏컷 풀이 비교</span></h2>
+                <div class="grid grid-cols-2 gap-6 flex-grow items-stretch">
+                    <div class="concept-card p-5 border-t-4 border-slate-500 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-slate-400 font-bold uppercase tracking-wider block mb-1">학생들의 돌아가는 풀이</span>
+                            <h3 class="text-base font-bold text-white mb-2">전 구간 증감표 완전 분석</h3>
+                            <div class="text-xs text-slate-300 space-y-2 leading-relaxed">
+                                <p>1. $h(u)=(u-2)^2e^u$ ($u=x-a$)의 증감을 처음부터 완전히 분석해 극댓값·극솟값을 다 구한다.</p>
+                                <p>2. $g(t)$를 $t<0,\ t=0,\ 0<t<4e^a,\ t=4e^a,\ t>4e^a$ 등 5개 구간으로 전부 쪼개 각 구간의 근의 개수를 센 뒤에야 불연속점을 발견한다.</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-slate-400 bg-slate-800/60 p-2 rounded mt-2">
+                            <i class="fa-solid fa-triangle-exclamation text-amber-400 mr-1"></i> 5구간 완전 분류 + 뒤늦은 불연속점 발견으로 시간 압박
+                        </div>
+                    </div>
+                    <div class="concept-card p-5 border-t-4 border-rose-500 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs text-rose-400 font-bold uppercase tracking-wider block mb-1">강사의 숏컷 풀이</span>
+                            <h3 class="text-base font-bold text-rose-300 mb-2">"외봉 그래프의 불연속점은 극댓값 지점 하나뿐"</h3>
+                            <div class="text-xs text-slate-200 space-y-3 leading-relaxed">
+                                <p class="bg-rose-950/40 p-2.5 rounded-lg border border-rose-800/40">
+                                    <b>핵심 개념:</b> $f$는 $x=a$에서 극댓값 $4e^a$(직선과 매끄럽게 연결), $x=a+2$에서 극솟값 $0$을 갖는 "봉우리 하나"짜리 그래프입니다. 최솟값-역함수 $g$의 불연속은 정확히 그 극댓값 지점 하나뿐입니다.
+                                </p>
+                                <p><b>즉시 확정:</b> $4e^a=12\Rightarrow a=\ln3$</p>
+                                <p><b>조각 판별로 계산:</b> $t=f(a+2)=0<12$이므로 직선 조각의 역함수(기울기 $1/e^{2a}=1/9$), $t=f(a+6)=48e^6>12$이므로 지수 조각의 역함수($1/f'(a+6)=1/(72e^6)$) &rArr; 비율 $=8e^6$</p>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-rose-300 bg-rose-900/40 p-2 rounded mt-2">
+                            <i class="fa-solid fa-bolt text-yellow-300 mr-1"></i> 그래프 스케치 한 번으로 불연속점과 조각 판별을 동시에!
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 20 -->
+            <div class="slide" data-category="문항 05 | 함정 &amp; 스킵 시그널">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 05 [클리닉] &nbsp;<span class="text-rose-400 text-lg">함정 포인트 &amp; 30초 스킵 시그널</span></h2>
+                <div class="grid grid-cols-2 gap-6 flex-grow items-stretch">
+                    <div class="concept-card p-6 border-t-4 border-amber-500 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="bg-amber-500/20 text-amber-300 p-2 rounded-lg"><i class="fa-solid fa-skull-crossbones text-xl"></i></span>
+                                <h3 class="text-lg font-bold text-amber-300">함정 포인트 (Trap Point)</h3>
+                            </div>
+                            <p class="text-sm text-slate-200 leading-relaxed bg-amber-950/30 p-3 rounded-lg border border-amber-800/30">
+                                $g'(f(a+2))$를 구할 때 $x=a+2$가 지수 조각 위에 있다고 보고 곧바로 $1/f'(a+2)$로 계산하는 것 &mdash; 그런데 $x=a+2$는 <b>극솟값 지점</b>이라 $f'(a+2)=0$이 되어 분모가 $0$이 된다. $t=0<12$이므로 실제로는 직선 조각의 역함수를 써야 한다.
+                            </p>
+                        </div>
+                        <div class="text-xs text-amber-200 font-semibold bg-amber-900/40 p-2.5 rounded-lg">
+                            <i class="fa-solid fa-lightbulb mr-1"></i> 역함수 미분 전에 "이 $t$값이 어느 조각에 속하는가"부터 확인!
+                        </div>
+                    </div>
+                    <div class="concept-card p-6 border-t-4 border-rose-500 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="bg-rose-500/20 text-rose-300 p-2 rounded-lg"><i class="fa-solid fa-hand text-xl"></i></span>
+                                <h3 class="text-lg font-bold text-rose-300">30초 스킵 시그널 (Skip Signal)</h3>
+                            </div>
+                            <p class="text-sm text-slate-200 leading-relaxed bg-rose-950/40 p-3 rounded-lg border border-rose-800/40 font-semibold">
+                                궁금한 $t$값이 그래프의 극댓값/극솟값보다 큰지 작은지 30초 안에 판단이 안 서면(어느 조각의 역함수를 써야 할지 헷갈리면), 전체 그래프를 손으로 그려 판별하는 정석으로 전환하라.
+                            </p>
+                        </div>
+                        <div class="text-xs text-rose-200 font-semibold bg-rose-900/50 p-2.5 rounded-lg">
+                            <i class="fa-solid fa-stopwatch mr-1"></i> 조각 판별이 불확실하면 숏컷 대신 그래프부터 그릴 것.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 21 -->
+            <div class="slide" data-category="문항 05 | 구조 변형">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 05 [구조 변형] &nbsp;<span class="text-rose-400 text-lg">실전 응용 문제</span></h2>
+                <div class="problem-box p-7 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Structure Extension</div>
+                        <h3 class="problem-text text-base leading-relaxed">
+                            함수 $f(x)$가
+                            $$f(x)=\begin{cases}(x-a-2)^2e^x & (x\ge a) \\ e^{2a}(x-a)+4e^a & (x \lt a)\end{cases}$$
+                            일 때, 실수 $t$에 대하여 $f(x)=t$를 만족시키는 $x$의 최솟값을 $g(t)$라 하자.<br><br>
+                            함수 $g(t)$가 $t=20$에서만 불연속일 때, $\dfrac{g'(f(a+2))}{g'(f(a+5))}$의 값은? (단, $a$는 상수이다.)
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 22: 정답표 -->
+            <div class="slide" data-category="정답표 (Answer Key)">
+                <h2 class="text-2xl font-extrabold text-white mb-4">준킬러 특강 2탄 &nbsp;<span class="text-rose-400 text-lg">전체 정답표 (Answer Key)</span></h2>
+                <div class="concept-card p-8 flex-grow flex flex-col justify-between">
+                    <div>
+                        <span class="text-xs text-rose-400 font-bold uppercase tracking-wider block mb-4">원문 기출 &amp; 구조 변형 문제 정답 종합</span>
+                        <div class="overflow-hidden rounded-xl border border-slate-700/60">
+                            <table class="w-full text-left text-sm text-slate-200">
+                                <thead class="bg-slate-800/90 text-rose-300 font-bold text-xs uppercase border-b border-slate-700">
+                                    <tr>
+                                        <th class="py-3.5 px-6">문항 번호</th>
+                                        <th class="py-3.5 px-6">단원 / 출처</th>
+                                        <th class="py-3.5 px-6 text-center">원문 기출 정답</th>
+                                        <th class="py-3.5 px-6 text-center">구조 변형 문제 정답</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-800 text-xs">
+                                    <tr class="hover:bg-slate-800/40">
+                                        <td class="py-3.5 px-6 font-bold text-white">문항 01</td>
+                                        <td class="py-3.5 px-6 text-slate-300">수학Ⅰ &middot; 2025학년도 수능 20번</td>
+                                        <td class="py-3.5 px-6 text-center font-bold text-rose-400">$36$</td>
+                                        <td class="py-3.5 px-6 text-center font-bold text-emerald-400">$12$</td>
+                                    </tr>
+                                    <tr class="hover:bg-slate-800/40">
+                                        <td class="py-3.5 px-6 font-bold text-white">문항 02</td>
+                                        <td class="py-3.5 px-6 text-slate-300">수학Ⅰ &middot; 2024학년도 9월 모의평가 14번</td>
+                                        <td class="py-3.5 px-6 text-center font-bold text-rose-400">$a+b=13$ (②)</td>
+                                        <td class="py-3.5 px-6 text-center font-bold text-emerald-400">$a+b=14$</td>
+                                    </tr>
+                                    <tr class="hover:bg-slate-800/40">
+                                        <td class="py-3.5 px-6 font-bold text-white">문항 03</td>
+                                        <td class="py-3.5 px-6 text-slate-300">수학Ⅱ &middot; 2024학년도 수능 20번</td>
+                                        <td class="py-3.5 px-6 text-center font-bold text-rose-400">$\text{OA}\times\text{AB}=25$</td>
+                                        <td class="py-3.5 px-6 text-center font-bold text-emerald-400">$100$</td>
+                                    </tr>
+                                    <tr class="hover:bg-slate-800/40">
+                                        <td class="py-3.5 px-6 font-bold text-white">문항 04</td>
+                                        <td class="py-3.5 px-6 text-slate-300">수학Ⅱ &middot; 2026학년도 6월 모의평가 15번</td>
+                                        <td class="py-3.5 px-6 text-center font-bold text-rose-400">$\dfrac{15}{4}$ (①)</td>
+                                        <td class="py-3.5 px-6 text-center font-bold text-emerald-400">$\dfrac{13}{2}$</td>
+                                    </tr>
+                                    <tr class="hover:bg-slate-800/40">
+                                        <td class="py-3.5 px-6 font-bold text-white">문항 05</td>
+                                        <td class="py-3.5 px-6 text-slate-300">미적분 &middot; 2025학년도 6월 모의평가 28번</td>
+                                        <td class="py-3.5 px-6 text-center font-bold text-rose-400">$8e^6$ (④)</td>
+                                        <td class="py-3.5 px-6 text-center font-bold text-emerald-400">$3e^5$</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="text-center text-xs text-slate-400 border-t border-slate-700/60 pt-4">
+                        수능 수학 고득점을 위한 준킬러 스피드 &amp; 숏컷 클리닉 특강 자료 (2탄)
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer / Controls -->
+        <div class="flex justify-between items-center z-20 pt-3 border-t border-slate-700/50 mx-8 mb-5 no-print text-xs">
+            <button onclick="prevSlide()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg font-bold transition">
+                <i class="fa-solid fa-chevron-left mr-1.5"></i> 이전 슬라이드
+            </button>
+            <div class="text-slate-400 font-medium">
+                <span id="current-slide-num" class="text-rose-400 font-bold">1</span> / <span id="total-slide-num">22</span>
+            </div>
+            <button onclick="nextSlide()" class="bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-lg font-bold transition">
+                다음 슬라이드 <i class="fa-solid fa-chevron-right ml-1.5"></i>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const totalSlides = slides.length;
+        const currentSlideNumEl = document.getElementById('current-slide-num');
+        const totalSlideNumEl = document.getElementById('total-slide-num');
+        const categoryEl = document.getElementById('slide-category');
+        const counterEl = document.getElementById('slide-counter');
+
+        totalSlideNumEl.textContent = totalSlides;
+
+        function showSlide(index) {
+            if (index < 0) index = 0;
+            if (index >= totalSlides) index = totalSlides - 1;
+
+            slides.forEach((slide, idx) => {
+                slide.classList.toggle('active', idx === index);
+            });
+
+            currentSlide = index;
+            currentSlideNumEl.textContent = currentSlide + 1;
+
+            const category = slides[currentSlide].getAttribute('data-category') || '';
+            categoryEl.textContent = category;
+            if (counterEl) counterEl.textContent = `${currentSlide + 1} / ${totalSlides}`;
+
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                window.MathJax.typesetPromise([slides[currentSlide]]);
+            }
+        }
+
+        function prevSlide() { if (currentSlide > 0) showSlide(currentSlide - 1); }
+        function nextSlide() { if (currentSlide < totalSlides - 1) showSlide(currentSlide + 1); }
+
+        showSlide(0);
+    </script>
+</body>
+</html>

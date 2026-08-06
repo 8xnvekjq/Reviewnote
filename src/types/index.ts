@@ -8,7 +8,7 @@ export interface ProblemBox {
 export interface MistakeAnalysis {
   solvingProcess: string;   // [문제 풀이 과정]
   mistakeSummary?: string;  // [학생 풀이 기반 틀린 이유 1줄 요약]
-  hints?: string[];         // [단계별 힌트 목록 (최대 3개)]
+  finalAnswer?: string;     // [최종 정답만 한 줄 — 복습 체크 전 스크롤 없이 바로 확인용]
   problemText?: string;     // [추출된 원본 문제 지문]
   problemBox?: ProblemBox;  // [인쇄된 문제 영역 바운딩 박스 (필기 제외)]
   matchedVideoId?: string;       // AI가 직접 매칭한 유튜브 Video ID
@@ -20,7 +20,12 @@ export interface MistakeAnalysis {
   modelUsed?: string;       // 분석에 사용된 AI 모델 명
   printed?: boolean;        // 인쇄/출력 완료 여부
   reviewDates?: string[];   // 단계별 복습 완료 일자 배열 (['7/10', '', ''])
+  durationMs?: number;      // 이 진단(classify+extract+solve 전체)이 실제로 걸린 시간(ms) — 평균 대기시간 계산용
 }
+
+// classify 완료 직후, solve가 아직 실질적인 텍스트를 스트리밍하기 전까지 잠깐 노출되는 placeholder 문구.
+// App.tsx(classifyStep)에서 설정하고, MistakeDetailModal에서 "아직 진짜 풀이 내용이 아님"을 구분하는 데 사용.
+export const SOLVING_PLACEHOLDER_TEXT = "### 1단계: 문제 이해하기\nAI가 정밀 문제 해설을 분석 중입니다... 잠시만 기다려 주세요.";
 
 export type ReviewState = 'O' | 'X' | 'star' | '';
 
@@ -34,7 +39,13 @@ export interface AdminUserStat {
   weeklyTotalCount: number;  // 이번주 등록된 오답 수
   weeklyCompletedCount: number; // 이번주 복습완료(O 3회) 수
   schoolGrade?: string;      // 학년 정보 (예: 중3, 고1)
+  nickname?: string;         // 커스텀 닉네임 (예: 성은성혁맘.❤️^^)
+  equippedTitle?: string;   // 장착 중인 칭호 (예: 수학의 신)
+  equippedStamp?: string;   // 장착 중인 스탬프 (effectValue)
+  equippedTheme?: string;   // 장착 중인 테마 (effectValue, hex)
+  equippedAiVoice?: string; // 장착 중인 AI 말투 (effectValue)
   lastReviewDate?: string | null; // 마지막 복습 일자
+  comboPoints?: number;      // 럭키상점 콤보 포인트 잔액
 }
 
 // 5대 실수 원인 유형 (체크박스)
@@ -77,6 +88,34 @@ export interface MistakeEntry {
   chapter?: string;
   rootCauses?: string[];
   userActionPlan?: string;
+  teacherScaffoldingHint?: string;
+}
+
+export type ActiveTab = 'notes' | 'completed' | 'camera' | 'stats' | 'admin' | 'guide' | 'store' | 'activity' | 'scaffolding';
+
+export type GachaRarity = 'MR' | 'UR' | 'SSR' | 'SR' | 'R';
+export type GachaCategory = 'STAMP' | 'TITLE' | 'THEME' | 'SHIELD' | 'AI_VOICE' | 'CHARM';
+
+export interface GachaItem {
+  id: string;
+  name: string;
+  description: string;
+  rarity: GachaRarity;
+  category: GachaCategory;
+  icon: string;
+  imageUrl?: string;
+  effectValue?: string; // e.g. '#10B981', '🐾', '수학의 연금술사'
+  gradient?: string; // e.g. 'linear-gradient(135deg, #10B981 0%, #047857 50%, #6EE7B7 100%)'
+  themeAccentValue?: string; // THEME 전용: 테두리/액센트에 별도로 쓰이는 2번째 hex (예: 골드 배경 + 은하수 보라 테두리)
+  color: string;
+  isLimited?: boolean; // 🔒 한정판/특수지급 전용 (가챠 뽑기Pool 제외 여부)
+}
+
+export interface EquippedItems {
+  stamp?: string;     // stamp emoji e.g. '🐾'
+  title?: string;     // title string e.g. '수학의 연금술사'
+  theme?: string;     // theme color name/hex e.g. 'emerald'
+  aiVoice?: string;   // AI persona type e.g. 'tsundere'
 }
 
 export type ActiveTab = 'notes' | 'completed' | 'camera' | 'stats' | 'admin' | 'guide' | 'materials';

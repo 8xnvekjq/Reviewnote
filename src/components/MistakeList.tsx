@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { MistakeEntry } from '../types';
 import { MistakeCard } from './MistakeCard';
 import { LaTeXRenderer } from './LaTeXRenderer';
+import { supabase } from '../services/supabase';
 
 interface MistakeListProps {
   mistakes: MistakeEntry[];
@@ -22,6 +23,9 @@ interface MistakeListProps {
   selectedPrintIds?: string[];
   onTogglePrintSelect?: (id: string) => void;
   onToggleAllPrintSelect?: () => void;
+  equippedStamp?: string;
+  profilesStampMap?: Record<string, string>;
+  scaffoldedMistakeIds?: Set<string>;
 }
 
 export const MistakeList: React.FC<MistakeListProps> = ({
@@ -43,11 +47,57 @@ export const MistakeList: React.FC<MistakeListProps> = ({
   selectedPrintIds = [],
   onTogglePrintSelect,
   onToggleAllPrintSelect,
+  equippedStamp,
+  profilesStampMap = {},
+  scaffoldedMistakeIds,
 }) => {
   const [selectedStudent, setSelectedStudent] = useState<string>('all');
   const [filterGrade, setFilterGrade] = useState<string>('all');
   const [filterChapter, setFilterChapter] = useState<string>('all');
   const [visibleCount, setVisibleCount] = useState<number>(10);
+  const [isLoadingActivity, setIsLoadingActivity] = useState<string | null>(null);
+
+  const handleActivityClick = async (act: any) => {
+    if (!act.mistake_id) return;
+    setIsLoadingActivity(act.mistake_id);
+    try {
+      // 1. 로컬 리스트에서 탐색
+      const localFind = mistakes.find(m => m.id === act.mistake_id);
+      if (localFind) {
+        onSelectEntry(localFind);
+        return;
+      }
+      // 2. 리모트 단건 SELECT 땡기기
+      const { data, error } = await supabase
+        .from('mistakes')
+        .select('*')
+        .eq('id', act.mistake_id)
+        .single();
+
+      if (error) throw error;
+      if (data) {
+        const remoteEntry: MistakeEntry = {
+          id: data.id,
+          userId: data.user_id,
+          title: data.title,
+          imageUrl: data.image_url,
+          date: data.date,
+          analysis: data.analysis || undefined,
+          reviews: data.reviews || ['', '', ''],
+          rootCauses: data.root_causes || [],
+          userActionPlan: data.user_action_plan || undefined,
+          grade: data.grade || undefined,
+          chapter: data.chapter || undefined,
+        };
+        onSelectEntry(remoteEntry);
+      }
+    } catch (err: any) {
+      console.error('활동 오답 로드 실패:', err);
+      alert('오답 카드를 불러오는데 실패했습니다: ' + err.message);
+    } finally {
+      setIsLoadingActivity(null);
+    }
+  };
 
   // 필터나 뷰모드가 변경되면 표시 개수를 10개로 리셋
   React.useEffect(() => {
@@ -159,13 +209,33 @@ export const MistakeList: React.FC<MistakeListProps> = ({
                   reviewDateStr = `${uD.getMonth() + 1}/${uD.getDate()} ${String(uD.getHours()).padStart(2, '0')}:${String(uD.getMinutes()).padStart(2, '0')}`;
                 }
                 const studentName = act.display_name || act.username || '동료 학생';
+                const isOnline = act.last_seen_at && (Date.now() - new Date(act.last_seen_at).getTime() < 300000); // 5분
+
+                const isLoadingThis = isLoadingActivity === act.mistake_id;
 
                 return (
-                  <div key={act.mistake_id || idx} className={`text-[10px] text-slate-300 leading-normal flex items-center justify-between space-x-2 ${idx > 0 ? 'pt-2' : ''}`}>
+                  <div
+                    key={act.mistake_id || idx}
+                    onClick={() => isAdmin && handleActivityClick(act)}
+                    className={`text-[10px] text-slate-300 leading-normal flex items-center justify-between space-x-2 ${
+                      idx > 0 ? 'pt-2' : ''
+                    } ${
+                      isAdmin 
+                        ? 'hover:bg-slate-800/40 cursor-pointer p-1.5 -mx-1.5 rounded-lg active:scale-[0.99] transition-all' 
+                        : 'py-1'
+                    } ${
+                      isLoadingThis ? 'opacity-50 pointer-events-none animate-pulse' : ''
+                    }`}
+                  >
                     <div className="flex items-center space-x-1.5 min-w-0 flex-1">
-                      <span className="font-bold text-indigo-300 truncate max-w-[80px] flex-none" title={studentName}>
-                        👤 {studentName}
-                      </span>
+                      <div className="flex items-center space-x-1 flex-none min-w-0">
+                        <span className="font-bold text-indigo-300 truncate max-w-[70px] flex-none" title={studentName}>
+                          👤 {studentName}
+                        </span>
+                        {isOnline && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse flex-none" title="온라인 상태" />
+                        )}
+                      </div>
                       <span className="text-slate-500 flex-none">&rarr;</span>
                       <span className="text-slate-200 truncate flex-1 min-w-0 font-bold">
                         {act.title.replace(/\$[^$]+\$/g, '').replace(/[#*`_]/g, '')}
@@ -318,11 +388,38 @@ export const MistakeList: React.FC<MistakeListProps> = ({
                             </span>
                           )}
                         </div>
-                        {studentName && (
-                          <span className="text-[8px] text-indigo-400 font-semibold mt-0.5 block">
-                            👤 {studentName}
-                          </span>
-                        )}
+                        <div className="flex items-center space-x-2 mt-1">
+                          {studentName && (
+                            <span className="text-[8px] text-indigo-400 font-semibold block">
+                              👤 {studentName}
+                            </span>
+                          )}
+                          {/* 미니 복습 진단 배지 (oox, xo별 등) */}
+                          <div className="flex items-center space-x-0.5 select-none">
+                            {(entry.reviews || ['', '', '']).slice(0, 3).map((state, idx) => {
+                              let badgeStyle = "bg-slate-950 text-slate-700 border-slate-900/60";
+                              let text = String(idx + 1);
+                              if (state === 'O') {
+                                badgeStyle = "bg-emerald-500/20 text-emerald-400 border-emerald-500/20 font-black";
+                                text = 'o';
+                              } else if (state === 'X') {
+                                badgeStyle = "bg-red-500/20 text-red-400 border-red-500/20 font-black";
+                                text = 'x';
+                              } else if (state === 'star') {
+                                badgeStyle = "bg-amber-500/20 text-amber-400 border-amber-500/20 font-black";
+                                text = '★';
+                              }
+                              return (
+                                <span
+                                  key={idx}
+                                  className={`w-[13px] h-[13px] rounded-full border text-[7.5px] flex items-center justify-center font-mono leading-none ${badgeStyle}`}
+                                >
+                                  {text}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </div>
                       </div>
                     </div>
 
@@ -366,6 +463,8 @@ export const MistakeList: React.FC<MistakeListProps> = ({
                   onDelete={onDeleteMistake}
                   studentName={isAdmin && entry.userId ? (profilesMap[entry.userId] || entry.userId.slice(0, 8)) : undefined}
                   isOwnNote={!isAdmin || entry.userId === currentUserId}
+                  equippedStamp={entry.userId ? profilesStampMap[entry.userId] : equippedStamp}
+                  hasScaffolding={scaffoldedMistakeIds?.has(entry.id)}
                 />
               ))}
             </div>
