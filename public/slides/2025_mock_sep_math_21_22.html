@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2025학년도 9월 모의평가 수학 21·22번 클리닉</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true
+            },
+            options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'] }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        .presentation-deck { position: relative; width: 1280px; height: 720px; background: radial-gradient(circle at 10% 20%, #2e1014 0%, #0f172a 100%); border: 1px solid rgba(255, 255, 255, 0.08); margin: 20px auto; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); border-left: 10px solid #e11d48; }
+        .slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 38px 65px; display: none; flex-direction: column; justify-content: space-between; z-index: 1; background: transparent; box-sizing: border-box; }
+        .slide.active { display: flex; z-index: 10; }
+
+        .concept-card { background: rgba(30, 41, 59, 0.75); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.25); }
+        .problem-box { background: linear-gradient(135deg, rgba(30, 20, 25, 0.9) 0%, rgba(15, 23, 42, 0.8) 100%); border-left: 8px solid #f43f5e; border-top: 1px solid rgba(255, 255, 255, 0.05); border-right: 1px solid rgba(255, 255, 255, 0.05); border-bottom: 1px solid rgba(255, 255, 255, 0.05); border-radius: 0 16px 16px 0; }
+        .problem-text { font-size: 1.2rem; font-weight: 700; color: #f1f5f9; line-height: 1.65; word-break: keep-all; }
+        .step-box { background: rgba(244, 63, 94, 0.06); border: 1px solid rgba(244, 63, 94, 0.2); border-radius: 12px; }
+
+        @media print {
+            body { background-color: #ffffff !important; margin: 0 !important; padding: 0 !important; }
+            .presentation-deck { width: 1280px !important; height: auto !important; box-shadow: none !important; border: none !important; margin: 0 !important; overflow: visible !important; display: block !important; }
+            .slide { position: relative !important; display: flex !important; width: 1280px !important; height: 720px !important; page-break-after: always !important; page-break-inside: avoid !important; background: #0f172a !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="presentation-deck" id="deck">
+        <div class="flex justify-between items-center z-20 pb-3 border-b border-rose-900/40 mx-8 mt-6 no-print">
+            <div class="flex items-center gap-3">
+                <span class="bg-rose-600 text-white text-xs font-black px-3 py-1 rounded-md uppercase">고3 | 정규수업</span>
+                <span class="text-slate-300 text-sm font-medium">2025학년도 9월 모의평가 수학 21·22번</span>
+            </div>
+            <div class="text-right flex items-center gap-4">
+                <span class="text-xs text-rose-400 font-bold uppercase tracking-wider" id="slide-category">단원 소개</span>
+                <span class="text-xs text-slate-400 font-semibold bg-slate-800/80 px-2.5 py-1 rounded-md border border-slate-700" id="slide-counter">1 / 6</span>
+            </div>
+        </div>
+
+        <div class="relative flex-grow my-2 overflow-hidden" id="slide-container">
+
+            <!-- Slide 1: 표지 -->
+            <div class="slide active" data-category="단원 소개">
+                <div class="flex-grow flex flex-col justify-center items-start">
+                    <span class="text-rose-400 font-bold text-lg tracking-widest mb-4">2025학년도 9월 모의평가 &nbsp;|&nbsp; 수학 영역</span>
+                    <h1 class="text-6xl font-black text-white leading-tight mb-6">21 · 22번 클리닉</h1>
+                    <div class="h-2 w-40 bg-rose-500 rounded-full mb-8"></div>
+                    <p class="text-2xl text-slate-300 font-medium">쉬운 시험일수록 더 자주 틀리는 이유를 분석한다</p>
+                    <p class="text-lg text-slate-500 font-medium mt-2">수학Ⅱ 도함수의 활용(21번) · 수학Ⅰ 수열의 귀납적 정의(22번)</p>
+                </div>
+            </div>
+
+            <!-- Slide 2: 문항21 원문 -->
+            <div class="slide" data-category="21번 | 원문">
+                <div class="flex items-center gap-4 mb-2">
+                    <span class="bg-rose-600 text-white text-sm font-black px-4 py-1.5 rounded-full">21번</span>
+                    <span class="text-rose-400 text-base font-bold">수학Ⅱ | 도함수의 활용 | 정수 조건 부등식</span>
+                </div>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Original Question (단답형)</div>
+                        <h3 class="problem-text text-lg leading-relaxed">
+                            최고차항의 계수가 $1$인 삼차함수 $f(x)$가 모든 정수 $k$에 대하여
+                            $$2k-8\le\dfrac{f(k+2)-f(k)}{2}\le4k^2+14k$$
+                            를 만족시킬 때, $f'(3)$의 값을 구하시오. [4점]
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 3: 문항21 핵심 풀이 -->
+            <div class="slide" data-category="21번 | 핵심 풀이">
+                <h2 class="text-2xl font-extrabold text-white mb-3">21번 [핵심 풀이] &nbsp;<span class="text-rose-400 text-lg">보조함수 g(x)를 빼서 곧바로 인수분해</span></h2>
+                <div class="concept-card p-6 flex-grow flex flex-col justify-center gap-3">
+                    <p class="text-base text-slate-100 leading-relaxed">
+                        <b class="text-rose-300">핵심 아이디어:</b> 하한 $2k-8$을 그대로 재현하는 이차함수 $g(x)$를 빼서 $h(x)=f(x)-g(x)$를 만들면, $h$는 $x=-2,-1$에서 값이 반복되는 삼차함수가 되어 바로 인수분해된다.
+                    </p>
+                    <div class="step-box p-4 text-sm text-slate-200 leading-relaxed">
+                        <p><b>① 보조함수:</b> $g(x)=x^2-10x$로 놓으면 $\dfrac{g(x+2)-g(x)}{2}=2x-8$ (하한과 항등적으로 일치).</p>
+                        <p><b>② 차함수:</b> $h(x)=f(x)-g(x)$라 하면 $\dfrac{h(x+2)-h(x)}{2}=0$ &nbsp;($x=-2,-1$에서, 상한=하한으로 값이 고정되므로) &nbsp;&rArr;&nbsp; $h(0)=h(-2)$, $h(1)=h(-1)$</p>
+                        <p><b>③ 인수분해:</b> $f$의 상수항은 자유롭게 택할 수 있으므로 $h(-2)=0$이 되도록 잡으면 $h(0)=h(-2)=0$도 성립. 최고차항 계수 $1$인 삼차식이므로 $h(x)=x(x+2)(x+a)$</p>
+                        <p><b>④ $a$ 결정:</b> $h(1)=h(-1)$ 대입: $3(1+a)=1-a \Rightarrow 4a=-2 \Rightarrow a=-\dfrac12$ &nbsp;&rArr;&nbsp; $h(x)=x(x+2)\!\left(x-\dfrac12\right),\ \ h'(x)=3x^2+3x-1$</p>
+                    </div>
+                    <div class="text-center text-xl font-bold text-rose-300 bg-rose-950/40 py-3 rounded-lg">
+                        $f'(x)=h'(x)+g'(x)=(3x^2+3x-1)+(2x-10)=3x^2+5x-11\ \Rightarrow\ f'(3)=\mathbf{31}$
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 5: 문항22 원문 -->
+            <div class="slide" data-category="22번 | 원문">
+                <div class="flex items-center gap-4 mb-2">
+                    <span class="bg-rose-600 text-white text-sm font-black px-4 py-1.5 rounded-full">22번</span>
+                    <span class="text-rose-400 text-base font-bold">수학Ⅰ | 수열의 귀납적 정의 | 두 갈래 점화식</span>
+                </div>
+                <div class="problem-box p-7 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-2">Original Question (단답형)</div>
+                        <h3 class="problem-text text-base leading-relaxed">
+                            양수 $k$에 대하여 $a_1=k$인 수열 $\{a_n\}$이 다음 조건을 만족시킨다.<br><br>
+                            (가) $a_2\times a_3<0$<br>
+                            (나) 모든 자연수 $n$에 대하여 $\left(a_{n+1}-a_n+\dfrac23k\right)\left(a_{n+1}+ka_n\right)=0$이다.<br><br>
+                            $a_5=0$이 되도록 하는 서로 다른 모든 양수 $k$에 대하여 $k^2$의 값의 합을 구하시오. [4점]
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 6: 문항22 핵심 풀이 -->
+            <div class="slide" data-category="22번 | 핵심 풀이">
+                <h2 class="text-2xl font-extrabold text-white mb-3">22번 [핵심 풀이] &nbsp;<span class="text-rose-400 text-lg">매 단계 두 갈래 중 하나, 가지치기로 추적</span></h2>
+                <div class="concept-card p-6 flex-grow flex flex-col justify-center gap-3">
+                    <p class="text-base text-slate-100 leading-relaxed">
+                        <b class="text-rose-300">핵심 아이디어:</b> 조건 (나)는 매 단계 두 갈래 중 하나를 강제한다 &mdash; <b>L형</b>: $a_{n+1}=a_n-\dfrac23k$ (등차형), <b>M형</b>: $a_{n+1}=-ka_n$ (부호반전&times;배율). (가)로 1~2단계 조합을 걸러낸 뒤, 3~4단계까지 전개해 $a_5=0$을 만드는 $k$를 전부 찾는다.
+                    </p>
+                    <div class="step-box p-4 text-sm text-slate-200 leading-relaxed">
+                        <p><b>① 1~2단계 필터링:</b> $a_2$가 L형(=$k/3>0$)이면 3단계 무엇을 택해도 $a_2\times a_3<0$ 자동 성립. $a_2$가 M형(=$-k^2<0$)이면 3단계는 반드시 M형이어야 함 (L형은 조건 위배). &rarr; 유효 조합: (L,L), (L,M), (M,M)</p>
+                        <p><b>② 각 갈래를 4단계까지 전개해 $a_5=0$인 양수 $k$ 도출:</b></p>
+                        <p class="pl-4">(L,L,M,L): $a_5=\dfrac{k^2-2k}{3}=0\ \Rightarrow\ k=2$</p>
+                        <p class="pl-4">(L,M,M,L): $a_5=\dfrac{k^3-2k}{3}=0\ \Rightarrow\ k=\sqrt2$</p>
+                        <p class="pl-4">(M,M,L,L): $a_5=\dfrac{3k^3-4k}{3}=0\ \Rightarrow\ k=\dfrac{2\sqrt3}{3}$</p>
+                        <p class="pl-4">(M,M,L,M): $a_5=\dfrac{-3k^4+2k^2}{3}=0\ \Rightarrow\ k=\dfrac{\sqrt6}{3}$</p>
+                    </div>
+                    <div class="text-center text-xl font-bold text-rose-300 bg-rose-950/40 py-3 rounded-lg">
+                        $k^2$의 합 $=4+2+\dfrac43+\dfrac23=\mathbf{8}$
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 7: 정답표 -->
+            <div class="slide" data-category="정답표">
+                <h2 class="text-2xl font-extrabold text-white mb-4">21 · 22번 클리닉 &nbsp;<span class="text-rose-400 text-lg">정답 정리</span></h2>
+                <div class="concept-card p-8 flex-grow flex flex-col justify-center gap-6">
+                    <div class="flex items-center justify-between step-box p-6">
+                        <div>
+                            <span class="text-rose-400 font-bold text-sm">21번 &middot; 수학Ⅱ</span>
+                            <p class="text-slate-300 text-sm mt-1">도함수의 활용 &middot; 정수 조건 부등식</p>
+                        </div>
+                        <div class="text-3xl font-black text-white">$f'(3)=31$</div>
+                    </div>
+                    <div class="flex items-center justify-between step-box p-6">
+                        <div>
+                            <span class="text-rose-400 font-bold text-sm">22번 &middot; 수학Ⅰ</span>
+                            <p class="text-slate-300 text-sm mt-1">수열의 귀납적 정의 &middot; 두 갈래 점화식</p>
+                        </div>
+                        <div class="text-3xl font-black text-white">$k^2$의 합 $=8$</div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="flex justify-between items-center z-20 pt-3 border-t border-rose-900/40 mx-8 mb-6 no-print">
+            <button onclick="prevSlide()" class="bg-slate-800/80 hover:bg-rose-600 text-slate-200 hover:text-white font-bold text-sm px-5 py-2 rounded-xl transition border border-slate-700">
+                <i class="fa-solid fa-chevron-left"></i> 이전 슬라이드
+            </button>
+            <div class="text-slate-400 text-xs font-semibold tracking-wider">
+                HIGH SCHOOL MATH CLASS PPT
+            </div>
+            <button onclick="nextSlide()" class="bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm px-5 py-2 rounded-xl transition shadow-md">
+                다음 슬라이드 <i class="fa-solid fa-chevron-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const counterEl = document.getElementById('slide-counter');
+        const categoryEl = document.getElementById('slide-category');
+
+        function updateSlide() {
+            slides.forEach((slide, idx) => slide.classList.toggle('active', idx === currentSlide));
+            if (counterEl) counterEl.textContent = `${currentSlide + 1} / ${slides.length}`;
+            if (categoryEl && slides[currentSlide]) categoryEl.textContent = slides[currentSlide].getAttribute('data-category') || '수업 자료';
+            if (window.MathJax && window.MathJax.typesetPromise) window.MathJax.typesetPromise();
+        }
+        function prevSlide() { if (currentSlide > 0) { currentSlide--; updateSlide(); } }
+        function nextSlide() { if (currentSlide < slides.length - 1) { currentSlide++; updateSlide(); } }
+        updateSlide();
+    </script>
+</body>
+</html>
