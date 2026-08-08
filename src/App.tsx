@@ -84,6 +84,8 @@ function App() {
   const [teacherApproachGuides, setTeacherApproachGuides] = useState<{ grade: string; chapter: string; guideText: string }[]>([]);
   // 주간 최다 오답 완료 챔피언 상태 (1~3위)
   const [weeklyChampions, setWeeklyChampions] = useState<any[]>([]);
+  // 명예의 전당 순위권(top3) 밖이어도 본인 점수/순위를 볼 수 있도록 별도 보관
+  const [myWeeklyStanding, setMyWeeklyStanding] = useState<{ rank: number; score: number; completedCount: number } | null>(null);
   // 분석통계 탭 학생 필터 상태 (어드민 전용)
   const [statsStudentFilter, setStatsStudentFilter] = useState<string>('all');
   // 분석통계 탭 기간 필터 상태 (디폴트: 'all' 전체기간)
@@ -388,9 +390,19 @@ function App() {
 
       const activeThisWeek = (data || []).filter((item: any) => item.score > 0);
       setWeeklyChampions(activeThisWeek.slice(0, 3));
+
+      // 순위권(top3) 밖이어도 본인 순위/점수는 항상 확인 가능하도록 전체 목록에서 내 위치를 별도로 계산
+      const myUserId = session?.user?.id;
+      const myIndex = myUserId ? activeThisWeek.findIndex((item: any) => item.user_id === myUserId) : -1;
+      setMyWeeklyStanding(
+        myIndex >= 0
+          ? { rank: myIndex + 1, score: activeThisWeek[myIndex].score, completedCount: activeThisWeek[myIndex].weekly_completed_count }
+          : null
+      );
     } catch (err) {
       console.error('loadWeeklyChampions failed:', err);
       setWeeklyChampions([]);
+      setMyWeeklyStanding(null);
     }
   };
 
@@ -1747,9 +1759,10 @@ function App() {
 
         {activeTab === 'notes' && (
           <>
-            {/* 명예의 전당 배너 (컴팩트 고정 프레임) */}
+            {/* 명예의 전당 배너 + (옆) 순위권 밖이어도 보이는 내 점수 란 */}
+            <div className="flex flex-col sm:flex-row gap-2 mb-3">
             {weeklyChampions && weeklyChampions.length > 0 ? (
-              <div className="bg-gradient-to-b from-slate-900/95 via-slate-900/90 to-slate-900/95 border border-amber-500/30 rounded-2xl p-2.5 mb-3 shadow-[0_0_15px_rgba(245,158,11,0.08)] animate-fade-in space-y-2">
+              <div className="flex-1 min-w-0 bg-gradient-to-b from-slate-900/95 via-slate-900/90 to-slate-900/95 border border-amber-500/30 rounded-2xl p-2.5 shadow-[0_0_15px_rgba(245,158,11,0.08)] animate-fade-in space-y-2">
                 {/* 헤더 타이틀 */}
                 <div className="flex items-center justify-between border-b border-slate-800/80 pb-1.5">
                   <div className="flex items-center space-x-1.5">
@@ -1826,11 +1839,11 @@ function App() {
 
                         {/* Right: 완료 X개 + X점 (단일 행 표출) */}
                         {champ && champ.score > 0 && (
-                          <div className="flex items-center space-x-1 flex-none text-right whitespace-nowrap pl-1">
-                            <span className="text-[7.5px] text-slate-500 font-medium">
+                          <div className="flex items-center space-x-1.5 flex-none text-right whitespace-nowrap pl-1">
+                            <span className="text-[9px] text-slate-400 font-medium">
                               완료 {champ.weekly_completed_count}개
                             </span>
-                            <span className={`font-black ${isFirst ? 'text-amber-400 text-[9.5px]' : 'text-slate-300 text-[8.5px]'}`}>
+                            <span className={`font-black ${isFirst ? 'text-amber-400 text-[11.5px]' : 'text-slate-300 text-[10.5px]'}`}>
                               {Math.round(champ.score)}점
                             </span>
                           </div>
@@ -1842,7 +1855,7 @@ function App() {
               </div>
             ) : (
               /* 두 주 연속 복습 완료자가 전혀 없을 때: 동기부여 공백 배너 제공 */
-              <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-3 mb-4 flex items-center justify-between shadow-lg shadow-indigo-950/5 animate-fade-in">
+              <div className="flex-1 min-w-0 bg-slate-900/40 border border-slate-800/80 rounded-2xl p-3 flex items-center justify-between shadow-lg shadow-indigo-950/5 animate-fade-in">
                 <div className="flex items-center space-x-2.5 min-w-0">
                   <span className="text-xl animate-pulse flex-none">👑</span>
                   <div className="min-w-0 leading-tight">
@@ -1859,6 +1872,22 @@ function App() {
                 </div>
               </div>
             )}
+
+            {/* 순위권(top3) 밖이어도 내 점수는 항상 보이는 작은 개인 랭킹 란 */}
+            {session?.user && (
+              <div className="sm:w-[110px] flex-none bg-slate-900/60 border border-slate-800/80 rounded-2xl p-2 flex sm:flex-col items-center sm:items-stretch justify-between sm:justify-center gap-0.5 sm:gap-1">
+                <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider sm:text-center">나의 순위</span>
+                <div className="flex items-baseline space-x-1 sm:justify-center sm:space-x-1.5">
+                  <span className="text-xs font-black text-indigo-300">
+                    {myWeeklyStanding ? `${myWeeklyStanding.rank}위` : '순위 밖'}
+                  </span>
+                  <span className="text-[9.5px] font-bold text-slate-400">
+                    {myWeeklyStanding ? `${Math.round(myWeeklyStanding.score)}점` : '0점'}
+                  </span>
+                </div>
+              </div>
+            )}
+            </div>
 
             <MistakeList
               mistakes={[...mistakes]
