@@ -8,6 +8,7 @@ interface BottomNavigationProps {
   onlineUsers: { id: string; display_name: string; nickname?: string; username: string }[];
   onStartReviewSession?: () => void;
   onOpenSlideList?: () => void;
+  reviewRemainingCount?: number;
 }
 
 export const BottomNavigation: React.FC<BottomNavigationProps> = ({
@@ -16,7 +17,8 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
   isAdmin,
   onlineUsers = [],
   onStartReviewSession,
-  onOpenSlideList
+  onOpenSlideList,
+  reviewRemainingCount
 }) => {
   const [showOnlinePopup, setShowOnlinePopup] = useState(false);
   const [showRightDrawer, setShowRightDrawer] = useState(false);
@@ -66,8 +68,8 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
           )}
         </div>
 
-        {/* 수업자료실 배지 버튼 (화면 우측 복습하기 왼편 플로팅) */}
-        <div className="absolute -top-3.5 right-[90px] z-50">
+        {/* 수업자료실 배지 버튼 (온라인 배지 옆, 정보성 배지끼리 좌측에 모아둠) */}
+        <div className="absolute -top-3.5 left-[88px] z-50">
           <button
             onClick={() => onOpenSlideList?.()}
             className="px-3 py-0.5 rounded-full border-2 text-[8.5px] font-black text-white flex items-center space-x-1 hover:scale-105 active:scale-95 transition-all backdrop-blur-md bg-emerald-700 hover:bg-emerald-650 border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.65)]"
@@ -76,14 +78,19 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
           </button>
         </div>
 
-        {/* 복습하기 배지 버튼 (화면 우측 상단 플로팅 + 황금 글로우) */}
+        {/* 복습하기 배지 버튼 (화면 우측, 남은 개수 표시로 단독 강조) */}
         {onStartReviewSession && (
-          <div className="absolute -top-3.5 right-4 z-50">
+          <div className="absolute -top-4 right-3 z-50">
             <button
               onClick={onStartReviewSession}
-              className="px-3 py-0.5 rounded-full bg-indigo-600 hover:bg-indigo-550 border-2 border-amber-400 text-[8.5px] font-black text-white flex items-center space-x-1 shadow-[0_0_12px_rgba(251,191,36,0.65)] hover:shadow-[0_0_18px_rgba(251,191,36,0.85)] hover:scale-105 active:scale-95 transition-all backdrop-blur-md"
+              className="px-3.5 py-1.5 rounded-full bg-indigo-600 hover:bg-indigo-550 border-2 border-amber-400 text-[11px] font-black text-white flex items-center space-x-1.5 shadow-[0_0_12px_rgba(251,191,36,0.65)] hover:shadow-[0_0_18px_rgba(251,191,36,0.85)] hover:scale-105 active:scale-95 transition-all backdrop-blur-md"
             >
               <span>📝 복습하기</span>
+              {typeof reviewRemainingCount === 'number' && reviewRemainingCount > 0 && (
+                <span className="bg-amber-400 text-amber-950 rounded-full px-1.5 py-0.2 text-[10px] font-black leading-tight">
+                  {reviewRemainingCount}
+                </span>
+              )}
             </button>
           </div>
         )}

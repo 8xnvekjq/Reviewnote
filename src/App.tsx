@@ -2258,6 +2258,7 @@ function App() {
         onlineUsers={onlineUsers}
         onStartReviewSession={handleStartReviewSession}
         onOpenSlideList={() => setIsSlideListOpen(true)}
+        reviewRemainingCount={mistakes.filter(m => (m.reviews?.filter(r => r === 'O').length || 0) < 3).length}
       />
 
       {/* 수업자료 모달 다이얼로그 */}
