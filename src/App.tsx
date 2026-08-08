@@ -28,7 +28,7 @@ import { getTitleBadgeStyle, GACHA_ITEMS } from './utils/gachaCatalog';
 import { getRandomCheer } from './utils/aiVoiceCheers';
 import type { EquippedItems } from './types';
 import { applyThemeColor } from './utils/theme';
-import { loadStreakState, recordReviewStreak, reconcileStreakState, getNewlyReachedMilestones, type StreakState } from './utils/streak';
+import { loadStreakState, recordReviewStreak, reconcileStreakState, getNewlyReachedMilestones, getKSTDateString, type StreakState } from './utils/streak';
 
 // DB의 mistakes row(snake_case) -> 클라이언트 MistakeEntry(camelCase) 매핑.
 // fetchUserData(전체 로드)와 refreshMistakesLight(실시간 경량 갱신)가 공유해서 로직이 갈라지지 않게 한다.
@@ -86,6 +86,8 @@ function App() {
   const [weeklyChampions, setWeeklyChampions] = useState<any[]>([]);
   // 명예의 전당 순위권(top3) 밖이어도 본인 점수/순위를 볼 수 있도록 별도 보관
   const [myWeeklyStanding, setMyWeeklyStanding] = useState<{ rank: number; score: number; completedCount: number } | null>(null);
+  // 🎯 일일 복습 퀘스트: 오늘 새로 체크한 복습 개수 (5개 달성 시 서버에서 콤보 포인트 보너스 자동 지급)
+  const [dailyReviewCount, setDailyReviewCount] = useState(0);
   // 분석통계 탭 학생 필터 상태 (어드민 전용)
   const [statsStudentFilter, setStatsStudentFilter] = useState<string>('all');
   // 분석통계 탭 기간 필터 상태 (디폴트: 'all' 전체기간)
@@ -648,7 +650,7 @@ function App() {
         targetId
           ? supabase
               .from('profiles')
-              .select('nickname, display_name, bonus_points, point_adjustment, equipped_title, equipped_stamp, equipped_theme, equipped_ai_voice, current_streak, streak_last_review_date, streak_shields, streak_milestone_claimed, custom_ai_name, combo_booster_expires_at, pending_gift_notice')
+              .select('nickname, display_name, bonus_points, point_adjustment, equipped_title, equipped_stamp, equipped_theme, equipped_ai_voice, current_streak, streak_last_review_date, streak_shields, streak_milestone_claimed, custom_ai_name, combo_booster_expires_at, pending_gift_notice, daily_review_date, daily_review_count')
               .eq('id', targetId)
               .maybeSingle()
           : Promise.resolve({ data: null } as { data: null }),
@@ -675,6 +677,9 @@ function App() {
           });
           setMyBonusPoints(myProfile.bonus_points || 0);
           setComboBoosterExpiresAt(myProfile.combo_booster_expires_at || null);
+
+          // 🎯 일일 복습 퀘스트: 날짜가 바뀌었으면(서버에 어제 값이 남아있어도) 화면상으론 0부터 다시 시작
+          setDailyReviewCount(myProfile.daily_review_date === getKSTDateString() ? (myProfile.daily_review_count || 0) : 0);
 
           // 🎁 선생님이 보낸 선물/공지가 있으면 한 번 띄우고 서버에서 즉시 비운다 (재접속 시 중복 노출 방지)
           const giftNotice = myProfile.pending_gift_notice as { title?: string; message?: string; icon?: string; badge?: string } | null;
@@ -1509,6 +1514,41 @@ function App() {
           });
       }
 
+      // 🎯 일일 복습 퀘스트: 이번 호출에서 빈 칸('')에서 새로 체크된 개수만 오늘의 진행도에 반영
+      // (되돌리기는 카운트하지 않음 — O↔X 왔다갔다 해도 매번 안 늘어나게)
+      const newlyCheckedCount = newReviews.filter((r, i) => r !== '' && oldReviews[i] === '').length;
+      if (newlyCheckedCount > 0 && session?.user?.id) {
+        supabase.rpc('record_daily_review_progress', {
+          user_id_param: session.user.id,
+          today_param: getKSTDateString(),
+          increment_param: newlyCheckedCount,
+        }).then(({ data, error: questError }) => {
+          if (questError) {
+            console.error('Failed to record daily review quest progress:', questError);
+            return;
+          }
+          const result = data as { count: number; bonusEarned: boolean } | null;
+          if (!result) return;
+          setDailyReviewCount(result.count);
+          if (result.bonusEarned) {
+            supabase.rpc('increment_bonus_points', { user_id_param: session.user.id, amount_param: 20 })
+              .then(({ data: newTotal, error: bonusRpcError }) => {
+                if (bonusRpcError) {
+                  console.error('Failed to grant daily quest bonus:', bonusRpcError);
+                  return;
+                }
+                if (typeof newTotal === 'number') setMyBonusPoints(newTotal);
+                showNoticeModal({
+                  title: '🎯 일일 복습 퀘스트 달성!',
+                  message: '오늘 복습 5개를 모두 채웠어요!\n보너스 콤보 포인트 +20점을 받았습니다!',
+                  badge: '일일 퀘스트 완료',
+                  icon: '🎯',
+                });
+              });
+          }
+        });
+      }
+
       // 매일 연속 복습 스트릭 갱신 (🔥 Daily Streak) — 신규 등록/복습 완료 공용 함수
       applyDailyStreakUpdate();
 
@@ -2258,7 +2298,7 @@ function App() {
         onlineUsers={onlineUsers}
         onStartReviewSession={handleStartReviewSession}
         onOpenSlideList={() => setIsSlideListOpen(true)}
-        reviewRemainingCount={mistakes.filter(m => (m.reviews?.filter(r => r === 'O').length || 0) < 3).length}
+        dailyReviewCount={dailyReviewCount}
       />
 
       {/* 수업자료 모달 다이얼로그 */}

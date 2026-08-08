@@ -8,8 +8,10 @@ interface BottomNavigationProps {
   onlineUsers: { id: string; display_name: string; nickname?: string; username: string }[];
   onStartReviewSession?: () => void;
   onOpenSlideList?: () => void;
-  reviewRemainingCount?: number;
+  dailyReviewCount?: number;
 }
+
+const DAILY_REVIEW_GOAL = 5;
 
 export const BottomNavigation: React.FC<BottomNavigationProps> = ({
   activeTab,
@@ -18,8 +20,9 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
   onlineUsers = [],
   onStartReviewSession,
   onOpenSlideList,
-  reviewRemainingCount
+  dailyReviewCount = 0
 }) => {
+  const questDone = dailyReviewCount >= DAILY_REVIEW_GOAL;
   const [showOnlinePopup, setShowOnlinePopup] = useState(false);
   const [showRightDrawer, setShowRightDrawer] = useState(false);
 
@@ -78,17 +81,21 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
           </button>
         </div>
 
-        {/* 복습하기 배지 버튼 (화면 우측, 남은 개수 표시로 단독 강조) */}
+        {/* 복습하기 배지 버튼 (화면 우측, 일일 복습 퀘스트 진행도로 단독 강조) */}
         {onStartReviewSession && (
           <div className="absolute -top-4 right-3 z-50">
             <button
               onClick={onStartReviewSession}
-              className="px-3.5 py-1.5 rounded-full bg-indigo-600 hover:bg-indigo-550 border-2 border-amber-400 text-[11px] font-black text-white flex items-center space-x-1.5 shadow-[0_0_12px_rgba(251,191,36,0.65)] hover:shadow-[0_0_18px_rgba(251,191,36,0.85)] hover:scale-105 active:scale-95 transition-all backdrop-blur-md"
+              className={`px-3.5 py-1.5 rounded-full border-2 text-[11px] font-black text-white flex items-center space-x-1.5 hover:scale-105 active:scale-95 transition-all backdrop-blur-md ${
+                questDone
+                  ? 'bg-emerald-600 hover:bg-emerald-550 border-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.65)] hover:shadow-[0_0_18px_rgba(16,185,129,0.85)]'
+                  : 'bg-indigo-600 hover:bg-indigo-550 border-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.65)] hover:shadow-[0_0_18px_rgba(251,191,36,0.85)]'
+              }`}
             >
-              <span>📝 복습하기</span>
-              {typeof reviewRemainingCount === 'number' && reviewRemainingCount > 0 && (
+              <span>{questDone ? '🎯 일일퀘스트 완료!' : '📝 일일복습'}</span>
+              {!questDone && (
                 <span className="bg-amber-400 text-amber-950 rounded-full px-1.5 py-0.2 text-[10px] font-black leading-tight">
-                  {reviewRemainingCount}
+                  {Math.min(dailyReviewCount, DAILY_REVIEW_GOAL)}/{DAILY_REVIEW_GOAL}
                 </span>
               )}
             </button>
