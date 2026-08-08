@@ -636,7 +636,7 @@ function App() {
         targetId
           ? supabase
               .from('profiles')
-              .select('nickname, display_name, bonus_points, point_adjustment, equipped_title, equipped_stamp, equipped_theme, equipped_ai_voice, current_streak, streak_last_review_date, streak_shields, streak_milestone_claimed, custom_ai_name, combo_booster_expires_at')
+              .select('nickname, display_name, bonus_points, point_adjustment, equipped_title, equipped_stamp, equipped_theme, equipped_ai_voice, current_streak, streak_last_review_date, streak_shields, streak_milestone_claimed, custom_ai_name, combo_booster_expires_at, pending_gift_notice')
               .eq('id', targetId)
               .maybeSingle()
           : Promise.resolve({ data: null } as { data: null }),
@@ -663,6 +663,18 @@ function App() {
           });
           setMyBonusPoints(myProfile.bonus_points || 0);
           setComboBoosterExpiresAt(myProfile.combo_booster_expires_at || null);
+
+          // 🎁 선생님이 보낸 선물/공지가 있으면 한 번 띄우고 서버에서 즉시 비운다 (재접속 시 중복 노출 방지)
+          const giftNotice = myProfile.pending_gift_notice as { title?: string; message?: string; icon?: string; badge?: string } | null;
+          if (giftNotice) {
+            showNoticeModal({
+              title: giftNotice.title || '알림',
+              message: giftNotice.message || '',
+              icon: giftNotice.icon,
+              badge: giftNotice.badge,
+            });
+            supabase.from('profiles').update({ pending_gift_notice: null }).eq('id', targetId).then(() => {});
+          }
 
           // 🎟️ 럭키상점에서 쓴 점수(포인트 차감치)를 서버 기준으로 복원 — 기기를 바꿔도 잔액이 정확하게 유지됨
           const dbPointAdjustment = myProfile.point_adjustment ?? 0;
