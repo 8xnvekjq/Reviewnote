@@ -1891,6 +1891,18 @@ function App() {
                                 </span>
                               )}
 
+                              {/* 🏅 역대 명예의 전당 주간 1/2/3등 누적 횟수 (압축 표시) */}
+                              {(champ.weekly_gold_count > 0 || champ.weekly_silver_count > 0 || champ.weekly_bronze_count > 0) && (
+                                <span
+                                  className="text-[8px] font-black text-slate-400 flex items-center space-x-1 flex-none"
+                                  title="역대 명예의 전당 주간 1/2/3등 횟수"
+                                >
+                                  {champ.weekly_gold_count > 0 && <span>🥇{champ.weekly_gold_count}</span>}
+                                  {champ.weekly_silver_count > 0 && <span>🥈{champ.weekly_silver_count}</span>}
+                                  {champ.weekly_bronze_count > 0 && <span>🥉{champ.weekly_bronze_count}</span>}
+                                </span>
+                              )}
+
                               {/* 긴 이름 말줄임(...) 표출 */}
                               <span 
                                 className={`font-black truncate max-w-[85px] sm:max-w-[140px] ${isFirst ? 'text-white text-[11px]' : 'text-slate-200 text-[10px]'}`}
