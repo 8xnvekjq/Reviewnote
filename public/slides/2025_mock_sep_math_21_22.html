@@ -47,6 +47,9 @@
             <div class="text-right flex items-center gap-4">
                 <span class="text-xs text-rose-400 font-bold uppercase tracking-wider" id="slide-category">단원 소개</span>
                 <span class="text-xs text-slate-400 font-semibold bg-slate-800/80 px-2.5 py-1 rounded-md border border-slate-700" id="slide-counter">1 / 6</span>
+                <button onclick="closeSlideDeck()" class="w-7 h-7 rounded-md bg-slate-800/80 hover:bg-rose-600 text-slate-300 hover:text-white flex items-center justify-center transition border border-slate-700" title="닫기">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
             </div>
         </div>
 
@@ -190,6 +193,11 @@
         }
         function prevSlide() { if (currentSlide > 0) { currentSlide--; updateSlide(); } }
         function nextSlide() { if (currentSlide < slides.length - 1) { currentSlide++; updateSlide(); } }
+        function closeSlideDeck() {
+            window.close();
+            // 스크립트로 열리지 않은 탭이라 window.close()가 막혔을 때의 대비책
+            setTimeout(() => { window.location.href = '/'; }, 200);
+        }
         updateSlide();
     </script>
 </body>
