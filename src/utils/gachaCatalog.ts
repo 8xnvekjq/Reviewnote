@@ -111,6 +111,16 @@ export const GACHA_ITEMS: GachaItem[] = [
     color: 'from-amber-400 via-pink-500 to-purple-500'
   },
   {
+    id: 'ai_queendongju',
+    name: '👑 AI 말투: 하이텐션 퀸동주',
+    description: 'AI 밤티 쌤이 "퀸" 컨셉의 하이텐션과 "에리얼", "까리꾸스", "우위" 같은 시그니처 조어로 수학 오답을 신나게 해설해줍니다.\n💬 "에리얼! 이 공식 완전 까리꾸스하지 않아? 우위~ 인정이야!"',
+    rarity: 'UR',
+    category: 'AI_VOICE',
+    icon: '👑',
+    effectValue: 'queendongju',
+    color: 'from-amber-400 via-pink-500 to-purple-500'
+  },
+  {
     id: 'item_ur_ticket',
     name: '🎫 UR 확정 뽑기권',
     description: '사용하는 즉시 UR 등급 아이템 중 하나를 100% 확정으로 획득할 수 있는 최고급 티켓입니다.',
@@ -286,6 +296,16 @@ export const GACHA_ITEMS: GachaItem[] = [
     icon: '✌️',
     imageUrl: '/assets/gyaru_teacher_avatar.jpg',
     effectValue: 'gyaru',
+    color: 'from-amber-400 via-yellow-400 to-amber-500'
+  },
+  {
+    id: 'ai_queengabee',
+    name: '💅 AI 말투: LA 셀럽 퀸가비',
+    description: 'AI 밤티 쌤이 나른한 톤과 당당한 내용의 대비, "헤이~", "RUDE! 무례하다고!" 같은 LA 셀럽 말투로 수학 오답을 해설해줍니다.\n💬 "헤이~ 이 정도는 나한테 껌이지, 무례하게 잘했다고 자랑해도 돼."',
+    rarity: 'SSR',
+    category: 'AI_VOICE',
+    icon: '💅',
+    effectValue: 'queengabee',
     color: 'from-amber-400 via-yellow-400 to-amber-500'
   },
   {
