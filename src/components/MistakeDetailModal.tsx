@@ -623,6 +623,14 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
     currentReviews[index] = currentReviews[index] === state ? '' : state;
     onUpdateReviews(selectedEntry.id, currentReviews as ReviewState[]);
+
+    // 🎯 복습 세션 중에는 O/X/★ 체크를 새로 추가하면 Next 버튼 없이 곧바로 다음 미완료 카드로 자동 이동
+    // (되돌리기 클릭은 isAddingCheck가 false라 자동 이동 대상에서 제외됨)
+    if (isReviewSession && isAddingCheck && hasNextEntry && nextEntry && onSelectEntry) {
+      setTimeout(() => {
+        onSelectEntry(nextEntry);
+      }, 550);
+    }
   };
 
   const handleRollbackReview = () => {
