@@ -88,6 +88,8 @@ function App() {
   const [myWeeklyStanding, setMyWeeklyStanding] = useState<{ rank: number; score: number; completedCount: number } | null>(null);
   // 🎯 일일 복습 퀘스트: 오늘 새로 체크한 복습 개수 (5개 달성 시 서버에서 콤보 포인트 보너스 자동 지급)
   const [dailyReviewCount, setDailyReviewCount] = useState(0);
+  // 🏅 명예의 전당 주간 1/2/3등 누적 횟수 — 주간 점수는 초기화되지만 이 기록은 영구히 남는다
+  const [weeklyMedals, setWeeklyMedals] = useState({ gold: 0, silver: 0, bronze: 0 });
   // 분석통계 탭 학생 필터 상태 (어드민 전용)
   const [statsStudentFilter, setStatsStudentFilter] = useState<string>('all');
   // 분석통계 탭 기간 필터 상태 (디폴트: 'all' 전체기간)
@@ -380,6 +382,12 @@ function App() {
   // 주간 최다 오답 완료 챔피언 정보 로드 + 내 점수 동시 갱신 (하이브리드 1주 이월 및 리셋 롤오버)
   const loadWeeklyChampions = async () => {
     try {
+      // 🏅 주가 바뀐 뒤 아직 지난주 1/2/3등 메달이 집계되지 않았으면 여기서 확정 (매번 호출해도
+      // 서버에서 이미 처리된 주인지 확인 후 스킵하므로 안전 — 별도 크론 없이 앱 사용 자체가 트리거)
+      supabase.rpc('finalize_last_week_medals_if_needed').then(({ error: medalError }) => {
+        if (medalError) console.error('Failed to finalize weekly medals:', medalError);
+      });
+
       // 이번 주 랭킹 뷰 조회. 지난주 점수를 이월해서 채워 넣지 않는다 — 이번 주에 아무것도
       // 안 한 학생이 지난주 성적 덕에 명예의전당에 끼어 있으면 "이번 주 노력"의 의미가 없어진다.
       // 실제로 이번 주 활동한 사람만, 그 인원이 1~2명뿐이어도 그대로 보여준다.
@@ -525,6 +533,7 @@ function App() {
         setYoutubeLectures([]);
         setTeacherApproachGuides([]);
         setWeeklyChampions([]);
+        setWeeklyMedals({ gold: 0, silver: 0, bronze: 0 });
         setEquippedItems({});
         setComboBoosterExpiresAt(null);
         setMyNickname('');
@@ -650,7 +659,7 @@ function App() {
         targetId
           ? supabase
               .from('profiles')
-              .select('nickname, display_name, bonus_points, point_adjustment, equipped_title, equipped_stamp, equipped_theme, equipped_ai_voice, current_streak, streak_last_review_date, streak_shields, streak_milestone_claimed, custom_ai_name, combo_booster_expires_at, pending_gift_notice, daily_review_date, daily_review_count')
+              .select('nickname, display_name, bonus_points, point_adjustment, equipped_title, equipped_stamp, equipped_theme, equipped_ai_voice, current_streak, streak_last_review_date, streak_shields, streak_milestone_claimed, custom_ai_name, combo_booster_expires_at, pending_gift_notice, daily_review_date, daily_review_count, weekly_gold_count, weekly_silver_count, weekly_bronze_count')
               .eq('id', targetId)
               .maybeSingle()
           : Promise.resolve({ data: null } as { data: null }),
@@ -680,6 +689,13 @@ function App() {
 
           // 🎯 일일 복습 퀘스트: 날짜가 바뀌었으면(서버에 어제 값이 남아있어도) 화면상으론 0부터 다시 시작
           setDailyReviewCount(myProfile.daily_review_date === getKSTDateString() ? (myProfile.daily_review_count || 0) : 0);
+
+          // 🏅 명예의 전당 주간 메달 누적 횟수
+          setWeeklyMedals({
+            gold: myProfile.weekly_gold_count || 0,
+            silver: myProfile.weekly_silver_count || 0,
+            bronze: myProfile.weekly_bronze_count || 0,
+          });
 
           // 🎁 선생님이 보낸 선물/공지가 있으면 한 번 띄우고 서버에서 즉시 비운다 (재접속 시 중복 노출 방지)
           const giftNotice = myProfile.pending_gift_notice as { title?: string; message?: string; icon?: string; badge?: string } | null;
@@ -1774,6 +1790,7 @@ function App() {
         myScore={currentDisplayPoints}
         onOpenStore={() => setActiveTab('store')}
         equippedTitle={equippedItems.title}
+        weeklyMedals={weeklyMedals}
         streakDays={streakState.currentStreak}
         comboBoosterExpiresAt={comboBoosterExpiresAt}
         isAdmin={isAdmin}

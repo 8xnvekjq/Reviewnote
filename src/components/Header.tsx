@@ -32,6 +32,7 @@ interface HeaderProps {
   myScore?: number;
   onOpenStore?: () => void;
   equippedTitle?: string;
+  weeklyMedals?: { gold: number; silver: number; bronze: number };
   streakDays?: number;
   hasNameChangeTicket?: boolean;
   onUpdateAiName?: (newName: string) => Promise<void>;
@@ -49,6 +50,7 @@ export const Header: React.FC<HeaderProps> = ({
   myScore,
   onOpenStore,
   equippedTitle,
+  weeklyMedals,
   streakDays,
   hasNameChangeTicket,
   onUpdateAiName,
@@ -152,6 +154,18 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
             );
           })()}
+
+          {/* 🏅 명예의 전당 주간 1/2/3등 누적 횟수 (압축 표시) — 점수는 매주 초기화돼도 이 기록은 영구히 남는다 */}
+          {weeklyMedals && (weeklyMedals.gold > 0 || weeklyMedals.silver > 0 || weeklyMedals.bronze > 0) && (
+            <span
+              className="text-[9px] px-2 py-0.5 rounded-full border border-slate-700 bg-slate-900/60 text-slate-300 font-black flex-none flex items-center space-x-1.5"
+              title="역대 명예의 전당 주간 1/2/3등 횟수"
+            >
+              {weeklyMedals.gold > 0 && <span>🥇{weeklyMedals.gold}</span>}
+              {weeklyMedals.silver > 0 && <span>🥈{weeklyMedals.silver}</span>}
+              {weeklyMedals.bronze > 0 && <span>🥉{weeklyMedals.bronze}</span>}
+            </span>
+          )}
 
           {/* 내 계정 메뉴 드롭다운 */}
           <div className="relative">
