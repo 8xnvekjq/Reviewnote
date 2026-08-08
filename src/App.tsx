@@ -1759,10 +1759,9 @@ function App() {
 
         {activeTab === 'notes' && (
           <>
-            {/* 명예의 전당 배너 + (옆) 순위권 밖이어도 보이는 내 점수 란 */}
-            <div className="flex flex-col sm:flex-row gap-2 mb-3">
+            {/* 명예의 전당 배너 */}
             {weeklyChampions && weeklyChampions.length > 0 ? (
-              <div className="flex-1 min-w-0 bg-gradient-to-b from-slate-900/95 via-slate-900/90 to-slate-900/95 border border-amber-500/30 rounded-2xl p-2.5 shadow-[0_0_15px_rgba(245,158,11,0.08)] animate-fade-in space-y-2">
+              <div className="bg-gradient-to-b from-slate-900/95 via-slate-900/90 to-slate-900/95 border border-amber-500/30 rounded-2xl p-2.5 mb-3 shadow-[0_0_15px_rgba(245,158,11,0.08)] animate-fade-in space-y-2">
                 {/* 헤더 타이틀 */}
                 <div className="flex items-center justify-between border-b border-slate-800/80 pb-1.5">
                   <div className="flex items-center space-x-1.5">
@@ -1773,6 +1772,19 @@ function App() {
                   </div>
                   <span className="text-[8.5px] text-slate-500 font-bold">매주 월요일 갱신</span>
                 </div>
+
+                {/* 순위권(top3) 밖이어도 내 점수는 항상 보이는 한 줄 */}
+                {session?.user && (
+                  <div className="flex items-center justify-between bg-slate-955/60 border border-slate-800/70 rounded-xl px-2.5 py-1">
+                    <span className="text-[9px] text-slate-500 font-bold">🙋 나의 순위</span>
+                    <span className="text-[10px] font-black text-indigo-300">
+                      {myWeeklyStanding ? `${myWeeklyStanding.rank}위` : '순위 밖'}
+                      <span className="text-slate-400 font-bold ml-1">
+                        · {myWeeklyStanding ? `${Math.round(myWeeklyStanding.score)}점` : '0점'}
+                      </span>
+                    </span>
+                  </div>
+                )}
 
                 {/* 1등 / 2등 / 3등 3줄 세로 명예의 전당 리스트 */}
                 <div className="space-y-1">
@@ -1855,39 +1867,38 @@ function App() {
               </div>
             ) : (
               /* 두 주 연속 복습 완료자가 전혀 없을 때: 동기부여 공백 배너 제공 */
-              <div className="flex-1 min-w-0 bg-slate-900/40 border border-slate-800/80 rounded-2xl p-3 flex items-center justify-between shadow-lg shadow-indigo-950/5 animate-fade-in">
-                <div className="flex items-center space-x-2.5 min-w-0">
-                  <span className="text-xl animate-pulse flex-none">👑</span>
-                  <div className="min-w-0 leading-tight">
-                    <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">복습왕 리그</div>
-                    <div className="text-xs font-bold text-slate-300 mt-0.5">
-                      이번주 첫 복습왕의 주인공이 되어보세요!
+              <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-3 mb-3 shadow-lg shadow-indigo-950/5 animate-fade-in space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2.5 min-w-0">
+                    <span className="text-xl animate-pulse flex-none">👑</span>
+                    <div className="min-w-0 leading-tight">
+                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">복습왕 리그</div>
+                      <div className="text-xs font-bold text-slate-300 mt-0.5">
+                        이번주 첫 복습왕의 주인공이 되어보세요!
+                      </div>
                     </div>
                   </div>
+                  <div className="text-right flex-none pl-3 border-l border-slate-800/50">
+                    <span className="text-[8px] text-indigo-400 font-black bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20">
+                      도전 대기 중
+                    </span>
+                  </div>
                 </div>
-                <div className="text-right flex-none pl-3 border-l border-slate-800/50">
-                  <span className="text-[8px] text-indigo-400 font-black bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20">
-                    도전 대기 중
-                  </span>
-                </div>
-              </div>
-            )}
 
-            {/* 순위권(top3) 밖이어도 내 점수는 항상 보이는 작은 개인 랭킹 란 */}
-            {session?.user && (
-              <div className="sm:w-[110px] flex-none bg-slate-900/60 border border-slate-800/80 rounded-2xl p-2 flex sm:flex-col items-center sm:items-stretch justify-between sm:justify-center gap-0.5 sm:gap-1">
-                <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider sm:text-center">나의 순위</span>
-                <div className="flex items-baseline space-x-1 sm:justify-center sm:space-x-1.5">
-                  <span className="text-xs font-black text-indigo-300">
-                    {myWeeklyStanding ? `${myWeeklyStanding.rank}위` : '순위 밖'}
-                  </span>
-                  <span className="text-[9.5px] font-bold text-slate-400">
-                    {myWeeklyStanding ? `${Math.round(myWeeklyStanding.score)}점` : '0점'}
-                  </span>
-                </div>
+                {/* 순위권(top3) 밖이어도 내 점수는 항상 보이는 한 줄 */}
+                {session?.user && (
+                  <div className="flex items-center justify-between bg-slate-955/60 border border-slate-800/70 rounded-xl px-2.5 py-1">
+                    <span className="text-[9px] text-slate-500 font-bold">🙋 나의 순위</span>
+                    <span className="text-[10px] font-black text-indigo-300">
+                      {myWeeklyStanding ? `${myWeeklyStanding.rank}위` : '순위 밖'}
+                      <span className="text-slate-400 font-bold ml-1">
+                        · {myWeeklyStanding ? `${Math.round(myWeeklyStanding.score)}점` : '0점'}
+                      </span>
+                    </span>
+                  </div>
+                )}
               </div>
             )}
-            </div>
 
             <MistakeList
               mistakes={[...mistakes]
