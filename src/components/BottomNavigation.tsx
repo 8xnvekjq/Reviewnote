@@ -222,18 +222,19 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                 학습 기능 & 메뉴
               </span>
 
-              {/* 1. 📊 분석통계 (전체메뉴로 이동) */}
+              {/* 드로어 메뉴 항목: 색은 "지금 선택된 항목"에만 인디고 강조, 나머지는 전부 중립 톤으로 통일 */}
+              {/* 1. 📊 분석통계 */}
               <button
                 onClick={() => handleSelectMenu('stats')}
                 className={`w-full p-3.5 rounded-2xl border flex items-center space-x-3.5 transition-all text-left group ${
                   activeTab === 'stats'
-                    ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-300 font-bold shadow-lg shadow-emerald-500/5'
+                    ? 'bg-indigo-500/10 border-indigo-500/50 text-indigo-300 font-bold shadow-lg shadow-indigo-500/5'
                     : 'bg-slate-955/60 border-slate-850 hover:border-slate-700 text-slate-300 hover:bg-slate-850'
                 }`}
               >
                 <span className="text-2xl group-hover:scale-110 transition-transform">📊</span>
                 <div>
-                  <div className="text-xs font-black text-emerald-400">분석통계</div>
+                  <div className="text-xs font-black">분석통계</div>
                   <div className="text-[9.5px] text-slate-500 mt-0.5">내 학습 현황 & 취약 단원 분석</div>
                 </div>
               </button>
@@ -243,7 +244,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                 onClick={() => handleSelectMenu('completed')}
                 className={`w-full p-3.5 rounded-2xl border flex items-center space-x-3.5 transition-all text-left group ${
                   activeTab === 'completed'
-                    ? 'bg-teal-500/10 border-teal-500/50 text-teal-300 font-bold shadow-lg shadow-teal-500/5'
+                    ? 'bg-indigo-500/10 border-indigo-500/50 text-indigo-300 font-bold shadow-lg shadow-indigo-500/5'
                     : 'bg-slate-955/60 border-slate-850 hover:border-slate-700 text-slate-300 hover:bg-slate-850'
                 }`}
               >
@@ -259,34 +260,34 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                 onClick={() => handleSelectMenu('scaffolding')}
                 className={`w-full p-3.5 rounded-2xl border flex items-center space-x-3.5 transition-all text-left group ${
                   activeTab === 'scaffolding'
-                    ? 'bg-amber-500/10 border-amber-500/50 text-amber-300 font-bold shadow-lg shadow-amber-500/5'
+                    ? 'bg-indigo-500/10 border-indigo-500/50 text-indigo-300 font-bold shadow-lg shadow-indigo-500/5'
                     : 'bg-slate-955/60 border-slate-850 hover:border-slate-700 text-slate-300 hover:bg-slate-850'
                 }`}
               >
                 <span className="text-2xl group-hover:scale-110 transition-transform">🧩</span>
                 <div>
-                  <div className="text-xs font-black text-amber-400">Scaffolding(스캐폴딩)</div>
+                  <div className="text-xs font-black">Scaffolding(스캐폴딩)</div>
                   <div className="text-[9.5px] text-slate-500 mt-0.5">선생님의 손글씨 풀이 힌트 모음</div>
                 </div>
               </button>
 
-              {/* 4. 💡 이용안내 (전체메뉴로 이동) */}
+              {/* 4. 💡 이용안내 */}
               <button
                 onClick={() => handleSelectMenu('guide')}
                 className={`w-full p-3.5 rounded-2xl border flex items-center space-x-3.5 transition-all text-left group ${
                   activeTab === 'guide'
-                    ? 'bg-amber-500/10 border-amber-500/50 text-amber-300 font-bold shadow-lg shadow-amber-500/5'
+                    ? 'bg-indigo-500/10 border-indigo-500/50 text-indigo-300 font-bold shadow-lg shadow-indigo-500/5'
                     : 'bg-slate-955/60 border-slate-850 hover:border-slate-700 text-slate-300 hover:bg-slate-850'
                 }`}
               >
                 <span className="text-2xl group-hover:scale-110 transition-transform">💡</span>
                 <div>
-                  <div className="text-xs font-black text-amber-400">이용안내</div>
+                  <div className="text-xs font-black">이용안내</div>
                   <div className="text-[9.5px] text-slate-500 mt-0.5">오답클리닉 & 럭키상점 가이드</div>
                 </div>
               </button>
 
-              {/* 5. 더쿠키수학 핵심 수업자료 */}
+              {/* 5. 더쿠키수학 핵심 수업자료 (모달이라 활성 탭 개념이 없어 항상 중립 톤) */}
               {onOpenSlideList && (
                 <button
                   onClick={() => {
@@ -297,7 +298,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                 >
                   <span className="text-2xl group-hover:scale-110 transition-transform">🖥️</span>
                   <div>
-                    <div className="text-xs font-black text-emerald-400">핵심 수업자료</div>
+                    <div className="text-xs font-black">핵심 수업자료</div>
                     <div className="text-[9.5px] text-slate-500 mt-0.5">선생님 제작 주차별 교안 슬라이드</div>
                   </div>
                 </button>
