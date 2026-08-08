@@ -110,6 +110,16 @@ export const GACHA_ITEMS: GachaItem[] = [
     gradient: 'linear-gradient(135deg, #FFFFFF 0%, #E2E8F0 50%, #00F0FF 100%)',
     color: 'from-amber-400 via-pink-500 to-purple-500'
   },
+  {
+    id: 'item_ur_ticket',
+    name: '🎫 UR 확정 뽑기권',
+    description: '사용하는 즉시 UR 등급 아이템 중 하나를 100% 확정으로 획득할 수 있는 최고급 티켓입니다.',
+    rarity: 'UR',
+    category: 'SHIELD',
+    icon: '🎫',
+    effectValue: 'ur_ticket',
+    color: 'from-amber-400 via-pink-500 to-purple-500'
+  },
 
   // ── SSR (7%) - Super Special Rare (황금 빛) ────────────────────────
   {
