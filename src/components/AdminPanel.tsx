@@ -238,10 +238,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
             <span className="mr-2">👑</span> 어드민 대시보드
           </h2>
           <p className="text-[11px] text-slate-400 mt-0.5 flex items-center space-x-1.5">
-            <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold flex items-center space-x-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-              <span>⚡ 실시간 동기화 중</span>
-            </span>
             <span>마지막 갱신: {lastRefreshed.toLocaleTimeString('ko-KR')}</span>
           </p>
         </div>

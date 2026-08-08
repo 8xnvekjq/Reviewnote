@@ -935,6 +935,7 @@ function App() {
       .channel('mistakes_live_sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'mistakes' }, () => {
         refreshMistakesLight();
+        loadWeeklyChampions();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'mistake_scaffoldings' }, () => {
         refreshMistakesLight();
@@ -1825,11 +1826,11 @@ function App() {
 
                         {/* Right: 완료 X개 + X점 (단일 행 표출) */}
                         {champ && champ.score > 0 && (
-                          <div className="flex items-center space-x-1.5 flex-none text-right whitespace-nowrap pl-1">
-                            <span className="text-[9px] text-slate-400 font-medium">
+                          <div className="flex items-center space-x-1 flex-none text-right whitespace-nowrap pl-1">
+                            <span className="text-[7.5px] text-slate-500 font-medium">
                               완료 {champ.weekly_completed_count}개
                             </span>
-                            <span className={`font-black ${isFirst ? 'text-amber-400 text-[11.5px]' : 'text-slate-300 text-[10.5px]'}`}>
+                            <span className={`font-black ${isFirst ? 'text-amber-400 text-[9.5px]' : 'text-slate-300 text-[8.5px]'}`}>
                               {Math.round(champ.score)}점
                             </span>
                           </div>
