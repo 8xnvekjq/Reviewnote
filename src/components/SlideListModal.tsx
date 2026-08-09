@@ -31,6 +31,7 @@ export const SlideListModal: React.FC<SlideListModalProps> = ({ isOpen, onClose 
     { title: "개념원리 공통수학2 - 평면좌표 (내분점~무게중심)", filename: "math2_plane_coordinates.html", date: "2026-07-18", grade: "고1" },
 
     // 🏫 고2 (수학Ⅰ, 수학Ⅱ, 미적분1)
+    { title: "수학Ⅱ/미적분1 - 삼차함수 실전 공식 특강 (비율관계·접선·극값)", filename: "math_cubic_function_practical_formulas_special.html", date: "2026-08-11", grade: "고2" },
     { title: "개념원리 미적분1 - 02. 도함수의 활용 - 01. 접선의 방정식 (p86~95)", filename: "calculus1_tangent_equation_p86_95.html", date: "2026-08-01", grade: "고2" },
     { title: "개념원리 미적분1 - 03. 도함수 (p72~82)", filename: "calculus1_derivative_function_p72_82.html", date: "2026-07-29", grade: "고2" },
     { title: "개념원리 미적분1 - 01. 함수의 극한과 연속 (p31~47)", filename: "calculus1_limit_continuity_01.html", date: "2026-07-22", grade: "고2" },

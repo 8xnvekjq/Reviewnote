@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>삼차함수 실전 공식 특강</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true
+            },
+            options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'] }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        .presentation-deck { position: relative; width: 1280px; height: 720px; background: radial-gradient(circle at 10% 20%, #2e1014 0%, #0f172a 100%); border: 1px solid rgba(255, 255, 255, 0.08); margin: 20px auto; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); border-left: 10px solid #e11d48; }
+        .slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 40px 65px; display: none; flex-direction: column; justify-content: space-between; z-index: 1; background: transparent; box-sizing: border-box; }
+        .slide.active { display: flex; z-index: 10; }
+
+        .concept-card { background: rgba(30, 41, 59, 0.75); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.25); }
+        .formula-box { background: rgba(225, 29, 72, 0.08); border: 1px solid rgba(225, 29, 72, 0.25); border-radius: 14px; }
+        .problem-box { background: linear-gradient(135deg, rgba(30, 20, 25, 0.9) 0%, rgba(15, 23, 42, 0.8) 100%); border-left: 8px solid #f43f5e; border-top: 1px solid rgba(255, 255, 255, 0.05); border-right: 1px solid rgba(255, 255, 255, 0.05); border-bottom: 1px solid rgba(255, 255, 255, 0.05); border-radius: 0 16px 16px 0; }
+        .problem-text { font-size: 1.2rem; font-weight: 700; color: #f1f5f9; line-height: 1.65; word-break: keep-all; }
+        .step-box { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; }
+
+        @media print {
+            body { background-color: #ffffff !important; margin: 0 !important; padding: 0 !important; }
+            .presentation-deck { width: 1280px !important; height: auto !important; box-shadow: none !important; border: none !important; margin: 0 !important; overflow: visible !important; display: block !important; }
+            .slide { position: relative !important; display: flex !important; width: 1280px !important; height: 720px !important; page-break-after: always !important; page-break-inside: avoid !important; background: #0f172a !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="presentation-deck" id="deck">
+        <div class="flex justify-between items-center z-20 pb-3 border-b border-rose-900/40 mx-8 mt-6 no-print">
+            <div class="flex items-center gap-3">
+                <span class="bg-rose-600 text-white text-xs font-black px-3 py-1 rounded-md uppercase">고3 | 실전 공식 특강</span>
+                <span class="text-slate-300 text-sm font-medium">삼차함수 넓이·극값·접선 공식</span>
+            </div>
+            <div class="text-right flex items-center gap-4">
+                <span class="text-xs text-rose-400 font-bold uppercase tracking-wider" id="slide-category">단원 소개</span>
+                <span class="text-xs text-slate-400 font-semibold bg-slate-800/80 px-2.5 py-1 rounded-md border border-slate-700" id="slide-counter">1 / 21</span>
+            </div>
+        </div>
+
+        <div class="relative flex-grow my-2 overflow-hidden" id="slide-container">
+
+            <!-- Slide 1: 표지 -->
+            <div class="slide active" data-category="단원 소개">
+                <div class="flex-grow flex flex-col justify-center items-start">
+                    <span class="text-rose-400 font-bold text-lg tracking-widest mb-4">고3 수능 대비 &nbsp;|&nbsp; 실전 공식 특강</span>
+                    <h1 class="text-6xl font-black text-white leading-tight mb-6">삼차함수 실전 공식</h1>
+                    <div class="h-2 w-40 bg-rose-500 rounded-full mb-8"></div>
+                    <p class="text-2xl text-slate-300 font-medium">넓이·극값·접선의 표준 공식으로 무거운 계산을 건너뛴다</p>
+                    <p class="text-lg text-slate-500 font-medium mt-2">평가원 기출 4문항 &middot; 각 문항: 핵심 공식 &rarr; 문제 &rarr; 적용 풀이</p>
+                </div>
+            </div>
+
+            <!-- ===================== 문항 01 : 1/12 공식 ===================== -->
+            <div class="slide" data-category="문항 01 | 핵심 공식">
+                <div class="flex items-center gap-4 mb-2">
+                    <span class="bg-rose-600 text-white text-sm font-black px-4 py-1.5 rounded-full">공식 01</span>
+                    <span class="text-rose-400 text-base font-bold">1/12 공식 &middot; 접하는 두 곡선 사이의 넓이</span>
+                </div>
+                <div class="concept-card p-8 flex-grow flex flex-col justify-center gap-4">
+                    <p class="text-lg text-slate-100 leading-relaxed">두 곡선(또는 곡선과 접선)의 차함수가 $x=\alpha$에서 <b class="text-rose-300">접하고</b>(중근) $x=\beta$에서 <b class="text-rose-300">만나는</b> 삼차식, 즉 $a(x-\alpha)^2(x-\beta)$ 꼴일 때, 둘러싸인 부분의 넓이는:</p>
+                    <div class="formula-box py-8 px-10 text-center">
+                        <p class="text-4xl text-rose-200 font-bold">$$S=\dfrac{|a|}{12}(\beta-\alpha)^4$$</p>
+                    </div>
+                    <p class="text-base text-slate-400">교점을 직접 적분하지 않고, 차함수의 최고차항 계수와 두 근의 차이만으로 넓이가 즉시 결정된다.</p>
+                </div>
+            </div>
+
+            <div class="slide" data-category="문항 01 | 원문">
+                <div class="flex items-center gap-4 mb-2">
+                    <span class="bg-rose-600 text-white text-sm font-black px-4 py-1.5 rounded-full">문항 01</span>
+                    <span class="text-rose-400 text-base font-bold">2024학년도 9월 모의평가 공통 19번</span>
+                </div>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Original Question (단답형)</div>
+                        <h3 class="problem-text text-xl leading-relaxed">
+                            두 곡선 $y=3x^3-7x^2$과 $y=-x^2$으로 둘러싸인 부분의 넓이를 구하시오. [3점]
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="slide" data-category="문항 01 | 적용 풀이">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 01 &nbsp;<span class="text-rose-400 text-lg">공식 적용 풀이</span></h2>
+                <div class="concept-card p-6 flex-grow flex flex-col justify-center gap-3">
+                    <div class="step-box p-4 text-base text-slate-200 leading-relaxed">
+                        <p><b>① 차함수:</b> $3x^3-7x^2-(-x^2)=3x^3-6x^2=3x^2(x-2)$</p>
+                        <p><b>② 접점·교점 확인:</b> $x=0$에서 중근(접함), $x=2$에서 단순근(만남) &nbsp;&rArr;&nbsp; $a=3,\ \alpha=0,\ \beta=2$</p>
+                        <p><b>③ 공식 대입:</b> 교점을 구하거나 적분식을 전개할 필요 없이 바로 대입.</p>
+                    </div>
+                    <div class="text-center text-2xl font-bold text-rose-300 bg-rose-950/40 py-4 rounded-lg">
+                        $$S=\dfrac{3}{12}(2-0)^4=\dfrac14\times16=\mathbf{4}$$
+                    </div>
+                </div>
+            </div>
+
+            <div class="slide" data-category="문항 01 | 변형문제">
+                <div class="flex items-center gap-4 mb-2">
+                    <span class="bg-rose-600 text-white text-sm font-black px-4 py-1.5 rounded-full">문항 01 변형</span>
+                    <span class="text-rose-400 text-base font-bold">공식 의존도 UP &middot; 접점 미공개형</span>
+                </div>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Structure Extension</div>
+                        <h3 class="problem-text text-xl leading-relaxed">
+                            두 곡선 $y=2x^3+ax^2$과 $y=4x^2-8x$가 $x=2$에서 접할 때, 이 두 곡선으로 둘러싸인 부분의 넓이를 구하시오. (단, $a$는 상수이다.)
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="slide" data-category="문항 01 변형 | 답">
+                <div class="concept-card flex-grow flex flex-col items-center justify-center gap-6">
+                    <span class="text-rose-400 font-bold text-lg uppercase tracking-widest">문항 01 변형 정답</span>
+                    <div class="text-6xl font-black text-white">$\dfrac{8}{3}$</div>
+                    <p class="text-sm text-slate-400 max-w-2xl text-center leading-relaxed">접함 조건에서 $a=-4$를 먼저 구하면 차함수 $2x(x-2)^2$ &nbsp;&rArr;&nbsp; $a_{\text{계수}}=2,\ \alpha=2,\ \beta=0$ &nbsp;&rArr;&nbsp; $S=\dfrac{2}{12}(2)^4=\dfrac{8}{3}$</p>
+                </div>
+            </div>
+
+            <!-- ===================== 문항 02 : 극대극소 차 공식 ===================== -->
+            <div class="slide" data-category="문항 02 | 핵심 공식">
+                <div class="flex items-center gap-4 mb-2">
+                    <span class="bg-rose-600 text-white text-sm font-black px-4 py-1.5 rounded-full">공식 02</span>
+                    <span class="text-rose-400 text-base font-bold">삼차함수의 극댓값 &minus; 극솟값 공식</span>
+                </div>
+                <div class="concept-card p-8 flex-grow flex flex-col justify-center gap-4">
+                    <p class="text-lg text-slate-100 leading-relaxed">최고차항 계수가 $a$인 삼차함수가 $x=\alpha,\ \beta$ ($\alpha \lt \beta$)에서 각각 극값을 가질 때, 두 극값의 차는:</p>
+                    <div class="formula-box py-8 px-10 text-center">
+                        <p class="text-4xl text-rose-200 font-bold">$$|(\text{극댓값})-(\text{극솟값})|=\dfrac{|a|}{2}(\beta-\alpha)^3$$</p>
+                    </div>
+                    <p class="text-base text-slate-400">극값 하나만 직접 계산하면, 나머지 하나는 함수식을 다시 대입하지 않고 이 차이값을 더하거나 빼서 얻는다.</p>
+                </div>
+            </div>
+
+            <div class="slide" data-category="문항 02 | 원문">
+                <div class="flex items-center gap-4 mb-2">
+                    <span class="bg-rose-600 text-white text-sm font-black px-4 py-1.5 rounded-full">문항 02</span>
+                    <span class="text-rose-400 text-base font-bold">2024학년도 9월 모의평가 공통 6번</span>
+                </div>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Original Question</div>
+                        <h3 class="problem-text text-xl leading-relaxed">
+                            함수 $f(x)=x^3+ax^2+bx+1$은 $x=-1$에서 극대이고, $x=3$에서 극소이다. 함수 $f(x)$의 극댓값은? (단, $a$, $b$는 상수이다.) [3점]
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="slide" data-category="문항 02 | 적용 풀이">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 02 &nbsp;<span class="text-rose-400 text-lg">공식 적용 풀이</span></h2>
+                <div class="concept-card p-6 flex-grow flex flex-col justify-center gap-3">
+                    <div class="step-box p-4 text-base text-slate-200 leading-relaxed">
+                        <p><b>① 계수 결정:</b> $f'(x)=3x^2+2ax+b$, $f'(-1)=0,\ f'(3)=0$을 연립하면 $a=-3,\ b=-9$</p>
+                        <p><b>② 극솟값 계산:</b> $f(3)=27-27-27+1=-26$</p>
+                        <p><b>③ 공식으로 차이 계산:</b> $\dfrac12(3-(-1))^3=\dfrac12\times64=32$ &nbsp;(극댓값을 따로 대입할 필요 없음)</p>
+                    </div>
+                    <div class="text-center text-2xl font-bold text-rose-300 bg-rose-950/40 py-4 rounded-lg">
+                        $$\text{극댓값}=-26+32=\mathbf{6}$$
+                    </div>
+                </div>
+            </div>
+
+            <div class="slide" data-category="문항 02 | 변형문제">
+                <div class="flex items-center gap-4 mb-2">
+                    <span class="bg-rose-600 text-white text-sm font-black px-4 py-1.5 rounded-full">문항 02 변형</span>
+                    <span class="text-rose-400 text-base font-bold">공식 의존도 UP &middot; 계수 완전 미공개형</span>
+                </div>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Structure Extension</div>
+                        <h3 class="problem-text text-xl leading-relaxed">
+                            최고차항의 계수가 $2$인 삼차함수 $f(x)$가 $x=-1$에서 극대, $x=3$에서 극소이다. 극댓값과 극솟값의 합이 $10$일 때, 극솟값을 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="slide" data-category="문항 02 변형 | 답">
+                <div class="concept-card flex-grow flex flex-col items-center justify-center gap-6">
+                    <span class="text-rose-400 font-bold text-lg uppercase tracking-widest">문항 02 변형 정답</span>
+                    <div class="text-6xl font-black text-white">$-27$</div>
+                    <p class="text-sm text-slate-400 max-w-2xl text-center leading-relaxed">계수 $a,b,c$를 전혀 구하지 않고 공식만으로 해결: 차이 $=\dfrac{2}{2}(3-(-1))^3=64$. 합 $10$과 연립: $2\times(\text{극솟값})=10-64=-54\ \Rightarrow\ -27$</p>
+                </div>
+            </div>
+
+            <!-- ===================== 문항 03 : 기울기 -1 삼각형 넓이 ===================== -->
+            <div class="slide" data-category="문항 03 | 핵심 공식">
+                <div class="flex items-center gap-4 mb-2">
+                    <span class="bg-rose-600 text-white text-sm font-black px-4 py-1.5 rounded-full">공식 03</span>
+                    <span class="text-rose-400 text-base font-bold">기울기 &minus;1 직선이 만드는 직각이등변삼각형</span>
+                </div>
+                <div class="concept-card p-8 flex-grow flex flex-col justify-center gap-4">
+                    <p class="text-lg text-slate-100 leading-relaxed">점 $(t,h)$를 지나고 기울기가 $-1$인 직선이 $x$축과 만날 때까지 만드는 영역은, 밑변과 높이가 모두 $h$인 직각이등변삼각형이 된다:</p>
+                    <div class="formula-box py-8 px-10 text-center">
+                        <p class="text-4xl text-rose-200 font-bold">$$S=\dfrac12h^2$$</p>
+                    </div>
+                    <p class="text-base text-slate-400">직선 구간을 정적분으로 계산하지 않고, 삼각형 넓이 공식으로 즉시 대체한다.</p>
+                </div>
+            </div>
+
+            <div class="slide" data-category="문항 03 | 원문">
+                <div class="flex items-center gap-4 mb-2">
+                    <span class="bg-rose-600 text-white text-sm font-black px-4 py-1.5 rounded-full">문항 03</span>
+                    <span class="text-rose-400 text-base font-bold">2026학년도 대학수학능력시험 공통 12번</span>
+                </div>
+                <div class="problem-box p-7 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-2">Original Question</div>
+                        <h3 class="problem-text text-base leading-relaxed">
+                            함수 $f(x)=\dfrac19x(x-6)(x-9)$와 실수 $t\ (0 \lt t \lt 6)$에 대하여 함수 $g(x)$는 $x \lt t$일 때 $f(x)$, $x\ge t$일 때 $-(x-t)+f(t)$이다. 함수 $y=g(x)$의 그래프와 $x$축으로 둘러싸인 영역의 넓이의 최댓값은? [4점]
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="slide" data-category="문항 03 | 적용 풀이">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 03 &nbsp;<span class="text-rose-400 text-lg">공식 적용 풀이</span></h2>
+                <div class="concept-card p-6 flex-grow flex flex-col justify-center gap-3">
+                    <div class="step-box p-4 text-sm text-slate-200 leading-relaxed">
+                        <p><b>① 넓이 함수:</b> $0\le x\le6$에서 $f(x)>0$이므로 $S(t)=\displaystyle\int_0^t f(x)dx+\dfrac12\{f(t)\}^2$ (우측은 삼각형 공식으로 대체)</p>
+                        <p><b>② 최댓값 조건:</b> $S'(t)=f(t)[1+f'(t)]$이고 $f(t)>0$이므로, $f'(t)=-1$인 지점에서 극값.</p>
+                        <p><b>③ $t$ 결정:</b> $f'(t)=\dfrac13t^2-\dfrac{10}3t+6=-1 \Rightarrow (t-3)(t-7)=0 \Rightarrow t=3$ (범위 내)</p>
+                        <p><b>④ 계산:</b> $f(3)=6$, 삼각형 넓이 $=\dfrac12(6)^2=18$, $\displaystyle\int_0^3f(x)dx=\dfrac{57}{4}$</p>
+                    </div>
+                    <div class="text-center text-2xl font-bold text-rose-300 bg-rose-950/40 py-4 rounded-lg">
+                        $$S(3)=\dfrac{57}{4}+18=\mathbf{\dfrac{129}{4}}$$
+                    </div>
+                </div>
+            </div>
+
+            <div class="slide" data-category="문항 03 | 변형문제">
+                <div class="flex items-center gap-4 mb-2">
+                    <span class="bg-rose-600 text-white text-sm font-black px-4 py-1.5 rounded-full">문항 03 변형</span>
+                    <span class="text-rose-400 text-base font-bold">공식 의존도 UP &middot; 다른 함수·다른 구간</span>
+                </div>
+                <div class="problem-box p-7 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-2">Structure Extension</div>
+                        <h3 class="problem-text text-base leading-relaxed">
+                            함수 $f(x)=\dfrac14x(x-4)(x-6)$와 실수 $t\ (0 \lt t \lt 4)$에 대하여 함수 $g(x)$는 $x \lt t$일 때 $f(x)$, $x\ge t$일 때 $-(x-t)+f(t)$이다. 함수 $y=g(x)$의 그래프와 $x$축으로 둘러싸인 영역의 넓이의 최댓값은?
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="slide" data-category="문항 03 변형 | 답">
+                <div class="concept-card flex-grow flex flex-col items-center justify-center gap-6">
+                    <span class="text-rose-400 font-bold text-lg uppercase tracking-widest">문항 03 변형 정답</span>
+                    <div class="text-6xl font-black text-white">$\dfrac{43}{3}$</div>
+                    <p class="text-sm text-slate-400 max-w-2xl text-center leading-relaxed">$f'(t)=-1 \Rightarrow 3t^2-20t+28=0 \Rightarrow t=2$ (범위 내). $f(2)=4$, 삼각형 넓이 $=8$, $\displaystyle\int_0^2f(x)dx=\dfrac{19}{3}$ &nbsp;&rArr;&nbsp; $\dfrac{19}{3}+8=\dfrac{43}{3}$</p>
+                </div>
+            </div>
+
+            <!-- ===================== 문항 04 : 교점개수=접조건 ===================== -->
+            <div class="slide" data-category="문항 04 | 핵심 공식">
+                <div class="flex items-center gap-4 mb-2">
+                    <span class="bg-rose-600 text-white text-sm font-black px-4 py-1.5 rounded-full">공식 04</span>
+                    <span class="text-rose-400 text-base font-bold">삼차방정식의 실근 개수 판별</span>
+                </div>
+                <div class="concept-card p-8 flex-grow flex flex-col justify-center gap-4">
+                    <p class="text-lg text-slate-100 leading-relaxed">삼차함수 $h(x)=0$이 서로 다른 실근을 <b class="text-rose-300">정확히 2개</b> 가지려면, $h$의 극댓값 또는 극솟값 중 <b class="text-rose-300">하나가 정확히 $0$</b>이어야 한다 (그 극점에서 $x$축과 접함).</p>
+                    <div class="formula-box py-6 px-10 text-center">
+                        <p class="text-2xl text-rose-200 font-bold">서로 다른 실근 2개 &nbsp;$\Longleftrightarrow$&nbsp; (극댓값)$=0$ 또는 (극솟값)$=0$</p>
+                    </div>
+                    <p class="text-base text-slate-400">그래프를 그리며 직선을 위아래로 움직이는 대신, 극값 위치에서 함숫값을 0으로 놓는 대수 조건으로 바로 전환한다.</p>
+                </div>
+            </div>
+
+            <div class="slide" data-category="문항 04 | 원문">
+                <div class="flex items-center gap-4 mb-2">
+                    <span class="bg-rose-600 text-white text-sm font-black px-4 py-1.5 rounded-full">문항 04</span>
+                    <span class="text-rose-400 text-base font-bold">2024학년도 6월 모의평가 공통 8번</span>
+                </div>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Original Question</div>
+                        <h3 class="problem-text text-xl leading-relaxed">
+                            두 곡선 $y=2x^2-1$과 $y=x^3-x^2+k$가 만나는 점의 개수가 2가 되도록 하는 양수 $k$의 값은? [4점]
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="slide" data-category="문항 04 | 적용 풀이">
+                <h2 class="text-2xl font-extrabold text-white mb-3">문항 04 &nbsp;<span class="text-rose-400 text-lg">공식 적용 풀이</span></h2>
+                <div class="concept-card p-6 flex-grow flex flex-col justify-center gap-3">
+                    <div class="step-box p-4 text-base text-slate-200 leading-relaxed">
+                        <p><b>① 차함수:</b> 두 식을 연립: $h(x)=x^3-3x^2+(k+1)=0$</p>
+                        <p><b>② 극값 위치:</b> $h'(x)=3x^2-6x=3x(x-2)=0 \Rightarrow x=0,\ 2$</p>
+                        <p><b>③ 조건 적용:</b> $h(0)=k+1=0\Rightarrow k=-1$ (양수 조건 위배, 기각) &nbsp;/&nbsp; $h(2)=k-3=0\Rightarrow k=3$ (양수, 채택)</p>
+                    </div>
+                    <div class="text-center text-2xl font-bold text-rose-300 bg-rose-950/40 py-4 rounded-lg">
+                        $$k=\mathbf{3}$$
+                    </div>
+                </div>
+            </div>
+
+            <div class="slide" data-category="문항 04 | 변형문제">
+                <div class="flex items-center gap-4 mb-2">
+                    <span class="bg-rose-600 text-white text-sm font-black px-4 py-1.5 rounded-full">문항 04 변형</span>
+                    <span class="text-rose-400 text-base font-bold">공식 의존도 UP &middot; 양쪽 경우 모두 사용</span>
+                </div>
+                <div class="problem-box p-8 flex-grow flex flex-col justify-center">
+                    <div class="max-w-4xl w-full mx-auto">
+                        <div class="text-xs font-bold text-rose-400 uppercase tracking-widest mb-3">Structure Extension</div>
+                        <h3 class="problem-text text-xl leading-relaxed">
+                            두 곡선 $y=3x^2-4$와 $y=x^3-3x^2+k$가 만나는 점의 개수가 2가 되도록 하는 모든 실수 $k$의 값의 곱을 구하시오.
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="slide" data-category="문항 04 변형 | 답">
+                <div class="concept-card flex-grow flex flex-col items-center justify-center gap-6">
+                    <span class="text-rose-400 font-bold text-lg uppercase tracking-widest">문항 04 변형 정답</span>
+                    <div class="text-6xl font-black text-white">$-112$</div>
+                    <p class="text-sm text-slate-400 max-w-2xl text-center leading-relaxed">$h(x)=x^3-6x^2+(k+4)=0$, $h'(x)=3x(x-4)=0$. $h(0)=0\Rightarrow k=-4$, $h(4)=0\Rightarrow k=28$. 이번엔 양수 제한이 없으므로 두 값 모두 채택: $(-4)\times28=-112$</p>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="flex justify-between items-center z-20 pt-3 border-t border-rose-900/40 mx-8 mb-6 no-print">
+            <button onclick="prevSlide()" class="bg-slate-800/80 hover:bg-rose-600 text-slate-200 hover:text-white font-bold text-sm px-5 py-2 rounded-xl transition border border-slate-700">
+                <i class="fa-solid fa-chevron-left"></i> 이전 슬라이드
+            </button>
+            <div class="text-slate-400 text-xs font-semibold tracking-wider">
+                HIGH SCHOOL MATH CLASS PPT
+            </div>
+            <button onclick="nextSlide()" class="bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm px-5 py-2 rounded-xl transition shadow-md">
+                다음 슬라이드 <i class="fa-solid fa-chevron-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const counterEl = document.getElementById('slide-counter');
+        const categoryEl = document.getElementById('slide-category');
+
+        function updateSlide() {
+            slides.forEach((slide, idx) => slide.classList.toggle('active', idx === currentSlide));
+            if (counterEl) counterEl.textContent = `${currentSlide + 1} / ${slides.length}`;
+            if (categoryEl && slides[currentSlide]) categoryEl.textContent = slides[currentSlide].getAttribute('data-category') || '수업 자료';
+            if (window.MathJax && window.MathJax.typesetPromise) window.MathJax.typesetPromise();
+        }
+        function prevSlide() { if (currentSlide > 0) { currentSlide--; updateSlide(); } }
+        function nextSlide() { if (currentSlide < slides.length - 1) { currentSlide++; updateSlide(); } }
+        updateSlide();
+    </script>
+</body>
+</html>
