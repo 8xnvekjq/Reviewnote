@@ -1480,6 +1480,18 @@ function App() {
         }
       }
 
+      // skipPointRecalc(정리하기)일 때는, 버려지는 X/★의 참여점수(1점씩)도 총점에서 사라지면 안 된다 —
+      // 남아있는 칸(대부분 O) 중 아무 데나 그 만큼을 얹어서 합계 자체는 정리 전후로 정확히 그대로 유지한다.
+      if (skipPointRecalc) {
+        const totalOld = oldReviewPoints.reduce((sum, p) => sum + (p || 0), 0);
+        const totalNew = currentPoints.reduce((sum, p) => sum + (p || 0), 0);
+        const lost = totalOld - totalNew;
+        if (lost > 0) {
+          const keepIdx = currentPoints.findIndex((_, i) => newReviews[i] !== '');
+          currentPoints[keepIdx >= 0 ? keepIdx : 0] += lost;
+        }
+      }
+
       const updatedAnalysis: MistakeAnalysis = {
         solvingProcess: targetEntry.analysis?.solvingProcess || '',
         ...targetEntry.analysis,
