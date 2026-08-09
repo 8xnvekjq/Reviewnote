@@ -25,6 +25,7 @@ export const SlideListModal: React.FC<SlideListModalProps> = ({ isOpen, onClose 
     { title: "베이직쎈 공통수학1 - 10. 순열과 조합 (조합의 활용) (p163~172)", filename: "math1_combination_usage_10.html", date: "2026-07-31", grade: "예비고1" },
 
     // 🏫 고1 (공통수학1, 공통수학2)
+    { title: "개념원리 공통수학2 - Ⅱ. 집합의 뜻과 포함관계 (p120~136)", filename: "math2_set_meaning_containment_p120_136.html", date: "2026-08-11", grade: "고1" },
     { title: "개념원리 공통수학2 - 03.원의 방정식 (p66~96)", filename: "math2_circle_equation_03.html", date: "2026-07-28", grade: "고1" },
     { title: "개념원리 공통수학2 - 02. 직선의 방정식 (p34~62)", filename: "math2_linear_equation_02.html", date: "2026-07-22", grade: "고1" },
     { title: "개념원리 공통수학2 - 평면좌표 (내분점~무게중심)", filename: "math2_plane_coordinates.html", date: "2026-07-18", grade: "고1" },

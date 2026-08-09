@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>개념원리 공통수학2 - 집합의 뜻과 포함관계(p120~136)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true
+            },
+            options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'] }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        .presentation-deck { position: relative; width: 1280px; height: 720px; background: radial-gradient(circle at 10% 20%, #292524 0%, #0f172a 100%); border: 1px solid rgba(255, 255, 255, 0.08); margin: 20px auto; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); border-left: 10px solid #f59e0b; }
+        .slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 40px 68px; display: none; flex-direction: column; justify-content: space-between; z-index: 1; background: transparent; box-sizing: border-box; }
+        .slide.active { display: flex; z-index: 10; }
+
+        .concept-card { background: rgba(41, 37, 36, 0.75); backdrop-filter: blur(10px); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 18px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); }
+        .formula-box { background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.22); border-radius: 14px; }
+        .idea-box { background: linear-gradient(135deg, rgba(120, 53, 15, 0.35) 0%, rgba(41, 37, 36, 0.6) 100%); border: 1px solid rgba(251, 191, 36, 0.35); border-radius: 14px; }
+        .problem-box { background: linear-gradient(135deg, rgba(24, 24, 27, 0.95) 0%, rgba(41, 37, 36, 0.85) 100%); border-left: 8px solid #f59e0b; border-top: 1px solid rgba(245, 158, 11, 0.2); border-right: 1px solid rgba(255, 255, 255, 0.05); border-bottom: 1px solid rgba(255, 255, 255, 0.05); border-radius: 0 18px 18px 0; }
+        .problem-text { font-size: 1.25rem; font-weight: 700; color: #fef3c7; line-height: 1.7; word-break: keep-all; }
+        .num-badge { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background: #d97706; color: white; font-weight: 900; font-size: 1.1rem; flex-shrink: 0; }
+
+        @media print {
+            body { background-color: #ffffff !important; margin: 0 !important; padding: 0 !important; }
+            .presentation-deck { width: 1280px !important; height: auto !important; box-shadow: none !important; border: none !important; margin: 0 !important; overflow: visible !important; display: block !important; }
+            .slide { position: relative !important; display: flex !important; width: 1280px !important; height: 720px !important; page-break-after: always !important; page-break-inside: avoid !important; background: #0f172a !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="presentation-deck" id="deck">
+        <!-- Top Bar -->
+        <div class="flex justify-between items-center z-20 pb-3 border-b border-amber-900/40 mx-8 mt-6 no-print">
+            <div class="flex items-center gap-3">
+                <span class="bg-amber-600 text-white text-xs font-black px-3 py-1 rounded-md uppercase">개념원리 | 고1</span>
+                <span class="text-slate-300 text-sm font-medium">Ⅱ. 집합과 명제 &gt; 1. 집합의 뜻과 포함 관계</span>
+            </div>
+            <div class="text-right flex items-center gap-4">
+                <span class="text-xs text-amber-400 font-bold uppercase tracking-wider" id="slide-category">단원 소개</span>
+                <span class="text-xs text-slate-400 font-semibold bg-slate-800/80 px-2.5 py-1 rounded-md border border-slate-700" id="slide-counter">1 / 17</span>
+            </div>
+        </div>
+
+        <!-- Slide Container -->
+        <div class="relative flex-grow my-2 overflow-hidden" id="slide-container">
+
+            <!-- Slide 1: Cover -->
+            <div class="slide active" data-category="단원 소개">
+                <div class="flex-grow flex flex-col justify-center items-start">
+                    <span class="text-amber-400 font-bold text-lg tracking-widest mb-4">개념원리 공통수학2 &nbsp;|&nbsp; Ⅱ. 집합과 명제</span>
+                    <h1 class="text-6xl font-black text-white leading-tight mb-6">집합의 뜻과 포함 관계</h1>
+                    <div class="h-2 w-40 bg-amber-500 rounded-full mb-8"></div>
+                    <p class="text-2xl text-slate-300 font-medium">집합과 원소부터 부분집합의 개수까지</p>
+                    <p class="text-lg text-slate-500 font-medium mt-2">교재 p.120 ~ p.136 · 필수예제 01 ~ 11</p>
+                </div>
+            </div>
+
+            <!-- Slide 2: 개념 A - 집합과 원소 -->
+            <div class="slide" data-category="개념 이해">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">1</span>
+                        <h2 class="text-3xl font-black text-white">집합과 원소</h2>
+                    </div>
+                    <p class="text-lg text-slate-100 leading-relaxed">어떤 기준에 따라 대상을 분명하게 정할 수 있을 때, 그 대상들의 모임을 <span class="text-amber-300 font-bold">집합</span>이라 하고, 집합을 이루는 대상 하나하나를 <span class="text-amber-300 font-bold">원소</span>라 한다.</p>
+                    <div class="formula-box py-4 px-8 text-lg text-white leading-loose">
+                        <p>① $a$가 집합 $A$의 원소일 때, $a\in A$ (원소이다·속한다)</p>
+                        <p>② $b$가 집합 $A$의 원소가 아닐 때, $b\notin A$ (원소가 아니다·속하지 않는다)</p>
+                    </div>
+                    <div class="idea-box p-4 flex items-start gap-3">
+                        <i class="fa-solid fa-lightbulb text-amber-300 text-xl mt-1"></i>
+                        <p class="text-base text-amber-100 leading-relaxed"><b>직관적 아이디어</b> — 집합인지 아닌지는 단 하나의 질문으로 판단한다: "기준이 명확한가?" '키가 작은', '예쁜', '가까운'처럼 사람마다 다르게 판단하는 표현은 집합이 될 수 없다. 반대로 '3보다 작은 자연수'처럼 딱 잘라 판단 가능하면 집합이다. $\in$과 $\notin$은 원소 하나하나에 대한 이야기이지 집합 전체를 비교하는 기호가 아니라는 점도 함께 기억할 것.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 3: 개념 B - 집합의 표현 방법 -->
+            <div class="slide" data-category="개념 이해">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">2</span>
+                        <h2 class="text-3xl font-black text-white">집합의 표현 방법</h2>
+                    </div>
+                    <div class="formula-box py-4 px-8 text-lg text-white leading-loose">
+                        <p><b>(1) 원소나열법</b>: 집합에 속하는 모든 원소를 $\{\ \}$ 안에 나열 &nbsp; 예) $\{1,3,5,7,9\}$</p>
+                        <p><b>(2) 조건제시법</b>: 원소들이 갖는 공통된 성질을 $\{\ \}$ 안에 조건으로 제시 &nbsp; 예) $\{x\,|\,x\text{는 10 이하의 홀수인 자연수}\}$</p>
+                        <p><b>(3) 벤다이어그램</b>: 집합을 그림으로 나타낸 것</p>
+                    </div>
+                    <div class="idea-box p-4 flex items-start gap-3">
+                        <i class="fa-solid fa-lightbulb text-amber-300 text-xl mt-1"></i>
+                        <p class="text-base text-amber-100 leading-relaxed"><b>직관적 아이디어</b> — 원소나열법은 "누가 들어있는지 직접 보여주기"이고, 조건제시법은 "들어올 수 있는 자격요건만 알려주기"이다. 원소가 몇 개 없으면 나열법이 편하고, 규칙은 있지만 원소가 많거나 무한하면 조건제시법이 편하다. 같은 집합을 두 표현 사이에서 자유롭게 바꿔 쓸 수 있어야 제대로 이해한 것이다.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 4: 개념 C - 집합의 원소의 개수 -->
+            <div class="slide" data-category="개념 이해">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">3</span>
+                        <h2 class="text-3xl font-black text-white">집합의 원소의 개수</h2>
+                    </div>
+                    <div class="formula-box py-4 px-8 text-lg text-white leading-loose">
+                        <p><b>(1) 유한집합</b>: 원소가 유한개인 집합 &nbsp;&nbsp; <b>무한집합</b>: 원소가 무수히 많은 집합</p>
+                        <p>&nbsp;&nbsp;&nbsp;특히 유한집합 중 원소가 하나도 없는 집합을 <b>공집합</b>이라 하고, 기호로 $\varnothing$</p>
+                        <p><b>(2)</b> 집합 $A$가 유한집합일 때, 원소의 개수를 기호로 $n(A)$ &nbsp;&nbsp; 특히 $n(\varnothing)=0$</p>
+                    </div>
+                    <div class="idea-box p-4 flex items-start gap-3">
+                        <i class="fa-solid fa-lightbulb text-amber-300 text-xl mt-1"></i>
+                        <p class="text-base text-amber-100 leading-relaxed"><b>직관적 아이디어</b> — 원소를 세다가 끝이 나면 유한집합, 세다가 끝이 없으면 무한집합이다. 공집합은 "원소가 0개인" 평범한 유한집합일 뿐 "집합이 아닌 것"이 아니다. $n(A)$는 어려운 기호가 아니라 그냥 "원소 개수를 세는 함수"라고 생각하면 헷갈릴 일이 없다.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 5: 개념 D - 부분집합, 서로 같은 집합, 진부분집합 -->
+            <div class="slide" data-category="개념 이해">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">4</span>
+                        <h2 class="text-3xl font-black text-white">부분집합 · 서로 같은 집합 · 진부분집합</h2>
+                    </div>
+                    <div class="formula-box py-3 px-8 text-base text-white leading-loose">
+                        <p><b>부분집합</b>: $A$의 모든 원소가 $B$에 속할 때 $A\subset B$ &nbsp;(성질: $\varnothing\subset A$, $A\subset A$, $A\subset B$이고 $B\subset C$이면 $A\subset C$)</p>
+                        <p><b>서로 같은 집합</b>: $A\subset B$이고 $B\subset A$일 때 $A=B$</p>
+                        <p><b>진부분집합</b>: $A\subset B$이고 $A\ne B$일 때, $A$를 $B$의 진부분집합이라 한다</p>
+                    </div>
+                    <div class="idea-box p-4 flex items-start gap-3">
+                        <i class="fa-solid fa-lightbulb text-amber-300 text-xl mt-1"></i>
+                        <p class="text-base text-amber-100 leading-relaxed"><b>직관적 아이디어</b> — $A\subset B$는 "$A$의 모든 원소가 $B$ 안에도 있다"는 한쪽 방향 포함관계이고, $A=B$는 그 포함관계가 양쪽 방향으로 동시에 성립하는 것이다. 진부분집합은 "포함되지만 완전히 같지는 않은" 경우이므로, 부분집합 목록에서 자기 자신 하나만 빼면 된다.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 6: 개념 E - 부분집합의 개수 -->
+            <div class="slide" data-category="개념 이해">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">5</span>
+                        <h2 class="text-3xl font-black text-white">부분집합의 개수</h2>
+                    </div>
+                    <p class="text-base text-slate-300">원소의 개수가 $n$인 집합 $A$에 대하여</p>
+                    <div class="formula-box py-3 px-8 text-base text-white leading-loose">
+                        <p>① $A$의 부분집합의 개수 $\Rightarrow$ $2^n$ &nbsp;&nbsp; $A$의 진부분집합의 개수 $\Rightarrow$ $2^n-1$</p>
+                        <p>② 특정한 원소 $k$개를 반드시 갖는 부분집합의 개수 $\Rightarrow$ $2^{n-k}$ (단, $k \lt n$)</p>
+                        <p>③ 특정한 원소 $m$개를 갖지 않는 부분집합의 개수 $\Rightarrow$ $2^{n-m}$ (단, $m \lt n$)</p>
+                        <p>④ 특정한 원소 $k$개 중 적어도 한 개를 원소로 갖는 부분집합의 개수 $\Rightarrow$ $2^n-2^{n-k}$ (단, $k \lt n$)</p>
+                    </div>
+                    <div class="idea-box p-4 flex items-start gap-3">
+                        <i class="fa-solid fa-lightbulb text-amber-300 text-xl mt-1"></i>
+                        <p class="text-sm text-amber-100 leading-relaxed"><b>직관적 아이디어</b> — 원소 하나하나마다 "부분집합에 넣을까 말까" 두 가지 선택이 있으므로 원소가 $n$개면 $2\times2\times\cdots\times2=2^n$가지다. 특정 원소를 반드시 넣어야 한다면 그 원소는 이미 선택이 끝난 것이므로 계산에서 빼고 나머지 원소 개수만큼만 $2$의 거듭제곱을 하면 된다. '적어도 하나'는 반대로 "전체 경우에서 하나도 없는 경우를 빼는" 여사건의 아이디어다.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 7: 필수예제 01 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">01</span>
+                        <h2 class="text-3xl font-black text-white">집합의 뜻</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">다음 중 집합인 것을 모두 고르면? (정답 2개)<br>
+                        ① 우리 반에서 키가 작은 학생들의 모임<br>
+                        ② 예쁜 학생들의 모임<br>
+                        ③ 혈액형이 B형인 우리 학교 학생들의 모임<br>
+                        ④ 키가 170 cm에 가까운 사람들의 모임<br>
+                        ⑤ 3보다 크고 10보다 작은 자연수의 모임</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 8: 필수예제 02 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">02</span>
+                        <h2 class="text-3xl font-black text-white">집합과 원소 사이의 관계</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">$4$의 양의 배수의 집합을 $A$, $8$의 양의 약수의 집합을 $B$라 할 때, 다음 중 옳은 것은?<br>
+                        ① $1\in A$ &nbsp; ② $2\notin B$ &nbsp; ③ $5\in B$ &nbsp; ④ $6\notin A$ &nbsp; ⑤ $8\notin B$</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 9: 필수예제 03 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">03</span>
+                        <h2 class="text-3xl font-black text-white">집합의 표현 방법</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">다음 집합에서 원소나열법으로 나타낸 것은 조건제시법으로, 조건제시법으로 나타낸 것은 원소나열법으로 나타내시오.<br>
+                        (1) $\{1,2,5,10\}$<br>
+                        (2) $\{3,6,9,12,\cdots\}$<br>
+                        (3) $\{x\,|\,x\text{는 1보다 크고 14보다 작은 짝수}\}$<br>
+                        (4) $\{x\,|\,x\text{는 3으로 나누었을 때의 나머지가 1인 자연수}\}$</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 10: 필수예제 04 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">04</span>
+                        <h2 class="text-3xl font-black text-white">조건제시법으로 나타내어진 집합</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">집합 $A=\{0,1,2\}$에 대하여 다음 집합을 원소나열법으로 나타내시오.<br>
+                        (1) $B=\{x+y\,|\,x\in A,\ y\in A\}$<br>
+                        (2) $C=\{xy\,|\,x\in A,\ y\in A\}$</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 11: 필수예제 05 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">05</span>
+                        <h2 class="text-3xl font-black text-white">유한집합과 무한집합</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">다음 중 무한집합인 것을 모두 고르면? (정답 2개)<br>
+                        ① $\{x\,|\,x=3n,\ n=1,2,3,4\}$<br>
+                        ② $\{x\,|\,x\text{는 9보다 큰 한 자리의 홀수}\}$<br>
+                        ③ $\{x\,|\,x\text{는 } 1 \lt x \lt 2\text{인 기약분수}\}$<br>
+                        ④ $\{x\,|\,x\text{는 세 자리 자연수}\}$<br>
+                        ⑤ $\{x\,|\,x\text{는 } x^2-3x+2 \lt 0\text{인 유리수}\}$</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 12: 필수예제 06 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">06</span>
+                        <h2 class="text-3xl font-black text-white">유한집합의 원소의 개수</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">다음 중 옳은 것은?<br>
+                        ① $n(\{0\})=0$ &nbsp; ② $n(\{\varnothing,3\})=1$ &nbsp; ③ $n(\{0,1,2\})-n(\{1,2\})=1$<br>
+                        ④ $n(\{3\}) \lt n(\{5\})$ &nbsp; ⑤ $n(\{0\})+n(\varnothing)+n(\{\varnothing\})+n(\{0,1\})=5$</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 13: 필수예제 07 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">07</span>
+                        <h2 class="text-3xl font-black text-white">기호 $\in$, $\subset$의 사용</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">집합 $A=\{\varnothing,1,2,\{1,2\}\}$에 대하여 다음 중 옳지 않은 것은?<br>
+                        ① $\varnothing\in A$ &nbsp; ② $\{\varnothing\}\subset A$ &nbsp; ③ $\{1\}\in A$ &nbsp; ④ $\{1,2\}\in A$ &nbsp; ⑤ $\{1,2\}\subset A$</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 14: 필수예제 08 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">08</span>
+                        <h2 class="text-3xl font-black text-white">집합 사이의 포함 관계를 이용하여 미지수 구하기</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">두 집합 $A=\{1,a+2\}$, $B=\{3,a^2+2,a+1\}$에 대하여 $A\subset B$일 때, 실수 $a$의 값을 구하시오.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 15: 필수예제 09 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">09</span>
+                        <h2 class="text-3xl font-black text-white">서로 같은 집합</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">두 집합 $A=\{-2,a^2+2a\}$, $B=\{3,a^2-3a\}$에 대하여 $A=B$일 때, 상수 $a$의 값을 구하시오.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 16: 필수예제 10 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">10</span>
+                        <h2 class="text-3xl font-black text-white">특정한 원소를 갖거나 갖지 않는 부분집합의 개수</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">집합 $A=\{3,4,5,6,7\}$에 대하여 다음을 구하시오.<br>
+                        (1) 집합 $A$의 부분집합 중 $5$는 반드시 원소로 갖고 $3$, $6$은 원소로 갖지 않는 부분집합의 개수<br>
+                        (2) 집합 $A$의 부분집합 중 적어도 한 개의 홀수를 원소로 갖는 부분집합의 개수</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 17: 필수예제 11 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">11</span>
+                        <h2 class="text-3xl font-black text-white">$A\subset X\subset B$를 만족시키는 집합 $X$의 개수</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">두 집합 $A=\{2,4\}$, $B=\{x\,|\,x\text{는 12의 양의 약수}\}$에 대하여 $A\subset X\subset B$를 만족시키는 집합 $X$의 개수를 구하시오.</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer Control -->
+        <div class="flex justify-between items-center z-20 pt-3 border-t border-amber-900/40 mx-8 mb-6 no-print">
+            <button onclick="prevSlide()" class="bg-slate-800/80 hover:bg-amber-600 text-slate-200 hover:text-white font-bold text-sm px-5 py-2 rounded-xl transition border border-slate-700">
+                <i class="fa-solid fa-chevron-left"></i> 이전 슬라이드
+            </button>
+            <div class="text-slate-400 text-xs font-semibold tracking-wider">
+                HIGH SCHOOL MATH CLASS PPT
+            </div>
+            <button onclick="nextSlide()" class="bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm px-5 py-2 rounded-xl transition shadow-md">
+                다음 슬라이드 <i class="fa-solid fa-chevron-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const counterEl = document.getElementById('slide-counter');
+        const categoryEl = document.getElementById('slide-category');
+
+        function updateSlide() {
+            slides.forEach((slide, idx) => slide.classList.toggle('active', idx === currentSlide));
+            if (counterEl) counterEl.textContent = `${currentSlide + 1} / ${slides.length}`;
+            if (categoryEl && slides[currentSlide]) categoryEl.textContent = slides[currentSlide].getAttribute('data-category') || '수업 자료';
+            if (window.MathJax && window.MathJax.typesetPromise) window.MathJax.typesetPromise();
+        }
+        function prevSlide() { if (currentSlide > 0) { currentSlide--; updateSlide(); } }
+        function nextSlide() { if (currentSlide < slides.length - 1) { currentSlide++; updateSlide(); } }
+        updateSlide();
+    </script>
+</body>
+</html>
