@@ -18,7 +18,7 @@ interface MistakeDetailModalProps {
   onClose: () => void;
   onDeleteMistake: (id: string, e: React.MouseEvent) => void;
   onStartAnalysis: (entry: MistakeEntry) => void;
-  onUpdateReviews: (id: string, newReviews: ReviewState[]) => void;
+  onUpdateReviews: (id: string, newReviews: ReviewState[], skipPointRecalc?: boolean) => void;
   onUpdateEntry: (updated: MistakeEntry) => void;
   onSelectEntry?: (entry: MistakeEntry | null) => void;
   isReviewSession?: boolean;
@@ -897,13 +897,15 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                     {activeStep === 3 && (
                       <button
                         onClick={() => {
-                          if (confirm('틀리거나 보류한 기록을 정리하고 맞춘(O) 기록만 앞으로 정렬하여 다시 복습하시겠습니까?')) {
-                            const oReviews = (selectedEntry.reviews || []).filter(r => r === 'O');
-                            // O가 하나도 없으면(전부 X/★) ''를 2개만 이어붙여선 배열 길이가 2에
-                            // 그쳐서 3번째 칸이 undefined가 되어 버튼도 안 뜨고 잠기지도 않는
-                            // "고정" 상태로 망가졌다. 항상 최소 3칸이 되도록 ''를 3개 붙인다.
-                            const newReviews = [...oReviews, '', '', ''].slice(0, 3) as ReviewState[];
-                            onUpdateReviews(selectedEntry.id, newReviews);
+                          if (confirm('틀리거나 보류한 기록만 정리하고, 맞춘(O) 기록은 그 자리에 그대로 둔 채 다시 복습하시겠습니까?')) {
+                            // 예전엔 O만 추려서 앞칸(1차)부터 다시 채웠는데, 배점이 몇 번째 칸이냐(1차 3점/
+                            // 2차 7점/3차 15점)로 정해지다 보니 O가 원래 있던 칸에서 밀려나면서 랭킹 점수·
+                            // 콤보 포인트가 부당하게 깎이는 버그가 있었다. X/★만 그 자리에서 비우고 O는
+                            // 원래 칸에 그대로 둬서, 배점에 영향을 주는 "몇 번째 칸인지"가 절대 안 바뀌게 한다.
+                            const newReviews = (selectedEntry.reviews || ['', '', '']).map(r => (r === 'O' ? r : '')) as ReviewState[];
+                            // 이것도 "정리"일 뿐 다시 틀린 게 아니므로, X/★를 비우는 것까지 포함해서
+                            // 점수 재계산 자체를 건너뛴다 — 이 버튼을 눌러서는 어떤 점수도 변하지 않는다.
+                            onUpdateReviews(selectedEntry.id, newReviews, true);
                           }
                         }}
                         className="w-full py-2.5 rounded-xl bg-indigo-600/10 hover:bg-indigo-600/20 active:scale-95 border border-indigo-500/20 text-indigo-400 font-bold text-xs transition-all flex items-center justify-center space-x-1.5"

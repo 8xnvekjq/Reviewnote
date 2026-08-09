@@ -1420,7 +1420,7 @@ function App() {
   };
 
   // Update reviews list in Supabase & local state
-  const handleUpdateReviews = async (id: string, newReviews: ReviewState[]) => {
+  const handleUpdateReviews = async (id: string, newReviews: ReviewState[], skipPointRecalc = false) => {
     try {
       const targetEntry = mistakes.find(m => m.id === id);
       if (!targetEntry) return;
@@ -1504,9 +1504,14 @@ function App() {
         if (state === 'X' || state === 'star') return 1;
         return 0;
       };
+      // skipPointRecalc: "맞춘 오답 제외하고 정리하기"처럼 이미 딴 O를 앞칸으로 당겨 재정렬만 하는
+      // 액션에서는 배점 계산을 건너뛴다 — 배점이 O가 몇 번째 칸에 있는지(1차/2차/3차)로 정해지다 보니,
+      // 실제로는 다시 틀리거나 취소한 게 아닌데도 재정렬만으로 콤보 포인트가 부당하게 깎이던 버그가 있었다.
       let reviewPointDelta = 0;
-      for (let i = 0; i < 3; i++) {
-        reviewPointDelta += pointsForStage(newReviews[i], i) - pointsForStage(oldReviews[i], i);
+      if (!skipPointRecalc) {
+        for (let i = 0; i < 3; i++) {
+          reviewPointDelta += pointsForStage(newReviews[i], i) - pointsForStage(oldReviews[i], i);
+        }
       }
 
       // ⚡ 콤보 부스터 3시간 5배 버프 적용 (사용 후 3시간 동안 모든 복습 획득 포인트 5배!)
