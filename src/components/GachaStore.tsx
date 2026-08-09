@@ -635,6 +635,57 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
     window.dispatchEvent(new Event('reviewnote_inventory_updated'));
   };
 
+  // 🎫 SSR 확정 뽑기권 사용 — 즉시 SSR 등급 아이템 중 하나를 100% 확정으로 지급 (자기 자신은 보상 후보에서 제외)
+  const handleUseSsrTicket = async () => {
+    const currentQty = inventory['item_ssr_ticket'] || 0;
+    if (currentQty < 1) return;
+
+    const newQty = currentQty - 1;
+    const { error } = await supabase
+      .from('user_items')
+      .update({ quantity: newQty })
+      .eq('user_id', userId)
+      .eq('item_id', 'item_ssr_ticket');
+
+    if (error) {
+      showNoticeModal({
+        title: '사용 실패',
+        message: `SSR 확정 뽑기권 사용에 실패했습니다: ${error.message}`,
+        badge: '오류',
+        icon: '⚠️',
+      });
+      return;
+    }
+
+    setInventory(prev => ({ ...prev, item_ssr_ticket: newQty }));
+
+    const ssrPool = GACHA_ITEMS.filter(g => g.rarity === 'SSR' && !g.isLimited && g.id !== 'item_ssr_ticket');
+    const wonItem = ssrPool[Math.floor(Math.random() * ssrPool.length)];
+    const isConsumable = wonItem.category === 'SHIELD' || wonItem.category === 'CHARM';
+    const alreadyOwned = (inventory[wonItem.id] || 0) > 0;
+
+    if (!isConsumable && alreadyOwned) {
+      const refund = getRefundPointsForRarity(wonItem.rarity);
+      onDeductPoints(-refund);
+      showNoticeModal({
+        title: '🎫 SSR 확정 뽑기권 사용!',
+        message: `${wonItem.icon} ${wonItem.name}\n이미 보유 중인 아이템이라 ${refund}점으로 자동 환급되었습니다!`,
+        badge: 'SSR 확정 뽑기 (중복 환급)',
+        icon: '🎫',
+      });
+    } else {
+      await addItemsToInventory([wonItem]);
+      showNoticeModal({
+        title: '🎫 SSR 확정 뽑기권 사용!',
+        message: `${wonItem.icon} ${wonItem.name}\n을(를) 획득했습니다!`,
+        badge: 'SSR 확정 뽑기',
+        icon: '🎫',
+      });
+    }
+
+    window.dispatchEvent(new Event('reviewnote_inventory_updated'));
+  };
+
   // 아이템 장착/해제 토글
   const handleToggleEquip = (item: GachaItem) => {
     if (item.category === 'STAMP') {
@@ -1041,6 +1092,15 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                         <button
                           onClick={handleUseUrTicket}
                           className="px-3 py-1.5 rounded-xl text-[10px] font-black flex-none transition-all bg-gradient-to-r from-amber-400 via-pink-500 to-purple-500 text-slate-950 hover:brightness-110 shadow"
+                        >
+                          사용하기
+                        </button>
+                      )}
+
+                      {item.category === 'SHIELD' && item.id === 'item_ssr_ticket' && (
+                        <button
+                          onClick={handleUseSsrTicket}
+                          className="px-3 py-1.5 rounded-xl text-[10px] font-black flex-none transition-all bg-gradient-to-r from-amber-400 to-yellow-400 text-slate-950 hover:brightness-110 shadow"
                         >
                           사용하기
                         </button>

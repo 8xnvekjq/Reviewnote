@@ -133,6 +133,16 @@ export const GACHA_ITEMS: GachaItem[] = [
 
   // ── SSR (7%) - Super Special Rare (황금 빛) ────────────────────────
   {
+    id: 'item_ssr_ticket',
+    name: '🎫 SSR 확정 뽑기권',
+    description: '사용하는 즉시 SSR 등급 아이템 중 하나를 100% 확정으로 획득할 수 있는 고급 티켓입니다.',
+    rarity: 'SSR',
+    category: 'SHIELD',
+    icon: '🎫',
+    effectValue: 'ssr_ticket',
+    color: 'from-amber-400 via-yellow-400 to-amber-500'
+  },
+  {
     id: 'item_point_booster',
     name: '🎟️ 콤보 부스터 (5배 버프 3시간권)',
     description: '보물가방에서 사용 시 3시간 동안 복습 완료할 때 얻는 모든 콤보 포인트를 5배로 획득하는 강력한 주문서입니다.',
