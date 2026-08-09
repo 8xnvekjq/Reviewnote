@@ -131,24 +131,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
           stat.weeklyCompletedCount += 1;
         }
 
-        // 3단 콤보 점수 계산 (1차 O: 3점, 2차 O: 7점, 3차 O(최종완료): 15점, X/★: 참여점수 1점)
-        // — weekly_leaderboard SQL 뷰(명예의전당)와 완전히 동일한 공식으로 통일함
+        // 3단 콤보 점수 계산 — weekly_leaderboard SQL 뷰(명예의전당)와 완전히 동일한 공식으로 통일함.
+        // "몇 번째 칸이냐"로 배점을 다시 매기지 않고, 체크 시점에 영구 저장된 analysis.reviewPoints를
+        // 그대로 합산한다 — "맞춘 오답 제외하고 정리하기"로 O가 다른 칸으로 옮겨가도 점수가 안 바뀐다.
         // reviewDates가 없거나 빈 문자열일 때 updated_at 및 date로 폴백 처리
+        const reviewPoints: number[] = m.analysis?.reviewPoints || [];
         const rDate0 = reviewDates[0] || m.updated_at || m.date;
         const rDate1 = reviewDates[1] || m.updated_at || m.date;
         const rDate2 = reviewDates[2] || m.updated_at || m.date;
 
-        const stagePoints = (state: string, oPoints: number, date: string): number => {
+        const stagePoints = (storedPoints: number | undefined, date: string): number => {
           if (!isDateInCurrentWeek(date)) return 0;
-          if (state === 'O') return oPoints;
-          if (state === 'X' || state === 'star') return 1;
-          return 0;
+          return storedPoints || 0;
         };
 
         let comboScore = 0;
-        comboScore += stagePoints(reviews[0], 3, rDate0);
-        comboScore += stagePoints(reviews[1], 7, rDate1);
-        comboScore += stagePoints(reviews[2], 15, rDate2);
+        comboScore += stagePoints(reviewPoints[0], rDate0);
+        comboScore += stagePoints(reviewPoints[1], rDate1);
+        comboScore += stagePoints(reviewPoints[2], rDate2);
 
         stat.weeklyScore += comboScore;
 

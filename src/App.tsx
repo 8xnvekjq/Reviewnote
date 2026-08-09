@@ -1427,17 +1427,22 @@ function App() {
 
       const oldReviews = targetEntry.reviews || ['', '', ''];
       const oldReviewDates = targetEntry.analysis?.reviewDates || ['', '', ''];
+      const oldReviewPoints = targetEntry.analysis?.reviewPoints || [0, 0, 0];
 
-      // 1. 기존에 'O' 였던 칸들의 날짜정보를 순서대로 수집
+      // 1. 기존에 'O' 였던 칸들의 날짜·점수를 순서대로 수집 (정리하기로 O가 다른 칸으로 옮겨가도
+      //    "그 순간 실제로 딴 점수"를 그대로 데려가기 위함 — 몇 번째 칸인지로 점수를 다시 매기지 않는다)
       const existingODates: string[] = [];
+      const existingOPoints: number[] = [];
       oldReviews.forEach((r, idx) => {
         if (r === 'O' && oldReviewDates[idx]) {
           existingODates.push(oldReviewDates[idx]);
+          existingOPoints.push(oldReviewPoints[idx] || 0);
         }
       });
 
-      // 2. newReviews 에 대응하여 currentDates 정렬 조립
+      // 2. newReviews 에 대응하여 currentDates/currentPoints 정렬 조립
       const currentDates = ['', '', ''];
+      const currentPoints = [0, 0, 0];
       let oCounter = 0;
 
       for (let i = 0; i < 3; i++) {
@@ -1446,26 +1451,31 @@ function App() {
 
         if (state === '') {
           currentDates[i] = '';
+          currentPoints[i] = 0;
         } else if (state === 'O') {
           // O 인 경우:
-          // 기존에 'O' 였던 개수 범위 내의 도장은 예전 맞춘 시간 슬라이딩 정비
+          // 기존에 'O' 였던 개수 범위 내의 도장은 예전 맞춘 시간·점수 슬라이딩 정비
           if (oCounter < existingODates.length) {
             currentDates[i] = existingODates[oCounter];
+            currentPoints[i] = existingOPoints[oCounter];
             oCounter++;
           } else {
-            // 새로 찍힌 O 이면 신규 타임스탬프 기록
+            // 새로 찍힌 O 이면 신규 타임스탬프 기록 + 지금 이 칸(1차/2차/3차) 배점으로 처음 확정
             const now = new Date();
             const dateStr = `${now.getMonth() + 1}/${now.getDate()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
             currentDates[i] = dateStr;
+            currentPoints[i] = [3, 7, 15][i];
           }
         } else {
           // X 또는 star 인 경우
           if (state === oldState && oldReviewDates[i]) {
             currentDates[i] = oldReviewDates[i];
+            currentPoints[i] = oldReviewPoints[i] || 1;
           } else {
             const now = new Date();
             const dateStr = `${now.getMonth() + 1}/${now.getDate()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
             currentDates[i] = dateStr;
+            currentPoints[i] = 1;
           }
         }
       }
@@ -1473,7 +1483,8 @@ function App() {
       const updatedAnalysis: MistakeAnalysis = {
         solvingProcess: targetEntry.analysis?.solvingProcess || '',
         ...targetEntry.analysis,
-        reviewDates: currentDates
+        reviewDates: currentDates,
+        reviewPoints: currentPoints
       };
 
       const { error } = await supabase
@@ -1497,20 +1508,15 @@ function App() {
       setSelectedEntry(prev => prev && prev.id === id ? updatedEntry : prev);
 
       // 🎯 복습 단계별 콤보 포인트 실시간·영구 적립 (1차 O=3, 2차 O=7, 3차 O=15, X/★=참여점수 1점).
-      // 이전 상태와 새 상태를 단계별로 비교해서 "차이(delta)"만 반영한다 — 그래야 O↔X↔빈칸을
-      // 왔다갔다 해도 매번 다시 지급되지 않고(악용 방지), 반대로 되돌리면 정확히 그만큼 회수된다.
-      const pointsForStage = (state: ReviewState, stageIndex: number): number => {
-        if (state === 'O') return [3, 7, 15][stageIndex];
-        if (state === 'X' || state === 'star') return 1;
-        return 0;
-      };
-      // skipPointRecalc: "맞춘 오답 제외하고 정리하기"처럼 이미 딴 O를 앞칸으로 당겨 재정렬만 하는
-      // 액션에서는 배점 계산을 건너뛴다 — 배점이 O가 몇 번째 칸에 있는지(1차/2차/3차)로 정해지다 보니,
-      // 실제로는 다시 틀리거나 취소한 게 아닌데도 재정렬만으로 콤보 포인트가 부당하게 깎이던 버그가 있었다.
+      // "몇 번째 칸이냐"가 아니라 위에서 계산한 currentPoints(체크 시점에 확정된 실제 점수)를 그대로
+      // 쓴다 — 그래야 "맞춘 오답 제외하고 정리하기"로 O가 다른 칸에 옮겨가도 배점이 안 바뀐다.
+      // 이전 상태와 새 상태를 비교해서 "차이(delta)"만 반영한다 — O↔X↔빈칸을 왔다갔다 해도 매번
+      // 다시 지급되지 않고(악용 방지), 반대로 되돌리면 정확히 그만큼 회수된다.
+      // skipPointRecalc: 정리하기처럼 애초에 아무 점수 변화도 원치 않는 액션을 위한 추가 안전장치.
       let reviewPointDelta = 0;
       if (!skipPointRecalc) {
         for (let i = 0; i < 3; i++) {
-          reviewPointDelta += pointsForStage(newReviews[i], i) - pointsForStage(oldReviews[i], i);
+          reviewPointDelta += currentPoints[i] - (oldReviewPoints[i] || 0);
         }
       }
 

@@ -903,12 +903,10 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                             // 그쳐서 3번째 칸이 undefined가 되어 버튼도 안 뜨고 잠기지도 않는
                             // "고정" 상태로 망가졌다. 항상 최소 3칸이 되도록 ''를 3개 붙인다.
                             const newReviews = [...oReviews, '', '', ''].slice(0, 3) as ReviewState[];
-                            // 이미 맞춘 O를 앞으로 당겨 정렬만 하는 것뿐, 실제로 다시 틀리거나 되돌린 게
-                            // 아니므로 (보유 콤보 포인트에는) 점수 재계산을 건너뛴다 — 안 그러면 O가 몇
-                            // 번째 칸으로 옮겨졌는지에 따라 배점(1차 3점/2차 7점/3차 15점)이 달라져서
-                            // 콤보 포인트가 부당하게 깎였음. 다만 명예의 전당 주간 랭킹 점수는 DB 뷰가
-                            // 실시간으로 "몇 번째 칸인지"를 그대로 다시 읽어서 계산하는 구조라, 이 정렬로
-                            // 인덱스가 바뀌는 순간 그 뷰 점수 자체는 여전히 바뀔 수 있음 (별개 이슈).
+                            // 배점은 이제 "몇 번째 칸이냐"가 아니라 체크 시점에 analysis.reviewPoints에
+                            // 영구 저장된 값을 그대로 데려가므로(handleUpdateReviews 참고), O를 앞으로
+                            // 당겨도 그 자체로는 점수가 안 바뀐다 — skipPointRecalc=true는 그래도 이
+                            // "정리" 액션만큼은 어떤 미세한 점수 변화도 없도록 하는 추가 안전장치.
                             onUpdateReviews(selectedEntry.id, newReviews, true);
                           }
                         }}

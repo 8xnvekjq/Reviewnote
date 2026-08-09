@@ -20,6 +20,7 @@ export interface MistakeAnalysis {
   modelUsed?: string;       // 분석에 사용된 AI 모델 명
   printed?: boolean;        // 인쇄/출력 완료 여부
   reviewDates?: string[];   // 단계별 복습 완료 일자 배열 (['7/10', '', ''])
+  reviewPoints?: number[];  // 단계별로 체크한 "그 순간" 영구 저장된 콤보 포인트 (1차 O=3/2차 O=7/3차 O=15, X·★=1) — 나중에 정리하기로 O가 다른 칸으로 옮겨가도 이 값은 안 바뀜
   durationMs?: number;      // 이 진단(classify+extract+solve 전체)이 실제로 걸린 시간(ms) — 평균 대기시간 계산용
 }
 
