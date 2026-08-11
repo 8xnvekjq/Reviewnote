@@ -382,7 +382,11 @@ function App() {
   };
 
   // 주간 최다 오답 완료 챔피언 정보 로드 + 내 점수 동시 갱신 (하이브리드 1주 이월 및 리셋 롤오버)
-  const loadWeeklyChampions = async () => {
+  // userIdOverride: 로그인 직후 fetchUserData가 넘겨주는 "방금 막 확정된" 세션 id. 이게 없으면
+  // 컴포넌트 state의 session을 읽는데, 로그인 첫 호출 시점엔 setSession()이 아직 리렌더링에 반영되기
+  // 전이라 session이 null인 채로 이 함수가 실행돼서 "나의 순위"가 영구적으로 null(순위 밖)에
+  // 고정돼버리는 버그가 있었다 — 이후 뭔가(복습, 실시간 이벤트 등)가 다시 호출해주기 전까지는 안 고쳐짐.
+  const loadWeeklyChampions = async (userIdOverride?: string) => {
     // 이 함수가 실시간 구독/본인 액션 등 여러 곳에서 거의 동시에 여러 번 호출될 수 있어서, 네트워크
     // 지연에 따라 "먼저 시작했지만 늦게 도착한" 오래된 응답이 방금 갱신된 최신 상태를 덮어써 버리는
     // 경합 문제가 있었다 — 이게 "실시간 순위/점수가 가끔 갱신 안 되고 옛날 값에 멈춰있는" 원인이었다.
@@ -410,7 +414,7 @@ function App() {
       setWeeklyChampions(activeThisWeek.slice(0, 3));
 
       // 순위권(top3) 밖이어도 본인 순위/점수는 항상 확인 가능하도록 전체 목록에서 내 위치를 별도로 계산
-      const myUserId = session?.user?.id;
+      const myUserId = userIdOverride || session?.user?.id;
       const myIndex = myUserId ? activeThisWeek.findIndex((item: any) => item.user_id === myUserId) : -1;
       setMyWeeklyStanding(
         myIndex >= 0
@@ -654,10 +658,10 @@ function App() {
   // Fetch mistakes from Supabase
   const fetchUserData = async (targetUserId?: string) => {
     try {
-      loadWeeklyChampions(); // 최신 챔피언 정보 동기화
-      fetchPeerActivities(); // 실시간 친구들 복습 현황 로드
-
       const targetId = targetUserId || session?.user?.id;
+
+      loadWeeklyChampions(targetId); // 최신 챔피언 정보 동기화 (로그인 직후 session state 반영 전이어도 정확한 id로)
+      fetchPeerActivities(); // 실시간 친구들 복습 현황 로드
 
       // 서로 결과에 의존하지 않는 4개의 조회를 순차 대기가 아니라 동시에 실행 — 로그인 유저
       // 프로필/전체 오답/전체 학생 이름맵/스캐폴딩을 하나씩 기다렸다가 다음 걸 시작하던 게
