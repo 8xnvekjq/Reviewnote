@@ -86,6 +86,8 @@ function App() {
   const [weeklyChampions, setWeeklyChampions] = useState<any[]>([]);
   // 명예의 전당 순위권(top3) 밖이어도 본인 점수/순위를 볼 수 있도록 별도 보관
   const [myWeeklyStanding, setMyWeeklyStanding] = useState<{ rank: number; score: number; completedCount: number } | null>(null);
+  // loadWeeklyChampions 호출 경합(race) 방지용 — 가장 최근에 시작한 요청 번호만 결과를 반영
+  const weeklyChampionsRequestIdRef = useRef(0);
   // 🎯 일일 복습 퀘스트: 오늘 새로 체크한 복습 개수 (5개 달성 시 서버에서 콤보 포인트 보너스 자동 지급)
   const [dailyReviewCount, setDailyReviewCount] = useState(0);
   // 🏅 명예의 전당 주간 1/2/3등 누적 횟수 — 주간 점수는 초기화되지만 이 기록은 영구히 남는다
@@ -381,6 +383,11 @@ function App() {
 
   // 주간 최다 오답 완료 챔피언 정보 로드 + 내 점수 동시 갱신 (하이브리드 1주 이월 및 리셋 롤오버)
   const loadWeeklyChampions = async () => {
+    // 이 함수가 실시간 구독/본인 액션 등 여러 곳에서 거의 동시에 여러 번 호출될 수 있어서, 네트워크
+    // 지연에 따라 "먼저 시작했지만 늦게 도착한" 오래된 응답이 방금 갱신된 최신 상태를 덮어써 버리는
+    // 경합 문제가 있었다 — 이게 "실시간 순위/점수가 가끔 갱신 안 되고 옛날 값에 멈춰있는" 원인이었다.
+    // 요청마다 고유 번호를 매겨서, 그 사이 더 최신 호출이 있었으면 이 응답은 그냥 버린다.
+    const requestId = ++weeklyChampionsRequestIdRef.current;
     try {
       // 🏅 주가 바뀐 뒤 아직 지난주 1/2/3등 메달이 집계되지 않았으면 여기서 확정 (매번 호출해도
       // 서버에서 이미 처리된 주인지 확인 후 스킵하므로 안전 — 별도 크론 없이 앱 사용 자체가 트리거)
@@ -397,6 +404,7 @@ function App() {
         .order('score', { ascending: false });
 
       if (error) throw error;
+      if (requestId !== weeklyChampionsRequestIdRef.current) return; // 더 최신 호출이 이미 진행 중 — 이 응답은 폐기
 
       const activeThisWeek = (data || []).filter((item: any) => item.score > 0);
       setWeeklyChampions(activeThisWeek.slice(0, 3));
@@ -410,6 +418,7 @@ function App() {
           : null
       );
     } catch (err) {
+      if (requestId !== weeklyChampionsRequestIdRef.current) return;
       console.error('loadWeeklyChampions failed:', err);
       setWeeklyChampions([]);
       setMyWeeklyStanding(null);
@@ -1853,16 +1862,22 @@ function App() {
                   <span className="text-[8.5px] text-slate-500 font-bold">매주 월요일 갱신</span>
                 </div>
 
-                {/* 순위권(top3) 밖이어도 내 점수는 항상 보이는 한 줄 */}
+                {/* 순위권(top3) 밖이어도 내 점수는 항상 보이는 한 줄 — 관리자 계정은 애초에 명예의
+                    전당 집계(weekly_leaderboard 뷰)에서 제외되므로, "순위 밖·0점"이 마치 실시간
+                    갱신이 안 되는 버그처럼 보이지 않도록 별도 안내 문구로 대체한다. */}
                 {session?.user && (
                   <div className="flex items-center justify-between bg-slate-955/60 border border-slate-800/70 rounded-xl px-2.5 py-1">
                     <span className="text-[9px] text-slate-500 font-bold">🙋 나의 순위</span>
-                    <span className="text-[10px] font-black text-indigo-300">
-                      {myWeeklyStanding ? `${myWeeklyStanding.rank}위` : '순위 밖'}
-                      <span className="text-slate-400 font-bold ml-1">
-                        · {myWeeklyStanding ? `${Math.round(myWeeklyStanding.score)}점` : '0점'}
+                    {isAdmin ? (
+                      <span className="text-[9px] font-bold text-slate-500">관리자 계정은 랭킹 집계 제외</span>
+                    ) : (
+                      <span className="text-[10px] font-black text-indigo-300">
+                        {myWeeklyStanding ? `${myWeeklyStanding.rank}위` : '순위 밖'}
+                        <span className="text-slate-400 font-bold ml-1">
+                          · {myWeeklyStanding ? `${Math.round(myWeeklyStanding.score)}점` : '0점'}
+                        </span>
                       </span>
-                    </span>
+                    )}
                   </div>
                 )}
 
@@ -1977,16 +1992,22 @@ function App() {
                   </div>
                 </div>
 
-                {/* 순위권(top3) 밖이어도 내 점수는 항상 보이는 한 줄 */}
+                {/* 순위권(top3) 밖이어도 내 점수는 항상 보이는 한 줄 — 관리자 계정은 애초에 명예의
+                    전당 집계(weekly_leaderboard 뷰)에서 제외되므로, "순위 밖·0점"이 마치 실시간
+                    갱신이 안 되는 버그처럼 보이지 않도록 별도 안내 문구로 대체한다. */}
                 {session?.user && (
                   <div className="flex items-center justify-between bg-slate-955/60 border border-slate-800/70 rounded-xl px-2.5 py-1">
                     <span className="text-[9px] text-slate-500 font-bold">🙋 나의 순위</span>
-                    <span className="text-[10px] font-black text-indigo-300">
-                      {myWeeklyStanding ? `${myWeeklyStanding.rank}위` : '순위 밖'}
-                      <span className="text-slate-400 font-bold ml-1">
-                        · {myWeeklyStanding ? `${Math.round(myWeeklyStanding.score)}점` : '0점'}
+                    {isAdmin ? (
+                      <span className="text-[9px] font-bold text-slate-500">관리자 계정은 랭킹 집계 제외</span>
+                    ) : (
+                      <span className="text-[10px] font-black text-indigo-300">
+                        {myWeeklyStanding ? `${myWeeklyStanding.rank}위` : '순위 밖'}
+                        <span className="text-slate-400 font-bold ml-1">
+                          · {myWeeklyStanding ? `${Math.round(myWeeklyStanding.score)}점` : '0점'}
+                        </span>
                       </span>
-                    </span>
+                    )}
                   </div>
                 )}
               </div>
