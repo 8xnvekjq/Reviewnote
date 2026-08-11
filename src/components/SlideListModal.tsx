@@ -231,11 +231,11 @@ export const SlideListModal: React.FC<SlideListModalProps> = ({ isOpen, onClose 
                             📄
                           </span>
                           <div className="min-w-0 space-y-0.5">
-                            <div className="flex items-center space-x-1.5">
+                            <div className="flex items-center space-x-1.5 min-w-0">
                               <span className={`text-[9px] font-black px-1.5 py-0.2 rounded border ${theme.badgeBg} flex-none`}>
                                 {slide.grade}
                               </span>
-                              <h5 className="text-xs font-bold text-slate-200 group-hover:text-white transition-colors truncate leading-snug">
+                              <h5 className="text-xs font-bold text-slate-200 group-hover:text-white transition-colors truncate leading-snug min-w-0">
                                 {slide.title}
                               </h5>
                             </div>
