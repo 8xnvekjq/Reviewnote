@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>개념원리 미적분Ⅰ - 함수의 극대·극소와 그래프(p108~129)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true
+            },
+            options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'] }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        .presentation-deck { position: relative; width: 1280px; height: 720px; background: radial-gradient(circle at 10% 20%, #172a33 0%, #0f172a 100%); border: 1px solid rgba(255, 255, 255, 0.08); margin: 20px auto; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); border-left: 10px solid #06b6d4; }
+        .slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 40px 66px; display: none; flex-direction: column; justify-content: space-between; z-index: 1; background: transparent; box-sizing: border-box; }
+        .slide.active { display: flex; z-index: 10; }
+
+        .concept-card { background: rgba(15, 30, 41, 0.75); backdrop-filter: blur(10px); border: 1px solid rgba(6, 182, 212, 0.25); border-radius: 18px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); }
+        .formula-box { background: rgba(6, 182, 212, 0.08); border: 1px solid rgba(6, 182, 212, 0.2); border-radius: 14px; }
+        .idea-box { background: linear-gradient(135deg, rgba(8, 60, 74, 0.45) 0%, rgba(15, 30, 41, 0.6) 100%); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 14px; }
+        .problem-box { background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(15, 30, 41, 0.85) 100%); border-left: 8px solid #06b6d4; border-top: 1px solid rgba(6, 182, 212, 0.2); border-right: 1px solid rgba(255, 255, 255, 0.05); border-bottom: 1px solid rgba(255, 255, 255, 0.05); border-radius: 0 18px 18px 0; }
+        .problem-text { font-size: 1.2rem; font-weight: 700; color: #cffafe; line-height: 1.65; word-break: keep-all; }
+        .num-badge { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background: #0891b2; color: white; font-weight: 900; font-size: 1.05rem; flex-shrink: 0; }
+        .num-badge.adv { background: #7c3aed; }
+        .type-badge { display: inline-flex; align-items: center; gap: 6px; background: #164e63; color: #a5f3fc; font-weight: 800; font-size: 0.72rem; padding: 3px 11px; border-radius: 9999px; letter-spacing: 0.03em; }
+        .type-badge.adv { background: #4c1d95; color: #ddd6fe; }
+
+        @media print {
+            body { background-color: #ffffff !important; margin: 0 !important; padding: 0 !important; }
+            .presentation-deck { width: 1280px !important; height: auto !important; box-shadow: none !important; border: none !important; margin: 0 !important; overflow: visible !important; display: block !important; }
+            .slide { position: relative !important; display: flex !important; width: 1280px !important; height: 720px !important; page-break-after: always !important; page-break-inside: avoid !important; background: #0f172a !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="presentation-deck" id="deck">
+        <!-- Top Bar -->
+        <div class="flex justify-between items-center z-20 pb-3 border-b border-cyan-900/40 mx-8 mt-6 no-print">
+            <div class="flex items-center gap-3">
+                <span class="bg-cyan-600 text-white text-xs font-black px-3 py-1 rounded-md uppercase">개념원리 | 고2</span>
+                <span class="text-slate-300 text-sm font-medium">Ⅱ. 미분 &gt; 2. 도함수의 활용 &gt; 극대·극소, 그래프, 최대·최소</span>
+            </div>
+            <div class="text-right flex items-center gap-4">
+                <span class="text-xs text-cyan-400 font-bold uppercase tracking-wider" id="slide-category">단원 소개</span>
+                <span class="text-xs text-slate-400 font-semibold bg-slate-800/80 px-2.5 py-1 rounded-md border border-slate-700" id="slide-counter">1 / 20</span>
+                <button onclick="closeDeck()" class="text-xs text-slate-400 hover:text-white bg-slate-800/80 hover:bg-cyan-600 w-7 h-7 flex items-center justify-center rounded-md border border-slate-700 transition" title="닫기" aria-label="닫기">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Slide Container -->
+        <div class="relative flex-grow my-2 overflow-hidden" id="slide-container">
+
+            <!-- Slide 1: Cover -->
+            <div class="slide active" data-category="단원 소개">
+                <div class="flex-grow flex flex-col justify-center items-start">
+                    <span class="text-cyan-400 font-bold text-lg tracking-widest mb-4">개념원리 미적분Ⅰ &nbsp;|&nbsp; Ⅱ. 미분 &gt; 2. 도함수의 활용</span>
+                    <h1 class="text-6xl font-black text-white leading-tight mb-6">함수의 극대·극소와 그래프</h1>
+                    <div class="h-2 w-40 bg-cyan-500 rounded-full mb-8"></div>
+                    <p class="text-2xl text-slate-300 font-medium">극값의 판정부터 그래프의 개형, 최댓값·최솟값의 활용까지</p>
+                    <p class="text-lg text-slate-500 font-medium mt-2">교재 p.108 ~ p.129 · 필수예제 13 ~ 25 (발전 20 포함)</p>
+                </div>
+            </div>
+
+            <!-- Slide 2: 개념 A - 극대·극소의 정의와 미분계수 -->
+            <div class="slide" data-category="개념 이해">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">1</span>
+                        <h2 class="text-3xl font-black text-white">함수의 극대와 극소, 극값과 미분계수</h2>
+                    </div>
+                    <p class="text-lg text-slate-100 leading-relaxed">$x=a$를 포함하는 어떤 열린구간에서 $f(x)\le f(a)$이면 $x=a$에서 <span class="text-cyan-300 font-bold">극대</span>(극댓값 $f(a)$), $f(x)\ge f(a)$이면 <span class="text-cyan-300 font-bold">극소</span>(극솟값 $f(a)$)라 한다. 극댓값과 극솟값을 통틀어 <b>극값</b>이라 한다.</p>
+                    <div class="formula-box py-4 px-8 text-center">
+                        <p class="text-2xl text-white font-bold">미분가능한 함수 $f(x)$가 $x=a$에서 극값을 가지면 $f'(a)=0$</p>
+                    </div>
+                    <div class="idea-box p-4 flex items-start gap-3">
+                        <i class="fa-solid fa-lightbulb text-cyan-300 text-xl mt-1"></i>
+                        <p class="text-base text-cyan-100 leading-relaxed"><b>직관적 아이디어</b> — "극값이면 기울기 0"은 참이지만 "기울기 0이면 극값"은 거짓이다 ($f(x)=x^3$은 $f'(0)=0$이지만 $x=0$에서 극값이 아니다). 이 방향성을 절대 뒤집어 쓰지 말 것 — $f'(a)=0$은 극값의 "필요조건"일 뿐, 진짜 극값인지는 좌우 부호 변화까지 확인해야 확정된다.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 3: 개념 B - 극대·극소의 판정 -->
+            <div class="slide" data-category="개념 이해">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">2</span>
+                        <h2 class="text-3xl font-black text-white">함수의 극대와 극소의 판정</h2>
+                    </div>
+                    <p class="text-lg text-slate-100 leading-relaxed">미분가능한 함수 $f(x)$에 대하여 $f'(a)=0$이고, $x=a$의 좌우에서 $f'(x)$의 부호가</p>
+                    <div class="formula-box py-4 px-8 text-lg text-white leading-loose">
+                        <p>(1) 양$(+)$에서 음$(-)$으로 바뀌면 $f(x)$는 $x=a$에서 <b>극대</b>이고, 극댓값 $f(a)$를 갖는다.</p>
+                        <p>(2) 음$(-)$에서 양$(+)$으로 바뀌면 $f(x)$는 $x=a$에서 <b>극소</b>이고, 극솟값 $f(a)$를 갖는다.</p>
+                    </div>
+                    <div class="idea-box p-4 flex items-start gap-3">
+                        <i class="fa-solid fa-lightbulb text-cyan-300 text-xl mt-1"></i>
+                        <p class="text-base text-cyan-100 leading-relaxed"><b>직관적 아이디어</b> — $f'(x)=0$인 점을 찾는 것은 "후보"를 고르는 것일 뿐이다. $+\to-$로 바뀌면 오르막에서 내리막으로 바뀌는 "정상"이므로 극대, $-\to+$면 내리막에서 오르막으로 바뀌는 "바닥"이므로 극소 — 증가·감소표를 그리는 이유는 바로 이 부호가 실제로 바뀌는지를 눈으로 확인하기 위함이다.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 4: 개념 C - 함수의 그래프 -->
+            <div class="slide" data-category="개념 이해">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">3</span>
+                        <h2 class="text-3xl font-black text-white">함수의 그래프</h2>
+                    </div>
+                    <p class="text-base text-slate-300">미분가능한 함수 $y=f(x)$의 그래프의 개형은 다음과 같은 순서로 그린다.</p>
+                    <div class="formula-box py-3 px-8 text-lg text-white leading-loose">
+                        <p>(i) $f'(x)=0$인 $x$의 값을 구한다.</p>
+                        <p>(ii) 그 값들의 좌우에서 $f'(x)$의 부호를 조사하여 증가와 감소를 표로 나타내고 극값을 구한다.</p>
+                        <p>(iii) $y=f(x)$의 그래프와 $x$축, $y$축의 교점의 좌표를 구한다.</p>
+                        <p>(iv) 그래프의 개형을 그린다.</p>
+                    </div>
+                    <div class="idea-box p-4 flex items-start gap-3">
+                        <i class="fa-solid fa-lightbulb text-cyan-300 text-xl mt-1"></i>
+                        <p class="text-base text-cyan-100 leading-relaxed"><b>직관적 아이디어</b> — 이 네 단계는 "울퉁불퉁한 흐름(극값)을 먼저 정하고, 위치(절편)를 나중에 맞추는" 순서다. 정확한 좌표보다 오르막·내리막의 흐름이 먼저 정해져야 그래프의 큰 모양이 정해지고, 그 다음 세부 위치만 조정하면 된다.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 5: 개념 D - 그래프의 개형과 도함수의 관계 -->
+            <div class="slide" data-category="개념 이해">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">4</span>
+                        <h2 class="text-3xl font-black text-white">함수의 그래프의 개형과 도함수의 관계</h2>
+                    </div>
+                    <p class="text-base text-slate-300">삼차함수 $f(x)$의 도함수 $f'(x)$에 대하여 이차방정식 $f'(x)=0$의 판별식을 $D$라 하면</p>
+                    <div class="formula-box py-4 px-8 text-lg text-white leading-loose">
+                        <p>① $f(x)$가 극값을 가질 조건 $\Rightarrow$ $D>0$ &nbsp;(서로 다른 두 실근)</p>
+                        <p>② $f(x)$가 극값을 갖지 않을 조건 $\Rightarrow$ $D\le 0$ &nbsp;(중근 또는 허근)</p>
+                    </div>
+                    <p class="text-sm text-slate-400">사차함수(최고차항 계수 양수)는 삼차방정식 $f'(x)=0$이 서로 다른 세 실근을 가지면 극댓값·극솟값을 모두 갖는다.</p>
+                    <div class="idea-box p-4 flex items-start gap-3">
+                        <i class="fa-solid fa-lightbulb text-cyan-300 text-xl mt-1"></i>
+                        <p class="text-base text-cyan-100 leading-relaxed"><b>직관적 아이디어</b> — 그래프를 직접 그려보지 않아도 "$f'(x)=0$이라는 방정식이 서로 다른 실근을 몇 개 갖는가"만 확인하면 극값의 존재 여부가 바로 결정된다. 삼차함수의 극값 문제는 결국 이차방정식의 판별식 문제로, 사차함수의 극값 문제는 삼차방정식의 실근 개수 문제로 바뀐다.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 6: 개념 E - 닫힌구간에서의 최댓값과 최솟값 -->
+            <div class="slide" data-category="개념 이해">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">5</span>
+                        <h2 class="text-3xl font-black text-white">함수의 최댓값과 최솟값</h2>
+                    </div>
+                    <p class="text-lg text-slate-100 leading-relaxed">닫힌구간 $[a,b]$에서 함수 $f(x)$가 연속일 때, 이 구간에서의 $f(x)$의 극값과 구간의 양 끝 점에서의 함숫값 $f(a)$, $f(b)$ 중에서</p>
+                    <div class="formula-box py-4 px-8 text-center text-xl text-white font-bold">
+                        가장 큰 값이 최댓값, 가장 작은 값이 최솟값이다.
+                    </div>
+                    <div class="idea-box p-4 flex items-start gap-3">
+                        <i class="fa-solid fa-lightbulb text-cyan-300 text-xl mt-1"></i>
+                        <p class="text-base text-cyan-100 leading-relaxed"><b>직관적 아이디어</b> — 최댓값·최솟값의 후보는 딱 두 종류뿐이다: ① 극값들, ② 구간의 양 끝점에서의 함숫값. 이 후보들을 전부 나열해서 가장 큰 값과 가장 작은 값을 고르면 끝이다. 극값이라고 무조건 최댓값이 되는 것도, 끝점이라고 무조건 최솟값이 되는 것도 아니므로 반드시 비교해야 한다.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 7: 개념 F - 극값이 하나뿐일 때 -->
+            <div class="slide" data-category="개념 이해">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">6</span>
+                        <h2 class="text-3xl font-black text-white">극값이 오직 하나 존재할 때의 최댓값과 최솟값</h2>
+                    </div>
+                    <p class="text-base text-slate-300">닫힌구간 $[a,b]$에서 함수 $f(x)$가 연속이고 극값이 오직 하나 존재할 때</p>
+                    <div class="formula-box py-4 px-8 text-lg text-white leading-loose">
+                        <p>(1) 극값이 극댓값인 경우 $\Rightarrow$ (최댓값)=(극댓값)이고, $f(a)$와 $f(b)$ 중 작은 값이 최솟값이다.</p>
+                        <p>(2) 극값이 극솟값인 경우 $\Rightarrow$ (최솟값)=(극솟값)이고, $f(a)$와 $f(b)$ 중 큰 값이 최댓값이다.</p>
+                    </div>
+                    <div class="idea-box p-4 flex items-start gap-3">
+                        <i class="fa-solid fa-lightbulb text-cyan-300 text-xl mt-1"></i>
+                        <p class="text-base text-cyan-100 leading-relaxed"><b>직관적 아이디어</b> — 극값이 하나뿐이면 비교할 후보가 줄어든다. 극댓값 하나뿐이면 더 큰 값이 나올 데가 없으므로 그게 바로 최댓값이 되고, 최솟값은 양 끝점 중 작은 쪽이 된다 — 반대도 마찬가지. 극값의 개수를 먼저 세는 것이 계산을 줄이는 지름길이다.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 8: 필수예제 13 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">13</span>
+                        <h2 class="text-3xl font-black text-white">삼차함수의 극값</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">다음 함수의 극값을 구하시오.<br>
+                        (1) $f(x)=x^3-3x^2-9x+2$<br>
+                        (2) $f(x)=-x^3+6x^2-9x+3$</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 9: 필수예제 14 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">14</span>
+                        <h2 class="text-3xl font-black text-white">사차함수의 극값</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">다음 함수의 극값을 구하시오.<br>
+                        (1) $f(x)=x^4-6x^2-8x+10$<br>
+                        (2) $f(x)=3x^4+4x^3-12x^2+15$</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 10: 필수예제 15 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">15</span>
+                        <h2 class="text-3xl font-black text-white">함수의 극값을 이용한 미정계수의 결정</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">다음 물음에 답하시오.<br>
+                        (1) 함수 $f(x)=-x^3+ax^2+bx+11$이 $x=2$에서 극솟값 $-21$을 가질 때, 상수 $a$, $b$의 값을 구하시오.<br>
+                        (2) 함수 $f(x)=x^3+ax^2+bx+c$가 $x=1$과 $x=3$에서 극값을 갖고 $f(x)$의 극솟값이 $-2$일 때, 극댓값을 구하시오. (단, $a$, $b$, $c$는 상수이다.)</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 11: 필수예제 16 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-6">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">16</span>
+                        <h2 class="text-3xl font-black text-white">도함수의 그래프와 함수의 극값</h2>
+                    </div>
+                    <div class="problem-box p-8">
+                        <div class="grid grid-cols-12 gap-6 items-center">
+                            <div class="col-span-7">
+                                <p class="problem-text">미분가능한 함수 $y=f(x)$의 도함수 $y=f'(x)$의 그래프가 그림과 같을 때, 다음을 구하시오.<br>
+                                (1) 함수 $f(x)$가 극댓값을 갖는 $x$의 값<br>
+                                (2) 함수 $f(x)$가 극솟값을 갖는 $x$의 값</p>
+                            </div>
+                            <div class="col-span-5 flex items-center justify-center">
+                                <svg viewBox="0 0 260 180" class="w-full h-40">
+                                    <line x1="10" y1="90" x2="250" y2="90" stroke="#475569" stroke-width="2"/>
+                                    <path d="M 20 40 C 45 100, 65 100, 80 90 C 100 78, 110 78, 125 90 C 140 100, 150 130, 165 90 C 180 55, 195 40, 240 15" fill="none" stroke="#22d3ee" stroke-width="3"/>
+                                    <circle cx="60" cy="90" r="3.5" fill="#fff"/>
+                                    <text x="52" y="106" fill="#cffafe" font-size="12" font-weight="bold">-2</text>
+                                    <circle cx="103" cy="90" r="3.5" fill="#fff"/>
+                                    <text x="95" y="106" fill="#cffafe" font-size="12" font-weight="bold">-1</text>
+                                    <circle cx="147" cy="90" r="3.5" fill="#fff"/>
+                                    <text x="141" y="106" fill="#cffafe" font-size="12" font-weight="bold">1</text>
+                                    <circle cx="190" cy="90" r="3.5" fill="#fff"/>
+                                    <text x="184" y="106" fill="#cffafe" font-size="12" font-weight="bold">2</text>
+                                    <text x="235" y="30" fill="#67e8f9" font-size="13" font-weight="bold">y=f'(x)</text>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 12: 필수예제 17 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">17</span>
+                        <h2 class="text-3xl font-black text-white">함수의 그래프</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">다음 함수의 그래프를 그리시오.<br>
+                        (1) $f(x)=x^3+\dfrac{15}{2}x^2+12x+2$<br>
+                        (2) $f(x)=-x^4+2x^2+3$</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 13: 필수예제 18 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">18</span>
+                        <h2 class="text-3xl font-black text-white">삼차함수가 극값을 가질 조건</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">다음 물음에 답하시오.<br>
+                        (1) 삼차함수 $f(x)=ax^3+6x^2+(15-3a)x+1$이 극값을 갖도록 하는 실수 $a$의 값의 범위를 구하시오.<br>
+                        (2) 함수 $f(x)=x^3+kx^2-3kx+2$가 극값을 갖지 않도록 하는 실수 $k$의 값의 범위를 구하시오.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 14: 필수예제 19 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">19</span>
+                        <h2 class="text-3xl font-black text-white">주어진 구간에서 삼차함수가 극값을 가질 조건</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">다음 물음에 답하시오.<br>
+                        (1) 함수 $f(x)=-x^3+a^2x^2-ax$가 $0 \lt x \lt 1$에서 극솟값을 갖고, $x>1$에서 극댓값을 갖도록 하는 실수 $a$의 값의 범위를 구하시오.<br>
+                        (2) 함수 $f(x)=x^3+3kx^2-(3k+1)x-2$가 $-1 \lt x \lt 1$에서 극댓값과 극솟값을 모두 갖도록 하는 실수 $k$의 값의 범위를 구하시오.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 15: 발전 20 -->
+            <div class="slide" data-category="발전문제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge adv">20</span>
+                        <div class="flex flex-col gap-1">
+                            <span class="type-badge adv">발전 · 필수예제와 번호 연속</span>
+                            <h2 class="text-3xl font-black text-white">사차함수가 극값을 가질 조건</h2>
+                        </div>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">함수 $f(x)=x^4-4x^3+2ax^2$에 대하여 다음을 구하시오.<br>
+                        (1) $f(x)$가 극댓값을 갖도록 하는 실수 $a$의 값의 범위<br>
+                        (2) $f(x)$가 극값을 하나만 갖도록 하는 실수 $a$의 값의 범위</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 16: 필수예제 21 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">21</span>
+                        <h2 class="text-3xl font-black text-white">함수의 최댓값과 최솟값</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">주어진 구간에서 다음 함수의 최댓값과 최솟값을 구하시오.<br>
+                        (1) $f(x)=2x^3-3x^2-12x+4\ \ [-2,4]$<br>
+                        (2) $f(x)=3x^4-12x^3+12x^2-2\ \ \left[\dfrac{1}{2},2\right]$</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 17: 필수예제 22 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">22</span>
+                        <h2 class="text-3xl font-black text-white">함수의 최대·최소를 이용한 미정계수의 결정</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">구간 $[-1,2]$에서 함수 $f(x)=ax^3-6ax^2+b$의 최댓값이 $3$, 최솟값이 $-29$일 때, 상수 $a$, $b$에 대하여 $a+b$의 값을 구하시오. (단, $a>0$)</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 18: 필수예제 23 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">23</span>
+                        <h2 class="text-3xl font-black text-white">최대·최소의 활용: 실생활</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">인터넷 쇼핑몰에서 어떤 원피스 $x$벌을 판매할 때 생기는 이익이 $(-x^3+144x^2+1200x-200)$원이라 한다. 이 원피스를 판매한 이익이 최대가 되려면 이 원피스를 몇 벌 판매해야 하는가? (단, $0 \lt x \lt 150$)<br><br>
+                        ① $84$벌 &nbsp; ② $96$벌 &nbsp; ③ $100$벌 &nbsp; ④ $120$벌 &nbsp; ⑤ $136$벌</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 19: 필수예제 24 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-6">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">24</span>
+                        <h2 class="text-3xl font-black text-white">최대·최소의 활용: 길이, 넓이</h2>
+                    </div>
+                    <div class="problem-box p-8">
+                        <div class="grid grid-cols-12 gap-6 items-center">
+                            <div class="col-span-7">
+                                <p class="problem-text">그림과 같이 곡선 $y=-2x^2+12$와 $x$축으로 둘러싸인 도형에 내접하고, 한 변이 $x$축 위에 있는 직사각형 ABCD의 넓이의 최댓값을 구하시오.</p>
+                            </div>
+                            <div class="col-span-5 flex items-center justify-center">
+                                <svg viewBox="0 0 220 170" class="w-full h-40">
+                                    <line x1="10" y1="130" x2="210" y2="130" stroke="#475569" stroke-width="2"/>
+                                    <path d="M 25 130 Q 110 -10 195 130" fill="none" stroke="#22d3ee" stroke-width="3"/>
+                                    <rect x="75" y="80" width="70" height="50" fill="rgba(34,211,238,0.25)" stroke="#67e8f9" stroke-width="2"/>
+                                    <text x="70" y="72" fill="#cffafe" font-size="12" font-weight="bold">B</text>
+                                    <text x="148" y="72" fill="#cffafe" font-size="12" font-weight="bold">A</text>
+                                    <text x="70" y="145" fill="#cffafe" font-size="12" font-weight="bold">C</text>
+                                    <text x="148" y="145" fill="#cffafe" font-size="12" font-weight="bold">D</text>
+                                    <text x="100" y="20" fill="#67e8f9" font-size="12" font-weight="bold">y=-2x²+12</text>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 20: 필수예제 25 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-6">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">25</span>
+                        <h2 class="text-3xl font-black text-white">최대·최소의 활용: 부피</h2>
+                    </div>
+                    <div class="problem-box p-8">
+                        <div class="grid grid-cols-12 gap-6 items-center">
+                            <div class="col-span-7">
+                                <p class="problem-text">그림과 같이 가로의 길이가 $16$, 세로의 길이가 $6$인 직사각형 모양의 종이의 네 모퉁이에서 한 변의 길이가 $x$인 정사각형을 잘라 내고 남은 부분으로 뚜껑이 없는 직육면체를 만들 때, 이 직육면체의 부피가 최대가 되도록 하는 $x$의 값을 구하시오.</p>
+                            </div>
+                            <div class="col-span-5 flex items-center justify-center">
+                                <svg viewBox="0 0 220 130" class="w-full h-36">
+                                    <rect x="15" y="10" width="190" height="110" fill="rgba(34,211,238,0.15)" stroke="#67e8f9" stroke-width="2"/>
+                                    <rect x="15" y="10" width="26" height="26" fill="#0f172a" stroke="#67e8f9" stroke-width="1.5"/>
+                                    <rect x="179" y="10" width="26" height="26" fill="#0f172a" stroke="#67e8f9" stroke-width="1.5"/>
+                                    <rect x="15" y="94" width="26" height="26" fill="#0f172a" stroke="#67e8f9" stroke-width="1.5"/>
+                                    <rect x="179" y="94" width="26" height="26" fill="#0f172a" stroke="#67e8f9" stroke-width="1.5"/>
+                                    <text x="100" y="4" fill="#cffafe" font-size="11" font-weight="bold">16</text>
+                                    <text x="2" y="68" fill="#cffafe" font-size="11" font-weight="bold">6</text>
+                                    <text x="24" y="27" fill="#a5f3fc" font-size="11">x</text>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer Control -->
+        <div class="flex justify-between items-center z-20 pt-3 border-t border-cyan-900/40 mx-8 mb-6 no-print">
+            <button onclick="prevSlide()" class="bg-slate-800/80 hover:bg-cyan-600 text-slate-200 hover:text-white font-bold text-sm px-5 py-2 rounded-xl transition border border-slate-700">
+                <i class="fa-solid fa-chevron-left"></i> 이전 슬라이드
+            </button>
+            <div class="text-slate-400 text-xs font-semibold tracking-wider">
+                HIGH SCHOOL MATH CLASS PPT
+            </div>
+            <button onclick="nextSlide()" class="bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-sm px-5 py-2 rounded-xl transition shadow-md">
+                다음 슬라이드 <i class="fa-solid fa-chevron-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const counterEl = document.getElementById('slide-counter');
+        const categoryEl = document.getElementById('slide-category');
+
+        function updateSlide() {
+            slides.forEach((slide, idx) => slide.classList.toggle('active', idx === currentSlide));
+            if (counterEl) counterEl.textContent = `${currentSlide + 1} / ${slides.length}`;
+            if (categoryEl && slides[currentSlide]) categoryEl.textContent = slides[currentSlide].getAttribute('data-category') || '수업 자료';
+            if (window.MathJax && window.MathJax.typesetPromise) window.MathJax.typesetPromise();
+        }
+        function prevSlide() { if (currentSlide > 0) { currentSlide--; updateSlide(); } }
+        function nextSlide() { if (currentSlide < slides.length - 1) { currentSlide++; updateSlide(); } }
+        function closeDeck() {
+            window.close();
+            setTimeout(() => { const d = document.getElementById('deck'); if (d) d.style.display = 'none'; }, 150);
+        }
+        updateSlide();
+    </script>
+</body>
+</html>
