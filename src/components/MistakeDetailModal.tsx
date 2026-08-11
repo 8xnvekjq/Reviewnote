@@ -74,6 +74,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   const [editChapter, setEditChapter] = React.useState(selectedEntry.chapter || '');
   const [editRootCauses, setEditRootCauses] = React.useState<string[]>(selectedEntry.rootCauses || []);
   const [editActionPlan, setEditActionPlan] = React.useState(selectedEntry.userActionPlan || '');
+  const [editFinalAnswer, setEditFinalAnswer] = React.useState(selectedEntry.analysis?.finalAnswer || '');
   const [isSaving, setIsSaving] = React.useState(false);
 
   // Image lightbox zoom states & Touch gestures (Pinch-to-zoom)
@@ -660,6 +661,11 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   const handleSave = async () => {
     setIsSaving(true);
     try {
+      // AI가 정답을 잘못 구했을 때 학생/선생님이 직접 고칠 수 있도록 analysis.finalAnswer도 함께 저장
+      const updatedAnalysis = selectedEntry.analysis
+        ? { ...selectedEntry.analysis, finalAnswer: editFinalAnswer || undefined }
+        : selectedEntry.analysis;
+
       const { error } = await supabase
         .from('mistakes')
         .update({
@@ -667,17 +673,19 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
           chapter: editChapter || null,
           root_causes: editRootCauses,
           user_action_plan: editActionPlan || null,
+          analysis: updatedAnalysis,
         })
         .eq('id', selectedEntry.id);
-      
+
       if (error) throw error;
-      
+
       onUpdateEntry({
         ...selectedEntry,
         grade: editGrade || undefined,
         chapter: editChapter || undefined,
         rootCauses: editRootCauses,
         userActionPlan: editActionPlan || undefined,
+        analysis: updatedAnalysis,
       });
 
       onClose(); // 저장 완료 후 모달창을 자동으로 닫아 깔끔하게 처리합니다.
@@ -1198,6 +1206,22 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                   ))}
                 </div>
               </div>
+
+              {/* AI가 구한 정답 수정 (오답/오류 발견 시 직접 고치기) */}
+              {selectedEntry.analysis && (
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-400 block">
+                    🎯 정답 수정 <span className="text-slate-600 font-medium">(AI가 틀리게 구했다면 여기서 고쳐주세요)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editFinalAnswer}
+                    onChange={e => setEditFinalAnswer(e.target.value)}
+                    placeholder="예: x = 3, y = -2"
+                    className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-600 outline-none focus:border-amber-500 transition-colors"
+                  />
+                </div>
+              )}
 
               {/* 나만의 대책 */}
               <div className="space-y-1.5">
