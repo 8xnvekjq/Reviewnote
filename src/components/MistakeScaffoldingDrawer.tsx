@@ -81,7 +81,7 @@ export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> =
     }
   };
 
-  // 선생님 전용: 힌트 사진 선택 & Base64 변환
+  // 힌트/개인 풀이 사진 선택 & Base64 변환
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -98,7 +98,7 @@ export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> =
     reader.readAsDataURL(file);
   };
 
-  // 선생님 전용: 스캐폴딩 사진 업로드 (SQL 데이터베이스 전송)
+  // 스캐폴딩(힌트/개인 풀이) 사진 업로드 (SQL 데이터베이스 전송)
   // ── 핀치 줌 및 터치 드래그 제스처 핸들러 (문제 사진과 동일) ──
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     if (e.touches.length === 1) {
@@ -159,9 +159,9 @@ export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> =
     setPosition({ x: 0, y: 0 });
   };
 
-  // 선생님 전용: 스캐폴딩 삭제
-  const handleDeleteScaffolding = async (scaffoldingId: string) => {
-    if (!isAdmin) return;
+  // 선생님 또는 본인이 올린 힌트만 삭제 가능
+  const handleDeleteScaffolding = async (scaffoldingId: string, canDelete: boolean) => {
+    if (!canDelete) return;
     const confirmed = window.confirm('이 스캐폴딩 힌트를 삭제하시겠습니까?');
     if (!confirmed) return;
     try {
@@ -257,26 +257,28 @@ export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> =
             <div className="text-center py-6 text-slate-500 text-xs">스캐폴딩 힌트를 불러오는 중...</div>
           ) : scaffoldings.length === 0 ? (
             <div className="text-center py-6 text-slate-500 text-xs space-y-1">
-              <p>등록된 선생님 힌트가 없습니다.</p>
-              <p className="text-[11px] text-slate-600">선생님이 추가 손글씨 풀이나 단계별 스캐폴딩 힌트를 남기면 이곳에 표시됩니다. 🧩</p>
+              <p>등록된 힌트가 없습니다.</p>
+              <p className="text-[11px] text-slate-600">선생님이 손글씨 풀이를 남기거나, 직접 자신만의 풀이를 저장해보세요. 🧩</p>
             </div>
           ) : (
             <div className="grid gap-3">
               {scaffoldings.map((sc, idx) => {
                 const animalEmoji = CUTE_ANIMAL_EMOJIS[idx % CUTE_ANIMAL_EMOJIS.length];
+                const isSelfUpload = sc.teacher_id === sc.student_id;
+                const canDelete = isAdmin || sc.teacher_id === currentUserId;
                 return (
                   <div key={sc.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-2.5 shadow-sm">
                     <div className="flex items-center justify-between text-[10px] text-slate-400">
-                      <span className="font-black text-amber-400 flex items-center space-x-1">
-                        <span>🧩</span>
-                        <span>스캐폴딩 힌트 #{idx + 1}</span>
+                      <span className={`font-black flex items-center space-x-1 ${isSelfUpload ? 'text-indigo-400' : 'text-amber-400'}`}>
+                        <span>{isSelfUpload ? '👤' : '🧩'}</span>
+                        <span>{isSelfUpload ? '내 풀이' : '선생님 힌트'} #{idx + 1}</span>
                       </span>
                       <div className="flex items-center space-x-2">
                         <span className="font-mono text-slate-500">{formatDateString(sc.created_at)}</span>
-                        {isAdmin && (
+                        {canDelete && (
                           <button
                             type="button"
-                            onClick={() => handleDeleteScaffolding(sc.id)}
+                            onClick={() => handleDeleteScaffolding(sc.id, canDelete)}
                             className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-red-900/40 text-red-400 border border-red-700/40 hover:bg-red-700/60 hover:text-red-100 transition-all active:scale-95"
                           >
                             🗑 삭제
@@ -319,11 +321,11 @@ export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> =
             </div>
           )}
 
-          {/* 선생님(어드민) 전용: 스캐폴딩 힌트 등록 폼 */}
-          {isAdmin && (
+          {/* 선생님(어드민) 또는 본인 오답일 때: 힌트/개인 풀이 등록 폼 */}
+          {(isAdmin || studentId === currentUserId) && (
             <form onSubmit={handleUploadScaffolding} className="space-y-3 pt-3 border-t border-slate-850">
               <span className="text-xs font-black text-amber-400 block">
-                🧩 힌트 작성 (말로 된 힌트 / 사진 선택)
+                {isAdmin ? '🧩 힌트 작성 (말로 된 힌트 / 사진 선택)' : '👤 내 풀이 저장 (말로 된 메모 / 사진 선택)'}
               </span>
 
               <div className="flex items-center space-x-2">
@@ -345,7 +347,7 @@ export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> =
                   type="text"
                   value={caption}
                   onChange={e => setCaption(e.target.value)}
-                  placeholder="말로 된 힌트 입력 (예: 1단계 공식 적용)"
+                  placeholder={isAdmin ? '말로 된 힌트 입력 (예: 1단계 공식 적용)' : '내 풀이 메모 입력 (예: 이렇게 풀었어요)'}
                   className="flex-1 bg-slate-900 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 outline-none transition-colors"
                 />
               </div>
@@ -372,7 +374,7 @@ export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> =
                 disabled={uploading || (!previewImage && !caption.trim())}
                 className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 disabled:opacity-40 text-slate-950 font-black text-xs transition-all shadow-md active:scale-95"
               >
-                {uploading ? '스캐폴딩 힌트 전송 중...' : '🧩 스캐폴딩 힌트 등록하기'}
+                {uploading ? '저장 중...' : isAdmin ? '🧩 스캐폴딩 힌트 등록하기' : '👤 내 풀이 저장하기'}
               </button>
             </form>
           )}

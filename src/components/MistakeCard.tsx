@@ -13,7 +13,7 @@ interface MistakeCardProps {
   studentName?: string;   // admin 전용: 학생 이름/아이디
   isOwnNote?: boolean;    // 내 오답 여부 (admin이 타인 오답 볼 때 false)
   equippedStamp?: string; // 학생이 장착한 레어 도장 (예: 🔥, ⭐, 👑, 🐾, 💎)
-  hasScaffolding?: boolean; // 선생님이 첨부한 스캐폴딩 힌트가 있는지 여부
+  hasScaffolding?: boolean; // 스캐폴딩 힌트(선생님 또는 본인)가 있는지 여부
 }
 
 export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDelete, studentName, isOwnNote = true, equippedStamp, hasScaffolding }) => {
@@ -79,7 +79,7 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
         {hasScaffolding && (
           <div
             className="absolute bottom-2 right-2 w-6 h-6 rounded-full bg-emerald-500/90 border border-emerald-300/60 backdrop-blur-sm shadow-sm flex items-center justify-center text-xs z-10"
-            title="선생님이 첨부한 스캐폴딩 힌트가 있습니다"
+            title="스캐폴딩 힌트가 있습니다"
           >
             🧩
           </div>
