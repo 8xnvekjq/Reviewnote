@@ -112,7 +112,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
         stat.mistakeCount += 1;
 
         const reviews: string[] = m.reviews || [];
-        const reviewDates: string[] = m.analysis?.reviewDates || [];
         const isCompleted = reviews.filter(r => r === 'O').length === 3;
 
         if (isCompleted) {
@@ -132,23 +131,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
         }
 
         // 3단 콤보 점수 계산 — weekly_leaderboard SQL 뷰(명예의전당)와 완전히 동일한 공식으로 통일함.
-        // "몇 번째 칸이냐"로 배점을 다시 매기지 않고, 체크 시점에 영구 저장된 analysis.reviewPoints를
-        // 그대로 합산한다 — "맞춘 오답 제외하고 정리하기"로 O가 다른 칸으로 옮겨가도 점수가 안 바뀐다.
-        // reviewDates가 없거나 빈 문자열일 때 updated_at 및 date로 폴백 처리
-        const reviewPoints: number[] = m.analysis?.reviewPoints || [];
-        const rDate0 = reviewDates[0] || m.updated_at || m.date;
-        const rDate1 = reviewDates[1] || m.updated_at || m.date;
-        const rDate2 = reviewDates[2] || m.updated_at || m.date;
-
-        const stagePoints = (storedPoints: number | undefined, date: string): number => {
-          if (!isDateInCurrentWeek(date)) return 0;
-          return storedPoints || 0;
-        };
-
-        let comboScore = 0;
-        comboScore += stagePoints(reviewPoints[0], rDate0);
-        comboScore += stagePoints(reviewPoints[1], rDate1);
-        comboScore += stagePoints(reviewPoints[2], rDate2);
+        // reviewPoints/reviewDates(칸 위치 기반)가 아니라 analysis.pointLog(포인트를 실제로 딴
+        // 날짜에 영구 귀속된 append-only 로그)를 기준으로 합산한다. "정리하기"로 O가 다른 칸에
+        // 옮겨가면 그 칸의 날짜(reviewDates)가 바뀌어버려 원래 이번 주에 딴 점수가 지난 주로
+        // 잘못 재배정되는 문제가 있었음 — pointLog는 정리하기가 건드리지 않으므로 항상 정확하다.
+        const pointLog: { date: string; points: number }[] = m.analysis?.pointLog || [];
+        const comboScore = pointLog.reduce((sum, entry) => {
+          return sum + (isDateInCurrentWeek(entry.date) ? (entry.points || 0) : 0);
+        }, 0);
 
         stat.weeklyScore += comboScore;
 

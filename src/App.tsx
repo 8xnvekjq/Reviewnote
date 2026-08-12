@@ -1505,11 +1505,28 @@ function App() {
         }
       }
 
+      // 📒 포인트 취득 시점의 실제 날짜를 영구 귀속시키는 append-only 로그.
+      // reviewPoints/reviewDates는 "정리하기"로 슬롯이 합쳐지면 그 슬롯의 날짜를 따라가버려서,
+      // 원래 이번 주에 딴 점수가 지난 주 날짜로 뒤엉켜 재배정되는 문제가 있었다 (주간 랭킹이 깎여 보이는 원인).
+      // pointLog는 슬롯 구조와 무관하게 "언제 몇 점을 땄는지"만 쌓아두고, 정리하기(skipPointRecalc)일
+      // 때는 아예 건드리지 않는다 — 그래야 정리를 몇 번 해도 주간 집계가 항상 정확하다.
+      const now = new Date();
+      const nowStr = `${now.getMonth() + 1}/${now.getDate()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      const existingPointLog = targetEntry.analysis?.pointLog || [];
+      const newPointLogEntries: { date: string; points: number }[] = [];
+      if (!skipPointRecalc) {
+        for (let i = 0; i < 3; i++) {
+          const delta = currentPoints[i] - (oldReviewPoints[i] || 0);
+          if (delta !== 0) newPointLogEntries.push({ date: nowStr, points: delta });
+        }
+      }
+
       const updatedAnalysis: MistakeAnalysis = {
         solvingProcess: targetEntry.analysis?.solvingProcess || '',
         ...targetEntry.analysis,
         reviewDates: currentDates,
-        reviewPoints: currentPoints
+        reviewPoints: currentPoints,
+        pointLog: [...existingPointLog, ...newPointLogEntries]
       };
 
       const { error } = await supabase

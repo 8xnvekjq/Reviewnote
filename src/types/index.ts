@@ -21,6 +21,7 @@ export interface MistakeAnalysis {
   printed?: boolean;        // 인쇄/출력 완료 여부
   reviewDates?: string[];   // 단계별 복습 완료 일자 배열 (['7/10', '', ''])
   reviewPoints?: number[];  // 단계별로 체크한 "그 순간" 영구 저장된 콤보 포인트 (1차 O=3/2차 O=7/3차 O=15, X·★=1) — 나중에 정리하기로 O가 다른 칸으로 옮겨가도 이 값은 안 바뀜
+  pointLog?: { date: string; points: number }[]; // 포인트를 실제로 딴 "그 날짜"에 영구 귀속시키는 append-only 로그. reviewPoints는 정리하기로 슬롯이 합쳐지면 그 슬롯의 날짜(reviewDates[i])를 따라가 버려 원래 다른 날짜에 딴 점수가 엉뚱한 주(week)로 재배정될 수 있음 — 주간 랭킹 집계는 반드시 이 로그 기준으로 해야 정리하기가 몇 번 일어나도 안전함
   durationMs?: number;      // 이 진단(classify+extract+solve 전체)이 실제로 걸린 시간(ms) — 평균 대기시간 계산용
 }
 
