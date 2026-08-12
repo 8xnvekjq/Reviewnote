@@ -217,53 +217,60 @@ export const SlideListModal: React.FC<SlideListModalProps> = ({ isOpen, onClose 
                   </div>
 
                   {/* 슬라이드 아이템 카드 리스트 */}
-                  <div className="grid gap-2">
+                  <div className="grid gap-1.5">
                     {visibleItems.map((slide, idx) => (
                       <div
                         key={idx}
-                        className="p-3.5 bg-slate-955/60 hover:bg-slate-900 border border-slate-850 hover:border-slate-700 rounded-2xl transition-all duration-200 shadow-sm space-y-2.5"
+                        className="px-3 py-2.5 bg-slate-955/60 hover:bg-slate-900 border border-slate-850 hover:border-slate-700 rounded-xl transition-all duration-200 shadow-sm space-y-1"
                       >
-                        <div className="flex items-start space-x-2.5">
-                          <span className="text-xl flex-none select-none">📄</span>
-                          <div className="min-w-0 flex-1 space-y-1">
-                            <span className={`inline-block text-[9px] font-black px-1.5 py-0.2 rounded border ${theme.badgeBg}`}>
-                              {slide.grade}
-                            </span>
-                            <h5 className="text-xs font-bold text-slate-200 leading-snug break-keep">
-                              {slide.title}
-                            </h5>
-                            <p className="text-[9.5px] text-slate-500 font-mono">📅 {slide.date}</p>
-                          </div>
+                        <div className="flex items-center space-x-1.5">
+                          <span className={`flex-none text-[9px] font-black px-1.5 py-0.2 rounded border ${theme.badgeBg}`}>
+                            {slide.grade}
+                          </span>
+                          <h5 className="text-xs font-bold text-slate-200 leading-snug break-keep line-clamp-2 min-w-0 flex-1">
+                            {slide.title}
+                          </h5>
                         </div>
 
-                        {/* 열기(왼쪽) / PDF 저장(오른쪽) 액션 버튼 */}
-                        <div className="flex items-center space-x-2 pl-[34px]">
-                          <a
-                            href={`/slides/${slide.filename}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex-1 text-center text-[10px] font-extrabold text-slate-300 hover:text-amber-300 transition-colors bg-slate-900 px-3 py-1.5 border border-slate-800 rounded-xl hover:border-amber-500/40 active:scale-95"
-                          >
-                            열기 ▶
-                          </a>
-                          <button
-                            onClick={() => {
-                              // 같은 출처(same-origin) 정적 파일이라, 새 창을 열어 로드 완료 후
-                              // 곧바로 인쇄 대화상자를 띄운다 — "html 다운로드 → 열기 → 인쇄" 단계를
-                              // "PDF 저장 버튼 클릭 → 인쇄 대화상자에서 PDF로 저장"으로 줄여줌.
-                              const printWin = window.open(`/slides/${slide.filename}`, '_blank');
-                              if (!printWin) return;
-                              printWin.addEventListener('load', () => {
-                                setTimeout(() => {
-                                  printWin.focus();
-                                  printWin.print();
-                                }, 500);
-                              });
-                            }}
-                            className="flex-1 text-center text-[10px] font-extrabold text-slate-300 hover:text-indigo-300 transition-colors bg-slate-900 px-3 py-1.5 border border-slate-800 rounded-xl hover:border-indigo-500/40 active:scale-95"
-                          >
-                            🖨️ PDF 저장
-                          </button>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[9.5px] text-slate-500 font-mono flex-none">📅 {slide.date}</span>
+                          <div className="flex items-center space-x-1.5 flex-none">
+                            <a
+                              href={`/slides/${slide.filename}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[10px] font-extrabold text-slate-300 hover:text-amber-300 transition-colors bg-slate-900 px-2.5 py-1 border border-slate-800 rounded-lg hover:border-amber-500/40 active:scale-95"
+                            >
+                              열기 ▶
+                            </a>
+                            <button
+                              onClick={() => {
+                                // window.open 팝업 방식은 팝업 차단에 걸리면 아무 반응 없이 조용히
+                                // 실패해서(사용자 입장엔 "버튼이 안 먹힘") 숨겨진 iframe으로 대체했다.
+                                // 새 창/탭을 전혀 띄우지 않으므로 팝업 차단과 무관하게 항상 동작한다.
+                                const iframe = document.createElement('iframe');
+                                iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+                                iframe.src = `/slides/${slide.filename}`;
+                                document.body.appendChild(iframe);
+                                const cleanup = () => {
+                                  if (iframe.parentNode) document.body.removeChild(iframe);
+                                };
+                                iframe.onload = () => {
+                                  setTimeout(() => {
+                                    const win = iframe.contentWindow;
+                                    if (!win) { cleanup(); return; }
+                                    win.addEventListener('afterprint', cleanup, { once: true });
+                                    win.focus();
+                                    win.print();
+                                    setTimeout(cleanup, 60000); // 혹시 afterprint가 안 잡히는 브라우저용 폴백 정리
+                                  }, 300);
+                                };
+                              }}
+                              className="text-[10px] font-extrabold text-slate-300 hover:text-indigo-300 transition-colors bg-slate-900 px-2.5 py-1 border border-slate-800 rounded-lg hover:border-indigo-500/40 active:scale-95"
+                            >
+                              🖨️ PDF
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))}
