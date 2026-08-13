@@ -41,6 +41,7 @@ export const SlideListModal: React.FC<SlideListModalProps> = ({ isOpen, onClose 
     { title: "II. 함수의 극한과 연속 - 01. 함수의 연속", filename: "math_continuity_01.html", date: "2026-07-18", grade: "고2" },
 
     // 🎓 고3 / N수 (수능 파이널 & 준킬러 특강)
+    { title: "2025·2026학년도 6월 모의평가 공통 4점 문항 특강", filename: "mock_jun_2025_2026_math_common_4point_special.html", date: "2026-08-13", grade: "고3" },
     { title: "수학Ⅱ/미적분1 - 삼차함수 실전 공식 특강 (비율관계·접선·극값)", filename: "math_cubic_function_practical_formulas_special.html", date: "2026-08-11", grade: "고3" },
     { title: "2025학년도 9월 모의평가 수학 21·22번 클리닉", filename: "2025_mock_sep_math_21_22.html", date: "2026-08-08", grade: "고3" },
     { title: "수학Ⅱ - 함수의 극한 존재조건 활용 (정규수업)", filename: "math2_limit_existence_condition.html", date: "2026-08-01", grade: "고3" },
