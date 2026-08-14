@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>개념원리 미적분Ⅰ - 방정식과 부등식에의 활용(p133~141)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true
+            },
+            options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'] }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        .presentation-deck { position: relative; width: 1280px; height: 720px; background: radial-gradient(circle at 10% 20%, #172a33 0%, #0f172a 100%); border: 1px solid rgba(255, 255, 255, 0.08); margin: 20px auto; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); border-left: 10px solid #06b6d4; }
+        .slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 40px 66px; display: none; flex-direction: column; justify-content: space-between; z-index: 1; background: transparent; box-sizing: border-box; }
+        .slide.active { display: flex; z-index: 10; }
+
+        .concept-card { background: rgba(15, 30, 41, 0.75); backdrop-filter: blur(10px); border: 1px solid rgba(6, 182, 212, 0.25); border-radius: 18px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); }
+        .formula-box { background: rgba(6, 182, 212, 0.08); border: 1px solid rgba(6, 182, 212, 0.2); border-radius: 14px; }
+        .idea-box { background: linear-gradient(135deg, rgba(8, 60, 74, 0.45) 0%, rgba(15, 30, 41, 0.6) 100%); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 14px; }
+        .problem-box { background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(15, 30, 41, 0.85) 100%); border-left: 8px solid #06b6d4; border-top: 1px solid rgba(6, 182, 212, 0.2); border-right: 1px solid rgba(255, 255, 255, 0.05); border-bottom: 1px solid rgba(255, 255, 255, 0.05); border-radius: 0 18px 18px 0; }
+        .problem-text { font-size: 1.25rem; font-weight: 700; color: #cffafe; line-height: 1.7; word-break: keep-all; }
+        .num-badge { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background: #0891b2; color: white; font-weight: 900; font-size: 1.05rem; flex-shrink: 0; }
+
+        @media print {
+            body { background-color: #ffffff !important; margin: 0 !important; padding: 0 !important; }
+            .presentation-deck { width: 1280px !important; height: auto !important; box-shadow: none !important; border: none !important; margin: 0 !important; overflow: visible !important; display: block !important; }
+            .slide { position: relative !important; display: flex !important; width: 1280px !important; height: 720px !important; page-break-after: always !important; page-break-inside: avoid !important; background: #0f172a !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="presentation-deck" id="deck">
+        <!-- Top Bar -->
+        <div class="flex justify-between items-center z-20 pb-3 border-b border-cyan-900/40 mx-8 mt-6 no-print">
+            <div class="flex items-center gap-3">
+                <span class="bg-cyan-600 text-white text-xs font-black px-3 py-1 rounded-md uppercase">개념원리 | 고2</span>
+                <span class="text-slate-300 text-sm font-medium">Ⅱ. 미분 &gt; 2. 도함수의 활용 &gt; 07. 방정식과 부등식에의 활용</span>
+            </div>
+            <div class="text-right flex items-center gap-4">
+                <span class="text-xs text-cyan-400 font-bold uppercase tracking-wider" id="slide-category">단원 소개</span>
+                <span class="text-xs text-slate-400 font-semibold bg-slate-800/80 px-2.5 py-1 rounded-md border border-slate-700" id="slide-counter">1 / 10</span>
+                <button onclick="closeDeck()" class="text-xs text-slate-400 hover:text-white bg-slate-800/80 hover:bg-cyan-600 w-7 h-7 flex items-center justify-center rounded-md border border-slate-700 transition" title="닫기" aria-label="닫기">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Slide Container -->
+        <div class="relative flex-grow my-2 overflow-hidden" id="slide-container">
+
+            <!-- Slide 1: Cover -->
+            <div class="slide active" data-category="단원 소개">
+                <div class="flex-grow flex flex-col justify-center items-start">
+                    <span class="text-cyan-400 font-bold text-lg tracking-widest mb-4">개념원리 미적분Ⅰ &nbsp;|&nbsp; Ⅱ. 미분 &gt; 2. 도함수의 활용</span>
+                    <h1 class="text-6xl font-black text-white leading-tight mb-6">방정식과 부등식에의 활용</h1>
+                    <div class="h-2 w-40 bg-cyan-500 rounded-full mb-8"></div>
+                    <p class="text-2xl text-slate-300 font-medium">실근의 개수 판별부터 부등식의 항상 성립 증명까지</p>
+                    <p class="text-lg text-slate-500 font-medium mt-2">교재 p.133 ~ p.141 · 필수예제 26 ~ 31</p>
+                </div>
+            </div>
+
+            <!-- Slide 2: 개념 1 - 방정식의 실근의 개수 -->
+            <div class="slide" data-category="개념 이해">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">1</span>
+                        <h2 class="text-3xl font-black text-white">방정식의 실근의 개수</h2>
+                    </div>
+                    <div class="formula-box py-4 px-8 text-lg text-white leading-loose">
+                        <p><b>(1) 방정식 $f(x)=0$</b>의 서로 다른 실근의 개수 $\Rightarrow$ 함수 $y=f(x)$의 그래프와 $x$축의 교점의 개수</p>
+                        <p><b>(2) 방정식 $f(x)=g(x)$</b>의 서로 다른 실근의 개수 $\Rightarrow$ 두 함수 $y=f(x)$, $y=g(x)$의 그래프의 교점의 개수</p>
+                    </div>
+                    <div class="idea-box p-4 flex items-start gap-3">
+                        <i class="fa-solid fa-lightbulb text-cyan-300 text-xl mt-1"></i>
+                        <p class="text-base text-cyan-100 leading-relaxed"><b>직관적 아이디어</b> — 방정식을 직접 푸는 대신 "그래프가 $x$축과 몇 번 만나는가"만 세면 끝난다. $f(x)=g(x)$도 두 그래프를 따로 그려 비교하지 말고, $h(x)=f(x)-g(x)$ 하나로 합쳐서 "$h(x)=0$의 실근 개수 = $h(x)$ 그래프가 $x$축과 만나는 횟수"로 바꾸면 그래프 하나만 그리면 된다.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 3: 개념 2 - 삼차방정식의 근의 판별 -->
+            <div class="slide" data-category="개념 이해">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">2</span>
+                        <h2 class="text-3xl font-black text-white">삼차방정식의 근의 판별</h2>
+                    </div>
+                    <p class="text-base text-slate-300">삼차함수 $f(x)$가 극값을 가질 때, 방정식 $f(x)=0$은</p>
+                    <div class="formula-box py-3 px-8 text-lg text-white leading-loose">
+                        <p>① (극댓값)$\times$(극솟값)$<0$ $\iff$ 서로 다른 세 실근</p>
+                        <p>② (극댓값)$\times$(극솟값)$=0$ $\iff$ 중근과 다른 한 실근(서로 다른 두 실근)</p>
+                        <p>③ (극댓값)$\times$(극솟값)$>0$ $\iff$ 한 실근과 두 허근</p>
+                    </div>
+                    <p class="text-sm text-slate-400">극값을 갖지 않으면 삼중근을 갖거나 한 실근과 두 허근을 갖는다.</p>
+                    <div class="idea-box p-4 flex items-start gap-3">
+                        <i class="fa-solid fa-lightbulb text-cyan-300 text-xl mt-1"></i>
+                        <p class="text-base text-cyan-100 leading-relaxed"><b>직관적 아이디어</b> — 극댓값과 극솟값의 부호가 다르면(곱$<0$) $x$축이 그 사이 어딘가를 반드시 지나가므로 세 번 만나고, 부호가 같으면(곱$>0$) $x$축이 봉우리와 골을 모두 피해가므로 한 번만 만난다. 그래프를 그리지 않고도 두 극값의 곱의 부호 하나로 실근의 개수가 바로 결정된다.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 4: 개념 3 - 부등식에의 활용 -->
+            <div class="slide" data-category="개념 이해">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">3</span>
+                        <h2 class="text-3xl font-black text-white">부등식에의 활용</h2>
+                    </div>
+                    <div class="formula-box py-3 px-8 text-lg text-white leading-loose">
+                        <p><b>(1) 모든 실수 $x$에 대하여</b> $f(x)\ge0$ 성립 $\Rightarrow$ $(f(x)$의 최솟값$)\ge0$임을 보인다.</p>
+                        <p><b>(2) $x\ge a$에서</b> $f(x)\ge0$ 성립 $\Rightarrow$ $x\ge a$에서 $(f(x)$의 최솟값$)\ge0$임을 보인다.</p>
+                    </div>
+                    <p class="text-sm text-slate-400">$f(x)\ge g(x)$ 꼴은 $h(x)=f(x)-g(x)$로 놓고 $(h(x)$의 최솟값$)\ge0$임을 보이면 된다.</p>
+                    <div class="idea-box p-4 flex items-start gap-3">
+                        <i class="fa-solid fa-lightbulb text-cyan-300 text-xl mt-1"></i>
+                        <p class="text-base text-cyan-100 leading-relaxed"><b>직관적 아이디어</b> — "모든 $x$에 대해 $f(x)\ge0$"을 증명하라는 건 결국 "가장 작은 값도 $0$ 이상인가"를 확인하라는 뜻이다. 최솟값만 $0$ 이상이면 나머지는 자동으로 다 $0$ 이상이므로, 부등식 증명 문제는 결국 "최솟값 구하기" 문제로 바뀐다. 두 함수를 비교하는 부등식도 차 함수 $h(x)$로 묶으면 똑같은 방법이 적용된다.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 5: 필수예제 26 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">26</span>
+                        <h2 class="text-3xl font-black text-white">방정식의 실근의 개수</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">방정식 $x^3+3x^2-3=0$의 서로 다른 실근의 개수를 구하시오.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 6: 필수예제 27 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">27</span>
+                        <h2 class="text-3xl font-black text-white">방정식의 근의 판별; 그래프</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">방정식 $2x^3-3x^2-12x-k=0$의 근이 다음과 같도록 하는 실수 $k$의 값 또는 범위를 구하시오.<br>
+                        (1) 서로 다른 세 실근 &nbsp; (2) 서로 다른 두 실근 &nbsp; (3) 한 개의 실근</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 7: 필수예제 28 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">28</span>
+                        <h2 class="text-3xl font-black text-white">삼차방정식의 근의 판별; 극값</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">방정식 $x^3+3x^2-9x+k=0$의 근이 다음과 같도록 하는 실수 $k$의 값의 범위를 구하시오.<br>
+                        (1) 서로 다른 세 실근 &nbsp;&nbsp; (2) 한 실근과 두 허근</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 8: 필수예제 29 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">29</span>
+                        <h2 class="text-3xl font-black text-white">방정식의 근의 분리</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">방정식 $x^3-\dfrac{3}{2}x^2-6x-k=0$의 근이 다음과 같도록 하는 실수 $k$의 값의 범위를 구하시오.<br>
+                        (1) 서로 다른 두 개의 양의 실근과 한 개의 음의 실근<br>
+                        (2) 한 개의 양의 실근과 두 개의 허근</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 9: 필수예제 30 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">30</span>
+                        <h2 class="text-3xl font-black text-white">모든 실수 $x$에 대하여 성립하는 부등식</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">다음 물음에 답하시오.<br>
+                        (1) 모든 실수 $x$에 대하여 부등식 $x^4-32x+a\ge0$이 성립하도록 하는 실수 $a$의 값의 범위를 구하시오.<br>
+                        (2) 두 함수 $f(x)=3x^4-6x^3+5x^2+a$, $g(x)=2x^3-x^2+10$에 대하여 부등식 $f(x)\ge g(x)$가 항상 성립하도록 하는 실수 $a$의 값의 범위를 구하시오.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 10: 필수예제 31 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">31</span>
+                        <h2 class="text-3xl font-black text-white">주어진 구간에서 성립하는 부등식</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">다음 물음에 답하시오.<br>
+                        (1) $x\ge0$일 때, 부등식 $x^3-3x^2+a\ge0$이 성립하도록 하는 실수 $a$의 값의 범위를 구하시오.<br>
+                        (2) 두 함수 $f(x)=x^3-x^2-x+1$, $g(x)=-x^2+2x+a$에 대하여 구간 $[0,2]$에서 부등식 $f(x)\ge g(x)$가 성립하도록 하는 실수 $a$의 값의 범위를 구하시오.</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer Control -->
+        <div class="flex justify-between items-center z-20 pt-3 border-t border-cyan-900/40 mx-8 mb-6 no-print">
+            <button onclick="prevSlide()" class="bg-slate-800/80 hover:bg-cyan-600 text-slate-200 hover:text-white font-bold text-sm px-5 py-2 rounded-xl transition border border-slate-700">
+                <i class="fa-solid fa-chevron-left"></i> 이전 슬라이드
+            </button>
+            <div class="text-slate-400 text-xs font-semibold tracking-wider">
+                HIGH SCHOOL MATH CLASS PPT
+            </div>
+            <button onclick="nextSlide()" class="bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-sm px-5 py-2 rounded-xl transition shadow-md">
+                다음 슬라이드 <i class="fa-solid fa-chevron-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const counterEl = document.getElementById('slide-counter');
+        const categoryEl = document.getElementById('slide-category');
+
+        function updateSlide() {
+            slides.forEach((slide, idx) => slide.classList.toggle('active', idx === currentSlide));
+            if (counterEl) counterEl.textContent = `${currentSlide + 1} / ${slides.length}`;
+            if (categoryEl && slides[currentSlide]) categoryEl.textContent = slides[currentSlide].getAttribute('data-category') || '수업 자료';
+            if (window.MathJax && window.MathJax.typesetPromise) window.MathJax.typesetPromise();
+        }
+        function prevSlide() { if (currentSlide > 0) { currentSlide--; updateSlide(); } }
+        function nextSlide() { if (currentSlide < slides.length - 1) { currentSlide++; updateSlide(); } }
+        function closeDeck() {
+            window.close();
+            setTimeout(() => { const d = document.getElementById('deck'); if (d) d.style.display = 'none'; }, 150);
+        }
+        updateSlide();
+    </script>
+</body>
+</html>

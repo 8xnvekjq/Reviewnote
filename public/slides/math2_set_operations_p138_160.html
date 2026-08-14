@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>개념원리 공통수학2 - 집합의 연산(p138~160)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true
+            },
+            options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'] }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        .presentation-deck { position: relative; width: 1280px; height: 720px; background: radial-gradient(circle at 10% 20%, #292524 0%, #0f172a 100%); border: 1px solid rgba(255, 255, 255, 0.08); margin: 20px auto; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); border-left: 10px solid #f59e0b; }
+        .slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 40px 68px; display: none; flex-direction: column; justify-content: space-between; z-index: 1; background: transparent; box-sizing: border-box; }
+        .slide.active { display: flex; z-index: 10; }
+
+        .concept-card { background: rgba(41, 37, 36, 0.75); backdrop-filter: blur(10px); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 18px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); }
+        .formula-box { background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.22); border-radius: 14px; }
+        .idea-box { background: linear-gradient(135deg, rgba(120, 53, 15, 0.35) 0%, rgba(41, 37, 36, 0.6) 100%); border: 1px solid rgba(251, 191, 36, 0.35); border-radius: 14px; }
+        .problem-box { background: linear-gradient(135deg, rgba(24, 24, 27, 0.95) 0%, rgba(41, 37, 36, 0.85) 100%); border-left: 8px solid #f59e0b; border-top: 1px solid rgba(245, 158, 11, 0.2); border-right: 1px solid rgba(255, 255, 255, 0.05); border-bottom: 1px solid rgba(255, 255, 255, 0.05); border-radius: 0 18px 18px 0; }
+        .problem-text { font-size: 1.2rem; font-weight: 700; color: #fef3c7; line-height: 1.7; word-break: keep-all; }
+        .num-badge { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background: #d97706; color: white; font-weight: 900; font-size: 1.05rem; flex-shrink: 0; }
+        .num-badge.adv { background: #7c3aed; }
+        .type-badge.adv { display: inline-flex; align-items: center; gap: 6px; background: #4c1d95; color: #ddd6fe; font-weight: 800; font-size: 0.72rem; padding: 3px 11px; border-radius: 9999px; letter-spacing: 0.03em; }
+
+        @media print {
+            body { background-color: #ffffff !important; margin: 0 !important; padding: 0 !important; }
+            .presentation-deck { width: 1280px !important; height: auto !important; box-shadow: none !important; border: none !important; margin: 0 !important; overflow: visible !important; display: block !important; }
+            .slide { position: relative !important; display: flex !important; width: 1280px !important; height: 720px !important; page-break-after: always !important; page-break-inside: avoid !important; background: #0f172a !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="presentation-deck" id="deck">
+        <!-- Top Bar -->
+        <div class="flex justify-between items-center z-20 pb-3 border-b border-amber-900/40 mx-8 mt-6 no-print">
+            <div class="flex items-center gap-3">
+                <span class="bg-amber-600 text-white text-xs font-black px-3 py-1 rounded-md uppercase">개념원리 | 고1</span>
+                <span class="text-slate-300 text-sm font-medium">Ⅱ. 집합과 명제 &gt; 2. 집합의 연산</span>
+            </div>
+            <div class="text-right flex items-center gap-4">
+                <span class="text-xs text-amber-400 font-bold uppercase tracking-wider" id="slide-category">단원 소개</span>
+                <span class="text-xs text-slate-400 font-semibold bg-slate-800/80 px-2.5 py-1 rounded-md border border-slate-700" id="slide-counter">1 / 20</span>
+                <button onclick="closeDeck()" class="text-xs text-slate-400 hover:text-white bg-slate-800/80 hover:bg-amber-600 w-7 h-7 flex items-center justify-center rounded-md border border-slate-700 transition" title="닫기" aria-label="닫기">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Slide Container -->
+        <div class="relative flex-grow my-2 overflow-hidden" id="slide-container">
+
+            <!-- Slide 1: Cover -->
+            <div class="slide active" data-category="단원 소개">
+                <div class="flex-grow flex flex-col justify-center items-start">
+                    <span class="text-amber-400 font-bold text-lg tracking-widest mb-4">개념원리 공통수학2 &nbsp;|&nbsp; Ⅱ. 집합과 명제</span>
+                    <h1 class="text-6xl font-black text-white leading-tight mb-6">집합의 연산</h1>
+                    <div class="h-2 w-40 bg-amber-500 rounded-full mb-8"></div>
+                    <p class="text-2xl text-slate-300 font-medium">합집합·교집합부터 드모르간의 법칙, 원소의 개수까지</p>
+                    <p class="text-lg text-slate-500 font-medium mt-2">교재 p.138 ~ p.160 · 필수예제 01 ~ 12 · 발전 13</p>
+                </div>
+            </div>
+
+            <!-- Slide 2: 개념 A - 합집합과 교집합 -->
+            <div class="slide" data-category="개념 이해">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">1</span>
+                        <h2 class="text-3xl font-black text-white">합집합과 교집합</h2>
+                    </div>
+                    <div class="formula-box py-4 px-8 text-lg text-white leading-loose">
+                        <p><b>합집합</b>: $A\cup B=\{x\,|\,x\in A\text{ 또는 }x\in B\}$</p>
+                        <p><b>교집합</b>: $A\cap B=\{x\,|\,x\in A\text{ 그리고 }x\in B\}$</p>
+                        <p><b>서로소</b>: $A\cap B=\varnothing$일 때, $A$와 $B$는 서로소이다.</p>
+                    </div>
+                    <div class="idea-box p-4 flex items-start gap-3">
+                        <i class="fa-solid fa-lightbulb text-amber-300 text-xl mt-1"></i>
+                        <p class="text-base text-amber-100 leading-relaxed"><b>직관적 아이디어</b> — 합집합은 "OR"(둘 중 하나라도), 교집합은 "AND"(둘 다 동시에)라는 논리 연산과 정확히 대응된다. 서로소는 교집합이 텅 빈 것 — 즉 "동시에 만족하는 원소가 하나도 없다"는 뜻일 뿐, 두 집합이 서로 무관하다는 뜻이 아니다.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 3: 개념 B - 집합의 연산의 성질 -->
+            <div class="slide" data-category="개념 이해">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">2</span>
+                        <h2 class="text-3xl font-black text-white">집합의 연산의 성질</h2>
+                    </div>
+                    <p class="text-base text-slate-300">전체집합 $U$의 두 부분집합 $A$, $B$에 대하여</p>
+                    <div class="formula-box py-3 px-8 text-base text-white leading-loose">
+                        <p>$A\cup\varnothing=A$, &nbsp;$A\cap\varnothing=\varnothing$, &nbsp;$A\cup A=A$, &nbsp;$A\cap A=A$</p>
+                        <p>$A\cup(A\cap B)=A$, &nbsp;$A\cap(A\cup B)=A$</p>
+                        <p>$A\cup A^C=U$, &nbsp;$A\cap A^C=\varnothing$, &nbsp;$(A^C)^C=A$, &nbsp;$A^C=U-A$</p>
+                    </div>
+                    <div class="idea-box p-4 flex items-start gap-3">
+                        <i class="fa-solid fa-lightbulb text-amber-300 text-xl mt-1"></i>
+                        <p class="text-base text-amber-100 leading-relaxed"><b>직관적 아이디어</b> — 자기 자신끼리의 연산($A\cup A$, $A\cap A$)은 항상 원래 집합 그대로이고, 여집합과의 연산($A\cup A^C$, $A\cap A^C$)은 항상 극단(전체 또는 공집합)으로 간다. $A\cup(A\cap B)=A$처럼 "큰 것과 작은 것을 합치거나 곱하면 큰 쪽이 이긴다"는 흡수법칙은 벤다이어그램으로 겹치는 부분을 그려보면 바로 눈에 보인다.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 4: 개념 C - 여집합과 차집합 -->
+            <div class="slide" data-category="개념 이해">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">3</span>
+                        <h2 class="text-3xl font-black text-white">여집합과 차집합</h2>
+                    </div>
+                    <p class="text-lg text-slate-100 leading-relaxed">어떤 집합에 대하여 그 부분집합을 생각할 때, 처음의 집합을 <b>전체집합</b> $U$라 한다.</p>
+                    <div class="formula-box py-4 px-8 text-lg text-white leading-loose">
+                        <p><b>여집합</b>: $A^C=\{x\,|\,x\in U\text{ 그리고 }x\notin A\}$</p>
+                        <p><b>차집합</b>: $A-B=\{x\,|\,x\in A\text{ 그리고 }x\notin B\}$</p>
+                    </div>
+                    <div class="idea-box p-4 flex items-start gap-3">
+                        <i class="fa-solid fa-lightbulb text-amber-300 text-xl mt-1"></i>
+                        <p class="text-base text-amber-100 leading-relaxed"><b>직관적 아이디어</b> — 여집합 $A^C$는 "전체에서 $A$를 뺀 나머지", 차집합 $A-B$는 "$A$에서 $B$와 겹치는 부분을 뺀 나머지"다. 사실 $A-B=A\cap B^C$로 표현할 수 있으므로, 차집합은 "여집합의 특수한 경우"로 이해하면 두 개념이 하나로 연결된다.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 5: 개념 D - 집합의 연산 법칙과 드모르간의 법칙 -->
+            <div class="slide" data-category="개념 이해">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">4</span>
+                        <h2 class="text-3xl font-black text-white">집합의 연산 법칙과 드모르간의 법칙</h2>
+                    </div>
+                    <div class="formula-box py-3 px-8 text-base text-white leading-loose">
+                        <p><b>교환법칙</b>: $A\cup B=B\cup A$, $A\cap B=B\cap A$</p>
+                        <p><b>결합법칙</b>: $(A\cup B)\cup C=A\cup(B\cup C)$, $(A\cap B)\cap C=A\cap(B\cap C)$</p>
+                        <p><b>분배법칙</b>: $A\cap(B\cup C)=(A\cap B)\cup(A\cap C)$, $A\cup(B\cap C)=(A\cup B)\cap(A\cup C)$</p>
+                        <p><b>드모르간의 법칙</b>: $(A\cup B)^C=A^C\cap B^C$, &nbsp;$(A\cap B)^C=A^C\cup B^C$</p>
+                    </div>
+                    <div class="idea-box p-4 flex items-start gap-3">
+                        <i class="fa-solid fa-lightbulb text-amber-300 text-xl mt-1"></i>
+                        <p class="text-sm text-amber-100 leading-relaxed"><b>직관적 아이디어</b> — 교환·결합·분배법칙은 숫자의 덧셈·곱셈 법칙과 똑같이 생각하면 된다($\cup$는 $+$, $\cap$는 $\times$처럼). 드모르간의 법칙은 "여집합을 씌우면 $\cup$와 $\cap$가 서로 자리를 바꾼다"는 한 문장으로 기억하면 두 공식 모두 저절로 나온다.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 6: 개념 E - 합집합의 원소의 개수 -->
+            <div class="slide" data-category="개념 이해">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">5</span>
+                        <h2 class="text-3xl font-black text-white">합집합의 원소의 개수</h2>
+                    </div>
+                    <p class="text-base text-slate-300">세 유한집합 $A$, $B$, $C$에 대하여</p>
+                    <div class="formula-box py-4 px-8 text-lg text-white leading-loose">
+                        <p>$n(A\cup B)=n(A)+n(B)-n(A\cap B)$</p>
+                        <p class="text-sm">$n(A\cup B\cup C)=n(A)+n(B)+n(C)$</p>
+                        <p class="text-sm">$\quad -n(A\cap B)-n(B\cap C)-n(C\cap A)+n(A\cap B\cap C)$</p>
+                    </div>
+                    <div class="idea-box p-4 flex items-start gap-3">
+                        <i class="fa-solid fa-lightbulb text-amber-300 text-xl mt-1"></i>
+                        <p class="text-base text-amber-100 leading-relaxed"><b>직관적 아이디어</b> — $n(A\cup B)=n(A)+n(B)-n(A\cap B)$는 "겹치는 부분을 두 번 세었으니 한 번 빼준다"는 상식적인 이야기다. 집합이 세 개로 늘어나면 "두 개씩 겹친 것은 빼고, 세 개 다 겹친 것은 다시 한 번 더해준다"는 포함-배제 원리로 자연스럽게 확장된다.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 7: 개념 F - 여집합과 차집합의 원소의 개수 -->
+            <div class="slide" data-category="개념 이해">
+                <div class="concept-card flex-grow p-8 flex flex-col justify-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">6</span>
+                        <h2 class="text-3xl font-black text-white">여집합과 차집합의 원소의 개수</h2>
+                    </div>
+                    <p class="text-base text-slate-300">전체집합 $U$가 유한집합일 때, 두 부분집합 $A$, $B$에 대하여</p>
+                    <div class="formula-box py-4 px-8 text-lg text-white leading-loose">
+                        <p>$n(A^C)=n(U)-n(A)$</p>
+                        <p>$n(A-B)=n(A)-n(A\cap B)=n(A\cup B)-n(B)$</p>
+                    </div>
+                    <div class="idea-box p-4 flex items-start gap-3">
+                        <i class="fa-solid fa-lightbulb text-amber-300 text-xl mt-1"></i>
+                        <p class="text-base text-amber-100 leading-relaxed"><b>직관적 아이디어</b> — $n(A^C)=n(U)-n(A)$는 "전체에서 $A$만큼 빼면 나머지"라는 뺄셈 그 자체다. $n(A-B)$도 "$A$에서 겹치는 부분($A\cap B$)만큼 빼면 된다"고 생각하면, 공식을 외우지 않아도 벤다이어그램만 떠올리면 스스로 유도된다.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 8: 필수예제 01 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">01</span>
+                        <h2 class="text-3xl font-black text-white">합집합과 교집합</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">세 집합<br>
+                        $A=\{3,5,7\}$, $B=\{x\,|\,x\text{는 }4 \lt x \lt 9\text{인 정수}\}$, $C=\{x\,|\,x\text{는 }12\text{의 양의 약수}\}$<br>
+                        에 대하여 다음을 구하시오.<br>
+                        (1) $A\cap(B\cup C)$<br>
+                        (2) $(A\cap B)\cup C$</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 9: 필수예제 02 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">02</span>
+                        <h2 class="text-3xl font-black text-white">서로소인 두 집합</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">다음 중 두 집합 $A$, $B$가 서로소인 것은?<br>
+                        ① $A=\{x\,|\,x-1=0\}$, $B=\{x\,|\,x^2-1=0\}$<br>
+                        ② $A=\{x\,|\,x^2=16\}$, $B=\{x\,|\,x<-4\}$<br>
+                        ③ $A=\{x\,|\,x\text{는 음이 아닌 정수}\}$, $B=\{x\,|\,x\text{는 자연수}\}$<br>
+                        ④ $A=\{x\,|\,x=2n,\ n\text{은 자연수}\}$, $B=\{x\,|\,x=3n+1,\ n\text{은 자연수}\}$<br>
+                        ⑤ $A=\{x\,|\,x\text{는 }3\text{의 양의 배수}\}$, $B=\{x\,|\,x\text{는 }8\text{의 양의 배수}\}$</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 10: 필수예제 03 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">03</span>
+                        <h2 class="text-3xl font-black text-white">여집합과 차집합</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">전체집합 $U=\{x\,|\,x\text{는 }12\text{ 이하의 자연수}\}$의 두 부분집합 $A=\{x\,|\,x\text{는 짝수}\}$, $B=\{x\,|\,x\text{는 }3\text{의 배수}\}$에 대하여 다음을 구하시오.<br>
+                        (1) $(A\cup B)^C$ &nbsp; (2) $(A\cap B)^C$ &nbsp; (3) $A^C-B$ &nbsp; (4) $B^C-A^C$</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 11: 필수예제 04 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">04</span>
+                        <h2 class="text-3xl font-black text-white">벤다이어그램을 이용한 집합의 연산</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">두 집합 $A$, $B$에 대하여<br>
+                        $B=\{1,2,4,5\}$, $A\cap B=\{2,5\}$, $A\cup B=\{1,2,3,4,5,6,7\}$<br>
+                        일 때, 집합 $A$를 구하시오.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 12: 필수예제 05 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">05</span>
+                        <h2 class="text-3xl font-black text-white">집합의 연산을 만족시키는 미지수 구하기</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">두 집합 $A=\{2,3,a^2+4\}$, $B=\{a+1,4,2a+3\}$에 대하여 $A\cap B=\{2,5\}$일 때, 상수 $a$의 값을 구하시오.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 13: 필수예제 06 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">06</span>
+                        <h2 class="text-3xl font-black text-white">집합의 연산의 성질</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">전체집합 $U$의 두 부분집합 $A$, $B$에 대하여 다음 중 항상 옳은 것은?<br>
+                        ① $A\subset U^C$ &nbsp; ② $(A\cup B)\subset A$ &nbsp; ③ $(A\cap B)\subset B$<br>
+                        ④ $U\cap B^C=B$ &nbsp; ⑤ $U\subset(A\cup B)$</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 14: 필수예제 07 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">07</span>
+                        <h2 class="text-3xl font-black text-white">집합의 연산의 성질과 포함 관계</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">전체집합 $U$의 서로 다른 두 부분집합 $A$, $B$에 대하여 $B\subset A$일 때, 다음 중 항상 옳은 것은?<br>
+                        ① $A\cap B=B$ &nbsp; ② $A\cup B=B$ &nbsp; ③ $A-B=\varnothing$<br>
+                        ④ $A^C\cup B=U$ &nbsp; ⑤ $B^C\subset A^C$</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 15: 필수예제 08 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">08</span>
+                        <h2 class="text-3xl font-black text-white">집합의 연산과 부분집합의 개수</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">두 집합 $A=\{a,b,c,d,e\}$, $B=\{d,e\}$에 대하여 $A\cap X=X$, $(A-B)\cup X=X$를 만족시키는 집합 $X$의 개수를 구하시오.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 16: 필수예제 09 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">09</span>
+                        <h2 class="text-3xl font-black text-white">집합의 연산 법칙을 이용하여 식 간단히 하기</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">전체집합 $U$의 두 부분집합 $A$, $B$에 대하여 다음을 간단히 하시오.<br>
+                        (1) $A\cap(A-B)^C$<br>
+                        (2) $A^C\cup(B-A)^C$<br>
+                        (3) $B-\{(B-A)\cup(B-A^C)\}$</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 17: 필수예제 10 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">10</span>
+                        <h2 class="text-3xl font-black text-white">집합의 연산 법칙과 포함 관계</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">전체집합 $U$의 두 부분집합 $A$, $B$에 대하여 $\{(A^C\cup B^C)\cap(A\cup B^C)\}\cap A=\varnothing$이 성립할 때, 다음 중 항상 옳은 것은?<br>
+                        ① $A\subset B$ &nbsp; ② $B\subset A$ &nbsp; ③ $A=B$ &nbsp; ④ $A\cap B=\varnothing$ &nbsp; ⑤ $A\cup B=U$</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 18: 필수예제 11 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">11</span>
+                        <h2 class="text-3xl font-black text-white">유한집합의 원소의 개수</h2>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">전체집합 $U$의 두 부분집합 $A$, $B$에 대하여<br>
+                        $n(U)=60$, $n(A)=37$, $n(B)=40$, $n(A^C\cap B^C)=15$<br>
+                        일 때, $n(B-A)$를 구하시오.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 19: 필수예제 12 -->
+            <div class="slide" data-category="필수예제">
+                <div class="flex-grow flex flex-col justify-center gap-6">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge">12</span>
+                        <h2 class="text-3xl font-black text-white">유한집합의 원소의 개수의 활용</h2>
+                    </div>
+                    <div class="problem-box p-8">
+                        <p class="problem-text">$60$명의 학생에게 영어, 수학 문제를 풀게 했더니 영어 문제를 맞힌 학생은 $35$명, 수학 문제를 맞힌 학생은 $28$명이고, 영어와 수학 문제를 모두 틀린 학생은 $5$명이었다. 다음 물음에 답하시오.<br>
+                        (1) 영어 문제와 수학 문제 중 적어도 한 문제를 맞힌 학생 수를 구하시오.<br>
+                        (2) 영어 문제와 수학 문제를 둘 다 맞힌 학생 수를 구하시오.<br>
+                        (3) 영어 문제만 맞힌 학생 수를 구하시오.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 20: 발전 13 -->
+            <div class="slide" data-category="발전문제">
+                <div class="flex-grow flex flex-col justify-center gap-8">
+                    <div class="flex items-center gap-4">
+                        <span class="num-badge adv">13</span>
+                        <div class="flex flex-col gap-1">
+                            <span class="type-badge adv">발전 · 필수예제와 번호 연속</span>
+                            <h2 class="text-3xl font-black text-white">유한집합의 원소의 개수의 최댓값과 최솟값</h2>
+                        </div>
+                    </div>
+                    <div class="problem-box p-10">
+                        <p class="problem-text">전체집합 $U$의 두 부분집합 $A$, $B$에 대하여 $n(U)=30$, $n(A)=22$, $n(B)=17$일 때, $n(A\cap B)$의 최댓값을 $M$, 최솟값을 $m$이라 하자. 이때 $M+m$의 값을 구하시오.</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer Control -->
+        <div class="flex justify-between items-center z-20 pt-3 border-t border-amber-900/40 mx-8 mb-6 no-print">
+            <button onclick="prevSlide()" class="bg-slate-800/80 hover:bg-amber-600 text-slate-200 hover:text-white font-bold text-sm px-5 py-2 rounded-xl transition border border-slate-700">
+                <i class="fa-solid fa-chevron-left"></i> 이전 슬라이드
+            </button>
+            <div class="text-slate-400 text-xs font-semibold tracking-wider">
+                HIGH SCHOOL MATH CLASS PPT
+            </div>
+            <button onclick="nextSlide()" class="bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm px-5 py-2 rounded-xl transition shadow-md">
+                다음 슬라이드 <i class="fa-solid fa-chevron-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const counterEl = document.getElementById('slide-counter');
+        const categoryEl = document.getElementById('slide-category');
+
+        function updateSlide() {
+            slides.forEach((slide, idx) => slide.classList.toggle('active', idx === currentSlide));
+            if (counterEl) counterEl.textContent = `${currentSlide + 1} / ${slides.length}`;
+            if (categoryEl && slides[currentSlide]) categoryEl.textContent = slides[currentSlide].getAttribute('data-category') || '수업 자료';
+            if (window.MathJax && window.MathJax.typesetPromise) window.MathJax.typesetPromise();
+        }
+        function prevSlide() { if (currentSlide > 0) { currentSlide--; updateSlide(); } }
+        function nextSlide() { if (currentSlide < slides.length - 1) { currentSlide++; updateSlide(); } }
+        function closeDeck() {
+            window.close();
+            setTimeout(() => { const d = document.getElementById('deck'); if (d) d.style.display = 'none'; }, 150);
+        }
+        updateSlide();
+    </script>
+</body>
+</html>
