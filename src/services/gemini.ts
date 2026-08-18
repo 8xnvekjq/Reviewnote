@@ -85,8 +85,12 @@ async function getGeminiProxyHeaders(): Promise<Record<string, string>> {
   };
 }
 
-/** CDN 이미지 다운로드 및 Gemini API 요청에 타임아웃을 걸어 무한 대기를 방지하기 위한 기본값 */
-const FETCH_TIMEOUT_MS = 20000;
+/**
+ * CDN 이미지 다운로드 타임아웃. 이 요청은 서버가 아니라 학생 본인 기기 회선으로 직접 받는 것이라
+ * (폰카메라 원본 사진 수 MB + 느린 학교 와이파이/이동 중 LTE 조합), Gemini API 호출(90초)만큼
+ * 넉넉하게 잡아야 "가끔 특정 학생만 요청시간 초과 오류를 겪는" 문제가 안 생긴다.
+ */
+const FETCH_TIMEOUT_MS = 60000;
 
 function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
   const controller = new AbortController();
@@ -116,10 +120,31 @@ async function imageUrlToBase64(url: string): Promise<{ mimeType: string; base64
   let targetUrl = url;
 
   if (!url.startsWith('data:')) {
-    try {
-      const response = await fetchWithTimeout(url);
-      if (!response.ok) throw new Error('CDN 이미지 다운로드 실패');
+    // 학생 회선의 일시적인 끊김/지연에도 바로 에러를 띄우지 않도록, Gemini API 503 재시도와
+    // 동일한 정책(최대 2회 재시도)으로 한 번 더 시도해본다.
+    let response: Response | undefined;
+    let lastError: any;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        response = await fetchWithTimeout(url);
+        if (!response.ok) throw new Error('CDN 이미지 다운로드 실패');
+        break;
+      } catch (err: any) {
+        lastError = err;
+        response = undefined;
+        if (attempt < MAX_RETRIES) {
+          await sleep(RETRY_DELAY_MS);
+        }
+      }
+    }
 
+    if (!response) {
+      console.error('Error fetching image CDN:', lastError);
+      const message = lastError?.name === 'AbortError' ? '이미지 다운로드 시간이 초과되었습니다.' : lastError?.message;
+      throw new Error(`이미지 다운로드 실패: ${message}`);
+    }
+
+    try {
       const blob = await response.blob();
       targetUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -128,9 +153,8 @@ async function imageUrlToBase64(url: string): Promise<{ mimeType: string; base64
         reader.readAsDataURL(blob);
       });
     } catch (err: any) {
-      console.error('Error fetching image CDN:', err);
-      const message = err?.name === 'AbortError' ? '이미지 다운로드 시간이 초과되었습니다.' : err.message;
-      throw new Error(`이미지 다운로드 실패: ${message}`);
+      console.error('Error reading image blob:', err);
+      throw new Error(`이미지 다운로드 실패: ${err.message}`);
     }
   }
 
