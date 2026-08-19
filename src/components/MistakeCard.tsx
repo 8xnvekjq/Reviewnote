@@ -1,5 +1,6 @@
 import React from 'react';
 import type { MistakeEntry } from '../types';
+import { SOLVING_PLACEHOLDER_TEXT } from '../types';
 import { formatDate, formatDateTime } from '../utils/date';
 import { GACHA_ITEMS, getRarityTheme } from '../utils/gachaCatalog';
 
@@ -121,9 +122,9 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
 
           {/* Right: AI Analysis Status/Fuzzy summary */}
           <div className="flex-none text-right text-[9.5px] max-w-[140px] truncate">
-            {entry.analysis ? (
+            {entry.analysis?.solvingProcess && entry.analysis.solvingProcess !== SOLVING_PLACEHOLDER_TEXT ? (
               <span className="text-slate-400 truncate block">
-                🔍 {entry.analysis.mistakeDetail}
+                🔍 {entry.analysis.mistakeSummary}
               </span>
             ) : (
               <span className="text-amber-500 font-black flex items-center justify-end flex-none">

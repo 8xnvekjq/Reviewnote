@@ -374,7 +374,17 @@ async function streamGeminiApi(
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 90000);
+    // 킬러문항처럼 정상적으로 오래 걸리는 풀이를, 연결이 멀쩡히 살아있는데도 고정된 총 시간
+    // 상한 때문에 억울하게 끊는 문제가 있었다 (스트리밍 도중에도 이 타이머를 한 번도 리셋하지
+    // 않아서, 청크가 계속 들어오고 있어도 요청 시작 후 90초가 지나면 무조건 abort됐음).
+    // "청크가 IDLE_TIMEOUT_MS 동안 전혀 안 온다 = 연결이 진짜 끊겼다"로 바꿔서, 연결이 살아있는
+    // 한(청크가 계속 오는 한) 총 소요 시간과 무관하게 끊기지 않도록 한다.
+    const IDLE_TIMEOUT_MS = 90000;
+    let idleTimeoutId = setTimeout(() => controller.abort(), IDLE_TIMEOUT_MS);
+    const resetIdleTimer = () => {
+      clearTimeout(idleTimeoutId);
+      idleTimeoutId = setTimeout(() => controller.abort(), IDLE_TIMEOUT_MS);
+    };
 
     let response: Response;
     try {
@@ -385,7 +395,7 @@ async function streamGeminiApi(
         signal: controller.signal
       });
     } catch (err: any) {
-      clearTimeout(timeoutId);
+      clearTimeout(idleTimeoutId);
       if (err?.name === 'AbortError') {
         throw new Error(`Gemini API 응답 시간이 초과되었습니다. (${modelName})`);
       }
@@ -393,14 +403,14 @@ async function streamGeminiApi(
     }
 
     if (response.status === 503 && attempt < MAX_RETRIES) {
-      clearTimeout(timeoutId);
+      clearTimeout(idleTimeoutId);
       console.warn(`Gemini API 일시적 과부하(503), ${RETRY_DELAY_MS}ms 후 재시도합니다... (${attempt + 1}/${MAX_RETRIES})`);
       await sleep(RETRY_DELAY_MS);
       continue;
     }
 
     if (!response.ok || !response.body) {
-      clearTimeout(timeoutId);
+      clearTimeout(idleTimeoutId);
       const errorJson = await response.json().catch(() => ({}));
       const errorMessage = errorJson?.error?.message || '네트워크 응답 오류';
       throw new Error(`Gemini API 오류 (${modelName}): ${errorMessage}`);
@@ -414,8 +424,18 @@ async function streamGeminiApi(
       let lastFinishReason: string | undefined;
 
       while (true) {
-        const { done, value } = await reader.read();
+        let readResult: ReadableStreamReadResult<Uint8Array>;
+        try {
+          readResult = await reader.read();
+        } catch (err: any) {
+          if (err?.name === 'AbortError') {
+            throw new Error(`Gemini API 응답이 지연되어 연결이 끊겼습니다. (${modelName})`);
+          }
+          throw err;
+        }
+        const { done, value } = readResult;
         if (done) break;
+        resetIdleTimer(); // 청크 도착 = 연결이 살아있다는 뜻이므로 타이머를 다시 90초로 늘림
         buffer += decoder.decode(value, { stream: true });
 
         // SSE 이벤트는 \r\n\r\n(환경에 따라 \n\n)으로 구분되고, 각 이벤트는 "data: {...}" 형태
@@ -453,7 +473,7 @@ async function streamGeminiApi(
 
       return fullText;
     } finally {
-      clearTimeout(timeoutId);
+      clearTimeout(idleTimeoutId);
     }
   }
 

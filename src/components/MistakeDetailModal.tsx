@@ -56,6 +56,14 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   isAdmin = false,
   aiPersonaName = '밤티',
 }) => {
+  // classify(1차) 단계가 끝나면 solve(2차)가 완료되기 전에도 analysis 객체 자체는 이미
+  // (자리표시자 텍스트를 담은 채로) DB에 존재한다. solve가 타임아웃 등으로 끝내 실패하면
+  // "analysis가 있냐 없냐"만으로는 성공/실패를 구분할 수 없어서, 자리표시자를 완성된
+  // 풀이인 것처럼 화면에 그대로 박아버리는(=학생 눈엔 영원히 멈춘 "무한로딩") 버그가 있었다.
+  // 반드시 solvingProcess가 자리표시자가 아닌 실제 내용인지로 판단해야 한다.
+  const hasRealAnalysis = (entry: MistakeEntry) =>
+    !!entry.analysis?.solvingProcess && entry.analysis.solvingProcess !== SOLVING_PLACEHOLDER_TEXT;
+
   const authorStamp = selectedEntry.userId ? profilesStampMap[selectedEntry.userId] : equippedStamp;
   // 장착한 스탬프의 실제 뽑기 등급(UR/SSR/SR/R)에 맞는 테두리 클래스
   const authorStampCatalogItem = authorStamp
@@ -65,7 +73,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   const [loadingText, setLoadingText] = React.useState('수학 문제 분석을 시작합니다...');
   const [progress, setProgress] = React.useState(0);
   const [elapsedMs, setElapsedMs] = React.useState(0);
-  const [showResult, setShowResult] = React.useState(!isAnalyzing && !!selectedEntry.analysis);
+  const [showResult, setShowResult] = React.useState(!isAnalyzing && hasRealAnalysis(selectedEntry));
   const analysisCardRef = React.useRef<HTMLDivElement>(null);
   const wasAnalyzingRef = React.useRef(isAnalyzing);
 
@@ -120,7 +128,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   React.useEffect(() => {
     setEditGrade(selectedEntry.grade || '');
     setEditChapter(selectedEntry.chapter || '');
-    setShowResult(!isAnalyzing && !!selectedEntry.analysis);
+    setShowResult(!isAnalyzing && hasRealAnalysis(selectedEntry));
   }, [selectedEntry.id, selectedEntry.grade, selectedEntry.chapter, isAnalyzing]);
 
   // ── 핀치 줌 및 터치 드래그 제스처 핸들러 ──────────────────────────────
@@ -540,20 +548,21 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     } else {
       // API 응답 완료 (isAnalyzing: true -> false)
       if (progress > 0 && progress < 100) {
-        if (selectedEntry.analysis) {
+        if (hasRealAnalysis(selectedEntry)) {
           setProgress(100); // 성공 시에만 100%로 도달 후 전환
           const delayTimer = setTimeout(() => {
             setShowResult(true);
           }, 500);
           return () => clearTimeout(delayTimer);
         } else {
-          // 분석 오류로 데이터가 누락되었을 시, 99%에 멈추지 않고 0%로 안전 리셋
+          // 분석 실패(타임아웃 등)로 자리표시자만 남았을 시, 99%에 멈추지 않고 0%로 안전 리셋
+          // + "AI 분석 시작하기" 버튼 화면으로 돌아가도록 showResult도 false로 유지
           setProgress(0);
           setShowResult(false);
         }
       } else {
-        setShowResult(!!selectedEntry.analysis);
-        if (!selectedEntry.analysis) {
+        setShowResult(hasRealAnalysis(selectedEntry));
+        if (!hasRealAnalysis(selectedEntry)) {
           setProgress(0);
         }
       }
@@ -1049,7 +1058,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 </div>
               </div>
             </div>
-          ) : selectedEntry.analysis ? (
+          ) : hasRealAnalysis(selectedEntry) ? (
             <div className="space-y-6 animate-scale-up">
               {/* AI 모델 명시 정보 */}
               <div className="flex items-center justify-end">
