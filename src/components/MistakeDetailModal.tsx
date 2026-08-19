@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import type { MistakeEntry, ReviewState } from '../types';
+import type { MistakeEntry, MistakeAnalysis, ReviewState } from '../types';
 import { ROOT_CAUSE_OPTIONS, MATH_CURRICULUM, GRADE_LIST, SOLVING_PLACEHOLDER_TEXT } from '../types';
 import { LaTeXRenderer } from './LaTeXRenderer';
 import { formatDate } from '../utils/date';
@@ -61,7 +61,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   // "analysis가 있냐 없냐"만으로는 성공/실패를 구분할 수 없어서, 자리표시자를 완성된
   // 풀이인 것처럼 화면에 그대로 박아버리는(=학생 눈엔 영원히 멈춘 "무한로딩") 버그가 있었다.
   // 반드시 solvingProcess가 자리표시자가 아닌 실제 내용인지로 판단해야 한다.
-  const hasRealAnalysis = (entry: MistakeEntry) =>
+  const hasRealAnalysis = (entry: MistakeEntry): entry is MistakeEntry & { analysis: MistakeAnalysis } =>
     !!entry.analysis?.solvingProcess && entry.analysis.solvingProcess !== SOLVING_PLACEHOLDER_TEXT;
 
   const authorStamp = selectedEntry.userId ? profilesStampMap[selectedEntry.userId] : equippedStamp;
