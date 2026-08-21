@@ -60,7 +60,11 @@ function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('notes');
   const [mistakes, setMistakes] = useState<MistakeEntry[]>([]);
   const [selectedEntry, setSelectedEntry] = useState<MistakeEntry | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [, setIsUploadingPhoto] = useState(false); // 사진 업로드(handleCropComplete) 전용 — AI 진단 자체는 analyzingEntryId로 별도 추적. 현재 이 값을 직접 읽는 UI는 없음(업로드 완료 후에야 모달이 열림)
+  // classify+solve 진단이 "어느 오답 항목"에 대해 진행 중인지 — 예전엔 boolean 하나였는데,
+  // 그러면 A를 진단하는 중 다른(B) 카드를 열어도 B에 가짜로 로딩 스피너가 뜨다가 조용히
+  // 사라지는 버그가 있었다(전역 상태라 "누구를 진단 중인지"를 구분 못 했음).
+  const [analyzingEntryId, setAnalyzingEntryId] = useState<string | null>(null);
 
   // 매일 연속 복습 스트릭 상태 (🔥 Streak 관리)
   const [streakState, setStreakState] = useState<StreakState>(() => loadStreakState());
@@ -996,7 +1000,10 @@ function App() {
 
   // Start analysis trigger (Gemini API 키는 서버(Edge Function)에서만 다루므로 클라이언트는 신경쓸 필요 없음)
   const handleStartAnalysis = async (entry: MistakeEntry) => {
-    setIsAnalyzing(true);
+    // 이미 다른 오답을 진단 중이면 중복 실행(더블탭 등)을 막는다 — 같은 항목에 두 번 걸리면
+    // 두 결과가 뒤섞여 DB에 저장될 수 있었고, 비용도 이중으로 나갔다.
+    if (analyzingEntryId) return;
+    setAnalyzingEntryId(entry.id);
     // 진단 전체(classify+extract+solve) 소요 시간을 재서 평균 대기시간 계산에 사용
     const analysisStartTime = Date.now();
     try {
@@ -1023,7 +1030,7 @@ function App() {
         icon: '⚠️',
       });
     } finally {
-      setIsAnalyzing(false);
+      setAnalyzingEntryId(null);
     }
   };
 
@@ -1333,7 +1340,7 @@ function App() {
     setTempCapturedImage(null);
     if (!session?.user) return;
 
-    setIsAnalyzing(true);
+    setIsUploadingPhoto(true);
     try {
       const blob = base64ToBlob(croppedBase64);
       const fileExt = blob.type.split('/')[1] || 'jpg';
@@ -1397,7 +1404,7 @@ function App() {
         icon: '⚠️',
       });
     } finally {
-      setIsAnalyzing(false);
+      setIsUploadingPhoto(false);
     }
   };
 
@@ -2350,7 +2357,7 @@ function App() {
           selectedEntry={selectedEntry}
           allEntries={mistakes}
           peerActivities={peerActivities}
-          isAnalyzing={isAnalyzing}
+          isAnalyzing={analyzingEntryId === selectedEntry.id}
           averageWaitMs={averageWaitMs}
           youtubeLectures={youtubeLectures}
           onClose={() => {

@@ -319,6 +319,8 @@ async function callGeminiApi(modelName: string, requestBody: any): Promise<any> 
   const headers = await getGeminiProxyHeaders();
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    // 연결 자체가 실패한 경우도(네트워크 순단 등) 이미지 다운로드처럼 재시도한다 — 기존엔
+    // AbortError가 아닌 에러는 재시도 없이 바로 던져서 일시적 네트워크 문제에 취약했음.
     let response: Response;
     try {
       response = await fetchWithTimeout(GEMINI_PROXY_URL, {
@@ -327,6 +329,11 @@ async function callGeminiApi(modelName: string, requestBody: any): Promise<any> 
         body: JSON.stringify({ model: modelName, requestBody, stream: false })
       }, 90000); // solve 단계 정상 응답이 1분 안팎으로 걸리는 경우가 있어, 정상 응답을 오탐하지 않도록 90초로 넉넉히 설정
     } catch (err: any) {
+      if (attempt < MAX_RETRIES) {
+        console.warn(`Gemini API 연결 실패, ${RETRY_DELAY_MS}ms 후 재시도합니다... (${attempt + 1}/${MAX_RETRIES})`, err);
+        await sleep(RETRY_DELAY_MS);
+        continue;
+      }
       if (err?.name === 'AbortError') {
         throw new Error(`Gemini API 응답 시간이 초과되었습니다. (${modelName})`);
       }
@@ -349,6 +356,13 @@ async function callGeminiApi(modelName: string, requestBody: any): Promise<any> 
     const responseText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!responseText) {
+      // Gemini가 간헐적으로 빈 candidates/parts를 반환하는 사례가 보고되어 있어(외부 리서치로
+      // 확인됨), 이것도 일시적 문제로 보고 재시도한다.
+      if (attempt < MAX_RETRIES) {
+        console.warn(`Gemini API 빈 응답, ${RETRY_DELAY_MS}ms 후 재시도합니다... (${attempt + 1}/${MAX_RETRIES})`);
+        await sleep(RETRY_DELAY_MS);
+        continue;
+      }
       const finishReason = result?.candidates?.[0]?.finishReason;
       throw new Error(`Gemini API로부터 올바른 응답 텍스트를 받지 못했습니다. (${modelName}, finishReason: ${finishReason || '알 수 없음'})`);
     }
@@ -386,6 +400,9 @@ async function streamGeminiApi(
       idleTimeoutId = setTimeout(() => controller.abort(), IDLE_TIMEOUT_MS);
     };
 
+    // 연결 시도(fetch) 자체가 실패한 경우 — 502/네트워크 순단 등도 이미지 다운로드처럼 재시도한다.
+    // (기존엔 AbortError만 특수 처리하고 그 외 에러는 재시도 없이 바로 던져서, 분류/풀이 단계가
+    // 이미지 다운로드보다 오히려 일시적 네트워크 문제에 더 취약했음)
     let response: Response;
     try {
       response = await fetch(GEMINI_PROXY_URL, {
@@ -396,6 +413,11 @@ async function streamGeminiApi(
       });
     } catch (err: any) {
       clearTimeout(idleTimeoutId);
+      if (attempt < MAX_RETRIES) {
+        console.warn(`Gemini API 연결 실패, ${RETRY_DELAY_MS}ms 후 재시도합니다... (${attempt + 1}/${MAX_RETRIES})`, err);
+        await sleep(RETRY_DELAY_MS);
+        continue;
+      }
       if (err?.name === 'AbortError') {
         throw new Error(`Gemini API 응답 시간이 초과되었습니다. (${modelName})`);
       }
@@ -424,15 +446,7 @@ async function streamGeminiApi(
       let lastFinishReason: string | undefined;
 
       while (true) {
-        let readResult: ReadableStreamReadResult<Uint8Array>;
-        try {
-          readResult = await reader.read();
-        } catch (err: any) {
-          if (err?.name === 'AbortError') {
-            throw new Error(`Gemini API 응답이 지연되어 연결이 끊겼습니다. (${modelName})`);
-          }
-          throw err;
-        }
+        const readResult = await reader.read();
         const { done, value } = readResult;
         if (done) break;
         resetIdleTimer(); // 청크 도착 = 연결이 살아있다는 뜻이므로 타이머를 다시 90초로 늘림
@@ -472,6 +486,21 @@ async function streamGeminiApi(
       }
 
       return fullText;
+    } catch (err: any) {
+      // 스트리밍 도중에 끊긴 경우(유휴 타임아웃 abort, 빈 응답 등) — 연결 시작 시점의 503과
+      // 동일하게 재시도 대상으로 취급한다. 기존엔 이 구간에 catch가 없어서, 정작 idle timeout이
+      // 새로 도입된 목적(오래 걸리는 킬러문항 보호)이 필요한 바로 그 상황에서 재시도가 전혀
+      // 걸리지 않고 바로 실패해버렸다.
+      if (attempt < MAX_RETRIES) {
+        const reason = err?.name === 'AbortError' ? '응답 지연으로 연결 끊김' : (err?.message || '알 수 없는 오류');
+        console.warn(`Gemini 스트리밍 중단(${reason}), ${RETRY_DELAY_MS}ms 후 재시도합니다... (${attempt + 1}/${MAX_RETRIES})`);
+        await sleep(RETRY_DELAY_MS);
+        continue;
+      }
+      if (err?.name === 'AbortError') {
+        throw new Error(`Gemini API 응답이 지연되어 연결이 끊겼습니다. (${modelName})`);
+      }
+      throw err;
     } finally {
       clearTimeout(idleTimeoutId);
     }
