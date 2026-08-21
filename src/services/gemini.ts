@@ -900,8 +900,20 @@ JSON이나 코드블록 없이 순수 텍스트로, 반드시 아래 순서 그�
       return { solvingProcess: '', mistakeSummary: afterSummaryDelim.trim(), finalAnswer };
     }
 
+    const finalSolvingProcess = afterSummaryDelim.slice(solvingDelimIdx + SOLVING_PROCESS_DELIMITER.length).trim();
+
+    // 해설 리포트가 끝까지 완성됐는지 확인. 프롬프트가 항상 마지막 줄에 "[처방 요약]"을 쓰도록
+    // 강제하므로, 정답/요약 구분자는 다 왔는데(=앞부분이라 스트림 초반에 이미 도착) 이 마커가
+    // 없다면 본문(해설)이 다 써지기 전에 스트림이 끊긴 것이다(네트워크/엣지 함수 등).
+    // Gemini 응답 자체가 끊긴 건 finishReason으로 못 잡는다 — done=true는 "정상 종료"와
+    // "연결이 끊겨서 더 이상 못 받음"을 구분하지 못하기 때문에, 우리 프롬프트가 요구하는
+    // 완성 마커로 직접 확인해야 한다. 이 체크 없이는 미완성 해설이 완료된 것처럼 영구히 보였음.
+    if (!finalSolvingProcess.includes('처방 요약')) {
+      throw new Error(`Gemini API 응답이 완성되기 전에 연결이 끊겼습니다. (${resolvedModel})`);
+    }
+
     return {
-      solvingProcess: afterSummaryDelim.slice(solvingDelimIdx + SOLVING_PROCESS_DELIMITER.length).trim(),
+      solvingProcess: finalSolvingProcess,
       mistakeSummary: afterSummaryDelim.slice(0, solvingDelimIdx).trim(),
       finalAnswer
     };
