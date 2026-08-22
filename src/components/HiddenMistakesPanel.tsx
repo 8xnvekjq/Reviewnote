@@ -61,7 +61,7 @@ export const HiddenMistakesPanel: React.FC<HiddenMistakesPanelProps> = ({ mistak
           </div>
           <p className="text-slate-300 font-medium">숨긴 카드가 없습니다</p>
           <p className="text-xs text-slate-500 mt-1.5 max-w-xs leading-relaxed">
-            오답 카드 우측 상단의 👁️ 버튼을 누르면 이번 시험범위가 아닌 문제를 메인 리스트에서 숨길 수 있어요.
+            오답 카드 우측 상단의 🙈 버튼을 누르면 이번 시험범위가 아닌 문제를 메인 리스트에서 숨길 수 있어요.
           </p>
         </div>
       ) : (
@@ -125,7 +125,7 @@ export const HiddenMistakesPanel: React.FC<HiddenMistakesPanelProps> = ({ mistak
                                 }}
                                 className="flex-none px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-slate-900 hover:bg-indigo-600 border border-slate-800 hover:border-indigo-500 text-slate-300 hover:text-white transition-all active:scale-95"
                               >
-                                👁️ 숨김 해제
+                                🙈 숨김 해제
                               </button>
                             </div>
                           ))}

@@ -86,7 +86,7 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
                   : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-600'
               }`}
             >
-              {entry.isHidden ? '🙈' : '👁️'}
+              🙈
             </button>
           )}
           <div className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-950/80 backdrop-blur-sm border ${isCompleted ? 'border-emerald-500/50 text-emerald-400' : 'border-slate-800 text-slate-300'}`}>
