@@ -307,6 +307,7 @@ function App() {
         .from('mistake_scaffoldings')
         .select('*')
         .eq('student_id', userId)
+        .neq('teacher_id', userId) // 본인이 자기 풀이로 셀프 업로드한 건 "선생님 힌트 도착" 알림 대상이 아님
         .or('is_read.is.null,is_read.eq.false')
         .order('created_at', { ascending: false });
 
