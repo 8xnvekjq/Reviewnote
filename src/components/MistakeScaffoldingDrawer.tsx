@@ -19,6 +19,7 @@ interface MistakeScaffoldingDrawerProps {
   studentId: string;
   currentUserId: string;
   isAdmin?: boolean;
+  refreshSignal?: number; // 값이 바뀔 때마다 목록을 다시 불러옴 (예: 외부에서 새 스캐폴딩을 등록했을 때)
 }
 
 export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> = ({
@@ -26,6 +27,7 @@ export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> =
   studentId,
   currentUserId,
   isAdmin = false,
+  refreshSignal,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false); // 📍 디폴트 접힘 상태
   const [scaffoldings, setScaffoldings] = useState<MistakeScaffolding[]>([]);
@@ -68,7 +70,7 @@ export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> =
 
   useEffect(() => {
     fetchScaffoldings();
-  }, [mistakeId]);
+  }, [mistakeId, refreshSignal]);
 
   // 펼쳤을 때 스크롤 위치 조절
   const handleToggleExpand = () => {

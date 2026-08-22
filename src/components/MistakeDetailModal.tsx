@@ -7,6 +7,7 @@ import { supabase } from '../services/supabase';
 import { GACHA_ITEMS, getRarityTheme } from '../utils/gachaCatalog';
 import { CatPawIcon } from './CatPawIcon';
 import { MistakeScaffoldingDrawer } from './MistakeScaffoldingDrawer';
+import { HandwritingOverlay } from './HandwritingOverlay';
 
 interface MistakeDetailModalProps {
   selectedEntry: MistakeEntry;
@@ -63,6 +64,11 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   // 반드시 solvingProcess가 자리표시자가 아닌 실제 내용인지로 판단해야 한다.
   const hasRealAnalysis = (entry: MistakeEntry): entry is MistakeEntry & { analysis: MistakeAnalysis } =>
     !!entry.analysis?.solvingProcess && entry.analysis.solvingProcess !== SOLVING_PLACEHOLDER_TEXT;
+
+  // 손 필기 / 펜슬 풀이 오버레이 — 저장하면 스캐폴딩(본인 풀이)으로 등록되므로,
+  // 저장될 때마다 이 값을 올려서 MistakeScaffoldingDrawer가 목록을 다시 불러오게 한다.
+  const [isHandwritingOpen, setIsHandwritingOpen] = React.useState(false);
+  const [scaffoldingRefreshKey, setScaffoldingRefreshKey] = React.useState(0);
 
   const authorStamp = selectedEntry.userId ? profilesStampMap[selectedEntry.userId] : equippedStamp;
   // 장착한 스탬프의 실제 뽑기 등급(UR/SSR/SR/R)에 맞는 테두리 클래스
@@ -744,11 +750,22 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             onClick={() => setIsZoomOpen(true)}
             className="w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center relative p-2 min-h-[200px] cursor-zoom-in group/img"
           >
-            <img 
-              src={selectedEntry.imageUrl} 
-              alt={selectedEntry.title} 
-              className="w-full h-auto max-h-[60vh] object-contain rounded-xl group-hover/img:opacity-90 transition-opacity" 
+            <img
+              src={selectedEntry.imageUrl}
+              alt={selectedEntry.title}
+              className="w-full h-auto max-h-[60vh] object-contain rounded-xl group-hover/img:opacity-90 transition-opacity"
             />
+            {/* 손 필기 / 펜슬로 간단히 풀어볼 수 있는 필기창 열기 버튼 */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsHandwritingOpen(true);
+              }}
+              title="손 필기 / 펜슬로 풀어보기"
+              className="absolute top-4 right-4 w-9 h-9 rounded-full bg-slate-950/85 border border-slate-800 hover:border-amber-500/60 text-amber-400 hover:text-amber-300 flex items-center justify-center text-base shadow backdrop-blur transition-all active:scale-90 z-10"
+            >
+              ✏️
+            </button>
             {/* 이미지 확대 가이드 골드 배지 (상시 노출 + 노란색/황금색 텍스트) */}
             <div className="absolute bottom-4 left-4 bg-slate-950/85 border border-slate-800/60 rounded-lg px-2 py-0.5 text-[9px] font-black text-amber-400 flex items-center space-x-1 shadow backdrop-blur select-none">
               <span>💡 이미지를 누르면 확대돼요!</span>
@@ -1096,6 +1113,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 studentId={selectedEntry.userId || ''}
                 currentUserId={currentUserId || ''}
                 isAdmin={isAdmin}
+                refreshSignal={scaffoldingRefreshKey}
               />
 
               {/* Card 1: 정석 풀이 과정 */}
@@ -1355,6 +1373,17 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             </button>
           </div>
         </div>
+      )}
+
+      {/* 손 필기 / 펜슬 풀이 오버레이 — 저장하면 스캐폴딩(본인 풀이)으로 등록됨 */}
+      {isHandwritingOpen && (
+        <HandwritingOverlay
+          mistakeId={selectedEntry.id}
+          studentId={selectedEntry.userId || ''}
+          currentUserId={currentUserId || ''}
+          onClose={() => setIsHandwritingOpen(false)}
+          onSaved={() => setScaffoldingRefreshKey(k => k + 1)}
+        />
       )}
     </div>
   );
