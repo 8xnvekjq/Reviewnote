@@ -15,9 +15,10 @@ interface MistakeCardProps {
   isOwnNote?: boolean;    // 내 오답 여부 (admin이 타인 오답 볼 때 false)
   equippedStamp?: string; // 학생이 장착한 레어 도장 (예: 🔥, ⭐, 👑, 🐾, 💎)
   hasScaffolding?: boolean; // 스캐폴딩 힌트(선생님 또는 본인)가 있는지 여부
+  onToggleHidden?: (id: string, hidden: boolean) => void; // 시험범위 제외 등으로 카드 숨기기 (전달 안 되면 버튼 자체를 숨김)
 }
 
-export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDelete, studentName, isOwnNote = true, equippedStamp, hasScaffolding }) => {
+export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDelete, studentName, isOwnNote = true, equippedStamp, hasScaffolding, onToggleHidden }) => {
   const struggleCount = entry.reviews ? entry.reviews.filter(r => r === 'X' || r === 'star').length : 0;
   const isCompleted = entry.reviews && entry.reviews.filter(r => r === 'O').length === 3;
 
@@ -70,11 +71,30 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
             )}
           </div>
         )}
-        <div className={`absolute top-2 right-2 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-950/80 backdrop-blur-sm border ${isCompleted ? 'border-emerald-500/50 text-emerald-400' : 'border-slate-800 text-slate-300'}`}>
-          {isCompleted
-            ? `✅ 완료: ${formatDateTime(entry.updatedAt || entry.date)}`
-            : formatDate(entry.date)
-          }
+        <div className="absolute top-2 right-2 flex items-center space-x-1.5 z-10">
+          {/* 시험범위 제외 등으로 메인 리스트에서 숨기기 (토글, 확인 모달 없이 즉시 전환) */}
+          {onToggleHidden && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleHidden(entry.id, !entry.isHidden);
+              }}
+              title={entry.isHidden ? '숨김 해제' : '시험범위 제외 (숨기기)'}
+              className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] backdrop-blur-sm border transition-all active:scale-90 ${
+                entry.isHidden
+                  ? 'bg-amber-500 border-amber-300 text-white shadow-sm'
+                  : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-600'
+              }`}
+            >
+              {entry.isHidden ? '🙈' : '👁️'}
+            </button>
+          )}
+          <div className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-950/80 backdrop-blur-sm border ${isCompleted ? 'border-emerald-500/50 text-emerald-400' : 'border-slate-800 text-slate-300'}`}>
+            {isCompleted
+              ? `✅ 완료: ${formatDateTime(entry.updatedAt || entry.date)}`
+              : formatDate(entry.date)
+            }
+          </div>
         </div>
         {/* 스캐폴딩 힌트 첨부 여부 (우측 하단 초록 마크) */}
         {hasScaffolding && (

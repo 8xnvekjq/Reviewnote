@@ -182,7 +182,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         <button
           onClick={() => setShowRightDrawer(!showRightDrawer)}
           className={`flex flex-col items-center justify-center w-14 h-11 rounded-xl transition-all ${
-            showRightDrawer || ['stats', 'completed', 'guide', 'scaffolding'].includes(activeTab)
+            showRightDrawer || ['stats', 'completed', 'guide', 'scaffolding', 'hidden'].includes(activeTab)
               ? 'text-purple-400 scale-105 font-black'
               : 'text-slate-500 hover:text-slate-300'
           }`}
@@ -294,7 +294,23 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                 </div>
               </button>
 
-              {/* 5. 더쿠키수학 핵심 수업자료 (모달이라 활성 탭 개념이 없어 항상 중립 톤) */}
+              {/* 5. 🙈 숨긴 카드 관리 */}
+              <button
+                onClick={() => handleSelectMenu('hidden')}
+                className={`w-full p-3.5 rounded-2xl border flex items-center space-x-3.5 transition-all text-left group ${
+                  activeTab === 'hidden'
+                    ? 'bg-indigo-500/10 border-indigo-500/50 text-indigo-300 font-bold shadow-lg shadow-indigo-500/5'
+                    : 'bg-slate-955/60 border-slate-850 hover:border-slate-700 text-slate-300 hover:bg-slate-850'
+                }`}
+              >
+                <span className="text-2xl group-hover:scale-110 transition-transform">🙈</span>
+                <div>
+                  <div className="text-xs font-black">숨긴 카드 관리</div>
+                  <div className="text-[9.5px] text-slate-500 mt-0.5">시험범위 제외 카드 모아보기 & 해제</div>
+                </div>
+              </button>
+
+              {/* 6. 더쿠키수학 핵심 수업자료 (모달이라 활성 탭 개념이 없어 항상 중립 톤) */}
               {onOpenSlideList && (
                 <button
                   onClick={() => {

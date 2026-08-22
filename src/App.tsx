@@ -16,6 +16,7 @@ import { AdminPanel } from './components/AdminPanel';
 import { StudentGuide } from './components/StudentGuide';
 import { LaTeXRenderer } from './components/LaTeXRenderer';
 import { SlideListModal } from './components/SlideListModal';
+import { HiddenMistakesPanel } from './components/HiddenMistakesPanel';
 import { GachaStore } from './components/GachaStore';
 import { RecentActivityFeed } from './components/RecentActivityFeed';
 import { ScaffoldingListPanel } from './components/ScaffoldingListPanel';
@@ -46,6 +47,7 @@ const mapDbMistakeRow = (m: any): MistakeEntry => ({
   rootCauses: m.root_causes || [],
   userActionPlan: m.user_action_plan || undefined,
   teacherScaffoldingHint: m.teacher_scaffolding_hint || undefined,
+  isHidden: m.is_hidden || false, // 구버전 로우(컬럼 추가 전)는 undefined/null -> false로 취급
 });
 
 function App() {
@@ -1439,6 +1441,28 @@ function App() {
     }
   };
 
+  // 시험범위 제외 등으로 오답 카드를 메인 리스트에서 숨기거나(true) 다시 노출(false)
+  const handleToggleHidden = async (id: string, hidden: boolean) => {
+    // 즉시 토글되는 가벼운 액션이라 낙관적으로 로컬 상태부터 반영하고, 실패 시에만 되돌린다.
+    setMistakes(prev => prev.map(m => m.id === id ? { ...m, isHidden: hidden } : m));
+    try {
+      const { error } = await supabase
+        .from('mistakes')
+        .update({ is_hidden: hidden })
+        .eq('id', id);
+      if (error) throw error;
+    } catch (err: any) {
+      console.error('Failed to toggle hidden state:', err);
+      setMistakes(prev => prev.map(m => m.id === id ? { ...m, isHidden: !hidden } : m));
+      showNoticeModal({
+        title: '처리 실패',
+        message: err.message || '숨김 상태 변경 중 오류가 발생했습니다.',
+        badge: '오류',
+        icon: '⚠️',
+      });
+    }
+  };
+
   // Update reviews list in Supabase & local state
   const handleUpdateReviews = async (id: string, newReviews: ReviewState[], skipPointRecalc = false) => {
     try {
@@ -2043,6 +2067,7 @@ function App() {
 
             <MistakeList
               mistakes={[...mistakes]
+                .filter(m => !m.isHidden)
                 .filter(m => !(m.reviews?.filter(r => r === 'O').length === 3))
                 .sort((a, b) => {
                 const aStruggles = a.reviews ? a.reviews.filter(r => r === 'X' || r === 'star').length : 0;
@@ -2067,13 +2092,14 @@ function App() {
             equippedStamp={equippedItems.stamp}
             profilesStampMap={profilesStampMap}
             scaffoldedMistakeIds={scaffoldedMistakeIds}
+            onToggleHidden={handleToggleHidden}
           />
           </>
         )}
 
         {activeTab === 'completed' && (
           <MistakeList
-            mistakes={mistakes.filter(m => {
+            mistakes={mistakes.filter(m => !m.isHidden).filter(m => {
               const oCount = m.reviews?.filter(r => r === 'O').length || 0;
               if (oCount === 3) return true; // 3차 완주는 상시 노출
               
@@ -2114,6 +2140,17 @@ function App() {
           <CameraScanner 
             onCapture={handleCameraCapture}
             onClose={() => setActiveTab('notes')}
+          />
+        )}
+
+        {activeTab === 'hidden' && (
+          <HiddenMistakesPanel
+            mistakes={mistakes.filter(m => m.isHidden)}
+            onSelectEntry={(entry) => {
+              setIsReviewSession(false);
+              setSelectedEntry(entry);
+            }}
+            onUnhide={(id) => handleToggleHidden(id, false)}
           />
         )}
 

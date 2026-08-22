@@ -26,6 +26,7 @@ interface MistakeListProps {
   equippedStamp?: string;
   profilesStampMap?: Record<string, string>;
   scaffoldedMistakeIds?: Set<string>;
+  onToggleHidden?: (id: string, hidden: boolean) => void; // 시험범위 제외 등으로 카드 숨기기/해제
 }
 
 export const MistakeList: React.FC<MistakeListProps> = ({
@@ -50,6 +51,7 @@ export const MistakeList: React.FC<MistakeListProps> = ({
   equippedStamp,
   profilesStampMap = {},
   scaffoldedMistakeIds,
+  onToggleHidden,
 }) => {
   const [selectedStudent, setSelectedStudent] = useState<string>('all');
   const [filterGrade, setFilterGrade] = useState<string>('all');
@@ -465,6 +467,7 @@ export const MistakeList: React.FC<MistakeListProps> = ({
                   isOwnNote={!isAdmin || entry.userId === currentUserId}
                   equippedStamp={entry.userId ? profilesStampMap[entry.userId] : equippedStamp}
                   hasScaffolding={scaffoldedMistakeIds?.has(entry.id)}
+                  onToggleHidden={onToggleHidden}
                 />
               ))}
             </div>

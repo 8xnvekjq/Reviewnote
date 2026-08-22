@@ -91,9 +91,10 @@ export interface MistakeEntry {
   rootCauses?: string[];
   userActionPlan?: string;
   teacherScaffoldingHint?: string;
+  isHidden?: boolean;       // 시험범위 제외 등으로 메인 리스트에서 숨김 처리됐는지 (구버전 데이터는 undefined -> false 취급)
 }
 
-export type ActiveTab = 'notes' | 'completed' | 'camera' | 'stats' | 'admin' | 'guide' | 'store' | 'activity' | 'scaffolding';
+export type ActiveTab = 'notes' | 'completed' | 'camera' | 'stats' | 'admin' | 'guide' | 'store' | 'activity' | 'scaffolding' | 'hidden';
 
 export type GachaRarity = 'MR' | 'UR' | 'SSR' | 'SR' | 'R';
 export type GachaCategory = 'STAMP' | 'TITLE' | 'THEME' | 'SHIELD' | 'AI_VOICE' | 'CHARM';
