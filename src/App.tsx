@@ -417,12 +417,11 @@ function App() {
         if (medalError) console.error('Failed to finalize weekly medals:', medalError);
       });
 
-      // 이번 주 랭킹 뷰 조회. 지난주 점수를 이월해서 채워 넣지 않는다 — 이번 주에 아무것도
+      // 이번 주 안전한 랭킹 RPC 조회. 지난주 점수를 이월해서 채워 넣지 않는다 — 이번 주에 아무것도
       // 안 한 학생이 지난주 성적 덕에 명예의전당에 끼어 있으면 "이번 주 노력"의 의미가 없어진다.
       // 실제로 이번 주 활동한 사람만, 그 인원이 1~2명뿐이어도 그대로 보여준다.
       const { data, error } = await supabase
-        .from('weekly_leaderboard')
-        .select('*')
+        .rpc('get_weekly_leaderboard')
         .order('score', { ascending: false });
 
       if (error) throw error;
@@ -964,12 +963,11 @@ function App() {
 
 
 
-  // Fetch recent peer review activities from read-only VIEW
+  // Fetch recent peer review activities through the authenticated safe RPC.
   const fetchPeerActivities = async () => {
     try {
       const { data, error } = await supabase
-        .from('recent_peer_activities')
-        .select('*')
+        .rpc('get_recent_peer_activities')
         .limit(10);
 
       if (error) throw error;

@@ -56,8 +56,7 @@ export const RecentActivityFeed: React.FC = () => {
   const fetchEvents = async () => {
     try {
       const { data, error: fetchError } = await supabase
-        .from('recent_activity_feed')
-        .select('*')
+        .rpc('get_recent_activity_feed')
         .limit(100);
       if (fetchError) throw fetchError;
       setEvents(data || []);
