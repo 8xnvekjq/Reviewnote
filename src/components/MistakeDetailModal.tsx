@@ -1,4 +1,5 @@
 import React, { useRef } from 'react';
+import { createPortal } from 'react-dom';
 import type { MistakeEntry, MistakeAnalysis, ReviewState } from '../types';
 import { ROOT_CAUSE_OPTIONS, MATH_CURRICULUM, GRADE_LIST, SOLVING_PLACEHOLDER_TEXT } from '../types';
 import { LaTeXRenderer } from './LaTeXRenderer';
@@ -35,6 +36,50 @@ const getInitialPhrases = (personaName: string) => [
   `${personaName}가 문제 이미지를 열심히 판독하고 있어요... 🔍`,
   `${personaName}가 수학 수식과 기호들을 꼼꼼하게 정리하고 있어요. ✍️`
 ];
+
+type ImageWindowResizeCorner = 'nw' | 'ne' | 'sw' | 'se';
+
+interface ImageWindowLayout {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+const IMAGE_WINDOW_MIN_SIZE = { width: 300, height: 240 };
+
+const IMAGE_WINDOW_RESIZE_HANDLES: Array<{
+  corner: ImageWindowResizeCorner;
+  label: string;
+  className: string;
+  iconClassName: string;
+}> = [
+  { corner: 'nw', label: '왼쪽 위에서 문제창 크기 조절', className: 'left-0 top-0 cursor-nwse-resize items-start justify-start', iconClassName: 'border-l-2 border-t-2 rounded-tl-sm' },
+  { corner: 'ne', label: '오른쪽 위에서 문제창 크기 조절', className: 'right-0 top-0 cursor-nesw-resize items-start justify-end', iconClassName: 'border-r-2 border-t-2 rounded-tr-sm' },
+  { corner: 'sw', label: '왼쪽 아래에서 문제창 크기 조절', className: 'left-0 bottom-0 cursor-nesw-resize items-end justify-start', iconClassName: 'border-l-2 border-b-2 rounded-bl-sm' },
+  { corner: 'se', label: '오른쪽 아래에서 문제창 크기 조절', className: 'right-0 bottom-0 cursor-nwse-resize items-end justify-end', iconClassName: 'border-r-2 border-b-2 rounded-br-sm' },
+];
+
+const getInitialImageWindowLayout = (): ImageWindowLayout => {
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const margin = viewportWidth >= 900 ? 20 : 8;
+  const width = Math.max(
+    IMAGE_WINDOW_MIN_SIZE.width,
+    Math.min(viewportWidth - margin * 2, viewportWidth >= 900 ? Math.round(viewportWidth * 0.48) : viewportWidth - margin * 2, 680),
+  );
+  const height = Math.max(
+    IMAGE_WINDOW_MIN_SIZE.height,
+    Math.min(viewportHeight - margin * 2, viewportWidth >= 900 ? viewportHeight - 100 : Math.round(viewportHeight * 0.55), 620),
+  );
+
+  return {
+    left: margin,
+    top: viewportWidth >= 900 ? 64 : margin,
+    width,
+    height,
+  };
+};
 
 export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   selectedEntry,
@@ -95,10 +140,25 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   const [isZoomOpen, setIsZoomOpen] = React.useState(false);
   const [scale, setScale] = React.useState(1);
   const [position, setPosition] = React.useState({ x: 0, y: 0 });
+  const [imageWindowLayout, setImageWindowLayout] = React.useState<ImageWindowLayout>(getInitialImageWindowLayout);
   const touchStartRef = React.useRef({ x: 0, y: 0 });
   const initialDistanceRef = React.useRef(0);
   const initialScaleRef = React.useRef(1);
   const isDraggingRef = React.useRef(false);
+  const imageWindowDragRef = React.useRef({
+    dragging: false,
+    startX: 0,
+    startY: 0,
+    originLeft: 0,
+    originTop: 0,
+  });
+  const imageWindowResizeRef = React.useRef({
+    resizing: false,
+    corner: 'se' as ImageWindowResizeCorner,
+    startX: 0,
+    startY: 0,
+    origin: { left: 0, top: 0, width: 0, height: 0 },
+  });
 
   // Accordion toggle states
   const [showProblemText, setShowProblemText] = React.useState(false);
@@ -190,6 +250,129 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
       setScale(1);
       setPosition({ x: 0, y: 0 });
     }
+  };
+
+  const safeSetPointerCapture = (element: HTMLElement, pointerId: number) => {
+    try {
+      element.setPointerCapture(pointerId);
+    } catch (error) {
+      console.warn('Problem image pointer capture failed:', error);
+    }
+  };
+
+  const resetImageZoom = () => {
+    setScale(1);
+    setPosition({ x: 0, y: 0 });
+  };
+
+  const openImageWindow = () => {
+    if (!isZoomOpen) {
+      setImageWindowLayout(getInitialImageWindowLayout());
+      resetImageZoom();
+    }
+    setIsZoomOpen(true);
+  };
+
+  const closeImageWindow = () => {
+    setIsZoomOpen(false);
+    resetImageZoom();
+  };
+
+  const updateImageScale = (nextScale: number) => {
+    const boundedScale = Math.max(1, Math.min(4.5, nextScale));
+    setScale(boundedScale);
+    if (boundedScale === 1) setPosition({ x: 0, y: 0 });
+  };
+
+  const handleImageWindowDragStart = (e: React.PointerEvent<HTMLDivElement>) => {
+    imageWindowDragRef.current = {
+      dragging: true,
+      startX: e.clientX,
+      startY: e.clientY,
+      originLeft: imageWindowLayout.left,
+      originTop: imageWindowLayout.top,
+    };
+    safeSetPointerCapture(e.currentTarget, e.pointerId);
+  };
+
+  const handleImageWindowDragMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const state = imageWindowDragRef.current;
+    if (!state.dragging) return;
+    const margin = 8;
+    const nextLeft = Math.max(
+      margin,
+      Math.min(window.innerWidth - imageWindowLayout.width - margin, state.originLeft + e.clientX - state.startX),
+    );
+    const nextTop = Math.max(
+      margin,
+      Math.min(window.innerHeight - imageWindowLayout.height - margin, state.originTop + e.clientY - state.startY),
+    );
+    setImageWindowLayout((layout) => ({ ...layout, left: nextLeft, top: nextTop }));
+  };
+
+  const handleImageWindowDragEnd = () => {
+    imageWindowDragRef.current.dragging = false;
+  };
+
+  const handleImageWindowResizeStart = (
+    e: React.PointerEvent<HTMLButtonElement>,
+    corner: ImageWindowResizeCorner,
+  ) => {
+    e.stopPropagation();
+    imageWindowResizeRef.current = {
+      resizing: true,
+      corner,
+      startX: e.clientX,
+      startY: e.clientY,
+      origin: imageWindowLayout,
+    };
+    safeSetPointerCapture(e.currentTarget, e.pointerId);
+  };
+
+  const handleImageWindowResizeMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const state = imageWindowResizeRef.current;
+    if (!state.resizing) return;
+    const margin = 8;
+    const dx = e.clientX - state.startX;
+    const dy = e.clientY - state.startY;
+    const usesWest = state.corner.includes('w');
+    const usesNorth = state.corner.includes('n');
+    let nextLeft = state.origin.left;
+    let nextTop = state.origin.top;
+    let nextWidth = state.origin.width;
+    let nextHeight = state.origin.height;
+
+    if (usesWest) {
+      nextLeft = Math.max(
+        margin,
+        Math.min(state.origin.left + state.origin.width - IMAGE_WINDOW_MIN_SIZE.width, state.origin.left + dx),
+      );
+      nextWidth = state.origin.width + state.origin.left - nextLeft;
+    } else {
+      nextWidth = Math.max(
+        IMAGE_WINDOW_MIN_SIZE.width,
+        Math.min(window.innerWidth - state.origin.left - margin, state.origin.width + dx),
+      );
+    }
+
+    if (usesNorth) {
+      nextTop = Math.max(
+        margin,
+        Math.min(state.origin.top + state.origin.height - IMAGE_WINDOW_MIN_SIZE.height, state.origin.top + dy),
+      );
+      nextHeight = state.origin.height + state.origin.top - nextTop;
+    } else {
+      nextHeight = Math.max(
+        IMAGE_WINDOW_MIN_SIZE.height,
+        Math.min(window.innerHeight - state.origin.top - margin, state.origin.height + dy),
+      );
+    }
+
+    setImageWindowLayout({ left: nextLeft, top: nextTop, width: nextWidth, height: nextHeight });
+  };
+
+  const handleImageWindowResizeEnd = () => {
+    imageWindowResizeRef.current.resizing = false;
   };
 
   const chaptersForGrade = editGrade ? (MATH_CURRICULUM[editGrade] || []) : [];
@@ -747,7 +930,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
           
           {/* Problem Image Preview */}
           <div 
-            onClick={() => setIsZoomOpen(true)}
+            onClick={openImageWindow}
             className="w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center relative p-2 min-h-[200px] cursor-zoom-in group/img"
           >
             <img
@@ -759,8 +942,11 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             <button
               onClick={(e) => {
                 e.stopPropagation();
+                openImageWindow();
                 setIsHandwritingOpen(true);
               }}
+              type="button"
+              aria-label="문제 이미지와 손 필기창 함께 열기"
               title="손 필기 / 펜슬로 풀어보기"
               className="absolute top-4 right-4 w-9 h-9 rounded-full bg-slate-950/85 border border-slate-800 hover:border-amber-500/60 text-amber-400 hover:text-amber-300 flex items-center justify-center text-base shadow backdrop-blur transition-all active:scale-90 z-10"
             >
@@ -1300,40 +1486,117 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
       </div>
 
-      {/* 이미지 전체화면 확대 모달 (두 손가락 Pinch-to-zoom 제스처 지원 + 풀스크린 오버레이 방식) */}
-      {isZoomOpen && (
-        <div 
-          className="fixed inset-0 z-50 bg-black/98 flex items-center justify-center animate-fade-in cursor-zoom-out"
-          onClick={() => {
-            setIsZoomOpen(false);
-            setScale(1);
-            setPosition({ x: 0, y: 0 });
-          }}
-        >
-          {/* Image Container (Touch 제스처 이벤트 바인딩 - 스크린 100% 꽉 채우기) */}
-          <div 
-            className="absolute inset-0 flex items-center justify-center touch-none select-none"
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
+      {/* 이동·크기 조절이 가능한 문제 참고창. 필기창과 동시에 조작할 수 있도록 배경은 클릭을 가로채지 않는다. */}
+      {isZoomOpen && createPortal(
+        <div className="fixed inset-0 z-[9997] pointer-events-none">
+          <section
+            role="dialog"
+            aria-label="문제 이미지 참고창"
+            aria-modal="false"
+            className="absolute flex flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-950 shadow-2xl pointer-events-auto animate-fade-in"
+            style={{
+              left: imageWindowLayout.left,
+              top: imageWindowLayout.top,
+              width: imageWindowLayout.width,
+              height: imageWindowLayout.height,
+            }}
           >
-            <img 
-              src={selectedEntry.imageUrl} 
-              alt="확대된 문제 이미지" 
-              className="max-w-full max-h-full object-contain pointer-events-none select-none"
-              style={{
-                transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+            <div
+              onPointerDown={handleImageWindowDragStart}
+              onPointerMove={handleImageWindowDragMove}
+              onPointerUp={handleImageWindowDragEnd}
+              onPointerCancel={handleImageWindowDragEnd}
+              className="flex h-11 flex-none cursor-move touch-none select-none items-center justify-between gap-2 border-b border-slate-800 bg-slate-950 px-10"
+            >
+              <div className="min-w-0">
+                <p className="truncate text-[11px] font-black text-slate-200">🖼️ 문제 이미지</p>
+                <p className="hidden truncate text-[8px] font-bold text-slate-500 sm:block">상단 바를 끌어 이동 · 모서리를 끌어 크기 조절</p>
+              </div>
+              <div className="flex flex-none items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={resetImageZoom}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  aria-label="문제 이미지 확대 초기화"
+                  title="확대 초기화"
+                  className="h-7 rounded-lg border border-slate-800 bg-slate-900 px-2 text-[9px] font-black text-slate-400 transition-colors hover:text-white"
+                >
+                  맞춤
+                </button>
+                <button
+                  type="button"
+                  onClick={closeImageWindow}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  aria-label="문제 이미지 참고창 닫기"
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-800 text-[10px] font-bold text-slate-400 transition-colors hover:bg-slate-700 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            <div
+              className="relative flex min-h-0 flex-1 touch-none select-none items-center justify-center overflow-hidden bg-black"
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+              onTouchCancel={handleTouchEnd}
+              onDoubleClick={resetImageZoom}
+              onWheel={(e) => {
+                e.preventDefault();
+                updateImageScale(scale + (e.deltaY < 0 ? 0.2 : -0.2));
               }}
-            />
-          </div>
-          
-          {/* Bottom Bar indicator Floating */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 select-none pointer-events-none">
-            <span className="text-[9.5px] text-slate-400 font-extrabold bg-slate-950/85 px-4 py-1.5 rounded-full border border-slate-850 shadow-lg backdrop-blur-md pointer-events-auto">
-              배율: {scale.toFixed(1)}x
-            </span>
-          </div>
-        </div>
+            >
+              <img
+                src={selectedEntry.imageUrl}
+                alt="확대된 문제 이미지"
+                draggable={false}
+                className="max-h-full max-w-full pointer-events-none select-none object-contain"
+                style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})` }}
+              />
+            </div>
+
+            <div className="flex h-11 flex-none items-center justify-between gap-2 border-t border-slate-800 bg-slate-950 px-10">
+              <span className="truncate text-[8px] font-bold text-slate-500">두 손가락 확대 · 확대 후 한 손가락 이동</span>
+              <div className="flex flex-none items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => updateImageScale(scale - 0.25)}
+                  aria-label="문제 이미지 축소"
+                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-800 bg-slate-900 text-xs font-black text-slate-300 hover:text-white"
+                >
+                  −
+                </button>
+                <span className="w-11 text-center text-[9px] font-black text-amber-400">{scale.toFixed(1)}x</span>
+                <button
+                  type="button"
+                  onClick={() => updateImageScale(scale + 0.25)}
+                  aria-label="문제 이미지 확대"
+                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-800 bg-slate-900 text-xs font-black text-slate-300 hover:text-white"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+
+            {IMAGE_WINDOW_RESIZE_HANDLES.map((handle) => (
+              <button
+                key={handle.corner}
+                type="button"
+                aria-label={handle.label}
+                title={handle.label}
+                onPointerDown={(e) => handleImageWindowResizeStart(e, handle.corner)}
+                onPointerMove={handleImageWindowResizeMove}
+                onPointerUp={handleImageWindowResizeEnd}
+                onPointerCancel={handleImageWindowResizeEnd}
+                className={`absolute z-20 flex h-9 w-9 touch-none p-1.5 text-slate-500 transition-colors hover:text-amber-300 focus-visible:text-amber-300 focus-visible:outline-none ${handle.className}`}
+              >
+                <span className={`block h-3.5 w-3.5 border-current ${handle.iconClassName}`} />
+              </button>
+            ))}
+          </section>
+        </div>,
+        document.body,
       )}
 
       {/* Next 화살표 버튼 (복습하기 세션 때만 우측 스크린 하단에 플로팅 + 크기만 컴팩트화) */}
