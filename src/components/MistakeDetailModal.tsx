@@ -1523,15 +1523,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 >
                   맞춤
                 </button>
-                <button
-                  type="button"
-                  onClick={closeImageWindow}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  aria-label="문제 이미지 참고창 닫기"
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-800 text-[10px] font-bold text-slate-400 transition-colors hover:bg-slate-700 hover:text-white"
-                >
-                  ✕
-                </button>
               </div>
             </div>
 
@@ -1556,8 +1547,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
               />
             </div>
 
-            <div className="flex h-11 flex-none items-center justify-between gap-2 border-t border-slate-800 bg-slate-950 px-10">
-              <span className="truncate text-[8px] font-bold text-slate-500">두 손가락 확대 · 확대 후 한 손가락 이동</span>
+            <div className="flex h-14 flex-none items-center justify-between gap-3 border-t border-slate-800 bg-slate-950 px-10">
               <div className="flex flex-none items-center gap-1">
                 <button
                   type="button"
@@ -1577,6 +1567,15 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                   +
                 </button>
               </div>
+              <button
+                type="button"
+                onClick={closeImageWindow}
+                aria-label="문제 이미지 참고창 닫기"
+                className="flex h-9 flex-none items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3 text-[10px] font-black text-slate-200 transition-all hover:border-rose-400/50 hover:bg-rose-500/15 hover:text-rose-200 active:scale-95"
+              >
+                <span aria-hidden="true">✕</span>
+                <span>문제창 닫기</span>
+              </button>
             </div>
 
             {IMAGE_WINDOW_RESIZE_HANDLES.map((handle) => (
