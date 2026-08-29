@@ -31,3 +31,11 @@ dist-ssr
 
 # Local drafts and backups for YouTube integration
 youtube_backup_draft/
+
+# Personal AI-agent settings
+.claude/launch.json
+.claude/loop.md
+CLAUDE.md
+
+# Local HTML study materials
+html/
