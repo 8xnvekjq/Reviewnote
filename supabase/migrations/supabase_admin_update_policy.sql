@@ -3,9 +3,9 @@ DROP POLICY IF EXISTS "Admins can update all profiles" ON public.profiles;
 
 CREATE POLICY "Admins can update all profiles" ON public.profiles
   FOR UPDATE USING (
-    id = auth.uid() OR 
-    (auth.jwt() ->> 'email') LIKE '8xnvekjq%'
+    id = (SELECT auth.uid()) OR
+    (SELECT private.is_current_user_admin())
   ) WITH CHECK (
-    id = auth.uid() OR 
-    (auth.jwt() ->> 'email') LIKE '8xnvekjq%'
+    id = (SELECT auth.uid()) OR
+    (SELECT private.is_current_user_admin())
   );

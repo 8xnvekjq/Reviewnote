@@ -11,6 +11,6 @@ DROP POLICY IF EXISTS "Scaffoldings update policy" ON public.mistake_scaffolding
 CREATE POLICY "Scaffoldings update policy"
   ON public.mistake_scaffoldings FOR UPDATE
   USING (
-    auth.uid() = student_id
-    OR EXISTS (SELECT 1 FROM public.profiles WHERE profiles.id = auth.uid() AND profiles.is_admin = true)
+    (SELECT auth.uid()) = student_id
+    OR (SELECT private.is_current_user_admin())
   );

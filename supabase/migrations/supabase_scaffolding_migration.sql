@@ -23,27 +23,27 @@ DROP POLICY IF EXISTS "Scaffoldings insert policy" ON public.mistake_scaffolding
 DROP POLICY IF EXISTS "Scaffoldings delete policy" ON public.mistake_scaffoldings;
 
 -- 4. Create RLS Policies: Students see their own mistake scaffoldings; Teachers (admins) see/manage all.
--- 관리자 판별은 하드코딩된 이메일 패턴이 아니라 profiles.is_admin으로 하여, 관리자 계정이
--- 추가되어도 별도 수정 없이 정상 동작하도록 한다.
+-- 관리자 판별은 학생이 수정 가능한 profiles.is_admin이 아니라 비공개 관리자 명단을 사용한다.
+-- 학생/교사의 기존 양방향 힌트 접근 조건은 그대로 유지한다.
 CREATE POLICY "Scaffoldings select policy"
   ON public.mistake_scaffoldings FOR SELECT
   USING (
-    auth.uid() = student_id
-    OR EXISTS (SELECT 1 FROM public.profiles WHERE profiles.id = auth.uid() AND profiles.is_admin = true)
+    (SELECT auth.uid()) = student_id
+    OR (SELECT private.is_current_user_admin())
   );
 
 CREATE POLICY "Scaffoldings insert policy"
   ON public.mistake_scaffoldings FOR INSERT
   WITH CHECK (
-    auth.uid() = teacher_id
-    OR EXISTS (SELECT 1 FROM public.profiles WHERE profiles.id = auth.uid() AND profiles.is_admin = true)
+    (SELECT auth.uid()) = teacher_id
+    OR (SELECT private.is_current_user_admin())
   );
 
 CREATE POLICY "Scaffoldings delete policy"
   ON public.mistake_scaffoldings FOR DELETE
   USING (
-    auth.uid() = teacher_id
-    OR EXISTS (SELECT 1 FROM public.profiles WHERE profiles.id = auth.uid() AND profiles.is_admin = true)
+    (SELECT auth.uid()) = teacher_id
+    OR (SELECT private.is_current_user_admin())
   );
 
 -- 5. Grant permissions to authenticated role

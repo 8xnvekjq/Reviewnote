@@ -8,16 +8,16 @@ DROP POLICY IF EXISTS "Admins can read all profiles" ON public.profiles;
 DROP POLICY IF EXISTS "Admins can read all mistakes" ON public.mistakes;
 DROP FUNCTION IF EXISTS public.is_admin();
 
--- 2. Create clean, recursion-free RLS policies using JWT metadata
--- This completely avoids querying the profiles table during policy checks.
+-- 2. Create clean, recursion-free RLS policies using the private admin allow-list.
+-- Requires 20260828181839_secure_admin_authorization.sql to be applied first.
 CREATE POLICY "Admins can read all profiles" ON public.profiles
   FOR SELECT USING (
-    id = auth.uid() OR 
-    (auth.jwt() ->> 'email') LIKE '8xnvekjq%'
+    id = (SELECT auth.uid()) OR
+    (SELECT private.is_current_user_admin())
   );
 
 CREATE POLICY "Admins can read all mistakes" ON public.mistakes
   FOR SELECT USING (
-    auth.uid() = user_id OR 
-    (auth.jwt() ->> 'email') LIKE '8xnvekjq%'
+    (SELECT auth.uid()) = user_id OR
+    (SELECT private.is_current_user_admin())
   );

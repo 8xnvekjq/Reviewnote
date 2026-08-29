@@ -19,4 +19,7 @@
 -- DELETE 정책에도 추가.
 
 CREATE POLICY "Admins can delete all mistakes" ON public.mistakes
-  FOR DELETE USING (auth.uid() = user_id OR (auth.jwt() ->> 'email') LIKE '8xnvekjq%');
+  FOR DELETE USING (
+    (SELECT auth.uid()) = user_id
+    OR (SELECT private.is_current_user_admin())
+  );

@@ -3,9 +3,9 @@ DROP POLICY IF EXISTS "Admins can update all mistakes" ON public.mistakes;
 
 CREATE POLICY "Admins can update all mistakes" ON public.mistakes
   FOR UPDATE USING (
-    auth.uid() = user_id OR 
-    (auth.jwt() ->> 'email') LIKE '8xnvekjq%'
+    (SELECT auth.uid()) = user_id OR
+    (SELECT private.is_current_user_admin())
   ) WITH CHECK (
-    auth.uid() = user_id OR 
-    (auth.jwt() ->> 'email') LIKE '8xnvekjq%'
+    (SELECT auth.uid()) = user_id OR
+    (SELECT private.is_current_user_admin())
   );

@@ -50,6 +50,17 @@ const mapDbMistakeRow = (m: any): MistakeEntry => ({
   isHidden: m.is_hidden || false, // 구버전 로우(컬럼 추가 전)는 undefined/null -> false로 취급
 });
 
+interface ProfileDirectoryRow {
+  id: string;
+  username: string | null;
+  nickname: string | null;
+  display_name: string | null;
+  school_grade: string | null;
+  last_seen_at: string | null;
+  equipped_title: string | null;
+  equipped_stamp: string | null;
+}
+
 function App() {
   // If Supabase credentials are not configured, block and show the setup guide
   if (!isSupabaseConfigured) {
@@ -436,16 +447,15 @@ function App() {
     }
   };
 
-  // Check admin status from profiles table
-  const fetchAdminStatus = async (userId: string) => {
+  // Check admin status against the private server-side allow-list.
+  // profiles.is_admin is retained only as a synchronized display/filter field.
+  const fetchAdminStatus = async () => {
     try {
-      const { data } = await supabase
-        .from('profiles')
-        .select('is_admin')
-        .eq('id', userId)
-        .single();
-      setIsAdmin(data?.is_admin === true);
-    } catch {
+      const { data, error } = await supabase.rpc('is_current_user_admin');
+      if (error) throw error;
+      setIsAdmin(data === true);
+    } catch (err) {
+      console.error('Failed to verify admin status:', err);
       setIsAdmin(false);
     }
   };
@@ -542,7 +552,7 @@ function App() {
         const username = session.user.email?.split('@')[0] || 'User';
         setCurrentUser(username);
         fetchUserData(session.user.id); // 내부에서 loadWeeklyChampions/fetchPeerActivities도 같이 호출함
-        fetchAdminStatus(session.user.id);
+        fetchAdminStatus();
         loadYoutubeLectures(); // 유튜브 강의 데이터 로드
         loadTeacherApproachGuides(); // 단원별 선생님 강의 접근법 가이드 로드
         fetchDiagnosisStats(); // 평균 진단 소요시간 조회
@@ -620,20 +630,19 @@ function App() {
     const fetchOnlineUsers = async () => {
       try {
         const fiveMinutesAgo = new Date(Date.now() - 300000).toISOString();
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, display_name, nickname, email')
-          .gte('last_seen_at', fiveMinutesAgo)
-          .eq('is_admin', false); // 학생들만 집계
+        const { data, error } = await supabase.rpc('get_profile_directory');
 
         if (error) throw error;
         if (data) {
-          const mapped = data.map(p => ({
-            id: p.id,
-            display_name: p.display_name,
-            nickname: p.nickname,
-            username: p.email?.split('@')[0] || 'User'
-          }));
+          const directory = data as ProfileDirectoryRow[];
+          const mapped = directory
+            .filter(p => !!p.last_seen_at && p.last_seen_at >= fiveMinutesAgo)
+            .map(p => ({
+              id: p.id,
+              display_name: p.display_name,
+              nickname: p.nickname,
+              username: p.username || 'User'
+            }));
           setOnlineUsers(mapped);
         }
       } catch (err) {
@@ -683,8 +692,8 @@ function App() {
               .eq('id', targetId)
               .maybeSingle()
           : Promise.resolve({ data: null } as { data: null }),
-        // Fetch all profiles for admin name mapping (display_name, school_grade, equipped_stamp 포함)
-        supabase.from('profiles').select('id, email, display_name, school_grade, equipped_stamp'),
+        // 이름·학년·스탬프만 노출하는 안전한 학생 디렉터리 RPC
+        supabase.rpc('get_profile_directory'),
         // 스캐폴딩 힌트가 첨부된 오답 id 집합 (RLS가 본인 것만/관리자는 전체를 알아서 걸러줌)
         supabase.from('mistake_scaffoldings').select('mistake_id'),
       ]);
@@ -755,12 +764,12 @@ function App() {
         checkAiNameChangeTicket(targetId);
       }
 
-      const profiles = allProfilesRes.data;
+      const profiles = (allProfilesRes.data || []) as ProfileDirectoryRow[];
       const pMap: Record<string, string> = {};
       const gMap: Record<string, string> = {};
       const sMap: Record<string, string> = {};
-      (profiles || []).forEach((p: any) => {
-        const username = p.email?.split('@')[0] || p.id.slice(0, 8);
+      profiles.forEach((p) => {
+        const username = p.username || p.id.slice(0, 8);
         const displayName = p.display_name?.trim();
         pMap[p.id] = displayName ? `${displayName} (${username})` : username;
         gMap[p.id] = p.school_grade || '';

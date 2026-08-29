@@ -21,13 +21,6 @@ export interface GachaLogEntry {
   created_at: string;
   user_name?: string;
   user_title?: string;
-  profiles?: {
-    nickname?: string;
-    display_name?: string;
-    equipped_title?: string;
-    email?: string;
-    is_admin?: boolean;
-  };
 }
 
 const getRefundPointsForRarity = (rarity: string): number => {
@@ -148,23 +141,13 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
     try {
       const { data, error } = await supabase
         .from('gacha_logs')
-        .select('id, user_id, item_name, item_icon, rarity, created_at, user_name, user_title, profiles(nickname, display_name, equipped_title, email, is_admin)')
+        .select('id, user_id, item_name, item_icon, rarity, created_at, user_name, user_title')
         .order('created_at', { ascending: false })
         .limit(10);
 
       if (error) throw error;
-
-      // 어드민 및 test/8xnvekjq 계정 필터링
-      const filtered = (data || []).filter((log: any) => {
-        const p = log.profiles;
-        if (!p) return true;
-        if (p.is_admin) return false;
-        const email = (p.email || '').toLowerCase();
-        if (email.startsWith('test') || email.startsWith('8xnvekjq')) return false;
-        return true;
-      });
-
-      setRecentLogs(filtered as unknown as GachaLogEntry[]);
+      // 표시 이름/칭호는 로그 생성 시 저장된 안전한 스냅샷을 사용한다.
+      setRecentLogs((data || []) as GachaLogEntry[]);
     } catch (err) {
       console.error('전광판 피드 로드 실패:', err);
     }
@@ -902,8 +885,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
               ) : (
                 <div className="space-y-2">
                   {recentLogs.map(log => {
-                    const p = log.profiles;
-                    const userName = log.user_name || p?.nickname || p?.display_name || '학생';
+                    const userName = log.user_name || '학생';
                     const isUR = log.rarity === 'UR';
                     const rTheme = getRarityTheme(log.rarity as any);
 
