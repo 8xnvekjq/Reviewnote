@@ -79,6 +79,10 @@ function App() {
   // 그러면 A를 진단하는 중 다른(B) 카드를 열어도 B에 가짜로 로딩 스피너가 뜨다가 조용히
   // 사라지는 버그가 있었다(전역 상태라 "누구를 진단 중인지"를 구분 못 했음).
   const [analyzingEntryId, setAnalyzingEntryId] = useState<string | null>(null);
+  // handleStartAnalysis의 중복 실행 가드용. state는 클로저마다(특히 재시도처럼 실패
+  // 시점에 만들어진 오래된 클로저에서) 그 함수가 "정의된 렌더 시점"의 값에 고정되어
+  // 최신 실행 여부를 알 수 없다 — ref는 모든 클로저가 항상 같은 최신 값을 본다.
+  const analyzingEntryIdRef = useRef<string | null>(null);
 
   // 매일 연속 복습 스트릭 상태 (🔥 Streak 관리)
   const [streakState, setStreakState] = useState<StreakState>(() => loadStreakState());
@@ -1012,9 +1016,13 @@ function App() {
 
   // Start analysis trigger (Gemini API 키는 서버(Edge Function)에서만 다루므로 클라이언트는 신경쓸 필요 없음)
   const handleStartAnalysis = async (entry: MistakeEntry) => {
-    // 이미 다른 오답을 진단 중이면 중복 실행(더블탭 등)을 막는다 — 같은 항목에 두 번 걸리면
-    // 두 결과가 뒤섞여 DB에 저장될 수 있었고, 비용도 이중으로 나갔다.
-    if (analyzingEntryId) return;
+    // 이미 다른 오답을 진단 중이면 중복 실행(더블탭, 실패 후 재시도 연타 등)을 막는다 —
+    // 같은 항목에 두 번 걸리면 두 결과가 뒤섞여 DB에 저장될 수 있었고, 비용도 이중으로 나갔다.
+    // ref로 체크하는 이유는 이 함수 자체가 "재시도" 버튼처럼 예전 렌더에서 만들어진
+    // 클로저를 통해 다시 호출될 수 있기 때문 — state였다면 그 오래된 클로저는 자신이
+    // 정의된 시점의 값에 고정되어 있어 현재 진행 중인 분석을 못 보고 가드를 통과해버린다.
+    if (analyzingEntryIdRef.current) return;
+    analyzingEntryIdRef.current = entry.id;
     setAnalyzingEntryId(entry.id);
     // 진단 전체(classify+extract+solve) 소요 시간을 재서 평균 대기시간 계산에 사용
     const analysisStartTime = Date.now();
@@ -1040,8 +1048,15 @@ function App() {
         message: err.message || 'AI 분석 실행 중 오류가 발생했습니다.',
         badge: '오류',
         icon: '⚠️',
+        buttonText: '닫기',
+        // 원탭 재시도: 기존 handleStartAnalysis를 그대로 재호출한다 (새 상태머신 없음).
+        // 같은 entry를 다시 넘기므로 classify/extract/solve가 처음부터 재실행되며,
+        // 이 함수 최상단의 analyzingEntryId 가드가 중복 실행을 그대로 막아준다.
+        secondaryButtonText: '다시 시도',
+        onSecondaryAction: () => handleStartAnalysis(entry),
       });
     } finally {
+      analyzingEntryIdRef.current = null;
       setAnalyzingEntryId(null);
     }
   };

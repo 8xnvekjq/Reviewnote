@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 
 export interface NoticeModalState {
   isOpen: boolean;
@@ -8,6 +8,8 @@ export interface NoticeModalState {
   icon?: string;
   buttonText?: string;
   onConfirm?: () => void;
+  secondaryButtonText?: string;
+  onSecondaryAction?: () => void;
 }
 
 interface CustomNoticeModalProps {
@@ -19,6 +21,13 @@ export const CustomNoticeModal: React.FC<CustomNoticeModalProps> = ({
   notice,
   onClose,
 }) => {
+  // 모달이 열릴 때마다 리셋: 버튼을 빠르게 연타하거나 두 버튼을 번갈아 눌러도
+  // 액션이 두 번 이상 실행되지 않도록 막는다 (예: 재시도 두 번 트리거).
+  const hasActedRef = useRef(false);
+  useEffect(() => {
+    if (notice.isOpen) hasActedRef.current = false;
+  }, [notice.isOpen]);
+
   if (!notice.isOpen) return null;
 
   const {
@@ -28,12 +37,19 @@ export const CustomNoticeModal: React.FC<CustomNoticeModalProps> = ({
     icon = '✨',
     buttonText = '확인',
     onConfirm,
+    secondaryButtonText,
+    onSecondaryAction,
   } = notice;
 
-  const handleConfirm = () => {
+  const runOnce = (action?: () => void) => {
+    if (hasActedRef.current) return;
+    hasActedRef.current = true;
     onClose();
-    if (onConfirm) onConfirm();
+    action?.();
   };
+
+  const handleConfirm = () => runOnce(onConfirm);
+  const handleSecondary = () => runOnce(onSecondaryAction);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
@@ -60,11 +76,23 @@ export const CustomNoticeModal: React.FC<CustomNoticeModalProps> = ({
           </p>
         </div>
 
-        {/* Action Button */}
-        <div className="pt-2">
+        {/* Action Button(s) */}
+        <div className="pt-2 flex flex-col space-y-2">
+          {secondaryButtonText && (
+            <button
+              onClick={handleSecondary}
+              className="w-full py-3 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-350 hover:to-amber-450 text-slate-950 font-black text-xs transition-all shadow-lg shadow-amber-500/20 active:scale-95 flex items-center justify-center space-x-1"
+            >
+              <span>{secondaryButtonText}</span>
+            </button>
+          )}
           <button
             onClick={handleConfirm}
-            className="w-full py-3 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-350 hover:to-amber-450 text-slate-950 font-black text-xs transition-all shadow-lg shadow-amber-500/20 active:scale-95 flex items-center justify-center space-x-1"
+            className={
+              secondaryButtonText
+                ? 'w-full py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-black text-xs transition-all active:scale-95 flex items-center justify-center space-x-1'
+                : 'w-full py-3 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-350 hover:to-amber-450 text-slate-950 font-black text-xs transition-all shadow-lg shadow-amber-500/20 active:scale-95 flex items-center justify-center space-x-1'
+            }
           >
             <span>{buttonText}</span>
           </button>
