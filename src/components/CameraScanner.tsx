@@ -1,13 +1,15 @@
 import React, { useRef, useState, useEffect } from 'react';
+import { computeInitialCropFromGuideBox, type CropPercent } from '../utils/guideBoxCrop';
 
 interface CameraScannerProps {
-  onCapture: (imageUrl: string) => void;
+  onCapture: (imageUrl: string, initialCrop?: CropPercent) => void;
   onClose: () => void;
 }
 
 export const CameraScanner: React.FC<CameraScannerProps> = ({ onCapture, onClose }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const guideBoxRef = useRef<HTMLDivElement>(null);
   // streamRef always holds the latest stream so cleanup closures can access it
   const streamRef = useRef<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -171,11 +173,22 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onCapture, onClose
         // Convert canvas image to JPEG base64 string
         const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
 
+        // Guide box position must be read before the stream stops and the
+        // viewfinder unmounts — it only exists as an on-screen CSS rect.
+        const initialCrop = guideBoxRef.current
+          ? computeInitialCropFromGuideBox(
+              video.getBoundingClientRect(),
+              guideBoxRef.current.getBoundingClientRect(),
+              video.videoWidth,
+              video.videoHeight
+            ) ?? undefined
+          : undefined;
+
         // ✅ Stop camera stream immediately after capture (removes iOS indicator)
         stopStream(streamRef.current);
         streamRef.current = null;
 
-        onCapture(dataUrl);
+        onCapture(dataUrl, initialCrop);
       }
     }
   };
@@ -270,7 +283,10 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onCapture, onClose
 
             {/* Target Reticle Overlay */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-4 sm:p-6">
-              <div className="w-full max-w-sm max-h-[55vh] aspect-[4/3] border border-white/20 rounded-2xl relative shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
+              <div
+                ref={guideBoxRef}
+                className="w-full max-w-sm max-h-[55vh] aspect-[4/3] border border-white/20 rounded-2xl relative shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]"
+              >
                 {/* Glowing corners */}
                 <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-emerald-400 rounded-tl-xl animate-pulse"></div>
                 <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-emerald-400 rounded-tr-xl animate-pulse"></div>
