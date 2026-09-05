@@ -74,7 +74,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('notes');
   const [mistakes, setMistakes] = useState<MistakeEntry[]>([]);
   const [selectedEntry, setSelectedEntry] = useState<MistakeEntry | null>(null);
-  const [, setIsUploadingPhoto] = useState(false); // 사진 업로드(handleCropComplete) 전용 — AI 진단 자체는 analyzingEntryId로 별도 추적. 현재 이 값을 직접 읽는 UI는 없음(업로드 완료 후에야 모달이 열림)
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false); // 사진 업로드(handleCropComplete) 전용 — AI 진단 자체는 analyzingEntryId로 별도 추적.
   // classify+solve 진단이 "어느 오답 항목"에 대해 진행 중인지 — 예전엔 boolean 하나였는데,
   // 그러면 A를 진단하는 중 다른(B) 카드를 열어도 B에 가짜로 로딩 스피너가 뜨다가 조용히
   // 사라지는 버그가 있었다(전역 상태라 "누구를 진단 중인지"를 구분 못 했음).
@@ -1365,6 +1365,10 @@ function App() {
 
   // Process crop completion, upload to Storage, and insert database record
   const handleCropComplete = async (croppedBase64: string) => {
+    // 이미 업로드가 진행 중이면 무시한다 — 크롭 화면 자체의 연타는 배치 렌더로
+    // 즉시 언마운트되어 안전하지만, 업로드 중에 카메라 탭으로 돌아가 새 사진을
+    // 또 확정하면 이 함수가 겹쳐 호출될 수 있어 별도로 막아야 한다.
+    if (isUploadingPhoto) return;
     setTempCapturedImage(null);
     setTempInitialCrop(undefined);
     if (!session?.user) return;
@@ -2548,6 +2552,14 @@ function App() {
 
       {/* ⚡ 클릭/터치 위치 플로팅 획득 포인트 애니메이션 */}
       <FloatingPointsContainer aiVoice={equippedItems.aiVoice} />
+
+      {/* 📤 크롭 확정 직후~업로드 완료 전까지 처리 중임을 표시 (Storage 업로드 + DB 저장 대기 구간) */}
+      {isUploadingPhoto && (
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center space-y-3 bg-black/70 backdrop-blur-sm">
+          <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs font-bold text-slate-200">문제를 저장하고 있어요...</p>
+        </div>
+      )}
 
     </div>
   );
