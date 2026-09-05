@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import type { ActiveTab, MistakeEntry, ReviewState, MistakeAnalysis } from './types';
 import { ROOT_CAUSE_OPTIONS, SOLVING_PLACEHOLDER_TEXT } from './types';
 import { CameraScanner } from './components/CameraScanner';
+import type { CropPercent } from './utils/guideBoxCrop';
 import { classifyMistakeWithGemini, solveMistakeWithGemini, extractProblemWithGemini, prepareGeminiImage } from './services/gemini';
 import { AuthScreen } from './components/AuthScreen';
 import { supabase, isSupabaseConfigured } from './services/supabase';
@@ -252,6 +253,7 @@ function App() {
 
   // State for image cropping flow
   const [tempCapturedImage, setTempCapturedImage] = useState<string | null>(null);
+  const [tempInitialCrop, setTempInitialCrop] = useState<CropPercent | undefined>(undefined);
 
   // 🎁 럭키상점 활용법 안내 모달 상태
   const [isStoreGuideOpen, setIsStoreGuideOpen] = useState(false);
@@ -1191,8 +1193,9 @@ function App() {
   };
 
   // Intercept camera capture and start cropping flow
-  const handleCameraCapture = (base64Image: string) => {
+  const handleCameraCapture = (base64Image: string, initialCrop?: CropPercent) => {
     setTempCapturedImage(base64Image);
+    setTempInitialCrop(initialCrop);
   };
 
   // 완료 오답 일괄 인쇄 트리거 핸들러
@@ -1348,6 +1351,7 @@ function App() {
   // Process crop completion, upload to Storage, and insert database record
   const handleCropComplete = async (croppedBase64: string) => {
     setTempCapturedImage(null);
+    setTempInitialCrop(undefined);
     if (!session?.user) return;
 
     setIsUploadingPhoto(true);
@@ -2431,8 +2435,12 @@ function App() {
       {tempCapturedImage && (
         <ImageCropper
           imageSrc={tempCapturedImage}
+          initialCrop={tempInitialCrop}
           onCropComplete={handleCropComplete}
-          onCancel={() => setTempCapturedImage(null)}
+          onCancel={() => {
+            setTempCapturedImage(null);
+            setTempInitialCrop(undefined);
+          }}
         />
       )}
 
