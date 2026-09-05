@@ -4,7 +4,7 @@ import type { CropPercent } from '../utils/guideBoxCrop';
 interface ImageCropperProps {
   imageSrc: string;
   initialCrop?: CropPercent;
-  onCropComplete: (croppedImageSrc: string) => void;
+  onCropComplete: (croppedBlob: Blob) => void;
   onCancel: () => void;
 }
 
@@ -69,7 +69,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, initialCro
     window.addEventListener('touchend', onEnd);
   };
 
-  const executeCrop = () => {
+  const executeCrop = async () => {
     if (!imageRef.current) return;
     setIsProcessing(true);
 
@@ -109,10 +109,14 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, initialCro
       sourceHeight
     );
 
-    // Convert to base64 jpeg
+    // Encode directly to a Blob — skips the toDataURL()→base64 text→atob() decode
+    // round-trip the previous implementation needed just to hand Storage a Blob.
     try {
-      const croppedBase64 = canvas.toDataURL('image/jpeg', 0.9);
-      onCropComplete(croppedBase64);
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, 'image/jpeg', 0.9)
+      );
+      if (!blob) throw new Error('캔버스 이미지 인코딩에 실패했습니다.');
+      onCropComplete(blob);
     } catch (err) {
       console.error(err);
       alert('캔버스 이미지 데이터 변환 중 오류가 발생했습니다.');

@@ -6,7 +6,6 @@ import type { CropPercent } from './utils/guideBoxCrop';
 import { classifyMistakeWithGemini, solveMistakeWithGemini, extractProblemWithGemini, prepareGeminiImage } from './services/gemini';
 import { AuthScreen } from './components/AuthScreen';
 import { supabase, isSupabaseConfigured } from './services/supabase';
-import { base64ToBlob } from './utils/image';
 import { SupabaseConfigWarning } from './components/SupabaseConfigWarning';
 import { Header } from './components/Header';
 import { MistakeList } from './components/MistakeList';
@@ -1364,7 +1363,7 @@ function App() {
   };
 
   // Process crop completion, upload to Storage, and insert database record
-  const handleCropComplete = async (croppedBase64: string) => {
+  const handleCropComplete = async (blob: Blob) => {
     // 이미 업로드가 진행 중이면 무시한다 — 크롭 화면 자체의 연타는 배치 렌더로
     // 즉시 언마운트되어 안전하지만, 업로드 중에 카메라 탭으로 돌아가 새 사진을
     // 또 확정하면 이 함수가 겹쳐 호출될 수 있어 별도로 막아야 한다.
@@ -1375,7 +1374,6 @@ function App() {
 
     setIsUploadingPhoto(true);
     try {
-      const blob = base64ToBlob(croppedBase64);
       const fileExt = blob.type.split('/')[1] || 'jpg';
       const fileName = `${session.user.id}/${Date.now()}.${fileExt}`;
 
