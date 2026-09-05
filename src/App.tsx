@@ -2094,6 +2094,27 @@ function App() {
               </div>
             )}
 
+            {/* 🏆 취약 단원 분석 진입점 — 기존 stats useMemo를 그대로 재사용, 새 계산 없음.
+                전체메뉴 드로어를 열어야만 존재를 알 수 있던 '분석통계'를 메인 화면에서
+                한 번에 열람할 수 있도록 진입 경로를 2탭에서 1탭으로 줄인다. */}
+            {stats.topChapters.length > 0 && (
+              <button
+                onClick={() => setActiveTab('stats')}
+                className="w-full flex items-center justify-between gap-2 bg-slate-900/60 border border-slate-800 rounded-2xl px-3.5 py-2.5 mb-3 text-left hover:border-indigo-500/40 hover:bg-slate-900 transition-colors group"
+              >
+                <div className="flex items-center space-x-2 min-w-0">
+                  <span className="text-base flex-none">🏆</span>
+                  <div className="min-w-0 leading-tight">
+                    <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">가장 많이 등록된 취약 단원</div>
+                    <div className="text-xs font-bold text-slate-200 truncate">{stats.topChapters[0][0]}</div>
+                  </div>
+                </div>
+                <span className="text-[10px] text-indigo-400 font-black flex-none group-hover:text-indigo-300">
+                  분석 보기 →
+                </span>
+              </button>
+            )}
+
             <MistakeList
               mistakes={[...mistakes]
                 .filter(m => !m.isHidden)
