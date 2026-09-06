@@ -136,6 +136,10 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   const [editFinalAnswer, setEditFinalAnswer] = React.useState(selectedEntry.analysis?.finalAnswer || '');
   const [isSaving, setIsSaving] = React.useState(false);
 
+  // 🎯 정답 수정 팝업 임시 편집값 (null이면 닫힘). 팝업 '저장'은 editFinalAnswer만 갱신하고,
+  // 실제 DB 반영은 기존 하단 '저장하기'(handleSave)가 그대로 담당한다 — 새 저장 경로를 만들지 않음.
+  const [answerDraft, setAnswerDraft] = React.useState<string | null>(null);
+
   // Image lightbox zoom states & Touch gestures (Pinch-to-zoom)
   const [isZoomOpen, setIsZoomOpen] = React.useState(false);
   const [scale, setScale] = React.useState(1);
@@ -163,7 +167,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   // Accordion toggle states
   const [showProblemText, setShowProblemText] = React.useState(false);
   const [showQuickAnswer, setShowQuickAnswer] = React.useState(false); // 복습 체크 전 스크롤 없이 정답만 바로 확인 (기본 접힘 — 실수로 먼저 보는 것 방지)
-  const [showSolvingProcess, setShowSolvingProcess] = React.useState(true); // Default open for study
+  const [showSolvingProcess, setShowSolvingProcess] = React.useState(false); // 기본 접힘 — 대책을 적기 전에 정답부터 스크롤로 보게 되는 것 방지
   const [showMistakeSummary, setShowMistakeSummary] = React.useState(false); // Default collapsed for self-study
 
   // 💡 동일 문제 연속 클릭 쿨다운 커스텀 알림 모달 상태
@@ -523,15 +527,17 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   // 1. Reset all local states when the selected mistake ID changes (opening a different mistake card)
   React.useEffect(() => {
     setShowProblemText(false);
-    setShowSolvingProcess(true);
+    setShowSolvingProcess(false);
     setShowMistakeSummary(false); // ID 변경 시 아코디언 닫음
+    setAnswerDraft(null); // 정답 수정 팝업도 카드 전환 시 닫음
     setEditGrade(selectedEntry.grade || '');
     setEditChapter(selectedEntry.chapter || '');
     setEditRootCauses(selectedEntry.rootCauses || []);
     setEditActionPlan(selectedEntry.userActionPlan || '');
+    setEditFinalAnswer(selectedEntry.analysis?.finalAnswer || ''); // 카드 전환 시 정답 미리보기도 새 카드 값으로 재동기화
   }, [selectedEntry.id]);
 
-  // 2. Sync grade and chapter only when AI classification finishes
+  // 2. Sync grade/chapter/finalAnswer only when AI classification finishes (분석 시작 전엔 비어있다가 완료 후 채워짐)
   React.useEffect(() => {
     if (wasAnalyzingRef.current && !isAnalyzing) {
       if (selectedEntry.grade) {
@@ -540,9 +546,12 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
       if (selectedEntry.chapter) {
         setEditChapter(selectedEntry.chapter);
       }
+      if (selectedEntry.analysis?.finalAnswer) {
+        setEditFinalAnswer(selectedEntry.analysis.finalAnswer);
+      }
     }
     wasAnalyzingRef.current = isAnalyzing;
-  }, [isAnalyzing, selectedEntry.grade, selectedEntry.chapter]);
+  }, [isAnalyzing, selectedEntry.grade, selectedEntry.chapter, selectedEntry.analysis?.finalAnswer]);
 
   // Loading text cycling effect with real-time statistics and domain metadata
   React.useEffect(() => {
@@ -981,24 +990,41 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
               </div>
             </div>
 
-            {/* 정답 바로 확인 (아래 정석 풀이 과정까지 스크롤 안 해도 여기서 바로 체크 가능) */}
-            {selectedEntry.analysis?.finalAnswer && (
-              <button
-                onClick={() => setShowQuickAnswer(!showQuickAnswer)}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20 transition-all"
-              >
-                <span className="text-[11px] font-bold text-amber-400 flex items-center space-x-1.5 min-w-0">
-                  <span className="flex-none">🎯</span>
-                  {showQuickAnswer ? (
-                    <LaTeXRenderer text={selectedEntry.analysis.finalAnswer} className="truncate" />
-                  ) : (
-                    <span>정답 확인하기</span>
-                  )}
-                </span>
-                <span className="text-[9px] text-amber-500/70 font-bold">
-                  {showQuickAnswer ? '▲ 가리기' : '▼ 보기'}
-                </span>
-              </button>
+            {/* 정답 바로 확인 + 수정 (아래 정석 풀이 과정까지 스크롤 안 해도 여기서 바로 확인/수정 가능) */}
+            {selectedEntry.analysis && (
+              <div className="flex items-center space-x-2">
+                {editFinalAnswer ? (
+                  <button
+                    onClick={() => setShowQuickAnswer(!showQuickAnswer)}
+                    className="flex-1 min-w-0 flex items-center justify-between px-3 py-2 rounded-xl bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20 transition-all"
+                  >
+                    <span className="text-[11px] font-bold text-amber-400 flex items-center space-x-1.5 min-w-0">
+                      <span className="flex-none">🎯</span>
+                      {showQuickAnswer ? (
+                        // 팝업에서 확정한 로컬 편집값(editFinalAnswer)을 바로 반영 — 하단 '저장하기' 전에도 미리보기 가능
+                        <LaTeXRenderer text={editFinalAnswer} className="truncate" />
+                      ) : (
+                        <span>정답 확인하기</span>
+                      )}
+                    </span>
+                    <span className="text-[9px] text-amber-500/70 font-bold">
+                      {showQuickAnswer ? '▲ 가리기' : '▼ 보기'}
+                    </span>
+                  </button>
+                ) : (
+                  <div className="flex-1 min-w-0 px-3 py-2 rounded-xl bg-slate-900/40 border border-slate-800/60 text-[11px] text-slate-500 font-bold">
+                    아직 등록된 정답이 없어요
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setAnswerDraft(editFinalAnswer)}
+                  title="정답 수정"
+                  className="flex-none w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 hover:border-amber-500/50 text-amber-400 hover:text-amber-300 flex items-center justify-center transition-all active:scale-95"
+                >
+                  ✏️
+                </button>
+              </div>
             )}
 
             {/* 단계별 유기적 활성화 영역 (3열 구조 복원 및 포커싱 강화) */}
@@ -1420,23 +1446,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 </div>
               </div>
 
-              {/* AI가 구한 정답 수정 (오답/오류 발견 시 직접 고치기) */}
-              {selectedEntry.analysis && (
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-slate-400 block">
-                    🎯 정답 수정 <span className="text-slate-600 font-medium">(AI가 틀리게 구했다면 여기서 고쳐주세요)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={editFinalAnswer}
-                    onChange={e => setEditFinalAnswer(e.target.value)}
-                    placeholder="예: x = 3, y = -2"
-                    className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-600 outline-none focus:border-amber-500 transition-colors"
-                  />
-                </div>
-              )}
-
-              {/* 나만의 대책 */}
+              {/* 나만의 대책 (정답 수정란보다 먼저 배치 — 정답을 보기 전에 스스로 다시 풀어보고 대책부터 적도록 유도) */}
               <div className="space-y-1.5">
                 <label className="text-[11px] font-bold text-slate-400 block">나만의 대책 (직접 작성)</label>
                 <textarea
@@ -1635,6 +1645,47 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             </button>
           </div>
         </div>
+      )}
+
+      {/* 🎯 정답 수정 팝업 — editFinalAnswer/handleSave를 그대로 재사용 (새 저장 경로 없음, '저장'은 로컬 확정만).
+          이동식 문제 참고창(z-[9997], document.body에 portal)에 가려지지 않도록 동일하게 portal + 더 높은 z-index 사용. */}
+      {answerDraft !== null && createPortal(
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-xs bg-slate-900 border border-amber-500/40 rounded-3xl p-5 shadow-2xl space-y-4 animate-scale-up">
+            <div className="space-y-1">
+              <h3 className="text-sm font-black text-white flex items-center space-x-1.5">
+                <span>🎯</span>
+                <span>정답 수정</span>
+              </h3>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                AI가 구한 정답이 틀렸다면 여기서 고쳐주세요. '저장'을 누르면 임시 반영되고, 실제 기록은 모달 하단 '저장하기'를 눌러야 완료됩니다.
+              </p>
+            </div>
+            <input
+              type="text"
+              autoFocus
+              value={answerDraft}
+              onChange={e => setAnswerDraft(e.target.value)}
+              placeholder="예: x = 3, y = -2"
+              className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-600 outline-none focus:border-amber-500 transition-colors"
+            />
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setAnswerDraft(null)}
+                className="flex-1 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition-all active:scale-95"
+              >
+                취소
+              </button>
+              <button
+                onClick={() => { setEditFinalAnswer(answerDraft || ''); setAnswerDraft(null); }}
+                className="flex-1 py-2.5 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-350 hover:to-amber-450 text-slate-950 font-black text-xs transition-all shadow-lg shadow-amber-500/20"
+              >
+                저장
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
       {/* 손 필기 / 펜슬 풀이 오버레이 — 저장하면 스캐폴딩(본인 풀이)으로 등록됨 */}
