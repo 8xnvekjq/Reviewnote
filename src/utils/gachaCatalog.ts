@@ -1,7 +1,19 @@
 import type { GachaItem, GachaRarity } from '../types';
 
 export const GACHA_ITEMS: GachaItem[] = [
-  // ── MR (0.1%) - Mythic Rare (신화급 강렬한 크림슨 불꽃) ───────────────
+  // ── MR (0.1%) - Mythic Rare (신화급 강렬한 크림슨 불꽃 & 전설의 특별 칭호) ───────────────
+  {
+    id: 'title_195h_marvel',
+    name: '✨ 칭호: 195시간의 경이',
+    description: '한 달 동안 195시간의 몰입으로 만들어낸 놀라운 기록.',
+    rarity: 'MR',
+    category: 'TITLE',
+    icon: '✨',
+    effectValue: '195시간의 경이',
+    color: 'from-pink-500 via-purple-500 to-cyan-400',
+    isLimited: true,
+    visualVariant: 'rainbow_wave',
+  },
   {
     id: 'title_160h_time_lord',
     name: '⏱️ 칭호: 160시간 시간의 지배자',
@@ -589,6 +601,15 @@ export function drawGachaItem(): GachaItem {
 
 // ── 칭호 희귀도별 화려한 이펙트 스타일 공통 반환 함수 ─────────────────
 export const getTitleBadgeStyle = (title: string) => {
+  // 🌈 개별 특별 이펙트(visualVariant)가 지정된 칭호 우선 적용
+  const catalogItem = GACHA_ITEMS.find(g => g.category === 'TITLE' && g.effectValue === title);
+  if (catalogItem?.visualVariant === 'rainbow_wave') {
+    return {
+      style: 'badge-rainbow-wave text-white font-black shadow-md',
+      icon: catalogItem.icon
+    };
+  }
+
   if (title.includes('시간의 지배자') || title.includes('160시간')) {
     return {
       style: 'bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 text-white border-red-400 shadow-[0_0_18px_rgba(244,63,94,0.95)] ring-2 ring-rose-500/80 animate-pulse font-black',
@@ -628,7 +649,6 @@ export const getTitleBadgeStyle = (title: string) => {
   // 위에서 전용 스타일이 지정되지 않은 칭호(예: 새벽의 오답마스터)는 카탈로그에 등록된
   // 실제 등급(rarity)에 맞는 색으로 자동 적용한다 — 고정된 회색 기본값 하나로 뭉뚱그리면
   // 새 칭호가 추가될 때마다 매번 이 함수를 안 고치는 한 등급과 무관하게 똑같이 보이는 문제가 있었다.
-  const catalogItem = GACHA_ITEMS.find(g => g.category === 'TITLE' && g.effectValue === title);
   if (catalogItem) {
     const rarityTheme = getRarityTheme(catalogItem.rarity);
     return {

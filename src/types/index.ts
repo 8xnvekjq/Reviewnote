@@ -169,6 +169,7 @@ export interface GachaItem {
   themeAccentValue?: string; // THEME 전용: 테두리/액센트에 별도로 쓰이는 2번째 hex (예: 골드 배경 + 은하수 보라 테두리)
   color: string;
   isLimited?: boolean; // 🔒 한정판/특수지급 전용 (가챠 뽑기Pool 제외 여부)
+  visualVariant?: 'rainbow_wave'; // 🌈 개별 특별 칭호 전용 시각 이펙트 변형 플래그
 }
 
 export interface EquippedItems {
