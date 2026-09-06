@@ -9,24 +9,19 @@ import { supabase, isSupabaseConfigured } from './services/supabase';
 import { SupabaseConfigWarning } from './components/SupabaseConfigWarning';
 import { AppShell } from './app/AppShell';
 import { Screen } from './app/ScreenRouter';
+import { OverlayHost } from './app/OverlayHost';
 import { Header } from './components/Header';
 import { MistakeList } from './components/MistakeList';
-import { MistakeDetailModal } from './components/MistakeDetailModal';
 import { BottomNavigation } from './components/BottomNavigation';
-import { ImageCropper } from './components/ImageCropper';
 import { AdminPanel } from './components/AdminPanel';
 import { StudentGuide } from './components/StudentGuide';
-import { LaTeXRenderer } from './components/LaTeXRenderer';
-import { SlideListModal } from './components/SlideListModal';
 import { HiddenMistakesPanel } from './components/HiddenMistakesPanel';
 import { GachaStore } from './components/GachaStore';
 import { RecentActivityFeed } from './components/RecentActivityFeed';
 import { ScaffoldingListPanel } from './components/ScaffoldingListPanel';
 import { ScaffoldingPanel } from './components/ScaffoldingPanel';
-import { StoreGuideModal } from './components/StoreGuideModal';
-import { NewScaffoldingModal, type UnseenScaffoldingItem } from './components/NewScaffoldingModal';
-import { CustomNoticeModal, type NoticeModalState } from './components/CustomNoticeModal';
-import { FloatingPointsContainer } from './components/FloatingPointsContainer';
+import type { UnseenScaffoldingItem } from './components/NewScaffoldingModal';
+import type { NoticeModalState } from './components/CustomNoticeModal';
 import { getTitleBadgeStyle, GACHA_ITEMS } from './utils/gachaCatalog';
 import { getRandomCheer } from './utils/aiVoiceCheers';
 import type { EquippedItems } from './types';
@@ -2776,139 +2771,58 @@ function App() {
         </Screen>
       </AppShell>
 
-      {/* Selected Entry Detail Modal */}
-      {selectedEntry && (
-        <MistakeDetailModal
-          selectedEntry={selectedEntry}
-          allEntries={mistakes}
-          peerActivities={peerActivities}
-          isAnalyzing={analyzingEntryId === selectedEntry.id}
-          averageWaitMs={averageWaitMs}
-          youtubeLectures={youtubeLectures}
-          onClose={() => {
-            setIsReviewSession(false);
-            setSelectedEntry(null);
-          }}
-          onDeleteMistake={handleDeleteMistake}
-          onStartAnalysis={handleStartAnalysis}
-          onUpdateReviews={handleUpdateReviews}
-          onUpdateCheckpointStatus={handleUpdateCheckpointStatus}
-          checkpointRegenStatus={checkpointRegenStatus[selectedEntry.id]}
-          onRetryCheckpointGeneration={() => regenerateCheckpointsWithProgress(selectedEntry)}
-          onSelectEntry={setSelectedEntry}
-          isReviewSession={isReviewSession}
-          onUpdateEntry={(updated) => {
-            setMistakes(prev => prev.map(m => m.id === updated.id ? updated : m));
-            setSelectedEntry(updated);
-          }}
-          equippedStamp={equippedItems.stamp}
-          profilesStampMap={profilesStampMap}
-          currentUserId={session?.user?.id || currentUser || ''}
-          isAdmin={isAdmin}
-          aiPersonaName={customAiName || '밤티'}
-          comboBoosterExpiresAt={comboBoosterExpiresAt}
-        />
-      )}
-
-      {/* Interactive Image Cropper Bounding Box overlay */}
-      {tempCapturedImage && (
-        <ImageCropper
-          imageSrc={tempCapturedImage}
-          initialCrop={tempInitialCrop}
-          onCropComplete={handleCropComplete}
-          onCancel={() => {
-            setTempCapturedImage(null);
-            setTempInitialCrop(undefined);
-          }}
-        />
-      )}
-
-      {/* 수업자료 모달 다이얼로그 */}
-      <SlideListModal
-        isOpen={isSlideListOpen}
-        onClose={() => setIsSlideListOpen(false)}
-      />
-
-      {/* 인쇄 전용 2열 세로 구분선 레이아웃 (@media print 시에만 노출) */}
-      {printItems && printItems.length > 0 && (
-        <div className="print-only-layout hidden">
-          {/* 정갈한 학습지 타이틀 */}
-          <div className="border-b-2 border-slate-850 pb-2.5 mb-6 flex justify-between items-end">
-            <div>
-              <h1 className="text-base font-extrabold text-slate-900 tracking-tight">더쿠키수학 오답노트</h1>
-              <p className="text-[8px] text-slate-500 font-mono mt-0.5">완료된 문제 모아찍기 학습지</p>
-            </div>
-            <div className="text-right text-[8px] text-slate-500 font-mono">
-              <span>인쇄일: {new Date().toLocaleDateString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit' }).replace(/\s/g, '')}</span>
-            </div>
-          </div>
-
-          <div className="print-column-wrapper">
-            {printItems.map((entry) => {
-              const cleanTitle = (entry.title || '').replace(/\$[^$]+\$/g, '').replace(/[#*`_]/g, '').slice(0, 16);
-              const formattedDate = entry.date 
-                ? new Date(entry.date).toLocaleDateString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit' }).replace(/\s/g, '')
-                : '—';
-              
-              const isTextPrint = printAsTextMap[entry.id];
-              const hasProblemText = !!entry.analysis?.problemText;
-
-              return (
-                <div key={entry.id} className="print-card-item">
-                  {/* 단정한 헤더 이력 바 */}
-                  <div className="flex justify-between items-center text-[7px] text-slate-500 border-b border-slate-200 pb-1 mb-1.5 font-mono">
-                    <span className="font-bold text-slate-800">[{entry.grade || '공통'} ➔ {entry.chapter || '기타'}] {cleanTitle}...</span>
-                    <span>등록: {formattedDate}</span>
-                  </div>
-                  {/* 문제 영역 (텍스트 또는 이미지) */}
-                  {isTextPrint && hasProblemText ? (
-                    <div className="text-[10px] text-slate-900 leading-relaxed font-sans select-text whitespace-pre-line py-1 border border-slate-100 rounded px-2 bg-slate-50/30">
-                      <LaTeXRenderer text={entry.analysis!.problemText || ''} className="text-[10px] text-slate-900 leading-relaxed" isPrintMode={true} />
-                    </div>
-                  ) : (
-                    <img src={entry.imageUrl} alt={entry.title} />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* 🎁 럭키상점 활용 가이드 모달 팝업 창 */}
-      <StoreGuideModal
-        isOpen={isStoreGuideOpen}
-        onClose={handleCloseStoreGuide}
-        onGoToStore={() => setActiveTab('store')}
-      />
-
-      {/* 💡 선생님의 신규 스캐폴딩 힌트 안내 모달 팝업 창 */}
-      <NewScaffoldingModal
-        isOpen={isNewScaffoldingModalOpen}
-        unseenItems={unseenScaffoldings}
-        onClose={handleCloseNewScaffoldingModal}
-        onSelectMistake={(entry) => {
-          setSelectedEntry(entry);
+      <OverlayHost
+        selectedEntry={selectedEntry}
+        mistakes={mistakes}
+        peerActivities={peerActivities}
+        analyzingEntryId={analyzingEntryId}
+        averageWaitMs={averageWaitMs}
+        youtubeLectures={youtubeLectures}
+        isReviewSession={isReviewSession}
+        checkpointRegenStatus={checkpointRegenStatus}
+        equippedStamp={equippedItems.stamp}
+        profilesStampMap={profilesStampMap}
+        currentUserId={session?.user?.id || currentUser || ''}
+        isAdmin={isAdmin}
+        aiPersonaName={customAiName || '밤티'}
+        comboBoosterExpiresAt={comboBoosterExpiresAt}
+        onCloseDetailModal={() => {
+          setIsReviewSession(false);
+          setSelectedEntry(null);
         }}
-        onGoToClinic={() => setActiveTab('scaffolding')}
+        onDeleteMistake={handleDeleteMistake}
+        onStartAnalysis={handleStartAnalysis}
+        onUpdateReviews={handleUpdateReviews}
+        onUpdateCheckpointStatus={handleUpdateCheckpointStatus}
+        onRetryCheckpointGeneration={regenerateCheckpointsWithProgress}
+        onSelectEntry={setSelectedEntry}
+        onUpdateDetailEntry={(updated) => {
+          setMistakes(prev => prev.map(m => m.id === updated.id ? updated : m));
+          setSelectedEntry(updated);
+        }}
+        tempCapturedImage={tempCapturedImage}
+        tempInitialCrop={tempInitialCrop}
+        onCropComplete={handleCropComplete}
+        onCancelCrop={() => {
+          setTempCapturedImage(null);
+          setTempInitialCrop(undefined);
+        }}
+        isSlideListOpen={isSlideListOpen}
+        onCloseSlideList={() => setIsSlideListOpen(false)}
+        printItems={printItems}
+        printAsTextMap={printAsTextMap}
+        isStoreGuideOpen={isStoreGuideOpen}
+        onCloseStoreGuide={handleCloseStoreGuide}
+        onGoToStore={() => setActiveTab('store')}
+        isNewScaffoldingModalOpen={isNewScaffoldingModalOpen}
+        unseenScaffoldings={unseenScaffoldings}
+        onCloseNewScaffoldingModal={handleCloseNewScaffoldingModal}
+        onGoToScaffoldingClinic={() => setActiveTab('scaffolding')}
+        noticeModal={noticeModal}
+        onCloseNotice={closeNoticeModal}
+        aiVoice={equippedItems.aiVoice}
+        isUploadingPhoto={isUploadingPhoto}
       />
-
-      {/* 🔔 전역 커스텀 알림 모달 (웹 브라우저 native alert 완전 대체) */}
-      <CustomNoticeModal
-        notice={noticeModal}
-        onClose={closeNoticeModal}
-      />
-
-      {/* ⚡ 클릭/터치 위치 플로팅 획득 포인트 애니메이션 */}
-      <FloatingPointsContainer aiVoice={equippedItems.aiVoice} />
-
-      {/* 📤 크롭 확정 직후~업로드 완료 전까지 처리 중임을 표시 (Storage 업로드 + DB 저장 대기 구간) */}
-      {isUploadingPhoto && (
-        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center space-y-3 bg-black/70 backdrop-blur-sm">
-          <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-xs font-bold text-slate-200">문제를 저장하고 있어요...</p>
-        </div>
-      )}
 
     </div>
   );
