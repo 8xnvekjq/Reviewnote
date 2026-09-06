@@ -11,6 +11,7 @@ import { Screen } from './app/ScreenRouter';
 import { OverlayHost } from './app/OverlayHost';
 import { useCheckpointGeneration } from './features/checkpoints/useCheckpointGeneration';
 import { useMistakeAnalysis } from './features/mistakes/useMistakeAnalysis';
+import { useMistakes, mapDbMistakeRow } from './features/mistakes/useMistakes';
 import { Header } from './components/Header';
 import { MistakeList } from './components/MistakeList';
 import { BottomNavigation } from './components/BottomNavigation';
@@ -28,25 +29,6 @@ import { getRandomCheer } from './utils/aiVoiceCheers';
 import type { EquippedItems } from './types';
 import { applyThemeColor } from './utils/theme';
 import { loadStreakState, recordReviewStreak, reconcileStreakState, getNewlyReachedMilestones, getKSTDateString, type StreakState } from './utils/streak';
-
-// DB의 mistakes row(snake_case) -> 클라이언트 MistakeEntry(camelCase) 매핑.
-// fetchUserData(전체 로드)와 refreshMistakesLight(실시간 경량 갱신)가 공유해서 로직이 갈라지지 않게 한다.
-const mapDbMistakeRow = (m: any): MistakeEntry => ({
-  id: m.id,
-  userId: m.user_id,
-  title: m.title,
-  imageUrl: m.image_url,
-  date: m.date,
-  updatedAt: m.updated_at,
-  analysis: m.analysis || undefined,
-  reviews: m.reviews || ['', '', ''],
-  grade: m.grade || undefined,
-  chapter: m.chapter || undefined,
-  rootCauses: m.root_causes || [],
-  userActionPlan: m.user_action_plan || undefined,
-  teacherScaffoldingHint: m.teacher_scaffolding_hint || undefined,
-  isHidden: m.is_hidden || false, // 구버전 로우(컬럼 추가 전)는 undefined/null -> false로 취급
-});
 
 interface ProfileDirectoryRow {
   id: string;
@@ -781,26 +763,20 @@ function App() {
     }
   };
 
-  // 🔄 오답노트/스캐폴딩 실시간 동기화 전용 경량 새로고침. fetchUserData는 프로필·전체 학생
-  // 이름맵·스트릭·티켓 등을 전부 다시 조회해서 무거운데, mistakes 테이블 변화 하나에는 그 중
-  // mistakes와 스캐폴딩 초록마크만 실제로 영향을 받으므로 그 두 개만 가볍게 다시 불러온다.
-  const refreshMistakesLight = async () => {
-    try {
-      const { data: dbMistakes, error } = await supabase
-        .from('mistakes')
-        .select('*')
-        .order('date', { ascending: false });
-      if (error) throw error;
-      setMistakes((dbMistakes || []).map(mapDbMistakeRow));
+  // 🔄 오답노트 데이터의 fetch(경량 refresh)/CRUD — src/features/mistakes/useMistakes로 이동.
+  // mistakes/selectedEntry 자체의 소유권은 계속 App.tsx에 남는다(이유는 훅 파일 주석 참고).
+  const {
+    refreshMistakesLight,
+    handleDeleteMistake,
+    handleToggleHidden,
+  } = useMistakes({
+    setMistakes,
+    setSelectedEntry,
+    setScaffoldedMistakeIds,
+    showNoticeModal,
+    onMistakeDeleted: () => loadWeeklyChampions(), // MVP 챔피언 배너 즉각 갱신
+  });
 
-      const { data: scaffoldingRows } = await supabase
-        .from('mistake_scaffoldings')
-        .select('mistake_id');
-      setScaffoldedMistakeIds(new Set((scaffoldingRows || []).map((r: any) => r.mistake_id)));
-    } catch (err) {
-      console.error('Error refreshing mistakes:', err);
-    }
-  };
   // 내 닉네임 수정 함수 (실제 이름 display_name은 변경되지 않고 nickname 컬럼만 업데이트)
   const handleUpdateNickname = async (newNick: string) => {
     if (!session?.user?.id) return;
@@ -1266,59 +1242,6 @@ function App() {
       });
     } finally {
       setIsUploadingPhoto(false);
-    }
-  };
-
-  // Delete mistake from Supabase & local state
-  const handleDeleteMistake = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (confirm('이 오답 기록을 삭제하시겠습니까?')) {
-      try {
-        const { data, error } = await supabase
-          .from('mistakes')
-          .delete()
-          .eq('id', id)
-          .select('id');
-
-        if (error) throw error;
-        if (!data || data.length === 0) {
-          throw new Error('삭제 권한이 없거나 이미 삭제된 기록입니다.');
-        }
-
-        setMistakes(prev => prev.filter(m => m.id !== id));
-        setSelectedEntry(null);
-        loadWeeklyChampions(); // MVP 챔피언 배너 즉각 갱신
-      } catch (err: any) {
-        console.error(err);
-        showNoticeModal({
-          title: '삭제 실패',
-          message: err.message,
-          badge: '오류',
-          icon: '⚠️',
-        });
-      }
-    }
-  };
-
-  // 시험범위 제외 등으로 오답 카드를 메인 리스트에서 숨기거나(true) 다시 노출(false)
-  const handleToggleHidden = async (id: string, hidden: boolean) => {
-    // 즉시 토글되는 가벼운 액션이라 낙관적으로 로컬 상태부터 반영하고, 실패 시에만 되돌린다.
-    setMistakes(prev => prev.map(m => m.id === id ? { ...m, isHidden: hidden } : m));
-    try {
-      const { error } = await supabase
-        .from('mistakes')
-        .update({ is_hidden: hidden })
-        .eq('id', id);
-      if (error) throw error;
-    } catch (err: any) {
-      console.error('Failed to toggle hidden state:', err);
-      setMistakes(prev => prev.map(m => m.id === id ? { ...m, isHidden: !hidden } : m));
-      showNoticeModal({
-        title: '처리 실패',
-        message: err.message || '숨김 상태 변경 중 오류가 발생했습니다.',
-        badge: '오류',
-        icon: '⚠️',
-      });
     }
   };
 
