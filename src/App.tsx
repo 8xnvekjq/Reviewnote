@@ -1068,8 +1068,11 @@ function App() {
   ): Promise<MistakeEntry> => {
     const firstResult = await classifyMistakeWithGemini(image, youtubeLectures, studentGrade, customAiName || '밤티');
 
-    // 1단계 결과를 기반으로 Supabase DB에 과목, 단원, 유튜브 매칭 필드 우선 업데이트
+    // 1단계 결과를 기반으로 Supabase DB에 과목, 단원, 유튜브 매칭 필드 우선 업데이트.
+    // 분석 시작 전에 이미 복습 체크(O/X/★)를 해뒀을 수 있으므로, 기존 analysis를 먼저 펼쳐서
+    // reviewDates/reviewPoints/pointLog/reviewLog가 통째로 덮여 사라지지 않게 한다.
     const partialAnalysis: MistakeAnalysis = {
+      ...entry.analysis,
       solvingProcess: SOLVING_PLACEHOLDER_TEXT,
       matchedVideoId: firstResult.matchedVideoId,
       matchedStartSeconds: firstResult.matchedStartSeconds,
@@ -1574,10 +1577,27 @@ function App() {
       const nowStr = `${now.getMonth() + 1}/${now.getDate()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
       const existingPointLog = targetEntry.analysis?.pointLog || [];
       const newPointLogEntries: { date: string; points: number }[] = [];
+      // 📒 같은 이유로 결과(O/X/★) 자체도 append-only 로그에 남긴다. "정리하기"로 X·★ 칸이
+      // 비워지는 건 다시 풀어보라는 의도된 리셋이지만, 그와 별개로 어드민의 당일 정답률처럼
+      // "오늘 실제로 무슨 결과가 있었는지"는 정리하기와 무관하게 보존되어야 한다.
+      // slot(0~1~2)을 함께 남겨서, 같은 칸을 같은 날 다시 고쳐도(X→O 정정 등) "그 칸의 최종
+      // 상태" 하나만 인정한다 — 시도/정정 횟수는 세지 않고 슬롯별 오늘 최종 결과만 본다(제품 정의).
+      // 날짜는 pointLog(nowStr, 연도 없음)와 달리 연도가 포함된 ISO 문자열로 남긴다 — 매일 단위로
+      // "오늘"을 비교하는 용도라 해가 바뀐 뒤 같은 월/일 과거 기록과 혼동되면 안 되기 때문.
+      const nowIso = now.toISOString();
+      const existingReviewLog = targetEntry.analysis?.reviewLog || [];
+      const newReviewLogEntries: { date: string; state: ReviewState; slot: number }[] = [];
       if (!skipPointRecalc) {
         for (let i = 0; i < 3; i++) {
           const delta = currentPoints[i] - (oldReviewPoints[i] || 0);
           if (delta !== 0) newPointLogEntries.push({ date: nowStr, points: delta });
+
+          // 빈칸으로 되돌아가는 것(되돌리기/재클릭 취소)도 함께 남긴다 — 그래야 집계에서
+          // "그 칸의 가장 최근 상태"를 봤을 때 취소된 체크가 여전히 정답/오답으로 잡히지 않는다.
+          const newState = newReviews[i];
+          if (newState !== oldReviews[i]) {
+            newReviewLogEntries.push({ date: nowIso, state: newState, slot: i });
+          }
         }
       }
 
@@ -1586,7 +1606,8 @@ function App() {
         ...targetEntry.analysis,
         reviewDates: currentDates,
         reviewPoints: currentPoints,
-        pointLog: [...existingPointLog, ...newPointLogEntries]
+        pointLog: [...existingPointLog, ...newPointLogEntries],
+        reviewLog: [...existingReviewLog, ...newReviewLogEntries]
       };
 
       const { error } = await supabase

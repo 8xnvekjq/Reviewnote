@@ -84,6 +84,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
           lastReviewDate: null,
           // 럭키상점 콤보 포인트 잔액 (App.tsx의 currentDisplayPoints와 동일 공식)
           comboPoints: Math.max(0, (p.bonus_points || 0) + (p.point_adjustment || 0)),
+          todayReviewedCount: 0,
+          todayCorrectCount: 0,
+          todayIncorrectCount: 0,
         });
       });
 
@@ -100,6 +103,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
             parsedDate = new Date(`${new Date().getFullYear()}/${dateStr}`);
           }
           return !isNaN(parsedDate.getTime()) && parsedDate >= mondayDate;
+        } catch {
+          return false;
+        }
+      };
+
+      // 오늘(현지 자정 기준) 여부 판정 유틸 — pointLog와 동일한 'M/D HH:mm' 포맷의 reviewLog에 사용
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const tomorrowStart = new Date(todayStart);
+      tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+      const isDateToday = (dateStr: string) => {
+        if (!dateStr) return false;
+        try {
+          let parsedDate: Date;
+          if (dateStr.includes('-') || dateStr.includes('T')) {
+            parsedDate = new Date(dateStr);
+          } else if (dateStr.includes('.')) {
+            parsedDate = new Date(dateStr.replace(/\./g, '/'));
+          } else {
+            parsedDate = new Date(`${new Date().getFullYear()}/${dateStr}`);
+          }
+          return !isNaN(parsedDate.getTime()) && parsedDate >= todayStart && parsedDate < tomorrowStart;
         } catch {
           return false;
         }
@@ -141,6 +166,33 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
         }, 0);
 
         stat.weeklyScore += comboScore;
+
+        // 오늘 복습 정답률 집계 — reviews/reviewDates가 아니라 reviewLog(append-only 결과 로그) 기준.
+        // "정리하기"로 X·★ 칸이 비워지는 건 의도된 동작(다시 풀어보게 리셋)이라 UI 슬롯 자체는
+        // 정확하지만, 그 때문에 reviews/reviewDates만으로는 오늘 있었던 결과를 재구성할 수 없다.
+        //
+        // [제품 정의] 오늘 정답률은 "각 슬롯의 오늘 최종 상태" 기준이다 — 같은 칸을 같은 날 X→O로
+        // 고치면 최종 O 1건만 인정하고, 시도/정정 횟수는 이번 범위에서 세지 않는다. slot별로 로그의
+        // 마지막 항목만 남기면 이게 그대로 구현된다(되돌리기로 인한 취소도 마지막 항목이 ''가 되어
+        // 자연히 제외됨).
+        // (구조적 한계: 3칸을 모두 채운 뒤 "정리하기"로 칸을 비우고 같은 날 그 칸을 또 체크하면
+        //  slot 번호가 재사용되어 정리 전 결과가 최신 결과에 덮일 수 있음. 완전히 없애려면 정리하기를
+        //  관통하는 별도 시도 ID가 필요한데, 이번 범위(시도/정정 횟수 미집계)에서는 필요치 않다고
+        //  판단해 허용하고 문서로만 남김.)
+        // ★(보류)는 코드 전반의 관례(정리 대상·취약 판정에서 X와 동일 취급)를 따라 오답에 합산한다.
+        const reviewLog: { date: string; state: 'O' | 'X' | 'star' | ''; slot: number }[] = m.analysis?.reviewLog || [];
+        const latestBySlot = new Map<number, { date: string; state: 'O' | 'X' | 'star' | '' }>();
+        reviewLog.forEach(entry => latestBySlot.set(entry.slot, entry)); // 배열은 항상 시간순 추가라 마지막에 덮어쓴 값이 최신
+        latestBySlot.forEach(entry => {
+          if (entry.state === '') return; // 되돌리기로 취소된 체크는 집계 제외
+          if (!isDateToday(entry.date)) return;
+          stat.todayReviewedCount += 1;
+          if (entry.state === 'O') {
+            stat.todayCorrectCount += 1;
+          } else {
+            stat.todayIncorrectCount += 1;
+          }
+        });
 
         // Track latest activity date
         if (!stat.lastActivity || m.date > stat.lastActivity) {
@@ -480,6 +532,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
                       <div className="text-[10px] text-emerald-500 font-bold mt-0.5">복습완료</div>
                     </div>
                   </div>
+
+                  {/* 오늘의 복습 정답률 (reviewLog 기준 — 정리하기해도 안 사라짐, ★는 오답에 합산) */}
+                  {user.todayReviewedCount > 0 && (
+                    <div className="bg-amber-950/20 border border-amber-800/30 rounded-xl px-3 py-2 flex items-center justify-between">
+                      <span className="text-[10px] text-amber-400 font-bold">
+                        🎯 오늘 {user.todayReviewedCount}문제 · 정답 {user.todayCorrectCount} · 오답 {user.todayIncorrectCount}
+                      </span>
+                      <span className="text-xs font-black text-amber-300">
+                        {Math.round((user.todayCorrectCount / user.todayReviewedCount) * 100)}%
+                      </span>
+                    </div>
+                  )}
 
                   {/* Completion Progress Bar */}
                   {user.mistakeCount > 0 && (

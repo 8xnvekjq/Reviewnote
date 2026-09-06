@@ -22,6 +22,7 @@ export interface MistakeAnalysis {
   reviewDates?: string[];   // 단계별 복습 완료 일자 배열 (['7/10', '', ''])
   reviewPoints?: number[];  // 단계별로 체크한 "그 순간" 영구 저장된 콤보 포인트 (1차 O=3/2차 O=7/3차 O=15, X·★=1) — 나중에 정리하기로 O가 다른 칸으로 옮겨가도 이 값은 안 바뀜
   pointLog?: { date: string; points: number }[]; // 포인트를 실제로 딴 "그 날짜"에 영구 귀속시키는 append-only 로그. reviewPoints는 정리하기로 슬롯이 합쳐지면 그 슬롯의 날짜(reviewDates[i])를 따라가 버려 원래 다른 날짜에 딴 점수가 엉뚱한 주(week)로 재배정될 수 있음 — 주간 랭킹 집계는 반드시 이 로그 기준으로 해야 정리하기가 몇 번 일어나도 안전함
+  reviewLog?: { date: string; state: ReviewState; slot: number }[]; // 복습 체크 "결과"를 딴 그 순간에 영구 귀속시키는 append-only 로그. reviews/reviewDates는 "정리하기"로 X·★ 칸이 비워지는 게 정상 동작(다시 풀어보라고 슬롯을 리셋)이라, 그 슬롯 상태만으로는 당일 결과 이력을 재구성할 수 없음 — 관리자 어드민의 당일 정답률처럼 "정리하기와 무관하게 오늘 실제로 무슨 결과가 있었는지"가 필요한 집계는 이 로그를 써야 함. date는 pointLog(연도 없음)와 달리 ISO 문자열(연도 포함). slot은 같은 칸을 같은 날 다시 고친 경우 "그 칸의 최종 상태" 하나만 인정하기 위한 키(시도/정정 횟수는 별도로 세지 않음) — state:''는 되돌리기로 그 칸의 체크가 취소됐다는 뜻이라 집계에서 제외
   durationMs?: number;      // 이 진단(classify+extract+solve 전체)이 실제로 걸린 시간(ms) — 평균 대기시간 계산용
 }
 
@@ -48,6 +49,9 @@ export interface AdminUserStat {
   equippedAiVoice?: string; // 장착 중인 AI 말투 (effectValue)
   lastReviewDate?: string | null; // 마지막 복습 일자
   comboPoints?: number;      // 럭키상점 콤보 포인트 잔액
+  todayReviewedCount: number;   // 오늘 체크한 복습 건수 (O+X+★, reviewLog 기준)
+  todayCorrectCount: number;    // 오늘 정답(O) 수
+  todayIncorrectCount: number;  // 오늘 오답 처리 수 (X+★ 합산 — 코드 전반에서 "미채택" 취급과 동일 기준)
 }
 
 // 5대 실수 원인 유형 (체크박스)
