@@ -915,10 +915,64 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   const remainingSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
   const overtimeSeconds = remainingMs < 0 ? Math.floor(-remainingMs / 1000) + 1 : 0;
 
+  // 🧭 바깥 영역 탭으로 닫기. target === currentTarget일 때만(=백드롭 자체를 직접 클릭했을 때만)
+  // 닫는다 — 카드 내부 어떤 클릭도 이 조건을 만족하지 않으므로(버블링된 이벤트의 target은 항상
+  // 원래 클릭된 자손 요소) 버튼/체크리스트/입력/이미지 클릭이 새어나가 닫히는 일이 없다.
+  // isZoomOpen(이미지 참고창) 가드가 필요한 이유: 그 창은 실제로는 화면 전체를 덮는 진짜 배경이
+  // 아니라 떠다니는 작은 창(바깥 영역이 pointer-events-none으로 완전히 뚫려 있음)이라, 창 밖을
+  // 클릭하면 이 백드롭까지 클릭이 그대로 새어들어온다 — 그 사이엔 창 자체의 명시적 닫기(✕ 문제창
+  // 닫기/맞춤)만 쓰게 하고 상세 모달 전체가 함께 닫히지 않게 막는다. 정답수정 팝업/쿨다운 알림은
+  // 자체적으로 불투명한 전체화면 배경(z-9998/z-100)이라 애초에 클릭이 여기까지 새어들 수 없어
+  // 별도 가드가 필요 없다.
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return;
+    if (isZoomOpen) return;
+    onClose();
+  };
+
+  // 🧭 상단 핸들에서 시작한 아래로 스와이프만 닫기로 인식한다(본문 스크롤/이미지 pinch·drag와는
+  // 완전히 분리된 별도 요소에만 리스너를 붙여 충돌 자체가 구조적으로 불가능하다). 실시간으로
+  // 시트를 손가락에 따라 움직이는 효과는 넣지 않고, 손을 뗀 시점에 임계값을 넘겼는지만 판정하는
+  // 가장 단순한 형태로 구현한다(짧은 탭/작은 움직임/위쪽 드래그는 자연히 무시됨).
+  const SHEET_SWIPE_DISMISS_THRESHOLD = 80;
+  const sheetSwipeRef = useRef<{ startY: number } | null>(null);
+
+  const handleSheetHandlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    sheetSwipeRef.current = { startY: e.clientY };
+    safeSetPointerCapture(e.currentTarget, e.pointerId);
+  };
+
+  const handleSheetHandlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const start = sheetSwipeRef.current;
+    sheetSwipeRef.current = null;
+    if (!start) return;
+    const deltaY = e.clientY - start.startY;
+    if (deltaY > SHEET_SWIPE_DISMISS_THRESHOLD) {
+      onClose();
+    }
+  };
+
+  const handleSheetHandlePointerCancel = () => {
+    sheetSwipeRef.current = null;
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4"
+      onClick={handleBackdropClick}
+    >
       <div className="w-full max-w-3xl bg-slate-900 border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-slide-up">
-        
+
+        {/* 모바일 시트 핸들 — 아래로 스와이프하면 닫힘(데스크톱 중앙 다이얼로그에서는 숨김) */}
+        <div
+          onPointerDown={handleSheetHandlePointerDown}
+          onPointerUp={handleSheetHandlePointerUp}
+          onPointerCancel={handleSheetHandlePointerCancel}
+          className="flex-none flex items-center justify-center py-2 touch-none select-none cursor-grab active:cursor-grabbing sm:hidden"
+        >
+          <div className="w-10 h-1.5 rounded-full bg-slate-700" />
+        </div>
+
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/80 sticky top-0">
           <div className="pr-4 flex-1">
