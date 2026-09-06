@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import type { AdminUserStat } from '../types';
+import type { AdminUserStat, DailyReviewStat } from '../types';
 import { supabase } from '../services/supabase';
 import { formatDate } from '../utils/date';
 import { GACHA_ITEMS, getTitleBadgeStyle } from '../utils/gachaCatalog';
@@ -61,6 +61,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
 
       // Aggregate per user (stats cards)
       const statsMap = new Map<string, AdminUserStat & { displayName?: string; username: string }>();
+      // 학생별 날짜별(YYYY-MM-DD, 로컬 자정 기준) 복습 정답률 — "오늘" 정답률과 완전히 동일한
+      // 정의를 날짜 축으로 확장한 것. Map<userId, Map<dateKey, DailyReviewStat>>
+      const dailyStatsByUser = new Map<string, Map<string, DailyReviewStat>>();
+      // reviewLog의 date는 항상 연도 포함 ISO 문자열이라(pointLog와 달리) 별도 포맷 분기가 필요 없다.
+      const getLocalDateKey = (isoDateStr: string): string | null => {
+        const d = new Date(isoDateStr);
+        if (isNaN(d.getTime())) return null;
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      };
+      // 최근 14일 창(오늘 포함)의 하한 날짜 키 — "최근 14개 활동일"이 아니라 "최근 14일간의
+      // 활동"이어야 하므로, 활동이 뜸한 학생이라도 이 날짜 이전 기록은 표시하지 않는다.
+      const fourteenDaysAgo = new Date();
+      fourteenDaysAgo.setHours(0, 0, 0, 0);
+      fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 13);
+      const fourteenDaysAgoKey = `${fourteenDaysAgo.getFullYear()}-${String(fourteenDaysAgo.getMonth() + 1).padStart(2, '0')}-${String(fourteenDaysAgo.getDate()).padStart(2, '0')}`;
 
       (profiles || []).forEach((p: any) => {
         const username = p.email?.split('@')[0] || p.display_name || p.id.slice(0, 8);
@@ -194,6 +212,40 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
           }
         });
 
+        // 날짜별(최근 14일) 복습 정답률 — 위 "오늘" 집계와 동일한 정의를 날짜 축으로 확장.
+        // 같은 슬롯을 같은 날짜 안에서 여러 번 고쳐도(X→O 등) 그 날짜의 마지막 항목만 인정한다
+        // — reviewLog는 항상 시간순으로 append되므로, (slot, 날짜) 키로 덮어쓰기만 해도 "그 날의
+        // 최종 상태"가 된다. 오늘 하루만 볼 때는 이 방식과 위 latestBySlot(전체 로그에서 슬롯별
+        // 최신 1건, 그게 오늘이면 집계) 방식이 항상 같은 결과를 낸다 — 오늘보다 미래 항목은
+        // 존재할 수 없으므로 "슬롯의 전체 최신"과 "슬롯의 오늘자 최신"이 같기 때문. 과거 날짜에서만
+        // 두 방식이 갈리며(과거엔 그 이후 정정이 있을 수 있음), 이번 날짜별 집계는 각 날짜마다
+        // 독립적으로 "그 날짜의 최종 상태"를 남겨 정확한 히스토리를 보존한다.
+        const latestBySlotAndDate = new Map<string, { dateKey: string; state: 'O' | 'X' | 'star' | '' }>();
+        reviewLog.forEach(entry => {
+          const dateKey = getLocalDateKey(entry.date);
+          if (!dateKey) return;
+          latestBySlotAndDate.set(`${entry.slot}-${dateKey}`, { dateKey, state: entry.state });
+        });
+
+        if (latestBySlotAndDate.size > 0) {
+          let userDailyMap = dailyStatsByUser.get(m.user_id);
+          if (!userDailyMap) {
+            userDailyMap = new Map<string, DailyReviewStat>();
+            dailyStatsByUser.set(m.user_id, userDailyMap);
+          }
+          latestBySlotAndDate.forEach(({ dateKey, state }) => {
+            if (state === '') return; // 되돌리기로 취소된 체크는 집계 제외
+            const dayStat = userDailyMap!.get(dateKey) || { date: dateKey, reviewedCount: 0, correctCount: 0, incorrectCount: 0 };
+            dayStat.reviewedCount += 1;
+            if (state === 'O') {
+              dayStat.correctCount += 1;
+            } else {
+              dayStat.incorrectCount += 1;
+            }
+            userDailyMap!.set(dateKey, dayStat);
+          });
+        }
+
         // Track latest activity date
         if (!stat.lastActivity || m.date > stat.lastActivity) {
           stat.lastActivity = m.date;
@@ -208,9 +260,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
         }
       });
 
-      // 각 유저별 주간 점수 산출 (콤보제 적용)
+      // 각 유저별 주간 점수 산출 (콤보제 적용) + 날짜별 복습 정답률 최근 14일 정리(최신순).
+      // "최근 14개 활동일"이 아니라 "최근 14일간의 활동"이므로 날짜 창으로 자르고, 그 안에서도
+      // 활동 없는 날짜는 행을 만들지 않는다 — Map에는 애초에 활동이 있었던 날짜만 들어있음.
       statsMap.forEach((stat) => {
         stat.weeklyScore = Math.round(stat.weeklyScore);
+
+        const userDailyMap = dailyStatsByUser.get(stat.userId);
+        if (userDailyMap) {
+          stat.dailyReviewStats = Array.from(userDailyMap.values())
+            .filter(day => day.date >= fourteenDaysAgoKey)
+            .sort((a, b) => b.date.localeCompare(a.date));
+        }
       });
 
       // Sort: 최근 오답 복습한 순 정렬 (복습 기록이 없는 학생은 최하단 배치)
@@ -648,6 +709,36 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
                       : '—'}
                   </span>
                 </div>
+
+                {/* 날짜별 복습 정답률 (최근 14일) — "오늘" 정답률과 완전히 동일한 정의를 날짜
+                    축으로 확장. 활동 없는 날짜는 행을 만들지 않음(fetchAdminStats에서 이미 필터됨) */}
+                {selectedStudent.dailyReviewStats && selectedStudent.dailyReviewStats.length > 0 && (
+                  <div className="space-y-2">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">📅 날짜별 복습 (최근 14일)</span>
+                    <div className="border border-slate-800 rounded-xl overflow-hidden">
+                      <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 px-3 py-1.5 bg-slate-800/50 text-[9px] font-bold text-slate-500">
+                        <span>날짜</span>
+                        <span className="text-right">문제</span>
+                        <span className="text-right">정답</span>
+                        <span className="text-right">오답</span>
+                        <span className="text-right">정답률</span>
+                      </div>
+                      <div className="divide-y divide-slate-800/60 max-h-56 overflow-y-auto">
+                        {selectedStudent.dailyReviewStats.map(day => (
+                          <div key={day.date} className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 px-3 py-1.5 text-[10px]">
+                            <span className="text-slate-300 font-semibold">{day.date.slice(5)}</span>
+                            <span className="text-right text-slate-400">{day.reviewedCount}</span>
+                            <span className="text-right text-emerald-400 font-bold">{day.correctCount}</span>
+                            <span className="text-right text-red-400 font-bold">{day.incorrectCount}</span>
+                            <span className="text-right text-amber-300 font-black">
+                              {Math.round((day.correctCount / day.reviewedCount) * 100)}%
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* 장착 아이템 */}
                 <div className="space-y-2">
