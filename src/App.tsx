@@ -701,11 +701,12 @@ function App() {
         targetId
           ? supabase
               .from('profiles')
-              .select('nickname, display_name, bonus_points, point_adjustment, equipped_title, equipped_stamp, equipped_theme, equipped_ai_voice, current_streak, streak_last_review_date, streak_shields, streak_milestone_claimed, custom_ai_name, combo_booster_expires_at, pending_gift_notice, daily_review_date, daily_review_count, weekly_gold_count, weekly_silver_count, weekly_bronze_count')
+              .select('email, nickname, display_name, bonus_points, point_adjustment, equipped_title, equipped_stamp, equipped_theme, equipped_ai_voice, current_streak, streak_last_review_date, streak_shields, streak_milestone_claimed, custom_ai_name, combo_booster_expires_at, pending_gift_notice, daily_review_date, daily_review_count, weekly_gold_count, weekly_silver_count, weekly_bronze_count')
               .eq('id', targetId)
               .maybeSingle()
           : Promise.resolve({ data: null } as { data: null }),
-        // 이름·학년·스탬프만 노출하는 안전한 학생 디렉터리 RPC
+        // 이름·학년·스탬프만 노출하는 안전한 학생 디렉터리 RPC (관리자 계정은 여기서 의도적으로
+        // 제외됨 — 아래 profilesMap 보강 블록 참고)
         supabase.rpc('get_profile_directory'),
         // 스캐폴딩 힌트가 첨부된 오답 id 집합 (RLS가 본인 것만/관리자는 전체를 알아서 걸러줌)
         supabase.from('mistake_scaffoldings').select('mistake_id'),
@@ -790,6 +791,20 @@ function App() {
           sMap[p.id] = p.equipped_stamp;
         }
       });
+
+      // 🛡️ get_profile_directory RPC는 관리자 계정을 의도적으로 제외한다(학생에게 관리자 정보가
+      // 노출되지 않게 하는 보안 정책 — RPC/마이그레이션은 그대로 유지). 그 결과 관리자 본인의
+      // 이름이 pMap에 없어서, "학생별 통계 조회"·"나의 오답노트" 이름 배지 등에서 관리자 자신이
+      // UUID 앞자리로 보이는 부작용이 있었다. 이미 별도로 가져온 "내 프로필"(행 소유자 직접
+      // 조회라 RLS상 항상 읽을 수 있음)로 내 항목 하나만 pMap에 보강한다 — 다른 사용자 항목에는
+      // 전혀 영향 없다(학생 계정으로 로그인해도 이 블록은 자기 자신의 항목만 채운다).
+      if (targetId && profileRes.data) {
+        const myProfileForMap = profileRes.data as { display_name?: string | null; email?: string | null };
+        const myUsername = myProfileForMap.email?.split('@')[0] || targetId.slice(0, 8);
+        const myDisplayName = myProfileForMap.display_name?.trim();
+        pMap[targetId] = myDisplayName ? `${myDisplayName} (${myUsername})` : myUsername;
+      }
+
       setProfilesMap(pMap);
       setProfilesGradeMap(gMap);
       setProfilesStampMap(sMap);
