@@ -128,7 +128,7 @@
   animation: rainbowWave 3s linear infinite;
 }
 
-/* 🌈 특별 MR 칭호("195시간의 경이") 전용 오로라 무지개 웨이브 & 소프트 쉬머 배지 효과 */
+/* 🌈 특별 MR 칭호("195시간의 경이") 전용 오로라 무지개 웨이브 & 네온 글로우 & 소프트 쉬머 배지 효과 */
 @keyframes titleRainbowWave {
   0% {
     background-position: 0% 50%;
@@ -143,46 +143,47 @@
 
 @keyframes titleShimmer {
   0%, 65% {
-    left: -100%;
+    left: -120%;
     opacity: 0;
   }
   70% {
     opacity: 1;
   }
   100% {
-    left: 200%;
+    left: 220%;
     opacity: 0;
   }
 }
 
 .badge-rainbow-wave {
-  position: relative;
-  overflow: hidden;
-  background: linear-gradient(90deg, #f43f5e, #a855f7, #3b82f6, #06b6d4, #10b981, #f59e0b, #f43f5e);
-  background-size: 300% 100%;
-  animation: titleRainbowWave 8s ease infinite;
-  border-color: rgba(255, 255, 255, 0.45) !important;
-  box-shadow: 0 0 12px rgba(168, 85, 247, 0.4), 0 0 20px rgba(59, 130, 246, 0.25);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
+  position: relative !important;
+  overflow: hidden !important;
+  isolation: isolate;
+  background: linear-gradient(90deg, #ff1493, #a855f7, #3b82f6, #00f0ff, #10b981, #facc15, #ff5722, #ff1493) !important;
+  background-size: 200% 100% !important;
+  animation: titleRainbowWave 6s linear infinite !important;
+  border-color: rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 0 0 16px rgba(168, 85, 247, 0.9), 0 0 28px rgba(6, 182, 212, 0.6) !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 3px rgba(0, 0, 0, 0.85);
 }
 
 .badge-rainbow-wave > * {
-  position: relative;
-  z-index: 1;
+  position: relative !important;
+  z-index: 2 !important;
 }
 
 .badge-rainbow-wave::after {
   content: '';
   position: absolute;
   top: 0;
-  left: -100%;
-  width: 50%;
+  left: -120%;
+  width: 65%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.85) 50%, transparent 100%);
   transform: skewX(-20deg);
-  animation: titleShimmer 6s ease-in-out infinite;
+  animation: titleShimmer 5s ease-in-out infinite;
   pointer-events: none;
-  z-index: 0;
+  z-index: 1;
 }
 
 @media (prefers-reduced-motion: reduce) {

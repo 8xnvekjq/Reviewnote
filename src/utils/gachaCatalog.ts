@@ -599,13 +599,38 @@ export function drawGachaItem(): GachaItem {
   return pool[selectedIndex];
 }
 
+// 칭호 문자열 정규화: 앞뒤 공백 제거, 앞부분 아이콘/이모지 및 '칭호:' 접두사 제거
+const normalizeTitleString = (raw: string): string => {
+  return raw
+    .trim()
+    .replace(/^[^\w\s가-힣]+/, '') // 시작부 이모지 제거 (예: ✨, ⏱️, 👑 등)
+    .replace(/^칭호\s*:\s*/, '')   // '칭호:' 접두사 제거
+    .trim();
+};
+
 // ── 칭호 희귀도별 화려한 이펙트 스타일 공통 반환 함수 ─────────────────
 export const getTitleBadgeStyle = (title: string) => {
-  // 🌈 개별 특별 이펙트(visualVariant)가 지정된 칭호 우선 적용
-  const catalogItem = GACHA_ITEMS.find(g => g.category === 'TITLE' && g.effectValue === title);
+  const normalized = normalizeTitleString(title);
+
+  // 1. 카탈로그에서 effectValue 또는 name 일치 (원본 및 정규화 문자열 양방향 매칭)
+  let catalogItem = GACHA_ITEMS.find(g =>
+    g.category === 'TITLE' && (
+      g.effectValue === title ||
+      g.name === title ||
+      (g.effectValue && normalizeTitleString(g.effectValue) === normalized) ||
+      (g.name && normalizeTitleString(g.name) === normalized)
+    )
+  );
+
+  // 2. 제한적 안전 fallback (문자열에 195시간이 포함된 경우)
+  if (!catalogItem && title.includes('195시간')) {
+    catalogItem = GACHA_ITEMS.find(g => g.id === 'title_195h_marvel');
+  }
+
+  // 🌈 개별 특별 이펙트(visualVariant)가 지정된 칭호 우선 적용 (기존 MR 강렬함 유지 + rainbow wave/glow)
   if (catalogItem?.visualVariant === 'rainbow_wave') {
     return {
-      style: 'badge-rainbow-wave text-white font-black shadow-md',
+      style: 'badge-rainbow-wave text-white font-black border-white/60 ring-2 ring-purple-400/80 shadow-[0_0_18px_rgba(168,85,247,0.95)]',
       icon: catalogItem.icon
     };
   }
