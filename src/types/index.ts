@@ -75,6 +75,15 @@ export function resolveNeedsHelp(reviews: ReviewState[] | undefined, needsHelp: 
   );
 }
 
+// 날짜별 복습 정답률 한 행 — AdminUserStat.todayReviewedCount 등("오늘" 정답률)과 정의를
+// 완전히 동일하게 날짜 축으로 확장한 것. date는 로컬 자정 기준 'YYYY-MM-DD'.
+export interface DailyReviewStat {
+  date: string;
+  reviewedCount: number;
+  correctCount: number;
+  incorrectCount: number;
+}
+
 export interface AdminUserStat {
   userId: string;
   email: string;
@@ -95,6 +104,7 @@ export interface AdminUserStat {
   todayReviewedCount: number;   // 오늘 체크한 복습 건수 (O+X+★, reviewLog 기준)
   todayCorrectCount: number;    // 오늘 정답(O) 수
   todayIncorrectCount: number;  // 오늘 오답 처리 수 (X+★ 합산 — 코드 전반에서 "미채택" 취급과 동일 기준)
+  dailyReviewStats?: DailyReviewStat[]; // 최근 14일치, 최신 날짜 먼저. 활동 없는 날짜는 행 자체가 없음(0행 생성 안 함)
 }
 
 // 5대 실수 원인 유형 (체크박스)
