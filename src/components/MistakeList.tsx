@@ -1,8 +1,33 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { MistakeEntry } from '../types';
 import { MistakeCard } from './MistakeCard';
 import { LaTeXRenderer } from './LaTeXRenderer';
 import { supabase } from '../services/supabase';
+import { getScreenState, setScreenState } from '../app/screenStateStore';
+
+interface StoredMistakeListState {
+  scrollTop: number;
+  visibleCount: number;
+  selectedStudent: string;
+  filterGrade: string;
+  filterChapter: string;
+}
+
+// MistakeList 자신은 스크롤 컨테이너를 갖지 않는다 — 실제 스크롤은 AppShell의 <main
+// overflow-y-auto>에서 일어난다. AppShell 구조를 건드리지 않고도 그 실제 스크롤 요소를 찾기 위해
+// DOM을 위로 타고 올라가며 overflow-y가 auto/scroll인 첫 조상을 찾는다(못 찾으면 문서 전체 스크롤
+// 요소로 폴백) — 모바일 뷰포트든 데스크톱이든 어떤 형태의 스크롤 컨테이너 구조에도 동작한다.
+function findScrollableAncestor(el: HTMLElement | null): HTMLElement | null {
+  let node = el?.parentElement ?? null;
+  while (node && node !== document.body) {
+    const overflowY = window.getComputedStyle(node).overflowY;
+    if (overflowY === 'auto' || overflowY === 'scroll') {
+      return node;
+    }
+    node = node.parentElement;
+  }
+  return (document.scrollingElement as HTMLElement | null) ?? document.documentElement;
+}
 
 interface MistakeListProps {
   mistakes: MistakeEntry[];
@@ -57,11 +82,77 @@ export const MistakeList: React.FC<MistakeListProps> = ({
   checkpointRegenStatusMap = {},
   onRetryCheckpointGeneration,
 }) => {
-  const [selectedStudent, setSelectedStudent] = useState<string>('all');
-  const [filterGrade, setFilterGrade] = useState<string>('all');
-  const [filterChapter, setFilterChapter] = useState<string>('all');
-  const [visibleCount, setVisibleCount] = useState<number>(10);
+  // 'notes' 탭은 viewMode 생략(card 기본값), 'completed' 탭은 'list'를 넘겨서 두 사용처가
+  // 이미 서로 다른 값을 쓰고 있으므로 이걸 그대로 저장 키로 재사용한다(새 prop 추가 없이 두
+  // 인스턴스의 스크롤/필터 기억을 서로 침범하지 않게 분리).
+  const screenKey = `mistakeList:${viewMode}`;
+  // 마운트 시점에 저장된 스냅샷을 딱 한 번만 읽어 온다(ref) — 이후 리렌더에서 다시 읽지 않는다.
+  const saved = useRef(getScreenState<StoredMistakeListState>(screenKey)).current;
+
+  const [selectedStudent, setSelectedStudent] = useState<string>(() => saved?.selectedStudent ?? 'all');
+  const [filterGrade, setFilterGrade] = useState<string>(() => saved?.filterGrade ?? 'all');
+  const [filterChapter, setFilterChapter] = useState<string>(() => saved?.filterChapter ?? 'all');
+  const [visibleCount, setVisibleCount] = useState<number>(() => saved?.visibleCount ?? 10);
   const [isLoadingActivity, setIsLoadingActivity] = useState<string | null>(null);
+
+  // 언마운트 시점에 최신 값을 저장하기 위한 ref들. effect의 cleanup 클로저가 마운트 시점 값에
+  // 고정되지 않도록(stale closure 방지), 매 렌더마다 최신 state를 동기적으로 반영해둔다.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const scrollTopRef = useRef<number>(saved?.scrollTop ?? 0);
+  const hasRestoredScrollRef = useRef(false);
+  const visibleCountRef = useRef(visibleCount);
+  visibleCountRef.current = visibleCount;
+  const selectedStudentRef = useRef(selectedStudent);
+  selectedStudentRef.current = selectedStudent;
+  const filterGradeRef = useRef(filterGrade);
+  filterGradeRef.current = filterGrade;
+  const filterChapterRef = useRef(filterChapter);
+  filterChapterRef.current = filterChapter;
+
+  // 스크롤 컨테이너에 리스너를 붙여 scrollTop을 ref로만 추적(리렌더 유발 방지)하고, 언마운트 시
+  // 그 시점의 스크롤/필터/더보기 상태를 스냅샷으로 저장한다.
+  useEffect(() => {
+    const container = findScrollableAncestor(rootRef.current);
+    if (!container) return;
+
+    const handleScroll = () => {
+      scrollTopRef.current = container.scrollTop;
+    };
+    container.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      setScreenState<StoredMistakeListState>(screenKey, {
+        scrollTop: scrollTopRef.current,
+        visibleCount: visibleCountRef.current,
+        selectedStudent: selectedStudentRef.current,
+        filterGrade: filterGradeRef.current,
+        filterChapter: filterChapterRef.current,
+      });
+    };
+  }, [screenKey]);
+
+  // 저장된 스크롤 위치 복원 시도. mistakes가 아직 다 안 실려서 스크롤할 만큼 콘텐츠가 없으면
+  // (scrollHeight <= clientHeight) 이번엔 건너뛰고, mistakes.length가 바뀔 때(예: 뒤늦게 도착한
+  // 데이터) 다시 한번만 시도한다 — 한 번이라도 성공하면(hasRestoredScrollRef) 이후 realtime
+  // 갱신 등으로 목록 길이가 바뀌어도 사용자가 이미 스크롤한 위치를 다시 잡아채지 않는다.
+  useEffect(() => {
+    if (hasRestoredScrollRef.current) return;
+    const target = saved?.scrollTop ?? 0;
+    if (target <= 0) {
+      hasRestoredScrollRef.current = true;
+      return;
+    }
+    const container = findScrollableAncestor(rootRef.current);
+    if (!container) return;
+
+    const raf = requestAnimationFrame(() => {
+      if (container.scrollHeight <= container.clientHeight) return; // 아직 콘텐츠 부족 — 다음 기회에 재시도
+      container.scrollTop = target;
+      hasRestoredScrollRef.current = true;
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [mistakes.length, saved]);
 
   const handleActivityClick = async (act: any) => {
     if (!act.mistake_id) return;
@@ -105,8 +196,15 @@ export const MistakeList: React.FC<MistakeListProps> = ({
     }
   };
 
-  // 필터나 뷰모드가 변경되면 표시 개수를 10개로 리셋
+  // 필터나 뷰모드가 변경되면 표시 개수를 10개로 리셋. 단, 마운트 직후 첫 실행은 건너뛴다 —
+  // 그렇지 않으면 위에서 저장된 스냅샷으로 복원한 visibleCount를 이 effect가 마운트되자마자
+  // 다시 10으로 되돌려버린다(React는 deps 배열과 무관하게 마운트 시 한 번은 항상 effect를 실행함).
+  const isFirstFilterEffectRef = useRef(true);
   React.useEffect(() => {
+    if (isFirstFilterEffectRef.current) {
+      isFirstFilterEffectRef.current = false;
+      return;
+    }
     setVisibleCount(10);
   }, [selectedStudent, filterGrade, filterChapter, viewMode]);
 
@@ -143,7 +241,7 @@ export const MistakeList: React.FC<MistakeListProps> = ({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5" ref={rootRef}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
