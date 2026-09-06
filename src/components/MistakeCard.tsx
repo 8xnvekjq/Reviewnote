@@ -1,6 +1,6 @@
 import React from 'react';
 import type { MistakeEntry } from '../types';
-import { SOLVING_PLACEHOLDER_TEXT } from '../types';
+import { SOLVING_PLACEHOLDER_TEXT, resolveNeedsHelp } from '../types';
 import { formatDate, formatDateTime } from '../utils/date';
 import { GACHA_ITEMS, getRarityTheme } from '../utils/gachaCatalog';
 
@@ -19,7 +19,10 @@ interface MistakeCardProps {
 }
 
 export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDelete, studentName, isOwnNote = true, equippedStamp, hasScaffolding, onToggleHidden }) => {
-  const struggleCount = entry.reviews ? entry.reviews.filter(r => r === 'X' || r === 'star').length : 0;
+  // "도움 필요"는 analysis.needsHelp 영구 플래그를 최우선으로 보되(정리하기 이후에도 유지되고
+  // O 획득 이후 false가 됨), 이 기능 배포 전부터 이미 3칸이 채워져 있던 레거시 데이터처럼 값이
+  // 아직 없는 경우에만 reviews를 즉석 판정하는 fallback을 쓴다(resolveNeedsHelp 참고).
+  const needsHelp = resolveNeedsHelp(entry.reviews, entry.analysis?.needsHelp);
   const isCompleted = entry.reviews && entry.reviews.filter(r => r === 'O').length === 3;
 
   // 장착한 스탬프의 실제 뽑기 등급(UR/SSR/SR/R)에 맞는 테두리 클래스
@@ -114,7 +117,7 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
               className="text-white font-bold text-sm line-clamp-1 inline-block w-full"
             />
           </h3>
-          {struggleCount === 3 && (
+          {needsHelp && (
             <span className="flex-none px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 text-[9px] font-black tracking-tight animate-pulse flex items-center gap-0.5">
               <span>🚨</span> 집중 공략 약점
             </span>

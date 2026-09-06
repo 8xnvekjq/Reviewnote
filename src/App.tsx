@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import type { ActiveTab, MistakeEntry, ReviewState, MistakeAnalysis } from './types';
-import { ROOT_CAUSE_OPTIONS, SOLVING_PLACEHOLDER_TEXT } from './types';
+import { ROOT_CAUSE_OPTIONS, SOLVING_PLACEHOLDER_TEXT, resolveNeedsHelp } from './types';
 import { CameraScanner } from './components/CameraScanner';
 import type { CropPercent } from './utils/guideBoxCrop';
 import { classifyMistakeWithGemini, solveMistakeWithGemini, extractProblemWithGemini, prepareGeminiImage } from './services/gemini';
@@ -1601,13 +1601,27 @@ function App() {
         }
       }
 
+      // 🙋 "도움 필요" 영구 플래그: 3칸이 모두 채워졌는데 O가 하나도 없으면 true로 확정하고,
+      // 이후 그 문제에서 O가 하나라도 나오면 false로 해제한다. 그 외(정리하기로 3칸이 비워지는
+      // 경우 포함)에는 이전 값을 그대로 둔다 — reviews 배열만으로는 "정리하기" 순간 신호가
+      // 사라지므로, 이 플래그로 정리하기와 무관하게 영속시킨다(needsHelp 필드 주석 참고).
+      const hasO = newReviews.includes('O');
+      const allFilled = newReviews.every(r => r !== '');
+      let newNeedsHelp = targetEntry.analysis?.needsHelp ?? false;
+      if (hasO) {
+        newNeedsHelp = false;
+      } else if (allFilled) {
+        newNeedsHelp = true;
+      }
+
       const updatedAnalysis: MistakeAnalysis = {
         solvingProcess: targetEntry.analysis?.solvingProcess || '',
         ...targetEntry.analysis,
         reviewDates: currentDates,
         reviewPoints: currentPoints,
         pointLog: [...existingPointLog, ...newPointLogEntries],
-        reviewLog: [...existingReviewLog, ...newReviewLogEntries]
+        reviewLog: [...existingReviewLog, ...newReviewLogEntries],
+        needsHelp: newNeedsHelp
       };
 
       const { error } = await supabase
@@ -2141,12 +2155,17 @@ function App() {
                 .filter(m => !m.isHidden)
                 .filter(m => !(m.reviews?.filter(r => r === 'O').length === 3))
                 .sort((a, b) => {
-                const aStruggles = a.reviews ? a.reviews.filter(r => r === 'X' || r === 'star').length : 0;
-                const bStruggles = b.reviews ? b.reviews.filter(r => r === 'X' || r === 'star').length : 0;
-                
-                if (aStruggles === 3 && bStruggles !== 3) return -1;
-                if (bStruggles === 3 && aStruggles !== 3) return 1;
-                
+                // "도움 필요"(needsHelp) 문제를 상단 고정 — 단, 어드민은 전체 학생의 오답을 다
+                // 보므로(RLS) 여기서 고정하면 모든 학생의 도움 필요 문제가 계속 쌓여 스크롤이
+                // 길어진다. 어드민은 날짜순 정렬만 적용하고, 고정은 본인 화면(학생)에서만 한다.
+                if (!isAdmin) {
+                  const aNeedsHelp = resolveNeedsHelp(a.reviews, a.analysis?.needsHelp);
+                  const bNeedsHelp = resolveNeedsHelp(b.reviews, b.analysis?.needsHelp);
+
+                  if (aNeedsHelp && !bNeedsHelp) return -1;
+                  if (bNeedsHelp && !aNeedsHelp) return 1;
+                }
+
                 return new Date(b.date).getTime() - new Date(a.date).getTime();
               })}
             onSelectEntry={(entry) => {
