@@ -83,14 +83,27 @@ function App() {
   // 최신 실행 여부를 알 수 없다 — ref는 모든 클로저가 항상 같은 최신 값을 본다.
   const analyzingEntryIdRef = useRef<string | null>(null);
   // generateAndSaveSolutionCheckpoints의 중복 실행 가드용(같은 이유로 ref 사용 — state/클로저는
-  // 이 함수가 신규 분석 직후 fire-and-forget으로도, 상세 모달 open 시 lazy로도 호출될 수 있어
-  // 거의 동시에 두 경로에서 같은 문제에 대해 겹쳐 호출될 여지가 있다). 문제 id를 담아 진행 중인
-  // 생성만 걸러내고, DB 재확인(아래 함수 본문)으로 한 번 더 방지한다.
-  const generatingCheckpointsIdsRef = useRef<Set<string>>(new Set());
+  // 이 함수가 신규 분석 직후 fire-and-forget으로도, 상세 모달 open 시 lazy로도, 정리하기(초기화)
+  // 재생성으로도 호출될 수 있어 같은 문제에 대해 겹쳐 호출될 여지가 있다). 문제 id별로 "지금
+  // 진행 중인 요청이 어느 세대(checkpointGenerationRef)의 것인지"까지 함께 기억해 둔다 —
+  // 같은 세대의 중복 호출은 Gemini를 또 부르지 않고 그 Promise를 그대로 재사용하고, 정리하기로
+  // 세대가 올라간 뒤 들어온 새 호출은 기존 요청이 끝나길 기다렸다가 그제서야 자신의 세대로 다시
+  // 시도한다(Gemini 동시 중복 호출 없이도 최신 세대 요청이 결국 반영되도록). DB 재확인(아래 함수
+  // 본문)으로 한 번 더 방지한다.
+  const checkpointGenerationInFlightRef = useRef<Record<string, { generation: number; promise: Promise<boolean> }>>({});
   // lazy 생성이 실패한 문제 id를 이 세션(탭) 동안만 기억해, 같은 문제를 열었다 닫았다
   // 반복할 때마다 Gemini를 매번 재호출하는 비용 낭비를 막는다. 메모리에만 있고 저장/영속화하지
   // 않으므로 새로고침·재로그인·다른 탭에서는 자유롭게 다시 시도된다 — 영구 잠금 아님.
   const checkpointGenerationFailedIdsRef = useRef<Set<string>>(new Set());
+  // "정리하기"(집중 오답 초기화)로 체크리스트를 다시 만들 때, 그 전에 이미 진행 중이던(예: 최초
+  // 분석 직후 eager) 생성 요청이 뒤늦게 끝나면서 초기화 이후 상태를 덮어쓰는 걸 막기 위한 세대
+  // 번호. 초기화 시 이 값을 올리면, 그보다 낮은 세대에서 시작된 생성 요청은 결과를 저장하지 않고
+  // 스스로 폐기한다(generateAndSaveSolutionCheckpoints 본문 참고).
+  const checkpointGenerationRef = useRef<Record<string, number>>({});
+  // 정리하기(초기화) 이후 체크리스트 재생성의 진행 상태 — 카드/상세 모달에 표시하기 위한
+  // React state(ref가 아님: 렌더로 드러나야 하는 UI 상태라서). 성공 상태는 잠깐 보여준 뒤
+  // 자동으로 지운다(엔트리 자체를 지움 = 평소 카드로 복귀).
+  const [checkpointRegenStatus, setCheckpointRegenStatus] = useState<Record<string, 'generating' | 'success' | 'failed'>>({});
 
   // 매일 연속 복습 스트릭 상태 (🔥 Streak 관리)
   const [streakState, setStreakState] = useState<StreakState>(() => loadStreakState());
@@ -1242,67 +1255,131 @@ function App() {
 
   // 🧭 단계형 풀이 체크리스트 생성 — 신규(solveStep 직후 eager)와 레거시 needsHelp 문제(상세
   // 모달을 열 때 lazy) 양쪽에서 동일하게 재사용하는 단일 함수. 이미 있으면(캐시) 재생성하지 않는다.
-  const generateAndSaveSolutionCheckpoints = async (entry: MistakeEntry) => {
-    // 1차 가드(같은 탭 안의 중복 호출 방지) — DB 재확인은 저장 직전에 한 번 더 한다.
-    if (generatingCheckpointsIdsRef.current.has(entry.id)) return;
-    if (entry.analysis?.solutionCheckpoints) return; // 이미 캐시돼 있음
-    if (!entry.analysis?.problemText || !entry.analysis?.solvingProcess) return; // 재료 미비(분석 미완료)
+  // 반환값은 "결과적으로 solutionCheckpoints가 유효하게 존재하는가"(성공 여부) — 정리하기(초기화)
+  // 재생성 흐름이 성공/실패 UI를 표시하려면 이 결과를 알아야 한다. 성공 기준은 Gemini 응답이 아니라
+  // DB 저장 완료(또는 이미 다른 경로로 저장되어 있음)다.
+  const generateAndSaveSolutionCheckpoints = async (entry: MistakeEntry): Promise<boolean> => {
+    if (entry.analysis?.solutionCheckpoints) return true; // 이미 캐시돼 있음 = 이미 성공한 상태
+    if (!entry.analysis?.problemText || !entry.analysis?.solvingProcess) return false; // 재료 미비(분석 미완료)
 
-    generatingCheckpointsIdsRef.current.add(entry.id);
-    try {
-      const checkpointStages = await generateSolutionCheckpointsWithGemini(
-        entry.analysis.problemText,
-        entry.analysis.solvingProcess
-      );
-      if (!checkpointStages) {
-        // 생성 실패/품질 검증 실패 — 조용히 폴백(기존 정석 풀이만 노출). 이 세션 동안은 같은
-        // 문제를 다시 열어도 자동 재호출하지 않는다(비용 낭비 방지) — 영구 잠금은 아니라서
-        // 새로고침/재로그인하면 다시 시도된다.
-        checkpointGenerationFailedIdsRef.current.add(entry.id);
-        return;
+    // 이 호출 시작 시점의 세대를 기억해둔다 — 정리하기(초기화)가 이 세대 번호를 올리면, 이 호출은
+    // (뒤늦게 응답이 와도) 더 이상 최신이 아니므로 결과를 저장하지 않고 조용히 스스로 폐기한다.
+    const myGeneration = checkpointGenerationRef.current[entry.id] || 0;
+
+    const inFlight = checkpointGenerationInFlightRef.current[entry.id];
+    if (inFlight) {
+      if (inFlight.generation === myGeneration) {
+        // 완전히 같은 세대의 겹친 호출(예: 신규 분석 직후 eager와 모달 open lazy가 거의 동시에
+        // 발생) — Gemini를 또 부르지 않고 이미 진행 중인 그 요청의 결과를 그대로 재사용한다.
+        return inFlight.promise;
       }
-
-      // 🛡️ background/lazy로 시간이 걸리는 호출이라, 그 사이 학생이 복습 체크·정리하기·대책 작성
-      // 등으로 analysis를 바꿨을 수 있다. 함수 시작 시 캡처해둔 entry.analysis는 stale할 수
-      // 있으므로, 저장 직전에 DB에서 analysis를 다시 읽어 그 위에 병합한다(classifyStep이 예전에
-      // analysis를 통째로 덮어써서 reviewLog 등이 사라지던 것과 같은 종류의 버그를 여기서도 막음).
-      const { data: freshRow, error: fetchError } = await supabase
-        .from('mistakes')
-        .select('analysis')
-        .eq('id', entry.id)
-        .single();
-
-      if (fetchError || !freshRow) {
-        console.error('Failed to refetch analysis before saving solution checkpoints:', fetchError);
-        checkpointGenerationFailedIdsRef.current.add(entry.id);
-        return;
-      }
-
-      // 그 사이 다른 경로(다른 탭, 겹친 호출 등)로 이미 생성/저장됐으면 중복 저장하지 않는다.
-      // (성공한 경우이므로 실패 마킹은 하지 않는다)
-      if (freshRow.analysis?.solutionCheckpoints) return;
-
-      const mergedAnalysis: MistakeAnalysis = {
-        ...freshRow.analysis,
-        solutionCheckpoints: checkpointStages,
-      };
-
-      const { error: updateError } = await supabase
-        .from('mistakes')
-        .update({ analysis: mergedAnalysis })
-        .eq('id', entry.id);
-
-      if (updateError) {
-        console.error('Failed to save solution checkpoints:', updateError);
-        checkpointGenerationFailedIdsRef.current.add(entry.id);
-        return;
-      }
-
-      setMistakes(prev => prev.map(m => m.id === entry.id ? { ...m, analysis: mergedAnalysis } : m));
-      setSelectedEntry(prev => prev && prev.id === entry.id ? { ...prev, analysis: mergedAnalysis } : prev);
-    } finally {
-      generatingCheckpointsIdsRef.current.delete(entry.id);
+      // 더 오래된 세대의 요청이 아직 진행 중(예: 레거시 문제를 열자마자 시작된 lazy 생성이 끝나기
+      // 전에 정리하기를 눌러 세대가 올라간 경우) — 새 Gemini 호출을 겹쳐 띄우지 않고 그 요청이
+      // 끝나길 기다린 뒤, 그래도 내가 여전히 최신 세대이면 그제서야 내 몫의 새 요청을 시작한다.
+      await inFlight.promise.catch(() => {});
+      if ((checkpointGenerationRef.current[entry.id] || 0) !== myGeneration) return false; // 기다리는 사이 또 새치기당함
     }
+
+    const run = (async (): Promise<boolean> => {
+      try {
+        const checkpointStages = await generateSolutionCheckpointsWithGemini(
+          entry.analysis!.problemText!,
+          entry.analysis!.solvingProcess!
+        );
+        if (!checkpointStages) {
+          // 생성 실패/품질 검증 실패 — 조용히 폴백(기존 정석 풀이만 노출). 이 세션 동안은 같은
+          // 문제를 다시 열어도 자동 재호출하지 않는다(비용 낭비 방지) — 영구 잠금은 아니라서
+          // 새로고침/재로그인하면 다시 시도된다.
+          checkpointGenerationFailedIdsRef.current.add(entry.id);
+          return false;
+        }
+
+        // 세대 확인: 이 호출이 진행되는 동안 정리하기(초기화)로 새 세대가 시작됐으면, 이 결과는
+        // 이제 무의미하므로 저장하지 않고 폐기한다 — "이전 요청 결과가 초기화 이후 저장되는" 것 방지.
+        if ((checkpointGenerationRef.current[entry.id] || 0) !== myGeneration) return false;
+
+        // 🛡️ background/lazy로 시간이 걸리는 호출이라, 그 사이 학생이 복습 체크·정리하기·대책 작성
+        // 등으로 analysis를 바꿨을 수 있다. 함수 시작 시 캡처해둔 entry.analysis는 stale할 수
+        // 있으므로, 저장 직전에 DB에서 analysis를 다시 읽어 그 위에 병합한다(classifyStep이 예전에
+        // analysis를 통째로 덮어써서 reviewLog 등이 사라지던 것과 같은 종류의 버그를 여기서도 막음).
+        const { data: freshRow, error: fetchError } = await supabase
+          .from('mistakes')
+          .select('analysis')
+          .eq('id', entry.id)
+          .single();
+
+        if (fetchError || !freshRow) {
+          console.error('Failed to refetch analysis before saving solution checkpoints:', fetchError);
+          checkpointGenerationFailedIdsRef.current.add(entry.id);
+          return false;
+        }
+
+        // 재조회 사이에도 새 세대가 시작될 수 있으므로 저장 직전에 한 번 더 확인한다.
+        if ((checkpointGenerationRef.current[entry.id] || 0) !== myGeneration) return false;
+
+        // 그 사이 다른 경로(다른 탭, 겹친 호출 등)로 이미 생성/저장됐으면 중복 저장하지 않는다.
+        // (성공한 경우이므로 실패 마킹은 하지 않는다)
+        if (freshRow.analysis?.solutionCheckpoints) return true;
+
+        const mergedAnalysis: MistakeAnalysis = {
+          ...freshRow.analysis,
+          solutionCheckpoints: checkpointStages,
+        };
+
+        const { error: updateError } = await supabase
+          .from('mistakes')
+          .update({ analysis: mergedAnalysis })
+          .eq('id', entry.id);
+
+        if (updateError) {
+          console.error('Failed to save solution checkpoints:', updateError);
+          checkpointGenerationFailedIdsRef.current.add(entry.id);
+          return false;
+        }
+
+        setMistakes(prev => prev.map(m => m.id === entry.id ? { ...m, analysis: mergedAnalysis } : m));
+        setSelectedEntry(prev => prev && prev.id === entry.id ? { ...prev, analysis: mergedAnalysis } : prev);
+        return true;
+      } finally {
+        if (checkpointGenerationInFlightRef.current[entry.id]?.generation === myGeneration) {
+          delete checkpointGenerationInFlightRef.current[entry.id];
+        }
+      }
+    })();
+
+    checkpointGenerationInFlightRef.current[entry.id] = { generation: myGeneration, promise: run };
+    return run;
+  };
+
+  // 🧭 정리하기(초기화) 이후의 체크리스트 재생성 + 진행 상태 표시를 하나로 묶은 헬퍼 — 초기화
+  // 트리거와 "다시 시도" 버튼이 동일하게 재사용한다. 세대 번호를 먼저 올려서, 이전에 떠 있던
+  // (초기화 전 시작된) 생성 요청이 뒤늦게 끝나도 결과를 저장하지 않도록 한다. 세대가 올라간
+  // 상태에서 이전 요청이 아직 진행 중이어도, generateAndSaveSolutionCheckpoints 자체가 세대별
+  // in-flight Promise를 추적해 새 Gemini 호출을 겹쳐 띄우지 않으면서 이전 요청이 끝나는 대로
+  // 이 최신 세대의 요청을 이어서 실행하므로, 여기서는 항상 그대로 호출하면 된다.
+  const regenerateCheckpointsWithProgress = (entry: MistakeEntry) => {
+    const id = entry.id;
+    checkpointGenerationRef.current[id] = (checkpointGenerationRef.current[id] || 0) + 1;
+    setCheckpointRegenStatus(prev => ({ ...prev, [id]: 'generating' }));
+    generateAndSaveSolutionCheckpoints(entry)
+      .then(success => {
+        setCheckpointRegenStatus(prev => ({ ...prev, [id]: success ? 'success' : 'failed' }));
+        if (success) {
+          // "✓ 새로운 진단이 준비됐어요"를 잠깐 보여준 뒤 일반 카드로 복귀
+          setTimeout(() => {
+            setCheckpointRegenStatus(prev => {
+              if (prev[id] !== 'success') return prev; // 그 사이 다시 재시도됐다면 건드리지 않음
+              const next = { ...prev };
+              delete next[id];
+              return next;
+            });
+          }, 2500);
+        }
+      })
+      .catch(err => {
+        console.error('Failed to regenerate solution checkpoints:', err);
+        setCheckpointRegenStatus(prev => ({ ...prev, [id]: 'failed' }));
+      });
   };
 
   // 🧭 단계형 풀이 체크포인트 상태 갱신("이해했어요"/"여기서 막혔어요") — O/X/★ 복습 체크와
@@ -1391,7 +1468,7 @@ function App() {
   //   더 시끄러워지기만 한다.
   // - 설령 클로저가 오래된 selectedEntry를 참조하더라도, 실제 호출 대상인
   //   generateAndSaveSolutionCheckpoints 자체가 저장 직전 DB를 다시 읽어 병합하고
-  //   (generatingCheckpointsIdsRef로) 동시 중복 실행도 막아주므로, 이 effect가 약간 오래된
+  //   (checkpointGenerationInFlightRef로) 동시 중복 실행도 막아주므로, 이 effect가 약간 오래된
   //   스냅샷으로 호출해도 데이터 유실이나 중복 저장으로 이어지지 않는다.
   // 즉 selectedEntry.id가 바뀔 때 "이 문제를 처음 열었는지"만 판단하면 충분하고 안전하다.
   useEffect(() => {
@@ -1818,7 +1895,12 @@ function App() {
         reviewPoints: currentPoints,
         pointLog: [...existingPointLog, ...newPointLogEntries],
         reviewLog: [...existingReviewLog, ...newReviewLogEntries],
-        needsHelp: newNeedsHelp
+        needsHelp: newNeedsHelp,
+        // 🧭 정리하기(초기화)면 기존 체크리스트를 지워 다시 진단하게 한다 — 반드시 undefined로
+        // 지워야 한다(빈 배열 []은 truthy라 generateAndSaveSolutionCheckpoints의 "이미 있음" 캐시
+        // 가드에 걸려 재생성이 아예 안 되고, undefined는 JSON 직렬화 시 키 자체가 빠져 DB에서도
+        // 실제로 지워진다).
+        ...(skipPointRecalc ? { solutionCheckpoints: undefined } : {}),
       };
 
       const { error } = await supabase
@@ -1840,6 +1922,11 @@ function App() {
 
       setMistakes(prev => prev.map(m => m.id === id ? updatedEntry : m));
       setSelectedEntry(prev => prev && prev.id === id ? updatedEntry : prev);
+
+      // 🧭 정리하기(초기화)였다면 방금 지운 체크리스트를 즉시 재생성 트리거 + 진행 상태 표시.
+      if (skipPointRecalc) {
+        regenerateCheckpointsWithProgress(updatedEntry);
+      }
 
       // 🎯 복습 단계별 콤보 포인트 실시간·영구 적립 (1차 O=3, 2차 O=7, 3차 O=15, X/★=참여점수 1점).
       // "몇 번째 칸이냐"가 아니라 위에서 계산한 currentPoints(체크 시점에 확정된 실제 점수)를 그대로
@@ -2380,6 +2467,8 @@ function App() {
             profilesStampMap={profilesStampMap}
             scaffoldedMistakeIds={scaffoldedMistakeIds}
             onToggleHidden={handleToggleHidden}
+            checkpointRegenStatusMap={checkpointRegenStatus}
+            onRetryCheckpointGeneration={regenerateCheckpointsWithProgress}
           />
           </>
         )}
@@ -2692,6 +2781,8 @@ function App() {
           onStartAnalysis={handleStartAnalysis}
           onUpdateReviews={handleUpdateReviews}
           onUpdateCheckpointStatus={handleUpdateCheckpointStatus}
+          checkpointRegenStatus={checkpointRegenStatus[selectedEntry.id]}
+          onRetryCheckpointGeneration={() => regenerateCheckpointsWithProgress(selectedEntry)}
           onSelectEntry={setSelectedEntry}
           isReviewSession={isReviewSession}
           onUpdateEntry={(updated) => {

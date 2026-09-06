@@ -22,6 +22,8 @@ interface MistakeDetailModalProps {
   onStartAnalysis: (entry: MistakeEntry) => void;
   onUpdateReviews: (id: string, newReviews: ReviewState[], skipPointRecalc?: boolean) => void;
   onUpdateCheckpointStatus: (id: string, stageIndex: number, checkpointIndex: number, newStatus: 'understood' | 'stuck') => void;
+  checkpointRegenStatus?: 'generating' | 'success' | 'failed'; // 정리하기(초기화) 후 단계형 체크리스트 재생성 진행 상태
+  onRetryCheckpointGeneration?: () => void; // 재생성 실패 시 "다시 시도"
   onUpdateEntry: (updated: MistakeEntry) => void;
   onSelectEntry?: (entry: MistakeEntry | null) => void;
   isReviewSession?: boolean;
@@ -94,6 +96,8 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   onStartAnalysis,
   onUpdateReviews,
   onUpdateCheckpointStatus,
+  checkpointRegenStatus,
+  onRetryCheckpointGeneration,
   onUpdateEntry,
   onSelectEntry,
   isReviewSession = false,
@@ -1330,6 +1334,33 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 refreshSignal={scaffoldingRefreshKey}
               />
 
+              {/* 🧭 정리하기(초기화) 이후 체크리스트 재생성 진행 상태 — 정석 풀이는 전혀 건드리지
+                  않고 이 배너들만 추가/제거된다(기존 데이터가 사라지거나 깜빡이지 않음). */}
+              {checkpointRegenStatus === 'generating' && (
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                  <span className="flex-none w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                  <span>AI가 새로운 학습 진단을 만들고 있어요...</span>
+                </div>
+              )}
+              {checkpointRegenStatus === 'failed' && (
+                <div className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-red-500/10 text-red-300 border border-red-500/20">
+                  <span>⚠️ AI 진단 생성에 실패했어요</span>
+                  {onRetryCheckpointGeneration && (
+                    <button
+                      onClick={onRetryCheckpointGeneration}
+                      className="flex-none px-3 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-200 font-black active:scale-95 transition-all"
+                    >
+                      다시 시도
+                    </button>
+                  )}
+                </div>
+              )}
+              {checkpointRegenStatus === 'success' && (
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                  <span>✓ 새로운 진단이 준비됐어요</span>
+                </div>
+              )}
+
               {/* Card 0.8: 단계형 풀이 체크리스트 — 기본 진단 UI. 없으면(아직 생성 전/생성 실패)
                   아무것도 안 보여주고 기존 정석 풀이만 노출(품질 방어선으로서의 조용한 fallback). */}
               {selectedEntry.analysis.solutionCheckpoints && (() => {
@@ -1343,12 +1374,16 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                   4: '4단계: 돌아보기 & 쌤의 한끝 팁',
                 };
 
-                // 4단계 전체를 관통하는 하나의 순서로 평탄화해서 순차 잠금을 계산한다 —
-                // 이전 checkpoint가 이해/막힘 둘 중 하나로 응답되지 않으면 다음은 잠금.
-                // 단순 미체크(unanswered)는 잠금 대상일 뿐 약점으로 기록되지 않는다.
+                // 4단계 전체를 관통하는 하나의 순서로 평탄화해서 순차 잠금을 계산한다.
+                // "진행 경계(frontier)" = 맨 앞에서부터 봤을 때 처음으로 understood가 아닌 지점
+                // (unanswered든, stuck이든). 그 경계까지는(포함) 상호작용 가능하고, 그 뒤는 전부
+                // 잠근다 — understood를 stuck으로 되돌리면 그 뒤에 있던 기존 응답(이미 understood/
+                // stuck으로 답했던 것)도 다시 잠기지만, status 데이터 자체는 지우지 않는다(그냥
+                // 잠금 화면 뒤에 보존됨). 다시 understood가 되면 경계가 한 칸 전진하면서 그 다음
+                // checkpoint가 열리는데, 거기 남아있던 예전 응답이 있으면 그대로 다시 보인다.
                 const flatStatuses = stages.flatMap(s => s.checkpoints.map(cp => cp.status));
-                let activeFlatIndex = flatStatuses.findIndex(status => status === 'unanswered');
-                if (activeFlatIndex === -1) activeFlatIndex = flatStatuses.length;
+                let frontierIndex = flatStatuses.findIndex(status => status !== 'understood');
+                if (frontierIndex === -1) frontierIndex = flatStatuses.length; // 전부 이해 완료
 
                 let flatCursor = -1;
 
@@ -1371,8 +1406,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                             {stageGroup.checkpoints.map((cp, checkpointIndex) => {
                               flatCursor += 1;
                               const myFlatIndex = flatCursor;
-                              const isLocked = myFlatIndex > activeFlatIndex;
-                              const isAnswered = cp.status !== 'unanswered';
+                              const isLocked = myFlatIndex > frontierIndex;
 
                               return (
                                 <div
@@ -1414,12 +1448,15 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                                     </div>
                                   )}
 
-                                  {isAnswered && (
+                                  {/* "이해했어요"는 다음 진행이 가능하다는 뜻일 뿐, AI 풀이 설명을 새로
+                                      보여주지 않는다(여러 정상 풀이가 있을 수 있는데 AI 설명과 다르다는
+                                      이유만으로 학생이 스스로를 "막혔다"고 오판하게 만들 수 있어서다).
+                                      detail/hint는 "여기서 막혔어요"를 선택했을 때만, 그리고 잠기지
+                                      않은(현재 진행 경계인) checkpoint에서만 보여준다. */}
+                                  {!isLocked && cp.status === 'stuck' && (
                                     <div className="mt-2 text-[11px] text-slate-400 leading-relaxed space-y-1">
                                       <p>{cp.detail}</p>
-                                      {cp.status === 'stuck' && (
-                                        <p className="text-amber-400 font-semibold">💡 {cp.hint}</p>
-                                      )}
+                                      <p className="text-amber-400 font-semibold">💡 {cp.hint}</p>
                                     </div>
                                   )}
                                 </div>

@@ -16,9 +16,11 @@ interface MistakeCardProps {
   equippedStamp?: string; // 학생이 장착한 레어 도장 (예: 🔥, ⭐, 👑, 🐾, 💎)
   hasScaffolding?: boolean; // 스캐폴딩 힌트(선생님 또는 본인)가 있는지 여부
   onToggleHidden?: (id: string, hidden: boolean) => void; // 시험범위 제외 등으로 카드 숨기기 (전달 안 되면 버튼 자체를 숨김)
+  checkpointRegenStatus?: 'generating' | 'success' | 'failed'; // 정리하기(초기화) 후 단계형 체크리스트 재생성 진행 상태
+  onRetryCheckpointGeneration?: () => void; // 재생성 실패 시 "다시 시도"
 }
 
-export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDelete, studentName, isOwnNote = true, equippedStamp, hasScaffolding, onToggleHidden }) => {
+export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDelete, studentName, isOwnNote = true, equippedStamp, hasScaffolding, onToggleHidden, checkpointRegenStatus, onRetryCheckpointGeneration }) => {
   // "도움 필요"는 analysis.needsHelp 영구 플래그를 최우선으로 보되(정리하기 이후에도 유지되고
   // O 획득 이후 false가 됨), 이 기능 배포 전부터 이미 3칸이 채워져 있던 레거시 데이터처럼 값이
   // 아직 없는 경우에만 reviews를 즉석 판정하는 fallback을 쓴다(resolveNeedsHelp 참고).
@@ -110,6 +112,36 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
         )}
       </div>
       <div className="p-3 pb-2.5 space-y-1.5">
+        {/* 🧭 정리하기(초기화) 이후 단계형 체크리스트 재생성 진행 상태 — 기존 카드 내용은 그대로
+            두고 위에 배너 한 줄만 추가(데이터가 사라지거나 카드가 깜빡이지 않게) */}
+        {checkpointRegenStatus && (
+          <div className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg text-[10px] font-bold ${
+            checkpointRegenStatus === 'generating' ? 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/20' :
+            checkpointRegenStatus === 'success' ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20' :
+            'bg-red-500/10 text-red-300 border border-red-500/20'
+          }`}>
+            {checkpointRegenStatus === 'generating' && (
+              <span className="flex items-center gap-1.5 min-w-0">
+                <span className="flex-none w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                <span className="truncate">AI가 새로운 학습 진단을 만들고 있어요...</span>
+              </span>
+            )}
+            {checkpointRegenStatus === 'success' && <span>✓ 새로운 진단이 준비됐어요</span>}
+            {checkpointRegenStatus === 'failed' && (
+              <>
+                <span className="truncate">⚠️ AI 진단 생성에 실패했어요</span>
+                {onRetryCheckpointGeneration && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onRetryCheckpointGeneration(); }}
+                    className="flex-none px-2 py-0.5 rounded-md bg-red-500/20 hover:bg-red-500/30 text-red-200 font-black active:scale-95 transition-all"
+                  >
+                    다시 시도
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        )}
         <div className="flex items-center justify-between gap-2">
           <h3 className="font-bold text-white line-clamp-1 group-hover:text-indigo-400 transition-colors flex-1 min-w-0">
             <LaTeXRenderer 
