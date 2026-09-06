@@ -5,6 +5,23 @@ export interface ProblemBox {
   right: number;
 }
 
+// 단계형 풀이 체크리스트 — "어디서 막혔는가" 축(향후 rootCauses="왜 틀렸는가", needsHelp="얼마나
+// 심하게 막혔는가"와 조합해 통계용으로 쓸 수 있게 서로 다른 필드로 분리 유지).
+export type StageType = 'CONDITION' | 'CONCEPT' | 'STRATEGY' | 'FORMULATION' | 'CALCULATION' | 'VERIFY';
+
+export interface SolutionCheckpoint {
+  stageType: StageType;
+  label: string;   // 학생용 짧은 체크 문구
+  detail: string;  // 선택 시 펼쳐지는 설명 — 정답/구체 수치 미노출
+  hint: string;    // "여기서 막혔어요" 선택 시 함께 보여줄 힌트 — 역시 정답/구체 수치 미노출
+  status: 'unanswered' | 'understood' | 'stuck'; // 기본 unanswered. 단순 미체크는 절대 약점 데이터로 취급하지 않음
+}
+
+export interface SolutionCheckpointStage {
+  stage: 1 | 2 | 3 | 4; // 기존 4단계(문제이해/계획세우기/계획실행/돌아보기)에 대응. 제목 문자열은 상수로 관리
+  checkpoints: SolutionCheckpoint[];
+}
+
 export interface MistakeAnalysis {
   solvingProcess: string;   // [문제 풀이 과정]
   mistakeSummary?: string;  // [학생 풀이 기반 틀린 이유 1줄 요약]
@@ -29,6 +46,13 @@ export interface MistakeAnalysis {
                             // (정리하기는 의도된 리셋 — 다시 풀어보라는 것) 별도로 영속시킨다. App.tsx의
                             // handleUpdateReviews에서만 갱신: 3칸 완료 + O 없음 → true, 이후 그 문제에서 O가
                             // 하나라도 나오면 → false. 그 외(정리하기로 비워짐 포함)에는 이전 값 그대로 유지.
+  solutionCheckpoints?: SolutionCheckpointStage[]; // 항상 길이 4(stage 1~4). 없으면 아직 생성 전(신규는
+                            // 풀이 완료 직후 background 생성, 레거시 needsHelp 문제는 lazy 생성) —
+                            // 한 번 생성되면 재호출 없이 그대로 캐시로 재사용됨.
+  checkpointStuckLog?: { date: string; stage: 1 | 2 | 3 | 4; stageType: StageType }[]; // "여기서
+                            // 막혔어요"를 선택할 때마다 append-only로 기록. 이후 understood로 바뀌어도
+                            // 이 로그는 지우지 않음 — reviewLog와 동일한 이유(라이브 status만 보면
+                            // 재선택으로 덮여써져 장기 통계가 불안정해짐).
 }
 
 // classify 완료 직후, solve가 아직 실질적인 텍스트를 스트리밍하기 전까지 잠깐 노출되는 placeholder 문구.

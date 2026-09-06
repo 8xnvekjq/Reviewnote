@@ -3,7 +3,7 @@ import type { ActiveTab, MistakeEntry, ReviewState, MistakeAnalysis } from './ty
 import { ROOT_CAUSE_OPTIONS, SOLVING_PLACEHOLDER_TEXT, resolveNeedsHelp } from './types';
 import { CameraScanner } from './components/CameraScanner';
 import type { CropPercent } from './utils/guideBoxCrop';
-import { classifyMistakeWithGemini, solveMistakeWithGemini, extractProblemWithGemini, prepareGeminiImage } from './services/gemini';
+import { classifyMistakeWithGemini, solveMistakeWithGemini, extractProblemWithGemini, prepareGeminiImage, generateSolutionCheckpointsWithGemini } from './services/gemini';
 import { AuthScreen } from './components/AuthScreen';
 import { supabase, isSupabaseConfigured } from './services/supabase';
 import { SupabaseConfigWarning } from './components/SupabaseConfigWarning';
@@ -82,6 +82,15 @@ function App() {
   // 시점에 만들어진 오래된 클로저에서) 그 함수가 "정의된 렌더 시점"의 값에 고정되어
   // 최신 실행 여부를 알 수 없다 — ref는 모든 클로저가 항상 같은 최신 값을 본다.
   const analyzingEntryIdRef = useRef<string | null>(null);
+  // generateAndSaveSolutionCheckpoints의 중복 실행 가드용(같은 이유로 ref 사용 — state/클로저는
+  // 이 함수가 신규 분석 직후 fire-and-forget으로도, 상세 모달 open 시 lazy로도 호출될 수 있어
+  // 거의 동시에 두 경로에서 같은 문제에 대해 겹쳐 호출될 여지가 있다). 문제 id를 담아 진행 중인
+  // 생성만 걸러내고, DB 재확인(아래 함수 본문)으로 한 번 더 방지한다.
+  const generatingCheckpointsIdsRef = useRef<Set<string>>(new Set());
+  // lazy 생성이 실패한 문제 id를 이 세션(탭) 동안만 기억해, 같은 문제를 열었다 닫았다
+  // 반복할 때마다 Gemini를 매번 재호출하는 비용 낭비를 막는다. 메모리에만 있고 저장/영속화하지
+  // 않으므로 새로고침·재로그인·다른 탭에서는 자유롭게 다시 시도된다 — 영구 잠금 아님.
+  const checkpointGenerationFailedIdsRef = useRef<Set<string>>(new Set());
 
   // 매일 연속 복습 스트릭 상태 (🔥 Streak 관리)
   const [streakState, setStreakState] = useState<StreakState>(() => loadStreakState());
@@ -1207,7 +1216,180 @@ function App() {
     } catch (err) {
       console.error('Failed to record diagnosis duration stats:', err);
     }
+
+    // 🧭 단계형 풀이 체크리스트: 신규 분석 완료 직후 background로 생성(needsHelp 여부 무관 —
+    // 모든 오답에 적용). await 하지 않는다 — 메인 분석 완료 화면은 기존 타이밍 그대로 유지하고,
+    // 체크리스트는 조금 늦게 도착해도 무방(record_diagnosis_duration과 동일한 fire-and-forget 패턴).
+    generateAndSaveSolutionCheckpoints(finalEntry).catch(err => {
+      console.error('Failed to generate solution checkpoints:', err);
+    });
   };
+
+  // 🧭 단계형 풀이 체크리스트 생성 — 신규(solveStep 직후 eager)와 레거시 needsHelp 문제(상세
+  // 모달을 열 때 lazy) 양쪽에서 동일하게 재사용하는 단일 함수. 이미 있으면(캐시) 재생성하지 않는다.
+  const generateAndSaveSolutionCheckpoints = async (entry: MistakeEntry) => {
+    // 1차 가드(같은 탭 안의 중복 호출 방지) — DB 재확인은 저장 직전에 한 번 더 한다.
+    if (generatingCheckpointsIdsRef.current.has(entry.id)) return;
+    if (entry.analysis?.solutionCheckpoints) return; // 이미 캐시돼 있음
+    if (!entry.analysis?.problemText || !entry.analysis?.solvingProcess) return; // 재료 미비(분석 미완료)
+
+    generatingCheckpointsIdsRef.current.add(entry.id);
+    try {
+      const checkpointStages = await generateSolutionCheckpointsWithGemini(
+        entry.analysis.problemText,
+        entry.analysis.solvingProcess
+      );
+      if (!checkpointStages) {
+        // 생성 실패/품질 검증 실패 — 조용히 폴백(기존 정석 풀이만 노출). 이 세션 동안은 같은
+        // 문제를 다시 열어도 자동 재호출하지 않는다(비용 낭비 방지) — 영구 잠금은 아니라서
+        // 새로고침/재로그인하면 다시 시도된다.
+        checkpointGenerationFailedIdsRef.current.add(entry.id);
+        return;
+      }
+
+      // 🛡️ background/lazy로 시간이 걸리는 호출이라, 그 사이 학생이 복습 체크·정리하기·대책 작성
+      // 등으로 analysis를 바꿨을 수 있다. 함수 시작 시 캡처해둔 entry.analysis는 stale할 수
+      // 있으므로, 저장 직전에 DB에서 analysis를 다시 읽어 그 위에 병합한다(classifyStep이 예전에
+      // analysis를 통째로 덮어써서 reviewLog 등이 사라지던 것과 같은 종류의 버그를 여기서도 막음).
+      const { data: freshRow, error: fetchError } = await supabase
+        .from('mistakes')
+        .select('analysis')
+        .eq('id', entry.id)
+        .single();
+
+      if (fetchError || !freshRow) {
+        console.error('Failed to refetch analysis before saving solution checkpoints:', fetchError);
+        checkpointGenerationFailedIdsRef.current.add(entry.id);
+        return;
+      }
+
+      // 그 사이 다른 경로(다른 탭, 겹친 호출 등)로 이미 생성/저장됐으면 중복 저장하지 않는다.
+      // (성공한 경우이므로 실패 마킹은 하지 않는다)
+      if (freshRow.analysis?.solutionCheckpoints) return;
+
+      const mergedAnalysis: MistakeAnalysis = {
+        ...freshRow.analysis,
+        solutionCheckpoints: checkpointStages,
+      };
+
+      const { error: updateError } = await supabase
+        .from('mistakes')
+        .update({ analysis: mergedAnalysis })
+        .eq('id', entry.id);
+
+      if (updateError) {
+        console.error('Failed to save solution checkpoints:', updateError);
+        checkpointGenerationFailedIdsRef.current.add(entry.id);
+        return;
+      }
+
+      setMistakes(prev => prev.map(m => m.id === entry.id ? { ...m, analysis: mergedAnalysis } : m));
+      setSelectedEntry(prev => prev && prev.id === entry.id ? { ...prev, analysis: mergedAnalysis } : prev);
+    } finally {
+      generatingCheckpointsIdsRef.current.delete(entry.id);
+    }
+  };
+
+  // 🧭 단계형 풀이 체크포인트 상태 갱신("이해했어요"/"여기서 막혔어요") — O/X/★ 복습 체크와
+  // 동일하게 클릭 즉시 저장한다. stuck을 선택할 때만 checkpointStuckLog에 append(understood는
+  // 기록하지 않음 — 통계는 "막혔던 적이 있는지"만 본다. 재선택으로 stuck→understood가 되어도
+  // 이 로그 자체는 지우지 않는다).
+  const handleUpdateCheckpointStatus = async (
+    id: string,
+    stageIndex: number,
+    checkpointIndex: number,
+    newStatus: 'understood' | 'stuck'
+  ) => {
+    try {
+      // generateAndSaveSolutionCheckpoints와 동일한 이유로, 저장 직전에 최신 analysis를 다시 읽어
+      // 그 위에 병합한다(그 사이 다른 필드가 바뀌었을 수 있음).
+      const { data: freshRow, error: fetchError } = await supabase
+        .from('mistakes')
+        .select('analysis')
+        .eq('id', id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const stages = freshRow?.analysis?.solutionCheckpoints as MistakeAnalysis['solutionCheckpoints'];
+      if (!stages || !stages[stageIndex] || !stages[stageIndex].checkpoints[checkpointIndex]) {
+        throw new Error('체크리스트를 찾을 수 없습니다.');
+      }
+
+      const targetCheckpoint = stages[stageIndex].checkpoints[checkpointIndex];
+      const updatedStages = stages.map((stageEntry, si) => {
+        if (si !== stageIndex) return stageEntry;
+        return {
+          ...stageEntry,
+          checkpoints: stageEntry.checkpoints.map((cp, ci) =>
+            ci === checkpointIndex ? { ...cp, status: newStatus } : cp
+          )
+        };
+      });
+
+      const existingStuckLog = freshRow.analysis?.checkpointStuckLog || [];
+      const updatedStuckLog = newStatus === 'stuck'
+        ? [...existingStuckLog, {
+            date: new Date().toISOString(),
+            stage: stages[stageIndex].stage,
+            stageType: targetCheckpoint.stageType
+          }]
+        : existingStuckLog;
+
+      const mergedAnalysis: MistakeAnalysis = {
+        ...freshRow.analysis,
+        solutionCheckpoints: updatedStages,
+        checkpointStuckLog: updatedStuckLog,
+      };
+
+      const { error: updateError } = await supabase
+        .from('mistakes')
+        .update({ analysis: mergedAnalysis })
+        .eq('id', id);
+
+      if (updateError) throw updateError;
+
+      setMistakes(prev => prev.map(m => m.id === id ? { ...m, analysis: mergedAnalysis } : m));
+      setSelectedEntry(prev => prev && prev.id === id ? { ...prev, analysis: mergedAnalysis } : prev);
+    } catch (err: any) {
+      console.error('체크포인트 상태 업데이트 실패:', err);
+      showNoticeModal({
+        title: '저장 실패',
+        message: err.message || '체크포인트 상태를 저장하지 못했습니다.',
+        badge: '오류',
+        icon: '⚠️',
+      });
+    }
+  };
+
+  // 🧭 레거시 needsHelp 문제 lazy 생성 — 상세 모달을 열 때(selectedEntry 변경) checkpoint가
+  // 없으면 그 순간 1회 생성. 신규 문제는 solveStep에서 이미 eager로 생성되므로 보통 이 경로를
+  // 타지 않는다(생성 함수 자체의 캐시 가드 덕에 겹쳐 호출돼도 안전). 이전 시도가 이 세션에서
+  // 이미 실패했으면 재호출하지 않는다(checkpointGenerationFailedIdsRef, 비용 낭비 방지).
+  //
+  // deps를 selectedEntry?.id로만 좁힌 것은 누락이 아니라 의도된 선택이다:
+  // - 이 lazy 경로가 대상으로 삼는 "이미 오래전에 분석 완료된 needsHelp 레거시 문제"는 모달을 여는
+  //   시점에 reviews/needsHelp/problemText/solvingProcess가 전부 이미 안정적으로 채워져 있다
+  //   (스트리밍 중인 신규 분석과 달리 이후에 이 필드들이 바뀔 일이 없다) — 그래서 이 조건들을
+  //   deps에 추가로 넣어도 "더 최신 값을 반영"할 기회가 실질적으로 생기지 않는다.
+  //   반대로 넣으면 review 체크·정리하기 등 이 문제와 무관해 보이는 변경에도 매번 재실행되어
+  //   더 시끄러워지기만 한다.
+  // - 설령 클로저가 오래된 selectedEntry를 참조하더라도, 실제 호출 대상인
+  //   generateAndSaveSolutionCheckpoints 자체가 저장 직전 DB를 다시 읽어 병합하고
+  //   (generatingCheckpointsIdsRef로) 동시 중복 실행도 막아주므로, 이 effect가 약간 오래된
+  //   스냅샷으로 호출해도 데이터 유실이나 중복 저장으로 이어지지 않는다.
+  // 즉 selectedEntry.id가 바뀔 때 "이 문제를 처음 열었는지"만 판단하면 충분하고 안전하다.
+  useEffect(() => {
+    if (!selectedEntry) return;
+    if (checkpointGenerationFailedIdsRef.current.has(selectedEntry.id)) return;
+    if (!resolveNeedsHelp(selectedEntry.reviews, selectedEntry.analysis?.needsHelp)) return;
+    if (selectedEntry.analysis?.solutionCheckpoints) return;
+    if (!selectedEntry.analysis?.problemText || !selectedEntry.analysis?.solvingProcess) return;
+
+    generateAndSaveSolutionCheckpoints(selectedEntry).catch(err => {
+      console.error('Failed to lazily generate solution checkpoints:', err);
+    });
+  }, [selectedEntry?.id]);
 
   // Intercept camera capture and start cropping flow
   const handleCameraCapture = (base64Image: string, initialCrop?: CropPercent) => {
@@ -2494,6 +2676,7 @@ function App() {
           onDeleteMistake={handleDeleteMistake}
           onStartAnalysis={handleStartAnalysis}
           onUpdateReviews={handleUpdateReviews}
+          onUpdateCheckpointStatus={handleUpdateCheckpointStatus}
           onSelectEntry={setSelectedEntry}
           isReviewSession={isReviewSession}
           onUpdateEntry={(updated) => {

@@ -1,4 +1,4 @@
-import type { ProblemBox } from '../types';
+import type { ProblemBox, SolutionCheckpointStage, StageType } from '../types';
 import { MATH_CURRICULUM } from '../types';
 import { supabase } from './supabase';
 
@@ -949,5 +949,153 @@ JSON이나 코드블록 없이 순수 텍스트로, 반드시 아래 순서 그�
   } catch (error: any) {
     console.error('Gemini solving failed:', error);
     throw new Error(error.message || 'Gemini API 호출 중 장애가 발생했습니다.');
+  }
+}
+
+/**
+ * 단계형 풀이 체크리스트용 checkpoint 생성 — solveMistakeWithGemini가 이미 만든 4단계 해설
+ * (solvingProcess)을 입력으로 재구성하는 것이라 이미지가 필요 없다. classify/extract와 같은
+ * JSON 스키마 패턴(non-streaming)을 그대로 재사용하고, solve의 스트리밍 구조는 건드리지 않는다.
+ *
+ * 정답 누출 방지는 하드코딩된 숫자/수식 패턴 검출기 대신 세 겹으로 처리한다:
+ * 1) 프롬프트의 좋은/나쁜 예시로 애초에 덜 새게 함(1차 방어)
+ * 2) 모델이 스스로 채우는 containsSpecificValue 자기점검 필드(2차 방어, 완전한 보증은 아님)
+ * 3) 스키마 검증 실패 또는 containsSpecificValue===true인 checkpoint가 하나라도 있으면
+ *    이 함수는 null을 반환 — 호출부는 체크리스트 없이 기존 정석 풀이만 노출(재시도 없음, 품질
+ *    방어선일 뿐 완전한 보안 검증으로 취급하지 않는다).
+ */
+export async function generateSolutionCheckpointsWithGemini(
+  problemText: string,
+  solvingProcess: string
+): Promise<SolutionCheckpointStage[] | null> {
+  const prompt = `너는 수학 학습 진단 도구를 만드는 보조 인공지능이다.
+아래 [원본 문제]와, 이미 학생에게 제공된 [정석 풀이 해설]을 참고하여, 학생이 스스로 "나는 여기까지는 이해/수행했다"를 순서대로 체크할 수 있는 단계형 진단 체크리스트를 만들어라.
+
+[원본 문제]
+${problemText}
+
+[정석 풀이 해설 — 이미 "### 1단계: 문제 이해하기", "### 2단계: 해결 계획 세우기", "### 3단계: 계획 실행하기", "### 4단계: 돌아보기 & 쌤의 한끝 팁" 헤더로 구성된 4단계 구조]
+${solvingProcess}
+
+★ [절대 규칙 - 정답/계산 결과 노출 금지] ★
+label, detail, hint 세 필드 어디에도 다음을 절대 직접 적지 마라:
+- 최종 정답, 구체적으로 계산된 숫자·좌표·근의 값
+- 문제 조건에 없던 중간 계산 결과(예: "판별식 D=16", "x=3을 대입하면")
+대신 "어떤 개념/공식을 어떤 순서로 적용하는지", "무엇을 확인/수행했는지"를 절차적으로만 서술하라.
+
+[좋은 예 vs 나쁜 예]
+- CONDITION 나쁜 예: "이차방정식의 두 근이 3과 5임을 확인했다" (구체적 근의 값 노출)
+- CONDITION 좋은 예: "문제에서 주어진 조건이 무엇인지 파악했다"
+- FORMULATION 나쁜 예: "x^2 - 8x + 15 = 0 형태로 식을 세웠다" (구체적 계수 노출)
+- FORMULATION 좋은 예: "근과 계수의 관계를 이용해 방정식을 세웠다"
+- CALCULATION 나쁜 예: "판별식을 계산해 D=16이 나왔다" (계산 결과 노출)
+- CALCULATION 좋은 예: "세운 식을 정리해 필요한 값을 계산했다"
+- VERIFY 나쁜 예: "구한 답 x=3이 조건을 만족함을 확인했다" (정답 노출)
+- VERIFY 좋은 예: "구한 값이 원래 조건을 만족하는지 검토했다"
+
+★ [체크포인트 구성 규칙] ★
+- 위 4단계 각각에 대해 1~3개의 체크포인트를 만들어라(1·2·4단계는 보통 1개, 3단계는 실제 풀이 흐름에 따라 1~3개로 자연스럽게 나눠라).
+- stageType은 CONDITION(문제 조건 파악) / CONCEPT(기초 개념) / STRATEGY(풀이 전략) / FORMULATION(식 세우기) / CALCULATION(계산 수행) / VERIFY(결과 검토) 중 그 체크포인트 성격에 가장 맞는 하나. 보통 1단계는 CONDITION 또는 CONCEPT, 2단계는 CONCEPT 또는 STRATEGY, 3단계는 FORMULATION 또는 CALCULATION, 4단계는 VERIFY가 자연스럽다.
+- label: 학생이 자기 자신에게 "나는 이걸 했나?"라고 묻는 짧은 한 문장(평서형, 예: "문제의 조건을 정확히 파악했다").
+- detail: label이 구체적으로 무엇을 의미하는지 1~2문장으로 풀어 설명(정답 미노출).
+- hint: 이 단계에서 막혔다고 답한 학생에게 줄 방향 제시 1문장(정답 미노출, 질문형이나 "~를 다시 살펴보세요" 형태 권장).
+- containsSpecificValue: 위 [절대 규칙]을 스스로 점검해서, label/detail/hint 중 하나라도 구체적 수치·계산 결과·정답을 직접 담고 있다고 판단되면 true, 아니면 false로 정직하게 채워라.`;
+
+  const requestBody = {
+    contents: [
+      { parts: [{ text: prompt }] }
+    ],
+    generationConfig: {
+      // 이 작업은 classify(단순 분류)보다는 판단이 필요한 재구성 작업이라 thinking을 끄지 않는다.
+      // maxOutputTokens 미지정 시 thinking 토큰이 기본 출력 상한을 다 써버려 응답이 비는 사례가
+      // 다른 호출들에서 실제로 있었던 문제라, 동일하게 넉넉히 지정(실사용량만 과금되어 비용 영향 없음).
+      maxOutputTokens: 65536,
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: 'OBJECT',
+        properties: {
+          stages: {
+            type: 'ARRAY',
+            minItems: 4,
+            maxItems: 4,
+            items: {
+              type: 'OBJECT',
+              properties: {
+                stage: { type: 'NUMBER' },
+                checkpoints: {
+                  type: 'ARRAY',
+                  minItems: 1,
+                  maxItems: 3,
+                  items: {
+                    type: 'OBJECT',
+                    properties: {
+                      stageType: { type: 'STRING', enum: ['CONDITION', 'CONCEPT', 'STRATEGY', 'FORMULATION', 'CALCULATION', 'VERIFY'] },
+                      label: { type: 'STRING' },
+                      detail: { type: 'STRING' },
+                      hint: { type: 'STRING' },
+                      containsSpecificValue: { type: 'BOOLEAN' }
+                    },
+                    required: ['stageType', 'label', 'detail', 'hint', 'containsSpecificValue']
+                  }
+                }
+              },
+              required: ['stage', 'checkpoints']
+            }
+          }
+        },
+        required: ['stages']
+      }
+    }
+  };
+
+  try {
+    const resolvedModel = 'gemini-2.5-flash';
+    const parsedJson = await callGeminiApi(resolvedModel, requestBody);
+    const stages = parsedJson?.stages;
+
+    if (!Array.isArray(stages) || stages.length !== 4) return null;
+
+    const validStageTypes: StageType[] = ['CONDITION', 'CONCEPT', 'STRATEGY', 'FORMULATION', 'CALCULATION', 'VERIFY'];
+    const seenStages = new Set<number>();
+    const result: SolutionCheckpointStage[] = [];
+
+    for (const stageEntry of stages) {
+      const stageNum = Number(stageEntry?.stage);
+      if (![1, 2, 3, 4].includes(stageNum) || seenStages.has(stageNum)) return null;
+      seenStages.add(stageNum);
+
+      const checkpoints = stageEntry?.checkpoints;
+      if (!Array.isArray(checkpoints) || checkpoints.length < 1 || checkpoints.length > 3) return null;
+
+      const builtCheckpoints: SolutionCheckpointStage['checkpoints'] = [];
+      for (const cp of checkpoints) {
+        // 모델 자기점검에 걸리거나(정답/계산결과 노출 우려), 스키마상 필수 필드가 비어있으면
+        // 이 체크포인트 세트 전체를 폐기한다(부분 폐기 시 단계형 UI가 깨지므로 전체 단위로 처리).
+        if (cp?.containsSpecificValue === true) return null;
+        if (!validStageTypes.includes(cp?.stageType)) return null;
+        if (!cp?.label || !cp?.detail || !cp?.hint) return null;
+
+        builtCheckpoints.push({
+          stageType: cp.stageType as StageType,
+          label: String(cp.label),
+          detail: String(cp.detail),
+          hint: String(cp.hint),
+          status: 'unanswered'
+        });
+      }
+
+      result.push({ stage: stageNum as 1 | 2 | 3 | 4, checkpoints: builtCheckpoints });
+    }
+
+    if (seenStages.size !== 4) return null; // 1~4단계가 중복 없이 전부 있어야 함
+
+    // stage 오름차순 정렬 — 모델이 순서를 안 지켜도 UI는 항상 1→4 순서로 렌더
+    result.sort((a, b) => a.stage - b.stage);
+    return result;
+  } catch (error: any) {
+    // API 레벨 실패(네트워크/인증/타임아웃)도 조용히 null 처리 — 이 기능은 품질 방어선일 뿐이라
+    // 실패해도 기존 정석 풀이가 그대로 있으므로 학생 경험을 막지 않는다. 재시도하지 않음(비용 절약).
+    console.error('Gemini solution checkpoints generation failed:', error);
+    return null;
   }
 }

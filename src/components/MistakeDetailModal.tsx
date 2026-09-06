@@ -21,6 +21,7 @@ interface MistakeDetailModalProps {
   onDeleteMistake: (id: string, e: React.MouseEvent) => void;
   onStartAnalysis: (entry: MistakeEntry) => void;
   onUpdateReviews: (id: string, newReviews: ReviewState[], skipPointRecalc?: boolean) => void;
+  onUpdateCheckpointStatus: (id: string, stageIndex: number, checkpointIndex: number, newStatus: 'understood' | 'stuck') => void;
   onUpdateEntry: (updated: MistakeEntry) => void;
   onSelectEntry?: (entry: MistakeEntry | null) => void;
   isReviewSession?: boolean;
@@ -92,6 +93,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   onDeleteMistake,
   onStartAnalysis,
   onUpdateReviews,
+  onUpdateCheckpointStatus,
   onUpdateEntry,
   onSelectEntry,
   isReviewSession = false,
@@ -1327,6 +1329,116 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 isAdmin={isAdmin}
                 refreshSignal={scaffoldingRefreshKey}
               />
+
+              {/* Card 0.8: 단계형 풀이 체크리스트 — 기본 진단 UI. 없으면(아직 생성 전/생성 실패)
+                  아무것도 안 보여주고 기존 정석 풀이만 노출(품질 방어선으로서의 조용한 fallback). */}
+              {selectedEntry.analysis.solutionCheckpoints && (() => {
+                const stages = selectedEntry.analysis.solutionCheckpoints;
+                if (!stages) return null;
+
+                const STAGE_TITLES: Record<number, string> = {
+                  1: '1단계: 문제 이해하기',
+                  2: '2단계: 해결 계획 세우기',
+                  3: '3단계: 계획 실행하기',
+                  4: '4단계: 돌아보기 & 쌤의 한끝 팁',
+                };
+
+                // 4단계 전체를 관통하는 하나의 순서로 평탄화해서 순차 잠금을 계산한다 —
+                // 이전 checkpoint가 이해/막힘 둘 중 하나로 응답되지 않으면 다음은 잠금.
+                // 단순 미체크(unanswered)는 잠금 대상일 뿐 약점으로 기록되지 않는다.
+                const flatStatuses = stages.flatMap(s => s.checkpoints.map(cp => cp.status));
+                let activeFlatIndex = flatStatuses.findIndex(status => status === 'unanswered');
+                if (activeFlatIndex === -1) activeFlatIndex = flatStatuses.length;
+
+                let flatCursor = -1;
+
+                return (
+                  <div className="space-y-3 border-l-4 border-emerald-500 pl-4 py-1">
+                    <h4 className="text-sm font-extrabold text-emerald-400 flex items-center">
+                      <span className="mr-1.5 text-base">🧭</span> 단계형 풀이 체크리스트
+                    </h4>
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      순서대로 "이해했어요" 또는 "여기서 막혔어요"를 선택해 보세요. 이전 단계를 선택해야 다음 단계가 열립니다.
+                    </p>
+
+                    <div className="space-y-4">
+                      {stages.map((stageGroup, stageIndex) => (
+                        <div key={stageGroup.stage} className="space-y-2">
+                          <span className="text-[10px] font-black text-slate-500 uppercase tracking-wide">
+                            {STAGE_TITLES[stageGroup.stage] || `${stageGroup.stage}단계`}
+                          </span>
+                          <div className="space-y-2">
+                            {stageGroup.checkpoints.map((cp, checkpointIndex) => {
+                              flatCursor += 1;
+                              const myFlatIndex = flatCursor;
+                              const isLocked = myFlatIndex > activeFlatIndex;
+                              const isAnswered = cp.status !== 'unanswered';
+
+                              return (
+                                <div
+                                  key={checkpointIndex}
+                                  className={`rounded-xl border p-3 transition-all ${
+                                    isLocked ? 'bg-slate-950/40 border-slate-900 opacity-40' :
+                                    cp.status === 'stuck' ? 'bg-amber-950/20 border-amber-800/40' :
+                                    cp.status === 'understood' ? 'bg-emerald-950/10 border-emerald-800/30' :
+                                    'bg-slate-900 border-indigo-500/50'
+                                  }`}
+                                >
+                                  <span className={`text-xs font-bold ${isLocked ? 'text-slate-600' : 'text-slate-200'}`}>
+                                    {isLocked && <span className="mr-1">🔒</span>}
+                                    {cp.label}
+                                  </span>
+
+                                  {!isLocked && (
+                                    <div className="flex items-center space-x-2 mt-2">
+                                      <button
+                                        onClick={() => onUpdateCheckpointStatus(selectedEntry.id, stageIndex, checkpointIndex, 'understood')}
+                                        className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all active:scale-95 ${
+                                          cp.status === 'understood'
+                                            ? 'bg-emerald-500 text-slate-950'
+                                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                                        }`}
+                                      >
+                                        ✅ 이해했어요
+                                      </button>
+                                      <button
+                                        onClick={() => onUpdateCheckpointStatus(selectedEntry.id, stageIndex, checkpointIndex, 'stuck')}
+                                        className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all active:scale-95 ${
+                                          cp.status === 'stuck'
+                                            ? 'bg-amber-500 text-slate-950'
+                                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                                        }`}
+                                      >
+                                        🙋 여기서 막혔어요
+                                      </button>
+                                    </div>
+                                  )}
+
+                                  {isAnswered && (
+                                    <div className="mt-2 text-[11px] text-slate-400 leading-relaxed space-y-1">
+                                      <p>{cp.detail}</p>
+                                      {cp.status === 'stuck' && (
+                                        <p className="text-amber-400 font-semibold">💡 {cp.hint}</p>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={() => setShowSolvingProcess(true)}
+                      className="text-[11px] text-indigo-400 hover:text-indigo-300 font-bold underline underline-offset-2"
+                    >
+                      전체 풀이 처음부터 보기 →
+                    </button>
+                  </div>
+                );
+              })()}
 
               {/* Card 1: 정석 풀이 과정 */}
               <div className="space-y-2 border-l-4 border-indigo-500 pl-4 py-1">
