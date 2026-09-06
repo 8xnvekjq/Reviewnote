@@ -7,6 +7,8 @@ import { classifyMistakeWithGemini, solveMistakeWithGemini, extractProblemWithGe
 import { AuthScreen } from './components/AuthScreen';
 import { supabase, isSupabaseConfigured } from './services/supabase';
 import { SupabaseConfigWarning } from './components/SupabaseConfigWarning';
+import { AppShell } from './app/AppShell';
+import { Screen } from './app/ScreenRouter';
 import { Header } from './components/Header';
 import { MistakeList } from './components/MistakeList';
 import { MistakeDetailModal } from './components/MistakeDetailModal';
@@ -2208,30 +2210,40 @@ function App() {
 
   return (
     <div className="h-full flex flex-col bg-app-main text-slate-100 select-none transition-colors duration-300">
-      
-      {/* Top Header */}
-      <Header 
-        currentUser={currentUser} 
-        userId={session?.user?.id}
-        nickname={myNickname}
-        onLogout={handleLogout} 
-        onUpdateNickname={handleUpdateNickname}
-        hasNameChangeTicket={hasNameChangeTicket}
-        onUpdateAiName={handleUpdateAiName}
-        hasAiNameChangeTicket={hasAiNameChangeTicket}
-        myScore={currentDisplayPoints}
-        onOpenStore={() => setActiveTab('store')}
-        equippedTitle={equippedItems.title}
-        weeklyMedals={weeklyMedals}
-        streakDays={streakState.currentStreak}
-        comboBoosterExpiresAt={comboBoosterExpiresAt}
-        isAdmin={isAdmin}
-        onSelectTab={(tab) => setActiveTab(tab)}
-      />
-
-      {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto px-4 py-6 pb-28">
-        {activeTab === 'store' && (
+      <AppShell
+        header={(
+          <Header
+            currentUser={currentUser}
+            userId={session?.user?.id}
+            nickname={myNickname}
+            onLogout={handleLogout}
+            onUpdateNickname={handleUpdateNickname}
+            hasNameChangeTicket={hasNameChangeTicket}
+            onUpdateAiName={handleUpdateAiName}
+            hasAiNameChangeTicket={hasAiNameChangeTicket}
+            myScore={currentDisplayPoints}
+            onOpenStore={() => setActiveTab('store')}
+            equippedTitle={equippedItems.title}
+            weeklyMedals={weeklyMedals}
+            streakDays={streakState.currentStreak}
+            comboBoosterExpiresAt={comboBoosterExpiresAt}
+            isAdmin={isAdmin}
+            onSelectTab={(tab) => setActiveTab(tab)}
+          />
+        )}
+        bottomNav={(
+          <BottomNavigation
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            isAdmin={isAdmin}
+            onlineUsers={onlineUsers}
+            onStartReviewSession={handleStartReviewSession}
+            onOpenSlideList={() => setIsSlideListOpen(true)}
+            dailyReviewCount={dailyReviewCount}
+          />
+        )}
+      >
+        <Screen when={activeTab === 'store'}>
           <GachaStore
             userId={session?.user?.id || ''}
             userPoints={currentDisplayPoints}
@@ -2244,9 +2256,9 @@ function App() {
             comboBoosterExpiresAt={comboBoosterExpiresAt}
             cheerLine={currentCheerLine}
           />
-        )}
+        </Screen>
 
-        {activeTab === 'notes' && (
+        <Screen when={activeTab === 'notes'}>
           <>
             {/* 명예의 전당 배너 */}
             {weeklyChampions && weeklyChampions.length > 0 ? (
@@ -2471,9 +2483,9 @@ function App() {
             onRetryCheckpointGeneration={regenerateCheckpointsWithProgress}
           />
           </>
-        )}
+        </Screen>
 
-        {activeTab === 'completed' && (
+        <Screen when={activeTab === 'completed'}>
           <MistakeList
             mistakes={mistakes.filter(m => !m.isHidden).filter(m => {
               const oCount = m.reviews?.filter(r => r === 'O').length || 0;
@@ -2510,16 +2522,16 @@ function App() {
             profilesStampMap={profilesStampMap}
             scaffoldedMistakeIds={scaffoldedMistakeIds}
           />
-        )}
+        </Screen>
 
-        {activeTab === 'camera' && !tempCapturedImage && (
-          <CameraScanner 
+        <Screen when={activeTab === 'camera' && !tempCapturedImage}>
+          <CameraScanner
             onCapture={handleCameraCapture}
             onClose={() => setActiveTab('notes')}
           />
-        )}
+        </Screen>
 
-        {activeTab === 'hidden' && (
+        <Screen when={activeTab === 'hidden'}>
           <HiddenMistakesPanel
             mistakes={mistakes.filter(m => m.isHidden)}
             onSelectEntry={(entry) => {
@@ -2528,22 +2540,22 @@ function App() {
             }}
             onUnhide={(id) => handleToggleHidden(id, false)}
           />
-        )}
+        </Screen>
 
-        {activeTab === 'admin' && isAdmin && (
+        <Screen when={activeTab === 'admin' && isAdmin}>
           <AdminPanel onSelectTab={(tab) => setActiveTab(tab)} />
-        )}
+        </Screen>
 
-        {activeTab === 'guide' && (
+        <Screen when={activeTab === 'guide'}>
           <StudentGuide />
-        )}
+        </Screen>
 
-        {activeTab === 'activity' && (
+        <Screen when={activeTab === 'activity'}>
           <RecentActivityFeed />
-        )}
+        </Screen>
 
         {/* ── 분석통계 탭 ── */}
-        {activeTab === 'stats' && (
+        <Screen when={activeTab === 'stats'}>
           <div className="space-y-6 w-full overflow-x-hidden min-w-0">
             <div>
               <h2 className="text-lg font-bold text-white">📊 나의 약점 분석</h2>
@@ -2745,11 +2757,11 @@ function App() {
               </>
             )}
           </div>
-        )}
+        </Screen>
 
         {/* Tab: 🧩 힌트 모음 (스캐폴딩 탐색기) */}
-        {activeTab === 'scaffolding' && (
-          isAdmin ? (
+        <Screen when={activeTab === 'scaffolding'}>
+          {isAdmin ? (
             <ScaffoldingPanel
               isAdmin={isAdmin}
               onOpenDetailModal={(entry) => setSelectedEntry(entry)}
@@ -2760,9 +2772,9 @@ function App() {
               isAdmin={isAdmin}
               onSelectMistake={(entry) => setSelectedEntry(entry)}
             />
-          )
-        )}
-      </main>
+          )}
+        </Screen>
+      </AppShell>
 
       {/* Selected Entry Detail Modal */}
       {selectedEntry && (
@@ -2810,17 +2822,6 @@ function App() {
           }}
         />
       )}
-
-      {/* Floating Glassmorphic Bottom Navigation Bar */}
-      <BottomNavigation 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        isAdmin={isAdmin} 
-        onlineUsers={onlineUsers}
-        onStartReviewSession={handleStartReviewSession}
-        onOpenSlideList={() => setIsSlideListOpen(true)}
-        dailyReviewCount={dailyReviewCount}
-      />
 
       {/* 수업자료 모달 다이얼로그 */}
       <SlideListModal
