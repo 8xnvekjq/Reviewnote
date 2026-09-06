@@ -6,6 +6,33 @@ import { supabase } from '../services/supabase';
 import { getKSTDateString } from '../utils/streak';
 import { CustomNoticeModal, type NoticeModalState } from './CustomNoticeModal';
 import { ItemSynthesisPanel } from './ItemSynthesisPanel';
+import { getScreenState, setScreenState } from '../app/screenStateStore';
+
+type GachaSubTab = 'draw' | 'synthesis' | 'inventory' | 'catalog';
+
+interface StoredGachaStoreState {
+  activeSubTab: GachaSubTab;
+  scrollTopBySubTab: Record<GachaSubTab, number>;
+}
+
+const initialScrollTopBySubTab: Record<GachaSubTab, number> = {
+  draw: 0,
+  synthesis: 0,
+  inventory: 0,
+  catalog: 0,
+};
+
+function findScrollableAncestor(el: HTMLElement | null): HTMLElement | null {
+  let node = el?.parentElement ?? null;
+  while (node && node !== document.body) {
+    const overflowY = window.getComputedStyle(node).overflowY;
+    if (overflowY === 'auto' || overflowY === 'scroll') {
+      return node;
+    }
+    node = node.parentElement;
+  }
+  return (document.scrollingElement as HTMLElement | null) ?? document.documentElement;
+}
 
 export interface ExtendedGachaItem extends GachaItem {
   isDuplicate?: boolean;
@@ -58,11 +85,23 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
   comboBoosterExpiresAt,
   cheerLine,
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'draw' | 'synthesis' | 'inventory' | 'catalog'>('draw');
+  const screenKey = 'gachaStore';
+  const saved = useRef(getScreenState<StoredGachaStoreState>(screenKey)).current;
+  const [activeSubTab, setActiveSubTab] = useState<GachaSubTab>(() => saved?.activeSubTab ?? 'draw');
+  const rootRef = useRef<HTMLDivElement>(null);
+  const activeSubTabRef = useRef(activeSubTab);
+  activeSubTabRef.current = activeSubTab;
+  const scrollTopBySubTabRef = useRef<Record<GachaSubTab, number>>({
+    ...initialScrollTopBySubTab,
+    ...saved?.scrollTopBySubTab,
+  });
+  const pendingRestoreSubTabRef = useRef<GachaSubTab | null>(activeSubTab);
 
   // Supabase 기반 인벤토리: { item_id: quantity }
   const [inventory, setInventory] = useState<Record<string, number>>({});
   const [inventoryLoading, setInventoryLoading] = useState(true);
+  const inventoryLoadingRef = useRef(inventoryLoading);
+  inventoryLoadingRef.current = inventoryLoading;
 
   // 뽑기 연출 관련 상태
   const [isDrawing, setIsDrawing] = useState(false);
@@ -106,6 +145,53 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
 
   // 🔮 최초 1회 보물 연성 합성 안내 모달 상태 (서버 DB 기준)
   const [showSynthesisNotice, setShowSynthesisNotice] = useState(false);
+
+  // AppShell의 실제 스크롤 컨테이너를 ref로만 추적해 서브탭별 위치를 독립적으로 기억한다.
+  // 서브탭 전환이나 GachaStore 언마운트 시 현재 위치를 잡고, 새 서브탭은 렌더 뒤 복원한다.
+  useEffect(() => {
+    const container = findScrollableAncestor(rootRef.current);
+    if (!container) return;
+    const scrollTopBySubTab = scrollTopBySubTabRef.current;
+
+    pendingRestoreSubTabRef.current = activeSubTab;
+    const restoreScroll = () => {
+      if (activeSubTab === 'inventory' && inventoryLoadingRef.current) return;
+      container.scrollTop = scrollTopBySubTab[activeSubTab];
+      pendingRestoreSubTabRef.current = null;
+    };
+    const raf = requestAnimationFrame(restoreScroll);
+
+    const handleScroll = () => {
+      scrollTopBySubTab[activeSubTab] = container.scrollTop;
+    };
+    container.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      cancelAnimationFrame(raf);
+      container.removeEventListener('scroll', handleScroll);
+    };
+  }, [activeSubTab]);
+
+  // inventory는 마운트 직후 로딩 UI가 먼저 렌더되므로 데이터가 채워진 다음 위치를 복원한다.
+  useEffect(() => {
+    if (inventoryLoading || pendingRestoreSubTabRef.current !== 'inventory') return;
+    const container = findScrollableAncestor(rootRef.current);
+    if (!container) return;
+
+    const raf = requestAnimationFrame(() => {
+      container.scrollTop = scrollTopBySubTabRef.current.inventory;
+      pendingRestoreSubTabRef.current = null;
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [inventoryLoading]);
+
+  // DB/localStorage가 아닌 세션 메모리 저장소에 unmount 시점의 UI 상태만 남긴다.
+  useEffect(() => () => {
+    setScreenState<StoredGachaStoreState>(screenKey, {
+      activeSubTab: activeSubTabRef.current,
+      scrollTopBySubTab: { ...scrollTopBySubTabRef.current },
+    });
+  }, [screenKey]);
 
   const closeSynthesisNotice = async (shouldNavigateToSynthesis = false) => {
     setShowSynthesisNotice(false);
@@ -701,7 +787,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
   const boosterRemainingStr = getBoosterRemainingTimeStr();
 
   return (
-    <div className="flex-1 flex flex-col bg-slate-955 text-slate-100 min-h-full pb-32 animate-fade-in select-none">
+    <div ref={rootRef} className="flex-1 flex flex-col bg-slate-955 text-slate-100 min-h-full pb-32 animate-fade-in select-none">
       {/* 캔버스 파티클 레이어 */}
       <canvas ref={canvasRef} className="pointer-events-none fixed inset-0 z-50" />
 
