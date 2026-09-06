@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../services/supabase';
 import type { MistakeEntry } from '../types';
-import { MATH_CURRICULUM } from '../types';
+import { MATH_CURRICULUM, resolveNeedsHelp } from '../types';
 
 interface ProfileInfo {
   id: string;
@@ -24,6 +24,7 @@ interface ExtendedMistakeEntry extends MistakeEntry {
   xCount: number;
   starCount: number;
   weakCount: number; // xCount + starCount
+  needsHelp: boolean; // resolveNeedsHelp(reviews, analysis?.needsHelp) — 학생 화면과 동일한 기준으로 한 번만 계산
   imageHints?: ScaffoldingImageItem[];
 }
 
@@ -42,6 +43,8 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
   const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
   const [minWeakCount, setMinWeakCount] = useState<number>(2); // 기본 X+★ 2개 이상
   const [hintFilterStatus, setHintFilterStatus] = useState<'all' | 'has_hint' | 'no_hint'>('all'); // 💡 힌트 작성 여부 필터
+  // 🙋 "도움 필요"(needsHelp) 문제만 보기 — 복습 3칸이 모두 X/★였던 적이 있는(정리하기 해도 유지되는) 영구 플래그 기준
+  const [needsHelpOnly, setNeedsHelpOnly] = useState<boolean>(false);
 
   // 🚀 5개씩 더보기 렌더링 제한
   const [displayLimit, setDisplayLimit] = useState<number>(5);
@@ -105,6 +108,9 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
         const weakCount = xCount + starCount;
         const studentProf = profMap[row.user_id] || {};
         const studentName = studentProf.nickname || studentProf.display_name || studentProf.email?.split('@')[0] || '학생';
+        // 학생 화면(상단고정/MistakeCard 배지)과 동일한 기준으로 딱 한 번 계산 — analysis.needsHelp가
+        // 있으면 그 값을 최우선으로, 배포 전 이미 3칸이 채워졌던 레거시 데이터만 즉석 판정으로 fallback.
+        const needsHelp = resolveNeedsHelp(reviewsArr as any, row.analysis?.needsHelp);
 
         return {
           id: row.id,
@@ -125,6 +131,7 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
           xCount,
           starCount,
           weakCount,
+          needsHelp,
         };
       });
 
@@ -159,8 +166,11 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
   // ── 2. 필터링된 취약 오답 목록 계산 ──────────────────────────────
   const filteredMistakes = useMemo(() => {
     return mistakes.filter((item) => {
-      // 1) 최소 취약 횟수 조건 (기본 X+★ >= 2)
-      if (item.weakCount < minWeakCount) return false;
+      // 1) 최소 취약 횟수 조건 (기본 X+★ >= 2) — 단, needsHelp(3연속 실패 영구 플래그)는 예외.
+      //    needsHelp는 "정리하기"를 누르면 reviews가 다 비워져 weakCount가 0으로 떨어지는데, 그때도
+      //    이 기준으로 걸러버리면 정리하기 직후 needsHelp 문제가 이 패널에서 통째로 사라져버려서
+      //    "정리해도 유지되는 신호"라는 needsHelp의 목적 자체가 무의미해진다.
+      if (item.weakCount < minWeakCount && !item.needsHelp) return false;
 
       // 2) 학생 선택 필터 (비어있으면 전체 선택 취급)
       if (selectedStudentIds.length > 0) {
@@ -180,9 +190,12 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
       if (hintFilterStatus === 'has_hint' && !hasAnyHint) return false;
       if (hintFilterStatus === 'no_hint' && hasAnyHint) return false;
 
+      // 5) "도움 필요"만 보기 (복습 3칸 완료 + O 없음이 한 번이라도 있었던 문제, 정리해도 유지됨)
+      if (needsHelpOnly && !item.needsHelp) return false;
+
       return true;
     });
-  }, [mistakes, minWeakCount, selectedStudentIds, selectedGrades, hintFilterStatus, scaffoldedMistakeIdsSet]);
+  }, [mistakes, minWeakCount, selectedStudentIds, selectedGrades, hintFilterStatus, scaffoldedMistakeIdsSet, needsHelpOnly]);
 
   // 5개씩 잘라낸 현재 렌더링 카드들
   const visibleMistakes = useMemo(() => {
@@ -463,6 +476,24 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
             ))}
           </div>
         </div>
+
+        {/* 5. 도움 필요(needsHelp)만 보기 — 3칸 완료 + O 없음이 한 번이라도 있었던, 정리해도 유지되는 영구 신호 */}
+        <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-xs font-bold">
+          <span className="text-slate-400">🙋 도움 필요(3회 실패) 문제만:</span>
+          <button
+            onClick={() => {
+              setNeedsHelpOnly(prev => !prev);
+              setDisplayLimit(5);
+            }}
+            className={`px-3 py-1 rounded-lg border transition-all ${
+              needsHelpOnly
+                ? 'bg-amber-500/20 text-amber-300 border-amber-500/60 font-black'
+                : 'bg-slate-950 text-slate-500 border-slate-800 hover:text-slate-300'
+            }`}
+          >
+            {needsHelpOnly ? 'ON' : 'OFF'}
+          </button>
+        </div>
       </div>
 
       {/* 📄 취약 오답 카드 리스트 */}
@@ -506,7 +537,7 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
                       </div>
                     </div>
 
-                    {/* 취약도 뱃지 */}
+                    {/* 취약도 뱃지 + 도움 필요 뱃지 */}
                     <div className="flex items-center space-x-2">
                       <div className="bg-rose-500/10 border border-rose-500/30 px-3 py-1 rounded-xl text-xs font-black text-rose-400 flex items-center space-x-1.5">
                         <span>⚠️ 취약도:</span>
@@ -515,6 +546,11 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
                           (X: {item.xCount}, ★: {item.starCount})
                         </span>
                       </div>
+                      {item.needsHelp && (
+                        <div className="bg-amber-500/10 border border-amber-500/30 px-3 py-1 rounded-xl text-xs font-black text-amber-400 flex items-center space-x-1">
+                          <span>🙋 도움 필요</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 

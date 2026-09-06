@@ -24,6 +24,11 @@ export interface MistakeAnalysis {
   pointLog?: { date: string; points: number }[]; // 포인트를 실제로 딴 "그 날짜"에 영구 귀속시키는 append-only 로그. reviewPoints는 정리하기로 슬롯이 합쳐지면 그 슬롯의 날짜(reviewDates[i])를 따라가 버려 원래 다른 날짜에 딴 점수가 엉뚱한 주(week)로 재배정될 수 있음 — 주간 랭킹 집계는 반드시 이 로그 기준으로 해야 정리하기가 몇 번 일어나도 안전함
   reviewLog?: { date: string; state: ReviewState; slot: number }[]; // 복습 체크 "결과"를 딴 그 순간에 영구 귀속시키는 append-only 로그. reviews/reviewDates는 "정리하기"로 X·★ 칸이 비워지는 게 정상 동작(다시 풀어보라고 슬롯을 리셋)이라, 그 슬롯 상태만으로는 당일 결과 이력을 재구성할 수 없음 — 관리자 어드민의 당일 정답률처럼 "정리하기와 무관하게 오늘 실제로 무슨 결과가 있었는지"가 필요한 집계는 이 로그를 써야 함. date는 pointLog(연도 없음)와 달리 ISO 문자열(연도 포함). slot은 같은 칸을 같은 날 다시 고친 경우 "그 칸의 최종 상태" 하나만 인정하기 위한 키(시도/정정 횟수는 별도로 세지 않음) — state:''는 되돌리기로 그 칸의 체크가 취소됐다는 뜻이라 집계에서 제외
   durationMs?: number;      // 이 진단(classify+extract+solve 전체)이 실제로 걸린 시간(ms) — 평균 대기시간 계산용
+  needsHelp?: boolean;      // 복습 3칸이 모두 채워졌는데 O가 하나도 없었던 적이 있다는 영구 플래그("도움 필요").
+                            // reviews/reviewDates만으로 판정하면 "정리하기"로 3칸이 비워지는 순간 신호가 사라지므로
+                            // (정리하기는 의도된 리셋 — 다시 풀어보라는 것) 별도로 영속시킨다. App.tsx의
+                            // handleUpdateReviews에서만 갱신: 3칸 완료 + O 없음 → true, 이후 그 문제에서 O가
+                            // 하나라도 나오면 → false. 그 외(정리하기로 비워짐 포함)에는 이전 값 그대로 유지.
 }
 
 // classify 완료 직후, solve가 아직 실질적인 텍스트를 스트리밍하기 전까지 잠깐 노출되는 placeholder 문구.
@@ -31,6 +36,20 @@ export interface MistakeAnalysis {
 export const SOLVING_PLACEHOLDER_TEXT = "### 1단계: 문제 이해하기\nAI가 정밀 문제 해설을 분석 중입니다... 잠시만 기다려 주세요.";
 
 export type ReviewState = 'O' | 'X' | 'star' | '';
+
+// "도움 필요" 판정의 유일한 기준점 — 학생 상단고정/MistakeCard 배지/ScaffoldingPanel이 전부 이
+// 함수를 통해서만 판정해야 세 곳이 항상 같은 의미를 쓴다는 게 보장된다.
+// analysis.needsHelp가 저장되어 있으면(true든 false든) 그 값을 최우선으로 신뢰한다 — 배포 이후
+// 정리하기로 유지된 true, O 획득 이후의 false 모두 이 값에 이미 정확히 반영되어 있다.
+// 값이 아직 없는(undefined) 경우에만 — 즉 이 기능이 배포되기 전부터 이미 3칸이 채워져 있던
+// 레거시 데이터에 한해서만 — reviews를 즉석에서 훑어 "3칸 모두 채워짐 && O 없음"으로 판정한다.
+// `??`를 써야 하는 이유: `||`를 쓰면 명시적으로 저장된 false(정리 후 유지 아님/이미 해결됨)가
+// falsy로 취급되어 레거시 재계산으로 다시 true가 튀어나올 수 있다.
+export function resolveNeedsHelp(reviews: ReviewState[] | undefined, needsHelp: boolean | undefined): boolean {
+  return needsHelp ?? (
+    !!reviews && reviews.length === 3 && reviews.every(r => r !== '') && !reviews.includes('O')
+  );
+}
 
 export interface AdminUserStat {
   userId: string;
