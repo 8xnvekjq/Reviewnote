@@ -20,12 +20,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
   const [activeSubTab, setActiveSubTab] = useState<'stats' | 'activity'>('stats');
   const [gradeFilter, setGradeFilter] = useState<string>('all');
 
-  // 학생 카드 클릭 시 장착 아이템 조회용 상태 (보유 전체가 아닌 "현재 장착 중"인 것만 표시)
-  const [selectedStudent, setSelectedStudent] = useState<AdminUserStat | null>(null);
-
-  const handleOpenStudentItems = (user: AdminUserStat) => {
-    setSelectedStudent(user);
-  };
+  // 학생 카드 클릭 시 여는 상세 모달 — 학생 "객체"가 아니라 id만 들고 있는다.
+  // 객체를 통째로 저장하면 실시간 갱신(fetchAdminStats)으로 stats가 새로 만들어져도 모달은
+  // 예전 스냅샷을 계속 보여주게 된다. id로만 들고 있고, 표시할 때마다 최신 stats에서 다시 찾는다
+  // (학생이 삭제/필터 밖으로 사라지면 selectedStudent가 자연히 null이 되어 모달도 자동으로 닫힘).
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const selectedStudent = selectedStudentId ? stats.find(u => u.userId === selectedStudentId) || null : null;
 
   const fetchAdminStats = async (isInitial = false) => {
     if (isInitial) {
@@ -402,164 +402,68 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
               </div>
             ) : (
               filteredStats.map((user) => {
-              const isEmailValid = user.email && user.email.includes('@');
-              const activeNotes = user.mistakeCount - user.completedCount;
-              const completionRate = user.mistakeCount > 0
-                ? Math.round((user.completedCount / user.mistakeCount) * 100)
-                : 0;
+              const realName = (user as any).displayName || (user as any).username;
+              const nick = user.nickname;
+              const hasCustomNick = nick && nick !== realName;
+              // 최근 업로드(lastActivity)와 마지막 복습(lastReviewDate) 중 실제로 더 최근인 쪽을 표시 —
+              // 복습 후 새 오답을 업로드했다면 그게 더 최근 활동이므로 review 우선으로 고정하면 안 됨
+              const lastActivityRaw = [user.lastActivity, user.lastReviewDate]
+                .filter((d): d is string => !!d)
+                .reduce((latest, d) => (!latest || new Date(d) > new Date(latest) ? d : latest), null as string | null);
+              const lastActivityLabel = lastActivityRaw ? formatDate(lastActivityRaw).split(' ')[0] : '—';
+              const todayAccuracyLabel = user.todayReviewedCount > 0
+                ? `${Math.round((user.todayCorrectCount / user.todayReviewedCount) * 100)}%`
+                : '—';
 
               return (
+                // 압축된 기본 카드: 스캔에 필요한 핵심 정보만 (이름/최근 활동/오늘 복습·정답률/학년 미지정 배지).
+                // 학년 select·주간 스코어·콤보 포인트·누적 통계·진행률·장착 아이템은 클릭 시 여는 상세
+                // 모달로 이동(아래 selectedStudent 블록) — 값과 로직은 그대로 재사용, 위치만 옮김.
                 <div
                   key={user.userId}
-                  onClick={() => handleOpenStudentItems(user)}
+                  onClick={() => setSelectedStudentId(user.userId)}
+                  onKeyDown={(e) => {
+                    // 학년 select 등 상세 정보가 이제 모달 안에 있어서, 카드 자체를 키보드로 열 수
+                    // 있어야 그 안의 컨트롤에도 도달할 수 있다.
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedStudentId(user.userId);
+                    }
+                  }}
                   role="button"
                   tabIndex={0}
-                  className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-4 transition-all hover:border-slate-700 cursor-pointer"
+                  className="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 flex items-center space-x-3 transition-all hover:border-slate-700 cursor-pointer"
                 >
-                  {/* User Identity Row */}
-                  <div className="flex items-center space-x-3">
-                    {/* Avatar */}
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-600 to-indigo-800 flex items-center justify-center text-white font-black text-base flex-none shadow-lg shadow-indigo-900/30">
-                      {((user as any).displayName || (user as any).username || 'U').charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2 flex-wrap gap-y-1">
-                        {/* 이름 (어드민에게는 이름 옆에 닉네임 병기) */}
-                        {(() => {
-                          const realName = (user as any).displayName || (user as any).username;
-                          const nick = user.nickname;
-                          const hasCustomNick = nick && nick !== realName;
-
-                          return (
-                            <span className={`font-extrabold text-sm truncate ${user.email?.toLowerCase().startsWith('test') ? 'text-rainbow-wave' : 'text-white'}`}>
-                              {realName} {hasCustomNick && <span className="text-amber-400 font-bold text-xs ml-1">({nick})</span>}
-                            </span>
-                          );
-                        })()}
-                        {user.equippedTitle && (() => {
-                          const badge = getTitleBadgeStyle(user.equippedTitle);
-                          return (
-                            <span className={`text-[9px] px-2 py-0.5 rounded-full border flex items-center space-x-1 flex-none ${badge.style}`}>
-                              <span>{badge.icon}</span>
-                              <span>{user.equippedTitle}</span>
-                            </span>
-                          );
-                        })()}
-                      </div>
-                      <span className="text-[10px] text-slate-400 truncate block mt-0.5">
-                        {(user as any).displayName ? `아이디: ${(user as any).username}` : (isEmailValid ? user.email : '(이메일 정보 없음)')}
-                      </span>
-                      {/* 학년 선택 컴포넌트 추가 */}
-                      <div className="flex items-center space-x-1.5 mt-2">
-                        <span className="text-[9px] text-slate-500 font-bold">학년:</span>
-                        <select
-                          value={user.schoolGrade || ''}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={async (e) => {
-                            const newGrade = e.target.value;
-
-                            try {
-                              const { error } = await supabase
-                                .from('profiles')
-                                .update({ school_grade: newGrade || null })
-                                .eq('id', user.userId);
-                                
-                              if (error) throw error;
-                              
-                              // Update local state
-                              setStats(prev => prev.map(u => u.userId === user.userId ? { ...u, schoolGrade: newGrade } : u));
-                            } catch (err: any) {
-                              alert('학년 업데이트 실패: ' + err.message);
-                            }
-                          }}
-                          className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 focus:border-indigo-500 text-[10px] text-white outline-none transition-colors font-bold text-center cursor-pointer"
-                        >
-                          <option value="">선택 없음</option>
-                          <option value="중3">중3</option>
-                          <option value="고1">고1</option>
-                          <option value="고2">고2</option>
-                          <option value="고3">고3</option>
-                        </select>
-                      </div>
-                    </div>
-                    {/* Weekly Score and Last Activity */}
-                    <div className="text-right flex-none pl-3 border-l border-slate-800/80 space-y-1">
-                      <div>
-                        <span className="text-[9px] text-slate-500 block leading-none">주간 스코어</span>
-                        <span className="text-xs font-black text-amber-400 leading-tight block">
-                          {Math.round(user.weeklyScore)}점
-                        </span>
-                        <span className="text-[8px] text-slate-500 block leading-none mt-0.5">
-                          ({user.weeklyCompletedCount}개 완료 / {user.weeklyTotalCount}개 등록)
-                        </span>
-                      </div>
-                      <div className="pt-1 border-t border-slate-850">
-                        <span className="text-[9px] text-slate-500 block leading-none">콤보 포인트</span>
-                        <span className="text-xs font-black text-emerald-400 leading-tight block">
-                          ⚡ {user.comboPoints ?? 0}점
-                        </span>
-                      </div>
-                      <div className="pt-1 border-t border-slate-850">
-                        <span className="text-[9px] text-slate-500 block leading-none">최근 업로드</span>
-                        <span className="text-[10px] text-slate-400 font-medium leading-none block mt-0.5">
-                          {user.lastActivity ? formatDate(user.lastActivity).split(' ')[0] : '—'}
-                        </span>
-                      </div>
-                      <div className="pt-1 border-t border-slate-850">
-                        <span className="text-[9px] text-indigo-400 block leading-none font-bold">마지막 복습</span>
-                        <span className="text-[10px] text-indigo-300 font-semibold leading-none block mt-0.5">
-                          {user.lastReviewDate ? formatDate(user.lastReviewDate).split(' ')[0] : '—'}
-                        </span>
-                      </div>
-                    </div>
+                  {/* Avatar */}
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-600 to-indigo-800 flex items-center justify-center text-white font-black text-xs flex-none">
+                    {(realName || 'U').charAt(0).toUpperCase()}
                   </div>
 
-                  {/* Stats Row */}
-                  <div className="grid grid-cols-3 gap-2">
-                    {/* Total Notes */}
-                    <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 text-center">
-                      <div className="text-xl font-black text-white">{user.mistakeCount}</div>
-                      <div className="text-[10px] text-slate-500 font-bold mt-0.5">총 오답노트</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center space-x-1.5 min-w-0">
+                      <span className={`font-bold text-xs truncate ${user.email?.toLowerCase().startsWith('test') ? 'text-rainbow-wave' : 'text-white'}`}>
+                        {realName}{hasCustomNick && <span className="text-amber-400 font-semibold"> ({nick})</span>}
+                      </span>
+                      {!user.schoolGrade && (
+                        <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-500 border border-slate-700 font-bold flex-none">
+                          학년 미지정
+                        </span>
+                      )}
                     </div>
-                    {/* Active Notes */}
-                    <div className="bg-indigo-950/50 border border-indigo-800/40 rounded-xl p-3 text-center">
-                      <div className="text-xl font-black text-indigo-300">{activeNotes}</div>
-                      <div className="text-[10px] text-indigo-500 font-bold mt-0.5">진행중</div>
-                    </div>
-                    {/* Completed */}
-                    <div className="bg-emerald-950/50 border border-emerald-800/40 rounded-xl p-3 text-center">
-                      <div className="text-xl font-black text-emerald-300">{user.completedCount}</div>
-                      <div className="text-[10px] text-emerald-500 font-bold mt-0.5">복습완료</div>
-                    </div>
+                    <span className="text-[9px] text-slate-500 truncate block mt-0.5">
+                      최근 활동 {lastActivityLabel}
+                    </span>
                   </div>
 
-                  {/* 오늘의 복습 정답률 (reviewLog 기준 — 정리하기해도 안 사라짐, ★는 오답에 합산) */}
-                  {user.todayReviewedCount > 0 && (
-                    <div className="bg-amber-950/20 border border-amber-800/30 rounded-xl px-3 py-2 flex items-center justify-between">
-                      <span className="text-[10px] text-amber-400 font-bold">
-                        🎯 오늘 {user.todayReviewedCount}문제 · 정답 {user.todayCorrectCount} · 오답 {user.todayIncorrectCount}
-                      </span>
-                      <span className="text-xs font-black text-amber-300">
-                        {Math.round((user.todayCorrectCount / user.todayReviewedCount) * 100)}%
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Completion Progress Bar */}
-                  {user.mistakeCount > 0 && (
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-slate-500 font-bold">복습 진행률</span>
-                        <span className="text-[10px] font-black text-slate-400">{completionRate}%</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full transition-all"
-                          style={{ width: `${completionRate}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
+                  {/* 오늘의 복습 (reviewLog 기준 — 항상 표시, 활동 없으면 0/— 로) */}
+                  <div className="flex-none text-right pl-2">
+                    <span className="text-[9px] text-amber-400 font-bold block leading-none">
+                      오늘 {user.todayReviewedCount}문제
+                    </span>
+                    <span className="text-xs font-black text-amber-300 block leading-none mt-1">
+                      {todayAccuracyLabel}
+                    </span>
+                  </div>
                 </div>
               );
             })
@@ -575,8 +479,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
         </div>
       )}
 
-      {/* ── 학생 카드 클릭 시: 현재 장착 중인 아이템만 조회하는 모달 ── */}
+      {/* ── 학생 카드 클릭 시 여는 상세 모달 ── 압축 카드에서 뺀 정보(학년/주간 스코어/콤보 포인트/
+          누적 통계/진행률/장착 아이템)를 여기로 그대로 옮겨왔다. 값·저장 로직은 기존 카드에서 쓰던
+          것을 그대로 재사용(select의 onChange 등) — selectedStudent가 stats에서 매번 다시 찾은
+          최신 값이라 학년을 바꿔도 이 모달 안에서 바로 최신 상태로 보인다. ── */}
       {selectedStudent && (() => {
+        const isEmailValid = selectedStudent.email && selectedStudent.email.includes('@');
+        const activeNotes = selectedStudent.mistakeCount - selectedStudent.completedCount;
+        const completionRate = selectedStudent.mistakeCount > 0
+          ? Math.round((selectedStudent.completedCount / selectedStudent.mistakeCount) * 100)
+          : 0;
+        const realName = (selectedStudent as any).displayName || (selectedStudent as any).username;
+        const nick = selectedStudent.nickname;
+        const hasCustomNick = nick && nick !== realName;
+
         const equippedSlots: { category: string; label: string; value?: string }[] = [
           { category: 'TITLE', label: '칭호', value: selectedStudent.equippedTitle },
           { category: 'STAMP', label: '스탬프', value: selectedStudent.equippedStamp },
@@ -587,33 +503,155 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
         return (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in"
-            onClick={() => setSelectedStudent(null)}
+            onClick={() => setSelectedStudentId(null)}
           >
             <div
-              className="w-full max-w-sm max-h-[80vh] bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-2xl space-y-4 animate-scale-up flex flex-col"
+              className="w-full max-w-sm max-h-[85vh] bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-2xl space-y-4 animate-scale-up flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between border-b border-slate-800 pb-2.5 flex-none">
                 <h3 className="text-sm font-extrabold text-white flex items-center space-x-2 min-w-0">
-                  <span>🎽</span>
-                  <span className="truncate">
-                    {(() => {
-                      const realName = (selectedStudent as any).displayName || (selectedStudent as any).username;
-                      const nick = selectedStudent.nickname;
-                      const hasCustomNick = nick && nick !== realName;
-                      return `${realName}${hasCustomNick ? ` (${nick})` : ''} 장착 아이템`;
-                    })()}
+                  <span className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-600 to-indigo-800 flex items-center justify-center text-white font-black text-xs flex-none">
+                    {(realName || 'U').charAt(0).toUpperCase()}
                   </span>
+                  <span className="truncate">
+                    {realName}{hasCustomNick ? ` (${nick})` : ''}
+                  </span>
+                  {selectedStudent.equippedTitle && (() => {
+                    const badge = getTitleBadgeStyle(selectedStudent.equippedTitle);
+                    return (
+                      <span className={`text-[9px] px-2 py-0.5 rounded-full border flex items-center space-x-1 flex-none ${badge.style}`}>
+                        <span>{badge.icon}</span>
+                        <span>{selectedStudent.equippedTitle}</span>
+                      </span>
+                    );
+                  })()}
                 </h3>
                 <button
-                  onClick={() => setSelectedStudent(null)}
+                  onClick={() => setSelectedStudentId(null)}
                   className="text-slate-400 hover:text-white text-xs font-bold px-2 py-1 rounded-lg flex-none"
                 >
                   ✕
                 </button>
               </div>
 
-              <div className="overflow-y-auto flex-1 space-y-2">
+              <div className="overflow-y-auto flex-1 space-y-4">
+                {/* 아이디/이메일 + 학년 선택 */}
+                <div className="space-y-1.5">
+                  <span className="text-[10px] text-slate-400 truncate block">
+                    {(selectedStudent as any).displayName ? `아이디: ${(selectedStudent as any).username}` : (isEmailValid ? selectedStudent.email : '(이메일 정보 없음)')}
+                  </span>
+                  <div className="flex items-center space-x-1.5">
+                    <span className="text-[9px] text-slate-500 font-bold">학년:</span>
+                    <select
+                      value={selectedStudent.schoolGrade || ''}
+                      onChange={async (e) => {
+                        const newGrade = e.target.value;
+                        const targetId = selectedStudent.userId;
+
+                        try {
+                          const { error } = await supabase
+                            .from('profiles')
+                            .update({ school_grade: newGrade || null })
+                            .eq('id', targetId);
+
+                          if (error) throw error;
+
+                          // Update local state
+                          setStats(prev => prev.map(u => u.userId === targetId ? { ...u, schoolGrade: newGrade } : u));
+                        } catch (err: any) {
+                          alert('학년 업데이트 실패: ' + err.message);
+                        }
+                      }}
+                      className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 focus:border-indigo-500 text-[10px] text-white outline-none transition-colors font-bold text-center cursor-pointer"
+                    >
+                      <option value="">선택 없음</option>
+                      <option value="중3">중3</option>
+                      <option value="고1">고1</option>
+                      <option value="고2">고2</option>
+                      <option value="고3">고3</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* 주간 스코어 / 콤보 포인트 / 최근 업로드 / 마지막 복습 */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-slate-950 border border-slate-800 rounded-xl p-2.5">
+                    <span className="text-[9px] text-slate-500 block leading-none">주간 스코어</span>
+                    <span className="text-xs font-black text-amber-400 leading-tight block mt-1">
+                      {Math.round(selectedStudent.weeklyScore)}점
+                    </span>
+                    <span className="text-[8px] text-slate-500 block leading-none mt-0.5">
+                      ({selectedStudent.weeklyCompletedCount}개 완료 / {selectedStudent.weeklyTotalCount}개 등록)
+                    </span>
+                  </div>
+                  <div className="bg-slate-950 border border-slate-800 rounded-xl p-2.5">
+                    <span className="text-[9px] text-slate-500 block leading-none">콤보 포인트</span>
+                    <span className="text-xs font-black text-emerald-400 leading-tight block mt-1">
+                      ⚡ {selectedStudent.comboPoints ?? 0}점
+                    </span>
+                  </div>
+                  <div className="bg-slate-950 border border-slate-800 rounded-xl p-2.5">
+                    <span className="text-[9px] text-slate-500 block leading-none">최근 업로드</span>
+                    <span className="text-[10px] text-slate-400 font-medium leading-none block mt-1">
+                      {selectedStudent.lastActivity ? formatDate(selectedStudent.lastActivity).split(' ')[0] : '—'}
+                    </span>
+                  </div>
+                  <div className="bg-slate-950 border border-slate-800 rounded-xl p-2.5">
+                    <span className="text-[9px] text-indigo-400 block leading-none font-bold">마지막 복습</span>
+                    <span className="text-[10px] text-indigo-300 font-semibold leading-none block mt-1">
+                      {selectedStudent.lastReviewDate ? formatDate(selectedStudent.lastReviewDate).split(' ')[0] : '—'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 누적 오답노트 통계 + 복습 진행률 */}
+                <div className="space-y-2">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 text-center">
+                      <div className="text-xl font-black text-white">{selectedStudent.mistakeCount}</div>
+                      <div className="text-[10px] text-slate-500 font-bold mt-0.5">총 오답노트</div>
+                    </div>
+                    <div className="bg-indigo-950/50 border border-indigo-800/40 rounded-xl p-3 text-center">
+                      <div className="text-xl font-black text-indigo-300">{activeNotes}</div>
+                      <div className="text-[10px] text-indigo-500 font-bold mt-0.5">진행중</div>
+                    </div>
+                    <div className="bg-emerald-950/50 border border-emerald-800/40 rounded-xl p-3 text-center">
+                      <div className="text-xl font-black text-emerald-300">{selectedStudent.completedCount}</div>
+                      <div className="text-[10px] text-emerald-500 font-bold mt-0.5">복습완료</div>
+                    </div>
+                  </div>
+                  {selectedStudent.mistakeCount > 0 && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-slate-500 font-bold">복습 진행률</span>
+                        <span className="text-[10px] font-black text-slate-400">{completionRate}%</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full transition-all"
+                          style={{ width: `${completionRate}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 오늘의 복습 정답률 상세 (reviewLog 기준 — 정리하기해도 안 사라짐, ★는 오답에 합산) */}
+                <div className="bg-amber-950/20 border border-amber-800/30 rounded-xl px-3 py-2 flex items-center justify-between">
+                  <span className="text-[10px] text-amber-400 font-bold">
+                    🎯 오늘 {selectedStudent.todayReviewedCount}문제 · 정답 {selectedStudent.todayCorrectCount} · 오답 {selectedStudent.todayIncorrectCount}
+                  </span>
+                  <span className="text-xs font-black text-amber-300">
+                    {selectedStudent.todayReviewedCount > 0
+                      ? `${Math.round((selectedStudent.todayCorrectCount / selectedStudent.todayReviewedCount) * 100)}%`
+                      : '—'}
+                  </span>
+                </div>
+
+                {/* 장착 아이템 */}
+                <div className="space-y-2">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">🎽 장착 아이템</span>
                 {equippedSlots.map(slot => {
                   const catalogItem = slot.value
                     ? GACHA_ITEMS.find(g => g.category === slot.category && g.effectValue === slot.value)
@@ -658,6 +696,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
                     </div>
                   );
                 })}
+                </div>
               </div>
             </div>
           </div>
