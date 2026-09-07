@@ -42,6 +42,9 @@ interface OverlayHostProps {
   checklistStatus: Record<string, 'generating' | 'failed'>;
   onToggleChecklistItem: (entryId: string, itemId: string) => void;
   onRetryChecklistGeneration: (entry: MistakeEntry) => void;
+  onUploadAnswerImage: (entry: MistakeEntry, blob: Blob) => void;
+  onDeleteAnswerImage: (entry: MistakeEntry) => void;
+  isUploadingAnswerImage: boolean;
   onSelectEntry: (entry: MistakeEntry | null) => void;
   onUpdateDetailEntry: (updated: MistakeEntry) => void;
 
@@ -109,6 +112,9 @@ export function OverlayHost({
   checklistStatus,
   onToggleChecklistItem,
   onRetryChecklistGeneration,
+  onUploadAnswerImage,
+  onDeleteAnswerImage,
+  isUploadingAnswerImage,
   onSelectEntry,
   onUpdateDetailEntry,
   tempCapturedImage,
@@ -152,6 +158,9 @@ export function OverlayHost({
           checklistStatus={checklistStatus[selectedEntry.id]}
           onToggleChecklistItem={onToggleChecklistItem}
           onRetryChecklistGeneration={() => onRetryChecklistGeneration(selectedEntry)}
+          onUploadAnswerImage={(blob) => onUploadAnswerImage(selectedEntry, blob)}
+          onDeleteAnswerImage={() => onDeleteAnswerImage(selectedEntry)}
+          isUploadingAnswerImage={isUploadingAnswerImage}
           onSelectEntry={onSelectEntry}
           isReviewSession={isReviewSession}
           onUpdateEntry={onUpdateDetailEntry}

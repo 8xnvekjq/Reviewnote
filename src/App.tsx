@@ -65,6 +65,7 @@ function App() {
   const [mistakes, setMistakes] = useState<MistakeEntry[]>([]);
   const [selectedEntry, setSelectedEntry] = useState<MistakeEntry | null>(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false); // 사진 업로드(handleCropComplete) 전용 — AI 진단 자체는 useMistakeAnalysis의 analyzingEntryId로 별도 추적.
+  const [isUploadingAnswerImage, setIsUploadingAnswerImage] = useState(false); // 재풀이 사진 업로드(handleUploadAnswerImage) 전용
 
   // 매일 연속 복습 스트릭 상태 (🔥 Streak 관리)
   const [streakState, setStreakState] = useState<StreakState>(() => loadStreakState());
@@ -1238,6 +1239,69 @@ function App() {
     }
   };
 
+  // 🧭 학생 재풀이 사진(선택, 1장) — 원본 문제 사진(problem-images 버킷)과 완전히 분리된
+  // answer-images 버킷/answer_image_url 컬럼을 쓴다(PR4). 업로드 패턴은 handleCropComplete와
+  // 동일(버킷 업로드 → publicUrl → DB 반영)하되, 신규 row를 만드는 게 아니라 기존 오답에 UPDATE.
+  const handleUploadAnswerImage = async (entry: MistakeEntry, blob: Blob) => {
+    if (isUploadingAnswerImage) return;
+    if (!session?.user) return;
+
+    setIsUploadingAnswerImage(true);
+    try {
+      const fileExt = blob.type.split('/')[1] || 'jpg';
+      const fileName = `${session.user.id}/${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('answer-images')
+        .upload(fileName, blob, { contentType: blob.type });
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('answer-images')
+        .getPublicUrl(fileName);
+
+      const { error: updateError } = await supabase
+        .from('mistakes')
+        .update({ answer_image_url: publicUrl })
+        .eq('id', entry.id);
+      if (updateError) throw updateError;
+
+      setMistakes(prev => prev.map(m => m.id === entry.id ? { ...m, answerImageUrl: publicUrl } : m));
+      setSelectedEntry(prev => prev && prev.id === entry.id ? { ...prev, answerImageUrl: publicUrl } : prev);
+    } catch (err: any) {
+      console.error('재풀이 사진 업로드 실패:', err);
+      showNoticeModal({
+        title: '업로드 실패',
+        message: err.message || '재풀이 사진을 업로드하지 못했습니다.',
+        badge: '오류',
+        icon: '⚠️',
+      });
+    } finally {
+      setIsUploadingAnswerImage(false);
+    }
+  };
+
+  const handleDeleteAnswerImage = async (entry: MistakeEntry) => {
+    try {
+      const { error: updateError } = await supabase
+        .from('mistakes')
+        .update({ answer_image_url: null })
+        .eq('id', entry.id);
+      if (updateError) throw updateError;
+
+      setMistakes(prev => prev.map(m => m.id === entry.id ? { ...m, answerImageUrl: undefined } : m));
+      setSelectedEntry(prev => prev && prev.id === entry.id ? { ...prev, answerImageUrl: undefined } : prev);
+    } catch (err: any) {
+      console.error('재풀이 사진 삭제 실패:', err);
+      showNoticeModal({
+        title: '삭제 실패',
+        message: err.message || '재풀이 사진을 삭제하지 못했습니다.',
+        badge: '오류',
+        icon: '⚠️',
+      });
+    }
+  };
+
   // O/X/★ 복습 상태머신 + 포인트/스트릭/콤보부스터/일일퀘스트 — src/features/mistakes/useReviewState로
   // 이동. mistakes/selectedEntry 자체의 소유권은 계속 App.tsx에 남는다.
   const {
@@ -2036,6 +2100,9 @@ function App() {
         checklistStatus={checklistStatus}
         onToggleChecklistItem={toggleChecklistItem}
         onRetryChecklistGeneration={handleRetryChecklistGeneration}
+        onUploadAnswerImage={handleUploadAnswerImage}
+        onDeleteAnswerImage={handleDeleteAnswerImage}
+        isUploadingAnswerImage={isUploadingAnswerImage}
         onSelectEntry={setSelectedEntry}
         onUpdateDetailEntry={(updated) => {
           setMistakes(prev => prev.map(m => m.id === updated.id ? updated : m));

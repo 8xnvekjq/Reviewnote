@@ -22,6 +22,7 @@ export const mapDbMistakeRow = (m: any): MistakeEntry => ({
   userActionPlan: m.user_action_plan || undefined,
   teacherScaffoldingHint: m.teacher_scaffolding_hint || undefined,
   isHidden: m.is_hidden || false, // 구버전 로우(컬럼 추가 전)는 undefined/null -> false로 취급
+  answerImageUrl: m.answer_image_url || undefined,
 });
 
 interface UseMistakesParams {
