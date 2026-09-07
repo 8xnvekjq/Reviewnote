@@ -11,7 +11,9 @@ import { Screen } from './app/ScreenRouter';
 import { OverlayHost } from './app/OverlayHost';
 import { LazyScreenBoundary } from './app/LazyScreenBoundary';
 import { useCheckpointGeneration } from './features/checkpoints/useCheckpointGeneration';
+import { useChecklistGeneration } from './features/checklist/useChecklistGeneration';
 import { useMistakeAnalysis } from './features/mistakes/useMistakeAnalysis';
+import { prepareGeminiImage } from './services/gemini';
 import { useMistakes, mapDbMistakeRow } from './features/mistakes/useMistakes';
 import { useReviewState } from './features/mistakes/useReviewState';
 import { Header } from './components/Header';
@@ -1002,12 +1004,12 @@ function App() {
     };
   }, [session?.user?.id]);
 
-  // 🧭 단계형 풀이 체크리스트 생성/재생성/상태 갱신 — src/features/checkpoints/useCheckpointGeneration로
-  // 이동. 이 훅은 selectedEntry를 읽기 전용으로만 참조하며, mistakes/selectedEntry 자체의
-  // 소유권은 계속 App.tsx에 남는다(안전장치는 훅 파일의 주석 참고, 전부 그대로 보존됨).
+  // 🧭 (레거시) 단계형 풀이 체크포인트 — src/features/checkpoints/useCheckpointGeneration.
+  // 체크리스트 2.0 도입 이후 신규 분석은 더 이상 이 구조를 생성하지 않는다. 이미 과거에 생성된
+  // 레코드의 "이해했어요/막혔어요" 상호작용(handleUpdateCheckpointStatus)만 계속 지원하기 위해
+  // 유지한다.
   const {
     checkpointRegenStatus,
-    generateAndSaveSolutionCheckpoints,
     regenerateCheckpointsWithProgress,
     handleUpdateCheckpointStatus,
   } = useCheckpointGeneration({
@@ -1017,9 +1019,24 @@ function App() {
     showNoticeModal,
   });
 
+  // 🧭 체크리스트 2.0 — src/features/checklist/useChecklistGeneration. solvingProcess에
+  // 종속되지 않는 새 체크리스트의 생성(classify와 병렬)/저장/체크 상태를 담당한다.
+  const {
+    checklistStatus,
+    startChecklistGeneration,
+    flushFirstChecklistSave,
+    toggleChecklistItem,
+    retryChecklistGeneration,
+  } = useChecklistGeneration({
+    setMistakes,
+    setSelectedEntry,
+    customAiName,
+    showNoticeModal,
+  });
+
   // AI 분석(classify → extract/solve) 파이프라인 — src/features/mistakes/useMistakeAnalysis로
-  // 이동. generateAndSaveSolutionCheckpoints(위 체크포인트 훅의 반환값)를 그대로 넘겨받아 분석
-  // 완료 직후 eager 생성을 트리거한다(순환 의존 없이 단방향으로만 연결).
+  // 이동. 체크리스트 2.0 훅의 함수를 그대로 넘겨받아 생성/저장 타이밍을 트리거한다(순환 의존
+  // 없이 단방향으로만 연결).
   const {
     analyzingEntryId,
     averageWaitMs,
@@ -1035,8 +1052,28 @@ function App() {
     aiVoice: equippedItems.aiVoice,
     teacherApproachGuides,
     showNoticeModal,
-    generateAndSaveSolutionCheckpoints,
+    startChecklistGeneration,
+    flushFirstChecklistSave,
   });
+
+  // 🧭 체크리스트 생성 실패 후 "다시 시도" — 이미지 준비는 useMistakeAnalysis 내부에서만
+  // 재사용되므로, 재시도 시점엔 여기서 다시 한번 준비한다(진단당 1회 재사용 원칙은 "같은 진단
+  // 실행 내"에 한정 — 재시도는 별개의 새 시도).
+  const handleRetryChecklistGeneration = async (entry: MistakeEntry) => {
+    try {
+      const studentGrade = entry.userId ? (profilesGradeMap[entry.userId] || '') : '';
+      const image = await prepareGeminiImage(entry.imageUrl);
+      await retryChecklistGeneration(entry, image, studentGrade);
+    } catch (err: any) {
+      console.error('체크리스트 재시도 실패:', err);
+      showNoticeModal({
+        title: '재시도 실패',
+        message: err.message || '체크리스트를 다시 생성하지 못했습니다.',
+        badge: '오류',
+        icon: '⚠️',
+      });
+    }
+  };
 
   // Intercept camera capture and start cropping flow
   const handleCameraCapture = (base64Image: string, initialCrop?: CropPercent) => {
@@ -1996,6 +2033,9 @@ function App() {
         onUpdateReviews={handleUpdateReviews}
         onUpdateCheckpointStatus={handleUpdateCheckpointStatus}
         onRetryCheckpointGeneration={regenerateCheckpointsWithProgress}
+        checklistStatus={checklistStatus}
+        onToggleChecklistItem={toggleChecklistItem}
+        onRetryChecklistGeneration={handleRetryChecklistGeneration}
         onSelectEntry={setSelectedEntry}
         onUpdateDetailEntry={(updated) => {
           setMistakes(prev => prev.map(m => m.id === updated.id ? updated : m));

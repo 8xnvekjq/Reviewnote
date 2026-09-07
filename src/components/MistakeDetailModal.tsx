@@ -25,6 +25,9 @@ interface MistakeDetailModalProps {
   onUpdateCheckpointStatus: (id: string, stageIndex: number, checkpointIndex: number, newStatus: 'understood' | 'stuck') => void;
   checkpointRegenStatus?: 'generating' | 'success' | 'failed'; // 정리하기(초기화) 후 단계형 체크리스트 재생성 진행 상태
   onRetryCheckpointGeneration?: () => void; // 재생성 실패 시 "다시 시도"
+  checklistStatus?: 'generating' | 'failed'; // 체크리스트 2.0 생성 진행 상태('ready'는 없음 — analysis.solutionChecklist 존재 자체가 ready)
+  onToggleChecklistItem: (entryId: string, itemId: string) => void;
+  onRetryChecklistGeneration?: () => void; // 체크리스트 2.0 생성 실패 시 "다시 시도"
   onUpdateEntry: (updated: MistakeEntry) => void;
   onSelectEntry?: (entry: MistakeEntry | null) => void;
   isReviewSession?: boolean;
@@ -99,6 +102,9 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   onUpdateCheckpointStatus,
   checkpointRegenStatus,
   onRetryCheckpointGeneration,
+  checklistStatus,
+  onToggleChecklistItem,
+  onRetryChecklistGeneration,
   onUpdateEntry,
   onSelectEntry,
   isReviewSession = false,
@@ -1378,9 +1384,9 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 </div>
               )}
 
-              {/* Card 0.8: 단계형 풀이 체크리스트 — 기본 진단 UI. 없으면(아직 생성 전/생성 실패)
-                  아무것도 안 보여주고 기존 정석 풀이만 노출(품질 방어선으로서의 조용한 fallback). */}
-              {selectedEntry.analysis.solutionCheckpoints && (() => {
+              {/* Card 0.8 (레거시): 단계형 풀이 체크리스트 — 체크리스트 2.0 이전에 생성된
+                  레코드만 대상(신규 분석은 항상 solutionChecklist를 갖게 되므로 자연히 배타적). */}
+              {!selectedEntry.analysis.solutionChecklist && selectedEntry.analysis.solutionCheckpoints && (() => {
                 const stages = selectedEntry.analysis.solutionCheckpoints;
                 if (!stages) return null;
 
@@ -1493,6 +1499,62 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                   </div>
                 );
               })()}
+
+              {/* Card 0.9: 체크리스트 2.0 — "AI 풀이를 이해했나요?"가 아니라 "풀기 전에 기본
+                  접근을 했나요?"를 확인하는 용도. solve 완료를 기다리지 않고 classify와 병렬로
+                  훨씬 일찍 준비되므로, 학생이 전체 풀이를 기다리는 동안에도 먼저 쓸 수 있다. */}
+              {checklistStatus === 'generating' && !selectedEntry.analysis.solutionChecklist && (
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                  <span className="flex-none w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                  <span>{aiPersonaName}가 문제 풀이 체크리스트를 작성 중이에요…</span>
+                </div>
+              )}
+              {checklistStatus === 'failed' && !selectedEntry.analysis.solutionChecklist && (
+                <div className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-red-500/10 text-red-300 border border-red-500/20">
+                  <span>⚠️ 체크리스트 생성에 실패했어요</span>
+                  {onRetryChecklistGeneration && (
+                    <button
+                      onClick={onRetryChecklistGeneration}
+                      className="flex-none px-3 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-200 font-black active:scale-95 transition-all"
+                    >
+                      다시 시도
+                    </button>
+                  )}
+                </div>
+              )}
+              {selectedEntry.analysis.solutionChecklist && (
+                <div className="space-y-2 border-l-4 border-emerald-500 pl-4 py-1">
+                  <h4 className="text-sm font-extrabold text-emerald-400 flex items-center">
+                    <span className="mr-1.5 text-base">✅</span> 풀기 전 체크리스트
+                  </h4>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    본격적으로 풀기 전에, 기본적인 접근을 제대로 했는지 스스로 확인해 보세요.
+                  </p>
+                  <div className="space-y-2">
+                    {selectedEntry.analysis.solutionChecklist.items.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => onToggleChecklistItem(selectedEntry.id, item.id)}
+                        className={`w-full flex items-start gap-2 text-left rounded-xl border p-3 transition-all active:scale-[0.99] ${
+                          item.checked
+                            ? 'bg-emerald-950/10 border-emerald-800/30'
+                            : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+                        }`}
+                      >
+                        <span className={`flex-none w-4 h-4 mt-0.5 rounded-md border-2 flex items-center justify-center ${
+                          item.checked ? 'bg-emerald-500 border-emerald-500' : 'border-slate-600'
+                        }`}>
+                          {item.checked && <span className="text-slate-950 text-[10px] font-black">✓</span>}
+                        </span>
+                        <span className={`text-xs font-bold leading-relaxed ${item.checked ? 'text-slate-400' : 'text-slate-200'}`}>
+                          {item.text}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Card 1: 정석 풀이 과정 */}
               <CollapsibleSection

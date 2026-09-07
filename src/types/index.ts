@@ -22,6 +22,21 @@ export interface SolutionCheckpointStage {
   checkpoints: SolutionCheckpoint[];
 }
 
+// 체크리스트 2.0 — solvingProcess(AI 풀이)에 종속되지 않는 새 구조. "AI 풀이를 이해했나요?"가 아니라
+// "풀기 전에 기본적인 접근을 했나요?"를 확인하는 용도로 목적을 재정의하면서, 4단계 고정 구조 대신
+// 평면 리스트로 단순화했다(고정 3개 + AI가 생성하는 문제별 맞춤 1~3개). 기존 SolutionCheckpointStage와
+// 같은 필드를 재사용하면 신/구 shape이 섞여 판별이 어려워지므로 별도 필드(solutionChecklist)로 분리.
+export interface SolutionChecklistItem {
+  id: string;              // 'fixed-1'~'fixed-3' | 'ai-0'~'ai-2' — 재생성해도 fixed id는 안정적으로 유지
+  text: string;
+  source: 'fixed' | 'ai';  // 'fixed'는 매번 AI 호출 없이 클라이언트 상수로 렌더(토큰 절감)
+  checked: boolean;
+}
+
+export interface SolutionChecklist {
+  items: SolutionChecklistItem[];
+}
+
 export interface MistakeAnalysis {
   solvingProcess: string;   // [문제 풀이 과정]
   mistakeSummary?: string;  // [학생 풀이 기반 틀린 이유 1줄 요약] (레거시 필드 — 더 이상 생성/저장/렌더하지
@@ -49,9 +64,11 @@ export interface MistakeAnalysis {
                             // (정리하기는 의도된 리셋 — 다시 풀어보라는 것) 별도로 영속시킨다. App.tsx의
                             // handleUpdateReviews에서만 갱신: 3칸 완료 + O 없음 → true, 이후 그 문제에서 O가
                             // 하나라도 나오면 → false. 그 외(정리하기로 비워짐 포함)에는 이전 값 그대로 유지.
-  solutionCheckpoints?: SolutionCheckpointStage[]; // 항상 길이 4(stage 1~4). 없으면 아직 생성 전(신규는
-                            // 풀이 완료 직후 background 생성, 레거시 needsHelp 문제는 lazy 생성) —
-                            // 한 번 생성되면 재호출 없이 그대로 캐시로 재사용됨.
+  solutionCheckpoints?: SolutionCheckpointStage[]; // (레거시 필드 — 체크리스트 2.0으로 대체되어 신규
+                            // 분석에서는 더 이상 생성/저장하지 않는다. 과거에 이미 생성된 레코드와의
+                            // DB 호환을 위해 타입/렌더 모두 그대로 유지.)
+  solutionChecklist?: SolutionChecklist; // 체크리스트 2.0 — 이미지 기반 FAST 호출로 solve와 병렬 생성,
+                            // 없으면 아직 생성 전이거나 실패.
   checkpointStuckLog?: { date: string; stage: 1 | 2 | 3 | 4; stageType: StageType }[]; // "여기서
                             // 막혔어요"를 선택할 때마다 append-only로 기록. 이후 understood로 바뀌어도
                             // 이 로그는 지우지 않음 — reviewLog와 동일한 이유(라이브 status만 보면

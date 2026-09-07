@@ -661,6 +661,138 @@ ${syllabusText || '등록된 강의가 없습니다.'}
 }
 
 /**
+ * 체크리스트 2.0 — 문제별 맞춤 체크 항목(1~3개)만 생성하는 FAST 호출. classify와 동일하게
+ * thinkingBudget:0으로 이미지를 직접 입력받는다(problemText/OCR 완료를 기다리지 않고 classify와
+ * 완전히 병렬로 t=0에 시작 가능 — 도형/그래프 문제에서 OCR 텍스트가 놓칠 수 있는 정보도 이미지
+ * 원본에는 남아있음). 고정 3개 문구는 이 함수가 생성하지 않는다(클라이언트 상수 — 매 진단마다
+ * 같은 문구를 또 생성/과금할 이유가 없음).
+ *
+ * 허용/금지 기준은 "구체성"이 아니라 "AI가 새로 만든 표현에 종속되는지"이다:
+ * - 허용: 문제 이미지에 실제 등장하는 수치·변수·함수·기호, 실제 도형 관계, 문제를 읽으면
+ *   자연스럽게 떠오르는 핵심 개념·관계·기본 전략
+ * - 금지: AI가 새로 만든 변수/함수/기호, 임의 치환, AI가 그은 보조선, 풀이를 위해 새로 만든
+ *   표현, 최종 정답/결정적 중간 계산 결과 스포일러
+ *
+ * (구조적 안전장치) 이 호출은 solve(전체 풀이)와 완전히 병렬로 실행되어 solve의 출력(최종 정답,
+ * 계산 결과)에 애초에 접근할 수 없다 — 풀이 스포일러가 프롬프트 준수 여부와 무관하게 원천 차단됨.
+ */
+export async function generateChecklistWithGemini(
+  image: { mimeType: string; base64Data: string },
+  studentGrade?: string,
+  personaName: string = '밤티'
+): Promise<string[] | null> {
+  const { mimeType, base64Data } = image;
+
+  const studentInfoPrompt = studentGrade
+    ? `\n이 문제를 등록한 학생의 현재 학년/과정은 "${studentGrade}"이다. 학생 수준에 맞는 자연스러운 표현을 써라.\n`
+    : '';
+
+  const prompt = `너는 더쿠키수학 오답클리닉의 학습 진단 보조 인공지능 '${personaName}'이다.
+주어진 수학 문제 이미지를 빠르게 읽고, 학생이 "문제 풀이를 시작하기 전에" 스스로 점검할 수 있는
+맞춤 체크리스트 항목을 1~3개 만들어라.
+
+이 체크리스트의 목적은 "AI가 이 문제를 어떻게 풀었는지 이해했는가"가 아니라 "학생이 풀기 전에
+기본적인 접근을 제대로 했는가"를 확인하는 것이다. 이미 다음 3개 항목은 모든 문제에 고정으로
+포함되므로, 너는 그 3개와 겹치지 않는 이 문제만의 맞춤 항목만 만들면 된다(참고용, 네가 다시
+만들 필요 없음):
+1. 문제의 조건을 빠뜨리지 않고 확인했나요?
+2. 조건을 내가 익숙한 식이나 그림으로 바꿔봤나요?
+3. 문제에서 무엇을 구해야 하는지 정확히 확인했나요?
+${studentInfoPrompt}
+★ [절대 규칙 - 허용/금지 기준] ★
+"구체적인 내용을 쓰지 마라"가 아니라 "네가 새로 만든 표현에 종속되지 마라"가 기준이다.
+
+허용:
+- 문제 이미지에 실제로 등장하는 수치, 변수, 함수, 기호
+- 문제 이미지에 실제로 명시된 도형 관계(각/길이/평행/수직 등)
+- 문제를 읽으면 자연스럽게 떠오르는 핵심 개념·관계·기본 전략
+
+금지:
+- 네(AI)가 새로 만든 변수나 함수, 임의로 도입한 치환
+- 네가 그은 보조선이나 새로 정의한 보조 구조/기호
+- 최종 정답이나 결정적인 중간 계산 결과의 스포일러
+
+[좋은 예 vs 나쁜 예 — 문제에 함수 f(x)와 조건 f(1)=3이 주어진 경우]
+- 좋은 예: "f(1)=3이라는 조건이 무엇을 의미하는지 확인했나요?" (문제에 실제 등장하는 f(x), f(1)=3을 그대로 언급 — 허용)
+- 나쁜 예: "g(x)=f(x)-3으로 치환한 이유를 이해했나요?" (AI가 풀이를 위해 새로 만든 함수 g(x) — 금지)
+- 나쁜 예: "이 문제의 답이 x=2가 되는 이유를 알고 있나요?" (정답 스포일러 — 금지)
+
+각 항목은 반드시 물음표로 끝나는 질문 형태로 작성하고, 한 문장으로 짧게 써라.
+
+[반환할 JSON 구조]
+customItems: 이 문제만의 맞춤 체크 항목 배열(1~3개). 각 항목은:
+- text: 질문형 문장
+- usesOnlyGivenElements: 위 [절대 규칙]을 스스로 점검해서, 이 항목이 AI가 새로 만든 변수/함수/보조선/치환을 쓰지 않았고 정답도 스포일러하지 않았으면 true, 하나라도 위반했으면 false로 정직하게 채워라.`;
+
+  const requestBody = {
+    contents: [
+      {
+        parts: [
+          { text: prompt },
+          {
+            inlineData: {
+              mimeType: mimeType,
+              data: base64Data
+            }
+          }
+        ]
+      }
+    ],
+    generationConfig: {
+      // classify와 동일한 이유로 thinking을 끄고 지연시간을 줄인다 — 이 호출은 classify/solve와
+      // 병렬로 시작되어 학생에게 가장 먼저 보여줄 체크리스트이므로 빠를수록 좋다.
+      thinkingConfig: { thinkingBudget: 0 },
+      maxOutputTokens: 65536,
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: 'OBJECT',
+        properties: {
+          customItems: {
+            type: 'ARRAY',
+            minItems: 1,
+            maxItems: 3,
+            items: {
+              type: 'OBJECT',
+              properties: {
+                text: { type: 'STRING' },
+                usesOnlyGivenElements: { type: 'BOOLEAN' }
+              },
+              required: ['text', 'usesOnlyGivenElements']
+            }
+          }
+        },
+        required: ['customItems']
+      }
+    }
+  };
+
+  try {
+    const resolvedModel = 'gemini-2.5-flash';
+    const parsedJson = await callGeminiApi(resolvedModel, requestBody);
+    const items = parsedJson?.customItems;
+
+    if (!Array.isArray(items) || items.length < 1 || items.length > 3) return null;
+
+    const result: string[] = [];
+    for (const item of items) {
+      // 모델 자기점검에 걸리거나(AI가 새로 만든 표현 사용 우려), 물음표로 끝나지 않으면(서술형
+      // 스포일러 가능성에 대한 구조적 방어선) 전체 세트를 폐기한다.
+      if (item?.usesOnlyGivenElements !== true) return null;
+      const text = String(item?.text || '').trim();
+      if (!text || !text.endsWith('?')) return null;
+      result.push(text);
+    }
+
+    return result;
+  } catch (error: any) {
+    // API 레벨 실패도 조용히 null 처리 — 품질 방어선일 뿐이라 실패해도 고정 3개 항목은 그대로
+    // 노출된다(재시도는 호출부의 별도 "다시 시도" 버튼으로만).
+    console.error('Gemini checklist generation failed:', error);
+    return null;
+  }
+}
+
+/**
  * 문제 지문(OCR)과 인쇄 영역 바운딩 박스를 추출하는 전용 호출.
  * 과목/단원 판정과 무관한 작업이라 classify와 동시에 병렬로 실행할 수 있다. (예전에는 solve
  * 호출 안에 함께 묶여 있어서 실제 풀이 계산과 순차적으로 처리되며 solve의 출력량/시간을 늘리고 있었음)

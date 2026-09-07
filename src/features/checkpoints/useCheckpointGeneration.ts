@@ -271,6 +271,10 @@ export function useCheckpointGeneration({
     if (checkpointGenerationFailedIdsRef.current.has(selectedEntry.id)) return;
     if (!resolveNeedsHelp(selectedEntry.reviews, selectedEntry.analysis?.needsHelp)) return;
     if (selectedEntry.analysis?.solutionCheckpoints) return;
+    // 체크리스트 2.0(solutionChecklist)로 이미 생성된 신규 레코드는 구버전 4단계 체크포인트를
+    // 또 만들 필요가 없다 — 신규 분석은 항상 solutionChecklist를 먼저 갖게 되므로, 이 레거시
+    // lazy 경로는 그 이전(체크리스트 2.0 이전)에 만들어진 needsHelp 레코드만 대상으로 한다.
+    if (selectedEntry.analysis?.solutionChecklist) return;
     if (!selectedEntry.analysis?.problemText || !selectedEntry.analysis?.solvingProcess) return;
 
     generateAndSaveSolutionCheckpoints(selectedEntry).catch(err => {
