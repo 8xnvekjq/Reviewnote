@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { createPortal } from 'react-dom';
-import type { MistakeEntry, MistakeAnalysis, ReviewState } from '../types';
+import type { MistakeEntry, MistakeAnalysis, ReviewState, SolutionChecklistItem } from '../types';
 import { ROOT_CAUSE_OPTIONS, MATH_CURRICULUM, GRADE_LIST, SOLVING_PLACEHOLDER_TEXT } from '../types';
 import { LaTeXRenderer } from './LaTeXRenderer';
 import { formatDate } from '../utils/date';
@@ -25,12 +25,11 @@ interface MistakeDetailModalProps {
   onUpdateCheckpointStatus: (id: string, stageIndex: number, checkpointIndex: number, newStatus: 'understood' | 'stuck') => void;
   checkpointRegenStatus?: 'generating' | 'success' | 'failed'; // 정리하기(초기화) 후 단계형 체크리스트 재생성 진행 상태
   onRetryCheckpointGeneration?: () => void; // 재생성 실패 시 "다시 시도"
-  checklistStatus?: 'generating' | 'failed'; // 체크리스트 2.0 생성 진행 상태('ready'는 없음 — analysis.solutionChecklist 존재 자체가 ready)
-  onToggleChecklistItem: (entryId: string, itemId: string) => void;
+  checklistStatus?: 'generating' | 'failed'; // 체크리스트 2.0 생성 진행 상태('ready'는 없음 — checklistPreview/analysis.solutionChecklist 존재 자체가 ready)
+  checklistPreview?: SolutionChecklistItem[]; // classify/solve의 analysis 스냅샷 교체와 분리된 독립 렌더 소스 — 있으면 이걸 최우선으로 쓴다
+  onSetChecklistItemStatus: (entryId: string, itemId: string, status: SolutionChecklistItem['status']) => void;
   onRetryChecklistGeneration?: () => void; // 체크리스트 2.0 생성 실패 시 "다시 시도"
-  onUploadAnswerImage: (blob: Blob) => void; // 재풀이 사진 업로드(선택, 1장) — 원본 문제 이미지와 별개
-  onDeleteAnswerImage: () => void;
-  isUploadingAnswerImage?: boolean;
+  onDeleteAnswerImage: () => void; // 과거에 업로드된 재풀이 사진을 지울 때만 사용(신규 업로드 UI는 제거됨)
   onUpdateEntry: (updated: MistakeEntry) => void;
   onSelectEntry?: (entry: MistakeEntry | null) => void;
   isReviewSession?: boolean;
@@ -134,11 +133,10 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   checkpointRegenStatus,
   onRetryCheckpointGeneration,
   checklistStatus,
-  onToggleChecklistItem,
+  checklistPreview,
+  onSetChecklistItemStatus,
   onRetryChecklistGeneration,
-  onUploadAnswerImage,
   onDeleteAnswerImage,
-  isUploadingAnswerImage = false,
   onUpdateEntry,
   onSelectEntry,
   isReviewSession = false,
@@ -231,7 +229,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   // "직접 다시 풀어보기" CTA를 이번 카드 보기 세션 동안만 건너뛰었는지(영구 저장 아님 — 카드를
   // 다시 열면 또 보인다, 죄책감 유발 요소 없이 매번 가볍게 제안만 함).
   const [reproposeDismissed, setReproposeDismissed] = React.useState(false);
-  const answerImageInputRef = useRef<HTMLInputElement>(null);
 
   // 💡 동일 문제 연속 클릭 쿨다운 커스텀 알림 모달 상태
   const [isCooldownNoticeOpen, setIsCooldownNoticeOpen] = React.useState(false);
@@ -1067,6 +1064,10 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target !== e.currentTarget) return;
     if (isZoomOpen) return;
+    // 풀이노트(HandwritingOverlay)는 이제 문제 확대창(openImageWindow) 없이도 단독으로 열릴 수
+    // 있다("다시 풀어볼게요"에서 바로 열림) — isZoomOpen만 보면 이 경우를 놓쳐서, 풀이노트가 뜬
+    // 채로 뒤쪽 배경을 클릭하면 상세 모달 전체가 닫혀버리는(풀이노트만 붕 뜨는) 문제가 생긴다.
+    if (isHandwritingOpen) return;
     onClose();
   };
 
@@ -1147,13 +1148,15 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
               alt={selectedEntry.title}
               className="w-full h-auto max-h-[60vh] object-contain rounded-xl group-hover/img:opacity-90 transition-opacity"
             />
-            {/* 풀이노트 — 손 필기/펜슬로 내 풀이를 써보는 창(저장하면 스캐폴딩 "내 풀이"로 등록).
+            {/* 풀이노트 — 문제 이미지를 배경으로 두고 손 필기/펜슬로 내 풀이를 써보는 창(저장하면
+                스캐폴딩 "내 풀이"로 등록). 예전엔 이 버튼이 확대창(openImageWindow)과 풀이노트
+                (HandwritingOverlay)를 동시에 열어 두 창이 겹쳐 뜨는 문제가 있었다 — 이제 풀이노트
+                자체가 문제 이미지를 보여주므로 확대창은 따로 열지 않는다.
                 🧭 아이콘 구분: 정답 수정(✏️) / 풀이노트(📝) / 문제에 쓰기(🖍)로 역할을 나눠
                 같은 연필 아이콘이 여러 기능에서 반복되어 헷갈리던 문제를 해소한다. */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                openImageWindow();
                 setIsHandwritingOpen(true);
               }}
               type="button"
@@ -1401,6 +1404,95 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             </div>
           )}
 
+          {/* Card 0.9: 체크리스트 2.0 — "AI 풀이를 이해했나요?"가 아니라 "풀기 전에 기본 접근을
+              했나요?"를 확인하는 용도. solve 완료를 기다리지 않고 classify와 병렬로 훨씬 일찍
+              준비되므로, 학생이 전체 풀이를 기다리는 동안에도 먼저 쓸 수 있어야 한다 — 그래서
+              바로 아래의 "AI Analysis trigger" 3분기 ternary(로딩 스피너 / 실제 분석 결과 / 시작
+              전 안내) 밖에, 그 위에 독립적으로 렌더한다. 예전엔 이 블록이 hasRealAnalysis(실제
+              풀이 스트리밍이 시작된 뒤에만 true)) 분기 안에 있어서, 체크리스트가 이미 준비돼도
+              solve의 첫 스트리밍 전까지는 화면에 아예 나타나지 않는 문제가 있었다(체크리스트만
+              분리해도 상위 조건에 계속 가려져 있으면 소용없음).
+              🧭 렌더 소스는 checklistPreview를 최우선으로 쓴다 — selectedEntry.analysis는
+              classify/solve가 각자 캡처한 stale 스냅샷으로 통째로 교체되기 때문에, 그것만
+              보고 렌더하면 체크리스트가 화면에서 사라졌다가 첫 저장 완료 후에야 다시 나타나는
+              문제가 있었다(useChecklistGeneration.ts 설계 주석 참고). checklistPreview가 아직
+              없는(이번 세션에 생성한 적 없는, 이전에 이미 저장된) 레코드만 analysis로 폴백한다. */}
+          {(() => {
+            const checklistItems = checklistPreview ?? selectedEntry.analysis?.solutionChecklist?.items;
+            return (
+              <>
+                {checklistStatus === 'generating' && !checklistItems && (
+                  <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                    <span className="flex-none w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                    <span>{aiPersonaName}가 문제 풀이 체크리스트를 작성 중이에요…</span>
+                  </div>
+                )}
+                {checklistStatus === 'failed' && !checklistItems && (
+                  <div className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-red-500/10 text-red-300 border border-red-500/20">
+                    <span>⚠️ 체크리스트 생성에 실패했어요</span>
+                    {onRetryChecklistGeneration && (
+                      <button
+                        onClick={onRetryChecklistGeneration}
+                        className="flex-none px-3 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-200 font-black active:scale-95 transition-all"
+                      >
+                        다시 시도
+                      </button>
+                    )}
+                  </div>
+                )}
+                {checklistItems && (
+                  <div className="space-y-2 border-l-4 border-emerald-500 pl-4 py-1">
+                    <h4 className="text-sm font-extrabold text-emerald-400 flex items-center">
+                      <span className="mr-1.5 text-base">✅</span> 풀기 전 체크리스트
+                    </h4>
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      풀기 전에 어디까지 스스로 해봤는지 확인해보세요.
+                    </p>
+                    <div className="space-y-2">
+                      {checklistItems.map((item) => (
+                        <div key={item.id} className="rounded-xl border p-3 bg-slate-900 border-slate-800">
+                          <LaTeXRenderer text={item.text} className="text-xs font-bold leading-relaxed text-slate-200" />
+                          <div className="flex items-center gap-2 mt-2">
+                            <button
+                              type="button"
+                              onClick={() => onSetChecklistItemStatus(selectedEntry.id, item.id, 'done')}
+                              className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all active:scale-95 ${
+                                item.status === 'done'
+                                  ? 'bg-emerald-500 text-slate-950'
+                                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                              }`}
+                            >
+                              ✅ 했어요
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onSetChecklistItemStatus(selectedEntry.id, item.id, 'stuck')}
+                              className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all active:scale-95 ${
+                                item.status === 'stuck'
+                                  ? 'bg-amber-500 text-slate-950'
+                                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                              }`}
+                            >
+                              🙋 막혔어요
+                            </button>
+                          </div>
+                          {item.status === 'stuck' && (
+                            <p className="mt-2 text-[11px] leading-relaxed text-amber-200" role="status">
+                              {item.id === 'fixed-1' ? '주어진 조건에 하나씩 밑줄을 긋고, 빠뜨린 조건이 있는지 찾아보세요.'
+                                : item.id === 'fixed-2' ? '아는 조건 하나만 골라 식이나 간단한 그림으로 옮겨보세요.'
+                                : item.id === 'fixed-3' ? '문제의 마지막 문장을 읽고 구할 대상을 내 말로 적어보세요.'
+                                : '이 질문과 연결된 조건을 문제에서 찾아보세요. 어떤 말이나 개념이 어려운지 짚어본 뒤 아래 풀이와 비교해 보세요.'}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
+
           {/* AI Analysis trigger / solving process rendering */}
           {(!showResult && (isAnalyzing || (progress > 0 && progress < 100)) && (!selectedEntry.analysis?.solvingProcess || selectedEntry.analysis.solvingProcess === SOLVING_PLACEHOLDER_TEXT)) ? (
             <div className="py-8 px-4 flex flex-col items-center space-y-8 animate-fade-in bg-slate-900/20 rounded-3xl border border-slate-800/40 backdrop-blur-md">
@@ -1478,10 +1570,10 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                   DB 저장/AI 분석 입력/체크포인트 생성 입력으로는 계속 그대로 쓰인다 — 여기서
                   지운 건 이 화면에 보여주던 접힘 섹션 하나뿐이다. */}
 
-              {/* Card 0.5: 📚 나의 학습 기록 — 선생님 힌트(스캐폴딩)와 재풀이 사진을 한 묶음으로.
-                  예전에는 재풀이 사진 업로드가 대책 작성란 아래 멀리 떨어져 있어 별도 기능처럼
-                  느껴졌다 — 스캐폴딩(선생님 힌트/내 풀이 기록)과 같은 "학습 기록" 흐름으로
-                  묶는다. 큰 DB 재설계 없이 순수 UI 재배치만 함(answerImageUrl 그대로 재사용). */}
+              {/* Card 0.5: 📚 나의 학습 기록 — 선생님 힌트(스캐폴딩)와 재풀이 기록을 한 묶음으로.
+                  재풀이는 이제 별도 사진 업로드 UI가 아니라 "다시 풀어볼게요" → 풀이노트(문제
+                  이미지 위에 직접 필기) → 저장 시 이 스캐폴딩 목록에 "내 풀이"로 자동 등록되는
+                  흐름 하나로 합쳐졌다(HandwritingOverlay.handleSave, 기존 구조 그대로 재사용). */}
               <div className="space-y-2">
                 <h4 className="text-[11px] font-black text-slate-500 uppercase tracking-wide px-1">📚 나의 학습 기록</h4>
                 <MistakeScaffoldingDrawer
@@ -1492,54 +1584,26 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                   refreshSignal={scaffoldingRefreshKey}
                 />
 
-                {/* 재풀이 사진(선택, 1장) — AI 진단 완료 후에만 노출. 이미 업로드된 사진이 있으면
-                    항상 보여준다("직접 다시 풀어보기"를 건너뛰었어도 이미 남긴 기록은 숨기지
-                    않음). 하지만 아직 사진이 없는데 학생이 "지금은 건너뛰기"를 눌렀다면, 업로드
-                    버튼까지 화면에 남아있으면 "건너뛰기가 안 먹힌 느낌"을 준다 — 그 경우엔 이
-                    섹션 자체를 접는다(재확장은 아래 배너의 "마음이 바뀌었나요?" 링크로). */}
-                {hasRealAnalysis(selectedEntry) && (selectedEntry.answerImageUrl || !reproposeDismissed) && (
+                {/* 과거(이번 라운드 이전)에 올린 재풀이 사진이 있으면 계속 보여준다 — DB/Storage
+                    데이터는 그대로 유지, 신규 업로드 UI만 제거됐다. 지우고 싶으면 삭제 가능. */}
+                {selectedEntry.answerImageUrl && (
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-slate-400 block">재풀이 사진 (선택)</label>
-                    {selectedEntry.answerImageUrl ? (
-                      <div className="relative rounded-xl overflow-hidden border border-slate-800 bg-slate-950">
-                        <img
-                          src={selectedEntry.answerImageUrl}
-                          alt="내가 다시 푼 풀이"
-                          className="w-full max-h-64 object-contain"
-                        />
-                        <button
-                          type="button"
-                          onClick={onDeleteAnswerImage}
-                          aria-label="재풀이 사진 삭제"
-                          className="absolute top-2 right-2 w-7 h-7 rounded-full bg-slate-950/80 hover:bg-red-500/80 flex items-center justify-center text-white text-xs font-black transition-colors"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ) : (
-                      <>
-                        <input
-                          ref={answerImageInputRef}
-                          type="file"
-                          accept="image/*"
-                          capture="environment"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) onUploadAnswerImage(file);
-                            e.target.value = '';
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => answerImageInputRef.current?.click()}
-                          disabled={isUploadingAnswerImage}
-                          className="w-full py-2.5 rounded-xl border border-dashed border-slate-700 text-[11px] font-bold text-slate-400 hover:border-slate-600 hover:text-slate-300 transition-colors disabled:opacity-50"
-                        >
-                          {isUploadingAnswerImage ? '업로드 중...' : '📷 다시 푼 풀이 사진 올리기'}
-                        </button>
-                      </>
-                    )}
+                    <label className="text-[11px] font-bold text-slate-400 block">이전에 올린 재풀이 사진</label>
+                    <div className="relative rounded-xl overflow-hidden border border-slate-800 bg-slate-950">
+                      <img
+                        src={selectedEntry.answerImageUrl}
+                        alt="내가 다시 푼 풀이"
+                        className="w-full max-h-64 object-contain"
+                      />
+                      <button
+                        type="button"
+                        onClick={onDeleteAnswerImage}
+                        aria-label="재풀이 사진 삭제"
+                        className="absolute top-2 right-2 w-7 h-7 rounded-full bg-slate-950/80 hover:bg-red-500/80 flex items-center justify-center text-white text-xs font-black transition-colors"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1687,74 +1751,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 );
               })()}
 
-              {/* Card 0.9: 체크리스트 2.0 — "AI 풀이를 이해했나요?"가 아니라 "풀기 전에 기본
-                  접근을 했나요?"를 확인하는 용도. solve 완료를 기다리지 않고 classify와 병렬로
-                  훨씬 일찍 준비되므로, 학생이 전체 풀이를 기다리는 동안에도 먼저 쓸 수 있다. */}
-              {checklistStatus === 'generating' && !selectedEntry.analysis.solutionChecklist && (
-                <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-                  <span className="flex-none w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
-                  <span>{aiPersonaName}가 문제 풀이 체크리스트를 작성 중이에요…</span>
-                </div>
-              )}
-              {checklistStatus === 'failed' && !selectedEntry.analysis.solutionChecklist && (
-                <div className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-red-500/10 text-red-300 border border-red-500/20">
-                  <span>⚠️ 체크리스트 생성에 실패했어요</span>
-                  {onRetryChecklistGeneration && (
-                    <button
-                      onClick={onRetryChecklistGeneration}
-                      className="flex-none px-3 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-200 font-black active:scale-95 transition-all"
-                    >
-                      다시 시도
-                    </button>
-                  )}
-                </div>
-              )}
-              {selectedEntry.analysis.solutionChecklist && (
-                <div className="space-y-2 border-l-4 border-emerald-500 pl-4 py-1">
-                  <h4 className="text-sm font-extrabold text-emerald-400 flex items-center">
-                    <span className="mr-1.5 text-base">✅</span> 풀기 전 체크리스트
-                  </h4>
-                  <p className="text-[11px] text-slate-500 leading-relaxed">
-                    풀기 전에 해 본 접근을 확인해 보세요. 항목을 누르면 미응답 → 했어요 → 여기서 막혔어요 → 미응답 순서로 바뀌어요.
-                    순서와 관계없이 답할 수 있고, 미응답은 막힘으로 기록하지 않아요.
-                  </p>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">
-                    모두 했어도 계산이나 개념 적용에서 틀릴 수 있어요. 아래 풀이와 내 풀이를 비교해 보세요.
-                  </p>
-                  <div className="space-y-2">
-                    {selectedEntry.analysis.solutionChecklist.items.map((item) => (
-                      <div key={item.id} className="space-y-1">
-                        <button
-                          type="button"
-                          onClick={() => onToggleChecklistItem(selectedEntry.id, item.id)}
-                          aria-label={`${item.text} 현재 ${item.status === 'done' ? '했어요' : item.status === 'stuck' ? '여기서 막혔어요' : '미응답'}. 누르면 ${item.status === 'done' ? '여기서 막혔어요' : item.status === 'stuck' ? '미응답' : '했어요'}로 변경`}
-                          className={`w-full flex items-start gap-2 text-left rounded-xl border p-3 transition-all active:scale-[0.99] ${
-                            item.status === 'done'
-                              ? 'bg-emerald-950/10 border-emerald-800/30'
-                              : item.status === 'stuck'
-                              ? 'bg-amber-950/20 border-amber-600/50'
-                              : 'bg-slate-900 border-slate-800 hover:border-slate-700'
-                          }`}
-                        >
-                          <span className="flex-1 text-xs font-bold leading-relaxed text-slate-200">{item.text}</span>
-                          <span className={`flex-none text-[11px] font-bold ${item.status === 'stuck' ? 'text-amber-300' : item.status === 'done' ? 'text-emerald-300' : 'text-slate-400'}`}>
-                            {item.status === 'done' ? '✓ 했어요' : item.status === 'stuck' ? '막혔어요' : '미응답'}
-                          </span>
-                        </button>
-                        {item.status === 'stuck' && (
-                          <p className="px-3 text-[11px] leading-relaxed text-amber-200" role="status">
-                            {item.id === 'fixed-1' ? '주어진 조건에 하나씩 밑줄을 긋고, 빠뜨린 조건이 있는지 찾아보세요.'
-                              : item.id === 'fixed-2' ? '아는 조건 하나만 골라 식이나 간단한 그림으로 옮겨보세요.'
-                              : item.id === 'fixed-3' ? '문제의 마지막 문장을 읽고 구할 대상을 내 말로 적어보세요.'
-                              : '이 질문과 연결된 조건을 문제에서 찾아보세요. 어떤 말이나 개념이 어려운지 짚어본 뒤 아래 풀이와 비교해 보세요.'}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {/* Card 1: 정석 풀이 과정 */}
               <CollapsibleSection
                 icon="💡"
@@ -1878,14 +1874,10 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
               </div>
 
               {/* 직접 다시 풀어보기 권유 — 강제하지 않는다: 건너뛰어도 복습에 지장 없고, 죄책감
-                  유발 문구를 쓰지 않는다. AI 진단이 끝난 뒤에만 노출. "네, 다시 풀어볼게요"는
-                  지금은 모달을 닫아 AI 풀이가 눈에 보이지 않는 상태로 스스로 다시 풀어보게
-                  유도한다(정답을 곁눈질하며 베끼는 것 방지) — 실제 재풀이 사진은 위 "📚 나의
-                  학습 기록" 섹션에서 언제든 올릴 수 있다.
-                  🧭 "지금은 건너뛰기"를 눌러도 아래에 업로드 UI가 그대로 남아있어 건너뛰기가
-                  안 먹힌 느낌을 주던 문제 수정: 이제 배너 자체를 작은 링크로 접는다(재풀이 사진
-                  섹션은 위로 옮겨졌으니 더 이상 이 배너 아래에 남아있지 않음). 이미 사진을
-                  올렸다면 그 사실과 무관하게 이 배너는 순수 "한 번 더 권유" UI일 뿐이다. */}
+                  유발 문구를 쓰지 않는다. AI 진단이 끝난 뒤에만 노출.
+                  🧭 "네, 다시 풀어볼게요"는 이제 모달을 닫는 대신 바로 풀이노트(문제 이미지 위에
+                  직접 필기 가능한 창)를 연다 — 클릭 즉시 다음 행동(문제 위에 쓰기)으로 바로
+                  이어지게 한다. 저장하면 위 "📚 나의 학습 기록"에 자동으로 남는다. */}
               {hasRealAnalysis(selectedEntry) && (
                 reproposeDismissed ? (
                   <button
@@ -1903,7 +1895,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={onClose}
+                        onClick={() => setIsHandwritingOpen(true)}
                         className="flex-1 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-400 active:scale-95 transition-all text-[11px] font-black text-white"
                       >
                         ✏️ 네, 다시 풀어볼게요
@@ -2217,12 +2209,15 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
         document.body
       )}
 
-      {/* 손 필기 / 펜슬 풀이 오버레이 — 저장하면 스캐폴딩(본인 풀이)으로 등록됨 */}
+      {/* 손 필기 / 펜슬 풀이 오버레이 — 저장하면 스캐폴딩(본인 풀이)으로 등록됨. 문제 이미지를
+          배경으로 깔아 그 위에 바로 필기할 수 있게 한다(ReactSketchCanvas의 backgroundImage +
+          exportWithBackgroundImage를 재사용 — 새 캔버스 합성 코드 없이 라이브러리 기능만 사용). */}
       {isHandwritingOpen && (
         <HandwritingOverlay
           mistakeId={selectedEntry.id}
           studentId={selectedEntry.userId || ''}
           currentUserId={currentUserId || ''}
+          backgroundImageUrl={selectedEntry.imageUrl}
           onClose={() => setIsHandwritingOpen(false)}
           onSaved={() => setScaffoldingRefreshKey(k => k + 1)}
         />
