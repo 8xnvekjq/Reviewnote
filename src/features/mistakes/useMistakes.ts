@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { MistakeEntry } from '../../types';
 import type { NoticeModalState } from '../../components/CustomNoticeModal';
@@ -50,7 +51,21 @@ export function useMistakes({
   // 🔄 오답노트/스캐폴딩 실시간 동기화 전용 경량 새로고침. fetchUserData는 프로필·전체 학생
   // 이름맵·스트릭·티켓 등을 전부 다시 조회해서 무거운데, mistakes 테이블 변화 하나에는 그 중
   // mistakes와 스캐폴딩 초록마크만 실제로 영향을 받으므로 그 두 개만 가볍게 다시 불러온다.
+  //
+  // ⚠️ mistakes_live_sync 채널(App.tsx)이 postgres_changes 이벤트마다 이 함수를 그대로 호출하므로,
+  // 짧은 시간에 이벤트가 몰리면(예: 관리자 세션에서 여러 학생이 동시에 복습) 이전 요청이 끝나기
+  // 전에 다음 요청이 겹쳐 시작될 수 있었다 — 네트워크 지연에 따라 먼저 시작했지만 늦게 도착한
+  // 응답이 최신 상태를 덮어쓰는 역전 위험이 있었음. 한 번에 하나만 실행하고, 진행 중에 새 이벤트가
+  // 오면 끝난 뒤 딱 한 번만 더 실행해서 최신 상태로 수렴시킨다(값 자체는 그대로, 중복/역전만 제거).
+  const fetchInFlightRef = useRef(false);
+  const pendingRefetchRef = useRef(false);
+
   const refreshMistakesLight = async () => {
+    if (fetchInFlightRef.current) {
+      pendingRefetchRef.current = true;
+      return;
+    }
+    fetchInFlightRef.current = true;
     try {
       const { data: dbMistakes, error } = await supabase
         .from('mistakes')
@@ -65,6 +80,12 @@ export function useMistakes({
       setScaffoldedMistakeIds(new Set((scaffoldingRows || []).map((r: any) => r.mistake_id)));
     } catch (err) {
       console.error('Error refreshing mistakes:', err);
+    } finally {
+      fetchInFlightRef.current = false;
+      if (pendingRefetchRef.current) {
+        pendingRefetchRef.current = false;
+        refreshMistakesLight();
+      }
     }
   };
 

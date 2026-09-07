@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { AdminUserStat, DailyReviewStat } from '../types';
 import { supabase } from '../services/supabase';
 import { formatDate } from '../utils/date';
@@ -27,7 +27,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const selectedStudent = selectedStudentId ? stats.find(u => u.userId === selectedStudentId) || null : null;
 
+  // ⚠️ admin-dashboard-realtime 채널이 profiles/mistakes의 postgres_changes 이벤트마다 이 함수를
+  // 조건 없이 호출했다 — 그런데 profiles에는 모든 로그인 클라이언트가 2분마다 쓰는 last_seen_at
+  // 하트비트(App.tsx의 updateLastSeen)처럼 이 통계와 무관한 컬럼 갱신도 섞여 있어서, 관리자가
+  // 대시보드를 보고 있는 동안 온라인 인원수만큼 겹쳐서 전체 재조회가 반복됐다. 게다가 요청 순서
+  // 보호가 없어 먼저 시작했지만 늦게 끝난 응답이 최신 상태를 덮어쓸 위험도 있었다. 한 번에 하나만
+  // 실행하고, 진행 중에 이벤트가 더 오면 끝난 뒤 딱 한 번만 더 실행해서 최신 상태로 수렴시킨다
+  // (표시되는 값 자체는 그대로 — 중복 실행/역전만 제거). 컴포넌트가 이미 언마운트된 뒤(admin 탭을
+  // 벗어난 뒤) 늦게 도착한 응답이 setState를 호출하지 않도록 isMountedRef로도 막는다.
+  const fetchInFlightRef = useRef(false);
+  const pendingRefetchRef = useRef(false);
+  const isMountedRef = useRef(true);
+
   const fetchAdminStats = async (isInitial = false) => {
+    if (fetchInFlightRef.current) {
+      pendingRefetchRef.current = true;
+      return;
+    }
+    fetchInFlightRef.current = true;
     if (isInitial) {
       setIsLoading(true);
     }
@@ -292,16 +309,29 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
         return a.email.localeCompare(b.email);
       });
 
+      if (!isMountedRef.current) return;
       setStats(sorted);
       setLastRefreshed(new Date());
     } catch (err: any) {
-      setError(err.message || '데이터를 불러오는 중 오류가 발생했습니다.');
+      if (isMountedRef.current) {
+        setError(err.message || '데이터를 불러오는 중 오류가 발생했습니다.');
+      }
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
+      fetchInFlightRef.current = false;
+      if (pendingRefetchRef.current) {
+        pendingRefetchRef.current = false;
+        if (isMountedRef.current) {
+          fetchAdminStats(false);
+        }
+      }
     }
   };
 
   useEffect(() => {
+    isMountedRef.current = true;
     fetchAdminStats(true);
 
     // ⚡ Realtime 실시간 동기화: profiles 및 mistakes 테이블 변경 시 즉시 배경 갱신 (깜빡임 0건)
@@ -324,6 +354,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
       .subscribe();
 
     return () => {
+      isMountedRef.current = false;
       supabase.removeChannel(channel);
     };
   }, []);
