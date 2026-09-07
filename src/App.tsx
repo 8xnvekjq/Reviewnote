@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, lazy } from 'react';
 import type { ActiveTab, MistakeEntry, MistakeAnalysis } from './types';
 import { ROOT_CAUSE_OPTIONS, resolveNeedsHelp } from './types';
 import { CameraScanner } from './components/CameraScanner';
@@ -9,6 +9,7 @@ import { SupabaseConfigWarning } from './components/SupabaseConfigWarning';
 import { AppShell } from './app/AppShell';
 import { Screen } from './app/ScreenRouter';
 import { OverlayHost } from './app/OverlayHost';
+import { LazyScreenBoundary } from './app/LazyScreenBoundary';
 import { useCheckpointGeneration } from './features/checkpoints/useCheckpointGeneration';
 import { useMistakeAnalysis } from './features/mistakes/useMistakeAnalysis';
 import { useMistakes, mapDbMistakeRow } from './features/mistakes/useMistakes';
@@ -16,13 +17,10 @@ import { useReviewState } from './features/mistakes/useReviewState';
 import { Header } from './components/Header';
 import { MistakeList } from './components/MistakeList';
 import { BottomNavigation } from './components/BottomNavigation';
-import { AdminPanel } from './components/AdminPanel';
 import { StudentGuide } from './components/StudentGuide';
 import { HiddenMistakesPanel } from './components/HiddenMistakesPanel';
-import { GachaStore } from './components/GachaStore';
 import { RecentActivityFeed } from './components/RecentActivityFeed';
 import { ScaffoldingListPanel } from './components/ScaffoldingListPanel';
-import { ScaffoldingPanel } from './components/ScaffoldingPanel';
 import type { UnseenScaffoldingItem } from './components/NewScaffoldingModal';
 import type { NoticeModalState } from './components/CustomNoticeModal';
 import { getTitleBadgeStyle, GACHA_ITEMS } from './utils/gachaCatalog';
@@ -30,6 +28,16 @@ import { getRandomCheer } from './utils/aiVoiceCheers';
 import type { EquippedItems } from './types';
 import { applyThemeColor } from './utils/theme';
 import { loadStreakState, reconcileStreakState, getKSTDateString, type StreakState } from './utils/streak';
+
+// PR9: 관리자 전용 화면(AdminPanel/ScaffoldingPanel)과 럭키상점(GachaStore)은 첫 화면(오답노트
+// 목록)을 보여주는 데는 필요 없는데, 지금까지는 일반 import라 학생 계정에서도 초기 번들에
+// 그대로 포함되고 있었다(런타임에는 isAdmin 게이트/탭 조건으로 렌더링만 막고 있었을 뿐, 다운로드
+// 자체는 막지 못함 — 실측: 이 3개를 지연 로드로 바꾸자 메인 청크가 gzip 기준 약 18.79kB
+// 줄었고, 그중 관리자 전용 두 화면만 따로 떼면 gzip 11.24kB가 학생 계정에서는 아예 다운로드되지
+// 않는다). named export라 lazy()에 바로 못 넣고 default로 매핑해야 한다.
+const AdminPanel = lazy(() => import('./components/AdminPanel').then(m => ({ default: m.AdminPanel })));
+const ScaffoldingPanel = lazy(() => import('./components/ScaffoldingPanel').then(m => ({ default: m.ScaffoldingPanel })));
+const GachaStore = lazy(() => import('./components/GachaStore').then(m => ({ default: m.GachaStore })));
 
 interface ProfileDirectoryRow {
   id: string;
@@ -1423,18 +1431,20 @@ function App() {
         )}
       >
         <Screen when={activeTab === 'store'}>
-          <GachaStore
-            userId={session?.user?.id || ''}
-            userPoints={currentDisplayPoints}
-            onDeductPoints={handleDeductPoints}
-            equippedItems={equippedItems}
-            onEquipItem={handleEquipItem}
-            onUseNameChangeTicket={handleUseNameChangeTicket}
-            onUseAiNameChangeTicket={handleUseAiNameChangeTicket}
-            aiPersonaName={customAiName || '밤티'}
-            comboBoosterExpiresAt={comboBoosterExpiresAt}
-            cheerLine={currentCheerLine}
-          />
+          <LazyScreenBoundary>
+            <GachaStore
+              userId={session?.user?.id || ''}
+              userPoints={currentDisplayPoints}
+              onDeductPoints={handleDeductPoints}
+              equippedItems={equippedItems}
+              onEquipItem={handleEquipItem}
+              onUseNameChangeTicket={handleUseNameChangeTicket}
+              onUseAiNameChangeTicket={handleUseAiNameChangeTicket}
+              aiPersonaName={customAiName || '밤티'}
+              comboBoosterExpiresAt={comboBoosterExpiresAt}
+              cheerLine={currentCheerLine}
+            />
+          </LazyScreenBoundary>
         </Screen>
 
         <Screen when={activeTab === 'notes'}>
@@ -1722,7 +1732,9 @@ function App() {
         </Screen>
 
         <Screen when={activeTab === 'admin' && isAdmin}>
-          <AdminPanel onSelectTab={(tab) => setActiveTab(tab)} />
+          <LazyScreenBoundary>
+            <AdminPanel onSelectTab={(tab) => setActiveTab(tab)} />
+          </LazyScreenBoundary>
         </Screen>
 
         <Screen when={activeTab === 'guide'}>
@@ -1941,10 +1953,12 @@ function App() {
         {/* Tab: 🧩 힌트 모음 (스캐폴딩 탐색기) */}
         <Screen when={activeTab === 'scaffolding'}>
           {isAdmin ? (
-            <ScaffoldingPanel
-              isAdmin={isAdmin}
-              onOpenDetailModal={(entry) => setSelectedEntry(entry)}
-            />
+            <LazyScreenBoundary>
+              <ScaffoldingPanel
+                isAdmin={isAdmin}
+                onOpenDetailModal={(entry) => setSelectedEntry(entry)}
+              />
+            </LazyScreenBoundary>
           ) : (
             <ScaffoldingListPanel
               currentUserId={session?.user?.id || currentUser || ''}
