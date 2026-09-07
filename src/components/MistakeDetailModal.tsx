@@ -72,8 +72,14 @@ const IMAGE_WINDOW_RESIZE_HANDLES: Array<{
 
 // 🧭 iPhone PWA standalone 모드에서 문제창 상단 바(필기 모드 토글 등)가 status bar/Wi-Fi/배터리
 // 영역과 겹쳐 탭하기 어렵다는 실사용 문제 — env(safe-area-inset-top)을 실측해서 문제창의 최소
-// top 위치로 사용한다. 세션 중 값이 바뀔 일이 거의 없어(회전 등 예외) 1회 측정 후 캐시한다.
+// top 위치로 사용한다. 매 호출마다 DOM probe를 만들지 않도록 캐시하되, 회전 등으로 실제 inset이
+// 바뀔 수 있어 resize/orientationchange 시 캐시를 무효화해 다음 호출에서 다시 측정한다.
 let cachedSafeAreaInsetTop: number | null = null;
+if (typeof window !== 'undefined') {
+  const invalidateSafeAreaInsetTopCache = () => { cachedSafeAreaInsetTop = null; };
+  window.addEventListener('resize', invalidateSafeAreaInsetTopCache);
+  window.addEventListener('orientationchange', invalidateSafeAreaInsetTopCache);
+}
 const getSafeAreaInsetTop = (): number => {
   if (cachedSafeAreaInsetTop !== null) return cachedSafeAreaInsetTop;
   if (typeof document === 'undefined') return 0;
@@ -81,7 +87,7 @@ const getSafeAreaInsetTop = (): number => {
   probe.style.position = 'fixed';
   probe.style.top = '0';
   probe.style.left = '0';
-  probe.style.paddingTop = 'env(safe-area-inset-top)';
+  probe.style.paddingTop = 'env(safe-area-inset-top, 0px)';
   probe.style.visibility = 'hidden';
   probe.style.pointerEvents = 'none';
   document.body.appendChild(probe);
@@ -1487,9 +1493,11 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 />
 
                 {/* 재풀이 사진(선택, 1장) — AI 진단 완료 후에만 노출. 이미 업로드된 사진이 있으면
-                    항상 보여준다(아래 "직접 다시 풀어보기" 배너를 건너뛰었어도 무관 — 건너뛰기는
-                    그 배너 하나만 접을 뿐, 이미 남긴 기록을 숨기지 않는다). */}
-                {hasRealAnalysis(selectedEntry) && (
+                    항상 보여준다("직접 다시 풀어보기"를 건너뛰었어도 이미 남긴 기록은 숨기지
+                    않음). 하지만 아직 사진이 없는데 학생이 "지금은 건너뛰기"를 눌렀다면, 업로드
+                    버튼까지 화면에 남아있으면 "건너뛰기가 안 먹힌 느낌"을 준다 — 그 경우엔 이
+                    섹션 자체를 접는다(재확장은 아래 배너의 "마음이 바뀌었나요?" 링크로). */}
+                {hasRealAnalysis(selectedEntry) && (selectedEntry.answerImageUrl || !reproposeDismissed) && (
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold text-slate-400 block">재풀이 사진 (선택)</label>
                     {selectedEntry.answerImageUrl ? (
