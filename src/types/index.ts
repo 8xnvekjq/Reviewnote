@@ -30,7 +30,7 @@ export interface SolutionChecklistItem {
   id: string;              // 'fixed-1'~'fixed-3' | 'ai-0'~'ai-2' — 재생성해도 fixed id는 안정적으로 유지
   text: string;
   source: 'fixed' | 'ai';  // 'fixed'는 매번 AI 호출 없이 클라이언트 상수로 렌더(토큰 절감)
-  checked: boolean;
+  status: 'unanswered' | 'done' | 'stuck'; // 미응답은 막힘으로 간주하지 않음
 }
 
 export interface SolutionChecklist {

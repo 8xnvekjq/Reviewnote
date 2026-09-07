@@ -6,6 +6,7 @@ import { supabase } from '../../services/supabase';
 import { generateChecklistWithGemini } from '../../services/gemini';
 
 interface UseChecklistGenerationParams {
+  mistakes: MistakeEntry[];
   setMistakes: Dispatch<SetStateAction<MistakeEntry[]>>;
   setSelectedEntry: Dispatch<SetStateAction<MistakeEntry | null>>;
   customAiName: string;
@@ -14,9 +15,9 @@ interface UseChecklistGenerationParams {
 
 // 매 문제마다 AI를 다시 부르지 않는 고정 3개 — 클라이언트 상수로만 렌더(토큰 절감).
 const FIXED_CHECKLIST_ITEMS: SolutionChecklistItem[] = [
-  { id: 'fixed-1', text: '문제의 조건을 빠뜨리지 않고 확인했나요?', source: 'fixed', checked: false },
-  { id: 'fixed-2', text: '조건을 내가 익숙한 식이나 그림으로 바꿔봤나요?', source: 'fixed', checked: false },
-  { id: 'fixed-3', text: '문제에서 무엇을 구해야 하는지 정확히 확인했나요?', source: 'fixed', checked: false },
+  { id: 'fixed-1', text: '문제의 조건을 빠뜨리지 않고 확인했나요?', source: 'fixed', status: 'unanswered' },
+  { id: 'fixed-2', text: '조건을 내가 익숙한 식이나 그림으로 바꿔봤나요?', source: 'fixed', status: 'unanswered' },
+  { id: 'fixed-3', text: '문제에서 무엇을 구해야 하는지 정확히 확인했나요?', source: 'fixed', status: 'unanswered' },
 ];
 
 // 🧭 체크리스트 2.0 생성/체크 상태 관리 훅.
@@ -28,7 +29,7 @@ const FIXED_CHECKLIST_ITEMS: SolutionChecklistItem[] = [
 //   "생성(Gemini 호출)"과 "DB 저장 시점"을 분리해, 저장은 항상 solve의 마지막 DB 쓰기 이후에만
 //   한다(=오늘의 eager 체크포인트 저장과 동일한 위치, 새로운 동시 쓰기를 만들지 않음).
 // - 그 사이(체크리스트가 로컬에 먼저 뜬 뒤 solve가 끝나기 전) 학생이 체크한 내용이 유실되지
-//   않도록, 체크는 항상 latest ref(checklistCheckedRef)에 동기 기록되고, 첫 저장은 그 ref를 쓰기
+//   않도록, 체크는 항상 latest ref(checklistItemStatusRef)에 동기 기록되고, 첫 저장은 그 ref를 쓰기
 //   직전 마지막 순간에 읽는다. 쓰는 도중에도 체크가 또 바뀔 수 있어 버전 번호(checklistVersionRef)로
 //   "쓰기 시작 시점 버전 == 쓰기 끝난 시점 버전"이 성립할 때까지 반복 저장한다(무한 재시도 구조가
 //   아니라, 실제로 그 사이 변경이 있었을 때만 한 번 더 도는 in-flight + merged-rerun 패턴).
@@ -37,6 +38,7 @@ const FIXED_CHECKLIST_ITEMS: SolutionChecklistItem[] = [
 //   장치가 필요 없다. 첫 저장이 끝난 뒤부터는 기존 handleUpdateCheckpointStatus와 동일한 즉시
 //   fetch-merge-write 경로로 전환된다.
 export function useChecklistGeneration({
+  mistakes,
   setMistakes,
   setSelectedEntry,
   customAiName,
@@ -46,13 +48,13 @@ export function useChecklistGeneration({
   // 로컬 analysis.solutionChecklist가 채워진 것 자체가 ready를 의미한다.
   const [checklistStatus, setChecklistStatus] = useState<Record<string, 'generating' | 'failed'>>({});
 
-  // 학생이 지금까지 체크한 항목(entry.id → itemId → checked). React state와 별개로 항상 최신값을
+  // 학생이 지금까지 체크한 항목(entry.id → itemId → status). React state와 별개로 항상 최신값을
   // 동기 유지하는 ref — 첫 저장 루프가 "쓰기 직전 마지막 순간"에 이 값을 읽어야 stale closure 없이
   // 정확한 최신 체크 상태를 저장할 수 있다.
-  const checklistCheckedRef = useRef<Record<string, Record<string, boolean>>>({});
+  const checklistItemStatusRef = useRef<Record<string, Record<string, SolutionChecklistItem['status']>>>({});
   // 체크가 바뀔 때마다 +1 — 첫 저장 루프가 "쓰는 동안 또 바뀌었는지"를 판단하는 데 사용.
   const checklistVersionRef = useRef<Record<string, number>>({});
-  // 생성된 항목(고정 3개 + AI 맞춤) — 첫 저장이 이 값 위에 최신 checked를 얹어서 저장한다.
+  // 생성된 항목(고정 3개 + AI 맞춤) — 첫 저장이 이 값 위에 최신 status를 얹어서 저장한다.
   const checklistItemsRef = useRef<Record<string, SolutionChecklistItem[]>>({});
   // 진행 중인(또는 이미 끝난) 생성 Promise — flush가 "결과가 아직 안 왔으면 기다렸다가" 저장할 수
   // 있도록 붙잡아 둔다.
@@ -61,6 +63,8 @@ export function useChecklistGeneration({
   const checklistFirstSaveDoneRef = useRef<Record<string, boolean>>({});
   // flush 중복 실행 방어(정상 흐름에선 flush가 entry당 1회만 불리지만, 방어적으로 유지).
   const checklistFlushInFlightRef = useRef<Record<string, boolean>>({});
+  // 첫 저장 이후에도 연속 선택의 DB 쓰기 순서를 유지한다.
+  const checklistSaveQueueRef = useRef<Record<string, Promise<void>>>({});
 
   // 🧭 체크리스트 생성 시작 — classify/solve와 병렬로, 이미지 준비 완료 즉시 호출한다(problemText/OCR
   // 완료를 기다리지 않음). 결과는 로컬 state(analysis.solutionChecklist)에만 반영되고 DB에는 아직
@@ -71,7 +75,7 @@ export function useChecklistGeneration({
     studentGrade: string | undefined
   ): Promise<void> => {
     setChecklistStatus(prev => ({ ...prev, [entry.id]: 'generating' }));
-    checklistCheckedRef.current[entry.id] = {};
+    checklistItemStatusRef.current[entry.id] = {};
     checklistVersionRef.current[entry.id] = 0;
     delete checklistItemsRef.current[entry.id];
     // 방어적 초기화: "AI 분석 시작하기" 버튼은 실제로는 미분석 항목에만 노출되어 이미 firstSaveDone인
@@ -86,7 +90,13 @@ export function useChecklistGeneration({
     });
 
     const promise = (async () => {
+      if (import.meta.env.DEV) {
+        console.log('[checklist-timing]', entry.id, 'checklist:start', performance.now());
+      }
       const customTexts = await generateChecklistWithGemini(image, studentGrade, customAiName || '밤티');
+      if (import.meta.env.DEV) {
+        console.log('[checklist-timing]', entry.id, 'checklist:resolved', performance.now(), { success: !!customTexts });
+      }
       if (!customTexts) {
         setChecklistStatus(prev => ({ ...prev, [entry.id]: 'failed' }));
         return;
@@ -94,7 +104,7 @@ export function useChecklistGeneration({
 
       const items: SolutionChecklistItem[] = [
         ...FIXED_CHECKLIST_ITEMS,
-        ...customTexts.map((text, i) => ({ id: `ai-${i}`, text, source: 'ai' as const, checked: false })),
+        ...customTexts.map((text, i) => ({ id: `ai-${i}`, text, source: 'ai' as const, status: 'unanswered' as const })),
       ];
       checklistItemsRef.current[entry.id] = items;
 
@@ -102,6 +112,11 @@ export function useChecklistGeneration({
       // 다른 카드로 전환했으면 selectedEntry는 건드리지 않는다)
       setMistakes(prev => prev.map(m => m.id === entry.id ? { ...m, analysis: applyLocalItems(m.analysis, items) } : m));
       setSelectedEntry(prev => prev && prev.id === entry.id ? { ...prev, analysis: applyLocalItems(prev.analysis, items) } : prev);
+
+      // State dispatch timestamp, not browser paint; compare using the shared performance clock.
+      if (import.meta.env.DEV) {
+        console.log('[checklist-timing]', entry.id, 'checklist:local-state', performance.now());
+      }
 
       setChecklistStatus(prev => {
         if (!(entry.id in prev)) return prev;
@@ -133,8 +148,8 @@ export function useChecklistGeneration({
       while (true) {
         const startVersion = checklistVersionRef.current[entry.id] || 0;
         const items = checklistItemsRef.current[entry.id]!;
-        const checkedSnapshot = checklistCheckedRef.current[entry.id] || {};
-        const itemsWithChecked = items.map(it => ({ ...it, checked: !!checkedSnapshot[it.id] }));
+        const statusSnapshot = checklistItemStatusRef.current[entry.id] || {};
+        const itemsWithStatus = items.map(it => ({ ...it, status: statusSnapshot[it.id] ?? 'unanswered' }));
 
         // 저장 직전 최신 analysis를 다시 읽어 병합 — classify/solve의 전체 덮어쓰기 저장 패턴과
         // 같은 이유로, 그 사이 바뀐 다른 필드(예: O/X 리뷰 체크)가 사라지지 않게 한다.
@@ -152,7 +167,7 @@ export function useChecklistGeneration({
 
         const mergedAnalysis: MistakeAnalysis = {
           ...freshRow.analysis,
-          solutionChecklist: { items: itemsWithChecked },
+          solutionChecklist: { items: itemsWithStatus },
         };
 
         const { error: updateError } = await supabase
@@ -182,7 +197,7 @@ export function useChecklistGeneration({
 
   // 🧭 첫 저장 이후의 개별 체크 즉시 저장 — handleUpdateCheckpointStatus(레거시)와 동일한
   // fetch-merge-write 패턴.
-  const persistChecklistItemStatus = async (entryId: string, itemId: string, checked: boolean) => {
+  const persistChecklistItemStatus = async (entryId: string, itemId: string, status: SolutionChecklistItem['status'], version: number) => {
     try {
       const { data: freshRow, error: fetchError } = await supabase
         .from('mistakes')
@@ -198,7 +213,7 @@ export function useChecklistGeneration({
       const mergedAnalysis: MistakeAnalysis = {
         ...freshRow.analysis,
         solutionChecklist: {
-          items: checklist.items.map((it: SolutionChecklistItem) => it.id === itemId ? { ...it, checked } : it),
+          items: checklist.items.map((it: SolutionChecklistItem) => it.id === itemId ? { id: it.id, text: it.text, source: it.source, status } : it),
         },
       };
 
@@ -209,8 +224,10 @@ export function useChecklistGeneration({
 
       if (updateError) throw updateError;
 
-      setMistakes(prev => prev.map(m => m.id === entryId ? { ...m, analysis: mergedAnalysis } : m));
-      setSelectedEntry(prev => prev && prev.id === entryId ? { ...prev, analysis: mergedAnalysis } : prev);
+      if (checklistVersionRef.current[entryId] === version) {
+        setMistakes(prev => prev.map(m => m.id === entryId ? { ...m, analysis: mergedAnalysis } : m));
+        setSelectedEntry(prev => prev && prev.id === entryId ? { ...prev, analysis: mergedAnalysis } : prev);
+      }
     } catch (err: any) {
       console.error('체크리스트 상태 업데이트 실패:', err);
       showNoticeModal({
@@ -224,8 +241,12 @@ export function useChecklistGeneration({
 
   // 🧭 UI가 호출하는 단일 토글 핸들러 — 첫 저장 전이면 로컬 state만, 이후면 즉시 DB 저장까지.
   const toggleChecklistItem = (entryId: string, itemId: string) => {
-    const nextChecked = !(checklistCheckedRef.current[entryId]?.[itemId] ?? false);
-    checklistCheckedRef.current[entryId] = { ...(checklistCheckedRef.current[entryId] || {}), [itemId]: nextChecked };
+    // Reloaded records come from state; refs take precedence during rapid clicks and first save.
+    // Old checked-only records have no status and start unanswered without implying a weakness.
+    const current = checklistItemStatusRef.current[entryId]?.[itemId]
+      ?? mistakes.find(m => m.id === entryId)?.analysis?.solutionChecklist?.items.find(it => it.id === itemId)?.status;
+    const status = current === 'done' ? 'stuck' : current === 'stuck' ? 'unanswered' : 'done';
+    checklistItemStatusRef.current[entryId] = { ...(checklistItemStatusRef.current[entryId] || {}), [itemId]: status };
     checklistVersionRef.current[entryId] = (checklistVersionRef.current[entryId] || 0) + 1;
 
     const applyToggle = (analysis: MistakeAnalysis | undefined): MistakeAnalysis | undefined => {
@@ -233,7 +254,7 @@ export function useChecklistGeneration({
       return {
         ...analysis,
         solutionChecklist: {
-          items: analysis.solutionChecklist.items.map(it => it.id === itemId ? { ...it, checked: nextChecked } : it),
+          items: analysis.solutionChecklist.items.map(it => it.id === itemId ? { id: it.id, text: it.text, source: it.source, status } : it),
         },
       };
     };
@@ -241,8 +262,11 @@ export function useChecklistGeneration({
     setMistakes(prev => prev.map(m => m.id === entryId ? { ...m, analysis: applyToggle(m.analysis) } : m));
     setSelectedEntry(prev => prev && prev.id === entryId ? { ...prev, analysis: applyToggle(prev.analysis) } : prev);
 
-    if (checklistFirstSaveDoneRef.current[entryId]) {
-      void persistChecklistItemStatus(entryId, itemId, nextChecked);
+    if (checklistFirstSaveDoneRef.current[entryId] !== false) {
+      // Undefined means a persisted entry loaded in this session; false means generation/first save.
+      const version = checklistVersionRef.current[entryId];
+      const pending = checklistSaveQueueRef.current[entryId] ?? Promise.resolve();
+      checklistSaveQueueRef.current[entryId] = pending.then(() => persistChecklistItemStatus(entryId, itemId, status, version));
     }
   };
 

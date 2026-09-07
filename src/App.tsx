@@ -1029,6 +1029,7 @@ function App() {
     toggleChecklistItem,
     retryChecklistGeneration,
   } = useChecklistGeneration({
+    mistakes,
     setMistakes,
     setSelectedEntry,
     customAiName,
