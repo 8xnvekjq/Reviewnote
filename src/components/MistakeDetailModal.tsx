@@ -209,16 +209,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     origin: { left: 0, top: 0, width: 0, height: 0 },
   });
 
-  // 🧭 이미지 위 필기(1차, 임시) — DB/Storage에 저장하지 않는다. 좌표 계산을 단순하게 유지하기
-  // 위해 필기 모드는 항상 scale=1/position=(0,0)(원본 배율)에서만 동작한다 — 그래서 좌표
-  // 변환(스케일/팬 역산) 없이 컨테이너의 getBoundingClientRect()를 그대로 로컬 좌표계로 쓸 수
-  // 있다. 이동/확대 모드로 돌아가 실제로 배율이나 위치를 바꾸면(그 순간부터 필기가 이미지와
-  // 어긋날 수 있으므로) 기존 필기를 지운다.
-  const [isDrawMode, setIsDrawMode] = React.useState(false);
-  const [drawStrokes, setDrawStrokes] = React.useState<{ x: number; y: number }[][]>([]);
-  const drawContainerRef = React.useRef<HTMLDivElement>(null);
-  const isDrawingRef = React.useRef(false);
-
   // Accordion toggle states
   const [showQuickAnswer, setShowQuickAnswer] = React.useState(false); // 복습 체크 전 스크롤 없이 정답만 바로 확인 (기본 접힘 — 실수로 먼저 보는 것 방지)
   const [showSolvingProcess, setShowSolvingProcess] = React.useState(false); // 기본 접힘 — 대책을 적기 전에 정답부터 스크롤로 보게 되는 것 방지
@@ -266,10 +256,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   }, [selectedEntry.id, selectedEntry.grade, selectedEntry.chapter, isAnalyzing]);
 
   // ── 핀치 줌 및 터치 드래그 제스처 핸들러 ──────────────────────────────
-  // 필기 모드에서는 이동/확대 제스처를 완전히 비활성화한다(모드 분리 — 손가락 하나로 "긋는" 것과
-  // "미는" 것을 동시에 지원하지 않고 명확히 나눔).
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (isDrawMode) return;
     if (e.touches.length === 1) {
       isDraggingRef.current = scale > 1;
       const touch = e.touches[0];
@@ -285,7 +272,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   };
 
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (isDrawMode) return;
     if (e.touches.length === 1 && isDraggingRef.current) {
       const touch = e.touches[0];
       const dx = touch.clientX - touchStartRef.current.x;
@@ -297,7 +283,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
       const boundedX = Math.max(-maxDragX, Math.min(maxDragX, dx));
       const boundedY = Math.max(-maxDragY, Math.min(maxDragY, dy));
 
-      clearDrawStrokesIfAny(); // 팬으로 실제 위치가 바뀌면 기존 필기가 어긋나므로 정리
       setPosition({ x: boundedX, y: boundedY });
     } else if (e.touches.length === 2) {
       const t1 = e.touches[0];
@@ -308,7 +293,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
         let newScale = initialScaleRef.current * factor;
         // 최소 1배 ~ 최대 4.5배 줌 스케일 제한
         newScale = Math.max(1, Math.min(4.5, newScale));
-        clearDrawStrokesIfAny(); // 배율이 실제로 바뀌면 기존 필기가 어긋나므로 정리
         setScale(newScale);
 
         if (newScale === 1) {
@@ -319,7 +303,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   };
 
   const handleTouchEnd = () => {
-    if (isDrawMode) return;
     isDraggingRef.current = false;
     if (scale <= 1) {
       setScale(1);
@@ -351,61 +334,12 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   const closeImageWindow = () => {
     setIsZoomOpen(false);
     resetImageZoom();
-    setIsDrawMode(false);
-    setDrawStrokes([]); // 임시 필기 — 창을 닫으면 저장 없이 사라짐
-  };
-
-  // 배율/위치가 실제로 바뀌기 직전에 호출 — 필기가 있으면 더 이상 이미지와 일치를 보장할 수
-  // 없으므로 정리한다(조용히 어긋난 채로 남지 않도록).
-  const clearDrawStrokesIfAny = () => {
-    setDrawStrokes(prev => (prev.length > 0 ? [] : prev));
   };
 
   const updateImageScale = (nextScale: number) => {
     const boundedScale = Math.max(1, Math.min(4.5, nextScale));
-    if (boundedScale !== scale) clearDrawStrokesIfAny();
     setScale(boundedScale);
     if (boundedScale === 1) setPosition({ x: 0, y: 0 });
-  };
-
-  // 이동/확대 ↔ 필기 모드 전환. 필기 모드로 들어갈 때는 항상 원본 배율(1x)로 리셋해 좌표
-  // 변환 없이 그릴 수 있게 한다.
-  const enterDrawMode = () => {
-    resetImageZoom();
-    setIsDrawMode(true);
-  };
-
-  const exitDrawMode = () => {
-    setIsDrawMode(false);
-  };
-
-  const getLocalDrawPoint = (clientX: number, clientY: number) => {
-    const rect = drawContainerRef.current?.getBoundingClientRect();
-    if (!rect) return { x: 0, y: 0 };
-    return { x: clientX - rect.left, y: clientY - rect.top };
-  };
-
-  const handleDrawPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDrawMode) return;
-    isDrawingRef.current = true;
-    safeSetPointerCapture(e.currentTarget, e.pointerId);
-    const pt = getLocalDrawPoint(e.clientX, e.clientY);
-    setDrawStrokes(prev => [...prev, [pt]]);
-  };
-
-  const handleDrawPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDrawMode || !isDrawingRef.current) return;
-    const pt = getLocalDrawPoint(e.clientX, e.clientY);
-    setDrawStrokes(prev => {
-      if (prev.length === 0) return prev;
-      const next = prev.slice();
-      next[next.length - 1] = [...next[next.length - 1], pt];
-      return next;
-    });
-  };
-
-  const handleDrawPointerUp = () => {
-    isDrawingRef.current = false;
   };
 
   const handleImageWindowDragStart = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -494,7 +428,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
       );
     }
 
-    clearDrawStrokesIfAny(); // 창 크기가 바뀌면 필기 좌표계(컨테이너 픽셀 기준)도 어긋나므로 정리
     setImageWindowLayout({ left: nextLeft, top: nextTop, width: nextWidth, height: nextHeight });
   };
 
@@ -1152,8 +1085,10 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 스캐폴딩 "내 풀이"로 등록). 예전엔 이 버튼이 확대창(openImageWindow)과 풀이노트
                 (HandwritingOverlay)를 동시에 열어 두 창이 겹쳐 뜨는 문제가 있었다 — 이제 풀이노트
                 자체가 문제 이미지를 보여주므로 확대창은 따로 열지 않는다.
-                🧭 아이콘 구분: 정답 수정(✏️) / 풀이노트(📝) / 문제에 쓰기(🖍)로 역할을 나눠
-                같은 연필 아이콘이 여러 기능에서 반복되어 헷갈리던 문제를 해소한다. */}
+                🧭 저장 가능한 필기는 이 풀이노트 하나로 통일했다 — 확대창(openImageWindow)에
+                있던 "문제에 쓰기"(임시 SVG 필기, 저장 안 됨)는 제거하고 확대/축소/이동 전용으로
+                남겼다. 아이콘 구분: 정답 수정(✏️) / 풀이노트(📝)로 역할을 나눠 같은 연필 아이콘이
+                여러 기능에서 반복되어 헷갈리던 문제를 해소한다. */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -1440,55 +1375,83 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                     )}
                   </div>
                 )}
-                {checklistItems && (
-                  <div className="space-y-2 border-l-4 border-emerald-500 pl-4 py-1">
-                    <h4 className="text-sm font-extrabold text-emerald-400 flex items-center">
-                      <span className="mr-1.5 text-base">✅</span> 풀기 전 체크리스트
-                    </h4>
-                    <p className="text-[11px] text-slate-500 leading-relaxed">
-                      풀기 전에 어디까지 스스로 해봤는지 확인해보세요.
-                    </p>
-                    <div className="space-y-2">
-                      {checklistItems.map((item) => (
-                        <div key={item.id} className="rounded-xl border p-3 bg-slate-900 border-slate-800">
-                          <LaTeXRenderer text={item.text} className="text-xs font-bold leading-relaxed text-slate-200" />
-                          <div className="flex items-center gap-2 mt-2">
-                            <button
-                              type="button"
-                              onClick={() => onSetChecklistItemStatus(selectedEntry.id, item.id, 'done')}
-                              className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all active:scale-95 ${
-                                item.status === 'done'
-                                  ? 'bg-emerald-500 text-slate-950'
-                                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                {checklistItems && (() => {
+                  // 🧭 순차 잠금 — 앞 항목이 미응답이면 다음 항목은 잠근다. "막혔어요"도 유효한
+                  // 응답이라 done/stuck 둘 다 다음을 연다("unanswered"만 멈춘다). 별도 잠금 필드를
+                  // DB에 저장하지 않는다 — 매 렌더마다 현재 items의 status로부터 다시 계산하므로,
+                  // 저장된 응답이 있는 문제를 다시 열어도 잠금 상태가 자연스럽게 복원된다(레거시
+                  // solutionCheckpoints의 frontier 계산과 동일한 패턴, 다만 거긴 stuck이 멈추고
+                  // 여긴 멈추지 않는다는 차이가 있다).
+                  const frontierIndex = (() => {
+                    const idx = checklistItems.findIndex(it => it.status === 'unanswered');
+                    return idx === -1 ? checklistItems.length : idx;
+                  })();
+                  return (
+                    <div className="space-y-2 border-l-4 border-emerald-500 pl-4 py-1">
+                      <h4 className="text-sm font-extrabold text-emerald-400 flex items-center">
+                        <span className="mr-1.5 text-base">✅</span> 풀기 전 체크리스트
+                      </h4>
+                      <p className="text-[11px] text-slate-500 leading-relaxed">
+                        풀기 전에 어디까지 스스로 해봤는지 확인해보세요.
+                      </p>
+                      <div className="space-y-2">
+                        {checklistItems.map((item, index) => {
+                          const isLocked = index > frontierIndex;
+                          return (
+                            <div
+                              key={item.id}
+                              className={`rounded-xl border p-3 transition-all ${
+                                isLocked ? 'bg-slate-950/40 border-slate-900 opacity-50' : 'bg-slate-900 border-slate-800'
                               }`}
                             >
-                              ✅ 했어요
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => onSetChecklistItemStatus(selectedEntry.id, item.id, 'stuck')}
-                              className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all active:scale-95 ${
-                                item.status === 'stuck'
-                                  ? 'bg-amber-500 text-slate-950'
-                                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                              }`}
-                            >
-                              🙋 막혔어요
-                            </button>
-                          </div>
-                          {item.status === 'stuck' && (
-                            <p className="mt-2 text-[11px] leading-relaxed text-amber-200" role="status">
-                              {item.id === 'fixed-1' ? '주어진 조건에 하나씩 밑줄을 긋고, 빠뜨린 조건이 있는지 찾아보세요.'
-                                : item.id === 'fixed-2' ? '아는 조건 하나만 골라 식이나 간단한 그림으로 옮겨보세요.'
-                                : item.id === 'fixed-3' ? '문제의 마지막 문장을 읽고 구할 대상을 내 말로 적어보세요.'
-                                : '이 질문과 연결된 조건을 문제에서 찾아보세요. 어떤 말이나 개념이 어려운지 짚어본 뒤 아래 풀이와 비교해 보세요.'}
-                            </p>
-                          )}
-                        </div>
-                      ))}
+                              <div className="flex items-start gap-1.5">
+                                {isLocked && <span className="flex-none text-sm leading-relaxed" aria-hidden="true">🔒</span>}
+                                <LaTeXRenderer
+                                  text={item.text}
+                                  className={`text-xs font-bold leading-relaxed ${isLocked ? 'text-slate-600' : 'text-slate-200'}`}
+                                />
+                              </div>
+                              <div className="flex items-center gap-2 mt-2">
+                                <button
+                                  type="button"
+                                  disabled={isLocked}
+                                  onClick={() => onSetChecklistItemStatus(selectedEntry.id, item.id, 'done')}
+                                  className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all active:scale-95 disabled:active:scale-100 disabled:cursor-not-allowed ${
+                                    item.status === 'done'
+                                      ? 'bg-emerald-500 text-slate-950'
+                                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:hover:bg-slate-800 disabled:text-slate-600'
+                                  }`}
+                                >
+                                  ✅ 했어요
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isLocked}
+                                  onClick={() => onSetChecklistItemStatus(selectedEntry.id, item.id, 'stuck')}
+                                  className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all active:scale-95 disabled:active:scale-100 disabled:cursor-not-allowed ${
+                                    item.status === 'stuck'
+                                      ? 'bg-amber-500 text-slate-950'
+                                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:hover:bg-slate-800 disabled:text-slate-600'
+                                  }`}
+                                >
+                                  🙋 막혔어요
+                                </button>
+                              </div>
+                              {!isLocked && item.status === 'stuck' && (
+                                <p className="mt-2 text-[11px] leading-relaxed text-amber-200" role="status">
+                                  {item.id === 'fixed-1' ? '주어진 조건에 하나씩 밑줄을 긋고, 빠뜨린 조건이 있는지 찾아보세요.'
+                                    : item.id === 'fixed-2' ? '아는 조건 하나만 골라 식이나 간단한 그림으로 옮겨보세요.'
+                                    : item.id === 'fixed-3' ? '문제의 마지막 문장을 읽고 구할 대상을 내 말로 적어보세요.'
+                                    : '이 질문과 연결된 조건을 문제에서 찾아보세요. 어떤 말이나 개념이 어려운지 짚어본 뒤 아래 풀이와 비교해 보세요.'}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </>
             );
           })()}
@@ -1977,72 +1940,29 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 <p className="hidden truncate text-[8px] font-bold text-slate-500 sm:block">상단 바를 끌어 이동 · 모서리를 끌어 크기 조절</p>
               </div>
               <div className="flex flex-none items-center gap-1.5">
-                {isDrawMode ? (
-                  <>
-                    {drawStrokes.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setDrawStrokes([])}
-                        onPointerDown={(e) => e.stopPropagation()}
-                        aria-label="필기 지우기"
-                        title="필기 지우기"
-                        className="h-7 rounded-lg border border-slate-800 bg-slate-900 px-2 text-[9px] font-black text-slate-400 transition-colors hover:text-white"
-                      >
-                        지우기
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={exitDrawMode}
-                      onPointerDown={(e) => e.stopPropagation()}
-                      aria-label="이동/확대 모드로 전환"
-                      title="이동/확대 모드로 전환"
-                      className="h-7 rounded-lg border border-indigo-500/40 bg-indigo-500/20 px-2 text-[9px] font-black text-indigo-300 transition-colors hover:text-white"
-                    >
-                      🔍 이동/확대
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={resetImageZoom}
-                      onPointerDown={(e) => e.stopPropagation()}
-                      aria-label="문제 이미지 확대 초기화"
-                      title="확대 초기화"
-                      className="h-7 rounded-lg border border-slate-800 bg-slate-900 px-2 text-[9px] font-black text-slate-400 transition-colors hover:text-white"
-                    >
-                      맞춤
-                    </button>
-                    <button
-                      type="button"
-                      onClick={enterDrawMode}
-                      onPointerDown={(e) => e.stopPropagation()}
-                      aria-label="문제에 쓰기 모드로 전환"
-                      title="문제에 쓰기(1x로 초기화됩니다)"
-                      className="h-7 rounded-lg border border-slate-800 bg-slate-900 px-2 text-[9px] font-black text-slate-400 transition-colors hover:text-white"
-                    >
-                      🖍 문제에 쓰기
-                    </button>
-                  </>
-                )}
+                <button
+                  type="button"
+                  onClick={resetImageZoom}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  aria-label="문제 이미지 확대 초기화"
+                  title="확대 초기화"
+                  className="h-7 rounded-lg border border-slate-800 bg-slate-900 px-2 text-[9px] font-black text-slate-400 transition-colors hover:text-white"
+                >
+                  맞춤
+                </button>
               </div>
             </div>
 
+            {/* 확대/축소/이동 전용 — 저장 가능한 필기는 풀이노트(HandwritingOverlay) 하나로
+                통일했다(아래 "풀이노트"/"다시 풀어볼게요" 진입점 참고). 이 창은 참고용 확대만. */}
             <div
-              ref={drawContainerRef}
-              className={`relative flex min-h-0 flex-1 touch-none select-none items-center justify-center overflow-hidden bg-black ${isDrawMode ? 'cursor-crosshair' : ''}`}
+              className="relative flex min-h-0 flex-1 touch-none select-none items-center justify-center overflow-hidden bg-black"
               onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
               onTouchCancel={handleTouchEnd}
-              onPointerDown={handleDrawPointerDown}
-              onPointerMove={handleDrawPointerMove}
-              onPointerUp={handleDrawPointerUp}
-              onPointerCancel={handleDrawPointerUp}
-              onDoubleClick={isDrawMode ? undefined : resetImageZoom}
+              onDoubleClick={resetImageZoom}
               onWheel={(e) => {
-                if (isDrawMode) return;
                 e.preventDefault();
                 updateImageScale(scale + (e.deltaY < 0 ? 0.2 : -0.2));
               }}
@@ -2054,26 +1974,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 className="max-h-full max-w-full pointer-events-none select-none object-contain"
                 style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})` }}
               />
-              {drawStrokes.length > 0 && (
-                <svg className="pointer-events-none absolute inset-0 h-full w-full">
-                  {drawStrokes.map((stroke, i) => (
-                    <polyline
-                      key={i}
-                      points={stroke.map(p => `${p.x},${p.y}`).join(' ')}
-                      fill="none"
-                      stroke="#f87171"
-                      strokeWidth={3}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  ))}
-                </svg>
-              )}
-              {isDrawMode && (
-                <div className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-slate-950/80 px-3 py-1 text-[9px] font-bold text-slate-300">
-                  손가락/마우스로 그어서 표시해 보세요 (저장되지 않아요)
-                </div>
-              )}
             </div>
 
             <div className="flex h-14 flex-none items-center justify-between gap-3 border-t border-slate-800 bg-slate-950 px-10">
@@ -2081,9 +1981,8 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 <button
                   type="button"
                   onClick={() => updateImageScale(scale - 0.25)}
-                  disabled={isDrawMode}
                   aria-label="문제 이미지 축소"
-                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-800 bg-slate-900 text-xs font-black text-slate-300 hover:text-white disabled:opacity-30"
+                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-800 bg-slate-900 text-xs font-black text-slate-300 hover:text-white"
                 >
                   −
                 </button>
@@ -2091,9 +1990,8 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 <button
                   type="button"
                   onClick={() => updateImageScale(scale + 0.25)}
-                  disabled={isDrawMode}
                   aria-label="문제 이미지 확대"
-                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-800 bg-slate-900 text-xs font-black text-slate-300 hover:text-white disabled:opacity-30"
+                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-800 bg-slate-900 text-xs font-black text-slate-300 hover:text-white"
                 >
                   +
                 </button>
