@@ -9,6 +9,7 @@ import { GACHA_ITEMS, getRarityTheme } from '../utils/gachaCatalog';
 import { CatPawIcon } from './CatPawIcon';
 import { MistakeScaffoldingDrawer } from './MistakeScaffoldingDrawer';
 import { HandwritingOverlay } from './HandwritingOverlay';
+import { CollapsibleSection } from './CollapsibleSection';
 
 interface MistakeDetailModalProps {
   selectedEntry: MistakeEntry;
@@ -171,10 +172,8 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   });
 
   // Accordion toggle states
-  const [showProblemText, setShowProblemText] = React.useState(false);
   const [showQuickAnswer, setShowQuickAnswer] = React.useState(false); // 복습 체크 전 스크롤 없이 정답만 바로 확인 (기본 접힘 — 실수로 먼저 보는 것 방지)
   const [showSolvingProcess, setShowSolvingProcess] = React.useState(false); // 기본 접힘 — 대책을 적기 전에 정답부터 스크롤로 보게 되는 것 방지
-  const [showMistakeSummary, setShowMistakeSummary] = React.useState(false); // Default collapsed for self-study
 
   // 💡 동일 문제 연속 클릭 쿨다운 커스텀 알림 모달 상태
   const [isCooldownNoticeOpen, setIsCooldownNoticeOpen] = React.useState(false);
@@ -531,10 +530,13 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   }, [selectedEntry, youtubeLectures]);
 
   // 1. Reset all local states when the selected mistake ID changes (opening a different mistake card)
+  // 🐛 UX1 버그 수정: 이 effect가 showSolvingProcess는 이미 리셋하고 있었지만 showQuickAnswer가
+  // 빠져 있었다 — 그래서 한 카드에서 정답을 펼친 뒤 "다음" 카드로 넘어가면 새 카드에서도 정답이
+  // 펼쳐진 채로 보이는 스포일러 버그가 있었다. showQuickAnswer를 여기 추가해서 카드 전환 시
+  // 함께 닫히게 한다.
   React.useEffect(() => {
-    setShowProblemText(false);
+    setShowQuickAnswer(false);
     setShowSolvingProcess(false);
-    setShowMistakeSummary(false); // ID 변경 시 아코디언 닫음
     setAnswerDraft(null); // 정답 수정 팝업도 카드 전환 시 닫음
     setEditGrade(selectedEntry.grade || '');
     setEditChapter(selectedEntry.chapter || '');
@@ -1227,31 +1229,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             })()}
           </div>
 
-          {/* ⚡ AI 틀린 이유 1줄 진단 */}
-          {selectedEntry.analysis?.mistakeSummary &&
-            selectedEntry.analysis.mistakeSummary !== '학생 풀이 없음' && (
-            <div className="space-y-2 border-l-4 border-red-500 pl-4 py-1">
-              <button
-                onClick={() => setShowMistakeSummary(!showMistakeSummary)}
-                className="w-full flex items-center justify-between text-left focus:outline-none group"
-              >
-                <h4 className="text-sm font-extrabold text-red-400 flex items-center group-hover:text-red-300 transition-colors">
-                  <span className="mr-1.5 text-base">⚡</span> AI 틀린 이유 진단
-                </h4>
-                <span className="text-xs text-slate-500 font-bold mr-1 group-hover:text-slate-400 transition-colors">
-                  {showMistakeSummary ? '▲ 닫기' : '▼ 보기'}
-                </span>
-              </button>
-              {showMistakeSummary && (
-                <div className="bg-red-950/20 p-4.5 rounded-2xl border border-red-500/20 animate-scale-up mt-2">
-                  <LaTeXRenderer 
-                    text={selectedEntry.analysis.mistakeSummary} 
-                    className="text-xs sm:text-sm leading-relaxed text-red-200" 
-                  />
-                </div>
-              )}
-            </div>
-          )}
           {/* ⚡ AI 추천 동영상 딥링크 연동 카드 (test 학생 한정) */}
           {matchedLecture && (
             <div className="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-3.5 flex items-center justify-between space-x-3.5 animate-scale-up">
@@ -1357,27 +1334,9 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 </span>
               </div>
               
-              {/* Card 0: 원본 문제 지문 복원 */}
-              {selectedEntry.analysis.problemText && (
-                <div className="space-y-2 border-l-4 border-slate-400 pl-4 py-1">
-                  <button
-                    onClick={() => setShowProblemText(!showProblemText)}
-                    className="w-full flex items-center justify-between text-left focus:outline-none group"
-                  >
-                    <h4 className="text-sm font-extrabold text-slate-300 flex items-center group-hover:text-white transition-colors">
-                      <span className="mr-1.5 text-base">📝</span> 원본 문제 지문
-                    </h4>
-                    <span className="text-xs text-slate-500 font-bold mr-1 group-hover:text-slate-400 transition-colors">
-                      {showProblemText ? '▲ 닫기' : '▼ 보기'}
-                    </span>
-                  </button>
-                  {showProblemText && (
-                    <div className="bg-slate-950 p-4.5 rounded-2xl border border-slate-850 animate-scale-up mt-2">
-                      <LaTeXRenderer text={selectedEntry.analysis.problemText} className="text-sm md:text-base leading-relaxed text-slate-300" />
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* Card 0: 원본 문제 지문(problemText)은 학생 UI에서 더 이상 렌더하지 않는다(요구사항).
+                  DB 저장/AI 분석 입력/체크포인트 생성 입력으로는 계속 그대로 쓰인다 — 여기서
+                  지운 건 이 화면에 보여주던 접힘 섹션 하나뿐이다. */}
 
               {/* Card 0.5: 선생님 힌트 (스캐폴딩) (접힘 상태 디폴트) */}
               <MistakeScaffoldingDrawer
@@ -1532,27 +1491,18 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
               })()}
 
               {/* Card 1: 정석 풀이 과정 */}
-              <div className="space-y-2 border-l-4 border-indigo-500 pl-4 py-1">
-                <button
-                  onClick={() => setShowSolvingProcess(!showSolvingProcess)}
-                  className="w-full flex items-center justify-between text-left focus:outline-none group"
-                >
-                  <h4 className="text-sm font-extrabold text-indigo-400 flex items-center group-hover:text-indigo-300 transition-colors">
-                    <span className="mr-1.5 text-base">💡</span> 정석 풀이 과정
-                    {isAnalyzing && (
-                      <span className="ml-2 text-[10px] font-bold text-indigo-300 animate-pulse">✍️ {aiPersonaName}가 실시간으로 작성 중...</span>
-                    )}
-                  </h4>
-                  <span className="text-xs text-slate-500 font-bold mr-1 group-hover:text-slate-400 transition-colors">
-                    {showSolvingProcess ? '▲ 닫기' : '▼ 보기'}
-                  </span>
-                </button>
-                {showSolvingProcess && (
-                  <div className="bg-slate-950 p-4.5 rounded-2xl border border-slate-850 animate-scale-up mt-2">
-                    <LaTeXRenderer text={selectedEntry.analysis.solvingProcess} className="text-sm md:text-base leading-relaxed" />
-                  </div>
+              <CollapsibleSection
+                icon="💡"
+                title="정석 풀이 과정"
+                subtitle={isAnalyzing && (
+                  <span className="ml-2 text-[10px] font-bold text-indigo-300 animate-pulse">✍️ {aiPersonaName}가 실시간으로 작성 중...</span>
                 )}
-              </div>
+                color="indigo"
+                isOpen={showSolvingProcess}
+                onToggle={() => setShowSolvingProcess(!showSolvingProcess)}
+              >
+                <LaTeXRenderer text={selectedEntry.analysis.solvingProcess} className="text-sm md:text-base leading-relaxed" />
+              </CollapsibleSection>
             </div>
           ) : (
             <div 

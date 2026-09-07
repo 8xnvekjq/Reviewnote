@@ -24,7 +24,10 @@ export interface SolutionCheckpointStage {
 
 export interface MistakeAnalysis {
   solvingProcess: string;   // [문제 풀이 과정]
-  mistakeSummary?: string;  // [학생 풀이 기반 틀린 이유 1줄 요약]
+  mistakeSummary?: string;  // [학생 풀이 기반 틀린 이유 1줄 요약] (레거시 필드 — 더 이상 생성/저장/렌더하지
+                            // 않음. "AI 틀린 이유 진단" 기능 자체를 제거하면서 신규 분석은 이 필드를 채우지
+                            // 않게 됐지만, 과거에 이미 저장된 값이 있는 기존 레코드와의 DB 호환을 위해 타입은
+                            // 남겨둔다.)
   finalAnswer?: string;     // [최종 정답만 한 줄 — 복습 체크 전 스크롤 없이 바로 확인용]
   problemText?: string;     // [추출된 원본 문제 지문]
   problemBox?: ProblemBox;  // [인쇄된 문제 영역 바운딩 박스 (필기 제외)]
