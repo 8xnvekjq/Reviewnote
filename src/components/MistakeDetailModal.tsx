@@ -183,6 +183,16 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     origin: { left: 0, top: 0, width: 0, height: 0 },
   });
 
+  // 🧭 이미지 위 필기(1차, 임시) — DB/Storage에 저장하지 않는다. 좌표 계산을 단순하게 유지하기
+  // 위해 필기 모드는 항상 scale=1/position=(0,0)(원본 배율)에서만 동작한다 — 그래서 좌표
+  // 변환(스케일/팬 역산) 없이 컨테이너의 getBoundingClientRect()를 그대로 로컬 좌표계로 쓸 수
+  // 있다. 이동/확대 모드로 돌아가 실제로 배율이나 위치를 바꾸면(그 순간부터 필기가 이미지와
+  // 어긋날 수 있으므로) 기존 필기를 지운다.
+  const [isDrawMode, setIsDrawMode] = React.useState(false);
+  const [drawStrokes, setDrawStrokes] = React.useState<{ x: number; y: number }[][]>([]);
+  const drawContainerRef = React.useRef<HTMLDivElement>(null);
+  const isDrawingRef = React.useRef(false);
+
   // Accordion toggle states
   const [showQuickAnswer, setShowQuickAnswer] = React.useState(false); // 복습 체크 전 스크롤 없이 정답만 바로 확인 (기본 접힘 — 실수로 먼저 보는 것 방지)
   const [showSolvingProcess, setShowSolvingProcess] = React.useState(false); // 기본 접힘 — 대책을 적기 전에 정답부터 스크롤로 보게 되는 것 방지
@@ -231,7 +241,10 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   }, [selectedEntry.id, selectedEntry.grade, selectedEntry.chapter, isAnalyzing]);
 
   // ── 핀치 줌 및 터치 드래그 제스처 핸들러 ──────────────────────────────
+  // 필기 모드에서는 이동/확대 제스처를 완전히 비활성화한다(모드 분리 — 손가락 하나로 "긋는" 것과
+  // "미는" 것을 동시에 지원하지 않고 명확히 나눔).
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (isDrawMode) return;
     if (e.touches.length === 1) {
       isDraggingRef.current = scale > 1;
       const touch = e.touches[0];
@@ -247,17 +260,19 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   };
 
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (isDrawMode) return;
     if (e.touches.length === 1 && isDraggingRef.current) {
       const touch = e.touches[0];
       const dx = touch.clientX - touchStartRef.current.x;
       const dy = touch.clientY - touchStartRef.current.y;
-      
+
       // 드래그 최대 범위 제한 (확대 상태에서 화면 밖으로 끝없이 사라짐 방지)
       const maxDragX = (scale - 1) * 200;
       const maxDragY = (scale - 1) * 300;
       const boundedX = Math.max(-maxDragX, Math.min(maxDragX, dx));
       const boundedY = Math.max(-maxDragY, Math.min(maxDragY, dy));
 
+      clearDrawStrokesIfAny(); // 팬으로 실제 위치가 바뀌면 기존 필기가 어긋나므로 정리
       setPosition({ x: boundedX, y: boundedY });
     } else if (e.touches.length === 2) {
       const t1 = e.touches[0];
@@ -268,6 +283,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
         let newScale = initialScaleRef.current * factor;
         // 최소 1배 ~ 최대 4.5배 줌 스케일 제한
         newScale = Math.max(1, Math.min(4.5, newScale));
+        clearDrawStrokesIfAny(); // 배율이 실제로 바뀌면 기존 필기가 어긋나므로 정리
         setScale(newScale);
 
         if (newScale === 1) {
@@ -278,6 +294,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   };
 
   const handleTouchEnd = () => {
+    if (isDrawMode) return;
     isDraggingRef.current = false;
     if (scale <= 1) {
       setScale(1);
@@ -309,12 +326,61 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   const closeImageWindow = () => {
     setIsZoomOpen(false);
     resetImageZoom();
+    setIsDrawMode(false);
+    setDrawStrokes([]); // 임시 필기 — 창을 닫으면 저장 없이 사라짐
+  };
+
+  // 배율/위치가 실제로 바뀌기 직전에 호출 — 필기가 있으면 더 이상 이미지와 일치를 보장할 수
+  // 없으므로 정리한다(조용히 어긋난 채로 남지 않도록).
+  const clearDrawStrokesIfAny = () => {
+    setDrawStrokes(prev => (prev.length > 0 ? [] : prev));
   };
 
   const updateImageScale = (nextScale: number) => {
     const boundedScale = Math.max(1, Math.min(4.5, nextScale));
+    if (boundedScale !== scale) clearDrawStrokesIfAny();
     setScale(boundedScale);
     if (boundedScale === 1) setPosition({ x: 0, y: 0 });
+  };
+
+  // 이동/확대 ↔ 필기 모드 전환. 필기 모드로 들어갈 때는 항상 원본 배율(1x)로 리셋해 좌표
+  // 변환 없이 그릴 수 있게 한다.
+  const enterDrawMode = () => {
+    resetImageZoom();
+    setIsDrawMode(true);
+  };
+
+  const exitDrawMode = () => {
+    setIsDrawMode(false);
+  };
+
+  const getLocalDrawPoint = (clientX: number, clientY: number) => {
+    const rect = drawContainerRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 0, y: 0 };
+    return { x: clientX - rect.left, y: clientY - rect.top };
+  };
+
+  const handleDrawPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDrawMode) return;
+    isDrawingRef.current = true;
+    safeSetPointerCapture(e.currentTarget, e.pointerId);
+    const pt = getLocalDrawPoint(e.clientX, e.clientY);
+    setDrawStrokes(prev => [...prev, [pt]]);
+  };
+
+  const handleDrawPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDrawMode || !isDrawingRef.current) return;
+    const pt = getLocalDrawPoint(e.clientX, e.clientY);
+    setDrawStrokes(prev => {
+      if (prev.length === 0) return prev;
+      const next = prev.slice();
+      next[next.length - 1] = [...next[next.length - 1], pt];
+      return next;
+    });
+  };
+
+  const handleDrawPointerUp = () => {
+    isDrawingRef.current = false;
   };
 
   const handleImageWindowDragStart = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -401,6 +467,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
       );
     }
 
+    clearDrawStrokesIfAny(); // 창 크기가 바뀌면 필기 좌표계(컨테이너 픽셀 기준)도 어긋나므로 정리
     setImageWindowLayout({ left: nextLeft, top: nextTop, width: nextWidth, height: nextHeight });
   };
 
@@ -1854,27 +1921,72 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 <p className="hidden truncate text-[8px] font-bold text-slate-500 sm:block">상단 바를 끌어 이동 · 모서리를 끌어 크기 조절</p>
               </div>
               <div className="flex flex-none items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={resetImageZoom}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  aria-label="문제 이미지 확대 초기화"
-                  title="확대 초기화"
-                  className="h-7 rounded-lg border border-slate-800 bg-slate-900 px-2 text-[9px] font-black text-slate-400 transition-colors hover:text-white"
-                >
-                  맞춤
-                </button>
+                {isDrawMode ? (
+                  <>
+                    {drawStrokes.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setDrawStrokes([])}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        aria-label="필기 지우기"
+                        title="필기 지우기"
+                        className="h-7 rounded-lg border border-slate-800 bg-slate-900 px-2 text-[9px] font-black text-slate-400 transition-colors hover:text-white"
+                      >
+                        지우기
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={exitDrawMode}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      aria-label="이동/확대 모드로 전환"
+                      title="이동/확대 모드로 전환"
+                      className="h-7 rounded-lg border border-indigo-500/40 bg-indigo-500/20 px-2 text-[9px] font-black text-indigo-300 transition-colors hover:text-white"
+                    >
+                      🔍 이동/확대
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={resetImageZoom}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      aria-label="문제 이미지 확대 초기화"
+                      title="확대 초기화"
+                      className="h-7 rounded-lg border border-slate-800 bg-slate-900 px-2 text-[9px] font-black text-slate-400 transition-colors hover:text-white"
+                    >
+                      맞춤
+                    </button>
+                    <button
+                      type="button"
+                      onClick={enterDrawMode}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      aria-label="필기 모드로 전환"
+                      title="필기 모드로 전환(1x로 초기화됩니다)"
+                      className="h-7 rounded-lg border border-slate-800 bg-slate-900 px-2 text-[9px] font-black text-slate-400 transition-colors hover:text-white"
+                    >
+                      ✏️ 필기
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
             <div
-              className="relative flex min-h-0 flex-1 touch-none select-none items-center justify-center overflow-hidden bg-black"
+              ref={drawContainerRef}
+              className={`relative flex min-h-0 flex-1 touch-none select-none items-center justify-center overflow-hidden bg-black ${isDrawMode ? 'cursor-crosshair' : ''}`}
               onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
               onTouchCancel={handleTouchEnd}
-              onDoubleClick={resetImageZoom}
+              onPointerDown={handleDrawPointerDown}
+              onPointerMove={handleDrawPointerMove}
+              onPointerUp={handleDrawPointerUp}
+              onPointerCancel={handleDrawPointerUp}
+              onDoubleClick={isDrawMode ? undefined : resetImageZoom}
               onWheel={(e) => {
+                if (isDrawMode) return;
                 e.preventDefault();
                 updateImageScale(scale + (e.deltaY < 0 ? 0.2 : -0.2));
               }}
@@ -1886,6 +1998,26 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 className="max-h-full max-w-full pointer-events-none select-none object-contain"
                 style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})` }}
               />
+              {drawStrokes.length > 0 && (
+                <svg className="pointer-events-none absolute inset-0 h-full w-full">
+                  {drawStrokes.map((stroke, i) => (
+                    <polyline
+                      key={i}
+                      points={stroke.map(p => `${p.x},${p.y}`).join(' ')}
+                      fill="none"
+                      stroke="#f87171"
+                      strokeWidth={3}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  ))}
+                </svg>
+              )}
+              {isDrawMode && (
+                <div className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-slate-950/80 px-3 py-1 text-[9px] font-bold text-slate-300">
+                  손가락/마우스로 그어서 표시해 보세요 (저장되지 않아요)
+                </div>
+              )}
             </div>
 
             <div className="flex h-14 flex-none items-center justify-between gap-3 border-t border-slate-800 bg-slate-950 px-10">
@@ -1893,8 +2025,9 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 <button
                   type="button"
                   onClick={() => updateImageScale(scale - 0.25)}
+                  disabled={isDrawMode}
                   aria-label="문제 이미지 축소"
-                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-800 bg-slate-900 text-xs font-black text-slate-300 hover:text-white"
+                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-800 bg-slate-900 text-xs font-black text-slate-300 hover:text-white disabled:opacity-30"
                 >
                   −
                 </button>
@@ -1902,8 +2035,9 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 <button
                   type="button"
                   onClick={() => updateImageScale(scale + 0.25)}
+                  disabled={isDrawMode}
                   aria-label="문제 이미지 확대"
-                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-800 bg-slate-900 text-xs font-black text-slate-300 hover:text-white"
+                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-800 bg-slate-900 text-xs font-black text-slate-300 hover:text-white disabled:opacity-30"
                 >
                   +
                 </button>
