@@ -182,7 +182,11 @@ export function useMistakeAnalysis({
       solvingProcess: secondResult.solvingProcess,
       problemText: extractResult.problemText,
       problemBox: extractResult.problemBox,
-      mistakeSummary: secondResult.mistakeSummary || undefined,
+      // "AI 틀린 이유 진단" 기능 제거 — Gemini에게 더 이상 요청하지 않으므로 secondResult에도
+      // 이 필드가 없다. 재분석 시 위 스프레드(...updatedEntry.analysis)로 예전 값이 그대로
+      // 새어들어오지 않도록 명시적으로 비워서 저장한다(이전에 이미 저장된, 재분석하지 않는
+      // 레코드의 과거 값 자체는 DB에 그대로 남아있어도 문제없음 — 그냥 더 이상 안 씀).
+      mistakeSummary: undefined,
       finalAnswer: secondResult.finalAnswer || undefined,
       modelUsed: 'gemini-2.5-flash',
       durationMs: Date.now() - analysisStartTime

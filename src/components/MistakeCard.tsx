@@ -175,19 +175,16 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
             )}
           </div>
 
-          {/* Right: AI Analysis Status/Fuzzy summary */}
-          <div className="flex-none text-right text-[9.5px] max-w-[140px] truncate">
-            {entry.analysis?.solvingProcess && entry.analysis.solvingProcess !== SOLVING_PLACEHOLDER_TEXT ? (
-              <span className="text-slate-400 truncate block">
-                🔍 {entry.analysis.mistakeSummary}
-              </span>
-            ) : (
+          {/* Right: AI 분석 진행 상태 — 완료되면(구 "AI 틀린 이유 진단" 요약 텍스트 자리) 이제
+              별도 텍스트 없이 조용히 사라진다. 미완료일 때만 진행 중 배지를 보여준다. */}
+          {!(entry.analysis?.solvingProcess && entry.analysis.solvingProcess !== SOLVING_PLACEHOLDER_TEXT) && (
+            <div className="flex-none text-right text-[9.5px] max-w-[140px] truncate">
               <span className="text-amber-500 font-black flex items-center justify-end flex-none">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1 animate-pulse flex-none"></span>
                 미완료
               </span>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* 하단 영역: 복습 진척사항 & 틀린이유 체크 이모지 */}

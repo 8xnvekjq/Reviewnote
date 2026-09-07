@@ -730,7 +730,6 @@ export async function extractProblemWithGemini(
 /**
  * 2차 API 호출: 확정된 과목/단원을 엄격한 가이드로 삼아 해설 정밀 생성 (스트리밍)
  */
-const MISTAKE_SUMMARY_DELIMITER = '%%MISTAKE_SUMMARY%%';
 const FINAL_ANSWER_DELIMITER = '%%FINAL_ANSWER%%';
 const SOLVING_PROCESS_DELIMITER = '%%SOLVING_PROCESS%%';
 
@@ -747,7 +746,6 @@ export async function solveMistakeWithGemini(
   teacherApproachGuides: { grade: string; chapter: string; guideText: string }[] = []
 ): Promise<{
   solvingProcess: string;
-  mistakeSummary: string;
   finalAnswer: string;
 }> {
   const { mimeType, base64Data } = image;
@@ -862,11 +860,9 @@ JSON이나 코드블록 없이 순수 텍스트로, 반드시 아래 순서 그�
 가장 먼저(다른 어떤 내용보다도 앞서), 정확히 "${FINAL_ANSWER_DELIMITER}" 라는 구분자를 한 줄 쓰고,
 그 다음 줄에 이 문제의 최종 정답만 적으십시오(finalAnswer). 풀이 과정, 단위 설명, 부가 설명 없이
 "x = 3", "15", "① 33"처럼 답 자체만 아주 간결하게 한 줄로 적으십시오. 객관식이면 보기 번호와 값을 함께 적으십시오.
-그 다음 줄에 정확히 "${MISTAKE_SUMMARY_DELIMITER}" 라는 구분자를 한 줄 쓰고,
-그 다음 줄에 학생 풀이 기반 틀린 이유를 30자 이내로 요약한 한 문장(mistakeSummary)만 적으십시오.
 그 다음 줄에 정확히 "${SOLVING_PROCESS_DELIMITER}" 라는 구분자를 한 줄 쓰고,
 그 다음부터 위 4개 헤더가 포함된 해설 리포트(solvingProcess)를 작성하십시오.
-[출력 순서가 중요한 이유]: 정답/요약을 해설보다 먼저 확정해 두어야, 해설이 길어져 응답이 중간에 잘리더라도 정답과 요약만큼은 항상 보존됩니다.`;
+[출력 순서가 중요한 이유]: 정답을 해설보다 먼저 확정해 두어야, 해설이 길어져 응답이 중간에 잘리더라도 정답만큼은 항상 보존됩니다.`;
 
   const requestBody = {
     contents: [
@@ -902,7 +898,7 @@ JSON이나 코드블록 없이 순수 텍스트로, 반드시 아래 순서 그�
   try {
     const resolvedModel = 'gemini-2.5-flash';
     const fullText = await streamGeminiApi(resolvedModel, requestBody, (accumulatedText) => {
-      // 정답/요약 헤더가 먼저 스트리밍되므로, 화면에는 SOLVING_PROCESS 구분자 이후만 흘려보낸다
+      // 정답 헤더가 먼저 스트리밍되므로, 화면에는 SOLVING_PROCESS 구분자 이후만 흘려보낸다
       const spIdx = accumulatedText.indexOf(SOLVING_PROCESS_DELIMITER);
       if (spIdx === -1) return;
       onProgress?.(accumulatedText.slice(spIdx + SOLVING_PROCESS_DELIMITER.length).trim());
@@ -911,28 +907,21 @@ JSON이나 코드블록 없이 순수 텍스트로, 반드시 아래 순서 그�
     const answerDelimIdx = fullText.indexOf(FINAL_ANSWER_DELIMITER);
     if (answerDelimIdx === -1) {
       // 헤더조차 못 받은 완전 예외 상황, 전체를 해설로 취급 (안전한 폴백)
-      return { solvingProcess: fullText.trim(), mistakeSummary: '', finalAnswer: '' };
+      return { solvingProcess: fullText.trim(), finalAnswer: '' };
     }
 
     const afterAnswerDelim = fullText.slice(answerDelimIdx + FINAL_ANSWER_DELIMITER.length);
-    const summaryDelimIdx = afterAnswerDelim.indexOf(MISTAKE_SUMMARY_DELIMITER);
-    if (summaryDelimIdx === -1) {
-      // 정답까지만 받고 잘린 경우, 정답이라도 살린다
-      return { solvingProcess: '', mistakeSummary: '', finalAnswer: afterAnswerDelim.trim() };
-    }
-
-    const finalAnswer = afterAnswerDelim.slice(0, summaryDelimIdx).trim();
-    const afterSummaryDelim = afterAnswerDelim.slice(summaryDelimIdx + MISTAKE_SUMMARY_DELIMITER.length);
-    const solvingDelimIdx = afterSummaryDelim.indexOf(SOLVING_PROCESS_DELIMITER);
+    const solvingDelimIdx = afterAnswerDelim.indexOf(SOLVING_PROCESS_DELIMITER);
     if (solvingDelimIdx === -1) {
-      // 요약까지만 받고 잘린 경우, 정답/요약은 살리고 해설만 비워둠
-      return { solvingProcess: '', mistakeSummary: afterSummaryDelim.trim(), finalAnswer };
+      // 정답까지만 받고 잘린 경우, 정답이라도 살린다
+      return { solvingProcess: '', finalAnswer: afterAnswerDelim.trim() };
     }
 
-    const finalSolvingProcess = afterSummaryDelim.slice(solvingDelimIdx + SOLVING_PROCESS_DELIMITER.length).trim();
+    const finalAnswer = afterAnswerDelim.slice(0, solvingDelimIdx).trim();
+    const finalSolvingProcess = afterAnswerDelim.slice(solvingDelimIdx + SOLVING_PROCESS_DELIMITER.length).trim();
 
     // 해설 리포트가 끝까지 완성됐는지 확인. 프롬프트가 항상 마지막 줄에 "[처방 요약]"을 쓰도록
-    // 강제하므로, 정답/요약 구분자는 다 왔는데(=앞부분이라 스트림 초반에 이미 도착) 이 마커가
+    // 강제하므로, 정답 구분자는 다 왔는데(=앞부분이라 스트림 초반에 이미 도착) 이 마커가
     // 없다면 본문(해설)이 다 써지기 전에 스트림이 끊긴 것이다(네트워크/엣지 함수 등).
     // Gemini 응답 자체가 끊긴 건 finishReason으로 못 잡는다 — done=true는 "정상 종료"와
     // "연결이 끊겨서 더 이상 못 받음"을 구분하지 못하기 때문에, 우리 프롬프트가 요구하는
@@ -943,7 +932,6 @@ JSON이나 코드블록 없이 순수 텍스트로, 반드시 아래 순서 그�
 
     return {
       solvingProcess: finalSolvingProcess,
-      mistakeSummary: afterSummaryDelim.slice(0, solvingDelimIdx).trim(),
       finalAnswer
     };
   } catch (error: any) {

@@ -1228,8 +1228,11 @@ function App() {
   const handleStartReviewSession = () => {
     if (!session?.user || mistakes.length === 0) return;
 
-    // 미완료 상태 (O 개수가 3개 미만인 오답 필터링)
+    // 미완료 상태 (O 개수가 3개 미만인 오답 필터링) — 시험범위 제외 등으로 숨긴(isHidden) 오답은
+    // 메인 목록에도 안 보이는데 복습하기가 그걸 열어버리면 학생이 왜 이 문제가 나왔는지 혼란스러울
+    // 수 있어 여기서도 제외한다. 우선순위/정렬 기준은 그대로 유지.
     const uncompleted = mistakes.filter(m => {
+      if (m.isHidden) return false;
       const oCount = m.reviews?.filter(r => r === 'O').length || 0;
       return oCount < 3;
     });
