@@ -113,7 +113,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
               setActiveTab('admin');
               setShowRightDrawer(false);
             }}
-            className={`flex flex-col items-center justify-center w-14 h-11 rounded-xl transition-all ${
+            className={`flex flex-col items-center justify-center w-14 h-11 rounded-xl transition-all active:scale-95 ${
               activeTab === 'admin' ? 'text-amber-400 scale-105 font-black' : 'text-slate-500 hover:text-slate-300'
             }`}
           >
@@ -126,7 +126,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
               setActiveTab('activity');
               setShowRightDrawer(false);
             }}
-            className={`flex flex-col items-center justify-center w-14 h-11 rounded-xl transition-all ${
+            className={`flex flex-col items-center justify-center w-14 h-11 rounded-xl transition-all active:scale-95 ${
               activeTab === 'activity' ? 'text-purple-400 scale-105 font-black' : 'text-slate-500 hover:text-slate-300'
             }`}
           >
@@ -141,7 +141,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
             setActiveTab('notes');
             setShowRightDrawer(false);
           }}
-          className={`flex flex-col items-center justify-center w-14 h-11 rounded-xl transition-all ${
+          className={`flex flex-col items-center justify-center w-14 h-11 rounded-xl transition-all active:scale-95 ${
             activeTab === 'notes' ? 'text-indigo-400 scale-105 font-black' : 'text-slate-500 hover:text-slate-300'
           }`}
         >
@@ -155,7 +155,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
             setActiveTab('camera');
             setShowRightDrawer(false);
           }}
-          className={`flex items-center justify-center w-13 h-13 rounded-full transition-all -translate-y-3.5 shadow-lg ${
+          className={`flex items-center justify-center w-13 h-13 rounded-full transition-all -translate-y-3.5 shadow-lg active:scale-95 ${
             activeTab === 'camera'
               ? 'bg-gradient-to-tr from-indigo-600 to-indigo-500 text-white scale-110 shadow-indigo-600/50 ring-4 ring-slate-950'
               : 'bg-slate-800 text-slate-200 hover:bg-slate-750 shadow-black/60 ring-4 ring-slate-950 hover:scale-105'
@@ -170,7 +170,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
             setActiveTab('store');
             setShowRightDrawer(false);
           }}
-          className={`flex flex-col items-center justify-center w-14 h-11 rounded-xl transition-all relative ${
+          className={`flex flex-col items-center justify-center w-14 h-11 rounded-xl transition-all relative active:scale-95 ${
             activeTab === 'store' ? 'text-amber-400 scale-105 font-black' : 'text-slate-500 hover:text-slate-300'
           }`}
         >
@@ -181,7 +181,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         {/* Tab 5: ☰ 전체메뉴 (우측 슬라이드 메뉴 펼침 버튼) */}
         <button
           onClick={() => setShowRightDrawer(!showRightDrawer)}
-          className={`flex flex-col items-center justify-center w-14 h-11 rounded-xl transition-all ${
+          className={`flex flex-col items-center justify-center w-14 h-11 rounded-xl transition-all active:scale-95 ${
             showRightDrawer || ['stats', 'completed', 'guide', 'scaffolding', 'hidden'].includes(activeTab)
               ? 'text-purple-400 scale-105 font-black'
               : 'text-slate-500 hover:text-slate-300'
