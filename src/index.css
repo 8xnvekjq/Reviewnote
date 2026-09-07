@@ -83,10 +83,14 @@
 }
 
 /* Custom CSS Keyframes and Animation Utilities for Premium UX */
+/* PR8: MistakeDetailModal 시트가 화면 밖(translateY(100%))에서 크게 슬라이드해 올라오던 것을,
+   "앱처럼" 느껴지도록 훨씬 짧은 거리/시간의 진입 효과로 조정했다. animate-slide-up은 이 모달의
+   시트 카드에만 쓰이는 클래스라(다른 곳에서 재사용 없음) 여기서 바로 값을 바꿔도 다른 화면에
+   영향이 없다. */
 @keyframes slideUp {
   from {
-    transform: translateY(100%);
-    opacity: 0.3;
+    transform: translateY(10px);
+    opacity: 0;
   }
   to {
     transform: translateY(0);
@@ -106,11 +110,69 @@
 }
 
 .animate-slide-up {
-  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: slideUp 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .animate-scale-up {
   animation: scaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* PR8: 탭 전환 시 화면이 "뚝" 바뀌지 않고 짧게 나타나도록 하는 진입 효과.
+   ScreenRouter.tsx의 Screen 컴포넌트 한 곳에서만 감싸 쓰므로, 화면마다 각각 애니메이션을
+   중복 하드코딩하지 않는다. min-height:100%는 장식이 아니라 필수다 — 이 클래스가 끼워지기
+   전에는 GachaStore 같은 화면의 루트가 <main>의 높이를 곧바로 물려받아 min-h-full(100%)이
+   정상적으로 해석됐는데, 사이에 높이가 정해지지 않은(auto) div가 하나 끼면 그 퍼센트 높이 체인이
+   끊어진다. 여기서도 <main>의 높이를 그대로 이어받게 해 기존 레이아웃과 동일하게 유지한다.
+   fill-mode를 지정하지 않아(기본값 none) 애니메이션이 끝나면 transform은 정적 규칙이 없으므로
+   자연히 none으로 돌아간다 — 애니메이션 도중에만 잠깐 생기는 transform 때문에 새 containing
+   block이 만들어지는 부작용이 200ms 뒤에는 저절로 사라진다. */
+@keyframes screenEnter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.screen-enter {
+  min-height: 100%;
+  animation: screenEnter 180ms ease-out;
+}
+
+/* PR8: MistakeDetailModal 백드롭 자체에는 그동안 opacity transition이 없어 배경이 즉시 나타났다.
+   시트 카드(animate-slide-up)와 별개로 백드롭만 살짝 페이드인시킨다. */
+@keyframes modalBackdropEnter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal-backdrop-enter {
+  animation: modalBackdropEnter 200ms ease-out;
+}
+
+/* PR8: 화면 전환/모달 애니메이션 + 이번에 새로 추가한 하단 탭 누름 피드백(transition-*)에 한해
+   prefers-reduced-motion을 존중한다. animate-pulse/spin/rainbowWave 같은 로딩·장식용 반복
+   애니메이션은 상태를 전달하는 용도라 여기서 건드리지 않는다(범위 밖). */
+@media (prefers-reduced-motion: reduce) {
+  .screen-enter,
+  .modal-backdrop-enter,
+  .animate-slide-up {
+    animation: none !important;
+  }
+
+  .transition-all,
+  .transition-transform,
+  .transition-colors,
+  .transition-opacity {
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* 닉네임 텍스트에 무지개색이 흘러가는 웨이브 효과 (글로우/그림자와 별개, 텍스트 자체 색이 움직임) */
