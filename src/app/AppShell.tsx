@@ -14,7 +14,10 @@ export function AppShell({ header, bottomNav, children }: AppShellProps) {
   return (
     <>
       {header}
-      <main className="flex-1 overflow-y-auto px-4 py-6 pb-28">
+      {/* pb-24(96px): 실기기 실측 결과 실제 하단 네비 높이(≈58px + safe-area-inset-bottom)보다
+          여유가 컸던 기존 pb-28(112px)을 축소. safe-area 자체는 BottomNavigation의
+          .bottom-nav-safe가 별도로 보장하므로 터치 안전성에는 영향 없음. */}
+      <main className="flex-1 overflow-y-auto px-4 py-6 pb-24">
         {children}
       </main>
       {bottomNav}

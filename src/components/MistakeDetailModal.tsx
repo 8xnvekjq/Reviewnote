@@ -179,9 +179,13 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   const [isCooldownNoticeOpen, setIsCooldownNoticeOpen] = React.useState(false);
 
   // ── 다음 오답 이동을 위한 미완료 정렬 목록 연산 ──────────────────────────────
+  // 🐛 숨김 카드 복습 재노출 버그 수정: App.tsx의 handleStartReviewSession(세션 진입점)에는
+  // isHidden 필터가 있었지만, 이 목록(세션 "내부" 진행에 쓰이는 "다음" 버튼/자동진행)에는
+  // 없었다 — 그래서 세션 진입 시점엔 안 보이던 숨김 카드가 세션 도중 재등장했다.
   const uncompletedSorted = React.useMemo(() => {
     return allEntries
       .filter(m => {
+        if (m.isHidden) return false;
         const oCount = m.reviews?.filter(r => r === 'O').length || 0;
         return oCount < 3;
       })
