@@ -1626,29 +1626,41 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                     <span className="mr-1.5 text-base">✅</span> 풀기 전 체크리스트
                   </h4>
                   <p className="text-[11px] text-slate-500 leading-relaxed">
-                    본격적으로 풀기 전에, 기본적인 접근을 제대로 했는지 스스로 확인해 보세요.
+                    풀기 전에 해 본 접근을 확인해 보세요. 항목을 누르면 미응답 → 했어요 → 여기서 막혔어요 → 미응답 순서로 바뀌어요.
+                    순서와 관계없이 답할 수 있고, 미응답은 막힘으로 기록하지 않아요.
+                  </p>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    모두 했어도 계산이나 개념 적용에서 틀릴 수 있어요. 아래 풀이와 내 풀이를 비교해 보세요.
                   </p>
                   <div className="space-y-2">
                     {selectedEntry.analysis.solutionChecklist.items.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => onToggleChecklistItem(selectedEntry.id, item.id)}
-                        className={`w-full flex items-start gap-2 text-left rounded-xl border p-3 transition-all active:scale-[0.99] ${
-                          item.checked
-                            ? 'bg-emerald-950/10 border-emerald-800/30'
-                            : 'bg-slate-900 border-slate-800 hover:border-slate-700'
-                        }`}
-                      >
-                        <span className={`flex-none w-4 h-4 mt-0.5 rounded-md border-2 flex items-center justify-center ${
-                          item.checked ? 'bg-emerald-500 border-emerald-500' : 'border-slate-600'
-                        }`}>
-                          {item.checked && <span className="text-slate-950 text-[10px] font-black">✓</span>}
-                        </span>
-                        <span className={`text-xs font-bold leading-relaxed ${item.checked ? 'text-slate-400' : 'text-slate-200'}`}>
-                          {item.text}
-                        </span>
-                      </button>
+                      <div key={item.id} className="space-y-1">
+                        <button
+                          type="button"
+                          onClick={() => onToggleChecklistItem(selectedEntry.id, item.id)}
+                          aria-label={`${item.text} 현재 ${item.status === 'done' ? '했어요' : item.status === 'stuck' ? '여기서 막혔어요' : '미응답'}. 누르면 ${item.status === 'done' ? '여기서 막혔어요' : item.status === 'stuck' ? '미응답' : '했어요'}로 변경`}
+                          className={`w-full flex items-start gap-2 text-left rounded-xl border p-3 transition-all active:scale-[0.99] ${
+                            item.status === 'done'
+                              ? 'bg-emerald-950/10 border-emerald-800/30'
+                              : item.status === 'stuck'
+                              ? 'bg-amber-950/20 border-amber-600/50'
+                              : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+                          }`}
+                        >
+                          <span className="flex-1 text-xs font-bold leading-relaxed text-slate-200">{item.text}</span>
+                          <span className={`flex-none text-[11px] font-bold ${item.status === 'stuck' ? 'text-amber-300' : item.status === 'done' ? 'text-emerald-300' : 'text-slate-400'}`}>
+                            {item.status === 'done' ? '✓ 했어요' : item.status === 'stuck' ? '막혔어요' : '미응답'}
+                          </span>
+                        </button>
+                        {item.status === 'stuck' && (
+                          <p className="px-3 text-[11px] leading-relaxed text-amber-200" role="status">
+                            {item.id === 'fixed-1' ? '주어진 조건에 하나씩 밑줄을 긋고, 빠뜨린 조건이 있는지 찾아보세요.'
+                              : item.id === 'fixed-2' ? '아는 조건 하나만 골라 식이나 간단한 그림으로 옮겨보세요.'
+                              : item.id === 'fixed-3' ? '문제의 마지막 문장을 읽고 구할 대상을 내 말로 적어보세요.'
+                              : '이 질문과 연결된 조건을 문제에서 찾아보세요. 어떤 말이나 개념이 어려운지 짚어본 뒤 아래 풀이와 비교해 보세요.'}
+                          </p>
+                        )}
+                      </div>
                     ))}
                   </div>
                 </div>

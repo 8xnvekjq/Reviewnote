@@ -135,7 +135,14 @@ export function useMistakeAnalysis({
     analysisStartTime: number
   ): Promise<void> => {
     // 풀이가 생성되는 대로 상세 모달에 실시간으로 흘려보냄 (완성될 때까지 기다리지 않음)
+    let loggedFirstStream = false;
     const onProgress = (partialSolvingProcess: string) => {
+      if (import.meta.env.DEV) {
+        if (!loggedFirstStream && partialSolvingProcess.trim()) {
+          loggedFirstStream = true;
+          console.log('[checklist-timing]', updatedEntry.id, 'solve:first-stream-state', performance.now());
+        }
+      }
       setSelectedEntry(prev => {
         if (!prev || prev.id !== updatedEntry.id) return prev;
         return { ...prev, analysis: { ...prev.analysis, solvingProcess: partialSolvingProcess } };
@@ -169,6 +176,9 @@ export function useMistakeAnalysis({
       }
     });
 
+    if (import.meta.env.DEV) {
+      console.log('[checklist-timing]', updatedEntry.id, 'solve:start', performance.now());
+    }
     const [secondResult, extractResult] = await Promise.all([
       solveMistakeWithGemini(
         image,
@@ -208,6 +218,9 @@ export function useMistakeAnalysis({
       .eq('id', updatedEntry.id);
 
     if (secondUpdateError) throw secondUpdateError;
+    if (import.meta.env.DEV) {
+      console.log('[checklist-timing]', updatedEntry.id, 'solve:db-complete', performance.now());
+    }
 
     const finalEntry: MistakeEntry = {
       ...updatedEntry,
@@ -217,6 +230,10 @@ export function useMistakeAnalysis({
     // 로컬 상태 2차 갱신 (상세 해설 로딩 완료 노출)
     setMistakes(prev => prev.map(m => m.id === updatedEntry.id ? finalEntry : m));
     setSelectedEntry(finalEntry);
+    // Final local state dispatch, not paint. The first streamed state is logged separately.
+    if (import.meta.env.DEV) {
+      console.log('[checklist-timing]', updatedEntry.id, 'solve:local-state', performance.now());
+    }
 
     // 평균 대기시간 통계에 이번 진단 소요시간 반영 (오답 카드 삭제와 무관하게 영구 누적).
     // 통계 기록 실패는 진단 자체의 성공/실패에 영향을 주면 안 되므로 별도로 감싸서 처리.
@@ -234,6 +251,9 @@ export function useMistakeAnalysis({
     // startChecklistGeneration), 여기서는 그 결과를 DB에 저장하기만 한다 — solve의 DB 쓰기가 막
     // 끝난 이 시점이 안전한 저장 위치(그 이후로는 classify/solve가 더 이상 analysis를 덮어쓰지
     // 않음). await 하지 않는다 — 메인 분석 완료 화면은 기존 타이밍 그대로 유지.
+    if (import.meta.env.DEV) {
+      console.log('[checklist-timing]', updatedEntry.id, 'checklist:flush-requested', performance.now());
+    }
     flushFirstChecklistSave(finalEntry).catch(err => {
       console.error('Failed to save checklist:', err);
     });
@@ -268,7 +288,13 @@ export function useMistakeAnalysis({
       // 없이) 시작합니다. 저장은 여기서 하지 않음 — solveStep의 마지막 DB 쓰기 이후에만 저장됩니다.
       void startChecklistGeneration(entry, image, studentGrade);
 
+      if (import.meta.env.DEV) {
+        console.log('[checklist-timing]', entry.id, 'classify:start', performance.now());
+      }
       const updated = await classifyStep(entry, studentGrade, image);
+      if (import.meta.env.DEV) {
+        console.log('[checklist-timing]', entry.id, 'classify:complete', performance.now());
+      }
       await solveStep(updated, studentGrade, image, extractPromise, analysisStartTime);
     } catch (err: any) {
       console.error(err);
