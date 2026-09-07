@@ -157,13 +157,26 @@
   animation: modalBackdropEnter 200ms ease-out;
 }
 
+/* PR3(능동 학습 UX): AI 진단이 막 완료된 순간 "나만의 대책" 입력란을 강제 스크롤 없이 조용히
+   한 번 강조하는 일회성 링(ring) 펄스. 반복 장식(rainbowWave 등)과 달리 1.4초 뒤 원래 상태로
+   완전히 되돌아온다(box-shadow는 정적 규칙이 없어 애니메이션이 끝나면 자연히 사라짐). */
+@keyframes actionPlanNudge {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+  30% { box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.35); }
+}
+
+.action-plan-nudge {
+  animation: actionPlanNudge 1.4s ease-out;
+}
+
 /* PR8: 화면 전환/모달 애니메이션 + 이번에 새로 추가한 하단 탭 누름 피드백(transition-*)에 한해
    prefers-reduced-motion을 존중한다. animate-pulse/spin/rainbowWave 같은 로딩·장식용 반복
    애니메이션은 상태를 전달하는 용도라 여기서 건드리지 않는다(범위 밖). */
 @media (prefers-reduced-motion: reduce) {
   .screen-enter,
   .modal-backdrop-enter,
-  .animate-slide-up {
+  .animate-slide-up,
+  .action-plan-nudge {
     animation: none !important;
   }
 

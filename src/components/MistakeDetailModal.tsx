@@ -181,6 +181,13 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   const [showQuickAnswer, setShowQuickAnswer] = React.useState(false); // 복습 체크 전 스크롤 없이 정답만 바로 확인 (기본 접힘 — 실수로 먼저 보는 것 방지)
   const [showSolvingProcess, setShowSolvingProcess] = React.useState(false); // 기본 접힘 — 대책을 적기 전에 정답부터 스크롤로 보게 되는 것 방지
 
+  // 🧭 능동 학습 UX: AI 진단이 막 완료된 순간 "나만의 대책" 입력란을 짧게(부드럽게) 강조한다.
+  // 강제 스크롤은 하지 않는다 — 화면이 갑자기 이동하는 UX보다 조용한 하이라이트를 택함.
+  const [actionPlanHighlight, setActionPlanHighlight] = React.useState(false);
+  // "직접 다시 풀어보기" CTA를 이번 카드 보기 세션 동안만 건너뛰었는지(영구 저장 아님 — 카드를
+  // 다시 열면 또 보인다, 죄책감 유발 요소 없이 매번 가볍게 제안만 함).
+  const [reproposeDismissed, setReproposeDismissed] = React.useState(false);
+
   // 💡 동일 문제 연속 클릭 쿨다운 커스텀 알림 모달 상태
   const [isCooldownNoticeOpen, setIsCooldownNoticeOpen] = React.useState(false);
 
@@ -553,6 +560,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     setEditRootCauses(selectedEntry.rootCauses || []);
     setEditActionPlan(selectedEntry.userActionPlan || '');
     setEditFinalAnswer(selectedEntry.analysis?.finalAnswer || ''); // 카드 전환 시 정답 미리보기도 새 카드 값으로 재동기화
+    setReproposeDismissed(false); // "직접 다시 풀어보기" 건너뛰기 여부도 카드 전환 시 초기화(이번 세션 한정 상태)
   }, [selectedEntry.id]);
 
   // 2. Sync grade/chapter/finalAnswer only when AI classification finishes (분석 시작 전엔 비어있다가 완료 후 채워짐)
@@ -570,6 +578,22 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     }
     wasAnalyzingRef.current = isAnalyzing;
   }, [isAnalyzing, selectedEntry.grade, selectedEntry.chapter, selectedEntry.analysis?.finalAnswer]);
+
+  // 2.5. AI 진단이 "이 카드에서" 막 완료된 순간에만 나만의 대책 입력란을 짧게 강조한다. id도 함께
+  // 비교하는 이유: wasAnalyzingRef(위)는 카드 전환만으로도 true→false가 될 수 있는데(다른 카드를
+  // 분석 중이다가 분석 중이 아닌 카드로 전환), 그런 경우까지 "이 카드의 AI 진단이 완료됐다"고
+  // 오인해 엉뚱한 카드에서 강조가 반짝이면 안 되기 때문.
+  const prevHighlightTriggerRef = React.useRef({ id: selectedEntry.id, isAnalyzing });
+  React.useEffect(() => {
+    const prev = prevHighlightTriggerRef.current;
+    if (prev.id === selectedEntry.id && prev.isAnalyzing && !isAnalyzing) {
+      setActionPlanHighlight(true);
+      const timer = setTimeout(() => setActionPlanHighlight(false), 1400);
+      prevHighlightTriggerRef.current = { id: selectedEntry.id, isAnalyzing };
+      return () => clearTimeout(timer);
+    }
+    prevHighlightTriggerRef.current = { id: selectedEntry.id, isAnalyzing };
+  }, [isAnalyzing, selectedEntry.id]);
 
   // Loading text cycling effect with real-time statistics and domain metadata
   React.useEffect(() => {
@@ -1665,8 +1689,9 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 </div>
               </div>
 
-              {/* 나만의 대책 (정답 수정란보다 먼저 배치 — 정답을 보기 전에 스스로 다시 풀어보고 대책부터 적도록 유도) */}
-              <div className="space-y-1.5">
+              {/* 나만의 대책 (정답 수정란보다 먼저 배치 — 정답을 보기 전에 스스로 다시 풀어보고 대책부터 적도록 유도)
+                  AI는 이 칸을 절대 자동으로 채우지 않는다 — 학생이 직접 적어야만 값이 채워진다. */}
+              <div className={`space-y-1.5 rounded-xl transition-shadow ${actionPlanHighlight ? 'action-plan-nudge' : ''}`}>
                 <label className="text-[11px] font-bold text-slate-400 block">나만의 대책 (직접 작성)</label>
                 <textarea
                   value={editActionPlan}
@@ -1676,6 +1701,36 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                   className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-600 outline-none focus:border-emerald-500 transition-colors resize-none leading-relaxed"
                 />
               </div>
+
+              {/* 직접 다시 풀어보기 권유 — 강제하지 않는다: 건너뛰어도 복습에 지장 없고, 죄책감
+                  유발 문구를 쓰지 않는다. AI 진단이 끝난 뒤에만 노출.
+                  🧭 풀이 사진 업로드 자체는 이 PR의 범위가 아니다(schema/storage 변경은 별도 PR).
+                  "네, 다시 풀어볼게요"는 지금은 모달을 닫아 AI 풀이가 눈에 보이지 않는 상태로
+                  스스로 다시 풀어보게 유도한다(정답을 곁눈질하며 베끼는 것 방지) — 실제 재풀이
+                  업로드 플로우가 생기면 이 버튼의 동작만 그걸로 교체하면 된다. */}
+              {hasRealAnalysis(selectedEntry) && !reproposeDismissed && (
+                <div className="space-y-2 rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-3">
+                  <p className="text-xs font-bold text-indigo-300 leading-relaxed">
+                    ✏️ 눈으로 읽는 것보다 직접 풀어보면 훨씬 오래 기억에 남아요. 한 번 다시 풀어볼까요?
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="flex-1 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-400 active:scale-95 transition-all text-[11px] font-black text-white"
+                    >
+                      ✏️ 네, 다시 풀어볼게요
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setReproposeDismissed(true)}
+                      className="flex-none px-3 py-2 rounded-lg text-[11px] font-bold text-slate-400 hover:text-slate-300 transition-colors"
+                    >
+                      지금은 건너뛰기
+                    </button>
+                  </div>
+                </div>
+              )}
 
             </div>
           </div>
