@@ -28,6 +28,9 @@ interface MistakeDetailModalProps {
   checklistStatus?: 'generating' | 'failed'; // 체크리스트 2.0 생성 진행 상태('ready'는 없음 — analysis.solutionChecklist 존재 자체가 ready)
   onToggleChecklistItem: (entryId: string, itemId: string) => void;
   onRetryChecklistGeneration?: () => void; // 체크리스트 2.0 생성 실패 시 "다시 시도"
+  onUploadAnswerImage: (blob: Blob) => void; // 재풀이 사진 업로드(선택, 1장) — 원본 문제 이미지와 별개
+  onDeleteAnswerImage: () => void;
+  isUploadingAnswerImage?: boolean;
   onUpdateEntry: (updated: MistakeEntry) => void;
   onSelectEntry?: (entry: MistakeEntry | null) => void;
   isReviewSession?: boolean;
@@ -105,6 +108,9 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   checklistStatus,
   onToggleChecklistItem,
   onRetryChecklistGeneration,
+  onUploadAnswerImage,
+  onDeleteAnswerImage,
+  isUploadingAnswerImage = false,
   onUpdateEntry,
   onSelectEntry,
   isReviewSession = false,
@@ -187,6 +193,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   // "직접 다시 풀어보기" CTA를 이번 카드 보기 세션 동안만 건너뛰었는지(영구 저장 아님 — 카드를
   // 다시 열면 또 보인다, 죄책감 유발 요소 없이 매번 가볍게 제안만 함).
   const [reproposeDismissed, setReproposeDismissed] = React.useState(false);
+  const answerImageInputRef = useRef<HTMLInputElement>(null);
 
   // 💡 동일 문제 연속 클릭 쿨다운 커스텀 알림 모달 상태
   const [isCooldownNoticeOpen, setIsCooldownNoticeOpen] = React.useState(false);
@@ -1729,6 +1736,56 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                       지금은 건너뛰기
                     </button>
                   </div>
+                </div>
+              )}
+
+              {/* 재풀이 사진 업로드(선택, 1장) — 위 권유 배너를 건너뛰었어도(reproposeDismissed) 항상
+                  노출한다: "지금은 건너뛰기"가 이 기능 자체를 막는 게 아니라 그 순간의 팝업만 닫는
+                  것이므로, 학생이 종이에 풀고 나중에 돌아와 올리고 싶을 때 언제든 쓸 수 있어야 한다.
+                  원본 문제 이미지(imageUrl)와 완전히 분리된 answer-images 버킷/컬럼을 쓴다. */}
+              {hasRealAnalysis(selectedEntry) && (
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-400 block">재풀이 사진 (선택)</label>
+                  {selectedEntry.answerImageUrl ? (
+                    <div className="relative rounded-xl overflow-hidden border border-slate-800 bg-slate-950">
+                      <img
+                        src={selectedEntry.answerImageUrl}
+                        alt="내가 다시 푼 풀이"
+                        className="w-full max-h-64 object-contain"
+                      />
+                      <button
+                        type="button"
+                        onClick={onDeleteAnswerImage}
+                        aria-label="재풀이 사진 삭제"
+                        className="absolute top-2 right-2 w-7 h-7 rounded-full bg-slate-950/80 hover:bg-red-500/80 flex items-center justify-center text-white text-xs font-black transition-colors"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <input
+                        ref={answerImageInputRef}
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) onUploadAnswerImage(file);
+                          e.target.value = '';
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => answerImageInputRef.current?.click()}
+                        disabled={isUploadingAnswerImage}
+                        className="w-full py-2.5 rounded-xl border border-dashed border-slate-700 text-[11px] font-bold text-slate-400 hover:border-slate-600 hover:text-slate-300 transition-colors disabled:opacity-50"
+                      >
+                        {isUploadingAnswerImage ? '업로드 중...' : '📷 다시 푼 풀이 사진 올리기'}
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
 

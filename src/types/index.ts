@@ -169,6 +169,9 @@ export interface MistakeEntry {
   userActionPlan?: string;
   teacherScaffoldingHint?: string;
   isHidden?: boolean;       // 시험범위 제외 등으로 메인 리스트에서 숨김 처리됐는지 (구버전 데이터는 undefined -> false 취급)
+  answerImageUrl?: string;  // 학생이 AI 진단 이후 직접 다시 풀어본 풀이 사진(선택, 1장). 원본 문제
+                            // 이미지(imageUrl)와 별개 Storage 버킷(answer-images)에 저장되며 의미도 다름
+                            // — 섞이지 않도록 필드/버킷 모두 분리.
 }
 
 export type ActiveTab = 'notes' | 'completed' | 'camera' | 'stats' | 'admin' | 'guide' | 'store' | 'activity' | 'scaffolding' | 'hidden';
