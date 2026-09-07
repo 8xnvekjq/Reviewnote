@@ -1404,6 +1404,95 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             </div>
           )}
 
+          {/* Card 0.9: 체크리스트 2.0 — "AI 풀이를 이해했나요?"가 아니라 "풀기 전에 기본 접근을
+              했나요?"를 확인하는 용도. solve 완료를 기다리지 않고 classify와 병렬로 훨씬 일찍
+              준비되므로, 학생이 전체 풀이를 기다리는 동안에도 먼저 쓸 수 있어야 한다 — 그래서
+              바로 아래의 "AI Analysis trigger" 3분기 ternary(로딩 스피너 / 실제 분석 결과 / 시작
+              전 안내) 밖에, 그 위에 독립적으로 렌더한다. 예전엔 이 블록이 hasRealAnalysis(실제
+              풀이 스트리밍이 시작된 뒤에만 true)) 분기 안에 있어서, 체크리스트가 이미 준비돼도
+              solve의 첫 스트리밍 전까지는 화면에 아예 나타나지 않는 문제가 있었다(체크리스트만
+              분리해도 상위 조건에 계속 가려져 있으면 소용없음).
+              🧭 렌더 소스는 checklistPreview를 최우선으로 쓴다 — selectedEntry.analysis는
+              classify/solve가 각자 캡처한 stale 스냅샷으로 통째로 교체되기 때문에, 그것만
+              보고 렌더하면 체크리스트가 화면에서 사라졌다가 첫 저장 완료 후에야 다시 나타나는
+              문제가 있었다(useChecklistGeneration.ts 설계 주석 참고). checklistPreview가 아직
+              없는(이번 세션에 생성한 적 없는, 이전에 이미 저장된) 레코드만 analysis로 폴백한다. */}
+          {(() => {
+            const checklistItems = checklistPreview ?? selectedEntry.analysis?.solutionChecklist?.items;
+            return (
+              <>
+                {checklistStatus === 'generating' && !checklistItems && (
+                  <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                    <span className="flex-none w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                    <span>{aiPersonaName}가 문제 풀이 체크리스트를 작성 중이에요…</span>
+                  </div>
+                )}
+                {checklistStatus === 'failed' && !checklistItems && (
+                  <div className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-red-500/10 text-red-300 border border-red-500/20">
+                    <span>⚠️ 체크리스트 생성에 실패했어요</span>
+                    {onRetryChecklistGeneration && (
+                      <button
+                        onClick={onRetryChecklistGeneration}
+                        className="flex-none px-3 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-200 font-black active:scale-95 transition-all"
+                      >
+                        다시 시도
+                      </button>
+                    )}
+                  </div>
+                )}
+                {checklistItems && (
+                  <div className="space-y-2 border-l-4 border-emerald-500 pl-4 py-1">
+                    <h4 className="text-sm font-extrabold text-emerald-400 flex items-center">
+                      <span className="mr-1.5 text-base">✅</span> 풀기 전 체크리스트
+                    </h4>
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      풀기 전에 어디까지 스스로 해봤는지 확인해보세요.
+                    </p>
+                    <div className="space-y-2">
+                      {checklistItems.map((item) => (
+                        <div key={item.id} className="rounded-xl border p-3 bg-slate-900 border-slate-800">
+                          <LaTeXRenderer text={item.text} className="text-xs font-bold leading-relaxed text-slate-200" />
+                          <div className="flex items-center gap-2 mt-2">
+                            <button
+                              type="button"
+                              onClick={() => onSetChecklistItemStatus(selectedEntry.id, item.id, 'done')}
+                              className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all active:scale-95 ${
+                                item.status === 'done'
+                                  ? 'bg-emerald-500 text-slate-950'
+                                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                              }`}
+                            >
+                              ✅ 했어요
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onSetChecklistItemStatus(selectedEntry.id, item.id, 'stuck')}
+                              className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all active:scale-95 ${
+                                item.status === 'stuck'
+                                  ? 'bg-amber-500 text-slate-950'
+                                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                              }`}
+                            >
+                              🙋 막혔어요
+                            </button>
+                          </div>
+                          {item.status === 'stuck' && (
+                            <p className="mt-2 text-[11px] leading-relaxed text-amber-200" role="status">
+                              {item.id === 'fixed-1' ? '주어진 조건에 하나씩 밑줄을 긋고, 빠뜨린 조건이 있는지 찾아보세요.'
+                                : item.id === 'fixed-2' ? '아는 조건 하나만 골라 식이나 간단한 그림으로 옮겨보세요.'
+                                : item.id === 'fixed-3' ? '문제의 마지막 문장을 읽고 구할 대상을 내 말로 적어보세요.'
+                                : '이 질문과 연결된 조건을 문제에서 찾아보세요. 어떤 말이나 개념이 어려운지 짚어본 뒤 아래 풀이와 비교해 보세요.'}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
+
           {/* AI Analysis trigger / solving process rendering */}
           {(!showResult && (isAnalyzing || (progress > 0 && progress < 100)) && (!selectedEntry.analysis?.solvingProcess || selectedEntry.analysis.solvingProcess === SOLVING_PLACEHOLDER_TEXT)) ? (
             <div className="py-8 px-4 flex flex-col items-center space-y-8 animate-fade-in bg-slate-900/20 rounded-3xl border border-slate-800/40 backdrop-blur-md">
@@ -1659,90 +1748,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                       전체 풀이 처음부터 보기 →
                     </button>
                   </div>
-                );
-              })()}
-
-              {/* Card 0.9: 체크리스트 2.0 — "AI 풀이를 이해했나요?"가 아니라 "풀기 전에 기본
-                  접근을 했나요?"를 확인하는 용도. solve 완료를 기다리지 않고 classify와 병렬로
-                  훨씬 일찍 준비되므로, 학생이 전체 풀이를 기다리는 동안에도 먼저 쓸 수 있다.
-                  🧭 렌더 소스는 checklistPreview를 최우선으로 쓴다 — selectedEntry.analysis는
-                  classify/solve가 각자 캡처한 stale 스냅샷으로 통째로 교체되기 때문에, 그것만
-                  보고 렌더하면 체크리스트가 화면에서 사라졌다가 첫 저장 완료 후에야 다시 나타나는
-                  문제가 있었다(useChecklistGeneration.ts 설계 주석 참고). checklistPreview가 아직
-                  없는(이번 세션에 생성한 적 없는, 이전에 이미 저장된) 레코드만 analysis로 폴백한다. */}
-              {(() => {
-                const checklistItems = checklistPreview ?? selectedEntry.analysis.solutionChecklist?.items;
-                return (
-                  <>
-                    {checklistStatus === 'generating' && !checklistItems && (
-                      <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-                        <span className="flex-none w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
-                        <span>{aiPersonaName}가 문제 풀이 체크리스트를 작성 중이에요…</span>
-                      </div>
-                    )}
-                    {checklistStatus === 'failed' && !checklistItems && (
-                      <div className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-red-500/10 text-red-300 border border-red-500/20">
-                        <span>⚠️ 체크리스트 생성에 실패했어요</span>
-                        {onRetryChecklistGeneration && (
-                          <button
-                            onClick={onRetryChecklistGeneration}
-                            className="flex-none px-3 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-200 font-black active:scale-95 transition-all"
-                          >
-                            다시 시도
-                          </button>
-                        )}
-                      </div>
-                    )}
-                    {checklistItems && (
-                      <div className="space-y-2 border-l-4 border-emerald-500 pl-4 py-1">
-                        <h4 className="text-sm font-extrabold text-emerald-400 flex items-center">
-                          <span className="mr-1.5 text-base">✅</span> 풀기 전 체크리스트
-                        </h4>
-                        <p className="text-[11px] text-slate-500 leading-relaxed">
-                          풀기 전에 어디까지 스스로 해봤는지 확인해보세요.
-                        </p>
-                        <div className="space-y-2">
-                          {checklistItems.map((item) => (
-                            <div key={item.id} className="rounded-xl border p-3 bg-slate-900 border-slate-800">
-                              <LaTeXRenderer text={item.text} className="text-xs font-bold leading-relaxed text-slate-200" />
-                              <div className="flex items-center gap-2 mt-2">
-                                <button
-                                  type="button"
-                                  onClick={() => onSetChecklistItemStatus(selectedEntry.id, item.id, 'done')}
-                                  className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all active:scale-95 ${
-                                    item.status === 'done'
-                                      ? 'bg-emerald-500 text-slate-950'
-                                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                                  }`}
-                                >
-                                  ✅ 했어요
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => onSetChecklistItemStatus(selectedEntry.id, item.id, 'stuck')}
-                                  className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all active:scale-95 ${
-                                    item.status === 'stuck'
-                                      ? 'bg-amber-500 text-slate-950'
-                                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                                  }`}
-                                >
-                                  🙋 막혔어요
-                                </button>
-                              </div>
-                              {item.status === 'stuck' && (
-                                <p className="mt-2 text-[11px] leading-relaxed text-amber-200" role="status">
-                                  {item.id === 'fixed-1' ? '주어진 조건에 하나씩 밑줄을 긋고, 빠뜨린 조건이 있는지 찾아보세요.'
-                                    : item.id === 'fixed-2' ? '아는 조건 하나만 골라 식이나 간단한 그림으로 옮겨보세요.'
-                                    : item.id === 'fixed-3' ? '문제의 마지막 문장을 읽고 구할 대상을 내 말로 적어보세요.'
-                                    : '이 질문과 연결된 조건을 문제에서 찾아보세요. 어떤 말이나 개념이 어려운지 짚어본 뒤 아래 풀이와 비교해 보세요.'}
-                                </p>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </>
                 );
               })()}
 
