@@ -7,11 +7,14 @@ interface HandwritingOverlayProps {
   mistakeId: string;
   studentId: string;
   currentUserId: string;
+  backgroundImageUrl?: string; // 있으면 이 이미지를 배경으로 깔고 그 위에 필기(예: 문제 이미지 위 재풀이)
   onClose: () => void;
   onSaved: () => void; // 저장 성공 시 부모(스캐폴딩 목록)에 새로고침을 알림
 }
 
-const DEFAULT_SIZE = { width: 320, height: 260 };
+// 문제 이미지를 배경으로 보여주게 되면서(재풀이 흐름) 기존 흰 캔버스 전용 기본 크기(320x260)로는
+// 문제를 읽기 어려워 조금 더 키움. 여전히 드래그/리사이즈로 자유롭게 조절 가능.
+const DEFAULT_SIZE = { width: 360, height: 440 };
 const MIN_SIZE = { width: 280, height: 200 };
 type ResizeCorner = 'nw' | 'ne' | 'sw' | 'se';
 
@@ -60,6 +63,7 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
   mistakeId,
   studentId,
   currentUserId,
+  backgroundImageUrl,
   onClose,
   onSaved,
 }) => {
@@ -271,8 +275,11 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
             ref={canvasRef}
             strokeWidth={3}
             eraserWidth={16}
-            strokeColor="#1e1b4b"
+            strokeColor="#dc2626"
             canvasColor="white"
+            backgroundImage={backgroundImageUrl || ''}
+            exportWithBackgroundImage={!!backgroundImageUrl}
+            preserveBackgroundImageAspectRatio="xMidYMid meet"
             width="100%"
             height="100%"
             style={{ border: 'none' }}

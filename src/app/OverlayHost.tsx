@@ -1,4 +1,4 @@
-import type { MistakeEntry, ReviewState } from '../types';
+import type { MistakeEntry, ReviewState, SolutionChecklistItem } from '../types';
 import type { NoticeModalState } from '../components/CustomNoticeModal';
 import type { UnseenScaffoldingItem } from '../components/NewScaffoldingModal';
 import type { CropPercent } from '../utils/guideBoxCrop';
@@ -40,11 +40,10 @@ interface OverlayHostProps {
   ) => void;
   onRetryCheckpointGeneration: (entry: MistakeEntry) => void;
   checklistStatus: Record<string, 'generating' | 'failed'>;
-  onToggleChecklistItem: (entryId: string, itemId: string) => void;
+  checklistPreview: Record<string, SolutionChecklistItem[]>;
+  onSetChecklistItemStatus: (entryId: string, itemId: string, status: SolutionChecklistItem['status']) => void;
   onRetryChecklistGeneration: (entry: MistakeEntry) => void;
-  onUploadAnswerImage: (entry: MistakeEntry, blob: Blob) => void;
   onDeleteAnswerImage: (entry: MistakeEntry) => void;
-  isUploadingAnswerImage: boolean;
   onSelectEntry: (entry: MistakeEntry | null) => void;
   onUpdateDetailEntry: (updated: MistakeEntry) => void;
 
@@ -110,11 +109,10 @@ export function OverlayHost({
   onUpdateCheckpointStatus,
   onRetryCheckpointGeneration,
   checklistStatus,
-  onToggleChecklistItem,
+  checklistPreview,
+  onSetChecklistItemStatus,
   onRetryChecklistGeneration,
-  onUploadAnswerImage,
   onDeleteAnswerImage,
-  isUploadingAnswerImage,
   onSelectEntry,
   onUpdateDetailEntry,
   tempCapturedImage,
@@ -156,11 +154,10 @@ export function OverlayHost({
           checkpointRegenStatus={checkpointRegenStatus[selectedEntry.id]}
           onRetryCheckpointGeneration={() => onRetryCheckpointGeneration(selectedEntry)}
           checklistStatus={checklistStatus[selectedEntry.id]}
-          onToggleChecklistItem={onToggleChecklistItem}
+          checklistPreview={checklistPreview[selectedEntry.id]}
+          onSetChecklistItemStatus={onSetChecklistItemStatus}
           onRetryChecklistGeneration={() => onRetryChecklistGeneration(selectedEntry)}
-          onUploadAnswerImage={(blob) => onUploadAnswerImage(selectedEntry, blob)}
           onDeleteAnswerImage={() => onDeleteAnswerImage(selectedEntry)}
-          isUploadingAnswerImage={isUploadingAnswerImage}
           onSelectEntry={onSelectEntry}
           isReviewSession={isReviewSession}
           onUpdateEntry={onUpdateDetailEntry}

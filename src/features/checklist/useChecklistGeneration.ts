@@ -1,6 +1,5 @@
 import { useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { MistakeAnalysis, MistakeEntry, SolutionChecklistItem } from '../../types';
-import { SOLVING_PLACEHOLDER_TEXT } from '../../types';
 import type { NoticeModalState } from '../../components/CustomNoticeModal';
 import { supabase } from '../../services/supabase';
 import { generateChecklistWithGemini } from '../../services/gemini';
@@ -45,8 +44,19 @@ export function useChecklistGeneration({
   showNoticeModal,
 }: UseChecklistGenerationParams) {
   // 카드/모달에 "생성 중.../실패" 배지를 그리기 위한 React state. 'ready'는 별도 값이 없다 —
-  // 로컬 analysis.solutionChecklist가 채워진 것 자체가 ready를 의미한다.
+  // checklistPreview(아래)가 채워진 것 자체가 ready를 의미한다.
   const [checklistStatus, setChecklistStatus] = useState<Record<string, 'generating' | 'failed'>>({});
+
+  // 🧭 체크리스트 화면 표시 전용 독립 state — selectedEntry.analysis와 완전히 분리한다.
+  // classifyStep/solveStep은 각자 시작 시점에 캡처한 entry/updatedEntry의 analysis "스냅샷"으로
+  // selectedEntry.analysis 전체를 교체한다(파일 상단 설계 주석 참고). 체크리스트가 그 스냅샷보다
+  // 먼저 화면에 뜬 뒤 classify/solve의 스냅샷 교체가 나중에 오면, 체크리스트가 화면에서 사라졌다가
+  // flushFirstChecklistSave가 끝나야 다시 나타나는 문제가 있었다 — 실사용에서 "체크리스트와 전체
+  // 풀이가 거의 동시에 등장한다"는 체감의 실제 원인. 그래서 생성 직후~첫 저장 전까지는
+  // selectedEntry.analysis를 전혀 건드리지 않고, 이 독립 state만 갱신해서 렌더 소스로 쓴다.
+  // 모달은 항상 `checklistPreview[id] ?? selectedEntry.analysis?.solutionChecklist?.items`로 읽어야
+  // 한다 — 이번 세션에 생성한 적 없는(이전 세션에 이미 저장된) 레코드는 뒤쪽 폴백으로 정상 표시된다.
+  const [checklistPreview, setChecklistPreview] = useState<Record<string, SolutionChecklistItem[]>>({});
 
   // 학생이 지금까지 체크한 항목(entry.id → itemId → status). React state와 별개로 항상 최신값을
   // 동기 유지하는 ref — 첫 저장 루프가 "쓰기 직전 마지막 순간"에 이 값을 읽어야 stale closure 없이
@@ -84,11 +94,6 @@ export function useChecklistGeneration({
     // classify/solve의 전체 덮어쓰기 저장과 충돌할 수 있다).
     checklistFirstSaveDoneRef.current[entry.id] = false;
 
-    const applyLocalItems = (analysis: MistakeAnalysis | undefined, items: SolutionChecklistItem[]): MistakeAnalysis => ({
-      ...(analysis ?? { solvingProcess: SOLVING_PLACEHOLDER_TEXT }),
-      solutionChecklist: { items },
-    });
-
     const promise = (async () => {
       if (import.meta.env.DEV) {
         console.log('[checklist-timing]', entry.id, 'checklist:start', performance.now());
@@ -108,10 +113,9 @@ export function useChecklistGeneration({
       ];
       checklistItemsRef.current[entry.id] = items;
 
-      // 로컬 프리뷰 반영 (id 가드 — solveStep의 onProgress 스트리밍과 동일한 패턴, 그 사이 학생이
-      // 다른 카드로 전환했으면 selectedEntry는 건드리지 않는다)
-      setMistakes(prev => prev.map(m => m.id === entry.id ? { ...m, analysis: applyLocalItems(m.analysis, items) } : m));
-      setSelectedEntry(prev => prev && prev.id === entry.id ? { ...prev, analysis: applyLocalItems(prev.analysis, items) } : prev);
+      // 독립 프리뷰에만 반영 — selectedEntry.analysis는 건드리지 않는다(파일 상단 설명 참고,
+      // classify/solve의 스냅샷 교체에 지워지는 것을 막기 위해).
+      setChecklistPreview(prev => ({ ...prev, [entry.id]: items }));
 
       // State dispatch timestamp, not browser paint; compare using the shared performance clock.
       if (import.meta.env.DEV) {
@@ -186,6 +190,10 @@ export function useChecklistGeneration({
           checklistFirstSaveDoneRef.current[entry.id] = true;
           setMistakes(prev => prev.map(m => m.id === entry.id ? { ...m, analysis: mergedAnalysis } : m));
           setSelectedEntry(prev => prev && prev.id === entry.id ? { ...prev, analysis: mergedAnalysis } : prev);
+          // classify/solve는 이 시점 이후 더 이상 analysis를 덮어쓰지 않으므로(solve의 마지막 DB
+          // 쓰기 이후에만 flush가 호출됨), 이제부터는 selectedEntry.analysis가 안전한 소스다.
+          // checklistPreview도 같은 값으로 맞춰 둔다(불일치 방지, 필수는 아님).
+          setChecklistPreview(prev => ({ ...prev, [entry.id]: itemsWithStatus }));
           return;
         }
         // 저장 도중 체크가 또 바뀜 — 같은 루프로 최신 스냅샷을 한 번 더 저장(수렴할 때까지)
@@ -239,28 +247,23 @@ export function useChecklistGeneration({
     }
   };
 
-  // 🧭 UI가 호출하는 단일 토글 핸들러 — 첫 저장 전이면 로컬 state만, 이후면 즉시 DB 저장까지.
-  const toggleChecklistItem = (entryId: string, itemId: string) => {
-    // Reloaded records come from state; refs take precedence during rapid clicks and first save.
-    // Old checked-only records have no status and start unanswered without implying a weakness.
-    const current = checklistItemStatusRef.current[entryId]?.[itemId]
-      ?? mistakes.find(m => m.id === entryId)?.analysis?.solutionChecklist?.items.find(it => it.id === itemId)?.status;
-    const status = current === 'done' ? 'stuck' : current === 'stuck' ? 'unanswered' : 'done';
+  // 🧭 UI가 호출하는 상태 설정 핸들러 — [했어요]/[막혔어요] 버튼이 각각 명시적으로 원하는
+  // status를 넘긴다(예전처럼 순환시키지 않음 — 두 버튼 중 하나를 명확히 고르는 UX). 첫 저장
+  // 전이면 로컬(checklistPreview)만 갱신하고, 이후면 즉시 DB 저장까지 이어간다.
+  const setChecklistItemStatus = (entryId: string, itemId: string, status: SolutionChecklistItem['status']) => {
     checklistItemStatusRef.current[entryId] = { ...(checklistItemStatusRef.current[entryId] || {}), [itemId]: status };
     checklistVersionRef.current[entryId] = (checklistVersionRef.current[entryId] || 0) + 1;
 
-    const applyToggle = (analysis: MistakeAnalysis | undefined): MistakeAnalysis | undefined => {
-      if (!analysis?.solutionChecklist) return analysis;
-      return {
-        ...analysis,
-        solutionChecklist: {
-          items: analysis.solutionChecklist.items.map(it => it.id === itemId ? { id: it.id, text: it.text, source: it.source, status } : it),
-        },
-      };
-    };
-
-    setMistakes(prev => prev.map(m => m.id === entryId ? { ...m, analysis: applyToggle(m.analysis) } : m));
-    setSelectedEntry(prev => prev && prev.id === entryId ? { ...prev, analysis: applyToggle(prev.analysis) } : prev);
+    // checklistPreview가 항상 렌더 소스이므로 이 클릭이 즉시 반영되게 한다. 이번 세션에 생성된
+    // 적 없는(이전 세션에 이미 저장된) 레코드를 처음 클릭하는 경우엔 mistakes에서 base를 가져와
+    // 시드한다 — 그 다음부터는 checklistPreview 자체가 최신 소스가 된다.
+    setChecklistPreview(prev => {
+      const baseItems = prev[entryId]
+        ?? checklistItemsRef.current[entryId]
+        ?? mistakes.find(m => m.id === entryId)?.analysis?.solutionChecklist?.items;
+      if (!baseItems) return prev;
+      return { ...prev, [entryId]: baseItems.map(it => it.id === itemId ? { ...it, status } : it) };
+    });
 
     if (checklistFirstSaveDoneRef.current[entryId] !== false) {
       // Undefined means a persisted entry loaded in this session; false means generation/first save.
@@ -283,9 +286,10 @@ export function useChecklistGeneration({
 
   return {
     checklistStatus,
+    checklistPreview,
     startChecklistGeneration,
     flushFirstChecklistSave,
-    toggleChecklistItem,
+    setChecklistItemStatus,
     retryChecklistGeneration,
   };
 }
