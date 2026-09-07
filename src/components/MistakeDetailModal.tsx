@@ -70,10 +70,32 @@ const IMAGE_WINDOW_RESIZE_HANDLES: Array<{
   { corner: 'se', label: '오른쪽 아래에서 문제창 크기 조절', className: 'right-0 bottom-0 cursor-nwse-resize items-end justify-end', iconClassName: 'border-r-2 border-b-2 rounded-br-sm' },
 ];
 
+// 🧭 iPhone PWA standalone 모드에서 문제창 상단 바(필기 모드 토글 등)가 status bar/Wi-Fi/배터리
+// 영역과 겹쳐 탭하기 어렵다는 실사용 문제 — env(safe-area-inset-top)을 실측해서 문제창의 최소
+// top 위치로 사용한다. 세션 중 값이 바뀔 일이 거의 없어(회전 등 예외) 1회 측정 후 캐시한다.
+let cachedSafeAreaInsetTop: number | null = null;
+const getSafeAreaInsetTop = (): number => {
+  if (cachedSafeAreaInsetTop !== null) return cachedSafeAreaInsetTop;
+  if (typeof document === 'undefined') return 0;
+  const probe = document.createElement('div');
+  probe.style.position = 'fixed';
+  probe.style.top = '0';
+  probe.style.left = '0';
+  probe.style.paddingTop = 'env(safe-area-inset-top)';
+  probe.style.visibility = 'hidden';
+  probe.style.pointerEvents = 'none';
+  document.body.appendChild(probe);
+  const value = parseFloat(getComputedStyle(probe).paddingTop) || 0;
+  document.body.removeChild(probe);
+  cachedSafeAreaInsetTop = value;
+  return value;
+};
+
 const getInitialImageWindowLayout = (): ImageWindowLayout => {
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
   const margin = viewportWidth >= 900 ? 20 : 8;
+  const minTop = Math.max(margin, getSafeAreaInsetTop() + 4);
   const width = Math.max(
     IMAGE_WINDOW_MIN_SIZE.width,
     Math.min(viewportWidth - margin * 2, viewportWidth >= 900 ? Math.round(viewportWidth * 0.48) : viewportWidth - margin * 2, 680),
@@ -85,7 +107,7 @@ const getInitialImageWindowLayout = (): ImageWindowLayout => {
 
   return {
     left: margin,
-    top: viewportWidth >= 900 ? 64 : margin,
+    top: viewportWidth >= 900 ? Math.max(64, minTop) : minTop,
     width,
     height,
   };
@@ -398,12 +420,13 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     const state = imageWindowDragRef.current;
     if (!state.dragging) return;
     const margin = 8;
+    const minTop = Math.max(margin, getSafeAreaInsetTop() + 4); // status bar 영역 아래로 드래그 못 올라가게
     const nextLeft = Math.max(
       margin,
       Math.min(window.innerWidth - imageWindowLayout.width - margin, state.originLeft + e.clientX - state.startX),
     );
     const nextTop = Math.max(
-      margin,
+      minTop,
       Math.min(window.innerHeight - imageWindowLayout.height - margin, state.originTop + e.clientY - state.startY),
     );
     setImageWindowLayout((layout) => ({ ...layout, left: nextLeft, top: nextTop }));
@@ -455,8 +478,9 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     }
 
     if (usesNorth) {
+      const minTop = Math.max(margin, getSafeAreaInsetTop() + 4); // status bar 영역 아래로 리사이즈 못 올라가게
       nextTop = Math.max(
-        margin,
+        minTop,
         Math.min(state.origin.top + state.origin.height - IMAGE_WINDOW_MIN_SIZE.height, state.origin.top + dy),
       );
       nextHeight = state.origin.height + state.origin.top - nextTop;
@@ -1117,7 +1141,9 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
               alt={selectedEntry.title}
               className="w-full h-auto max-h-[60vh] object-contain rounded-xl group-hover/img:opacity-90 transition-opacity"
             />
-            {/* 손 필기 / 펜슬로 간단히 풀어볼 수 있는 필기창 열기 버튼 */}
+            {/* 풀이노트 — 손 필기/펜슬로 내 풀이를 써보는 창(저장하면 스캐폴딩 "내 풀이"로 등록).
+                🧭 아이콘 구분: 정답 수정(✏️) / 풀이노트(📝) / 문제에 쓰기(🖍)로 역할을 나눠
+                같은 연필 아이콘이 여러 기능에서 반복되어 헷갈리던 문제를 해소한다. */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -1125,11 +1151,11 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 setIsHandwritingOpen(true);
               }}
               type="button"
-              aria-label="문제 이미지와 손 필기창 함께 열기"
-              title="손 필기 / 펜슬로 풀어보기"
+              aria-label="풀이노트 열기"
+              title="📝 풀이노트"
               className="absolute top-4 right-4 w-9 h-9 rounded-full bg-slate-950/85 border border-slate-800 hover:border-amber-500/60 text-amber-400 hover:text-amber-300 flex items-center justify-center text-base shadow backdrop-blur transition-all active:scale-90 z-10"
             >
-              ✏️
+              📝
             </button>
             {/* 이미지 확대 가이드 골드 배지 (상시 노출 + 노란색/황금색 텍스트) */}
             <div className="absolute bottom-4 left-4 bg-slate-950/85 border border-slate-800/60 rounded-lg px-2 py-0.5 text-[9px] font-black text-amber-400 flex items-center space-x-1 shadow backdrop-blur select-none">
@@ -1446,14 +1472,69 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                   DB 저장/AI 분석 입력/체크포인트 생성 입력으로는 계속 그대로 쓰인다 — 여기서
                   지운 건 이 화면에 보여주던 접힘 섹션 하나뿐이다. */}
 
-              {/* Card 0.5: 선생님 힌트 (스캐폴딩) (접힘 상태 디폴트) */}
-              <MistakeScaffoldingDrawer
-                mistakeId={selectedEntry.id}
-                studentId={selectedEntry.userId || ''}
-                currentUserId={currentUserId || ''}
-                isAdmin={isAdmin}
-                refreshSignal={scaffoldingRefreshKey}
-              />
+              {/* Card 0.5: 📚 나의 학습 기록 — 선생님 힌트(스캐폴딩)와 재풀이 사진을 한 묶음으로.
+                  예전에는 재풀이 사진 업로드가 대책 작성란 아래 멀리 떨어져 있어 별도 기능처럼
+                  느껴졌다 — 스캐폴딩(선생님 힌트/내 풀이 기록)과 같은 "학습 기록" 흐름으로
+                  묶는다. 큰 DB 재설계 없이 순수 UI 재배치만 함(answerImageUrl 그대로 재사용). */}
+              <div className="space-y-2">
+                <h4 className="text-[11px] font-black text-slate-500 uppercase tracking-wide px-1">📚 나의 학습 기록</h4>
+                <MistakeScaffoldingDrawer
+                  mistakeId={selectedEntry.id}
+                  studentId={selectedEntry.userId || ''}
+                  currentUserId={currentUserId || ''}
+                  isAdmin={isAdmin}
+                  refreshSignal={scaffoldingRefreshKey}
+                />
+
+                {/* 재풀이 사진(선택, 1장) — AI 진단 완료 후에만 노출. 이미 업로드된 사진이 있으면
+                    항상 보여준다(아래 "직접 다시 풀어보기" 배너를 건너뛰었어도 무관 — 건너뛰기는
+                    그 배너 하나만 접을 뿐, 이미 남긴 기록을 숨기지 않는다). */}
+                {hasRealAnalysis(selectedEntry) && (
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-slate-400 block">재풀이 사진 (선택)</label>
+                    {selectedEntry.answerImageUrl ? (
+                      <div className="relative rounded-xl overflow-hidden border border-slate-800 bg-slate-950">
+                        <img
+                          src={selectedEntry.answerImageUrl}
+                          alt="내가 다시 푼 풀이"
+                          className="w-full max-h-64 object-contain"
+                        />
+                        <button
+                          type="button"
+                          onClick={onDeleteAnswerImage}
+                          aria-label="재풀이 사진 삭제"
+                          className="absolute top-2 right-2 w-7 h-7 rounded-full bg-slate-950/80 hover:bg-red-500/80 flex items-center justify-center text-white text-xs font-black transition-colors"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <input
+                          ref={answerImageInputRef}
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) onUploadAnswerImage(file);
+                            e.target.value = '';
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => answerImageInputRef.current?.click()}
+                          disabled={isUploadingAnswerImage}
+                          className="w-full py-2.5 rounded-xl border border-dashed border-slate-700 text-[11px] font-bold text-slate-400 hover:border-slate-600 hover:text-slate-300 transition-colors disabled:opacity-50"
+                        >
+                          {isUploadingAnswerImage ? '업로드 중...' : '📷 다시 푼 풀이 사진 올리기'}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
 
               {/* 🧭 정리하기(초기화) 이후 체크리스트 재생성 진행 상태 — 정석 풀이는 전혀 건드리지
                   않고 이 배너들만 추가/제거된다(기존 데이터가 사라지거나 깜빡이지 않음). */}
@@ -1777,83 +1858,46 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
               </div>
 
               {/* 직접 다시 풀어보기 권유 — 강제하지 않는다: 건너뛰어도 복습에 지장 없고, 죄책감
-                  유발 문구를 쓰지 않는다. AI 진단이 끝난 뒤에만 노출.
-                  🧭 풀이 사진 업로드 자체는 이 PR의 범위가 아니다(schema/storage 변경은 별도 PR).
-                  "네, 다시 풀어볼게요"는 지금은 모달을 닫아 AI 풀이가 눈에 보이지 않는 상태로
-                  스스로 다시 풀어보게 유도한다(정답을 곁눈질하며 베끼는 것 방지) — 실제 재풀이
-                  업로드 플로우가 생기면 이 버튼의 동작만 그걸로 교체하면 된다. */}
-              {hasRealAnalysis(selectedEntry) && !reproposeDismissed && (
-                <div className="space-y-2 rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-3">
-                  <p className="text-xs font-bold text-indigo-300 leading-relaxed">
-                    ✏️ 눈으로 읽는 것보다 직접 풀어보면 훨씬 오래 기억에 남아요. 한 번 다시 풀어볼까요?
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={onClose}
-                      className="flex-1 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-400 active:scale-95 transition-all text-[11px] font-black text-white"
-                    >
-                      ✏️ 네, 다시 풀어볼게요
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setReproposeDismissed(true)}
-                      className="flex-none px-3 py-2 rounded-lg text-[11px] font-bold text-slate-400 hover:text-slate-300 transition-colors"
-                    >
-                      지금은 건너뛰기
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* 재풀이 사진 업로드(선택, 1장) — 위 권유 배너를 건너뛰었어도(reproposeDismissed) 항상
-                  노출한다: "지금은 건너뛰기"가 이 기능 자체를 막는 게 아니라 그 순간의 팝업만 닫는
-                  것이므로, 학생이 종이에 풀고 나중에 돌아와 올리고 싶을 때 언제든 쓸 수 있어야 한다.
-                  원본 문제 이미지(imageUrl)와 완전히 분리된 answer-images 버킷/컬럼을 쓴다. */}
+                  유발 문구를 쓰지 않는다. AI 진단이 끝난 뒤에만 노출. "네, 다시 풀어볼게요"는
+                  지금은 모달을 닫아 AI 풀이가 눈에 보이지 않는 상태로 스스로 다시 풀어보게
+                  유도한다(정답을 곁눈질하며 베끼는 것 방지) — 실제 재풀이 사진은 위 "📚 나의
+                  학습 기록" 섹션에서 언제든 올릴 수 있다.
+                  🧭 "지금은 건너뛰기"를 눌러도 아래에 업로드 UI가 그대로 남아있어 건너뛰기가
+                  안 먹힌 느낌을 주던 문제 수정: 이제 배너 자체를 작은 링크로 접는다(재풀이 사진
+                  섹션은 위로 옮겨졌으니 더 이상 이 배너 아래에 남아있지 않음). 이미 사진을
+                  올렸다면 그 사실과 무관하게 이 배너는 순수 "한 번 더 권유" UI일 뿐이다. */}
               {hasRealAnalysis(selectedEntry) && (
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-slate-400 block">재풀이 사진 (선택)</label>
-                  {selectedEntry.answerImageUrl ? (
-                    <div className="relative rounded-xl overflow-hidden border border-slate-800 bg-slate-950">
-                      <img
-                        src={selectedEntry.answerImageUrl}
-                        alt="내가 다시 푼 풀이"
-                        className="w-full max-h-64 object-contain"
-                      />
+                reproposeDismissed ? (
+                  <button
+                    type="button"
+                    onClick={() => setReproposeDismissed(false)}
+                    className="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 underline underline-offset-2 transition-colors"
+                  >
+                    마음이 바뀌었나요? 다시 풀어볼게요 ✏️
+                  </button>
+                ) : (
+                  <div className="space-y-2 rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-3">
+                    <p className="text-xs font-bold text-indigo-300 leading-relaxed">
+                      ✏️ 눈으로 읽는 것보다 직접 풀어보면 훨씬 오래 기억에 남아요. 한 번 다시 풀어볼까요?
+                    </p>
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={onDeleteAnswerImage}
-                        aria-label="재풀이 사진 삭제"
-                        className="absolute top-2 right-2 w-7 h-7 rounded-full bg-slate-950/80 hover:bg-red-500/80 flex items-center justify-center text-white text-xs font-black transition-colors"
+                        onClick={onClose}
+                        className="flex-1 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-400 active:scale-95 transition-all text-[11px] font-black text-white"
                       >
-                        ✕
+                        ✏️ 네, 다시 풀어볼게요
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReproposeDismissed(true)}
+                        className="flex-none px-3 py-2 rounded-lg text-[11px] font-bold text-slate-400 hover:text-slate-300 transition-colors"
+                      >
+                        지금은 건너뛰기
                       </button>
                     </div>
-                  ) : (
-                    <>
-                      <input
-                        ref={answerImageInputRef}
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) onUploadAnswerImage(file);
-                          e.target.value = '';
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => answerImageInputRef.current?.click()}
-                        disabled={isUploadingAnswerImage}
-                        className="w-full py-2.5 rounded-xl border border-dashed border-slate-700 text-[11px] font-bold text-slate-400 hover:border-slate-600 hover:text-slate-300 transition-colors disabled:opacity-50"
-                      >
-                        {isUploadingAnswerImage ? '업로드 중...' : '📷 다시 푼 풀이 사진 올리기'}
-                      </button>
-                    </>
-                  )}
-                </div>
+                  </div>
+                )
               )}
 
             </div>
@@ -1962,11 +2006,11 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                       type="button"
                       onClick={enterDrawMode}
                       onPointerDown={(e) => e.stopPropagation()}
-                      aria-label="필기 모드로 전환"
-                      title="필기 모드로 전환(1x로 초기화됩니다)"
+                      aria-label="문제에 쓰기 모드로 전환"
+                      title="문제에 쓰기(1x로 초기화됩니다)"
                       className="h-7 rounded-lg border border-slate-800 bg-slate-900 px-2 text-[9px] font-black text-slate-400 transition-colors hover:text-white"
                     >
-                      ✏️ 필기
+                      🖍 문제에 쓰기
                     </button>
                   </>
                 )}
