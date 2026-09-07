@@ -23,10 +23,17 @@ interface UseMistakeAnalysisParams {
   aiVoice: string | undefined;
   teacherApproachGuides: { grade: string; chapter: string; guideText: string }[];
   showNoticeModal: (info: Omit<NoticeModalState, 'isOpen'>) => void;
-  // 신규 분석 완료 직후 eager로 체크리스트를 생성하기 위한 연결 — useCheckpointGeneration이
-  // 소유한 함수를 그대로 넘겨받아 호출만 한다(circular dependency를 피하기 위해 이 훅은
-  // useCheckpointGeneration을 직접 호출하지 않는다).
-  generateAndSaveSolutionCheckpoints: (entry: MistakeEntry) => Promise<boolean>;
+  // 체크리스트 2.0 — useChecklistGeneration이 소유한 함수를 그대로 넘겨받아 호출만 한다
+  // (circular dependency를 피하기 위해 이 훅은 useChecklistGeneration을 직접 호출하지 않는다).
+  // 생성은 classify와 병렬로 최대한 일찍 시작하고(startChecklistGeneration), 실제 DB 저장은
+  // solve의 마지막 DB 쓰기가 끝난 직후 한 번만 한다(flushFirstChecklistSave) — 새로운 동시
+  // 쓰기를 만들지 않기 위한 설계(자세한 이유는 useChecklistGeneration.ts 참고).
+  startChecklistGeneration: (
+    entry: MistakeEntry,
+    image: { mimeType: string; base64Data: string },
+    studentGrade: string | undefined
+  ) => Promise<void>;
+  flushFirstChecklistSave: (entry: MistakeEntry) => Promise<void>;
 }
 
 // AI 분석(classify → extract/solve) 파이프라인을 담당하는 훅. App.tsx에 있던 것을 그대로 옮긴
@@ -41,7 +48,8 @@ export function useMistakeAnalysis({
   aiVoice,
   teacherApproachGuides,
   showNoticeModal,
-  generateAndSaveSolutionCheckpoints,
+  startChecklistGeneration,
+  flushFirstChecklistSave,
 }: UseMistakeAnalysisParams) {
   // classify+solve 진단이 "어느 오답 항목"에 대해 진행 중인지 — 예전엔 boolean 하나였는데,
   // 그러면 A를 진단하는 중 다른(B) 카드를 열어도 B에 가짜로 로딩 스피너가 뜨다가 조용히
@@ -222,11 +230,12 @@ export function useMistakeAnalysis({
       console.error('Failed to record diagnosis duration stats:', err);
     }
 
-    // 🧭 단계형 풀이 체크리스트: 신규 분석 완료 직후 background로 생성(needsHelp 여부 무관 —
-    // 모든 오답에 적용). await 하지 않는다 — 메인 분석 완료 화면은 기존 타이밍 그대로 유지하고,
-    // 체크리스트는 조금 늦게 도착해도 무방(record_diagnosis_duration과 동일한 fire-and-forget 패턴).
-    generateAndSaveSolutionCheckpoints(finalEntry).catch(err => {
-      console.error('Failed to generate solution checkpoints:', err);
+    // 🧭 체크리스트 2.0 첫 저장: 생성 자체는 이미 classify와 병렬로 훨씬 일찍 시작돼 있고(위
+    // startChecklistGeneration), 여기서는 그 결과를 DB에 저장하기만 한다 — solve의 DB 쓰기가 막
+    // 끝난 이 시점이 안전한 저장 위치(그 이후로는 classify/solve가 더 이상 analysis를 덮어쓰지
+    // 않음). await 하지 않는다 — 메인 분석 완료 화면은 기존 타이밍 그대로 유지.
+    flushFirstChecklistSave(finalEntry).catch(err => {
+      console.error('Failed to save checklist:', err);
     });
   };
 
@@ -254,6 +263,10 @@ export function useMistakeAnalysis({
       // classify가 끝날 때까지 extractPromise를 아직 await하지 않으므로, 그 사이 실패하더라도
       // "unhandled promise rejection" 경고가 뜨지 않도록 별도 채널로 미리 캐치해둔다 (실제 처리는 solveStep에서).
       extractPromise.catch(() => {});
+
+      // 🧭 체크리스트 2.0 생성도 classify/extract와 완전히 동시에(이미지 기반, problemText 대기
+      // 없이) 시작합니다. 저장은 여기서 하지 않음 — solveStep의 마지막 DB 쓰기 이후에만 저장됩니다.
+      void startChecklistGeneration(entry, image, studentGrade);
 
       const updated = await classifyStep(entry, studentGrade, image);
       await solveStep(updated, studentGrade, image, extractPromise, analysisStartTime);

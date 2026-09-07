@@ -39,6 +39,9 @@ interface OverlayHostProps {
     newStatus: 'understood' | 'stuck'
   ) => void;
   onRetryCheckpointGeneration: (entry: MistakeEntry) => void;
+  checklistStatus: Record<string, 'generating' | 'failed'>;
+  onToggleChecklistItem: (entryId: string, itemId: string) => void;
+  onRetryChecklistGeneration: (entry: MistakeEntry) => void;
   onSelectEntry: (entry: MistakeEntry | null) => void;
   onUpdateDetailEntry: (updated: MistakeEntry) => void;
 
@@ -103,6 +106,9 @@ export function OverlayHost({
   onUpdateReviews,
   onUpdateCheckpointStatus,
   onRetryCheckpointGeneration,
+  checklistStatus,
+  onToggleChecklistItem,
+  onRetryChecklistGeneration,
   onSelectEntry,
   onUpdateDetailEntry,
   tempCapturedImage,
@@ -143,6 +149,9 @@ export function OverlayHost({
           onUpdateCheckpointStatus={onUpdateCheckpointStatus}
           checkpointRegenStatus={checkpointRegenStatus[selectedEntry.id]}
           onRetryCheckpointGeneration={() => onRetryCheckpointGeneration(selectedEntry)}
+          checklistStatus={checklistStatus[selectedEntry.id]}
+          onToggleChecklistItem={onToggleChecklistItem}
+          onRetryChecklistGeneration={() => onRetryChecklistGeneration(selectedEntry)}
           onSelectEntry={onSelectEntry}
           isReviewSession={isReviewSession}
           onUpdateEntry={onUpdateDetailEntry}
