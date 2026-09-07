@@ -283,11 +283,17 @@ function App() {
   // 💡 신규 스캐폴딩(선생님 맞춤 힌트) 안내 모달 상태
   const [unseenScaffoldings, setUnseenScaffoldings] = useState<UnseenScaffoldingItem[]>([]);
   const [isNewScaffoldingModalOpen, setIsNewScaffoldingModalOpen] = useState(false);
+  // checkUnseenScaffoldings 호출 경합(race) 방지용 — loadWeeklyChampions와 동일한 패턴으로, 가장
+  // 최근 요청 번호만 결과를 반영한다. 팝업을 닫아 읽음 처리한 뒤에도 그 전에 시작된 오래된 조회가
+  // 늦게 도착하면 방금 닫은 팝업을 다시 열어버리는 경합이 있었음 — handleCloseNewScaffoldingModal에서도
+  // 이 번호를 올려서 그 시점 이전에 시작된 응답은 전부 무효화한다.
+  const unseenScaffoldingsRequestIdRef = useRef(0);
 
   // 💡 DB 기반 미확인 신규 스캐폴딩 힌트 조회 (is_read === false)
   const checkUnseenScaffoldings = async () => {
     const userId = session?.user?.id;
     if (!userId || isAdmin) return;
+    const requestId = ++unseenScaffoldingsRequestIdRef.current;
 
     try {
       const { data: rows, error } = await supabase
@@ -342,7 +348,9 @@ function App() {
         });
       });
 
-      if (items.length > 0) {
+      // 이 응답을 시작한 뒤 더 최신 요청이 있었거나(재조회 몰림) 그 사이 팝업이 닫혔다면
+      // (handleCloseNewScaffoldingModal이 번호를 올림) 늦게 도착한 이 결과는 버린다.
+      if (items.length > 0 && requestId === unseenScaffoldingsRequestIdRef.current) {
         setUnseenScaffoldings(items);
         setIsNewScaffoldingModalOpen(true);
       }
@@ -351,6 +359,14 @@ function App() {
     }
   };
 
+  // mistakes_live_sync 채널(아래)이 세션 id에만 의존해 구독을 한 번 걸어두는데, 그 콜백이
+  // 구독 당시의 checkUnseenScaffoldings 클로저(= 그 시점의 isAdmin 값)를 그대로 붙잡고 있었다.
+  // 로그인 직후 isAdmin이 비동기 RPC로 뒤늦게 true로 바뀌어도 그 이후 콜백은 여전히 옛 false를
+  // 기준으로 판단해버리는 stale closure 문제라, 매 렌더마다 최신 함수를 담아두고 그 ref를 통해서만
+  // 호출한다.
+  const checkUnseenScaffoldingsRef = useRef(checkUnseenScaffoldings);
+  checkUnseenScaffoldingsRef.current = checkUnseenScaffoldings;
+
   useEffect(() => {
     if (session?.user?.id && !isAdmin) {
       checkUnseenScaffoldings();
@@ -358,6 +374,7 @@ function App() {
   }, [session?.user?.id, isAdmin]);
 
   const handleCloseNewScaffoldingModal = async () => {
+    unseenScaffoldingsRequestIdRef.current++; // 아직 도착 안 한 이전 조회 결과를 전부 무효화
     setIsNewScaffoldingModalOpen(false);
     const userId = session?.user?.id;
     if (!userId || unseenScaffoldings.length === 0) return;
@@ -968,7 +985,7 @@ function App() {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'mistake_scaffoldings' }, () => {
         refreshMistakesLight();
-        checkUnseenScaffoldings();
+        checkUnseenScaffoldingsRef.current();
       })
       .subscribe();
 
