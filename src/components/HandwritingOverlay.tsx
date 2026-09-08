@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ReactSketchCanvas, type ReactSketchCanvasRef } from 'react-sketch-canvas';
+import { ReactSketchCanvas, type ReactSketchCanvasRef, type CanvasPath } from 'react-sketch-canvas';
 import { supabase } from '../services/supabase';
 
 interface HandwritingOverlayProps {
@@ -13,9 +13,10 @@ interface HandwritingOverlayProps {
 }
 
 // 문제 이미지를 배경으로 보여주게 되면서(재풀이 흐름) 기존 흰 캔버스 전용 기본 크기(320x260)로는
-// 문제를 읽기 어려워 조금 더 키움. 여전히 드래그/리사이즈로 자유롭게 조절 가능.
-const DEFAULT_SIZE = { width: 360, height: 440 };
-const MIN_SIZE = { width: 280, height: 200 };
+// 문제를 읽기 어려워 조금 더 키움. 여전히 드래그/리사이즈로 자유롭게 조절 가능. 펜/지우개/undo/색상/
+// 새 필기장 버튼이 하단 2줄 툴바로 늘어나면서 최소 높이도 함께 소폭 키웠다.
+const DEFAULT_SIZE = { width: 360, height: 480 };
+const MIN_SIZE = { width: 280, height: 240 };
 type ResizeCorner = 'nw' | 'ne' | 'sw' | 'se';
 
 const RESIZE_HANDLES: Array<{
@@ -50,6 +51,17 @@ const RESIZE_HANDLES: Array<{
   },
 ];
 
+// 펜 색상 1차 버전: 검정/빨강/초록 3개만. 컬러피커나 팔레트는 이번 범위 밖.
+const PEN_COLORS: Array<{ value: string; label: string }> = [
+  { value: '#000000', label: '검정' },
+  { value: '#dc2626', label: '빨강' },
+  { value: '#16a34a', label: '초록' },
+];
+
+// 확인 없이 바로 실행되면 위험한 동작(전체 지우기 / 필기장 전환)에 대한 대기 상태.
+// targetUrl은 전환 대상 배경(undefined = 새 빈 필기장, 문자열 = 문제 이미지로 복귀)을 의미한다.
+type PendingConfirm = { type: 'clear' } | { type: 'switchMode'; targetUrl: string | undefined };
+
 // 위치를 CSS transform 트릭(left:50%+translate) 대신 실제 픽셀 left/top으로 직접 관리한다.
 // 예전엔 진입 애니메이션 클래스가 같은 transform 속성을 덮어써서 창이 화면 밖으로 밀려나는
 // 버그가 있었는데(이미 한 번 고침), 크기 조절까지 추가되면 그 방식은 "우측 하단 꼭짓점을
@@ -69,8 +81,17 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
 }) => {
   const canvasRef = useRef<ReactSketchCanvasRef>(null);
   const [isErasing, setIsErasing] = useState(false);
+  const [strokeColor, setStrokeColor] = useState(PEN_COLORS[1].value); // 기존 사용자 학습된 기본값(빨강) 유지
+  const [hasStrokes, setHasStrokes] = useState(false); // undo/전체지우기 disabled 판단용 — 라이브러리 자체 history 상태를 새로 베끼지 않고 onChange로만 추적
   const [isSaving, setIsSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
+
+  // 기본값 = 문제 이미지 위 필기. "＋ 새 필기장"을 누르면 이 값이 undefined로 바뀌어 빈 캔버스가 된다.
+  // 문제 이미지가 애초에 없는 호출부(향후 확장 대비)에서는 전환 버튼 자체를 숨긴다.
+  const hasOriginalBackground = !!backgroundImageUrl;
+  const [activeBackgroundUrl, setActiveBackgroundUrl] = useState<string | undefined>(backgroundImageUrl);
+  const isBlankMode = !activeBackgroundUrl;
 
   const [pos, setPos] = useState(getInitialPosition);
   const [size, setSize] = useState(DEFAULT_SIZE);
@@ -195,14 +216,64 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
     resizeStateRef.current.resizing = false;
   };
 
-  const toggleEraser = () => {
-    const next = !isErasing;
-    setIsErasing(next);
-    canvasRef.current?.eraseMode(next);
+  // 펜 ↔ 지우개는 하나의 아이콘을 재사용해 토글하던 방식(모드가 뭔지 알아보기 어려움)을 버리고,
+  // 각 버튼이 자기 모드로 "명시적으로" 설정만 한다 — 두 버튼 다 라이브러리의 eraseMode(boolean)를 그대로 씀.
+  const handleSelectPen = () => {
+    if (isSaving) return;
+    setIsErasing(false);
+    canvasRef.current?.eraseMode(false);
   };
 
-  const handleClear = () => {
-    canvasRef.current?.clearCanvas();
+  const handleSelectEraser = () => {
+    if (isSaving) return;
+    setIsErasing(true);
+    canvasRef.current?.eraseMode(true);
+  };
+
+  const handleSelectColor = (color: string) => {
+    if (isSaving) return;
+    setStrokeColor(color);
+    // 지우개 상태에서 색을 고르면 자연스럽게 펜으로 돌아온다 — 지우개용 색상 선택은 의미가 없으므로.
+    if (isErasing) {
+      setIsErasing(false);
+      canvasRef.current?.eraseMode(false);
+    }
+  };
+
+  // 라이브러리 자체 undo/redo 히스토리를 그대로 사용 — 별도 undo 스택을 만들지 않는다.
+  const handleUndo = () => {
+    if (isSaving || !hasStrokes) return;
+    canvasRef.current?.undo();
+  };
+
+  // 전체 지우기는 바로 실행하지 않고 확인 대기 상태로만 전환한다. 지울 필기가 없으면 버튼 자체가 비활성.
+  const requestClear = () => {
+    if (isSaving || !hasStrokes) return;
+    setPendingConfirm({ type: 'clear' });
+  };
+
+  // "＋ 새 필기장" ↔ "문제 이미지로 돌아가기" 전환. 자동으로 열리지 않고 항상 학생이 직접 눌러야 한다.
+  // 아직 그려둔 게 없으면 확인 없이 바로 전환, 그려둔 게 있으면 잃을 수 있다고 먼저 확인받는다.
+  const requestModeSwitch = (targetUrl: string | undefined) => {
+    if (isSaving) return;
+    if (!hasStrokes) {
+      setActiveBackgroundUrl(targetUrl);
+      return;
+    }
+    setPendingConfirm({ type: 'switchMode', targetUrl });
+  };
+
+  const handleConfirmCancel = () => setPendingConfirm(null);
+
+  const handleConfirmAccept = () => {
+    if (!pendingConfirm) return;
+    if (pendingConfirm.type === 'clear') {
+      canvasRef.current?.clearCanvas();
+    } else {
+      canvasRef.current?.clearCanvas();
+      setActiveBackgroundUrl(pendingConfirm.targetUrl);
+    }
+    setPendingConfirm(null);
   };
 
   // 저장하기: 캔버스를 PNG로 내보내 스캐폴딩(본인 풀이)으로 등록
@@ -218,7 +289,7 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
           student_id: studentId,
           teacher_id: currentUserId,
           image_url: dataUrl,
-          caption: '✏️ 직접 손으로 쓴 풀이',
+          caption: isBlankMode ? '📝 새 필기장' : '✏️ 직접 손으로 쓴 풀이',
         }]);
       if (error) throw error;
 
@@ -256,7 +327,8 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
           className="flex-none flex items-center justify-between px-10 py-2 bg-slate-950 border-b border-slate-800 cursor-move select-none touch-none"
         >
           <span className="text-[11px] font-black text-slate-300 flex items-center space-x-1.5">
-            <span>✏️</span><span>손 필기 / 펜슬 풀이</span>
+            <span>✏️</span>
+            <span>손 필기 / 펜슬 풀이{isBlankMode && hasOriginalBackground ? ' · 새 필기장' : ''}</span>
           </span>
           <button
             type="button"
@@ -275,11 +347,18 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
             ref={canvasRef}
             strokeWidth={3}
             eraserWidth={16}
-            strokeColor="#dc2626"
+            strokeColor={strokeColor}
             canvasColor="white"
-            backgroundImage={backgroundImageUrl || ''}
-            exportWithBackgroundImage={!!backgroundImageUrl}
-            preserveBackgroundImageAspectRatio="xMidYMid meet"
+            backgroundImage={activeBackgroundUrl || ''}
+            exportWithBackgroundImage={!!activeBackgroundUrl}
+            // "meet"(레터박스)는 창 비율과 문제 사진 비율이 다르면 PNG 저장 시 그 여백이 완전
+            // 투명하게 남는다 — 라이브러리 공식 타입 문서에도 "meet에서는 레터박스 영역이
+            // canvasColor로 채워지지 않는다(JPEG 제외)"고 명시돼 있다. 이 투명 여백이 나중에
+            // 스캐폴딩 갤러리의 검은 배경(bg-black) 썸네일 위에 얹히면서 "이미지가 사라지고
+            // 검은 배경만 남는" 것처럼 보였던 것 — 원인. "slice"(cover)로 바꾸면 배경 이미지가
+            // 항상 캔버스 전체를 꽉 채워 투명/검은 여백 자체가 생기지 않는다.
+            preserveBackgroundImageAspectRatio="xMidYMid slice"
+            onChange={(paths: CanvasPath[]) => setHasStrokes(paths.length > 0)}
             width="100%"
             height="100%"
             style={{ border: 'none' }}
@@ -291,31 +370,94 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
           )}
         </div>
 
-        {/* 하단 툴바 */}
-        <div className="flex-none flex items-center justify-between gap-1.5 px-9 py-2 bg-slate-950 border-t border-slate-800">
-          <div className="flex items-center gap-1.5">
+        {/* 하단 툴바 — 1줄: 펜/지우개/색상/undo, 2줄: 전체지우기/새 필기장/저장 */}
+        <div className="flex-none flex items-center justify-between gap-1.5 px-2.5 py-1.5 bg-slate-950 border-t border-slate-800">
+          <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={toggleEraser}
-              title={isErasing ? '펜으로 전환' : '지우개로 전환'}
-              aria-label={isErasing ? '펜으로 전환' : '지우개로 전환'}
-              className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm border transition-all active:scale-90 ${
+              onClick={handleSelectPen}
+              disabled={isSaving}
+              title="펜"
+              aria-label="펜 도구 선택"
+              aria-pressed={!isErasing}
+              className={`w-7 h-7 rounded-lg flex items-center justify-center text-[13px] border transition-all active:scale-90 disabled:opacity-40 ${
+                !isErasing
+                  ? 'bg-indigo-600 border-indigo-500 text-white'
+                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              ✏️
+            </button>
+            <button
+              type="button"
+              onClick={handleSelectEraser}
+              disabled={isSaving}
+              title="지우개"
+              aria-label="지우개 도구 선택"
+              aria-pressed={isErasing}
+              className={`w-7 h-7 rounded-lg flex items-center justify-center text-[13px] border transition-all active:scale-90 disabled:opacity-40 ${
                 isErasing
                   ? 'bg-indigo-600 border-indigo-500 text-white'
                   : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
               }`}
             >
-              {isErasing ? '🧽' : '✏️'}
+              🧽
             </button>
+            <span className="w-px h-5 bg-slate-800 mx-0.5" aria-hidden="true" />
+            {PEN_COLORS.map((color) => (
+              <button
+                key={color.value}
+                type="button"
+                onClick={() => handleSelectColor(color.value)}
+                disabled={isSaving}
+                title={`${color.label} 펜`}
+                aria-label={`${color.label} 펜 선택`}
+                aria-pressed={!isErasing && strokeColor === color.value}
+                className={`w-6 h-6 rounded-full border-2 transition-all active:scale-90 disabled:opacity-40 ${
+                  !isErasing && strokeColor === color.value
+                    ? 'border-amber-400 ring-2 ring-amber-400/50 scale-110'
+                    : 'border-slate-700'
+                }`}
+                style={{ backgroundColor: color.value }}
+              />
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={handleUndo}
+            disabled={isSaving || !hasStrokes}
+            title="실행 취소"
+            aria-label="직전 필기 실행 취소"
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-sm font-black bg-slate-900 border border-slate-800 text-slate-300 hover:text-slate-100 transition-all active:scale-90 disabled:opacity-30 disabled:active:scale-100"
+          >
+            ↶
+          </button>
+        </div>
+
+        <div className="flex-none flex items-center justify-between gap-1.5 px-2.5 py-1.5 bg-slate-950 border-t border-slate-800">
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
-              onClick={handleClear}
+              onClick={requestClear}
+              disabled={isSaving || !hasStrokes}
               title="전체 지우기"
               aria-label="필기 전체 지우기"
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-xs bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 transition-all active:scale-90"
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-xs bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 transition-all active:scale-90 disabled:opacity-30"
             >
               🗑️
             </button>
+            {hasOriginalBackground && (
+              <button
+                type="button"
+                onClick={() => requestModeSwitch(isBlankMode ? backgroundImageUrl : undefined)}
+                disabled={isSaving}
+                title={isBlankMode ? '문제 이미지로 돌아가기' : '새 빈 필기장 열기'}
+                className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-slate-900 border border-slate-800 text-slate-300 hover:text-slate-100 transition-all active:scale-95 disabled:opacity-40 whitespace-nowrap"
+              >
+                {isBlankMode ? '🖼 문제 이미지로' : '＋ 새 필기장'}
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-1.5">
@@ -337,6 +479,44 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
             </button>
           </div>
         </div>
+
+        {/* 전체 지우기 / 필기장 전환 확인창 — 실수 터치로 필기가 통째로 날아가지 않도록 창 전체를 덮는다 */}
+        {pendingConfirm && (
+          <div className="absolute inset-0 z-30 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-slate-900 border border-slate-700 rounded-2xl p-4 w-full max-w-[240px] shadow-2xl space-y-3">
+              <p className="text-xs font-black text-white leading-relaxed">
+                {pendingConfirm.type === 'clear'
+                  ? '작성한 필기를 모두 지울까요?'
+                  : pendingConfirm.targetUrl
+                    ? '문제 이미지로 돌아갈까요?'
+                    : '새 필기장을 시작할까요?'}
+              </p>
+              <p className="text-[10.5px] text-slate-400 leading-relaxed">
+                {pendingConfirm.type === 'clear' ? '되돌릴 수 없어요.' : '지금 작성한 필기가 사라져요.'}
+              </p>
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleConfirmCancel}
+                  className="flex-1 py-2 rounded-xl text-[10.5px] font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 transition-all active:scale-95"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmAccept}
+                  className="flex-1 py-2 rounded-xl text-[10.5px] font-black bg-rose-600 hover:bg-rose-500 text-white transition-all active:scale-95"
+                >
+                  {pendingConfirm.type === 'clear'
+                    ? '모두 지우기'
+                    : pendingConfirm.targetUrl
+                      ? '돌아가기'
+                      : '새 필기장 시작'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 네 꼭짓점 모두 넓은 터치 영역을 제공한다. 하단 툴바는 좌우 여백으로 손잡이와 분리. */}
         {RESIZE_HANDLES.map((handle) => (
