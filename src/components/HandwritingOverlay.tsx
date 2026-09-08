@@ -142,6 +142,17 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
   const [pos, setPos] = useState(() => getInitialPosition(initialPositionHint));
   const [size, setSize] = useState(DEFAULT_SIZE);
 
+  // 문제 전환 시 부모가 이 인스턴스를 언마운트해도, 이미 시작된 handleSave의 await 체인(특히
+  // runExclusiveSave 대기)은 그대로 계속 실행된다. 그 완료 시점에 캡처해뒀던 onSaved/onClose를
+  // 그대로 호출하면, 같은 "extra" 슬롯에 새로 열린 다음 문제의 창을 엉뚱하게 닫아버릴 수 있다
+  // (부모 상태는 문제 전환에도 살아있는 단일 슬롯이므로). 언마운트 이후에는 그 콜백들을 걸러낸다.
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   useImperativeHandle(ref, () => ({
     getBounds: () => ({ left: pos.left, top: pos.top, width: size.width, height: size.height }),
   }), [pos, size]);
@@ -442,9 +453,15 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
         if (error) throw error;
       });
 
+      // 이 인스턴스가 대기하는 사이 문제가 전환되어 이미 언마운트됐다면, 여기서 멈춘다 — 저장 자체는
+      // (스냅샷된 mistakeId로) 정상적으로 끝났지만, onSaved/onClose는 지금 살아있는 다른 세션의
+      // 슬롯을 잘못 건드리게 되므로 절대 호출하지 않는다.
+      if (!isMountedRef.current) return;
+
       onSaved();
       setSavedFlash(true);
       setTimeout(() => {
+        if (!isMountedRef.current) return;
         onClose();
       }, 700);
     } catch (err: any) {
@@ -452,6 +469,7 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
       if (import.meta.env.DEV) {
         console.log('[handwriting-save]', 'failure', { stage: err?.stage, message: err?.message });
       }
+      if (!isMountedRef.current) return;
       // 실패해도 필기는 그대로 남는다 — 창을 닫지 않고 isSaving만 복구해 다시 저장을 시도할 수
       // 있게 한다. 공유 락은 runExclusiveSave 내부 task가 실패해도(reject) 다음 작업으로 정상
       // 넘어가도록 구성돼 있어(useSharedSaveLock) 다른 창이 대기 중이었다면 그대로 진행된다.
