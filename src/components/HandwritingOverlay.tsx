@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { ReactSketchCanvas, type ReactSketchCanvasRef, type CanvasPath } from 'react-sketch-canvas';
 import { supabase } from '../services/supabase';
 import { useHandwritingInput, type DocumentSize } from '../features/handwriting/useHandwritingInput';
+import { flattenHandwriting, blobToDataUrl } from '../features/handwriting/flattenHandwriting';
 
 // 문서(캔버스) 좌표계의 "기준 해상도" — 문제 사진의 실제 카메라 해상도(수천 px일 수 있음)를 그대로
 // 쓰지 않고 화면비만 유지한 채 이 값으로 정규화한다. PR1은 "라이브 편집 중 좌표계"만 다루고,
@@ -170,7 +171,7 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
     ? referenceImageDocSize
     : blankDocSize;
 
-  const { camera, captureHandlers } = useHandwritingInput({
+  const { camera, captureHandlers, finalizeActiveStroke } = useHandwritingInput({
     viewportRef,
     documentSize,
     enabled: !isSaving && !pendingConfirm,
@@ -366,20 +367,52 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
     setPendingConfirm(null);
   };
 
-  // 저장하기: 캔버스를 PNG로 내보내 스캐폴딩(본인 풀이)으로 등록
+  // 저장하기: 문제 이미지 전체(자르지 않음) + 흰 배경 + 필기를 직접 합성해 PNG로 만든 뒤
+  // 스캐폴딩(본인 풀이)으로 등록한다. react-sketch-canvas의 내장 exportImage()는 더 이상 쓰지
+  // 않는다 — exportSvg()(undo/지우개 mask가 반영된 최종 상태)만 재사용하고, 배경 합성은
+  // flattenHandwriting이 직접 offscreen canvas에서 한다(PR2, 검은 배경/crop 버그의 근본 수정).
   const handleSave = async () => {
-    if (isSaving || !canvasRef.current) return;
+    if (isSaving || !canvasRef.current || !documentSize) return;
+    // readOnly prop은 이후의 pointerdown/move/up/cancel을 전부 끊어버릴 뿐, 이 순간 이미 눌려 있던
+    // pointer의 stroke를 라이브러리 스스로 정상 종료시켜주지는 않는다(리뷰에서 실제 설치본 실행으로
+    // 확인) — readOnly를 켜기(=isSaving을 true로 만들기) 전에 먼저 진행 중이던 stroke를 확정한다.
+    finalizeActiveStroke();
     setIsSaving(true);
     try {
-      const dataUrl = await canvasRef.current.exportImage('png');
+      // 입력 동결: setIsSaving(true) 자체는 다음 렌더에서야 readOnly prop을 캔버스에 반영한다.
+      // 두 번의 rAF로 그 렌더가 실제로 커밋(paint)될 때까지 기다린 뒤에야 snapshot을 뜬다 —
+      // 그래야 저장 시작 직후에도 진행 중이던 stroke의 다음 pointermove가 반영되지 않는다.
+      await new Promise<void>(resolve => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
+      if (!canvasRef.current) throw new Error('캔버스를 찾을 수 없습니다.');
+
+      const svgMarkup = await canvasRef.current.exportSvg();
+
+      // snapshot — 이 시점 이후 state/ref가 바뀌어도(예: 모달이 닫히거나 문제가 전환돼도) 아래
+      // 값들만 사용한다.
+      const snapshotDocumentSize = documentSize;
+      const snapshotBackgroundUrl = activeBackgroundUrl;
+      const snapshotCaption = isBlankMode ? '📝 새 필기장' : '✏️ 직접 손으로 쓴 풀이';
+      const snapshotMistakeId = mistakeId;
+      const snapshotStudentId = studentId;
+      const snapshotTeacherId = currentUserId;
+
+      const blob = await flattenHandwriting({
+        documentSize: snapshotDocumentSize,
+        backgroundImageUrl: snapshotBackgroundUrl,
+        svgMarkup,
+      });
+      const dataUrl = await blobToDataUrl(blob);
+
       const { error } = await supabase
         .from('mistake_scaffoldings')
         .insert([{
-          mistake_id: mistakeId,
-          student_id: studentId,
-          teacher_id: currentUserId,
+          mistake_id: snapshotMistakeId,
+          student_id: snapshotStudentId,
+          teacher_id: snapshotTeacherId,
           image_url: dataUrl,
-          caption: isBlankMode ? '📝 새 필기장' : '✏️ 직접 손으로 쓴 풀이',
+          caption: snapshotCaption,
         }]);
       if (error) throw error;
 
@@ -390,6 +423,10 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
       }, 700);
     } catch (err: any) {
       console.error('Failed to save handwriting:', err);
+      if (import.meta.env.DEV) {
+        console.log('[handwriting-save]', 'failure', { stage: err?.stage, message: err?.message });
+      }
+      // 실패해도 필기는 그대로 남는다 — 창을 닫지 않고 isSaving만 복구해 다시 저장을 시도할 수 있게 한다.
       alert('저장에 실패했습니다: ' + (err.message || '알 수 없는 오류'));
       setIsSaving(false);
     }
@@ -424,8 +461,12 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
             type="button"
             onClick={onClose}
             onPointerDown={(e) => e.stopPropagation()}
+            // 저장 도중(특히 배경 이미지를 fetch하는 동안) 창을 닫아 언마운트시키면, 이후 저장이
+            // 실패해도 "필기가 그대로 남는다"는 보장이 무의미해진다(언마운트된 캔버스는 복구 불가 —
+            // 리뷰에서 확인된 문제) — 다른 저장 관련 버튼들과 동일하게 저장 중에는 비활성화한다.
+            disabled={isSaving}
             aria-label="필기창 닫기"
-            className="w-6 h-6 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-[10px] font-bold transition-colors"
+            className="w-6 h-6 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-[10px] font-bold transition-colors disabled:opacity-40"
           >
             ✕
           </button>
@@ -465,14 +506,28 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
                 strokeWidth={3 / camera.scale}
                 eraserWidth={16 / camera.scale}
                 strokeColor={strokeColor}
-                canvasColor="white"
+                // 화면 배경(bg-white)이 이미 흰색이라 캔버스 자체는 투명해도 빈 필기장은 그대로
+                // 흰 종이처럼 보인다 — 대신 exportSvg()가 내보내는 배경 rect도 투명해진다(canvasColor
+                // 값 그대로 채워지던 걸 없앰). exportWithBackgroundImage=false와 맞물려 exportSvg()
+                // 결과가 "필기 획만 있는, 원격 이미지 참조도 없는" 순수 벡터가 되어(설치본 K() 함수
+                // 기준 확인) flattenHandwriting이 그 위에 흰 배경 + 원본 사진을 안전하게 겹칠 수 있다.
+                canvasColor="transparent"
                 backgroundImage={activeBackgroundUrl || ''}
-                exportWithBackgroundImage={!!activeBackgroundUrl}
-                // slice(cover) 방식 자체는 PR2(저장 합성) 범위 — 이번 PR에서 이 값을 바꾸지 않는다.
-                // 문서 크기를 사진의 실제 비율에 맞춰 고정했기 때문에(위 documentSize) 여기서는
-                // 문서 박스와 사진 비율이 항상 일치해 slice가 실질적으로 아무것도 잘라내지 않는다.
-                preserveBackgroundImageAspectRatio="xMidYMid slice"
+                // 항상 false — 저장(export)에서는 라이브러리의 배경 합성을 쓰지 않는다. 실시간
+                // 화면에는 영향 없음(backgroundImage prop만으로 표시됨, 이 값은 export 전용).
+                // flattenHandwriting(PR2)이 문제 이미지 전체를 직접 그려 넣는다.
+                exportWithBackgroundImage={false}
+                // slice(cover, 잘라냄)를 meet(contain, 안 잘림)으로 되돌린다 — 검은 배경 버그의
+                // 본질은 meet가 아니라 meet가 남기는 여백이 투명이었던 것. 저장은 이제
+                // flattenHandwriting이 흰 배경을 먼저 채우므로, 화면도 다시 원본을 자르지 않는
+                // meet로 복귀해도 안전하다. documentSize가 사진 비율과 이미 일치해 실제로는
+                // 여백 자체가 거의 생기지 않는다.
+                preserveBackgroundImageAspectRatio="xMidYMid meet"
                 onChange={(paths: CanvasPath[]) => setHasStrokes(paths.length > 0)}
+                // 저장 중에는 새 입력을 받지 않는다(기존 획/undo/export API는 계속 정상 동작) —
+                // useHandwritingInput의 enabled=false는 우리 augmentation만 멈추지, 라이브러리 자체
+                // pointer 리스너는 막지 못하므로 이 prop이 실제 "입력 동결"을 담당한다.
+                readOnly={isSaving}
                 width="100%"
                 height="100%"
                 style={{ border: 'none' }}
@@ -592,7 +647,7 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
             <button
               type="button"
               onClick={handleSave}
-              disabled={isSaving}
+              disabled={isSaving || !documentSize}
               className="px-3 py-1.5 rounded-lg text-[10px] font-black bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 transition-all active:scale-95 disabled:opacity-50"
             >
               {isSaving ? '저장 중...' : '💾 저장하기'}
