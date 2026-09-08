@@ -70,6 +70,9 @@ interface CaptureHandlers {
 interface UseHandwritingInputResult {
   camera: Camera;
   captureHandlers: CaptureHandlers;
+  /** 저장(PR2) 등 입력을 동결하기 직전에 호출 — 그 순간 진행 중이던 stroke가 있으면 라이브러리
+   * 자신의 정상 종료 경로로 먼저 끝내둔다. 없으면 아무 일도 하지 않는다. */
+  finalizeActiveStroke: () => void;
 }
 
 const IDENTITY_CAMERA: Camera = { scale: 1, x: 0, y: 0 };
@@ -208,6 +211,30 @@ export function useHandwritingInput({
       gestureStateRef.current = 'awaiting-release';
       pinchStartRef.current = null;
     }
+  };
+
+  // PR2(저장)용 최소 연동 지점 — react-sketch-canvas의 readOnly prop은 pointerdown/move/up/cancel
+  // 핸들러를 전부 끊어버릴 뿐, 그 순간 이미 눌려 있던 pointer의 stroke를 라이브러리 스스로 정상
+  // 종료(finishActivePointer)시켜주지는 않는다(리뷰에서 실제 설치본 실행으로 확인된 문제) — 그대로
+  // 두면 다음 저장 뒤 첫 새 stroke가 "이전 stroke 종료"로 잘못 소비된다. 저장이 readOnly를 켜기
+  // 직전에 호출해, 그 시점에 진행 중이던 stroke가 있으면 synthetic pointercancel로 라이브러리
+  // 자신의 정상 취소 경로를 태워 먼저 끝내준다. 입력 상태 기계 자체는 바꾸지 않는다.
+  const finalizeActiveStroke = () => {
+    if (gestureStateRef.current !== 'drawing') return;
+    const pointerId = drawingPointerIdRef.current;
+    if (pointerId === null) return;
+    const sample = pointersRef.current.get(pointerId);
+    if (!sample) return;
+    // 실제 pointer 이벤트가 아니라 우리가 능동적으로 만드는 것이라 e.target이 없다 — 마지막으로
+    // 알려진 화면 좌표에서 실제로 무엇이 있는지 조회해 그 요소에 dispatch한다(react-sketch-canvas의
+    // 렌더 트리 내부 노드를 우리가 직접 참조하지 않아도 된다).
+    const target = document.elementFromPoint(sample.x, sample.y);
+    if (target) {
+      dispatchSyntheticPointerEvent('pointercancel', target, sample.x, sample.y, pointerId, sample.type, 0);
+      logDev(debugLabel, 'finalize-active-stroke', { pointerId });
+    }
+    pointersRef.current.delete(pointerId);
+    releaseToIdleOrAwait(pointersRef.current.size);
   };
 
   const captureHandlers = useMemo<CaptureHandlers>(() => {
@@ -419,5 +446,5 @@ export function useHandwritingInput({
     };
   }, [enabled, documentSize, viewportSize, viewportRef, debugLabel]);
 
-  return { camera, captureHandlers };
+  return { camera, captureHandlers, finalizeActiveStroke };
 }

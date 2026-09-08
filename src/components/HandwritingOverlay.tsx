@@ -171,7 +171,7 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
     ? referenceImageDocSize
     : blankDocSize;
 
-  const { camera, captureHandlers } = useHandwritingInput({
+  const { camera, captureHandlers, finalizeActiveStroke } = useHandwritingInput({
     viewportRef,
     documentSize,
     enabled: !isSaving && !pendingConfirm,
@@ -373,6 +373,10 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
   // flattenHandwriting이 직접 offscreen canvas에서 한다(PR2, 검은 배경/crop 버그의 근본 수정).
   const handleSave = async () => {
     if (isSaving || !canvasRef.current || !documentSize) return;
+    // readOnly prop은 이후의 pointerdown/move/up/cancel을 전부 끊어버릴 뿐, 이 순간 이미 눌려 있던
+    // pointer의 stroke를 라이브러리 스스로 정상 종료시켜주지는 않는다(리뷰에서 실제 설치본 실행으로
+    // 확인) — readOnly를 켜기(=isSaving을 true로 만들기) 전에 먼저 진행 중이던 stroke를 확정한다.
+    finalizeActiveStroke();
     setIsSaving(true);
     try {
       // 입력 동결: setIsSaving(true) 자체는 다음 렌더에서야 readOnly prop을 캔버스에 반영한다.
@@ -457,8 +461,12 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
             type="button"
             onClick={onClose}
             onPointerDown={(e) => e.stopPropagation()}
+            // 저장 도중(특히 배경 이미지를 fetch하는 동안) 창을 닫아 언마운트시키면, 이후 저장이
+            // 실패해도 "필기가 그대로 남는다"는 보장이 무의미해진다(언마운트된 캔버스는 복구 불가 —
+            // 리뷰에서 확인된 문제) — 다른 저장 관련 버튼들과 동일하게 저장 중에는 비활성화한다.
+            disabled={isSaving}
             aria-label="필기창 닫기"
-            className="w-6 h-6 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-[10px] font-bold transition-colors"
+            className="w-6 h-6 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-[10px] font-bold transition-colors disabled:opacity-40"
           >
             ✕
           </button>
