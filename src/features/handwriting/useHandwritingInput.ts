@@ -110,7 +110,11 @@ function isFiniteCoord(n: unknown): n is number {
   return typeof n === 'number' && Number.isFinite(n);
 }
 
-function dispatchSyntheticMove(
+// pointermove: coalesced 샘플/pointerup 종료 좌표를 라이브러리 자신의 정상 처리 경로로 채워 넣는다.
+// pointercancel: lostpointercapture처럼 라이브러리가 아예 듣지 않는 이벤트가 왔을 때, 그래도
+// 라이브러리 내부 상태를 정상적으로 마무리시키기 위해 대신 보낸다(review 5번 항목 대응).
+function dispatchSyntheticPointerEvent(
+  type: 'pointermove' | 'pointercancel',
   target: EventTarget,
   clientX: number,
   clientY: number,
@@ -118,7 +122,7 @@ function dispatchSyntheticMove(
   pointerType: string,
   pressure: number,
 ) {
-  const evt = new PointerEvent('pointermove', {
+  const evt = new PointerEvent(type, {
     bubbles: true,
     cancelable: true,
     composed: true,
@@ -128,10 +132,10 @@ function dispatchSyntheticMove(
     clientY,
     pressure: Number.isFinite(pressure) && pressure > 0 ? pressure : 0.5,
     isPrimary: true,
-    buttons: 1,
+    buttons: type === 'pointermove' ? 1 : 0,
   });
   // 우리가 만든 synthetic 이벤트가 같은 capture 핸들러를 다시 타고 들어와 무한 루프에 빠지지
-  // 않도록 표시해둔다(재진입 시 handlePointerMoveCapture가 이 값을 보고 즉시 return).
+  // 않도록 표시해둔다(재진입 시 각 핸들러가 이 값을 보고 즉시 return).
   (evt as unknown as { __rnSynthetic?: boolean }).__rnSynthetic = true;
   target.dispatchEvent(evt);
 }
@@ -167,9 +171,6 @@ export function useHandwritingInput({
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
-    // 창 자체가 드래그로만 움직이는 경우(크기는 그대로)도 뷰포트의 화면상 절대 위치(left/top)가
-    // 바뀌므로 핀치 앵커 계산을 위해 위치도 갱신해줘야 한다 — 매 프레임 재계산은 과하므로
-    // pointerdown 시점에 다시 한 번 최신화한다(아래 handlePointerDownCapture).
     return () => ro.disconnect();
   }, [viewportRef]);
 
@@ -210,42 +211,78 @@ export function useHandwritingInput({
   };
 
   const captureHandlers = useMemo<CaptureHandlers>(() => {
+    const beginPinch = (pointers: Map<number, PointerSample>) => {
+      gestureStateRef.current = 'pinching';
+      drawingPointerIdRef.current = null;
+      const ids = Array.from(pointers.keys());
+      const p1 = pointers.get(ids[0])!;
+      const p2 = pointers.get(ids[1])!;
+      const distance = Math.hypot(p2.x - p1.x, p2.y - p1.y) || 1;
+      const midX = (p1.x + p2.x) / 2;
+      const midY = (p1.y + p2.y) / 2;
+      pinchStartRef.current = { distance, midX, midY, camera: cameraRef.current };
+      logDev(debugLabel, 'pinch-start', { distance, midX, midY });
+    };
+
     const handlePointerDownCapture = (e: React.PointerEvent) => {
       if (!enabled) return;
-      const pointers = pointersRef.current;
-      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, type: e.pointerType });
-      logDev(debugLabel, 'pointerdown', { pointerId: e.pointerId, pointerType: e.pointerType, count: pointers.size, state: gestureStateRef.current });
 
-      if (pointers.size === 1) {
-        if (gestureStateRef.current === 'idle') {
-          drawingPointerIdRef.current = e.pointerId;
-          gestureStateRef.current = 'drawing';
+      // 뷰포트의 화면상 위치를 항상 최신화한다 — 창이 리사이즈 없이 드래그만 됐어도 위치가
+      // 바뀌므로, ResizeObserver(크기 변화만 감지)에만 의존하면 문서 경계 판정이 어긋난다.
+      const el = viewportRef.current;
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        viewportRectRef.current = { left: rect.left, top: rect.top };
+      }
+
+      // 문서 바깥(레터박스 여백)에서 시작한 pointer는 애초에 추적하지 않는다 — 그 여백은
+      // react-sketch-canvas의 DOM 서브트리 바깥이라 실제 이벤트도 라이브러리에 전달되지 않는데,
+      // 여기서만 pinch로 취급하면 "핀치는 시작됐지만 첫 손가락은 계속 라이브러리에 그림을 그리는"
+      // 불일치가 생긴다(리뷰에서 확인된 문제).
+      if (documentSize && viewportRectRef.current) {
+        const cam = cameraRef.current;
+        const docLeft = viewportRectRef.current.left + cam.x;
+        const docTop = viewportRectRef.current.top + cam.y;
+        const docWidth = documentSize.width * cam.scale;
+        const docHeight = documentSize.height * cam.scale;
+        const inside = e.clientX >= docLeft && e.clientX <= docLeft + docWidth && e.clientY >= docTop && e.clientY <= docTop + docHeight;
+        if (!inside) {
+          logDev(debugLabel, 'pointerdown-outside-document', { pointerId: e.pointerId });
+          return;
         }
+      }
+
+      const pointers = pointersRef.current;
+      const priorState = gestureStateRef.current;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, type: e.pointerType });
+      logDev(debugLabel, 'pointerdown', { pointerId: e.pointerId, pointerType: e.pointerType, count: pointers.size, state: priorState });
+
+      if (priorState === 'idle') {
+        // 첫 pointer — 이 실제 이벤트를 그대로 흘려보내 라이브러리가 정상적으로 stroke를 시작하게 둔다.
+        drawingPointerIdRef.current = e.pointerId;
+        gestureStateRef.current = 'drawing';
         return;
       }
 
-      if (pointers.size === 2) {
-        // 두 번째 pointer 진입 — 이 실제 이벤트는 그대로 흘려보내(preventDefault/stopPropagation
-        // 안 함) react-sketch-canvas 자신의 핸들러도 같은 이벤트를 받는다. 라이브러리는 이미
-        // "두 번째 pointerdown이 오면 현재 stroke를 그 자리에서 확정(버리지 않음)"하는 동작을
-        // 갖고 있다(조사서에서 소스로 확인) — 여기서는 우리 쪽 제스처 상태만 pinch로 전환한다.
-        const el = viewportRef.current;
-        if (el) {
-          const rect = el.getBoundingClientRect();
-          viewportRectRef.current = { left: rect.left, top: rect.top };
-        }
-        gestureStateRef.current = 'pinching';
-        drawingPointerIdRef.current = null;
-        const ids = Array.from(pointers.keys());
-        const p1 = pointers.get(ids[0])!;
-        const p2 = pointers.get(ids[1])!;
-        const distance = Math.hypot(p2.x - p1.x, p2.y - p1.y) || 1;
-        const midX = (p1.x + p2.x) / 2;
-        const midY = (p1.y + p2.y) / 2;
-        pinchStartRef.current = { distance, midX, midY, camera: cameraRef.current };
-        logDev(debugLabel, 'pinch-start', { distance, midX, midY });
+      if (priorState === 'drawing') {
+        // 두 번째 pointer — 이 실제 이벤트만은 라이브러리로 그대로 흘려보낸다(막지 않음). 라이브러리
+        // 자신이 "두 번째 pointerdown이 오면 현재 stroke를 그 자리에서 확정한다"는 동작을 갖고 있다
+        // (조사서 + 리뷰에서 실제 설치본 실행으로 확인).
+        beginPinch(pointers);
+        return;
       }
-      // 3번째 이상의 pointer는 무시 — 진행 중인 pinch 기준점을 흔들지 않는다.
+
+      // priorState가 'pinching' 또는 'awaiting-release'일 때 들어오는 추가 pointerdown(3번째 손가락,
+      // 또는 핀치 중 손가락 하나를 뗐다 다시 댄 경우)은 여기서 막는다 — 이 시점엔 라이브러리의 활성
+      // pointer가 이미 null이라 그대로 통과시키면 "새 stroke 시작"으로 오인해서 pinch 도중 갑자기
+      // 그림이 그려지는 버그가 생긴다(리뷰에서 실제 설치본 실행으로 확인된 문제).
+      e.stopPropagation();
+      logDev(debugLabel, 'pointerdown-blocked', { pointerId: e.pointerId, count: pointers.size, priorState });
+      if (priorState === 'awaiting-release' && pointers.size === 2) {
+        // 손가락을 바꿔 잡는 정당한 재-핀치로 취급 — 이 이벤트는 라이브러리에 전달되지 않으므로
+        // 새 stroke가 시작될 위험은 없다.
+        beginPinch(pointers);
+      }
     };
 
     const handlePointerMoveCapture = (e: React.PointerEvent) => {
@@ -300,14 +337,15 @@ export function useHandwritingInput({
       }
       if (samples.length === 0) samples = [native];
 
-      // 마지막 샘플은 실제 이벤트 자신과 같은 좌표이므로(스펙상 대표 이벤트가 곧 마지막
-      // coalesced 샘플) 굳이 다시 보내지 않는다 — 실제 이벤트가 자연스럽게 라이브러리에
-      // 도달하도록 그대로 둔다. 그 앞의 "유실됐을" 중간 샘플만 synthetic move로 채운다.
+      // 스펙상 "마지막 coalesced 샘플 = 대표 이벤트 좌표"가 보장되지 않는다(대표 이벤트는 추가
+      // 정렬/보정을 거칠 수 있음 — 리뷰에서 지적된 문제) — 그래서 마지막 샘플을 건너뛰지 않고
+      // 전부 주입한다. 실제 이벤트도 막지 않고 그대로 통과시키므로, 최악의 경우 거의 같은 좌표가
+      // 한 번 더(무해하게) 추가될 뿐 좌표 손실은 없다.
       let injected = 0;
-      for (let i = 0; i < samples.length - 1; i++) {
+      for (let i = 0; i < samples.length; i++) {
         const s = samples[i];
         if (!isFiniteCoord(s.clientX) || !isFiniteCoord(s.clientY)) continue; // 좌표 유효성 검증(보수적 처리)
-        dispatchSyntheticMove(target, s.clientX, s.clientY, e.pointerId, e.pointerType, s.pressure);
+        dispatchSyntheticPointerEvent('pointermove', target, s.clientX, s.clientY, e.pointerId, e.pointerType, s.pressure);
         injected += 1;
       }
       if (injected > 0) {
@@ -316,7 +354,41 @@ export function useHandwritingInput({
     };
 
     const handlePointerUpCapture = (e: React.PointerEvent) => {
-      if (!enabled) return;
+      const native = e.nativeEvent as PointerEvent & { __rnSynthetic?: boolean };
+      if (native.__rnSynthetic) return;
+
+      const pointers = pointersRef.current;
+      const wasDrawingPointer = gestureStateRef.current === 'drawing' && drawingPointerIdRef.current === e.pointerId;
+
+      if (enabled && wasDrawingPointer && e.target) {
+        // pointerup 자신의 좌표는 react-sketch-canvas의 finishActivePointer가 읽지 않는다(조사서
+        // 확인 원인) — 정상 pointermove 경로로 한 번 더 태워서 마지막 실제 좌표를 path에 반영한
+        // 뒤에 실제 pointerup이 이어서 도착하도록 둔다(여기서 stopPropagation 하지 않음).
+        dispatchSyntheticPointerEvent('pointermove', e.target, e.clientX, e.clientY, e.pointerId, e.pointerType, e.pressure);
+        logDev(debugLabel, 'pointerup-endpoint', { pointerId: e.pointerId, x: e.clientX, y: e.clientY });
+      }
+
+      // 소유권 정리는 enabled 여부와 무관하게 항상 수행한다 — 저장/확인창 표시 중에 손을 뗀
+      // pointer를 정리하지 않고 남겨두면, 다음 정상 입력이 "가짜 두 번째 pointer"로 계산되는
+      // 문제가 생긴다(리뷰에서 확인된 문제).
+      pointers.delete(e.pointerId);
+      logDev(debugLabel, 'pointerup', { pointerId: e.pointerId, remaining: pointers.size });
+      releaseToIdleOrAwait(pointers.size);
+    };
+
+    const handlePointerCancelCapture = (e: React.PointerEvent) => {
+      const native = e.nativeEvent as PointerEvent & { __rnSynthetic?: boolean };
+      if (native.__rnSynthetic) return;
+      const pointers = pointersRef.current;
+      pointers.delete(e.pointerId);
+      // cancel은 "예상 밖" 종료이므로 pointerup과 달리 마지막 좌표를 억지로 만들어 추가하지 않는다
+      // — 이미 확보한 실제 좌표만 보존하고 상태만 정리한다(조사서 원칙). enabled 여부와 무관하게
+      // 항상 정리한다(위 pointerup과 동일한 이유).
+      logDev(debugLabel, 'pointercancel', { pointerId: e.pointerId, remaining: pointers.size });
+      releaseToIdleOrAwait(pointers.size);
+    };
+
+    const handleLostPointerCaptureCapture = (e: React.PointerEvent) => {
       const native = e.nativeEvent as PointerEvent & { __rnSynthetic?: boolean };
       if (native.__rnSynthetic) return;
 
@@ -324,27 +396,17 @@ export function useHandwritingInput({
       const wasDrawingPointer = gestureStateRef.current === 'drawing' && drawingPointerIdRef.current === e.pointerId;
 
       if (wasDrawingPointer && e.target) {
-        // pointerup 자신의 좌표는 react-sketch-canvas의 finishActivePointer가 읽지 않는다(조사서
-        // 확인 원인) — 정상 pointermove 경로로 한 번 더 태워서 마지막 실제 좌표를 path에 반영한
-        // 뒤에 실제 pointerup이 이어서 도착하도록 둔다(여기서 stopPropagation 하지 않음).
-        dispatchSyntheticMove(e.target, e.clientX, e.clientY, e.pointerId, e.pointerType, e.pressure);
-        logDev(debugLabel, 'pointerup-endpoint', { pointerId: e.pointerId, x: e.clientX, y: e.clientY });
+        // react-sketch-canvas는 pointerup/pointercancel에만 자신의 종료 처리(finishActivePointer)를
+        // 연결해뒀고 lostpointercapture는 듣지 않는다(설치본 확인 — 리뷰에서도 재확인). 그대로 두면
+        // capture만 예기치 않게 풀리고 라이브러리 내부의 활성 pointer/isDrawing 상태가 남아, 다음
+        // pointerdown이 "새 stroke 시작" 대신 "이전 stroke 종료"로 잘못 소비될 수 있다. 같은
+        // target에 synthetic pointercancel을 보내 라이브러리 자신의 정상 취소 경로로 마무리시킨다.
+        dispatchSyntheticPointerEvent('pointercancel', e.target, e.clientX, e.clientY, e.pointerId, e.pointerType, 0);
+        logDev(debugLabel, 'lostpointercapture-forced-cancel', { pointerId: e.pointerId });
       }
 
       pointers.delete(e.pointerId);
-      logDev(debugLabel, 'pointerup', { pointerId: e.pointerId, remaining: pointers.size });
-      releaseToIdleOrAwait(pointers.size);
-    };
-
-    const handlePointerCancelCapture = (e: React.PointerEvent) => {
-      if (!enabled) return;
-      const native = e.nativeEvent as PointerEvent & { __rnSynthetic?: boolean };
-      if (native.__rnSynthetic) return;
-      const pointers = pointersRef.current;
-      pointers.delete(e.pointerId);
-      // cancel/lostpointercapture는 "예상 밖" 종료이므로 pointerup과 달리 마지막 좌표를 억지로
-      // 만들어 추가하지 않는다 — 이미 확보한 실제 좌표만 보존하고 상태만 정리한다(조사서 원칙).
-      logDev(debugLabel, 'pointercancel', { pointerId: e.pointerId, remaining: pointers.size });
+      logDev(debugLabel, 'lostpointercapture', { pointerId: e.pointerId, remaining: pointers.size });
       releaseToIdleOrAwait(pointers.size);
     };
 
@@ -353,7 +415,7 @@ export function useHandwritingInput({
       onPointerMoveCapture: handlePointerMoveCapture,
       onPointerUpCapture: handlePointerUpCapture,
       onPointerCancelCapture: handlePointerCancelCapture,
-      onLostPointerCaptureCapture: handlePointerCancelCapture,
+      onLostPointerCaptureCapture: handleLostPointerCaptureCapture,
     };
   }, [enabled, documentSize, viewportSize, viewportRef, debugLabel]);
 

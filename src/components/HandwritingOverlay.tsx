@@ -177,6 +177,15 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
     debugLabel: isBlankMode ? 'blank' : 'problem',
   });
 
+  // documentSize가 null → 값으로 바뀔 때마다(모드 전환/문서 재측정) 아래 JSX가 <ReactSketchCanvas>를
+  // 새로 마운트한다 — 그러면 canvasRef가 새 인스턴스를 가리키고, 라이브러리 내부 eraseMode는 항상
+  // 기본값(펜)으로 초기화된다. 이때 우리 쪽 isErasing 상태만 "지우개 선택됨"으로 남아있으면 툴바
+  // 표시와 실제 동작이 어긋난다(리뷰에서 확인된 회귀) — 마운트/재마운트될 때마다 다시 동기화한다.
+  useEffect(() => {
+    if (!documentSize) return;
+    canvasRef.current?.eraseMode(isErasing);
+  }, [documentSize, isErasing]);
+
   // 창 이동(드래그) — pointer event 하나로 마우스/터치/펜슬 전부 처리
   const dragStateRef = useRef<{ dragging: boolean; startX: number; startY: number; originLeft: number; originTop: number }>({
     dragging: false, startX: 0, startY: 0, originLeft: 0, originTop: 0,
@@ -449,8 +458,12 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
             >
               <ReactSketchCanvas
                 ref={canvasRef}
-                strokeWidth={3}
-                eraserWidth={16}
+                // 획 굵기는 문서(=react-sketch-canvas 내부) 좌표 단위라, 카메라 배율을 그대로 두면
+                // 기본 축소 상태(예: 1600 단위 문서를 360px 창에 맞춤, scale≈0.22)에서 화면에는
+                // 3px가 아니라 1px도 안 되게 그려진다(리뷰에서 확인된 회귀). 배율의 역수를 곱해
+                // "지금 화면에 보이는 굵기"가 항상 기존과 같은 3px/16px가 되도록 보정한다.
+                strokeWidth={3 / camera.scale}
+                eraserWidth={16 / camera.scale}
                 strokeColor={strokeColor}
                 canvasColor="white"
                 backgroundImage={activeBackgroundUrl || ''}
