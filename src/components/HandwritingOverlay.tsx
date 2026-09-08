@@ -1,7 +1,14 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ReactSketchCanvas, type ReactSketchCanvasRef, type CanvasPath } from 'react-sketch-canvas';
 import { supabase } from '../services/supabase';
+import { useHandwritingInput, type DocumentSize } from '../features/handwriting/useHandwritingInput';
+
+// 문서(캔버스) 좌표계의 "기준 해상도" — 문제 사진의 실제 카메라 해상도(수천 px일 수 있음)를 그대로
+// 쓰지 않고 화면비만 유지한 채 이 값으로 정규화한다. PR1은 "라이브 편집 중 좌표계"만 다루고,
+// 저장용 실제 출력 해상도/용량 상한은 PR2(저장 합성) 범위 — 여기서는 그 둘을 분리해서, 큰 사진이
+// react-sketch-canvas의 SVG 박스 자체를 불필요하게 거대하게 만들지 않도록 한다.
+const DOC_REFERENCE_LONG_SIDE = 1600;
 
 interface HandwritingOverlayProps {
   mistakeId: string;
@@ -95,6 +102,89 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
 
   const [pos, setPos] = useState(getInitialPosition);
   const [size, setSize] = useState(DEFAULT_SIZE);
+
+  // ── 문서 좌표계: 창 크기(=화면에 보이는 뷰포트)와 완전히 분리된 "고정 문서" 크기 ──────────
+  // 문제 위 필기 = 사진의 실제 가로세로 비율 기준, 새 필기장(빈 캔버스) = 그 모드에 처음 진입한
+  // 순간의 캔버스 영역 크기로 잠금. 창을 리사이즈하거나 핀치를 해도 이 값 자체는 바뀌지 않는다 —
+  // useHandwritingInput의 카메라(scale/x/y)만 바뀐다. 이미 그려둔 획은 문서 좌표에 저장되므로
+  // 창을 늘리거나 줄여도 위치가 어긋나지 않는다.
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [imageIntrinsicSize, setImageIntrinsicSize] = useState<{ width: number; height: number } | null>(null);
+  const [imageLoadFailed, setImageLoadFailed] = useState(false);
+  const [blankDocSize, setBlankDocSize] = useState<DocumentSize | null>(null);
+
+  // 문제 이미지의 실제 원본 비율은 canvas 배경 prop만으로는 알 수 없어(react-sketch-canvas가
+  // 크기를 다시 알려주지 않음) 가볍게 한 번 더 미리 불러와 naturalWidth/Height만 확인한다 —
+  // 이 로드는 좌표계 기준 확보용이고 export/CORS 처리는 PR2(저장 합성)의 몫이라 여기서는 하지 않는다.
+  useEffect(() => {
+    if (!activeBackgroundUrl) return;
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => {
+      if (cancelled) return;
+      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+        setImageIntrinsicSize({ width: img.naturalWidth, height: img.naturalHeight });
+      } else {
+        setImageLoadFailed(true);
+      }
+    };
+    img.onerror = () => {
+      if (!cancelled) setImageLoadFailed(true);
+    };
+    img.src = activeBackgroundUrl;
+    return () => { cancelled = true; };
+  }, [activeBackgroundUrl]);
+
+  // 모드가 바뀔 때마다(문제 위 필기 ↔ 새 필기장) "새 문서"로 취급한다 — 기존 모드 전환 확인창이
+  // 이미 캔버스를 비워주므로, 여기서 예전 측정값을 버리고 다음에 다시 정확히 재는 것이 안전하다.
+  useEffect(() => {
+    setBlankDocSize(null);
+    setImageLoadFailed(false);
+  }, [activeBackgroundUrl]);
+
+  // 새 필기장(빈 캔버스) 또는 문제 이미지 로드 실패 시: "지금 보이는 캔버스 영역 크기"를 그대로
+  // 문서 크기로 한 번 잠근다. 이미지 로드가 실패해도 예전처럼(배경 없이 빈 캔버스로 조용히
+  // 대체) 필기 자체는 계속할 수 있게 한다.
+  useLayoutEffect(() => {
+    const needsViewportSizing = !activeBackgroundUrl || imageLoadFailed;
+    if (!needsViewportSizing || blankDocSize) return;
+    const el = viewportRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      setBlankDocSize({ width: Math.round(rect.width), height: Math.round(rect.height) });
+    }
+  }, [activeBackgroundUrl, imageLoadFailed, blankDocSize]);
+
+  const referenceImageDocSize = useMemo<DocumentSize | null>(() => {
+    if (!imageIntrinsicSize) return null;
+    const longSide = Math.max(imageIntrinsicSize.width, imageIntrinsicSize.height);
+    const scale = DOC_REFERENCE_LONG_SIDE / longSide;
+    return {
+      width: Math.round(imageIntrinsicSize.width * scale),
+      height: Math.round(imageIntrinsicSize.height * scale),
+    };
+  }, [imageIntrinsicSize]);
+
+  const documentSize: DocumentSize | null = (activeBackgroundUrl && !imageLoadFailed)
+    ? referenceImageDocSize
+    : blankDocSize;
+
+  const { camera, captureHandlers } = useHandwritingInput({
+    viewportRef,
+    documentSize,
+    enabled: !isSaving && !pendingConfirm,
+    debugLabel: isBlankMode ? 'blank' : 'problem',
+  });
+
+  // documentSize가 null → 값으로 바뀔 때마다(모드 전환/문서 재측정) 아래 JSX가 <ReactSketchCanvas>를
+  // 새로 마운트한다 — 그러면 canvasRef가 새 인스턴스를 가리키고, 라이브러리 내부 eraseMode는 항상
+  // 기본값(펜)으로 초기화된다. 이때 우리 쪽 isErasing 상태만 "지우개 선택됨"으로 남아있으면 툴바
+  // 표시와 실제 동작이 어긋난다(리뷰에서 확인된 회귀) — 마운트/재마운트될 때마다 다시 동기화한다.
+  useEffect(() => {
+    if (!documentSize) return;
+    canvasRef.current?.eraseMode(isErasing);
+  }, [documentSize, isErasing]);
 
   // 창 이동(드래그) — pointer event 하나로 마우스/터치/펜슬 전부 처리
   const dragStateRef = useRef<{ dragging: boolean; startX: number; startY: number; originLeft: number; originTop: number }>({
@@ -341,28 +431,58 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
           </button>
         </div>
 
-        {/* 그리기 캔버스 */}
-        <div className="flex-1 min-h-0 bg-white relative">
-          <ReactSketchCanvas
-            ref={canvasRef}
-            strokeWidth={3}
-            eraserWidth={16}
-            strokeColor={strokeColor}
-            canvasColor="white"
-            backgroundImage={activeBackgroundUrl || ''}
-            exportWithBackgroundImage={!!activeBackgroundUrl}
-            // "meet"(레터박스)는 창 비율과 문제 사진 비율이 다르면 PNG 저장 시 그 여백이 완전
-            // 투명하게 남는다 — 라이브러리 공식 타입 문서에도 "meet에서는 레터박스 영역이
-            // canvasColor로 채워지지 않는다(JPEG 제외)"고 명시돼 있다. 이 투명 여백이 나중에
-            // 스캐폴딩 갤러리의 검은 배경(bg-black) 썸네일 위에 얹히면서 "이미지가 사라지고
-            // 검은 배경만 남는" 것처럼 보였던 것 — 원인. "slice"(cover)로 바꾸면 배경 이미지가
-            // 항상 캔버스 전체를 꽉 채워 투명/검은 여백 자체가 생기지 않는다.
-            preserveBackgroundImageAspectRatio="xMidYMid slice"
-            onChange={(paths: CanvasPath[]) => setHasStrokes(paths.length > 0)}
-            width="100%"
-            height="100%"
-            style={{ border: 'none' }}
-          />
+        {/* 그리기 캔버스 뷰포트 — 실제 보이는 영역. 안쪽 문서 박스는 고정 크기이고, 이 박스는
+            그 문서를 어떻게 비추는지(카메라: scale/x/y)만 담당한다. touch-action:none은 이 영역
+            안에서만 적용해 헤더/툴바의 스크롤·탭 동작에는 영향을 주지 않는다. */}
+        <div
+          ref={viewportRef}
+          className="flex-1 min-h-0 bg-white relative overflow-hidden"
+          style={{ touchAction: 'none' }}
+          onPointerDownCapture={captureHandlers.onPointerDownCapture}
+          onPointerMoveCapture={captureHandlers.onPointerMoveCapture}
+          onPointerUpCapture={captureHandlers.onPointerUpCapture}
+          onPointerCancelCapture={captureHandlers.onPointerCancelCapture}
+          onLostPointerCaptureCapture={captureHandlers.onLostPointerCaptureCapture}
+        >
+          {documentSize ? (
+            <div
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                width: documentSize.width,
+                height: documentSize.height,
+                transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.scale})`,
+                transformOrigin: '0 0',
+              }}
+            >
+              <ReactSketchCanvas
+                ref={canvasRef}
+                // 획 굵기는 문서(=react-sketch-canvas 내부) 좌표 단위라, 카메라 배율을 그대로 두면
+                // 기본 축소 상태(예: 1600 단위 문서를 360px 창에 맞춤, scale≈0.22)에서 화면에는
+                // 3px가 아니라 1px도 안 되게 그려진다(리뷰에서 확인된 회귀). 배율의 역수를 곱해
+                // "지금 화면에 보이는 굵기"가 항상 기존과 같은 3px/16px가 되도록 보정한다.
+                strokeWidth={3 / camera.scale}
+                eraserWidth={16 / camera.scale}
+                strokeColor={strokeColor}
+                canvasColor="white"
+                backgroundImage={activeBackgroundUrl || ''}
+                exportWithBackgroundImage={!!activeBackgroundUrl}
+                // slice(cover) 방식 자체는 PR2(저장 합성) 범위 — 이번 PR에서 이 값을 바꾸지 않는다.
+                // 문서 크기를 사진의 실제 비율에 맞춰 고정했기 때문에(위 documentSize) 여기서는
+                // 문서 박스와 사진 비율이 항상 일치해 slice가 실질적으로 아무것도 잘라내지 않는다.
+                preserveBackgroundImageAspectRatio="xMidYMid slice"
+                onChange={(paths: CanvasPath[]) => setHasStrokes(paths.length > 0)}
+                width="100%"
+                height="100%"
+                style={{ border: 'none' }}
+              />
+            </div>
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center text-[11px] text-slate-400 font-bold">
+              문서를 준비하는 중…
+            </div>
+          )}
           {savedFlash && (
             <div className="absolute inset-0 bg-emerald-500/90 flex items-center justify-center text-white font-black text-sm animate-fade-in">
               ✅ 저장했습니다!
