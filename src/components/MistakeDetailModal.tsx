@@ -8,7 +8,8 @@ import { supabase } from '../services/supabase';
 import { GACHA_ITEMS, getRarityTheme } from '../utils/gachaCatalog';
 import { CatPawIcon } from './CatPawIcon';
 import { MistakeScaffoldingDrawer } from './MistakeScaffoldingDrawer';
-import { HandwritingOverlay } from './HandwritingOverlay';
+import { HandwritingOverlay, type HandwritingOverlayBounds, type HandwritingOverlayHandle } from './HandwritingOverlay';
+import { useSharedSaveLock } from '../features/handwriting/useSharedSaveLock';
 import { CollapsibleSection } from './CollapsibleSection';
 
 interface MistakeDetailModalProps {
@@ -157,8 +158,61 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
   // 손 필기 / 펜슬 풀이 오버레이 — 저장하면 스캐폴딩(본인 풀이)으로 등록되므로,
   // 저장될 때마다 이 값을 올려서 MistakeScaffoldingDrawer가 목록을 다시 불러오게 한다.
+  //
+  // PR3: "문제 위 필기창"(isHandwritingOpen)과 "추가 필기장"(isExtraNotebookOpen)은 완전히 독립된
+  // HandwritingOverlay 인스턴스 두 개다 — 최대 2개까지만 동시에 존재할 수 있다. frontOverlay는
+  // 어느 창이 위에 그려질지만 결정하고(z-index), 두 인스턴스는 절대 unmount/remount하지 않는다
+  // (stable key로 마운트 유지 — 그래야 획/undo/드래그 위치가 창을 전환해도 보존된다).
   const [isHandwritingOpen, setIsHandwritingOpen] = React.useState(false);
+  const [isExtraNotebookOpen, setIsExtraNotebookOpen] = React.useState(false);
+  const [frontOverlay, setFrontOverlay] = React.useState<'problem' | 'extra' | null>(null);
+  // 추가 필기장을 처음 열 때만 "문제 위 필기창의 그 순간 위치"를 한 번 읽어 대각선 오프셋 기준으로
+  // 쓴다 — 이후로는 각 창이 완전히 독립적으로 자기 위치를 관리하므로 이 값을 다시 읽지 않는다.
+  const [extraNotebookBoundsHint, setExtraNotebookBoundsHint] = React.useState<HandwritingOverlayBounds | null>(null);
+  const problemOverlayRef = React.useRef<HandwritingOverlayHandle>(null);
+  // 두 창의 raster export/업로드가 겹치지 않게 하는 공유 락 — 모달(=두 창의 공통 부모) 생애주기
+  // 동안 하나만 유지된다.
+  const runExclusiveSave = useSharedSaveLock();
   const [scaffoldingRefreshKey, setScaffoldingRefreshKey] = React.useState(0);
+
+  const openProblemOverlay = () => {
+    setIsHandwritingOpen(true);
+    setFrontOverlay('problem');
+  };
+
+  const closeProblemOverlay = () => {
+    setIsHandwritingOpen(false);
+    setFrontOverlay(prev => (prev === 'problem' ? (isExtraNotebookOpen ? 'extra' : null) : prev));
+  };
+
+  // "＋ 새 필기장" — 이미 추가 필기장이 열려 있으면 세 번째 창을 만들지 않고 그 창을 앞으로만
+  // 가져온다. 새로 여는 경우에만 문제 위 필기창의 현재 위치를 한 번 읽어 대각선 오프셋 기준으로 쓴다.
+  const handleRequestExtraNotebook = () => {
+    if (isExtraNotebookOpen) {
+      setFrontOverlay('extra');
+      return;
+    }
+    setExtraNotebookBoundsHint(problemOverlayRef.current?.getBounds() ?? null);
+    setIsExtraNotebookOpen(true);
+    setFrontOverlay('extra');
+  };
+
+  const closeExtraNotebook = () => {
+    setIsExtraNotebookOpen(false);
+    setExtraNotebookBoundsHint(null);
+    setFrontOverlay(prev => (prev === 'extra' ? (isHandwritingOpen ? 'problem' : null) : prev));
+  };
+
+  // 세션 경계: 다른 문제로 전환되면(모달 자체는 언마운트되지 않고 selectedEntry만 바뀜) 두 필기창을
+  // 전부 닫는다 — 안 그러면 이전 문제의 획/배경/mistakeId가 다음 문제로 그대로 넘어간다(BLOCKER급
+  // 문제). 모달이 아예 닫히는 경우는 OverlayHost가 이 컴포넌트 자체를 unmount하므로 별도 처리가
+  // 필요 없다(portal로 띄운 두 HandwritingOverlay도 부모를 따라 자동으로 unmount된다).
+  React.useEffect(() => {
+    setIsHandwritingOpen(false);
+    setIsExtraNotebookOpen(false);
+    setFrontOverlay(null);
+    setExtraNotebookBoundsHint(null);
+  }, [selectedEntry.id]);
 
   const authorStamp = selectedEntry.userId ? profilesStampMap[selectedEntry.userId] : equippedStamp;
   // 장착한 스탬프의 실제 뽑기 등급(UR/SSR/SR/R)에 맞는 테두리 클래스
@@ -1000,7 +1054,8 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     // 풀이노트(HandwritingOverlay)는 이제 문제 확대창(openImageWindow) 없이도 단독으로 열릴 수
     // 있다("다시 풀어볼게요"에서 바로 열림) — isZoomOpen만 보면 이 경우를 놓쳐서, 풀이노트가 뜬
     // 채로 뒤쪽 배경을 클릭하면 상세 모달 전체가 닫혀버리는(풀이노트만 붕 뜨는) 문제가 생긴다.
-    if (isHandwritingOpen) return;
+    // PR3: 추가 필기장만 열려 있고 문제 위 필기창은 닫혀 있는 경우도 똑같이 보호해야 한다.
+    if (isHandwritingOpen || isExtraNotebookOpen) return;
     onClose();
   };
 
@@ -1092,7 +1147,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                setIsHandwritingOpen(true);
+                openProblemOverlay();
               }}
               type="button"
               aria-label="풀이노트 열기"
@@ -1858,7 +1913,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => setIsHandwritingOpen(true)}
+                        onClick={openProblemOverlay}
                         className="flex-1 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-400 active:scale-95 transition-all text-[11px] font-black text-white"
                       >
                         ✏️ 네, 다시 풀어볼게요
@@ -2109,15 +2164,38 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
       {/* 손 필기 / 펜슬 풀이 오버레이 — 저장하면 스캐폴딩(본인 풀이)으로 등록됨. 문제 이미지를
           배경으로 깔아 그 위에 바로 필기할 수 있게 한다(ReactSketchCanvas의 backgroundImage +
-          exportWithBackgroundImage를 재사용 — 새 캔버스 합성 코드 없이 라이브러리 기능만 사용). */}
+          exportWithBackgroundImage를 재사용 — 새 캔버스 합성 코드 없이 라이브러리 기능만 사용).
+          PR3: 문제 위 필기창과 추가 필기장은 완전히 독립된 두 인스턴스다 — key를 고정해서 서로의
+          존재/닫힘이 다른 쪽을 리마운트시키지 않는다(안 그러면 획/undo/드래그 위치가 날아간다). */}
       {isHandwritingOpen && (
         <HandwritingOverlay
+          key="problem"
+          ref={problemOverlayRef}
           mistakeId={selectedEntry.id}
           studentId={selectedEntry.userId || ''}
           currentUserId={currentUserId || ''}
           backgroundImageUrl={selectedEntry.imageUrl}
-          onClose={() => setIsHandwritingOpen(false)}
+          onClose={closeProblemOverlay}
           onSaved={() => setScaffoldingRefreshKey(k => k + 1)}
+          onFocus={() => setFrontOverlay('problem')}
+          isFront={frontOverlay !== 'extra'}
+          onRequestExtraNotebook={handleRequestExtraNotebook}
+          runExclusiveSave={runExclusiveSave}
+        />
+      )}
+      {isExtraNotebookOpen && (
+        <HandwritingOverlay
+          key="extra"
+          mistakeId={selectedEntry.id}
+          studentId={selectedEntry.userId || ''}
+          currentUserId={currentUserId || ''}
+          backgroundImageUrl={undefined}
+          initialPositionHint={extraNotebookBoundsHint ?? undefined}
+          onClose={closeExtraNotebook}
+          onSaved={() => setScaffoldingRefreshKey(k => k + 1)}
+          onFocus={() => setFrontOverlay('extra')}
+          isFront={frontOverlay === 'extra'}
+          runExclusiveSave={runExclusiveSave}
         />
       )}
     </div>

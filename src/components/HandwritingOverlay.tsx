@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ReactSketchCanvas, type ReactSketchCanvasRef, type CanvasPath } from 'react-sketch-canvas';
 import { supabase } from '../services/supabase';
@@ -11,13 +11,37 @@ import { flattenHandwriting, blobToDataUrl } from '../features/handwriting/flatt
 // react-sketch-canvas의 SVG 박스 자체를 불필요하게 거대하게 만들지 않도록 한다.
 const DOC_REFERENCE_LONG_SIDE = 1600;
 
+// 헤더(닫기 버튼 포함)가 화면 밖으로 완전히 나가면 창을 되찾을 방법이 없어지므로, 최소한 헤더
+// 일부는 항상 화면 안에 남도록 clamp한다 — 드래그 중(handleDragMove)과 최초 배치(getInitialPosition,
+// 추가 필기장이 문제 위 필기창 기준으로 대각선 오프셋될 때) 둘 다에서 같은 기준을 쓴다.
+const HEADER_MARGIN = 40;
+
+export interface HandwritingOverlayBounds {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+export interface HandwritingOverlayHandle {
+  /** 지금 이 창의 화면상 위치/크기. 추가 필기장을 열 때 "이 창 기준 대각선 오프셋"을 계산하는
+   * 용도로만 부모(MistakeDetailModal)가 한 번 읽어간다 — 위치 상태 자체는 계속 이 컴포넌트
+   * 내부에만 있고(완전히 독립), 부모가 구독하거나 제어하지 않는다. */
+  getBounds: () => HandwritingOverlayBounds;
+}
+
 interface HandwritingOverlayProps {
   mistakeId: string;
   studentId: string;
   currentUserId: string;
-  backgroundImageUrl?: string; // 있으면 이 이미지를 배경으로 깔고 그 위에 필기(예: 문제 이미지 위 재풀이)
+  backgroundImageUrl?: string; // 있으면 이 이미지를 배경으로 깔고 그 위에 필기(문제 위 필기). 없으면 흰 캔버스(추가 필기장) — 이 창의 평생 고정값, 내부에서 바꾸지 않는다.
   onClose: () => void;
   onSaved: () => void; // 저장 성공 시 부모(스캐폴딩 목록)에 새로고침을 알림
+  onFocus?: () => void; // 이 창을 앞으로 가져와 달라는 요청(클릭/드래그 등 상호작용 시)
+  isFront: boolean; // 두 창이 동시에 열려 있을 때 어느 쪽이 위에 그려질지
+  onRequestExtraNotebook?: () => void; // 있으면 "＋ 새 필기장" 버튼 노출 — 문제 위 필기창에서만 전달됨
+  initialPositionHint?: HandwritingOverlayBounds; // 있으면 이 사각형 기준 대각선 오프셋으로 초기 위치를 잡음(추가 필기장 전용)
+  runExclusiveSave: (task: () => Promise<void>) => Promise<void>; // 두 창의 raster export/저장이 겹치지 않게 하는 공유 락
 }
 
 // 문제 이미지를 배경으로 보여주게 되면서(재풀이 흐름) 기존 흰 캔버스 전용 기본 크기(320x260)로는
@@ -66,49 +90,78 @@ const PEN_COLORS: Array<{ value: string; label: string }> = [
   { value: '#16a34a', label: '초록' },
 ];
 
-// 확인 없이 바로 실행되면 위험한 동작(전체 지우기 / 필기장 전환)에 대한 대기 상태.
-// targetUrl은 전환 대상 배경(undefined = 새 빈 필기장, 문자열 = 문제 이미지로 복귀)을 의미한다.
-type PendingConfirm = { type: 'clear' } | { type: 'switchMode'; targetUrl: string | undefined };
+// 전체 지우기(파괴적 동작)에 대한 확인 대기 상태. 예전엔 "필기장 전환" 확인도 같은 상태로
+// 처리했지만, PR3에서 "새 필기장"이 더 이상 이 창 내부의 배경 전환이 아니라 부모에게 완전히
+// 독립된 창을 요청하는 것으로 바뀌면서(요청 자체는 파괴적이지 않음) 더는 필요 없어졌다.
+const DIAGONAL_OFFSET = 44; // 추가 필기장을 열 때 문제 위 필기창 기준으로 대각선으로 밀어내는 거리
 
 // 위치를 CSS transform 트릭(left:50%+translate) 대신 실제 픽셀 left/top으로 직접 관리한다.
 // 예전엔 진입 애니메이션 클래스가 같은 transform 속성을 덮어써서 창이 화면 밖으로 밀려나는
 // 버그가 있었는데(이미 한 번 고침), 크기 조절까지 추가되면 그 방식은 "우측 하단 꼭짓점을
 // 끌면 왼쪽 위는 고정된 채 커진다"는 자연스러운 동작을 구현하기도 번거로워 픽셀 좌표로 바꿨다.
-const getInitialPosition = () => ({
-  left: Math.max(8, Math.round((window.innerWidth - DEFAULT_SIZE.width) / 2)),
-  top: Math.max(8, Math.round((window.innerHeight - DEFAULT_SIZE.height) / 2)),
-});
+//
+// hint가 있으면(추가 필기장) 그 사각형에서 대각선으로 조금 떨어진 위치에서 시작한다 — 화면
+// 중앙 기준이 아니라 "지금 실제로 문제 위 필기창이 있는 자리" 기준. 좁은 화면에서도 헤더가
+// 화면 밖으로 나가지 않게 handleDragMove와 같은 규칙으로 clamp한다.
+const getInitialPosition = (hint?: HandwritingOverlayBounds) => {
+  if (hint) {
+    const rawLeft = hint.left + DIAGONAL_OFFSET;
+    const rawTop = hint.top + DIAGONAL_OFFSET;
+    return {
+      left: Math.min(window.innerWidth - HEADER_MARGIN, Math.max(HEADER_MARGIN - DEFAULT_SIZE.width, rawLeft)),
+      top: Math.min(window.innerHeight - HEADER_MARGIN, Math.max(0, rawTop)),
+    };
+  }
+  return {
+    left: Math.max(8, Math.round((window.innerWidth - DEFAULT_SIZE.width) / 2)),
+    top: Math.max(8, Math.round((window.innerHeight - DEFAULT_SIZE.height) / 2)),
+  };
+};
 
-export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
+export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, HandwritingOverlayProps>(({
   mistakeId,
   studentId,
   currentUserId,
   backgroundImageUrl,
   onClose,
   onSaved,
-}) => {
+  onFocus,
+  isFront,
+  onRequestExtraNotebook,
+  initialPositionHint,
+  runExclusiveSave,
+}, ref) => {
   const canvasRef = useRef<ReactSketchCanvasRef>(null);
   const [isErasing, setIsErasing] = useState(false);
   const [strokeColor, setStrokeColor] = useState(PEN_COLORS[1].value); // 기존 사용자 학습된 기본값(빨강) 유지
   const [hasStrokes, setHasStrokes] = useState(false); // undo/전체지우기 disabled 판단용 — 라이브러리 자체 history 상태를 새로 베끼지 않고 onChange로만 추적
   const [isSaving, setIsSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
-  const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
-  // 기본값 = 문제 이미지 위 필기. "＋ 새 필기장"을 누르면 이 값이 undefined로 바뀌어 빈 캔버스가 된다.
-  // 문제 이미지가 애초에 없는 호출부(향후 확장 대비)에서는 전환 버튼 자체를 숨긴다.
-  const hasOriginalBackground = !!backgroundImageUrl;
-  const [activeBackgroundUrl, setActiveBackgroundUrl] = useState<string | undefined>(backgroundImageUrl);
-  const isBlankMode = !activeBackgroundUrl;
-
-  const [pos, setPos] = useState(getInitialPosition);
+  const [pos, setPos] = useState(() => getInitialPosition(initialPositionHint));
   const [size, setSize] = useState(DEFAULT_SIZE);
 
+  // 문제 전환 시 부모가 이 인스턴스를 언마운트해도, 이미 시작된 handleSave의 await 체인(특히
+  // runExclusiveSave 대기)은 그대로 계속 실행된다. 그 완료 시점에 캡처해뒀던 onSaved/onClose를
+  // 그대로 호출하면, 같은 "extra" 슬롯에 새로 열린 다음 문제의 창을 엉뚱하게 닫아버릴 수 있다
+  // (부모 상태는 문제 전환에도 살아있는 단일 슬롯이므로). 언마운트 이후에는 그 콜백들을 걸러낸다.
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useImperativeHandle(ref, () => ({
+    getBounds: () => ({ left: pos.left, top: pos.top, width: size.width, height: size.height }),
+  }), [pos, size]);
+
   // ── 문서 좌표계: 창 크기(=화면에 보이는 뷰포트)와 완전히 분리된 "고정 문서" 크기 ──────────
-  // 문제 위 필기 = 사진의 실제 가로세로 비율 기준, 새 필기장(빈 캔버스) = 그 모드에 처음 진입한
-  // 순간의 캔버스 영역 크기로 잠금. 창을 리사이즈하거나 핀치를 해도 이 값 자체는 바뀌지 않는다 —
-  // useHandwritingInput의 카메라(scale/x/y)만 바뀐다. 이미 그려둔 획은 문서 좌표에 저장되므로
-  // 창을 늘리거나 줄여도 위치가 어긋나지 않는다.
+  // 문제 위 필기 = 사진의 실제 가로세로 비율 기준, 새 필기장(빈 캔버스) = 마운트 시점의 캔버스
+  // 영역 크기로 잠금. backgroundImageUrl은 이 창의 평생 고정값이라(PR3부터 내부에서 바뀌지
+  // 않음) 아래 로직도 전부 마운트 시 한 번만 판단하면 된다. 창을 리사이즈하거나 핀치를 해도 이
+  // 값 자체는 바뀌지 않는다 — useHandwritingInput의 카메라(scale/x/y)만 바뀐다.
   const viewportRef = useRef<HTMLDivElement>(null);
   const [imageIntrinsicSize, setImageIntrinsicSize] = useState<{ width: number; height: number } | null>(null);
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
@@ -118,7 +171,7 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
   // 크기를 다시 알려주지 않음) 가볍게 한 번 더 미리 불러와 naturalWidth/Height만 확인한다 —
   // 이 로드는 좌표계 기준 확보용이고 export/CORS 처리는 PR2(저장 합성)의 몫이라 여기서는 하지 않는다.
   useEffect(() => {
-    if (!activeBackgroundUrl) return;
+    if (!backgroundImageUrl) return;
     let cancelled = false;
     const img = new Image();
     img.onload = () => {
@@ -132,22 +185,16 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
     img.onerror = () => {
       if (!cancelled) setImageLoadFailed(true);
     };
-    img.src = activeBackgroundUrl;
+    img.src = backgroundImageUrl;
     return () => { cancelled = true; };
-  }, [activeBackgroundUrl]);
-
-  // 모드가 바뀔 때마다(문제 위 필기 ↔ 새 필기장) "새 문서"로 취급한다 — 기존 모드 전환 확인창이
-  // 이미 캔버스를 비워주므로, 여기서 예전 측정값을 버리고 다음에 다시 정확히 재는 것이 안전하다.
-  useEffect(() => {
-    setBlankDocSize(null);
-    setImageLoadFailed(false);
-  }, [activeBackgroundUrl]);
+  }, [backgroundImageUrl]);
 
   // 새 필기장(빈 캔버스) 또는 문제 이미지 로드 실패 시: "지금 보이는 캔버스 영역 크기"를 그대로
-  // 문서 크기로 한 번 잠근다. 이미지 로드가 실패해도 예전처럼(배경 없이 빈 캔버스로 조용히
-  // 대체) 필기 자체는 계속할 수 있게 한다.
+  // 문서 크기로 한 번 잠근다. backgroundImageUrl이 이 창 안에서 다시 바뀌는 일이 없으므로(PR3),
+  // blankDocSize는 마운트 중 한 번만 정해지면 충분 — 재측정 트리거는 필요 없다. 이미지 로드가
+  // 실패해도 예전처럼(배경 없이 빈 캔버스로 조용히 대체) 필기 자체는 계속할 수 있게 한다.
   useLayoutEffect(() => {
-    const needsViewportSizing = !activeBackgroundUrl || imageLoadFailed;
+    const needsViewportSizing = !backgroundImageUrl || imageLoadFailed;
     if (!needsViewportSizing || blankDocSize) return;
     const el = viewportRef.current;
     if (!el) return;
@@ -155,7 +202,7 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
     if (rect.width > 0 && rect.height > 0) {
       setBlankDocSize({ width: Math.round(rect.width), height: Math.round(rect.height) });
     }
-  }, [activeBackgroundUrl, imageLoadFailed, blankDocSize]);
+  }, [backgroundImageUrl, imageLoadFailed, blankDocSize]);
 
   const referenceImageDocSize = useMemo<DocumentSize | null>(() => {
     if (!imageIntrinsicSize) return null;
@@ -167,21 +214,23 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
     };
   }, [imageIntrinsicSize]);
 
-  const documentSize: DocumentSize | null = (activeBackgroundUrl && !imageLoadFailed)
+  const documentSize: DocumentSize | null = (backgroundImageUrl && !imageLoadFailed)
     ? referenceImageDocSize
     : blankDocSize;
 
   const { camera, captureHandlers, finalizeActiveStroke } = useHandwritingInput({
     viewportRef,
     documentSize,
-    enabled: !isSaving && !pendingConfirm,
-    debugLabel: isBlankMode ? 'blank' : 'problem',
+    enabled: !isSaving && !showClearConfirm,
+    // 두 창이 동시에 열릴 수 있으므로 DEV 로그에서 어느 창인지 구분한다 — mistakeId는 두 창이
+    // 공유하므로 배경 유무로 구분하는 편이 실제 원인 추적에 더 유용하다.
+    debugLabel: backgroundImageUrl ? 'problem' : 'extra',
   });
 
-  // documentSize가 null → 값으로 바뀔 때마다(모드 전환/문서 재측정) 아래 JSX가 <ReactSketchCanvas>를
-  // 새로 마운트한다 — 그러면 canvasRef가 새 인스턴스를 가리키고, 라이브러리 내부 eraseMode는 항상
-  // 기본값(펜)으로 초기화된다. 이때 우리 쪽 isErasing 상태만 "지우개 선택됨"으로 남아있으면 툴바
-  // 표시와 실제 동작이 어긋난다(리뷰에서 확인된 회귀) — 마운트/재마운트될 때마다 다시 동기화한다.
+  // documentSize가 null → 값으로 바뀔 때(마운트 후 문서 크기가 처음 확정될 때) 아래 JSX가
+  // <ReactSketchCanvas>를 처음 마운트한다 — 그러면 canvasRef가 인스턴스를 가리키고, 라이브러리
+  // 내부 eraseMode는 항상 기본값(펜)으로 초기화된다. 이때 우리 쪽 isErasing 상태만 "지우개
+  // 선택됨"으로 남아있으면 툴바 표시와 실제 동작이 어긋난다 — 마운트/재마운트될 때마다 다시 동기화한다.
   useEffect(() => {
     if (!documentSize) return;
     canvasRef.current?.eraseMode(isErasing);
@@ -232,9 +281,6 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
     if (!dragStateRef.current.dragging) return;
     const dx = e.clientX - dragStateRef.current.startX;
     const dy = e.clientY - dragStateRef.current.startY;
-    // 헤더(닫기 버튼 포함)가 화면 밖으로 완전히 나가면 창을 되찾을 방법이 없어지므로,
-    // 최소한 헤더 일부는 항상 화면 안에 남도록 좌표를 clamp한다.
-    const HEADER_MARGIN = 40;
     const nextLeft = Math.min(window.innerWidth - HEADER_MARGIN, Math.max(HEADER_MARGIN - size.width, dragStateRef.current.originLeft + dx));
     const nextTop = Math.min(window.innerHeight - HEADER_MARGIN, Math.max(0, dragStateRef.current.originTop + dy));
     setPos({ left: nextLeft, top: nextTop });
@@ -340,31 +386,14 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
   // 전체 지우기는 바로 실행하지 않고 확인 대기 상태로만 전환한다. 지울 필기가 없으면 버튼 자체가 비활성.
   const requestClear = () => {
     if (isSaving || !hasStrokes) return;
-    setPendingConfirm({ type: 'clear' });
+    setShowClearConfirm(true);
   };
 
-  // "＋ 새 필기장" ↔ "문제 이미지로 돌아가기" 전환. 자동으로 열리지 않고 항상 학생이 직접 눌러야 한다.
-  // 아직 그려둔 게 없으면 확인 없이 바로 전환, 그려둔 게 있으면 잃을 수 있다고 먼저 확인받는다.
-  const requestModeSwitch = (targetUrl: string | undefined) => {
-    if (isSaving) return;
-    if (!hasStrokes) {
-      setActiveBackgroundUrl(targetUrl);
-      return;
-    }
-    setPendingConfirm({ type: 'switchMode', targetUrl });
-  };
-
-  const handleConfirmCancel = () => setPendingConfirm(null);
+  const handleConfirmCancel = () => setShowClearConfirm(false);
 
   const handleConfirmAccept = () => {
-    if (!pendingConfirm) return;
-    if (pendingConfirm.type === 'clear') {
-      canvasRef.current?.clearCanvas();
-    } else {
-      canvasRef.current?.clearCanvas();
-      setActiveBackgroundUrl(pendingConfirm.targetUrl);
-    }
-    setPendingConfirm(null);
+    canvasRef.current?.clearCanvas();
+    setShowClearConfirm(false);
   };
 
   // 저장하기: 문제 이미지 전체(자르지 않음) + 흰 배경 + 필기를 직접 합성해 PNG로 만든 뒤
@@ -389,36 +418,50 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
 
       const svgMarkup = await canvasRef.current.exportSvg();
 
-      // snapshot — 이 시점 이후 state/ref가 바뀌어도(예: 모달이 닫히거나 문제가 전환돼도) 아래
-      // 값들만 사용한다.
+      // snapshot — "저장 시작 시점"(=이 시점)의 값만 이후 계속 쓴다. 두 창이 동시에 열려 있을 때
+      // 아래 runExclusiveSave가 이 창의 실제 합성/업로드를 뒤로 미루더라도(다른 창이 먼저 저장
+      // 중이면), 그 사이 모달이 닫히거나 문제가 전환돼 selectedEntry/props가 바뀌어도 이 저장
+      // 작업의 대상(mistakeId 등)은 절대 바뀌지 않는다.
       const snapshotDocumentSize = documentSize;
-      const snapshotBackgroundUrl = activeBackgroundUrl;
-      const snapshotCaption = isBlankMode ? '📝 새 필기장' : '✏️ 직접 손으로 쓴 풀이';
+      const snapshotBackgroundUrl = backgroundImageUrl;
+      const snapshotCaption = backgroundImageUrl ? '✏️ 직접 손으로 쓴 풀이' : '📝 추가 필기장';
       const snapshotMistakeId = mistakeId;
       const snapshotStudentId = studentId;
       const snapshotTeacherId = currentUserId;
 
-      const blob = await flattenHandwriting({
-        documentSize: snapshotDocumentSize,
-        backgroundImageUrl: snapshotBackgroundUrl,
-        svgMarkup,
-      });
-      const dataUrl = await blobToDataUrl(blob);
+      // 두 필기창이 동시에 열려 있을 수 있으므로, 실제 raster export + 업로드는 공유 락으로
+      // 직렬화한다(최대 2개 창뿐이라 범용 큐 대신 promise 체인 하나로 충분 — useSharedSaveLock).
+      // 이 창이 대기하는 동안에도 위에서 이미 isSaving=true가 됐으므로 "저장 중…" 표시는
+      // 끊기지 않는다 — 버튼이 죽은 것처럼 보이지 않는다.
+      await runExclusiveSave(async () => {
+        const blob = await flattenHandwriting({
+          documentSize: snapshotDocumentSize,
+          backgroundImageUrl: snapshotBackgroundUrl,
+          svgMarkup,
+        });
+        const dataUrl = await blobToDataUrl(blob);
 
-      const { error } = await supabase
-        .from('mistake_scaffoldings')
-        .insert([{
-          mistake_id: snapshotMistakeId,
-          student_id: snapshotStudentId,
-          teacher_id: snapshotTeacherId,
-          image_url: dataUrl,
-          caption: snapshotCaption,
-        }]);
-      if (error) throw error;
+        const { error } = await supabase
+          .from('mistake_scaffoldings')
+          .insert([{
+            mistake_id: snapshotMistakeId,
+            student_id: snapshotStudentId,
+            teacher_id: snapshotTeacherId,
+            image_url: dataUrl,
+            caption: snapshotCaption,
+          }]);
+        if (error) throw error;
+      });
+
+      // 이 인스턴스가 대기하는 사이 문제가 전환되어 이미 언마운트됐다면, 여기서 멈춘다 — 저장 자체는
+      // (스냅샷된 mistakeId로) 정상적으로 끝났지만, onSaved/onClose는 지금 살아있는 다른 세션의
+      // 슬롯을 잘못 건드리게 되므로 절대 호출하지 않는다.
+      if (!isMountedRef.current) return;
 
       onSaved();
       setSavedFlash(true);
       setTimeout(() => {
+        if (!isMountedRef.current) return;
         onClose();
       }, 700);
     } catch (err: any) {
@@ -426,17 +469,21 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
       if (import.meta.env.DEV) {
         console.log('[handwriting-save]', 'failure', { stage: err?.stage, message: err?.message });
       }
-      // 실패해도 필기는 그대로 남는다 — 창을 닫지 않고 isSaving만 복구해 다시 저장을 시도할 수 있게 한다.
+      if (!isMountedRef.current) return;
+      // 실패해도 필기는 그대로 남는다 — 창을 닫지 않고 isSaving만 복구해 다시 저장을 시도할 수
+      // 있게 한다. 공유 락은 runExclusiveSave 내부 task가 실패해도(reject) 다음 작업으로 정상
+      // 넘어가도록 구성돼 있어(useSharedSaveLock) 다른 창이 대기 중이었다면 그대로 진행된다.
       alert('저장에 실패했습니다: ' + (err.message || '알 수 없는 오류'));
       setIsSaving(false);
     }
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[9998] pointer-events-none">
+    <div className="fixed inset-0 pointer-events-none" style={{ zIndex: isFront ? 9999 : 9998 }}>
       <div
         role="dialog"
         aria-label="손 필기 풀이창"
+        onPointerDownCapture={() => onFocus?.()}
         className="absolute rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl flex flex-col overflow-hidden pointer-events-auto"
         style={{
           width: size.width,
@@ -455,7 +502,7 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
         >
           <span className="text-[11px] font-black text-slate-300 flex items-center space-x-1.5">
             <span>✏️</span>
-            <span>손 필기 / 펜슬 풀이{isBlankMode && hasOriginalBackground ? ' · 새 필기장' : ''}</span>
+            <span>손 필기 / 펜슬 풀이{!backgroundImageUrl ? ' · 추가 필기장' : ''}</span>
           </span>
           <button
             type="button"
@@ -512,7 +559,7 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
                 // 결과가 "필기 획만 있는, 원격 이미지 참조도 없는" 순수 벡터가 되어(설치본 K() 함수
                 // 기준 확인) flattenHandwriting이 그 위에 흰 배경 + 원본 사진을 안전하게 겹칠 수 있다.
                 canvasColor="transparent"
-                backgroundImage={activeBackgroundUrl || ''}
+                backgroundImage={backgroundImageUrl || ''}
                 // 항상 false — 저장(export)에서는 라이브러리의 배경 합성을 쓰지 않는다. 실시간
                 // 화면에는 영향 없음(backgroundImage prop만으로 표시됨, 이 값은 export 전용).
                 // flattenHandwriting(PR2)이 문제 이미지 전체를 직접 그려 넣는다.
@@ -622,15 +669,15 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
             >
               🗑️
             </button>
-            {hasOriginalBackground && (
+            {onRequestExtraNotebook && (
               <button
                 type="button"
-                onClick={() => requestModeSwitch(isBlankMode ? backgroundImageUrl : undefined)}
+                onClick={onRequestExtraNotebook}
                 disabled={isSaving}
-                title={isBlankMode ? '문제 이미지로 돌아가기' : '새 빈 필기장 열기'}
+                title="추가 흰색 필기장 열기"
                 className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-slate-900 border border-slate-800 text-slate-300 hover:text-slate-100 transition-all active:scale-95 disabled:opacity-40 whitespace-nowrap"
               >
-                {isBlankMode ? '🖼 문제 이미지로' : '＋ 새 필기장'}
+                ＋ 새 필기장
               </button>
             )}
           </div>
@@ -655,19 +702,15 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
           </div>
         </div>
 
-        {/* 전체 지우기 / 필기장 전환 확인창 — 실수 터치로 필기가 통째로 날아가지 않도록 창 전체를 덮는다 */}
-        {pendingConfirm && (
+        {/* 전체 지우기 확인창 — 실수 터치로 필기가 통째로 날아가지 않도록 창 전체를 덮는다 */}
+        {showClearConfirm && (
           <div className="absolute inset-0 z-30 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
             <div className="bg-slate-900 border border-slate-700 rounded-2xl p-4 w-full max-w-[240px] shadow-2xl space-y-3">
               <p className="text-xs font-black text-white leading-relaxed">
-                {pendingConfirm.type === 'clear'
-                  ? '작성한 필기를 모두 지울까요?'
-                  : pendingConfirm.targetUrl
-                    ? '문제 이미지로 돌아갈까요?'
-                    : '새 필기장을 시작할까요?'}
+                작성한 필기를 모두 지울까요?
               </p>
               <p className="text-[10.5px] text-slate-400 leading-relaxed">
-                {pendingConfirm.type === 'clear' ? '되돌릴 수 없어요.' : '지금 작성한 필기가 사라져요.'}
+                되돌릴 수 없어요.
               </p>
               <div className="flex items-center gap-2 pt-1">
                 <button
@@ -682,11 +725,7 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
                   onClick={handleConfirmAccept}
                   className="flex-1 py-2 rounded-xl text-[10.5px] font-black bg-rose-600 hover:bg-rose-500 text-white transition-all active:scale-95"
                 >
-                  {pendingConfirm.type === 'clear'
-                    ? '모두 지우기'
-                    : pendingConfirm.targetUrl
-                      ? '돌아가기'
-                      : '새 필기장 시작'}
+                  모두 지우기
                 </button>
               </div>
             </div>
@@ -713,4 +752,6 @@ export const HandwritingOverlay: React.FC<HandwritingOverlayProps> = ({
     </div>,
     document.body
   );
-};
+});
+
+HandwritingOverlay.displayName = 'HandwritingOverlay';
