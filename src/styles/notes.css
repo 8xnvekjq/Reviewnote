@@ -18,9 +18,12 @@
 .rn-student-select{max-width:180px;min-height:38px;padding:6px 10px;border-radius:var(--rn-radius-sm);background:var(--rn-elevated);border:1px solid var(--rn-line);color:var(--rn-text);font-size:13px;outline:none;cursor:pointer}
 .rn-student-select:focus-visible{border-color:var(--rn-accent)}
 .rn-note-card{min-width:0;overflow:hidden;border:1px solid var(--rn-line);border-radius:var(--rn-radius-lg);background:var(--rn-surface);transition:border-color 160ms}
-/* 삭제 버튼만 남는 topline — 학생 이름은 이미지 overlay로, 숨기기는 practice row로 옮겨가서
-   isOwnNote가 아니면 이 줄 자체가 렌더되지 않아 빈 프레임이 생기지 않는다. */
-.rn-note-topline-delete-only{display:flex;justify-content:flex-end;padding:6px 8px 0}
+/* 상단바 — 과목/단원 배지(좌) + 삭제 버튼(우, 내 오답노트일 때만). 학생 이름은 이미지
+   overlay로, 숨기기는 practice row로 옮겨가 있다. 둘 다 없으면 이 줄 자체가 렌더되지
+   않아 빈 프레임이 생기지 않는다. 삭제 버튼은 margin-left:auto로 항상 오른쪽에 붙는다
+   (과목/단원이 없어도 justify-content 없이 동일하게 동작). */
+.rn-note-topline{display:flex;align-items:center;gap:8px;padding:6px 8px 0}
+.rn-note-topline .rn-note-delete{margin-left:auto}
 .rn-note-open{display:block;width:100%;text-align:left;color:var(--rn-text);transition:background 160ms;touch-action:manipulation}
 .rn-note-open:active{background:var(--rn-elevated)}
 .rn-note-image{position:relative;height:150px;display:flex;align-items:center;justify-content:center;background:#e9ecf2;overflow:hidden}
@@ -36,11 +39,11 @@
 .rn-note-date{font-size:11px;color:var(--rn-muted);line-height:1.5;flex:1;min-width:0}
 .rn-note-status{font-size:10px;font-weight:700;line-height:1.5;color:var(--rn-accent);flex-shrink:0;padding:3px 7px;border:1px solid var(--rn-line);border-radius:8px;margin-left:auto}
 .rn-note-status.is-help{color:var(--rn-warning)}.rn-note-status.is-complete{color:var(--rn-success)}
-/* 학생이 적은 대책(userActionPlan) 미리보기 — 값이 있을 때만 한 줄, ellipsis로 잘라 카드
-   높이를 거의 늘리지 않는다(라벨은 항상 온전히 보이고 내용만 잘림). */
-.rn-note-plan{display:flex;align-items:center;gap:4px;min-width:0;margin-top:4px;font-size:10.5px;line-height:1.4;color:var(--rn-muted)}
-.rn-note-plan-label{flex:none;color:var(--rn-accent);font-weight:800}
-.rn-note-plan-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 대책(userActionPlan) 작성 여부만 표시하는 compact 배지 — 실제 내용은 절대 담지
+   않는다(복습 전 카드에서 내용 일부가 보이면 힌트로 작동할 수 있다는 실사용 피드백).
+   기존 과목/단원(rn-note-subject)이 있던 context row 슬롯을 그대로 재사용하므로
+   .rn-note-status와 같은 시각적 무게(한 줄 metadata 수준)로 맞춘다. */
+.rn-note-plan-badge{font-size:10px;font-weight:700;line-height:1.5;color:var(--rn-success);flex-shrink:0;padding:3px 7px;border:1px solid var(--rn-line);border-radius:8px}
 .rn-note-title{font-size:16px;font-weight:750;line-height:1.5;margin:0 0 6px;overflow-wrap:anywhere}.rn-note-title .katex{font-size:1em}
 .rn-note-meta{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;color:var(--rn-muted);font-size:11px;line-height:1.6}.rn-note-hint{color:var(--rn-success)}
 /* rn-note-open(button) 밖 형제 행 — 등록일+복습 dot+숨기기를 한 줄로. */
