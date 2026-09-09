@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { Sheet } from './ui/Sheet';
 
 export interface NoticeModalState {
   isOpen: boolean;
@@ -52,11 +53,11 @@ export const CustomNoticeModal: React.FC<CustomNoticeModalProps> = ({
   const handleSecondary = () => runOnce(onSecondaryAction);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-      <div className="w-full max-w-sm bg-slate-900 border border-amber-500/40 rounded-3xl p-6 shadow-2xl space-y-4 text-center animate-scale-up">
+    <Sheet open={notice.isOpen} onClose={onClose} title={title}>
+      <div className="rn-notice space-y-4 text-center">
         {/* Top Icon Badge */}
         <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto shadow-inner">
-          <span className="text-3xl animate-bounce">{icon}</span>
+          <span className="text-3xl">{icon}</span>
         </div>
 
         {/* Badge tag */}
@@ -68,10 +69,7 @@ export const CustomNoticeModal: React.FC<CustomNoticeModalProps> = ({
 
         {/* Content */}
         <div className="space-y-1.5">
-          <h3 className="text-base font-black text-white leading-tight">
-            {title}
-          </h3>
-          <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-line px-1">
+          <p className="rn-caption whitespace-pre-line px-1">
             {message}
           </p>
         </div>
@@ -81,7 +79,7 @@ export const CustomNoticeModal: React.FC<CustomNoticeModalProps> = ({
           {secondaryButtonText && (
             <button
               onClick={handleSecondary}
-              className="w-full py-3 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-350 hover:to-amber-450 text-slate-950 font-black text-xs transition-all shadow-lg shadow-amber-500/20 active:scale-95 flex items-center justify-center space-x-1"
+              className="rn-button rn-button-primary w-full"
             >
               <span>{secondaryButtonText}</span>
             </button>
@@ -90,14 +88,14 @@ export const CustomNoticeModal: React.FC<CustomNoticeModalProps> = ({
             onClick={handleConfirm}
             className={
               secondaryButtonText
-                ? 'w-full py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-black text-xs transition-all active:scale-95 flex items-center justify-center space-x-1'
-                : 'w-full py-3 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-350 hover:to-amber-450 text-slate-950 font-black text-xs transition-all shadow-lg shadow-amber-500/20 active:scale-95 flex items-center justify-center space-x-1'
+                ? 'rn-button rn-button-secondary w-full'
+                : 'rn-button rn-button-primary w-full'
             }
           >
             <span>{buttonText}</span>
           </button>
         </div>
       </div>
-    </div>
+    </Sheet>
   );
 };

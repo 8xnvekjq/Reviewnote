@@ -27,14 +27,14 @@ class LazyScreenErrorBoundary extends Component<{ children: ReactNode }, ErrorBo
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex flex-col items-center justify-center py-16 space-y-4 text-center px-6">
+        <div className="rn-empty" role="alert">
           <span className="text-3xl">⚠️</span>
-          <p className="text-xs text-slate-400 leading-relaxed">
+          <p className="rn-caption">
             화면을 불러오지 못했습니다.<br />네트워크 상태를 확인한 뒤 다시 시도해 주세요.
           </p>
           <button
             onClick={() => window.location.reload()}
-            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all active:scale-95"
+            className="rn-button rn-button-primary"
           >
             새로고침
           </button>
@@ -46,9 +46,11 @@ class LazyScreenErrorBoundary extends Component<{ children: ReactNode }, ErrorBo
 }
 
 const DEFAULT_FALLBACK = (
-  <div className="py-16 text-center space-y-3">
-    <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
-    <p className="text-xs text-slate-400 font-bold">불러오는 중...</p>
+  <div className="rn-loading" role="status" aria-label="화면을 불러오는 중">
+    <div className="rn-skeleton h-7 w-40" aria-hidden="true" />
+    <div className="rn-skeleton rn-loading-card" aria-hidden="true" />
+    <div className="rn-skeleton rn-loading-card" aria-hidden="true" />
+    <p className="rn-caption">학습 공간을 준비하고 있어요…</p>
   </div>
 );
 

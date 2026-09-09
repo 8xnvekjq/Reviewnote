@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
+import '../styles/detail.css';
 
 type CollapsibleSectionColor = 'indigo' | 'emerald' | 'amber' | 'purple' | 'slate';
 
@@ -25,12 +26,15 @@ const COLOR_STYLES: Record<CollapsibleSectionColor, { border: string; title: str
 // 한 줄뿐이라 접힌 정보 블록인지 알아보기 어렵던" 문제를 이 컴포넌트로 통일해서 해결한다.
 export function CollapsibleSection({ icon, title, subtitle, color, isOpen, onToggle, children }: CollapsibleSectionProps) {
   const style = COLOR_STYLES[color];
+  const contentId = useId();
   return (
-    <div className={`rounded-2xl border border-slate-800 bg-slate-900/40 overflow-hidden border-l-4 ${style.border}`}>
+    <div className="rn-detail-section">
       <button
         type="button"
         onClick={onToggle}
-        className="w-full flex items-center justify-between text-left px-4 py-3 focus:outline-none group"
+        aria-expanded={isOpen}
+        aria-controls={contentId}
+        className="rn-section-toggle w-full flex items-center justify-between text-left px-4 py-3 group"
       >
         <h4 className={`text-sm font-extrabold flex items-center ${style.title} ${style.titleHover} transition-colors`}>
           <span className="mr-1.5 text-base">{icon}</span>
@@ -38,11 +42,11 @@ export function CollapsibleSection({ icon, title, subtitle, color, isOpen, onTog
           {subtitle}
         </h4>
         <span className="text-xs text-slate-500 font-bold ml-2 flex-none group-hover:text-slate-400 transition-colors">
-          {isOpen ? '▲ 닫기' : '▼ 보기'}
+          {isOpen ? '접기 −' : '보기 +'}
         </span>
       </button>
       {isOpen && (
-        <div className="px-4 pb-4 pt-3 border-t border-slate-800/60 animate-scale-up">
+        <div id={contentId} className="px-4 pb-4 pt-3 border-t border-slate-800/60 animate-fade-in">
           {children}
         </div>
       )}

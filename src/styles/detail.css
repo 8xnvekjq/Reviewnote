@@ -1,0 +1,81 @@
+/* Focused learning surfaces. Scope styles to preserve canvas geometry and portals. */
+.rn-detail-backdrop { background: rgba(5, 9, 18, .76); }
+.rn-detail-sheet { background: var(--rn-bg); border-color: var(--rn-line); max-height: calc(100dvh - env(safe-area-inset-top) - 12px); }
+.rn-detail-header { background: var(--rn-surface); padding: 18px 20px; gap: 12px; }
+.rn-detail-header h3, .rn-detail-header h3 > * { font-size: 18px; line-height: 1.45; letter-spacing: -.025em; }
+.rn-detail-header > div > span { font-size: 12px; color: var(--rn-muted); margin-bottom: 4px; }
+.rn-detail-body { padding: 20px; overscroll-behavior: contain; scrollbar-width: thin; }
+.rn-detail-body > * + * { margin-top: 24px; }
+.rn-detail-body :is(p, label, input, textarea, select) { font-size: max(12px, 1em); }
+.rn-detail-body :is(textarea, select, input) { font-size: 16px; min-height: 44px; }
+.rn-detail-body :is(button, a):not(.rn-review-choices button) { min-height: 44px; }
+.rn-detail-body button { touch-action: manipulation; }
+.rn-detail-body .text-xs:not(input):not(textarea):not(select) { font-size: 14px; line-height: 1.55; }
+.rn-detail-body :is(.text-\[9px\], .text-\[10px\], .text-\[11px\]) { font-size: 12px; line-height: 1.45; }
+.rn-review-panel { padding: 20px; margin-top: 20px; background: var(--rn-surface); border-color: var(--rn-line); border-radius: var(--rn-radius-lg); }
+.rn-review-panel > :first-child { align-items: flex-start; gap: 8px; }
+.rn-review-panel > :first-child > span { font-size: 16px; color: var(--rn-text); }
+.rn-review-stages { grid-template-columns: 1fr; gap: 8px; }
+.rn-review-stage { flex-direction: row; align-items: center; gap: 12px; min-height: 76px; padding: 12px; border-radius: 16px; box-shadow: none; }
+.rn-review-stage > :first-child { margin: 0; white-space: nowrap; font-size: 12px; }
+.rn-review-stage > :nth-child(2) { justify-content: flex-end; }
+.rn-review-choices { gap: 6px; }
+.rn-review-choices > button { min-width: 48px; width: auto; height: 52px; padding: 5px 7px; border-radius: 12px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 2px; font-size: 17px; line-height: 1.1; }
+.rn-review-choice-label { font-size: 10px; font-weight: 600; white-space: nowrap; }
+.rn-checklist { padding: 20px; border: 1px solid var(--rn-line); border-radius: var(--rn-radius-lg); background: var(--rn-surface); }
+.rn-checklist > h4 { color: var(--rn-text); font-size: 16px; }
+.rn-checklist button { min-height: 44px; font-size: 13px; }
+.rn-checklist p { line-height: 1.6; }
+.rn-detail-section { border: 1px solid var(--rn-line); border-radius: var(--rn-radius-md); background: var(--rn-surface); overflow: hidden; }
+.rn-section-toggle { min-height: 64px; gap: 16px; }
+.rn-section-toggle h4 { font-size: 15px; font-weight: 650; color: var(--rn-text); flex-wrap: wrap; gap: 4px; }
+.rn-section-toggle > span { font-size: 12px; color: var(--rn-muted); }
+.rn-detail-footer { background: var(--rn-surface); border-color: var(--rn-line); padding: 12px 20px max(12px, env(safe-area-inset-bottom)); }
+.rn-detail-footer button { min-height: 48px; font-size: 14px; border-radius: 14px; background-image: none; box-shadow: none; }
+.rn-detail-footer button:last-child { background: var(--rn-success); color: #102a24; }
+.rn-writing-window { background: var(--rn-surface); border-color: var(--rn-line); border-radius: 20px; box-shadow: 0 24px 80px #0008; }
+.rn-writing-window > div:first-child { min-height: 60px; background: var(--rn-surface); padding-top: 8px; padding-bottom: 8px; }
+.rn-writing-window > div:first-child > span { font-size: 12px; }
+.rn-writing-window button[aria-label="필기창 닫기"] { width: 44px; height: 44px; flex-shrink: 0; }
+.rn-writing-toolbar { min-height: 60px; padding: 8px; gap: 6px; background: var(--rn-surface); border-color: var(--rn-line); flex-wrap: wrap; }
+.rn-writing-toolbar > div { gap: 4px; }
+.rn-writing-toolbar button { min-width: 44px; min-height: 44px; height: auto; flex-shrink: 0; font-size: 12px; border-radius: 12px; touch-action: manipulation; }
+.rn-writing-toolbar .rn-pen-color { width: 44px; height: 44px; min-height: 44px; border-radius: 50%; background-clip: content-box; padding: 9px; box-shadow: none; transform: none; }
+.rn-writing-toolbar .rn-pen-color[aria-pressed="true"] { outline: 2px solid var(--rn-accent); outline-offset: -3px; border-color: transparent; }
+.rn-writing-toolbar > button[aria-label="직전 필기 실행 취소"] { margin-left: auto; }
+.rn-detail-sheet button:focus-visible, .rn-writing-window button:focus-visible, .rn-section-toggle:focus-visible { outline: 2px solid var(--rn-accent); outline-offset: 3px; }
+@media (min-width: 640px) {
+  .rn-detail-backdrop { align-items: center; }
+  .rn-detail-sheet { max-height: min(92dvh, 1024px); }
+  .rn-detail-body { padding: 28px; }
+  .rn-review-stages { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .rn-review-stage { flex-direction: column; min-height: 116px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rn-detail-sheet *, .rn-writing-window *, .rn-detail-section * { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+
+.rn-review-choices > :not([hidden]) ~ :not([hidden]) { margin-left: 0; }
+@media (max-width: 379px) {
+  .rn-review-stage { flex-direction: column; align-items: stretch; }
+  .rn-review-stage > :nth-child(2) { justify-content: center; }
+  .rn-review-choices { justify-content: center; }
+}
+.rn-plan { display: grid; gap: 12px; }
+.rn-plan > .rn-title { font-size: 18px; }
+.rn-metadata-summary { min-height: 60px; cursor: pointer; padding: 18px 16px; }
+.rn-metadata-summary > div { display: none; }
+.rn-metadata label { min-height: 44px; }
+.rn-detail-body input.rn-cause-checkbox { appearance: auto; accent-color: var(--rn-accent); width: 20px; height: 20px; min-height: 20px; flex: none; }
+.rn-problem { border-radius: 20px; border: 1px solid var(--rn-line); overflow: hidden; background: var(--rn-surface); }
+.rn-problem-image { display: block; width: 100%; position: relative; background: #eff0f4; padding: 12px; }
+.rn-problem-image img { width: 100%; max-height: 42dvh; object-fit: contain; }
+.rn-problem-image > span { position: absolute; right: 10px; bottom: 10px; border-radius: 8px; background: #152033; color: white; padding: 5px 8px; font-size: 11px; }
+.rn-problem-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; }
+.rn-problem-actions .rn-caption { font-size: 12px; }
+.rn-detail-header { flex-shrink: 0; }
+.rn-detail-header > div { min-width: 0; }
+.rn-detail-footer { flex-shrink: 0; }
+.rn-writing-toolbar > div { gap: 0; }
+.rn-writing-toolbar > div > span[aria-hidden] { margin-inline: 2px; }
+.rn-writing-window > div:first-child { padding-inline: 40px; }

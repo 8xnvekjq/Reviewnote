@@ -105,13 +105,13 @@ export function AppShell({ header, bottomNav, children }: AppShellProps) {
   return (
     <>
       {header}
-      {/* pb-24는 기존 값을 유지한다. 실제 네비 높이와 여백 원인은 DEV 진단으로 확인한다. */}
+      {/* The dock occupies its own flex row: content never needs guessed bottom padding. */}
       <main {...(import.meta.env.DEV ? { 'data-bottom-nav-diagnostic': '' } : {})}
-        className="flex-1 overflow-y-auto px-4 py-6 pb-24">
+        className="rn-main">
         {children}
       </main>
       {bottomNav}
-      {import.meta.env.DEV && BottomNavDiagnostic && <BottomNavDiagnostic />}
+      {import.meta.env.DEV && new URLSearchParams(window.location.search).has('navDiagnostic') && BottomNavDiagnostic && <BottomNavDiagnostic />}
     </>
   );
 }
