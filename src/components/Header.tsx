@@ -129,26 +129,32 @@ export const Header: React.FC<HeaderProps> = ({
                 onlineUsers는 App.tsx의 last_seen_at 5분 윈도 폴링을 그대로 재사용 — 여기서
                 별도 realtime/polling을 새로 만들지 않는다. MistakeList의 "함께 공부 중"
                 배지와 데이터는 동일하지만(코드로 확인됨, 별도 presence 채널 없음), 오답노트
-                탭에서만 보이던 것과 달리 이 버튼은 모든 화면에서 항상 접근 가능하다. */}
-            {onlineUsers.length > 0 && (
-              <div className="rn-online-wrap">
-                <button type="button" className="rn-online-badge" onClick={() => setShowOnlinePopup(v => !v)} aria-expanded={showOnlinePopup} aria-haspopup="dialog" aria-label={`실시간 온라인 학생 ${onlineUsers.length}명, 목록 보기`}>
-                  <span className="rn-online-dot" aria-hidden="true" />
-                  <span aria-hidden="true">👥</span>
-                  <span>{onlineUsers.length}</span>
-                </button>
-                {showOnlinePopup && (
-                  <div className="rn-online-popup" role="dialog" aria-label="실시간 온라인 학생 목록">
-                    <div className="rn-online-popup-title"><span>공부 중인 친구들</span><span className="rn-online-live">● Live</span></div>
+                탭에서만 보이던 것과 달리 이 버튼은 모든 화면에서 항상 접근 가능하다.
+                🐛 실기기 회귀 수정: 예전엔 이 블록 전체를 {`{onlineUsers.length > 0 && ...}`}
+                로 감싸서, 5분 윈도 안에 last_seen_at이 있는 사람이 아무도 없으면(흔한 상황)
+                버튼 자체가 렌더되지 않아 기능이 있는지조차 알 수 없었다 — 요청대로 항상
+                렌더하고(0명이어도 "👥 0"), 팝업 안에서만 빈 상태를 안내한다. */}
+            <div className="rn-online-wrap">
+              <button type="button" className="rn-online-badge" onClick={() => setShowOnlinePopup(v => !v)} aria-expanded={showOnlinePopup} aria-haspopup="dialog" aria-label={`실시간 온라인 학생 ${onlineUsers.length}명, 목록 보기`}>
+                <span className="rn-online-dot" aria-hidden="true" />
+                <span aria-hidden="true">👥</span>
+                <span>{onlineUsers.length}</span>
+              </button>
+              {showOnlinePopup && (
+                <div className="rn-online-popup" role="dialog" aria-label="실시간 온라인 학생 목록">
+                  <div className="rn-online-popup-title"><span>공부 중인 친구들</span><span className="rn-online-live">● Live</span></div>
+                  {onlineUsers.length === 0 ? (
+                    <p className="rn-caption" style={{ textAlign: 'center', padding: '4px 0' }}>지금은 혼자 공부 중이에요.</p>
+                  ) : (
                     <ul className="rn-online-popup-list">
                       {onlineUsers.map(u => (
                         <li key={u.id}><span className="rn-online-dot" aria-hidden="true" /><span>{u.nickname || u.display_name || u.username}</span></li>
                       ))}
                     </ul>
-                  </div>
-                )}
-              </div>
-            )}
+                  )}
+                </div>
+              )}
+            </div>
             <button type="button" className="rn-icon-button" onClick={() => setShowUserMenu(true)} aria-label="내 계정 메뉴" aria-haspopup="dialog" aria-expanded={showUserMenu}><AppIcon name="user" /></button>
           </div>
         </div>
