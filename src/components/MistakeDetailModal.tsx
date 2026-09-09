@@ -1112,10 +1112,11 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     sheetSwipeRef.current = null;
   };
 
-  // 학습 흐름 재정렬(체크리스트 → 풀이 → 틀린 이유+대책 → 그 외)을 위해, 기존에 하나의 3분기
-  // ternary 안에서만 쓰이던 조건을 이름 붙은 상수로 한 번만 계산해서 "풀이" 영역과 "그 외"
-  // 영역 두 곳에서 그대로 재사용한다 — 조건식 자체를 중복 작성하지 않아 두 영역이 항상 같은
-  // 판단을 보도록 보장한다(로직 변경 없음, 위치만 분리).
+  // 학습 흐름은 PR #46 이전 실제 순서로 복원됐다: 복습 확인 → 유튜브 딥링크 → 체크리스트 →
+  // 학습 기록 → 레거시 체크리스트 → 풀이 → 틀린 이유+대책(git show 62ec993 기준 확인). 이
+  // 상수들은 기존에 하나의 3분기 ternary 안에서만 쓰이던 조건을 한 번만 계산해서 "풀이"
+  // 영역과 "학습 기록" 영역 두 곳에서 그대로 재사용한다 — 조건식 자체를 중복 작성하지 않아
+  // 두 영역이 항상 같은 판단을 보도록 보장한다(로직 변경 없음, 위치만 분리).
   const isAnalysisLoading = !showResult && (isAnalyzing || (progress > 0 && progress < 100)) && (!selectedEntry.analysis?.solvingProcess || selectedEntry.analysis.solvingProcess === SOLVING_PLACEHOLDER_TEXT);
   const isAnalysisReady = hasRealAnalysis(selectedEntry);
 
@@ -1169,8 +1170,219 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             </button>
             <div className="rn-problem-actions"><span className="rn-caption">먼저, 나의 힘으로 풀어봐요</span><button type="button" onClick={openProblemOverlay} aria-label="풀이노트 열기" className="rn-button rn-button-primary">✎ 풀이노트</button></div>
           </section>
-          {/* ── 학습 흐름 1: 체크리스트 (기본 펼침, 맨 먼저). 이전엔 복습 상태(O/X/★) 패널과
-              추천 강의 카드가 여기 먼저 있었다 — 둘 다 "그 외 부가정보"로 옮겨졌다(아래 참고).
+          {/* ── 학습 흐름 1: 복습 확인 (PR #46 이전 실제 순서로 복원 — git show
+              62ec993:src/components/MistakeDetailModal.tsx 기준, 문제 이미지 바로 다음이
+              항상 이 "복습 상태 진단" 패널이었다). O/X/★ 저장 로직(handleReviewToggle/
+              onUpdateReviews)·activeStep 계산·쿨다운·롤백은 전혀 건드리지 않고, 3열 카드
+              그리드(각 105px 이상)만 실기기 피드백에 따라 한 줄짜리 compact 행으로 압축했다. */}
+          <div className="rn-review-panel rn-review-panel-compact bg-slate-950 p-4 rounded-2xl border border-slate-850 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="rn-review-panel-title flex items-center">
+                <span className="mr-1">📋</span> 복습 체크
+              </span>
+              <div className="flex-none">
+                {selectedEntry.reviews?.filter(r => r === 'O').length === 3 ? (
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30 font-bold">
+                    🎉 복습 완료
+                  </span>
+                ) : (
+                  <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full border border-slate-700 font-bold">
+                    진행 중
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* 정답 바로 확인 + 수정 (아래 정석 풀이 과정까지 스크롤 안 해도 여기서 바로 확인/수정 가능) */}
+            {selectedEntry.analysis && (
+              <div className="flex items-center space-x-2">
+                {editFinalAnswer ? (
+                  <button
+                    onClick={() => setShowQuickAnswer(!showQuickAnswer)}
+                    className="flex-1 min-w-0 flex items-center justify-between px-3 py-2 rounded-xl bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20 transition-all"
+                  >
+                    <span className="text-[11px] font-bold text-amber-400 flex items-center space-x-1.5 min-w-0">
+                      <span className="flex-none">🎯</span>
+                      {showQuickAnswer ? (
+                        // 팝업에서 확정한 로컬 편집값(editFinalAnswer)을 바로 반영 — 하단 '저장하기' 전에도 미리보기 가능
+                        <LaTeXRenderer text={editFinalAnswer} className="truncate" />
+                      ) : (
+                        <span>정답 확인하기</span>
+                      )}
+                    </span>
+                    <span className="text-[9px] text-amber-500/70 font-bold">
+                      {showQuickAnswer ? '▲ 가리기' : '▼ 보기'}
+                    </span>
+                  </button>
+                ) : (
+                  <div className="flex-1 min-w-0 px-3 py-2 rounded-xl bg-slate-900/40 border border-slate-800/60 text-[11px] text-slate-500 font-bold">
+                    아직 등록된 정답이 없어요
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setAnswerDraft(editFinalAnswer)}
+                  title="정답 수정"
+                  className="flex-none w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 hover:border-amber-500/50 text-amber-400 hover:text-amber-300 flex items-center justify-center transition-all active:scale-95"
+                >
+                  ✏️
+                </button>
+              </div>
+            )}
+
+            {/* 단계별 유기적 활성화 영역 — 1/2/3차를 3열 카드(각 105px+)로 나열하던 것을
+                실기기 피드백("스크롤 피로감")에 따라 차수가 가로 한 줄에 오는 compact 행
+                리스트로 바꿨다. activeStep/isCompleted/isLocked 판정과 handleReviewToggle
+                호출부는 그대로 재사용 — presentation만 바뀐다. */}
+            {(() => {
+              const reviews = selectedEntry.reviews || ['', '', ''];
+              let activeStep = 3;
+              for (let i = 0; i < 3; i++) {
+                if (reviews[i] === '') {
+                  activeStep = i;
+                  break;
+                }
+              }
+
+              return (
+                <>
+                  <div className="rn-review-rows">
+                    {[0, 1, 2].map((index) => {
+                      const state = reviews[index];
+                      const isCompleted = state !== '';
+                      const isActive = index === activeStep;
+                      const rowState = isCompleted ? 'completed' : isActive ? 'active' : 'locked';
+
+                      return (
+                        <div key={index} className="rn-review-row" data-state={rowState}>
+                          <span className="rn-review-row-label">{index + 1}차</span>
+                          <div className="rn-review-row-choices">
+                            {isCompleted ? (
+                              <>
+                                {state === 'O' && (
+                                  authorStamp ? (
+                                    <span className={`rn-review-result is-o ${authorStampCatalogItem ? `border-2 ${authorStampBorderClass}` : ''}`} aria-label={`맞았어요 · ${index + 1}차 복습`}>
+                                      {authorStamp === '🐾' ? <CatPawIcon className="w-4 h-4" /> : authorStamp}
+                                    </span>
+                                  ) : (
+                                    <span className="rn-review-result is-o" aria-label={`맞았어요 · ${index + 1}차 복습`}>O</span>
+                                  )
+                                )}
+                                {state === 'X' && <span className="rn-review-result is-x" aria-label={`틀렸어요 · ${index + 1}차 복습`}>X</span>}
+                                {state === 'star' && <span className="rn-review-result is-star" aria-label={`보류함 · ${index + 1}차 복습`}>★</span>}
+                                {selectedEntry.analysis?.reviewDates?.[index] && (
+                                  <span className="rn-review-row-date">{selectedEntry.analysis.reviewDates[index]}</span>
+                                )}
+                              </>
+                            ) : isActive ? (
+                              <>
+                                <button
+                                  onClick={(e) => handleReviewToggle(index, 'O', e)}
+                                  aria-label={`맞았어요 · ${index + 1}차 복습`}
+                                  aria-pressed={false}
+                                  className="rn-review-pick is-o"
+                                >
+                                  O
+                                </button>
+                                <button
+                                  onClick={(e) => handleReviewToggle(index, 'X', e)}
+                                  aria-label={`틀렸어요 · ${index + 1}차 복습`}
+                                  aria-pressed={false}
+                                  className="rn-review-pick is-x"
+                                >
+                                  X
+                                </button>
+                                <button
+                                  onClick={(e) => handleReviewToggle(index, 'star', e)}
+                                  aria-label={`보류할게요 · ${index + 1}차 복습`}
+                                  aria-pressed={false}
+                                  className="rn-review-pick is-star"
+                                >
+                                  ★
+                                </button>
+                              </>
+                            ) : (
+                              <span className="rn-review-row-locked" aria-label={`${index + 1}차 복습 대기 중`}>🔒</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* 하단 롤백(앞으로 가기) 및 복습 기록 정리 제어반 */}
+                  <div className="flex flex-col space-y-2 mt-1">
+                    {activeStep > 0 && (
+                      <button
+                        onClick={handleRollbackReview}
+                        className="px-3 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-500 hover:text-slate-400 font-bold text-[10px] transition-all active:scale-95 w-fit mx-auto flex items-center justify-center mt-1"
+                      >
+                        <span>↩ 이전 단계로</span>
+                      </button>
+                    )}
+
+                    {activeStep === 3 && (
+                      <button
+                        onClick={() => {
+                          if (confirm('틀리거나 보류한 기록을 정리하고 맞춘(O) 기록만 앞으로 정렬하여 다시 복습하시겠습니까?')) {
+                            const oReviews = (selectedEntry.reviews || []).filter(r => r === 'O');
+                            // O가 하나도 없으면(전부 X/★) ''를 2개만 이어붙여선 배열 길이가 2에
+                            // 그쳐서 3번째 칸이 undefined가 되어 버튼도 안 뜨고 잠기지도 않는
+                            // "고정" 상태로 망가졌다. 항상 최소 3칸이 되도록 ''를 3개 붙인다.
+                            const newReviews = [...oReviews, '', '', ''].slice(0, 3) as ReviewState[];
+                            // 배점은 이제 "몇 번째 칸이냐"가 아니라 체크 시점에 analysis.reviewPoints에
+                            // 영구 저장된 값을 그대로 데려가므로(handleUpdateReviews 참고), O를 앞으로
+                            // 당겨도 그 자체로는 점수가 안 바뀐다 — skipPointRecalc=true는 그래도 이
+                            // "정리" 액션만큼은 어떤 미세한 점수 변화도 없도록 하는 추가 안전장치.
+                            onUpdateReviews(selectedEntry.id, newReviews, true);
+                          }
+                        }}
+                        className="w-full py-2.5 rounded-xl bg-indigo-600/10 hover:bg-indigo-600/20 active:scale-95 border border-indigo-500/20 text-indigo-400 font-bold text-xs transition-all flex items-center justify-center space-x-1.5"
+                      >
+                        <span>🔄 맞춘 오답 제외하고 복습 기록 정리하기</span>
+                      </button>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+
+          {/* ── 학습 흐름 2: 유튜브 딥링크 (PR #46 이전 순서 복원 — git history 기준, 복습
+              확인 패널 바로 다음이었다). AI 추천 동영상 딥링크 연동 카드 (test 학생 한정). */}
+          {matchedLecture && (
+            <div className="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-3.5 flex items-center justify-between space-x-3.5 animate-scale-up">
+              <div className="flex items-center space-x-3 min-w-0">
+                <span className="text-xl flex-none">📺</span>
+                <div className="min-w-0 space-y-0.5">
+                  <p className="text-[10px] font-black text-rose-400 uppercase tracking-wider">선생님 추천 강의</p>
+                  <h5 className="text-xs font-bold text-slate-200 truncate leading-tight">
+                    {matchedLecture.videoTitle}
+                  </h5>
+                  <p className="text-[10px] text-slate-400 truncate">
+                    ⏱️ {matchedLecture.chapterTitle} ({
+                      Math.floor(matchedLecture.startSeconds / 60) > 0
+                        ? `${Math.floor(matchedLecture.startSeconds / 60)}분 ${matchedLecture.startSeconds % 60}초`
+                        : `${matchedLecture.startSeconds % 60}초`
+                    }부터)
+                  </p>
+                </div>
+              </div>
+
+              <a
+                href={`https://youtu.be/${matchedLecture.videoId}?t=${matchedLecture.startSeconds}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 active:scale-95 text-rose-300 hover:text-rose-200 font-extrabold text-[10px] border border-rose-500/20 transition-all flex items-center space-x-1 flex-none shadow-md"
+              >
+                <span>▶️</span>
+                <span>바로가기</span>
+              </a>
+            </div>
+          )}
+
+          {/* ── 학습 흐름 3: 체크리스트 (기본 펼침). PR #46 이전엔 복습 확인 → 유튜브 딥링크
+              다음이 바로 이 체크리스트였다(git show 62ec993 기준) — 그 실제 순서로 복원.
               Card 0.9: 체크리스트 2.0 — "AI 풀이를 이해했나요?"가 아니라 "풀기 전에 기본 접근을
               했나요?"를 확인하는 용도. solve 완료를 기다리지 않고 classify와 병렬로 훨씬 일찍
               준비되므로, 학생이 전체 풀이를 기다리는 동안에도 먼저 쓸 수 있어야 한다 — 그래서
@@ -1288,9 +1500,90 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             );
           })()}
 
-          {/* Card 0.8 (레거시): 단계형 풀이 체크리스트 — 체크리스트 2.0 이전에 생성된
-              레코드만 대상(신규 분석은 항상 solutionChecklist를 갖게 되므로 자연히 배타적).
-              새 체크리스트와 같은 "학습 흐름 1: 체크리스트" 그룹으로 옮겨왔다 — 원래
+          {/* ── 학습 흐름 3.5: 학습 기록(스캐폴딩/재풀이) + 진단 재생성 배너. PR #46 이전엔
+              이 블록이 체크리스트 2.0과 레거시 체크리스트 "사이"에 있었다(git show 62ec993
+              기준 Card 0.5) — 그 원래 위치 그대로 복원. AI 모델 정보(관리자 전용)도 같은
+              자리. 각 조건/데이터/저장 경로는 전혀 바꾸지 않고 위치만 옮겼다. */}
+          {isAnalysisReady && (
+            <div className="space-y-6">
+              {/* AI 모델 명시 정보 */}
+              {isAdmin && <div className="flex items-center justify-end">
+                <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-slate-800 text-indigo-400 border border-slate-700/60 flex items-center space-x-1 select-none">
+                  <span>⚡ AI 엔진:</span>
+                  <span className="font-extrabold">{selectedEntry.analysis!.modelUsed || 'gemini-2.5-flash (기본)'}</span>
+                </span>
+              </div>}
+
+              {/* Card 0.5: 📚 나의 학습 기록 — 선생님 힌트(스캐폴딩)와 재풀이 기록을 한 묶음으로.
+                  재풀이는 이제 별도 사진 업로드 UI가 아니라 "다시 풀어볼게요" → 풀이노트(문제
+                  이미지 위에 직접 필기) → 저장 시 이 스캐폴딩 목록에 "내 풀이"로 자동 등록되는
+                  흐름 하나로 합쳐졌다(HandwritingOverlay.handleSave, 기존 구조 그대로 재사용). */}
+              <div className="space-y-2">
+                <h4 className="text-[11px] font-black text-slate-500 uppercase tracking-wide px-1">📚 나의 학습 기록</h4>
+                <MistakeScaffoldingDrawer
+                  mistakeId={selectedEntry.id}
+                  studentId={selectedEntry.userId || ''}
+                  currentUserId={currentUserId || ''}
+                  isAdmin={isAdmin}
+                  refreshSignal={scaffoldingRefreshKey}
+                />
+
+                {/* 과거(이번 라운드 이전)에 올린 재풀이 사진이 있으면 계속 보여준다 — DB/Storage
+                    데이터는 그대로 유지, 신규 업로드 UI만 제거됐다. 지우고 싶으면 삭제 가능. */}
+                {selectedEntry.answerImageUrl && (
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-slate-400 block">이전에 올린 재풀이 사진</label>
+                    <div className="relative rounded-xl overflow-hidden border border-slate-800 bg-slate-950">
+                      <img
+                        src={selectedEntry.answerImageUrl}
+                        alt="내가 다시 푼 풀이"
+                        className="w-full max-h-64 object-contain"
+                      />
+                      <button
+                        type="button"
+                        onClick={onDeleteAnswerImage}
+                        aria-label="재풀이 사진 삭제"
+                        className="absolute top-2 right-2 w-7 h-7 rounded-full bg-slate-950/80 hover:bg-red-500/80 flex items-center justify-center text-white text-xs font-black transition-colors"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 🧭 정리하기(초기화) 이후 체크리스트 재생성 진행 상태 — 정석 풀이는 전혀 건드리지
+                  않고 이 배너들만 추가/제거된다(기존 데이터가 사라지거나 깜빡이지 않음). */}
+              {checkpointRegenStatus === 'generating' && (
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                  <span className="flex-none w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                  <span>AI가 새로운 학습 진단을 만들고 있어요...</span>
+                </div>
+              )}
+              {checkpointRegenStatus === 'failed' && (
+                <div className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-red-500/10 text-red-300 border border-red-500/20">
+                  <span>⚠️ AI 진단 생성에 실패했어요</span>
+                  {onRetryCheckpointGeneration && (
+                    <button
+                      onClick={onRetryCheckpointGeneration}
+                      className="flex-none px-3 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-200 font-black active:scale-95 transition-all"
+                    >
+                      다시 시도
+                    </button>
+                  )}
+                </div>
+              )}
+              {checkpointRegenStatus === 'success' && (
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                  <span>✓ 새로운 진단이 준비됐어요</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── 학습 흐름 4: 레거시 체크리스트. Card 0.8(레거시): 단계형 풀이 체크리스트 —
+              체크리스트 2.0 이전에 생성된 레코드만 대상(신규 분석은 항상 solutionChecklist를
+              갖게 되므로 자연히 배타적). PR #46 이전 순서(학습 기록 다음)로 복원. 원래
               hasRealAnalysis 분기 안에서만 analysis가 보장됐던 자리라, 여기서는
               selectedEntry.analysis 존재를 직접 확인한다(narrowing 목적, 로직 변경 없음). */}
           {selectedEntry.analysis && !selectedEntry.analysis.solutionChecklist && selectedEntry.analysis.solutionCheckpoints && (() => {
@@ -1407,9 +1700,10 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             );
           })()}
 
-          {/* ── 학습 흐름 2: 풀이 (기본 접힘). isAnalysisLoading/isAnalysisReady는 위에서
-              한 번만 계산해 이 영역과 "그 외"(§4) 영역이 항상 같은 판단을 보게 한다 — 로직
-              변경 없음, 조건을 다시 쓰지 않고 이름 붙은 상수를 재사용할 뿐이다. */}
+          {/* ── 학습 흐름 5: 풀이 (기본 접힘). PR #46 이전엔 레거시 체크리스트 바로 다음이
+              정석 풀이(Card 1)였다 — 그 순서로 복원. isAnalysisLoading/isAnalysisReady는
+              위에서 한 번만 계산해 이 영역과 학습 기록(§3.5) 영역이 항상 같은 판단을 보게
+              한다 — 로직 변경 없음, 조건을 다시 쓰지 않고 이름 붙은 상수를 재사용할 뿐이다. */}
           {isAnalysisLoading ? (
             <div className="py-8 px-4 flex flex-col items-center space-y-8 animate-fade-in bg-slate-900/20 rounded-3xl border border-slate-800/40 backdrop-blur-md">
               {/* 상단: 타이머와 로딩 텍스트를 담은 세련된 원형 기기 */}
@@ -1512,11 +1806,12 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             </div>
           )}
 
-          {/* ── 학습 흐름 3: 틀린 이유 + 대책 — 하나의 자기성찰 섹션 (기본 펼침, collapse 없음).
-              이전엔 "실수 원인"이 맨 아래 접힘 <details>에, "나만의 대책"이 여기 따로 있어 두
-              단계가 멀리 떨어져 있었다. root_causes/userActionPlan 데이터 구조·저장 경로는
-              전혀 바꾸지 않고, 같은 state(editRootCauses/editActionPlan)를 이 한 섹션 안에서
-              위아래로 이어 보여주기만 한다. */}
+          {/* ── 학습 흐름 6: 틀린 이유 + 대책 — 하나의 자기성찰 섹션 (기본 펼침, collapse 없음).
+              PR #46 이전엔 "실수 원인"+"나만의 대책"이 정석 풀이 바로 다음, 학생입력영역
+              카드 안에 있었다(git show 62ec993 기준) — 그 순서(풀이 다음, 맨 끝)로 복원.
+              root_causes/userActionPlan 데이터 구조·저장 경로는 전혀 바꾸지 않고, 같은
+              state(editRootCauses/editActionPlan)를 이 한 섹션 안에서 위아래로 이어
+              보여주기만 한다(이 병합 자체는 PR #47에서 확정한 개선이라 유지). */}
           <section className="rn-checklist rn-plan" aria-label="왜 틀렸을까, 다음엔 어떻게">
             <p className="rn-eyebrow">SELF CHECK</p>
             <h4 className="rn-title">왜 틀렸을까?</h4>
@@ -1587,321 +1882,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
           </section>
 
-          {/* ── 학습 흐름 5: 복습 O/X/★ (그 외 부가정보보다 먼저, 자기성찰 다음 단계로).
-              예전엔 이미지 바로 아래 있었다 — 지금은 체크리스트/풀이/틀린이유+대책 다음. */}
-          <div className="rn-review-panel bg-slate-950 p-4 rounded-2xl border border-slate-850 space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-300 flex items-center">
-                <span className="mr-1 text-sm">📋</span> 이번 복습은 어땠나요?
-              </span>
-              <div className="flex-none">
-                {selectedEntry.reviews?.filter(r => r === 'O').length === 3 ? (
-                  <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30 font-bold">
-                    🎉 복습 완료
-                  </span>
-                ) : (
-                  <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full border border-slate-700 font-bold">
-                    진행 중
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* 정답 바로 확인 + 수정 (아래 정석 풀이 과정까지 스크롤 안 해도 여기서 바로 확인/수정 가능) */}
-            {selectedEntry.analysis && (
-              <div className="flex items-center space-x-2">
-                {editFinalAnswer ? (
-                  <button
-                    onClick={() => setShowQuickAnswer(!showQuickAnswer)}
-                    className="flex-1 min-w-0 flex items-center justify-between px-3 py-2 rounded-xl bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20 transition-all"
-                  >
-                    <span className="text-[11px] font-bold text-amber-400 flex items-center space-x-1.5 min-w-0">
-                      <span className="flex-none">🎯</span>
-                      {showQuickAnswer ? (
-                        // 팝업에서 확정한 로컬 편집값(editFinalAnswer)을 바로 반영 — 하단 '저장하기' 전에도 미리보기 가능
-                        <LaTeXRenderer text={editFinalAnswer} className="truncate" />
-                      ) : (
-                        <span>정답 확인하기</span>
-                      )}
-                    </span>
-                    <span className="text-[9px] text-amber-500/70 font-bold">
-                      {showQuickAnswer ? '▲ 가리기' : '▼ 보기'}
-                    </span>
-                  </button>
-                ) : (
-                  <div className="flex-1 min-w-0 px-3 py-2 rounded-xl bg-slate-900/40 border border-slate-800/60 text-[11px] text-slate-500 font-bold">
-                    아직 등록된 정답이 없어요
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setAnswerDraft(editFinalAnswer)}
-                  title="정답 수정"
-                  className="flex-none w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 hover:border-amber-500/50 text-amber-400 hover:text-amber-300 flex items-center justify-center transition-all active:scale-95"
-                >
-                  ✏️
-                </button>
-              </div>
-            )}
-
-            {/* 단계별 유기적 활성화 영역 (3열 구조 복원 및 포커싱 강화) */}
-            {(() => {
-              const reviews = selectedEntry.reviews || ['', '', ''];
-              let activeStep = 3;
-              for (let i = 0; i < 3; i++) {
-                if (reviews[i] === '') {
-                  activeStep = i;
-                  break;
-                }
-              }
-
-              return (
-                <>
-                  <div className="rn-review-stages grid grid-cols-3 gap-3">
-                    {[0, 1, 2].map((index) => {
-                      const state = reviews[index];
-                      const isCompleted = state !== '';
-                      const isActive = index === activeStep;
-                      const isLocked = index > activeStep;
-
-                      let cardStyle = "";
-                      if (isActive) {
-                        cardStyle = "bg-slate-900 border-indigo-500/80 shadow-lg shadow-indigo-500/5 ring-1 ring-indigo-500/30";
-                      } else if (isCompleted) {
-                        cardStyle = "bg-slate-900/80 border-slate-800 opacity-95";
-                      } else if (isLocked) {
-                        cardStyle = "bg-slate-900/40 border-slate-900 opacity-40";
-                      }
-
-                      return (
-                        <div
-                          key={index}
-                          className={`rn-review-stage p-3 rounded-2xl border text-center flex flex-col justify-between min-h-[105px] transition-all duration-300 ${cardStyle}`}
-                        >
-                          <div className="text-[10px] font-bold text-slate-500 mb-1">{index + 1}차 복습</div>
-
-                          <div className="flex-1 flex items-center justify-center">
-                            {isCompleted ? (
-                              /* 완료 상태: 큼직한 결과 스탬프 배지 및 아래 날짜 노출 */
-                              <div className="animate-scale-up flex flex-col items-center">
-                                {state === 'O' && (
-                                  authorStamp ? (
-                                    <span className={`w-9 h-9 rounded-full flex items-center justify-center text-[26px] drop-shadow-[0_2px_8px_rgba(245,158,11,0.25)] animate-scale-up ${authorStampCatalogItem ? `border-2 ${authorStampBorderClass}` : ''}`}>
-                                      {authorStamp === '🐾' ? <CatPawIcon className="w-6 h-6" /> : authorStamp}
-                                    </span>
-                                  ) : (
-                                    <span className="w-9 h-9 rounded-full bg-emerald-500 text-slate-950 font-black text-sm flex items-center justify-center shadow-lg shadow-emerald-500/10">
-                                      O
-                                    </span>
-                                  )
-                                )}
-                                {state === 'X' && (
-                                  <span className="w-9 h-9 rounded-full bg-red-500 text-white font-black text-sm flex items-center justify-center shadow-lg shadow-red-500/10">
-                                    X
-                                  </span>
-                                )}
-                                {state === 'star' && (
-                                  <span className="w-9 h-9 rounded-full bg-amber-400 text-slate-950 font-black text-sm flex items-center justify-center shadow-lg shadow-amber-400/10">
-                                    ★
-                                  </span>
-                                )}
-                                {selectedEntry.analysis?.reviewDates?.[index] && (
-                                  <span className="text-[9px] text-slate-400 font-bold font-mono mt-1.5 block select-none">
-                                    📅 {selectedEntry.analysis.reviewDates[index]}
-                                  </span>
-                                )}
-                              </div>
-                            ) : isActive ? (
-                              /* 활성 상태: 클릭 가능한 입력 버튼 활성화 */
-                              <div className="rn-review-choices flex items-center space-x-1.5 animate-fade-in">
-                                <button
-                                  onClick={(e) => handleReviewToggle(index, 'O', e)}
-                                  aria-label={`맞았어요 · ${index + 1}차 복습`}
-                                  aria-pressed={false}
-                                  className="w-7 h-7 rounded-full text-xs font-black bg-slate-800 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 transition-all active:scale-90 border border-slate-700/60"
-                                >
-                                  <span aria-hidden="true">O</span><span className="rn-review-choice-label">맞았어요</span>
-                                </button>
-                                <button
-                                  onClick={(e) => handleReviewToggle(index, 'X', e)}
-                                  aria-label={`틀렸어요 · ${index + 1}차 복습`}
-                                  aria-pressed={false}
-                                  className="w-7 h-7 rounded-full text-xs font-black bg-slate-800 text-red-400 hover:bg-red-500 hover:text-white transition-all active:scale-90 border border-slate-700/60"
-                                >
-                                  <span aria-hidden="true">X</span><span className="rn-review-choice-label">틀렸어요</span>
-                                </button>
-                                <button
-                                  onClick={(e) => handleReviewToggle(index, 'star', e)}
-                                  aria-label={`보류할게요 · ${index + 1}차 복습`}
-                                  aria-pressed={false}
-                                  className="w-7 h-7 rounded-full text-xs font-black bg-slate-800 text-amber-400 hover:bg-amber-400 hover:text-slate-950 transition-all active:scale-90 border border-slate-700/60"
-                                >
-                                  <span aria-hidden="true">★</span><span className="rn-review-choice-label">보류할게요</span>
-                                </button>
-                              </div>
-                            ) : (
-                              /* 잠금 상태: 🔒 표시 */
-                              <div className="text-[10px] text-slate-600 font-bold flex flex-col items-center justify-center space-y-1">
-                                <span className="text-xs">🔒</span>
-                                <span>대기 중</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* 하단 롤백(앞으로 가기) 및 복습 기록 정리 제어반 */}
-                  <div className="flex flex-col space-y-2 mt-1">
-                    {activeStep > 0 && (
-                      <button
-                        onClick={handleRollbackReview}
-                        className="px-3 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-500 hover:text-slate-400 font-bold text-[10px] transition-all active:scale-95 w-fit mx-auto flex items-center justify-center mt-1"
-                      >
-                        <span>↩ 이전 단계로</span>
-                      </button>
-                    )}
-
-                    {activeStep === 3 && (
-                      <button
-                        onClick={() => {
-                          if (confirm('틀리거나 보류한 기록을 정리하고 맞춘(O) 기록만 앞으로 정렬하여 다시 복습하시겠습니까?')) {
-                            const oReviews = (selectedEntry.reviews || []).filter(r => r === 'O');
-                            // O가 하나도 없으면(전부 X/★) ''를 2개만 이어붙여선 배열 길이가 2에
-                            // 그쳐서 3번째 칸이 undefined가 되어 버튼도 안 뜨고 잠기지도 않는
-                            // "고정" 상태로 망가졌다. 항상 최소 3칸이 되도록 ''를 3개 붙인다.
-                            const newReviews = [...oReviews, '', '', ''].slice(0, 3) as ReviewState[];
-                            // 배점은 이제 "몇 번째 칸이냐"가 아니라 체크 시점에 analysis.reviewPoints에
-                            // 영구 저장된 값을 그대로 데려가므로(handleUpdateReviews 참고), O를 앞으로
-                            // 당겨도 그 자체로는 점수가 안 바뀐다 — skipPointRecalc=true는 그래도 이
-                            // "정리" 액션만큼은 어떤 미세한 점수 변화도 없도록 하는 추가 안전장치.
-                            onUpdateReviews(selectedEntry.id, newReviews, true);
-                          }
-                        }}
-                        className="w-full py-2.5 rounded-xl bg-indigo-600/10 hover:bg-indigo-600/20 active:scale-95 border border-indigo-500/20 text-indigo-400 font-bold text-xs transition-all flex items-center justify-center space-x-1.5"
-                      >
-                        <span>🔄 맞춘 오답 제외하고 복습 기록 정리하기</span>
-                      </button>
-                    )}
-                  </div>
-                </>
-              );
-            })()}
-          </div>
-
-          {/* ── 학습 흐름 6: 그 외 부가정보 ── AI 모델 정보, 학습 기록(스캐폴딩/재풀이), 진단
-              재생성 배너. 각 조건/데이터/저장 경로는 전혀 바꾸지 않고 위치만 옮겼다. */}
-          {isAnalysisReady && (
-            <div className="space-y-6">
-              {/* AI 모델 명시 정보 */}
-              {isAdmin && <div className="flex items-center justify-end">
-                <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-slate-800 text-indigo-400 border border-slate-700/60 flex items-center space-x-1 select-none">
-                  <span>⚡ AI 엔진:</span>
-                  <span className="font-extrabold">{selectedEntry.analysis!.modelUsed || 'gemini-2.5-flash (기본)'}</span>
-                </span>
-              </div>}
-
-              {/* Card 0.5: 📚 나의 학습 기록 — 선생님 힌트(스캐폴딩)와 재풀이 기록을 한 묶음으로.
-                  재풀이는 이제 별도 사진 업로드 UI가 아니라 "다시 풀어볼게요" → 풀이노트(문제
-                  이미지 위에 직접 필기) → 저장 시 이 스캐폴딩 목록에 "내 풀이"로 자동 등록되는
-                  흐름 하나로 합쳐졌다(HandwritingOverlay.handleSave, 기존 구조 그대로 재사용). */}
-              <div className="space-y-2">
-                <h4 className="text-[11px] font-black text-slate-500 uppercase tracking-wide px-1">📚 나의 학습 기록</h4>
-                <MistakeScaffoldingDrawer
-                  mistakeId={selectedEntry.id}
-                  studentId={selectedEntry.userId || ''}
-                  currentUserId={currentUserId || ''}
-                  isAdmin={isAdmin}
-                  refreshSignal={scaffoldingRefreshKey}
-                />
-
-                {/* 과거(이번 라운드 이전)에 올린 재풀이 사진이 있으면 계속 보여준다 — DB/Storage
-                    데이터는 그대로 유지, 신규 업로드 UI만 제거됐다. 지우고 싶으면 삭제 가능. */}
-                {selectedEntry.answerImageUrl && (
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-slate-400 block">이전에 올린 재풀이 사진</label>
-                    <div className="relative rounded-xl overflow-hidden border border-slate-800 bg-slate-950">
-                      <img
-                        src={selectedEntry.answerImageUrl}
-                        alt="내가 다시 푼 풀이"
-                        className="w-full max-h-64 object-contain"
-                      />
-                      <button
-                        type="button"
-                        onClick={onDeleteAnswerImage}
-                        aria-label="재풀이 사진 삭제"
-                        className="absolute top-2 right-2 w-7 h-7 rounded-full bg-slate-950/80 hover:bg-red-500/80 flex items-center justify-center text-white text-xs font-black transition-colors"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* 🧭 정리하기(초기화) 이후 체크리스트 재생성 진행 상태 — 정석 풀이는 전혀 건드리지
-                  않고 이 배너들만 추가/제거된다(기존 데이터가 사라지거나 깜빡이지 않음). */}
-              {checkpointRegenStatus === 'generating' && (
-                <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
-                  <span className="flex-none w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
-                  <span>AI가 새로운 학습 진단을 만들고 있어요...</span>
-                </div>
-              )}
-              {checkpointRegenStatus === 'failed' && (
-                <div className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-red-500/10 text-red-300 border border-red-500/20">
-                  <span>⚠️ AI 진단 생성에 실패했어요</span>
-                  {onRetryCheckpointGeneration && (
-                    <button
-                      onClick={onRetryCheckpointGeneration}
-                      className="flex-none px-3 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-200 font-black active:scale-95 transition-all"
-                    >
-                      다시 시도
-                    </button>
-                  )}
-                </div>
-              )}
-              {checkpointRegenStatus === 'success' && (
-                <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-                  <span>✓ 새로운 진단이 준비됐어요</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ⚡ AI 추천 동영상 딥링크 연동 카드 (test 학생 한정) — "그 외" 그룹으로 이동 */}
-          {matchedLecture && (
-            <div className="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-3.5 flex items-center justify-between space-x-3.5 animate-scale-up">
-              <div className="flex items-center space-x-3 min-w-0">
-                <span className="text-xl flex-none">📺</span>
-                <div className="min-w-0 space-y-0.5">
-                  <p className="text-[10px] font-black text-rose-400 uppercase tracking-wider">선생님 추천 강의</p>
-                  <h5 className="text-xs font-bold text-slate-200 truncate leading-tight">
-                    {matchedLecture.videoTitle}
-                  </h5>
-                  <p className="text-[10px] text-slate-400 truncate">
-                    ⏱️ {matchedLecture.chapterTitle} ({
-                      Math.floor(matchedLecture.startSeconds / 60) > 0
-                        ? `${Math.floor(matchedLecture.startSeconds / 60)}분 ${matchedLecture.startSeconds % 60}초`
-                        : `${matchedLecture.startSeconds % 60}초`
-                    }부터)
-                  </p>
-                </div>
-              </div>
-
-              <a
-                href={`https://youtu.be/${matchedLecture.videoId}?t=${matchedLecture.startSeconds}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 active:scale-95 text-rose-300 hover:text-rose-200 font-extrabold text-[10px] border border-rose-500/20 transition-all flex items-center space-x-1 flex-none shadow-md"
-              >
-                <span>▶️</span>
-                <span>바로가기</span>
-              </a>
-            </div>
-          )}
-
-          {/* 문제 분류 편집 — 실수 원인은 "왜 틀렸을까?"(§3) 섹션으로 옮겨갔으므로
+          {/* 문제 분류 편집 — 실수 원인은 "왜 틀렸을까?"(학습 흐름 6) 섹션으로 옮겨갔으므로
               여기서는 과목/단원만 남는다(기본 접힘 유지). */}
           <details className="rn-detail-section rn-metadata">
             <summary className="rn-metadata-summary">
