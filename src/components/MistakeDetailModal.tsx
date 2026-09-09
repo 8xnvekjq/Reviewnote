@@ -4,7 +4,6 @@ import { createPortal } from 'react-dom';
 import type { MistakeEntry, MistakeAnalysis, ReviewState, SolutionChecklistItem } from '../types';
 import { ROOT_CAUSE_OPTIONS, MATH_CURRICULUM, GRADE_LIST, SOLVING_PLACEHOLDER_TEXT } from '../types';
 import { LaTeXRenderer } from './LaTeXRenderer';
-import { formatDate } from '../utils/date';
 import { supabase } from '../services/supabase';
 import { GACHA_ITEMS, getRarityTheme } from '../utils/gachaCatalog';
 import { CatPawIcon } from './CatPawIcon';
@@ -1138,19 +1137,12 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
           <div className="w-10 h-1.5 rounded-full bg-slate-700" />
         </div>
 
-        {/* Modal Header */}
-        <div className="rn-detail-header px-6 py-4 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/80 sticky top-0">
-          <div className="pr-4 flex-1">
-            <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-wider">
-              {formatDate(selectedEntry.date)}
-            </span>
-            <h3 id="rn-detail-title" className="font-bold text-white text-base line-clamp-1 min-w-0">
-              <LaTeXRenderer
-                text={selectedEntry.title}
-                className="text-white font-bold text-base line-clamp-1 inline-block w-full"
-              />
-            </h3>
-          </div>
+        {/* Modal Header — 큰 제목/날짜(카드에서 이미 본 문제명·등록일 중복)를 없애고 닫기
+            버튼만 남긴 최소 높이 바. 다이얼로그 접근성 이름(aria-labelledby)은 화면에는
+            안 보이는 sr-only h3로 계속 제공 — "제목 제거"가 곧 "접근성 이름 제거"가 되지
+            않게 한다. 학생이 열자마자 문제 이미지가 바로 보이는 게 우선(이번 요청 §2). */}
+        <div className="rn-detail-header rn-detail-header-compact px-4 py-1.5 border-b border-slate-800/80 flex items-center justify-end bg-slate-900/80 sticky top-0">
+          <h3 id="rn-detail-title" className="sr-only"><LaTeXRenderer text={selectedEntry.title} className="sr-only" /></h3>
           <button
             onClick={onClose}
             aria-label="문제 상세 닫기"
@@ -1170,6 +1162,23 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             </button>
             <div className="rn-problem-actions"><span className="rn-caption">먼저, 나의 힘으로 풀어봐요</span><button type="button" onClick={openProblemOverlay} aria-label="풀이노트 열기" className="rn-button rn-button-primary">✎ 풀이노트</button></div>
           </section>
+
+          {/* 문제 분류 — "문제 분류 편집"이라는 큰 section title/details 접힘 없이, 현재
+              값이 항상 보이는 한 줄 compact control로 이동(이번 요청 §7-8). 기존
+              editGrade/editChapter state·onChange·save 경로(§handleUpdateMistake의
+              grade/chapter 필드)는 그대로 재사용 — 새 필드/스키마 없음, 두 개의 select를
+              나란히 두는 기존 데이터 구조(과목→단원 종속)를 그대로 살렸다. */}
+          <div className="rn-category-row">
+            <select aria-label="과목" value={editGrade} onChange={e => { setEditGrade(e.target.value); setEditChapter(''); }} className="rn-category-select">
+              <option value="">과목 선택</option>
+              {GRADE_LIST.map(g => <option key={g} value={g}>{g}</option>)}
+            </select>
+            <select aria-label="단원" value={editChapter} onChange={e => setEditChapter(e.target.value)} disabled={!editGrade} className="rn-category-select">
+              <option value="">단원 선택</option>
+              {chaptersForGrade.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
           {/* ── 학습 흐름 1: 복습 확인 (PR #46 이전 실제 순서로 복원 — git show
               62ec993:src/components/MistakeDetailModal.tsx 기준, 문제 이미지 바로 다음이
               항상 이 "복습 상태 진단" 패널이었다). O/X/★ 저장 로직(handleReviewToggle/
@@ -1230,10 +1239,11 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
               </div>
             )}
 
-            {/* 단계별 유기적 활성화 영역 — 1/2/3차를 3열 카드(각 105px+)로 나열하던 것을
-                실기기 피드백("스크롤 피로감")에 따라 차수가 가로 한 줄에 오는 compact 행
-                리스트로 바꿨다. activeStep/isCompleted/isLocked 판정과 handleReviewToggle
-                호출부는 그대로 재사용 — presentation만 바뀐다. */}
+            {/* 단계별 유기적 활성화 영역 — 세로로 3행 쌓이던 compact row를 다시 "1차/2차/3차"가
+                가로로 나란한 3열 그리드로 바꿔 세로 높이를 한 번 더 줄인다(이번 요청 §1: "차수를
+                가로로"). 각 열 안에서는 라벨 → O/X/★(또는 결과/잠금) → 날짜 순으로 세로 2~3줄만
+                차지한다. activeStep/isCompleted/isLocked 판정과 handleReviewToggle 호출부는
+                그대로 재사용 — presentation만 바뀐다. */}
             {(() => {
               const reviews = selectedEntry.reviews || ['', '', ''];
               let activeStep = 3;
@@ -1253,6 +1263,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                       const isActive = index === activeStep;
                       const rowState = isCompleted ? 'completed' : isActive ? 'active' : 'locked';
 
+                      const reviewDate = selectedEntry.analysis?.reviewDates?.[index];
                       return (
                         <div key={index} className="rn-review-row" data-state={rowState}>
                           <span className="rn-review-row-label">{index + 1}차</span>
@@ -1270,9 +1281,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                                 )}
                                 {state === 'X' && <span className="rn-review-result is-x" aria-label={`틀렸어요 · ${index + 1}차 복습`}>X</span>}
                                 {state === 'star' && <span className="rn-review-result is-star" aria-label={`보류함 · ${index + 1}차 복습`}>★</span>}
-                                {selectedEntry.analysis?.reviewDates?.[index] && (
-                                  <span className="rn-review-row-date">{selectedEntry.analysis.reviewDates[index]}</span>
-                                )}
                               </>
                             ) : isActive ? (
                               <>
@@ -1305,6 +1313,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                               <span className="rn-review-row-locked" aria-label={`${index + 1}차 복습 대기 중`}>🔒</span>
                             )}
                           </div>
+                          {isCompleted && reviewDate && <span className="rn-review-row-date">{reviewDate}</span>}
                         </div>
                       );
                     })}
@@ -1420,16 +1429,19 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                   </div>
                 )}
                 {checklistItems && (() => {
-                  // 🧭 순차 잠금 — 앞 항목이 미응답이면 다음 항목은 잠근다. "막혔어요"도 유효한
-                  // 응답이라 done/stuck 둘 다 다음을 연다("unanswered"만 멈춘다). 별도 잠금 필드를
-                  // DB에 저장하지 않는다 — 매 렌더마다 현재 items의 status로부터 다시 계산하므로,
-                  // 저장된 응답이 있는 문제를 다시 열어도 잠금 상태가 자연스럽게 복원된다(레거시
-                  // solutionCheckpoints의 frontier 계산과 동일한 패턴, 다만 거긴 stuck이 멈추고
-                  // 여긴 멈추지 않는다는 차이가 있다).
-                  const frontierIndex = (() => {
-                    const idx = checklistItems.findIndex(it => it.status === 'unanswered');
-                    return idx === -1 ? checklistItems.length : idx;
-                  })();
+                  // 🧭 Progressive disclosure — 한 문항씩만 노출한다(세로 스크롤 피로감 감소
+                  // 요청). status 값(unanswered/done/stuck)과 저장 로직(onSetChecklistItemStatus)
+                  // 은 전혀 바꾸지 않고, "몇 번째까지 화면에 그릴지"만 매 렌더마다 새로 계산한다 —
+                  // 별도 UI-only state 없이 items의 status로부터 파생되므로 재진입해도 저장된
+                  // 응답 그대로 정확히 복원된다.
+                  // product decision(이번 요청 §4): done만 다음 문항을 열고, stuck은 그 다음부터
+                  // "표시" 자체를 멈춘다(레거시 solutionCheckpoints의 done/stuck 둘 다 다음을 여는
+                  // 규칙과는 의도적으로 다르다 — 레거시 쪽은 건드리지 않음). haltIndex = 'done'이
+                  // 아닌 첫 항목(= 아직 안 푼 문항이거나 막힌 문항) — 그 이후는 아예 렌더하지
+                  // 않는다(예전처럼 🔒로 흐리게 보여주는 게 아니라 완전히 숨김).
+                  const haltIndex = checklistItems.findIndex(it => it.status !== 'done');
+                  const visibleCount = haltIndex === -1 ? checklistItems.length : haltIndex + 1;
+                  const visibleItems = checklistItems.slice(0, visibleCount);
                   return (
                     <div className="rn-checklist rn-checklist-compact space-y-1.5">
                       <h4 className="text-sm font-extrabold text-emerald-400 flex items-center">
@@ -1439,59 +1451,61 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                         풀기 전에 어디까지 스스로 해봤는지 확인해보세요.
                       </p>
                       <div className="space-y-1.5">
-                        {checklistItems.map((item, index) => {
-                          const isLocked = index > frontierIndex;
+                        {visibleItems.map((item, index) => {
+                          const isLast = index === visibleItems.length - 1;
+                          const isActive = isLast && item.status === 'unanswered';
+                          if (!isActive) {
+                            // 완료(✓)/막힘(⚠) 문항 — 큰 카드+버튼 대신 한 줄짜리 compact row.
+                            // 원문 그대로 유지, 왜곡/축약 없음. row 자체가 작은 상태 수정
+                            // affordance(탭하면 done⇄stuck 전환, 기존 onSetChecklistItemStatus
+                            // 재사용, 새 로직 없음) — done을 stuck으로 되돌리면 그 뒤 항목은
+                            // 자연히 다시 숨겨진다(halt 규칙이 매번 다시 계산되므로).
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => onSetChecklistItemStatus(selectedEntry.id, item.id, item.status === 'done' ? 'stuck' : 'done')}
+                                className={`rn-checklist-row ${item.status === 'done' ? 'is-done' : 'is-stuck'}`}
+                                aria-label={`${item.status === 'done' ? '완료' : '막힘'} · 탭하여 상태 변경`}
+                              >
+                                <span className="rn-checklist-row-icon" aria-hidden="true">{item.status === 'done' ? '✓' : '⚠'}</span>
+                                <LaTeXRenderer text={item.text} className="rn-checklist-row-text" />
+                              </button>
+                            );
+                          }
                           return (
-                            <div
-                              key={item.id}
-                              className={`rn-checklist-item rounded-xl border transition-all ${
-                                isLocked ? 'bg-slate-950/40 border-slate-900 opacity-50' : 'bg-slate-900 border-slate-800'
-                              }`}
-                            >
+                            <div key={item.id} className="rn-checklist-item rounded-xl border bg-slate-900 border-slate-800 transition-all">
                               <div className="flex items-start gap-1.5">
-                                {isLocked && <span className="flex-none text-sm leading-relaxed" aria-hidden="true">🔒</span>}
-                                <LaTeXRenderer
-                                  text={item.text}
-                                  className={`text-xs font-bold leading-relaxed ${isLocked ? 'text-slate-600' : 'text-slate-200'}`}
-                                />
+                                <LaTeXRenderer text={item.text} className="text-xs font-bold leading-relaxed text-slate-200" />
                               </div>
                               <div className="rn-checklist-actions flex items-center gap-1.5">
                                 <button
                                   type="button"
-                                  disabled={isLocked}
                                   onClick={() => onSetChecklistItemStatus(selectedEntry.id, item.id, 'done')}
-                                  className={`rn-checklist-choice flex-1 rounded-lg text-[11px] font-bold transition-all active:scale-95 disabled:active:scale-100 disabled:cursor-not-allowed ${
-                                    item.status === 'done'
-                                      ? 'bg-emerald-500 text-slate-950'
-                                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:hover:bg-slate-800 disabled:text-slate-600'
-                                  }`}
+                                  className="rn-checklist-choice flex-1 rounded-lg text-[11px] font-bold transition-all active:scale-95 bg-slate-800 text-slate-300 hover:bg-slate-700"
                                 >
                                   ✅ 했어요
                                 </button>
                                 <button
                                   type="button"
-                                  disabled={isLocked}
                                   onClick={() => onSetChecklistItemStatus(selectedEntry.id, item.id, 'stuck')}
-                                  className={`rn-checklist-choice flex-1 rounded-lg text-[11px] font-bold transition-all active:scale-95 disabled:active:scale-100 disabled:cursor-not-allowed ${
-                                    item.status === 'stuck'
-                                      ? 'bg-amber-500 text-slate-950'
-                                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:hover:bg-slate-800 disabled:text-slate-600'
-                                  }`}
+                                  className="rn-checklist-choice flex-1 rounded-lg text-[11px] font-bold transition-all active:scale-95 bg-slate-800 text-slate-300 hover:bg-slate-700"
                                 >
                                   🙋 막혔어요
                                 </button>
                               </div>
-                              {!isLocked && item.status === 'stuck' && (
-                                <p className="mt-1.5 text-[11px] leading-relaxed text-amber-200" role="status">
-                                  {item.id === 'fixed-1' ? '주어진 조건에 하나씩 밑줄을 긋고, 빠뜨린 조건이 있는지 찾아보세요.'
-                                    : item.id === 'fixed-2' ? '아는 조건 하나만 골라 식이나 간단한 그림으로 옮겨보세요.'
-                                    : item.id === 'fixed-3' ? '문제의 마지막 문장을 읽고 구할 대상을 내 말로 적어보세요.'
-                                    : '이 질문과 연결된 조건을 문제에서 찾아보세요. 어떤 말이나 개념이 어려운지 짚어본 뒤 아래 풀이와 비교해 보세요.'}
-                                </p>
-                              )}
                             </div>
                           );
                         })}
+                        {/* frontier 항목이 stuck이면(= 이후 문항 표시 중단) 힌트만 별도로 한 줄 더 보여준다 */}
+                        {haltIndex !== -1 && checklistItems[haltIndex].status === 'stuck' && (
+                          <p className="text-[11px] leading-relaxed text-amber-200 px-1" role="status">
+                            {checklistItems[haltIndex].id === 'fixed-1' ? '주어진 조건에 하나씩 밑줄을 긋고, 빠뜨린 조건이 있는지 찾아보세요.'
+                              : checklistItems[haltIndex].id === 'fixed-2' ? '아는 조건 하나만 골라 식이나 간단한 그림으로 옮겨보세요.'
+                              : checklistItems[haltIndex].id === 'fixed-3' ? '문제의 마지막 문장을 읽고 구할 대상을 내 말로 적어보세요.'
+                              : '이 질문과 연결된 조건을 문제에서 찾아보세요. 어떤 말이나 개념이 어려운지 짚어본 뒤 아래 풀이와 비교해 보세요.'}
+                          </p>
+                        )}
                       </div>
                     </div>
                   );
@@ -1881,50 +1895,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
               )}
 
           </section>
-
-          {/* 문제 분류 편집 — 실수 원인은 "왜 틀렸을까?"(학습 흐름 6) 섹션으로 옮겨갔으므로
-              여기서는 과목/단원만 남는다(기본 접힘 유지). */}
-          <details className="rn-detail-section rn-metadata">
-            <summary className="rn-metadata-summary">
-              <span className="text-xs font-extrabold text-slate-300">문제 분류 편집</span>
-              {(selectedEntry.grade || selectedEntry.chapter) && (
-                <div className="flex items-center space-x-1.5">
-                  {selectedEntry.grade && <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-600/20 text-indigo-400 border border-indigo-600/30 font-bold">{selectedEntry.grade}</span>}
-                  {selectedEntry.chapter && <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-700 text-slate-300 border border-slate-600 font-bold">{selectedEntry.chapter}</span>}
-                </div>
-              )}
-            </summary>
-            <div className="p-4 space-y-4">
-
-              {/* 과목 / 단원 선택 */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-slate-400 block">과목 (AI 자동분류)</label>
-                  <select
-                    aria-label="과목" value={editGrade}
-                    onChange={e => { setEditGrade(e.target.value); setEditChapter(''); }}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer"
-                  >
-                    <option value="">선택하세요</option>
-                    {GRADE_LIST.map(g => <option key={g} value={g}>{g}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-slate-400 block">단원</label>
-                  <select
-                    aria-label="단원" value={editChapter}
-                    onChange={e => setEditChapter(e.target.value)}
-                    disabled={!editGrade}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer disabled:opacity-40"
-                  >
-                    <option value="">선택하세요</option>
-                    {chaptersForGrade.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-              </div>
-
-            </div>
-          </details>
 
         </div>
 

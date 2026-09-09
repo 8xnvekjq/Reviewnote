@@ -2,8 +2,17 @@
 .rn-detail-backdrop { background: rgba(5, 9, 18, .76); }
 .rn-detail-sheet { background: var(--rn-bg); border-color: var(--rn-line); max-height: calc(100dvh - env(safe-area-inset-top) - 12px); }
 .rn-detail-header { background: var(--rn-surface); padding: 18px 20px; gap: 12px; }
-.rn-detail-header h3, .rn-detail-header h3 > * { font-size: 18px; line-height: 1.45; letter-spacing: -.025em; }
-.rn-detail-header > div > span { font-size: 12px; color: var(--rn-muted); margin-bottom: 4px; }
+/* 큰 제목/날짜 제거 후 닫기 버튼만 남은 최소 높이 헤더(이번 요청 §2) — 카드에서 이미 본
+   문제명이 상세를 열자마자 다시 크게 보이며 콘텐츠를 아래로 밀어내던 문제 해결. */
+.rn-detail-header.rn-detail-header-compact { padding: 6px 12px; gap: 0; }
+/* 문제 분류 — "문제 분류 편집" 큰 section/details 대신 항상 보이는 한 줄 compact select
+   두 개(과목/단원, 기존 필드 그대로). .rn-student-select와 같은 compact select 관례를
+   재사용(13px/34px) — .rn-app :where(select){font-size:16px}는 :where()라 특이도 0이라
+   여기서도 안전하게 덮어써진다. */
+.rn-detail-body .rn-category-row { display: flex; gap: 6px; }
+.rn-detail-body .rn-category-select { flex: 1; min-width: 0; min-height: 34px; padding: 6px 10px; border-radius: var(--rn-radius-sm); background: var(--rn-elevated); border: 1px solid var(--rn-line); color: var(--rn-text); font-size: 13px; outline: none; cursor: pointer; }
+.rn-detail-body .rn-category-select:disabled { opacity: .45; cursor: not-allowed; }
+.rn-detail-body .rn-category-select:focus-visible { border-color: var(--rn-accent); }
 .rn-detail-body { padding: 20px; overscroll-behavior: contain; scrollbar-width: thin; }
 .rn-detail-body > * + * { margin-top: 24px; }
 .rn-detail-body :is(p, label, input, textarea, select) { font-size: max(12px, 1em); }
@@ -20,22 +29,24 @@
    변경하지 않고 presentation만 바꾼다 — activeStep/handleReviewToggle 그대로. */
 .rn-review-panel.rn-review-panel-compact { padding: 14px; }
 .rn-review-panel-title { font-size: 11px; font-weight: 800; color: var(--rn-muted); text-transform: uppercase; letter-spacing: .04em; }
-.rn-review-rows { display: grid; gap: 6px; }
-.rn-review-row { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 6px 10px; border-radius: 12px; background: var(--rn-elevated); border: 1px solid var(--rn-line); }
+/* 1차/2차/3차를 세로 3행(row)이 아니라 가로 3열(column)로 나란히 — 이번 요청 §1:
+   "차수가 가로로" 스크롤 피로감 감소. 열 안에서는 라벨→O/X/★(또는 결과)→날짜 순 세로 배치. */
+.rn-review-rows { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.rn-review-row { display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 40px; padding: 8px 4px; border-radius: 12px; background: var(--rn-elevated); border: 1px solid var(--rn-line); }
 .rn-review-row[data-state="active"] { border-color: rgb(var(--color-indigo-400) / .5); background: rgb(var(--color-indigo-500) / .1); }
 .rn-review-row[data-state="locked"] { opacity: .5; }
-.rn-review-row-label { flex: none; width: 26px; font-size: 11px; font-weight: 800; color: var(--rn-muted); }
-.rn-review-row-choices { display: flex; align-items: center; gap: 6px; flex: 1; }
-.rn-review-pick { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; background: var(--rn-surface); border: 1px solid var(--rn-line); color: var(--rn-muted); touch-action: manipulation; }
+.rn-review-row-label { font-size: 11px; font-weight: 800; color: var(--rn-muted); }
+.rn-review-row-choices { display: flex; align-items: center; justify-content: center; gap: 4px; }
+.rn-review-pick { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; background: var(--rn-surface); border: 1px solid var(--rn-line); color: var(--rn-muted); touch-action: manipulation; }
 .rn-review-pick.is-o:hover, .rn-review-pick.is-o:active { color: var(--rn-success); border-color: var(--rn-success); }
 .rn-review-pick.is-x:hover, .rn-review-pick.is-x:active { color: var(--rn-danger); border-color: var(--rn-danger); }
 .rn-review-pick.is-star:hover, .rn-review-pick.is-star:active { color: var(--rn-warning); border-color: var(--rn-warning); }
-.rn-review-result { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 800; flex: none; }
+.rn-review-result { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; flex: none; }
 .rn-review-result.is-o { background: rgba(120,219,181,.15); color: var(--rn-success); }
 .rn-review-result.is-x { background: rgba(245,155,167,.15); color: var(--rn-danger); }
 .rn-review-result.is-star { background: rgba(242,199,119,.15); color: var(--rn-warning); }
-.rn-review-row-date { font-size: 10px; color: var(--rn-muted); font-variant-numeric: tabular-nums; }
-.rn-review-row-locked { font-size: 13px; }
+.rn-review-row-date { font-size: 9px; color: var(--rn-muted); font-variant-numeric: tabular-nums; }
+.rn-review-row-locked { font-size: 12px; }
 .rn-checklist { padding: 20px; border: 1px solid var(--rn-line); border-radius: var(--rn-radius-lg); background: var(--rn-surface); }
 .rn-checklist > h4 { color: var(--rn-text); font-size: 16px; }
 .rn-checklist button { min-height: 44px; font-size: 13px; }
@@ -50,6 +61,17 @@
 .rn-checklist-item { padding: 8px; }
 .rn-checklist-actions { margin-top: 6px; }
 .rn-checklist .rn-checklist-actions .rn-checklist-choice { min-height: 34px; font-size: 11px; padding: 6px 8px; }
+/* 풀기 전 체크리스트 progressive disclosure — 완료(done)/막힘(stuck) 문항의 compact 한 줄
+   row. 큰 카드+버튼 대신 탭하면 done⇄stuck을 바로 전환하는 작은 수정 affordance(동일
+   onSetChecklistItemStatus 재사용). 3-class 선택자로 .rn-detail-body의 44px 블랑켓
+   규칙을 덮어써서 진짜 짧은 한 줄로 만든다. */
+.rn-checklist.rn-checklist-compact .rn-checklist-row { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 30px; padding: 5px 8px; border-radius: 10px; text-align: left; touch-action: manipulation; }
+.rn-checklist-row.is-done { background: rgba(120,219,181,.08); }
+.rn-checklist-row.is-stuck { background: rgba(242,199,119,.08); }
+.rn-checklist-row-icon { flex: none; font-size: 12px; font-weight: 800; }
+.rn-checklist-row.is-done .rn-checklist-row-icon { color: var(--rn-success); }
+.rn-checklist-row.is-stuck .rn-checklist-row-icon { color: var(--rn-warning); }
+.rn-checklist-row-text { font-size: 12px; font-weight: 600; color: var(--rn-muted); line-height: 1.4; }
 .rn-detail-section { border: 1px solid var(--rn-line); border-radius: var(--rn-radius-md); background: var(--rn-surface); overflow: hidden; }
 .rn-section-toggle { min-height: 64px; gap: 16px; }
 .rn-section-toggle h4 { font-size: 15px; font-weight: 650; color: var(--rn-text); flex-wrap: wrap; gap: 4px; }
@@ -78,9 +100,6 @@
 }
 .rn-plan { display: grid; gap: 12px; }
 .rn-plan > .rn-title { font-size: 18px; }
-.rn-metadata-summary { min-height: 60px; cursor: pointer; padding: 18px 16px; }
-.rn-metadata-summary > div { display: none; }
-.rn-metadata label { min-height: 44px; }
 .rn-detail-body input.rn-cause-checkbox { appearance: auto; accent-color: var(--rn-accent); width: 20px; height: 20px; min-height: 20px; flex: none; }
 .rn-problem { border-radius: 20px; border: 1px solid var(--rn-line); overflow: hidden; background: var(--rn-surface); }
 .rn-problem-image { display: block; width: 100%; position: relative; background: #eff0f4; padding: 12px; }
@@ -89,7 +108,6 @@
 .rn-problem-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; }
 .rn-problem-actions .rn-caption { font-size: 12px; }
 .rn-detail-header { flex-shrink: 0; }
-.rn-detail-header > div { min-width: 0; }
 .rn-detail-footer { flex-shrink: 0; }
 .rn-writing-toolbar > div { gap: 0; }
 .rn-writing-toolbar > div > span[aria-hidden] { margin-inline: 2px; }

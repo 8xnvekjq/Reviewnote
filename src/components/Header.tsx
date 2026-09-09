@@ -4,6 +4,9 @@ import logoImg from '../assets/logo.jpg';
 import { AppIcon } from './ui/AppIcon';
 import { Sheet } from './ui/Sheet';
 import { getTitleBadgeStyle } from '../utils/gachaCatalog';
+// rn-online-* 클래스는 notes.css에 정의돼 있다(MistakeList의 "함께 공부 중" 배지와 동일
+// 컴포넌트/스타일 재사용 — 상단 네비바용으로 새로 만들지 않는다).
+import '../styles/notes.css';
 
 // vite.config.ts의 define 블록에서 빌드 시 자동 주입
 declare const __APP_VERSION__: string;
@@ -42,6 +45,7 @@ interface HeaderProps {
   comboBoosterExpiresAt?: string | null; // 콤보 부스터 5배 버프 만료시각 (서버 profiles 기준)
   isAdmin?: boolean;
   onSelectTab?: (tab: ActiveTab) => void;
+  onlineUsers?: { id: string; display_name: string; nickname?: string; username: string }[]; // 실시간 온라인 학생 — App.tsx가 이미 계산해 MistakeList/BottomNavigation에도 넘기는 것과 동일한 배열 재사용(신규 realtime subscription 없음)
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -60,8 +64,10 @@ export const Header: React.FC<HeaderProps> = ({
   comboBoosterExpiresAt,
   isAdmin,
   onSelectTab,
+  onlineUsers = [],
 }) => {
   const [showUserMenu, setShowUserMenu] = React.useState(false);
+  const [showOnlinePopup, setShowOnlinePopup] = React.useState(false);
   const [isNicknameModalOpen, setIsNicknameModalOpen] = React.useState(false);
   const [nicknameInput, setNicknameInput] = React.useState('');
   const [isAiNameModalOpen, setIsAiNameModalOpen] = React.useState(false);
@@ -118,6 +124,31 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
           <div className="rn-header-actions">
             {myScore !== undefined && <button type="button" className="rn-button rn-points" onClick={() => onOpenStore?.()} aria-label={`내 포인트 ${myScore}점, 럭키상점 열기`}><span aria-hidden="true">✦</span>{myScore.toLocaleString()}</button>}
+            {/* 실시간 온라인 학생 확인 — 전체메뉴 정리 과정에서 사라진 기능을 상단 네비바에
+                작은 아이콘 버튼으로 복원(git history 83f91a4 "Online 배지+목록 팝업" 기준).
+                onlineUsers는 App.tsx의 last_seen_at 5분 윈도 폴링을 그대로 재사용 — 여기서
+                별도 realtime/polling을 새로 만들지 않는다. MistakeList의 "함께 공부 중"
+                배지와 데이터는 동일하지만(코드로 확인됨, 별도 presence 채널 없음), 오답노트
+                탭에서만 보이던 것과 달리 이 버튼은 모든 화면에서 항상 접근 가능하다. */}
+            {onlineUsers.length > 0 && (
+              <div className="rn-online-wrap">
+                <button type="button" className="rn-online-badge" onClick={() => setShowOnlinePopup(v => !v)} aria-expanded={showOnlinePopup} aria-haspopup="dialog" aria-label={`실시간 온라인 학생 ${onlineUsers.length}명, 목록 보기`}>
+                  <span className="rn-online-dot" aria-hidden="true" />
+                  <span aria-hidden="true">👥</span>
+                  <span>{onlineUsers.length}</span>
+                </button>
+                {showOnlinePopup && (
+                  <div className="rn-online-popup" role="dialog" aria-label="실시간 온라인 학생 목록">
+                    <div className="rn-online-popup-title"><span>공부 중인 친구들</span><span className="rn-online-live">● Live</span></div>
+                    <ul className="rn-online-popup-list">
+                      {onlineUsers.map(u => (
+                        <li key={u.id}><span className="rn-online-dot" aria-hidden="true" /><span>{u.nickname || u.display_name || u.username}</span></li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
             <button type="button" className="rn-icon-button" onClick={() => setShowUserMenu(true)} aria-label="내 계정 메뉴" aria-haspopup="dialog" aria-expanded={showUserMenu}><AppIcon name="user" /></button>
           </div>
         </div>
