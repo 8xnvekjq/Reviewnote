@@ -98,8 +98,11 @@ function App() {
   const [weeklyMedals, setWeeklyMedals] = useState({ gold: 0, silver: 0, bronze: 0 });
   // 분석통계 탭 학생 필터 상태 (어드민 전용)
   const [statsStudentFilter, setStatsStudentFilter] = useState<string>('all');
-  // 분석통계 탭 기간 필터 상태 (디폴트: 'all' 전체기간)
-  const [statsPeriodFilter, setStatsPeriodFilter] = useState<'all' | '90' | '30'>('all');
+  // 분석통계 탭 기간 필터 상태 (디폴트: '30' 최근 30일 — 최근 취약점 파악에 더 유효한
+  // 기본값으로 변경. 저장된 사용자 preference 구조는 없음(plain useState, 매 로드마다
+  // 초기화) — 확인 후 안전하게 리터럴만 변경. 필터/집계 로직(filteredMistakesForStats)은
+  // 무변경, 사용자는 여전히 전체/90일/30일을 자유롭게 전환 가능.
+  const [statsPeriodFilter, setStatsPeriodFilter] = useState<'all' | '90' | '30'>('30');
   // 분석통계 탭 과목 아코디언 상태 (grade -> true/false)
   const [statsExpandedGrades, setStatsExpandedGrades] = useState<Record<string, boolean>>({});
   // userId -> schoolGrade map (AI 학년별 분류 최적화용)
