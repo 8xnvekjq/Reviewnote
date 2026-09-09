@@ -103,8 +103,15 @@ function App() {
   // 초기화) — 확인 후 안전하게 리터럴만 변경. 필터/집계 로직(filteredMistakesForStats)은
   // 무변경, 사용자는 여전히 전체/90일/30일을 자유롭게 전환 가능.
   const [statsPeriodFilter, setStatsPeriodFilter] = useState<'all' | '90' | '30'>('30');
-  // 분석통계 탭 과목 아코디언 상태 (grade -> true/false)
+  // 분석통계 탭 과목 아코디언 상태 (grade -> true/false). 시각화 개편(SUMMARY FIRST →
+  // DETAIL ON DEMAND)으로 기본값이 "펼침"에서 "접힘"으로 바뀐다 — 아래 렌더 쪽에서
+  // `=== true`로 판정(이전엔 `!== false`로 펼침이 기본이었다).
   const [statsExpandedGrades, setStatsExpandedGrades] = useState<Record<string, boolean>>({});
+  // 분석통계 탭 단원별 실수유형 drilldown 토글 상태 (`${grade}__${chapter}` -> true/false).
+  // 단원 row를 누르면 그 단원의 실수유형 세부 분포를 보여준다(신규 UI-only 상태, 집계
+  // 로직/데이터 구조는 그대로 — bubbleChartData의 기존 row.stats를 그대로 읽어 표시만
+  // 바꾼다).
+  const [statsExpandedChapters, setStatsExpandedChapters] = useState<Record<string, boolean>>({});
   // userId -> schoolGrade map (AI 학년별 분류 최적화용)
   const [profilesGradeMap, setProfilesGradeMap] = useState<Record<string, string>>({});
   // userId -> equippedStamp map (유저별 레어 도장 표출용)
@@ -1387,8 +1394,16 @@ function App() {
     const totalGrade = Object.values(gradeCounts).reduce((a, b) => a + b, 0);
     const totalCause = Object.values(causeCounts).reduce((a, b) => a + b, 0);
     const topChapters = Object.entries(chapterCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    // 실수유형별 compact bar용 — causeCounts를 건수 내림차순으로 정렬만 한다(집계 자체는
+    // 그대로, 시각화 개편 감사 보고서 §추천안 1위: "실수유형별 compact bar"). 0건인
+    // 원인은 굳이 안 보여준다 — 최대 5종류뿐이라 "TOP 4~5"는 사실상 있는 것만 노출.
+    const topCauses = ROOT_CAUSE_OPTIONS
+      .map(opt => ({ id: opt.id, label: opt.label, count: causeCounts[opt.id] || 0 }))
+      .filter(c => c.count > 0)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
 
-    return { gradeCounts, causeCounts, totalGrade, totalCause, topChapters };
+    return { gradeCounts, chapterCounts, causeCounts, totalGrade, totalCause, topChapters, topCauses };
   }, [filteredMistakesForStats]);
 
   const bubbleChartData = useMemo(() => {
@@ -1442,17 +1457,9 @@ function App() {
     });
   }, [filteredMistakesForStats]);
 
-  const maxCountInBubbles = useMemo(() => {
-    let maxVal = 0;
-    bubbleChartData.forEach(gGroup => {
-      gGroup.rows.forEach(row => {
-        row.stats.forEach(cell => {
-          if (cell.count > maxVal) maxVal = cell.count;
-        });
-      });
-    });
-    return Math.max(maxVal, 1);
-  }, [bubbleChartData]);
+  // maxCountInBubbles(예전 5열 버블 그리드의 크기/색 비율 계산용)는 시각화 개편으로
+  // 버블 렌더링 자체가 없어져 더 이상 쓰이지 않는다 — 죽은 코드라 제거(bubbleChartData
+  // 등 집계 데이터는 그대로 유지, 이 useMemo만 삭제).
 
   const maskId = (username: string) => {
     if (!username) return '';
@@ -1818,20 +1825,42 @@ function App() {
 
         {/* ── 분석통계 탭 ── */}
         <Screen when={activeTab === 'stats'}>
-          <div className="space-y-6 w-full overflow-x-hidden min-w-0">
+          <div className="space-y-5 w-full overflow-x-hidden min-w-0">
             <div>
               <h2 className="text-lg font-bold text-white">📊 나의 약점 분석</h2>
-              <p className="text-xs text-slate-400 mt-0.5">총 {filteredMistakesForStats.length}개의 오답 기록 기반</p>
+              <p className="text-xs text-slate-400 mt-0.5">총 {filteredMistakesForStats.length}건의 등록된 오답 기록 기반</p>
             </div>
 
-            {/* 어드민인 경우 학생 필터 셀렉터 추가 - 모바일 overflow 방지를 위해 세로 flex-col 배치 */}
+            {/* 기간 필터 — TOP3/실수유형/단원상세 화면 전체에 공통 적용되므로 카드 안이
+                아니라 화면 최상단으로 이동(시각화 개편 감사 §8: 390px 첫 화면에 기간
+                filter가 보여야 함). 필터 로직(filteredMistakesForStats)은 그대로. */}
+            <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-850 space-x-1 w-fit select-none">
+              {(['all', '90', '30'] as const).map(p => {
+                const label = p === 'all' ? '전체누적' : p === '90' ? '90일' : '30일';
+                const isAct = statsPeriodFilter === p;
+                return (
+                  <button
+                    key={p}
+                    onClick={() => setStatsPeriodFilter(p)}
+                    className={`px-2.5 py-1 rounded-lg text-[9px] font-black transition-all ${
+                      isAct ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* 어드민 학생 선택 — 기존 2행(라벨 줄 + 전체폭 select) 카드에서 1행 인라인으로
+                압축(감사 §Worker B: COMPACT). 기능/옵션 목록은 그대로. */}
             {isAdmin && (
-              <div className="flex flex-col space-y-2 bg-slate-900 border border-slate-800 p-3.5 rounded-2xl shadow-sm min-w-0">
-                <span className="text-xs text-slate-300 font-extrabold flex-none">👤 학생별 통계 조회</span>
+              <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-2 rounded-xl min-w-0">
+                <span className="text-[10px] text-slate-400 font-extrabold flex-none">👤 학생별</span>
                 <select
                   value={statsStudentFilter}
                   onChange={e => setStatsStudentFilter(e.target.value)}
-                  className="w-full min-w-0 px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer font-bold"
+                  className="flex-1 min-w-0 px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer font-bold"
                 >
                   <option value="all">전체 학생 합계 ({mistakes.length}개)</option>
                   {Array.from(new Set(mistakes.map(m => m.userId).filter(Boolean) as string[]))
@@ -1850,170 +1879,138 @@ function App() {
                 <p className="text-slate-300 font-medium text-sm">아직 분석할 데이터가 없습니다</p>
                 <p className="text-xs text-slate-500 mt-1">오답을 등록하고 실수 원인을 체크해 주세요.</p>
               </div>
+            ) : stats.topChapters.length === 0 && stats.topCauses.length === 0 && bubbleChartData.length === 0 ? (
+              // 오답은 있지만 단원/과목/실수유형이 아직 하나도 분류되지 않은 경우(예: AI
+              // 분석 전) — 기존에도 "해당 기간 내 분석된 약점 데이터가 없습니다" 안내가
+              // 있었다(구 버블 섹션 내부), 같은 문구를 화면 레벨로 유지.
+              <p className="text-xs text-slate-500 py-10 text-center">해당 기간 내 분석된 약점 데이터가 없습니다.</p>
             ) : (
               <>
-                {/* 아코디언 범주형 버블 차트 (Categorical Bubble Chart) */}
-                <div className="bg-[#0e1322] border border-slate-800/80 rounded-2xl p-5 space-y-4 shadow-[0_4px_30px_rgba(0,0,0,0.4)] backdrop-blur-md">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-800/60 pb-3">
-                    <div className="flex items-center space-x-1.5">
-                      <span className="text-base select-none">🫧</span>
-                      <h3 className="text-sm font-extrabold text-white">단원별 취약 버블 분석</h3>
-                    </div>
-                    {/* 기간 필터 토글 탭 */}
-                    <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-850 space-x-1 w-fit select-none">
-                      {(['all', '90', '30'] as const).map(p => {
-                        const label = p === 'all' ? '전체누적' : p === '90' ? '90일' : '30일';
-                        const isAct = statsPeriodFilter === p;
+                {/* ── SUMMARY FIRST ①: 최근 오답에서 많이 반복된 단원 TOP 3 ──
+                    기존 stats.topChapters(이미 건수 내림차순 계산됨)를 그대로 재사용,
+                    3개만 잘라서 화면 맨 위로 이동(기존엔 화면 맨 아래 TOP 5 카드였다).
+                    "개" 대신 "건" 표기, 단원명은 "그레이드 > 챕터" key에서 챕터만 추출해
+                    표시(표시 전용 파싱, chapterCounts 집계 자체는 그대로). */}
+                {stats.topChapters.length > 0 && (
+                  <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 space-y-2">
+                    <h3 className="text-xs font-extrabold text-slate-300">🔥 최근 오답에서 많이 반복된 단원</h3>
+                    <div className="space-y-1.5">
+                      {stats.topChapters.slice(0, 3).map(([key, count], i) => {
+                        const chapterLabel = key.split(' > ').slice(1).join(' > ') || key;
                         return (
-                          <button
-                            key={p}
-                            onClick={() => setStatsPeriodFilter(p)}
-                            className={`px-2.5 py-1 rounded-lg text-[9px] font-black transition-all ${
-                              isAct ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'
-                            }`}
-                          >
-                            {label}
-                          </button>
+                          <div key={key} className="flex items-center gap-2.5 bg-slate-950/50 rounded-lg px-3 py-2 border border-slate-800/60">
+                            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black flex-none ${
+                              i === 0 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                              i === 1 ? 'bg-slate-500/20 text-slate-300 border border-slate-600/30' :
+                              'bg-orange-700/20 text-orange-400 border border-orange-700/30'
+                            }`}>{i + 1}</span>
+                            <span className="flex-1 min-w-0 text-xs font-bold text-white truncate">{chapterLabel}</span>
+                            <span className="text-xs font-black text-indigo-300 flex-none">{count}건</span>
+                          </div>
                         );
                       })}
                     </div>
                   </div>
+                )}
 
-                  {bubbleChartData.length === 0 ? (
-                    <p className="text-xs text-slate-500 py-6 text-center">해당 기간 내 분석된 약점 데이터가 없습니다.</p>
-                  ) : (
-                    <div className="space-y-4 max-w-[360px] mx-auto w-full">
-                      {bubbleChartData.map(gGroup => {
-                        const isExpanded = statsExpandedGrades[gGroup.grade] !== false; // 기본값: 펼침
+                {/* ── SUMMARY FIRST ②: 실수유형별 compact bar ──
+                    causeCounts를 건수 내림차순 정렬만 한 stats.topCauses(최대 5개, 원인이
+                    다중 선택이라 stacked bar는 쓰지 않고 단일 색 bar 길이로만 표현).
+                    student self-report라는 의미를 라벨에서 유지하고 "%"/비율은 절대 쓰지
+                    않는다 — bar width는 순수 시각적 상대 비교용 CSS 스타일일 뿐, 화면에
+                    숫자로 노출되는 값은 항상 "건" 카운트뿐이다. */}
+                {stats.topCauses.length > 0 && (
+                  <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 space-y-2">
+                    <h3 className="text-xs font-extrabold text-slate-300">✍️ 학생이 스스로 체크한 실수 유형</h3>
+                    <div className="space-y-1.5">
+                      {stats.topCauses.map(c => {
+                        const maxCauseCount = stats.topCauses[0].count;
+                        const widthPct = Math.max(8, Math.round((c.count / maxCauseCount) * 100));
                         return (
-                          <div key={gGroup.grade} className="border border-slate-800/60 rounded-2xl overflow-hidden bg-slate-950/20">
-                            {/* 아코디언 헤더 */}
+                          <div key={c.id} className="flex items-center gap-2 text-[11px]">
+                            <span className="w-24 flex-none text-slate-400 font-bold truncate">{c.label}</span>
+                            <div className="flex-1 h-2.5 rounded-full bg-slate-800/70 overflow-hidden">
+                              <div className="h-full rounded-full bg-indigo-500" style={{ width: `${widthPct}%` }} />
+                            </div>
+                            <span className="w-8 flex-none text-right text-slate-200 font-black">{c.count}건</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── DETAIL ON DEMAND: 단원별 상세(기본 접힘) → 단원 탭하면 실수유형 drilldown ──
+                    데이터 원본은 기존 bubbleChartData(grade→chapter→5종 원인 카운트, 집계
+                    로직 무변경)를 그대로 쓰고, 표현만 5열 버블 그리드 → 텍스트 리스트로
+                    바꾼다. 버블 크기/색 이중 인코딩, 매 아코디언마다 반복되던 5열 헤더,
+                    hover 전용 툴팁, 하단 색상 범례를 전부 제거(감사 §6에서 지적된
+                    항목들 — 새 레이아웃에서는 애초에 필요가 없어진다). 단원 총 건수는
+                    stats.chapterCounts(=TOP3와 같은 소스)에서 읽어 일관성을 유지 —
+                    row.stats(원인별 카운트) 합계를 쓰지 않는 이유는, 한 오답이 원인을
+                    복수 선택하면 합계가 실제 오답 건수보다 커질 수 있어서다. */}
+                {bubbleChartData.length > 0 && (
+                  <div className="bg-[#0e1322] border border-slate-800/80 rounded-2xl p-4 space-y-3 shadow-[0_4px_30px_rgba(0,0,0,0.4)] backdrop-blur-md">
+                    <div>
+                      <h3 className="text-sm font-extrabold text-white">📚 단원별 상세</h3>
+                      <p className="text-[10px] text-slate-500 mt-0.5">단원을 눌러보면 실수 유형별 분포를 볼 수 있어요</p>
+                    </div>
+                    <div className="space-y-2">
+                      {bubbleChartData.map(gGroup => {
+                        const isExpanded = statsExpandedGrades[gGroup.grade] === true; // 기본값: 접힘(이전엔 펼침)
+                        const getChapterTotal = (chapter: string) => chapter === '기타/미분류'
+                          ? filteredMistakesForStats.filter(m => m.grade === gGroup.grade && !m.chapter).length
+                          : (stats.chapterCounts[`${gGroup.grade} > ${chapter}`] || 0);
+                        const sortedRows = [...gGroup.rows].sort((a, b) => getChapterTotal(b.chapter) - getChapterTotal(a.chapter));
+                        return (
+                          <div key={gGroup.grade} className="border border-slate-800/60 rounded-xl overflow-hidden bg-slate-950/20">
                             <button
                               onClick={() => setStatsExpandedGrades(prev => ({ ...prev, [gGroup.grade]: !isExpanded }))}
-                              className="w-full flex items-center justify-between px-4 py-3 bg-slate-900/40 hover:bg-slate-900/70 transition-colors border-b border-slate-850/40 text-left"
+                              className="w-full flex items-center justify-between px-3.5 py-2.5 bg-slate-900/40 hover:bg-slate-900/70 transition-colors text-left"
                             >
                               <span className="text-xs font-black text-indigo-400">📚 {gGroup.grade}</span>
                               <span className="text-[9px] text-slate-500 font-extrabold">{isExpanded ? '▲ 접기' : '▼ 펼치기'}</span>
                             </button>
 
-                            {/* 아코디언 컨텐츠 */}
                             {isExpanded && (
-                              <div className="p-3.5 space-y-4">
-                                {/* 가로 헤더 (실수 유형) */}
-                                <div className="flex items-center text-[9px] text-slate-500 font-black">
-                                  <div className="w-20 flex-none text-right pr-2">단원명</div>
-                                  <div className="flex-1 grid grid-cols-5 gap-2 text-center justify-items-center">
-                                    {ROOT_CAUSE_OPTIONS.map(opt => {
-                                      const labelClean = opt.label.replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
-                                      return (
-                                        <div key={opt.id} className="w-full max-w-[40px] truncate text-[8px] tracking-tighter text-slate-400 font-black text-center">
-                                          {labelClean}
+                              <div className="p-3 space-y-1.5">
+                                {sortedRows.map(row => {
+                                  const total = getChapterTotal(row.chapter);
+                                  const rowKey = `${gGroup.grade}__${row.chapter}`;
+                                  const isRowOpen = !!statsExpandedChapters[rowKey];
+                                  const nonZeroCauses = row.stats.filter(c => c.count > 0).sort((a, b) => b.count - a.count);
+                                  return (
+                                    <div key={row.chapter} className="rounded-lg bg-slate-900/40 border border-slate-800/50 overflow-hidden">
+                                      <button
+                                        onClick={() => setStatsExpandedChapters(prev => ({ ...prev, [rowKey]: !isRowOpen }))}
+                                        className="w-full flex items-center justify-between px-3 py-2 text-left gap-2"
+                                      >
+                                        <span className="text-[11px] font-bold text-slate-200 truncate">{row.chapter}</span>
+                                        <span className="text-[11px] font-black text-slate-400 flex-none">{total}건</span>
+                                      </button>
+                                      {isRowOpen && (
+                                        <div className="px-3 pb-2.5 pt-2 border-t border-slate-800/50 space-y-1">
+                                          {nonZeroCauses.length === 0 ? (
+                                            <p className="text-[10px] text-slate-600">체크된 실수 유형이 없어요.</p>
+                                          ) : (
+                                            nonZeroCauses.map(c => (
+                                              <div key={c.id} className="flex items-center justify-between text-[10.5px]">
+                                                <span className="text-slate-400">{c.label}</span>
+                                                <span className="text-slate-300 font-bold">{c.count}건</span>
+                                              </div>
+                                            ))
+                                          )}
                                         </div>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-
-                                {/* 단원별 버블 가로 행 */}
-                                <div className="space-y-3.5">
-                                  {gGroup.rows.map(row => (
-                                    <div key={row.chapter} className="flex items-center">
-                                      {/* 단원명 (왼쪽 고정 컬럼) */}
-                                      <div className="w-20 flex-none text-[9px] font-black text-slate-400 truncate pr-2 text-right tracking-tight" title={row.chapter}>
-                                        {row.chapter}
-                                      </div>
-
-                                      {/* 5칸 버블 격자 */}
-                                      <div className="flex-1 grid grid-cols-5 gap-2 justify-items-center items-center">
-                                        {row.stats.map(cell => {
-                                          const count = cell.count;
-                                          const ratio = count / maxCountInBubbles;
-                                          let bubbleClass = '';
-                                          let bgStyle: React.CSSProperties = {};
-
-                                          if (count === 0) {
-                                            // 0회: 아주 옅은 오프 상태
-                                            bubbleClass = 'w-1.5 h-1.5 bg-slate-800/80 rounded-full hover:bg-slate-700 transition-all';
-                                          } else {
-                                            // 1회 이상: 방울 크기 비율 적용
-                                            const size = Math.round(12 + (ratio * 16)); // 최소 12px ~ 최대 28px
-                                            bgStyle = { width: `${size}px`, height: `${size}px` };
-
-                                            if (ratio <= 0.25) {
-                                              bubbleClass = 'rounded-full border border-emerald-500/50 bg-emerald-500/20 text-emerald-300 shadow-[0_0_6px_rgba(16,185,129,0.2)]';
-                                            } else if (ratio <= 0.50) {
-                                              bubbleClass = 'rounded-full border border-yellow-500/50 bg-yellow-500/30 text-yellow-300 shadow-[0_0_8px_rgba(245,158,11,0.25)]';
-                                            } else if (ratio <= 0.75) {
-                                              bubbleClass = 'rounded-full border border-orange-500/60 bg-orange-500/40 text-orange-300 shadow-[0_0_10px_rgba(249,115,22,0.3)]';
-                                            } else {
-                                              bubbleClass = 'rounded-full border border-rose-300 bg-rose-500 text-white shadow-[0_0_12px_rgba(244,63,94,0.75)]';
-                                            }
-                                          }
-
-                                          return (
-                                            <div
-                                              key={cell.id}
-                                              style={bgStyle}
-                                              className={`flex items-center justify-center transition-all duration-300 hover:scale-115 active:scale-95 cursor-pointer relative group ${bubbleClass}`}
-                                            >
-                                              {/* 호버 시 툴팁 대응 */}
-                                              {count > 0 && (
-                                                <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-800 text-[8px] text-indigo-300 px-1.5 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 shadow-lg font-bold">
-                                                  {count}회
-                                                </span>
-                                              )}
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
+                                      )}
                                     </div>
-                                  ))}
-                                </div>
+                                  );
+                                })}
                               </div>
                             )}
                           </div>
                         );
                       })}
-
-                      {/* 하단 범례 안내 */}
-                      <div className="flex justify-between items-center text-[8.5px] text-slate-500 pt-3 border-t border-slate-800/60 font-bold select-none">
-                        <div className="flex items-center space-x-1.5">
-                          <span className="w-1.5 h-1.5 bg-slate-800 rounded-full"></span>
-                          <span>적음 (low)</span>
-                          <span>➔</span>
-                          <span>많음 (high)</span>
-                          {/* 범례 미니 버블 나열 */}
-                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/20 border border-emerald-500/50"></span>
-                          <span className="w-3 h-3 rounded-full bg-yellow-500/30 border border-yellow-500/50"></span>
-                          <span className="w-3.5 h-3.5 rounded-full bg-orange-500/40 border border-orange-500/60"></span>
-                          <span className="w-4 h-4 rounded-full bg-rose-500 border border-rose-300" style={{ boxShadow: '0 0 6px rgba(244, 63, 94, 0.7)' }}></span>
-                        </div>
-                        <span className="text-[8px] text-slate-400">
-                          {statsPeriodFilter === 'all' ? '전체 누적 통계' : statsPeriodFilter === '90' ? '최근 90일 데이터' : '최근 30일 데이터'}
-                        </span>
-                      </div>
                     </div>
-                  )}
-                </div>
-
-                {/* 취약 단원 TOP 5 */}
-                {stats.topChapters.length > 0 && (
-                  <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 space-y-3">
-                    <h3 className="text-sm font-extrabold text-emerald-400">🏆 취약 단원 TOP {stats.topChapters.length}</h3>
-                    {stats.topChapters.map(([key, count], i) => (
-                      <div key={key} className="flex items-center space-x-3 bg-slate-950/50 rounded-xl p-3 border border-slate-800/60">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-black flex-none ${
-                          i === 0 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
-                          i === 1 ? 'bg-slate-500/20 text-slate-300 border border-slate-600/30' :
-                          i === 2 ? 'bg-orange-700/20 text-orange-400 border border-orange-700/30' :
-                          'bg-slate-800 text-slate-500'
-                        }`}>{i + 1}</div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-white truncate">{key}</p>
-                        </div>
-                        <div className="text-xs font-black text-red-400 flex-none">{count}개</div>
-                      </div>
-                    ))}
                   </div>
                 )}
               </>
