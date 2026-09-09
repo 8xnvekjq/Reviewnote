@@ -73,11 +73,11 @@
 .rn-account-menu > div:first-child p { font-size: 14px; }
 .rn-dock { flex: none; z-index: 40; background: var(--rn-surface); border-top: 1px solid var(--rn-line); padding-inline: max(12px, env(safe-area-inset-left)); }
 .rn-dock-inner { max-width: 760px; margin-inline: auto; }
-.rn-review-shortcut { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 8px; min-height: 52px; border-bottom: 1px solid var(--rn-line); text-align: left; }
-.rn-review-shortcut > span:first-child { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 10px; background: rgb(var(--color-indigo-500) / .16); color: var(--rn-accent); }
-.rn-review-shortcut strong { display: block; font-size: 13px; font-weight: 700; }
-.rn-review-shortcut small { font-size: 11px; color: var(--rn-muted); }
-.rn-review-shortcut .rn-daily-count { margin-left: auto; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--rn-success); }
+/* 오늘의 복습 — 예전엔 전체폭 두 줄 배너였다. bottom nav를 덜 가리도록 우측 정렬 pill로 축소:
+   primary nav로 승격하지 않고, 진행도(N/5)만 보이는 compact control. */
+.rn-review-pill-row { display: flex; justify-content: flex-end; padding: 6px max(8px, env(safe-area-inset-right)) 0 8px; }
+.rn-review-pill { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; border-radius: 999px; background: rgb(var(--color-indigo-500) / .16); border: 1px solid rgb(var(--color-indigo-400) / .3); color: var(--rn-accent); font-size: 12.5px; font-weight: 750; font-variant-numeric: tabular-nums; touch-action: manipulation; }
+.rn-review-pill:active { transform: scale(.97); }
 .rn-bottom-nav { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 4px; padding-top: 6px; padding-bottom: calc(env(safe-area-inset-bottom) + 8px); }
 .rn-nav-item { display: flex; flex-direction: column; justify-content: center; align-items: center; min-width: 0; min-height: 54px; gap: 4px; border-radius: 14px; color: var(--rn-muted); font-size: 11px; font-weight: 600; transition: background var(--rn-fast), color var(--rn-fast), transform var(--rn-fast); }
 .rn-nav-item[aria-current=page], .rn-nav-item[aria-expanded=true] { background: rgb(var(--color-indigo-500) / .15); color: rgb(var(--color-indigo-200)); }
@@ -90,8 +90,9 @@
 .rn-menu-row strong { display: block; font-size: 14px; }
 .rn-menu-row small { font-size: 12px; color: var(--rn-muted); }
 .rn-menu-row[aria-current=page], .rn-menu-row:active { background: var(--rn-elevated); }
+.rn-menu-row-emoji { flex: none; display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; font-size: 19px; line-height: 1; }
 @media (min-width: 768px) { .rn-main { padding: 28px 32px 36px; } .rn-sheet[open] { align-items: center; } .rn-sheet-panel { border-radius: 28px; max-height: 88dvh; } }
-@media (max-height: 500px) and (orientation: landscape) { .rn-header { padding-block: 6px; } .rn-review-shortcut { min-height: 44px; padding-block: 4px; } .rn-review-shortcut small { display: none; } .rn-nav-item { min-height: 44px; flex-direction: row; gap: 6px; } .rn-bottom-nav { padding-top: 3px; } }
+@media (max-height: 500px) and (orientation: landscape) { .rn-header { padding-block: 6px; } .rn-review-pill-row { padding-top: 3px; } .rn-review-pill { min-height: 32px; } .rn-nav-item { min-height: 44px; flex-direction: row; gap: 6px; } .rn-bottom-nav { padding-top: 3px; } }
 @media (prefers-reduced-motion: reduce) { .rn-skeleton, .rn-sheet-panel { animation: none; } .rn-button, .rn-icon-button, .rn-nav-item { transition: none; } }
 .rn-sheet-closing .rn-sheet-panel { animation: rn-sheet-exit 120ms ease-in forwards; }
 @keyframes rn-sheet-exit { to { opacity: 0; transform: translateY(16px); } }

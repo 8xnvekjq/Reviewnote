@@ -28,37 +28,56 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
   const isAnalyzed = !!entry.analysis?.solvingProcess && entry.analysis.solvingProcess !== SOLVING_PLACEHOLDER_TEXT;
   const stampCatalogItem = equippedStamp ? GACHA_ITEMS.find(g => g.category === 'STAMP' && g.effectValue === equippedStamp) : undefined;
   const stampBorderClass = stampCatalogItem ? getRarityTheme(stampCatalogItem.rarity).border : 'border-transparent';
-  const status = isCompleted ? '복습 완료' : needsHelp ? '함께 풀어봐요' : isAnalyzed ? '다시 풀 준비 완료' : '분석 대기';
+  // 예외적인 상태만 배지로 띄운다 — "이어 풀기" CTA와 아래 복습 dot이 이미 기본 진행 상태를
+  // 말해주므로, 평범히 진행 중인 카드에는 뱃지를 더하지 않는다(정보 밀도 축소).
+  const statusBadge = isCompleted ? { text: '완료', cls: 'is-complete' } : needsHelp ? { text: '도움 필요', cls: 'is-help' } : !isAnalyzed ? { text: '분석 중', cls: '' } : null;
 
   return (
     <article className="rn-note-card">
+      <div className="rn-note-topline">
+        {studentName && <span className="rn-note-student">{studentName}</span>}
+        {(onToggleHidden || isOwnNote) && (
+          <div className="rn-note-utilities">
+            {onToggleHidden && (
+              <button
+                type="button"
+                className="rn-note-utility"
+                aria-pressed={!!entry.isHidden}
+                onClick={() => onToggleHidden(entry.id, !entry.isHidden)}
+                title={entry.isHidden ? '숨김 해제' : '시험범위 제외 (숨기기)'}
+                aria-label={entry.isHidden ? '숨김 해제' : '시험범위 제외로 숨기기'}
+              >
+                <span aria-hidden="true">🙈</span>
+              </button>
+            )}
+            {isOwnNote && (
+              <button type="button" className="rn-note-utility rn-note-delete" onClick={e => onDelete(entry.id, e)} aria-label={`${entry.title} 삭제`} title="삭제">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7" /></svg>
+              </button>
+            )}
+          </div>
+        )}
+      </div>
       <button type="button" className="rn-note-open" onClick={() => onSelect(entry)} aria-label={`${entry.title} 문제 열기`}>
         <div className="rn-note-image">
           <img src={entry.imageUrl} alt={entry.title} loading="lazy" />
-          <span className="rn-note-image-hint">문제 보기 ↗</span>
         </div>
         <div className="rn-note-body">
-          <div className="rn-note-context">
-            <span className="rn-note-subject">{entry.grade || '수학'}{entry.chapter ? ` · ${entry.chapter}` : ''}</span>
-            <span className={`rn-note-status ${needsHelp ? 'is-help' : isCompleted ? 'is-complete' : ''}`}>{status}</span>
-          </div>
           <h3 className="rn-note-title"><LaTeXRenderer text={entry.title} className="line-clamp-2" /></h3>
-          <div className="rn-note-meta">
-            {studentName && <span>{studentName}</span>}
-            <span>{isCompleted ? `${formatDateTime(entry.updatedAt || entry.date)} 완료` : `${formatDate(entry.date)} 등록`}</span>
-            {(hasScaffolding || entry.teacherScaffoldingHint?.trim()) && <span className="rn-note-hint">힌트 있음</span>}
+          <div className="rn-note-context">
+            {entry.chapter && <span className="rn-note-subject">{entry.chapter}</span>}
+            <span className="rn-note-date">{isCompleted ? formatDateTime(entry.updatedAt || entry.date) : formatDate(entry.date)}</span>
+            {(hasScaffolding || entry.teacherScaffoldingHint?.trim()) && <span className="rn-note-hint-icon" title="힌트 있음" aria-label="힌트 있음">💡</span>}
+            {statusBadge && <span className={`rn-note-status ${statusBadge.cls}`}>{statusBadge.text}</span>}
           </div>
           <div className="rn-note-practice">
-            <div>
-              <span className="rn-note-progress-label">복습 {completedCount}/3</span>
-              <div className="rn-review-dots" aria-label={`복습 ${completedCount}회 성공`}>
-                {(entry.reviews || ['', '', '']).slice(0, 3).map((state, idx) => (
-                  <span key={idx} title={`${idx + 1}차: ${state === 'O' ? '성공' : state === 'X' ? '다시 도전' : state === 'star' ? '별표' : '시작 전'}`}
-                    className={`rn-review-dot ${state === 'O' ? 'is-success' : state === 'X' ? 'is-retry' : state === 'star' ? 'is-star' : ''} ${state === 'O' && equippedStamp ? `border-2 ${stampBorderClass}` : ''}`}>
-                    {state === 'star' ? '★' : state === 'O' ? (equippedStamp === '🐾' ? <CatPawIcon className="w-4 h-4" /> : (equippedStamp || 'O')) : (state || idx + 1)}
-                  </span>
-                ))}
-              </div>
+            <div className="rn-review-dots" aria-label={`복습 ${completedCount}회 성공`}>
+              {(entry.reviews || ['', '', '']).slice(0, 3).map((state, idx) => (
+                <span key={idx} title={`${idx + 1}차: ${state === 'O' ? '성공' : state === 'X' ? '다시 도전' : state === 'star' ? '별표' : '시작 전'}`}
+                  className={`rn-review-dot ${state === 'O' ? 'is-success' : state === 'X' ? 'is-retry' : state === 'star' ? 'is-star' : ''} ${state === 'O' && equippedStamp ? `border-2 ${stampBorderClass}` : ''}`}>
+                  {state === 'star' ? '★' : state === 'O' ? (equippedStamp === '🐾' ? <CatPawIcon className="w-4 h-4" /> : (equippedStamp || 'O')) : (state || idx + 1)}
+                </span>
+              ))}
             </div>
             <span className="rn-note-continue">{isCompleted ? '기록 보기' : '이어 풀기'} <span aria-hidden="true">→</span></span>
           </div>
@@ -68,17 +87,6 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
         <div className={`rn-note-regeneration ${checkpointRegenStatus === 'failed' ? 'is-failed' : ''}`} role="status">
           <span>{checkpointRegenStatus === 'generating' ? '새로운 학습 진단을 만들고 있어요…' : checkpointRegenStatus === 'success' ? '새로운 진단이 준비됐어요' : '진단을 만들지 못했어요'}</span>
           {checkpointRegenStatus === 'failed' && onRetryCheckpointGeneration && <button type="button" className="rn-button rn-button-secondary" onClick={onRetryCheckpointGeneration}>다시 시도</button>}
-        </div>
-      )}
-      {(onToggleHidden || isOwnNote) && (
-        <div className="rn-note-utilities">
-          {onToggleHidden && <button type="button" className="rn-note-utility" aria-pressed={!!entry.isHidden} onClick={() => onToggleHidden(entry.id, !entry.isHidden)}>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M3 7h18v13H3zM2 3h20v4H2zM9 11h6" /></svg>
-            {entry.isHidden ? '숨김 해제' : '숨기기'}
-          </button>}
-          {isOwnNote && <button type="button" className="rn-note-utility rn-note-delete" onClick={e => onDelete(entry.id, e)} aria-label={`${entry.title} 삭제`}>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7" /></svg>삭제
-          </button>}
         </div>
       )}
     </article>
