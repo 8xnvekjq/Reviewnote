@@ -8,22 +8,34 @@
 .rn-detail-body > * + * { margin-top: 24px; }
 .rn-detail-body :is(p, label, input, textarea, select) { font-size: max(12px, 1em); }
 .rn-detail-body :is(textarea, select, input) { font-size: 16px; min-height: 44px; }
-.rn-detail-body :is(button, a):not(.rn-review-choices button) { min-height: 44px; }
+.rn-detail-body :is(button, a):not(.rn-review-row-choices button) { min-height: 44px; }
 .rn-detail-body button { touch-action: manipulation; }
 .rn-detail-body .text-xs:not(input):not(textarea):not(select) { font-size: 14px; line-height: 1.55; }
 .rn-detail-body :is(.text-\[9px\], .text-\[10px\], .text-\[11px\]) { font-size: 12px; line-height: 1.45; }
 /* margin-top은 더 이상 별도로 안 준다 — 예전엔 이미지 바로 아래 붙어 -mt-4.5로 밀착시켰지만,
    지금은 "그 외" 그룹으로 옮겨가 다른 형제 섹션들과 같은 .rn-detail-body > * + * 간격을 그대로 쓴다. */
 .rn-review-panel { padding: 20px; background: var(--rn-surface); border-color: var(--rn-line); border-radius: var(--rn-radius-lg); }
-.rn-review-panel > :first-child { align-items: flex-start; gap: 8px; }
-.rn-review-panel > :first-child > span { font-size: 16px; color: var(--rn-text); }
-.rn-review-stages { grid-template-columns: 1fr; gap: 8px; }
-.rn-review-stage { flex-direction: row; align-items: center; gap: 12px; min-height: 76px; padding: 12px; border-radius: 16px; box-shadow: none; }
-.rn-review-stage > :first-child { margin: 0; white-space: nowrap; font-size: 12px; }
-.rn-review-stage > :nth-child(2) { justify-content: flex-end; }
-.rn-review-choices { gap: 6px; }
-.rn-review-choices > button { min-width: 48px; width: auto; height: 52px; padding: 5px 7px; border-radius: 12px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 2px; font-size: 17px; line-height: 1.1; }
-.rn-review-choice-label { font-size: 10px; font-weight: 600; white-space: nowrap; }
+/* 실기기 피드백: 1/2/3차를 105px+ 카드 3열로 나열하던 것을 "차수가 가로 한 줄"로
+   읽히는 compact 행 리스트로 압축(§ 복습 UI 복원 요청). O/X/★ 의미·저장 로직은
+   변경하지 않고 presentation만 바꾼다 — activeStep/handleReviewToggle 그대로. */
+.rn-review-panel.rn-review-panel-compact { padding: 14px; }
+.rn-review-panel-title { font-size: 11px; font-weight: 800; color: var(--rn-muted); text-transform: uppercase; letter-spacing: .04em; }
+.rn-review-rows { display: grid; gap: 6px; }
+.rn-review-row { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 6px 10px; border-radius: 12px; background: var(--rn-elevated); border: 1px solid var(--rn-line); }
+.rn-review-row[data-state="active"] { border-color: rgb(var(--color-indigo-400) / .5); background: rgb(var(--color-indigo-500) / .1); }
+.rn-review-row[data-state="locked"] { opacity: .5; }
+.rn-review-row-label { flex: none; width: 26px; font-size: 11px; font-weight: 800; color: var(--rn-muted); }
+.rn-review-row-choices { display: flex; align-items: center; gap: 6px; flex: 1; }
+.rn-review-pick { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; background: var(--rn-surface); border: 1px solid var(--rn-line); color: var(--rn-muted); touch-action: manipulation; }
+.rn-review-pick.is-o:hover, .rn-review-pick.is-o:active { color: var(--rn-success); border-color: var(--rn-success); }
+.rn-review-pick.is-x:hover, .rn-review-pick.is-x:active { color: var(--rn-danger); border-color: var(--rn-danger); }
+.rn-review-pick.is-star:hover, .rn-review-pick.is-star:active { color: var(--rn-warning); border-color: var(--rn-warning); }
+.rn-review-result { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 800; flex: none; }
+.rn-review-result.is-o { background: rgba(120,219,181,.15); color: var(--rn-success); }
+.rn-review-result.is-x { background: rgba(245,155,167,.15); color: var(--rn-danger); }
+.rn-review-result.is-star { background: rgba(242,199,119,.15); color: var(--rn-warning); }
+.rn-review-row-date { font-size: 10px; color: var(--rn-muted); font-variant-numeric: tabular-nums; }
+.rn-review-row-locked { font-size: 13px; }
 .rn-checklist { padding: 20px; border: 1px solid var(--rn-line); border-radius: var(--rn-radius-lg); background: var(--rn-surface); }
 .rn-checklist > h4 { color: var(--rn-text); font-size: 16px; }
 .rn-checklist button { min-height: 44px; font-size: 13px; }
@@ -60,18 +72,9 @@
   .rn-detail-backdrop { align-items: center; }
   .rn-detail-sheet { max-height: min(92dvh, 1024px); }
   .rn-detail-body { padding: 28px; }
-  .rn-review-stages { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .rn-review-stage { flex-direction: column; min-height: 116px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .rn-detail-sheet *, .rn-writing-window *, .rn-detail-section * { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
-}
-
-.rn-review-choices > :not([hidden]) ~ :not([hidden]) { margin-left: 0; }
-@media (max-width: 379px) {
-  .rn-review-stage { flex-direction: column; align-items: stretch; }
-  .rn-review-stage > :nth-child(2) { justify-content: center; }
-  .rn-review-choices { justify-content: center; }
 }
 .rn-plan { display: grid; gap: 12px; }
 .rn-plan > .rn-title { font-size: 18px; }
