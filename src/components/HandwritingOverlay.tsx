@@ -1,5 +1,6 @@
 import React, { useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import '../styles/detail.css';
 import { ReactSketchCanvas, type ReactSketchCanvasRef, type CanvasPath } from 'react-sketch-canvas';
 import { supabase } from '../services/supabase';
 import { useHandwritingInput, type DocumentSize } from '../features/handwriting/useHandwritingInput';
@@ -48,7 +49,7 @@ interface HandwritingOverlayProps {
 // 문제를 읽기 어려워 조금 더 키움. 여전히 드래그/리사이즈로 자유롭게 조절 가능. 펜/지우개/undo/색상/
 // 새 필기장 버튼이 하단 2줄 툴바로 늘어나면서 최소 높이도 함께 소폭 키웠다.
 const DEFAULT_SIZE = { width: 360, height: 480 };
-const MIN_SIZE = { width: 280, height: 240 };
+const MIN_SIZE = { width: 280, height: 340 };
 type ResizeCorner = 'nw' | 'ne' | 'sw' | 'se';
 
 const RESIZE_HANDLES: Array<{
@@ -103,18 +104,20 @@ const DIAGONAL_OFFSET = 44; // 추가 필기장을 열 때 문제 위 필기창 
 // hint가 있으면(추가 필기장) 그 사각형에서 대각선으로 조금 떨어진 위치에서 시작한다 — 화면
 // 중앙 기준이 아니라 "지금 실제로 문제 위 필기창이 있는 자리" 기준. 좁은 화면에서도 헤더가
 // 화면 밖으로 나가지 않게 handleDragMove와 같은 규칙으로 clamp한다.
+const getInitialSize = () => ({ width: Math.min(DEFAULT_SIZE.width, window.innerWidth - 16), height: Math.min(DEFAULT_SIZE.height, window.innerHeight - 16) });
 const getInitialPosition = (hint?: HandwritingOverlayBounds) => {
+  const initialSize = getInitialSize();
   if (hint) {
     const rawLeft = hint.left + DIAGONAL_OFFSET;
     const rawTop = hint.top + DIAGONAL_OFFSET;
     return {
-      left: Math.min(window.innerWidth - HEADER_MARGIN, Math.max(HEADER_MARGIN - DEFAULT_SIZE.width, rawLeft)),
-      top: Math.min(window.innerHeight - HEADER_MARGIN, Math.max(0, rawTop)),
+      left: Math.max(8, Math.min(window.innerWidth - initialSize.width - 8, rawLeft)),
+      top: Math.max(8, Math.min(window.innerHeight - initialSize.height - 8, rawTop)),
     };
   }
   return {
-    left: Math.max(8, Math.round((window.innerWidth - DEFAULT_SIZE.width) / 2)),
-    top: Math.max(8, Math.round((window.innerHeight - DEFAULT_SIZE.height) / 2)),
+    left: Math.max(8, Math.round((window.innerWidth - initialSize.width) / 2)),
+    top: Math.max(8, Math.round((window.innerHeight - initialSize.height) / 2)),
   };
 };
 
@@ -140,7 +143,7 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const [pos, setPos] = useState(() => getInitialPosition(initialPositionHint));
-  const [size, setSize] = useState(DEFAULT_SIZE);
+  const [size, setSize] = useState(getInitialSize);
 
   // 문제 전환 시 부모가 이 인스턴스를 언마운트해도, 이미 시작된 handleSave의 await 체인(특히
   // runExclusiveSave 대기)은 그대로 계속 실행된다. 그 완료 시점에 캡처해뒀던 onSaved/onClose를
@@ -484,7 +487,7 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
         role="dialog"
         aria-label="손 필기 풀이창"
         onPointerDownCapture={() => onFocus?.()}
-        className="absolute rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl flex flex-col overflow-hidden pointer-events-auto"
+        className="rn-writing-window absolute rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl flex flex-col overflow-hidden pointer-events-auto"
         style={{
           width: size.width,
           height: size.height,
@@ -502,7 +505,7 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
         >
           <span className="text-[11px] font-black text-slate-300 flex items-center space-x-1.5">
             <span>✏️</span>
-            <span>손 필기 / 펜슬 풀이{!backgroundImageUrl ? ' · 추가 필기장' : ''}</span>
+            <span>풀이노트{!backgroundImageUrl ? ' · 추가 필기장' : ''}</span>
           </span>
           <button
             type="button"
@@ -593,7 +596,7 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
         </div>
 
         {/* 하단 툴바 — 1줄: 펜/지우개/색상/undo, 2줄: 전체지우기/새 필기장/저장 */}
-        <div className="flex-none flex items-center justify-between gap-1.5 px-2.5 py-1.5 bg-slate-950 border-t border-slate-800">
+        <div className="rn-writing-toolbar flex-none flex items-center justify-between gap-1.5 px-2.5 py-1.5 bg-slate-950 border-t border-slate-800">
           <div className="flex items-center gap-1">
             <button
               type="button"
@@ -635,7 +638,7 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
                 title={`${color.label} 펜`}
                 aria-label={`${color.label} 펜 선택`}
                 aria-pressed={!isErasing && strokeColor === color.value}
-                className={`w-6 h-6 rounded-full border-2 transition-all active:scale-90 disabled:opacity-40 ${
+                className={`rn-pen-color w-6 h-6 rounded-full border-2 transition-all active:scale-90 disabled:opacity-40 ${
                   !isErasing && strokeColor === color.value
                     ? 'border-amber-400 ring-2 ring-amber-400/50 scale-110'
                     : 'border-slate-700'
@@ -657,7 +660,7 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
           </button>
         </div>
 
-        <div className="flex-none flex items-center justify-between gap-1.5 px-2.5 py-1.5 bg-slate-950 border-t border-slate-800">
+        <div className="rn-writing-toolbar flex-none flex items-center justify-between gap-1.5 px-2.5 py-1.5 bg-slate-950 border-t border-slate-800">
           <div className="flex items-center gap-1.5">
             <button
               type="button"
@@ -683,19 +686,12 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
           </div>
 
           <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isSaving}
-              className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 transition-all active:scale-95 disabled:opacity-40"
-            >
-              저장하지 않기
-            </button>
+
             <button
               type="button"
               onClick={handleSave}
               disabled={isSaving || !documentSize}
-              className="px-3 py-1.5 rounded-lg text-[10px] font-black bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 transition-all active:scale-95 disabled:opacity-50"
+              className="rn-button rn-button-primary"
             >
               {isSaving ? '저장 중...' : '💾 저장하기'}
             </button>

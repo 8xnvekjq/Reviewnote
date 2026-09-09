@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import '../styles/store.css';
 import type { GachaItem, EquippedItems } from '../types';
 import { GACHA_ITEMS, drawGachaItem, getRarityTheme, getRarityBadgeTextColor, getTitleBadgeStyle } from '../utils/gachaCatalog';
 import { CatPawIcon } from './CatPawIcon';
@@ -787,161 +788,66 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
   const boosterRemainingStr = getBoosterRemainingTimeStr();
 
   return (
-    <div ref={rootRef} className="flex-1 flex flex-col bg-slate-955 text-slate-100 min-h-full pb-32 animate-fade-in select-none">
+    <div ref={rootRef} className="rn-store flex-1 flex flex-col min-h-full pb-6 animate-fade-in">
       {/* 캔버스 파티클 레이어 */}
       <canvas ref={canvasRef} className="pointer-events-none fixed inset-0 z-50" />
 
-      {/* 헤더 안내 및 내 점수 (모바일 반응형 랩핑 적용) */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border-b border-slate-800 p-3.5 sm:p-5 shadow-lg flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className="flex items-center space-x-3 min-w-0">
-          <span className="text-2xl sm:text-3xl animate-bounce flex-none">🎁</span>
-          <div className="min-w-0">
-            <h2 className="text-sm sm:text-base font-black text-white flex items-center space-x-1.5 whitespace-nowrap">
-              <span>행운의 럭키 상점</span>
-              <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-mono flex-none">
-                BETA
-              </span>
-            </h2>
-            <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate sm:whitespace-normal">
-              복습으로 모은 콤보 점수로 레어 스탬프, 칭호, 테마를 뽑아보세요!
-            </p>
-          </div>
+      <header className="rn-store-header">
+        <div>
+          <p className="rn-eyebrow">REWARDS / 나를 위한 작은 보상</p>
+          <h2 className="rn-title">럭키 상점</h2>
+          <p className="rn-caption">꾸준히 쌓은 복습을, 나만의 컬렉션으로.</p>
         </div>
+        <div className="rn-store-wallet">
+          <div><span className="rn-caption">보유 콤보 점수</span><strong>{userPoints.toLocaleString()}<small>점</small></strong></div>
+          <button onClick={() => window.dispatchEvent(new CustomEvent('reviewnote_open_store_guide'))} className="rn-button rn-button-secondary" title="럭키상점 활용법 가이드 열기">이용 가이드</button>
+          {boosterRemainingStr && <p className="rn-store-booster">⚡ 5배 부스터 · {boosterRemainingStr}</p>}
+          {cheerLine && <p className="rn-store-cheer">{cheerLine}</p>}
+        </div>
+      </header>
 
-        {/* 내 보유 점수 통장 & 이용 가이드 버튼 (모바일 폭 대응) */}
-        <div className="flex items-center justify-between sm:justify-end space-x-2 flex-wrap sm:flex-nowrap gap-y-1.5">
-          {boosterRemainingStr && (
-            <div className="bg-amber-500/20 border border-amber-400/50 px-2.5 py-1 rounded-2xl flex flex-col items-center shadow-sm animate-pulse flex-none">
-              <span className="text-[8px] sm:text-[8.5px] font-black text-amber-300">⚡ 5배 부스터 발동중</span>
-              <span className="text-[9px] sm:text-[9.5px] font-extrabold text-amber-400 font-mono">{boosterRemainingStr}</span>
-            </div>
-          )}
-
-          <button
-            onClick={() => window.dispatchEvent(new CustomEvent('reviewnote_open_store_guide'))}
-            className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 px-2.5 py-1.5 rounded-2xl text-[10.5px] font-extrabold flex items-center space-x-1 transition-all shadow-sm whitespace-nowrap flex-none shrink-0"
-            title="럭키상점 활용법 가이드 열기"
-          >
-            <span>🎁</span>
-            <span>가이드</span>
+      <nav className="rn-store-tabs" aria-label="럭키 상점 메뉴">
+        {([
+          ['draw', '보물 뽑기'], ['synthesis', '아이템 합성'],
+          ['inventory', '내 보물가방'], ['catalog', '수집 도감'],
+        ] as const).map(([tab, label]) => (
+          <button key={tab} type="button" aria-current={activeSubTab === tab ? 'page' : undefined} onClick={() => setActiveSubTab(tab)} className={`rn-store-tab ${activeSubTab === tab ? 'is-active' : ''}`}>
+            {label}
           </button>
+        ))}
+      </nav>
 
-          <div className="bg-slate-955/80 border border-amber-500/30 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-2xl flex flex-col items-end shadow-inner flex-1 sm:flex-none max-w-none sm:max-w-[220px]">
-            <span className="text-[8.5px] sm:text-[9px] text-slate-400 font-bold">보유 콤보 점수</span>
-            <span className="text-xs sm:text-sm font-black text-amber-400 flex items-center space-x-1">
-              <span>⚡</span>
-              <span>{userPoints}점</span>
-            </span>
-            <span className="text-[8.5px] sm:text-[9px] text-slate-400 font-semibold mt-0.5 text-right leading-snug line-clamp-1 sm:line-clamp-2">
-              {cheerLine}
-            </span>
-          </div>
-        </div>
+      <div className="rn-store-progress">
+        <span>나의 컬렉션</span>
+        <progress aria-label="아이템 수집 진행" value={unlockedItemIds.length} max={GACHA_ITEMS.length} />
+        <strong>{inventoryLoading ? '확인 중' : `${unlockedItemIds.length} / ${GACHA_ITEMS.length}`}</strong>
       </div>
 
-      {/* 서브 탭 서브 네비게이션 (모바일 가로 스크롤 overflow-x-auto) */}
-      <div className="flex items-center justify-start sm:justify-center p-2.5 sm:p-3 border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md overflow-x-auto no-scrollbar">
-        <div className="flex space-x-1 bg-slate-950 p-1 rounded-2xl border border-slate-800 flex-nowrap shrink-0">
-          <button
-            onClick={() => setActiveSubTab('draw')}
-            className={`px-3 py-2 rounded-xl text-[11px] font-extrabold transition-all whitespace-nowrap ${
-              activeSubTab === 'draw'
-                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md scale-105'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            🎰 뽑기 머신
-          </button>
-          <button
-            onClick={() => setActiveSubTab('synthesis')}
-            className={`px-3 py-2 rounded-xl text-[11px] font-extrabold transition-all whitespace-nowrap ${
-              activeSubTab === 'synthesis'
-                ? 'bg-gradient-to-r from-amber-500 via-purple-600 to-pink-500 text-white shadow-md scale-105 border border-amber-300'
-                : 'text-amber-400 hover:text-amber-200 bg-amber-500/10 border border-amber-500/20'
-            }`}
-          >
-            🔮 합성!
-          </button>
-          <button
-            onClick={() => setActiveSubTab('inventory')}
-            className={`px-3 py-2 rounded-xl text-[11px] font-extrabold transition-all relative whitespace-nowrap ${
-              activeSubTab === 'inventory'
-                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md scale-105'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <span>🎒 내 보물가방</span>
-            {unlockedItemIds.length > 0 && (
-              <span className="ml-1 text-[9px] bg-emerald-500 text-white px-1.5 py-0.2 rounded-full">
-                {unlockedItemIds.length}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveSubTab('catalog')}
-            className={`px-3 py-2 rounded-xl text-[11px] font-extrabold transition-all whitespace-nowrap ${
-              activeSubTab === 'catalog'
-                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md scale-105'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            📜 수집 도감 ({Math.round((unlockedItemIds.length / GACHA_ITEMS.length) * 100)}%)
-          </button>
-        </div>
-      </div>
-
-      {/* main content area */}
-      <div className="p-4 flex-1">
-        {/* TAB 1: 🎰 뽑기 메인 */}
+      <div className="rn-store-content flex-1">
         {activeSubTab === 'draw' && (
-          <div className="flex flex-col items-center justify-center py-6 space-y-6">
-            {/* 보물 상자 비주얼 뷰 */}
-            <div className="relative group cursor-pointer" onClick={() => handleStartDraw(1, canFreeDraw1)}>
-              <div className="absolute -inset-4 bg-gradient-to-r from-amber-500/20 via-purple-500/30 to-pink-500/20 rounded-full blur-xl animate-pulse" />
-              <div className="relative w-44 h-44 bg-gradient-to-b from-slate-900 to-slate-950 border-2 border-amber-500/40 rounded-3xl flex flex-col items-center justify-center shadow-2xl group-hover:scale-105 transition-transform duration-300">
-                <span className="text-7xl group-hover:rotate-6 transition-transform">🧰</span>
-                <span className="mt-3 text-xs font-black text-amber-300 bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-full">
-                  럭키 보물상자
-                </span>
+          <div className="rn-store-draw">
+            <section className="rn-store-hero">
+              <div className="rn-store-hero-copy">
+                <p className="rn-eyebrow">TODAY’S LITTLE LUCK</p>
+                <h3>꾸준함이 쌓여,<br />나만의 보물로.</h3>
+                <p>스탬프, 칭호, 테마로<br />나의 학습 공간을 채워보세요.</p>
+                <span className="rn-store-availability">{!freeDrawStatusLoaded ? '무료 혜택 확인 중' : canFreeDraw1 ? '오늘의 무료 보상이 기다려요' : '내일 새로운 무료 보상을 만나요'}</span>
               </div>
-            </div>
-
-            {/* 뽑기 버튼 패널 — 무료 뽑기가 남아있으면 무료로, 이미 썼으면 점수 차감으로 자동 전환 */}
-            <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
-              <button
-                onClick={() => handleStartDraw(1, canFreeDraw1)}
-                className={`flex flex-col items-center justify-center p-4 rounded-2xl text-white border shadow-lg active:scale-95 transition-all ${
-                  canFreeDraw1
-                    ? 'bg-gradient-to-b from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 border-emerald-400/40 shadow-emerald-600/30'
-                    : 'bg-gradient-to-b from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 border-indigo-400/30 shadow-indigo-600/30'
-                }`}
-              >
-                <span className="text-sm font-black">{canFreeDraw1 ? '오늘의 무료 1회' : '1회 뽑기'}</span>
-                <span className="text-xs font-bold text-amber-300 mt-1 flex items-center space-x-1">
-                  <span>{canFreeDraw1 ? '무료' : '⚡ 10점'}</span>
-                </span>
-              </button>
-
-              <button
-                onClick={() => handleStartDraw(10, canFreeDraw10)}
-                className={`flex flex-col items-center justify-center p-4 rounded-2xl text-white border shadow-lg active:scale-95 transition-all relative overflow-hidden ${
-                  canFreeDraw10
-                    ? 'bg-gradient-to-b from-sky-600 to-blue-700 hover:from-sky-500 hover:to-blue-600 border-sky-400/40 shadow-blue-600/30'
-                    : 'bg-gradient-to-b from-amber-600 to-purple-700 hover:from-amber-500 hover:to-purple-600 border-amber-400/40 shadow-purple-600/30'
-                }`}
-              >
-                <div className="absolute -right-6 -top-6 w-12 h-12 bg-amber-400/20 rotate-45" />
-                <span className="text-sm font-black flex items-center space-x-1">
-                  <span>{canFreeDraw10 ? `🎁 무료 10연속` : '🔥 10회 연속 뽑기'}</span>
-                </span>
-                <span className="text-xs font-bold text-amber-200 mt-1 flex items-center space-x-1">
-                  <span>{canFreeDraw10 ? `무료 (${freeDraw10Remaining}회 남음)` : '⚡ 70점 (-30%)'}</span>
-                </span>
-              </button>
-            </div>
+              <div className="rn-store-chest" aria-hidden="true"><span>🧰</span><small>LUCKY COLLECTION</small></div>
+              <div className="rn-store-draw-actions">
+                <button type="button" disabled={!freeDrawStatusLoaded || isDrawing} onClick={() => handleStartDraw(1, canFreeDraw1)} className="rn-store-draw-primary">
+                  <span>{!freeDrawStatusLoaded ? '혜택 확인 중…' : canFreeDraw1 ? '오늘의 무료 1회 열기' : '보물상자 1회 열기'}</span>
+                  <small>{!freeDrawStatusLoaded ? '잠시 기다려주세요' : canFreeDraw1 ? '매일 한 번, 무료' : '10점'}</small>
+                </button>
+                <button type="button" disabled={!freeDrawStatusLoaded || isDrawing} onClick={() => handleStartDraw(10, canFreeDraw10)} className="rn-store-draw-secondary">
+                  <span>{canFreeDraw10 ? '무료 10연속 열기' : '10회 연속 열기'}</span>
+                  <small>{!freeDrawStatusLoaded ? '혜택 확인 중' : canFreeDraw10 ? `무료 혜택 ${freeDraw10Remaining}회 남음` : '70점 · 30% 할인'}</small>
+                </button>
+              </div>
+            </section>
 
             {/* 확률 표 안내 */}
-            <div className="w-full max-w-sm bg-slate-900/60 border border-slate-800 rounded-2xl p-4 space-y-2 text-[10.5px]">
+            <div className="rn-store-odds rn-surface p-5 space-y-3 text-xs">
               <div className="flex items-center justify-between text-slate-400 font-bold border-b border-slate-800 pb-2">
                 <span>🎰 획득 가능 등급</span>
                 <span className="text-amber-400 font-mono">100% 랜덤 당첨</span>
@@ -955,17 +861,17 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
             </div>
 
             {/* 🌟 실시간 SR / SSR / UR 전설 획득 전광판 피드 */}
-            <div className="w-full max-w-sm bg-slate-900/90 border border-amber-500/30 rounded-2xl p-4 space-y-3 shadow-xl">
+            <div className="rn-store-feed rn-surface p-5 space-y-3">
               <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
                 <h3 className="text-xs font-black text-amber-300 flex items-center space-x-1.5 uppercase tracking-wider">
                   <span>🎉</span>
-                  <span>실시간 SR / SSR / UR 획득 전광판</span>
+                  <span>함께 모으는 보물</span>
                 </h3>
                 <span className="text-[9.5px] text-slate-500 font-bold">라이브 피드</span>
               </div>
 
               {recentLogs.length === 0 ? (
-                <div className="text-center py-4 text-[11px] text-slate-500 font-medium">
+                <div className="rn-empty text-center py-6 text-sm">
                   아직 SR 이상 희귀 보물 획득 소식이 없습니다. 럭키 행운의 주인공이 되어보세요! ✨
                 </div>
               ) : (
@@ -1038,7 +944,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
 
         {/* TAB 2: 🎒 내 보물가방 (획득한 아이템 장착) */}
         {activeSubTab === 'inventory' && (
-          <div className="space-y-4">
+          <div className="rn-store-collection space-y-4">
             <h3 className="text-xs font-extrabold text-slate-400 flex items-center space-x-2">
               <span>🎒 보유 아이템 및 착용 상태</span>
             </h3>
@@ -1069,11 +975,11 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
             </div>
 
             {inventoryLoading ? (
-              <div className="text-center py-8 text-slate-500 text-sm">로딩 중...</div>
+              <div className="rn-skeleton h-32" role="status" aria-label="보물가방 불러오는 중"><span className="sr-only">보물가방 불러오는 중</span></div>
             ) : unlockedItemIds.length === 0 ? (
-              <div className="text-center py-8 text-slate-600 text-sm">
+              <div className="rn-empty text-center py-8 text-sm">
                 <p>🎒 보물가방이 비어있어요!</p>
-                <p className="text-xs mt-1">뽑기 머신에서 아이템을 획득해보세요.</p>
+                <p className="text-xs mt-1">보물 뽑기에서 첫 번째 컬렉션을 만나보세요.</p>
               </div>
             ) : (
               /* 획득한 아이템 목록 */
@@ -1197,7 +1103,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
 
         {/* TAB 3: 📜 수집 도감 */}
         {activeSubTab === 'catalog' && (
-          <div className="space-y-4">
+          <div className="rn-store-collection space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-extrabold text-slate-400">📜 전체 럭키 수집 도감</h3>
               <span className="text-xs font-black text-amber-400 font-mono">
@@ -1313,7 +1219,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                 {/* 당첨 아이템 뷰 카셀 */}
                 <div className="bg-slate-955 border border-slate-800 rounded-2xl p-6 flex flex-col items-center space-y-3 shadow-inner relative overflow-hidden">
                   <div className={`absolute inset-0 opacity-15 bg-gradient-to-b ${drawnItemsResult[currentResultIndex].color}`} />
-                  
+
                   <span className="text-6xl relative z-10 animate-bounce flex items-center justify-center">
                     {drawnItemsResult[currentResultIndex].icon === '🐾'
                       ? <CatPawIcon className="w-14 h-14" />

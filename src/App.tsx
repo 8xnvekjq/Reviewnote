@@ -1462,7 +1462,7 @@ function App() {
   }
 
   return (
-    <div className="h-full flex flex-col bg-app-main text-slate-100 select-none transition-colors duration-300">
+    <div className="rn-app h-full flex flex-col bg-app-main text-slate-100 select-none transition-colors duration-300">
       <AppShell
         header={(
           <Header

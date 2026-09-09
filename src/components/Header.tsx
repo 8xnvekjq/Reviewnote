@@ -1,6 +1,8 @@
 import React from 'react';
 import type { ActiveTab } from '../types';
 import logoImg from '../assets/logo.jpg';
+import { AppIcon } from './ui/AppIcon';
+import { Sheet } from './ui/Sheet';
 import { getTitleBadgeStyle } from '../utils/gachaCatalog';
 
 // vite.config.ts의 define 블록에서 빌드 시 자동 주입
@@ -12,7 +14,7 @@ const formatBuildTime = (iso: string): string => {
   try {
     const utcDate = new Date(iso);
     const kstDate = new Date(utcDate.getTime() + 9 * 60 * 60 * 1000);
-    
+
     const mm = String(kstDate.getUTCMonth() + 1).padStart(2, '0');
     const dd = String(kstDate.getUTCDate()).padStart(2, '0');
     const hh = String(kstDate.getUTCHours()).padStart(2, '0');
@@ -106,93 +108,27 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <>
-      <header className="safe-top flex-none border-b-2 border-app-theme bg-app-header backdrop-blur-md px-4 py-3 flex items-center justify-between sticky top-0 z-30 transition-colors duration-300 shadow-md">
-        <div className="flex items-center space-x-2.5 min-w-0 flex-1 mr-2">
-          <img 
-            src={logoImg} 
-            alt="더쿠키수학 로고" 
-            className="w-8 h-8 rounded-lg object-cover shadow-lg border border-slate-800/80 flex-none"
-          />
-          <div className="flex flex-col min-w-0">
-            <h1 className="text-base font-extrabold text-white leading-tight truncate">
-              오답클리닉
-            </h1>
-            <span className="text-[8px] font-bold text-slate-500 mt-0.5 whitespace-nowrap flex-none">
-              {buildLabel}
-            </span>
+      <header className="rn-header">
+        <div className="rn-header-inner">
+          <div className="rn-brand">
+            <img src={logoImg} alt="더쿠키수학 로고" />
+            <div><h1>Reviewnote<span className="sr-only"> 오답클리닉</span></h1><p>오늘의 실수가 내일의 실력으로</p></div>
+          </div>
+          <div className="rn-header-actions">
+            {myScore !== undefined && <button type="button" className="rn-button rn-points" onClick={() => onOpenStore?.()} aria-label={`내 포인트 ${myScore}점, 럭키상점 열기`}><span aria-hidden="true">✦</span>{myScore.toLocaleString()}</button>}
+            <button type="button" className="rn-icon-button" onClick={() => setShowUserMenu(true)} aria-label="내 계정 메뉴" aria-haspopup="dialog" aria-expanded={showUserMenu}><AppIcon name="user" /></button>
           </div>
         </div>
-
-        <div className="flex items-center space-x-2 flex-none min-w-0 whitespace-nowrap">
-          {/* ⚡ 5배 부스터 발동중 배지 (상단 네비바 노출) */}
-          {boosterStr && (
-            <button
-              onClick={() => onOpenStore?.()}
-              className="text-[9.5px] text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-400/50 font-black flex items-center space-x-1 flex-none animate-pulse shadow-sm shadow-amber-500/20"
-              title="5배 콤보 부스터 버프 발동 중"
-            >
-              <span>⚡</span>
-              <span>5배 {boosterStr}</span>
-            </button>
-          )}
-
-          {/* 연속 복습 일수 (🔥 Streak 배지) */}
-          {streakDays !== undefined && streakDays > 0 && (
-            <span className="text-[9.5px] text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-full border border-orange-500/30 font-black flex items-center space-x-0.5 flex-none">
-              <span>🔥</span>
-              <span>{streakDays}일</span>
-            </span>
-          )}
-
-          {/* 칭호 배지 (희귀도별 삐까뻔쩍 글로우 발광 이펙트 적용) */}
-          {equippedTitle && (() => {
-            const badge = getTitleBadgeStyle(equippedTitle);
-            return (
-              <span className={`text-[9px] px-2 py-0.5 rounded-full border truncate max-w-[105px] flex-none flex items-center space-x-0.5 ${badge.style}`}>
-                <span>{badge.icon}</span>
-                <span>{equippedTitle}</span>
-              </span>
-            );
-          })()}
-
-          {/* 🏅 명예의 전당 주간 1/2/3등 누적 횟수 (압축 표시) — 점수는 매주 초기화돼도 이 기록은 영구히 남는다 */}
-          {weeklyMedals && (weeklyMedals.gold > 0 || weeklyMedals.silver > 0 || weeklyMedals.bronze > 0) && (
-            <span
-              className="text-[9px] px-2 py-0.5 rounded-full border border-slate-700 bg-slate-900/60 text-slate-300 font-black flex-none flex items-center space-x-1.5"
-              title="역대 명예의 전당 주간 1/2/3등 횟수"
-            >
-              {weeklyMedals.gold > 0 && <span>🥇{weeklyMedals.gold}</span>}
-              {weeklyMedals.silver > 0 && <span>🥈{weeklyMedals.silver}</span>}
-              {weeklyMedals.bronze > 0 && <span>🥉{weeklyMedals.bronze}</span>}
-            </span>
-          )}
-
-          {/* 내 계정 메뉴 드롭다운 */}
-          <div className="relative">
-            <button
-              onClick={() => setShowUserMenu(!showUserMenu)}
-              className="text-[10px] text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-750 px-2.5 py-1 rounded-full border border-slate-700 font-bold max-w-[120px] truncate flex items-center space-x-1 transition-all"
-              title="내 계정 메뉴"
-            >
-              <span>👤</span>
-              <span className="truncate">{currentUser}</span>
-              <span className="text-[8px] opacity-70">▼</span>
-            </button>
-
-            {showUserMenu && (
-              <>
-                <div 
-                  className="fixed inset-0 z-40" 
-                  onClick={() => setShowUserMenu(false)} 
-                />
-
-                <div className="absolute right-0 mt-2 w-48 rounded-xl bg-slate-900 border border-slate-800 shadow-2xl p-2 z-50 space-y-1.5 animate-fade-in">
-                  <div className="px-2.5 py-1.5 border-b border-slate-800/80">
-                    <p className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">닉네임</p>
-                    <p className="text-[10.5px] font-black text-slate-200 truncate">{nickname || currentUser}</p>
-                  </div>
-
-                  {myScore !== undefined && (
+      </header>
+      <Sheet open={showUserMenu} onClose={() => setShowUserMenu(false)} title={`${nickname || currentUser}의 공간`}>
+        <p className="rn-caption">오늘도 한 걸음씩, 꾸준히.</p>
+        <div className="rn-account-details">
+          {streakDays !== undefined && streakDays > 0 && <span className="rn-caption">🔥 {streakDays}일 연속 복습</span>}
+          {boosterStr && <button className="rn-button rn-points" onClick={() => { setShowUserMenu(false); onOpenStore?.(); }}>⚡ 5배 부스터 · {boosterStr}</button>}
+          {equippedTitle && (() => { const badge = getTitleBadgeStyle(equippedTitle); return <span className={`px-3 py-1 rounded-full border text-xs ${badge.style}`}>{badge.icon} {equippedTitle}</span>; })()}
+          {weeklyMedals && <span className="rn-caption" aria-label="역대 주간 메달">{weeklyMedals.gold > 0 && `🥇 ${weeklyMedals.gold} `}{weeklyMedals.silver > 0 && `🥈 ${weeklyMedals.silver} `}{weeklyMedals.bronze > 0 && `🥉 ${weeklyMedals.bronze}`}</span>}
+        </div>
+        <div className="rn-account-menu">                  {myScore !== undefined && (
                     <button
                       onClick={() => {
                         setShowUserMenu(false);
@@ -243,12 +179,9 @@ export const Header: React.FC<HeaderProps> = ({
                     <span>🚪</span>
                     <span>로그아웃</span>
                   </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </header>
+
+        </div><p className="rn-caption mt-5">{buildLabel}</p>
+      </Sheet>
 
       {/* ── 닉네임 변경 자체 커스텀 UI 모달 팝업 창 (브라우저 alert/prompt 완전 대체) ── */}
       {isNicknameModalOpen && (

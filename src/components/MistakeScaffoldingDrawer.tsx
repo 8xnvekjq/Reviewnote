@@ -230,13 +230,13 @@ export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> =
     <div ref={drawerTopRef} className="w-full bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-md my-3 scroll-mt-6">
       {/* ── 1. 접힘/펼침 토글 버튼 (디폴트: 접힘) ────────────────────── */}
       <button
-        onClick={handleToggleExpand}
+        aria-expanded={isExpanded} onClick={handleToggleExpand}
         className="w-full px-4 py-3 bg-slate-950/80 hover:bg-slate-850 flex items-center justify-between transition-colors text-left"
       >
         <div className="flex items-center space-x-2.5">
           <span className="text-base">🧩</span>
           <span className="text-xs font-black text-slate-200">
-            Scaffolding(스캐폴딩)
+            풀이와 선생님 힌트
           </span>
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
             {scaffoldings.length}개
@@ -256,7 +256,7 @@ export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> =
         <div className="p-3.5 space-y-4 border-t border-slate-800 bg-slate-950/50 animate-fade-in">
           {/* 스캐폴딩 힌트 카드 리스트 */}
           {loading ? (
-            <div className="text-center py-6 text-slate-500 text-xs">스캐폴딩 힌트를 불러오는 중...</div>
+            <div className="text-center py-6 text-slate-500 text-xs">풀이 기록을 불러오는 중...</div>
           ) : scaffoldings.length === 0 ? (
             <div className="text-center py-6 text-slate-500 text-xs space-y-1">
               <p>등록된 힌트가 없습니다.</p>

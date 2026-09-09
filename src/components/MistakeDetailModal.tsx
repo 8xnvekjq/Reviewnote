@@ -1,4 +1,5 @@
 import React, { useRef } from 'react';
+import '../styles/detail.css';
 import { createPortal } from 'react-dom';
 import type { MistakeEntry, MistakeAnalysis, ReviewState, SolutionChecklistItem } from '../types';
 import { ROOT_CAUSE_OPTIONS, MATH_CURRICULUM, GRADE_LIST, SOLVING_PLACEHOLDER_TEXT } from '../types';
@@ -276,6 +277,32 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
   // 💡 동일 문제 연속 클릭 쿨다운 커스텀 알림 모달 상태
   const [isCooldownNoticeOpen, setIsCooldownNoticeOpen] = React.useState(false);
+
+  // Keep background navigation inert while preserving portaled writing windows.
+  const modalRootRef = useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const background = [...document.querySelectorAll<HTMLElement>('.rn-header, .rn-main, .rn-dock')];
+    const previousInert = background.map(element => element.inert);
+    background.forEach(element => { element.inert = true; });
+    modalRootRef.current?.querySelector<HTMLButtonElement>('[aria-label="문제 상세 닫기"]')?.focus({ preventScroll: true });
+    const trapTab = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab' || document.querySelector('dialog[open]')) return;
+      const roots = [modalRootRef.current, ...document.querySelectorAll<HTMLElement>('.rn-writing-window')];
+      const controls = roots.flatMap(root => root ? [...root.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], summary, [tabindex="0"]')] : [])
+        .filter(element => element.getClientRects().length && getComputedStyle(element).visibility !== 'hidden');
+      const first = controls[0];
+      const last = controls.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    document.addEventListener('keydown', trapTab);
+    return () => {
+      document.removeEventListener('keydown', trapTab);
+      background.forEach((element, index) => { element.inert = previousInert[index]; });
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+    };
+  }, []);
 
   // ── 다음 오답 이동을 위한 미완료 정렬 목록 연산 ──────────────────────────────
   // 🐛 숨김 카드 복습 재노출 버그 수정: App.tsx의 handleStartReviewSession(세션 진입점)에는
@@ -689,7 +716,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
       setLoadingText('처리 중...');
       return;
     }
-    
+
     // 1. 동적 반복 멘트 풀(repeatPhrases) 조립
     const repeatPhrases: string[] = [];
 
@@ -808,7 +835,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
           }
         }
         const cleanTitle = (act.title || '').replace(/\$[^$]+\$/g, '').replace(/[#*`_]/g, '').slice(0, 15);
-        
+
         if (lastReview === 'O') {
           repeatPhrases.push(`👤 ${studentName}님이 방금 '${cleanTitle}...' 오답을 깔끔하게 해결했어요! 🎉`);
         } else {
@@ -1087,10 +1114,11 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4 modal-backdrop-enter"
+      ref={modalRootRef}
+      className="rn-detail-backdrop fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4 modal-backdrop-enter"
       onClick={handleBackdropClick}
     >
-      <div className="w-full max-w-3xl bg-slate-900 border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-slide-up">
+      <div role="dialog" aria-modal="true" aria-labelledby="rn-detail-title" className="rn-detail-sheet w-full max-w-3xl bg-slate-900 border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-slide-up">
 
         {/* 모바일 시트 핸들 — 아래로 스와이프하면 닫힘(데스크톱 중앙 다이얼로그에서는 숨김) */}
         <div
@@ -1103,74 +1131,42 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
         </div>
 
         {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/80 sticky top-0">
+        <div className="rn-detail-header px-6 py-4 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/80 sticky top-0">
           <div className="pr-4 flex-1">
             <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-wider">
               {formatDate(selectedEntry.date)}
             </span>
-            <h3 className="font-bold text-white text-base line-clamp-1 min-w-0">
-              <LaTeXRenderer 
-                text={selectedEntry.title} 
+            <h3 id="rn-detail-title" className="font-bold text-white text-base line-clamp-1 min-w-0">
+              <LaTeXRenderer
+                text={selectedEntry.title}
                 className="text-white font-bold text-base line-clamp-1 inline-block w-full"
               />
             </h3>
           </div>
-          <button 
+          <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 active:scale-90 flex items-center justify-center text-slate-400 text-lg transition-all flex-none"
+            aria-label="문제 상세 닫기"
+            className="rn-icon-button w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 active:scale-90 flex items-center justify-center text-slate-400 text-lg transition-all flex-none"
           >
             ✕
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          
-          {/* Problem Image Preview */}
-          <div 
-            onClick={openImageWindow}
-            className="w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center relative p-2 min-h-[200px] cursor-zoom-in group/img"
-          >
-            <img
-              src={selectedEntry.imageUrl}
-              alt={selectedEntry.title}
-              className="w-full h-auto max-h-[60vh] object-contain rounded-xl group-hover/img:opacity-90 transition-opacity"
-            />
-            {/* 풀이노트 — 문제 이미지를 배경으로 두고 손 필기/펜슬로 내 풀이를 써보는 창(저장하면
-                스캐폴딩 "내 풀이"로 등록). 예전엔 이 버튼이 확대창(openImageWindow)과 풀이노트
-                (HandwritingOverlay)를 동시에 열어 두 창이 겹쳐 뜨는 문제가 있었다 — 이제 풀이노트
-                자체가 문제 이미지를 보여주므로 확대창은 따로 열지 않는다.
-                🧭 저장 가능한 필기는 이 풀이노트 하나로 통일했다 — 확대창(openImageWindow)에
-                있던 "문제에 쓰기"(임시 SVG 필기, 저장 안 됨)는 제거하고 확대/축소/이동 전용으로
-                남겼다. 아이콘 구분: 정답 수정(✏️) / 풀이노트(📝)로 역할을 나눠 같은 연필 아이콘이
-                여러 기능에서 반복되어 헷갈리던 문제를 해소한다. */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                openProblemOverlay();
-              }}
-              type="button"
-              aria-label="풀이노트 열기"
-              title="📝 풀이노트"
-              className="absolute top-4 right-4 w-9 h-9 rounded-full bg-slate-950/85 border border-slate-800 hover:border-amber-500/60 text-amber-400 hover:text-amber-300 flex items-center justify-center text-base shadow backdrop-blur transition-all active:scale-90 z-10"
-            >
-              📝
-            </button>
-            {/* 이미지 확대 가이드 골드 배지 (상시 노출 + 노란색/황금색 텍스트) */}
-            <div className="absolute bottom-4 left-4 bg-slate-950/85 border border-slate-800/60 rounded-lg px-2 py-0.5 text-[9px] font-black text-amber-400 flex items-center space-x-1 shadow backdrop-blur select-none">
-              <span>💡 이미지를 누르면 확대돼요!</span>
-            </div>
-            
-            <div className="absolute bottom-4 right-4 bg-slate-950/80 border border-slate-800 rounded-lg px-2.5 py-1 text-[10px] text-slate-400 font-bold flex items-center space-x-1.5 shadow backdrop-blur opacity-0 group-hover/img:opacity-100 transition-opacity">
-              <span>🔍 크게 보기</span>
-            </div>
-          </div>
+        <div className="rn-detail-body flex-1 overflow-y-auto p-6 space-y-6">
 
+          <section className="rn-problem" aria-label="문제와 풀이노트">
+            <button type="button" className="rn-problem-image" onClick={openImageWindow} aria-label="문제 이미지 확대">
+              <img src={selectedEntry.imageUrl} alt={selectedEntry.title} />
+              <span>이미지 확대 ↗</span>
+            </button>
+            <div className="rn-problem-actions"><span className="rn-caption">먼저, 나의 힘으로 풀어봐요</span><button type="button" onClick={openProblemOverlay} aria-label="풀이노트 열기" className="rn-button rn-button-primary">✎ 풀이노트</button></div>
+          </section>
           {/* 3-Step Review Status Selection Card (이미지와 아예 밀착되도록 -mt-4.5 상단 마진 인가) */}
-          <div className="bg-slate-950 p-4 rounded-2xl border border-slate-850 space-y-4 -mt-4.5">
+          <div className="rn-review-panel bg-slate-950 p-4 rounded-2xl border border-slate-850 space-y-4 -mt-4.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-300 flex items-center">
-                <span className="mr-1 text-sm">📋</span> 복습 상태 진단 (3회 완료 시 보관함 이동)
+                <span className="mr-1 text-sm">📋</span> 이번 복습은 어땠나요?
               </span>
               <div className="flex-none">
                 {selectedEntry.reviews?.filter(r => r === 'O').length === 3 ? (
@@ -1235,7 +1231,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
               return (
                 <>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="rn-review-stages grid grid-cols-3 gap-3">
                     {[0, 1, 2].map((index) => {
                       const state = reviews[index];
                       const isCompleted = state !== '';
@@ -1252,12 +1248,12 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                       }
 
                       return (
-                        <div 
-                          key={index} 
-                          className={`p-3 rounded-2xl border text-center flex flex-col justify-between min-h-[105px] transition-all duration-300 ${cardStyle}`}
+                        <div
+                          key={index}
+                          className={`rn-review-stage p-3 rounded-2xl border text-center flex flex-col justify-between min-h-[105px] transition-all duration-300 ${cardStyle}`}
                         >
                           <div className="text-[10px] font-bold text-slate-500 mb-1">{index + 1}차 복습</div>
-                          
+
                           <div className="flex-1 flex items-center justify-center">
                             {isCompleted ? (
                               /* 완료 상태: 큼직한 결과 스탬프 배지 및 아래 날짜 노출 */
@@ -1291,24 +1287,30 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                               </div>
                             ) : isActive ? (
                               /* 활성 상태: 클릭 가능한 입력 버튼 활성화 */
-                              <div className="flex items-center space-x-1.5 animate-fade-in">
+                              <div className="rn-review-choices flex items-center space-x-1.5 animate-fade-in">
                                 <button
                                   onClick={(e) => handleReviewToggle(index, 'O', e)}
+                                  aria-label={`맞았어요 · ${index + 1}차 복습`}
+                                  aria-pressed={false}
                                   className="w-7 h-7 rounded-full text-xs font-black bg-slate-800 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 transition-all active:scale-90 border border-slate-700/60"
                                 >
-                                  O
+                                  <span aria-hidden="true">O</span><span className="rn-review-choice-label">맞았어요</span>
                                 </button>
                                 <button
                                   onClick={(e) => handleReviewToggle(index, 'X', e)}
+                                  aria-label={`틀렸어요 · ${index + 1}차 복습`}
+                                  aria-pressed={false}
                                   className="w-7 h-7 rounded-full text-xs font-black bg-slate-800 text-red-400 hover:bg-red-500 hover:text-white transition-all active:scale-90 border border-slate-700/60"
                                 >
-                                  X
+                                  <span aria-hidden="true">X</span><span className="rn-review-choice-label">틀렸어요</span>
                                 </button>
                                 <button
                                   onClick={(e) => handleReviewToggle(index, 'star', e)}
+                                  aria-label={`보류할게요 · ${index + 1}차 복습`}
+                                  aria-pressed={false}
                                   className="w-7 h-7 rounded-full text-xs font-black bg-slate-800 text-amber-400 hover:bg-amber-400 hover:text-slate-950 transition-all active:scale-90 border border-slate-700/60"
                                 >
-                                  ★
+                                  <span aria-hidden="true">★</span><span className="rn-review-choice-label">보류할게요</span>
                                 </button>
                               </div>
                             ) : (
@@ -1374,8 +1376,8 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                   </h5>
                   <p className="text-[10px] text-slate-400 truncate">
                     ⏱️ {matchedLecture.chapterTitle} ({
-                      Math.floor(matchedLecture.startSeconds / 60) > 0 
-                        ? `${Math.floor(matchedLecture.startSeconds / 60)}분 ${matchedLecture.startSeconds % 60}초` 
+                      Math.floor(matchedLecture.startSeconds / 60) > 0
+                        ? `${Math.floor(matchedLecture.startSeconds / 60)}분 ${matchedLecture.startSeconds % 60}초`
                         : `${matchedLecture.startSeconds % 60}초`
                     }부터)
                   </p>
@@ -1442,7 +1444,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                     return idx === -1 ? checklistItems.length : idx;
                   })();
                   return (
-                    <div className="space-y-2 border-l-4 border-emerald-500 pl-4 py-1">
+                    <div className="rn-checklist space-y-2">
                       <h4 className="text-sm font-extrabold text-emerald-400 flex items-center">
                         <span className="mr-1.5 text-base">✅</span> 풀기 전 체크리스트
                       </h4>
@@ -1511,6 +1513,63 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             );
           })()}
 
+          <section className="rn-checklist rn-plan" aria-label="나의 대책과 재풀이">
+            <p className="rn-eyebrow">MY NEXT STEP</p>
+            <h4 className="rn-title">다음엔 이렇게 풀어볼래요</h4>
+              {/* 나만의 대책 (정답 수정란보다 먼저 배치 — 정답을 보기 전에 스스로 다시 풀어보고 대책부터 적도록 유도)
+                  AI는 이 칸을 절대 자동으로 채우지 않는다 — 학생이 직접 적어야만 값이 채워진다. */}
+              <div className={`space-y-1.5 rounded-xl transition-shadow ${actionPlanHighlight ? 'action-plan-nudge' : ''}`}>
+                <label className="text-[11px] font-bold text-slate-400 block">나만의 대책 (직접 작성)</label>
+                <textarea
+                  aria-label="나만의 대책" value={editActionPlan}
+                  onChange={e => setEditActionPlan(e.target.value)}
+                  placeholder="이번 실수를 통해 앞으로 어떻게 풀겠다는 나만의 대책을 자유롭게 적어보세요..."
+                  rows={3}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-600 outline-none focus:border-emerald-500 transition-colors resize-none leading-relaxed"
+                />
+              </div>
+
+              {/* 직접 다시 풀어보기 권유 — 강제하지 않는다: 건너뛰어도 복습에 지장 없고, 죄책감
+                  유발 문구를 쓰지 않는다. AI 진단이 끝난 뒤에만 노출.
+                  🧭 "네, 다시 풀어볼게요"는 이제 모달을 닫는 대신 바로 풀이노트(문제 이미지 위에
+                  직접 필기 가능한 창)를 연다 — 클릭 즉시 다음 행동(문제 위에 쓰기)으로 바로
+                  이어지게 한다. 저장하면 위 "📚 나의 학습 기록"에 자동으로 남는다. */}
+              {hasRealAnalysis(selectedEntry) && (
+                reproposeDismissed ? (
+                  <button
+                    type="button"
+                    onClick={() => setReproposeDismissed(false)}
+                    className="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 underline underline-offset-2 transition-colors"
+                  >
+                    마음이 바뀌었나요? 다시 풀어볼게요 ✏️
+                  </button>
+                ) : (
+                  <div className="space-y-2 rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-3">
+                    <p className="text-xs font-bold text-indigo-300 leading-relaxed">
+                      ✏️ 눈으로 읽는 것보다 직접 풀어보면 훨씬 오래 기억에 남아요. 한 번 다시 풀어볼까요?
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={openProblemOverlay}
+                        className="flex-1 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-400 active:scale-95 transition-all text-[11px] font-black text-white"
+                      >
+                        ✏️ 네, 다시 풀어볼게요
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReproposeDismissed(true)}
+                        className="flex-none px-3 py-2 rounded-lg text-[11px] font-bold text-slate-400 hover:text-slate-300 transition-colors"
+                      >
+                        지금은 건너뛰기
+                      </button>
+                    </div>
+                  </div>
+                )
+              )}
+
+          </section>
+
           {/* AI Analysis trigger / solving process rendering */}
           {(!showResult && (isAnalyzing || (progress > 0 && progress < 100)) && (!selectedEntry.analysis?.solvingProcess || selectedEntry.analysis.solvingProcess === SOLVING_PLACEHOLDER_TEXT)) ? (
             <div className="py-8 px-4 flex flex-col items-center space-y-8 animate-fade-in bg-slate-900/20 rounded-3xl border border-slate-800/40 backdrop-blur-md">
@@ -1550,7 +1609,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                     </span>
                   </div>
                 </div>
-                
+
                 {/* 진행 상황 및 남은 예상 시간 설명 */}
                 <div className="text-center space-y-1">
                   <p className="text-sm font-semibold text-white tracking-tight flex items-center justify-center space-x-1.5 min-h-[20px]">
@@ -1577,13 +1636,13 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
           ) : hasRealAnalysis(selectedEntry) ? (
             <div className="space-y-6 animate-scale-up">
               {/* AI 모델 명시 정보 */}
-              <div className="flex items-center justify-end">
+              {isAdmin && <div className="flex items-center justify-end">
                 <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-slate-800 text-indigo-400 border border-slate-700/60 flex items-center space-x-1 select-none">
                   <span>⚡ AI 엔진:</span>
                   <span className="font-extrabold">{selectedEntry.analysis.modelUsed || 'gemini-2.5-flash (기본)'}</span>
                 </span>
-              </div>
-              
+              </div>}
+
               {/* Card 0: 원본 문제 지문(problemText)은 학생 UI에서 더 이상 렌더하지 않는다(요구사항).
                   DB 저장/AI 분석 입력/체크포인트 생성 입력으로는 계속 그대로 쓰인다 — 여기서
                   지운 건 이 화면에 보여주던 접힘 섹션 하나뿐이다. */}
@@ -1680,7 +1739,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 let flatCursor = -1;
 
                 return (
-                  <div className="space-y-3 border-l-4 border-emerald-500 pl-4 py-1">
+                  <div className="rn-checklist space-y-3">
                     <h4 className="text-sm font-extrabold text-emerald-400 flex items-center">
                       <span className="mr-1.5 text-base">🧭</span> 단계형 풀이 체크리스트
                     </h4>
@@ -1784,7 +1843,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
               </CollapsibleSection>
             </div>
           ) : (
-            <div 
+            <div
               ref={analysisCardRef}
               className="py-8 bg-slate-950/60 rounded-2xl border border-slate-800 p-6 text-center space-y-4"
             >
@@ -1795,7 +1854,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                   아직 오답 원인이 분석되지 않았습니다. AI가 설계하는 맞춤형 오답 처방전을 확인해 보세요.
                 </p>
               </div>
-              <button 
+              <button
                 onClick={() => onStartAnalysis({
                   ...selectedEntry,
                   grade: editGrade || undefined,
@@ -1811,24 +1870,24 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
           )}
 
           {/* ── 학생 입력 영역 ── */}
-          <div className="border border-slate-800 rounded-2xl overflow-hidden bg-slate-950/30">
-            <div className="bg-slate-800/50 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between">
-              <span className="text-xs font-extrabold text-slate-300">✏️ 오답 클리닉 기록</span>
+          <details className="rn-detail-section rn-metadata">
+            <summary className="rn-metadata-summary">
+              <span className="text-xs font-extrabold text-slate-300">문제 분류 · 실수 원인 편집</span>
               {(selectedEntry.grade || selectedEntry.rootCauses?.length) && (
                 <div className="flex items-center space-x-1.5">
                   {selectedEntry.grade && <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-600/20 text-indigo-400 border border-indigo-600/30 font-bold">{selectedEntry.grade}</span>}
                   {selectedEntry.chapter && <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-700 text-slate-300 border border-slate-600 font-bold">{selectedEntry.chapter}</span>}
                 </div>
               )}
-            </div>
+            </summary>
             <div className="p-4 space-y-4">
 
               {/* 과목 / 단원 선택 */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-slate-400 block">과목 (AI 자동분류)</label>
-                  <select 
-                    value={editGrade} 
+                  <select
+                    aria-label="과목" value={editGrade}
                     onChange={e => { setEditGrade(e.target.value); setEditChapter(''); }}
                     className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer"
                   >
@@ -1838,8 +1897,8 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-slate-400 block">단원</label>
-                  <select 
-                    value={editChapter} 
+                  <select
+                    aria-label="단원" value={editChapter}
                     onChange={e => setEditChapter(e.target.value)}
                     disabled={!editGrade}
                     className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer disabled:opacity-40"
@@ -1855,88 +1914,24 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                 <label className="text-[11px] font-bold text-slate-400 block">실수 원인 (복수 선택 가능)</label>
                 <div className="space-y-2">
                   {ROOT_CAUSE_OPTIONS.map(opt => (
-                    <label 
-                      key={opt.id} 
+                    <label
+                      key={opt.id}
                       className="flex items-center space-x-3 cursor-pointer group"
                     >
-                      <div
-                        className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-none transition-all ${
-                          editRootCauses.includes(opt.id)
-                            ? 'bg-amber-500 border-amber-500'
-                            : 'bg-slate-950 border-slate-700 group-hover:border-amber-500/50'
-                        }`}
-                        onClick={() => toggleRootCause(opt.id)}
-                      >
-                        {editRootCauses.includes(opt.id) && <span className="text-white text-[10px] font-black">✓</span>}
-                      </div>
-                      <div onClick={() => toggleRootCause(opt.id)}>
-                        <span className="text-xs font-semibold text-slate-200">{opt.label}</span>
-                        <span className="text-[10px] text-slate-500 ml-1.5">{opt.desc}</span>
-                      </div>
-                    </label>
+                      <input type="checkbox" checked={editRootCauses.includes(opt.id)} onChange={() => toggleRootCause(opt.id)} className="rn-cause-checkbox" />
+                      <span><span className="text-xs font-semibold text-slate-200">{opt.label}</span><span className="rn-caption ml-2">{opt.desc}</span></span>                    </label>
                   ))}
                 </div>
               </div>
 
-              {/* 나만의 대책 (정답 수정란보다 먼저 배치 — 정답을 보기 전에 스스로 다시 풀어보고 대책부터 적도록 유도)
-                  AI는 이 칸을 절대 자동으로 채우지 않는다 — 학생이 직접 적어야만 값이 채워진다. */}
-              <div className={`space-y-1.5 rounded-xl transition-shadow ${actionPlanHighlight ? 'action-plan-nudge' : ''}`}>
-                <label className="text-[11px] font-bold text-slate-400 block">나만의 대책 (직접 작성)</label>
-                <textarea
-                  value={editActionPlan}
-                  onChange={e => setEditActionPlan(e.target.value)}
-                  placeholder="이번 실수를 통해 앞으로 어떻게 풀겠다는 나만의 대책을 자유롭게 적어보세요..."
-                  rows={3}
-                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-600 outline-none focus:border-emerald-500 transition-colors resize-none leading-relaxed"
-                />
-              </div>
-
-              {/* 직접 다시 풀어보기 권유 — 강제하지 않는다: 건너뛰어도 복습에 지장 없고, 죄책감
-                  유발 문구를 쓰지 않는다. AI 진단이 끝난 뒤에만 노출.
-                  🧭 "네, 다시 풀어볼게요"는 이제 모달을 닫는 대신 바로 풀이노트(문제 이미지 위에
-                  직접 필기 가능한 창)를 연다 — 클릭 즉시 다음 행동(문제 위에 쓰기)으로 바로
-                  이어지게 한다. 저장하면 위 "📚 나의 학습 기록"에 자동으로 남는다. */}
-              {hasRealAnalysis(selectedEntry) && (
-                reproposeDismissed ? (
-                  <button
-                    type="button"
-                    onClick={() => setReproposeDismissed(false)}
-                    className="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 underline underline-offset-2 transition-colors"
-                  >
-                    마음이 바뀌었나요? 다시 풀어볼게요 ✏️
-                  </button>
-                ) : (
-                  <div className="space-y-2 rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-3">
-                    <p className="text-xs font-bold text-indigo-300 leading-relaxed">
-                      ✏️ 눈으로 읽는 것보다 직접 풀어보면 훨씬 오래 기억에 남아요. 한 번 다시 풀어볼까요?
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={openProblemOverlay}
-                        className="flex-1 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-400 active:scale-95 transition-all text-[11px] font-black text-white"
-                      >
-                        ✏️ 네, 다시 풀어볼게요
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setReproposeDismissed(true)}
-                        className="flex-none px-3 py-2 rounded-lg text-[11px] font-bold text-slate-400 hover:text-slate-300 transition-colors"
-                      >
-                        지금은 건너뛰기
-                      </button>
-                    </div>
-                  </div>
-                )
-              )}
 
             </div>
-          </div>
+          </details>
 
         </div>
 
         {/* Modal Footer */}
-        <div className="p-4 border-t border-slate-800/80 bg-slate-950/60 flex space-x-3">
+        <div className="rn-detail-footer p-4 border-t border-slate-800/80 bg-slate-950/60 flex space-x-3">
           <button
             onClick={(e) => onDeleteMistake(selectedEntry.id, e)}
             className="py-3 px-4 rounded-xl border border-red-500/20 hover:border-red-500/40 bg-red-500/5 hover:bg-red-500/10 active:scale-95 transition-all text-xs font-bold text-red-400 flex items-center justify-center space-x-1.5"
