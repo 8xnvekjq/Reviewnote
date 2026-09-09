@@ -37,14 +37,17 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
 
   return (
     <article className="rn-note-card">
-      {/* 학생 이름은 이미지 overlay로, 숨기기(🙈)는 아래 practice row로 옮겨가서 이 줄에는
-          "내 오답노트"일 때의 삭제 버튼만 남는다 — 남는 줄이 없으면 렌더하지 않아 빈 프레임을
-          없앤다(높이 축소). */}
-      {isOwnNote && (
-        <div className="rn-note-topline rn-note-topline-delete-only">
-          <button type="button" className="rn-note-utility rn-note-delete" onClick={e => onDelete(entry.id, e)} aria-label={`${entry.title} 삭제`} title="삭제">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7" /></svg>
-          </button>
+      {/* 상단바 — 과목/단원(교재+단원)을 여기로 이동(기존엔 본문 context row에 있었다).
+          숨기기(🙈)는 아래 practice row에, 삭제는 "내 오답노트"일 때만 오른쪽에 유지.
+          둘 다 없으면 렌더하지 않아 빈 프레임을 만들지 않는다(높이 축소 유지). */}
+      {(subjectLine || isOwnNote) && (
+        <div className="rn-note-topline">
+          {subjectLine && <span className="rn-note-subject">{subjectLine}</span>}
+          {isOwnNote && (
+            <button type="button" className="rn-note-utility rn-note-delete" onClick={e => onDelete(entry.id, e)} aria-label={`${entry.title} 삭제`} title="삭제">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7" /></svg>
+            </button>
+          )}
         </div>
       )}
       <button type="button" className="rn-note-open" onClick={() => onSelect(entry)} aria-label={`${entry.title} 문제 열기`}>
@@ -60,21 +63,13 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
         <div className="rn-note-body">
           <h3 className="rn-note-title"><LaTeXRenderer text={entry.title} className="line-clamp-2" /></h3>
           <div className="rn-note-context">
-            {subjectLine && <span className="rn-note-subject">{subjectLine}</span>}
+            {/* 대책(userActionPlan) "작성 여부"만 compact 표시 — 실제 내용은 절대
+                렌더하지 않는다. 실사용 피드백: 복습 전에 보는 카드에서 대책 내용 일부가
+                보이면 그 자체로 힌트처럼 작동할 수 있다. 과목/단원이 있던 이 슬롯을
+                그대로 재사용(상단바로 옮긴 subjectLine 대신), 새 세로줄은 추가하지 않음. */}
+            {entry.userActionPlan?.trim() && <span className="rn-note-plan-badge">🎓 대책 작성 완료</span>}
             {statusBadge && <span className={`rn-note-status ${statusBadge.cls}`}>{statusBadge.text}</span>}
           </div>
-          {/* 학생이 적은 "대책(userActionPlan)" 미리보기 복원 — git show
-              62ec993:src/components/MistakeCard.tsx 기준(PR #46 직전, 🎓대책: 라벨 +
-              단일 행 ellipsis). 관리자/학생 화면 구분 없이 동일하게 보이던 기존 동작 그대로
-              재사용(새 role 정책 없음). 값이 없으면 이 행 자체를 렌더하지 않고, 예전에 있던
-              "대책 작성 대기" placeholder도 이번엔 넣지 않는다(요청사항). AI 생성/저장 로직은
-              전혀 건드리지 않고 이미 저장된 entry.userActionPlan을 그대로 읽기만 한다. */}
-          {entry.userActionPlan?.trim() && (
-            <p className="rn-note-plan">
-              <span className="rn-note-plan-label" aria-hidden="true">🎓 대책:</span>
-              <span className="rn-note-plan-text">{entry.userActionPlan.trim()}</span>
-            </p>
-          )}
         </div>
       </button>
       {/* 등록일 + 복습 진행(●●○)을 한 줄로 압축, 숨기기(🙈)를 예전 "이어 풀기"가 있던 우측
