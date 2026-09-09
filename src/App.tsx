@@ -1736,6 +1736,7 @@ function App() {
             onToggleHidden={handleToggleHidden}
             checkpointRegenStatusMap={checkpointRegenStatus}
             onRetryCheckpointGeneration={regenerateCheckpointsWithProgress}
+            onlineUsers={onlineUsers}
           />
           </>
         </Screen>

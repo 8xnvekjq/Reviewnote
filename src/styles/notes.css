@@ -1,31 +1,52 @@
 .rn-notes-header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .rn-notes-header .rn-title{margin:6px 0 8px}.rn-notes-header .rn-button{flex-shrink:0}
-.rn-notes-overview{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;border-radius:var(--rn-radius-md);background:var(--rn-elevated);font-size:12px;color:var(--rn-muted)}
-.rn-notes-overview strong{color:var(--rn-text);font-size:22px;margin-right:5px}.rn-notes-overview>span:last-child{text-align:right}
+.rn-notes-header-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+/* 함께 공부 중인 학생 수 — 전체메뉴에서 복귀. 큰 summary 카드가 아니라 작은 floating badge +
+   누르면 나오는 compact 목록 팝업(예전 BottomNavigation의 Online 팝업과 같은 패턴 재사용). */
+.rn-online-wrap{position:relative}
+.rn-online-badge{display:flex;align-items:center;gap:4px;min-height:36px;padding:0 10px;border-radius:999px;background:var(--rn-elevated);border:1px solid var(--rn-line);color:var(--rn-text);font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;touch-action:manipulation}
+.rn-online-dot{width:6px;height:6px;border-radius:50%;background:var(--rn-success);flex:none}
+.rn-online-popup{position:absolute;top:calc(100% + 6px);right:0;z-index:20;width:180px;padding:10px;border-radius:var(--rn-radius-md);background:var(--rn-surface);border:1px solid var(--rn-line);box-shadow:0 12px 32px rgba(0,0,0,.35)}
+.rn-online-popup-title{display:flex;align-items:center;justify-content:space-between;font-size:11px;font-weight:800;color:var(--rn-muted);border-bottom:1px solid var(--rn-line);padding-bottom:6px;margin-bottom:6px}
+.rn-online-live{color:var(--rn-success);font-size:10px}
+.rn-online-popup-list{display:grid;gap:4px;max-height:140px;overflow-y:auto}
+.rn-online-popup-list li{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--rn-text)}
 .rn-notes-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:20px}
+/* 어드민 학생 필터 — 여러 학생을 빠르게 훑을 수 있도록 select 자체 폭을 줄인다(기존 전체폭
+   flex-1 대신 고정 max-width). */
+.rn-student-select-row{display:flex;align-items:center;gap:8px}
+.rn-student-select{max-width:180px;min-height:38px;padding:6px 10px;border-radius:var(--rn-radius-sm);background:var(--rn-elevated);border:1px solid var(--rn-line);color:var(--rn-text);font-size:13px;outline:none;cursor:pointer}
+.rn-student-select:focus-visible{border-color:var(--rn-accent)}
 .rn-note-card{min-width:0;overflow:hidden;border:1px solid var(--rn-line);border-radius:var(--rn-radius-lg);background:var(--rn-surface);transition:border-color 160ms}
-.rn-note-topline{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px 8px 14px;min-height:40px}
-.rn-note-student{min-width:0;font-size:13px;font-weight:800;color:var(--rn-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 삭제 버튼만 남는 topline — 학생 이름은 이미지 overlay로, 숨기기는 practice row로 옮겨가서
+   isOwnNote가 아니면 이 줄 자체가 렌더되지 않아 빈 프레임이 생기지 않는다. */
+.rn-note-topline-delete-only{display:flex;justify-content:flex-end;padding:6px 8px 0}
 .rn-note-open{display:block;width:100%;text-align:left;color:var(--rn-text);transition:background 160ms;touch-action:manipulation}
 .rn-note-open:active{background:var(--rn-elevated)}
-.rn-note-image{position:relative;height:132px;display:flex;align-items:center;justify-content:center;background:#e9ecf2;overflow:hidden}
-.rn-note-image img{height:100%;width:100%;object-fit:contain;padding:8px}
-.rn-note-body{padding:12px 16px 14px}.rn-note-context{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px}
+.rn-note-image{position:relative;height:150px;display:flex;align-items:center;justify-content:center;background:#e9ecf2;overflow:hidden}
+/* contain(전체 표시, 세로로 눌림) 대신 cover+top — 가로폭 기준으로 확대해 문제 상단 문장이
+   조금이라도 읽히게 한다. 세로 crop은 허용(요청사항). */
+.rn-note-image img{height:100%;width:100%;object-fit:cover;object-position:top;padding:0}
+/* 학생 이름 overlay(관리자 전용) — 예전 이미지 좌상단 파란 배지 스타일 재사용. */
+.rn-note-name-badge{position:absolute;top:8px;left:8px;display:flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;background:rgb(var(--color-indigo-600)/.92);color:#fff;font-size:11px;font-weight:800;backdrop-filter:blur(4px);max-width:calc(100% - 16px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 스캐폴딩 힌트 overlay — 예전 초록 원형 배지(🧩)를 이미지 우하단에 복원. */
+.rn-note-scaffold-badge{position:absolute;bottom:8px;right:8px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--rn-success);border:1px solid var(--rn-success);opacity:.94;font-size:13px;backdrop-filter:blur(4px)}
+.rn-note-body{padding:10px 16px 8px}.rn-note-context{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px}
 .rn-note-subject{display:inline-block;min-width:0;max-width:100%;font-size:11px;font-weight:700;line-height:1.5;color:var(--rn-accent);background:rgb(var(--color-indigo-500)/.12);padding:2px 8px;border-radius:999px;overflow-wrap:anywhere}
-.rn-note-date{font-size:11px;color:var(--rn-muted);line-height:1.5}
-.rn-note-hint-icon{font-size:12px;line-height:1}
+.rn-note-date{font-size:11px;color:var(--rn-muted);line-height:1.5;flex:1;min-width:0}
 .rn-note-status{font-size:10px;font-weight:700;line-height:1.5;color:var(--rn-accent);flex-shrink:0;padding:3px 7px;border:1px solid var(--rn-line);border-radius:8px;margin-left:auto}
 .rn-note-status.is-help{color:var(--rn-warning)}.rn-note-status.is-complete{color:var(--rn-success)}
 .rn-note-title{font-size:16px;font-weight:750;line-height:1.5;margin:0 0 6px;overflow-wrap:anywhere}.rn-note-title .katex{font-size:1em}
 .rn-note-meta{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;color:var(--rn-muted);font-size:11px;line-height:1.6}.rn-note-hint{color:var(--rn-success)}
-.rn-note-practice{margin-top:10px;padding-top:10px;border-top:1px solid var(--rn-line);display:flex;justify-content:space-between;align-items:center;gap:12px}
-.rn-review-dots{display:flex;gap:6px}
-.rn-review-dot{width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;border-radius:9px;background:var(--rn-elevated);color:var(--rn-muted);font-size:12px;font-weight:700}
+/* rn-note-open(button) 밖 형제 행 — 등록일+복습 dot+숨기기를 한 줄로. */
+.rn-note-practice{padding:0 16px 10px;display:flex;justify-content:flex-end;align-items:center;gap:8px}
+.rn-review-dots{display:flex;gap:5px}
+.rn-review-dot{width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;background:var(--rn-elevated);color:var(--rn-muted);font-size:11px;font-weight:700}
 .rn-review-dot.is-success{background:rgba(120,219,181,.12);color:var(--rn-success)}.rn-review-dot.is-retry{background:rgba(245,155,167,.12);color:var(--rn-danger)}.rn-review-dot.is-star{background:rgba(242,199,119,.12);color:var(--rn-warning)}
-.rn-note-continue{font-size:13px;font-weight:700;color:var(--rn-accent);white-space:nowrap}.rn-note-continue>span{margin-left:6px}
 .rn-note-utilities{display:flex;align-items:center;gap:4px;flex-shrink:0}
 .rn-note-utility{min-height:36px;min-width:36px;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--rn-muted);border-radius:10px;transition:background 160ms,color 160ms}
 .rn-note-utility:active{background:var(--rn-elevated)}.rn-note-delete:hover{color:var(--rn-danger)}
+.rn-note-practice-hide{flex-shrink:0}
 .rn-note-regeneration{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 18px;font-size:12px;color:var(--rn-accent);background:var(--rn-elevated)}.rn-note-regeneration.is-failed{color:var(--rn-danger)}
 .rn-notes-print{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px}.rn-notes-print>.rn-caption{margin-right:auto}
 .rn-notes-filters{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;padding:16px;border-radius:var(--rn-radius-md);border:1px solid var(--rn-line);background:var(--rn-surface)}
@@ -39,6 +60,6 @@
 .rn-record-title{display:block;color:var(--rn-text);font-size:15px;font-weight:700;margin:6px 0;overflow-wrap:anywhere}.rn-record-bottom{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px}
 .rn-record-print{grid-column:1/-1;margin:0 16px 12px;justify-self:end;font-size:11px!important}.rn-record-print[aria-pressed=true]{border-color:var(--rn-success);color:var(--rn-success)}
 .rn-note-open:focus-visible,.rn-note-utility:focus-visible,.rn-record-open:focus-visible{outline:2px solid var(--rn-accent);outline-offset:-3px}
-@media(min-width:640px){.rn-notes-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.rn-note-image{height:150px}}
-@media(max-width:359px){.rn-note-body{padding:10px 14px 12px}.rn-notes-overview>span:last-child{max-width:110px}.rn-record-open{padding:12px}.rn-note-continue{font-size:12px}}
+@media(min-width:640px){.rn-notes-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.rn-note-image{height:168px}}
+@media(max-width:359px){.rn-note-body{padding:8px 14px 6px}.rn-note-practice{padding:0 14px 8px}.rn-record-open{padding:12px}}
 @media(prefers-reduced-motion:reduce){.rn-note-card,.rn-note-open,.rn-note-utility,.rn-record-open{transition:none}}

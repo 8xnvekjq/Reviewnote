@@ -1219,20 +1219,20 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                     return idx === -1 ? checklistItems.length : idx;
                   })();
                   return (
-                    <div className="rn-checklist space-y-2">
+                    <div className="rn-checklist rn-checklist-compact space-y-1.5">
                       <h4 className="text-sm font-extrabold text-emerald-400 flex items-center">
                         <span className="mr-1.5 text-base">✅</span> 풀기 전 체크리스트
                       </h4>
                       <p className="text-[11px] text-slate-500 leading-relaxed">
                         풀기 전에 어디까지 스스로 해봤는지 확인해보세요.
                       </p>
-                      <div className="space-y-2">
+                      <div className="space-y-1.5">
                         {checklistItems.map((item, index) => {
                           const isLocked = index > frontierIndex;
                           return (
                             <div
                               key={item.id}
-                              className={`rounded-xl border p-3 transition-all ${
+                              className={`rn-checklist-item rounded-xl border transition-all ${
                                 isLocked ? 'bg-slate-950/40 border-slate-900 opacity-50' : 'bg-slate-900 border-slate-800'
                               }`}
                             >
@@ -1243,12 +1243,12 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                                   className={`text-xs font-bold leading-relaxed ${isLocked ? 'text-slate-600' : 'text-slate-200'}`}
                                 />
                               </div>
-                              <div className="flex items-center gap-2 mt-2">
+                              <div className="rn-checklist-actions flex items-center gap-1.5">
                                 <button
                                   type="button"
                                   disabled={isLocked}
                                   onClick={() => onSetChecklistItemStatus(selectedEntry.id, item.id, 'done')}
-                                  className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all active:scale-95 disabled:active:scale-100 disabled:cursor-not-allowed ${
+                                  className={`rn-checklist-choice flex-1 rounded-lg text-[11px] font-bold transition-all active:scale-95 disabled:active:scale-100 disabled:cursor-not-allowed ${
                                     item.status === 'done'
                                       ? 'bg-emerald-500 text-slate-950'
                                       : 'bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:hover:bg-slate-800 disabled:text-slate-600'
@@ -1260,7 +1260,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                                   type="button"
                                   disabled={isLocked}
                                   onClick={() => onSetChecklistItemStatus(selectedEntry.id, item.id, 'stuck')}
-                                  className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all active:scale-95 disabled:active:scale-100 disabled:cursor-not-allowed ${
+                                  className={`rn-checklist-choice flex-1 rounded-lg text-[11px] font-bold transition-all active:scale-95 disabled:active:scale-100 disabled:cursor-not-allowed ${
                                     item.status === 'stuck'
                                       ? 'bg-amber-500 text-slate-950'
                                       : 'bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:hover:bg-slate-800 disabled:text-slate-600'
@@ -1270,7 +1270,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                                 </button>
                               </div>
                               {!isLocked && item.status === 'stuck' && (
-                                <p className="mt-2 text-[11px] leading-relaxed text-amber-200" role="status">
+                                <p className="mt-1.5 text-[11px] leading-relaxed text-amber-200" role="status">
                                   {item.id === 'fixed-1' ? '주어진 조건에 하나씩 밑줄을 긋고, 빠뜨린 조건이 있는지 찾아보세요.'
                                     : item.id === 'fixed-2' ? '아는 조건 하나만 골라 식이나 간단한 그림으로 옮겨보세요.'
                                     : item.id === 'fixed-3' ? '문제의 마지막 문장을 읽고 구할 대상을 내 말로 적어보세요.'
@@ -1318,7 +1318,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             let flatCursor = -1;
 
             return (
-              <div className="rn-checklist space-y-3">
+              <div className="rn-checklist rn-checklist-compact space-y-2">
                 <h4 className="text-sm font-extrabold text-emerald-400 flex items-center">
                   <span className="mr-1.5 text-base">🧭</span> 단계형 풀이 체크리스트
                 </h4>
@@ -1326,13 +1326,13 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                   순서대로 "이해했어요" 또는 "여기서 막혔어요"를 선택해 보세요. 이전 단계를 선택해야 다음 단계가 열립니다.
                 </p>
 
-                <div className="space-y-4">
+                <div className="space-y-2.5">
                   {stages.map((stageGroup, stageIndex) => (
-                    <div key={stageGroup.stage} className="space-y-2">
+                    <div key={stageGroup.stage} className="space-y-1.5">
                       <span className="text-[10px] font-black text-slate-500 uppercase tracking-wide">
                         {STAGE_TITLES[stageGroup.stage] || `${stageGroup.stage}단계`}
                       </span>
-                      <div className="space-y-2">
+                      <div className="space-y-1.5">
                         {stageGroup.checkpoints.map((cp, checkpointIndex) => {
                           flatCursor += 1;
                           const myFlatIndex = flatCursor;
@@ -1341,7 +1341,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                           return (
                             <div
                               key={checkpointIndex}
-                              className={`rounded-xl border p-3 transition-all ${
+                              className={`rn-checklist-item rounded-xl border transition-all ${
                                 isLocked ? 'bg-slate-950/40 border-slate-900 opacity-40' :
                                 cp.status === 'stuck' ? 'bg-amber-950/20 border-amber-800/40' :
                                 cp.status === 'understood' ? 'bg-emerald-950/10 border-emerald-800/30' :
@@ -1354,10 +1354,10 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                               </span>
 
                               {!isLocked && (
-                                <div className="flex items-center space-x-2 mt-2">
+                                <div className="rn-checklist-actions flex items-center gap-1.5">
                                   <button
                                     onClick={() => onUpdateCheckpointStatus(selectedEntry.id, stageIndex, checkpointIndex, 'understood')}
-                                    className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all active:scale-95 ${
+                                    className={`rn-checklist-choice flex-1 rounded-lg text-[11px] font-bold transition-all active:scale-95 ${
                                       cp.status === 'understood'
                                         ? 'bg-emerald-500 text-slate-950'
                                         : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
@@ -1367,7 +1367,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                                   </button>
                                   <button
                                     onClick={() => onUpdateCheckpointStatus(selectedEntry.id, stageIndex, checkpointIndex, 'stuck')}
-                                    className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all active:scale-95 ${
+                                    className={`rn-checklist-choice flex-1 rounded-lg text-[11px] font-bold transition-all active:scale-95 ${
                                       cp.status === 'stuck'
                                         ? 'bg-amber-500 text-slate-950'
                                         : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
@@ -1384,7 +1384,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                                   detail/hint는 "여기서 막혔어요"를 선택했을 때만, 그리고 잠기지
                                   않은(현재 진행 경계인) checkpoint에서만 보여준다. */}
                               {!isLocked && cp.status === 'stuck' && (
-                                <div className="mt-2 text-[11px] text-slate-400 leading-relaxed space-y-1">
+                                <div className="mt-1.5 text-[11px] text-slate-400 leading-relaxed space-y-1">
                                   <p>{cp.detail}</p>
                                   <p className="text-amber-400 font-semibold">💡 {cp.hint}</p>
                                 </div>
@@ -1587,88 +1587,8 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
           </section>
 
-          {/* ── 학습 흐름 4: 그 외 부가정보 ── 복습 상태(O/X/★), 추천 강의, 학습 기록(스캐폴딩/
-              재풀이), 진단 재생성 배너, 문제 분류 편집. 전부 이전엔 더 위에 있던 내용을 위치만
-              옮긴 것 — 각 조건/데이터/저장 경로는 전혀 바꾸지 않았다. */}
-          {isAnalysisReady && (
-            <div className="space-y-6">
-              {/* AI 모델 명시 정보 */}
-              {isAdmin && <div className="flex items-center justify-end">
-                <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-slate-800 text-indigo-400 border border-slate-700/60 flex items-center space-x-1 select-none">
-                  <span>⚡ AI 엔진:</span>
-                  <span className="font-extrabold">{selectedEntry.analysis!.modelUsed || 'gemini-2.5-flash (기본)'}</span>
-                </span>
-              </div>}
-
-              {/* Card 0.5: 📚 나의 학습 기록 — 선생님 힌트(스캐폴딩)와 재풀이 기록을 한 묶음으로.
-                  재풀이는 이제 별도 사진 업로드 UI가 아니라 "다시 풀어볼게요" → 풀이노트(문제
-                  이미지 위에 직접 필기) → 저장 시 이 스캐폴딩 목록에 "내 풀이"로 자동 등록되는
-                  흐름 하나로 합쳐졌다(HandwritingOverlay.handleSave, 기존 구조 그대로 재사용). */}
-              <div className="space-y-2">
-                <h4 className="text-[11px] font-black text-slate-500 uppercase tracking-wide px-1">📚 나의 학습 기록</h4>
-                <MistakeScaffoldingDrawer
-                  mistakeId={selectedEntry.id}
-                  studentId={selectedEntry.userId || ''}
-                  currentUserId={currentUserId || ''}
-                  isAdmin={isAdmin}
-                  refreshSignal={scaffoldingRefreshKey}
-                />
-
-                {/* 과거(이번 라운드 이전)에 올린 재풀이 사진이 있으면 계속 보여준다 — DB/Storage
-                    데이터는 그대로 유지, 신규 업로드 UI만 제거됐다. 지우고 싶으면 삭제 가능. */}
-                {selectedEntry.answerImageUrl && (
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-slate-400 block">이전에 올린 재풀이 사진</label>
-                    <div className="relative rounded-xl overflow-hidden border border-slate-800 bg-slate-950">
-                      <img
-                        src={selectedEntry.answerImageUrl}
-                        alt="내가 다시 푼 풀이"
-                        className="w-full max-h-64 object-contain"
-                      />
-                      <button
-                        type="button"
-                        onClick={onDeleteAnswerImage}
-                        aria-label="재풀이 사진 삭제"
-                        className="absolute top-2 right-2 w-7 h-7 rounded-full bg-slate-950/80 hover:bg-red-500/80 flex items-center justify-center text-white text-xs font-black transition-colors"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* 🧭 정리하기(초기화) 이후 체크리스트 재생성 진행 상태 — 정석 풀이는 전혀 건드리지
-                  않고 이 배너들만 추가/제거된다(기존 데이터가 사라지거나 깜빡이지 않음). */}
-              {checkpointRegenStatus === 'generating' && (
-                <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
-                  <span className="flex-none w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
-                  <span>AI가 새로운 학습 진단을 만들고 있어요...</span>
-                </div>
-              )}
-              {checkpointRegenStatus === 'failed' && (
-                <div className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-red-500/10 text-red-300 border border-red-500/20">
-                  <span>⚠️ AI 진단 생성에 실패했어요</span>
-                  {onRetryCheckpointGeneration && (
-                    <button
-                      onClick={onRetryCheckpointGeneration}
-                      className="flex-none px-3 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-200 font-black active:scale-95 transition-all"
-                    >
-                      다시 시도
-                    </button>
-                  )}
-                </div>
-              )}
-              {checkpointRegenStatus === 'success' && (
-                <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-                  <span>✓ 새로운 진단이 준비됐어요</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 3-Step Review Status Selection Card — "그 외" 그룹으로 이동 (예전엔 이미지 바로
-              아래, 체크리스트/풀이/틀린이유보다 먼저 있었다). */}
+          {/* ── 학습 흐름 5: 복습 O/X/★ (그 외 부가정보보다 먼저, 자기성찰 다음 단계로).
+              예전엔 이미지 바로 아래 있었다 — 지금은 체크리스트/풀이/틀린이유+대책 다음. */}
           <div className="rn-review-panel bg-slate-950 p-4 rounded-2xl border border-slate-850 space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-300 flex items-center">
@@ -1869,6 +1789,85 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
               );
             })()}
           </div>
+
+          {/* ── 학습 흐름 6: 그 외 부가정보 ── AI 모델 정보, 학습 기록(스캐폴딩/재풀이), 진단
+              재생성 배너. 각 조건/데이터/저장 경로는 전혀 바꾸지 않고 위치만 옮겼다. */}
+          {isAnalysisReady && (
+            <div className="space-y-6">
+              {/* AI 모델 명시 정보 */}
+              {isAdmin && <div className="flex items-center justify-end">
+                <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-slate-800 text-indigo-400 border border-slate-700/60 flex items-center space-x-1 select-none">
+                  <span>⚡ AI 엔진:</span>
+                  <span className="font-extrabold">{selectedEntry.analysis!.modelUsed || 'gemini-2.5-flash (기본)'}</span>
+                </span>
+              </div>}
+
+              {/* Card 0.5: 📚 나의 학습 기록 — 선생님 힌트(스캐폴딩)와 재풀이 기록을 한 묶음으로.
+                  재풀이는 이제 별도 사진 업로드 UI가 아니라 "다시 풀어볼게요" → 풀이노트(문제
+                  이미지 위에 직접 필기) → 저장 시 이 스캐폴딩 목록에 "내 풀이"로 자동 등록되는
+                  흐름 하나로 합쳐졌다(HandwritingOverlay.handleSave, 기존 구조 그대로 재사용). */}
+              <div className="space-y-2">
+                <h4 className="text-[11px] font-black text-slate-500 uppercase tracking-wide px-1">📚 나의 학습 기록</h4>
+                <MistakeScaffoldingDrawer
+                  mistakeId={selectedEntry.id}
+                  studentId={selectedEntry.userId || ''}
+                  currentUserId={currentUserId || ''}
+                  isAdmin={isAdmin}
+                  refreshSignal={scaffoldingRefreshKey}
+                />
+
+                {/* 과거(이번 라운드 이전)에 올린 재풀이 사진이 있으면 계속 보여준다 — DB/Storage
+                    데이터는 그대로 유지, 신규 업로드 UI만 제거됐다. 지우고 싶으면 삭제 가능. */}
+                {selectedEntry.answerImageUrl && (
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-slate-400 block">이전에 올린 재풀이 사진</label>
+                    <div className="relative rounded-xl overflow-hidden border border-slate-800 bg-slate-950">
+                      <img
+                        src={selectedEntry.answerImageUrl}
+                        alt="내가 다시 푼 풀이"
+                        className="w-full max-h-64 object-contain"
+                      />
+                      <button
+                        type="button"
+                        onClick={onDeleteAnswerImage}
+                        aria-label="재풀이 사진 삭제"
+                        className="absolute top-2 right-2 w-7 h-7 rounded-full bg-slate-950/80 hover:bg-red-500/80 flex items-center justify-center text-white text-xs font-black transition-colors"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 🧭 정리하기(초기화) 이후 체크리스트 재생성 진행 상태 — 정석 풀이는 전혀 건드리지
+                  않고 이 배너들만 추가/제거된다(기존 데이터가 사라지거나 깜빡이지 않음). */}
+              {checkpointRegenStatus === 'generating' && (
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                  <span className="flex-none w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                  <span>AI가 새로운 학습 진단을 만들고 있어요...</span>
+                </div>
+              )}
+              {checkpointRegenStatus === 'failed' && (
+                <div className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-red-500/10 text-red-300 border border-red-500/20">
+                  <span>⚠️ AI 진단 생성에 실패했어요</span>
+                  {onRetryCheckpointGeneration && (
+                    <button
+                      onClick={onRetryCheckpointGeneration}
+                      className="flex-none px-3 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-200 font-black active:scale-95 transition-all"
+                    >
+                      다시 시도
+                    </button>
+                  )}
+                </div>
+              )}
+              {checkpointRegenStatus === 'success' && (
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                  <span>✓ 새로운 진단이 준비됐어요</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ⚡ AI 추천 동영상 딥링크 연동 카드 (test 학생 한정) — "그 외" 그룹으로 이동 */}
           {matchedLecture && (
