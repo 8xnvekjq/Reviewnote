@@ -36,6 +36,11 @@
 .rn-note-date{font-size:11px;color:var(--rn-muted);line-height:1.5;flex:1;min-width:0}
 .rn-note-status{font-size:10px;font-weight:700;line-height:1.5;color:var(--rn-accent);flex-shrink:0;padding:3px 7px;border:1px solid var(--rn-line);border-radius:8px;margin-left:auto}
 .rn-note-status.is-help{color:var(--rn-warning)}.rn-note-status.is-complete{color:var(--rn-success)}
+/* 학생이 적은 대책(userActionPlan) 미리보기 — 값이 있을 때만 한 줄, ellipsis로 잘라 카드
+   높이를 거의 늘리지 않는다(라벨은 항상 온전히 보이고 내용만 잘림). */
+.rn-note-plan{display:flex;align-items:center;gap:4px;min-width:0;margin-top:4px;font-size:10.5px;line-height:1.4;color:var(--rn-muted)}
+.rn-note-plan-label{flex:none;color:var(--rn-accent);font-weight:800}
+.rn-note-plan-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rn-note-title{font-size:16px;font-weight:750;line-height:1.5;margin:0 0 6px;overflow-wrap:anywhere}.rn-note-title .katex{font-size:1em}
 .rn-note-meta{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;color:var(--rn-muted);font-size:11px;line-height:1.6}.rn-note-hint{color:var(--rn-success)}
 /* rn-note-open(button) 밖 형제 행 — 등록일+복습 dot+숨기기를 한 줄로. */

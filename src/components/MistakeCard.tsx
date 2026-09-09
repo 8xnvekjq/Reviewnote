@@ -63,6 +63,18 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
             {subjectLine && <span className="rn-note-subject">{subjectLine}</span>}
             {statusBadge && <span className={`rn-note-status ${statusBadge.cls}`}>{statusBadge.text}</span>}
           </div>
+          {/* 학생이 적은 "대책(userActionPlan)" 미리보기 복원 — git show
+              62ec993:src/components/MistakeCard.tsx 기준(PR #46 직전, 🎓대책: 라벨 +
+              단일 행 ellipsis). 관리자/학생 화면 구분 없이 동일하게 보이던 기존 동작 그대로
+              재사용(새 role 정책 없음). 값이 없으면 이 행 자체를 렌더하지 않고, 예전에 있던
+              "대책 작성 대기" placeholder도 이번엔 넣지 않는다(요청사항). AI 생성/저장 로직은
+              전혀 건드리지 않고 이미 저장된 entry.userActionPlan을 그대로 읽기만 한다. */}
+          {entry.userActionPlan?.trim() && (
+            <p className="rn-note-plan">
+              <span className="rn-note-plan-label" aria-hidden="true">🎓 대책:</span>
+              <span className="rn-note-plan-text">{entry.userActionPlan.trim()}</span>
+            </p>
+          )}
         </div>
       </button>
       {/* 등록일 + 복습 진행(●●○)을 한 줄로 압축, 숨기기(🙈)를 예전 "이어 풀기"가 있던 우측
