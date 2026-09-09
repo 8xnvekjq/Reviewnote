@@ -37,19 +37,10 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
 
   return (
     <article className="rn-note-card">
-      {/* 상단바 — 과목/단원(교재+단원)을 여기로 이동(기존엔 본문 context row에 있었다).
-          숨기기(🙈)는 아래 practice row에, 삭제는 "내 오답노트"일 때만 오른쪽에 유지.
-          둘 다 없으면 렌더하지 않아 빈 프레임을 만들지 않는다(높이 축소 유지). */}
-      {(subjectLine || isOwnNote) && (
-        <div className="rn-note-topline">
-          {subjectLine && <span className="rn-note-subject">{subjectLine}</span>}
-          {isOwnNote && (
-            <button type="button" className="rn-note-utility rn-note-delete" onClick={e => onDelete(entry.id, e)} aria-label={`${entry.title} 삭제`} title="삭제">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7" /></svg>
-            </button>
-          )}
-        </div>
-      )}
+      {/* 상단 베젤(과목/단원 전용 띠) 제거 — 카드 최상단은 바로 이미지로 시작해 카드 모양을
+          한 가지 패턴으로 통일한다. 과목/단원은 제목 바로 아래 한 줄로 복원(아래 참고).
+          삭제 버튼은 이 베젤이 있던 자리 대신 아래 practice row로 옮겨 숨기기(🙈)와 같은
+          "카드 전체를 여는 button 밖" 유틸리티 줄에 모은다. */}
       <button type="button" className="rn-note-open" onClick={() => onSelect(entry)} aria-label={`${entry.title} 문제 열기`}>
         <div className="rn-note-image">
           <img src={entry.imageUrl} alt={entry.title} loading="lazy" />
@@ -62,20 +53,23 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
         </div>
         <div className="rn-note-body">
           <h3 className="rn-note-title"><LaTeXRenderer text={entry.title} className="line-clamp-2" /></h3>
-          <div className="rn-note-context">
-            {/* 대책(userActionPlan) "작성 여부"만 compact 표시 — 실제 내용은 절대
-                렌더하지 않는다. 실사용 피드백: 복습 전에 보는 카드에서 대책 내용 일부가
-                보이면 그 자체로 힌트처럼 작동할 수 있다. 과목/단원이 있던 이 슬롯을
-                그대로 재사용(상단바로 옮긴 subjectLine 대신), 새 세로줄은 추가하지 않음. */}
-            {entry.userActionPlan?.trim() && <span className="rn-note-plan-badge">🎓 대책 작성 완료</span>}
-            {statusBadge && <span className={`rn-note-status ${statusBadge.cls}`}>{statusBadge.text}</span>}
-          </div>
+          {/* 과목/단원 — 상단 베젤에서 원래 위치(제목 바로 아래 한 줄)로 복원. 칩/배지가
+              아니라 조용한 compact text로 둬서 "배지가 여러 개 쪼개진" 느낌을 줄인다. */}
+          {subjectLine && <p className="rn-note-subject-line">{subjectLine}</p>}
+          {/* 대책(userActionPlan) "작성 여부"만 compact 표시(실제 내용은 렌더하지 않음) +
+              예외적인 분석 상태 배지 — 둘 다 없으면 렌더하지 않아 빈 프레임을 만들지 않는다. */}
+          {(entry.userActionPlan?.trim() || statusBadge) && (
+            <div className="rn-note-context">
+              {entry.userActionPlan?.trim() && <span className="rn-note-plan-badge">🎓 대책 작성 완료</span>}
+              {statusBadge && <span className={`rn-note-status ${statusBadge.cls}`}>{statusBadge.text}</span>}
+            </div>
+          )}
         </div>
       </button>
-      {/* 등록일 + 복습 진행(●●○)을 한 줄로 압축, 숨기기(🙈)를 예전 "이어 풀기"가 있던 우측
-          action 자리로 이동 — 별도 review row·중복 CTA 제거. rn-note-open(button) 밖의 형제
-          행으로 둔다: 숨기기가 실제 &lt;button&gt;이라 카드 전체를 여는 button 안에 넣으면(중첩
-          button은 유효하지 않은 HTML) 클릭/포커스 동작이 깨진다. */}
+      {/* 등록일 + 복습 진행(●●○) + 숨기기(🙈) + 삭제(🗑️, 내 오답노트일 때만)를 한 줄로 압축.
+          rn-note-open(button) 밖의 형제 행으로 둔다: 이 안의 버튼들이 실제 &lt;button&gt;이라
+          카드 전체를 여는 button 안에 넣으면(중첩 button은 유효하지 않은 HTML) 클릭/포커스
+          동작이 깨진다. */}
       <div className="rn-note-practice">
         <span className="rn-note-date">{isCompleted ? formatDateTime(entry.updatedAt || entry.date) : `${formatDate(entry.date)} 등록`}</span>
         <div className="rn-review-dots" aria-label={`복습 ${completedCount}회 성공`}>
@@ -96,6 +90,11 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
             aria-label={entry.isHidden ? '숨김 해제' : '시험범위 제외로 숨기기'}
           >
             <span aria-hidden="true">🙈</span>
+          </button>
+        )}
+        {isOwnNote && (
+          <button type="button" className="rn-note-utility rn-note-delete" onClick={e => onDelete(entry.id, e)} aria-label={`${entry.title} 삭제`} title="삭제">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7" /></svg>
           </button>
         )}
       </div>

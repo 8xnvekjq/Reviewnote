@@ -18,12 +18,8 @@
 .rn-student-select{max-width:180px;min-height:38px;padding:6px 10px;border-radius:var(--rn-radius-sm);background:var(--rn-elevated);border:1px solid var(--rn-line);color:var(--rn-text);font-size:13px;outline:none;cursor:pointer}
 .rn-student-select:focus-visible{border-color:var(--rn-accent)}
 .rn-note-card{min-width:0;overflow:hidden;border:1px solid var(--rn-line);border-radius:var(--rn-radius-lg);background:var(--rn-surface);transition:border-color 160ms}
-/* 상단바 — 과목/단원 배지(좌) + 삭제 버튼(우, 내 오답노트일 때만). 학생 이름은 이미지
-   overlay로, 숨기기는 practice row로 옮겨가 있다. 둘 다 없으면 이 줄 자체가 렌더되지
-   않아 빈 프레임이 생기지 않는다. 삭제 버튼은 margin-left:auto로 항상 오른쪽에 붙는다
-   (과목/단원이 없어도 justify-content 없이 동일하게 동작). */
-.rn-note-topline{display:flex;align-items:center;gap:8px;padding:6px 8px 0}
-.rn-note-topline .rn-note-delete{margin-left:auto}
+/* 상단 베젤(과목/단원 전용 띠)을 없애고 카드가 바로 이미지로 시작하도록 통일 — 삭제 버튼은
+   아래 practice row로 옮겨감(rn-note-utility 재사용, 신규 스타일 없음). */
 .rn-note-open{display:block;width:100%;text-align:left;color:var(--rn-text);transition:background 160ms;touch-action:manipulation}
 .rn-note-open:active{background:var(--rn-elevated)}
 .rn-note-image{position:relative;height:150px;display:flex;align-items:center;justify-content:center;background:#e9ecf2;overflow:hidden}
@@ -34,20 +30,26 @@
 .rn-note-name-badge{position:absolute;top:8px;left:8px;display:flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;background:rgb(var(--color-indigo-600)/.92);color:#fff;font-size:11px;font-weight:800;backdrop-filter:blur(4px);max-width:calc(100% - 16px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* 스캐폴딩 힌트 overlay — 예전 초록 원형 배지(🧩)를 이미지 우하단에 복원. */
 .rn-note-scaffold-badge{position:absolute;bottom:8px;right:8px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--rn-success);border:1px solid var(--rn-success);opacity:.94;font-size:13px;backdrop-filter:blur(4px)}
-.rn-note-body{padding:10px 16px 8px}.rn-note-context{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px}
+/* 상단 베젤 제거로 이미지 바로 아래가 body의 유일한 상단 여백이 되므로, 기존에 좁은
+   화면(<359px)에서만 쓰던 tighter padding을 기본값으로 승격(카드 전체 compact화). */
+.rn-note-body{padding:8px 14px 4px}.rn-note-context{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;margin-top:3px}
 .rn-note-subject{display:inline-block;min-width:0;max-width:100%;font-size:11px;font-weight:700;line-height:1.5;color:var(--rn-accent);background:rgb(var(--color-indigo-500)/.12);padding:2px 8px;border-radius:999px;overflow-wrap:anywhere}
+/* 과목/단원 — 상단 베젤에서 제목 바로 아래 원래 자리로 복원. 칩이 아니라 조용한 compact
+   text로 둬서 배지가 여러 개 쪼개져 보이는 느낌을 줄인다("원래처럼" 요청 반영). */
+.rn-note-subject-line{font-size:11px;font-weight:600;color:var(--rn-muted);line-height:1.4;margin:2px 0 0;overflow-wrap:anywhere}
 .rn-note-date{font-size:11px;color:var(--rn-muted);line-height:1.5;flex:1;min-width:0}
 .rn-note-status{font-size:10px;font-weight:700;line-height:1.5;color:var(--rn-accent);flex-shrink:0;padding:3px 7px;border:1px solid var(--rn-line);border-radius:8px;margin-left:auto}
 .rn-note-status.is-help{color:var(--rn-warning)}.rn-note-status.is-complete{color:var(--rn-success)}
 /* 대책(userActionPlan) 작성 여부만 표시하는 compact 배지 — 실제 내용은 절대 담지
    않는다(복습 전 카드에서 내용 일부가 보이면 힌트로 작동할 수 있다는 실사용 피드백).
-   기존 과목/단원(rn-note-subject)이 있던 context row 슬롯을 그대로 재사용하므로
-   .rn-note-status와 같은 시각적 무게(한 줄 metadata 수준)로 맞춘다. */
+   과목/단원 다음 줄, rn-note-status와 같은 context row에서 예외적으로만 등장하는
+   배지끼리 같은 시각적 무게(한 줄 metadata 수준)로 맞춘다. */
 .rn-note-plan-badge{font-size:10px;font-weight:700;line-height:1.5;color:var(--rn-success);flex-shrink:0;padding:3px 7px;border:1px solid var(--rn-line);border-radius:8px}
-.rn-note-title{font-size:16px;font-weight:750;line-height:1.5;margin:0 0 6px;overflow-wrap:anywhere}.rn-note-title .katex{font-size:1em}
+.rn-note-title{font-size:16px;font-weight:750;line-height:1.4;margin:0;overflow-wrap:anywhere}.rn-note-title .katex{font-size:1em}
 .rn-note-meta{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;color:var(--rn-muted);font-size:11px;line-height:1.6}.rn-note-hint{color:var(--rn-success)}
-/* rn-note-open(button) 밖 형제 행 — 등록일+복습 dot+숨기기를 한 줄로. */
-.rn-note-practice{padding:0 16px 10px;display:flex;justify-content:flex-end;align-items:center;gap:8px}
+/* rn-note-open(button) 밖 형제 행 — 등록일+복습 dot+숨기기+삭제(내 오답노트일 때)를 한
+   줄로. 좁은 화면(<359px)에서만 쓰던 tighter padding을 기본값으로 승격. */
+.rn-note-practice{padding:0 14px 8px;display:flex;justify-content:flex-end;align-items:center;gap:6px}
 .rn-review-dots{display:flex;gap:5px}
 .rn-review-dot{width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;background:var(--rn-elevated);color:var(--rn-muted);font-size:11px;font-weight:700}
 .rn-review-dot.is-success{background:rgba(120,219,181,.12);color:var(--rn-success)}.rn-review-dot.is-retry{background:rgba(245,155,167,.12);color:var(--rn-danger)}.rn-review-dot.is-star{background:rgba(242,199,119,.12);color:var(--rn-warning)}
@@ -69,5 +71,5 @@
 .rn-record-print{grid-column:1/-1;margin:0 16px 12px;justify-self:end;font-size:11px!important}.rn-record-print[aria-pressed=true]{border-color:var(--rn-success);color:var(--rn-success)}
 .rn-note-open:focus-visible,.rn-note-utility:focus-visible,.rn-record-open:focus-visible{outline:2px solid var(--rn-accent);outline-offset:-3px}
 @media(min-width:640px){.rn-notes-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.rn-note-image{height:168px}}
-@media(max-width:359px){.rn-note-body{padding:8px 14px 6px}.rn-note-practice{padding:0 14px 8px}.rn-record-open{padding:12px}}
+@media(max-width:359px){.rn-record-open{padding:12px}}
 @media(prefers-reduced-motion:reduce){.rn-note-card,.rn-note-open,.rn-note-utility,.rn-record-open{transition:none}}
