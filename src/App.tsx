@@ -1482,6 +1482,7 @@ function App() {
             comboBoosterExpiresAt={comboBoosterExpiresAt}
             isAdmin={isAdmin}
             onSelectTab={(tab) => setActiveTab(tab)}
+            onlineUsers={onlineUsers}
           />
         )}
         bottomNav={(
