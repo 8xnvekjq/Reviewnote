@@ -55,6 +55,7 @@ interface MistakeListProps {
   onToggleHidden?: (id: string, hidden: boolean) => void; // 시험범위 제외 등으로 카드 숨기기/해제
   checkpointRegenStatusMap?: Record<string, 'generating' | 'success' | 'failed'>; // 정리하기(초기화) 후 체크리스트 재생성 진행 상태
   onRetryCheckpointGeneration?: (entry: MistakeEntry) => void; // 재생성 실패 시 "다시 시도"
+  onlineUsers?: { id: string; display_name: string; nickname?: string; username: string }[]; // 함께 공부 중인 학생 — App.tsx가 이미 계산해 BottomNavigation에도 넘기는 것과 동일한 배열을 재사용(신규 로직 없음)
 }
 
 export const MistakeList: React.FC<MistakeListProps> = ({
@@ -82,7 +83,9 @@ export const MistakeList: React.FC<MistakeListProps> = ({
   onToggleHidden,
   checkpointRegenStatusMap = {},
   onRetryCheckpointGeneration,
+  onlineUsers = [],
 }) => {
+  const [showOnlinePopup, setShowOnlinePopup] = useState(false);
   // 'notes' 탭은 viewMode 생략(card 기본값), 'completed' 탭은 'list'를 넘겨서 두 사용처가
   // 이미 서로 다른 값을 쓰고 있으므로 이걸 그대로 저장 키로 재사용한다(새 prop 추가 없이 두
   // 인스턴스의 스크롤/필터 기억을 서로 침범하지 않게 분리).
@@ -249,14 +252,36 @@ export const MistakeList: React.FC<MistakeListProps> = ({
           <h2 className="rn-title">{title}</h2>
           <p className="rn-caption">{isAdmin ? `전체 ${mistakes.length}개 · 표시 ${filtered.length}개` : viewMode === 'list' ? `${mistakes.length}개의 도전이 기록되었어요` : '한 문제씩, 어제보다 확실하게.'}</p>
         </div>
-        {!hideAddButton && <button type="button" onClick={onAddClick} className="rn-button rn-button-primary">+ 문제 추가</button>}
-      </header>
-      {viewMode === 'card' && mistakes.length > 0 && (
-        <div className="rn-notes-overview">
-          <span><strong>{mistakes.length}</strong> 다시 볼 문제</span>
-          <span>작은 복습이 실력이 되는 시간</span>
+        <div className="rn-notes-header-actions">
+          {/* 함께 공부 중인 학생 수 — 전체메뉴로 옮겨갔던 정보를 오답노트 패널로 복귀. 큰 summary
+              카드가 아니라 작은 floating badge, 누르면 예전처럼 목록 팝업. onlineUsers는
+              App.tsx가 이미 계산해 BottomNavigation에도 넘기는 것과 같은 배열 재사용(신규 로직 없음). */}
+          {onlineUsers.length > 0 && (
+            <div className="rn-online-wrap">
+              <button type="button" className="rn-online-badge" onClick={() => setShowOnlinePopup(v => !v)} aria-expanded={showOnlinePopup} aria-label={`함께 공부 중인 학생 ${onlineUsers.length}명, 목록 보기`}>
+                <span className="rn-online-dot" aria-hidden="true" />
+                <span aria-hidden="true">👥</span>
+                <span>{onlineUsers.length}</span>
+              </button>
+              {showOnlinePopup && (
+                <div className="rn-online-popup" role="dialog" aria-label="함께 공부 중인 학생 목록">
+                  <div className="rn-online-popup-title"><span>공부 중인 친구들</span><span className="rn-online-live">● Live</span></div>
+                  {onlineUsers.length === 0 ? (
+                    <p className="rn-caption" style={{ textAlign: 'center', padding: '4px 0' }}>지금은 혼자 공부 중이에요.</p>
+                  ) : (
+                    <ul className="rn-online-popup-list">
+                      {onlineUsers.map(u => (
+                        <li key={u.id}><span className="rn-online-dot" aria-hidden="true" /><span>{u.nickname || u.display_name || u.username}</span></li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          {!hideAddButton && <button type="button" onClick={onAddClick} className="rn-button rn-button-primary rn-button-compact">+ 문제 추가</button>}
         </div>
-      )}
+      </header>
       {onPrintClick && mistakes.length > 0 && (
         <div className="rn-notes-print">
           <span className="rn-caption">{selectedPrintIds.length}개 선택</span>
@@ -352,16 +377,17 @@ export const MistakeList: React.FC<MistakeListProps> = ({
         </div>
       )}
 
-      {/* 어드민 학생 필터 셀렉트 */}
+      {/* 어드민 학생 필터 셀렉트 — 여러 학생을 빠르게 훑을 수 있도록 폭을 줄이고, 문제카드
+          영역에 시각적 우선순위를 더 준다(기존 select 기능/옵션 구성 그대로, compact화만). */}
       {isAdmin && studentOptions.length > 0 && (
-        <div className="flex items-center space-x-2">
+        <div className="rn-student-select-row">
           <label htmlFor={`${screenKey}-student`} className="rn-caption">학생</label>
           <select
             id={`${screenKey}-student`} value={selectedStudent}
             onChange={e => setSelectedStudent(e.target.value)}
-            className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+            className="rn-student-select"
           >
-            <option value="all">전체 학생 ({mistakes.length}개)</option>
+            <option value="all">전체 ({mistakes.length}개)</option>
             {studentOptions.map(s => {
               const count = mistakes.filter(m => m.userId === s.uid).length;
               return (

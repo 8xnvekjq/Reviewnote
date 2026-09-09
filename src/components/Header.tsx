@@ -112,7 +112,9 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="rn-header-inner">
           <div className="rn-brand">
             <img src={logoImg} alt="더쿠키수학 로고" />
-            <div><h1>Reviewnote<span className="sr-only"> 오답클리닉</span></h1><p>오늘의 실수가 내일의 실력으로</p></div>
+            {/* 슬로건 문구는 제거 — 대신 예전처럼 버전/업데이트 시각을 상단에서 바로 보이게
+                복원한다(프로필 시트 안에 있으면 한 번 더 탭해야 해서 접근성이 떨어졌다). */}
+            <div><h1>Reviewnote<span className="sr-only"> 오답클리닉</span></h1><p>{buildLabel}</p></div>
           </div>
           <div className="rn-header-actions">
             {myScore !== undefined && <button type="button" className="rn-button rn-points" onClick={() => onOpenStore?.()} aria-label={`내 포인트 ${myScore}점, 럭키상점 열기`}><span aria-hidden="true">✦</span>{myScore.toLocaleString()}</button>}
@@ -180,7 +182,7 @@ export const Header: React.FC<HeaderProps> = ({
                     <span>로그아웃</span>
                   </button>
 
-        </div><p className="rn-caption mt-5">{buildLabel}</p>
+        </div>
       </Sheet>
 
       {/* ── 닉네임 변경 자체 커스텀 UI 모달 팝업 창 (브라우저 alert/prompt 완전 대체) ── */}

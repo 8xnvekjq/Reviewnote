@@ -28,6 +28,16 @@
 .rn-checklist > h4 { color: var(--rn-text); font-size: 16px; }
 .rn-checklist button { min-height: 44px; font-size: 13px; }
 .rn-checklist p { line-height: 1.6; }
+/* 실기기에서 체크리스트가 너무 길다는 피드백 — 항목/섹션 padding과 완료·막힘 버튼 높이만
+   줄인다(순차 잠금·완료/막힘 의미·잠긴 행 표시는 그대로). 버튼 크기는 .rn-checklist-choice에
+   더 구체적인 선택자로만 덮어써서, 같은 .rn-checklist 안의 "전체 풀이 처음부터 보기" 같은 다른
+   버튼과 .rn-review-panel의 O/X/★ 버튼은 기존 44px 규칙을 그대로 유지한다. */
+.rn-checklist-compact { padding: 14px; }
+.rn-checklist-compact > h4 { font-size: 14px; }
+.rn-checklist-compact > p { font-size: 11px; }
+.rn-checklist-item { padding: 8px; }
+.rn-checklist-actions { margin-top: 6px; }
+.rn-checklist .rn-checklist-actions .rn-checklist-choice { min-height: 34px; font-size: 11px; padding: 6px 8px; }
 .rn-detail-section { border: 1px solid var(--rn-line); border-radius: var(--rn-radius-md); background: var(--rn-surface); overflow: hidden; }
 .rn-section-toggle { min-height: 64px; gap: 16px; }
 .rn-section-toggle h4 { font-size: 15px; font-weight: 650; color: var(--rn-text); flex-wrap: wrap; gap: 4px; }
