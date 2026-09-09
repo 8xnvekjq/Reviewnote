@@ -12,7 +12,9 @@
 .rn-detail-body button { touch-action: manipulation; }
 .rn-detail-body .text-xs:not(input):not(textarea):not(select) { font-size: 14px; line-height: 1.55; }
 .rn-detail-body :is(.text-\[9px\], .text-\[10px\], .text-\[11px\]) { font-size: 12px; line-height: 1.45; }
-.rn-review-panel { padding: 20px; margin-top: 20px; background: var(--rn-surface); border-color: var(--rn-line); border-radius: var(--rn-radius-lg); }
+/* margin-top은 더 이상 별도로 안 준다 — 예전엔 이미지 바로 아래 붙어 -mt-4.5로 밀착시켰지만,
+   지금은 "그 외" 그룹으로 옮겨가 다른 형제 섹션들과 같은 .rn-detail-body > * + * 간격을 그대로 쓴다. */
+.rn-review-panel { padding: 20px; background: var(--rn-surface); border-color: var(--rn-line); border-radius: var(--rn-radius-lg); }
 .rn-review-panel > :first-child { align-items: flex-start; gap: 8px; }
 .rn-review-panel > :first-child > span { font-size: 16px; color: var(--rn-text); }
 .rn-review-stages { grid-template-columns: 1fr; gap: 8px; }

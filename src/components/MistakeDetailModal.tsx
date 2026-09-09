@@ -1112,6 +1112,13 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
     sheetSwipeRef.current = null;
   };
 
+  // 학습 흐름 재정렬(체크리스트 → 풀이 → 틀린 이유+대책 → 그 외)을 위해, 기존에 하나의 3분기
+  // ternary 안에서만 쓰이던 조건을 이름 붙은 상수로 한 번만 계산해서 "풀이" 영역과 "그 외"
+  // 영역 두 곳에서 그대로 재사용한다 — 조건식 자체를 중복 작성하지 않아 두 영역이 항상 같은
+  // 판단을 보도록 보장한다(로직 변경 없음, 위치만 분리).
+  const isAnalysisLoading = !showResult && (isAnalyzing || (progress > 0 && progress < 100)) && (!selectedEntry.analysis?.solvingProcess || selectedEntry.analysis.solvingProcess === SOLVING_PLACEHOLDER_TEXT);
+  const isAnalysisReady = hasRealAnalysis(selectedEntry);
+
   return (
     <div
       ref={modalRootRef}
@@ -1162,8 +1169,507 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             </button>
             <div className="rn-problem-actions"><span className="rn-caption">먼저, 나의 힘으로 풀어봐요</span><button type="button" onClick={openProblemOverlay} aria-label="풀이노트 열기" className="rn-button rn-button-primary">✎ 풀이노트</button></div>
           </section>
-          {/* 3-Step Review Status Selection Card (이미지와 아예 밀착되도록 -mt-4.5 상단 마진 인가) */}
-          <div className="rn-review-panel bg-slate-950 p-4 rounded-2xl border border-slate-850 space-y-4 -mt-4.5">
+          {/* ── 학습 흐름 1: 체크리스트 (기본 펼침, 맨 먼저). 이전엔 복습 상태(O/X/★) 패널과
+              추천 강의 카드가 여기 먼저 있었다 — 둘 다 "그 외 부가정보"로 옮겨졌다(아래 참고).
+              Card 0.9: 체크리스트 2.0 — "AI 풀이를 이해했나요?"가 아니라 "풀기 전에 기본 접근을
+              했나요?"를 확인하는 용도. solve 완료를 기다리지 않고 classify와 병렬로 훨씬 일찍
+              준비되므로, 학생이 전체 풀이를 기다리는 동안에도 먼저 쓸 수 있어야 한다 — 그래서
+              바로 아래의 "AI Analysis trigger" 3분기 ternary(로딩 스피너 / 실제 분석 결과 / 시작
+              전 안내) 밖에, 그 위에 독립적으로 렌더한다. 예전엔 이 블록이 hasRealAnalysis(실제
+              풀이 스트리밍이 시작된 뒤에만 true)) 분기 안에 있어서, 체크리스트가 이미 준비돼도
+              solve의 첫 스트리밍 전까지는 화면에 아예 나타나지 않는 문제가 있었다(체크리스트만
+              분리해도 상위 조건에 계속 가려져 있으면 소용없음).
+              🧭 렌더 소스는 checklistPreview를 최우선으로 쓴다 — selectedEntry.analysis는
+              classify/solve가 각자 캡처한 stale 스냅샷으로 통째로 교체되기 때문에, 그것만
+              보고 렌더하면 체크리스트가 화면에서 사라졌다가 첫 저장 완료 후에야 다시 나타나는
+              문제가 있었다(useChecklistGeneration.ts 설계 주석 참고). checklistPreview가 아직
+              없는(이번 세션에 생성한 적 없는, 이전에 이미 저장된) 레코드만 analysis로 폴백한다. */}
+          {(() => {
+            const checklistItems = checklistPreview ?? selectedEntry.analysis?.solutionChecklist?.items;
+            return (
+              <>
+                {checklistStatus === 'generating' && !checklistItems && (
+                  <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                    <span className="flex-none w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                    <span>{aiPersonaName}가 문제 풀이 체크리스트를 작성 중이에요…</span>
+                  </div>
+                )}
+                {checklistStatus === 'failed' && !checklistItems && (
+                  <div className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-red-500/10 text-red-300 border border-red-500/20">
+                    <span>⚠️ 체크리스트 생성에 실패했어요</span>
+                    {onRetryChecklistGeneration && (
+                      <button
+                        onClick={onRetryChecklistGeneration}
+                        className="flex-none px-3 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-200 font-black active:scale-95 transition-all"
+                      >
+                        다시 시도
+                      </button>
+                    )}
+                  </div>
+                )}
+                {checklistItems && (() => {
+                  // 🧭 순차 잠금 — 앞 항목이 미응답이면 다음 항목은 잠근다. "막혔어요"도 유효한
+                  // 응답이라 done/stuck 둘 다 다음을 연다("unanswered"만 멈춘다). 별도 잠금 필드를
+                  // DB에 저장하지 않는다 — 매 렌더마다 현재 items의 status로부터 다시 계산하므로,
+                  // 저장된 응답이 있는 문제를 다시 열어도 잠금 상태가 자연스럽게 복원된다(레거시
+                  // solutionCheckpoints의 frontier 계산과 동일한 패턴, 다만 거긴 stuck이 멈추고
+                  // 여긴 멈추지 않는다는 차이가 있다).
+                  const frontierIndex = (() => {
+                    const idx = checklistItems.findIndex(it => it.status === 'unanswered');
+                    return idx === -1 ? checklistItems.length : idx;
+                  })();
+                  return (
+                    <div className="rn-checklist space-y-2">
+                      <h4 className="text-sm font-extrabold text-emerald-400 flex items-center">
+                        <span className="mr-1.5 text-base">✅</span> 풀기 전 체크리스트
+                      </h4>
+                      <p className="text-[11px] text-slate-500 leading-relaxed">
+                        풀기 전에 어디까지 스스로 해봤는지 확인해보세요.
+                      </p>
+                      <div className="space-y-2">
+                        {checklistItems.map((item, index) => {
+                          const isLocked = index > frontierIndex;
+                          return (
+                            <div
+                              key={item.id}
+                              className={`rounded-xl border p-3 transition-all ${
+                                isLocked ? 'bg-slate-950/40 border-slate-900 opacity-50' : 'bg-slate-900 border-slate-800'
+                              }`}
+                            >
+                              <div className="flex items-start gap-1.5">
+                                {isLocked && <span className="flex-none text-sm leading-relaxed" aria-hidden="true">🔒</span>}
+                                <LaTeXRenderer
+                                  text={item.text}
+                                  className={`text-xs font-bold leading-relaxed ${isLocked ? 'text-slate-600' : 'text-slate-200'}`}
+                                />
+                              </div>
+                              <div className="flex items-center gap-2 mt-2">
+                                <button
+                                  type="button"
+                                  disabled={isLocked}
+                                  onClick={() => onSetChecklistItemStatus(selectedEntry.id, item.id, 'done')}
+                                  className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all active:scale-95 disabled:active:scale-100 disabled:cursor-not-allowed ${
+                                    item.status === 'done'
+                                      ? 'bg-emerald-500 text-slate-950'
+                                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:hover:bg-slate-800 disabled:text-slate-600'
+                                  }`}
+                                >
+                                  ✅ 했어요
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isLocked}
+                                  onClick={() => onSetChecklistItemStatus(selectedEntry.id, item.id, 'stuck')}
+                                  className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all active:scale-95 disabled:active:scale-100 disabled:cursor-not-allowed ${
+                                    item.status === 'stuck'
+                                      ? 'bg-amber-500 text-slate-950'
+                                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:hover:bg-slate-800 disabled:text-slate-600'
+                                  }`}
+                                >
+                                  🙋 막혔어요
+                                </button>
+                              </div>
+                              {!isLocked && item.status === 'stuck' && (
+                                <p className="mt-2 text-[11px] leading-relaxed text-amber-200" role="status">
+                                  {item.id === 'fixed-1' ? '주어진 조건에 하나씩 밑줄을 긋고, 빠뜨린 조건이 있는지 찾아보세요.'
+                                    : item.id === 'fixed-2' ? '아는 조건 하나만 골라 식이나 간단한 그림으로 옮겨보세요.'
+                                    : item.id === 'fixed-3' ? '문제의 마지막 문장을 읽고 구할 대상을 내 말로 적어보세요.'
+                                    : '이 질문과 연결된 조건을 문제에서 찾아보세요. 어떤 말이나 개념이 어려운지 짚어본 뒤 아래 풀이와 비교해 보세요.'}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </>
+            );
+          })()}
+
+          {/* Card 0.8 (레거시): 단계형 풀이 체크리스트 — 체크리스트 2.0 이전에 생성된
+              레코드만 대상(신규 분석은 항상 solutionChecklist를 갖게 되므로 자연히 배타적).
+              새 체크리스트와 같은 "학습 흐름 1: 체크리스트" 그룹으로 옮겨왔다 — 원래
+              hasRealAnalysis 분기 안에서만 analysis가 보장됐던 자리라, 여기서는
+              selectedEntry.analysis 존재를 직접 확인한다(narrowing 목적, 로직 변경 없음). */}
+          {selectedEntry.analysis && !selectedEntry.analysis.solutionChecklist && selectedEntry.analysis.solutionCheckpoints && (() => {
+            const stages = selectedEntry.analysis.solutionCheckpoints;
+            if (!stages) return null;
+
+            const STAGE_TITLES: Record<number, string> = {
+              1: '1단계: 문제 이해하기',
+              2: '2단계: 해결 계획 세우기',
+              3: '3단계: 계획 실행하기',
+              4: '4단계: 돌아보기 & 쌤의 한끝 팁',
+            };
+
+            // 4단계 전체를 관통하는 하나의 순서로 평탄화해서 순차 잠금을 계산한다.
+            // "진행 경계(frontier)" = 맨 앞에서부터 봤을 때 처음으로 understood가 아닌 지점
+            // (unanswered든, stuck이든). 그 경계까지는(포함) 상호작용 가능하고, 그 뒤는 전부
+            // 잠근다 — understood를 stuck으로 되돌리면 그 뒤에 있던 기존 응답(이미 understood/
+            // stuck으로 답했던 것)도 다시 잠기지만, status 데이터 자체는 지우지 않는다(그냥
+            // 잠금 화면 뒤에 보존됨). 다시 understood가 되면 경계가 한 칸 전진하면서 그 다음
+            // checkpoint가 열리는데, 거기 남아있던 예전 응답이 있으면 그대로 다시 보인다.
+            const flatStatuses = stages.flatMap(s => s.checkpoints.map(cp => cp.status));
+            let frontierIndex = flatStatuses.findIndex(status => status !== 'understood');
+            if (frontierIndex === -1) frontierIndex = flatStatuses.length; // 전부 이해 완료
+
+            let flatCursor = -1;
+
+            return (
+              <div className="rn-checklist space-y-3">
+                <h4 className="text-sm font-extrabold text-emerald-400 flex items-center">
+                  <span className="mr-1.5 text-base">🧭</span> 단계형 풀이 체크리스트
+                </h4>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  순서대로 "이해했어요" 또는 "여기서 막혔어요"를 선택해 보세요. 이전 단계를 선택해야 다음 단계가 열립니다.
+                </p>
+
+                <div className="space-y-4">
+                  {stages.map((stageGroup, stageIndex) => (
+                    <div key={stageGroup.stage} className="space-y-2">
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-wide">
+                        {STAGE_TITLES[stageGroup.stage] || `${stageGroup.stage}단계`}
+                      </span>
+                      <div className="space-y-2">
+                        {stageGroup.checkpoints.map((cp, checkpointIndex) => {
+                          flatCursor += 1;
+                          const myFlatIndex = flatCursor;
+                          const isLocked = myFlatIndex > frontierIndex;
+
+                          return (
+                            <div
+                              key={checkpointIndex}
+                              className={`rounded-xl border p-3 transition-all ${
+                                isLocked ? 'bg-slate-950/40 border-slate-900 opacity-40' :
+                                cp.status === 'stuck' ? 'bg-amber-950/20 border-amber-800/40' :
+                                cp.status === 'understood' ? 'bg-emerald-950/10 border-emerald-800/30' :
+                                'bg-slate-900 border-indigo-500/50'
+                              }`}
+                            >
+                              <span className={`text-xs font-bold ${isLocked ? 'text-slate-600' : 'text-slate-200'}`}>
+                                {isLocked && <span className="mr-1">🔒</span>}
+                                {cp.label}
+                              </span>
+
+                              {!isLocked && (
+                                <div className="flex items-center space-x-2 mt-2">
+                                  <button
+                                    onClick={() => onUpdateCheckpointStatus(selectedEntry.id, stageIndex, checkpointIndex, 'understood')}
+                                    className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all active:scale-95 ${
+                                      cp.status === 'understood'
+                                        ? 'bg-emerald-500 text-slate-950'
+                                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                                    }`}
+                                  >
+                                    ✅ 이해했어요
+                                  </button>
+                                  <button
+                                    onClick={() => onUpdateCheckpointStatus(selectedEntry.id, stageIndex, checkpointIndex, 'stuck')}
+                                    className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all active:scale-95 ${
+                                      cp.status === 'stuck'
+                                        ? 'bg-amber-500 text-slate-950'
+                                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                                    }`}
+                                  >
+                                    🙋 여기서 막혔어요
+                                  </button>
+                                </div>
+                              )}
+
+                              {/* "이해했어요"는 다음 진행이 가능하다는 뜻일 뿐, AI 풀이 설명을 새로
+                                  보여주지 않는다(여러 정상 풀이가 있을 수 있는데 AI 설명과 다르다는
+                                  이유만으로 학생이 스스로를 "막혔다"고 오판하게 만들 수 있어서다).
+                                  detail/hint는 "여기서 막혔어요"를 선택했을 때만, 그리고 잠기지
+                                  않은(현재 진행 경계인) checkpoint에서만 보여준다. */}
+                              {!isLocked && cp.status === 'stuck' && (
+                                <div className="mt-2 text-[11px] text-slate-400 leading-relaxed space-y-1">
+                                  <p>{cp.detail}</p>
+                                  <p className="text-amber-400 font-semibold">💡 {cp.hint}</p>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => setShowSolvingProcess(true)}
+                  className="text-[11px] text-indigo-400 hover:text-indigo-300 font-bold underline underline-offset-2"
+                >
+                  전체 풀이 처음부터 보기 →
+                </button>
+              </div>
+            );
+          })()}
+
+          {/* ── 학습 흐름 2: 풀이 (기본 접힘). isAnalysisLoading/isAnalysisReady는 위에서
+              한 번만 계산해 이 영역과 "그 외"(§4) 영역이 항상 같은 판단을 보게 한다 — 로직
+              변경 없음, 조건을 다시 쓰지 않고 이름 붙은 상수를 재사용할 뿐이다. */}
+          {isAnalysisLoading ? (
+            <div className="py-8 px-4 flex flex-col items-center space-y-8 animate-fade-in bg-slate-900/20 rounded-3xl border border-slate-800/40 backdrop-blur-md">
+              {/* 상단: 타이머와 로딩 텍스트를 담은 세련된 원형 기기 */}
+              <div className="flex flex-col items-center space-y-4">
+                <div className="relative w-32 h-32 flex items-center justify-center">
+                  {/* 뒷배경 서클 트랙 */}
+                  <svg className="w-full h-full transform -rotate-90">
+                    <circle
+                      cx="64"
+                      cy="64"
+                      r="54"
+                      className="stroke-slate-800/60"
+                      strokeWidth="6"
+                      fill="transparent"
+                    />
+                    {/* 앞 배경 프로그레스 서클 */}
+                    <circle
+                      cx="64"
+                      cy="64"
+                      r="54"
+                      className="stroke-indigo-500 transition-all duration-100 ease-out"
+                      strokeWidth="6"
+                      fill="transparent"
+                      strokeDasharray="339.29"
+                      strokeDashoffset={339.29 - (339.29 * progress) / 100}
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  {/* 중앙 진행 퍼센티지 텍스트 */}
+                  <div className="absolute flex flex-col items-center justify-center">
+                    <span className="text-2xl font-black text-white font-mono">
+                      {Math.round(progress)}%
+                    </span>
+                    <span className="text-[10px] text-indigo-400 font-bold tracking-wider mt-0.5 animate-pulse">
+                      진단 중
+                    </span>
+                  </div>
+                </div>
+
+                {/* 진행 상황 및 남은 예상 시간 설명 */}
+                <div className="text-center space-y-1">
+                  <p className="text-sm font-semibold text-white tracking-tight flex items-center justify-center space-x-1.5 min-h-[20px]">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-500 animate-ping"></span>
+                    <span className="animate-pulse">{loadingText}</span>
+                  </p>
+                  <p className="text-[11px] text-slate-500">
+                    {progress >= 100 ? (
+                      <span className="text-emerald-400 font-bold animate-pulse">완료! 상세 진단을 표시합니다...</span>
+                    ) : overtimeSeconds > 0 ? (
+                      <span className="text-amber-400 font-bold">예상보다 오래 걸리고 있어요 (+{overtimeSeconds}초)</span>
+                    ) : (
+                      <span>예상 대기 시간: 약 {remainingSeconds}초</span>
+                    )}
+                  </p>
+                  {averageWaitMs && (
+                    <p className="text-[10px] text-slate-600">
+                      (최근 진단 평균 소요 시간: 약 {Math.round(averageWaitMs / 1000)}초)
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : isAnalysisReady ? (
+            <CollapsibleSection
+              icon="💡"
+              title="정석 풀이 과정"
+              subtitle={isAnalyzing && (
+                <span className="ml-2 text-[10px] font-bold text-indigo-300 animate-pulse">✍️ {aiPersonaName}가 실시간으로 작성 중...</span>
+              )}
+              color="indigo"
+              isOpen={showSolvingProcess}
+              onToggle={() => setShowSolvingProcess(!showSolvingProcess)}
+            >
+              <LaTeXRenderer text={selectedEntry.analysis!.solvingProcess} className="text-sm md:text-base leading-relaxed" />
+            </CollapsibleSection>
+          ) : (
+            <div
+              ref={analysisCardRef}
+              className="py-8 bg-slate-950/60 rounded-2xl border border-slate-800 p-6 text-center space-y-4"
+            >
+              <div className="text-3xl">🐱</div>
+              <div className="space-y-1">
+                <p className="text-sm font-bold text-white">AI 수학 클리닉 진단</p>
+                <p className="text-xs text-slate-400 leading-relaxed max-w-xs mx-auto">
+                  아직 오답 원인이 분석되지 않았습니다. AI가 설계하는 맞춤형 오답 처방전을 확인해 보세요.
+                </p>
+              </div>
+              <button
+                onClick={() => onStartAnalysis({
+                  ...selectedEntry,
+                  grade: editGrade || undefined,
+                  chapter: editChapter || undefined,
+                  rootCauses: editRootCauses,
+                  userActionPlan: editActionPlan || undefined
+                })}
+                className="px-6 py-2.5 rounded-full bg-gradient-to-r from-indigo-600 to-indigo-500 active:scale-95 transition-all text-xs font-bold text-white shadow-md shadow-indigo-600/20"
+              >
+                AI 분석 시작하기
+              </button>
+            </div>
+          )}
+
+          {/* ── 학습 흐름 3: 틀린 이유 + 대책 — 하나의 자기성찰 섹션 (기본 펼침, collapse 없음).
+              이전엔 "실수 원인"이 맨 아래 접힘 <details>에, "나만의 대책"이 여기 따로 있어 두
+              단계가 멀리 떨어져 있었다. root_causes/userActionPlan 데이터 구조·저장 경로는
+              전혀 바꾸지 않고, 같은 state(editRootCauses/editActionPlan)를 이 한 섹션 안에서
+              위아래로 이어 보여주기만 한다. */}
+          <section className="rn-checklist rn-plan" aria-label="왜 틀렸을까, 다음엔 어떻게">
+            <p className="rn-eyebrow">SELF CHECK</p>
+            <h4 className="rn-title">왜 틀렸을까?</h4>
+            <div className="space-y-2">
+              <label className="text-[11px] font-bold text-slate-400 block">실수 원인 (복수 선택 가능)</label>
+              <div className="space-y-2">
+                {ROOT_CAUSE_OPTIONS.map(opt => (
+                  <label key={opt.id} className="flex items-center space-x-3 cursor-pointer group">
+                    <input type="checkbox" checked={editRootCauses.includes(opt.id)} onChange={() => toggleRootCause(opt.id)} className="rn-cause-checkbox" />
+                    <span><span className="text-xs font-semibold text-slate-200">{opt.label}</span><span className="rn-caption ml-2">{opt.desc}</span></span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <h4 className="rn-title" style={{ marginTop: 4 }}>다음엔 이렇게 풀어볼래요</h4>
+              {/* 나만의 대책 (정답 수정란보다 먼저 배치 — 정답을 보기 전에 스스로 다시 풀어보고 대책부터 적도록 유도)
+                  AI는 이 칸을 절대 자동으로 채우지 않는다 — 학생이 직접 적어야만 값이 채워진다. */}
+              <div className={`space-y-1.5 rounded-xl transition-shadow ${actionPlanHighlight ? 'action-plan-nudge' : ''}`}>
+                <label className="text-[11px] font-bold text-slate-400 block">나만의 대책 (직접 작성)</label>
+                <textarea
+                  aria-label="나만의 대책" value={editActionPlan}
+                  onChange={e => setEditActionPlan(e.target.value)}
+                  placeholder="이번 실수를 통해 앞으로 어떻게 풀겠다는 나만의 대책을 자유롭게 적어보세요..."
+                  rows={3}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-600 outline-none focus:border-emerald-500 transition-colors resize-none leading-relaxed"
+                />
+              </div>
+
+              {/* 직접 다시 풀어보기 권유 — 강제하지 않는다: 건너뛰어도 복습에 지장 없고, 죄책감
+                  유발 문구를 쓰지 않는다. AI 진단이 끝난 뒤에만 노출.
+                  🧭 "네, 다시 풀어볼게요"는 이제 모달을 닫는 대신 바로 풀이노트(문제 이미지 위에
+                  직접 필기 가능한 창)를 연다 — 클릭 즉시 다음 행동(문제 위에 쓰기)으로 바로
+                  이어지게 한다. 저장하면 아래 "📚 나의 학습 기록"에 자동으로 남는다. */}
+              {isAnalysisReady && (
+                reproposeDismissed ? (
+                  <button
+                    type="button"
+                    onClick={() => setReproposeDismissed(false)}
+                    className="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 underline underline-offset-2 transition-colors"
+                  >
+                    마음이 바뀌었나요? 다시 풀어볼게요 ✏️
+                  </button>
+                ) : (
+                  <div className="space-y-2 rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-3">
+                    <p className="text-xs font-bold text-indigo-300 leading-relaxed">
+                      ✏️ 눈으로 읽는 것보다 직접 풀어보면 훨씬 오래 기억에 남아요. 한 번 다시 풀어볼까요?
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={openProblemOverlay}
+                        className="flex-1 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-400 active:scale-95 transition-all text-[11px] font-black text-white"
+                      >
+                        ✏️ 네, 다시 풀어볼게요
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReproposeDismissed(true)}
+                        className="flex-none px-3 py-2 rounded-lg text-[11px] font-bold text-slate-400 hover:text-slate-300 transition-colors"
+                      >
+                        지금은 건너뛰기
+                      </button>
+                    </div>
+                  </div>
+                )
+              )}
+
+          </section>
+
+          {/* ── 학습 흐름 4: 그 외 부가정보 ── 복습 상태(O/X/★), 추천 강의, 학습 기록(스캐폴딩/
+              재풀이), 진단 재생성 배너, 문제 분류 편집. 전부 이전엔 더 위에 있던 내용을 위치만
+              옮긴 것 — 각 조건/데이터/저장 경로는 전혀 바꾸지 않았다. */}
+          {isAnalysisReady && (
+            <div className="space-y-6">
+              {/* AI 모델 명시 정보 */}
+              {isAdmin && <div className="flex items-center justify-end">
+                <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-slate-800 text-indigo-400 border border-slate-700/60 flex items-center space-x-1 select-none">
+                  <span>⚡ AI 엔진:</span>
+                  <span className="font-extrabold">{selectedEntry.analysis!.modelUsed || 'gemini-2.5-flash (기본)'}</span>
+                </span>
+              </div>}
+
+              {/* Card 0.5: 📚 나의 학습 기록 — 선생님 힌트(스캐폴딩)와 재풀이 기록을 한 묶음으로.
+                  재풀이는 이제 별도 사진 업로드 UI가 아니라 "다시 풀어볼게요" → 풀이노트(문제
+                  이미지 위에 직접 필기) → 저장 시 이 스캐폴딩 목록에 "내 풀이"로 자동 등록되는
+                  흐름 하나로 합쳐졌다(HandwritingOverlay.handleSave, 기존 구조 그대로 재사용). */}
+              <div className="space-y-2">
+                <h4 className="text-[11px] font-black text-slate-500 uppercase tracking-wide px-1">📚 나의 학습 기록</h4>
+                <MistakeScaffoldingDrawer
+                  mistakeId={selectedEntry.id}
+                  studentId={selectedEntry.userId || ''}
+                  currentUserId={currentUserId || ''}
+                  isAdmin={isAdmin}
+                  refreshSignal={scaffoldingRefreshKey}
+                />
+
+                {/* 과거(이번 라운드 이전)에 올린 재풀이 사진이 있으면 계속 보여준다 — DB/Storage
+                    데이터는 그대로 유지, 신규 업로드 UI만 제거됐다. 지우고 싶으면 삭제 가능. */}
+                {selectedEntry.answerImageUrl && (
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-slate-400 block">이전에 올린 재풀이 사진</label>
+                    <div className="relative rounded-xl overflow-hidden border border-slate-800 bg-slate-950">
+                      <img
+                        src={selectedEntry.answerImageUrl}
+                        alt="내가 다시 푼 풀이"
+                        className="w-full max-h-64 object-contain"
+                      />
+                      <button
+                        type="button"
+                        onClick={onDeleteAnswerImage}
+                        aria-label="재풀이 사진 삭제"
+                        className="absolute top-2 right-2 w-7 h-7 rounded-full bg-slate-950/80 hover:bg-red-500/80 flex items-center justify-center text-white text-xs font-black transition-colors"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 🧭 정리하기(초기화) 이후 체크리스트 재생성 진행 상태 — 정석 풀이는 전혀 건드리지
+                  않고 이 배너들만 추가/제거된다(기존 데이터가 사라지거나 깜빡이지 않음). */}
+              {checkpointRegenStatus === 'generating' && (
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                  <span className="flex-none w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                  <span>AI가 새로운 학습 진단을 만들고 있어요...</span>
+                </div>
+              )}
+              {checkpointRegenStatus === 'failed' && (
+                <div className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-red-500/10 text-red-300 border border-red-500/20">
+                  <span>⚠️ AI 진단 생성에 실패했어요</span>
+                  {onRetryCheckpointGeneration && (
+                    <button
+                      onClick={onRetryCheckpointGeneration}
+                      className="flex-none px-3 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-200 font-black active:scale-95 transition-all"
+                    >
+                      다시 시도
+                    </button>
+                  )}
+                </div>
+              )}
+              {checkpointRegenStatus === 'success' && (
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                  <span>✓ 새로운 진단이 준비됐어요</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 3-Step Review Status Selection Card — "그 외" 그룹으로 이동 (예전엔 이미지 바로
+              아래, 체크리스트/풀이/틀린이유보다 먼저 있었다). */}
+          <div className="rn-review-panel bg-slate-950 p-4 rounded-2xl border border-slate-850 space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-300 flex items-center">
                 <span className="mr-1 text-sm">📋</span> 이번 복습은 어땠나요?
@@ -1364,7 +1870,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             })()}
           </div>
 
-          {/* ⚡ AI 추천 동영상 딥링크 연동 카드 (test 학생 한정) */}
+          {/* ⚡ AI 추천 동영상 딥링크 연동 카드 (test 학생 한정) — "그 외" 그룹으로 이동 */}
           {matchedLecture && (
             <div className="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-3.5 flex items-center justify-between space-x-3.5 animate-scale-up">
               <div className="flex items-center space-x-3 min-w-0">
@@ -1396,484 +1902,12 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             </div>
           )}
 
-          {/* Card 0.9: 체크리스트 2.0 — "AI 풀이를 이해했나요?"가 아니라 "풀기 전에 기본 접근을
-              했나요?"를 확인하는 용도. solve 완료를 기다리지 않고 classify와 병렬로 훨씬 일찍
-              준비되므로, 학생이 전체 풀이를 기다리는 동안에도 먼저 쓸 수 있어야 한다 — 그래서
-              바로 아래의 "AI Analysis trigger" 3분기 ternary(로딩 스피너 / 실제 분석 결과 / 시작
-              전 안내) 밖에, 그 위에 독립적으로 렌더한다. 예전엔 이 블록이 hasRealAnalysis(실제
-              풀이 스트리밍이 시작된 뒤에만 true)) 분기 안에 있어서, 체크리스트가 이미 준비돼도
-              solve의 첫 스트리밍 전까지는 화면에 아예 나타나지 않는 문제가 있었다(체크리스트만
-              분리해도 상위 조건에 계속 가려져 있으면 소용없음).
-              🧭 렌더 소스는 checklistPreview를 최우선으로 쓴다 — selectedEntry.analysis는
-              classify/solve가 각자 캡처한 stale 스냅샷으로 통째로 교체되기 때문에, 그것만
-              보고 렌더하면 체크리스트가 화면에서 사라졌다가 첫 저장 완료 후에야 다시 나타나는
-              문제가 있었다(useChecklistGeneration.ts 설계 주석 참고). checklistPreview가 아직
-              없는(이번 세션에 생성한 적 없는, 이전에 이미 저장된) 레코드만 analysis로 폴백한다. */}
-          {(() => {
-            const checklistItems = checklistPreview ?? selectedEntry.analysis?.solutionChecklist?.items;
-            return (
-              <>
-                {checklistStatus === 'generating' && !checklistItems && (
-                  <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-                    <span className="flex-none w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
-                    <span>{aiPersonaName}가 문제 풀이 체크리스트를 작성 중이에요…</span>
-                  </div>
-                )}
-                {checklistStatus === 'failed' && !checklistItems && (
-                  <div className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-red-500/10 text-red-300 border border-red-500/20">
-                    <span>⚠️ 체크리스트 생성에 실패했어요</span>
-                    {onRetryChecklistGeneration && (
-                      <button
-                        onClick={onRetryChecklistGeneration}
-                        className="flex-none px-3 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-200 font-black active:scale-95 transition-all"
-                      >
-                        다시 시도
-                      </button>
-                    )}
-                  </div>
-                )}
-                {checklistItems && (() => {
-                  // 🧭 순차 잠금 — 앞 항목이 미응답이면 다음 항목은 잠근다. "막혔어요"도 유효한
-                  // 응답이라 done/stuck 둘 다 다음을 연다("unanswered"만 멈춘다). 별도 잠금 필드를
-                  // DB에 저장하지 않는다 — 매 렌더마다 현재 items의 status로부터 다시 계산하므로,
-                  // 저장된 응답이 있는 문제를 다시 열어도 잠금 상태가 자연스럽게 복원된다(레거시
-                  // solutionCheckpoints의 frontier 계산과 동일한 패턴, 다만 거긴 stuck이 멈추고
-                  // 여긴 멈추지 않는다는 차이가 있다).
-                  const frontierIndex = (() => {
-                    const idx = checklistItems.findIndex(it => it.status === 'unanswered');
-                    return idx === -1 ? checklistItems.length : idx;
-                  })();
-                  return (
-                    <div className="rn-checklist space-y-2">
-                      <h4 className="text-sm font-extrabold text-emerald-400 flex items-center">
-                        <span className="mr-1.5 text-base">✅</span> 풀기 전 체크리스트
-                      </h4>
-                      <p className="text-[11px] text-slate-500 leading-relaxed">
-                        풀기 전에 어디까지 스스로 해봤는지 확인해보세요.
-                      </p>
-                      <div className="space-y-2">
-                        {checklistItems.map((item, index) => {
-                          const isLocked = index > frontierIndex;
-                          return (
-                            <div
-                              key={item.id}
-                              className={`rounded-xl border p-3 transition-all ${
-                                isLocked ? 'bg-slate-950/40 border-slate-900 opacity-50' : 'bg-slate-900 border-slate-800'
-                              }`}
-                            >
-                              <div className="flex items-start gap-1.5">
-                                {isLocked && <span className="flex-none text-sm leading-relaxed" aria-hidden="true">🔒</span>}
-                                <LaTeXRenderer
-                                  text={item.text}
-                                  className={`text-xs font-bold leading-relaxed ${isLocked ? 'text-slate-600' : 'text-slate-200'}`}
-                                />
-                              </div>
-                              <div className="flex items-center gap-2 mt-2">
-                                <button
-                                  type="button"
-                                  disabled={isLocked}
-                                  onClick={() => onSetChecklistItemStatus(selectedEntry.id, item.id, 'done')}
-                                  className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all active:scale-95 disabled:active:scale-100 disabled:cursor-not-allowed ${
-                                    item.status === 'done'
-                                      ? 'bg-emerald-500 text-slate-950'
-                                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:hover:bg-slate-800 disabled:text-slate-600'
-                                  }`}
-                                >
-                                  ✅ 했어요
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={isLocked}
-                                  onClick={() => onSetChecklistItemStatus(selectedEntry.id, item.id, 'stuck')}
-                                  className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all active:scale-95 disabled:active:scale-100 disabled:cursor-not-allowed ${
-                                    item.status === 'stuck'
-                                      ? 'bg-amber-500 text-slate-950'
-                                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:hover:bg-slate-800 disabled:text-slate-600'
-                                  }`}
-                                >
-                                  🙋 막혔어요
-                                </button>
-                              </div>
-                              {!isLocked && item.status === 'stuck' && (
-                                <p className="mt-2 text-[11px] leading-relaxed text-amber-200" role="status">
-                                  {item.id === 'fixed-1' ? '주어진 조건에 하나씩 밑줄을 긋고, 빠뜨린 조건이 있는지 찾아보세요.'
-                                    : item.id === 'fixed-2' ? '아는 조건 하나만 골라 식이나 간단한 그림으로 옮겨보세요.'
-                                    : item.id === 'fixed-3' ? '문제의 마지막 문장을 읽고 구할 대상을 내 말로 적어보세요.'
-                                    : '이 질문과 연결된 조건을 문제에서 찾아보세요. 어떤 말이나 개념이 어려운지 짚어본 뒤 아래 풀이와 비교해 보세요.'}
-                                </p>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </>
-            );
-          })()}
-
-          <section className="rn-checklist rn-plan" aria-label="나의 대책과 재풀이">
-            <p className="rn-eyebrow">MY NEXT STEP</p>
-            <h4 className="rn-title">다음엔 이렇게 풀어볼래요</h4>
-              {/* 나만의 대책 (정답 수정란보다 먼저 배치 — 정답을 보기 전에 스스로 다시 풀어보고 대책부터 적도록 유도)
-                  AI는 이 칸을 절대 자동으로 채우지 않는다 — 학생이 직접 적어야만 값이 채워진다. */}
-              <div className={`space-y-1.5 rounded-xl transition-shadow ${actionPlanHighlight ? 'action-plan-nudge' : ''}`}>
-                <label className="text-[11px] font-bold text-slate-400 block">나만의 대책 (직접 작성)</label>
-                <textarea
-                  aria-label="나만의 대책" value={editActionPlan}
-                  onChange={e => setEditActionPlan(e.target.value)}
-                  placeholder="이번 실수를 통해 앞으로 어떻게 풀겠다는 나만의 대책을 자유롭게 적어보세요..."
-                  rows={3}
-                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-600 outline-none focus:border-emerald-500 transition-colors resize-none leading-relaxed"
-                />
-              </div>
-
-              {/* 직접 다시 풀어보기 권유 — 강제하지 않는다: 건너뛰어도 복습에 지장 없고, 죄책감
-                  유발 문구를 쓰지 않는다. AI 진단이 끝난 뒤에만 노출.
-                  🧭 "네, 다시 풀어볼게요"는 이제 모달을 닫는 대신 바로 풀이노트(문제 이미지 위에
-                  직접 필기 가능한 창)를 연다 — 클릭 즉시 다음 행동(문제 위에 쓰기)으로 바로
-                  이어지게 한다. 저장하면 위 "📚 나의 학습 기록"에 자동으로 남는다. */}
-              {hasRealAnalysis(selectedEntry) && (
-                reproposeDismissed ? (
-                  <button
-                    type="button"
-                    onClick={() => setReproposeDismissed(false)}
-                    className="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 underline underline-offset-2 transition-colors"
-                  >
-                    마음이 바뀌었나요? 다시 풀어볼게요 ✏️
-                  </button>
-                ) : (
-                  <div className="space-y-2 rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-3">
-                    <p className="text-xs font-bold text-indigo-300 leading-relaxed">
-                      ✏️ 눈으로 읽는 것보다 직접 풀어보면 훨씬 오래 기억에 남아요. 한 번 다시 풀어볼까요?
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={openProblemOverlay}
-                        className="flex-1 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-400 active:scale-95 transition-all text-[11px] font-black text-white"
-                      >
-                        ✏️ 네, 다시 풀어볼게요
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setReproposeDismissed(true)}
-                        className="flex-none px-3 py-2 rounded-lg text-[11px] font-bold text-slate-400 hover:text-slate-300 transition-colors"
-                      >
-                        지금은 건너뛰기
-                      </button>
-                    </div>
-                  </div>
-                )
-              )}
-
-          </section>
-
-          {/* AI Analysis trigger / solving process rendering */}
-          {(!showResult && (isAnalyzing || (progress > 0 && progress < 100)) && (!selectedEntry.analysis?.solvingProcess || selectedEntry.analysis.solvingProcess === SOLVING_PLACEHOLDER_TEXT)) ? (
-            <div className="py-8 px-4 flex flex-col items-center space-y-8 animate-fade-in bg-slate-900/20 rounded-3xl border border-slate-800/40 backdrop-blur-md">
-              {/* 상단: 타이머와 로딩 텍스트를 담은 세련된 원형 기기 */}
-              <div className="flex flex-col items-center space-y-4">
-                <div className="relative w-32 h-32 flex items-center justify-center">
-                  {/* 뒷배경 서클 트랙 */}
-                  <svg className="w-full h-full transform -rotate-90">
-                    <circle
-                      cx="64"
-                      cy="64"
-                      r="54"
-                      className="stroke-slate-800/60"
-                      strokeWidth="6"
-                      fill="transparent"
-                    />
-                    {/* 앞 배경 프로그레스 서클 */}
-                    <circle
-                      cx="64"
-                      cy="64"
-                      r="54"
-                      className="stroke-indigo-500 transition-all duration-100 ease-out"
-                      strokeWidth="6"
-                      fill="transparent"
-                      strokeDasharray="339.29"
-                      strokeDashoffset={339.29 - (339.29 * progress) / 100}
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                  {/* 중앙 진행 퍼센티지 텍스트 */}
-                  <div className="absolute flex flex-col items-center justify-center">
-                    <span className="text-2xl font-black text-white font-mono">
-                      {Math.round(progress)}%
-                    </span>
-                    <span className="text-[10px] text-indigo-400 font-bold tracking-wider mt-0.5 animate-pulse">
-                      진단 중
-                    </span>
-                  </div>
-                </div>
-
-                {/* 진행 상황 및 남은 예상 시간 설명 */}
-                <div className="text-center space-y-1">
-                  <p className="text-sm font-semibold text-white tracking-tight flex items-center justify-center space-x-1.5 min-h-[20px]">
-                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-500 animate-ping"></span>
-                    <span className="animate-pulse">{loadingText}</span>
-                  </p>
-                  <p className="text-[11px] text-slate-500">
-                    {progress >= 100 ? (
-                      <span className="text-emerald-400 font-bold animate-pulse">완료! 상세 진단을 표시합니다...</span>
-                    ) : overtimeSeconds > 0 ? (
-                      <span className="text-amber-400 font-bold">예상보다 오래 걸리고 있어요 (+{overtimeSeconds}초)</span>
-                    ) : (
-                      <span>예상 대기 시간: 약 {remainingSeconds}초</span>
-                    )}
-                  </p>
-                  {averageWaitMs && (
-                    <p className="text-[10px] text-slate-600">
-                      (최근 진단 평균 소요 시간: 약 {Math.round(averageWaitMs / 1000)}초)
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : hasRealAnalysis(selectedEntry) ? (
-            <div className="space-y-6 animate-scale-up">
-              {/* AI 모델 명시 정보 */}
-              {isAdmin && <div className="flex items-center justify-end">
-                <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-slate-800 text-indigo-400 border border-slate-700/60 flex items-center space-x-1 select-none">
-                  <span>⚡ AI 엔진:</span>
-                  <span className="font-extrabold">{selectedEntry.analysis.modelUsed || 'gemini-2.5-flash (기본)'}</span>
-                </span>
-              </div>}
-
-              {/* Card 0: 원본 문제 지문(problemText)은 학생 UI에서 더 이상 렌더하지 않는다(요구사항).
-                  DB 저장/AI 분석 입력/체크포인트 생성 입력으로는 계속 그대로 쓰인다 — 여기서
-                  지운 건 이 화면에 보여주던 접힘 섹션 하나뿐이다. */}
-
-              {/* Card 0.5: 📚 나의 학습 기록 — 선생님 힌트(스캐폴딩)와 재풀이 기록을 한 묶음으로.
-                  재풀이는 이제 별도 사진 업로드 UI가 아니라 "다시 풀어볼게요" → 풀이노트(문제
-                  이미지 위에 직접 필기) → 저장 시 이 스캐폴딩 목록에 "내 풀이"로 자동 등록되는
-                  흐름 하나로 합쳐졌다(HandwritingOverlay.handleSave, 기존 구조 그대로 재사용). */}
-              <div className="space-y-2">
-                <h4 className="text-[11px] font-black text-slate-500 uppercase tracking-wide px-1">📚 나의 학습 기록</h4>
-                <MistakeScaffoldingDrawer
-                  mistakeId={selectedEntry.id}
-                  studentId={selectedEntry.userId || ''}
-                  currentUserId={currentUserId || ''}
-                  isAdmin={isAdmin}
-                  refreshSignal={scaffoldingRefreshKey}
-                />
-
-                {/* 과거(이번 라운드 이전)에 올린 재풀이 사진이 있으면 계속 보여준다 — DB/Storage
-                    데이터는 그대로 유지, 신규 업로드 UI만 제거됐다. 지우고 싶으면 삭제 가능. */}
-                {selectedEntry.answerImageUrl && (
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-slate-400 block">이전에 올린 재풀이 사진</label>
-                    <div className="relative rounded-xl overflow-hidden border border-slate-800 bg-slate-950">
-                      <img
-                        src={selectedEntry.answerImageUrl}
-                        alt="내가 다시 푼 풀이"
-                        className="w-full max-h-64 object-contain"
-                      />
-                      <button
-                        type="button"
-                        onClick={onDeleteAnswerImage}
-                        aria-label="재풀이 사진 삭제"
-                        className="absolute top-2 right-2 w-7 h-7 rounded-full bg-slate-950/80 hover:bg-red-500/80 flex items-center justify-center text-white text-xs font-black transition-colors"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* 🧭 정리하기(초기화) 이후 체크리스트 재생성 진행 상태 — 정석 풀이는 전혀 건드리지
-                  않고 이 배너들만 추가/제거된다(기존 데이터가 사라지거나 깜빡이지 않음). */}
-              {checkpointRegenStatus === 'generating' && (
-                <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
-                  <span className="flex-none w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
-                  <span>AI가 새로운 학습 진단을 만들고 있어요...</span>
-                </div>
-              )}
-              {checkpointRegenStatus === 'failed' && (
-                <div className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-red-500/10 text-red-300 border border-red-500/20">
-                  <span>⚠️ AI 진단 생성에 실패했어요</span>
-                  {onRetryCheckpointGeneration && (
-                    <button
-                      onClick={onRetryCheckpointGeneration}
-                      className="flex-none px-3 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-200 font-black active:scale-95 transition-all"
-                    >
-                      다시 시도
-                    </button>
-                  )}
-                </div>
-              )}
-              {checkpointRegenStatus === 'success' && (
-                <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-                  <span>✓ 새로운 진단이 준비됐어요</span>
-                </div>
-              )}
-
-              {/* Card 0.8 (레거시): 단계형 풀이 체크리스트 — 체크리스트 2.0 이전에 생성된
-                  레코드만 대상(신규 분석은 항상 solutionChecklist를 갖게 되므로 자연히 배타적). */}
-              {!selectedEntry.analysis.solutionChecklist && selectedEntry.analysis.solutionCheckpoints && (() => {
-                const stages = selectedEntry.analysis.solutionCheckpoints;
-                if (!stages) return null;
-
-                const STAGE_TITLES: Record<number, string> = {
-                  1: '1단계: 문제 이해하기',
-                  2: '2단계: 해결 계획 세우기',
-                  3: '3단계: 계획 실행하기',
-                  4: '4단계: 돌아보기 & 쌤의 한끝 팁',
-                };
-
-                // 4단계 전체를 관통하는 하나의 순서로 평탄화해서 순차 잠금을 계산한다.
-                // "진행 경계(frontier)" = 맨 앞에서부터 봤을 때 처음으로 understood가 아닌 지점
-                // (unanswered든, stuck이든). 그 경계까지는(포함) 상호작용 가능하고, 그 뒤는 전부
-                // 잠근다 — understood를 stuck으로 되돌리면 그 뒤에 있던 기존 응답(이미 understood/
-                // stuck으로 답했던 것)도 다시 잠기지만, status 데이터 자체는 지우지 않는다(그냥
-                // 잠금 화면 뒤에 보존됨). 다시 understood가 되면 경계가 한 칸 전진하면서 그 다음
-                // checkpoint가 열리는데, 거기 남아있던 예전 응답이 있으면 그대로 다시 보인다.
-                const flatStatuses = stages.flatMap(s => s.checkpoints.map(cp => cp.status));
-                let frontierIndex = flatStatuses.findIndex(status => status !== 'understood');
-                if (frontierIndex === -1) frontierIndex = flatStatuses.length; // 전부 이해 완료
-
-                let flatCursor = -1;
-
-                return (
-                  <div className="rn-checklist space-y-3">
-                    <h4 className="text-sm font-extrabold text-emerald-400 flex items-center">
-                      <span className="mr-1.5 text-base">🧭</span> 단계형 풀이 체크리스트
-                    </h4>
-                    <p className="text-[11px] text-slate-500 leading-relaxed">
-                      순서대로 "이해했어요" 또는 "여기서 막혔어요"를 선택해 보세요. 이전 단계를 선택해야 다음 단계가 열립니다.
-                    </p>
-
-                    <div className="space-y-4">
-                      {stages.map((stageGroup, stageIndex) => (
-                        <div key={stageGroup.stage} className="space-y-2">
-                          <span className="text-[10px] font-black text-slate-500 uppercase tracking-wide">
-                            {STAGE_TITLES[stageGroup.stage] || `${stageGroup.stage}단계`}
-                          </span>
-                          <div className="space-y-2">
-                            {stageGroup.checkpoints.map((cp, checkpointIndex) => {
-                              flatCursor += 1;
-                              const myFlatIndex = flatCursor;
-                              const isLocked = myFlatIndex > frontierIndex;
-
-                              return (
-                                <div
-                                  key={checkpointIndex}
-                                  className={`rounded-xl border p-3 transition-all ${
-                                    isLocked ? 'bg-slate-950/40 border-slate-900 opacity-40' :
-                                    cp.status === 'stuck' ? 'bg-amber-950/20 border-amber-800/40' :
-                                    cp.status === 'understood' ? 'bg-emerald-950/10 border-emerald-800/30' :
-                                    'bg-slate-900 border-indigo-500/50'
-                                  }`}
-                                >
-                                  <span className={`text-xs font-bold ${isLocked ? 'text-slate-600' : 'text-slate-200'}`}>
-                                    {isLocked && <span className="mr-1">🔒</span>}
-                                    {cp.label}
-                                  </span>
-
-                                  {!isLocked && (
-                                    <div className="flex items-center space-x-2 mt-2">
-                                      <button
-                                        onClick={() => onUpdateCheckpointStatus(selectedEntry.id, stageIndex, checkpointIndex, 'understood')}
-                                        className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all active:scale-95 ${
-                                          cp.status === 'understood'
-                                            ? 'bg-emerald-500 text-slate-950'
-                                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                                        }`}
-                                      >
-                                        ✅ 이해했어요
-                                      </button>
-                                      <button
-                                        onClick={() => onUpdateCheckpointStatus(selectedEntry.id, stageIndex, checkpointIndex, 'stuck')}
-                                        className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all active:scale-95 ${
-                                          cp.status === 'stuck'
-                                            ? 'bg-amber-500 text-slate-950'
-                                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                                        }`}
-                                      >
-                                        🙋 여기서 막혔어요
-                                      </button>
-                                    </div>
-                                  )}
-
-                                  {/* "이해했어요"는 다음 진행이 가능하다는 뜻일 뿐, AI 풀이 설명을 새로
-                                      보여주지 않는다(여러 정상 풀이가 있을 수 있는데 AI 설명과 다르다는
-                                      이유만으로 학생이 스스로를 "막혔다"고 오판하게 만들 수 있어서다).
-                                      detail/hint는 "여기서 막혔어요"를 선택했을 때만, 그리고 잠기지
-                                      않은(현재 진행 경계인) checkpoint에서만 보여준다. */}
-                                  {!isLocked && cp.status === 'stuck' && (
-                                    <div className="mt-2 text-[11px] text-slate-400 leading-relaxed space-y-1">
-                                      <p>{cp.detail}</p>
-                                      <p className="text-amber-400 font-semibold">💡 {cp.hint}</p>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <button
-                      onClick={() => setShowSolvingProcess(true)}
-                      className="text-[11px] text-indigo-400 hover:text-indigo-300 font-bold underline underline-offset-2"
-                    >
-                      전체 풀이 처음부터 보기 →
-                    </button>
-                  </div>
-                );
-              })()}
-
-              {/* Card 1: 정석 풀이 과정 */}
-              <CollapsibleSection
-                icon="💡"
-                title="정석 풀이 과정"
-                subtitle={isAnalyzing && (
-                  <span className="ml-2 text-[10px] font-bold text-indigo-300 animate-pulse">✍️ {aiPersonaName}가 실시간으로 작성 중...</span>
-                )}
-                color="indigo"
-                isOpen={showSolvingProcess}
-                onToggle={() => setShowSolvingProcess(!showSolvingProcess)}
-              >
-                <LaTeXRenderer text={selectedEntry.analysis.solvingProcess} className="text-sm md:text-base leading-relaxed" />
-              </CollapsibleSection>
-            </div>
-          ) : (
-            <div
-              ref={analysisCardRef}
-              className="py-8 bg-slate-950/60 rounded-2xl border border-slate-800 p-6 text-center space-y-4"
-            >
-              <div className="text-3xl">🐱</div>
-              <div className="space-y-1">
-                <p className="text-sm font-bold text-white">AI 수학 클리닉 진단</p>
-                <p className="text-xs text-slate-400 leading-relaxed max-w-xs mx-auto">
-                  아직 오답 원인이 분석되지 않았습니다. AI가 설계하는 맞춤형 오답 처방전을 확인해 보세요.
-                </p>
-              </div>
-              <button
-                onClick={() => onStartAnalysis({
-                  ...selectedEntry,
-                  grade: editGrade || undefined,
-                  chapter: editChapter || undefined,
-                  rootCauses: editRootCauses,
-                  userActionPlan: editActionPlan || undefined
-                })}
-                className="px-6 py-2.5 rounded-full bg-gradient-to-r from-indigo-600 to-indigo-500 active:scale-95 transition-all text-xs font-bold text-white shadow-md shadow-indigo-600/20"
-              >
-                AI 분석 시작하기
-              </button>
-            </div>
-          )}
-
-          {/* ── 학생 입력 영역 ── */}
+          {/* 문제 분류 편집 — 실수 원인은 "왜 틀렸을까?"(§3) 섹션으로 옮겨갔으므로
+              여기서는 과목/단원만 남는다(기본 접힘 유지). */}
           <details className="rn-detail-section rn-metadata">
             <summary className="rn-metadata-summary">
-              <span className="text-xs font-extrabold text-slate-300">문제 분류 · 실수 원인 편집</span>
-              {(selectedEntry.grade || selectedEntry.rootCauses?.length) && (
+              <span className="text-xs font-extrabold text-slate-300">문제 분류 편집</span>
+              {(selectedEntry.grade || selectedEntry.chapter) && (
                 <div className="flex items-center space-x-1.5">
                   {selectedEntry.grade && <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-600/20 text-indigo-400 border border-indigo-600/30 font-bold">{selectedEntry.grade}</span>}
                   {selectedEntry.chapter && <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-700 text-slate-300 border border-slate-600 font-bold">{selectedEntry.chapter}</span>}
@@ -1908,22 +1942,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                   </select>
                 </div>
               </div>
-
-              {/* 실수 원인 체크박스 */}
-              <div className="space-y-2">
-                <label className="text-[11px] font-bold text-slate-400 block">실수 원인 (복수 선택 가능)</label>
-                <div className="space-y-2">
-                  {ROOT_CAUSE_OPTIONS.map(opt => (
-                    <label
-                      key={opt.id}
-                      className="flex items-center space-x-3 cursor-pointer group"
-                    >
-                      <input type="checkbox" checked={editRootCauses.includes(opt.id)} onChange={() => toggleRootCause(opt.id)} className="rn-cause-checkbox" />
-                      <span><span className="text-xs font-semibold text-slate-200">{opt.label}</span><span className="rn-caption ml-2">{opt.desc}</span></span>                    </label>
-                  ))}
-                </div>
-              </div>
-
 
             </div>
           </details>
