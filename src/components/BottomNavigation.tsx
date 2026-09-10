@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import type { ActiveTab } from '../types';
 import { AppIcon, type AppIconName } from './ui/AppIcon';
 import { Sheet } from './ui/Sheet';
+import { canViewOwnExamPrep } from '../utils/examPrepAccess';
 
 interface BottomNavigationProps {
   activeTab: ActiveTab;
   setActiveTab: (tab: ActiveTab) => void;
   isAdmin?: boolean;
+  currentUserId?: string;
   onlineUsers: { id: string; display_name: string; nickname?: string; username: string }[];
   onStartReviewSession?: () => void;
   onOpenSlideList?: () => void;
@@ -21,12 +23,16 @@ const menus: { tab: ActiveTab; label: string; description: string; icon: AppIcon
   { tab: 'guide', label: '이용안내', description: '오답노트와 럭키상점 사용법', icon: 'help' },
   { tab: 'hidden', label: '숨긴 카드', description: '제외한 문제 확인과 다시 꺼내기', icon: 'eye', emoji: '🙈' },
 ];
-// 관리자 전용 항목 — 학생 계정에는 절대 노출되지 않는다(아래 isAdmin && 렌더 가드).
-const adminMenu: { tab: ActiveTab; label: string; description: string; icon: AppIconName } =
+// 관리자는 학생별 전체 리포트, 1차 허용 대상 학생은 본인 리포트만 — 같은 tab('examPrep')으로
+// 들어가지만 라벨/설명만 역할에 따라 다르게 보여준다(둘 다 아니면 메뉴 자체가 없음).
+const examPrepMenuAdmin: { tab: ActiveTab; label: string; description: string; icon: AppIconName } =
   { tab: 'examPrep', label: '시험대비 분석', description: '학생별 취약 단원과 수업 방향', icon: 'chart' };
-export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, setActiveTab, isAdmin, onOpenSlideList }) => {
+const examPrepMenuStudent: { tab: ActiveTab; label: string; description: string; icon: AppIconName } =
+  { tab: 'examPrep', label: '나의 시험대비 분석', description: '내 취약 단원과 시험 전 우선순위', icon: 'chart' };
+export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, setActiveTab, isAdmin, currentUserId, onOpenSlideList }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const select = (tab: ActiveTab) => { setActiveTab(tab); setMenuOpen(false); };
+  const examPrepMenu = isAdmin ? examPrepMenuAdmin : canViewOwnExamPrep(currentUserId) ? examPrepMenuStudent : null;
   const tabs: { tab: ActiveTab; label: string; icon: AppIconName }[] = [
     { tab: isAdmin ? 'admin' : 'activity', label: isAdmin ? '관리자' : '최근활동', icon: isAdmin ? 'chart' : 'activity' },
     { tab: 'notes', label: '오답노트', icon: 'notes' },
@@ -45,7 +51,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, s
     </div>
     <Sheet open={menuOpen} onClose={() => setMenuOpen(false)} title="나의 학습 공간">
       <div className="rn-menu-list">
-        {isAdmin && <button type="button" key={adminMenu.tab} className="rn-menu-row" aria-current={activeTab === adminMenu.tab ? 'page' : undefined} onClick={() => select(adminMenu.tab)}><AppIcon name={adminMenu.icon} /><span><strong>{adminMenu.label}</strong><small>{adminMenu.description}</small></span><AppIcon name="arrow" width={16} /></button>}
+        {examPrepMenu && <button type="button" key={examPrepMenu.tab} className="rn-menu-row" aria-current={activeTab === examPrepMenu.tab ? 'page' : undefined} onClick={() => select(examPrepMenu.tab)}><AppIcon name={examPrepMenu.icon} /><span><strong>{examPrepMenu.label}</strong><small>{examPrepMenu.description}</small></span><AppIcon name="arrow" width={16} /></button>}
         {menus.map(item => <button type="button" key={item.tab} className="rn-menu-row" aria-current={activeTab === item.tab ? 'page' : undefined} onClick={() => select(item.tab)}><AppIcon name={item.icon} /><span><strong>{item.label}{item.emoji ? ` ${item.emoji}` : ''}</strong><small>{item.description}</small></span><AppIcon name="arrow" width={16} /></button>)}
         {onOpenSlideList && <button type="button" className="rn-menu-row" onClick={() => { setMenuOpen(false); onOpenSlideList(); }}><AppIcon name="book" /><span><strong>수업자료</strong><small>선생님이 준비한 교안 슬라이드</small></span><AppIcon name="arrow" width={16} /></button>}
         {/* "함께 공부 중" 인원수는 오답노트 패널로 복귀했다(중복 노출 제거) — MistakeList.tsx 참고. */}

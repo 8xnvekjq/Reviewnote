@@ -12,7 +12,10 @@ interface Props {
   studentName: string;
   mistakes: MistakeEntry[];
   scaffoldedMistakeIds: Set<string>;
-  onBack: () => void;
+  onBack?: () => void;
+  // 'student'면 본인 리포트를 보는 것 — 교사 전용인 "실제 수업 순서 제안" 섹션을 숨기고,
+  // 학생 목록으로 돌아가는 버튼(onBack)도 표시하지 않는다. 분석 로직/데이터 자체는 동일하게 재사용.
+  viewerRole?: 'admin' | 'student';
 }
 
 const REVIEW_COLOR: Record<string, string> = { complete: 'var(--rn-success)', inProgress: 'var(--rn-warning)', retry: 'var(--rn-danger)', unreviewed: '#5b6376' };
@@ -22,7 +25,7 @@ const CAUSE_COLOR: Record<string, string> = { concept: '#8b7bea', strategy: '#e0
 // 공통수학2를 가장 흔히 쓰는 기본값으로 — 나머지는 교사가 직접 선택.
 const DEFAULT_GRADE = MATH_CURRICULUM['공통수학2'] ? '공통수학2' : GRADE_LIST[0];
 
-export function ExamPrepStudentReport({ studentId, studentName, mistakes, scaffoldedMistakeIds, onBack }: Props) {
+export function ExamPrepStudentReport({ studentId, studentName, mistakes, scaffoldedMistakeIds, onBack, viewerRole = 'admin' }: Props) {
   const [grade, setGrade] = useState(DEFAULT_GRADE);
   const chapters = MATH_CURRICULUM[grade] || [];
   const [startChapter, setStartChapter] = useState(chapters[0] || '');
@@ -52,10 +55,12 @@ export function ExamPrepStudentReport({ studentId, studentName, mistakes, scaffo
 
   return (
     <div className="rn-examprep-no-print">
-      <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={onBack} style={{ marginBottom: 10 }}>
-        <AppIcon name="arrow" width={14} height={14} style={{ transform: 'rotate(180deg)' }} /> 학생 목록
-      </button>
-      <h2 className="rn-title" style={{ marginBottom: 2 }}>{studentName}</h2>
+      {onBack && (
+        <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={onBack} style={{ marginBottom: 10 }}>
+          <AppIcon name="arrow" width={14} height={14} style={{ transform: 'rotate(180deg)' }} /> 학생 목록
+        </button>
+      )}
+      {viewerRole === 'admin' && <h2 className="rn-title" style={{ marginBottom: 2 }}>{studentName}</h2>}
       <p className="rn-caption" style={{ marginBottom: 14 }}>오답노트 기록을 바탕으로 본 시험대비 분석이에요. 시험범위를 지정하고 분석하기를 눌러주세요.</p>
 
       <div className="rn-examprep-range-bar">
@@ -224,15 +229,17 @@ export function ExamPrepStudentReport({ studentId, studentName, mistakes, scaffo
             ))}
           </div>
 
-          <div className="rn-surface" style={{ padding: 16, marginTop: 14 }}>
-            <h3 className="rn-section" style={{ fontSize: 14, fontWeight: 750, marginBottom: 4 }}>실제 수업 순서 제안</h3>
-            {report.lessonSteps.map(step => (
-              <div className="rn-examprep-lesson-step" key={step.when}>
-                <div className="rn-examprep-lesson-when">{step.when}</div>
-                <ul>{step.items.map(item => <li key={item}>{item}</li>)}</ul>
-              </div>
-            ))}
-          </div>
+          {viewerRole === 'admin' && (
+            <div className="rn-surface" style={{ padding: 16, marginTop: 14 }}>
+              <h3 className="rn-section" style={{ fontSize: 14, fontWeight: 750, marginBottom: 4 }}>실제 수업 순서 제안</h3>
+              {report.lessonSteps.map(step => (
+                <div className="rn-examprep-lesson-step" key={step.when}>
+                  <div className="rn-examprep-lesson-when">{step.when}</div>
+                  <ul>{step.items.map(item => <li key={item}>{item}</li>)}</ul>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div style={{ marginTop: 14 }}>
             <CollapsibleSection icon="⚠️" title="데이터 해석 주의사항" color="slate" isOpen={showCaveats} onToggle={() => setShowCaveats(v => !v)}>
