@@ -10,6 +10,7 @@ import { AppIcon } from '../ui/AppIcon';
 interface Props {
   studentId: string;
   studentName: string;
+  schoolGrade?: string; // profiles.school_grade(고1/고2 등) — 시험범위 과목 기본값 선택에만 사용
   mistakes: MistakeEntry[];
   scaffoldedMistakeIds: Set<string>;
   onBack?: () => void;
@@ -23,11 +24,16 @@ const REVIEW_LABEL: Record<string, string> = { complete: '복습 완료', inProg
 const CAUSE_COLOR: Record<string, string> = { concept: '#8b7bea', strategy: '#e0996a', calc: '#e0c56a', formula: 'var(--rn-accent)', misread: 'var(--rn-danger)' };
 const PLAN_CATEGORY_COLOR: Record<string, string> = { condition: 'var(--rn-danger)', strategy: '#e0996a', conceptFormula: '#8b7bea', calc: '#e0c56a' };
 
-// 공통수학2를 가장 흔히 쓰는 기본값으로 — 나머지는 교사가 직접 선택.
-const DEFAULT_GRADE = MATH_CURRICULUM['공통수학2'] ? '공통수학2' : GRADE_LIST[0];
+// 학년별로 가장 흔히 쓰는 과목을 기본값으로 골라준다 — 나머지는 교사/학생이 직접 바꿀 수 있다.
+// 고2는 미적분Ⅰ, 그 외(고1 등)는 공통수학2를 기본으로 — 해당 과목이 커리큘럼에 없으면 첫 과목으로 대체.
+const FALLBACK_GRADE = MATH_CURRICULUM['공통수학2'] ? '공통수학2' : GRADE_LIST[0];
+function defaultGradeFor(schoolGrade?: string): string {
+  if (schoolGrade === '고2' && MATH_CURRICULUM['미적분Ⅰ']) return '미적분Ⅰ';
+  return FALLBACK_GRADE;
+}
 
-export function ExamPrepStudentReport({ studentId, studentName, mistakes, scaffoldedMistakeIds, onBack, viewerRole = 'admin' }: Props) {
-  const [grade, setGrade] = useState(DEFAULT_GRADE);
+export function ExamPrepStudentReport({ studentId, studentName, schoolGrade, mistakes, scaffoldedMistakeIds, onBack, viewerRole = 'admin' }: Props) {
+  const [grade, setGrade] = useState(() => defaultGradeFor(schoolGrade));
   const chapters = MATH_CURRICULUM[grade] || [];
   const [startChapter, setStartChapter] = useState(chapters[0] || '');
   const [endChapter, setEndChapter] = useState(chapters[chapters.length - 1] || '');

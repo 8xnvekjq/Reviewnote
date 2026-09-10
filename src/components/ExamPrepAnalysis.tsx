@@ -30,6 +30,7 @@ export function ExamPrepAnalysis({ mistakes, profilesMap, profilesGradeMap, scaf
         <ExamPrepStudentReport
           studentId={currentUserId}
           studentName={profilesMap[currentUserId] || '나'}
+          schoolGrade={profilesGradeMap[currentUserId]}
           mistakes={mistakes}
           scaffoldedMistakeIds={scaffoldedMistakeIds}
           viewerRole="student"
@@ -53,6 +54,7 @@ export function ExamPrepAnalysis({ mistakes, profilesMap, profilesGradeMap, scaf
         <ExamPrepStudentReport
           studentId={selectedStudentId}
           studentName={profilesMap[selectedStudentId] || selectedStudentId.slice(0, 8)}
+          schoolGrade={profilesGradeMap[selectedStudentId]}
           mistakes={mistakes}
           scaffoldedMistakeIds={scaffoldedMistakeIds}
           onBack={() => setSelectedStudentId(null)}
