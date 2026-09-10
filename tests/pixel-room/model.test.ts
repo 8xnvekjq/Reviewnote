@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { defaultState, storageKey, loadRoom, saveRoom, validateRoom, canPlace, placeFurniture, removeFurniture, isCellFree, findSpawn, FURNITURE } from '../../src/features/pixel-room/model.ts';
+import { defaultState, storageKey, loadRoom, saveRoom, validateRoom, canPlace, placeFurniture, removeFurniture, isCellFree, findSpawn, planWalk, FURNITURE, ROOM_WIDTH } from '../../src/features/pixel-room/model.ts';
 import type { RoomState, StorageLike } from '../../src/features/pixel-room/model.ts';
 
 function memoryStorage(): StorageLike & { data: Map<string, string> } {
@@ -115,6 +115,31 @@ test('storage access and quota failures are returned to UI rather than thrown or
   const invalid = { ...defaultState(), version: 2 } as unknown as RoomState;
   assert.equal(saveRoom('A', invalid, storage).ok, false);
   assert.equal(storage.data.size, 0);
+});
+
+test('planWalk reaches the target in a straight line and diagonally via a greedy Manhattan walk', () => {
+  const room = defaultState();
+  assert.deepEqual(planWalk(room, { x: 0, y: 0 }, { x: 3, y: 0 }), [{ x: 1, y: 0 }, { x: 2, y: 0 }, { x: 3, y: 0 }]);
+  assert.deepEqual(planWalk(room, { x: 0, y: 0 }, { x: 0, y: 0 }), []);
+  const diagonal = planWalk(room, { x: 0, y: 0 }, { x: 2, y: 2 });
+  assert.equal(diagonal.length, 4);
+  assert.deepEqual(diagonal[diagonal.length - 1], { x: 2, y: 2 });
+  // Every intermediate step must itself be a free, in-bounds cell (no teleporting through walls).
+  for (const cell of diagonal) assert.equal(isCellFree(room, cell), true);
+});
+
+test('planWalk refuses a blocked or out-of-room target and returns a partial path when boxed in', () => {
+  const room = defaultState();
+  assert.deepEqual(planWalk(room, { x: 0, y: 0 }, { x: -1, y: 0 }), []);
+  assert.deepEqual(planWalk(room, { x: 0, y: 0 }, { x: ROOM_WIDTH, y: 0 }), []);
+  const withBed = placeFurniture(room, 'bed', { x: 1, y: 0 })!; // 2 wide x 3 tall, blocks x:1-2, y:0-2
+  assert.deepEqual(planWalk(withBed, { x: 1, y: 0 }, { x: 1, y: 2 }), []); // target itself is covered
+  assert.deepEqual(planWalk(withBed, { x: 0, y: 0 }, { x: 3, y: 0 }), []); // straight into the bed, no vertical delta to route around it
+  // L-shaped block (bed + chair) traps a diagonal walk after 2 steps — partial path, not a crash.
+  const boxed = placeFurniture(placeFurniture(room, 'bed', { x: 1, y: 0 })!, 'chair', { x: 0, y: 3 })!;
+  const partial = planWalk(boxed, { x: 0, y: 0 }, { x: 3, y: 3 });
+  assert.deepEqual(partial, [{ x: 0, y: 1 }, { x: 0, y: 2 }]);
+  for (const cell of partial) assert.equal(isCellFree(boxed, cell), true);
 });
 
 test('asset footprints fit exactly at their final valid column', () => {

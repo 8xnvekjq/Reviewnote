@@ -89,6 +89,36 @@ export function findSpawn(state: RoomState): Cell | null {
   return null;
 }
 
+/** Greedy Manhattan walk, not a pathfinder: each step takes whichever axis still has
+ * distance left (larger axis first) and is free, otherwise tries the other axis, otherwise
+ * stops with whatever prefix it managed — good enough for a small mostly-open room with a
+ * handful of furniture footprints, without a BFS/A* dependency. Empty/blocked target -> []. */
+export function planWalk(state: RoomState, from: Cell, to: Cell): Cell[] {
+  if (!isCellFree(state, to)) return [];
+  const path: Cell[] = [];
+  let current = from;
+  const maxSteps = ROOM_WIDTH + ROOM_HEIGHT;
+  for (let i = 0; i < maxSteps && (current.x !== to.x || current.y !== to.y); i++) {
+    const dx = to.x - current.x;
+    const dy = to.y - current.y;
+    const candidates: Cell[] = [];
+    const stepX = { x: current.x + Math.sign(dx), y: current.y };
+    const stepY = { x: current.x, y: current.y + Math.sign(dy) };
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      if (dx !== 0) candidates.push(stepX);
+      if (dy !== 0) candidates.push(stepY);
+    } else {
+      if (dy !== 0) candidates.push(stepY);
+      if (dx !== 0) candidates.push(stepX);
+    }
+    const next = candidates.find(cell => isCellFree(state, cell));
+    if (!next) break; // blocked — return the partial path walked so far
+    path.push(next);
+    current = next;
+  }
+  return path;
+}
+
 /** Reject a whole corrupt snapshot rather than silently deleting individual possessions. */
 export function validateRoom(value: unknown): RoomState | null {
   if (!record(value) || value.version !== 1 || !record(value.avatar)) return null;
