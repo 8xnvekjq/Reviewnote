@@ -42,6 +42,7 @@ const AdminPanel = lazy(() => import('./components/AdminPanel').then(m => ({ def
 const ExamPrepAnalysis = lazy(() => import('./components/ExamPrepAnalysis').then(m => ({ default: m.ExamPrepAnalysis })));
 const ScaffoldingPanel = lazy(() => import('./components/ScaffoldingPanel').then(m => ({ default: m.ScaffoldingPanel })));
 const GachaStore = lazy(() => import('./components/GachaStore').then(m => ({ default: m.GachaStore })));
+const PixelRoom = lazy(() => import('./features/pixel-room/PixelRoom'));
 
 interface ProfileDirectoryRow {
   id: string;
@@ -1510,6 +1511,33 @@ function App() {
           />
         )}
       >
+        <Screen when={activeTab === 'pixelRoom' && !!session?.user?.id}>
+          <LazyScreenBoundary>
+            {(() => {
+              // Pixel Room은 gachaCatalog/aiVoiceCheers를 직접 import하지 않는 지연 로드 청크라
+              // (메인 번들이 커지는 걸 막기 위해), 여기 App.tsx에서 이미 로드된 모듈로 값을
+              // 미리 계산해 plain prop으로만 넘긴다 — 새 프로필/AI 호출 없이 기존 equipped state 재사용.
+              const pixelRoomTitleBadge = equippedItems.title ? getTitleBadgeStyle(equippedItems.title) : null;
+              const pixelRoomTheme = equippedItems.theme
+                ? GACHA_ITEMS.find(item => item.category === 'THEME' && item.effectValue === equippedItems.theme)
+                : undefined;
+              return (
+                <PixelRoom
+                  userId={session?.user?.id}
+                  displayName={myNickname || currentUser}
+                  onExit={() => setActiveTab('notes')}
+                  title={equippedItems.title}
+                  titleBadgeStyle={pixelRoomTitleBadge?.style}
+                  titleBadgeIcon={pixelRoomTitleBadge?.icon}
+                  themePrimary={pixelRoomTheme?.effectValue}
+                  themeAccent={pixelRoomTheme?.themeAccentValue || pixelRoomTheme?.effectValue}
+                  onSpeak={() => getRandomCheer(equippedItems.aiVoice)}
+                />
+              );
+            })()}
+          </LazyScreenBoundary>
+        </Screen>
+
         <Screen when={activeTab === 'store'}>
           <LazyScreenBoundary>
             <GachaStore
