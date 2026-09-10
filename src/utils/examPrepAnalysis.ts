@@ -1,4 +1,5 @@
 import { MATH_CURRICULUM, type MistakeEntry } from '../types';
+import { aggregatePlanPatterns, type PlanCategory } from './planPatternAnalysis';
 
 // 관리자용 "시험대비 분석" 리포트 — 순수 계산 함수(AI 호출 없음).
 //
@@ -38,6 +39,7 @@ export interface ExamPrepChapterDrilldown {
 export interface ExamPrepPriority { rank: 1 | 2 | 3; title: string; reason: string; suggestion: string }
 export interface ExamPrepLessonStep { when: string; items: string[] }
 export interface ExamPrepPlanSample { title: string; text: string; chapter?: string }
+export interface ExamPrepPlanCategoryStat { category: PlanCategory; label: string; count: number }
 
 export interface ExamPrepReport {
   studentId: string;
@@ -53,7 +55,9 @@ export interface ExamPrepReport {
   review: ExamPrepReviewBuckets;
   planCount: number;
   planRate: number;
-  concretePlanCount: number;
+  planCategoryStats: ExamPrepPlanCategoryStat[];
+  planSpecificity: { concrete: number; vague: number; unclear: number };
+  planInterpretation: string[];
   planSamples: ExamPrepPlanSample[];
   radar: { label: string; score: number }[];
   weakItems: ExamPrepWeakItem[];
@@ -74,19 +78,6 @@ function reviewBucket(reviews: MistakeEntry['reviews']): keyof ExamPrepReviewBuc
   if (r.length === 3 && filled.length === 3) return 'complete';
   if (filled.length > 0) return 'inProgress';
   return 'unreviewed';
-}
-
-// 대책 문구가 "구체적"인지 판별하는 아주 단순한 휴리스틱(NLP 아님) — 순전히 길이 + 흔한
-// 추상 표현 여부로만 판단하며, 교사에게도 "단순 기준"임을 리포트에 명시한다.
-const VAGUE_PATTERNS = ['잘 읽', '똑바로', '검토한다', '집중하', '꼼꼼히', '다시 본다', '잘 본다', '조심'];
-function isConcretePlan(text: string): boolean {
-  const trimmed = text.trim();
-  if (trimmed.length >= 14) {
-    // 길더라도 순수 추상 표현 반복이면(예: "문제를 잘 읽고 검토하고 집중하겠다") 비구체로 간주
-    const vagueOnly = VAGUE_PATTERNS.some(p => trimmed.includes(p)) && trimmed.length < 22;
-    return !vagueOnly;
-  }
-  return false;
 }
 
 export function computeExamPrepReport(
@@ -145,7 +136,7 @@ export function computeExamPrepReport(
   const plans = inScope.filter(m => m.userActionPlan?.trim());
   const planCount = plans.length;
   const planRate = N > 0 ? planCount / N : 0;
-  const concretePlanCount = plans.filter(m => isConcretePlan(m.userActionPlan!)).length;
+  const planPattern = aggregatePlanPatterns(plans.map(m => ({ text: m.userActionPlan!.trim(), rootCauses: m.rootCauses || [] })));
   const planSamples: ExamPrepPlanSample[] = plans.slice(0, 6).map(m => ({
     title: m.title, text: m.userActionPlan!.trim(), chapter: m.chapter,
   }));
@@ -268,7 +259,9 @@ export function computeExamPrepReport(
 
   return {
     studentId, studentName, grade, startChapter, endChapter, rangeChapters,
-    N, T, chapterStats, causeStats, review, planCount, planRate, concretePlanCount, planSamples,
+    N, T, chapterStats, causeStats, review, planCount, planRate,
+    planCategoryStats: planPattern.categoryCounts, planSpecificity: planPattern.specificity,
+    planInterpretation: planPattern.interpretation, planSamples,
     radar, weakItems: finalWeak, stableItems: stableItems.slice(0, 3), priorities, lessonSteps,
     chapterDrilldowns, scaffoldingCount, dataGapChapters, sampleWarning,
     generatedAt: new Date().toISOString(),
