@@ -38,6 +38,7 @@ import { loadStreakState, reconcileStreakState, getKSTDateString, type StreakSta
 // 줄었고, 그중 관리자 전용 두 화면만 따로 떼면 gzip 11.24kB가 학생 계정에서는 아예 다운로드되지
 // 않는다). named export라 lazy()에 바로 못 넣고 default로 매핑해야 한다.
 const AdminPanel = lazy(() => import('./components/AdminPanel').then(m => ({ default: m.AdminPanel })));
+const ExamPrepAnalysis = lazy(() => import('./components/ExamPrepAnalysis').then(m => ({ default: m.ExamPrepAnalysis })));
 const ScaffoldingPanel = lazy(() => import('./components/ScaffoldingPanel').then(m => ({ default: m.ScaffoldingPanel })));
 const GachaStore = lazy(() => import('./components/GachaStore').then(m => ({ default: m.GachaStore })));
 
@@ -1812,6 +1813,17 @@ function App() {
         <Screen when={activeTab === 'admin' && isAdmin}>
           <LazyScreenBoundary>
             <AdminPanel onSelectTab={(tab) => setActiveTab(tab)} />
+          </LazyScreenBoundary>
+        </Screen>
+
+        <Screen when={activeTab === 'examPrep' && isAdmin}>
+          <LazyScreenBoundary>
+            <ExamPrepAnalysis
+              mistakes={mistakes}
+              profilesMap={profilesMap}
+              profilesGradeMap={profilesGradeMap}
+              scaffoldedMistakeIds={scaffoldedMistakeIds}
+            />
           </LazyScreenBoundary>
         </Screen>
 

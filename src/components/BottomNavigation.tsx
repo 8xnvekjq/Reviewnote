@@ -21,6 +21,9 @@ const menus: { tab: ActiveTab; label: string; description: string; icon: AppIcon
   { tab: 'guide', label: '이용안내', description: '오답노트와 럭키상점 사용법', icon: 'help' },
   { tab: 'hidden', label: '숨긴 카드', description: '제외한 문제 확인과 다시 꺼내기', icon: 'eye', emoji: '🙈' },
 ];
+// 관리자 전용 항목 — 학생 계정에는 절대 노출되지 않는다(아래 isAdmin && 렌더 가드).
+const adminMenu: { tab: ActiveTab; label: string; description: string; icon: AppIconName } =
+  { tab: 'examPrep', label: '시험대비 분석', description: '학생별 취약 단원과 수업 방향', icon: 'chart' };
 export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, setActiveTab, isAdmin, onOpenSlideList }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const select = (tab: ActiveTab) => { setActiveTab(tab); setMenuOpen(false); };
@@ -42,6 +45,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, s
     </div>
     <Sheet open={menuOpen} onClose={() => setMenuOpen(false)} title="나의 학습 공간">
       <div className="rn-menu-list">
+        {isAdmin && <button type="button" key={adminMenu.tab} className="rn-menu-row" aria-current={activeTab === adminMenu.tab ? 'page' : undefined} onClick={() => select(adminMenu.tab)}><AppIcon name={adminMenu.icon} /><span><strong>{adminMenu.label}</strong><small>{adminMenu.description}</small></span><AppIcon name="arrow" width={16} /></button>}
         {menus.map(item => <button type="button" key={item.tab} className="rn-menu-row" aria-current={activeTab === item.tab ? 'page' : undefined} onClick={() => select(item.tab)}><AppIcon name={item.icon} /><span><strong>{item.label}{item.emoji ? ` ${item.emoji}` : ''}</strong><small>{item.description}</small></span><AppIcon name="arrow" width={16} /></button>)}
         {onOpenSlideList && <button type="button" className="rn-menu-row" onClick={() => { setMenuOpen(false); onOpenSlideList(); }}><AppIcon name="book" /><span><strong>수업자료</strong><small>선생님이 준비한 교안 슬라이드</small></span><AppIcon name="arrow" width={16} /></button>}
         {/* "함께 공부 중" 인원수는 오답노트 패널로 복귀했다(중복 노출 제거) — MistakeList.tsx 참고. */}
