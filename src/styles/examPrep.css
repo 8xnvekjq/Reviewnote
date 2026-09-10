@@ -1,0 +1,70 @@
+/* 관리자 전용 "시험대비 분석" — 기존 design-system.css의 --rn-* 토큰만 사용, 새 팔레트는
+   만들지 않는다. 취약 신호=danger(warm), 안정 신호=success(cool green) 톤을 일관되게 재사용. */
+.rn-examprep-student-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
+@media (min-width: 480px) { .rn-examprep-student-grid { grid-template-columns: 1fr 1fr; } }
+.rn-examprep-student-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px; min-height: 56px; border-radius: var(--rn-radius-md); background: var(--rn-surface); border: 1px solid var(--rn-line); text-align: left; transition: border-color var(--rn-fast), background var(--rn-fast); }
+.rn-examprep-student-card:active { background: var(--rn-elevated); }
+.rn-examprep-student-name { font-size: 15px; font-weight: 750; color: var(--rn-text); }
+.rn-examprep-student-sub { font-size: 11.5px; color: var(--rn-muted); margin-top: 2px; }
+
+.rn-examprep-range-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; padding: 14px 16px; border-radius: var(--rn-radius-md); background: var(--rn-surface); border: 1px solid var(--rn-line); margin-bottom: 16px; }
+.rn-examprep-range-field { display: flex; flex-direction: column; gap: 4px; min-width: 120px; flex: 1 1 120px; }
+.rn-examprep-range-field label { font-size: 10.5px; font-weight: 700; color: var(--rn-muted); text-transform: uppercase; letter-spacing: .03em; }
+.rn-examprep-range-field select { min-height: 44px; padding: 8px 10px; border-radius: var(--rn-radius-sm); background: var(--rn-elevated); border: 1px solid var(--rn-line); color: var(--rn-text); font-size: 13.5px; font-weight: 600; }
+
+.rn-examprep-summary-grid { display: grid; grid-template-columns: 1fr; gap: 8px; margin-bottom: 14px; }
+@media (min-width: 640px) { .rn-examprep-summary-grid { grid-template-columns: repeat(4, 1fr); } }
+.rn-examprep-summary-tile { padding: 10px 12px; border-radius: var(--rn-radius-sm); background: var(--rn-elevated); border: 1px solid var(--rn-line); }
+.rn-examprep-summary-tile .num { font-size: 19px; font-weight: 800; color: var(--rn-text); font-variant-numeric: tabular-nums; }
+.rn-examprep-summary-tile .label { font-size: 10.5px; color: var(--rn-muted); margin-top: 2px; }
+
+.rn-examprep-two-col { display: grid; grid-template-columns: 1fr; gap: 14px; }
+@media (min-width: 768px) { .rn-examprep-two-col { grid-template-columns: 1fr 1fr; align-items: start; } }
+
+.rn-examprep-radar-caption { text-align: center; font-size: 11px; color: var(--rn-muted); margin-top: -6px; }
+
+.rn-examprep-priority-row { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--rn-line); }
+.rn-examprep-priority-row:last-child { border-bottom: none; }
+.rn-examprep-priority-badge { flex: none; width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; background: rgb(var(--color-indigo-500) / .18); color: var(--rn-accent); }
+.rn-examprep-priority-title { font-size: 13px; font-weight: 750; color: var(--rn-text); margin-bottom: 3px; }
+.rn-examprep-priority-detail { font-size: 11.5px; color: var(--rn-muted); line-height: 1.55; }
+
+.rn-examprep-weak-item { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--rn-line); }
+.rn-examprep-weak-item:last-child { border-bottom: none; }
+.rn-examprep-weak-num { flex: none; width: 22px; height: 22px; border-radius: 50%; background: rgba(245,155,167,.15); color: var(--rn-danger); font-size: 11.5px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+.rn-examprep-stable-item { display: flex; align-items: flex-start; gap: 8px; padding: 7px 0; font-size: 12.5px; color: var(--rn-text); }
+.rn-examprep-stable-dot { flex: none; color: var(--rn-success); font-size: 13px; line-height: 1.5; }
+
+.rn-examprep-barlist { display: grid; gap: 8px; }
+.rn-examprep-bar-row { display: grid; grid-template-columns: 92px 1fr auto; align-items: center; gap: 8px; width: 100%; text-align: left; border-radius: 8px; padding: 4px; }
+.rn-examprep-bar-row.is-selected { background: var(--rn-elevated); }
+.rn-examprep-bar-label { font-size: 12px; font-weight: 700; color: var(--rn-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rn-examprep-bar-track { height: 20px; border-radius: 6px; background: var(--rn-elevated); overflow: hidden; }
+.rn-examprep-bar-fill { display: block; height: 100%; border-radius: 6px; transition: width var(--rn-fast); }
+.rn-examprep-bar-count { font-size: 12px; font-weight: 800; color: var(--rn-text); font-variant-numeric: tabular-nums; flex: none; }
+
+.rn-examprep-review-strip { display: flex; height: 26px; border-radius: 8px; overflow: hidden; border: 1px solid var(--rn-line); }
+.rn-examprep-review-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 8px; font-size: 11px; color: var(--rn-muted); }
+.rn-examprep-review-legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+
+.rn-examprep-signal-card { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: var(--rn-radius-sm); background: var(--rn-elevated); font-size: 12px; font-weight: 700; color: var(--rn-text); }
+.rn-examprep-signal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+
+.rn-examprep-drilldown-chapter { padding: 10px 0; border-bottom: 1px solid var(--rn-line); }
+.rn-examprep-drilldown-chapter:last-child { border-bottom: none; }
+.rn-examprep-plan-sample { padding: 8px 10px; border-radius: 8px; background: var(--rn-elevated); font-size: 12px; color: var(--rn-text); margin-bottom: 6px; }
+.rn-examprep-plan-sample .chip { display: inline-block; font-size: 10px; font-weight: 700; color: var(--rn-muted); margin-bottom: 3px; }
+
+.rn-examprep-lesson-step { padding: 10px 0; border-bottom: 1px solid var(--rn-line); }
+.rn-examprep-lesson-step:last-child { border-bottom: none; }
+.rn-examprep-lesson-when { font-size: 10.5px; font-weight: 800; color: var(--rn-accent); text-transform: uppercase; letter-spacing: .03em; margin-bottom: 4px; }
+.rn-examprep-lesson-step ul { margin: 0; padding-left: 1.1em; font-size: 12.5px; color: var(--rn-text); }
+.rn-examprep-lesson-step li { margin-bottom: 3px; }
+
+.rn-examprep-warning { font-size: 11.5px; color: var(--rn-warning); background: rgba(242,199,119,.1); border: 1px solid rgba(242,199,119,.3); border-radius: 8px; padding: 8px 10px; margin-bottom: 12px; }
+
+@media print {
+  .rn-dock, .rn-header, .rn-examprep-no-print { display: none !important; }
+  .rn-main { overflow: visible !important; padding: 0 !important; }
+  body { background: #fff !important; }
+}

@@ -174,7 +174,7 @@ export interface MistakeEntry {
                             // — 섞이지 않도록 필드/버킷 모두 분리.
 }
 
-export type ActiveTab = 'notes' | 'completed' | 'camera' | 'stats' | 'admin' | 'guide' | 'store' | 'activity' | 'scaffolding' | 'hidden';
+export type ActiveTab = 'notes' | 'completed' | 'camera' | 'stats' | 'admin' | 'guide' | 'store' | 'activity' | 'scaffolding' | 'hidden' | 'examPrep';
 
 export type GachaRarity = 'MR' | 'UR' | 'SSR' | 'SR' | 'R';
 export type GachaCategory = 'STAMP' | 'TITLE' | 'THEME' | 'SHIELD' | 'AI_VOICE' | 'CHARM';
