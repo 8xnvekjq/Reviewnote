@@ -9,6 +9,12 @@ export const EXAM_PREP_SELF_ACCESS_IDS: ReadonlySet<string> = new Set([
   '1766ac87-593d-40c3-9cf7-4530a876826f', // 이민정
   '96d5792b-646a-4944-9ff7-7a74738561c5', // 최성혁
   '945dd787-7606-4244-9056-43ab32c21d93', // test 계정
+  // 고2 (미적분Ⅰ 함수의 극한 ~ 접선의 방정식과 평균값 정리)
+  '0b479959-54c8-4deb-9916-a4c5cb5ef256', // 김혜원
+  '7462422b-d9c1-434a-958c-45d7a43164a8', // 류예지
+  '5888a1b5-5d18-4dfa-a64a-bba88118d98b', // 최예준
+  '4825dce7-f05b-4029-b5da-d80075852804', // 김성태 (프로필 display_name 오타: 김성탸)
+  '00aa9fec-da92-4450-b079-75ae3113e21c', // 이용준
 ]);
 
 export function canViewOwnExamPrep(userId: string | undefined): boolean {
