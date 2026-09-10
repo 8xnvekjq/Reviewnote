@@ -21,6 +21,7 @@ interface Props {
 const REVIEW_COLOR: Record<string, string> = { complete: 'var(--rn-success)', inProgress: 'var(--rn-warning)', retry: 'var(--rn-danger)', unreviewed: '#5b6376' };
 const REVIEW_LABEL: Record<string, string> = { complete: '복습 완료', inProgress: '진행 중', retry: '재도전 필요', unreviewed: '미복습' };
 const CAUSE_COLOR: Record<string, string> = { concept: '#8b7bea', strategy: '#e0996a', calc: '#e0c56a', formula: 'var(--rn-accent)', misread: 'var(--rn-danger)' };
+const PLAN_CATEGORY_COLOR: Record<string, string> = { condition: 'var(--rn-danger)', strategy: '#e0996a', conceptFormula: '#8b7bea', calc: '#e0c56a' };
 
 // 공통수학2를 가장 흔히 쓰는 기본값으로 — 나머지는 교사가 직접 선택.
 const DEFAULT_GRADE = MATH_CURRICULUM['공통수학2'] ? '공통수학2' : GRADE_LIST[0];
@@ -190,12 +191,14 @@ export function ExamPrepStudentReport({ studentId, studentName, mistakes, scaffo
           </div>
 
           <div className="rn-surface" style={{ padding: 16, marginTop: 14 }}>
-            <h3 className="rn-section" style={{ fontSize: 14, fontWeight: 750, marginBottom: 8 }}>학생이 적은 대책 분석</h3>
-            <p style={{ fontSize: 12.5, color: 'var(--rn-text)', lineHeight: 1.6 }}>
-              {report.planCount === 0
-                ? '아직 대책을 작성한 오답이 없어요.'
-                : `${report.N}건 중 ${report.planCount}건에 대책이 적혀 있고, 그중 ${report.concretePlanCount}건은 비교적 구체적인 문장이에요(짧은 일반론 표현은 제외한 단순 기준). 나머지는 "잘 읽는다"처럼 행동 기준이 모호한 경우가 있어, 문제별 확인 순서로 바꿔보도록 안내하면 좋아요.`}
-            </p>
+            <h3 className="rn-section" style={{ fontSize: 14, fontWeight: 750, marginBottom: 2 }}>학생이 적은 대책 분석</h3>
+            <p className="rn-caption" style={{ marginBottom: 8 }}>대책 작성 {report.planCount}/{report.N}건 · 주요 대책 유형</p>
+            {report.planCategoryStats.length > 0 && (
+              <BarList rows={report.planCategoryStats.map(c => ({ label: c.label, count: c.count, color: PLAN_CATEGORY_COLOR[c.category] }))} />
+            )}
+            {report.planInterpretation.map((line, i) => (
+              <p key={i} style={{ fontSize: 12.5, color: 'var(--rn-text)', lineHeight: 1.6, marginTop: i === 0 ? 10 : 6 }}>{line}</p>
+            ))}
             {report.planSamples.length > 0 && (
               <div style={{ marginTop: 8 }}>
                 <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={() => setShowPlans(v => !v)}>
