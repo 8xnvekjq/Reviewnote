@@ -30,6 +30,7 @@ import { getRandomCheer } from './utils/aiVoiceCheers';
 import type { EquippedItems } from './types';
 import { applyThemeColor } from './utils/theme';
 import { loadStreakState, reconcileStreakState, getKSTDateString, type StreakState } from './utils/streak';
+import { canViewOwnExamPrep } from './utils/examPrepAccess';
 
 // PR9: 관리자 전용 화면(AdminPanel/ScaffoldingPanel)과 럭키상점(GachaStore)은 첫 화면(오답노트
 // 목록)을 보여주는 데는 필요 없는데, 지금까지는 일반 import라 학생 계정에서도 초기 번들에
@@ -1501,6 +1502,7 @@ function App() {
             activeTab={activeTab}
             setActiveTab={setActiveTab}
             isAdmin={isAdmin}
+            currentUserId={session?.user?.id}
             onlineUsers={onlineUsers}
             onStartReviewSession={handleStartReviewSession}
             onOpenSlideList={() => setIsSlideListOpen(true)}
@@ -1816,13 +1818,15 @@ function App() {
           </LazyScreenBoundary>
         </Screen>
 
-        <Screen when={activeTab === 'examPrep' && isAdmin}>
+        <Screen when={activeTab === 'examPrep' && (isAdmin || canViewOwnExamPrep(session?.user?.id))}>
           <LazyScreenBoundary>
             <ExamPrepAnalysis
               mistakes={mistakes}
               profilesMap={profilesMap}
               profilesGradeMap={profilesGradeMap}
               scaffoldedMistakeIds={scaffoldedMistakeIds}
+              isAdmin={isAdmin}
+              currentUserId={session?.user?.id}
             />
           </LazyScreenBoundary>
         </Screen>
