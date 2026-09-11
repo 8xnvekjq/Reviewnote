@@ -108,9 +108,9 @@ function RoomForUser({ userId, displayName, onExit, title, titleBadgeStyle, titl
 
   function begin(next: Direction) { setWalkQueue([]); setDirection(next); setHeld(next); }
   function walkTo(target: Cell) {
-    if (decorating) return;
+    if (decorating || (target.x === actor.x && target.y === actor.y)) return;
     const path = planWalk(room, actor, target);
-    if (path.length === 0) return;
+    if (path.length === 0) { setMessage('그 칸에는 갈 수 없어요. 가구가 없는 바닥을 눌러 주세요.'); return; }
     const steps: WalkStep[] = [];
     let from = actor;
     for (const cell of path) { steps.push({ cell, direction: stepDirection(from, cell) }); from = cell; }

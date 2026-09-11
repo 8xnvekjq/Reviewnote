@@ -89,34 +89,35 @@ export function findSpawn(state: RoomState): Cell | null {
   return null;
 }
 
-/** Greedy Manhattan walk, not a pathfinder: each step takes whichever axis still has
- * distance left (larger axis first) and is free, otherwise tries the other axis, otherwise
- * stops with whatever prefix it managed — good enough for a small mostly-open room with a
- * handful of furniture footprints, without a BFS/A* dependency. Empty/blocked target -> []. */
+/** Shortest-path BFS over the (at most 10×8 = 80 cell) floor grid — genuinely walks around
+ * furniture rather than dead-ending against it, while staying far lighter than a general
+ * pathfinder (no heuristics, no diagonal moves, no weighted edges). Same-cell, out-of-room,
+ * furniture-covered or genuinely unreachable targets all -> []; a reachable target always
+ * returns the actual shortest route, never a partial one, so the walk never stops short for
+ * no visible reason. */
 export function planWalk(state: RoomState, from: Cell, to: Cell): Cell[] {
-  if (!isCellFree(state, to)) return [];
-  const path: Cell[] = [];
-  let current = from;
-  const maxSteps = ROOM_WIDTH + ROOM_HEIGHT;
-  for (let i = 0; i < maxSteps && (current.x !== to.x || current.y !== to.y); i++) {
-    const dx = to.x - current.x;
-    const dy = to.y - current.y;
-    const candidates: Cell[] = [];
-    const stepX = { x: current.x + Math.sign(dx), y: current.y };
-    const stepY = { x: current.x, y: current.y + Math.sign(dy) };
-    if (Math.abs(dx) >= Math.abs(dy)) {
-      if (dx !== 0) candidates.push(stepX);
-      if (dy !== 0) candidates.push(stepY);
-    } else {
-      if (dy !== 0) candidates.push(stepY);
-      if (dx !== 0) candidates.push(stepX);
+  if (!isCellFree(state, to) || (from.x === to.x && from.y === to.y)) return [];
+  const key = (cell: Cell) => cell.y * ROOM_WIDTH + cell.x;
+  const cameFrom = new Map<number, Cell>();
+  const visited = new Set<number>([key(from)]);
+  const queue: Cell[] = [from];
+  const steps: Cell[] = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
+  for (let i = 0; i < queue.length; i++) {
+    const current = queue[i];
+    if (current.x === to.x && current.y === to.y) {
+      const path: Cell[] = [];
+      for (let cell: Cell | undefined = current; cell && !(cell.x === from.x && cell.y === from.y); cell = cameFrom.get(key(cell))) path.unshift(cell);
+      return path;
     }
-    const next = candidates.find(cell => isCellFree(state, cell));
-    if (!next) break; // blocked — return the partial path walked so far
-    path.push(next);
-    current = next;
+    for (const step of steps) {
+      const next = { x: current.x + step.x, y: current.y + step.y };
+      if (visited.has(key(next)) || !isCellFree(state, next)) continue;
+      visited.add(key(next));
+      cameFrom.set(key(next), current);
+      queue.push(next);
+    }
   }
-  return path;
+  return [];
 }
 
 /** Reject a whole corrupt snapshot rather than silently deleting individual possessions. */
