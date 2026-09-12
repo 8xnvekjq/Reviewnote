@@ -51,6 +51,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, s
     </div>
     <Sheet open={menuOpen} onClose={() => setMenuOpen(false)} title="나의 학습 공간">
       <div className="rn-menu-list">
+        {currentUserId && <button type="button" className="rn-menu-row" aria-current={activeTab === 'pixelRoom' ? 'page' : undefined} onClick={() => select('pixelRoom')}><AppIcon name="user" /><span><strong>🎮 Pixel Room</strong><small>내 캐릭터와 작은 방 꾸미기</small></span><AppIcon name="arrow" width={16} /></button>}
         {examPrepMenu && <button type="button" key={examPrepMenu.tab} className="rn-menu-row" aria-current={activeTab === examPrepMenu.tab ? 'page' : undefined} onClick={() => select(examPrepMenu.tab)}><AppIcon name={examPrepMenu.icon} /><span><strong>{examPrepMenu.label}</strong><small>{examPrepMenu.description}</small></span><AppIcon name="arrow" width={16} /></button>}
         {menus.map(item => <button type="button" key={item.tab} className="rn-menu-row" aria-current={activeTab === item.tab ? 'page' : undefined} onClick={() => select(item.tab)}><AppIcon name={item.icon} /><span><strong>{item.label}{item.emoji ? ` ${item.emoji}` : ''}</strong><small>{item.description}</small></span><AppIcon name="arrow" width={16} /></button>)}
         {onOpenSlideList && <button type="button" className="rn-menu-row" onClick={() => { setMenuOpen(false); onOpenSlideList(); }}><AppIcon name="book" /><span><strong>수업자료</strong><small>선생님이 준비한 교안 슬라이드</small></span><AppIcon name="arrow" width={16} /></button>}
