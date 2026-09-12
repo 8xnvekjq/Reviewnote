@@ -38,7 +38,7 @@ function Preview() {
       <select aria-label="장착 말투" value={voice} onChange={e => setVoice(e.target.value)} style={{ maxWidth: 110, background: '#283246' }}><option value="">기본 말투</option>{VOICE_OPTIONS.map(v => <option key={v} value={v}>{v}</option>)}</select>
     </header>}
     bottomNav={<BottomNavigation activeTab={tab} setActiveTab={setTab} currentUserId={user} isAdmin={user === 'admin'} onlineUsers={[]} />}>
-    <Screen when={tab === 'pixelRoom'}><LazyScreenBoundary><PixelRoom
+    <Screen when={tab === 'pixelRoom'} className="pr-screen-fill"><LazyScreenBoundary><PixelRoom
       userId={user} displayName={user} onExit={() => setTab('notes')}
       title={title || undefined}
       titleBadgeStyle={titleBadge?.style}

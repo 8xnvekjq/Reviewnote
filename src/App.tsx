@@ -1511,7 +1511,7 @@ function App() {
           />
         )}
       >
-        <Screen when={activeTab === 'pixelRoom' && !!session?.user?.id}>
+        <Screen when={activeTab === 'pixelRoom' && !!session?.user?.id} className="pr-screen-fill">
           <LazyScreenBoundary>
             {(() => {
               // Pixel Room은 gachaCatalog/aiVoiceCheers를 직접 import하지 않는 지연 로드 청크라
