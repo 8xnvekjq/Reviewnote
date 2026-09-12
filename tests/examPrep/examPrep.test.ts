@@ -7,6 +7,7 @@ import {
   RADAR_DISCLAIMER_STUDENT,
 } from '../../src/utils/examPrepAnalysis.ts';
 import { buildExamPrepStudentOptions } from '../../src/utils/examPrepStudents.ts';
+import { EXAM_PREP_TEST_USER_ID } from '../../src/utils/examPrepAccess.ts';
 import type { MistakeEntry } from '../../src/types/index.ts';
 
 const GRADE = '공통수학2';
@@ -145,11 +146,14 @@ test('축별 evidence는 실제 카운트 문장이며 AI 생성 텍스트가 �
   assert.ok(planAxis.evidence.some(line => line.includes('대책을 작성한 문제 1건 / 전체 2건')));
 });
 
-test('관리자 학생 선택기는 학년 제한 없이 학년 미상까지 포함하고 관리자처럼 디렉터리에 없는 id는 제외한다', () => {
+test('관리자 학생 선택기는 학년 제한 없이 학년 미상까지 포함하고 관리자·test 계정은 제외한다', () => {
   const profilesMap = {
     middle: '중3 학생', high1: '고1 학생', high2: '고2 학생', high3: '고3 학생', unknown: '학년 미상', admin: '관리자',
+    [EXAM_PREP_TEST_USER_ID]: 'test',
   };
-  const profilesGradeMap = { middle: '중3', high1: '고1', high2: '고2', high3: '고3', unknown: '' };
+  const profilesGradeMap = {
+    middle: '중3', high1: '고1', high2: '고2', high3: '고3', unknown: '', [EXAM_PREP_TEST_USER_ID]: '',
+  };
   const items = [
     mistake({ id: 'a', userId: 'high3', date: '2026-09-03' }),
     mistake({ id: 'b', userId: 'middle', date: '2026-09-02' }),
