@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { MistakeEntry } from '../../types';
 import { MATH_CURRICULUM, GRADE_LIST } from '../../types';
-import { computeExamPrepReport, type ExamPrepReport } from '../../utils/examPrepAnalysis';
+import { computeExamPrepReport, type ExamPrepReport, RADAR_DISCLAIMER_ADMIN, RADAR_DISCLAIMER_STUDENT } from '../../utils/examPrepAnalysis';
 import { RadarChart } from './RadarChart';
 import { BarList } from './BarList';
 import { CollapsibleSection } from '../CollapsibleSection';
@@ -116,7 +116,7 @@ export function ExamPrepStudentReport({ studentId, studentName, schoolGrade, mis
             <div className="rn-surface" style={{ padding: 16 }}>
               <h3 className="rn-section" style={{ fontSize: 14, fontWeight: 750, marginBottom: 8 }}>6축 학습 프로필</h3>
               <RadarChart scores={report.radar} />
-              <p className="rn-examprep-radar-caption">오답노트 기록을 바탕으로 본 현재 학습 프로필이에요. 절대적인 실력 점수가 아니라 상대적 경향입니다.</p>
+              <p className="rn-examprep-radar-disclaimer">{viewerRole === 'student' ? RADAR_DISCLAIMER_STUDENT : RADAR_DISCLAIMER_ADMIN}</p>
             </div>
             <div className="rn-surface" style={{ padding: 16 }}>
               <h3 className="rn-section" style={{ fontSize: 14, fontWeight: 750, marginBottom: 4 }}>가장 먼저 잡을 취약점</h3>
