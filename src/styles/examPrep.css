@@ -63,6 +63,16 @@
 
 .rn-examprep-warning { font-size: 11.5px; color: var(--rn-warning); background: rgba(242,199,119,.1); border: 1px solid rgba(242,199,119,.3); border-radius: 8px; padding: 8px 10px; margin-bottom: 12px; }
 
+.rn-examprep-comment-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.rn-examprep-comment-badge { font-size: 10.5px; font-weight: 800; color: var(--rn-accent); background: rgb(var(--color-indigo-500) / .15); border-radius: 999px; padding: 2px 9px; font-variant-numeric: tabular-nums; }
+.rn-examprep-comment-text { font-size: 13px; line-height: 1.65; color: var(--rn-text); white-space: pre-wrap; margin: 0; }
+.rn-examprep-comment-textarea { width: 100%; min-height: 88px; padding: 10px 12px; border-radius: var(--rn-radius-sm); background: var(--rn-elevated); border: 1px solid var(--rn-line); color: var(--rn-text); font-size: 13px; line-height: 1.6; font-family: inherit; resize: vertical; }
+.rn-examprep-comment-textarea:disabled { opacity: .6; }
+.rn-examprep-comment-actions { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.rn-examprep-comment-status { font-size: 11.5px; font-weight: 600; }
+.rn-examprep-comment-status.ok { color: var(--rn-success); }
+.rn-examprep-comment-status.error { color: var(--rn-danger); }
+
 @media print {
   .rn-dock, .rn-header, .rn-examprep-no-print { display: none !important; }
   .rn-main { overflow: visible !important; padding: 0 !important; }

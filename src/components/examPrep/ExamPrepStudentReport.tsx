@@ -6,6 +6,8 @@ import { RadarChart } from './RadarChart';
 import { BarList } from './BarList';
 import { CollapsibleSection } from '../CollapsibleSection';
 import { AppIcon } from '../ui/AppIcon';
+import { TeacherCommentCard } from './TeacherCommentCard';
+import { TeacherCommentEditor } from './TeacherCommentEditor';
 
 interface Props {
   studentId: string;
@@ -70,6 +72,12 @@ export function ExamPrepStudentReport({ studentId, studentName, schoolGrade, mis
       {viewerRole === 'admin' && <h2 className="rn-title" style={{ marginBottom: 2 }}>{studentName}</h2>}
       <p className="rn-caption" style={{ marginBottom: 14 }}>오답노트 기록을 바탕으로 본 시험대비 분석이에요. 시험범위를 지정하고 분석하기를 눌러주세요.</p>
 
+      {/* 선생님 코멘트는 report(시험범위별 분석 결과)와 완전히 무관하게 studentId 하나로만
+         정해지는 영역이라, 분석하기를 누르기 전에도 항상 같은 최신 코멘트를 보여준다. */}
+      {viewerRole === 'admin'
+        ? <TeacherCommentEditor studentId={studentId} />
+        : <TeacherCommentCard studentId={studentId} />}
+
       <div className="rn-examprep-range-bar">
         <div className="rn-examprep-range-field">
           <label htmlFor="ep-grade">과목/교재</label>
@@ -96,8 +104,12 @@ export function ExamPrepStudentReport({ studentId, studentName, schoolGrade, mis
 
       {report && report.N === 0 && (
         <div className="rn-empty">
-          <span>{studentName}가 이 시험범위({startChapter} ~ {endChapter})에 등록한 오답이 아직 없어요.</span>
-          <span className="rn-caption">시험범위를 바꿔보거나, 학생이 오답을 등록한 뒤 다시 분석해 주세요.</span>
+          <span>{viewerRole === 'student'
+            ? '선택한 시험범위에 등록된 오답이 없어요.'
+            : `${studentName}가 이 시험범위(${startChapter} ~ ${endChapter})에 등록한 오답이 아직 없어요.`}</span>
+          <span className="rn-caption">{viewerRole === 'student'
+            ? '시험범위를 바꿔보거나, 오답을 등록한 뒤 다시 분석해 보세요.'
+            : '시험범위를 바꿔보거나, 학생이 오답을 등록한 뒤 다시 분석해 주세요.'}</span>
         </div>
       )}
 
@@ -166,8 +178,8 @@ export function ExamPrepStudentReport({ studentId, studentName, schoolGrade, mis
               )}
             </div>
             <div className="rn-surface" style={{ padding: 16 }}>
-              <h3 className="rn-section" style={{ fontSize: 14, fontWeight: 750, marginBottom: 2 }}>{studentName}는 이렇게 느꼈어요</h3>
-              <p className="rn-caption" style={{ marginBottom: 8 }}>학생이 오답을 등록하며 직접 선택한 실수 유형이에요. AI가 추론한 원인이 아닙니다.</p>
+              <h3 className="rn-section" style={{ fontSize: 14, fontWeight: 750, marginBottom: 2 }}>{viewerRole === 'student' ? '나는 이렇게 느꼈어요' : `${studentName}는 이렇게 느꼈어요`}</h3>
+              <p className="rn-caption" style={{ marginBottom: 8 }}>{viewerRole === 'student' ? '오답을 등록하며 내가 직접 선택한 실수 유형이에요. AI가 추론한 원인이 아니에요.' : '학생이 오답을 등록하며 직접 선택한 실수 유형이에요. AI가 추론한 원인이 아닙니다.'}</p>
               {report.causeStats.length === 0 ? (
                 <p className="rn-caption">아직 자기진단이 기록된 오답이 없어요.</p>
               ) : (
@@ -197,18 +209,18 @@ export function ExamPrepStudentReport({ studentId, studentName, schoolGrade, mis
           </div>
 
           <div className="rn-surface" style={{ padding: 16, marginTop: 14 }}>
-            <h3 className="rn-section" style={{ fontSize: 14, fontWeight: 750, marginBottom: 2 }}>학생이 적은 대책 분석</h3>
+            <h3 className="rn-section" style={{ fontSize: 14, fontWeight: 750, marginBottom: 2 }}>{viewerRole === 'student' ? '내가 적은 대책 분석' : '학생이 적은 대책 분석'}</h3>
             <p className="rn-caption" style={{ marginBottom: 8 }}>대책 작성 {report.planCount}/{report.N}건 · 주요 대책 유형</p>
             {report.planCategoryStats.length > 0 && (
               <BarList rows={report.planCategoryStats.map(c => ({ label: c.label, count: c.count, color: PLAN_CATEGORY_COLOR[c.category] }))} />
             )}
-            {report.planInterpretation.map((line, i) => (
+            {(viewerRole === 'student' ? report.planInterpretationForStudent : report.planInterpretation).map((line, i) => (
               <p key={i} style={{ fontSize: 12.5, color: 'var(--rn-text)', lineHeight: 1.6, marginTop: i === 0 ? 10 : 6 }}>{line}</p>
             ))}
             {report.planSamples.length > 0 && (
               <div style={{ marginTop: 8 }}>
                 <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={() => setShowPlans(v => !v)}>
-                  {showPlans ? '대책 원문 닫기 ▴' : '학생이 실제로 적은 대책 보기 ▾'}
+                  {showPlans ? '대책 원문 닫기 ▴' : (viewerRole === 'student' ? '내가 실제로 적은 대책 보기 ▾' : '학생이 실제로 적은 대책 보기 ▾')}
                 </button>
                 {showPlans && (
                   <div style={{ marginTop: 8 }}>
@@ -232,7 +244,7 @@ export function ExamPrepStudentReport({ studentId, studentName, schoolGrade, mis
                 <span>
                   <div className="rn-examprep-priority-title">{p.title}</div>
                   <div className="rn-examprep-priority-detail">{p.reason}</div>
-                  <div className="rn-examprep-priority-detail" style={{ color: 'var(--rn-accent)', marginTop: 2 }}>→ {p.suggestion}</div>
+                  <div className="rn-examprep-priority-detail" style={{ color: 'var(--rn-accent)', marginTop: 2 }}>→ {viewerRole === 'student' ? p.studentSuggestion : p.suggestion}</div>
                 </span>
               </div>
             ))}
@@ -254,9 +266,9 @@ export function ExamPrepStudentReport({ studentId, studentName, schoolGrade, mis
             <CollapsibleSection icon="⚠️" title="데이터 해석 주의사항" color="slate" isOpen={showCaveats} onToggle={() => setShowCaveats(v => !v)}>
               <ul style={{ margin: 0, paddingLeft: '1.1em', fontSize: 11.5, color: 'var(--rn-muted)', lineHeight: 1.7 }}>
                 <li>오답노트 기반 분석으로, 전체 학습에 대한 정답률/성취도가 아닙니다.</li>
-                <li>실수 유형은 학생이 직접 선택한 자기진단이며, 실제 원인과 다를 수 있습니다.</li>
+                <li>{viewerRole === 'student' ? '실수 유형은 내가 직접 선택한 자기진단이며, 실제 원인과 다를 수 있어요.' : '실수 유형은 학생이 직접 선택한 자기진단이며, 실제 원인과 다를 수 있습니다.'}</li>
                 <li>복습 현황은 현재 시점 스냅샷이며, 재풀이·손풀이 기록은 최근 도입된 기능이라 장기 비교에는 한계가 있습니다.</li>
-                <li>is_hidden 처리된 문제와 선택한 시험범위 밖의 문제는 분석에서 제외했습니다.</li>
+                <li>숨김 처리한 문제와 선택한 시험범위 밖의 문제는 분석에서 제외했습니다.</li>
                 <li>분석 기준: 방금 계산됨 (열람 시점의 현재 데이터 기준, 저장되지 않고 매번 새로 계산됩니다)</li>
               </ul>
             </CollapsibleSection>

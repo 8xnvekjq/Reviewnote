@@ -118,6 +118,10 @@ function App() {
   const [profilesGradeMap, setProfilesGradeMap] = useState<Record<string, string>>({});
   // userId -> equippedStamp map (유저별 레어 도장 표출용)
   const [profilesStampMap, setProfilesStampMap] = useState<Record<string, string>>({});
+  // 시험대비 분석 관리자 학생 선택기에서만 제외할 계정(현재는 단일 QA용 test 계정 하나) — profiles에
+  // is_admin 같은 전용 플래그가 없어, get_profile_directory가 이미 내려주는 username(이메일
+  // 앞부분)으로 식별한다. 다른 화면(profilesMap 등)에는 전혀 영향 없음 — 이 화면 하나만 제외.
+  const [examPrepExcludedStudentIds, setExamPrepExcludedStudentIds] = useState<Set<string>>(new Set());
   const [scaffoldedMistakeIds, setScaffoldedMistakeIds] = useState<Set<string>>(new Set()); // 스캐폴딩 힌트가 첨부된 오답 id 집합
   // Supabase system_config 테이블에서 로드한 Gemini API Key 상태 (무료키는 레이트리밋 문제로 배제하고 유료키만 사용)
   // 다른 학생들의 실시간 복습 현황 목록
@@ -767,6 +771,7 @@ function App() {
       const pMap: Record<string, string> = {};
       const gMap: Record<string, string> = {};
       const sMap: Record<string, string> = {};
+      const examPrepExcluded = new Set<string>();
       profiles.forEach((p) => {
         const username = p.username || p.id.slice(0, 8);
         const displayName = p.display_name?.trim();
@@ -775,6 +780,7 @@ function App() {
         if (p.equipped_stamp) {
           sMap[p.id] = p.equipped_stamp;
         }
+        if (username === 'test') examPrepExcluded.add(p.id);
       });
 
       // 🛡️ get_profile_directory RPC는 관리자 계정을 의도적으로 제외한다(학생에게 관리자 정보가
@@ -793,6 +799,7 @@ function App() {
       setProfilesMap(pMap);
       setProfilesGradeMap(gMap);
       setProfilesStampMap(sMap);
+      setExamPrepExcludedStudentIds(examPrepExcluded);
 
       const scaffoldingRows = scaffoldingRes.data;
       setScaffoldedMistakeIds(new Set((scaffoldingRows || []).map((r: any) => r.mistake_id)));
@@ -1827,6 +1834,7 @@ function App() {
               scaffoldedMistakeIds={scaffoldedMistakeIds}
               isAdmin={isAdmin}
               currentUserId={session?.user?.id}
+              excludedStudentIds={examPrepExcludedStudentIds}
             />
           </LazyScreenBoundary>
         </Screen>
