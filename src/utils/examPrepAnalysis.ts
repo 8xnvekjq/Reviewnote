@@ -36,7 +36,7 @@ export interface ExamPrepChapterDrilldown {
   review: ExamPrepReviewBuckets;
   representativeTitles: string[];
 }
-export interface ExamPrepPriority { rank: 1 | 2 | 3; title: string; reason: string; suggestion: string }
+export interface ExamPrepPriority { rank: 1 | 2 | 3; title: string; reason: string; suggestion: string; studentSuggestion: string }
 export interface ExamPrepLessonStep { when: string; items: string[] }
 export interface ExamPrepPlanSample { title: string; text: string; chapter?: string }
 export interface ExamPrepPlanCategoryStat { category: PlanCategory; label: string; count: number }
@@ -58,6 +58,7 @@ export interface ExamPrepReport {
   planCategoryStats: ExamPrepPlanCategoryStat[];
   planSpecificity: { concrete: number; vague: number; unclear: number };
   planInterpretation: string[];
+  planInterpretationForStudent: string[];
   planSamples: ExamPrepPlanSample[];
   radar: { label: string; score: number }[];
   weakItems: ExamPrepWeakItem[];
@@ -197,7 +198,9 @@ export function computeExamPrepReport(
   if (leastCause && T > 0) {
     stableItems.push(`"${leastCause.label}"로 인한 자기진단이 상대적으로 드묾(${T}건 중 ${leastCause.count}건)`);
   }
-  if (review.retry === 0 && N > 0) {
+  // N이 아주 작으면(1~2건) 재도전 0건이라도 "안정적"이라 단정하기엔 근거가 얕다 — 표본이 더
+  // 쌓였을 때만 이 항목을 올린다.
+  if (review.retry === 0 && N >= 3) {
     stableItems.push('재도전(X)이 필요했던 문제가 시험범위 내에 없음 — 반복 실패 사례가 적은 편');
   }
   const bestChapter = chapterStats
@@ -212,6 +215,9 @@ export function computeExamPrepReport(
     stableItems.push('아직 안정적이라고 판단할 만큼 데이터가 쌓이지 않음');
   }
 
+  // suggestion은 관리자(교사가 학생에게 무엇을 시킬지)용 문구, studentSuggestion은 학생 본인이
+  // 읽을 때 자기 행동으로 느껴지도록 바꾼 문구 — 같은 판단 결과를 문장만 역할별로 나눈 것이지
+  // 별도로 다시 계산하지 않는다.
   const priorities: ExamPrepPriority[] = finalWeak.slice(0, 3).map((w, i) => ({
     rank: (i + 1) as 1 | 2 | 3,
     title: w.title,
@@ -219,6 +225,9 @@ export function computeExamPrepReport(
     suggestion: w.chapter
       ? `${w.chapter} 문제부터 다시 풀리며 이 유형이 반복되는지 확인`
       : '해당 문제부터 다시 풀리며 반복 여부 확인',
+    studentSuggestion: w.chapter
+      ? `${w.chapter} 문제부터 다시 풀어보며 이 유형이 반복되는지 확인해봐요`
+      : '해당 문제부터 다시 풀어보며 반복 여부를 확인해봐요',
   }));
 
   const lessonSteps: ExamPrepLessonStep[] = [
@@ -255,13 +264,20 @@ export function computeExamPrepReport(
 
   const scaffoldingCount = inScope.filter(m => scaffoldedMistakeIds.has(m.id)).length;
 
-  const sampleWarning = N < 8 ? `이번 시험범위 내 기록이 ${N}건으로 적은 편이라, 아래 해석은 참고용으로만 활용해 주세요.` : null;
+  // N=0은 컴포넌트가 별도의 빈 상태로 처리(이 함수까지 오지 않음). 1~2건은 "패턴"이라고
+  // 부르기엔 근거가 너무 얕다는 걸 명확히 하는 별도 문구를 쓰고, 8건 미만까지는 기존처럼
+  // 참고용 경고만 덧붙인다.
+  const sampleWarning = N <= 2
+    ? '아직 반복되는 패턴을 판단하기에는 기록이 적어요.'
+    : N < 8
+      ? `이번 시험범위 내 기록이 ${N}건으로 적은 편이라, 아래 해석은 참고용으로만 활용해 주세요.`
+      : null;
 
   return {
     studentId, studentName, grade, startChapter, endChapter, rangeChapters,
     N, T, chapterStats, causeStats, review, planCount, planRate,
     planCategoryStats: planPattern.categoryCounts, planSpecificity: planPattern.specificity,
-    planInterpretation: planPattern.interpretation, planSamples,
+    planInterpretation: planPattern.interpretation, planInterpretationForStudent: planPattern.interpretationForStudent, planSamples,
     radar, weakItems: finalWeak, stableItems: stableItems.slice(0, 3), priorities, lessonSteps,
     chapterDrilldowns, scaffoldingCount, dataGapChapters, sampleWarning,
     generatedAt: new Date().toISOString(),
