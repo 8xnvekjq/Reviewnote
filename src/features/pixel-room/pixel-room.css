@@ -103,10 +103,32 @@
 .pr-shell svg { image-rendering:pixelated; }.pr-login { padding:24px; }
 @media(min-width:700px) {
   .pr-shell { padding-top:8px; }
-  .pr-room-frame { max-width:520px; margin:auto; }
+  /* Desktop/tablet room sizing bug (found from a real PC preview screenshot): the mobile rules
+     give .pr-room-frame `flex:1 1 auto` so it fills whatever vertical space .pr-stage's
+     container-query letterbox needs on a viewport-height-driven phone screen — but on a tall
+     desktop window .pr-shell itself can be 800-1000px+ tall, so flex:1 kept growing room-frame
+     to fill nearly all of it. Adding `margin:auto` on that still-growing flex item didn't cap it
+     either: auto margins only absorb space flex-grow leaves over, and 1 1 auto has no upper bound
+     to leave anything over. The card ended up tall and narrow instead of a normal-sized 10:8 room.
+     Fix: stop growing (flex:none), give the frame a real width cap instead of just a max-width, and
+     let the now content-sized frame's own `margin:auto` center it (this time correctly, since
+     there's no active flex-grow fighting it). Inside it, .pr-stage no longer needs to be flexed to
+     an unknown height either — with an explicit width and its own aspect-ratio, its height is
+     simply derived, and .pr-board can just be 100% of that already-correct 10:8 box instead of
+     doing the cqw/cqh min() dance (which stays exactly as-is for mobile, untouched below 700px).
+     Width is deliberately conservative (88% of .pr-shell's existing 680px reading-width cap, so
+     ~598px in practice, not the full 700-800px a wide monitor could fit) — measured against a real
+     1024x768 window the toolbar/room/instructions/sheet-trigger stack together need more height
+     than that viewport's content area has, so .pr-shell's pre-existing overflow-y:auto fallback
+     already has to carry some of the weight there; sizing the room any bigger made that worse
+     without fixing it (a short window can't fit a big 1080p-sized room card no matter how it's
+     capped). This is flagged as a known limitation below, not silently hidden. */
+  .pr-room-frame { flex:0 0 auto; width:min(88%, 700px); margin:auto; }
   .pr-wall { height:60px; }
   .pr-wall>span { display:block; padding-left:74px; }
   .pr-window { width:36px; height:35px; top:8px; }
+  .pr-stage { flex:none; padding:0; aspect-ratio:10/8; }
+  .pr-board { width:100%; height:auto; }
   .pr-catalog { grid-template-columns:repeat(6,minmax(0,1fr)); }
   .pr-sheet-panel { max-height:55cqh; }
 }
