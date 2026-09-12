@@ -1,5 +1,5 @@
 import { MATH_CURRICULUM, type MistakeEntry } from '../types';
-import { aggregatePlanPatterns, type PlanCategory } from './planPatternAnalysis';
+import { aggregatePlanPatterns, classifyPlanText, type PlanCategory } from './planPatternAnalysis';
 
 // 관리자용 "시험대비 분석" 리포트 — 순수 계산 함수(AI 호출 없음).
 //
@@ -23,7 +23,7 @@ export function causeLabel(cause: string): string {
   return ROOT_CAUSE_LABEL[cause] || cause;
 }
 
-export const RADAR_AXIS_LABELS = ['개념 이해', '조건 해석·문제 읽기', '풀이 전략', '계산 정확도', '복습 이행', '자기교정·대책 실천'] as const;
+export const RADAR_AXIS_LABELS = ['개념 회복', '조건 해석 점검', '풀이 계획 정교화', '계산 점검', '복습 이행', '대책 구체성'] as const;
 
 export const RADAR_WEAK_THRESHOLD = 45;
 export const RADAR_STABLE_THRESHOLD = 70;
@@ -31,9 +31,9 @@ export const RADAR_STABLE_THRESHOLD = 70;
 // 6축 프로필은 "절대 실력 점수"가 아니라 Reviewnote 기록에서 계산한 상대적 학습 신호라는 점을
 // 학생/관리자 화면 모두에서 반드시 함께 보여준다 — 정확한 문구는 임의로 바꾸지 않는다.
 export const RADAR_DISCLAIMER_ADMIN =
-  '이 점수는 절대적인 실력 점수가 아닙니다. Reviewnote에 기록된 오답, 복습 결과, 자기진단, 대책 등의 신호를 정해진 규칙으로 계산한 상대적 학습 프로필 점수입니다. 같은 학생 안에서 어떤 영역을 먼저 확인할지 비교하는 용도로 봐주세요.';
+  '이 숫자는 절대적인 실력 점수가 아닙니다. 최근 Reviewnote의 오답, 복습, 자기진단, 대책, 재풀이 신호를 정해진 규칙으로 종합한 상대적 참고값입니다. 잘한다·못한다를 단정하지 않고, 같은 학생 안에서 어떤 학습 행동을 먼저 점검할지 비교하는 용도로 봐주세요.';
 export const RADAR_DISCLAIMER_STUDENT =
-  '이 숫자는 시험 점수가 아니라, 내 Reviewnote 기록에서 계산한 상대적 학습 신호예요.';
+  '이 숫자는 시험 점수나 실력 판정이 아니에요. 최근 오답, 복습, 자기진단, 대책, 재풀이 기록을 종합해 어떤 학습 행동을 먼저 점검할지 보여주는 상대적 참고값이에요.';
 
 export interface ExamPrepChapterStat { chapter: string; count: number }
 export interface ExamPrepCauseStat { cause: string; label: string; count: number }
@@ -178,38 +178,62 @@ export function computeExamPrepReport(
         ? '현재 다른 영역보다 안정적인 신호입니다.'
         : '다른 영역과 비슷한 수준의 신호입니다.';
 
-  // 원인(root_causes) 기반 4축(개념/문제읽기/전략/계산)은 "그 원인 태그가 시험범위 전체 오답
-  // N건 중 몇 건이나 나오는가"를 분모 N 기준으로 본다. 원인 기록이 없는 축은 강점으로 추정하지
-  // 않고 50(중립)에 둔 채, 해당 원인의 발생 비율만큼 그 축만 최대 46점까지 낮춘다. 따라서 한
-  // 원인만 계속 자기진단해도 나머지 세 축이 근거 없이 100점으로 올라가지 않는다. 또한 count는
-  // causeCounts를 합산하지 않고 "해당 원인 중 하나라도 태그된 서로 다른 오답 건수"로 센다 —
-  // 계산 정확도 축처럼 causes=['calc','formula'] 두 태그를 모두 가진 오답이 있으면 예전 방식은
-  // 그 오답을 두 번 카운트해 count>N이 되어 rate>1(raw가 음수)이 나오는 버그가 있었다.
+  // 앞 4축에서 root_causes는 관련 문제 표본을 고르는 보조 신호로만 쓴다. 해당 태그의 빈도는
+  // 점수를 낮추지 않고, 관련 문제에서 관찰된 복습 완료(55%)·대책 구체성(30%)·재풀이/손풀이
+  // 기록(15%)으로 회복/점검 행동을 계산한다. 자기진단을 정직하게 더 남겨도 같은 행동 수준이면
+  // 불이익이 없고, 기록을 회피할 유인도 생기지 않는다. 관련 표본이 없으면 강점으로 추정하지 않고
+  // 50 중립이다. calc+formula는 같은 문제를 한 번만 센다.
   const taggedByCauses = (causes: string[]) => inScope.filter(m => (m.rootCauses || []).some(c => causes.includes(c)));
-  const axisFromCauses = (label: string, causes: string[]): ExamPrepRadarAxis => {
-    if (T === 0) {
+  const planQuality = (mistake: MistakeEntry) => {
+    const text = mistake.userActionPlan?.trim();
+    if (!text) return 0;
+    const specificity = classifyPlanText(text).specificity;
+    return specificity === 'concrete' ? 1 : specificity === 'vague' ? 0.5 : 0;
+  };
+  const reviewProgress = (mistake: MistakeEntry) => {
+    const bucket = reviewBucket(mistake.reviews);
+    if (bucket === 'complete') return 1;
+    if (bucket === 'inProgress') return 0.65;
+    if (bucket === 'retry') return 0.35;
+    return 0;
+  };
+  const axisFromRecovery = (label: string, causes: string[]): ExamPrepRadarAxis => {
+    const tagged = taggedByCauses(causes);
+    const count = tagged.length;
+    if (count === 0) {
       return {
         label,
         score: 50,
-        sampleSize: N,
-        evidence: [`시험범위 내 자기진단(자기 체크) 기록이 아직 없어요 — 분석 표본 ${N}건.`],
+        sampleSize: 0,
+        evidence: [`${label} 관련 자기진단 표본이 아직 없어 50점(중립)으로 표시합니다.`],
       };
     }
-    const tagged = taggedByCauses(causes);
-    const count = tagged.length;
-    const raw = Math.max(4, Math.min(50, Math.round(50 - rate(count, N) * 46)));
-    const score = shrink(raw, N);
-    const unresolved = tagged.filter(m => { const b = reviewBucket(m.reviews); return b === 'retry' || b === 'unreviewed'; }).length;
-    const complete = tagged.filter(m => reviewBucket(m.reviews) === 'complete').length;
+    const signals = tagged.map(mistake => ({
+      reviewBucket: reviewBucket(mistake.reviews),
+      reviewProgress: reviewProgress(mistake),
+      planQuality: planQuality(mistake),
+      scaffolded: scaffoldedMistakeIds.has(mistake.id),
+    }));
+    const complete = signals.filter(signal => signal.reviewBucket === 'complete').length;
+    const inProgress = signals.filter(signal => signal.reviewBucket === 'inProgress').length;
+    const retry = signals.filter(signal => signal.reviewBucket === 'retry').length;
+    const concretePlans = signals.filter(signal => signal.planQuality === 1).length;
+    const vaguePlans = signals.filter(signal => signal.planQuality === 0.5).length;
+    const scaffolded = signals.filter(signal => signal.scaffolded).length;
+    const behaviorSignal = signals.reduce((sum, signal) => (
+      sum + signal.reviewProgress * 0.55 + signal.planQuality * 0.3 + (signal.scaffolded ? 0.15 : 0)
+    ), 0) / count;
+    const raw = Math.round(55 + behaviorSignal * 45);
+    const score = shrink(raw, count);
     return {
       label,
       score,
-      sampleSize: N,
+      sampleSize: count,
       evidence: [
-        `${label} 관련 자기진단 ${count}건 (전체 ${N}건 중)`,
-        `그중 최근 미해결(재도전 필요·미복습) ${unresolved}건`,
-        `복습 완료 ${complete}건`,
-        `분석 표본 ${N}건`,
+        `${label} 관련 자기진단 ${count}건 — 빈도 자체는 감점하지 않음`,
+        `관련 문제 중 복습 완료 ${complete}건, 진행 중 ${inProgress}건, 재도전 필요 ${retry}건`,
+        `구체적 대책 ${concretePlans}건, 모호한 대책 ${vaguePlans}건, 재풀이·손풀이 ${scaffolded}건`,
+        `행동 신호 원점수 ${raw}점 · 표본 보정 후 ${score}점 (표본 ${count}건)`,
         evidenceTail(score),
       ],
     };
@@ -247,10 +271,10 @@ export function computeExamPrepReport(
   };
 
   const radar: ExamPrepRadarAxis[] = [
-    axisFromCauses(RADAR_AXIS_LABELS[0], ['concept']),
-    axisFromCauses(RADAR_AXIS_LABELS[1], ['misread']),
-    axisFromCauses(RADAR_AXIS_LABELS[2], ['strategy']),
-    axisFromCauses(RADAR_AXIS_LABELS[3], ['calc', 'formula']),
+    axisFromRecovery(RADAR_AXIS_LABELS[0], ['concept']),
+    axisFromRecovery(RADAR_AXIS_LABELS[1], ['misread']),
+    axisFromRecovery(RADAR_AXIS_LABELS[2], ['strategy']),
+    axisFromRecovery(RADAR_AXIS_LABELS[3], ['calc', 'formula']),
     reviewAxis,
     planAxis,
   ];

@@ -15,12 +15,12 @@ interface RadarChartProps {
   scores: ExamPrepRadarAxis[];
 }
 
-const SIZE_X = 320;
-const SIZE_Y = 300;
-const CX = 160;
-const CY = 145;
-const R = 70;
-const LABEL_R = R + 34;
+const SIZE_X = 420;
+const SIZE_Y = 360;
+const CX = 210;
+const CY = 172;
+const R = 105;
+const LABEL_R = R + 46;
 
 function scoreColor(score: number): string {
   return score < RADAR_WEAK_THRESHOLD ? 'var(--rn-danger)' : score >= RADAR_STABLE_THRESHOLD ? 'var(--rn-success)' : 'var(--rn-text)';

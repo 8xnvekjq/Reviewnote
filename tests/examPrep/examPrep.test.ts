@@ -6,6 +6,7 @@ import {
   RADAR_DISCLAIMER_ADMIN,
   RADAR_DISCLAIMER_STUDENT,
 } from '../../src/utils/examPrepAnalysis.ts';
+import { buildExamPrepStudentOptions } from '../../src/utils/examPrepStudents.ts';
 import type { MistakeEntry } from '../../src/types/index.ts';
 
 const GRADE = '공통수학2';
@@ -25,16 +26,13 @@ function mistake(partial: Partial<MistakeEntry> & { id: string }): MistakeEntry 
   } as MistakeEntry;
 }
 
-test('RADAR_AXIS_LABELS는 6개, disclaimer 문구는 요청된 정확한 텍스트를 유지한다', () => {
-  assert.equal(RADAR_AXIS_LABELS.length, 6);
-  assert.equal(
-    RADAR_DISCLAIMER_ADMIN,
-    '이 점수는 절대적인 실력 점수가 아닙니다. Reviewnote에 기록된 오답, 복습 결과, 자기진단, 대책 등의 신호를 정해진 규칙으로 계산한 상대적 학습 프로필 점수입니다. 같은 학생 안에서 어떤 영역을 먼저 확인할지 비교하는 용도로 봐주세요.',
-  );
-  assert.equal(
-    RADAR_DISCLAIMER_STUDENT,
-    '이 숫자는 시험 점수가 아니라, 내 Reviewnote 기록에서 계산한 상대적 학습 신호예요.',
-  );
+test('6개 축은 회복·점검 행동으로 구분되고 안내문은 절대 실력 판정을 부정한다', () => {
+  assert.deepEqual(RADAR_AXIS_LABELS, [
+    '개념 회복', '조건 해석 점검', '풀이 계획 정교화', '계산 점검', '복습 이행', '대책 구체성',
+  ]);
+  assert.match(RADAR_DISCLAIMER_ADMIN, /절대적인 실력 점수가 아닙니다/);
+  assert.match(RADAR_DISCLAIMER_ADMIN, /잘한다·못한다를 단정하지 않고/);
+  assert.match(RADAR_DISCLAIMER_STUDENT, /시험 점수나 실력 판정이 아니에요/);
 });
 
 test('N=0이면 6축 전부 중립값 50, sampleSize=0', () => {
@@ -47,7 +45,7 @@ test('N=0이면 6축 전부 중립값 50, sampleSize=0', () => {
   }
 });
 
-test('한 원인만 반복되어도 기록 없는 다른 원인 축은 가짜 100점이 아니라 50 중립이다', () => {
+test('한 원인만 반복되어도 그 빈도를 벌점화하지 않고 다른 원인 축은 50 중립이다', () => {
   const tagged = Array.from({ length: 5 }, (_, i) => mistake({ id: `c${i}`, rootCauses: ['concept'] }));
   const untagged = Array.from({ length: 5 }, (_, i) => mistake({ id: `u${i}` }));
   const report = computeExamPrepReport([...tagged, ...untagged], 's1', '학생', GRADE, START, END, new Set());
@@ -55,23 +53,42 @@ test('한 원인만 반복되어도 기록 없는 다른 원인 축은 가짜 10
   assert.equal(report!.N, 10);
   assert.equal(report!.T, 5);
   const concept = report!.radar[0];
-  assert.equal(concept.score, 27);
+  assert.equal(concept.score, 55);
+  assert.match(concept.evidence[0], /빈도 자체는 감점하지 않음/);
   for (const axis of report!.radar.slice(1, 4)) {
     assert.equal(axis.score, 50, `${axis.label} should stay neutral without evidence`);
   }
 });
 
-test('low-N shrink는 같은 극단 원인 신호를 N=1·2에서 억제하고 N=5부터 원점수를 사용한다', () => {
+test('low-N shrink는 완전한 회복 행동도 표본 1·2건에서는 완만하게, 5건부터 원점수로 반영한다', () => {
   const scoreFor = (count: number) => {
-    const items = Array.from({ length: count }, (_, i) => mistake({ id: `n${count}-${i}`, rootCauses: ['concept'] }));
-    const report = computeExamPrepReport(items, 's1', '학생', GRADE, START, END, new Set());
+    const items = Array.from({ length: count }, (_, i) => mistake({
+      id: `n${count}-${i}`,
+      rootCauses: ['concept'],
+      reviews: ['O', 'O', 'O'],
+      userActionPlan: '개념 공식을 다시 확인하고 대입한다',
+    }));
+    const report = computeExamPrepReport(items, 's1', '학생', GRADE, START, END, new Set(items.map(item => item.id)));
     assert.ok(report);
     return report!.radar[0].score;
   };
 
-  assert.equal(scoreFor(1), 41);
-  assert.equal(scoreFor(2), 32);
-  assert.equal(scoreFor(5), 4);
+  assert.equal(scoreFor(1), 60);
+  assert.equal(scoreFor(2), 70);
+  assert.equal(scoreFor(5), 100);
+});
+
+test('조건 해석 자기진단을 많이 남겨도 후속 학습 행동이 충실하면 높은 점수로 보인다', () => {
+  const items = Array.from({ length: 5 }, (_, i) => mistake({
+    id: `m${i}`,
+    rootCauses: ['misread'],
+    reviews: ['O', 'O', 'O'],
+    userActionPlan: '조건에 밑줄을 긋고 식에 대입해 확인한다',
+  }));
+  const report = computeExamPrepReport(items, 's1', '학생', GRADE, START, END, new Set());
+  assert.ok(report);
+  assert.equal(report!.radar[1].score, 93);
+  assert.match(report!.radar[1].evidence[0], /5건 — 빈도 자체는 감점하지 않음/);
 });
 
 test('계산 정확도 축(calc+formula 복수 태그)은 같은 문제를 두 번 세지 않는다(distinct-mistake count)', () => {
@@ -82,9 +99,7 @@ test('계산 정확도 축(calc+formula 복수 태그)은 같은 문제를 두 �
   assert.equal(report!.N, 4);
   assert.equal(report!.T, 4);
   const calcAxis = report!.radar[3];
-  // count가 6(3건 x 2태그)으로 이중 집계됐다면 rate>1 -> raw가 음수로 클램프되어 score가 바닥(4)에
-  // 붙는다. distinct 카운트(3건)로 고치면 rate=3/4=.75 -> 바닥에 붙지 않는다.
-  assert.ok(calcAxis.score > 4, `calc+formula axis should not hit the floor due to double counting, got ${calcAxis.score}`);
+  assert.equal(calcAxis.sampleSize, 3);
   assert.ok(calcAxis.evidence[0].includes('3건'), calcAxis.evidence[0]);
 });
 
@@ -124,8 +139,25 @@ test('축별 evidence는 실제 카운트 문장이며 AI 생성 텍스트가 �
   const report = computeExamPrepReport(items, 's1', '학생', GRADE, START, END, new Set());
   assert.ok(report);
   const strategyAxis = report!.radar[2];
-  assert.ok(strategyAxis.evidence.some(line => line.includes('풀이 전략 관련 자기진단 2건')));
+  assert.ok(strategyAxis.evidence.some(line => line.includes('풀이 계획 정교화 관련 자기진단 2건')));
   assert.ok(strategyAxis.evidence.some(line => /복습 완료 1건/.test(line)));
   const planAxis = report!.radar[5];
   assert.ok(planAxis.evidence.some(line => line.includes('대책을 작성한 문제 1건 / 전체 2건')));
+});
+
+test('관리자 학생 선택기는 학년 제한 없이 학년 미상까지 포함하고 관리자처럼 디렉터리에 없는 id는 제외한다', () => {
+  const profilesMap = {
+    middle: '중3 학생', high1: '고1 학생', high2: '고2 학생', high3: '고3 학생', unknown: '학년 미상', admin: '관리자',
+  };
+  const profilesGradeMap = { middle: '중3', high1: '고1', high2: '고2', high3: '고3', unknown: '' };
+  const items = [
+    mistake({ id: 'a', userId: 'high3', date: '2026-09-03' }),
+    mistake({ id: 'b', userId: 'middle', date: '2026-09-02' }),
+    mistake({ id: 'c', userId: 'admin', date: '2026-09-04' }),
+  ];
+
+  const students = buildExamPrepStudentOptions(items, profilesMap, profilesGradeMap);
+  assert.deepEqual(students.map(student => student.id), ['middle', 'high1', 'high2', 'high3', 'unknown']);
+  assert.equal(students.find(student => student.id === 'high3')?.count, 1);
+  assert.equal(students.at(-1)?.grade, '');
 });
