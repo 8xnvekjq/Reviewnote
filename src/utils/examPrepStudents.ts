@@ -1,4 +1,5 @@
 import type { MistakeEntry } from '../types';
+import { EXAM_PREP_TEST_USER_ID } from './examPrepAccess';
 
 export interface ExamPrepStudentOption {
   id: string;
@@ -23,7 +24,7 @@ export function buildExamPrepStudentOptions(
   profilesMap: Record<string, string>,
   profilesGradeMap: Record<string, string>,
 ): ExamPrepStudentOption[] {
-  const studentIds = new Set(Object.keys(profilesGradeMap));
+  const studentIds = new Set(Object.keys(profilesGradeMap).filter(id => id !== EXAM_PREP_TEST_USER_ID));
   const activity = new Map<string, { count: number; latest: string | null }>();
 
   for (const mistake of mistakes) {
@@ -34,7 +35,7 @@ export function buildExamPrepStudentOptions(
     activity.set(mistake.userId, current);
   }
 
-  return Object.keys(profilesGradeMap)
+  return Array.from(studentIds)
     .map(id => {
       const studentActivity = activity.get(id);
       return {
