@@ -11,6 +11,8 @@ interface Props {
   scaffoldedMistakeIds: Set<string>;
   isAdmin: boolean;
   currentUserId?: string;
+  // 관리자 학생 선택기에서만 제외할 계정(예: QA용 test 계정) — 학생 본인 열람에는 영향 없음.
+  excludedStudentIds?: Set<string>;
 }
 
 // "시험대비 분석" — 관리자는 학생을 선택해 전체 학생 리포트를 볼 수 있고(기존 그대로),
@@ -18,7 +20,7 @@ interface Props {
 // 섹션은 ExamPrepStudentReport 내부에서 viewerRole로 숨김). 분석 로직/컴포넌트는 완전히
 // 동일하게 재사용 — mistakes는 RLS로 이미 본인 소유 행만 내려오므로 다른 학생 데이터가
 // 클라이언트에 아예 도달하지 않는다(추가로 studentId를 본인 id로 고정해 이중 보장).
-export function ExamPrepAnalysis({ mistakes, profilesMap, profilesGradeMap, scaffoldedMistakeIds, isAdmin, currentUserId }: Props) {
+export function ExamPrepAnalysis({ mistakes, profilesMap, profilesGradeMap, scaffoldedMistakeIds, isAdmin, currentUserId, excludedStudentIds }: Props) {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
   if (!isAdmin) {
@@ -48,6 +50,7 @@ export function ExamPrepAnalysis({ mistakes, profilesMap, profilesGradeMap, scaf
           mistakes={mistakes}
           profilesMap={profilesMap}
           profilesGradeMap={profilesGradeMap}
+          excludedStudentIds={excludedStudentIds}
           onSelect={setSelectedStudentId}
         />
       ) : (

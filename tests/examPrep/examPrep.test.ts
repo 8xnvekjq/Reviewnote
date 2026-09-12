@@ -4,6 +4,7 @@ import { canViewOwnExamPrep } from '../../src/utils/examPrepAccess.ts';
 import { computeExamPrepReport } from '../../src/utils/examPrepAnalysis.ts';
 import { aggregatePlanPatterns } from '../../src/utils/planPatternAnalysis.ts';
 import { daysSince } from '../../src/utils/examPrepCommentFormat.ts';
+import { buildExamPrepStudentList } from '../../src/utils/examPrepStudentList.ts';
 import type { MistakeEntry } from '../../src/types/index.ts';
 
 const GRADE = '공통수학2';
@@ -99,4 +100,28 @@ test('daysSince: same calendar day is D+0, a day earlier is D+1', () => {
   assert.equal(daysSince(yesterday), 1);
   const thirteenDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 13, 12, 0, 0).toISOString();
   assert.equal(daysSince(thirteenDaysAgo), 13);
+});
+
+test('buildExamPrepStudentList: no longer filters by grade — 고3/중3 real students are included', () => {
+  const profilesGradeMap = { s1: '고1', s2: '고2', s3: '고3', s4: '중3' };
+  const profilesMap = { s1: '학생1', s2: '학생2', s3: '학생3', s4: '학생4' };
+  const list = buildExamPrepStudentList([], profilesMap, profilesGradeMap);
+  assert.deepEqual(list.map(s => s.id).sort(), ['s1', 's2', 's3', 's4']);
+});
+
+test('buildExamPrepStudentList: excludedStudentIds removes only the named account(s), nothing else', () => {
+  const profilesGradeMap = { s1: '고1', test1: '중3', s2: '고2' };
+  const profilesMap = { s1: '학생1', test1: 'Test', s2: '학생2' };
+  const list = buildExamPrepStudentList([], profilesMap, profilesGradeMap, new Set(['test1']));
+  assert.deepEqual(list.map(s => s.id).sort(), ['s1', 's2']);
+  assert.ok(!list.some(s => s.id === 'test1'));
+});
+
+test('buildExamPrepStudentList: a student with no school_grade is kept (not dropped) and sorts last', () => {
+  const profilesGradeMap = { s1: '고1', noGrade: '', s2: '고2' };
+  const profilesMap = { s1: '학생1', noGrade: '학생0', s2: '학생2' };
+  const list = buildExamPrepStudentList([], profilesMap, profilesGradeMap);
+  assert.equal(list.length, 3);
+  assert.equal(list.at(-1)!.id, 'noGrade');
+  assert.equal(list.at(-1)!.grade, '');
 });
