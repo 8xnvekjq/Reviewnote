@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import {
   createPlazaStoreState,
   getOtherPlayers,
+  getPathSince,
   plazaStoreReducer,
+  MAX_PATH_LENGTH,
   type PlazaStoreState,
 } from '../../src/features/pixel-room/plaza/presenceStore.ts';
 import type { PlazaPlayerState } from '../../src/features/pixel-room/plaza/types.ts';
@@ -246,4 +248,113 @@ test('정지 후 다시 이동해도 같은 sessionId는 갱신될 뿐 중복 �
     movedAgain.players.get('walker'),
     makePlayer({ sessionId: 'walker', seq: 3, x: 4, y: 4, moving: true }),
   );
+});
+
+// --- 실시간 이동 버그(순간이동/경로 스킵) 수정 검증: paths 누적 + getPathSince ---
+//
+// 실제 원인은 usePlazaRealtime.ts 헤더 주석 참고: React가 같은 태스크 안의 여러 dispatch를
+// 렌더 1번으로 묶어버리면(presence의 leave+join 동시 diff, broadcast burst 등), "players"
+// 스냅샷만 보는 소비자는 그 사이의 중간 좌표를 전부 놓친다. 아래 첫 테스트가 그 상황을 그대로
+// 재현한다 — 중간 상태를 한 번도 들여다보지 않고 오직 "배치가 끝난 뒤의 최종 state"만으로
+// getPathSince를 호출해도, 지나온 좌표가 하나도 빠지지 않고 전부 나와야 한다.
+test('배치로 렌더가 묶여 중간 state를 한 번도 관찰하지 못해도, paths에는 지나온 좌표가 전부 남는다', () => {
+  // 오직 "마지막 state"만 사용한다 — React가 batch 안의 3개 dispatch를 렌더 1번으로 묶었을 때
+  // 소비자가 실제로 볼 수 있는 것과 정확히 동일한 조건.
+  const afterBurst = [
+    { seq: 1, x: 1, y: 0 },
+    { seq: 2, x: 2, y: 0 },
+    { seq: 3, x: 3, y: 0 },
+  ].reduce(
+    (state, step) => plazaStoreReducer(state, {
+      type: 'broadcast',
+      player: makePlayer({ sessionId: 'burst', seq: step.seq, x: step.x, y: step.y, moving: true }),
+    }),
+    createPlazaStoreState(),
+  );
+
+  // "players"(최종 스냅샷)만 보면 x=3 하나뿐 — 이게 바로 옛 버그(retarget-to-latest)가 x=1,2를
+  // 잃어버렸던 지점이다.
+  assert.deepEqual(afterBurst.players.get('burst'), makePlayer({ sessionId: 'burst', seq: 3, x: 3, y: 0, moving: true }));
+
+  // 하지만 paths는 배치 여부와 무관하게 reducer가 실제로 처리한 액션 순서를 전부 보존한다.
+  const fullPath = getPathSince(afterBurst.paths, 'burst', -1);
+  assert.deepEqual(fullPath, [
+    { x: 1, y: 0, seq: 1 },
+    { x: 2, y: 0, seq: 2 },
+    { x: 3, y: 0, seq: 3 },
+  ]);
+});
+
+test('getPathSince: sinceSeq보다 큰 것만, 도착 순서 그대로 돌려준다(커서 재조회)', () => {
+  let state = createPlazaStoreState();
+  for (const step of [{ seq: 1, x: 0 }, { seq: 2, x: 1 }, { seq: 3, x: 2 }]) {
+    state = plazaStoreReducer(state, { type: 'broadcast', player: makePlayer({ sessionId: 's', seq: step.seq, x: step.x, y: 0 }) });
+  }
+  // 커서를 2로 삼으면 seq 3짜리 하나만 "새로운" 것으로 보인다.
+  assert.deepEqual(getPathSince(state.paths, 's', 2), [{ x: 2, y: 0, seq: 3 }]);
+  // 커서가 이미 최신이면 빈 배열.
+  assert.deepEqual(getPathSince(state.paths, 's', 3), []);
+  // 알 수 없는 세션은 빈 배열.
+  assert.deepEqual(getPathSince(state.paths, 'nobody', -1), []);
+});
+
+test('presence-join(이동 정지 전이 포함)도 경로에 좌표를 추가한다', () => {
+  const moved = plazaStoreReducer(createPlazaStoreState(), {
+    type: 'broadcast',
+    player: makePlayer({ sessionId: 'walker', seq: 1, x: 1, y: 0, moving: true }),
+  });
+  const stopped = plazaStoreReducer(moved, {
+    type: 'presence-join',
+    players: [makePlayer({ sessionId: 'walker', seq: 2, x: 2, y: 0, moving: false })],
+  });
+  assert.deepEqual(getPathSince(stopped.paths, 'walker', -1), [
+    { x: 1, y: 0, seq: 1 },
+    { x: 2, y: 0, seq: 2 },
+  ]);
+});
+
+test('presence-sync는 경로를 그 순간 위치 하나로 리셋한다(그 이전 경로는 관측한 적 없으므로 재생하지 않음)', () => {
+  const moved = plazaStoreReducer(createPlazaStoreState(), {
+    type: 'broadcast',
+    player: makePlayer({ sessionId: 'walker', seq: 1, x: 1, y: 0 }),
+  });
+  const synced = plazaStoreReducer(moved, {
+    type: 'presence-sync',
+    players: [makePlayer({ sessionId: 'walker', seq: 5, x: 9, y: 9 })],
+  });
+  assert.deepEqual(getPathSince(synced.paths, 'walker', -1), [{ x: 9, y: 9, seq: 5 }]);
+});
+
+test('presence-leave는 해당 세션의 경로 이력도 함께 지운다', () => {
+  const moved = plazaStoreReducer(createPlazaStoreState(), {
+    type: 'broadcast',
+    player: makePlayer({ sessionId: 'walker', seq: 1, x: 1, y: 0 }),
+  });
+  const left = plazaStoreReducer(moved, { type: 'presence-leave', sessionIds: ['walker'] });
+  assert.deepEqual(getPathSince(left.paths, 'walker', -1), []);
+});
+
+test('paths는 MAX_PATH_LENGTH를 넘으면 오래된 좌표부터 잘라내고(무한 성장 방지), 최신 구간은 보존한다', () => {
+  let state = createPlazaStoreState();
+  const total = MAX_PATH_LENGTH + 5;
+  for (let seq = 1; seq <= total; seq++) {
+    state = plazaStoreReducer(state, { type: 'broadcast', player: makePlayer({ sessionId: 'long-walker', seq, x: seq, y: 0 }) });
+  }
+  const path = getPathSince(state.paths, 'long-walker', -1);
+  assert.equal(path.length, MAX_PATH_LENGTH);
+  // 가장 오래된 5개(seq 1~5)는 잘려나가고, 최신 구간(마지막 seq)은 그대로 남아 있다.
+  assert.equal(path[0].seq, total - MAX_PATH_LENGTH + 1);
+  assert.equal(path[path.length - 1].seq, total);
+});
+
+test('낡은/순서 뒤바뀐 broadcast(거부됨)는 players뿐 아니라 paths에도 남지 않는다', () => {
+  const advanced = plazaStoreReducer(createPlazaStoreState(), {
+    type: 'broadcast',
+    player: makePlayer({ sessionId: 's', seq: 5, x: 5, y: 0 }),
+  });
+  const stale = plazaStoreReducer(advanced, {
+    type: 'broadcast',
+    player: makePlayer({ sessionId: 's', seq: 3, x: 0, y: 0 }), // 이미 거부되는 낡은 메시지
+  });
+  assert.deepEqual(getPathSince(stale.paths, 's', -1), [{ x: 5, y: 0, seq: 5 }]);
 });

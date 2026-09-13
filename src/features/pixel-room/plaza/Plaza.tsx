@@ -8,6 +8,7 @@ import { useSmoothedPlayerPositions } from './useSmoothedPlayerPositions';
 import { AvatarSprite, FurnitureSprite } from '../sprites';
 import type { PublicAvatarAppearance } from '../shop/types';
 import { fetchEquippedAppearance } from '../../../utils/pixelShop';
+import { plazaDebugLog } from './plazaDebug';
 import '../pixel-room.css';
 
 const EMPTY_APPEARANCE: PublicAvatarAppearance = { top: null, bottom: null, shoes: null, hair: null, eyes: null };
@@ -100,11 +101,11 @@ export default function Plaza({ userId, sessionId, onReachEntrance }: Props) {
     return () => { cancelled = true; };
   }, [userId]);
 
-  const { players, updateMyState } = usePlazaRealtime(sessionId, appearance);
-  // Worker B's real interpolation lands here later (see useSmoothedPlayerPositions.ts) — this
-  // component only ever renders `renderedPlayers`, never the raw realtime list, so the swap is a
-  // one-line change in that file with nothing to update here.
-  const renderedPlayers = useSmoothedPlayerPositions(players);
+  const { players, paths, updateMyState } = usePlazaRealtime(sessionId, appearance);
+  // This component only ever renders `renderedPlayers`, never the raw realtime list — see
+  // useSmoothedPlayerPositions.ts's header comment for why it needs both `players` (roster/
+  // appearance) and `paths` (the actual waypoint-by-waypoint history, for smoothing).
+  const renderedPlayers = useSmoothedPlayerPositions(players, paths);
 
   const [actor, setActor] = useState<Cell>(() => findSpawn());
   const [direction, setDirection] = useState<PlazaDirection>(SPAWN_DIRECTION);
@@ -115,8 +116,14 @@ export default function Plaza({ userId, sessionId, onReachEntrance }: Props) {
   const moving = !!held || walkQueue.length > 0;
 
   // Push every x/y/direction/moving change up to the realtime layer — throttling is the hook's
-  // job (per the Worker A contract), not ours.
-  useEffect(() => { updateMyState({ x: actor.x, y: actor.y, direction, moving }); }, [actor.x, actor.y, direction, moving, updateMyState]);
+  // job (per the Worker A contract), not ours. Every commit of actor.x/y is its own separate tick
+  // callback (setInterval/setTimeout in the movement effects below), so this effect really does
+  // fire once per grid cell crossed — the local side of the pipeline was never the place waypoints
+  // went missing (see usePlazaRealtime.ts/useSmoothedPlayerPositions.ts for where they actually did).
+  useEffect(() => {
+    plazaDebugLog('local:move', sessionId, `(${actor.x},${actor.y})`, { direction, moving, t: performance.now().toFixed(1) });
+    updateMyState({ x: actor.x, y: actor.y, direction, moving });
+  }, [actor.x, actor.y, direction, moving, updateMyState, sessionId]);
 
   // Reaching the door: guarded against firing on the very first render (spawn is one cell away
   // from PLAZA_ENTRANCE by construction, so this only ever fires from real movement, but the

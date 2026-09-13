@@ -4,13 +4,46 @@
 
 import type { PlazaPlayerState } from './types';
 
+// 실시간 이동 버그(순간이동/경로 스킵) 조사 결과 — usePlazaRealtime.ts 상단 주석 참고. React는
+// 같은 태스크 안에서 여러 dispatch가 몰리면(예: presence의 leave+join 동시 diff, 브라우저가
+// 네트워크 큐를 한꺼번에 배출하는 broadcast burst 등) 렌더를 1번만 커밋한다 — 즉 "players"
+// 스냅샷은 그 사이의 중간 좌표들을 절대 보여주지 못한다. 하지만 reducer 자신은 배치 여부와
+// 무관하게 dispatch된 액션을 빠짐없이 순서대로 처리하므로("players"에 반영되는 건 마지막
+// 결과뿐이라도, 그 결과를 만드는 과정에서 모든 액션이 실제로 실행된다), 렌더와 별개로 "그
+// 세션이 실제로 지나온 좌표 순서"를 여기 "paths"에 append-only로 누적해 두면 정보 손실이
+// 전혀 없다. 소비자(useSmoothedPlayerPositions.ts)는 seq를 커서 삼아 "마지막으로 읽은 이후"
+// 구간만 꺼내가면서 rAF로 재생한다 — 렌더 횟수와 완전히 무관하게 실제 이동 경로를 그대로
+// 따라갈 수 있다.
+export interface PathWaypoint {
+  x: number;
+  y: number;
+  seq: number; // 소비자가 "마지막으로 읽은 지점"을 기억하는 커서 — sender가 채우는 단조증가 값을 그대로 재사용.
+}
+
+// 세션 하나가 오래 이동해도 메모리가 무한정 자라지 않도록 하는 방어적 상한. 실전에서는 거의
+// 항상 매 dispatch마다 소비되므로(렌더가 배치되지 않는 한 즉시 비워짐) 이 상한에 닿을 일이
+// 없다 — 정말 오래 배치가 밀리거나(탭이 백그라운드로 오래 머묾) 드문 상황에서만 오래된 좌표를
+// 잘라내는 안전망이다. 170ms 간격 기준 약 5초 분량. export는 테스트에서 캡 동작을 정확히
+// 검증하기 위함.
+export const MAX_PATH_LENGTH = 30;
+
+function appendPath(paths: Map<string, PathWaypoint[]>, sessionId: string, point: PathWaypoint): Map<string, PathWaypoint[]> {
+  const next = new Map(paths);
+  const existing = next.get(sessionId) ?? [];
+  const updated = [...existing, point];
+  next.set(sessionId, updated.length > MAX_PATH_LENGTH ? updated.slice(updated.length - MAX_PATH_LENGTH) : updated);
+  return next;
+}
+
 export interface PlazaStoreState {
-  // sessionId -> 그 세션의 마지막으로 승인된 상태.
+  // sessionId -> 그 세션의 마지막으로 승인된 상태(렌더링/appearance/roster 판정용 — "지금" 스냅샷).
   players: Map<string, PlazaPlayerState>;
+  // sessionId -> 그 세션이 실제로 지나온 좌표들의 append-only 이력(스무딩 재생용 — 위 주석 참고).
+  paths: Map<string, PathWaypoint[]>;
 }
 
 export function createPlazaStoreState(): PlazaStoreState {
-  return { players: new Map() };
+  return { players: new Map(), paths: new Map() };
 }
 
 // Presence(sync/join)와 Broadcast(move)를 분리한 이유: 정책이 서로 다르기 때문이다(아래 reducer
@@ -78,27 +111,42 @@ export function plazaStoreReducer(state: PlazaStoreState, action: PlazaStoreActi
   switch (action.type) {
     case 'presence-sync': {
       const players = new Map<string, PlazaPlayerState>();
+      const paths = new Map<string, PathWaypoint[]>();
       for (const player of action.players) {
-        players.set(player.sessionId, sanitizePlayerState(player));
+        const sanitized = sanitizePlayerState(player);
+        players.set(sanitized.sessionId, sanitized);
+        // sync는 "지금 이 순간의 완전한 명단"이다 — 그 이전 경로는 우리가 관측하지 못했던
+        // 구간이므로 재생하지 않고, 이 좌표 하나를 새 출발점으로 삼는다(스푼 없이 그 자리에서
+        // 시작). 기존에 알고 있던 이력은 sync로 대체되므로 함께 초기화한다.
+        paths.set(sanitized.sessionId, [{ x: sanitized.x, y: sanitized.y, seq: sanitized.seq }]);
       }
-      return { players };
+      return { players, paths };
     }
     case 'presence-join': {
       if (action.players.length === 0) return state;
       const players = new Map(state.players);
+      let paths = state.paths;
       for (const player of action.players) {
-        players.set(player.sessionId, sanitizePlayerState(player));
+        const sanitized = sanitizePlayerState(player);
+        players.set(sanitized.sessionId, sanitized);
+        // presence-join은 이동 시작/정지 전이, appearance 변경, 최초 입장에서만 온다(빈도 낮음,
+        // 항상 신뢰). moving:false 전이의 경우 "실제 최종 도착 칸"을 담고 있으므로, 혹시 그 사이
+        // broadcast 일부가 유실되더라도 경로의 마지막 지점은 반드시 정확하게 재생되도록 이
+        // 좌표도 경로에 추가한다.
+        paths = appendPath(paths, sanitized.sessionId, { x: sanitized.x, y: sanitized.y, seq: sanitized.seq });
       }
-      return { players };
+      return { players, paths };
     }
     case 'presence-leave': {
       if (action.sessionIds.length === 0) return state;
       const players = new Map(state.players);
+      const paths = new Map(state.paths);
       let changed = false;
       for (const sessionId of action.sessionIds) {
         if (players.delete(sessionId)) changed = true;
+        paths.delete(sessionId);
       }
-      return changed ? { players } : state;
+      return changed ? { players, paths } : state;
     }
     case 'broadcast': {
       const incoming = sanitizePlayerState(action.player);
@@ -109,7 +157,8 @@ export function plazaStoreReducer(state: PlazaStoreState, action: PlazaStoreActi
       }
       const players = new Map(state.players);
       players.set(incoming.sessionId, incoming);
-      return { players };
+      const paths = appendPath(state.paths, incoming.sessionId, { x: incoming.x, y: incoming.y, seq: incoming.seq });
+      return { players, paths };
     }
     default:
       return state;
@@ -124,4 +173,15 @@ export function getOtherPlayers(state: PlazaStoreState, meSessionId: string): Pl
     if (player.sessionId !== meSessionId) result.push(player);
   }
   return result;
+}
+
+// sinceSeq보다 큰 seq를 가진, 아직 소비되지 않은 경로 구간만 순서대로 돌려준다. paths는
+// PlazaStoreState.paths를 그대로 받는다(usePlazaRealtime.ts가 storeState 전체가 아니라 이 Map만
+// 밖으로 내보내므로). 호출자(useSmoothedPlayerPositions.ts)는 이 반환값의 마지막 seq를 다음
+// 호출의 sinceSeq로 기억해 두는 식으로 "커서"를 직접 들고 있는다 — 렌더가 몇 번 일어났든(배치로
+// 1번이든 N번이든) 이 함수는 항상 "그 사이 실제로 지나온 좌표 전부"를 빠짐없이 돌려준다.
+export function getPathSince(paths: Map<string, PathWaypoint[]>, sessionId: string, sinceSeq: number): PathWaypoint[] {
+  const path = paths.get(sessionId);
+  if (!path || path.length === 0) return [];
+  return path.filter(point => point.seq > sinceSeq);
 }
