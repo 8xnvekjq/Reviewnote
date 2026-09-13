@@ -117,11 +117,11 @@
 .pr-shop-name { font-size:11px; font-weight:600; }
 .pr-shop-status { font-size:10px; color:var(--rn-muted); }
 .pr-shop-hint { font-size:9.5px; color:var(--rn-muted); }
-.pr-shop-action { min-height:32px; width:100%; margin-top:2px; border:1px solid var(--rn-line); border-radius:8px; background:var(--pr-theme-accent, #496e5d); color:#fff; font-size:11px; font-weight:700; padding:4px 6px; }
+.pr-shop-action { min-height:44px; width:100%; margin-top:2px; border:1px solid var(--rn-line); border-radius:8px; background:var(--pr-theme-accent, #496e5d); color:#fff; font-size:11px; font-weight:700; padding:4px 6px; }
 .pr-shop-confirm { width:100%; margin-top:2px; display:flex; flex-direction:column; gap:5px; }
 .pr-shop-confirm p { margin:0; font-size:10px; color:var(--rn-muted); line-height:1.4; }
 .pr-shop-confirm-actions { display:flex; gap:5px; }
-.pr-shop-confirm-actions button { flex:1; min-height:30px; border-radius:7px; font-size:10.5px; font-weight:700; border:1px solid var(--rn-line); }
+.pr-shop-confirm-actions button { flex:1; min-height:44px; border-radius:7px; font-size:10.5px; font-weight:700; border:1px solid var(--rn-line); }
 .pr-shop-confirm-actions button:first-child { background:var(--pr-theme-accent, #496e5d); color:#fff; border-color:transparent; }
 @media(min-width:420px) { .pr-shop-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
 
