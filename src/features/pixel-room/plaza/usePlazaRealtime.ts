@@ -3,8 +3,10 @@ import type { RealtimeChannel, RealtimePresenceState } from '@supabase/supabase-
 import { supabase } from '../../../services/supabase';
 import type { PublicAvatarAppearance } from '../shop/types';
 import { createPlazaStoreState, getOtherPlayers, plazaStoreReducer } from './presenceStore';
+import type { PathWaypoint } from './presenceStore';
 import type { PlazaDirection, PlazaPlayerState } from './types';
 import { PLAZA_CHANNEL_NAME } from './types';
+import { plazaDebugLog } from './plazaDebug';
 
 const MOVE_BROADCAST_EVENT = 'move';
 
@@ -23,6 +25,11 @@ function reconnectDelayFor(attempt: number): number {
 
 export interface UsePlazaRealtimeResult {
   players: PlazaPlayerState[]; // everyone else currently in the plaza (not me)
+  // sessionId -> every waypoint that session has actually passed through, in order (append-only —
+  // see presenceStore.ts's PathWaypoint/getPathSince). useSmoothedPlayerPositions.ts consumes this
+  // instead of only the latest `players` snapshot so a burst of same-task updates (real risk — see
+  // that hook's header comment) never loses an in-between waypoint.
+  paths: Map<string, PathWaypoint[]>;
   ready: boolean;              // channel subscribed + initial presence sync received (false while reconnecting)
   updateMyState: (partial: { x: number; y: number; direction: PlazaDirection; moving: boolean }) => void;
 }
@@ -144,6 +151,7 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
 
       nextChannel.on('presence', { event: 'sync' }, () => {
         const players = flattenPresenceState(nextChannel.presenceState<PlazaPlayerState>());
+        plazaDebugLog('recv:presence-sync', { count: players.length, t: performance.now().toFixed(1) });
         dispatch({ type: 'presence-sync', players });
         // 늦게 들어온 학생이 '현재' 모두의 위치를 읽는 지점 — sync를 한 번이라도 받으면 광장의
         // 초기 상태를 확보한 것이므로 여기서 ready로 전환한다.
@@ -151,14 +159,17 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
       });
 
       nextChannel.on<PlazaPlayerState>('presence', { event: 'join' }, ({ newPresences }) => {
+        plazaDebugLog('recv:presence-join', newPresences.map(p => `${p.sessionId}(${p.x},${p.y})#${p.seq} moving=${p.moving}`), { t: performance.now().toFixed(1) });
         dispatch({ type: 'presence-join', players: newPresences });
       });
 
       nextChannel.on<PlazaPlayerState>('presence', { event: 'leave' }, ({ leftPresences }) => {
+        plazaDebugLog('recv:presence-leave', leftPresences.map(p => p.sessionId), { t: performance.now().toFixed(1) });
         dispatch({ type: 'presence-leave', sessionIds: leftPresences.map(presence => presence.sessionId) });
       });
 
       nextChannel.on<PlazaPlayerState>('broadcast', { event: MOVE_BROADCAST_EVENT }, ({ payload }) => {
+        plazaDebugLog('recv:broadcast', payload.sessionId, `(${payload.x},${payload.y})#${payload.seq}`, { t: performance.now().toFixed(1) });
         dispatch({ type: 'broadcast', player: payload });
       });
 
@@ -237,6 +248,7 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
       // 170ms 간격은 이미 "실시간처럼 느껴지는" 값으로 검증된 기존 방 이동 cadence라, 이보다
       // 더 줄일(throttle) 필요는 없다고 판단했다 — Broadcast는 가벼운 fire-and-forget이라 30명
       // 미만 규모에서 매 tick 전송이 부담될 정도는 아니다.
+      plazaDebugLog('send:broadcast', sessionId, `(${state.x},${state.y})#${state.seq}`, { moving: state.moving, t: performance.now().toFixed(1) });
       void channel.send({ type: 'broadcast', event: MOVE_BROADCAST_EVENT, payload: state });
 
       // Presence(track): 무거운 경로이므로 매 tick이 아니라 "이동 시작"과 "이동 정지"
@@ -251,5 +263,5 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
 
   const players = useMemo(() => getOtherPlayers(storeState, sessionId), [storeState, sessionId]);
 
-  return { players, ready, updateMyState };
+  return { players, paths: storeState.paths, ready, updateMyState };
 }
