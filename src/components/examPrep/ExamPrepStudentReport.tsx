@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { MistakeEntry } from '../../types';
 import { MATH_CURRICULUM, GRADE_LIST } from '../../types';
-import { computeExamPrepReport, type ExamPrepReport } from '../../utils/examPrepAnalysis';
+import { computeExamPrepReport, type ExamPrepReport, RADAR_DISCLAIMER_ADMIN, RADAR_DISCLAIMER_STUDENT } from '../../utils/examPrepAnalysis';
 import { RadarChart } from './RadarChart';
 import { BarList } from './BarList';
 import { CollapsibleSection } from '../CollapsibleSection';
@@ -72,12 +72,6 @@ export function ExamPrepStudentReport({ studentId, studentName, schoolGrade, mis
       {viewerRole === 'admin' && <h2 className="rn-title" style={{ marginBottom: 2 }}>{studentName}</h2>}
       <p className="rn-caption" style={{ marginBottom: 14 }}>오답노트 기록을 바탕으로 본 시험대비 분석이에요. 시험범위를 지정하고 분석하기를 눌러주세요.</p>
 
-      {/* 선생님 코멘트는 report(시험범위별 분석 결과)와 완전히 무관하게 studentId 하나로만
-         정해지는 영역이라, 분석하기를 누르기 전에도 항상 같은 최신 코멘트를 보여준다. */}
-      {viewerRole === 'admin'
-        ? <TeacherCommentEditor studentId={studentId} />
-        : <TeacherCommentCard studentId={studentId} />}
-
       <div className="rn-examprep-range-bar">
         <div className="rn-examprep-range-field">
           <label htmlFor="ep-grade">과목/교재</label>
@@ -128,7 +122,7 @@ export function ExamPrepStudentReport({ studentId, studentName, schoolGrade, mis
             <div className="rn-surface" style={{ padding: 16 }}>
               <h3 className="rn-section" style={{ fontSize: 14, fontWeight: 750, marginBottom: 8 }}>6축 학습 프로필</h3>
               <RadarChart scores={report.radar} />
-              <p className="rn-examprep-radar-caption">오답노트 기록을 바탕으로 본 현재 학습 프로필이에요. 절대적인 실력 점수가 아니라 상대적 경향입니다.</p>
+              <p className="rn-examprep-radar-disclaimer">{viewerRole === 'student' ? RADAR_DISCLAIMER_STUDENT : RADAR_DISCLAIMER_ADMIN}</p>
             </div>
             <div className="rn-surface" style={{ padding: 16 }}>
               <h3 className="rn-section" style={{ fontSize: 14, fontWeight: 750, marginBottom: 4 }}>가장 먼저 잡을 취약점</h3>
@@ -262,21 +256,38 @@ export function ExamPrepStudentReport({ studentId, studentName, schoolGrade, mis
             </div>
           )}
 
+        </>
+      )}
+
+      {/* 코멘트 데이터는 studentId에만 연결된 학생별 공통 값이다. UI만 분석 결과 생성 뒤로
+         미뤄 리포트 하단, 데이터 해석 주의사항 바로 위에서 보여준다. */}
+      {report && (
+        <>
           <div style={{ marginTop: 14 }}>
-            <CollapsibleSection icon="⚠️" title="데이터 해석 주의사항" color="slate" isOpen={showCaveats} onToggle={() => setShowCaveats(v => !v)}>
-              <ul style={{ margin: 0, paddingLeft: '1.1em', fontSize: 11.5, color: 'var(--rn-muted)', lineHeight: 1.7 }}>
-                <li>오답노트 기반 분석으로, 전체 학습에 대한 정답률/성취도가 아닙니다.</li>
-                <li>{viewerRole === 'student' ? '실수 유형은 내가 직접 선택한 자기진단이며, 실제 원인과 다를 수 있어요.' : '실수 유형은 학생이 직접 선택한 자기진단이며, 실제 원인과 다를 수 있습니다.'}</li>
-                <li>복습 현황은 현재 시점 스냅샷이며, 재풀이·손풀이 기록은 최근 도입된 기능이라 장기 비교에는 한계가 있습니다.</li>
-                <li>숨김 처리한 문제와 선택한 시험범위 밖의 문제는 분석에서 제외했습니다.</li>
-                <li>분석 기준: 방금 계산됨 (열람 시점의 현재 데이터 기준, 저장되지 않고 매번 새로 계산됩니다)</li>
-              </ul>
-            </CollapsibleSection>
+            {viewerRole === 'admin'
+              ? <TeacherCommentEditor studentId={studentId} />
+              : <TeacherCommentCard studentId={studentId} />}
           </div>
 
-          <div style={{ marginTop: 16, textAlign: 'right' }}>
-            <button type="button" className="rn-button rn-button-secondary rn-button-compact" onClick={() => window.print()}>인쇄 / PDF 저장</button>
-          </div>
+          {report.N > 0 && (
+            <>
+              <div>
+                <CollapsibleSection icon="⚠️" title="데이터 해석 주의사항" color="slate" isOpen={showCaveats} onToggle={() => setShowCaveats(v => !v)}>
+                  <ul style={{ margin: 0, paddingLeft: '1.1em', fontSize: 11.5, color: 'var(--rn-muted)', lineHeight: 1.7 }}>
+                    <li>오답노트 기반 분석으로, 전체 학습에 대한 정답률/성취도가 아닙니다.</li>
+                    <li>{viewerRole === 'student' ? '실수 유형은 내가 직접 선택한 자기진단이며, 실제 원인과 다를 수 있어요.' : '실수 유형은 학생이 직접 선택한 자기진단이며, 실제 원인과 다를 수 있습니다.'}</li>
+                    <li>복습 현황은 현재 시점 스냅샷이며, 재풀이·손풀이 기록은 최근 도입된 기능이라 장기 비교에는 한계가 있습니다.</li>
+                    <li>숨김 처리한 문제와 선택한 시험범위 밖의 문제는 분석에서 제외했습니다.</li>
+                    <li>분석 기준: 방금 계산됨 (열람 시점의 현재 데이터 기준, 저장되지 않고 매번 새로 계산됩니다)</li>
+                  </ul>
+                </CollapsibleSection>
+              </div>
+
+              <div style={{ marginTop: 16, textAlign: 'right' }}>
+                <button type="button" className="rn-button rn-button-secondary rn-button-compact" onClick={() => window.print()}>인쇄 / PDF 저장</button>
+              </div>
+            </>
+          )}
         </>
       )}
     </div>

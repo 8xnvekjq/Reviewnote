@@ -1,23 +1,18 @@
-// Minimal Node ESM resolution hook so `node --test` can run this project's .ts source files
-// directly (no vitest/tsx dependency to add). Vite's bundler resolves extensionless specifiers
-// like `../types` (-> `../types/index.ts`) and `./foo` (-> `./foo.ts`) the way CommonJS/webpack
-// do; plain Node ESM does not. This hook only kicks in when Node's own resolution fails, and only
-// tries the two suffixes Vite would — it never changes resolution for a specifier that already
-// works. Local test infra only, never imported by the app itself.
-import { existsSync } from 'node:fs';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-
+// node --test는 Vite 스타일의 확장자 없는/디렉터리 import(예: from '../types' -> ../types/index.ts)를
+// 기본적으로 해석하지 못한다(ERR_UNSUPPORTED_DIR_IMPORT / ERR_MODULE_NOT_FOUND). 테스트 전용으로,
+// 실패한 resolve를 .ts / /index.ts를 붙여 재시도하는 최소한의 로더.
 export async function resolve(specifier, context, nextResolve) {
   try {
     return await nextResolve(specifier, context);
   } catch (err) {
-    const code = err && typeof err === 'object' ? err.code : undefined;
-    if (code !== 'ERR_MODULE_NOT_FOUND' && code !== 'ERR_UNSUPPORTED_DIR_IMPORT') throw err;
-    if (!specifier.startsWith('.') && !specifier.startsWith('/')) throw err;
-    const base = new URL(specifier, context.parentURL);
-    const asPath = fileURLToPath(base);
-    for (const candidate of [`${asPath}.ts`, `${asPath}/index.ts`]) {
-      if (existsSync(candidate)) return nextResolve(pathToFileURL(candidate).href, context);
+    if (specifier.startsWith('.')) {
+      for (const suffix of ['.ts', '/index.ts']) {
+        try {
+          return await nextResolve(specifier + suffix, context);
+        } catch {
+          // try next suffix
+        }
+      }
     }
     throw err;
   }
