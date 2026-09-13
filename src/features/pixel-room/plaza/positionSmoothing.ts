@@ -148,13 +148,24 @@ export function advance(
 }
 
 /** True while `state` still has visible distance left to cover at time `now` (either the current
- * leg hasn't finished, or there are queued legs still waiting to play) — the rAF-driving hook uses
- * this to know when it can stop scheduling frames instead of animating forever. */
+ * leg hasn't finished, or there are queued legs still waiting to play) — used both by the rAF-
+ * driving hook (to know when it can stop scheduling frames) and — since the reconnect-cursor bug
+ * fix (tests/plaza/reconnect.browser.mjs) — to derive the rendered walk-cycle "moving" flag
+ * directly from actual on-screen motion instead of trusting the sender's raw `moving` flag (see
+ * useSmoothedPlayerPositions.ts), so a receiver never keeps playing a walk animation once it has
+ * genuinely caught up, no matter what the network's last-known flag says.
+ *
+ * A leg with from===to (nothing to actually move through — the initial createInterpolationState()
+ * spawn point, or any waypoint identical to the resting point) never counts as "interpolating"
+ * regardless of elapsed time: there is no distance to animate, so treating a fresh 0-distance leg
+ * as "just started, still in progress" would flash a one-tick walking pose on a player who never
+ * actually moved. */
 export function isInterpolating(
   state: InterpolationState,
   now: number,
   durationMs: number = PLAZA_SMOOTH_DURATION_MS,
 ): boolean {
-  if (now - state.startTime < durationMs) return true;
-  return (state.queue?.length ?? 0) > 0;
+  const hasDistance = state.from.x !== state.to.x || state.from.y !== state.to.y;
+  const activeLeg = hasDistance && now - state.startTime < durationMs;
+  return activeLeg || (state.queue?.length ?? 0) > 0;
 }

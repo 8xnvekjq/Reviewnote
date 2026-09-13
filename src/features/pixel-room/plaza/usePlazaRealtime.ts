@@ -76,10 +76,17 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
   const [ready, setReady] = useState(false);
 
   const channelRef = useRef<RealtimeChannel | null>(null);
-  // 이 세션 안에서 단조증가하는 시퀀스 — PlazaPlayerState.seq를 우리가 소유하고 채운다. 마운트마다
-  // (재접속마다) 0부터 다시 시작한다 — presenceStore.ts의 재접속 정책 주석 참고. 채널 재연결
-  // (reconnect)도 이 훅 입장에서는 "재접속"의 한 형태이므로 동일하게 0부터 다시 시작한다 —
-  // presence-join 경로는 seq를 비교하지 않으므로 이 리셋은 안전하다.
+  // 이 세션(=이 훅 인스턴스, 탭 하나) 안에서 단조증가하는 시퀀스 — PlazaPlayerState.seq를 우리가
+  // 소유하고 채운다. 최초 마운트에서만 0부터 시작하고, 그 뒤로는 채널 재연결(reconnect)이 일어나도
+  // 리셋하지 않는다 — 실시간 이동 재현 테스트(tests/plaza/reconnect.browser.mjs)로 확인된 버그:
+  // 예전엔 connect()가 호출될 때마다(재연결 포함) 0으로 되돌렸는데, presence-join 경로 자체는
+  // seq를 안 보니 그건 "안전"했지만, useSmoothedPlayerPositions.ts의 스무딩 커서(그 세션에서
+  // 마지막으로 소비한 seq를 기억)는 seq가 이 훅 인스턴스 동안 계속 커진다는 가정에 기대고
+  // 있었다. 재연결로 seq가 0 근처로 되돌아가면 새로 들어오는 broadcast의 seq가 커서보다 한동안
+  // 계속 작아서(stale 취급) getPathSince가 빈 배열만 돌려주고, 상대는 moving:true인데도 좌표가
+  // 갱신되지 않는 "제자리 걷기"로 보였다 — 로컬 seq가 그 커서를 다시 추월할 때까지. 재연결도
+  // sessionId는 그대로 유지되는 같은 세션이므로(새 sessionId를 받는 건 완전히 다른 탭/재입장뿐),
+  // seq를 이 훅 인스턴스 생애 동안 계속 단조증가시키는 쪽이 올바른 모델이다.
   const seqRef = useRef(0);
   // 최근에 실제로 전송한 내 위치/방향/이동여부 — appearance만 바뀌어서 재track할 때도, 그리고
   // 재연결로 새 채널을 만들 때도 최신 위치를 그대로 실어 보내기 위해 필요하다.
@@ -137,7 +144,12 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
 
     function connect() {
       if (cancelled) return;
-      seqRef.current = 0;
+      plazaDebugLog('channel:connect', sessionId, { previousSeq: seqRef.current, reconnectAttempt });
+      // seqRef는 여기서 리셋하지 않는다 — 위 seqRef 선언부 주석 참고(리셋하면 재연결 후 seq가
+      // 스무딩 커서보다 작아져 상대 화면에서 "제자리 걷기"가 재현된다). movingRef만 리셋한다:
+      // 새 채널은 presence 상태가 텅 비어 있으므로, 재연결 직후 내 실제 moving 값이 바뀌지 않아도
+      // (이미 움직이고 있던 중이었어도) 다음 updateMyState 호출에서 새 채널에 대한 track()이 한 번
+      // 더 나가도록 "이 채널엔 아직 아무것도 track 안 했다"는 상태로 되돌려 둔다.
       movingRef.current = false;
       setReady(false);
 
@@ -181,6 +193,7 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
         // 재연결을 스케줄하는 경합이 생긴다. nextChannel은 이 connect() 호출 하나에만 묶인
         // const라 정확한 신원 확인이 된다.
         if (channel !== nextChannel) return;
+        plazaDebugLog('channel:status', sessionId, { status, seq: seqRef.current });
         if (status === 'SUBSCRIBED') {
           reconnectAttempt = 0; // 정상적으로 붙었으니 다음에 다시 끊기면 backoff를 처음부터 센다
           seqRef.current += 1;

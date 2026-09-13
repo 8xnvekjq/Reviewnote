@@ -14,7 +14,16 @@ test('createInterpolationState: 갓 생성된 상태는 목표에서 정지해 �
   const state = createInterpolationState({ x: 3, y: 4 }, 1000);
   assert.deepEqual(interpolatedPosition(state, 1000), { x: 3, y: 4 });
   assert.deepEqual(interpolatedPosition(state, 5000), { x: 3, y: 4 });
-  assert.equal(isInterpolating(state, 1000), true); // 방금 시작된 구간(elapsed=0)이라 아직 "진행 중"으로 본다
+  // from===to는 이동 거리가 0이므로 elapsed와 무관하게 "진행 중"이 아니다 — 갓 스폰된(한 번도
+  // 움직인 적 없는) 세션이 화면에서 한 틱짜리 걷기 애니메이션을 잘못 재생하지 않도록 하는 지점
+  // (재연결 커서 버그 수정과 함께, moving을 이제 raw 플래그가 아니라 이 함수로 유도하므로 중요).
+  assert.equal(isInterpolating(state, 1000), false);
+  assert.equal(isInterpolating(state, 1000 + PLAZA_SMOOTH_DURATION_MS), false);
+});
+
+test('isInterpolating: from!==to인 leg는 시작 직후(elapsed=0)엔 여전히 "진행 중"이다', () => {
+  const state = { from: { x: 0, y: 0 }, to: { x: 1, y: 0 }, startTime: 1000, queue: [] };
+  assert.equal(isInterpolating(state, 1000), true);
   assert.equal(isInterpolating(state, 1000 + PLAZA_SMOOTH_DURATION_MS), false);
 });
 

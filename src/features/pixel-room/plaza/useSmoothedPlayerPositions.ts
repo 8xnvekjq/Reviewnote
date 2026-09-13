@@ -80,6 +80,11 @@ export function useSmoothedPlayerPositions(
 
       const sinceSeq = cursors.get(player.sessionId) ?? -1;
       const newWaypoints = getPathSince(paths, player.sessionId, sinceSeq);
+      plazaDebugLog('smooth:consume', player.sessionId, {
+        recvSeq: player.seq, cursor: sinceSeq, moving: player.moving,
+        raw: { x: player.x, y: player.y }, rendered: interpolatedPosition(existing, now),
+        pathCount: newWaypoints.length, queueLength: existing.queue?.length ?? 0,
+      });
       if (newWaypoints.length === 0) continue;
 
       let state = existing;
@@ -116,10 +121,16 @@ export function useSmoothedPlayerPositions(
             states.set(player.sessionId, advanced);
             plazaDebugLog('smooth:leg-start', player.sessionId, `${advanced.from.x},${advanced.from.y} -> ${advanced.to.x},${advanced.to.y}`, { queueLeft: advanced.queue?.length ?? 0, t: frameNow.toFixed(1) });
           }
-          if (isInterpolating(advanced, frameNow)) stillAnimating = true;
+          // 렌더링되는 moving은 sender가 보낸 raw player.moving을 그대로 믿지 않는다 — 실제로 이
+          // 화면에서 아직 이동할 거리가 남아있는지(isInterpolating)로 직접 유도한다. 재연결 커서
+          // 버그가 보여줬듯 raw moving과 실제 화면 진행 상태는 얼마든지 어긋날 수 있다(그 버그가
+          // 아니어도, 상대가 마지막 정지 신호를 못 보내고 탭을 닫는 등 다른 이유로도 어긋날 수
+          // 있음) — "지금 화면에서 실제로 걷고 있는가"만이 걷기 애니메이션 재생 여부를 결정한다.
+          const animating = isInterpolating(advanced, frameNow);
+          if (animating) stillAnimating = true;
           const pos = interpolatedPosition(advanced, frameNow);
-          if (pos.x === player.x && pos.y === player.y) return player;
-          return { ...player, x: pos.x, y: pos.y };
+          if (pos.x === player.x && pos.y === player.y && animating === player.moving) return player;
+          return { ...player, x: pos.x, y: pos.y, moving: animating };
         });
         setRendered(next);
         rafRef.current = stillAnimating ? requestAnimationFrame(tick) : null;
