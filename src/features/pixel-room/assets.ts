@@ -47,6 +47,7 @@ import sheet44 from './assets/character/Hair_Walk_Left-Sheet.png';
 import sheet45 from './assets/character/Hair_Walk_Right-Sheet.png';
 import interior from './assets/interior/source-17655392.png';
 import decorations from './assets/interior/source-17737185.png';
+import type { PixelAvatarSlot } from './shop/types';
 
 export type AvatarAnimation = 'Idle' | 'Walk';
 export type AvatarDirection = 'Front' | 'Back' | 'Left' | 'Right';
@@ -68,8 +69,37 @@ export const avatarSheets: Record<AvatarAnimation, Record<AvatarDirection, Avata
 };
 
 export const avatarGeometry = { frameWidth: 32, frameHeight: 32, frames: 4, sheetWidth: 128 } as const;
-// Row numbers are zero based. Tops 0/1/2 are the red/green/blue short-sleeve variations.
-export const avatarTopRows = { red: 0, green: 1, blue: 2 } as const;
+
+// assetKey -> sheet row, per equip slot (PixelAvatarSlot from the Phase 1 shared contract).
+// Row 0 is always today's default look for every slot (top 'default' plus the only row ever
+// drawn for bottom/shoes/hair/eyes so far), so an unrecognized or unset assetKey/slot safely
+// falls back to row 0 in sprites.tsx's rowForSlot() rather than throwing. itemId is NOT the key
+// here — PixelItem.assetKey is (per shop/types.ts), matching model.ts's legacy SHIRTS values for
+// 'top' so the pre-Phase-1 local shirt picker keeps working unchanged.
+//
+// Row-count audit (2026-09-13, decoded real PNG pixels — see worker report for full detail):
+// every sheet below has far more pre-drawn rows than are wired up here. Candidates for a future
+// PIXEL_CATALOG expansion (Integration Lead decides, per shop/catalog.ts's note — not added here):
+//   top:    29 rows total. Rows 0-20 = 21 distinct colors (one sleeve style); rows 21-28 = the
+//           same first 8 colors redrawn in a second (sleeveless/cropped) style. Only 0/1/2 wired.
+//   bottom: 14 rows total. Rows 0-7 = 8 colors (style A); rows 8-13 = 6 colors, different
+//           silhouette (style B, denim/sweatpants-like). None wired (always row 0).
+//   shoes:  10 rows total. Rows 0-4 and 5-9 = the same 5 colors in two shoe silhouettes.
+//           None wired (always row 0).
+//   hair:   25 rows total = 5 hairstyles x 5 colors each (brown/ginger/blonde/black/gray,
+//           consistent per style). None wired (always row 0).
+//   eyes:    4 rows total = 4 eye colors. None wired (always row 0).
+//   body:    5 rows total = 5 skin tones. Not a PixelAvatarSlot in the v1 contract (no catalog
+//            slot for skin tone) — left at row 0, not part of this mapping.
+// All rows within each sheet were byte-compared and are genuinely distinct art (no blank/
+// duplicate padding rows found in the samples checked).
+export const AVATAR_ROW_BY_SLOT: Record<PixelAvatarSlot, Record<string, number>> = {
+  top: { default: 0, sage: 1, blue: 2 },
+  bottom: {},
+  shoes: {},
+  hair: {},
+  eyes: {},
+};
 
 export interface FurnitureArt { src: string; x: number; y: number; width: number; height: number; sheetWidth: number; sheetHeight: number }
 export const furnitureArt: Record<string, FurnitureArt> = {

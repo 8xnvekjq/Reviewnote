@@ -3,6 +3,8 @@ import type { CSSProperties } from 'react';
 import { FURNITURE, ROOM_HEIGHT, ROOM_WIDTH, findSpawn, isCellFree, loadRoom, placeFurniture, planWalk, removeFurniture, saveRoom } from './model';
 import type { Cell, FurnitureType, RoomState, StorageLike } from './model';
 import { AvatarSprite, FurnitureSprite } from './sprites';
+import { DEFAULT_AVATAR_APPEARANCE, fetchEquippedAppearance } from './equippedAppearance';
+import type { PublicAvatarAppearance } from './shop/types';
 import './pixel-room.css';
 
 export type Direction = 'Front' | 'Back' | 'Left' | 'Right';
@@ -56,6 +58,26 @@ function RoomForUser({ userId, displayName, onExit, title, titleBadgeStyle, titl
   const [speech, setSpeech] = useState('');
   const board = useRef<HTMLDivElement>(null);
   const speechTimer = useRef<number | undefined>(undefined);
+
+  // "장착"의 서버 소스: Phase 1부터 무엇을 입고 있는지는 이 localStorage RoomState가 아니라
+  // 서버(Worker A의 구매/장착 RPC)가 정한다. 방 컴포넌트는 userId가 바뀔 때마다(위 PixelRoom의
+  // key={userId}로 전체 재마운트) 매번 새로 조회하므로, 다른 계정으로 전환하거나 상점에서 장착을
+  // 바꾼 뒤 방에 다시 들어오면 오래된 값이 남지 않는다. 같은 마운트 안에서 장착이 바뀌는 실시간
+  // 갱신(예: 상점 화면이 이 방과 함께 마운트된 채로 장착 변경)은 이 프론트만으로는 알 수 없다 —
+  // 통합 시 상점 쪽에서 갱신을 트리거하거나 이 방을 다시 마운트해야 한다.
+  const [serverAppearance, setServerAppearance] = useState<PublicAvatarAppearance>(DEFAULT_AVATAR_APPEARANCE);
+  useEffect(() => {
+    let cancelled = false;
+    fetchEquippedAppearance(userId)
+      .then(result => { if (!cancelled) setServerAppearance(result); })
+      .catch(() => { if (!cancelled) setServerAppearance(DEFAULT_AVATAR_APPEARANCE); });
+    return () => { cancelled = true; };
+  }, [userId]);
+  // top만 로컬 폴백을 둔다: 아직 서버가 아무것도 장착 안 했다고 답하면(현재 스텁은 항상 그렇다),
+  // 예전부터 있던 옷 갈아입기 패널(로컬 저장 room.avatar.shirt)이 계속 동작한다 — 서버 장착이
+  // 실제로 연결되면 serverAppearance.top이 그 값을 그대로 덮어쓴다. bottom/hair/shoes/eyes는
+  // 로컬에 대응 UI가 없으므로 서버 값(현재는 항상 null → row 0)을 그대로 쓴다.
+  const appearance: PublicAvatarAppearance = { ...serverAppearance, top: serverAppearance.top ?? room.avatar.shirt };
 
   // 장착 테마는 전체 앱 테마(applyThemeColor)를 건드리지 않고, room 안 CSS 변수로만 좁혀서 반영한다.
   const roomStyle = themePrimary ? ({ '--pr-theme-primary': themePrimary, '--pr-theme-accent': themeAccent || themePrimary } as CSSProperties) : undefined;
@@ -169,7 +191,7 @@ function RoomForUser({ userId, displayName, onExit, title, titleBadgeStyle, titl
           {room.furniture.map(item => <div key={item.type} data-furniture={item.type} className={`pr-furniture ${selected === item.type ? 'pr-selected' : ''}`} style={{ left: `${item.x * 10}%`, top: `${item.y * 12.5}%`, width: `${FURNITURE[item.type].width * 10}%`, height: `${FURNITURE[item.type].height * 12.5}%`, zIndex: item.y + FURNITURE[item.type].height }}><FurnitureSprite type={item.type} /></div>)}
           <button type="button" className="pr-actor" data-x={actor.x} data-y={actor.y} data-direction={direction} data-shirt={room.avatar.shirt} style={{ left: `${actor.x * 10 - 6}%`, bottom: `${(ROOM_HEIGHT - actor.y - 1) * 12.5}%`, zIndex: actor.y + 1, pointerEvents: decorating ? 'none' : 'auto' }} tabIndex={decorating ? -1 : 0} onClick={event => { event.stopPropagation(); speak(); }} aria-label={`내 캐릭터, ${actor.x + 1}열 ${actor.y + 1}행. 눌러서 말 걸어보기`}>
             {speech && <span className="pr-bubble" role="status">{speech}</span>}
-            <span className="pr-shadow" /><AvatarSprite direction={direction} frame={held || walkQueue.length > 0 ? frame : 0} walking={!!held || walkQueue.length > 0} shirt={room.avatar.shirt} />
+            <span className="pr-shadow" /><AvatarSprite direction={direction} frame={held || walkQueue.length > 0 ? frame : 0} walking={!!held || walkQueue.length > 0} appearance={appearance} />
           </button>
         </div>
       </div>
@@ -194,7 +216,7 @@ function RoomForUser({ userId, displayName, onExit, title, titleBadgeStyle, titl
            in .pr-below-room (always mounted) — this one is just here because the sheet panel
            visually covers that region while open, per Codex review finding #10. */}
         <p className="pr-sheet-status" aria-hidden="true">{message}</p>
-        {panel === 'clothes' ? <div className="pr-clothes"><div className="pr-portrait"><AvatarSprite direction="Front" frame={0} walking={false} shirt={room.avatar.shirt} /></div><div><h2>오늘은 어떤 색?</h2><p>가볍게 갈아입어 보세요.</p><div className="pr-swatches">{shirts.map(shirt => <button key={shirt.id} aria-pressed={room.avatar.shirt === shirt.id} onClick={() => { persist({ ...room, avatar: { ...room.avatar, shirt: shirt.id } }); setMessage(`${shirt.label} 옷으로 갈아입었어요.`); }}><i style={{ '--swatch': shirt.color } as CSSProperties} />{shirt.label}</button>)}</div></div></div>
+        {panel === 'clothes' ? <div className="pr-clothes"><div className="pr-portrait"><AvatarSprite direction="Front" frame={0} walking={false} appearance={appearance} /></div><div><h2>오늘은 어떤 색?</h2><p>가볍게 갈아입어 보세요.</p><div className="pr-swatches">{shirts.map(shirt => <button key={shirt.id} aria-pressed={room.avatar.shirt === shirt.id} onClick={() => { persist({ ...room, avatar: { ...room.avatar, shirt: shirt.id } }); setMessage(`${shirt.label} 옷으로 갈아입었어요.`); }}><i style={{ '--swatch': shirt.color } as CSSProperties} />{shirt.label}</button>)}</div></div></div>
           : <><p className="pr-tool-hint">{decorating ? '가구를 선택 → 방의 칸을 터치. 배치한 가구도 다시 옮길 수 있어요.' : '꾸미기를 켜면 가구를 놓고 옮길 수 있어요.'}</p><div className="pr-catalog">{(Object.keys(FURNITURE) as FurnitureType[]).map(type => <button key={type} aria-pressed={selected === type} onClick={() => { enterDecorating(); setSelected(selected === type ? null : type); setMessage(`${names[type]}: 원하는 칸을 눌러 주세요.`); }}><span className="pr-catalog-art"><FurnitureSprite type={type} /></span><strong>{names[type]}</strong><small>{room.furniture.some(item => item.type === type) ? '배치 중' : '보유 1개'}</small></button>)}</div>{placed && <button className="rn-button rn-button-secondary pr-remove" onClick={() => { persist(removeFurniture(room, selected)); exitDecorating(`${names[selected]}을 보관함으로 돌려놓았어요. 이제 방을 누르면 그 자리로 걸어가요.`); }}>선택한 가구 치우기</button>}</>}
       </div>}
     </div>
