@@ -1535,6 +1535,18 @@ function App() {
                   themePrimary={pixelRoomTheme?.effectValue}
                   themeAccent={pixelRoomTheme?.themeAccentValue || pixelRoomTheme?.effectValue}
                   onSpeak={() => getRandomCheer(equippedItems.aiVoice)}
+                  pointsBalance={currentDisplayPoints}
+                  onPixelPurchase={newBalance => {
+                    // Pixel World의 purchase_pixel_item RPC가 이미 profiles.point_adjustment를
+                    // 원자적으로 서버에서 직접 차감했다 — handleDeductPoints를 또 부르면(자체적으로
+                    // 별도 supabase.update를 한 번 더 쏨) 불필요할 뿐 아니라, 그 사이 다른 포인트
+                    // 적립(예: 복습 콤보)이 있었다면 클라이언트가 들고 있던 오래된 값 기준으로
+                    // 덮어써서 서버의 정확한 값을 되돌려버릴 위험이 있다. 여기서는 화면 표시 상태만
+                    // 서버가 돌려준 진짜 값에 맞춰 동기화한다(추가 서버 쓰기 없음).
+                    const nextAdjustment = newBalance - myBonusPoints;
+                    setPointAdjustment(nextAdjustment);
+                    try { localStorage.setItem('reviewnote_point_adj', String(nextAdjustment)); } catch (e) { console.error(e); }
+                  }}
                 />
               );
             })()}
