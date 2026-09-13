@@ -177,7 +177,7 @@ export interface MistakeEntry {
                             // 로만 바뀐다 — 학생 본인도 이 값은 직접 수정 불가(DB 트리거로 보호).
 }
 
-export type ActiveTab = 'notes' | 'completed' | 'camera' | 'stats' | 'admin' | 'guide' | 'store' | 'activity' | 'scaffolding' | 'hidden' | 'examPrep' | 'reviewCheck';
+export type ActiveTab = 'notes' | 'completed' | 'camera' | 'stats' | 'admin' | 'guide' | 'store' | 'activity' | 'scaffolding' | 'hidden' | 'examPrep' | 'reviewCheck' | 'pixelRoom';
 
 export type GachaRarity = 'MR' | 'UR' | 'SSR' | 'SR' | 'R';
 export type GachaCategory = 'STAMP' | 'TITLE' | 'THEME' | 'SHIELD' | 'AI_VOICE' | 'CHARM';

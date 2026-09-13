@@ -1,0 +1,136 @@
+/* Fullscreen-in-.rn-main shell: .screen-enter.pr-screen-fill (App.tsx's <Screen className>) gets
+   height:100% from .rn-main's already-definite flex height, and .pr-shell inherits that same
+   100% down one more level. No new dvh/safe-area math here — .rn-header/.rn-dock already own the
+   top/bottom safe-area insets, so re-adding them here would double them. */
+.screen-enter.pr-screen-fill { height:100%; }
+/* container-type:size turns cqw/cqh (below) into exact reads of this element's own box — used so
+   the bottom sheet can cap itself against the *real* remaining room height instead of raw dvh,
+   which can't know how much the toolbar/error banner/trigger row above it are already using. */
+.pr-shell { max-width:680px; margin:0 auto; height:100%; display:flex; flex-direction:column; overflow-y:auto; overflow-x:hidden; position:relative; color:var(--rn-text); gap:6px; container-type:size; container-name:pr-shell; }
+.pr-toolbar { flex:0 0 auto; display:flex; justify-content:space-between; align-items:center; gap:8px; padding-top:2px; }
+.pr-toolbar .rn-button:first-child { padding-left:0; }
+.pr-storage-error { flex:0 0 auto; background:#6d432933; border:1px solid #e9b57755; color:#f2ce9c; padding:8px 10px; border-radius:8px; font-size:11px; line-height:1.5; }
+
+/* min-height keeps the room from collapsing to nothing in a pathologically short viewport (e.g. a
+   storage-error banner plus landscape phone) — .pr-shell's own overflow-y:auto is the fallback for
+   that edge case, so content degrades to a rare scroll instead of silently vanishing. */
+.pr-room-frame { flex:1 1 auto; min-height:140px; display:flex; flex-direction:column; position:relative; overflow:hidden; border:6px solid var(--pr-theme-primary, #8a6653); border-radius:5px; box-shadow:0 12px 32px #0002, 0 0 0 1px #b89271; background:#e1c799; }
+.pr-room-frame.pr-decorating { border-color:#c97a3d; box-shadow:0 12px 32px #0002, 0 0 0 1px #c97a3d, 0 0 0 3px #c97a3d55; }
+
+/* Small overlay label in the room's corner replaces the old page-level heading/owner-line block. */
+.pr-nameplate { position:absolute; top:6px; left:8px; z-index:3; display:flex; align-items:center; gap:5px; max-width:calc(100% - 16px); background:#0007; backdrop-filter:blur(2px); border-radius:20px; padding:3px 9px 3px 3px; }
+.pr-nameplate-name { font-size:10.5px; font-weight:700; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:110px; }
+
+.pr-wall { flex:0 0 auto; height:32px; position:relative; background:repeating-linear-gradient(90deg,#e4d7b9 0,#e4d7b9 31px,#d2c6aa 32px,#e4d7b9 33px); border-bottom:5px solid #977354; box-shadow:inset 0 -4px #bea17c; display:flex; align-items:center; justify-content:center; }
+.pr-wall>span { display:none; color:#8a7960; font-size:8px; letter-spacing:2px; }
+.pr-window { position:absolute; left:15%; top:5px; display:grid; grid-template-columns:1fr 1fr; gap:2px; width:22px; height:21px; border:3px solid #94785a; background:#e4d8b5; box-shadow:2px 3px #b4a083; }
+.pr-window i { background:linear-gradient(135deg,var(--pr-theme-accent, #a9d4dc) 60%,#d4e9df 60%); }
+
+/* The one true letterbox. `height:100%; width:auto; max-width:100%` looks like the standard
+   recipe but is a trap here: once height is a *definite* size (100% of a definite-height flex
+   item) and width also gets clamped by max-width, the spec does NOT shrink height back down to
+   restore the ratio — it only clamps width, so a tall/narrow stage silently stretches the tiles
+   into rectangles instead of letterboxing (caught in review, verified against the CSS Sizing
+   aspect-ratio transfer rules). container-type:size turns cqw/cqh into exact reads of .pr-stage's
+   own content box, so width:min(100cqw, 125cqh) picks whichever axis is actually the tighter
+   constraint and aspect-ratio derives the other dimension from THAT — a real letterbox. */
+.pr-stage { flex:1 1 auto; min-height:0; display:flex; padding:3%; container-type:size; container-name:pr-stage; }
+.pr-board { aspect-ratio:10/8; width:min(100cqw, 125cqh); margin:auto; position:relative; outline-offset:-3px; background:repeating-linear-gradient(0deg,transparent 0,transparent calc(12.5% - 1px),#b28b614a calc(12.5% - 1px),#b28b614a 12.5%),repeating-linear-gradient(90deg,#d5b589 0,#d5b589 19.8%,#c3a178 19.8%,#c3a178 20%); isolation:isolate; }
+.pr-board:focus-visible { outline:3px solid #4c766a; }
+.pr-board:not(.pr-board-edit) { cursor:pointer; }
+.pr-grid { position:absolute; inset:0; display:grid; grid-template-columns:repeat(10,1fr); grid-template-rows:repeat(8,1fr); }
+.pr-grid button { min-width:0; min-height:0; border:0; background:transparent; padding:0; }
+.pr-board-edit .pr-grid button { border:1px solid #75583924; cursor:crosshair; }
+.pr-board-edit .pr-grid button:hover,.pr-board-edit .pr-grid button:focus-visible { background:#fff7; outline:2px solid #496e5d; outline-offset:-2px; }
+.pr-furniture { position:absolute; pointer-events:none; }
+.pr-furniture svg { position:absolute; bottom:0; width:100%; height:auto; overflow:hidden; }
+.pr-selected { outline:2px dashed #42745c; outline-offset:1px; background:#fff2; }
+.pr-actor { position:absolute; width:22%; height:27%; background:none; border:0; padding:0; cursor:pointer; }
+.pr-avatar { display:flex; flex-direction:column; }
+.pr-avatar-head, .pr-avatar-body { display:block; width:100%; }
+.pr-avatar-head { height:70%; }
+.pr-avatar-body { height:30%; width:112%; margin-left:-6%; }
+.pr-actor .pr-avatar { position:absolute; inset:0; }
+.pr-actor:focus-visible { outline:2px solid var(--pr-theme-accent, #496e5d); outline-offset:2px; }
+.pr-shadow { position:absolute; bottom:3%; left:31%; width:38%; height:9%; border-radius:50%; background:#715b5533; }
+.pr-bubble { position:absolute; bottom:100%; left:50%; transform:translateX(-50%); margin-bottom:6px; max-width:150px; width:max-content; background:#fff; color:#3a2f26; font-size:10.5px; line-height:1.5; padding:6px 9px; border-radius:10px; box-shadow:0 4px 10px #0003; z-index:20; pointer-events:none; }
+.pr-bubble::after { content:''; position:absolute; top:100%; left:50%; transform:translateX(-50%); border:5px solid transparent; border-top-color:#fff; }
+
+.pr-threshold { flex:0 0 auto; height:8px; background:linear-gradient(90deg,#987052 0%,#987052 37%,#d7b889 37%,#d7b889 63%,#987052 63%); border-top:2px solid #b68c63; }
+
+/* Floating D-pad: an opt-in overlay anchored to the room card's corner, not a row in the flex
+   column — tap-to-move is the default input, so this never costs vertical space unless opened. */
+.pr-dpad-dock { position:absolute; right:8px; bottom:16px; z-index:4; display:flex; align-items:flex-end; gap:6px; }
+.pr-dpad-toggle { width:34px; height:34px; border-radius:50%; background:#0007; color:#fff; border:1px solid #fff3; font-size:15px; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(2px); }
+.pr-dpad-toggle[aria-pressed=true] { background:var(--pr-theme-accent, #496e5d); }
+.pr-controls { display:grid; grid-template-columns:repeat(3,32px); grid-template-rows:repeat(2,30px); gap:3px; touch-action:none; }
+.pr-direction { background:#000a; color:#fff; border:1px solid #fff3; border-radius:8px; font-size:15px; user-select:none; touch-action:none; backdrop-filter:blur(2px); }
+.pr-direction:active { background:var(--pr-theme-accent, #608d7b); }
+.pr-direction-Back { grid-area:1/2; }.pr-direction-Left { grid-area:2/1; }.pr-direction-Front { grid-area:2/2; }.pr-direction-Right { grid-area:2/3; }
+
+.pr-below-room { flex:0 0 auto; min-height:0; }
+.pr-instructions { color:var(--rn-muted); font-size:11.5px; line-height:1.4; max-height:2.8em; overflow:hidden; }
+
+/* Bottom sheet: the trigger row is a normal flex:none row (always reserves its own height, so it
+   never overlaps the room), while the expanded panel is a position:absolute overlay anchored to
+   that row's top edge — opening/closing never resizes .pr-room-frame, it only lays a translucent
+   panel over its lower edge. Closing it is instant: the room was never actually resized. */
+.pr-sheet { flex:0 0 auto; position:relative; }
+.pr-sheet-trigger { display:flex; border:1px solid var(--rn-line); border-radius:var(--rn-radius-md); background:var(--rn-surface); overflow:hidden; }
+.pr-sheet-trigger button { flex:1; min-height:44px; font-size:13px; font-weight:700; color:var(--rn-muted); border-right:1px solid var(--rn-line); }
+.pr-sheet-trigger button:last-child { border-right:0; }
+.pr-sheet-trigger button[aria-pressed=true] { color:var(--rn-text); background:var(--rn-elevated); }
+.pr-sheet-trigger small { margin-left:4px; opacity:.6; }
+/* max-height in cqh (of .pr-shell, not dvh of the viewport) — a raw viewport fraction can't know
+   how much of the shell the toolbar/error banner/trigger row already used, so on a short/landscape
+   screen a dvh-based cap could grow the panel past .pr-shell's own top edge and clip its start
+   where scrolling can never reach it. 40% of the *shell's own* height always leaves the trigger's
+   own small fixed height as headroom, so this can't happen. */
+.pr-sheet-panel { position:absolute; left:0; right:0; bottom:calc(100% + 6px); max-height:40cqh; overflow-y:auto; overscroll-behavior:contain; border:1px solid var(--rn-line); border-radius:var(--rn-radius-md); background:var(--rn-surface); box-shadow:0 -8px 24px #0003; z-index:5; animation:pr-sheet-enter 160ms ease-out; }
+.pr-sheet-status { margin:0; padding:10px 14px 0; font-size:11.5px; color:var(--rn-muted); }
+@keyframes pr-sheet-enter { from { opacity:.4; transform:translateY(10px); } }
+@media(prefers-reduced-motion:reduce) { .pr-sheet-panel { animation:none; } }
+
+.pr-clothes { display:flex; gap:16px; align-items:center; padding:16px; }
+.pr-clothes h2 { font-size:14px; font-weight:700; }.pr-clothes p { font-size:11px; color:var(--rn-muted); margin:4px 0 10px; }
+.pr-portrait { width:60px; height:72px; border-radius:12px; flex-shrink:0; background:#d5c3a2; position:relative; }
+.pr-portrait .pr-avatar { width:60px; height:60px; position:absolute; bottom:4px; left:0; }
+.pr-swatches { display:flex; gap:8px; flex-wrap:wrap; }.pr-swatches button { display:flex; align-items:center; gap:5px; min-height:38px; border:1px solid var(--rn-line); border-radius:8px; padding:4px 8px; font-size:11px; }.pr-swatches button[aria-pressed=true] { border-color:#b5d4c0; background:#a5d6be12; }.pr-swatches i { width:12px; height:12px; border-radius:3px; background:var(--swatch); }
+.pr-tool-hint { font-size:11px; color:var(--rn-muted); padding:12px 14px 0; line-height:1.6; }
+.pr-catalog { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; padding:12px; }.pr-catalog button { border:1px solid var(--rn-line); border-radius:10px; padding:8px 4px; display:flex; align-items:center; flex-direction:column; gap:4px; }.pr-catalog button[aria-pressed=true] { border-color:#b5d4c0; background:#a5d6be12; }.pr-catalog strong { font-size:11px; font-weight:500; }.pr-catalog small { font-size:10px; color:var(--rn-muted); }.pr-catalog-art { width:48px; height:46px; display:flex; align-items:center; justify-content:center; }.pr-catalog-art svg { width:100%; height:100%; }
+.pr-remove { margin:0 12px 12px; font-size:12px; }
+
+.pr-shell svg { image-rendering:pixelated; }.pr-login { padding:24px; }
+@media(min-width:700px) {
+  .pr-shell { padding-top:8px; }
+  /* Desktop/tablet room sizing bug (found from a real PC preview screenshot): the mobile rules
+     give .pr-room-frame `flex:1 1 auto` so it fills whatever vertical space .pr-stage's
+     container-query letterbox needs on a viewport-height-driven phone screen — but on a tall
+     desktop window .pr-shell itself can be 800-1000px+ tall, so flex:1 kept growing room-frame
+     to fill nearly all of it. Adding `margin:auto` on that still-growing flex item didn't cap it
+     either: auto margins only absorb space flex-grow leaves over, and 1 1 auto has no upper bound
+     to leave anything over. The card ended up tall and narrow instead of a normal-sized 10:8 room.
+     Fix: stop growing (flex:none), give the frame a real width cap instead of just a max-width, and
+     let the now content-sized frame's own `margin:auto` center it (this time correctly, since
+     there's no active flex-grow fighting it). Inside it, .pr-stage no longer needs to be flexed to
+     an unknown height either — with an explicit width and its own aspect-ratio, its height is
+     simply derived, and .pr-board can just be 100% of that already-correct 10:8 box instead of
+     doing the cqw/cqh min() dance (which stays exactly as-is for mobile, untouched below 700px).
+     Width is deliberately conservative (88% of .pr-shell's existing 680px reading-width cap, so
+     ~598px in practice, not the full 700-800px a wide monitor could fit) — measured against a real
+     1024x768 window the toolbar/room/instructions/sheet-trigger stack together need more height
+     than that viewport's content area has, so .pr-shell's pre-existing overflow-y:auto fallback
+     already has to carry some of the weight there; sizing the room any bigger made that worse
+     without fixing it (a short window can't fit a big 1080p-sized room card no matter how it's
+     capped). This is flagged as a known limitation below, not silently hidden. */
+  .pr-room-frame { flex:0 0 auto; width:min(88%, 700px); margin:auto; }
+  .pr-wall { height:60px; }
+  .pr-wall>span { display:block; padding-left:74px; }
+  .pr-window { width:36px; height:35px; top:8px; }
+  .pr-stage { flex:none; padding:0; aspect-ratio:10/8; }
+  .pr-board { width:100%; height:auto; }
+  .pr-catalog { grid-template-columns:repeat(6,minmax(0,1fr)); }
+  .pr-sheet-panel { max-height:55cqh; }
+}
+@media(max-width:360px) { .pr-clothes { gap:10px; padding:14px 10px; } .pr-swatches { gap:4px; } }
+@media(prefers-reduced-motion:reduce) { .pr-shell * { scroll-behavior:auto; } }
