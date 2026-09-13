@@ -3,6 +3,9 @@ import type { ReactNode } from 'react';
 interface ScreenProps {
   when: boolean;
   children: ReactNode;
+  /** Extra class appended to the screen-enter wrapper — e.g. a screen that needs to fill
+   * .rn-main's height itself (Pixel Room) instead of the default shrink-to-fit/scroll behavior. */
+  className?: string;
 }
 
 // 기존 App.tsx의 `{activeTab === 'x' && (...)}` 조건부 렌더 패턴을 그대로 옮긴 최소 래퍼.
@@ -13,7 +16,7 @@ interface ScreenProps {
 // 한 번만 감싼다. React는 when이 false→true로 바뀌면 이 화면 전체를 새로 mount하므로(기존
 // unmount 구조 그대로 유지, 두 화면을 동시에 렌더하는 구조 아님) CSS 애니메이션이 자동으로
 // 매 진입마다 처음부터 재생된다 — 별도의 상태/타이머 없이 순수 CSS만으로 "짧게 나타나는" 효과.
-export function Screen({ when, children }: ScreenProps) {
+export function Screen({ when, children, className }: ScreenProps) {
   if (!when) return null;
-  return <div className="screen-enter">{children}</div>;
+  return <div className={className ? `screen-enter ${className}` : 'screen-enter'}>{children}</div>;
 }

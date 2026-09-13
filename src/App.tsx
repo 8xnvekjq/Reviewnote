@@ -43,6 +43,7 @@ const ExamPrepAnalysis = lazy(() => import('./components/ExamPrepAnalysis').then
 const ReviewCheckScreen = lazy(() => import('./components/reviewCheck/ReviewCheckScreen').then(m => ({ default: m.ReviewCheckScreen })));
 const ScaffoldingPanel = lazy(() => import('./components/ScaffoldingPanel').then(m => ({ default: m.ScaffoldingPanel })));
 const GachaStore = lazy(() => import('./components/GachaStore').then(m => ({ default: m.GachaStore })));
+const PixelRoom = lazy(() => import('./features/pixel-room/PixelRoom'));
 
 interface ProfileDirectoryRow {
   id: string;
@@ -1511,6 +1512,35 @@ function App() {
           />
         )}
       >
+        {/* Pixel World는 아직 시각/경제 실험 단계 — Phase 1(실제 포인트 구매)이 검증되기 전까지
+            소프트 런칭으로 admin(선생님 본인)에게만 열어둔다. 전체 학생 공개는 별도 결정. */}
+        <Screen when={activeTab === 'pixelRoom' && !!session?.user?.id && isAdmin} className="pr-screen-fill">
+          <LazyScreenBoundary>
+            {(() => {
+              // Pixel Room은 gachaCatalog/aiVoiceCheers를 직접 import하지 않는 지연 로드 청크라
+              // (메인 번들이 커지는 걸 막기 위해), 여기 App.tsx에서 이미 로드된 모듈로 값을
+              // 미리 계산해 plain prop으로만 넘긴다 — 새 프로필/AI 호출 없이 기존 equipped state 재사용.
+              const pixelRoomTitleBadge = equippedItems.title ? getTitleBadgeStyle(equippedItems.title) : null;
+              const pixelRoomTheme = equippedItems.theme
+                ? GACHA_ITEMS.find(item => item.category === 'THEME' && item.effectValue === equippedItems.theme)
+                : undefined;
+              return (
+                <PixelRoom
+                  userId={session?.user?.id}
+                  displayName={myNickname || currentUser}
+                  onExit={() => setActiveTab('notes')}
+                  title={equippedItems.title}
+                  titleBadgeStyle={pixelRoomTitleBadge?.style}
+                  titleBadgeIcon={pixelRoomTitleBadge?.icon}
+                  themePrimary={pixelRoomTheme?.effectValue}
+                  themeAccent={pixelRoomTheme?.themeAccentValue || pixelRoomTheme?.effectValue}
+                  onSpeak={() => getRandomCheer(equippedItems.aiVoice)}
+                />
+              );
+            })()}
+          </LazyScreenBoundary>
+        </Screen>
+
         <Screen when={activeTab === 'store'}>
           <LazyScreenBoundary>
             <GachaStore
