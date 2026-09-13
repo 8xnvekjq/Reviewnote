@@ -188,47 +188,62 @@ test('presence sync는 매번 전체 목록을 완전히 대체한다(더 이상
   assert.deepEqual([...synced.players.keys()], ['a']);
 });
 
-test('sweep-stale: updatedAt으로부터 staleAfterMs 넘게 아무 갱신이 없으면 제거한다(마지막 안전망)', () => {
+test('버그 회귀 방지: 15초 이상 정지해 있어도(broadcast/track 없이 시간만 흘러도) store에서 사라지지 않는다', () => {
+  // 과거 sweep-stale 버그의 핵심 시나리오 그대로: presence-join 이후 15초+ 동안 어떤 액션도
+  // dispatch하지 않는다(정지한 플레이어는 broadcast도 track도 다시 보내지 않으므로). reducer는
+  // Date.now()를 스스로 부르지 않으므로 "시간이 흐른다"는 사실 자체가 액션 없이는 아무 효과도
+  // 없어야 한다 — 더 이상 시간 기반으로 제거하는 경로가 전혀 없다는 것을 확인한다.
   const joined = plazaStoreReducer(createPlazaStoreState(), {
     type: 'presence-join',
-    players: [makePlayer({ sessionId: 'stale-one', updatedAt: 1000 })],
+    players: [makePlayer({ sessionId: 'idle-one', updatedAt: 1000 })],
   });
-  const swept = plazaStoreReducer(joined, { type: 'sweep-stale', now: 1000 + 15_000 + 1, staleAfterMs: 15_000 });
-  assert.equal(swept.players.size, 0);
+  assert.strictEqual(joined.players.size, 1);
+  assert.ok(joined.players.has('idle-one'));
+  // (더 이상 'sweep-stale' 같은 시간 기반 action이 존재하지 않으므로 여기서 dispatch할 것이
+  // 없다 — state가 join 직후 그대로 유지된다는 사실 자체가 이 회귀 테스트의 전부다.)
 });
 
-test('sweep-stale: staleAfterMs 이내면 살아있는 세션은 건드리지 않는다(동일 참조 반환)', () => {
+test('presence leave는 즉시(다른 조건 없이) 플레이어를 제거한다', () => {
   const joined = plazaStoreReducer(createPlazaStoreState(), {
     type: 'presence-join',
-    players: [makePlayer({ sessionId: 'fresh-one', updatedAt: 1000 })],
+    players: [makePlayer({ sessionId: 'leaving-one', updatedAt: 1000 })],
   });
-  const swept = plazaStoreReducer(joined, { type: 'sweep-stale', now: 1000 + 15_000 - 1, staleAfterMs: 15_000 });
-  assert.strictEqual(swept, joined);
+  const left = plazaStoreReducer(joined, { type: 'presence-leave', sessionIds: ['leaving-one'] });
+  assert.equal(left.players.size, 0);
+  assert.ok(!left.players.has('leaving-one'));
 });
 
-test('sweep-stale: 여러 세션 중 오래된 것만 골라서 제거하고 신선한 것은 남긴다', () => {
-  const joined = plazaStoreReducer(createPlazaStoreState(), {
-    type: 'presence-join',
-    players: [
-      makePlayer({ sessionId: 'old', updatedAt: 0 }),
-      makePlayer({ sessionId: 'new', updatedAt: 20_000 }),
-    ],
-  });
-  const swept = plazaStoreReducer(joined, { type: 'sweep-stale', now: 20_001, staleAfterMs: 15_000 });
-  assert.deepEqual([...swept.players.keys()], ['new']);
-});
-
-test('sweep-stale은 정상적인 presence-leave/broadcast 동작을 바꾸지 않는다(기존 정책 그대로)', () => {
-  // sweep-stale action 자체를 한 번도 dispatch하지 않는 한, 이미 통과하던 기존 12개 테스트의
-  // 시나리오(presence-join/leave/broadcast의 seq 정책)는 이 추가분과 전혀 상호작용하지 않는다 —
-  // 이 테스트는 그 사실을 broadcast 경로로 한 번 더 확인해 둔다(회귀 방지용).
-  const joined = plazaStoreReducer(createPlazaStoreState(), {
-    type: 'presence-join',
-    players: [makePlayer({ seq: 5, x: 10, y: 10 })],
-  });
-  const stale = plazaStoreReducer(joined, {
+test('이동 후 정지 상태가 그대로 유지된다(정지했다고 값이 사라지거나 바뀌지 않음)', () => {
+  const moved = plazaStoreReducer(createPlazaStoreState(), {
     type: 'broadcast',
-    player: makePlayer({ seq: 3, x: 0, y: 0 }),
+    player: makePlayer({ sessionId: 'walker', seq: 1, x: 3, y: 4, moving: true }),
   });
-  assert.deepEqual(stale.players.get('session-a'), makePlayer({ seq: 5, x: 10, y: 10 }));
+  // 정지 전이 — updateMyState가 moving:false로 마지막 track()을 보낸 상황을 presence-join으로
+  // 재현한다(실제 훅에서는 track, 여기서는 reducer 레벨이라 presence-join으로 대체 가능).
+  const stopped = plazaStoreReducer(moved, {
+    type: 'presence-join',
+    players: [makePlayer({ sessionId: 'walker', seq: 2, x: 3, y: 4, moving: false })],
+  });
+  assert.deepEqual(
+    stopped.players.get('walker'),
+    makePlayer({ sessionId: 'walker', seq: 2, x: 3, y: 4, moving: false }),
+  );
+  // 정지 상태로 시간이 흘러도(추가 액션 없이) 그대로 남아있다.
+  assert.strictEqual(stopped.players.size, 1);
+});
+
+test('정지 후 다시 이동해도 같은 sessionId는 갱신될 뿐 중복 생성되지 않는다', () => {
+  const stopped = plazaStoreReducer(createPlazaStoreState(), {
+    type: 'presence-join',
+    players: [makePlayer({ sessionId: 'walker', seq: 2, x: 3, y: 4, moving: false })],
+  });
+  const movedAgain = plazaStoreReducer(stopped, {
+    type: 'broadcast',
+    player: makePlayer({ sessionId: 'walker', seq: 3, x: 4, y: 4, moving: true }),
+  });
+  assert.equal(movedAgain.players.size, 1);
+  assert.deepEqual(
+    movedAgain.players.get('walker'),
+    makePlayer({ sessionId: 'walker', seq: 3, x: 4, y: 4, moving: true }),
+  );
 });

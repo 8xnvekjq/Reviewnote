@@ -16,16 +16,20 @@ export function createPlazaStoreState(): PlazaStoreState {
 // Presence(sync/join)와 Broadcast(move)를 분리한 이유: 정책이 서로 다르기 때문이다(아래 reducer
 // 주석 참고). 'leave'는 presence의 명시적 퇴장 이벤트만 소비한다 — broadcast에는 leave 개념이
 // 없다(플레이어가 사라지는 유일한 신호는 presence leave 또는 sync에서의 누락).
-// 'sweep-stale'는 Worker B(rework) 추가분 — presence-leave/sync 등 "진짜" 퇴장 신호를 대신하는
-// 게 아니라, 그게 어떤 이유로든 전달되지 못했을 때만 발동하는 마지막 안전망이다(아래 reducer
-// case 주석 참고). 순수성을 지키기 위해 reducer 자신은 Date.now()를 호출하지 않고, 호출자가
-// "지금"을 데이터로 넘긴다 — usePlazaRealtime.ts가 주기적으로 이 action을 dispatch한다.
+//
+// (과거에 있었던 'sweep-stale' — updatedAt 기준 마지막 안전망 — 은 폐기했다. 정지한 플레이어는
+// moving 전이가 없는 한 track()도 broadcast도 다시 안 보내므로 updatedAt이 그 시점에서 멈추고,
+// 그 결과 "가만히 있기만 해도 얼마 뒤 사라졌다가 다시 움직이면 나타나는" 실사용 버그를 냈다 —
+// 이건 Supabase 문제가 아니라 "마지막 이동 시각"을 "접속 여부"로 오독한 클라이언트 상태 모델
+// 버그였다. 접속 여부의 유일한 기준은 이제 presence-leave/sync, untrack→removeChannel cleanup,
+// reconnect뿐이다. <30명 규모의 내부 도구에서 탭이 강제 종료돼 leave 이벤트 자체가 유실되는
+// 극단적 경우까지 로컬에서 따로 방어할 필요는 없다고 판단해 추가하지 않았다 — 정말 필요해지면
+// "마지막 이동 시각"이 아니라 실제 connection/heartbeat 신호를 기준으로 다시 설계할 것.)
 export type PlazaStoreAction =
   | { type: 'presence-sync'; players: PlazaPlayerState[] }
   | { type: 'presence-join'; players: PlazaPlayerState[] }
   | { type: 'presence-leave'; sessionIds: string[] }
-  | { type: 'broadcast'; player: PlazaPlayerState }
-  | { type: 'sweep-stale'; now: number; staleAfterMs: number };
+  | { type: 'broadcast'; player: PlazaPlayerState };
 
 // Supabase Presence/Broadcast가 콜백에 건네주는 raw payload는 우리가 보낸 PlazaPlayerState보다
 // 필드가 더 많을 수 있다(대표적으로 Presence는 presence_ref를 얹는다). 저장/렌더링에 쓰이는 값은
@@ -106,24 +110,6 @@ export function plazaStoreReducer(state: PlazaStoreState, action: PlazaStoreActi
       const players = new Map(state.players);
       players.set(incoming.sessionId, incoming);
       return { players };
-    }
-    case 'sweep-stale': {
-      // 마지막 안전망(LAST RESORT), 정상 퇴장 처리의 대체물이 아님: 제품 요구사항 그대로 —
-      // "stale timeout은 정상적인 퇴장 처리의 대체물이 아니라 마지막 안전망으로만 사용". 1차
-      // 퇴장 경로는 여전히 presence-leave 이벤트 + usePlazaRealtime.ts의 확정적 cleanup
-      // (untrack을 await한 뒤 removeChannel)이다. 이 case는 오직 "그 둘 다 어떤 이유로든
-      // 전달되지 못한" 드문 경우(예: 탭이 강제 종료돼 beforeunload/leave 이벤트 자체가 유실된
-      // 상황)를 위한 뒷정리다. 판정 기준은 seq가 아니라 updatedAt — 마지막으로 실제 업데이트를
-      // 받은 시각으로부터 staleAfterMs 넘게 아무 신호(presence든 broadcast든)도 없으면 제거한다.
-      let changed = false;
-      const players = new Map(state.players);
-      for (const [sessionId, player] of state.players) {
-        if (action.now - player.updatedAt > action.staleAfterMs) {
-          players.delete(sessionId);
-          changed = true;
-        }
-      }
-      return changed ? { players } : state;
     }
     default:
       return state;

@@ -21,16 +21,6 @@ function reconnectDelayFor(attempt: number): number {
   return Math.min(RECONNECT_BASE_DELAY_MS * 2 ** attempt, RECONNECT_MAX_DELAY_MS);
 }
 
-// Stale-entry sweep (Worker B rework, issue #4) — LAST-RESORT safety net only, per product
-// requirement ("stale timeout은 정상적인 퇴장 처리의 대체물이 아니라 마지막 안전망으로만 사용").
-// The primary leave mechanism is still presence-leave + this hook's deterministic cleanup below
-// (await untrack() before removeChannel). This sweep only ever catches the rare case where neither
-// of those fired (e.g. a tab killed hard enough that even beforeunload/leave never reached the
-// server). 15s: comfortably above the 170ms move tick and above a plausible missed-heartbeat
-// window, without being so long that a real ghost lingers noticeably.
-const STALE_TIMEOUT_MS = 15_000;
-const STALE_SWEEP_INTERVAL_MS = 5_000;
-
 export interface UsePlazaRealtimeResult {
   players: PlazaPlayerState[]; // everyone else currently in the plaza (not me)
   ready: boolean;              // channel subscribed + initial presence sync received (false while reconnecting)
@@ -111,7 +101,9 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
   }
 
   // 채널 생성/구독/해체는 sessionId가 바뀔 때만 다시 한다(탭 하나에 sessionId 하나 — 보통 마운트
-  // 동안 고정값이다). 이 안에서 채널 (재)연결, 재연결 backoff, stale sweep까지 전부 소유한다.
+  // 동안 고정값이다). 이 안에서 채널 (재)연결, 재연결 backoff까지 전부 소유한다. 접속 여부의
+  // 판정은 오직 presence-leave/sync와 이 effect의 확정적 cleanup(leaveChannelSafely)뿐이다 —
+  // "마지막 이동 시각" 기반 별도 stale sweep은 폐기했다(presenceStore.ts 상단 주석 참고).
   useEffect(() => {
     let cancelled = false;
     let channel: RealtimeChannel | null = null;
@@ -203,13 +195,6 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
 
     connect();
 
-    // 마지막 안전망(sweep-stale) — presenceStore.ts의 case 주석 참고. 정상 퇴장 신호가 어떤
-    // 이유로든 도착하지 못했을 때만 발동하도록, 주기적으로 "지금" 시각을 데이터로 넘겨 dispatch할
-    // 뿐 이 훅도 reducer도 판단 로직 자체를 따로 갖지 않는다.
-    const staleSweepTimer = window.setInterval(() => {
-      dispatch({ type: 'sweep-stale', now: Date.now(), staleAfterMs: STALE_TIMEOUT_MS });
-    }, STALE_SWEEP_INTERVAL_MS);
-
     // beforeunload에서의 untrack은 best-effort일 뿐이다(브라우저가 네트워크 요청을 끝까지
     // 보장해주지 않는다) — 진짜 안전망은 Supabase Presence 자신의 연결 끊김 감지(소켓이 끊기면
     // 서버가 자동으로 그 presence를 leave 처리)다. 여기서는 정상 종료 시 정리를 한 틱이라도
@@ -220,7 +205,6 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
     return () => {
       cancelled = true;
       clearReconnectTimer();
-      window.clearInterval(staleSweepTimer);
       window.removeEventListener('beforeunload', handleBeforeUnload);
       channelRef.current = null;
       setReady(false);
