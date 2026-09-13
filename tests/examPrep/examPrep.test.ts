@@ -7,7 +7,7 @@ import {
   RADAR_DISCLAIMER_STUDENT,
 } from '../../src/utils/examPrepAnalysis.ts';
 import { buildExamPrepStudentOptions } from '../../src/utils/examPrepStudents.ts';
-import { canViewOwnExamPrep, EXAM_PREP_TEST_USER_ID } from '../../src/utils/examPrepAccess.ts';
+import { canViewOwnExamPrep } from '../../src/utils/examPrepAccess.ts';
 import { aggregatePlanPatterns } from '../../src/utils/planPatternAnalysis.ts';
 import { daysSince } from '../../src/utils/examPrepCommentFormat.ts';
 import type { MistakeEntry } from '../../src/types/index.ts';
@@ -148,28 +148,33 @@ test('축별 evidence는 실제 카운트 문장이며 AI 생성 텍스트가 �
   assert.ok(planAxis.evidence.some(line => line.includes('대책을 작성한 문제 1건 / 전체 2건')));
 });
 
-test('관리자 학생 선택기는 학년 제한 없이 학년 미상까지 포함하고 관리자·test 계정은 제외한다', () => {
+test('관리자 학생 선택기는 학년 제한 없이 test·학년 미상 계정을 포함하고 RPC에서 빠진 관리자는 제외한다', () => {
+  const testUserId = '945dd787-7606-4244-9056-43ab32c21d93';
   const profilesMap = {
     middle: '중3 학생', high1: '고1 학생', high2: '고2 학생', high3: '고3 학생', unknown: '학년 미상', admin: '관리자',
-    [EXAM_PREP_TEST_USER_ID]: 'test',
+    [testUserId]: 'test',
   };
   const profilesGradeMap = {
-    middle: '중3', high1: '고1', high2: '고2', high3: '고3', unknown: '', [EXAM_PREP_TEST_USER_ID]: '',
+    middle: '중3', high1: '고1', high2: '고2', high3: '고3', unknown: '', [testUserId]: '',
   };
   const items = [
     mistake({ id: 'a', userId: 'high3', date: '2026-09-03' }),
     mistake({ id: 'b', userId: 'middle', date: '2026-09-02' }),
     mistake({ id: 'c', userId: 'admin', date: '2026-09-04' }),
+    mistake({ id: 'd', userId: testUserId, date: '2026-09-05' }),
   ];
 
   const students = buildExamPrepStudentOptions(items, profilesMap, profilesGradeMap);
-  assert.deepEqual(students.map(student => student.id), ['middle', 'high1', 'high2', 'high3', 'unknown']);
+  assert.deepEqual(students.map(student => student.id), ['middle', 'high1', 'high2', 'high3', 'unknown', testUserId]);
   assert.equal(students.find(student => student.id === 'high3')?.count, 1);
+  assert.equal(students.find(student => student.id === testUserId)?.count, 1);
+  assert.equal(students.some(student => student.id === 'admin'), false);
   assert.equal(students.at(-1)?.grade, '');
 });
 
 test('시험대비 분석 본인 리포트는 모든 로그인 학생에게 열려 있다', () => {
   assert.equal(canViewOwnExamPrep('any-logged-in-user'), true);
+  assert.equal(canViewOwnExamPrep('945dd787-7606-4244-9056-43ab32c21d93'), true);
   assert.equal(canViewOwnExamPrep(undefined), false);
   assert.equal(canViewOwnExamPrep(''), false);
 });
