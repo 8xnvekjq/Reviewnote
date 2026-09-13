@@ -16,7 +16,7 @@ const TITLE_OPTIONS = GACHA_ITEMS.filter(g => g.category === 'TITLE').map(g => g
 const THEME_OPTIONS = GACHA_ITEMS.filter(g => g.category === 'THEME');
 const VOICE_OPTIONS = GACHA_ITEMS.filter(g => g.category === 'AI_VOICE').map(g => g.effectValue!).filter(Boolean);
 
-function Preview() {
+export function Preview() {
   const params = new URLSearchParams(location.search);
   const [user, setUser] = useState(params.get('user') || 'student-A');
   const [tab, setTab] = useState<ActiveTab>((params.get('tab') as ActiveTab) || 'notes');
@@ -40,6 +40,7 @@ function Preview() {
     bottomNav={<BottomNavigation activeTab={tab} setActiveTab={setTab} currentUserId={user} isAdmin={user === 'admin'} onlineUsers={[]} />}>
     <Screen when={tab === 'pixelRoom'} className="pr-screen-fill"><LazyScreenBoundary><PixelRoom
       userId={user} displayName={user} onExit={() => setTab('notes')}
+      pointsBalance={Number(params.get('testBalance') || 0)}
       title={title || undefined}
       titleBadgeStyle={titleBadge?.style}
       titleBadgeIcon={titleBadge?.icon}

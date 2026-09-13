@@ -2,6 +2,12 @@
 export const ROOM_WIDTH = 10;
 export const ROOM_HEIGHT = 8;
 export const FURNITURE = {
+  roundtable: { width: 3, height: 2 },
+  television: { width: 2, height: 1 },
+  aquarium: { width: 3, height: 1 },
+  globe: { width: 1, height: 1 },
+  tallplant: { width: 1, height: 1 },
+  floorlamp: { width: 1, height: 1 },
   bed: { width: 2, height: 3 },
   desk: { width: 3, height: 1 },
   chair: { width: 1, height: 1 },

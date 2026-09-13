@@ -8,9 +8,7 @@ const layers: { key: keyof AvatarLayers; height: number; slot: PixelAvatarSlot |
   { key: 'bottoms', height: 448, slot: 'bottom' }, { key: 'shoes', height: 320, slot: 'shoes' },
   { key: 'tops', height: 928, slot: 'top' }, { key: 'hair', height: 800, slot: 'hair' },
 ];
-// null/unrecognized assetKey (including every slot with nothing wired up yet, per
-// AVATAR_ROW_BY_SLOT in assets.ts) always resolves to row 0 — today's only drawn row for those
-// layers — so an avatar with nothing equipped anywhere renders identically to before this change.
+// Unset/unknown asset keys resolve to the original row 0; server equipment selects all other rows.
 function rowForSlot(slot: PixelAvatarSlot | null, assetKey: string | null): number {
   if (!slot || !assetKey) return 0;
   return AVATAR_ROW_BY_SLOT[slot][assetKey] ?? 0;
@@ -20,7 +18,7 @@ function renderLayers(sheets: AvatarLayers, frame: number, appearance: PublicAva
     const src = sheets[layer.key];
     if (!src) return null;
     const row = rowForSlot(layer.slot, layer.slot ? appearance[layer.slot] : null);
-    return <image key={layer.key} href={src} x={-frame * 32} y={-row * 32} width={128} height={layer.height} />;
+    return <image key={layer.key} data-slot={layer.slot ?? 'body'} data-row={row} href={src} x={-frame * 32} y={-row * 32} width={128} height={layer.height} />;
   });
 }
 // Every direction/frame in this pack draws its narrowest "neck" row at y=18 of the 32-unit

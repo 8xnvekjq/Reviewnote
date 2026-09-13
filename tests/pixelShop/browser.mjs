@@ -1,0 +1,94 @@
+// Real components + intercepted REST for browser regression. Live RPCs are tested separately
+// by server-roundtrip.sql, which rolls back all changes. No real account credentials needed.
+import { createRequire } from 'node:module';
+import { mkdir } from 'node:fs/promises';
+import assert from 'node:assert/strict';
+import { PIXEL_CATALOG } from '../../src/features/pixel-room/shop/catalog.ts';
+const require = createRequire(import.meta.url);
+const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
+const out = process.env.UI_OUTPUT || 'node_modules/.cache/pixel-content';
+await mkdir(out, { recursive: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const catalog = PIXEL_CATALOG.map(i => ({ item_id:i.itemId, category:i.category, slot:i.slot, price:i.price, asset_key:i.assetKey, display_name:i.displayName, tier:i.tier, stackable:false }));
+const errors=[];
+try {
+  for (const [width,height] of [[390,844],[800,1280],[1440,1000]]) {
+    const context=await browser.newContext({ viewport:{width,height}, hasTouch:true, serviceWorkers:'block' });
+    let activeUser='student-A';
+    const states=new Map();
+    function state(id) { if (!states.has(id)) states.set(id,{owned:new Set(),equipment:{top:null,bottom:null,shoes:null,hair:null,eyes:null},balance:10000}); return states.get(id); }
+    await context.route('**/*', async route => {
+      const url=new URL(route.request().url());
+      if (url.hostname==='127.0.0.1') return route.continue();
+      const s=state(url.searchParams.get('user_id')?.replace('eq.','') || activeUser);
+      let data=[];
+      if (url.pathname.endsWith('/pixel_item_catalog')) data=catalog;
+      else if(url.pathname.endsWith('/pixel_item_ownership')) data=[...s.owned].map(item_id=>({item_id}));
+      else if(url.pathname.endsWith('/pixel_avatar_equipment')) data=s.equipment;
+      else if(url.pathname.endsWith('/purchase_pixel_item')) {
+        const {p_item_id}=route.request().postDataJSON(); const item=catalog.find(i=>i.item_id===p_item_id);
+        if(s.owned.has(p_item_id)) data={ok:false,reason:'already_owned'};
+        else if(!item || s.balance<item.price) data={ok:false,reason:'insufficient_balance'};
+        else {s.owned.add(p_item_id);s.balance-=item.price;data={ok:true,itemId:p_item_id,newBalance:s.balance};}
+      } else if(url.pathname.endsWith('/equip_pixel_item')) {
+        const {p_slot,p_item_id}=route.request().postDataJSON();
+        const item=catalog.find(i=>i.item_id===p_item_id);
+        if(p_item_id && (!s.owned.has(p_item_id) || item.slot!==p_slot)) data={ok:false,reason:'not_owned'};
+        else {s.equipment[p_slot]=p_item_id;data={ok:true,slot:p_slot,itemId:p_item_id};}
+      } else return route.abort();
+      return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(data)});
+    });
+    const page=await context.newPage(); page.on('pageerror',e=>errors.push(e.message));
+    const url='http://127.0.0.1:5174/tests/pixel-room/?tab=pixelRoom&testBalance=10000';
+    await page.goto(url); await page.locator('.pr-actor').waitFor();
+    async function openShop() {
+      const trigger=page.locator('.pr-sheet-trigger button').filter({hasText:'상점'});
+      if(await trigger.getAttribute('aria-expanded')!=='true') await trigger.click();
+      await page.locator('[data-item="top_sage"]').waitFor();
+    }
+    async function buy(id) {
+      await openShop(); const card=page.locator(`[data-item="${id}"]`);
+      await card.getByRole('button',{name:'구매하기',exact:true}).click();
+      await card.getByRole('button',{name:'구매',exact:true}).click();
+      await page.waitForFunction(()=>!document.querySelector('.pr-shop-confirm button:disabled'));
+    }
+    for (const [id,slot,row] of [['hair_buns','hair',5],['top_vest','top',17],['bottom_denim','bottom',8],['shoes_low','shoes',7]]) {
+      await buy(id);
+      await page.locator(`.pr-actor [data-slot="${slot}"][data-row="${row}"]`).first().waitFor();
+    }
+    await page.locator('.pr-sheet-trigger button').filter({hasText:'옷'}).click();
+    await page.getByRole('button',{name:'기본 헤어',exact:true}).click();
+    await page.locator('.pr-actor [data-slot="hair"][data-row="0"]').first().waitFor();
+    await page.getByRole('button',{name:'동글 양갈래 번',exact:true}).click();
+    await page.locator('.pr-actor [data-slot="hair"][data-row="5"]').first().waitFor();
+    await page.getByRole('button',{name:'뒷모습 보기',exact:true}).click();
+    await page.screenshot({path:`${out}/wardrobe-${width}.png`,animations:'disabled'});
+    await page.reload();
+    for(const [slot,row] of [['hair',5],['top',17],['bottom',8],['shoes',7]]) await page.locator(`.pr-actor [data-slot="${slot}"][data-row="${row}"]`).first().waitFor();
+    assert.equal(await page.locator('.pr-nameplate').count(),0);
+    await openShop(); await page.screenshot({path:`${out}/shop-${width}.png`,animations:'disabled'});
+    const positions=[['roundtable',0,0],['television',3,0],['aquarium',5,0],['globe',0,3],['tallplant',4,3],['floorlamp',7,3]];
+    for(const [type,x,y] of positions) {
+      await buy(`furniture_${type}`);
+      await page.getByRole('button',{name:`${x+1}열 ${y+1}행에 배치`,exact:true}).click();
+      await page.locator(`[data-furniture="${type}"]`).waitFor();
+    }
+    await page.screenshot({path:`${out}/room-${width}.png`,animations:'disabled'});
+    const storage=await page.evaluate(()=>JSON.parse(localStorage.getItem('pixelRoom:student-A:v1')));
+    assert.equal(storage.furniture.length,6);
+    await page.reload(); await page.locator('[data-furniture="aquarium"]').waitFor();
+    activeUser='student-B'; await page.getByLabel('검증 계정').selectOption(activeUser);
+    await page.locator('.pr-actor [data-slot="hair"][data-row="0"]').first().waitFor();
+    assert.equal(await page.locator('[data-furniture]').count(),0);
+    activeUser='student-A'; await page.getByLabel('검증 계정').selectOption(activeUser);
+    await page.locator('.pr-actor [data-slot="hair"][data-row="5"]').first().waitFor();
+    await page.locator('[data-furniture="aquarium"]').waitFor();
+    const layout=await page.evaluate(()=>({body:document.body.scrollWidth,viewport:innerWidth,room:document.querySelector('.pr-room-frame').getBoundingClientRect().toJSON()}));
+    assert.ok(layout.body<=width,JSON.stringify(layout));
+    await page.getByRole('button',{name:'← Reviewnote',exact:true}).click();
+    await page.getByRole('heading',{name:'오답노트',exact:true}).waitFor();
+    console.log(`PASS ${width}x${height}: 4-slot purchase/equip/reload, 6 new furniture purchase/place/reload, A/B isolation, no nameplate/overflow, exit`);
+    await context.close();
+  }
+  assert.deepEqual(errors,[]);
+} finally {await browser.close();}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { equipPixelItem, fetchEquippedAppearance, fetchOwnedPixelItemIds, fetchPixelCatalog, purchasePixelItem } from '../../utils/pixelShop';
 import { PIXEL_CATALOG } from './shop/catalog';
 import type { PixelAvatarSlot, PixelItem, PublicAvatarAppearance, PurchasePixelItemResult } from './shop/types';
@@ -10,6 +10,10 @@ export type PurchaseOutcome = PurchasePixelItemResult & { equipFailed?: boolean 
 /** Owns the ownership/equip/balance state for the Pixel World shop, backed by the real
  * src/utils/pixelShop.ts (Worker A's economy RPCs) now that integration is complete. */
 export function usePixelShop(userId: string, initialBalance: number, onBalanceChange?: (balance: number) => void) {
+  const mutationLock = useRef(false);
+  const mounted = useRef(true);
+  const [mutating, setMutating] = useState(false);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const [ownedIds, setOwnedIds] = useState<Set<string>>(new Set());
   const [equipped, setEquipped] = useState<PublicAvatarAppearance>(EMPTY_APPEARANCE);
   // 컴파일된 PIXEL_CATALOG를 초기값으로 즉시 보여주고(로딩 깜빡임 없음), 서버가 응답하면 그 값으로
@@ -48,51 +52,49 @@ export function usePixelShop(userId: string, initialBalance: number, onBalanceCh
       });
     // 카탈로그는 별도 요청 — 실패해도 위 보유/장착 조회와 무관하게 정적 폴백으로 계속 동작하면
     // 되므로 Promise.all에 묶어서 전체를 실패시키지 않는다.
-    fetchPixelCatalog().then(rows => { if (!cancelled && rows.length > 0) setCatalog(rows); }).catch(() => {});
+    fetchPixelCatalog().then(rows => { if (!cancelled && rows.length > 0) setCatalog(rows.filter(row => PIXEL_CATALOG.some(known => known.itemId === row.itemId && known.slot === row.slot && known.assetKey === row.assetKey))); }).catch(() => {});
     return () => { cancelled = true; };
   }, [userId, reloadToken]);
 
   const reload = () => setReloadToken(token => token + 1);
 
-  // itemId(카탈로그 키, 예: 'top_sage')는 소유권 확인용으로 서버에 보내고, assetKey(예: 'sage')는
-  // 화면 렌더링(PublicAvatarAppearance.top 등)에 쓴다 — 둘을 섞으면 장착 직후 낙관적 업데이트가
-  // 스프라이트에 없는 값을 가리키게 된다. 실패하면 직전 값으로 되돌린다 — "장착했다"고 화면에
-  // 보여준 채로 서버는 실패한 상태가 남으면(예: 새로고침 후 원래대로 돌아옴) 학생이 혼란스럽다.
-  async function equip(slot: PixelAvatarSlot, itemId: string | null, assetKey: string | null): Promise<boolean> {
-    let previousValue: string | null = null;
-    setEquipped(previous => { previousValue = previous[slot]; return { ...previous, [slot]: assetKey }; });
+  // Render only server-confirmed equipment. Refresh after the RPC instead of optimistic
+  // slot writes, so rapid clicks/failures cannot leave an appearance the server never stored.
+  async function equipConfirmed(slot: PixelAvatarSlot, itemId: string | null): Promise<boolean> {
     try {
       const result = await equipPixelItem(slot, itemId);
-      if (result.ok) return true;
-      setEquipped(previous => ({ ...previous, [slot]: previousValue }));
-      return false;
-    } catch {
-      setEquipped(previous => ({ ...previous, [slot]: previousValue }));
-      return false;
-    }
+      if (!result.ok) return false;
+      const appearance = await fetchEquippedAppearance(userId);
+      if (!mounted.current) return false;
+      setEquipped(appearance);
+      return true;
+    } catch { if (mounted.current) setLoadError(true); return false; }
+  }
+  async function equip(slot: PixelAvatarSlot, itemId: string | null): Promise<boolean> {
+    if (mutationLock.current || !ready || loadError) return false;
+    mutationLock.current = true; setMutating(true);
+    try { return await equipConfirmed(slot, itemId); }
+    finally { mutationLock.current = false; if (mounted.current) setMutating(false); }
   }
 
   async function purchase(item: PixelItem): Promise<PurchaseOutcome> {
-    let result: PurchasePixelItemResult;
+    if (mutationLock.current || !ready || loadError) return { ok: false, reason: 'unknown', message: '이전 처리를 마친 뒤 다시 시도해 주세요.' };
+    mutationLock.current = true; setMutating(true);
     try {
-      result = await purchasePixelItem(item.itemId);
-    } catch {
-      return { ok: false, reason: 'unknown', message: '구매를 처리하지 못했어요. 잠시 후 다시 시도해 주세요.' };
-    }
-    if (!result.ok) return result;
-    setOwnedIds(previous => new Set(previous).add(item.itemId));
-    setBalance(result.newBalance);
-    onBalanceChange?.(result.newBalance);
-    // 아바타 아이템은 구매 즉시 장착까지 끝내야 "바로 장착"이 된다 — 가구는 배치할 칸을
-    // 직접 골라야 하므로(기존 배치 UX 재사용) 여기서는 장착만 처리하고, 배치 시작은 호출부(패널
-    // 전환)에서 이어서 담당한다. 장착이 실패해도 구매 자체는 이미 성공했으므로 ok:true는 유지하고,
-    // equipFailed로 호출부가 문구를 다르게 보여줄 수 있게 한다.
-    if (item.category === 'avatar') {
-      const equipOk = await equip(item.slot as PixelAvatarSlot, item.itemId, item.assetKey);
-      if (!equipOk) return { ...result, equipFailed: true };
-    }
-    return result;
+      const result = await purchasePixelItem(item.itemId);
+      if (!mounted.current) return { ok: false, reason: 'unknown', message: '계정 화면이 변경되었어요. 다시 입장해 구매 결과를 확인해 주세요.' };
+      if (!result.ok) { if (result.reason === 'already_owned') reload(); return result; }
+      setOwnedIds(previous => new Set(previous).add(item.itemId));
+      setBalance(result.newBalance);
+      onBalanceChange?.(result.newBalance);
+      if (item.category === 'avatar') {
+        const equipOk = await equipConfirmed(item.slot as PixelAvatarSlot, item.itemId);
+        if (!equipOk) return { ...result, equipFailed: true };
+      }
+      return result;
+    } catch { return { ok: false, reason: 'unknown', message: '구매 결과를 확인하지 못했어요. 다시 불러온 뒤 확인해 주세요.' }; }
+    finally { mutationLock.current = false; if (mounted.current) setMutating(false); }
   }
 
-  return { ownedIds, equipped, catalog, balance, ready, loadError, reload, equip, purchase };
+  return { ownedIds, equipped, catalog, balance, ready, loadError, reload, equip, purchase, mutating };
 }
