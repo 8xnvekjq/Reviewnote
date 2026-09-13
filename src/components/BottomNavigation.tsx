@@ -33,6 +33,11 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, s
   const [menuOpen, setMenuOpen] = useState(false);
   const select = (tab: ActiveTab) => { setActiveTab(tab); setMenuOpen(false); };
   const examPrepMenu = isAdmin ? examPrepMenuAdmin : canViewOwnExamPrep(currentUserId) ? examPrepMenuStudent : null;
+  // 복습체크는 학생 본인만 시작할 수 있다(관리자는 학생 카드 쪽 채점 화면을 따로 씀) — primary
+  // nav가 아니라 전체메뉴 안에만 넣는다(요청 사항).
+  const reviewCheckMenu = !isAdmin && currentUserId
+    ? { tab: 'reviewCheck' as ActiveTab, label: '복습체크', description: '복습 완료 문제 다시 풀어보고 채점받기', icon: 'check' as AppIconName }
+    : null;
   const tabs: { tab: ActiveTab; label: string; icon: AppIconName }[] = [
     { tab: isAdmin ? 'admin' : 'activity', label: isAdmin ? '관리자' : '최근활동', icon: isAdmin ? 'chart' : 'activity' },
     { tab: 'notes', label: '오답노트', icon: 'notes' },
@@ -52,6 +57,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, s
     <Sheet open={menuOpen} onClose={() => setMenuOpen(false)} title="나의 학습 공간">
       <div className="rn-menu-list">
         {examPrepMenu && <button type="button" key={examPrepMenu.tab} className="rn-menu-row" aria-current={activeTab === examPrepMenu.tab ? 'page' : undefined} onClick={() => select(examPrepMenu.tab)}><AppIcon name={examPrepMenu.icon} /><span><strong>{examPrepMenu.label}</strong><small>{examPrepMenu.description}</small></span><AppIcon name="arrow" width={16} /></button>}
+        {reviewCheckMenu && <button type="button" key={reviewCheckMenu.tab} className="rn-menu-row" aria-current={activeTab === reviewCheckMenu.tab ? 'page' : undefined} onClick={() => select(reviewCheckMenu.tab)}><AppIcon name={reviewCheckMenu.icon} /><span><strong>{reviewCheckMenu.label}</strong><small>{reviewCheckMenu.description}</small></span><AppIcon name="arrow" width={16} /></button>}
         {menus.map(item => <button type="button" key={item.tab} className="rn-menu-row" aria-current={activeTab === item.tab ? 'page' : undefined} onClick={() => select(item.tab)}><AppIcon name={item.icon} /><span><strong>{item.label}{item.emoji ? ` ${item.emoji}` : ''}</strong><small>{item.description}</small></span><AppIcon name="arrow" width={16} /></button>)}
         {onOpenSlideList && <button type="button" className="rn-menu-row" onClick={() => { setMenuOpen(false); onOpenSlideList(); }}><AppIcon name="book" /><span><strong>수업자료</strong><small>선생님이 준비한 교안 슬라이드</small></span><AppIcon name="arrow" width={16} /></button>}
         {/* "함께 공부 중" 인원수는 오답노트 패널로 복귀했다(중복 노출 제거) — MistakeList.tsx 참고. */}

@@ -40,6 +40,7 @@ import { canViewOwnExamPrep } from './utils/examPrepAccess';
 // 않는다). named export라 lazy()에 바로 못 넣고 default로 매핑해야 한다.
 const AdminPanel = lazy(() => import('./components/AdminPanel').then(m => ({ default: m.AdminPanel })));
 const ExamPrepAnalysis = lazy(() => import('./components/ExamPrepAnalysis').then(m => ({ default: m.ExamPrepAnalysis })));
+const ReviewCheckScreen = lazy(() => import('./components/reviewCheck/ReviewCheckScreen').then(m => ({ default: m.ReviewCheckScreen })));
 const ScaffoldingPanel = lazy(() => import('./components/ScaffoldingPanel').then(m => ({ default: m.ScaffoldingPanel })));
 const GachaStore = lazy(() => import('./components/GachaStore').then(m => ({ default: m.GachaStore })));
 
@@ -1827,6 +1828,17 @@ function App() {
               scaffoldedMistakeIds={scaffoldedMistakeIds}
               isAdmin={isAdmin}
               currentUserId={session?.user?.id}
+            />
+          </LazyScreenBoundary>
+        </Screen>
+
+        {/* 관리자는 학생 카드 쪽 전용 채점 화면을 쓰므로 이 학생용 셀프 테스트 탭은 노출하지 않는다. */}
+        <Screen when={activeTab === 'reviewCheck' && !isAdmin && !!session?.user?.id}>
+          <LazyScreenBoundary>
+            <ReviewCheckScreen
+              currentUserId={session?.user?.id || ''}
+              schoolGrade={profilesGradeMap[session?.user?.id || '']}
+              mistakes={mistakes}
             />
           </LazyScreenBoundary>
         </Screen>

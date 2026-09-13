@@ -172,9 +172,12 @@ export interface MistakeEntry {
   answerImageUrl?: string;  // 학생이 AI 진단 이후 직접 다시 풀어본 풀이 사진(선택, 1장). 원본 문제
                             // 이미지(imageUrl)와 별개 Storage 버킷(answer-images)에 저장되며 의미도 다름
                             // — 섞이지 않도록 필드/버킷 모두 분리.
+  reviewCheckMasteredAt?: string | null; // 복습체크에서 O(정답) 판정을 받아 "완벽!" 확정된 시각(ISO).
+                            // 관리자 채점 RPC(grade_review_check_session/update_review_check_item_grade)
+                            // 로만 바뀐다 — 학생 본인도 이 값은 직접 수정 불가(DB 트리거로 보호).
 }
 
-export type ActiveTab = 'notes' | 'completed' | 'camera' | 'stats' | 'admin' | 'guide' | 'store' | 'activity' | 'scaffolding' | 'hidden' | 'examPrep';
+export type ActiveTab = 'notes' | 'completed' | 'camera' | 'stats' | 'admin' | 'guide' | 'store' | 'activity' | 'scaffolding' | 'hidden' | 'examPrep' | 'reviewCheck';
 
 export type GachaRarity = 'MR' | 'UR' | 'SSR' | 'SR' | 'R';
 export type GachaCategory = 'STAMP' | 'TITLE' | 'THEME' | 'SHIELD' | 'AI_VOICE' | 'CHARM';

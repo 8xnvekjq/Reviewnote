@@ -50,6 +50,8 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
           {/* 스캐폴딩 힌트 표시 — 전구(💡)가 아니라 예전부터 쓰던 초록 퍼즐(🧩) 아이콘으로
               복원(MistakeScaffoldingDrawer/ScaffoldingPanel과 같은 의미의 아이콘 통일). */}
           {(hasScaffolding || entry.teacherScaffoldingHint?.trim()) && <span className="rn-note-scaffold-badge" title="스캐폴딩 힌트가 있어요" aria-label="스캐폴딩 힌트가 있어요">🧩</span>}
+          {/* 복습체크 완벽! — 카드 높이를 늘리지 않도록 이미지 위 작은 배지 하나로만 표시. */}
+          {entry.reviewCheckMasteredAt && <span className="rn-note-mastered-badge" title="복습체크에서 완벽! 판정을 받았어요" aria-label="복습체크 완벽">완벽!</span>}
         </div>
         <div className="rn-note-body">
           <h3 className="rn-note-title"><LaTeXRenderer text={entry.title} className="line-clamp-2" /></h3>

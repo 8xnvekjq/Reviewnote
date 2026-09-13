@@ -1,0 +1,35 @@
+/* 복습체크 — examPrep.css와 같은 --rn-* 토큰만 사용, 새 팔레트는 만들지 않는다. */
+
+/* 관리자 전체화면 오버레이 — 새 window/tab 없이 앱 안에서 목록<->상세를 오간다. */
+.rn-reviewcheck-overlay { position: fixed; inset: 0; z-index: 60; background: var(--rn-bg, #0b0d12); display: flex; flex-direction: column; }
+.rn-reviewcheck-overlay-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--rn-line); flex: none; }
+.rn-reviewcheck-overlay-body { flex: 1; overflow-y: auto; padding: 16px; max-width: 640px; margin: 0 auto; width: 100%; box-sizing: border-box; }
+
+.rn-reviewcheck-history-list { display: grid; gap: 8px; }
+.rn-reviewcheck-history-row { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: var(--rn-radius-md); background: var(--rn-surface); border: 1px solid var(--rn-line); text-align: left; }
+.rn-reviewcheck-history-row .date { font-size: 12px; font-weight: 700; color: var(--rn-muted); flex: none; width: 44px; }
+.rn-reviewcheck-history-row .result { font-size: 15px; font-weight: 800; color: var(--rn-text); flex: 1; }
+.rn-reviewcheck-history-row .pending { font-size: 12.5px; font-weight: 700; color: var(--rn-warning); flex: 1; }
+
+.rn-reviewcheck-answer-block { padding: 10px 12px; border-radius: var(--rn-radius-sm); background: var(--rn-elevated); margin-bottom: 8px; }
+.rn-reviewcheck-answer-block .label { font-size: 10.5px; font-weight: 700; color: var(--rn-muted); text-transform: uppercase; letter-spacing: .03em; margin-bottom: 3px; }
+.rn-reviewcheck-answer-block .value { font-size: 15px; font-weight: 750; color: var(--rn-text); word-break: break-word; }
+.rn-reviewcheck-answer-block.compact { padding: 6px 10px; margin-bottom: 5px; }
+.rn-reviewcheck-answer-block.compact .value { font-size: 13px; }
+
+.rn-reviewcheck-ox-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.rn-reviewcheck-ox-btn { min-height: 56px; border-radius: var(--rn-radius-md); border: 2px solid transparent; font-size: 20px; font-weight: 800; cursor: pointer; }
+.rn-reviewcheck-ox-btn.is-correct { background: rgba(120, 219, 181, .16); color: var(--rn-success); border-color: rgba(120, 219, 181, .4); }
+.rn-reviewcheck-ox-btn.is-incorrect { background: rgba(245, 155, 167, .16); color: var(--rn-danger); border-color: rgba(245, 155, 167, .4); }
+.rn-reviewcheck-ox-btn.compact { min-height: 40px; font-size: 14px; }
+.rn-reviewcheck-ox-btn.is-active.is-correct { background: var(--rn-success); color: #06231a; }
+.rn-reviewcheck-ox-btn.is-active.is-incorrect { background: var(--rn-danger); color: #2a0a0e; }
+.rn-reviewcheck-ox-btn:disabled { opacity: .6; cursor: default; }
+
+.rn-reviewcheck-graded-list { display: grid; gap: 10px; }
+.rn-reviewcheck-graded-row { display: flex; gap: 10px; padding: 12px; align-items: stretch; }
+.rn-reviewcheck-graded-thumb { flex: none; width: 64px; height: 64px; border-radius: 8px; overflow: hidden; background: var(--rn-elevated); }
+.rn-reviewcheck-graded-thumb img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+.rn-reviewcheck-graded-info { flex: 1; min-width: 0; }
+.rn-reviewcheck-graded-ox { flex: none; display: flex; flex-direction: column; gap: 6px; justify-content: center; }
+.rn-reviewcheck-graded-ox .rn-reviewcheck-ox-btn { width: 44px; }
