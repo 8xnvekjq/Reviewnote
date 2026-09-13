@@ -92,11 +92,17 @@ function sanitizePlayerState(raw: PlazaPlayerState): PlazaPlayerState {
 //
 // - presence-sync / presence-join은 항상 그대로 반영한다(seq 비교 없음). Supabase Presence는
 //   서버가 "이 key의 현재 상태"로 이미 합의를 끝낸 값을 밀어주는 채널이라, 클라이언트 입장에서는
-//   "presence가 말하는 현재 상태"가 곧 진실이다. 탭이 새로고침/재접속되면 이 훅은 seq 카운터를
-//   0(또는 1)부터 다시 시작하므로, 같은 sessionId가 이전보다 낮은 seq로 "재등장"하는 일이 정상
-//   케이스로 발생한다 — 이걸 막으면 재접속한 사람이 영영 안 보이거나 낡은 위치에 박제된다. 그래서
-//   presence 경로는 의도적으로 seq를 판정에 쓰지 않고, 재접속 시의 seq 리셋을 새 기준선으로
-//   받아들인다.
+//   "presence가 말하는 현재 상태"가 곧 진실이다. 탭이 새로고침되면 PixelRoom.tsx가 sessionId 자체를
+//   새로 발급하므로(crypto.randomUUID() 재실행 — 완전히 다른 사람으로 취급돼도 무해) 그 새
+//   sessionId는 당연히 seq 0부터 새로 시작하는 무관한 key다. 반면 같은 sessionId를 유지한 채
+//   채널만 끊겼다 재연결되는 경우(usePlazaRealtime.ts의 reconnect backoff)는 seq를 리셋하지
+//   않는다 — 예전엔 리셋했었는데, presence 경로 자체는 seq를 안 보니 그건 "안전"해 보였지만
+//   useSmoothedPlayerPositions.ts의 스무딩 커서가 "그 세션의 seq는 이 훅 인스턴스 동안 계속
+//   커진다"에 기대고 있어서, 재연결로 seq가 작아지면 커서보다 계속 낮은 값으로 취급돼 새 좌표를
+//   전혀 소비하지 못하는 버그("제자리 걷기")가 났다(usePlazaRealtime.ts의 seqRef 선언부 주석,
+//   tests/plaza/reconnect.browser.mjs 참고). 어느 경우든 presence 경로는 여전히 seq를 판정에
+//   쓰지 않고 "지금 이 순간의 상태"를 그대로 받아들인다 — 위 설명은 그 seq 값이 실제로 어떻게
+//   변화하는지에 대한 것일 뿐, presence 판정 로직 자체는 바뀌지 않았다.
 // - broadcast(move)만 seq 단조증가를 엄격히 검사해서 낡은/순서 뒤바뀐 메시지를 버린다. 같은 접속
 //   안에서 온 이동 이벤트들은 seq가 항상 커지므로, "저장된 seq보다 크지 않으면 버린다"가 곧
 //   "네트워크상에서 늦게 도착한 예전 이동값이 최신 위치를 되돌리지 못하게 한다"는 뜻이 된다.
