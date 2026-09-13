@@ -3,16 +3,30 @@ import type { CSSProperties } from 'react';
 import { FURNITURE, ROOM_HEIGHT, ROOM_WIDTH, findSpawn, isCellFree, loadRoom, placeFurniture, planWalk, removeFurniture, saveRoom } from './model';
 import type { Cell, FurnitureType, RoomState, StorageLike } from './model';
 import { AvatarSprite, FurnitureSprite } from './sprites';
+import { PIXEL_CATALOG } from './shop/catalog';
+import type { PixelItem } from './shop/types';
+import { usePixelShop } from './usePixelShop';
 import './pixel-room.css';
 
 export type Direction = 'Front' | 'Back' | 'Left' | 'Right';
 const directions: Record<Direction, Cell> = { Front: { x: 0, y: 1 }, Back: { x: 0, y: -1 }, Left: { x: -1, y: 0 }, Right: { x: 1, y: 0 } };
 const keys: Record<string, Direction> = { ArrowDown: 'Front', s: 'Front', ArrowUp: 'Back', w: 'Back', ArrowLeft: 'Left', a: 'Left', ArrowRight: 'Right', d: 'Right' };
 const names: Record<FurnitureType, string> = { bed: '포근한 침대', desk: '나무 책상', chair: '작은 의자', bookshelf: '나의 책장', plant: '초록 화분', decoration: '작은 장식' };
-const shirts = [{ id: 'default', label: '코랄', color: '#de7668' }, { id: 'blue', label: '블루', color: '#75a5d6' }, { id: 'sage', label: '그린', color: '#90b67c' }] as const;
+// 아바타 상의 색상칩 — 풀 스프라이트 미리보기 대신 쓰는 v1 폴백(Worker B의 감사 이후 풀 스프라이트로
+// 교체 가능). 'default'는 시작 시 누구나 가진 무료 기본값이라 카탈로그에 없어 여기서 직접 채운다.
+const topColors: Record<string, string> = { sage: '#90b67c', blue: '#75a5d6' };
+const avatarWardrobe: { key: string; label: string; color: string; assetKey: string | null; itemId: string | null; price: number }[] = [
+  { key: 'default', label: '코랄(기본)', color: '#de7668', assetKey: null, itemId: null, price: 0 },
+  ...PIXEL_CATALOG.filter(item => item.category === 'avatar').map(item => ({ key: item.itemId, label: item.displayName, color: topColors[item.assetKey] || '#c9a46b', assetKey: item.assetKey, itemId: item.itemId, price: item.price })),
+];
+/** PublicAvatarAppearance.top(assetKey|null) → 기존 AvatarSprite의 shirt prop. Worker B가 아바타
+ * 렌더러를 PublicAvatarAppearance 전체를 받도록 일반화하면 이 어댑터는 그 prop으로 교체된다. */
+function topToShirt(top: string | null): RoomState['avatar']['shirt'] {
+  return top === 'blue' || top === 'sage' ? top : 'default';
+}
 const cells = Array.from({ length: ROOM_WIDTH * ROOM_HEIGHT }, (_, i) => ({ x: i % ROOM_WIDTH, y: Math.floor(i / ROOM_WIDTH) }));
 type WalkStep = { cell: Cell; direction: Direction };
-type Panel = 'clothes' | 'furniture';
+type Panel = 'clothes' | 'furniture' | 'shop';
 function stepDirection(from: Cell, to: Cell): Direction {
   if (to.x > from.x) return 'Right';
   if (to.x < from.x) return 'Left';
@@ -29,6 +43,11 @@ interface Props {
   title?: string; titleBadgeStyle?: string; titleBadgeIcon?: string;
   themePrimary?: string; themeAccent?: string;
   onSpeak?: () => string;
+  // Pixel World Phase 1 — 학생이 다른 화면에서 이미 보는 그 포인트 잔액을 그대로 받아서 보여준다
+  // (여기서 새로 계산하지 않음). 구매 성공 시 서버가 돌려준 새 잔액을 그대로 올려보내서, 앱
+  // 전체에서 쓰는 잔액 표시가 Pixel Room 밖에서도 즉시 맞아떨어지게 한다.
+  pointsBalance?: number;
+  onPixelPurchase?: (newBalance: number) => void;
 }
 
 /** Keyed at the identity boundary: even a direct A → B switch starts from B's snapshot. */
@@ -38,7 +57,7 @@ export default function PixelRoom(props: Props) {
   return <RoomForUser key={userId} {...props} userId={userId} />;
 }
 
-function RoomForUser({ userId, displayName, onExit, title, titleBadgeStyle, titleBadgeIcon, themePrimary, themeAccent, onSpeak }: Props & { userId: string }) {
+function RoomForUser({ userId, displayName, onExit, title, titleBadgeStyle, titleBadgeIcon, themePrimary, themeAccent, onSpeak, pointsBalance = 0, onPixelPurchase }: Props & { userId: string }) {
   const [initial] = useState(() => loadRoom(userId, browserStorage()));
   const [room, setRoom] = useState(initial.state);
   const [actor, setActor] = useState(() => findSpawn(initial.state) ?? { x: 0, y: 7 });
@@ -54,8 +73,32 @@ function RoomForUser({ userId, displayName, onExit, title, titleBadgeStyle, titl
   const [message, setMessage] = useState('방의 바닥을 누르면 그 자리로 걸어가요.');
   const [storageError, setStorageError] = useState(initial.ok ? '' : initial.error);
   const [speech, setSpeech] = useState('');
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [purchasingId, setPurchasingId] = useState<string | null>(null);
   const board = useRef<HTMLDivElement>(null);
   const speechTimer = useRef<number | undefined>(undefined);
+  const shop = usePixelShop(userId, pointsBalance, onPixelPurchase);
+  const ownedFurnitureTypes = new Set(PIXEL_CATALOG.filter(item => item.category === 'furniture' && shop.ownedIds.has(item.itemId)).map(item => item.assetKey as FurnitureType));
+  useEffect(() => { if (panel !== 'shop') setConfirmingId(null); }, [panel]);
+
+  async function handlePurchase(item: PixelItem) {
+    if (purchasingId) return;
+    setPurchasingId(item.itemId);
+    const outcome = await shop.purchase(item);
+    setPurchasingId(null);
+    setConfirmingId(null);
+    if (!outcome.ok) {
+      setMessage(outcome.reason === 'insufficient_balance' ? '포인트가 조금 부족해요. 복습을 더 하면 모을 수 있어요.'
+        : outcome.reason === 'already_owned' ? '이미 보유한 아이템이에요.'
+        : outcome.message || '구매를 처리하지 못했어요. 잠시 후 다시 시도해 주세요.');
+      return;
+    }
+    if (item.category === 'avatar') { setMessage(`${item.displayName} 구매 완료! 바로 갈아입었어요.`); return; }
+    const type = item.assetKey as FurnitureType;
+    enterDecorating();
+    setSelected(type);
+    setMessage(`${item.displayName} 구매 완료! 원하는 칸을 눌러서 놓아 주세요.`);
+  }
 
   // 장착 테마는 전체 앱 테마(applyThemeColor)를 건드리지 않고, room 안 CSS 변수로만 좁혀서 반영한다.
   const roomStyle = themePrimary ? ({ '--pr-theme-primary': themePrimary, '--pr-theme-accent': themeAccent || themePrimary } as CSSProperties) : undefined;
@@ -167,9 +210,9 @@ function RoomForUser({ userId, displayName, onExit, title, titleBadgeStyle, titl
           }} onBlur={() => setHeld(null)}>
           <div className="pr-grid">{cells.map(cell => <button key={`${cell.x}-${cell.y}`} type="button" tabIndex={decorating ? 0 : -1} aria-label={`${cell.x + 1}열 ${cell.y + 1}행에 배치`} onClick={() => chooseCell(cell)} />)}</div>
           {room.furniture.map(item => <div key={item.type} data-furniture={item.type} className={`pr-furniture ${selected === item.type ? 'pr-selected' : ''}`} style={{ left: `${item.x * 10}%`, top: `${item.y * 12.5}%`, width: `${FURNITURE[item.type].width * 10}%`, height: `${FURNITURE[item.type].height * 12.5}%`, zIndex: item.y + FURNITURE[item.type].height }}><FurnitureSprite type={item.type} /></div>)}
-          <button type="button" className="pr-actor" data-x={actor.x} data-y={actor.y} data-direction={direction} data-shirt={room.avatar.shirt} style={{ left: `${actor.x * 10 - 6}%`, bottom: `${(ROOM_HEIGHT - actor.y - 1) * 12.5}%`, zIndex: actor.y + 1, pointerEvents: decorating ? 'none' : 'auto' }} tabIndex={decorating ? -1 : 0} onClick={event => { event.stopPropagation(); speak(); }} aria-label={`내 캐릭터, ${actor.x + 1}열 ${actor.y + 1}행. 눌러서 말 걸어보기`}>
+          <button type="button" className="pr-actor" data-x={actor.x} data-y={actor.y} data-direction={direction} data-shirt={topToShirt(shop.equipped.top)} style={{ left: `${actor.x * 10 - 6}%`, bottom: `${(ROOM_HEIGHT - actor.y - 1) * 12.5}%`, zIndex: actor.y + 1, pointerEvents: decorating ? 'none' : 'auto' }} tabIndex={decorating ? -1 : 0} onClick={event => { event.stopPropagation(); speak(); }} aria-label={`내 캐릭터, ${actor.x + 1}열 ${actor.y + 1}행. 눌러서 말 걸어보기`}>
             {speech && <span className="pr-bubble" role="status">{speech}</span>}
-            <span className="pr-shadow" /><AvatarSprite direction={direction} frame={held || walkQueue.length > 0 ? frame : 0} walking={!!held || walkQueue.length > 0} shirt={room.avatar.shirt} />
+            <span className="pr-shadow" /><AvatarSprite direction={direction} frame={held || walkQueue.length > 0 ? frame : 0} walking={!!held || walkQueue.length > 0} shirt={topToShirt(shop.equipped.top)} />
           </button>
         </div>
       </div>
@@ -187,15 +230,71 @@ function RoomForUser({ userId, displayName, onExit, title, titleBadgeStyle, titl
     <div className="pr-sheet">
       <div className="pr-sheet-trigger">
         <button aria-pressed={sheetOpen && panel === 'clothes'} aria-expanded={sheetOpen && panel === 'clothes'} aria-controls="pr-sheet-panel" onClick={() => openPanel('clothes')}>옷</button>
-        <button aria-pressed={sheetOpen && panel === 'furniture'} aria-expanded={sheetOpen && panel === 'furniture'} aria-controls="pr-sheet-panel" onClick={() => openPanel('furniture')}>가구 <small>6</small></button>
+        <button aria-pressed={sheetOpen && panel === 'furniture'} aria-expanded={sheetOpen && panel === 'furniture'} aria-controls="pr-sheet-panel" onClick={() => openPanel('furniture')}>가구 <small>{ownedFurnitureTypes.size}</small></button>
+        <button aria-pressed={sheetOpen && panel === 'shop'} aria-expanded={sheetOpen && panel === 'shop'} aria-controls="pr-sheet-panel" onClick={() => openPanel('shop')}>상점 <small>{shop.ownedIds.size}/{PIXEL_CATALOG.length}</small></button>
       </div>
       {sheetOpen && <div className="pr-sheet-panel" id="pr-sheet-panel">
         {/* Visual-only duplicate: the live region that actually announces changes stays the one
            in .pr-below-room (always mounted) — this one is just here because the sheet panel
            visually covers that region while open, per Codex review finding #10. */}
         <p className="pr-sheet-status" aria-hidden="true">{message}</p>
-        {panel === 'clothes' ? <div className="pr-clothes"><div className="pr-portrait"><AvatarSprite direction="Front" frame={0} walking={false} shirt={room.avatar.shirt} /></div><div><h2>오늘은 어떤 색?</h2><p>가볍게 갈아입어 보세요.</p><div className="pr-swatches">{shirts.map(shirt => <button key={shirt.id} aria-pressed={room.avatar.shirt === shirt.id} onClick={() => { persist({ ...room, avatar: { ...room.avatar, shirt: shirt.id } }); setMessage(`${shirt.label} 옷으로 갈아입었어요.`); }}><i style={{ '--swatch': shirt.color } as CSSProperties} />{shirt.label}</button>)}</div></div></div>
-          : <><p className="pr-tool-hint">{decorating ? '가구를 선택 → 방의 칸을 터치. 배치한 가구도 다시 옮길 수 있어요.' : '꾸미기를 켜면 가구를 놓고 옮길 수 있어요.'}</p><div className="pr-catalog">{(Object.keys(FURNITURE) as FurnitureType[]).map(type => <button key={type} aria-pressed={selected === type} onClick={() => { enterDecorating(); setSelected(selected === type ? null : type); setMessage(`${names[type]}: 원하는 칸을 눌러 주세요.`); }}><span className="pr-catalog-art"><FurnitureSprite type={type} /></span><strong>{names[type]}</strong><small>{room.furniture.some(item => item.type === type) ? '배치 중' : '보유 1개'}</small></button>)}</div>{placed && <button className="rn-button rn-button-secondary pr-remove" onClick={() => { persist(removeFurniture(room, selected)); exitDecorating(`${names[selected]}을 보관함으로 돌려놓았어요. 이제 방을 누르면 그 자리로 걸어가요.`); }}>선택한 가구 치우기</button>}</>}
+        {panel === 'clothes' ? <div className="pr-clothes">
+          <div className="pr-portrait"><AvatarSprite direction="Front" frame={0} walking={false} shirt={topToShirt(shop.equipped.top)} /></div>
+          <div>
+            <h2>오늘은 어떤 색?</h2>
+            <p>보유한 옷 중에서 골라 입어요.</p>
+            <div className="pr-swatches">{avatarWardrobe.map(entry => {
+              const owned = entry.assetKey === null || shop.ownedIds.has(entry.itemId as string);
+              const isEquipped = (entry.assetKey ?? null) === (shop.equipped.top ?? null);
+              return <button key={entry.key} aria-pressed={isEquipped} disabled={!owned} onClick={() => {
+                if (!owned) { setMessage('상점에서 먼저 구매하면 입을 수 있어요.'); return; }
+                shop.equip('top', entry.assetKey);
+                setMessage(`${entry.label} 옷으로 갈아입었어요.`);
+              }}><i style={{ '--swatch': entry.color } as CSSProperties} />{entry.label}{!owned && <small> · {entry.price}P</small>}</button>;
+            })}</div>
+          </div>
+        </div>
+          : panel === 'furniture' ? <>
+            <p className="pr-tool-hint">{decorating ? '가구를 선택 → 방의 칸을 터치. 배치한 가구도 다시 옮길 수 있어요.' : '꾸미기를 켜면 가구를 놓고 옮길 수 있어요.'}</p>
+            {ownedFurnitureTypes.size === 0
+              ? <div className="pr-shop-empty"><p>아직 보유한 가구가 없어요.</p><button type="button" className="rn-button rn-button-secondary" onClick={() => setPanel('shop')}>상점 둘러보기</button></div>
+              : <div className="pr-catalog">{(Object.keys(FURNITURE) as FurnitureType[]).filter(type => ownedFurnitureTypes.has(type)).map(type => <button key={type} aria-pressed={selected === type} onClick={() => { enterDecorating(); setSelected(selected === type ? null : type); setMessage(`${names[type]}: 원하는 칸을 눌러 주세요.`); }}><span className="pr-catalog-art"><FurnitureSprite type={type} /></span><strong>{names[type]}</strong><small>{room.furniture.some(item => item.type === type) ? '배치 중' : '보유 1개'}</small></button>)}</div>}
+            {placed && <button className="rn-button rn-button-secondary pr-remove" onClick={() => { persist(removeFurniture(room, selected)); exitDecorating(`${names[selected]}을 보관함으로 돌려놓았어요. 이제 방을 누르면 그 자리로 걸어가요.`); }}>선택한 가구 치우기</button>}
+          </>
+          : <div className="pr-shop">
+            <p className="pr-shop-balance">보유 포인트 <strong>{shop.balance.toLocaleString()}P</strong></p>
+            {!shop.ready ? <p className="pr-shop-loading" role="status">구매 정보를 불러오는 중이에요…</p> : <div className="pr-shop-grid">
+              {PIXEL_CATALOG.map(item => {
+                const owned = shop.ownedIds.has(item.itemId);
+                const isAvatar = item.category === 'avatar';
+                const active = isAvatar ? shop.equipped.top === item.assetKey : room.furniture.some(furnitureItem => furnitureItem.type === item.assetKey);
+                const canAfford = shop.balance >= item.price;
+                const locked = !owned && !canAfford;
+                const busy = purchasingId === item.itemId;
+                const statusLabel = owned
+                  ? (isAvatar ? (active ? '장착 중' : '보유 중 · 탭해서 장착') : (active ? '배치됨' : '보유 중 · 가구 탭에서 배치'))
+                  : `${item.price}P`;
+                return <div key={item.itemId} className={`pr-shop-card ${active ? 'pr-shop-active' : ''} ${locked ? 'pr-shop-locked' : ''}`}>
+                  <span className="pr-shop-art" aria-hidden="true">{isAvatar
+                    ? <i className="pr-shop-swatch" style={{ '--swatch': topColors[item.assetKey] || '#c9a46b' } as CSSProperties} />
+                    : <FurnitureSprite type={item.assetKey as FurnitureType} />}</span>
+                  <strong className="pr-shop-name">{item.displayName}</strong>
+                  <span className="pr-shop-status">{statusLabel}</span>
+                  {locked && <span className="pr-shop-hint">🔒 포인트가 조금 모자라요</span>}
+                  {owned && isAvatar && !active && <button type="button" className="pr-shop-action" onClick={() => { shop.equip('top', item.assetKey); setMessage(`${item.displayName}으로 갈아입었어요.`); }}>장착하기</button>}
+                  {!owned && !locked && (confirmingId === item.itemId
+                    ? <div className="pr-shop-confirm">
+                      <p>{item.price}P로 구매할까요?</p>
+                      <div className="pr-shop-confirm-actions">
+                        <button type="button" disabled={busy} onClick={() => handlePurchase(item)}>{busy ? '구매 중…' : '구매'}</button>
+                        <button type="button" onClick={() => setConfirmingId(null)}>취소</button>
+                      </div>
+                    </div>
+                    : <button type="button" className="pr-shop-action" onClick={() => setConfirmingId(item.itemId)}>구매하기</button>)}
+                </div>;
+              })}
+            </div>}
+          </div>}
       </div>}
     </div>
   </section>;

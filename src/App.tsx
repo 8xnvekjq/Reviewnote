@@ -1535,6 +1535,8 @@ function App() {
                   themePrimary={pixelRoomTheme?.effectValue}
                   themeAccent={pixelRoomTheme?.themeAccentValue || pixelRoomTheme?.effectValue}
                   onSpeak={() => getRandomCheer(equippedItems.aiVoice)}
+                  pointsBalance={currentDisplayPoints}
+                  onPixelPurchase={newBalance => handleDeductPoints(currentDisplayPoints - newBalance)}
                 />
               );
             })()}
