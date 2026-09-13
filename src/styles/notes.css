@@ -30,6 +30,8 @@
 .rn-note-name-badge{position:absolute;top:8px;left:8px;display:flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;background:rgb(var(--color-indigo-600)/.92);color:#fff;font-size:11px;font-weight:800;backdrop-filter:blur(4px);max-width:calc(100% - 16px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* 스캐폴딩 힌트 overlay — 예전 초록 원형 배지(🧩)를 이미지 우하단에 복원. */
 .rn-note-scaffold-badge{position:absolute;bottom:8px;right:8px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--rn-success);border:1px solid var(--rn-success);opacity:.94;font-size:13px;backdrop-filter:blur(4px)}
+/* 복습체크에서 O 판정을 받아 "완벽!" 확정된 문제 — 이미지 우상단에 조용한 금색 배지 하나만. */
+.rn-note-mastered-badge{position:absolute;top:8px;right:8px;padding:3px 8px;border-radius:999px;background:var(--rn-warning);color:#3a2c06;font-size:10.5px;font-weight:800;backdrop-filter:blur(4px)}
 /* 상단 베젤 제거로 이미지 바로 아래가 body의 유일한 상단 여백이 되므로, 기존에 좁은
    화면(<359px)에서만 쓰던 tighter padding을 기본값으로 승격(카드 전체 compact화). */
 .rn-note-body{padding:8px 14px 4px}.rn-note-context{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;margin-top:3px}
