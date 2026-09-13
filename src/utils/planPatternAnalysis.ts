@@ -102,7 +102,8 @@ export interface PlanAggregateResult {
   alignedCount: number;
   evaluableCount: number; // 대책 + root_causes 둘 다 있어서 연결성을 판단할 수 있는 건수
   repeatedVague: boolean; // 같은 모호한 표현이 2회 이상 반복됐는지
-  interpretation: string[]; // 2~3문장
+  interpretation: string[]; // 2~3문장 — 관리자(교사)가 읽는 문구, "학생이 ~" 3인칭
+  interpretationForStudent: string[]; // 같은 판단을 학생 본인 시점으로 바꾼 문구(데이터는 동일, 문장만 다름)
 }
 
 function normalizeForDupCheck(text: string): string {
@@ -145,25 +146,35 @@ export function aggregatePlanPatterns(plans: PlanAggregateInput[]): PlanAggregat
 
   const repeatedVague = Object.values(vagueTexts).some(n => n >= 2);
 
+  // 판단 로직은 한 번만 계산하고, 문장만 역할별로 나눈다(관리자용 3인칭 "학생이 ~" / 학생
+  // 본인용 1인칭) — "다음 상담에서" 같은 교사 일정 표현도 학생용에서는 제거한다.
   const interpretation: string[] = [];
+  const interpretationForStudent: string[] = [];
   if (plans.length === 0) {
     interpretation.push('아직 대책을 작성한 오답이 없어요.');
+    interpretationForStudent.push('아직 대책을 작성한 오답이 없어요.');
   } else {
     const top = categoryCounts[0];
-    if (top) interpretation.push(CATEGORY_TEMPLATE[top.category]);
+    if (top) { interpretation.push(CATEGORY_TEMPLATE[top.category]); interpretationForStudent.push(CATEGORY_TEMPLATE[top.category]); }
     if (specificity.vague > 0 && (repeatedVague || specificity.vague >= Math.max(2, Math.ceil(plans.length * 0.3)))) {
-      interpretation.push('다만 "집중하기", "천천히 풀기"처럼 행동 기준이 넓은 표현도 반복되어, 다음 문제에서 바로 실행할 수 있는 순서로 바꿔보면 좋아요.');
+      const vagueLine = '다만 "집중하기", "천천히 풀기"처럼 행동 기준이 넓은 표현도 반복되어, 다음 문제에서 바로 실행할 수 있는 순서로 바꿔보면 좋아요.';
+      interpretation.push(vagueLine);
+      interpretationForStudent.push(vagueLine);
     }
     if (evaluableCount >= 3) {
       const alignRate = alignedCount / evaluableCount;
       if (alignRate >= 0.6) {
         interpretation.push('학생이 체크한 실수 유형과 대책이 대체로 잘 연결되어 있어요.');
+        interpretationForStudent.push('내가 체크한 실수 유형과 대책이 대체로 잘 연결되어 있어요.');
       } else if (alignRate < 0.35) {
         interpretation.push('학생이 체크한 실수 유형과 대책이 다른 방향을 향하는 경우가 있어 — 다음 상담에서 같이 짚어보면 좋아요.');
+        interpretationForStudent.push('내가 체크한 실수 유형과 대책이 다른 방향을 향할 때가 있어요 — 대책을 쓸 때 체크한 실수 유형을 먼저 다시 보면 좋아요.');
       }
     }
     if (specificity.unclear > 0 && specificity.unclear >= plans.length * 0.3) {
-      interpretation.push('짧은 메모라 의도를 판단하기 어려운 대책도 섞여 있어요.');
+      const unclearLine = '짧은 메모라 의도를 판단하기 어려운 대책도 섞여 있어요.';
+      interpretation.push(unclearLine);
+      interpretationForStudent.push(unclearLine);
     }
   }
 
@@ -175,5 +186,6 @@ export function aggregatePlanPatterns(plans: PlanAggregateInput[]): PlanAggregat
     evaluableCount,
     repeatedVague,
     interpretation: interpretation.slice(0, 3),
+    interpretationForStudent: interpretationForStudent.slice(0, 3),
   };
 }

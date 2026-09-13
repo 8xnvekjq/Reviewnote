@@ -7,7 +7,9 @@ import {
   RADAR_DISCLAIMER_STUDENT,
 } from '../../src/utils/examPrepAnalysis.ts';
 import { buildExamPrepStudentOptions } from '../../src/utils/examPrepStudents.ts';
-import { EXAM_PREP_TEST_USER_ID } from '../../src/utils/examPrepAccess.ts';
+import { canViewOwnExamPrep, EXAM_PREP_TEST_USER_ID } from '../../src/utils/examPrepAccess.ts';
+import { aggregatePlanPatterns } from '../../src/utils/planPatternAnalysis.ts';
+import { daysSince } from '../../src/utils/examPrepCommentFormat.ts';
 import type { MistakeEntry } from '../../src/types/index.ts';
 
 const GRADE = '공통수학2';
@@ -164,4 +166,45 @@ test('관리자 학생 선택기는 학년 제한 없이 학년 미상까지 포
   assert.deepEqual(students.map(student => student.id), ['middle', 'high1', 'high2', 'high3', 'unknown']);
   assert.equal(students.find(student => student.id === 'high3')?.count, 1);
   assert.equal(students.at(-1)?.grade, '');
+});
+
+test('시험대비 분석 본인 리포트는 모든 로그인 학생에게 열려 있다', () => {
+  assert.equal(canViewOwnExamPrep('any-logged-in-user'), true);
+  assert.equal(canViewOwnExamPrep(undefined), false);
+  assert.equal(canViewOwnExamPrep(''), false);
+});
+
+test('표본 경고는 N<=2와 N<8을 구분하고 얇은 표본을 안정적이라고 단정하지 않는다', () => {
+  const one = computeExamPrepReport([mistake({ id: 'one' })], 's1', '학생', GRADE, START, END, new Set());
+  assert.equal(one!.sampleWarning, '아직 반복되는 패턴을 판단하기에는 기록이 적어요.');
+  assert.ok(!one!.stableItems.some(item => item.includes('재도전(X)이 필요했던 문제가 시험범위 내에 없음')));
+
+  const fiveItems = Array.from({ length: 5 }, (_, i) => mistake({ id: `five-${i}` }));
+  const five = computeExamPrepReport(fiveItems, 's1', '학생', GRADE, START, END, new Set());
+  assert.match(five!.sampleWarning!, /참고용으로만 활용/);
+});
+
+test('관리자와 학생에게 우선순위·대책 해석 문구를 역할에 맞게 제공한다', () => {
+  const report = computeExamPrepReport([
+    mistake({ id: 'r1', rootCauses: ['calc'] }),
+    mistake({ id: 'r2', rootCauses: ['calc'] }),
+    mistake({ id: 'r3', rootCauses: ['calc'] }),
+  ], 's1', '학생', GRADE, START, END, new Set());
+  assert.match(report!.priorities[0].suggestion, /다시 풀리며/);
+  assert.match(report!.priorities[0].studentSuggestion, /다시 풀어보며/);
+
+  const planPattern = aggregatePlanPatterns(Array.from({ length: 4 }, () => ({
+    text: '조건을 다시 확인하겠다', rootCauses: ['calc'],
+  })));
+  assert.ok(planPattern.interpretation.some(line => line.includes('다음 상담')));
+  assert.ok(planPattern.interpretationForStudent.some(line => line.includes('내가')));
+  assert.ok(!planPattern.interpretationForStudent.some(line => line.includes('다음 상담')));
+});
+
+test('코멘트 경과일은 updated_at 날짜를 D+N으로 계산한다', () => {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23).toISOString();
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).toISOString();
+  assert.equal(daysSince(today), 0);
+  assert.equal(daysSince(yesterday), 1);
 });

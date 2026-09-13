@@ -23,8 +23,8 @@ const menus: { tab: ActiveTab; label: string; description: string; icon: AppIcon
   { tab: 'guide', label: '이용안내', description: '오답노트와 럭키상점 사용법', icon: 'help' },
   { tab: 'hidden', label: '숨긴 카드', description: '제외한 문제 확인과 다시 꺼내기', icon: 'eye', emoji: '🙈' },
 ];
-// 관리자는 학생별 전체 리포트, 1차 허용 대상 학생은 본인 리포트만 — 같은 tab('examPrep')으로
-// 들어가지만 라벨/설명만 역할에 따라 다르게 보여준다(둘 다 아니면 메뉴 자체가 없음).
+// 관리자는 학생별 전체 리포트, 그 외 로그인한 모든 학생은 본인 리포트만 — 같은 tab('examPrep')
+// 으로 들어가지만 라벨/설명만 역할에 따라 다르게 보여준다(로그아웃 상태면 메뉴 자체가 없음).
 const examPrepMenuAdmin: { tab: ActiveTab; label: string; description: string; icon: AppIconName } =
   { tab: 'examPrep', label: '시험대비 분석', description: '학생별 취약 단원과 수업 방향', icon: 'chart' };
 const examPrepMenuStudent: { tab: ActiveTab; label: string; description: string; icon: AppIconName } =
