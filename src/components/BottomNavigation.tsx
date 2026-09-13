@@ -8,6 +8,7 @@ interface BottomNavigationProps {
   activeTab: ActiveTab;
   setActiveTab: (tab: ActiveTab) => void;
   isAdmin?: boolean;
+  canAccessPixelWorld?: boolean;
   currentUserId?: string;
   onlineUsers: { id: string; display_name: string; nickname?: string; username: string }[];
   onStartReviewSession?: () => void;
@@ -29,7 +30,7 @@ const examPrepMenuAdmin: { tab: ActiveTab; label: string; description: string; i
   { tab: 'examPrep', label: '시험대비 분석', description: '학생별 취약 단원과 수업 방향', icon: 'chart' };
 const examPrepMenuStudent: { tab: ActiveTab; label: string; description: string; icon: AppIconName } =
   { tab: 'examPrep', label: '나의 시험대비 분석', description: '내 취약 단원과 시험 전 우선순위', icon: 'chart' };
-export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, setActiveTab, isAdmin, currentUserId, onOpenSlideList }) => {
+export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, setActiveTab, isAdmin, canAccessPixelWorld, currentUserId, onOpenSlideList }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const select = (tab: ActiveTab) => { setActiveTab(tab); setMenuOpen(false); };
   const examPrepMenu = isAdmin ? examPrepMenuAdmin : canViewOwnExamPrep(currentUserId) ? examPrepMenuStudent : null;
@@ -57,7 +58,8 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, s
     <Sheet open={menuOpen} onClose={() => setMenuOpen(false)} title="나의 학습 공간">
       <div className="rn-menu-list">
         {/* Pixel World 소프트 런칭 — Phase 1(실제 포인트 구매) 검증 전까지 admin에게만 노출. */}
-        {currentUserId && isAdmin && <button type="button" className="rn-menu-row" aria-current={activeTab === 'pixelRoom' ? 'page' : undefined} onClick={() => select('pixelRoom')}><AppIcon name="user" /><span><strong>🎮 Pixel Room</strong><small>내 캐릭터와 작은 방 꾸미기</small></span><AppIcon name="arrow" width={16} /></button>}
+        {/* Pixel World 소프트 런칭 — Phase 2A(광장 실시간 테스트)까지는 admin + test 계정에게만 노출. */}
+        {currentUserId && canAccessPixelWorld && <button type="button" className="rn-menu-row" aria-current={activeTab === 'pixelRoom' ? 'page' : undefined} onClick={() => select('pixelRoom')}><AppIcon name="user" /><span><strong>🎮 Pixel Room</strong><small>내 캐릭터와 작은 방 꾸미기</small></span><AppIcon name="arrow" width={16} /></button>}
         {examPrepMenu && <button type="button" key={examPrepMenu.tab} className="rn-menu-row" aria-current={activeTab === examPrepMenu.tab ? 'page' : undefined} onClick={() => select(examPrepMenu.tab)}><AppIcon name={examPrepMenu.icon} /><span><strong>{examPrepMenu.label}</strong><small>{examPrepMenu.description}</small></span><AppIcon name="arrow" width={16} /></button>}
         {reviewCheckMenu && <button type="button" key={reviewCheckMenu.tab} className="rn-menu-row" aria-current={activeTab === reviewCheckMenu.tab ? 'page' : undefined} onClick={() => select(reviewCheckMenu.tab)}><AppIcon name={reviewCheckMenu.icon} /><span><strong>{reviewCheckMenu.label}</strong><small>{reviewCheckMenu.description}</small></span><AppIcon name="arrow" width={16} /></button>}
         {menus.map(item => <button type="button" key={item.tab} className="rn-menu-row" aria-current={activeTab === item.tab ? 'page' : undefined} onClick={() => select(item.tab)}><AppIcon name={item.icon} /><span><strong>{item.label}{item.emoji ? ` ${item.emoji}` : ''}</strong><small>{item.description}</small></span><AppIcon name="arrow" width={16} /></button>)}

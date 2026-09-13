@@ -234,6 +234,13 @@ function App() {
   // 실시간·영구 적립하는 방식으로 바꿨다 (자세한 배점은 handleUpdateReviews의 pointsForStage 참고).
   // 그래서 여기서는 mistakes를 다시 훑지 않고 bonus_points를 그대로 잔액으로 쓴다.
   const currentDisplayPoints = Math.max(0, (myBonusPoints || 0) + pointAdjustment);
+
+  // Pixel World Phase 2A — 광장 테스트를 위해 admin뿐 아니라 기존 test 계정도 접근 가능하게 연다
+  // (그 외 일반 학생은 계속 차단). 새 판별 방식을 만들지 않고 GachaStore.tsx가 이미 쓰는
+  // "email이 test로 시작하면 테스트 계정" 기준을 그대로 재사용 — 메뉴 노출과 Screen 진입 guard
+  // 양쪽에 이 값 하나로 동일하게 적용한다.
+  const isTestAccount = (session?.user?.email || '').toLowerCase().startsWith('test');
+  const canAccessPixelWorld = isAdmin || isTestAccount;
   
   const prevTabRef = useRef(activeTab);
 
@@ -1504,6 +1511,7 @@ function App() {
             activeTab={activeTab}
             setActiveTab={setActiveTab}
             isAdmin={isAdmin}
+            canAccessPixelWorld={canAccessPixelWorld}
             currentUserId={session?.user?.id}
             onlineUsers={onlineUsers}
             onStartReviewSession={handleStartReviewSession}
@@ -1512,9 +1520,9 @@ function App() {
           />
         )}
       >
-        {/* Pixel World는 아직 시각/경제 실험 단계 — Phase 1(실제 포인트 구매)이 검증되기 전까지
-            소프트 런칭으로 admin(선생님 본인)에게만 열어둔다. 전체 학생 공개는 별도 결정. */}
-        <Screen when={activeTab === 'pixelRoom' && !!session?.user?.id && isAdmin} className="pr-screen-fill">
+        {/* Pixel World는 아직 시각/경제 실험 단계 — Phase 2A(광장 실시간 테스트)까지는
+            admin + test 계정에게만 열어둔다(canAccessPixelWorld). 전체 학생 공개는 별도 결정. */}
+        <Screen when={activeTab === 'pixelRoom' && !!session?.user?.id && canAccessPixelWorld} className="pr-screen-fill">
           <LazyScreenBoundary>
             {(() => {
               // Pixel Room은 gachaCatalog/aiVoiceCheers를 직접 import하지 않는 지연 로드 청크라
