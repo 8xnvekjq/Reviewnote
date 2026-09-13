@@ -68,11 +68,18 @@ export const avatarSheets: Record<AvatarAnimation, Record<AvatarDirection, Avata
 };
 
 export const avatarGeometry = { frameWidth: 32, frameHeight: 32, frames: 4, sheetWidth: 128 } as const;
-// Row numbers are zero based. Tops 0/1/2 are the red/green/blue short-sleeve variations.
-export const avatarTopRows = { red: 0, green: 1, blue: 2 } as const;
+
+// Verified against original composited rows, including every walk direction.
+export { AVATAR_ROW_BY_SLOT } from './shop/appearanceRows';
 
 export interface FurnitureArt { src: string; x: number; y: number; width: number; height: number; sheetWidth: number; sheetHeight: number }
-export const furnitureArt: Record<string, FurnitureArt> = {
+export const furnitureArt: Record<import('./model').FurnitureType, FurnitureArt> = {
+  roundtable: { src: interior, x: 48, y: 0, width: 48, height: 32, sheetWidth: 256, sheetHeight: 256 },
+  television: { src: interior, x: 192, y: 48, width: 32, height: 32, sheetWidth: 256, sheetHeight: 256 },
+  aquarium: { src: interior, x: 161, y: 160, width: 47, height: 32, sheetWidth: 256, sheetHeight: 256 },
+  globe: { src: interior, x: 80, y: 176, width: 16, height: 32, sheetWidth: 256, sheetHeight: 256 },
+  tallplant: { src: interior, x: 192, y: 112, width: 16, height: 48, sheetWidth: 256, sheetHeight: 256 },
+  floorlamp: { src: interior, x: 208, y: 128, width: 16, height: 32, sheetWidth: 256, sheetHeight: 256 },
   bed: { src: interior, x: 0, y: 32, width: 32, height: 48, sheetWidth: 256, sheetHeight: 256 },
   desk: { src: interior, x: 128, y: 128, width: 48, height: 32, sheetWidth: 256, sheetHeight: 256 },
   chair: { src: interior, x: 128, y: 48, width: 16, height: 32, sheetWidth: 256, sheetHeight: 256 },

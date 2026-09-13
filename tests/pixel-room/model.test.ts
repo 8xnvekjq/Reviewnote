@@ -65,7 +65,7 @@ test('validation rejects fractional/outside/unknown, duplicate and overlapping p
     Array.from({ length: 7 }, (_, x) => ({ type: 'chair', x, y: 0 })),
   ];
   for (const furniture of badPlacements) assert.equal(validateRoom({ ...defaultState(), furniture }), null, JSON.stringify(furniture));
-  assert.equal(Object.keys(FURNITURE).length, 6);
+  assert.equal(Object.keys(FURNITURE).length, 12);
 });
 
 test('placement observes footprints, touching edges, actor occupancy and immutability', () => {
