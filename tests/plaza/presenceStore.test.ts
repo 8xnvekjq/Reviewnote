@@ -187,3 +187,48 @@ test('presence sync는 매번 전체 목록을 완전히 대체한다(더 이상
   });
   assert.deepEqual([...synced.players.keys()], ['a']);
 });
+
+test('sweep-stale: updatedAt으로부터 staleAfterMs 넘게 아무 갱신이 없으면 제거한다(마지막 안전망)', () => {
+  const joined = plazaStoreReducer(createPlazaStoreState(), {
+    type: 'presence-join',
+    players: [makePlayer({ sessionId: 'stale-one', updatedAt: 1000 })],
+  });
+  const swept = plazaStoreReducer(joined, { type: 'sweep-stale', now: 1000 + 15_000 + 1, staleAfterMs: 15_000 });
+  assert.equal(swept.players.size, 0);
+});
+
+test('sweep-stale: staleAfterMs 이내면 살아있는 세션은 건드리지 않는다(동일 참조 반환)', () => {
+  const joined = plazaStoreReducer(createPlazaStoreState(), {
+    type: 'presence-join',
+    players: [makePlayer({ sessionId: 'fresh-one', updatedAt: 1000 })],
+  });
+  const swept = plazaStoreReducer(joined, { type: 'sweep-stale', now: 1000 + 15_000 - 1, staleAfterMs: 15_000 });
+  assert.strictEqual(swept, joined);
+});
+
+test('sweep-stale: 여러 세션 중 오래된 것만 골라서 제거하고 신선한 것은 남긴다', () => {
+  const joined = plazaStoreReducer(createPlazaStoreState(), {
+    type: 'presence-join',
+    players: [
+      makePlayer({ sessionId: 'old', updatedAt: 0 }),
+      makePlayer({ sessionId: 'new', updatedAt: 20_000 }),
+    ],
+  });
+  const swept = plazaStoreReducer(joined, { type: 'sweep-stale', now: 20_001, staleAfterMs: 15_000 });
+  assert.deepEqual([...swept.players.keys()], ['new']);
+});
+
+test('sweep-stale은 정상적인 presence-leave/broadcast 동작을 바꾸지 않는다(기존 정책 그대로)', () => {
+  // sweep-stale action 자체를 한 번도 dispatch하지 않는 한, 이미 통과하던 기존 12개 테스트의
+  // 시나리오(presence-join/leave/broadcast의 seq 정책)는 이 추가분과 전혀 상호작용하지 않는다 —
+  // 이 테스트는 그 사실을 broadcast 경로로 한 번 더 확인해 둔다(회귀 방지용).
+  const joined = plazaStoreReducer(createPlazaStoreState(), {
+    type: 'presence-join',
+    players: [makePlayer({ seq: 5, x: 10, y: 10 })],
+  });
+  const stale = plazaStoreReducer(joined, {
+    type: 'broadcast',
+    player: makePlayer({ seq: 3, x: 0, y: 0 }),
+  });
+  assert.deepEqual(stale.players.get('session-a'), makePlayer({ seq: 5, x: 10, y: 10 }));
+});
