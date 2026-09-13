@@ -7,8 +7,11 @@
    the bottom sheet can cap itself against the *real* remaining room height instead of raw dvh,
    which can't know how much the toolbar/error banner/trigger row above it are already using. */
 .pr-shell { max-width:680px; margin:0 auto; height:100%; display:flex; flex-direction:column; overflow-y:auto; overflow-x:hidden; position:relative; color:var(--rn-text); gap:6px; container-type:size; container-name:pr-shell; }
-.pr-toolbar { flex:0 0 auto; display:flex; justify-content:space-between; align-items:center; gap:8px; padding-top:2px; }
+.pr-toolbar { flex:0 0 auto; display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px; padding-top:2px; }
 .pr-toolbar .rn-button:first-child { padding-left:0; }
+/* 내 방/광장 toggle: a small two-tab group next to the back button (Phase 2A). Compact buttons
+   (existing rn-button-compact utility) keep 3-4 controls from overflowing a narrow phone toolbar. */
+.pr-view-tabs { display:flex; gap:6px; }
 .pr-storage-error { flex:0 0 auto; background:#6d432933; border:1px solid #e9b57755; color:#f2ce9c; padding:8px 10px; border-radius:8px; font-size:11px; line-height:1.5; }
 
 /* min-height keeps the room from collapsing to nothing in a pathologically short viewport (e.g. a
@@ -187,3 +190,23 @@
 .pr-wardrobe-grid>button[aria-pressed=true] { border-color:#b5d4c0; }
 .pr-wardrobe-grid strong { font-size:11px; font-weight:500; display:block; }
 @media(max-width:420px) { .pr-category-tabs { gap:4px; }.pr-category-tabs button { padding:0 9px; } }
+
+/* Pixel World Phase 2A — Plaza. Reuses the room's exact letterbox trick (.pr-stage/.pr-board,
+   container-type:size + cqw/cqh min()) and wood-frame chrome (.pr-room-frame/.pr-wall/.pr-threshold)
+   for visual consistency with the room, just at the plaza's wider 16x12 grid instead of 10x8 — see
+   the big comment on .pr-board above for why the letterbox recipe itself isn't touched here, only
+   overridden per-property. No furniture/camera/scroll: a single flat floor other players share. */
+.pr-plaza-board { aspect-ratio:16/12; background:repeating-linear-gradient(0deg,transparent 0,transparent calc(8.3333% - 1px),#b28b614a calc(8.3333% - 1px),#b28b614a 8.3333%),repeating-linear-gradient(90deg,#d5b589 0,#d5b589 6.1%,#c3a178 6.1%,#c3a178 6.25%); }
+.pr-plaza-grid { grid-template-columns:repeat(16,1fr); grid-template-rows:repeat(12,1fr); }
+/* Other players are appearance-only — no nickname/title/email/any identifying text renders near
+   them, ever (per the Phase 2A brief). Purely decorative, so aria-hidden + pointer-events:none. */
+.pr-plaza-actor, .pr-plaza-other { position:absolute; pointer-events:none; }
+.pr-plaza-actor .pr-avatar, .pr-plaza-other .pr-avatar { position:absolute; inset:0; }
+.pr-plaza-instructions { padding:0 2px; }
+@media(min-width:700px) {
+  /* Mirrors the room's own desktop override just above (.pr-stage { aspect-ratio:10/8 }) — the
+     plaza's stage needs the matching 16/12 ratio here too, since .pr-board switches to
+     width:100%/height:auto at this breakpoint and derives its height from whichever aspect-ratio
+     is live on it; without this the stage box would still be shaped for the room's 10/8 floor. */
+  .pr-plaza-frame .pr-stage { aspect-ratio:16/12; }
+}

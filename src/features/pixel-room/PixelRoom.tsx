@@ -6,6 +6,7 @@ import { AvatarSprite, FurnitureSprite } from './sprites';
 import type { PixelItem } from './shop/types';
 import { usePixelShop } from './usePixelShop';
 import { ShopPanel, Wardrobe } from './shop/CustomizationPanel';
+import Plaza from './plaza/Plaza';
 import './pixel-room.css';
 
 export type Direction = 'Front' | 'Back' | 'Left' | 'Right';
@@ -15,6 +16,7 @@ const names: Record<FurnitureType, string> = { bed: '포근한 침대', desk: '�
 const cells = Array.from({ length: ROOM_WIDTH * ROOM_HEIGHT }, (_, i) => ({ x: i % ROOM_WIDTH, y: Math.floor(i / ROOM_WIDTH) }));
 type WalkStep = { cell: Cell; direction: Direction };
 type Panel = 'clothes' | 'furniture' | 'shop';
+type PixelWorldView = 'room' | 'plaza';
 function stepDirection(from: Cell, to: Cell): Direction {
   if (to.x > from.x) return 'Right';
   if (to.x < from.x) return 'Left';
@@ -46,6 +48,7 @@ export default function PixelRoom(props: Props) {
 }
 
 function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, pointsBalance = 0, onPixelPurchase }: Props & { userId: string }) {
+  const [view, setView] = useState<PixelWorldView>('room');
   const [initial] = useState(() => loadRoom(userId, browserStorage()));
   const [room, setRoom] = useState(initial.state);
   const [actor, setActor] = useState(() => findSpawn(initial.state) ?? { x: 0, y: 7 });
@@ -112,9 +115,13 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
     const result = saveRoom(userId, next, browserStorage());
     setStorageError(result.ok ? '' : result.error);
   }
+  // Plaza toggle stops room movement immediately (not just on the next tick) when switching away,
+  // so no stray timer keeps stepping the actor while the room card isn't even shown.
+  useEffect(() => { if (view !== 'room') { setHeld(null); setWalkQueue([]); } }, [view]);
+
   // A single timer runs only during input. No animation loop remains after exit/blur.
   useEffect(() => {
-    if (!held || decorating) return;
+    if (!held || decorating || view !== 'room') return;
     function step() {
       const delta = directions[held!];
       setActor(previous => {
@@ -129,12 +136,12 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
     window.addEventListener('blur', stop);
     document.addEventListener('visibilitychange', stop);
     return () => { clearInterval(timer); window.removeEventListener('blur', stop); document.removeEventListener('visibilitychange', stop); };
-  }, [held, decorating, activeRoom]);
+  }, [held, decorating, view, activeRoom]);
 
   // Tap-to-walk consumes one precomputed step per tick; re-fires itself as walkQueue shrinks by
   // one each render, so it self-terminates without a manual interval to tear down mid-walk.
   useEffect(() => {
-    if (walkQueue.length === 0 || decorating || held) return;
+    if (walkQueue.length === 0 || decorating || held || view !== 'room') return;
     const [next, ...rest] = walkQueue;
     const timer = window.setTimeout(() => {
       setActor(previous => isCellFree(activeRoom, next.cell) ? next.cell : previous);
@@ -146,7 +153,7 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
     window.addEventListener('blur', stop);
     document.addEventListener('visibilitychange', stop);
     return () => { clearTimeout(timer); window.removeEventListener('blur', stop); document.removeEventListener('visibilitychange', stop); };
-  }, [walkQueue, decorating, held, activeRoom]);
+  }, [walkQueue, decorating, held, view, activeRoom]);
 
   function begin(next: Direction) { setWalkQueue([]); setDirection(next); setHeld(next); }
   function walkTo(target: Cell) {
@@ -184,13 +191,18 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
     <h1 className="sr-only">나만의 Pixel Room</h1>
     <header className="pr-toolbar">
       <button className="rn-button rn-button-ghost" onClick={onExit}>← Reviewnote</button>
-      <button className={`rn-button ${decorating ? 'rn-button-primary' : 'rn-button-secondary'}`} aria-pressed={decorating} onClick={() => {
+      <div className="pr-view-tabs" role="tablist" aria-label="Pixel World 화면 전환">
+        <button type="button" role="tab" aria-selected={view === 'room'} className={`rn-button rn-button-compact ${view === 'room' ? 'rn-button-primary' : 'rn-button-secondary'}`} onClick={() => setView('room')}>내 방</button>
+        <button type="button" role="tab" aria-selected={view === 'plaza'} className={`rn-button rn-button-compact ${view === 'plaza' ? 'rn-button-primary' : 'rn-button-secondary'}`} onClick={() => setView('plaza')}>광장</button>
+      </div>
+      {view === 'room' && <button className={`rn-button rn-button-compact ${decorating ? 'rn-button-primary' : 'rn-button-secondary'}`} aria-pressed={decorating} onClick={() => {
         if (decorating) exitDecorating('방을 누르면 그 자리로 걸어가요.');
         else { enterDecorating(); setMessage('가구를 고르고 방의 원하는 칸을 눌러 주세요.'); }
-      }}>{decorating ? '꾸미기 완료' : '꾸미기'}</button>
+      }}>{decorating ? '꾸미기 완료' : '꾸미기'}</button>}
     </header>
-    {storageError && <p className="pr-storage-error" role="alert">{storageError} 변경 내용은 현재 화면에서만 유지될 수 있어요.</p>}
-    <div className={`pr-room-frame ${decorating ? 'pr-decorating' : ''}`}>
+    {view === 'room' && storageError && <p className="pr-storage-error" role="alert">{storageError} 변경 내용은 현재 화면에서만 유지될 수 있어요.</p>}
+    {view === 'plaza' && <Plaza userId={userId} />}
+    {view === 'room' && <div className={`pr-room-frame ${decorating ? 'pr-decorating' : ''}`}>
       <div className="pr-wall" aria-hidden="true"><div className="pr-window"><i /><i /><i /><i /></div><span>HOME, SWEET HOME</span></div>
       <div className="pr-stage">
         <div ref={board} className={`pr-board ${decorating ? 'pr-board-edit' : ''}`} tabIndex={0} role="group" aria-label="내 방. 바닥을 눌러 이동하거나 방향키/WASD로 이동" aria-describedby="pr-instructions"
@@ -219,9 +231,9 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
         }}>{ { Back: '↑', Front: '↓', Left: '←', Right: '→' }[next]}</button>)}</div>}
         <button type="button" className="pr-dpad-toggle" aria-pressed={dpadOpen} onClick={() => setDpadOpen(open => !open)} aria-label={dpadOpen ? '방향키 숨기기' : '방향키로 이동하기'}>⛶</button>
       </div>}
-    </div>
-    <div className="pr-below-room"><p id="pr-instructions" className="pr-instructions" role="status">{message}</p></div>
-    <div className="pr-sheet">
+    </div>}
+    {view === 'room' && <div className="pr-below-room"><p id="pr-instructions" className="pr-instructions" role="status">{message}</p></div>}
+    {view === 'room' && <div className="pr-sheet">
       <div className="pr-sheet-trigger">
         <button aria-pressed={sheetOpen && panel === 'clothes'} aria-expanded={sheetOpen && panel === 'clothes'} aria-controls="pr-sheet-panel" onClick={() => openPanel('clothes')}>옷</button>
         <button aria-pressed={sheetOpen && panel === 'furniture'} aria-expanded={sheetOpen && panel === 'furniture'} aria-controls="pr-sheet-panel" onClick={() => openPanel('furniture')}>가구 <small>{ownedFurnitureTypes.size}</small></button>
@@ -243,6 +255,6 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
           : <ShopPanel shop={shop} room={activeRoom} busy={!!purchasingId} setMessage={setMessage} onPurchase={handlePurchase} onPlace={type => { enterDecorating(); setSelected(type); setMessage(`${names[type]}: 원하는 칸을 눌러 주세요.`); }} />}
 
       </div>}
-    </div>
+    </div>}
   </section>;
 }
