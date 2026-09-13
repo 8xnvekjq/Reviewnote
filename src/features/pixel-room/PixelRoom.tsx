@@ -16,7 +16,39 @@ const names: Record<FurnitureType, string> = { bed: '포근한 침대', desk: '�
 const cells = Array.from({ length: ROOM_WIDTH * ROOM_HEIGHT }, (_, i) => ({ x: i % ROOM_WIDTH, y: Math.floor(i / ROOM_WIDTH) }));
 type WalkStep = { cell: Cell; direction: Direction };
 type Panel = 'clothes' | 'furniture' | 'shop';
-type PixelWorldView = 'room' | 'plaza';
+
+// Pixel World Phase 2A rework — where you are. A third location (e.g. a future fishing spot)
+// plugs in the same way the plaza did: one more union member here, one more door-cell constant +
+// reach-effect (below), and one more conditionally-rendered branch in the JSX — the transition
+// plumbing itself (overlay/sessionId/lock) doesn't change. Deliberately NOT a generic
+// location-graph/config system — with only two places that would be speculative.
+type Location = 'room' | 'plaza';
+
+// The room's one door: bottom row, center-ish. Reaching this cell (by tap-to-move, keyboard, or
+// the D-pad — anything that ends in setActor) is the only way into the plaza now; there is no
+// fallback toggle. ROOM_SPAWN_FROM_PLAZA is one cell "in front of" the door, facing 'Back' — away
+// from the door, deeper into the room — so arriving reads as continuing the walk you were already
+// on, not turning around to face the door you just came through.
+const ROOM_DOOR: Cell = { x: 4, y: 7 };
+const ROOM_SPAWN_FROM_PLAZA: { cell: Cell; direction: Direction } = { cell: { x: 4, y: 6 }, direction: 'Back' };
+// Furniture can never cover the door or its landing cell — otherwise a fully-decorated room could
+// wall off the only way to the plaza (model.ts's canPlace has no door concept, so this is enforced
+// here instead, client-side, without touching that file's tested contract).
+const RESERVED_ROOM_CELLS: Cell[] = [ROOM_DOOR, ROOM_SPAWN_FROM_PLAZA.cell];
+function coversReservedCell(type: FurnitureType, position: Cell): boolean {
+  const size = FURNITURE[type];
+  return RESERVED_ROOM_CELLS.some(cell => cell.x >= position.x && cell.x < position.x + size.width && cell.y >= position.y && cell.y < position.y + size.height);
+}
+
+// Full-screen fade timing (see .pr-transition-overlay in pixel-room.css). DOOR_FADE_MS must match
+// that rule's CSS transition duration — the setTimeout below is how JS knows the cover fade has
+// visually finished before it swaps `location` and mounts the destination. PRESENCE_HEAD_START_MS
+// is extra time spent fully covered before revealing, so the plaza's realtime channel (mounted the
+// instant the screen goes opaque) has a head start on receiving presence-sync before anyone can see
+// an empty plaza.
+const DOOR_FADE_MS = 260;
+const PRESENCE_HEAD_START_MS = 140;
+
 function stepDirection(from: Cell, to: Cell): Direction {
   if (to.x > from.x) return 'Right';
   if (to.x < from.x) return 'Left';
@@ -48,7 +80,15 @@ export default function PixelRoom(props: Props) {
 }
 
 function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, pointsBalance = 0, onPixelPurchase }: Props & { userId: string }) {
-  const [view, setView] = useState<PixelWorldView>('room');
+  // Orchestrator state (Phase 2A rework): which screen is showing, the transition overlay, and a
+  // sessionId generated ONCE per component lifetime (not per plaza visit) — see Plaza.tsx's own
+  // comment on why a stable id matters for Presence's dedup. Everything below this remains the
+  // room's own state; the plaza owns its own movement state entirely inside Plaza.tsx.
+  const [location, setLocation] = useState<Location>('room');
+  const [sessionId] = useState(() => crypto.randomUUID());
+  const [overlayActive, setOverlayActive] = useState(false);
+  const transitionLockRef = useRef(false);
+
   const [initial] = useState(() => loadRoom(userId, browserStorage()));
   const [room, setRoom] = useState(initial.state);
   const [actor, setActor] = useState(() => findSpawn(initial.state) ?? { x: 0, y: 7 });
@@ -71,6 +111,40 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
   const ownedFurnitureTypes = useMemo(() => new Set(shop.catalog.filter(item => item.category === 'furniture' && shop.ownedIds.has(item.itemId)).map(item => item.assetKey as FurnitureType)), [shop.catalog, shop.ownedIds]);
   // Legacy local placements cannot grant ownership or leave invisible obstacles.
   const activeRoom = useMemo(() => ({ ...room, furniture: room.furniture.filter(item => ownedFurnitureTypes.has(item.type)) }), [room, ownedFurnitureTypes]);
+
+  // Walks the fade overlay to full opacity, swaps `location` (mounting the destination while the
+  // screen is fully covered — see the DOOR_FADE_MS/PRESENCE_HEAD_START_MS comment above), then
+  // fades back out. `transitionLockRef` blocks re-entry for the whole sequence so a double door
+  // hit (e.g. re-triggering right as the fade starts) can't stack two transitions.
+  function transitionTo(next: Location) {
+    if (transitionLockRef.current || next === location) return;
+    transitionLockRef.current = true;
+    setHeld(null);
+    setWalkQueue([]);
+    setOverlayActive(true);
+    window.setTimeout(() => {
+      if (next === 'room') { setActor(ROOM_SPAWN_FROM_PLAZA.cell); setDirection(ROOM_SPAWN_FROM_PLAZA.direction); }
+      setLocation(next);
+      window.setTimeout(() => {
+        setOverlayActive(false);
+        transitionLockRef.current = false;
+      }, PRESENCE_HEAD_START_MS);
+    }, DOOR_FADE_MS);
+  }
+
+  // Reaching the room door — fires from ANY movement path that ends in setActor (held-key tick,
+  // tap-to-walk queue, D-pad), since they all funnel through the same `actor` state watched here.
+  // Guarded against firing on the very first render: if a fully-decorated room's default spawn
+  // (model.ts's findSpawn, unrelated to and untouched by this rework) ever happened to land
+  // exactly on the door cell, we don't want mounting the room to instantly teleport into the
+  // plaza — only a real step onto the door should.
+  const skipDoorCheckRef = useRef(true);
+  useEffect(() => {
+    if (skipDoorCheckRef.current) { skipDoorCheckRef.current = false; return; }
+    if (location !== 'room' || decorating) return;
+    if (actor.x === ROOM_DOOR.x && actor.y === ROOM_DOOR.y) transitionTo('plaza');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actor, location, decorating]);
 
   async function handlePurchase(item: PixelItem) {
     if (purchasingId) return;
@@ -115,13 +189,13 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
     const result = saveRoom(userId, next, browserStorage());
     setStorageError(result.ok ? '' : result.error);
   }
-  // Plaza toggle stops room movement immediately (not just on the next tick) when switching away,
-  // so no stray timer keeps stepping the actor while the room card isn't even shown.
-  useEffect(() => { if (view !== 'room') { setHeld(null); setWalkQueue([]); } }, [view]);
+  // Leaving the room stops room movement immediately (not just on the next tick), so no stray
+  // timer keeps stepping the actor while the room card isn't even shown.
+  useEffect(() => { if (location !== 'room') { setHeld(null); setWalkQueue([]); } }, [location]);
 
   // A single timer runs only during input. No animation loop remains after exit/blur.
   useEffect(() => {
-    if (!held || decorating || view !== 'room') return;
+    if (!held || decorating || location !== 'room') return;
     function step() {
       const delta = directions[held!];
       setActor(previous => {
@@ -136,12 +210,12 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
     window.addEventListener('blur', stop);
     document.addEventListener('visibilitychange', stop);
     return () => { clearInterval(timer); window.removeEventListener('blur', stop); document.removeEventListener('visibilitychange', stop); };
-  }, [held, decorating, view, activeRoom]);
+  }, [held, decorating, location, activeRoom]);
 
   // Tap-to-walk consumes one precomputed step per tick; re-fires itself as walkQueue shrinks by
   // one each render, so it self-terminates without a manual interval to tear down mid-walk.
   useEffect(() => {
-    if (walkQueue.length === 0 || decorating || held || view !== 'room') return;
+    if (walkQueue.length === 0 || decorating || held || location !== 'room') return;
     const [next, ...rest] = walkQueue;
     const timer = window.setTimeout(() => {
       setActor(previous => isCellFree(activeRoom, next.cell) ? next.cell : previous);
@@ -153,7 +227,7 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
     window.addEventListener('blur', stop);
     document.addEventListener('visibilitychange', stop);
     return () => { clearTimeout(timer); window.removeEventListener('blur', stop); document.removeEventListener('visibilitychange', stop); };
-  }, [walkQueue, decorating, held, view, activeRoom]);
+  }, [walkQueue, decorating, held, location, activeRoom]);
 
   function begin(next: Direction) { setWalkQueue([]); setDirection(next); setHeld(next); }
   function walkTo(target: Cell) {
@@ -180,6 +254,7 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
       else setMessage('아래에서 놓을 가구를 먼저 골라 주세요.');
       return;
     }
+    if (coversReservedCell(selected, cell)) { setMessage('문 앞 칸에는 가구를 놓을 수 없어요.'); return; }
     const next = placeFurniture(activeRoom, selected, cell, actor);
     if (!next) { setMessage('가구와 캐릭터가 없는, 방 안의 빈 공간을 골라 주세요.'); return; }
     persist(next);
@@ -189,23 +264,24 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
   function openPanel(next: Panel) { setSheetOpen(open => !(open && panel === next)); setPanel(next); }
   return <section className="pr-shell" aria-label="Pixel Room" style={roomStyle}>
     <h1 className="sr-only">나만의 Pixel Room</h1>
+    {/* Full-screen fade — the ONLY transition between room and plaza (Phase 2A rework). While this
+       is opaque, `location` has already swapped and the destination is mounted underneath it, so
+       the plaza's realtime connection gets a head start before anyone can see it (see
+       transitionTo above). Sits above the toolbar too, on purpose. */}
+    <div className={`pr-transition-overlay${overlayActive ? ' pr-transition-active' : ''}`} aria-hidden="true" />
     <header className="pr-toolbar">
       <button className="rn-button rn-button-ghost" onClick={onExit}>← Reviewnote</button>
-      <div className="pr-view-tabs" role="tablist" aria-label="Pixel World 화면 전환">
-        <button type="button" role="tab" aria-selected={view === 'room'} className={`rn-button rn-button-compact ${view === 'room' ? 'rn-button-primary' : 'rn-button-secondary'}`} onClick={() => setView('room')}>내 방</button>
-        <button type="button" role="tab" aria-selected={view === 'plaza'} className={`rn-button rn-button-compact ${view === 'plaza' ? 'rn-button-primary' : 'rn-button-secondary'}`} onClick={() => setView('plaza')}>광장</button>
-      </div>
-      {view === 'room' && <button className={`rn-button rn-button-compact ${decorating ? 'rn-button-primary' : 'rn-button-secondary'}`} aria-pressed={decorating} onClick={() => {
+      {location === 'room' && <button className={`rn-button rn-button-compact ${decorating ? 'rn-button-primary' : 'rn-button-secondary'}`} aria-pressed={decorating} onClick={() => {
         if (decorating) exitDecorating('방을 누르면 그 자리로 걸어가요.');
         else { enterDecorating(); setMessage('가구를 고르고 방의 원하는 칸을 눌러 주세요.'); }
       }}>{decorating ? '꾸미기 완료' : '꾸미기'}</button>}
     </header>
-    {view === 'room' && storageError && <p className="pr-storage-error" role="alert">{storageError} 변경 내용은 현재 화면에서만 유지될 수 있어요.</p>}
-    {view === 'plaza' && <Plaza userId={userId} />}
-    {view === 'room' && <div className={`pr-room-frame ${decorating ? 'pr-decorating' : ''}`}>
+    {location === 'room' && storageError && <p className="pr-storage-error" role="alert">{storageError} 변경 내용은 현재 화면에서만 유지될 수 있어요.</p>}
+    {location === 'plaza' && <Plaza userId={userId} sessionId={sessionId} onReachEntrance={() => transitionTo('room')} />}
+    {location === 'room' && <div className={`pr-room-frame ${decorating ? 'pr-decorating' : ''}`}>
       <div className="pr-wall" aria-hidden="true"><div className="pr-window"><i /><i /><i /><i /></div><span>HOME, SWEET HOME</span></div>
       <div className="pr-stage">
-        <div ref={board} className={`pr-board ${decorating ? 'pr-board-edit' : ''}`} tabIndex={0} role="group" aria-label="내 방. 바닥을 눌러 이동하거나 방향키/WASD로 이동" aria-describedby="pr-instructions"
+        <div ref={board} className={`pr-board ${decorating ? 'pr-board-edit' : ''}`} tabIndex={0} role="group" aria-label="내 방. 바닥을 눌러 이동하거나 방향키/WASD로 이동. 아래쪽 문 칸으로 걸어가면 광장으로 이동해요." aria-describedby="pr-instructions"
           onKeyDown={event => {
             if (event.target !== event.currentTarget || decorating || event.altKey || event.ctrlKey || event.metaKey) return;
             const next = keys[event.key.length === 1 ? event.key.toLowerCase() : event.key];
@@ -232,8 +308,8 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
         <button type="button" className="pr-dpad-toggle" aria-pressed={dpadOpen} onClick={() => setDpadOpen(open => !open)} aria-label={dpadOpen ? '방향키 숨기기' : '방향키로 이동하기'}>⛶</button>
       </div>}
     </div>}
-    {view === 'room' && <div className="pr-below-room"><p id="pr-instructions" className="pr-instructions" role="status">{message}</p></div>}
-    {view === 'room' && <div className="pr-sheet">
+    {location === 'room' && <div className="pr-below-room"><p id="pr-instructions" className="pr-instructions" role="status">{message}</p></div>}
+    {location === 'room' && <div className="pr-sheet">
       <div className="pr-sheet-trigger">
         <button aria-pressed={sheetOpen && panel === 'clothes'} aria-expanded={sheetOpen && panel === 'clothes'} aria-controls="pr-sheet-panel" onClick={() => openPanel('clothes')}>옷</button>
         <button aria-pressed={sheetOpen && panel === 'furniture'} aria-expanded={sheetOpen && panel === 'furniture'} aria-controls="pr-sheet-panel" onClick={() => openPanel('furniture')}>가구 <small>{ownedFurnitureTypes.size}</small></button>

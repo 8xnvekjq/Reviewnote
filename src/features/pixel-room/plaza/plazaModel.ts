@@ -29,6 +29,11 @@ export function isInsidePlaza(cell: Cell): boolean {
     && cell.x >= 0 && cell.y >= 0 && cell.x < PLAZA_WIDTH && cell.y < PLAZA_HEIGHT;
 }
 
+// Pixel World Phase 2A rework — the plaza's one door back to the room. Bottom row, center-ish
+// (mirrors the room's own door convention in PixelRoom.tsx: a fixed cell on the near edge, not a
+// button). Walking onto this cell is the ONLY way back to the room now.
+export const PLAZA_ENTRANCE: Cell = { x: Math.floor(PLAZA_WIDTH / 2), y: PLAZA_HEIGHT - 1 };
+
 export function stepDirection(from: Cell, to: Cell): PlazaDirection {
   if (to.x > from.x) return 'Right';
   if (to.x < from.x) return 'Left';
@@ -40,10 +45,12 @@ export function moveOneStep(cell: Cell, direction: PlazaDirection): Cell {
   return { x: cell.x + delta.x, y: cell.y + delta.y };
 }
 
-/** Deterministic default spawn — bottom-center of the plaza, mirroring the room's near-the-door
- * spawn convention (no random persistence, no obstacles to avoid here). */
+/** Deterministic spawn for arriving FROM the room — one cell in front of (above) PLAZA_ENTRANCE,
+ * mirroring the room's own "one cell in front of the door" spawn convention (no random
+ * persistence, no obstacles to avoid here). The plaza has exactly one door, so this is the only
+ * spawn case; a future second entrance would just add its own spawn constant next to this one. */
 export function findSpawn(): Cell {
-  return { x: Math.floor(PLAZA_WIDTH / 2), y: PLAZA_HEIGHT - 1 };
+  return { x: PLAZA_ENTRANCE.x, y: PLAZA_ENTRANCE.y - 1 };
 }
 
 /** Shortest-path BFS over the 16x12 plaza grid, boundary-only (no furniture/dynamic obstacles —
