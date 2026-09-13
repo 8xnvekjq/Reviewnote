@@ -8,9 +8,32 @@ import { PLAZA_CHANNEL_NAME } from './types';
 
 const MOVE_BROADCAST_EVENT = 'move';
 
+// Reconnect backoff (Worker B rework, issue #2 — a channel that hits CHANNEL_ERROR/TIMED_OUT/
+// CLOSED used to stay silently dead for the rest of the session because only 'SUBSCRIBED' was
+// handled). Exponential with a low ceiling: doubles from 500ms up to a 10s cap, then keeps retrying
+// at the cap indefinitely for as long as this hook stays mounted — a live plaza screen should keep
+// trying to come back rather than ever giving up outright (a hard retry-count cap would just leave
+// the student staring at a frozen plaza with no way back short of a manual refresh).
+const RECONNECT_BASE_DELAY_MS = 500;
+const RECONNECT_MAX_DELAY_MS = 10_000;
+
+function reconnectDelayFor(attempt: number): number {
+  return Math.min(RECONNECT_BASE_DELAY_MS * 2 ** attempt, RECONNECT_MAX_DELAY_MS);
+}
+
+// Stale-entry sweep (Worker B rework, issue #4) — LAST-RESORT safety net only, per product
+// requirement ("stale timeout은 정상적인 퇴장 처리의 대체물이 아니라 마지막 안전망으로만 사용").
+// The primary leave mechanism is still presence-leave + this hook's deterministic cleanup below
+// (await untrack() before removeChannel). This sweep only ever catches the rare case where neither
+// of those fired (e.g. a tab killed hard enough that even beforeunload/leave never reached the
+// server). 15s: comfortably above the 170ms move tick and above a plausible missed-heartbeat
+// window, without being so long that a real ghost lingers noticeably.
+const STALE_TIMEOUT_MS = 15_000;
+const STALE_SWEEP_INTERVAL_MS = 5_000;
+
 export interface UsePlazaRealtimeResult {
   players: PlazaPlayerState[]; // everyone else currently in the plaza (not me)
-  ready: boolean;              // channel subscribed + initial presence sync received
+  ready: boolean;              // channel subscribed + initial presence sync received (false while reconnecting)
   updateMyState: (partial: { x: number; y: number; direction: PlazaDirection; moving: boolean }) => void;
 }
 
@@ -27,6 +50,27 @@ function flattenPresenceState(state: RealtimePresenceState<PlazaPlayerState>): P
   return players;
 }
 
+/** 채널을 정말로 안전하게 정리한다: untrack()의 leave push가 실제로 나갈 기회를 갖기 전에
+ * removeChannel()이 소켓/채널을 뜯어버리는 경합(Worker B rework, issue #3 — 기존에는
+ * `void channel.untrack(); void supabase.removeChannel(channel);`처럼 둘 다 기다리지 않고 쐈다)을
+ * 없애기 위해 untrack()을 먼저 await한 뒤에만 removeChannel()을 호출한다.
+ *
+ * (removeChannel 자체는 채널의 leave를 push한 뒤 소켓 연결을 정리하므로, untrack을 기다리지
+ * 않고 바로 이어 불러도 실전에서 유실되는 경우는 드물 것으로 보인다 — untrack의 push와
+ * removeChannel이 트리거하는 leave push가 같은 큐에 순서대로 올라가기 때문. 그래도 "기다리지
+ * 않아도 대체로 괜찮다"에 기대는 것과 "명시적으로 기다려서 보장한다"는 다르므로, 실질적 차이가
+ * 크든 작든 더 올바른 순서를 굳이 마다할 이유가 없어 이렇게 구현한다.) untrack이 실패해도(예:
+ * 이미 끊긴 소켓) removeChannel은 반드시 이어져야 하므로 catch로 삼킨다. */
+async function leaveChannelSafely(channel: RealtimeChannel): Promise<void> {
+  try {
+    await channel.untrack();
+  } catch {
+    // best-effort — 소켓이 이미 죽어 있으면 untrack 자체가 실패할 수 있다. 그래도 아래
+    // removeChannel은 반드시 실행되어야 로컬 채널 핸들/리스너가 남지 않는다.
+  }
+  void supabase.removeChannel(channel);
+}
+
 /** Pixel World Phase 2A — 광장(Plaza) 실시간 배선. presenceStore.ts의 순수 reducer 위에
  * Supabase Presence(현재 위치의 진실, 느림/무거움)와 Broadcast(이동 중 보간용, 빠름/가벼움)를
  * 얹는다. 정확한 라우팅 정책은 updateMyState 안의 주석 참고. */
@@ -36,10 +80,12 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
 
   const channelRef = useRef<RealtimeChannel | null>(null);
   // 이 세션 안에서 단조증가하는 시퀀스 — PlazaPlayerState.seq를 우리가 소유하고 채운다. 마운트마다
-  // (재접속마다) 0부터 다시 시작한다 — presenceStore.ts의 재접속 정책 주석 참고.
+  // (재접속마다) 0부터 다시 시작한다 — presenceStore.ts의 재접속 정책 주석 참고. 채널 재연결
+  // (reconnect)도 이 훅 입장에서는 "재접속"의 한 형태이므로 동일하게 0부터 다시 시작한다 —
+  // presence-join 경로는 seq를 비교하지 않으므로 이 리셋은 안전하다.
   const seqRef = useRef(0);
-  // 최근에 실제로 전송한 내 위치/방향/이동여부 — appearance만 바뀌어서 재track할 때도 최신 위치를
-  // 그대로 실어 보내기 위해 필요하다(updateMyState 호출 없이도 track 페이로드를 완성할 수 있게).
+  // 최근에 실제로 전송한 내 위치/방향/이동여부 — appearance만 바뀌어서 재track할 때도, 그리고
+  // 재연결로 새 채널을 만들 때도 최신 위치를 그대로 실어 보내기 위해 필요하다.
   const selfRef = useRef<{ x: number; y: number; direction: PlazaDirection; moving: boolean }>({
     x: 0,
     y: 0,
@@ -65,62 +111,122 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
   }
 
   // 채널 생성/구독/해체는 sessionId가 바뀔 때만 다시 한다(탭 하나에 sessionId 하나 — 보통 마운트
-  // 동안 고정값이다).
+  // 동안 고정값이다). 이 안에서 채널 (재)연결, 재연결 backoff, stale sweep까지 전부 소유한다.
   useEffect(() => {
     let cancelled = false;
-    seqRef.current = 0;
-    movingRef.current = false;
-    setReady(false);
+    let channel: RealtimeChannel | null = null;
+    let reconnectAttempt = 0;
+    let reconnectTimer: number | null = null;
 
-    // presence: { key: sessionId } — 같은 계정으로 연 여러 탭도 sessionId가 서로 달라서 독립된
-    // presence 항목으로 잡힌다(서로 덮어쓰지 않음).
-    const channel = supabase.channel(PLAZA_CHANNEL_NAME, {
-      config: { presence: { key: sessionId } },
-    });
-    channelRef.current = channel;
-
-    channel.on('presence', { event: 'sync' }, () => {
-      const players = flattenPresenceState(channel.presenceState<PlazaPlayerState>());
-      dispatch({ type: 'presence-sync', players });
-      // 늦게 들어온 학생이 '현재' 모두의 위치를 읽는 지점 — sync를 한 번이라도 받으면 광장의
-      // 초기 상태를 확보한 것이므로 여기서 ready로 전환한다.
-      if (!cancelled) setReady(true);
-    });
-
-    channel.on<PlazaPlayerState>('presence', { event: 'join' }, ({ newPresences }) => {
-      dispatch({ type: 'presence-join', players: newPresences });
-    });
-
-    channel.on<PlazaPlayerState>('presence', { event: 'leave' }, ({ leftPresences }) => {
-      dispatch({ type: 'presence-leave', sessionIds: leftPresences.map(presence => presence.sessionId) });
-    });
-
-    channel.on<PlazaPlayerState>('broadcast', { event: MOVE_BROADCAST_EVENT }, ({ payload }) => {
-      dispatch({ type: 'broadcast', player: payload });
-    });
-
-    channel.subscribe(status => {
-      if (cancelled) return;
-      if (status === 'SUBSCRIBED') {
-        seqRef.current += 1;
-        void channel.track(buildSelfState(seqRef.current));
+    function clearReconnectTimer() {
+      if (reconnectTimer !== null) {
+        window.clearTimeout(reconnectTimer);
+        reconnectTimer = null;
       }
-    });
+    }
+
+    function scheduleReconnect() {
+      if (cancelled || reconnectTimer !== null) return;
+      const delay = reconnectDelayFor(reconnectAttempt);
+      reconnectAttempt += 1;
+      reconnectTimer = window.setTimeout(() => {
+        reconnectTimer = null;
+        if (cancelled) return;
+        connect();
+      }, delay);
+    }
+
+    function connect() {
+      if (cancelled) return;
+      seqRef.current = 0;
+      movingRef.current = false;
+      setReady(false);
+
+      // presence: { key: sessionId } — 같은 계정으로 연 여러 탭도 sessionId가 서로 달라서 독립된
+      // presence 항목으로 잡힌다(서로 덮어쓰지 않음).
+      const nextChannel = supabase.channel(PLAZA_CHANNEL_NAME, {
+        config: { presence: { key: sessionId } },
+      });
+      channel = nextChannel;
+      channelRef.current = nextChannel;
+
+      nextChannel.on('presence', { event: 'sync' }, () => {
+        const players = flattenPresenceState(nextChannel.presenceState<PlazaPlayerState>());
+        dispatch({ type: 'presence-sync', players });
+        // 늦게 들어온 학생이 '현재' 모두의 위치를 읽는 지점 — sync를 한 번이라도 받으면 광장의
+        // 초기 상태를 확보한 것이므로 여기서 ready로 전환한다.
+        if (!cancelled) setReady(true);
+      });
+
+      nextChannel.on<PlazaPlayerState>('presence', { event: 'join' }, ({ newPresences }) => {
+        dispatch({ type: 'presence-join', players: newPresences });
+      });
+
+      nextChannel.on<PlazaPlayerState>('presence', { event: 'leave' }, ({ leftPresences }) => {
+        dispatch({ type: 'presence-leave', sessionIds: leftPresences.map(presence => presence.sessionId) });
+      });
+
+      nextChannel.on<PlazaPlayerState>('broadcast', { event: MOVE_BROADCAST_EVENT }, ({ payload }) => {
+        dispatch({ type: 'broadcast', player: payload });
+      });
+
+      nextChannel.subscribe(status => {
+        if (cancelled) return;
+        // 이 채널이 이미 다른 connect()/teardown에 의해 교체된 뒤 뒤늦게 도착한 이벤트라면
+        // 무시한다 — 그렇지 않으면 옛 채널의 트레일링 CLOSED 같은 이벤트가 "channel"이라는
+        // effect-scope 공유 변수를 통해 방금 새로 만든(진짜 살아있는) 채널을 잘못 죽이고 또
+        // 재연결을 스케줄하는 경합이 생긴다. nextChannel은 이 connect() 호출 하나에만 묶인
+        // const라 정확한 신원 확인이 된다.
+        if (channel !== nextChannel) return;
+        if (status === 'SUBSCRIBED') {
+          reconnectAttempt = 0; // 정상적으로 붙었으니 다음에 다시 끊기면 backoff를 처음부터 센다
+          seqRef.current += 1;
+          void nextChannel.track(buildSelfState(seqRef.current));
+          return;
+        }
+        // CHANNEL_ERROR / TIMED_OUT / CLOSED — 예전에는 여기서 아무것도 하지 않아서(issue #2) 한
+        // 번 끊기면 그 세션 내내 조용히 죽어 있었다. ready를 내려서 "재연결 중"임을 알 수 있게
+        // 하고, backoff를 두고 새 채널로 재연결을 시도한다. 지금 죽어가는 채널 자체는 다시
+        // subscribe()하지 않는다 — 이 라이브러리 버전은 채널이 'closed' 상태일 때만 subscribe()가
+        // 실제로 join을 재시도하므로(channelAdapter.isClosed() 가드), errored 상태에서 같은
+        // 인스턴스에 재호출하는 것보다 깨끗하게 새 채널을 만들어 스스로 재연결을 책임지는 쪽이
+        // 더 예측 가능하다.
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          setReady(false);
+          channel = null;
+          channelRef.current = null;
+          void leaveChannelSafely(nextChannel);
+          scheduleReconnect();
+        }
+      });
+    }
+
+    connect();
+
+    // 마지막 안전망(sweep-stale) — presenceStore.ts의 case 주석 참고. 정상 퇴장 신호가 어떤
+    // 이유로든 도착하지 못했을 때만 발동하도록, 주기적으로 "지금" 시각을 데이터로 넘겨 dispatch할
+    // 뿐 이 훅도 reducer도 판단 로직 자체를 따로 갖지 않는다.
+    const staleSweepTimer = window.setInterval(() => {
+      dispatch({ type: 'sweep-stale', now: Date.now(), staleAfterMs: STALE_TIMEOUT_MS });
+    }, STALE_SWEEP_INTERVAL_MS);
 
     // beforeunload에서의 untrack은 best-effort일 뿐이다(브라우저가 네트워크 요청을 끝까지
     // 보장해주지 않는다) — 진짜 안전망은 Supabase Presence 자신의 연결 끊김 감지(소켓이 끊기면
     // 서버가 자동으로 그 presence를 leave 처리)다. 여기서는 정상 종료 시 정리를 한 틱이라도
     // 앞당기는 정도의 역할만 한다.
-    const handleBeforeUnload = () => { void channel.untrack(); };
+    const handleBeforeUnload = () => { void channel?.untrack(); };
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
       cancelled = true;
+      clearReconnectTimer();
+      window.clearInterval(staleSweepTimer);
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      void channel.untrack();
-      void supabase.removeChannel(channel);
       channelRef.current = null;
       setReady(false);
+      const dying = channel;
+      channel = null;
+      if (dying) void leaveChannelSafely(dying);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
