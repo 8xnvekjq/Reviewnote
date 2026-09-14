@@ -26,9 +26,18 @@ function makePlayer(overrides: Partial<PlazaPlayerState> = {}): PlazaPlayerState
   };
 }
 
+// presence-join/sync의 새 액션 shape은 각 player마다 presence_ref(그 join/접속을 식별하는 값,
+// Supabase가 매 track()마다 새로 발급)를 함께 실어 보낸다 — presenceStore.ts의 PlazaStoreState.
+// presenceRefs 주석 참고. 테스트 대부분은 "정상적인 한 번의 join/leave 왕복"만 검증하면 되므로
+// 기본 ref 하나('ref-a')로 join과 leave를 짝지어 준다 — 실제 identity 검증(다른 ref의 leave는
+// 무시됨) 테스트는 별도로 아래에 둔다.
+function withRef(player: PlazaPlayerState, presenceRef = 'ref-a') {
+  return { player, presenceRef };
+}
+
 test('presence join이 새 플레이어를 추가한다', () => {
   const state = createPlazaStoreState();
-  const next = plazaStoreReducer(state, { type: 'presence-join', players: [makePlayer()] });
+  const next = plazaStoreReducer(state, { type: 'presence-join', players: [withRef(makePlayer())] });
   assert.equal(next.players.size, 1);
   assert.deepEqual(next.players.get('session-a'), makePlayer());
 });
@@ -36,25 +45,25 @@ test('presence join이 새 플레이어를 추가한다', () => {
 test('presence leave가 플레이어를 제거한다', () => {
   const joined = plazaStoreReducer(createPlazaStoreState(), {
     type: 'presence-join',
-    players: [makePlayer()],
+    players: [withRef(makePlayer())],
   });
-  const left = plazaStoreReducer(joined, { type: 'presence-leave', sessionIds: ['session-a'] });
+  const left = plazaStoreReducer(joined, { type: 'presence-leave', leaves: [{ sessionId: 'session-a', presenceRef: 'ref-a' }] });
   assert.equal(left.players.size, 0);
 });
 
 test('presence leave에 없는 sessionId를 넘기면 아무 변화 없다(동일 참조 반환)', () => {
   const joined = plazaStoreReducer(createPlazaStoreState(), {
     type: 'presence-join',
-    players: [makePlayer()],
+    players: [withRef(makePlayer())],
   });
-  const same = plazaStoreReducer(joined, { type: 'presence-leave', sessionIds: ['unknown'] });
+  const same = plazaStoreReducer(joined, { type: 'presence-leave', leaves: [{ sessionId: 'unknown', presenceRef: 'whatever' }] });
   assert.strictEqual(same, joined);
 });
 
 test('broadcast: seq가 저장된 값보다 크지 않으면(낮거나 같으면) 버린다 — 위치가 되돌아가지 않는다', () => {
   const joined = plazaStoreReducer(createPlazaStoreState(), {
     type: 'presence-join',
-    players: [makePlayer({ seq: 5, x: 10, y: 10 })],
+    players: [withRef(makePlayer({ seq: 5, x: 10, y: 10 }))],
   });
 
   const staleLower = plazaStoreReducer(joined, {
@@ -73,7 +82,7 @@ test('broadcast: seq가 저장된 값보다 크지 않으면(낮거나 같으면
 test('broadcast: seq가 저장된 값보다 크면 적용한다', () => {
   const joined = plazaStoreReducer(createPlazaStoreState(), {
     type: 'presence-join',
-    players: [makePlayer({ seq: 5, x: 10, y: 10 })],
+    players: [withRef(makePlayer({ seq: 5, x: 10, y: 10 }))],
   });
   const applied = plazaStoreReducer(joined, {
     type: 'broadcast',
@@ -95,13 +104,14 @@ test('재접속(같은 sessionId, seq가 이전보다 낮음): presence 경로�
   // 먼저 오래 있었던 세션 — seq가 많이 쌓였다.
   const before = plazaStoreReducer(createPlazaStoreState(), {
     type: 'presence-join',
-    players: [makePlayer({ seq: 42, x: 9, y: 9 })],
+    players: [withRef(makePlayer({ seq: 42, x: 9, y: 9 }), 'ref-old')],
   });
 
-  // 탭 새로고침 등으로 재접속 — 훅이 seq 카운터를 1부터 다시 시작해서 presence-join으로 재등장.
+  // 탭 새로고침 등으로 재접속 — 훅이 seq 카운터를 1부터 다시 시작해서 presence-join으로 재등장
+  // 한다(서버는 이 새 join에 새 presence_ref를 발급한다).
   const reconnected = plazaStoreReducer(before, {
     type: 'presence-join',
-    players: [makePlayer({ seq: 1, x: 0, y: 0, updatedAt: 5000 })],
+    players: [withRef(makePlayer({ seq: 1, x: 0, y: 0, updatedAt: 5000 }), 'ref-new')],
   });
 
   // 낮은 seq임에도 재접속 후 최신 상태(위치 0,0)가 반영되어야 한다 — presence는 seq를 비교하지
@@ -125,7 +135,7 @@ test('재접속(같은 sessionId, seq가 이전보다 낮음): presence 경로�
 test('getOtherPlayers: "나"의 sessionId는 목록에서 제외된다', () => {
   const state = plazaStoreReducer(createPlazaStoreState(), {
     type: 'presence-join',
-    players: [makePlayer({ sessionId: 'me' }), makePlayer({ sessionId: 'friend' })],
+    players: [withRef(makePlayer({ sessionId: 'me' })), withRef(makePlayer({ sessionId: 'friend' }))],
   });
   const others = getOtherPlayers(state, 'me');
   assert.equal(others.length, 1);
@@ -135,7 +145,7 @@ test('getOtherPlayers: "나"의 sessionId는 목록에서 제외된다', () => {
 test('getOtherPlayers: 아무도 제외되지 않는 sessionId를 넘기면 전원이 나온다', () => {
   const state = plazaStoreReducer(createPlazaStoreState(), {
     type: 'presence-join',
-    players: [makePlayer({ sessionId: 'a' }), makePlayer({ sessionId: 'b' })],
+    players: [withRef(makePlayer({ sessionId: 'a' })), withRef(makePlayer({ sessionId: 'b' }))],
   });
   const others = getOtherPlayers(state, 'nobody-here');
   assert.equal(others.length, 2);
@@ -145,7 +155,7 @@ test('appearance는 있는 그대로 왕복된다(값 손상 없음)', () => {
   const appearance = { top: 'sage', bottom: 'blue', shoes: 'red', hair: 'brown', eyes: 'green' };
   const state = plazaStoreReducer(createPlazaStoreState(), {
     type: 'presence-join',
-    players: [makePlayer({ appearance })],
+    players: [withRef(makePlayer({ appearance }))],
   });
   assert.deepEqual(state.players.get('session-a')?.appearance, appearance);
 });
@@ -160,7 +170,7 @@ test('PlazaPlayerState에 없는 여분 필드(예: presence_ref, 닉네임 등 
 
   const state = plazaStoreReducer(createPlazaStoreState(), {
     type: 'presence-join',
-    players: [rawWithExtraFields],
+    players: [withRef(rawWithExtraFields)],
   });
   const stored = state.players.get('session-a');
   assert.ok(stored);
@@ -181,11 +191,11 @@ test('PlazaPlayerState에 없는 여분 필드(예: presence_ref, 닉네임 등 
 test('presence sync는 매번 전체 목록을 완전히 대체한다(더 이상 sync에 없는 세션은 사라짐)', () => {
   const joined: PlazaStoreState = plazaStoreReducer(createPlazaStoreState(), {
     type: 'presence-join',
-    players: [makePlayer({ sessionId: 'a' }), makePlayer({ sessionId: 'b' })],
+    players: [withRef(makePlayer({ sessionId: 'a' })), withRef(makePlayer({ sessionId: 'b' }))],
   });
   const synced = plazaStoreReducer(joined, {
     type: 'presence-sync',
-    players: [makePlayer({ sessionId: 'a' })], // b는 이제 sync에 없다 — 나간 것으로 취급
+    players: [withRef(makePlayer({ sessionId: 'a' }))], // b는 이제 sync에 없다 — 나간 것으로 취급
   });
   assert.deepEqual([...synced.players.keys()], ['a']);
 });
@@ -197,7 +207,7 @@ test('버그 회귀 방지: 15초 이상 정지해 있어도(broadcast/track 없
   // 없어야 한다 — 더 이상 시간 기반으로 제거하는 경로가 전혀 없다는 것을 확인한다.
   const joined = plazaStoreReducer(createPlazaStoreState(), {
     type: 'presence-join',
-    players: [makePlayer({ sessionId: 'idle-one', updatedAt: 1000 })],
+    players: [withRef(makePlayer({ sessionId: 'idle-one', updatedAt: 1000 }))],
   });
   assert.strictEqual(joined.players.size, 1);
   assert.ok(joined.players.has('idle-one'));
@@ -208,9 +218,9 @@ test('버그 회귀 방지: 15초 이상 정지해 있어도(broadcast/track 없
 test('presence leave는 즉시(다른 조건 없이) 플레이어를 제거한다', () => {
   const joined = plazaStoreReducer(createPlazaStoreState(), {
     type: 'presence-join',
-    players: [makePlayer({ sessionId: 'leaving-one', updatedAt: 1000 })],
+    players: [withRef(makePlayer({ sessionId: 'leaving-one', updatedAt: 1000 }))],
   });
-  const left = plazaStoreReducer(joined, { type: 'presence-leave', sessionIds: ['leaving-one'] });
+  const left = plazaStoreReducer(joined, { type: 'presence-leave', leaves: [{ sessionId: 'leaving-one', presenceRef: 'ref-a' }] });
   assert.equal(left.players.size, 0);
   assert.ok(!left.players.has('leaving-one'));
 });
@@ -224,7 +234,7 @@ test('이동 후 정지 상태가 그대로 유지된다(정지했다고 값이 
   // 재현한다(실제 훅에서는 track, 여기서는 reducer 레벨이라 presence-join으로 대체 가능).
   const stopped = plazaStoreReducer(moved, {
     type: 'presence-join',
-    players: [makePlayer({ sessionId: 'walker', seq: 2, x: 3, y: 4, moving: false })],
+    players: [withRef(makePlayer({ sessionId: 'walker', seq: 2, x: 3, y: 4, moving: false }))],
   });
   assert.deepEqual(
     stopped.players.get('walker'),
@@ -237,7 +247,7 @@ test('이동 후 정지 상태가 그대로 유지된다(정지했다고 값이 
 test('정지 후 다시 이동해도 같은 sessionId는 갱신될 뿐 중복 생성되지 않는다', () => {
   const stopped = plazaStoreReducer(createPlazaStoreState(), {
     type: 'presence-join',
-    players: [makePlayer({ sessionId: 'walker', seq: 2, x: 3, y: 4, moving: false })],
+    players: [withRef(makePlayer({ sessionId: 'walker', seq: 2, x: 3, y: 4, moving: false }))],
   });
   const movedAgain = plazaStoreReducer(stopped, {
     type: 'broadcast',
@@ -305,7 +315,7 @@ test('presence-join(이동 정지 전이 포함)도 경로에 좌표를 추가�
   });
   const stopped = plazaStoreReducer(moved, {
     type: 'presence-join',
-    players: [makePlayer({ sessionId: 'walker', seq: 2, x: 2, y: 0, moving: false })],
+    players: [withRef(makePlayer({ sessionId: 'walker', seq: 2, x: 2, y: 0, moving: false }))],
   });
   assert.deepEqual(getPathSince(stopped.paths, 'walker', -1), [
     { x: 1, y: 0, seq: 1 },
@@ -320,7 +330,7 @@ test('presence-sync는 경로를 그 순간 위치 하나로 리셋한다(그 �
   });
   const synced = plazaStoreReducer(moved, {
     type: 'presence-sync',
-    players: [makePlayer({ sessionId: 'walker', seq: 5, x: 9, y: 9 })],
+    players: [withRef(makePlayer({ sessionId: 'walker', seq: 5, x: 9, y: 9 }))],
   });
   assert.deepEqual(getPathSince(synced.paths, 'walker', -1), [{ x: 9, y: 9, seq: 5 }]);
 });
@@ -330,7 +340,11 @@ test('presence-leave는 해당 세션의 경로 이력도 함께 지운다', () 
     type: 'broadcast',
     player: makePlayer({ sessionId: 'walker', seq: 1, x: 1, y: 0 }),
   });
-  const left = plazaStoreReducer(moved, { type: 'presence-leave', sessionIds: ['walker'] });
+  const joined = plazaStoreReducer(moved, {
+    type: 'presence-join',
+    players: [withRef(makePlayer({ sessionId: 'walker', seq: 1, x: 1, y: 0 }), 'ref-a')],
+  });
+  const left = plazaStoreReducer(joined, { type: 'presence-leave', leaves: [{ sessionId: 'walker', presenceRef: 'ref-a' }] });
   assert.deepEqual(getPathSince(left.paths, 'walker', -1), []);
 });
 
@@ -357,4 +371,75 @@ test('낡은/순서 뒤바뀐 broadcast(거부됨)는 players뿐 아니라 paths
     player: makePlayer({ sessionId: 's', seq: 3, x: 0, y: 0 }), // 이미 거부되는 낡은 메시지
   });
   assert.deepEqual(getPathSince(stale.paths, 's', -1), [{ x: 5, y: 0, seq: 5 }]);
+});
+
+// --- 퇴장/재입장(leave/rejoin) lifecycle 버그(2026-09) 수정 검증 ---
+//
+// 실제 원인: 광장을 나가면(Plaza unmount) usePlazaRealtime.ts가 untrack()을 비동기로(fire-and-
+// forget) 보낸다. 사용자가 곧바로 다시 들어오면(Plaza remount) 새 join의 track()이 먼저
+// 서버/다른 클라이언트에 도착하고, 나갈 때 보낸 leave가 그 뒤에야 뒤늦게 도착할 수 있다 —
+// 예전 reducer는 leave를 sessionId만 보고 지웠으므로, 이 뒤늦은 leave가 방금 재입장한 진짜
+// 최신 세션을 통째로 지워버렸다(tests/plaza/lifecycle.browser.mjs가 실제 브라우저로 재현).
+// presence_ref(그 join의 식별자)를 함께 기억해 두고, "지금 아는 join과 다른 leave"는 무시하는
+// 것으로 고쳤다.
+test('presence-leave: 이미 새 join(다른 presenceRef)으로 대체된 세션에 대한 뒤늦은 leave는 무시한다', () => {
+  const firstJoin = plazaStoreReducer(createPlazaStoreState(), {
+    type: 'presence-join',
+    players: [withRef(makePlayer({ sessionId: 'walker', seq: 1, x: 1, y: 0 }), 'ref-old')],
+  });
+  // 사용자가 곧바로 재입장 — 새 join, 새 presence_ref, 새 seq(0부터).
+  const rejoined = plazaStoreReducer(firstJoin, {
+    type: 'presence-join',
+    players: [withRef(makePlayer({ sessionId: 'walker', seq: 1, x: 5, y: 5 }), 'ref-new')],
+  });
+  assert.deepEqual(rejoined.players.get('walker'), makePlayer({ sessionId: 'walker', seq: 1, x: 5, y: 5 }));
+
+  // 나갈 때 보냈던 leave가 이제야(재입장보다 늦게) 도착한다 — ref-old 그대로.
+  const afterStaleLeave = plazaStoreReducer(rejoined, {
+    type: 'presence-leave',
+    leaves: [{ sessionId: 'walker', presenceRef: 'ref-old' }],
+  });
+  // 무시돼야 한다 — 방금 재입장한 walker가 화면에서 사라지면 안 된다.
+  assert.strictEqual(afterStaleLeave, rejoined);
+  assert.deepEqual(afterStaleLeave.players.get('walker'), makePlayer({ sessionId: 'walker', seq: 1, x: 5, y: 5 }));
+  assert.ok(afterStaleLeave.players.has('walker'));
+});
+
+test('presence-leave: 진짜 현재 join(같은 presenceRef)에 대한 leave는 정상적으로 제거한다', () => {
+  const joined = plazaStoreReducer(createPlazaStoreState(), {
+    type: 'presence-join',
+    players: [withRef(makePlayer({ sessionId: 'walker' }), 'ref-current')],
+  });
+  const left = plazaStoreReducer(joined, {
+    type: 'presence-leave',
+    leaves: [{ sessionId: 'walker', presenceRef: 'ref-current' }],
+  });
+  assert.ok(!left.players.has('walker'));
+  assert.deepEqual(getPathSince(left.paths, 'walker', -1), []);
+});
+
+test('presence-leave: 한 번도 join으로 본 적 없는 세션의 leave는 조용히 무시한다(모르는 걸 지우지 않음)', () => {
+  const state = createPlazaStoreState();
+  const result = plazaStoreReducer(state, {
+    type: 'presence-leave',
+    leaves: [{ sessionId: 'ghost', presenceRef: 'ref-unknown' }],
+  });
+  assert.strictEqual(result, state);
+});
+
+test('presence-join은 재입장마다 presenceRef를 최신 것으로 갱신한다(그 뒤의 진짜 leave는 정상 처리)', () => {
+  const firstJoin = plazaStoreReducer(createPlazaStoreState(), {
+    type: 'presence-join',
+    players: [withRef(makePlayer({ sessionId: 'walker' }), 'ref-1')],
+  });
+  const rejoined = plazaStoreReducer(firstJoin, {
+    type: 'presence-join',
+    players: [withRef(makePlayer({ sessionId: 'walker', x: 9 }), 'ref-2')],
+  });
+  // 최신 ref(ref-2)에 대한 leave는 정상적으로 제거돼야 한다.
+  const left = plazaStoreReducer(rejoined, {
+    type: 'presence-leave',
+    leaves: [{ sessionId: 'walker', presenceRef: 'ref-2' }],
+  });
+  assert.ok(!left.players.has('walker'));
 });
