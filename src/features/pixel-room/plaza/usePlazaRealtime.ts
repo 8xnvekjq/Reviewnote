@@ -79,7 +79,12 @@ function flattenPresenceState(state: RealtimePresenceState<PlazaPlayerState>): A
  * removeChannel이 트리거하는 leave push가 같은 큐에 순서대로 올라가기 때문. 그래도 "기다리지
  * 않아도 대체로 괜찮다"에 기대는 것과 "명시적으로 기다려서 보장한다"는 다르므로, 실질적 차이가
  * 크든 작든 더 올바른 순서를 굳이 마다할 이유가 없어 이렇게 구현한다.) untrack이 실패해도(예:
- * 이미 끊긴 소켓) removeChannel은 반드시 이어져야 하므로 catch로 삼킨다. */
+ * 이미 끊긴 소켓) removeChannel은 반드시 이어져야 하므로 catch로 삼킨다.
+ *
+ * removeChannel() 자체가 await한다(RealtimeClient.removeChannel: `await channel.unsubscribe()`
+ * — 서버의 leave ack를 기다리는 진짜 네트워크 왕복, 곧바로 끝나지 않는다) — 이 함수가 반환하는
+ * Promise는 그 왕복까지 전부 끝난 뒤에야 resolve된다. 호출자(connect())가 이 Promise를
+ * plazaVisitTeardown에 등록해 두는 이유는 바로 아래 주석 참고. */
 async function leaveChannelSafely(channel: RealtimeChannel): Promise<void> {
   try {
     await channel.untrack();
@@ -87,7 +92,40 @@ async function leaveChannelSafely(channel: RealtimeChannel): Promise<void> {
     // best-effort — 소켓이 이미 죽어 있으면 untrack 자체가 실패할 수 있다. 그래도 아래
     // removeChannel은 반드시 실행되어야 로컬 채널 핸들/리스너가 남지 않는다.
   }
-  void supabase.removeChannel(channel);
+  await supabase.removeChannel(channel);
+}
+
+// 모듈 스코프(훅 인스턴스가 아니라 이 파일 자체에 하나) — 퇴장/재입장 lifecycle 버그(2026-09)의
+// 실제 원인을 여기서 고친다. node_modules/@supabase/realtime-js/dist/main/RealtimeClient.js를
+// 직접 읽어 확인: `channel(topic, params)`는 "같은 topic의 채널이 이미 있으면 새로 안 만들고
+// 그 기존 채널을 그대로 돌려준다"(주어진 config는 그 경우 완전히 무시됨) — 그리고
+// `removeChannel(channel)`은 `await channel.unsubscribe()`(서버의 leave ack를 기다리는 진짜
+// 네트워크 왕복)가 끝난 뒤에야 `channel.teardown()`을 불러 그 채널을 topic 레지스트리에서 뺀다.
+// PLAZA_CHANNEL_NAME은 광장의 모든 방문자가 공유하는 하나의 topic이므로, 사용자가 광장을
+// 나갔다가(Plaza unmount → leaveChannelSafely가 백그라운드에서 진행 중) 그 unsubscribe ack가
+// 오기 전에 빠르게 다시 들어오면(Plaza remount → connect()가 다시 supabase.channel(같은 topic,
+// ...)을 부름), 새 연결이라고 믿었던 nextChannel이 사실은 "아직 안 끝난 퇴장" 중인 바로 그
+// 이전 채널 객체를 그대로 돌려받는다 — 거기에 .on() 리스너를 또 등록하고(중복 누적), 이미
+// unsubscribe 중인 채널에 subscribe()/track()을 다시 걸어 join/leave 순서가 뒤섞인다. presence_ref
+// 신원 확인(presenceStore.ts)은 "받은 이벤트를 어떻게 해석할지"를 고쳤지만, 이건 그 이전 단계 —
+// "애초에 이벤트를 잘못된 채널 객체에 걸고 있었다"는 문제라 별도로 고쳐야 한다.
+//
+// 고치는 법: "이번 방문의 퇴장이 실제로 끝났다"를 Promise로 추적해 두고, 다음 connect()(재입장이든
+// 같은 마운트 안의 재연결이든)는 supabase.channel()을 부르기 전에 그 Promise를 먼저 기다린다 —
+// timeout이 아니라 실제 비동기 작업이 끝났다는 진짜 신호를 기다리는 것이다. 새 방문(visit)은 이전
+// 방문의 presence가 topic 레지스트리에서 확실히 사라진 뒤에만 시작된다.
+let plazaVisitTeardown: Promise<void> | null = null;
+
+function beginPlazaVisitTeardown(channel: RealtimeChannel): void {
+  // .catch(()=>{})로 감싼 버전을 추적한다 — connect()가 이 Promise를 곧바로 await하므로, 여기서
+  // reject가 새어나가면 unhandled rejection이 되는 데다 connect() 자체가 채널을 만들어보지도
+  // 못하고 중단된다. leaveChannelSafely는 best-effort 정리일 뿐이라 실패해도 다음 방문을
+  // 막을 이유가 없다 — 실패했든 성공했든 "이전 방문 정리 시도가 끝났다"는 사실만 중요하다.
+  const teardown = leaveChannelSafely(channel).catch(() => {});
+  plazaVisitTeardown = teardown;
+  void teardown.finally(() => {
+    if (plazaVisitTeardown === teardown) plazaVisitTeardown = null;
+  });
 }
 
 /** Pixel World Phase 2A — 광장(Plaza) 실시간 배선. presenceStore.ts의 순수 reducer 위에
@@ -168,8 +206,17 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
       }, delay);
     }
 
-    function connect() {
+    async function connect() {
       if (cancelled) return;
+      // 이전 방문(같은 topic의 이전 채널)의 퇴장이 아직 끝나지 않았으면 기다린다 — 그러지 않으면
+      // supabase.channel()이 아직 unsubscribe 중인 옛 채널 객체를 그대로 돌려줄 수 있다(위
+      // plazaVisitTeardown 주석 참고). 광장을 빠르게 왕복하지 않는 보통의 경우엔 이 시점에 이미
+      // null이라 사실상 대기 없이 지나간다.
+      if (plazaVisitTeardown) {
+        plazaDebugLog('channel:awaiting-previous-teardown', sessionId, {});
+        await plazaVisitTeardown;
+        if (cancelled) return;
+      }
       plazaDebugLog('channel:connect', sessionId, { previousSeq: seqRef.current, reconnectAttempt });
       // seqRef는 여기서 리셋하지 않는다 — 위 seqRef 선언부 주석 참고(리셋하면 재연결 후 seq가
       // 스무딩 커서보다 작아져 상대 화면에서 "제자리 걷기"가 재현된다). movingRef만 리셋한다:
@@ -180,7 +227,9 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
       setReady(false);
 
       // presence: { key: sessionId } — 같은 계정으로 연 여러 탭도 sessionId가 서로 달라서 독립된
-      // presence 항목으로 잡힌다(서로 덮어쓰지 않음).
+      // presence 항목으로 잡힌다(서로 덮어쓰지 않음). 위에서 plazaVisitTeardown을 기다렸으므로
+      // 이 시점엔 같은 topic의 이전 채널이 레지스트리에서 확실히 빠져 있다 — supabase.channel()이
+      // 그 옛 채널을 재사용하지 않고 진짜 새 채널을 만든다.
       const nextChannel = supabase.channel(PLAZA_CHANNEL_NAME, {
         config: { presence: { key: sessionId } },
       });
@@ -243,7 +292,7 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
           setReady(false);
           channel = null;
           channelRef.current = null;
-          void leaveChannelSafely(nextChannel);
+          beginPlazaVisitTeardown(nextChannel);
           scheduleReconnect();
         }
       });
@@ -266,7 +315,7 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
       setReady(false);
       const dying = channel;
       channel = null;
-      if (dying) void leaveChannelSafely(dying);
+      if (dying) beginPlazaVisitTeardown(dying);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
