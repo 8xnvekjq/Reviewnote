@@ -34,18 +34,6 @@
 .pr-room-frame.pr-plaza-frame { justify-content:center; }
 .pr-plaza-frame .pr-stage { flex:0 0 auto; width:100%; aspect-ratio:16/12; max-height:max(140px,calc(100cqh - 160px)); }
 .pr-plaza-frame .pr-plaza-board { width:min(100cqw,133.333cqh); }
-.pr-plaza-frame .pr-stage { max-height:max(140px,calc(100cqh - 350px)); }
-.pr-plaza-activities { flex:none; padding-top:12px; }
-.pr-reaction-bar { display:flex; flex-wrap:wrap; justify-content:center; gap:6px; }
-.pr-reaction-bar button,.pr-well-card button { min-height:44px; border:1px solid #79926f55; border-radius:12px; padding:6px 12px; background:var(--rn-surface,#fffdf5); color:var(--rn-text,#3b513d); font:inherit; font-size:12px; cursor:pointer; }
-.pr-reaction-bar button:disabled { opacity:.45; cursor:default; }
-.pr-reaction-bar button:focus-visible,.pr-well-card button:focus-visible,.pr-well-target:focus-visible { outline:2px solid #7f9d62; outline-offset:3px; }
-.pr-reaction-status { width:100%; min-height:16px; text-align:center; font-size:10px; opacity:.65; }
-.pr-well-card { display:flex; align-items:center; flex-wrap:wrap; justify-content:space-between; gap:8px; margin:8px 2px 0; padding:12px; border:1px solid #8a9d7540; border-radius:12px; background:#91aa7210; }
-.pr-well-card strong { display:block; font-size:12px; }
-.pr-well-card small { display:block; margin-top:5px; font-size:10px; opacity:.7; }
-.pr-well-card .pr-well-footnote { flex-basis:100%; margin:0; font-size:9px; }
-.pr-well-message { flex-basis:100%; font-size:12px; line-height:1.7; margin:3px 0; padding:8px; border-radius:8px; background:#a5bd801b; }
 .pr-well-target { position:absolute; left:43.75%; top:16.666%; width:12.5%; height:33.333%; z-index:20; border:0; background:transparent; cursor:pointer; border-radius:8px; }
 .pr-well-target span { position:absolute; top:0; right:-15%; font-size:14px; }
 .pr-reaction-anchor { position:absolute; pointer-events:none; display:flex; justify-content:center; }
@@ -54,3 +42,22 @@
 @keyframes pr-reaction-in { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
 @keyframes pr-well-glow { from { opacity:.3; transform:scale(.8); } to { opacity:.85; transform:scale(1.1); } }
 @media(prefers-reduced-motion:reduce) { .pr-reaction-bubble,.pr-well-ripple { animation:none; } }
+
+/* In-world controls take no layout height and leave the floor available for walking. */
+.pr-world-interactions { position:absolute; inset:0; pointer-events:none; z-index:40; }
+.pr-world-interactions button,.pr-reaction-chooser,.pr-well-popup { pointer-events:auto; }
+.pr-world-interactions .pr-self-target { z-index:21; }
+.pr-reaction-chooser,.pr-well-popup { z-index:22; }
+.pr-well-target:disabled { cursor:default; }
+.pr-self-target { position:absolute; transform:translateX(-50%); width:10%; min-width:40px; height:17%; min-height:40px; border:0; background:transparent; border-radius:16px; cursor:pointer; }
+.pr-self-target:focus-visible,.pr-world-interactions button:focus-visible { outline:2px solid #6a8c4c; outline-offset:2px; }
+.pr-reaction-chooser { position:absolute; transform:translateX(-50%); display:flex; gap:4px; width:208px; flex-wrap:wrap; justify-content:center; }
+.pr-reaction-chooser button { flex:1; min-height:44px; padding:6px 4px; border:1px solid #8fa779; border-radius:18px; background:#fffcec; color:#38503a; font:inherit; font-size:11px; box-shadow:0 3px 0 #3c583b30; cursor:pointer; }
+.pr-reaction-chooser button:disabled { color:#7c8475; background:#edeedd; cursor:default; }
+.pr-reaction-status { width:100%; text-align:center; font-size:10px; background:#fffcec; color:#435639; padding:5px; border-radius:10px; }
+.pr-well-popup { position:absolute; top:3%; left:50%; transform:translateX(-50%); width:min(260px,calc(100% - 24px)); max-height:43%; overflow:auto; box-sizing:border-box; padding:12px 14px; border:2px solid #91a976; border-radius:15px; background:#fffcec; color:#38503a; box-shadow:0 4px 0 #48634235; }
+.pr-well-popup strong { font-size:11px; display:block; padding-right:28px; }
+.pr-well-popup>button { position:absolute; top:0; right:0; width:40px; height:40px; border:0; background:none; font-size:22px; color:#607a4a; cursor:pointer; }
+.pr-well-message { margin:10px 0 0; font-size:12px; line-height:1.6; }
+.pr-well-popup small { font-size:9px; }
+.pr-world-notice { position:absolute; bottom:3%; left:50%; transform:translateX(-50%); max-width:90%; width:max-content; padding:6px 10px; border-radius:12px; background:#fffcecee; color:#38503a; font-size:10px; text-align:center; }
