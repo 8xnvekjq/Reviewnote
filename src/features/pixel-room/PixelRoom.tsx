@@ -154,12 +154,32 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
         const migratedKey = `${storageKey(userId)}:migrated`;
         if (storage?.getItem(migratedKey)) return; // already attempted (or confirmed empty) before
         const legacy = loadRoom(userId, storage);
-        if (legacy.ok && legacy.state.furniture.length > 0) {
-          const ownedLegacy = legacy.state.furniture.filter(item => itemIdByType.has(item.type));
-          if (ownedLegacy.length > 0) {
-            const placements = ownedLegacy.map(item => ({ itemId: itemIdByType.get(item.type)!, x: item.x, y: item.y }));
-            const result = await savePixelRoomLayout(placements);
-            if (!cancelled && result.ok) applyLoadedFurniture(ownedLegacy);
+        // room state was never itself pruned when ownership changed (only the derived activeRoom
+        // was, for rendering) — so legacy.state.furniture can genuinely contain types the user no
+        // longer (or never actually) owns. itemIdByType.has(...) only checks "is this a real
+        // furniture type", not ownership — filtering on that alone let an unowned leftover sink
+        // the whole RPC call (all-or-nothing on ownership), which silently emptied the room and
+        // still marked migration done. Filter to shop.ownedIds here so only what's truly owned
+        // is ever sent.
+        const ownedLegacy = legacy.ok
+          ? legacy.state.furniture.filter(item => {
+              const itemId = itemIdByType.get(item.type);
+              return !!itemId && shop.ownedIds.has(itemId);
+            })
+          : [];
+        if (ownedLegacy.length > 0) {
+          const placements = ownedLegacy.map(item => ({ itemId: itemIdByType.get(item.type)!, x: item.x, y: item.y }));
+          const result = await savePixelRoomLayout(placements);
+          if (cancelled) return;
+          if (result.ok) {
+            applyLoadedFurniture(ownedLegacy);
+          } else {
+            // Don't lose the migration attempt silently: show the legacy layout for this session
+            // anyway (nothing was saved server-side, so a later real edit will persist it) and
+            // don't mark "migrated" — next load retries instead of losing it for good.
+            applyLoadedFurniture(ownedLegacy);
+            setStorageError(result.message || '이전 가구 배치를 서버로 옮기지 못했어요. 가구를 다시 놓으면 저장돼요.');
+            return;
           }
         }
         storage?.setItem(migratedKey, '1');
@@ -170,7 +190,7 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
       }
     })();
     return () => { cancelled = true; };
-  }, [shop.ready, shop.catalog, userId]);
+  }, [shop.ready, shop.catalog, shop.ownedIds, userId]);
 
   // Walks the fade overlay to full opacity, swaps `location` (mounting the destination while the
   // screen is fully covered — see the DOOR_FADE_MS/PRESENCE_HEAD_START_MS comment above), then
@@ -246,11 +266,19 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
 
   // 서버가 기준 — 실패하면 화면과 서버가 갈라지지 않도록 낙관적 갱신을 되돌린다(이전엔 항상
   // 성공하는 localStorage 저장이라 되돌릴 필요가 없었지만, 이제는 네트워크 저장이라 실패할 수 있음).
+  //
+  // next.furniture를 소유한 것만 걸러서 보낸다 — "가구 치우기" 버튼은 removeFurniture(room, ...)로
+  // 필터 전 원본 room을 그대로 쓰므로(선택한 것 하나만 빼고 나머지는 그대로), room에 남아있던
+  // 과거의 미소유 잔여 항목(activeRoom은 렌더링에서만 걸러내고 room 자체는 한 번도 정리한 적이
+  // 없었음)이 같이 실려가면 서버가 배치 전체를 통째로 거부해서(RPC는 all-or-nothing) 정작 방금
+  // 치우려던 아이템조차 안 치워지는 문제가 있었다. 여기서 걸러 두면 그 문제가 재발하지 않고, room
+  // 상태도 이 저장을 계기로 자연스럽게 정리된다.
   function persist(next: RoomState) {
     const previous = room;
-    setRoom(next);
+    const cleaned: RoomState = { ...next, furniture: next.furniture.filter(item => ownedFurnitureTypes.has(item.type)) };
+    setRoom(cleaned);
     const itemIdByType = new Map(shop.catalog.filter(item => item.category === 'furniture').map(item => [item.assetKey as FurnitureType, item.itemId]));
-    const placements = next.furniture
+    const placements = cleaned.furniture
       .map(item => { const itemId = itemIdByType.get(item.type); return itemId ? { itemId, x: item.x, y: item.y } : null; })
       .filter((placement): placement is { itemId: string; x: number; y: number } => placement !== null);
     savePixelRoomLayout(placements).then(result => {
