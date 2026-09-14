@@ -11,6 +11,14 @@
 .rn-reviewcheck-history-row .result { font-size: 15px; font-weight: 800; color: var(--rn-text); flex: 1; }
 .rn-reviewcheck-history-row .pending { font-size: 12.5px; font-weight: 700; color: var(--rn-warning); flex: 1; }
 
+/* 전체메뉴 "복습체크"의 어드민 학생 목록 — history-row와 같은 카드 스타일을 공유한다. */
+.rn-reviewcheck-student-row { justify-content: space-between; }
+.rn-reviewcheck-student-name { display: flex; flex-direction: column; gap: 2px; font-size: 14.5px; font-weight: 750; color: var(--rn-text); }
+.rn-reviewcheck-student-name small { font-size: 11px; font-weight: 600; color: var(--rn-muted); }
+.rn-reviewcheck-student-row .pending { font-size: 12.5px; font-weight: 700; color: var(--rn-warning); }
+.rn-reviewcheck-student-row .result { font-size: 13px; font-weight: 700; color: var(--rn-muted); }
+.rn-reviewcheck-student-empty { font-size: 12.5px; font-weight: 600; color: var(--rn-muted); opacity: .7; }
+
 .rn-reviewcheck-answer-block { padding: 10px 12px; border-radius: var(--rn-radius-sm); background: var(--rn-elevated); margin-bottom: 8px; }
 .rn-reviewcheck-answer-block .label { font-size: 10.5px; font-weight: 700; color: var(--rn-muted); text-transform: uppercase; letter-spacing: .03em; margin-bottom: 3px; }
 .rn-reviewcheck-answer-block .value { font-size: 15px; font-weight: 750; color: var(--rn-text); word-break: break-word; }
@@ -28,6 +36,7 @@
 
 .rn-reviewcheck-graded-list { display: grid; gap: 10px; }
 .rn-reviewcheck-graded-row { display: flex; gap: 10px; padding: 12px; align-items: stretch; }
+.rn-reviewcheck-graded-open { display: flex; gap: 10px; flex: 1; min-width: 0; text-align: left; background: none; border: none; padding: 0; cursor: pointer; }
 .rn-reviewcheck-graded-thumb { flex: none; width: 64px; height: 64px; border-radius: 8px; overflow: hidden; background: var(--rn-elevated); }
 .rn-reviewcheck-graded-thumb img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
 .rn-reviewcheck-graded-info { flex: 1; min-width: 0; }

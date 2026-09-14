@@ -1,13 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import type { AdminUserStat, DailyReviewStat, MistakeEntry } from '../types';
+import type { AdminUserStat, DailyReviewStat } from '../types';
 import { supabase } from '../services/supabase';
 import { formatDate } from '../utils/date';
 import { GACHA_ITEMS, getTitleBadgeStyle } from '../utils/gachaCatalog';
 import { RecentActivityFeed } from './RecentActivityFeed';
 import { CatPawIcon } from './CatPawIcon';
-import { fetchAllReviewCheckSessions, type ReviewCheckSession } from '../utils/reviewCheckClient';
-import { ReviewCheckAdminOverlay } from './reviewCheck/ReviewCheckAdminOverlay';
-import { mapDbMistakeRow } from '../features/mistakes/useMistakes';
 
 interface AdminPanelProps {
   onBack?: () => void;
@@ -28,16 +25,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
   // 예전 스냅샷을 계속 보여주게 된다. id로만 들고 있고, 표시할 때마다 최신 stats에서 다시 찾는다
   // (학생이 삭제/필터 밖으로 사라지면 selectedStudent가 자연히 null이 되어 모달도 자동으로 닫힘).
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
-
-  // 복습체크: 학생 카드 compact 배지 + [채점하기]/[내역] 오버레이용. mistakes는 fetchAdminStats가
-  // 이미 전체 학생분을 한 번에 불러오므로(아래) 그 raw row를 그대로 재사용 — 별도 쿼리를 늘리지
-  // 않는다. 세션 목록은 그와 별개로 자체 refresh(reloadReviewCheck)를 갖는다: 오버레이에서
-  // 채점/수정을 하고 닫을 때 카드 배지가 바로 최신화되도록.
-  const [allMistakes, setAllMistakes] = useState<MistakeEntry[]>([]);
-  const [reviewCheckSessions, setReviewCheckSessions] = useState<ReviewCheckSession[]>([]);
-  const [reviewCheckOverlay, setReviewCheckOverlay] = useState<{ id: string; name: string } | null>(null);
-  const reloadReviewCheck = () => { fetchAllReviewCheckSessions().then(setReviewCheckSessions).catch(err => console.error('Failed to load review check sessions:', err)); };
-  useEffect(() => { reloadReviewCheck(); }, []);
   const selectedStudent = selectedStudentId ? stats.find(u => u.userId === selectedStudentId) || null : null;
 
   // ⚠️ admin-dashboard-realtime 채널이 profiles/mistakes의 postgres_changes 이벤트마다 이 함수를
@@ -78,7 +65,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
         .order('date', { ascending: false });
 
       if (mistakesError) throw mistakesError;
-      if (isMountedRef.current) setAllMistakes((mistakes || []).map(mapDbMistakeRow));
 
       // Fetch all mistakes is completed successfully, proceed to monday calculation
 
@@ -365,13 +351,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
           fetchAdminStats(false);
         }
       )
-      // 복습체크 세션이 새로 제출/채점되면 학생 카드의 "채점 대기"/"최근 결과" 배지도 바로
-      // 갱신 — 대시보드를 계속 켜둔 관리자가 다시 열지 않아도 최신 상태를 보게 한다.
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'review_check_sessions' },
-        () => { reloadReviewCheck(); }
-      )
       .subscribe();
 
     return () => {
@@ -528,12 +507,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
                 ? `${Math.round((user.todayCorrectCount / user.todayReviewedCount) * 100)}%`
                 : '—';
 
-              // 복습체크 compact 배지 — 채점 대기가 있으면 최근 결과보다 우선 노출(요청사항).
-              // 세션 목록은 created_at desc로 이미 정렬돼 있으므로 find()가 곧 "가장 최근" 것.
-              const userSessions = reviewCheckSessions.filter(s => s.studentId === user.userId);
-              const pendingSession = userSessions.find(s => s.status === 'submitted');
-              const recentGradedSession = userSessions.find(s => s.status === 'graded');
-
               return (
                 // 압축된 기본 카드: 스캔에 필요한 핵심 정보만 (이름/최근 활동/오늘 복습·정답률/학년 미지정 배지).
                 // 학년 select·주간 스코어·콤보 포인트·누적 통계·진행률·장착 아이템은 클릭 시 여는 상세
@@ -585,26 +558,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
                       </span>
                     </div>
                   </div>
-
-                  {/* 복습체크 — 채점 대기가 있을 때만/최근 결과가 있을 때만 한 줄 추가(둘 다 없으면
-                      아예 렌더하지 않아 카드 높이를 키우지 않는다). */}
-                  {(pendingSession || recentGradedSession) && (
-                    <div className="mt-2 pt-2 border-t border-slate-850 flex items-center justify-between">
-                      <span className="text-[9px] text-slate-500 font-bold">복습체크</span>
-                      {pendingSession ? (
-                        <span className="text-[10px] text-amber-300 font-bold">채점 대기 · {pendingSession.totalCount}문제</span>
-                      ) : (
-                        <span className="text-[10px] text-slate-400 font-bold">최근 {recentGradedSession!.correctCount}/{recentGradedSession!.totalCount}</span>
-                      )}
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); setReviewCheckOverlay({ id: user.userId, name: realName }); }}
-                        className={`text-[10px] font-black px-2.5 py-1 rounded-lg border ${pendingSession ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-slate-800 text-slate-300 border-slate-700'}`}
-                      >
-                        {pendingSession ? '채점하기' : '내역 ›'}
-                      </button>
-                    </div>
-                  )}
                 </div>
               );
             })
@@ -873,15 +826,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
           </div>
         );
       })()}
-
-      {reviewCheckOverlay && (
-        <ReviewCheckAdminOverlay
-          studentId={reviewCheckOverlay.id}
-          studentName={reviewCheckOverlay.name}
-          mistakes={allMistakes}
-          onClose={() => { setReviewCheckOverlay(null); reloadReviewCheck(); }}
-        />
-      )}
     </div>
   );
 };

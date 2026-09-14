@@ -30,15 +30,18 @@ const examPrepMenuAdmin: { tab: ActiveTab; label: string; description: string; i
   { tab: 'examPrep', label: '시험대비 분석', description: '학생별 취약 단원과 수업 방향', icon: 'chart' };
 const examPrepMenuStudent: { tab: ActiveTab; label: string; description: string; icon: AppIconName } =
   { tab: 'examPrep', label: '나의 시험대비 분석', description: '내 취약 단원과 시험 전 우선순위', icon: 'chart' };
+// 복습체크도 examPrep과 같은 패턴: 같은 tab('reviewCheck')으로 들어가지만 어드민은 채점/학생별
+// 시험 관리 화면(ReviewCheckAdminScreen)으로, 학생은 본인 셀프 테스트 화면(ReviewCheckScreen)으로
+// 라우팅된다(App.tsx). primary nav가 아니라 전체메뉴 안에만 넣는다(요청 사항).
+const reviewCheckMenuAdmin: { tab: ActiveTab; label: string; description: string; icon: AppIconName } =
+  { tab: 'reviewCheck', label: '복습체크 관리', description: '채점하기 · 학생별 시험 관리', icon: 'check' };
+const reviewCheckMenuStudent: { tab: ActiveTab; label: string; description: string; icon: AppIconName } =
+  { tab: 'reviewCheck', label: '복습체크', description: '복습 완료 문제 다시 풀어보고 채점받기', icon: 'check' };
 export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, setActiveTab, isAdmin, canAccessPixelWorld, currentUserId, onOpenSlideList }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const select = (tab: ActiveTab) => { setActiveTab(tab); setMenuOpen(false); };
   const examPrepMenu = isAdmin ? examPrepMenuAdmin : canViewOwnExamPrep(currentUserId) ? examPrepMenuStudent : null;
-  // 복습체크는 학생 본인만 시작할 수 있다(관리자는 학생 카드 쪽 채점 화면을 따로 씀) — primary
-  // nav가 아니라 전체메뉴 안에만 넣는다(요청 사항).
-  const reviewCheckMenu = !isAdmin && currentUserId
-    ? { tab: 'reviewCheck' as ActiveTab, label: '복습체크', description: '복습 완료 문제 다시 풀어보고 채점받기', icon: 'check' as AppIconName }
-    : null;
+  const reviewCheckMenu = isAdmin ? reviewCheckMenuAdmin : currentUserId ? reviewCheckMenuStudent : null;
   const tabs: { tab: ActiveTab; label: string; icon: AppIconName }[] = [
     { tab: isAdmin ? 'admin' : 'activity', label: isAdmin ? '관리자' : '최근활동', icon: isAdmin ? 'chart' : 'activity' },
     { tab: 'notes', label: '오답노트', icon: 'notes' },
