@@ -24,8 +24,8 @@ try {
     });
     await page.waitForTimeout(250);
     await page.screenshot({ path: `${output}/${viewport.width}-populated.png` });
-    await page.locator('.pr-plaza-grid button').nth(4 * 16 + 7).click();
-    await page.waitForFunction(() => { const p = window.plazaTransport.last('viewer'); return p?.x === 7 && p.y === 4; });
+    await page.locator('.pr-plaza-grid button').nth(4 * 16 + 6).click();
+    await page.waitForFunction(() => { const p = window.plazaTransport.last('viewer'); return p?.x === 6 && p.y === 4; });
     await page.getByRole('button', { name: '↓ 내 방으로 가는 길' }).click();
     await page.waitForFunction(() => document.body.dataset.returned === 'true');
     assert.deepEqual(errors, []);

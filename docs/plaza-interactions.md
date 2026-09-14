@@ -1,5 +1,9 @@
 # Small plaza interactions
 
+Mobile interaction update: the fixed reaction bar and well card are removed. Tap/click your avatar to open three compact choices next to it; selection closes them. Tap the floor or press Escape to dismiss. Tap the well itself only while standing still in an adjacent cell to read its in-map bubble; distant taps do nothing. The previous 190px panel reservation is removed from map sizing. Read storage and the realtime protocol remain unchanged.
+
+The browser fixture additionally checks distant-well rejection, chooser dismissal, touch opening at the map's top edge, and a 390×620 viewport with a 256px-high map. It still checks persistence, delivery/cooldown and reconnect.
+
 - Three fixed reactions: wave, cheer and rest. A bubble follows the avatar for 3.2 seconds; both sender and receiver apply a 4-second cooldown. No free text, nickname or account ID is broadcast. Unknown reaction kinds, malformed/expired payloads, unknown sessions and duplicate/out-of-order timestamps are ignored. Ephemeral state is bounded and cleared on expiry/departure.
 - The existing Realtime channel has one additional `reaction` event. Movement sequence, presence and interpolation are unchanged. Disconnected clients cannot send reactions, and failed sends display feedback. This retains the existing client-broadcast trust model; it does not add server-authenticated sender identity or server rate limiting.
 - At the central well, read a date-selected encouragement (14 authored messages rotate, Korea midnight boundary). First reading sends a brief sparkle when connected and outside reaction cooldown. Reading again does not send another sparkle. The activity also works alone/offline. There are no points, streaks or competitive rewards.
