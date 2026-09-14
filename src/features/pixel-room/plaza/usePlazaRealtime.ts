@@ -110,10 +110,22 @@ async function leaveChannelSafely(channel: RealtimeChannel): Promise<void> {
 // 신원 확인(presenceStore.ts)은 "받은 이벤트를 어떻게 해석할지"를 고쳤지만, 이건 그 이전 단계 —
 // "애초에 이벤트를 잘못된 채널 객체에 걸고 있었다"는 문제라 별도로 고쳐야 한다.
 //
-// 고치는 법: "이번 방문의 퇴장이 실제로 끝났다"를 Promise로 추적해 두고, 다음 connect()(재입장이든
-// 같은 마운트 안의 재연결이든)는 supabase.channel()을 부르기 전에 그 Promise를 먼저 기다린다 —
-// timeout이 아니라 실제 비동기 작업이 끝났다는 진짜 신호를 기다리는 것이다. 새 방문(visit)은 이전
-// 방문의 presence가 topic 레지스트리에서 확실히 사라진 뒤에만 시작된다.
+// 고치는 법: "이번 방문의 퇴장이 실제로 끝났다"를 Promise로 추적해 두고, 다음 connect()(재입장)는
+// supabase.channel()을 부르기 전에 그 Promise를 먼저 기다린다 — timeout이 아니라 실제 비동기
+// 작업이 끝났다는 진짜 신호를 기다리는 것이다. 새 방문(visit)은 이전 방문의 presence가 topic
+// 레지스트리에서 확실히 사라진 뒤에만 시작된다.
+//
+// 중요: 이 대기는 "능동적으로 나가는"(Plaza unmount) 경로에서만 건다 — CHANNEL_ERROR/CLOSED로
+// 인한 재연결에는 걸지 않는다(실제 Supabase 재현 조사, 2026-09 3차: presence rate limit으로
+// 채널이 CLOSED될 때마다 5~12초씩 멈췄다가 순간이동하는 패턴을 실제 프로젝트 realtime_logs와
+// 대조해 확인했다). RealtimeChannel 생성자를 직접 읽어보면 `this._onClose(() => {
+// this.socket._remove(this); })`를 등록해 둔다 — 즉 채널이 CLOSED 상태에 도달하면(우리가 그
+// status 콜백을 받는 바로 그 시점에 이미) 스스로 topic 레지스트리에서 빠진다. untrack()/
+// removeChannel()의 서버 ack를 기다릴 필요가 원천적으로 없다 — 이미 죽어서 서버가 ack를 줄 수도
+// 없는 채널에 그 ack를 기다리게 하면 removeChannel 내부의 unsubscribe()가 자체 timeout(수 초)까지
+// 그냥 흘려보내고, connect()는 그동안 재연결을 시작조차 못 한다. plazaVisitTeardown이 원래 막으려던
+// 건 "살아있는 채널을 능동적으로 untrack하는 도중에 생기는 재사용 경합"이었지, "이미 죽은 채널이
+// 재사용될까봐"가 아니었다 — CLOSED 채널은 애초에 재사용될 수 없다(레지스트리에 없으므로).
 let plazaVisitTeardown: Promise<void> | null = null;
 
 function beginPlazaVisitTeardown(channel: RealtimeChannel): void {
@@ -287,12 +299,17 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
         // subscribe()하지 않는다 — 이 라이브러리 버전은 채널이 'closed' 상태일 때만 subscribe()가
         // 실제로 join을 재시도하므로(channelAdapter.isClosed() 가드), errored 상태에서 같은
         // 인스턴스에 재호출하는 것보다 깨끗하게 새 채널을 만들어 스스로 재연결을 책임지는 쪽이
-        // 더 예측 가능하다.
+        // 더 예측 가능하다. leaveChannelSafely는 fire-and-forget으로만 부른다(await 안 함, 다음
+        // connect()도 이 결과를 기다리지 않는다) — CLOSED에 도달한 채널은 이미 스스로 topic
+        // 레지스트리에서 빠져 있으므로(위 plazaVisitTeardown 주석 참고) 기다릴 이유가 없고,
+        // 기다리면 죽은 채널의 untrack()/unsubscribe()가 서버 ack를 못 받아 자체 timeout까지
+        // 재연결 자체가 미뤄진다 — 실제 Supabase에서 확인된 "5~12초 멈췄다가 순간이동" 패턴의
+        // 핵심 원인이었다.
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
           setReady(false);
           channel = null;
           channelRef.current = null;
-          beginPlazaVisitTeardown(nextChannel);
+          void leaveChannelSafely(nextChannel);
           scheduleReconnect();
         }
       });
@@ -345,11 +362,22 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
       plazaDebugLog('send:broadcast', sessionId, `(${state.x},${state.y})#${state.seq}`, { moving: state.moving, t: performance.now().toFixed(1) });
       void channel.send({ type: 'broadcast', event: MOVE_BROADCAST_EVENT, payload: state });
 
-      // Presence(track): 무거운 경로이므로 매 tick이 아니라 "이동 시작"과 "이동 정지"
-      // 전이(transition)에서만 갱신한다 — moving 값이 실제로 바뀔 때만 track을 호출한다.
-      if (partial.moving !== movingRef.current) {
-        movingRef.current = partial.moving;
+      // Presence(track): 무거운 경로이므로 "이동 정지" 전이에서만 갱신한다 — moving 값이 실제로
+      // 바뀔 때 전부가 아니라 true->false(멈춤)일 때만 track을 호출한다. 실제 Supabase
+      // realtime_logs로 확인된 원인(2026-09 3차 조사): 우리 자신의 track() 트래픽이
+      // ClientPresenceRateLimitReached를 반복적으로 유발해 채널이 주기적으로 끊기고, 그때마다
+      // presence-sync가 상대 화면을 순간이동시켰다 — "5초 정상 → 5초 정지 → 순간이동" 패턴의
+      // 근본 원인. false->true(이동 시작)에서는 더 이상 track하지 않는다: 시작 직후 곧바로
+      // broadcast가 170ms 간격으로 나가므로(바로 아래), "이동 시작"을 presence로 한 번 더 알릴
+      // 필요가 없다 — 알려주는 정보가 broadcast보다 최대 170ms 빠를 뿐이고, 그 정도는 아무도
+      // 못 느낀다. 반면 정지 시의 track은 그대로 유지한다 — 정지하면 broadcast가 더 이상 안
+      // 나가므로(정책 그대로), "내가 최종적으로 멈춘 그 칸"을 presence로 알려주는 게 유일한
+      // 신호이기 때문이다. 이 변경만으로 이동당 track() 호출이 2번에서 1번으로 절반이 된다.
+      if (!partial.moving && movingRef.current) {
+        movingRef.current = false;
         void channel.track(state);
+      } else if (partial.moving !== movingRef.current) {
+        movingRef.current = partial.moving;
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -6,6 +6,7 @@ import {
   getPathSince,
   plazaStoreReducer,
   MAX_PATH_LENGTH,
+  MAX_RECENTLY_LEFT_REFS,
   type PlazaStoreState,
 } from '../../src/features/pixel-room/plaza/presenceStore.ts';
 import type { PlazaPlayerState } from '../../src/features/pixel-room/plaza/types.ts';
@@ -442,4 +443,84 @@ test('presence-join은 재입장마다 presenceRef를 최신 것으로 갱신한
     leaves: [{ sessionId: 'walker', presenceRef: 'ref-2' }],
   });
   assert.ok(!left.players.has('walker'));
+});
+
+// --- 실시간 이동 3차 조사(2026-09) 수정 검증: presence-sync가 이미 처리된 leave를 되살리지
+// 못하게 막는 recentlyLeftRefs ---
+//
+// 실제 원인은 usePlazaRealtime.ts의 plazaVisitTeardown 주석과 PlazaStoreState.recentlyLeftRefs
+// 주석 참고 — 실제 Supabase 프로젝트를 대상으로 재현했을 때, presence-leave를 정상 처리한
+// 직후(같은 밀리초 안에) 그 세션을 다시 포함한 presence-sync가 뒤따라오는 경우가 실제로
+// 관찰됐다(leave와 그 leave를 아직 반영 못 한 sync가 함께 도착 — 서버 쪽 결과적 일관성
+// 문제로 보인다). sync가 무조건 신뢰되는 기존 정책이라면 방금 지운 세션이 그대로 되살아난다
+// ("광장 퇴장 후에도 상대 화면에 캐릭터가 남음" 버그).
+test('presence-sync: 방금 leave를 확인한 join(같은 presenceRef)이 sync에 다시 나타나도 되살리지 않는다', () => {
+  const joined = plazaStoreReducer(createPlazaStoreState(), {
+    type: 'presence-join',
+    players: [withRef(makePlayer({ sessionId: 'walker' }), 'ref-gone')],
+  });
+  const left = plazaStoreReducer(joined, {
+    type: 'presence-leave',
+    leaves: [{ sessionId: 'walker', presenceRef: 'ref-gone' }],
+  });
+  assert.ok(!left.players.has('walker'));
+
+  // leave 처리 직후, 아직 그 leave를 반영하지 못한 stale한 sync가 뒤따라온다 — 같은 sessionId,
+  // 같은(=이미 끝난) presenceRef.
+  const staleSync = plazaStoreReducer(left, {
+    type: 'presence-sync',
+    players: [withRef(makePlayer({ sessionId: 'walker' }), 'ref-gone')],
+  });
+  assert.ok(!staleSync.players.has('walker'), 'sync가 방금 확인한 leave를 되살리면 안 된다');
+  assert.deepEqual(getPathSince(staleSync.paths, 'walker', -1), []);
+});
+
+test('presence-sync: 진짜 재입장(다른 presenceRef)은 sync로도 정상 반영된다', () => {
+  const joined = plazaStoreReducer(createPlazaStoreState(), {
+    type: 'presence-join',
+    players: [withRef(makePlayer({ sessionId: 'walker' }), 'ref-old')],
+  });
+  const left = plazaStoreReducer(joined, {
+    type: 'presence-leave',
+    leaves: [{ sessionId: 'walker', presenceRef: 'ref-old' }],
+  });
+  // 진짜 재입장 — 새 presenceRef를 단 sync.
+  const resynced = plazaStoreReducer(left, {
+    type: 'presence-sync',
+    players: [withRef(makePlayer({ sessionId: 'walker', x: 7 }), 'ref-new')],
+  });
+  assert.deepEqual(resynced.players.get('walker'), makePlayer({ sessionId: 'walker', x: 7 }));
+});
+
+test('presence-sync: leave를 겪은 적 없는 세션은(recentlyLeftRefs와 무관하게) 평소처럼 반영된다', () => {
+  const state = plazaStoreReducer(createPlazaStoreState(), {
+    type: 'presence-sync',
+    players: [withRef(makePlayer({ sessionId: 'newcomer' }), 'ref-fresh')],
+  });
+  assert.ok(state.players.has('newcomer'));
+});
+
+test('recentlyLeftRefs는 MAX_RECENTLY_LEFT_REFS를 넘으면 가장 오래된 것부터 잊는다(무한 성장 방지)', () => {
+  let state = createPlazaStoreState();
+  const total = MAX_RECENTLY_LEFT_REFS + 5;
+  for (let i = 1; i <= total; i++) {
+    const ref = `ref-${i}`;
+    state = plazaStoreReducer(state, {
+      type: 'presence-join',
+      players: [withRef(makePlayer({ sessionId: `s${i}` }), ref)],
+    });
+    state = plazaStoreReducer(state, {
+      type: 'presence-leave',
+      leaves: [{ sessionId: `s${i}`, presenceRef: ref }],
+    });
+  }
+  assert.equal(state.recentlyLeftRefs.size, MAX_RECENTLY_LEFT_REFS);
+  // 가장 오래된(ref-1..ref-5)은 잊혔으므로, 그 ref로 다시 sync가 와도 이제는 정상적으로 받아들여진다.
+  const forgotten = plazaStoreReducer(state, {
+    type: 'presence-sync',
+    players: [withRef(makePlayer({ sessionId: 's1' }), 'ref-1')],
+  });
+  assert.ok(forgotten.players.has('s1'), '너무 오래된 leave 기록은 잊혀 더 이상 sync를 막지 않아야 한다');
+  // 가장 최근(ref-total)은 여전히 기억하고 있어야 한다.
+  assert.ok(state.recentlyLeftRefs.has(`ref-${total}`));
 });
