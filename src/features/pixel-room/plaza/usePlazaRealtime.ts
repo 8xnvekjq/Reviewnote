@@ -8,6 +8,10 @@ import type { PlazaDirection, PlazaPlayerState } from './types';
 import { PLAZA_CHANNEL_NAME } from './types';
 import { plazaDebugLog } from './plazaDebug';
 
+import { usePlazaReactions } from './usePlazaReactions';
+import { REACTION_COOLDOWN_MS, nearWell } from './plazaInteractions';
+import type { ReactionKind } from './plazaInteractions';
+
 const MOVE_BROADCAST_EVENT = 'move';
 
 // Reconnect backoff (Worker B rework, issue #2 — a channel that hits CHANNEL_ERROR/TIMED_OUT/
@@ -30,6 +34,8 @@ export interface UsePlazaRealtimeResult {
   // instead of only the latest `players` snapshot so a burst of same-task updates (real risk — see
   // that hook's header comment) never loses an in-between waypoint.
   paths: Map<string, PathWaypoint[]>;
+  reactions: ReturnType<typeof usePlazaReactions>['reactions'];
+  sendReaction: (kind: ReactionKind) => Promise<boolean>;
   ready: boolean;              // channel subscribed + initial presence sync received (false while reconnecting)
   updateMyState: (partial: { x: number; y: number; direction: PlazaDirection; moving: boolean }) => void;
 }
@@ -90,6 +96,10 @@ async function leaveChannelSafely(channel: RealtimeChannel): Promise<void> {
 export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppearance): UsePlazaRealtimeResult {
   const [storeState, dispatch] = useReducer(plazaStoreReducer, undefined, createPlazaStoreState);
   const [ready, setReady] = useState(false);
+  const { reactions, receive } = usePlazaReactions(sessionId, storeState.players);
+  const receiveRef = useRef(receive);
+  receiveRef.current = receive;
+  const reactionSentAt = useRef(0);
 
   const channelRef = useRef<RealtimeChannel | null>(null);
   // 이 세션(=이 훅 인스턴스, 탭 하나) 안에서 단조증가하는 시퀀스 — PlazaPlayerState.seq를 우리가
@@ -203,6 +213,10 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
         dispatch({ type: 'broadcast', player: payload });
       });
 
+      nextChannel.on('broadcast', { event: 'reaction' }, ({ payload }) => {
+        if (!cancelled && channel === nextChannel) receiveRef.current(payload);
+      });
+
       nextChannel.subscribe(status => {
         if (cancelled) return;
         // 이 채널이 이미 다른 connect()/teardown에 의해 교체된 뒤 뒤늦게 도착한 이벤트라면
@@ -294,5 +308,19 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
 
   const players = useMemo(() => getOtherPlayers(storeState, sessionId), [storeState, sessionId]);
 
-  return { players, paths: storeState.paths, ready, updateMyState };
+  async function sendReaction(kind: ReactionKind): Promise<boolean> {
+    const channel = channelRef.current;
+    const now = Date.now();
+    if (!channel || !ready || now - reactionSentAt.current < REACTION_COOLDOWN_MS
+      || (kind === 'wish' && !nearWell(selfRef.current))) return false;
+    reactionSentAt.current = now;
+    const payload = { sessionId, kind, sentAt: now };
+    try {
+      const result = await channel.send({ type: 'broadcast', event: 'reaction', payload });
+      if (result !== 'ok' || channelRef.current !== channel) return false;
+      receiveRef.current(payload);
+      return true;
+    } catch { return false; }
+  }
+  return { players, paths: storeState.paths, ready, updateMyState, reactions, sendReaction };
 }

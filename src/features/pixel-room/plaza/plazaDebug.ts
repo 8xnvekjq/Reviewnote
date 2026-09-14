@@ -5,7 +5,10 @@
 // ('rn-plaza-debug')`로 끈다. 코드 수정 없이 온오프할 수 있게 하기 위한 임시 계측이며 기본값
 // OFF라 평소 사용자 경험에는 전혀 영향이 없다 — 광장은 이미 admin/test 계정만 들어오므로 이
 // 이상의 접근 제어는 두지 않았다.
-export const PLAZA_DEBUG = typeof window !== 'undefined' && window.localStorage?.getItem('rn-plaza-debug') === '1';
+export const PLAZA_DEBUG = (() => {
+  try { return typeof window !== 'undefined' && window.localStorage?.getItem('rn-plaza-debug') === '1'; }
+  catch { return false; }
+})();
 
 export function plazaDebugLog(tag: string, ...args: unknown[]): void {
   if (PLAZA_DEBUG) console.debug(`[PlazaDebug] ${tag}`, ...args);
