@@ -40,10 +40,23 @@ export interface PlazaStoreState {
   players: Map<string, PlazaPlayerState>;
   // sessionId -> 그 세션이 실제로 지나온 좌표들의 append-only 이력(스무딩 재생용 — 위 주석 참고).
   paths: Map<string, PathWaypoint[]>;
+  // sessionId -> 그 sessionId를 "지금 실제로 소유하고 있다"고 우리가 믿는 presence_ref. Supabase
+  // Presence는 track()을 다시 호출할 때마다(재연결, 재입장 등) 같은 key(sessionId)에 대해서도
+  // 서버가 새 presence_ref를 발급한다 — 퇴장/재입장 lifecycle 버그(2026-09) 조사 결과, 이 값을
+  // 버리면 두 가지 문제가 동시에 생긴다: (1) 광장을 나갔다가 빠르게 다시 들어왔을 때, 나갈 때
+  // 보낸 untrack()의 leave가 네트워크를 거쳐 "새로 들어온 뒤"에야 도착할 수 있는데, leave가
+  // sessionId만 보고 지우면 방금 재입장한 진짜 최신 세션까지 통째로 지워버린다("상대 화면에서
+  // 사라짐" 버그). presence_ref를 대조해서 "지금 알고 있는 join과 다른, 이미 대체된 낡은 join의
+  // leave 메아리"면 무시하는 것으로 고친다. (2) 두 개의 join이 같은 key 아래 잠깐 공존하는
+  // 동안(퇴장의 leave가 아직 반영 안 된 채 재입장의 join이 먼저 도착) flattenPresenceState가
+  // 배열의 [0]번째(=Phoenix Presence.syncDiff가 join 시 새 meta를 unshift로 "뒤에" 붙이므로
+  // 실제로는 가장 오래된 meta)를 골라 쓰면, 화면에는 재입장 이전의 "낡은" 위치가 계속 보인다
+  // ("입구에서 제자리걸음" 버그) — usePlazaRealtime.ts의 flattenPresenceState 주석 참고.
+  presenceRefs: Map<string, string>;
 }
 
 export function createPlazaStoreState(): PlazaStoreState {
-  return { players: new Map(), paths: new Map() };
+  return { players: new Map(), paths: new Map(), presenceRefs: new Map() };
 }
 
 // Presence(sync/join)와 Broadcast(move)를 분리한 이유: 정책이 서로 다르기 때문이다(아래 reducer
@@ -59,15 +72,16 @@ export function createPlazaStoreState(): PlazaStoreState {
 // 극단적 경우까지 로컬에서 따로 방어할 필요는 없다고 판단해 추가하지 않았다 — 정말 필요해지면
 // "마지막 이동 시각"이 아니라 실제 connection/heartbeat 신호를 기준으로 다시 설계할 것.)
 export type PlazaStoreAction =
-  | { type: 'presence-sync'; players: PlazaPlayerState[] }
-  | { type: 'presence-join'; players: PlazaPlayerState[] }
-  | { type: 'presence-leave'; sessionIds: string[] }
+  | { type: 'presence-sync'; players: Array<{ player: PlazaPlayerState; presenceRef: string }> }
+  | { type: 'presence-join'; players: Array<{ player: PlazaPlayerState; presenceRef: string }> }
+  | { type: 'presence-leave'; leaves: Array<{ sessionId: string; presenceRef: string }> }
   | { type: 'broadcast'; player: PlazaPlayerState };
 
 // Supabase Presence/Broadcast가 콜백에 건네주는 raw payload는 우리가 보낸 PlazaPlayerState보다
-// 필드가 더 많을 수 있다(대표적으로 Presence는 presence_ref를 얹는다). 저장/렌더링에 쓰이는 값은
-// 반드시 PlazaPlayerState 필드만 남도록 화이트리스트 방식으로 재구성한다 — 장차 실수로 다른
-// 필드(닉네임 등 개인식별정보)가 payload에 섞여도 여기서 걸러져 저장되지 않는다.
+// 필드가 더 많을 수 있다(대표적으로 Presence는 presence_ref를 얹는다 — usePlazaRealtime.ts가
+// 그 값을 여기 도착하기 전에 따로 뽑아 각 액션의 presenceRef로 넘긴다). 저장/렌더링에 쓰이는
+// 값은 반드시 PlazaPlayerState 필드만 남도록 화이트리스트 방식으로 재구성한다 — 장차 실수로
+// 다른 필드(닉네임 등 개인식별정보)가 payload에 섞여도 여기서 걸러져 저장되지 않는다.
 function sanitizePlayerState(raw: PlazaPlayerState): PlazaPlayerState {
   const appearance = raw.appearance ?? { top: null, bottom: null, shoes: null, hair: null, eyes: null };
   return {
@@ -113,46 +127,62 @@ function sanitizePlayerState(raw: PlazaPlayerState): PlazaPlayerState {
 //   그 이후에 도착하는 상황은 사실상 발생하지 않는다(30명 미만의 내부용 도구, 적대적 사용자를
 //   가정하지 않음) — 최악의 경우에도 다음 tick(170ms)에서 바로 정정되는 한 프레임짜리 시각적
 //   흠으로 그친다. 이 정도는 감수하기로 하고, 굳이 공유 타입에 epoch 필드를 추가하지 않았다.
+// - presence-leave만 예외적으로 sessionId 외에 presenceRef도 함께 검사한다: 그 sessionId를
+//   "지금 소유하고 있다"고 기록해 둔 presenceRef와 이 leave의 presenceRef가 다르면(=이미 새
+//   join으로 대체된 낡은 join의 뒤늦은 leave), 조용히 무시한다 — 위 PlazaStoreState.presenceRefs
+//   주석 참고. 이건 seq 비교가 아니라 "이 leave가 지금 내가 아는 그 join이 맞는지" 신원 확인이다.
 export function plazaStoreReducer(state: PlazaStoreState, action: PlazaStoreAction): PlazaStoreState {
   switch (action.type) {
     case 'presence-sync': {
       const players = new Map<string, PlazaPlayerState>();
       const paths = new Map<string, PathWaypoint[]>();
-      for (const player of action.players) {
+      const presenceRefs = new Map<string, string>();
+      for (const { player, presenceRef } of action.players) {
         const sanitized = sanitizePlayerState(player);
         players.set(sanitized.sessionId, sanitized);
+        presenceRefs.set(sanitized.sessionId, presenceRef);
         // sync는 "지금 이 순간의 완전한 명단"이다 — 그 이전 경로는 우리가 관측하지 못했던
         // 구간이므로 재생하지 않고, 이 좌표 하나를 새 출발점으로 삼는다(스푼 없이 그 자리에서
         // 시작). 기존에 알고 있던 이력은 sync로 대체되므로 함께 초기화한다.
         paths.set(sanitized.sessionId, [{ x: sanitized.x, y: sanitized.y, seq: sanitized.seq }]);
       }
-      return { players, paths };
+      return { players, paths, presenceRefs };
     }
     case 'presence-join': {
       if (action.players.length === 0) return state;
       const players = new Map(state.players);
+      const presenceRefs = new Map(state.presenceRefs);
       let paths = state.paths;
-      for (const player of action.players) {
+      for (const { player, presenceRef } of action.players) {
         const sanitized = sanitizePlayerState(player);
         players.set(sanitized.sessionId, sanitized);
+        presenceRefs.set(sanitized.sessionId, presenceRef);
         // presence-join은 이동 시작/정지 전이, appearance 변경, 최초 입장에서만 온다(빈도 낮음,
         // 항상 신뢰). moving:false 전이의 경우 "실제 최종 도착 칸"을 담고 있으므로, 혹시 그 사이
         // broadcast 일부가 유실되더라도 경로의 마지막 지점은 반드시 정확하게 재생되도록 이
         // 좌표도 경로에 추가한다.
         paths = appendPath(paths, sanitized.sessionId, { x: sanitized.x, y: sanitized.y, seq: sanitized.seq });
       }
-      return { players, paths };
+      return { players, paths, presenceRefs };
     }
     case 'presence-leave': {
-      if (action.sessionIds.length === 0) return state;
+      if (action.leaves.length === 0) return state;
       const players = new Map(state.players);
       const paths = new Map(state.paths);
+      const presenceRefs = new Map(state.presenceRefs);
       let changed = false;
-      for (const sessionId of action.sessionIds) {
+      for (const { sessionId, presenceRef } of action.leaves) {
+        // 이 leave가 "지금 내가 그 sessionId의 주인이라고 아는 join"의 것이 아니면(이미 새
+        // join으로 대체됨) 무시한다 — 퇴장(비동기 untrack)과 재입장(join)이 경합할 때, 늦게
+        // 도착한 옛 leave가 방금 막 재입장한 진짜 최신 세션을 지워버리지 않도록 하는 지점.
+        // 우리가 그 sessionId의 ref를 전혀 모르는 경우(join을 아직 못 본 채로 leave부터 온
+        // 극히 드문 순서 — 그래도 안전하게)도 무시한다: 모르는 걸 지울 이유가 없다.
+        if (presenceRefs.get(sessionId) !== presenceRef) continue;
         if (players.delete(sessionId)) changed = true;
         paths.delete(sessionId);
+        presenceRefs.delete(sessionId);
       }
-      return changed ? { players, paths } : state;
+      return changed ? { players, paths, presenceRefs } : state;
     }
     case 'broadcast': {
       const incoming = sanitizePlayerState(action.player);
@@ -164,7 +194,7 @@ export function plazaStoreReducer(state: PlazaStoreState, action: PlazaStoreActi
       const players = new Map(state.players);
       players.set(incoming.sessionId, incoming);
       const paths = appendPath(state.paths, incoming.sessionId, { x: incoming.x, y: incoming.y, seq: incoming.seq });
-      return { players, paths };
+      return { players, paths, presenceRefs: state.presenceRefs };
     }
     default:
       return state;

@@ -36,15 +36,31 @@ export interface UsePlazaRealtimeResult {
 
 // Supabase Presence는 우리가 track()에 넘긴 값 위에 presence_ref 같은 자체 필드를 얹어서 돌려준다
 // (RealtimePresence.d.ts의 Presence<T> = { presence_ref: string } & T 참고). presenceStore의
-// reducer가 어차피 PlazaPlayerState 필드만 화이트리스트로 골라 저장하므로, 여기서는 그대로
-// 넘겨도 안전하다.
-function flattenPresenceState(state: RealtimePresenceState<PlazaPlayerState>): PlazaPlayerState[] {
-  const players: PlazaPlayerState[] = [];
+// reducer가 어차피 PlazaPlayerState 필드만 화이트리스트로 골라 저장하므로 렌더링에는 안전하지만,
+// presence_ref 자체는 "이 항목이 어느 join(접속)의 것인가"를 구분하는 유일한 정보라 여기서
+// 뽑아 presenceStore.ts로 넘긴다 — presence-leave의 신원 확인(PlazaStoreState.presenceRefs 주석
+// 참고)에 필요하다.
+type RawPresenceEntry = PlazaPlayerState & { presence_ref: string };
+
+// 한 key(sessionId)에 meta가 여러 개일 수 있다 — 퇴장/재입장 lifecycle 버그(2026-09) 조사로 확인:
+// 광장을 나갔다가 빠르게 다시 들어오면, 나갈 때의 untrack() leave가 아직 서버에 반영되기 전에
+// 재입장의 새 join이 먼저 도착해서 같은 key 아래 옛 meta와 새 meta가 잠깐 공존할 수 있다.
+// node_modules/@supabase/phoenix의 presence.js(Presence.syncDiff)를 직접 읽어 확인한 병합
+// 순서: `state[key] = clone(newPresence)` 로 새 meta를 먼저 채운 뒤 `state[key].metas.unshift(
+// ...curMetas)` 로 기존 meta를 "앞에" 끼워 넣는다 — 즉 배열의 마지막 원소가 가장 최근 join이고,
+// [0]번째는 가장 오래된(어쩌면 이미 떠난) meta다. 예전 코드는 entries[0]을 집어 써서, 이 공존
+// 구간 동안 항상 "낡은" 위치/시퀀스를 보여줬다 — 재입장해도 "입구에 남아 제자리걸음"으로 보이는
+// 원인 중 하나였다. 항상 배열의 마지막(가장 최근) 원소를 쓴다.
+function flattenPresenceState(state: RealtimePresenceState<PlazaPlayerState>): Array<{ player: PlazaPlayerState; presenceRef: string }> {
+  const result: Array<{ player: PlazaPlayerState; presenceRef: string }> = [];
   for (const key of Object.keys(state)) {
-    const entries = state[key];
-    if (entries && entries.length > 0) players.push(entries[0]);
+    const entries = state[key] as RawPresenceEntry[] | undefined;
+    if (entries && entries.length > 0) {
+      const newest = entries[entries.length - 1];
+      result.push({ player: newest, presenceRef: newest.presence_ref });
+    }
   }
-  return players;
+  return result;
 }
 
 /** 채널을 정말로 안전하게 정리한다: untrack()의 leave push가 실제로 나갈 기회를 갖기 전에
@@ -171,13 +187,15 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
       });
 
       nextChannel.on<PlazaPlayerState>('presence', { event: 'join' }, ({ newPresences }) => {
-        plazaDebugLog('recv:presence-join', newPresences.map(p => `${p.sessionId}(${p.x},${p.y})#${p.seq} moving=${p.moving}`), { t: performance.now().toFixed(1) });
-        dispatch({ type: 'presence-join', players: newPresences });
+        const players = (newPresences as RawPresenceEntry[]).map(p => ({ player: p, presenceRef: p.presence_ref }));
+        plazaDebugLog('recv:presence-join', players.map(({ player: p, presenceRef }) => `${p.sessionId}(${p.x},${p.y})#${p.seq} moving=${p.moving} ref=${presenceRef}`), { t: performance.now().toFixed(1) });
+        dispatch({ type: 'presence-join', players });
       });
 
       nextChannel.on<PlazaPlayerState>('presence', { event: 'leave' }, ({ leftPresences }) => {
-        plazaDebugLog('recv:presence-leave', leftPresences.map(p => p.sessionId), { t: performance.now().toFixed(1) });
-        dispatch({ type: 'presence-leave', sessionIds: leftPresences.map(presence => presence.sessionId) });
+        const leaves = (leftPresences as RawPresenceEntry[]).map(p => ({ sessionId: p.sessionId, presenceRef: p.presence_ref }));
+        plazaDebugLog('recv:presence-leave', leaves.map(l => `${l.sessionId} ref=${l.presenceRef}`), { t: performance.now().toFixed(1) });
+        dispatch({ type: 'presence-leave', leaves });
       });
 
       nextChannel.on<PlazaPlayerState>('broadcast', { event: MOVE_BROADCAST_EVENT }, ({ payload }) => {
