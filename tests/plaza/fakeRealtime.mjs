@@ -11,8 +11,22 @@
 // can no longer successfully untrack — matches a genuinely dead socket failing to deliver a
 // graceful goodbye push, so leaveChannelSafely's try/catch swallows it exactly as it would in
 // production, and no spurious extra leave fires during a plain reconnect test.
+//
+// registryByKey models a real, separately-confirmed behavior of @supabase/realtime-js's
+// RealtimeClient (node_modules/@supabase/realtime-js/dist/main/RealtimeClient.js): `channel(topic,
+// params)` returns an EXISTING channel object for that topic instead of creating a new one if one
+// is still registered ("If a channel with the same topic already exists it will be returned instead
+// of creating a duplicate connection" — the new `params`/config passed in is silently ignored in
+// that case). And `removeChannel(channel)` is itself `async` — it awaits `channel.unsubscribe()`
+// (a genuine server round trip for the leave ack) before calling `channel.teardown()`, which is
+// what actually drops the channel from that registry. So a fast leave-then-rejoin on the SAME
+// presence key can otherwise get back the SAME half-torn-down channel object instead of a fresh
+// one. registryByKey + removeDelayMs reproduce that exact timing so
+// tests/plaza/lifecycle.browser.mjs can prove the fix (usePlazaRealtime.ts's plazaVisitTeardown)
+// actually closes the race.
 let joinCounter = 0;
 const channels = [];
+const registryByKey = new Map(); // presenceKey -> the Channel object supabase.channel() currently returns for it
 const presence = new Map(); // presenceKey -> Map<joinId, meta>
 
 function entriesFor(key) {
@@ -36,6 +50,7 @@ class Channel {
     this.handlers = [];
     this.active = true;
     this.untrackDelayMs = 0; // test hook — see plazaTransport.delayUntrack
+    this.removeDelayMs = 0; // test hook — see plazaTransport.delayRemove
   }
   on(kind, filter, callback) { this.handlers.push({ kind, event: filter.event, callback }); return this; }
   emit(kind, event, payload = {}) { for (const h of this.handlers) if (h.kind === kind && h.event === event) h.callback(payload); }
@@ -67,8 +82,25 @@ class Channel {
   }
 }
 export const supabase = {
-  channel(_name, { config }) { const ch = new Channel(config.presence.key); channels.push(ch); return ch; },
-  async removeChannel(ch) { removeJoin(ch); ch.active = false; },
+  channel(_name, { config }) {
+    const key = config.presence.key;
+    const existing = registryByKey.get(key);
+    if (existing) return existing; // real RealtimeClient.channel(): same-topic reuse, new config ignored
+    const ch = new Channel(key);
+    channels.push(ch);
+    registryByKey.set(key, ch);
+    return ch;
+  },
+  async removeChannel(ch) {
+    // Models RealtimeClient.removeChannel's `await channel.unsubscribe()` before teardown() —
+    // genuinely async even with no delay configured, so callers that (correctly) await this can't
+    // accidentally rely on it resolving synchronously.
+    if (ch.removeDelayMs > 0) await new Promise(resolve => setTimeout(resolve, ch.removeDelayMs));
+    else await Promise.resolve();
+    removeJoin(ch);
+    ch.active = false;
+    if (registryByKey.get(ch.id) === ch) registryByKey.delete(ch.id);
+  },
 };
 Object.assign(window, { plazaTransport: {
   fail(id) { const ch = channels.findLast(ch => ch.id === id && ch.active); ch.active = false; ch.status('CHANNEL_ERROR'); },
@@ -79,4 +111,7 @@ Object.assign(window, { plazaTransport: {
   // Delays THIS session's next untrack() by ms — models real network latency on the leave push, to
   // stress the race between an old channel's async leave and a fast rejoin's new join.
   delayUntrack(id, ms) { const ch = channels.findLast(ch => ch.id === id && ch.active); if (ch) ch.untrackDelayMs = ms; },
+  // Delays removeChannel()'s teardown (the point at which supabase.channel() would stop reusing
+  // this object) by ms — models the real client's await-unsubscribe-ack-before-teardown window.
+  delayRemove(id, ms) { const ch = channels.findLast(ch => ch.id === id && ch.active); if (ch) ch.removeDelayMs = ms; },
 } });
