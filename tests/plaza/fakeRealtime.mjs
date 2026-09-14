@@ -59,7 +59,7 @@ class Channel {
     for (const ch of channels) if (ch.active && ch !== this) ch.emit('presence', 'join', { newPresences: [withRef] });
     this.emit('presence', 'sync');
   }
-  async send({ payload }) { for (const ch of channels) if (ch.active && ch.id !== payload.sessionId) ch.emit('broadcast', 'move', { payload }); }
+  async send({ payload, event }) { for (const ch of channels) if (ch.active && ch.id !== payload.sessionId) ch.emit('broadcast', event, { payload }); return 'ok'; }
   async untrack() {
     if (!this.active) throw new Error('untrack on a dead connection'); // matches a genuinely closed socket
     if (this.untrackDelayMs > 0) await new Promise(resolve => setTimeout(resolve, this.untrackDelayMs));
@@ -75,6 +75,7 @@ Object.assign(window, { plazaTransport: {
   last(id) { const entries = entriesFor(id); return entries[entries.length - 1]; },
   entryCount(id) { return entriesFor(id).length; },
   broadcast(player) { for (const ch of channels) if (ch.active && ch.id !== player.sessionId) ch.emit('broadcast', 'move', { payload: player }); },
+  reaction(payload) { for (const ch of channels) if (ch.active) ch.emit('broadcast', 'reaction', { payload }); },
   // Delays THIS session's next untrack() by ms — models real network latency on the leave push, to
   // stress the race between an old channel's async leave and a fast rejoin's new join.
   delayUntrack(id, ms) { const ch = channels.findLast(ch => ch.id === id && ch.active); if (ch) ch.untrackDelayMs = ms; },

@@ -12,6 +12,8 @@ import { plazaDebugLog } from './plazaDebug';
 import '../pixel-room.css';
 import { PlazaLandscape } from './PlazaLandscape';
 import './plaza.css';
+import { PlazaActivities } from './PlazaActivities';
+import { REACTIONS } from './plazaInteractions';
 
 const EMPTY_APPEARANCE: PublicAvatarAppearance = { top: null, bottom: null, shoes: null, hair: null, eyes: null };
 const KEYS: Record<string, PlazaDirection> = { ArrowDown: 'Front', s: 'Front', ArrowUp: 'Back', w: 'Back', ArrowLeft: 'Left', a: 'Left', ArrowRight: 'Right', d: 'Right' };
@@ -64,7 +66,7 @@ export default function Plaza({ userId, sessionId, onReachEntrance }: Props) {
     return () => { cancelled = true; };
   }, [userId]);
 
-  const { players, paths, updateMyState } = usePlazaRealtime(sessionId, appearance);
+  const { players, paths, updateMyState, ready, reactions, sendReaction } = usePlazaRealtime(sessionId, appearance);
   // This component only ever renders `renderedPlayers`, never the raw realtime list — see
   // useSmoothedPlayerPositions.ts's header comment for why it needs both `players` (roster/
   // appearance) and `paths` (the actual waypoint-by-waypoint history, for smoothing).
@@ -170,6 +172,8 @@ export default function Plaza({ userId, sessionId, onReachEntrance }: Props) {
           if (next && event.target === event.currentTarget) { event.preventDefault(); if (held === next) setHeld(null); }
         }} onBlur={() => setHeld(null)}>
         <PlazaLandscape />
+        <button type="button" className="pr-well-target" aria-label="우물 곁으로 걸어가기" onClick={() => walkTo({ x: 7, y: 6 })}><span aria-hidden="true">✨</span></button>
+        {[...reactions.values()].some(event => event.kind === 'wish') && <div className="pr-well-ripple" aria-hidden="true">✧</div>}
         <div className="pr-grid pr-plaza-grid">{boardCells.map(cell => <button key={`${cell.x}-${cell.y}`} type="button" tabIndex={-1} aria-hidden="true" disabled={!isWalkablePlaza(cell)} onClick={() => { board.current?.focus({ preventScroll: true }); walkTo(cell); }} />)}</div>
         {/* Other players — appearance only, no nickname/title/email/any identifying text. */}
         {renderedPlayers.map(player => <div key={player.sessionId} className="pr-plaza-other" aria-hidden="true" style={actorStyle({ x: player.x, y: player.y }, 1)}>
@@ -178,8 +182,14 @@ export default function Plaza({ userId, sessionId, onReachEntrance }: Props) {
         <div className="pr-plaza-actor" aria-hidden="true" style={actorStyle(actor, 2)}>
           <span className="pr-shadow" /><AvatarSprite direction={direction} frame={moving ? frame : 0} walking={moving} appearance={appearance} />
         </div>
+        {[{ sessionId, ...actor }, ...renderedPlayers].map(player => {
+          const reaction = reactions.get(player.sessionId);
+          return reaction && <div key={player.sessionId} className="pr-reaction-anchor" aria-hidden="true" style={{ left: `${Math.max(13, Math.min(87, (player.x + .5) * CELL_W))}%`, bottom: `${Math.min(86, (PLAZA_HEIGHT - player.y + .65) * CELL_H)}%`, zIndex: 30 }}><span className="pr-reaction-bubble">{REACTIONS[reaction.kind].emoji} {REACTIONS[reaction.kind].label}</span></div>;
+        })}
       </div>
     </div>
+    <span className="sr-only" role="status">{[...reactions.values()].filter(event => event.sessionId !== sessionId).map(event => `누군가 ${REACTIONS[event.kind].label}`).join(' · ')}</span>
+    <PlazaActivities key={userId} userId={userId} actor={actor} moving={moving} ready={ready} walkTo={walkTo} sendReaction={sendReaction} />
     <button className="pr-hub-home" onClick={() => walkTo(PLAZA_ENTRANCE)}>↓ 내 방으로 가는 길</button>
     <p id="pr-plaza-instructions" className="pr-instructions pr-plaza-instructions" role="status">우물 옆에서 잠깐 쉬어 가요. 길이나 잔디를 누르면 걸어가요.</p>
   </div>;
