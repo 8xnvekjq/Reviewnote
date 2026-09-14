@@ -151,7 +151,11 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
         }
 
         const storage = browserStorage();
-        const migratedKey = `${storageKey(userId)}:migrated`;
+        // v2: 이전 배포의 마이그레이션 로직이 소유권을 확인하지 않고 통째로 실패해도 이 마커를
+        // 찍는 버그가 있었다(바로 위 고침) — 그 버그를 이미 겪은 계정은 v1 마커가 이미 찍혀 있어
+        // 재시도를 막고 있으므로, 키 자체를 올려서 이 고침이 배포되는 순간 자연스럽게 한 번 더
+        // 재시도하게 한다. v1 마커는 그냥 죽은 키로 남지만 지울 필요는 없다.
+        const migratedKey = `${storageKey(userId)}:migrated:v2`;
         if (storage?.getItem(migratedKey)) return; // already attempted (or confirmed empty) before
         const legacy = loadRoom(userId, storage);
         // room state was never itself pruned when ownership changed (only the derived activeRoom
