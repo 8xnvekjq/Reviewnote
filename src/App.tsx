@@ -41,6 +41,7 @@ import { canViewOwnExamPrep } from './utils/examPrepAccess';
 const AdminPanel = lazy(() => import('./components/AdminPanel').then(m => ({ default: m.AdminPanel })));
 const ExamPrepAnalysis = lazy(() => import('./components/ExamPrepAnalysis').then(m => ({ default: m.ExamPrepAnalysis })));
 const ReviewCheckScreen = lazy(() => import('./components/reviewCheck/ReviewCheckScreen').then(m => ({ default: m.ReviewCheckScreen })));
+const ReviewCheckAdminScreen = lazy(() => import('./components/reviewCheck/ReviewCheckAdminScreen').then(m => ({ default: m.ReviewCheckAdminScreen })));
 const ScaffoldingPanel = lazy(() => import('./components/ScaffoldingPanel').then(m => ({ default: m.ScaffoldingPanel })));
 const GachaStore = lazy(() => import('./components/GachaStore').then(m => ({ default: m.GachaStore })));
 const PixelRoom = lazy(() => import('./features/pixel-room/PixelRoom'));
@@ -1882,7 +1883,15 @@ function App() {
           </LazyScreenBoundary>
         </Screen>
 
-        {/* 관리자는 학생 카드 쪽 전용 채점 화면을 쓰므로 이 학생용 셀프 테스트 탭은 노출하지 않는다. */}
+        {/* 어드민은 채점/학생별 시험 관리 화면(ReviewCheckAdminScreen)으로, 학생은 본인 셀프
+            테스트 화면(ReviewCheckScreen)으로 — 같은 tab('reviewCheck')을 역할에 따라 다르게
+            라우팅한다(BottomNavigation의 reviewCheckMenuAdmin/Student와 짝). */}
+        <Screen when={activeTab === 'reviewCheck' && isAdmin}>
+          <LazyScreenBoundary>
+            <ReviewCheckAdminScreen />
+          </LazyScreenBoundary>
+        </Screen>
+
         <Screen when={activeTab === 'reviewCheck' && !isAdmin && !!session?.user?.id}>
           <LazyScreenBoundary>
             <ReviewCheckScreen
