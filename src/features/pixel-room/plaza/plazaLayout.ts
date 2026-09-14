@@ -1,0 +1,36 @@
+// One small, fixed outdoor map. Ground, scenery and collision share the same cell coordinates.
+export interface PlazaRect { x: number; y: number; w: number; h: number }
+export interface PlazaScenery extends PlazaRect {
+  kind: 'tree' | 'bush' | 'well' | 'bench' | 'notice' | 'fence';
+  footprint: PlazaRect;
+}
+export const COURTYARD: PlazaRect = { x: 4, y: 3, w: 8, h: 6 };
+export const PATHS: PlazaRect[] = [
+  { x: 7, y: 8, w: 3, h: 4 },
+  { x: 2, y: 5, w: 3, h: 2 },
+  { x: 11, y: 5, w: 3, h: 2 },
+];
+export const SCENERY: PlazaScenery[] = [
+  { kind: 'well', x: 7, y: 2, w: 2, h: 4, footprint: { x: 7, y: 5, w: 2, h: 1 } },
+  { kind: 'notice', x: 10, y: 2, w: 2, h: 2, footprint: { x: 10, y: 3, w: 2, h: 1 } },
+  { kind: 'bench', x: 4, y: 6, w: 2, h: 1, footprint: { x: 4, y: 6, w: 2, h: 1 } },
+  { kind: 'bench', x: 10, y: 6, w: 2, h: 1, footprint: { x: 10, y: 6, w: 2, h: 1 } },
+  { kind: 'tree', x: 1, y: 0, w: 2, h: 4, footprint: { x: 1, y: 3, w: 2, h: 1 } },
+  { kind: 'tree', x: 13, y: 0, w: 2, h: 4, footprint: { x: 13, y: 3, w: 2, h: 1 } },
+  { kind: 'tree', x: 0, y: 7, w: 2, h: 4, footprint: { x: 0, y: 10, w: 2, h: 1 } },
+  { kind: 'tree', x: 14, y: 7, w: 2, h: 4, footprint: { x: 14, y: 10, w: 2, h: 1 } },
+  { kind: 'bush', x: 0, y: 4, w: 1, h: 1, footprint: { x: 0, y: 4, w: 1, h: 1 } },
+  { kind: 'bush', x: 2, y: 8, w: 1, h: 1, footprint: { x: 2, y: 8, w: 1, h: 1 } },
+  { kind: 'bush', x: 12, y: 9, w: 1, h: 1, footprint: { x: 12, y: 9, w: 1, h: 1 } },
+  { kind: 'bush', x: 15, y: 5, w: 1, h: 1, footprint: { x: 15, y: 5, w: 1, h: 1 } },
+  { kind: 'fence', x: 4, y: 1, w: 3, h: 1, footprint: { x: 4, y: 1, w: 3, h: 1 } },
+  { kind: 'fence', x: 10, y: 0, w: 3, h: 1, footprint: { x: 10, y: 0, w: 3, h: 1 } },
+  { kind: 'fence', x: 3, y: 11, w: 4, h: 1, footprint: { x: 3, y: 11, w: 4, h: 1 } },
+  { kind: 'fence', x: 10, y: 11, w: 3, h: 1, footprint: { x: 10, y: 11, w: 3, h: 1 } },
+];
+export function inRect(cell: { x: number; y: number }, rect: PlazaRect): boolean {
+  return cell.x >= rect.x && cell.x < rect.x + rect.w && cell.y >= rect.y && cell.y < rect.y + rect.h;
+}
+export function isSceneryCell(cell: { x: number; y: number }): boolean {
+  return SCENERY.some(item => inRect(cell, item.footprint));
+}
