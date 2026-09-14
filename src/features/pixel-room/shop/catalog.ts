@@ -15,6 +15,27 @@ export const PIXEL_CATALOG: readonly PixelItem[] = [
   { itemId: 'hair_swept', category: 'avatar', slot: 'hair', price: 120, assetKey: 'swept', displayName: '옆으로 넘긴 머리', tier: 2, stackable: false },
   { itemId: 'bottom_denim', category: 'avatar', slot: 'bottom', price: 80, assetKey: 'denim', displayName: '일자 데님 팬츠', tier: 2, stackable: false },
   { itemId: 'shoes_low', category: 'avatar', slot: 'shoes', price: 30, assetKey: 'low', displayName: '블랙 로우 슈즈', tier: 1, stackable: false },
+  // 실루엣이 달라지는 아이템 우선 — 상의 리본은 기존 카탈로그에 전혀 없던 새 실루엣, 하의 반바지도
+  // 마찬가지(기존엔 긴바지형인 데님 하나뿐이었음). vest_black/pants_black은 이미 있는 실루엣의 저채도
+  // 대비 색상 1개씩만 추가(무분별한 색상 증식 방지).
+  { itemId: 'top_ribbon_red', category: 'avatar', slot: 'top', price: 90, assetKey: 'ribbon_red', displayName: '레드 리본 블라우스', tier: 2, stackable: false },
+  { itemId: 'top_ribbon_blue', category: 'avatar', slot: 'top', price: 90, assetKey: 'ribbon_blue', displayName: '블루 리본 블라우스', tier: 2, stackable: false },
+  { itemId: 'top_ribbon_black', category: 'avatar', slot: 'top', price: 90, assetKey: 'ribbon_black', displayName: '블랙 리본 블라우스', tier: 2, stackable: false },
+  { itemId: 'top_vest_black', category: 'avatar', slot: 'top', price: 120, assetKey: 'vest_black', displayName: '블랙 니트 조끼', tier: 2, stackable: false },
+  { itemId: 'bottom_shorts_blue', category: 'avatar', slot: 'bottom', price: 45, assetKey: 'shorts_blue', displayName: '블루 반바지', tier: 1, stackable: false },
+  { itemId: 'bottom_shorts_black', category: 'avatar', slot: 'bottom', price: 45, assetKey: 'shorts_black', displayName: '블랙 반바지', tier: 1, stackable: false },
+  { itemId: 'bottom_pants_black', category: 'avatar', slot: 'bottom', price: 80, assetKey: 'pants_black', displayName: '블랙 슬랙스', tier: 2, stackable: false },
+  // 헤어는 형태(번/단발/긴머리/옆머리) 4종이 전부 같은 갈색 한 색으로만 팔리고 있었다 — 형태를
+  // 구매해도 색은 다 똑같아 보이는 게 "구분이 잘 안 됨"의 큰 원인이라, 형태별로 블론드/블랙 두
+  // 색을 추가한다(전 색상 대신 대비가 큰 2색만 — 카탈로그를 과하게 불리지 않는다).
+  { itemId: 'hair_buns_blonde', category: 'avatar', slot: 'hair', price: 150, assetKey: 'buns_blonde', displayName: '블론드 양갈래 번', tier: 2, stackable: false },
+  { itemId: 'hair_buns_black', category: 'avatar', slot: 'hair', price: 150, assetKey: 'buns_black', displayName: '블랙 양갈래 번', tier: 2, stackable: false },
+  { itemId: 'hair_bob_blonde', category: 'avatar', slot: 'hair', price: 120, assetKey: 'bob_blonde', displayName: '블론드 단발', tier: 2, stackable: false },
+  { itemId: 'hair_bob_black', category: 'avatar', slot: 'hair', price: 120, assetKey: 'bob_black', displayName: '블랙 단발', tier: 2, stackable: false },
+  { itemId: 'hair_long_blonde', category: 'avatar', slot: 'hair', price: 180, assetKey: 'long_blonde', displayName: '블론드 긴 머리', tier: 2, stackable: false },
+  { itemId: 'hair_long_black', category: 'avatar', slot: 'hair', price: 180, assetKey: 'long_black', displayName: '블랙 긴 머리', tier: 2, stackable: false },
+  { itemId: 'hair_swept_blonde', category: 'avatar', slot: 'hair', price: 120, assetKey: 'swept_blonde', displayName: '블론드 옆머리', tier: 2, stackable: false },
+  { itemId: 'hair_swept_black', category: 'avatar', slot: 'hair', price: 120, assetKey: 'swept_black', displayName: '블랙 옆머리', tier: 2, stackable: false },
   { itemId: 'furniture_plant', category: 'furniture', slot: 'furniture', price: 25, assetKey: 'plant', displayName: '작은 화분', tier: 1, stackable: false },
   { itemId: 'furniture_decoration', category: 'furniture', slot: 'furniture', price: 40, assetKey: 'decoration', displayName: '작은 칠판', tier: 1, stackable: false },
   { itemId: 'furniture_chair', category: 'furniture', slot: 'furniture', price: 50, assetKey: 'chair', displayName: '나무 의자', tier: 1, stackable: false },

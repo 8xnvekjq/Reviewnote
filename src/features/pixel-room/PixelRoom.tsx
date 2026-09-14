@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { FURNITURE, ROOM_HEIGHT, ROOM_WIDTH, findSpawn, isCellFree, loadRoom, placeFurniture, planWalk, removeFurniture, saveRoom } from './model';
-import type { Cell, FurnitureType, RoomState, StorageLike } from './model';
+import { FURNITURE, ROOM_HEIGHT, ROOM_WIDTH, defaultState, findSpawn, isCellFree, loadRoom, placeFurniture, planWalk, removeFurniture, storageKey, validateRoom } from './model';
+import type { Cell, FurnitureType, Placement, RoomState, StorageLike } from './model';
 import { AvatarSprite, FurnitureSprite } from './sprites';
 import type { PixelItem } from './shop/types';
 import { usePixelShop } from './usePixelShop';
 import { ShopPanel, Wardrobe } from './shop/CustomizationPanel';
 import Plaza from './plaza/Plaza';
+import { fetchPixelFurniturePlacement, savePixelRoomLayout } from '../../utils/pixelShop';
 import './pixel-room.css';
 
 export type Direction = 'Front' | 'Back' | 'Left' | 'Right';
@@ -89,9 +90,8 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
   const [overlayActive, setOverlayActive] = useState(false);
   const transitionLockRef = useRef(false);
 
-  const [initial] = useState(() => loadRoom(userId, browserStorage()));
-  const [room, setRoom] = useState(initial.state);
-  const [actor, setActor] = useState(() => findSpawn(initial.state) ?? { x: 0, y: 7 });
+  const [room, setRoom] = useState(defaultState());
+  const [actor, setActor] = useState(() => findSpawn(defaultState()) ?? { x: 0, y: 7 });
   const [direction, setDirection] = useState<Direction>('Front');
   const [frame, setFrame] = useState(0);
   const [held, setHeld] = useState<Direction | null>(null);
@@ -102,7 +102,12 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
   const [dpadOpen, setDpadOpen] = useState(false);
   const [selected, setSelected] = useState<FurnitureType | null>(null);
   const [message, setMessage] = useState('방의 바닥을 누르면 그 자리로 걸어가요.');
-  const [storageError, setStorageError] = useState(initial.ok ? '' : initial.error);
+  // 가구 배치는 이제 서버가 기준(pixel_furniture_placement) — roomReady는 그 최초 로드(+필요하면
+  // 레거시 localStorage 1회 이전)가 끝났는지를 나타낸다. storageError는 그 로드나 이후 저장이
+  // 실패했을 때만 채워진다(로컬 저장소 접근 불가 자체는 더 이상 에러가 아님 — 그냥 서버 기준으로
+  // 시작할 뿐).
+  const [roomReady, setRoomReady] = useState(false);
+  const [storageError, setStorageError] = useState('');
   const [speech, setSpeech] = useState('');
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
   const board = useRef<HTMLDivElement>(null);
@@ -111,6 +116,61 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
   const ownedFurnitureTypes = useMemo(() => new Set(shop.catalog.filter(item => item.category === 'furniture' && shop.ownedIds.has(item.itemId)).map(item => item.assetKey as FurnitureType)), [shop.catalog, shop.ownedIds]);
   // Legacy local placements cannot grant ownership or leave invisible obstacles.
   const activeRoom = useMemo(() => ({ ...room, furniture: room.furniture.filter(item => ownedFurnitureTypes.has(item.type)) }), [room, ownedFurnitureTypes]);
+
+  // 서버가 기준인 가구 배치 최초 로드. shop.ready가 되는 순간 딱 한 번만 실행(ref로 가드) — 그
+  // 시점의 shop.catalog로 item_id<->assetKey를 매핑한다(usePixelShop이 즉시 정적 PIXEL_CATALOG로
+  // 초기화해 두므로 네트워크 전에도 이미 채워져 있다). 서버에 아직 아무 행도 없으면(신규 유저 또는
+  // 이 기능 출시 전 로컬에만 저장해 둔 유저) 레거시 localStorage를 한 번만 읽어 소유한 가구만
+  // 서버로 이전한다 — 이전 시도 여부는 기기별 마커로 기록해서 다시 비운 방을 매번 되살리지 않는다.
+  const roomLoadStartedRef = useRef(false);
+  useEffect(() => {
+    if (!shop.ready || roomLoadStartedRef.current) return;
+    roomLoadStartedRef.current = true;
+    let cancelled = false;
+    const furnitureCatalog = shop.catalog.filter(item => item.category === 'furniture');
+    const typeByItemId = new Map(furnitureCatalog.map(item => [item.itemId, item.assetKey as FurnitureType]));
+    const itemIdByType = new Map(furnitureCatalog.map(item => [item.assetKey as FurnitureType, item.itemId]));
+
+    function applyLoadedFurniture(furniture: Placement[]) {
+      const loaded = validateRoom({ version: 1, avatar: defaultState().avatar, furniture });
+      if (!loaded) return;
+      setRoom(loaded);
+      setActor(previous => (isCellFree(loaded, previous) ? previous : findSpawn(loaded) ?? previous));
+    }
+
+    (async () => {
+      try {
+        const rows = await fetchPixelFurniturePlacement(userId);
+        if (cancelled) return;
+        if (rows.length > 0) {
+          const furniture = rows
+            .map(row => { const type = typeByItemId.get(row.itemId); return type ? { type, x: row.x, y: row.y } : null; })
+            .filter((item): item is Placement => item !== null);
+          applyLoadedFurniture(furniture);
+          return;
+        }
+
+        const storage = browserStorage();
+        const migratedKey = `${storageKey(userId)}:migrated`;
+        if (storage?.getItem(migratedKey)) return; // already attempted (or confirmed empty) before
+        const legacy = loadRoom(userId, storage);
+        if (legacy.ok && legacy.state.furniture.length > 0) {
+          const ownedLegacy = legacy.state.furniture.filter(item => itemIdByType.has(item.type));
+          if (ownedLegacy.length > 0) {
+            const placements = ownedLegacy.map(item => ({ itemId: itemIdByType.get(item.type)!, x: item.x, y: item.y }));
+            const result = await savePixelRoomLayout(placements);
+            if (!cancelled && result.ok) applyLoadedFurniture(ownedLegacy);
+          }
+        }
+        storage?.setItem(migratedKey, '1');
+      } catch {
+        if (!cancelled) setStorageError('가구 배치를 불러오지 못했어요. 새로고침 후 다시 시도해 주세요.');
+      } finally {
+        if (!cancelled) setRoomReady(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [shop.ready, shop.catalog, userId]);
 
   // Walks the fade overlay to full opacity, swaps `location` (mounting the destination while the
   // screen is fully covered — see the DOOR_FADE_MS/PRESENCE_HEAD_START_MS comment above), then
@@ -184,10 +244,19 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
   }
   useEffect(() => () => window.clearTimeout(speechTimer.current), []);
 
+  // 서버가 기준 — 실패하면 화면과 서버가 갈라지지 않도록 낙관적 갱신을 되돌린다(이전엔 항상
+  // 성공하는 localStorage 저장이라 되돌릴 필요가 없었지만, 이제는 네트워크 저장이라 실패할 수 있음).
   function persist(next: RoomState) {
+    const previous = room;
     setRoom(next);
-    const result = saveRoom(userId, next, browserStorage());
-    setStorageError(result.ok ? '' : result.error);
+    const itemIdByType = new Map(shop.catalog.filter(item => item.category === 'furniture').map(item => [item.assetKey as FurnitureType, item.itemId]));
+    const placements = next.furniture
+      .map(item => { const itemId = itemIdByType.get(item.type); return itemId ? { itemId, x: item.x, y: item.y } : null; })
+      .filter((placement): placement is { itemId: string; x: number; y: number } => placement !== null);
+    savePixelRoomLayout(placements).then(result => {
+      if (!result.ok) { setRoom(previous); setStorageError(result.message); }
+      else setStorageError('');
+    });
   }
   // Leaving the room stops room movement immediately (not just on the next tick), so no stray
   // timer keeps stepping the actor while the room card isn't even shown.
@@ -246,7 +315,7 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
   function exitDecorating(nextMessage: string) { setDecorating(false); setSelected(null); setSheetOpen(false); setMessage(nextMessage); }
   function chooseCell(cell: Cell) {
     if (!decorating) { board.current?.focus({ preventScroll: true }); walkTo(cell); return; }
-    if (!shop.ready || shop.loadError) { setMessage('보유 정보를 불러온 뒤 배치할 수 있어요.'); return; }
+    if (!shop.ready || shop.loadError || !roomReady) { setMessage('보유 정보를 불러온 뒤 배치할 수 있어요.'); return; }
     if (selected && !ownedFurnitureTypes.has(selected)) { setSelected(null); return; }
     if (!selected) {
       const item = activeRoom.furniture.find(item => cell.x >= item.x && cell.x < item.x + FURNITURE[item.type].width && cell.y >= item.y && cell.y < item.y + FURNITURE[item.type].height);
@@ -276,7 +345,7 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
         else { enterDecorating(); setMessage('가구를 고르고 방의 원하는 칸을 눌러 주세요.'); }
       }}>{decorating ? '꾸미기 완료' : '꾸미기'}</button>}
     </header>
-    {location === 'room' && storageError && <p className="pr-storage-error" role="alert">{storageError} 변경 내용은 현재 화면에서만 유지될 수 있어요.</p>}
+    {location === 'room' && storageError && <p className="pr-storage-error" role="alert">{storageError}</p>}
     {location === 'plaza' && <Plaza userId={userId} sessionId={sessionId} onReachEntrance={() => transitionTo('room')} />}
     {location === 'room' && <div className={`pr-room-frame ${decorating ? 'pr-decorating' : ''}`}>
       <div className="pr-wall" aria-hidden="true"><div className="pr-window"><i /><i /><i /><i /></div><span>HOME, SWEET HOME</span></div>

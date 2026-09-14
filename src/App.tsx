@@ -236,12 +236,10 @@ function App() {
   // 그래서 여기서는 mistakes를 다시 훑지 않고 bonus_points를 그대로 잔액으로 쓴다.
   const currentDisplayPoints = Math.max(0, (myBonusPoints || 0) + pointAdjustment);
 
-  // Pixel World Phase 2A — 광장 테스트를 위해 admin뿐 아니라 기존 test 계정도 접근 가능하게 연다
-  // (그 외 일반 학생은 계속 차단). 새 판별 방식을 만들지 않고 GachaStore.tsx가 이미 쓰는
-  // "email이 test로 시작하면 테스트 계정" 기준을 그대로 재사용 — 메뉴 노출과 Screen 진입 guard
-  // 양쪽에 이 값 하나로 동일하게 적용한다.
-  const isTestAccount = (session?.user?.email || '').toLowerCase().startsWith('test');
-  const canAccessPixelWorld = isAdmin || isTestAccount;
+  // Pixel World 전체 공개 — admin/test 계정으로만 열어뒀던 Phase 2A 접근 제한을 없앴다. 로그인
+  // 여부 자체는 이 플래그가 아니라 호출부(BottomNavigation의 currentUserId, 아래 Screen의
+  // session?.user?.id)가 각자 따로 확인하므로 여기서는 단순히 "누구나"로 둔다.
+  const canAccessPixelWorld = true;
   
   const prevTabRef = useRef(activeTab);
 
@@ -1521,8 +1519,7 @@ function App() {
           />
         )}
       >
-        {/* Pixel World는 아직 시각/경제 실험 단계 — Phase 2A(광장 실시간 테스트)까지는
-            admin + test 계정에게만 열어둔다(canAccessPixelWorld). 전체 학생 공개는 별도 결정. */}
+        {/* Pixel World — 로그인한 모든 계정에게 열려 있다(전체 학생 공개). */}
         <Screen when={activeTab === 'pixelRoom' && !!session?.user?.id && canAccessPixelWorld} className="pr-screen-fill">
           <LazyScreenBoundary>
             {(() => {

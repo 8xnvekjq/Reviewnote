@@ -60,8 +60,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, s
     </div>
     <Sheet open={menuOpen} onClose={() => setMenuOpen(false)} title="나의 학습 공간">
       <div className="rn-menu-list">
-        {/* Pixel World 소프트 런칭 — Phase 1(실제 포인트 구매) 검증 전까지 admin에게만 노출. */}
-        {/* Pixel World 소프트 런칭 — Phase 2A(광장 실시간 테스트)까지는 admin + test 계정에게만 노출. */}
+        {/* Pixel World 전체 공개 — 로그인한 모든 계정에게 노출. */}
         {currentUserId && canAccessPixelWorld && <button type="button" className="rn-menu-row" aria-current={activeTab === 'pixelRoom' ? 'page' : undefined} onClick={() => select('pixelRoom')}><AppIcon name="user" /><span><strong>🎮 Pixel Room</strong><small>내 캐릭터와 작은 방 꾸미기</small></span><AppIcon name="arrow" width={16} /></button>}
         {examPrepMenu && <button type="button" key={examPrepMenu.tab} className="rn-menu-row" aria-current={activeTab === examPrepMenu.tab ? 'page' : undefined} onClick={() => select(examPrepMenu.tab)}><AppIcon name={examPrepMenu.icon} /><span><strong>{examPrepMenu.label}</strong><small>{examPrepMenu.description}</small></span><AppIcon name="arrow" width={16} /></button>}
         {reviewCheckMenu && <button type="button" key={reviewCheckMenu.tab} className="rn-menu-row" aria-current={activeTab === reviewCheckMenu.tab ? 'page' : undefined} onClick={() => select(reviewCheckMenu.tab)}><AppIcon name={reviewCheckMenu.icon} /><span><strong>{reviewCheckMenu.label}</strong><small>{reviewCheckMenu.description}</small></span><AppIcon name="arrow" width={16} /></button>}

@@ -16,8 +16,11 @@ test('every avatar product maps to a real, bounded atlas row in its own slot', (
     const row = AVATAR_ROW_BY_SLOT[item.slot][item.assetKey];
     assert.ok(Number.isInteger(row) && row > 0 && row < rowCounts[item.slot]);
   }
-  assert.equal(ids.size, 24);
-  assert.equal(PIXEL_CATALOG.filter(item => item.slot === 'hair').length, 4);
+  assert.equal(ids.size, 39);
+  assert.equal(PIXEL_CATALOG.filter(item => item.slot === 'hair').length, 12);
+  assert.equal(PIXEL_CATALOG.filter(item => item.slot === 'top').length, 10);
+  assert.equal(PIXEL_CATALOG.filter(item => item.slot === 'bottom').length, 4);
+  assert.equal(PIXEL_CATALOG.filter(item => item.category === 'furniture').length, 12);
 });
 
 test('server equipment maps all four product slots independently into shared appearance', () => {
