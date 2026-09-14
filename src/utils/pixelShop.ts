@@ -97,3 +97,36 @@ export async function equipPixelItem(slot: PixelAvatarSlot, itemId: string | nul
   }
   return data as EquipPixelItemResult;
 }
+
+export interface FurniturePlacementRow { itemId: string; x: number; y: number }
+
+/** This user's server-stored furniture layout — the authoritative source for "다른 기기에서도
+ * 같은 배치" (previously localStorage-only, per-device). RLS already scopes rows to the caller
+ * (or an admin), but we still filter by userId explicitly for the same clarity as the other
+ * fetch* helpers here. */
+export async function fetchPixelFurniturePlacement(userId: string): Promise<FurniturePlacementRow[]> {
+  const { data, error } = await supabase
+    .from('pixel_furniture_placement')
+    .select('item_id, x, y')
+    .eq('user_id', userId);
+  if (error) throw error;
+  return (data || []).map((row: { item_id: string; x: number; y: number }) => ({ itemId: row.item_id, x: row.x, y: row.y }));
+}
+
+export type SavePixelRoomLayoutResult =
+  | { ok: true; count: number }
+  | { ok: false; reason: 'invalid_payload' | 'duplicate_item' | 'out_of_bounds' | 'not_found' | 'not_owned' | 'unknown'; message: string };
+
+/** Replaces the caller's ENTIRE furniture layout in one atomic call — mirrors how the client's
+ * RoomState.furniture is itself a full array, so place/move/remove all go through this same
+ * function (remove = call again without that item). Server re-validates ownership, item
+ * category, bounds and duplicates itself; nothing here is trusted price/ownership input. */
+export async function savePixelRoomLayout(placements: FurniturePlacementRow[]): Promise<SavePixelRoomLayoutResult> {
+  const { data, error } = await supabase.rpc('save_pixel_room_layout', {
+    p_placements: placements.map(p => ({ itemId: p.itemId, x: p.x, y: p.y })),
+  });
+  if (error) {
+    return { ok: false, reason: 'unknown', message: error.message || '가구 배치를 저장하지 못했어요.' };
+  }
+  return data as SavePixelRoomLayoutResult;
+}

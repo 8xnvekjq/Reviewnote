@@ -42,4 +42,65 @@ END
 $test$;
 RESET ROLE;
 ROLLBACK;
-SELECT 'PASS: 24 catalog purchases/duplicate prevention, all avatar slot equipment persisted, wrong slot and direct write denied; rolled back' AS result;
+SELECT 'PASS: 39 catalog purchases/duplicate prevention, all avatar slot equipment persisted, wrong slot and direct write denied; rolled back' AS result;
+
+-- save_pixel_room_layout — 가구 배치 서버 저장(place/move/remove/ownership/bounds/duplicate/
+-- direct-write guard). 위 블록과 별개 트랜잭션이라 그 블록의 롤백에 의존하지 않는다.
+BEGIN;
+UPDATE public.profiles SET point_adjustment = point_adjustment + 10000
+WHERE id = '50b0db29-89b6-4601-bfd9-a17c5c81137b';
+SET LOCAL request.jwt.claim.sub = '50b0db29-89b6-4601-bfd9-a17c5c81137b';
+SET LOCAL ROLE authenticated;
+DO $furniture_test$
+DECLARE result jsonb; denied boolean := false;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.pixel_item_ownership WHERE user_id=auth.uid() AND item_id='furniture_chair') THEN
+    result := public.purchase_pixel_item('furniture_chair');
+    IF result->>'ok' <> 'true' THEN RAISE EXCEPTION 'purchase failed: %', result; END IF;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.pixel_item_ownership WHERE user_id=auth.uid() AND item_id='furniture_plant') THEN
+    result := public.purchase_pixel_item('furniture_plant');
+    IF result->>'ok' <> 'true' THEN RAISE EXCEPTION 'purchase failed: %', result; END IF;
+  END IF;
+
+  result := public.save_pixel_room_layout('[{"itemId":"furniture_chair","x":1,"y":2},{"itemId":"furniture_plant","x":3,"y":4}]'::jsonb);
+  IF result->>'ok' <> 'true' OR (result->>'count')::int <> 2 THEN RAISE EXCEPTION 'save failed: %', result; END IF;
+  IF (SELECT count(*) FROM public.pixel_furniture_placement WHERE user_id=auth.uid()) <> 2 THEN RAISE EXCEPTION 'row count wrong'; END IF;
+
+  -- move one, remove the other (only chair remains, moved) — place/move/remove all go through
+  -- this one whole-layout RPC.
+  result := public.save_pixel_room_layout('[{"itemId":"furniture_chair","x":5,"y":5}]'::jsonb);
+  IF result->>'ok' <> 'true' THEN RAISE EXCEPTION 'move/remove failed: %', result; END IF;
+  IF (SELECT count(*) FROM public.pixel_furniture_placement WHERE user_id=auth.uid()) <> 1 THEN RAISE EXCEPTION 'remove did not shrink rows'; END IF;
+  IF (SELECT x FROM public.pixel_furniture_placement WHERE user_id=auth.uid() AND item_id='furniture_chair') <> 5 THEN RAISE EXCEPTION 'move did not persist'; END IF;
+
+  result := public.save_pixel_room_layout('[{"itemId":"furniture_bed","x":0,"y":0}]'::jsonb);
+  IF result->>'reason' <> 'not_owned' THEN RAISE EXCEPTION 'unowned furniture was not rejected: %', result; END IF;
+  IF (SELECT count(*) FROM public.pixel_furniture_placement WHERE user_id=auth.uid()) <> 1 THEN RAISE EXCEPTION 'rejected call mutated state'; END IF;
+
+  result := public.save_pixel_room_layout('[{"itemId":"furniture_chair","x":10,"y":0}]'::jsonb);
+  IF result->>'reason' <> 'out_of_bounds' THEN RAISE EXCEPTION 'out-of-bounds not rejected: %', result; END IF;
+
+  result := public.save_pixel_room_layout('[{"itemId":"top_sage","x":0,"y":0}]'::jsonb);
+  IF result->>'reason' <> 'not_found' THEN RAISE EXCEPTION 'avatar item accepted as furniture: %', result; END IF;
+
+  result := public.save_pixel_room_layout('[{"itemId":"furniture_chair","x":0,"y":0},{"itemId":"furniture_chair","x":1,"y":1}]'::jsonb);
+  IF result->>'reason' <> 'duplicate_item' THEN RAISE EXCEPTION 'duplicate not rejected: %', result; END IF;
+
+  result := public.save_pixel_room_layout('[]'::jsonb);
+  IF result->>'ok' <> 'true' THEN RAISE EXCEPTION 'empty save failed: %', result; END IF;
+  IF (SELECT count(*) FROM public.pixel_furniture_placement WHERE user_id=auth.uid()) <> 0 THEN RAISE EXCEPTION 'empty save did not clear'; END IF;
+
+  PERFORM set_config('reviewnote.pixel_rpc', '', true);
+  BEGIN
+    INSERT INTO public.pixel_furniture_placement (user_id, item_id, x, y) VALUES (auth.uid(), 'furniture_chair', 0, 0);
+    denied := false;
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM LIKE 'direct writes to %' THEN denied := true; ELSE RAISE; END IF;
+  END;
+  IF NOT denied THEN RAISE EXCEPTION 'direct insert unexpectedly allowed'; END IF;
+END
+$furniture_test$;
+RESET ROLE;
+ROLLBACK;
+SELECT 'PASS: save_pixel_room_layout place/move/remove/ownership/bounds/duplicate/direct-write-guard all verified; rolled back' AS result;
