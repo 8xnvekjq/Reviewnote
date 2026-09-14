@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PLAZA_HEIGHT, PLAZA_MOVE_TICK_MS, PLAZA_WIDTH } from './types';
 import type { PlazaDirection } from './types';
-import { PLAZA_ENTRANCE, findSpawn, isInsidePlaza, moveOneStep, planWalk } from './plazaModel';
+import { PLAZA_ENTRANCE, findSpawn, isWalkablePlaza, moveOneStep, planWalk } from './plazaModel';
 import type { Cell, PlazaWalkStep } from './plazaModel';
 import { usePlazaRealtime } from './usePlazaRealtime';
 import { useSmoothedPlayerPositions } from './useSmoothedPlayerPositions';
-import { AvatarSprite, FurnitureSprite } from '../sprites';
+import { AvatarSprite } from '../sprites';
 import type { PublicAvatarAppearance } from '../shop/types';
 import { fetchEquippedAppearance } from '../../../utils/pixelShop';
 import { plazaDebugLog } from './plazaDebug';
 import '../pixel-room.css';
+import { PlazaLandscape } from './PlazaLandscape';
+import './plaza.css';
 
 const EMPTY_APPEARANCE: PublicAvatarAppearance = { top: null, bottom: null, shoes: null, hair: null, eyes: null };
 const KEYS: Record<string, PlazaDirection> = { ArrowDown: 'Front', s: 'Front', ArrowUp: 'Back', w: 'Back', ArrowLeft: 'Left', a: 'Left', ArrowRight: 'Right', d: 'Right' };
@@ -35,46 +37,7 @@ function actorStyle(cell: Cell, zBoost: number) {
     zIndex: cell.y + zBoost,
   };
 }
-// Ground-level dressing (hedge/path/stub): no z-index here — these stay under everything via the
-// low z-index their CSS classes carry, so they never need to compete with avatars/scenery.
-function rectStyle(item: Rect) {
-  return { left: `${item.x * CELL_W}%`, top: `${item.y * CELL_H}%`, width: `${item.w * CELL_W}%`, height: `${item.h * CELL_H}%` };
-}
-// Standing scenery (tree/bush/bench/board): z-index by footprint row, same convention as the
-// room's furniture (item.y + height) — so an avatar can walk in front of or behind it correctly.
-function sceneryStyle(item: SceneryItem) {
-  return { ...rectStyle(item), zIndex: item.y + item.h };
-}
-
 const cells: Cell[] = Array.from({ length: PLAZA_WIDTH * PLAZA_HEIGHT }, (_, i) => ({ x: i % PLAZA_WIDTH, y: Math.floor(i / PLAZA_WIDTH) }));
-
-// Outdoor set dressing — a data table, not bespoke per-item JSX, so a future scenery pass (or a
-// third location reusing the same rendering shape) is mostly a matter of adding rows here.
-// tree/bush reuse the room's existing furniture-sprite-crop technique (same FurnitureSprite the
-// room uses for real furniture) rather than new art; board/bench are drawn with plain CSS. None
-// of this participates in collision — see plazaModel.ts's header comment for why the plaza has no
-// obstacle system.
-type Rect = { x: number; y: number; w: number; h: number };
-type SceneryKind = 'tree' | 'bush' | 'bench' | 'board';
-interface SceneryItem extends Rect { kind: SceneryKind }
-const PLAZA_SCENERY: SceneryItem[] = [
-  { kind: 'board', x: 7, y: 2, w: 2, h: 2 },
-  { kind: 'bench', x: 5, y: 5, w: 2, h: 1 },
-  { kind: 'bench', x: 9, y: 5, w: 2, h: 1 },
-  { kind: 'tree', x: 3, y: 1, w: 1, h: 2 },
-  { kind: 'tree', x: 12, y: 1, w: 1, h: 2 },
-  { kind: 'tree', x: 2, y: 6, w: 1, h: 2 },
-  { kind: 'tree', x: 13, y: 6, w: 1, h: 2 },
-  { kind: 'bush', x: 4, y: 3, w: 1, h: 1 },
-  { kind: 'bush', x: 11, y: 3, w: 1, h: 1 },
-  { kind: 'bush', x: 5, y: 9, w: 1, h: 1 },
-  { kind: 'bush', x: 10, y: 9, w: 1, h: 1 },
-];
-// Walkway from the entrance up to the notice board. A separate short "stub" pokes through a gap
-// in the top border (see .pr-plaza-hedge-top-* below) — purely decorative, hinting that the world
-// continues past this frame, not connected to the real path and not going anywhere yet.
-const PLAZA_PATH: Rect = { x: 7, y: 4, w: 2, h: 8 };
-const PLAZA_PATH_STUB: Rect = { x: 7, y: 0, w: 2, h: 1 };
 
 interface Props {
   userId: string;
@@ -84,9 +47,9 @@ interface Props {
 
 /** Pixel World Phase 2A rework — the shared plaza screen. Same tap-to-move + keyboard movement
  * *feel* as PixelRoom.tsx (identical held/walkQueue/frame state machine, same 170ms tick),
- * reimplemented against plazaModel.ts's boundary-only grid instead of model.ts's furniture-aware
+ * reimplemented against plazaModel.ts's fixed-scenery grid instead of model.ts's furniture-aware
  * RoomState — see plazaModel.ts for why. No furniture, no save/load, no decorating mode: this
- * screen is the ground, some non-collidable outdoor scenery, my avatar, and everyone else's.
+ * screen is the ground, some outdoor scenery, my avatar, and everyone else's.
  *
  * The ONLY way out is walking onto PLAZA_ENTRANCE — PixelRoom.tsx owns the actual transition
  * (fade overlay + swapping which location is mounted); this component just tells it when the
@@ -141,11 +104,11 @@ export default function Plaza({ userId, sessionId, onReachEntrance }: Props) {
   }, [actor]);
 
   // Held-key/D-pad movement: one timer runs only while a direction is held, same shape as
-  // PixelRoom.tsx's identical effect (furniture-collision check swapped for a boundary check).
+  // PixelRoom.tsx's identical effect (fixed outdoor footprints instead of room furniture).
   useEffect(() => {
     if (!held) return;
     function step() {
-      setActor(previous => { const next = moveOneStep(previous, held!); return isInsidePlaza(next) ? next : previous; });
+      setActor(previous => { const next = moveOneStep(previous, held!); return isWalkablePlaza(next) ? next : previous; });
       setFrame(previous => (previous + 1) % 4);
     }
     step();
@@ -162,7 +125,7 @@ export default function Plaza({ userId, sessionId, onReachEntrance }: Props) {
     if (walkQueue.length === 0 || held) return;
     const [next, ...rest] = walkQueue;
     const timer = window.setTimeout(() => {
-      setActor(previous => isInsidePlaza(next.cell) ? next.cell : previous);
+      setActor(previous => isWalkablePlaza(next.cell) ? next.cell : previous);
       setDirection(next.direction);
       setFrame(previous => (previous + 1) % 4);
       setWalkQueue(rest);
@@ -195,7 +158,7 @@ export default function Plaza({ userId, sessionId, onReachEntrance }: Props) {
   const boardCells = useMemo(() => cells, []);
 
   return <div className="pr-room-frame pr-plaza-frame">
-    <div className="pr-wall" aria-hidden="true"><div className="pr-window"><i /><i /><i /><i /></div><span>PIXEL PLAZA</span></div>
+    <header className="pr-hub-heading"><div><span>PIXEL WORLD · OUTDOORS</span><h2>모여라, 작은 광장</h2></div><span className="pr-hub-weather" aria-label="맑은 날">☀</span></header>
     <div className="pr-stage">
       <div ref={board} className="pr-board pr-plaza-board" tabIndex={0} role="group" aria-label="광장. 바닥을 눌러 이동하거나 방향키/WASD로 이동. 아래쪽 입구 칸으로 걸어가면 내 방으로 돌아가요." aria-describedby="pr-plaza-instructions"
         onKeyDown={event => {
@@ -206,23 +169,8 @@ export default function Plaza({ userId, sessionId, onReachEntrance }: Props) {
           const next = KEYS[event.key.length === 1 ? event.key.toLowerCase() : event.key];
           if (next && event.target === event.currentTarget) { event.preventDefault(); if (held === next) setHeld(null); }
         }} onBlur={() => setHeld(null)}>
-        {/* Ground dressing, back to front: border hedge (with one decorative gap + off-frame path
-           stub), the walkway, then trees/bushes/bench/board. All aria-hidden + non-interactive —
-           purely a "this reads as outdoors" backdrop, never an obstacle (see plazaModel.ts). */}
-        <div className="pr-plaza-hedge" aria-hidden="true" style={rectStyle({ x: 0, y: 0, w: 7, h: 1 })} />
-        <div className="pr-plaza-hedge" aria-hidden="true" style={rectStyle({ x: 9, y: 0, w: PLAZA_WIDTH - 9, h: 1 })} />
-        <div className="pr-plaza-hedge" aria-hidden="true" style={rectStyle({ x: 0, y: PLAZA_HEIGHT - 1, w: 7, h: 1 })} />
-        <div className="pr-plaza-hedge" aria-hidden="true" style={rectStyle({ x: 9, y: PLAZA_HEIGHT - 1, w: PLAZA_WIDTH - 9, h: 1 })} />
-        <div className="pr-plaza-hedge" aria-hidden="true" style={rectStyle({ x: 0, y: 0, w: 1, h: PLAZA_HEIGHT })} />
-        <div className="pr-plaza-hedge" aria-hidden="true" style={rectStyle({ x: PLAZA_WIDTH - 1, y: 0, w: 1, h: PLAZA_HEIGHT })} />
-        <div className="pr-plaza-path-stub" aria-hidden="true" style={rectStyle(PLAZA_PATH_STUB)} />
-        <div className="pr-plaza-path" aria-hidden="true" style={rectStyle(PLAZA_PATH)} />
-        <div className="pr-grid pr-plaza-grid">{boardCells.map(cell => <button key={`${cell.x}-${cell.y}`} type="button" tabIndex={-1} aria-hidden="true" onClick={() => { board.current?.focus({ preventScroll: true }); walkTo(cell); }} />)}</div>
-        {PLAZA_SCENERY.map((item, index) => <div key={index} className={`pr-plaza-scenery pr-plaza-scenery-${item.kind}`} aria-hidden="true" style={sceneryStyle(item)}>
-          {item.kind === 'tree' && <FurnitureSprite type="tallplant" />}
-          {item.kind === 'bush' && <FurnitureSprite type="plant" />}
-          {item.kind === 'board' && <span className="pr-plaza-board-face"><i /><i /><i /></span>}
-        </div>)}
+        <PlazaLandscape />
+        <div className="pr-grid pr-plaza-grid">{boardCells.map(cell => <button key={`${cell.x}-${cell.y}`} type="button" tabIndex={-1} aria-hidden="true" disabled={!isWalkablePlaza(cell)} onClick={() => { board.current?.focus({ preventScroll: true }); walkTo(cell); }} />)}</div>
         {/* Other players — appearance only, no nickname/title/email/any identifying text. */}
         {renderedPlayers.map(player => <div key={player.sessionId} className="pr-plaza-other" aria-hidden="true" style={actorStyle({ x: player.x, y: player.y }, 1)}>
           <span className="pr-shadow" /><AvatarSprite direction={player.direction} frame={player.moving ? othersFrame : 0} walking={player.moving} appearance={player.appearance} />
@@ -232,7 +180,7 @@ export default function Plaza({ userId, sessionId, onReachEntrance }: Props) {
         </div>
       </div>
     </div>
-    <div className="pr-threshold" aria-hidden="true" />
-    <p id="pr-plaza-instructions" className="pr-instructions pr-plaza-instructions" role="status">광장의 바닥을 누르면 그 자리로 걸어가요. 아래쪽 입구 칸으로 걸어가면 내 방으로 돌아가요. 다른 학생들도 함께 보여요.</p>
+    <button className="pr-hub-home" onClick={() => walkTo(PLAZA_ENTRANCE)}>↓ 내 방으로 가는 길</button>
+    <p id="pr-plaza-instructions" className="pr-instructions pr-plaza-instructions" role="status">우물 옆에서 잠깐 쉬어 가요. 길이나 잔디를 누르면 걸어가요.</p>
   </div>;
 }
