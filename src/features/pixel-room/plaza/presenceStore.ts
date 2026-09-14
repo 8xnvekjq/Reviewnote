@@ -53,10 +53,37 @@ export interface PlazaStoreState {
   // 실제로는 가장 오래된 meta)를 골라 쓰면, 화면에는 재입장 이전의 "낡은" 위치가 계속 보인다
   // ("입구에서 제자리걸음" 버그) — usePlazaRealtime.ts의 flattenPresenceState 주석 참고.
   presenceRefs: Map<string, string>;
+  // 최근에 "확실히 떠났다"고 우리가 직접 처리한 presence_ref들(용량 제한된 최근 이력).
+  // 퇴장 lifecycle 재조사(2026-09 3차, 실제 Supabase 대상) 결과 확인: presence-leave를 정상
+  // 처리한 직후(같은 밀리초 안에) 그 세션을 다시 포함한 presence-sync가 뒤따라와, sync가
+  // 무조건 신뢰되는 기존 정책 때문에 방금 지운 세션이 그대로 되살아나는 경우가 실제로
+  // 재현됐다(같은 join의 leave와 그 leave를 아직 반영하지 못한 sync가 이례적으로 함께
+  // 도착 — Realtime 서버 쪽의 순간적인 결과적 일관성 문제로 보인다). sync에 다시 나타난
+  // 항목의 presence_ref가 여기 있으면(=우리가 이미 그 join의 종료를 직접 확인했으면) sync가
+  // 그 항목을 되살리지 못하게 걸러낸다 — presence-leave의 신원 확인(PlazaStoreState.
+  // presenceRefs 주석)과 같은 종류의 방어를, sync 쪽에서 겪는 "leave보다 sync가 늦게 일관되는"
+  // 경우에도 적용하는 것.
+  recentlyLeftRefs: Set<string>;
+}
+
+// recentlyLeftRefs가 세션이 오래갈수록 무한정 자라지 않도록 하는 상한 — MAX_PATH_LENGTH와 같은
+// 성격의 방어적 캡. 평소엔 몇 개만 들어있다가 곧바로 안 쓰이게 되므로 이 크기에 실제로 닿을 일은
+// 거의 없다.
+export const MAX_RECENTLY_LEFT_REFS = 50;
+
+function rememberLeftRef(recentlyLeftRefs: Set<string>, presenceRef: string): Set<string> {
+  const next = new Set(recentlyLeftRefs);
+  next.add(presenceRef); // Set은 삽입 순서를 유지하므로, 이미 있던 값이면 재삽입 없이 그대로 둔다.
+  while (next.size > MAX_RECENTLY_LEFT_REFS) {
+    const oldest = next.values().next().value;
+    if (oldest === undefined) break;
+    next.delete(oldest);
+  }
+  return next;
 }
 
 export function createPlazaStoreState(): PlazaStoreState {
-  return { players: new Map(), paths: new Map(), presenceRefs: new Map() };
+  return { players: new Map(), paths: new Map(), presenceRefs: new Map(), recentlyLeftRefs: new Set() };
 }
 
 // Presence(sync/join)와 Broadcast(move)를 분리한 이유: 정책이 서로 다르기 때문이다(아래 reducer
@@ -131,6 +158,9 @@ function sanitizePlayerState(raw: PlazaPlayerState): PlazaPlayerState {
 //   "지금 소유하고 있다"고 기록해 둔 presenceRef와 이 leave의 presenceRef가 다르면(=이미 새
 //   join으로 대체된 낡은 join의 뒤늦은 leave), 조용히 무시한다 — 위 PlazaStoreState.presenceRefs
 //   주석 참고. 이건 seq 비교가 아니라 "이 leave가 지금 내가 아는 그 join이 맞는지" 신원 확인이다.
+// - presence-sync도 대칭적으로 신원 확인을 한 번 거친다: sync에 들어있는 항목의 presence_ref가
+//   recentlyLeftRefs(우리가 이미 명시적으로 leave 처리를 확인한 join들)에 있으면, 그 항목은
+//   sync에서 빼고 취급한다 — 위 PlazaStoreState.recentlyLeftRefs 주석 참고.
 export function plazaStoreReducer(state: PlazaStoreState, action: PlazaStoreAction): PlazaStoreState {
   switch (action.type) {
     case 'presence-sync': {
@@ -138,6 +168,10 @@ export function plazaStoreReducer(state: PlazaStoreState, action: PlazaStoreActi
       const paths = new Map<string, PathWaypoint[]>();
       const presenceRefs = new Map<string, string>();
       for (const { player, presenceRef } of action.players) {
+        // 이미 leave를 직접 확인한 join이 sync에 되살아나 있으면 무시한다(recentlyLeftRefs 주석
+        // 참고) — 정말로 재입장한 것이라면 그 새 join은 반드시 새 presence_ref를 달고 오므로,
+        // 진짜 재입장을 놓치는 게 아니라 "이미 끝난 그 join"만 걸러낼 뿐이다.
+        if (state.recentlyLeftRefs.has(presenceRef)) continue;
         const sanitized = sanitizePlayerState(player);
         players.set(sanitized.sessionId, sanitized);
         presenceRefs.set(sanitized.sessionId, presenceRef);
@@ -146,7 +180,7 @@ export function plazaStoreReducer(state: PlazaStoreState, action: PlazaStoreActi
         // 시작). 기존에 알고 있던 이력은 sync로 대체되므로 함께 초기화한다.
         paths.set(sanitized.sessionId, [{ x: sanitized.x, y: sanitized.y, seq: sanitized.seq }]);
       }
-      return { players, paths, presenceRefs };
+      return { players, paths, presenceRefs, recentlyLeftRefs: state.recentlyLeftRefs };
     }
     case 'presence-join': {
       if (action.players.length === 0) return state;
@@ -163,13 +197,14 @@ export function plazaStoreReducer(state: PlazaStoreState, action: PlazaStoreActi
         // 좌표도 경로에 추가한다.
         paths = appendPath(paths, sanitized.sessionId, { x: sanitized.x, y: sanitized.y, seq: sanitized.seq });
       }
-      return { players, paths, presenceRefs };
+      return { players, paths, presenceRefs, recentlyLeftRefs: state.recentlyLeftRefs };
     }
     case 'presence-leave': {
       if (action.leaves.length === 0) return state;
       const players = new Map(state.players);
       const paths = new Map(state.paths);
       const presenceRefs = new Map(state.presenceRefs);
+      let recentlyLeftRefs = state.recentlyLeftRefs;
       let changed = false;
       for (const { sessionId, presenceRef } of action.leaves) {
         // 이 leave가 "지금 내가 그 sessionId의 주인이라고 아는 join"의 것이 아니면(이미 새
@@ -181,8 +216,9 @@ export function plazaStoreReducer(state: PlazaStoreState, action: PlazaStoreActi
         if (players.delete(sessionId)) changed = true;
         paths.delete(sessionId);
         presenceRefs.delete(sessionId);
+        recentlyLeftRefs = rememberLeftRef(recentlyLeftRefs, presenceRef);
       }
-      return changed ? { players, paths, presenceRefs } : state;
+      return changed ? { players, paths, presenceRefs, recentlyLeftRefs } : state;
     }
     case 'broadcast': {
       const incoming = sanitizePlayerState(action.player);
@@ -194,7 +230,7 @@ export function plazaStoreReducer(state: PlazaStoreState, action: PlazaStoreActi
       const players = new Map(state.players);
       players.set(incoming.sessionId, incoming);
       const paths = appendPath(state.paths, incoming.sessionId, { x: incoming.x, y: incoming.y, seq: incoming.seq });
-      return { players, paths, presenceRefs: state.presenceRefs };
+      return { players, paths, presenceRefs: state.presenceRefs, recentlyLeftRefs: state.recentlyLeftRefs };
     }
     default:
       return state;
