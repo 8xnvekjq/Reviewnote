@@ -340,3 +340,16 @@ set/reset/잘못된 값 거부/직접쓰기 차단을 추가해 실제 DB에서 
   `furniture-race.browser.mjs`, `yard.browser.mjs`(390/1440), `dog.browser.mjs`,
   `plaza/interactions.browser.mjs`, `plaza/landscape.browser.mjs`(390/1440). `npm run build`
   clean, `npm run lint`에는 무관한 기존 `src/App.tsx` 오류만 있음(미수정 파일).
+
+### 후속 수정 — 운영 DB catalog 누락 (2026-09-16)
+
+PR #92 병합 직후 사용자가 "새 헤어가 실제 상점에 안 보인다"고 보고. 원인은 이 PR이 client-side
+`catalog.ts`만 바꾸고 **운영 Supabase `pixel_item_catalog`에 INSERT 마이그레이션을 빠뜨린 것** —
+`usePixelShop.ts`가 처음엔 `PIXEL_CATALOG`(정적)로 즉시 렌더링하지만, 서버 fetch가 끝나면
+`rows.filter(row => PIXEL_CATALOG.some(known => ...))`로 카탈로그 state를 **서버 응답으로 완전히
+교체**한다 — 서버에 없는 6개는 그 순간 사라진다. 코드/테스트(`content.test.ts`)는 전부 정적
+카탈로그만 검증했기 때문에 이 누락을 잡지 못했다. 기존 avatar variant 추가(PR #88 계열,
+`20260915010000_pixel_world_avatar_variants.sql`)에서 쓰던 것과 같은 패턴으로
+`supabase/migrations/20260916020000_pixel_world_short_hair.sql`을 추가해 실제 DB에 6개 행을
+넣었고, REST(anon key)로 직접 조회해 6개 전부가 반환되는 것까지 확인했다(SQL SELECT만이 아니라
+앱이 실제로 호출하는 것과 동일한 HTTP 경로). 이미지/atlas는 이미 정상이라 다시 건드리지 않았다.
