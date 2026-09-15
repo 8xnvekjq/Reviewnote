@@ -306,3 +306,37 @@ set/reset/잘못된 값 거부/직접쓰기 차단을 추가해 실제 DB에서 
   사라졌음과 상점 카드/얼굴 확대(`face-zoom`)에서 피부색·눈동자색 스와치가 정상 반영됨을 육안
   확인. `npm run build`(tsc -b && vite build) clean, `npm run lint`에는 사전 존재하던
   `src/App.tsx`의 react-hooks 오류가 있으나 이번 변경 파일과 무관(수정 파일에 없음, 손대지 않음).
+
+## 후속 작업 — 짧은 헤어 보강 (2026-09-16)
+
+- 신고된 문제: 헤어가 번/단발/긴머리/옆머리(전부 볼륨 있는 긴/여성형 실루엣) 4종뿐이라 짧은
+  스타일이 없음. 사용자가 제시한 5개 후보(까까머리/단정한 짧은머리/짧은 앞머리 컷/투블럭 숏컷/
+  부스스한 숏컷) 중 atlas 재사용 가능 범위와 새 아트 리스크를 사용자에게 보고하고, "재사용 1개 +
+  신규 1개"로 범위를 합의한 뒤 진행했다(8개 hair sheet에 새 row를 일관되게 추가하는 건 강아지
+  sprite 교체보다 훨씬 큰 작업이라, 스타일 수를 늘리는 대신 품질에 집중).
+- **재사용**: hair atlas 25행을 전부 확인해 rows 0-4가 상점에서 한 번도 판 적 없던 미사용
+  스타일임을 발견 — 볼륨/뎁 없는 단정한 숏컷, 4방향 모두 정렬 정상. 요청한 4색 중 black/
+  dark_brown/blonde 3개가 기존 5색 반복(다크브라운/레드/블론드/블랙/그레이) 안에 이미 있었다.
+  다만 dark_brown(row 0)은 다른 모든 슬롯과 마찬가지로 `hair:null`(미장착) 렌더 기본값이라
+  이미 모든 유저가 공짜로 보고 있는 모습 — 그대로 팔면 "소유"의 의미가 없어져서 상품화하지 않고
+  블론드(`hair_crop_blonde`)/블랙(`hair_crop_black`) 2개만 새로 팔았다.
+- **신규 추가(진짜 버즈컷)**: 위 3색으로는 "brown"(다크브라운과 구별되는 중간 갈색)과 buzzcut
+  실루엣 자체가 atlas에 없어, Python(Pillow)으로 8개 Hair 시트(Idle/Walk × Front/Back/Left/
+  Right) 전부에 새 row 25-28을 추가했다. 손으로 새 좌표를 그리지 않고, 이미 검증된 rows 0-4
+  실루엣의 alpha를 `ImageFilter.MinFilter`로 2단계 침식(erode)해 바깥 테두리만 남기는 방식을
+  썼다 — 그래서 4방향/걷기 전부 처음부터 원본과 같은 자리에 맞는다(정렬 버그가 생길 수 없는
+  구조). 색상은 다크브라운(기본)/블론드/블랙(기존 팔레트 재사용) + 새로 만든 중간 갈색
+  `rgb(124,79,45)`(요청한 4색 중 atlas에 없던 유일한 색) 총 4개(`hair_buzz`/`hair_buzz_blonde`/
+  `hair_buzz_black`/`hair_buzz_brown`). 결과: 새 상품 6개(재사용 2 + 신규 4), 카탈로그 총
+  40→46개, 헤어 슬롯 12→18개.
+- `sprites.tsx`의 hair 레이어 렌더 height 상수(800→928)를 실제 시트 높이에 맞춰 갱신했다 —
+  누락했다면 새로 추가한 4행이 잘못된 y좌표로 잘려 보였을 것.
+- 검증: `tests/pixelShop/content.test.ts`(atlas row 경계/카탈로그 개수 전수 검사, hair row 개수
+  25→29 갱신) 등 전체 유닛 테스트 79/79 통과. Playwright로 새 상품 6개 전부 구매→자동 장착 후
+  방에서 정면/후면/측면 스크린샷 확인 — 4방향 모두 헤어라인 정렬 정상, 버즈컷은 두피 색이 비쳐
+  보이는 얇은 테두리로 기존 굵은 스타일들과 실루엣이 뚜렷이 구분됨. 기존 브라우저 회귀 테스트
+  전부 재실행해 회귀 없음 재확인: `pixelShop/browser.mjs`(390/800/1440, 기존 4슬롯 구매/장착/
+  새로고침 포함), `base-appearance.browser.mjs`(피부색/눈동자색 무회귀), `doormat.browser.mjs`,
+  `furniture-race.browser.mjs`, `yard.browser.mjs`(390/1440), `dog.browser.mjs`,
+  `plaza/interactions.browser.mjs`, `plaza/landscape.browser.mjs`(390/1440). `npm run build`
+  clean, `npm run lint`에는 무관한 기존 `src/App.tsx` 오류만 있음(미수정 파일).

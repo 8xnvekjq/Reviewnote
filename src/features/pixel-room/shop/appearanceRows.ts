@@ -19,6 +19,16 @@ export const AVATAR_ROW_BY_SLOT: Record<AppearanceLayerKey, Record<string, numbe
     buns: 5, bob: 10, long: 15, swept: 20,
     buns_blonde: 7, buns_black: 8, bob_blonde: 12, bob_black: 13,
     long_blonde: 17, long_black: 18, swept_blonde: 22, swept_black: 23,
+    // rows 0-4: 상점에서 한 번도 판 적 없던 짧은 실루엣(볼륨/뎁 없는 단정한 숏컷). row 0(다크브라운)은
+    // 다른 모든 슬롯과 마찬가지로 미장착 기본값이라 팔지 않는다(이미 모든 유저가 공짜로 보고 있는
+    // 모습 — 여기서 상품화하면 "소유"의 의미가 없어진다). 그래서 색상 변형 2개(블론드/블랙)만 새
+    // PNG 없이 판다.
+    crop_blonde: 2, crop_black: 3,
+    // rows 25-28: 기존 25행에 없던 진짜 버즈컷. 기존 crop(rows 0-4) 실루엣의 alpha를 침식(erode)해
+    // 만든 얇은 테두리라 4방향/걷기 모두 원본과 항상 같은 자리에 맞는다 — 손으로 새로 그린 좌표가
+    // 아니라 이미 검증된 헤어라인에서 파생된 도형이라 정렬이 깨질 수 없다. brown은 기존 팔레트에
+    // 없던 색이라 새로 추가했다(다크브라운과 구분되는 중간 갈색).
+    buzz: 25, buzz_blonde: 26, buzz_black: 27, buzz_brown: 28,
   },
   eyes: { navy: 0, sky: 1, olive: 2, brown: 3 },
   skin: { tan: 0, sand: 1, wheat: 2, umber: 3, porcelain: 4 },
