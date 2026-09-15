@@ -162,7 +162,7 @@ export default function Plaza({ userId, sessionId, onReachEntrance }: Props) {
   return <div className="pr-room-frame pr-plaza-frame">
     <header className="pr-hub-heading"><div><span>PIXEL WORLD · OUTDOORS</span><h2>모여라, 작은 광장</h2></div><span className="pr-hub-weather" aria-label="맑은 날">☀</span></header>
     <div className="pr-stage">
-      <div ref={board} className="pr-board pr-plaza-board" tabIndex={0} role="group" aria-label="광장. 바닥을 눌러 이동하거나 방향키/WASD로 이동. 아래쪽 입구 칸으로 걸어가면 내 방으로 돌아가요." aria-describedby="pr-plaza-instructions"
+      <div ref={board} className="pr-board pr-plaza-board" tabIndex={0} role="group" aria-label="광장. 바닥을 눌러 이동하거나 방향키/WASD로 이동. 아래쪽 입구 칸으로 걸어가면 집 앞으로 돌아가요." aria-describedby="pr-plaza-instructions"
         onKeyDown={event => {
           if (event.target !== event.currentTarget || event.altKey || event.ctrlKey || event.metaKey) return;
           const next = KEYS[event.key.length === 1 ? event.key.toLowerCase() : event.key];
@@ -189,7 +189,7 @@ export default function Plaza({ userId, sessionId, onReachEntrance }: Props) {
       </div>
     </div>
     <span className="sr-only" role="status">{[...reactions.values()].filter(event => event.sessionId !== sessionId).map(event => `누군가 ${REACTIONS[event.kind].label}`).join(' · ')}</span>
-    <button className="pr-hub-home" onClick={() => walkTo(PLAZA_ENTRANCE)}>↓ 내 방으로 가는 길</button>
+    <button className="pr-hub-home" onClick={() => walkTo(PLAZA_ENTRANCE)}>↓ 집 앞으로 가는 길</button>
     <p id="pr-plaza-instructions" className="pr-instructions pr-plaza-instructions" role="status">내 캐릭터를 눌러 인사 · 우물 곁에서 우물을 눌러 쉬어 가요</p>
   </div>;
 }

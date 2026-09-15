@@ -11,7 +11,7 @@ import {
 } from '../../src/features/pixel-room/plaza/presenceStore.ts';
 import type { PlazaPlayerState } from '../../src/features/pixel-room/plaza/types.ts';
 
-const APPEARANCE = { top: 'sage', bottom: null, shoes: null, hair: null, eyes: null };
+const APPEARANCE = { top: 'sage', bottom: null, shoes: null, hair: null, eyes: null, skin: null };
 
 function makePlayer(overrides: Partial<PlazaPlayerState> = {}): PlazaPlayerState {
   return {
@@ -153,7 +153,7 @@ test('getOtherPlayers: 아무도 제외되지 않는 sessionId를 넘기면 전�
 });
 
 test('appearance는 있는 그대로 왕복된다(값 손상 없음)', () => {
-  const appearance = { top: 'sage', bottom: 'blue', shoes: 'red', hair: 'brown', eyes: 'green' };
+  const appearance = { top: 'sage', bottom: 'blue', shoes: 'red', hair: 'brown', eyes: 'green', skin: null };
   const state = plazaStoreReducer(createPlazaStoreState(), {
     type: 'presence-join',
     players: [withRef(makePlayer({ appearance }))],
@@ -185,7 +185,7 @@ test('PlazaPlayerState에 없는 여분 필드(예: presence_ref, 닉네임 등 
     'x',
     'y',
   ]);
-  assert.deepEqual(Object.keys(stored.appearance).sort(), ['bottom', 'eyes', 'hair', 'shoes', 'top']);
+  assert.deepEqual(Object.keys(stored.appearance).sort(), ['bottom', 'eyes', 'hair', 'shoes', 'skin', 'top']);
   assert.deepEqual(stored.appearance, APPEARANCE);
 });
 

@@ -1,0 +1,16 @@
+.pr-yard-ground { position:absolute; inset:0; display:grid; grid-template-columns:repeat(16,1fr); grid-template-rows:repeat(12,1fr); pointer-events:none; }
+.pr-yard-board svg { display:block; width:100%; height:100%; image-rendering:pixelated; overflow:hidden; }
+.pr-yard-house { position:absolute; left:18.75%; top:8.333%; width:37.5%; height:50%; display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:repeat(3,1fr); pointer-events:none; z-index:6; }
+.pr-yard-mat { position:absolute; left:34.375%; top:58.333%; width:12.5%; height:8.333%; pointer-events:none; z-index:1; }
+.pr-yard-board .pr-yard-tree { position:absolute; width:12.5%; height:33.333%; pointer-events:none; }
+.pr-yard-fence { position:absolute; left:62.5%; width:25%; height:8.333%; display:flex; pointer-events:none; z-index:3; }
+.pr-yard-fence svg { min-width:0; }
+.pr-yard-garden { position:absolute; left:65%; top:35%; width:19%; height:34%; border:2px dashed #65994e55; border-radius:22%; pointer-events:none; color:#f4dfa2; display:flex; align-items:flex-end; justify-content:space-between; }
+.pr-yard-sign { position:absolute; left:49%; bottom:9%; background:#9c643c; color:#fff0c8; padding:4px 7px; font-size:clamp(9px,2vw,13px); border-bottom:3px solid #765132; pointer-events:none; z-index:2; }
+.pr-yard-door,.pr-yard-gate { position:absolute; background:transparent; border:0; cursor:pointer; z-index:20; }
+.pr-yard-door { left:31.25%; top:41.666%; width:12.5%; height:16.667%; }
+.pr-yard-gate { left:31.25%; bottom:0; width:18.75%; height:8.333%; color:#fff2ce; font-size:20px; }
+.pr-yard-door:focus-visible,.pr-yard-gate:focus-visible { outline:2px solid #fff2ce; outline-offset:-2px; }
+.pr-yard-frame .pr-stage { max-height:max(140px,calc(100cqh - 130px)); }
+
+.pr-yard-frame .pr-plaza-instructions { margin:14px 0 6px; flex:none; }
