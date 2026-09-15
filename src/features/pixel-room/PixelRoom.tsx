@@ -194,7 +194,19 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
       }
     })();
     return () => { cancelled = true; };
-  }, [shop.ready, shop.catalog, shop.ownedIds, userId]);
+    // 의도적으로 shop.catalog/shop.ownedIds는 deps에서 뺀다 — 이 effect는 shop.ready가 처음 true가
+    // 되는 그 순간의 값을 클로저로 한 번만 읽는 "딱 한 번" 로더(roomLoadStartedRef가 재실행을
+    // 막음)다. usePixelShop은 카탈로그를 ready와 별개의 독립된 요청으로 나중에 갱신하는데
+    // (fetchPixelCatalog는 Promise.all 밖에 있음), 그 값을 deps에 넣으면 ready가 true가 된 직후
+    // 카탈로그가 도착하는 순간 이 effect가 통째로 재실행되면서 clean-up이 먼저 실행되어 진행 중이던
+    // 클로저의 cancelled를 true로 만들어 버렸다 — roomLoadStartedRef 때문에 새 실행은 즉시
+    // no-op이고, 원래 실행은 cancelled 체크 때문에 finally의 setRoomReady(true)조차 건너뛰어서
+    // roomReady가 영원히 false로 남았다("보유 정보를 불러온 뒤 배치할 수 있어요"가 계속 뜨던 원인).
+    // shop.ownedIds는 ready와 같은 배치에서 함께 설정되므로 굳이 deps에 없어도 최초 실행 시점엔
+    // 이미 최신값이고, shop.catalog가 아직 서버 응답 전이라도 정적 PIXEL_CATALOG 기본값 자체가
+    // 이미 완전한 목록이라 기능적으로 문제없다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shop.ready, userId]);
 
   // Walks the fade overlay to full opacity, swaps `location` (mounting the destination while the
   // screen is fully covered — see the DOOR_FADE_MS/PRESENCE_HEAD_START_MS comment above), then
