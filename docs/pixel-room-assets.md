@@ -53,12 +53,12 @@
 
 다운로드 CDN URL은 itch.io가 일시적으로 발급하므로 만료 가능한 URL을 코드에 저장하지 않았다. 위 공식 페이지와 upload ID, 원본 PNG를 출처 기록으로 유지한다. 이번 검증은 공식 라이선스 문구, ZIP 구성, PNG 크기와 atlas 육안 확인까지다. 앱 내 이동/착용/가구 배치와 모든 프레임의 합성 결과는 통합 브라우저 검증에서 확인한다.
 
-## 펫: dog_medium (rmazanek)
+## 펫: 강아지 (자체 제작, 2026-09-16 교체)
 
-- 원본: [Dog (3)](https://opengameart.org/content/dog-3) — OpenGameArt.org
-- 라이선스: CC0 1.0 Universal (Public Domain). [공식 설명](https://creativecommons.org/publicdomain/zero/1.0/).
-- 저작자 표기(원 배포 페이지 기준, 필수는 아니나 이 문서에 보존): 원작 rmazanek, German Shepherd 프레임은 Shepardskin, Husky 프레임은 Hellkipz 제공.
-- 저장 파일: `src/features/pixel-room/pet/assets/dog.png`(원본 `dog_medium.png` 그대로), 파일 옆에 `LICENSE.md`로도 동일 출처를 보존.
-- geometry: 360×228 PNG, 60×38 셀 6행. 행별 프레임 수(왼쪽부터): 짖기 4, 걷기 6, 달리기 6, 앉기 전환 3, 앉은 대기 4, 서 있는 대기 4.
-- 측면(side-view) 아트만 있고 정면/후면 별도 그림이 없다 — 오른쪽 이동은 `scaleX(-1)`로 좌우 반전해서 표현한다(다른 방향 전용 그림 없음).
+- 원래는 OpenGameArt의 CC0 `dog_medium.png`(rmazanek)를 그대로 썼으나, 정교한 음영/얇은 선의 사실적 화풍이 이 프로젝트의 캐릭터·가구(굵은 외곽선, 단순 색면, 낮은 디테일 밀도)와 이질적이라는 지적을 받고 교체했다.
+- 새 `dog.png`는 제3자 에셋이 아니라 이 프로젝트를 위해 직접 만든 원본 아트다. Python(Pillow)으로 도형(타원/폴리곤)을 10배 크기로 그린 뒤 축소하는 방식으로 그렸고, 별도 라이선스/저작자 표기가 필요 없다.
+- 팔레트는 캐릭터 시트의 따뜻한 피부/머리색 계열에 맞춘 탠/크림 톤, 진갈색 굵은 외곽선, 볼터치, 큼직한 단순 눈으로 캐릭터·가구와 화풍을 맞췄다.
+- 저장 파일: `src/features/pixel-room/pet/assets/dog.png`, 제작 배경은 `LICENSE.md`에 기록.
+- geometry: 192×192 PNG, 32×32 셀 6행 — 아바타 시트와 같은 프레임 크기. 행별 프레임 수는 교체 전과 동일(짖기 4, 걷기 6, 달리기 6, 앉기 전환 3, 앉은 대기 4, 서 있는 대기 4)이라 `Dog.tsx`의 행/프레임 로직은 그대로이고 셀 크기 상수만 60×38→32×32, 360×228→192×192로 바뀌었다. FSM(`dogModel.ts`)과 월드 충돌(`dogWorld.ts`)은 전혀 건드리지 않았다.
+- 정면 지향 아트이며, 오른쪽 이동은 이전과 동일하게 `scaleX(-1)`로 좌우 반전해서 표현한다.
 - 소리 에셋은 사용하지 않았다.

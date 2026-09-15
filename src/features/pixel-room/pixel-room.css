@@ -47,9 +47,7 @@
 .pr-selected { outline:2px dashed #42745c; outline-offset:1px; background:#fff2; }
 .pr-actor { position:absolute; width:22%; height:27%; background:none; border:0; padding:0; cursor:pointer; }
 .pr-avatar { display:flex; flex-direction:column; }
-.pr-avatar-head, .pr-avatar-body { display:block; width:100%; }
-.pr-avatar-head { height:70%; }
-.pr-avatar-body { height:30%; width:112%; margin-left:-6%; }
+.pr-avatar>svg { display:block; width:100%; height:100%; }
 .pr-actor .pr-avatar { position:absolute; inset:0; }
 .pr-actor:focus-visible { outline:2px solid var(--pr-theme-accent, #496e5d); outline-offset:2px; }
 .pr-shadow { position:absolute; bottom:3%; left:31%; width:38%; height:9%; border-radius:50%; background:#715b5533; }
