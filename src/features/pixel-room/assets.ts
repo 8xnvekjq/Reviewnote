@@ -73,6 +73,12 @@ export const avatarGeometry = { frameWidth: 32, frameHeight: 32, frames: 4, shee
 export { AVATAR_ROW_BY_SLOT } from './shop/appearanceRows';
 
 export interface FurnitureArt { src: string; x: number; y: number; width: number; height: number; sheetWidth: number; sheetHeight: number }
+
+// 출입구 카펫 — 가구가 아니라 바닥/맵 장식(구매·소유·배치 대상 아님, 항상 문 앞에 고정). 같은
+// interior atlas의 기존 미사용 러그 타일(48,144,48,32)을 그대로 쓴다 — 새 PNG 없음, 방의 다른
+// 가구와 같은 화풍.
+export const doormatArt: FurnitureArt = { src: interior, x: 48, y: 144, width: 48, height: 32, sheetWidth: 256, sheetHeight: 256 };
+
 export const furnitureArt: Record<import('./model').FurnitureType, FurnitureArt> = {
   roundtable: { src: interior, x: 48, y: 0, width: 48, height: 32, sheetWidth: 256, sheetHeight: 256 },
   television: { src: interior, x: 192, y: 48, width: 32, height: 32, sheetWidth: 256, sheetHeight: 256 },

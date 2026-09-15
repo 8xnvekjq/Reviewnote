@@ -104,3 +104,47 @@ $furniture_test$;
 RESET ROLE;
 ROLLBACK;
 SELECT 'PASS: save_pixel_room_layout place/move/remove/ownership/bounds/duplicate/direct-write-guard all verified; rolled back' AS result;
+
+-- set_pixel_base_appearance — 무료 기본 appearance(피부색/눈동자색). 소유권 개념이 없어 별개
+-- 트랜잭션으로 검증한다.
+BEGIN;
+UPDATE public.profiles SET point_adjustment = point_adjustment + 100
+WHERE id = '50b0db29-89b6-4601-bfd9-a17c5c81137b';
+SET LOCAL request.jwt.claim.sub = '50b0db29-89b6-4601-bfd9-a17c5c81137b';
+SET LOCAL ROLE authenticated;
+DO $base_appearance_test$
+DECLARE result jsonb; row_skin text; row_eye text; denied boolean := false; affected integer;
+BEGIN
+  result := public.set_pixel_base_appearance('porcelain', 'sky');
+  IF result->>'ok' <> 'true' THEN RAISE EXCEPTION 'set failed: %', result; END IF;
+  SELECT skin_tone, eye_color INTO row_skin, row_eye FROM public.pixel_avatar_equipment WHERE user_id=auth.uid();
+  IF row_skin <> 'porcelain' OR row_eye <> 'sky' THEN RAISE EXCEPTION 'values did not persist: % %', row_skin, row_eye; END IF;
+
+  -- reset to default (NULL = row 0, the look every existing user already has)
+  result := public.set_pixel_base_appearance(NULL, NULL);
+  IF result->>'ok' <> 'true' THEN RAISE EXCEPTION 'reset failed: %', result; END IF;
+  SELECT skin_tone, eye_color INTO row_skin, row_eye FROM public.pixel_avatar_equipment WHERE user_id=auth.uid();
+  IF row_skin IS NOT NULL OR row_eye IS NOT NULL THEN RAISE EXCEPTION 'reset did not clear'; END IF;
+
+  result := public.set_pixel_base_appearance('not-a-real-tone', NULL);
+  IF result->>'reason' <> 'invalid_value' THEN RAISE EXCEPTION 'invalid skin_tone accepted: %', result; END IF;
+  result := public.set_pixel_base_appearance(NULL, 'not-a-real-color');
+  IF result->>'reason' <> 'invalid_value' THEN RAISE EXCEPTION 'invalid eye_color accepted: %', result; END IF;
+
+  -- pixel_avatar_equipment has no UPDATE policy (SELECT-only RLS) — a direct write matches 0 rows
+  -- silently, same as the other pixel_* tables' guard trigger would separately also block.
+  PERFORM set_config('reviewnote.pixel_rpc', '', true);
+  BEGIN
+    UPDATE public.pixel_avatar_equipment SET skin_tone = 'umber' WHERE user_id=auth.uid();
+    GET DIAGNOSTICS affected = ROW_COUNT;
+    denied := affected = 0;
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM LIKE 'direct writes to %' THEN denied := true; ELSE RAISE; END IF;
+  WHEN insufficient_privilege THEN denied := true;
+  END;
+  IF NOT denied THEN RAISE EXCEPTION 'direct update unexpectedly allowed'; END IF;
+END
+$base_appearance_test$;
+RESET ROLE;
+ROLLBACK;
+SELECT 'PASS: set_pixel_base_appearance set/reset/invalid-value-rejection/direct-write-blocked all verified; rolled back' AS result;

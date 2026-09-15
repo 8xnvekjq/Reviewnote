@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { equipPixelItem, fetchEquippedAppearance, fetchOwnedPixelItemIds, fetchPixelCatalog, purchasePixelItem } from '../../utils/pixelShop';
+import { equipPixelItem, fetchEquippedAppearance, fetchOwnedPixelItemIds, fetchPixelCatalog, purchasePixelItem, setPixelBaseAppearance } from '../../utils/pixelShop';
 import { PIXEL_CATALOG } from './shop/catalog';
 import type { PixelAvatarSlot, PixelItem, PublicAvatarAppearance, PurchasePixelItemResult } from './shop/types';
 
-const EMPTY_APPEARANCE: PublicAvatarAppearance = { top: null, bottom: null, shoes: null, hair: null, eyes: null };
+const EMPTY_APPEARANCE: PublicAvatarAppearance = { top: null, bottom: null, shoes: null, hair: null, eyes: null, skin: null };
 
 export type PurchaseOutcome = PurchasePixelItemResult & { equipFailed?: boolean };
 
@@ -77,6 +77,22 @@ export function usePixelShop(userId: string, initialBalance: number, onBalanceCh
     finally { mutationLock.current = false; if (mounted.current) setMutating(false); }
   }
 
+  // 무료 기본 appearance(피부색/눈동자색) — 소유권이 없으니 equip과 달리 카탈로그/ownedIds에는
+  // 손대지 않는다. 같은 "서버 확인 후 재조회" 패턴(낙관적 갱신 없음)을 그대로 따른다.
+  async function setBaseAppearance(skinTone: string | null, eyeColor: string | null): Promise<boolean> {
+    if (mutationLock.current || !ready || loadError) return false;
+    mutationLock.current = true; setMutating(true);
+    try {
+      const result = await setPixelBaseAppearance(skinTone, eyeColor);
+      if (!result.ok) return false;
+      const appearance = await fetchEquippedAppearance(userId);
+      if (!mounted.current) return false;
+      setEquipped(appearance);
+      return true;
+    } catch { if (mounted.current) setLoadError(true); return false; }
+    finally { mutationLock.current = false; if (mounted.current) setMutating(false); }
+  }
+
   async function purchase(item: PixelItem): Promise<PurchaseOutcome> {
     if (mutationLock.current || !ready || loadError) return { ok: false, reason: 'unknown', message: '이전 처리를 마친 뒤 다시 시도해 주세요.' };
     mutationLock.current = true; setMutating(true);
@@ -96,5 +112,5 @@ export function usePixelShop(userId: string, initialBalance: number, onBalanceCh
     finally { mutationLock.current = false; if (mounted.current) setMutating(false); }
   }
 
-  return { ownedIds, equipped, catalog, balance, ready, loadError, reload, equip, purchase, mutating };
+  return { ownedIds, equipped, catalog, balance, ready, loadError, reload, equip, purchase, setBaseAppearance, mutating };
 }

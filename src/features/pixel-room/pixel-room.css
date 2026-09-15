@@ -40,6 +40,10 @@
 .pr-board-edit .pr-grid button:hover,.pr-board-edit .pr-grid button:focus-visible { background:#fff7; outline:2px solid #496e5d; outline-offset:-2px; }
 .pr-furniture { position:absolute; pointer-events:none; }
 .pr-furniture svg { position:absolute; bottom:0; width:100%; height:auto; overflow:hidden; }
+/* 출입구 카펫 — 가구와 같은 anchor(bottom:0)/pointer-events 처리를 쓰지만 z-index는 항상 바닥
+   바로 위(가구/캐릭터보다 낮음)로 고정한다. */
+.pr-doormat { position:absolute; pointer-events:none; z-index:0; }
+.pr-doormat svg { position:absolute; bottom:0; width:100%; height:auto; overflow:hidden; }
 .pr-selected { outline:2px dashed #42745c; outline-offset:1px; background:#fff2; }
 .pr-actor { position:absolute; width:22%; height:27%; background:none; border:0; padding:0; cursor:pointer; }
 .pr-avatar { display:flex; flex-direction:column; }
@@ -187,6 +191,28 @@
 .pr-wardrobe-grid>button[aria-pressed=true] { border-color:#b5d4c0; }
 .pr-wardrobe-grid strong { font-size:11px; font-weight:500; display:block; }
 @media(max-width:420px) { .pr-category-tabs { gap:4px; }.pr-category-tabs button { padding:0 9px; } }
+
+/* 무료 기본 appearance(피부색/눈동자색) — 스와치 선택 + 확대 얼굴 미리보기. 눈동자색은 실제
+   캐릭터 크기에서는 잘 안 보이므로 이 확대 미리보기 하나로 충분히 확인하게 한다. */
+.pr-base-appearance { display:flex; flex-direction:column; gap:14px; align-items:center; }
+.pr-face-zoom { width:140px; height:150px; background:#d4c3a5; border-radius:14px; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+.pr-face-zoom .pr-avatar { width:220px; height:220px; }
+.pr-face-zoom .pr-avatar svg { image-rendering:pixelated; }
+.pr-base-appearance-group { width:100%; }
+.pr-base-appearance-group h3 { font-size:12px; font-weight:700; color:var(--rn-muted); margin-bottom:6px; }
+.pr-swatch-row { display:flex; gap:10px; flex-wrap:wrap; }
+.pr-swatch { width:36px; height:36px; border-radius:50%; border:2px solid transparent; padding:0; cursor:pointer; }
+.pr-swatch[aria-pressed=true] { border-color:#e8fff2; box-shadow:0 0 0 2px #496e5d; }
+.pr-swatch:disabled { opacity:.55; cursor:default; }
+.pr-swatch-skin-tan { background:#c1834f; }
+.pr-swatch-skin-sand { background:#f0c9a0; }
+.pr-swatch-skin-wheat { background:#d9ac7c; }
+.pr-swatch-skin-umber { background:#7a4a2c; }
+.pr-swatch-skin-porcelain { background:#f2dcc2; }
+.pr-swatch-eye-navy { background:#2b3a67; }
+.pr-swatch-eye-sky { background:#a8d0e6; }
+.pr-swatch-eye-olive { background:#7c7a3c; }
+.pr-swatch-eye-brown { background:#6b4226; }
 
 /* Full-screen fade — the door-transition overlay (Phase 2A rework). Reuses the app's own surface
    token instead of a flat color so it never flashes white against either theme; opacity-only so

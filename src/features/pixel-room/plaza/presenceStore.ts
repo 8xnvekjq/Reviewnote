@@ -110,7 +110,7 @@ export type PlazaStoreAction =
 // 값은 반드시 PlazaPlayerState 필드만 남도록 화이트리스트 방식으로 재구성한다 — 장차 실수로
 // 다른 필드(닉네임 등 개인식별정보)가 payload에 섞여도 여기서 걸러져 저장되지 않는다.
 function sanitizePlayerState(raw: PlazaPlayerState): PlazaPlayerState {
-  const appearance = raw.appearance ?? { top: null, bottom: null, shoes: null, hair: null, eyes: null };
+  const appearance = raw.appearance ?? { top: null, bottom: null, shoes: null, hair: null, eyes: null, skin: null };
   return {
     sessionId: raw.sessionId,
     x: raw.x,
@@ -123,6 +123,7 @@ function sanitizePlayerState(raw: PlazaPlayerState): PlazaPlayerState {
       shoes: appearance.shoes ?? null,
       hair: appearance.hair ?? null,
       eyes: appearance.eyes ?? null,
+      skin: appearance.skin ?? null,
     },
     seq: raw.seq,
     updatedAt: raw.updatedAt,
