@@ -14,8 +14,8 @@ export { toPublicAvatarAppearance } from './pixelShopAppearance';
 
 interface PixelItemCatalogRow {
   item_id: string;
-  category: 'avatar' | 'furniture';
-  slot: PixelAvatarSlot | 'furniture';
+  category: 'avatar' | 'furniture' | 'pet';
+  slot: PixelAvatarSlot | 'furniture' | 'pet';
   price: number;
   asset_key: string;
   display_name: string;

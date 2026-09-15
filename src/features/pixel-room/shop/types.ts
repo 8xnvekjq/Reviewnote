@@ -4,7 +4,7 @@
 // 전달하고, Worker가 임의로 이 파일을 고치지 않는다(단, Worker A는 카탈로그 상수 파일은 소유함 —
 // 아래 PIXEL_CATALOG 참고).
 
-export type PixelItemCategory = 'avatar' | 'furniture';
+export type PixelItemCategory = 'avatar' | 'furniture' | 'pet';
 
 // 아바타 아이템의 슬롯 — 기존 sprites.tsx의 레이어 키와 1:1 대응(furniture는 슬롯 개념이 없으므로
 // 별도 카테고리로 취급). 'top'은 기존 model.ts의 SHIRTS를 대체/확장하는 개념이다.
@@ -19,7 +19,7 @@ export type AppearanceLayerKey = PixelAvatarSlot | 'skin';
 export interface PixelItem {
   itemId: string;         // 안정적인 카탈로그 키, 예: 'top_sage', 'furniture_bed'. 절대 재사용/변경 금지(구매 기록의 외래키가 됨)
   category: PixelItemCategory;
-  slot: PixelAvatarSlot | 'furniture';
+  slot: PixelAvatarSlot | 'furniture' | 'pet';
   price: number;          // 화면 표시용. 실제 가격 판정은 항상 서버(구매 RPC)가 카탈로그에서 직접 조회 — 클라이언트는 price를 파라미터로 넘기지 않는다
   assetKey: string;       // avatar: 기존 sprite row 선택 키(예: model.ts의 SHIRTS 값과 동일한 문자열). furniture: 기존 FurnitureType 문자열
   displayName: string;    // 학생에게 보이는 한글 이름

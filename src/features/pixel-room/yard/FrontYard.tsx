@@ -8,6 +8,8 @@ import { YARD_DOOR, YARD_GATE, YARD_SPAWNS, yardExit, yardPath, yardWalkable } f
 import type { YardCell, YardDestination } from './yardModel';
 import '../plaza/plaza.css';
 import './yard.css';
+import { Dog } from '../pet/Dog';
+import { yardDogWorld } from '../pet/dogWorld';
 
 const cells = Array.from({ length: 192 }, (_, i) => ({ x: i % 16, y: Math.floor(i / 16) }));
 const deltas: Record<PlazaDirection, YardCell> = { Front: { x: 0, y: 1 }, Back: { x: 0, y: -1 }, Left: { x: -1, y: 0 }, Right: { x: 1, y: 0 } };
@@ -25,8 +27,8 @@ const Landscape = memo(function Landscape() {
   </>;
 });
 
-interface Props { from: YardDestination; appearance: PublicAvatarAppearance; onExit: (destination: YardDestination) => void }
-export default function FrontYard({ from, appearance, onExit }: Props) {
+interface Props { dogActive?: boolean; from: YardDestination; appearance: PublicAvatarAppearance; onExit: (destination: YardDestination) => void }
+export default function FrontYard({ from, appearance, onExit, dogActive = false }: Props) {
   const [actor, setActor] = useState<YardCell>(() => YARD_SPAWNS[from]);
   const [direction, setDirection] = useState<PlazaDirection>(from === 'room' ? 'Front' : 'Back');
   const [held, setHeld] = useState<PlazaDirection | null>(null);
@@ -73,6 +75,7 @@ export default function FrontYard({ from, appearance, onExit }: Props) {
       <div className="pr-grid pr-plaza-grid">{cells.map(cell => <button type="button" key={`${cell.x}-${cell.y}`} tabIndex={-1} aria-hidden="true" disabled={!yardWalkable(cell)} onClick={() => walkTo(cell)} />)}</div>
       <button type="button" className="pr-yard-door" aria-label="집 문으로 걸어가기" onClick={() => walkTo(YARD_DOOR)} />
       <button type="button" className="pr-yard-gate" aria-label="길을 따라 광장으로 걸어가기" onClick={() => walkTo(YARD_GATE)}>↓</button>
+      {dogActive && <Dog world={yardDogWorld(actor)} />}
       <div className="pr-plaza-actor" aria-hidden="true" data-x={actor.x} data-y={actor.y} data-direction={direction} style={{ left: `${(actor.x - .6) / 16 * 100}%`, bottom: `${(11 - actor.y) / 12 * 100}%`, width: '13.75%', height: '18%', zIndex: actor.y + 2 }}><span className="pr-shadow" /><AvatarSprite direction={direction} frame={moving ? frame : 0} walking={moving} appearance={appearance} /></div>
     </div></div>
     <p className="pr-instructions pr-plaza-instructions">집 문으로 들어가거나, 아래 길을 따라 광장으로 걸어가요.</p>

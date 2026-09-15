@@ -48,4 +48,5 @@ export const PIXEL_CATALOG: readonly PixelItem[] = [
   { itemId: 'furniture_globe', category: 'furniture', slot: 'furniture', price: 120, assetKey: 'globe', displayName: '여행자의 지구본', tier: 2, stackable: false },
   { itemId: 'furniture_tallplant', category: 'furniture', slot: 'furniture', price: 80, assetKey: 'tallplant', displayName: '키 큰 초록 식물', tier: 2, stackable: false },
   { itemId: 'furniture_floorlamp', category: 'furniture', slot: 'furniture', price: 100, assetKey: 'floorlamp', displayName: '격자 갓 스탠드', tier: 2, stackable: false },
+  { itemId: 'pet_dog', category: 'pet', slot: 'pet', price: 200, assetKey: 'dog', displayName: '우리 집 강아지', tier: 2, stackable: false },
 ];
