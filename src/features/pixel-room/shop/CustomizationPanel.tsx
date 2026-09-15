@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { DogSprite } from '../pet/Dog';
+import type { usePet } from '../pet/usePet';
 import { AvatarSprite, FurnitureSprite } from '../sprites';
 import type { FurnitureType, RoomState } from '../model';
 import type { usePixelShop } from '../usePixelShop';
@@ -66,7 +68,7 @@ function BaseAppearancePicker({ shop, setMessage, busy }: Props) {
   </div>;
 }
 
-export function ShopPanel({ shop, room, setMessage, busy, onPurchase, onPlace }: Props & { room: RoomState; onPurchase: (item: PixelItem) => Promise<void>; onPlace: (type: FurnitureType) => void }) {
+export function ShopPanel({ shop, pet, room, setMessage, busy, onPurchase, onPlace }: Props & { pet: ReturnType<typeof usePet>; room: RoomState; onPurchase: (item: PixelItem) => Promise<void>; onPlace: (type: FurnitureType) => void }) {
   const [category, setCategory] = useState<string>('all');
   const [confirming, setConfirming] = useState<string | null>(null);
   const featured = ['hair_buns', 'top_vest', 'furniture_aquarium', 'hair_long', 'bottom_denim', 'shoes_low'];
@@ -74,23 +76,26 @@ export function ShopPanel({ shop, room, setMessage, busy, onPurchase, onPlace }:
   const filtered = shop.catalog.filter(item => category === 'all' || item.slot === category).sort((a, b) => rank(a) - rank(b));
   return <div className="pr-shop">
     <div className="pr-shop-heading"><div><h2>작은 변화, 나다운 공간</h2><p>직접 입어 본 모습으로 골라요.</p></div><p className="pr-shop-balance"><strong>{shop.balance.toLocaleString()}P</strong></p></div>
-    <div className="pr-category-tabs" aria-label="상품 분류">{[['all', '전체'], ...AVATAR_SLOTS.map(slot => [slot, SLOT_LABELS[slot]]), ['furniture', '가구']].map(([key, label]) => <button key={key} aria-pressed={category === key} onClick={() => { setCategory(key); setConfirming(null); }}>{label}</button>)}</div>
+    <div className="pr-category-tabs" aria-label="상품 분류">{[['all', '전체'], ...AVATAR_SLOTS.map(slot => [slot, SLOT_LABELS[slot]]), ['furniture', '가구'], ['pet', '펫']].map(([key, label]) => <button key={key} aria-pressed={category === key} onClick={() => { setCategory(key); setConfirming(null); }}>{label}</button>)}</div>
     {!shop.ready ? <p role="status">구매 정보를 불러오는 중이에요…</p> : shop.loadError ? <div className="pr-shop-empty"><p>구매 정보를 불러오지 못했어요.</p><button className="rn-button rn-button-secondary" onClick={shop.reload}>다시 시도</button></div> : <div className="pr-shop-grid">{filtered.map(item => {
       const owned = shop.ownedIds.has(item.itemId);
       const avatar = item.category === 'avatar';
-      const active = owned && (avatar ? shop.equipped[item.slot as PixelAvatarSlot] === item.assetKey : room.furniture.some(entry => entry.type === item.assetKey));
-      const disabled = busy || shop.mutating;
+      const isPet = item.category === 'pet';
+      const active = owned && (avatar ? shop.equipped[item.slot as PixelAvatarSlot] === item.assetKey : isPet ? pet.active === item.itemId : room.furniture.some(entry => entry.type === item.assetKey));
+      const disabled = busy || shop.mutating || (isPet && (!pet.ready || pet.busy));
       const short = Math.max(0, item.price - shop.balance);
       return <article key={item.itemId} data-item={item.itemId} className={`pr-shop-card ${active ? 'pr-shop-active' : ''} ${item.tier === 3 ? 'pr-shop-goal' : ''}`}>
-        <span className="pr-item-kind">{avatar ? SLOT_LABELS[item.slot as PixelAvatarSlot] : item.tier === 3 ? '모으고 싶은 가구' : '가구'}</span>
-        <span className={`pr-shop-art ${avatar ? 'pr-item-avatar' : ''}`} aria-hidden="true">{avatar ? <AvatarSprite direction="Front" frame={0} walking={false} appearance={{ ...shop.equipped, [item.slot]: item.assetKey }} /> : <FurnitureSprite type={item.assetKey as FurnitureType} />}</span>
+        <span className="pr-item-kind">{avatar ? SLOT_LABELS[item.slot as PixelAvatarSlot] : isPet ? '방과 마당의 친구' : item.tier === 3 ? '모으고 싶은 가구' : '가구'}</span>
+        <span className={`pr-shop-art ${avatar ? 'pr-item-avatar' : ''}`} aria-hidden="true">{avatar ? <AvatarSprite direction="Front" frame={0} walking={false} appearance={{ ...shop.equipped, [item.slot]: item.assetKey }} /> : isPet ? <DogSprite /> : <FurnitureSprite type={item.assetKey as FurnitureType} />}</span>
+        {isPet && pet.error && <p role="alert">펫 설정을 확인하지 못했어요. <button onClick={pet.reload}>다시 확인</button></p>}
         <strong className="pr-shop-name">{item.displayName}</strong>
-        <span className="pr-shop-status">{owned ? (active ? avatar ? '장착 중' : '배치됨' : '보유 중') : `${item.price}P`}</span>
+        <span className="pr-shop-status">{owned ? (active ? avatar ? '장착 중' : isPet ? '함께 사는 중' : '배치됨' : '보유 중') : `${item.price}P`}</span>
         {owned ? <button className="pr-shop-action" disabled={disabled || (avatar && active)} onClick={async () => {
+          if (isPet) { const ok = await pet.activate(!active); setMessage(ok ? active ? '강아지가 잠시 쉬어요.' : '강아지가 함께 살아요.' : '펫 설정을 저장하지 못했어요. 다시 시도해 주세요.'); return; }
           if (!avatar) { onPlace(item.assetKey as FurnitureType); return; }
           const ok = await shop.equip(item.slot as PixelAvatarSlot, item.itemId);
           setMessage(ok ? `${item.displayName} 장착 완료.` : '장착 확인에 실패했어요. 다시 시도해 주세요.');
-        }}>{avatar ? active ? '장착 중' : '장착하기' : active ? '옮기기' : '방에 놓기'}</button> : short > 0 ? <span className="pr-shop-hint">{short}P 더 모으면 만나요</span> : confirming === item.itemId ? <div className="pr-shop-confirm"><p>{item.price}P로 구매하고 {avatar ? '바로 장착' : '방에 배치'}할까요?</p><div className="pr-shop-confirm-actions"><button disabled={disabled} onClick={async () => { await onPurchase(item); setConfirming(null); }}>{disabled ? '처리 중…' : '구매'}</button><button disabled={disabled} onClick={() => setConfirming(null)}>취소</button></div></div> : <button className="pr-shop-action" disabled={disabled} onClick={() => setConfirming(item.itemId)}>구매하기</button>}
+        }}>{avatar ? active ? '장착 중' : '장착하기' : isPet ? active ? '잠시 쉬게 하기' : '함께 살기' : active ? '옮기기' : '방에 놓기'}</button> : short > 0 ? <span className="pr-shop-hint">{short}P 더 모으면 만나요</span> : confirming === item.itemId ? <div className="pr-shop-confirm"><p>{item.price}P로 구매하고 {avatar ? '바로 장착' : isPet ? '함께 살기' : '방에 배치'}할까요?</p><div className="pr-shop-confirm-actions"><button disabled={disabled} onClick={async () => { await onPurchase(item); setConfirming(null); }}>{disabled ? '처리 중…' : '구매'}</button><button disabled={disabled} onClick={() => setConfirming(null)}>취소</button></div></div> : <button className="pr-shop-action" disabled={disabled} onClick={() => setConfirming(item.itemId)}>구매하기</button>}
       </article>;
     })}</div>}
   </div>;

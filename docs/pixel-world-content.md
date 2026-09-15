@@ -227,3 +227,37 @@ set/reset/잘못된 값 거부/직접쓰기 차단을 추가해 실제 DB에서 
 클라이언트: `tests/pixel-room/base-appearance.browser.mjs`(신규, 실제 브라우저) — 스와치 선택 시
 즉시 반영, 새로고침/완전히 새 세션(로컬 상태 전혀 없음)에서도 서버 기준으로 복원, 장착
 아이템은 전혀 영향받지 않음, 지워진/알 수 없는 저장값은 안전하게 기본값으로 표시됨을 확인.
+
+## 후속 작업 — 첫 번째 펫: 강아지 (2026-09-16)
+
+집 앞(Front Yard, PR #89)이 먼저 들어온 뒤, 그 위에 이어서 구현했다. 코드/에셋/DB/테스트 대부분은
+이미 작성돼 있었고(다른 세션이 작업트리에 미완성 상태로 남긴 것 — `codex/first-dog` 브랜치) 이번
+라운드에서는 실제로 끝까지 완결됐는지 처음부터 다시 확인하고, 발견한 문제만 고쳐서 마무리했다.
+
+- 에셋: `dog_medium.png`(rmazanek, CC0, OpenGameArt) — 걷기/달리기/앉기 전환/앉은 대기/서 있는
+  대기/짖기 6종 애니메이션. 출처는 `src/features/pixel-room/pet/assets/LICENSE.md`와 이 문서의
+  "펫: dog_medium" 절 양쪽에 보존했다(기존 캐릭터/가구 에셋과 같은 문서 관례).
+- 행동: `dogModel.ts`의 순수 상태머신(`advanceDog`) — 방(느린 걸음 480ms/틱, 긴 휴식
+  2800~4800ms), 집 앞 마당(빠른 달림 260ms/틱, 짧은 휴식 1300~3300ms), 짖기는 12% 확률만.
+  `dogWorld.ts`가 기존 `isCellFree`(가구)와 `yardWalkable`(마당)을 그대로 재사용해서 새 충돌
+  로직을 만들지 않았고, 문/카펫 앞 칸은 방 쪽에서 별도로 제외한다. 플레이어가 펫의 칸으로 들어오면
+  그 프레임에는 렌더를 건너뛰어(절대 안 막음) 다음 tick에 자동으로 다른 자리에 다시 나타난다.
+- 서버: 기존 `pixel_item_catalog`/`purchase_pixel_item`을 그대로 재사용(카테고리 `pet` 하나
+  추가). 활성 펫은 새 테이블 `pixel_pet_equipment` 1줄 — `(user_id, active_pet)`이
+  `pixel_item_ownership(user_id, item_id)`를 참조하는 복합 FK라서 **소유하지 않은 펫을
+  활성화하는 요청은 DB 자체가 거부**한다(RPC/트리거 없이 선언적 제약만으로). RLS는 본인 행만
+  읽기/쓰기 허용. 위치/타이머는 전부 로컬 상태이고 서버에는 전혀 저장·중계하지 않는다(광장
+  realtime과 무관).
+- 발견해서 고친 문제: (1) `saveActivePet`이 direct upsert를 쓰는 게 기존 pixel_* 패턴(RPC 경유)과
+  달라 보였지만, FK+RLS만으로 이미 안전하게 소유권이 강제되는 걸 실제 DB에서 검증해서 그대로
+  뒀다. (2) `tests/pixelShop/content.test.ts`가 새 `pet` 슬롯을 몰라서 깨졌던 걸 스킵 처리로 수정.
+  (3) 문서(LICENSE.md의 attribution)가 중앙 자산 문서(`docs/pixel-room-assets.md`)에는 빠져 있어
+  추가.
+- 검증: `tests/plaza/dog.test.ts`(순수 모델, 180초 시뮬레이션으로 가구/문/플레이어/마당 경계
+  이탈 없음 확인) 통과. `tests/pixel-room/dog-server.sql`을 실제 Supabase에서 실행 —
+  구매/중복방지/활성화/소유권 FK 거부/타 사용자 RLS 거부/익명 거부까지 전부 확인 후 롤백.
+  `tests/pixel-room/dog.browser.mjs`(신규, 실제 브라우저) — 구매 시 자동 입양, 방(차분)/마당
+  (활발) 양쪽에서 관찰, 광장에는 완전히 없음, 방↔마당↔광장↔마당↔방을 여러 번 왕복해도 안정적,
+  새로 놓은 가구 위에 서지 않음, 새로고침과 완전히 새 세션에서도 활성 펫이 서버 기준으로 복원됨을
+  확인. 기존 `tests/pixelShop/browser.mjs`(3개 뷰포트)/`furniture-race.browser.mjs`/
+  `doormat.browser.mjs`/`base-appearance.browser.mjs` 전부 재실행해 회귀 없음을 재확인.

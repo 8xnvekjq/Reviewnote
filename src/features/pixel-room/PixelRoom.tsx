@@ -8,6 +8,10 @@ import { usePixelShop } from './usePixelShop';
 import { ShopPanel, Wardrobe } from './shop/CustomizationPanel';
 import Plaza from './plaza/Plaza';
 import FrontYard from './yard/FrontYard';
+import { Dog } from './pet/Dog';
+import { DOG_ITEM_ID } from './pet/dogModel';
+import { roomDogWorld } from './pet/dogWorld';
+import { usePet } from './pet/usePet';
 import { fetchPixelFurniturePlacement, savePixelRoomLayout } from '../../utils/pixelShop';
 import './pixel-room.css';
 
@@ -78,6 +82,7 @@ export default function PixelRoom(props: Props) {
 }
 
 function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, pointsBalance = 0, onPixelPurchase }: Props & { userId: string }) {
+  const pet = usePet(userId);
   // Orchestrator state (Phase 2A rework): which screen is showing, the transition overlay, and a
   // sessionId generated ONCE per component lifetime (not per plaza visit) — see Plaza.tsx's own
   // comment on why a stable id matters for Presence's dedup. Everything below this remains the
@@ -258,6 +263,11 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
         : `${item.displayName} 구매 완료! 바로 갈아입었어요.`);
       return;
     }
+    if (item.category === 'pet') {
+      const ok = await pet.activate(true);
+      setMessage(ok ? '강아지가 우리 집에 왔어요!' : '구매 완료! 펫 탭에서 함께 살기를 다시 눌러 주세요.');
+      return;
+    }
     const type = item.assetKey as FurnitureType;
     enterDecorating();
     setSelected(type);
@@ -390,7 +400,7 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
     </header>
     {location === 'room' && storageError && <p className="pr-storage-error" role="alert">{storageError}</p>}
     {location === 'plaza' && <Plaza userId={userId} sessionId={sessionId} onReachEntrance={() => transitionTo('yard')} />}
-    {location === 'yard' && <FrontYard from={yardFrom} appearance={shop.equipped} onExit={transitionTo} />}
+    {location === 'yard' && <FrontYard from={yardFrom} appearance={shop.equipped} dogActive={pet.ready && !pet.error && pet.active === DOG_ITEM_ID && shop.ownedIds.has(DOG_ITEM_ID)} onExit={transitionTo} />}
     {location === 'room' && <div className={`pr-room-frame ${decorating ? 'pr-decorating' : ''}`}>
       <div className="pr-wall" aria-hidden="true"><div className="pr-window"><i /><i /><i /><i /></div><span>HOME, SWEET HOME</span></div>
       <div className="pr-stage">
@@ -413,6 +423,7 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
              쪽으로 걸어간다. */}
           <div className="pr-doormat" style={{ left: `${(ROOM_DOOR.x - 0.5) * 10}%`, top: `${ROOM_DOOR.y * 12.5}%`, width: '20%', height: '12.5%' }}><DoormatSprite /></div>
           {activeRoom.furniture.map(item => <div key={item.type} data-furniture={item.type} className={`pr-furniture ${selected === item.type ? 'pr-selected' : ''}`} style={{ left: `${item.x * 10}%`, top: `${item.y * 12.5}%`, width: `${FURNITURE[item.type].width * 10}%`, height: `${FURNITURE[item.type].height * 12.5}%`, zIndex: item.y + FURNITURE[item.type].height }}><FurnitureSprite type={item.type} /></div>)}
+          {roomReady && shop.ready && !shop.loadError && pet.ready && !pet.error && pet.active === DOG_ITEM_ID && shop.ownedIds.has(DOG_ITEM_ID) && <Dog key={JSON.stringify(activeRoom.furniture)} world={roomDogWorld(activeRoom, actor)} paused={decorating} />}
           <button type="button" className="pr-actor" data-x={actor.x} data-y={actor.y} data-direction={direction} data-shirt={shop.equipped.top ?? 'default'} style={{ left: `${actor.x * 10 - 6}%`, bottom: `${(ROOM_HEIGHT - actor.y - 1) * 12.5}%`, zIndex: actor.y + 1, pointerEvents: decorating ? 'none' : 'auto' }} tabIndex={decorating ? -1 : 0} onClick={event => { event.stopPropagation(); speak(); }} aria-label={`내 캐릭터, ${actor.x + 1}열 ${actor.y + 1}행. 눌러서 말 걸어보기`}>
             {speech && <span className="pr-bubble" role="status">{speech}</span>}
             <span className="pr-shadow" /><AvatarSprite direction={direction} frame={held || walkQueue.length > 0 ? frame : 0} walking={!!held || walkQueue.length > 0} appearance={shop.equipped} />
@@ -449,7 +460,7 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
               : <div className="pr-catalog">{(Object.keys(FURNITURE) as FurnitureType[]).filter(type => ownedFurnitureTypes.has(type)).map(type => <button key={type} aria-pressed={selected === type} onClick={() => { enterDecorating(); setSelected(selected === type ? null : type); setMessage(`${names[type]}: 원하는 칸을 눌러 주세요.`); }}><span className="pr-catalog-art"><FurnitureSprite type={type} /></span><strong>{names[type]}</strong><small>{room.furniture.some(item => item.type === type) ? '배치 중' : '보유 1개'}</small></button>)}</div>}
             {placed && <button className="rn-button rn-button-secondary pr-remove" onClick={() => { persist(removeFurniture(room, selected)); exitDecorating(`${names[selected]}을 보관함으로 돌려놓았어요. 이제 방을 누르면 그 자리로 걸어가요.`); }}>선택한 가구 치우기</button>}
           </>
-          : <ShopPanel shop={shop} room={activeRoom} busy={!!purchasingId} setMessage={setMessage} onPurchase={handlePurchase} onPlace={type => { enterDecorating(); setSelected(type); setMessage(`${names[type]}: 원하는 칸을 눌러 주세요.`); }} />}
+          : <ShopPanel shop={shop} pet={pet} room={activeRoom} busy={!!purchasingId} setMessage={setMessage} onPurchase={handlePurchase} onPlace={type => { enterDecorating(); setSelected(type); setMessage(`${names[type]}: 원하는 칸을 눌러 주세요.`); }} />}
 
       </div>}
     </div>}
