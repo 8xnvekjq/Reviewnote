@@ -261,3 +261,48 @@ set/reset/잘못된 값 거부/직접쓰기 차단을 추가해 실제 DB에서 
   새로 놓은 가구 위에 서지 않음, 새로고침과 완전히 새 세션에서도 활성 펫이 서버 기준으로 복원됨을
   확인. 기존 `tests/pixelShop/browser.mjs`(3개 뷰포트)/`furniture-race.browser.mjs`/
   `doormat.browser.mjs`/`base-appearance.browser.mjs` 전부 재실행해 회귀 없음을 재확인.
+
+## 후속 작업 — 캐릭터/강아지 비주얼 정리 (2026-09-16)
+
+- 신고된 문제: (1) 집 앞에서 기본 캐릭터 목이 꺾여 보임, (2) 기본 캐릭터가 화풍 대비 덜 귀엽고
+  어색함, (3) 강아지가 캐릭터/월드와 화풍이 달라 이질적임. "비율/scale/offset 미세조정으로는
+  이미 여러 번 시도했지만 효과 없었다"는 전제로, 이번엔 근본 원인을 찾아 구조적으로 고쳤다.
+- **(1) 목 꺾임의 실제 원인**: `sprites.tsx`의 `AvatarSprite`가 32×32 프레임을 y=18에서
+  head/body 두 개로 잘라 각각 별도의 `<svg>`로 렌더링하고, CSS(`.pr-avatar-head{height:70%}`,
+  `.pr-avatar-body{height:30%;width:112%;margin-left:-6%}`)로 서로 다른 비율로 독립
+  스케일하던 것이 원인이었다 — 이전 세션이 "귀엽게 보이려고" 시도했던 head:body 재비례 트릭.
+  head는 100% 폭, body는 112% 폭 + -6% margin으로 서로 다른 스케일 계수를 쓰다 보니, 목/칼라의
+  수직 윤곽선이 이음매에서 정확히 같은 화면 픽셀 열에 맞지 않아 "꺾인 목"으로 보였다. 방
+  (`.pr-actor`, 22%/27%)과 집 앞(`.pr-plaza-actor`, 13.75%/18%)은 셀 단위 비율은 동일하지만
+  실제 렌더 픽셀 크기가 달라(방 ~129px, 집 앞 ~93px — Playwright로 실측) 작은 쪽에서 어긋남이
+  더 크게 보였을 뿐, 버그 자체는 두 화면 모두에 있었다(스크린샷으로 확인). 수정: 두 SVG 분리를
+  완전히 제거하고 단일 `<svg viewBox="0 0 32 32">`로 되돌렸다 — 세부 숫자를 조정한 게 아니라
+  이음매가 생길 수 있는 구조 자체를 없앴다.
+- **(2) 기본 캐릭터**: 위 수정만으로 목 꺾임이 사라졌을 뿐 아니라, 원본 도트(Ordinary Bumblebee
+  팩)의 둥근 비율도 왜곡 없이 그대로 살아나 "안 귀엽고 어색함"의 상당 부분이 함께 해결됐다 —
+  애초에 그 트릭이 원본을 비틀어서 어색해 보이게 만든 주범이었다. 호환 가능한 대체 캐릭터 pack도
+  찾아봤지만(itch.io/OpenGameArt 여러 후보 확인) CC0/상업이용 가능하면서 기존 상의/하의/신발/
+  머리 layer 구조와 맞는 건 없어, base sprite 자체는 교체하지 않았다(사용자 확인 후 이 상태로
+  마무리).
+- **(3) 강아지 화풍 교체**: 기존 `dog.png`(rmazanek, CC0, OpenGameArt)는 정교한 음영/얇은 선의
+  사실적 스타일이라 캐릭터·가구의 두꺼운 외곽선-단순 색면 스타일과 실제로 이질적이었다. 대체할
+  기성 CC0 강아지 pack을 여러 곳에서 찾아봤으나(smolcofe: 유료+라이선스 불명, DoodleDino: 상업
+  이용 불가+bark 미포함, Cat&Dog: 벡터 고해상도+bark/sit 미포함) 필요한 5개 동작(idle/walk/run/
+  sit/bark)과 화풍을 동시에 만족하는 게 없어, 사용자 승인을 받아 Python(Pillow)으로 원본
+  아트를 새로 그렸다. 타원/폴리곤을 10배 크기로 그린 뒤 축소하는 방식이며, 캐릭터 시트의 따뜻한
+  톤에 맞춘 탠/크림 팔레트, 굵은 진갈색 외곽선, 볼터치, 큰 단순 눈으로 화풍을 맞췄다. 동작 세트와
+  행 순서는 교체 전과 동일(bark 4/walk 6/run 6/sit-transition 3/sit-idle 4/stand-idle 4)이라
+  `dogModel.ts`(FSM)와 `dogWorld.ts`(충돌)는 전혀 건드리지 않았고, `Dog.tsx`는 셀 크기 상수만
+  60×38→32×32, 시트 크기 360×228→192×192로 바꿨다(캐릭터 시트와 같은 32×32 프레임 단위로 통일).
+- 검증: `tests/pixel-room/dog.browser.mjs` 재실행 — 새 sprite로도 구매/자동입양/방·마당 행동
+  차이/광장 부재/가구·문 회피/새로고침·새 세션 지속성 전부 그대로 통과(FSM 무회귀 확인). 전체
+  유닛 테스트 79/79 통과(`content.test.ts`/`pixelShop.test.ts`/`model.test.ts`/`dog.test.ts`/
+  `presenceStore.test.ts`/`positionSmoothing.test.ts`/`layout.test.ts`/`interactions.test.ts`/
+  `yard.test.ts`). 기존 브라우저 회귀 테스트 전부 재실행해 회귀 없음 확인:
+  `pixelShop/browser.mjs`(390/800/1440), `pixel-room/base-appearance.browser.mjs`,
+  `pixel-room/doormat.browser.mjs`, `pixel-room/furniture-race.browser.mjs`,
+  `pixel-room/yard.browser.mjs`(390/1440), `plaza/interactions.browser.mjs`,
+  `plaza/landscape.browser.mjs`(390/1440). Playwright 스크린샷으로 방/집 앞 양쪽에서 목 이음매가
+  사라졌음과 상점 카드/얼굴 확대(`face-zoom`)에서 피부색·눈동자색 스와치가 정상 반영됨을 육안
+  확인. `npm run build`(tsc -b && vite build) clean, `npm run lint`에는 사전 존재하던
+  `src/App.tsx`의 react-hooks 오류가 있으나 이번 변경 파일과 무관(수정 파일에 없음, 손대지 않음).

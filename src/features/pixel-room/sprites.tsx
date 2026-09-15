@@ -23,20 +23,18 @@ function renderLayers(sheets: AvatarLayers, frame: number, appearance: PublicAva
     return <image key={layer.key} data-slot={layer.slot ?? 'body'} data-row={row} href={src} x={-frame * 32} y={-row * 32} width={128} height={layer.height} />;
   });
 }
-// Every direction/frame in this pack draws its narrowest "neck" row at y=18 of the 32-unit
-// frame (measured across body/hair/tops sheets — the shirt layer itself starts exactly there),
-// so splitting the composited sprite there and rendering each band into its own disproportionate
-// share of the on-screen height (see .pr-avatar-head/.pr-avatar-body) turns the pack's naturally
-// ~56/44 head:body ratio into a rounder, shorter chibi silhouette without redrawing any art.
-const HEAD_SPLIT = 18;
-// Pure presentational: driven entirely by props, no notion of "current logged-in user". This is
-// what lets the same component later render a friend/plaza avatar from someone else's
-// PublicAvatarAppearance (fetched by the caller) with no changes here.
+// A previous attempt at a cuter silhouette split this sprite into two independently CSS-scaled
+// SVGs (head 70% / body 30% of the container height, body additionally stretched to 112% width).
+// Because the two bands were separate DOM elements sized from independently rounded percentages
+// of a non-integer container size, the vertical edges of the art (the collar/neck outline) did not
+// land on the same on-screen pixel column across the seam — visible as a bent/dislocated neck,
+// worse wherever the container happened to render smaller (the front yard's board scales the actor
+// down further than the room's). Rendering the whole 32x32 frame as one SVG removes the seam
+// structurally: there is no second, separately-scaled element left to misalign against.
 export function AvatarSprite({ direction, frame, walking, appearance }: { direction: AvatarDirection; frame: number; walking: boolean; appearance: PublicAvatarAppearance }) {
   const sheets = avatarSheets[walking ? 'Walk' : 'Idle'][direction];
   return <div className="pr-avatar">
-    <svg className="pr-avatar-head" viewBox={`0 0 32 ${HEAD_SPLIT}`} preserveAspectRatio="none" aria-hidden="true" overflow="hidden">{renderLayers(sheets, frame, appearance)}</svg>
-    <svg className="pr-avatar-body" viewBox={`0 ${HEAD_SPLIT} 32 ${32 - HEAD_SPLIT}`} preserveAspectRatio="none" aria-hidden="true" overflow="hidden">{renderLayers(sheets, frame, appearance)}</svg>
+    <svg viewBox="0 0 32 32" aria-hidden="true" overflow="hidden">{renderLayers(sheets, frame, appearance)}</svg>
   </div>;
 }
 function ArtSprite({ art }: { art: FurnitureArt }) {
