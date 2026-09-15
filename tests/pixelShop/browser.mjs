@@ -16,7 +16,7 @@ try {
     const context=await browser.newContext({ viewport:{width,height}, hasTouch:true, serviceWorkers:'block' });
     let activeUser='student-A';
     const states=new Map();
-    function state(id) { if (!states.has(id)) states.set(id,{owned:new Set(),equipment:{top:null,bottom:null,shoes:null,hair:null,eyes:null},balance:10000}); return states.get(id); }
+    function state(id) { if (!states.has(id)) states.set(id,{owned:new Set(),equipment:{top:null,bottom:null,shoes:null,hair:null,eyes:null},balance:10000,placements:new Map()}); return states.get(id); }
     await context.route('**/*', async route => {
       const url=new URL(route.request().url());
       if (url.hostname==='127.0.0.1') return route.continue();
@@ -25,6 +25,13 @@ try {
       if (url.pathname.endsWith('/pixel_item_catalog')) data=catalog;
       else if(url.pathname.endsWith('/pixel_item_ownership')) data=[...s.owned].map(item_id=>({item_id}));
       else if(url.pathname.endsWith('/pixel_avatar_equipment')) data=s.equipment;
+      else if(url.pathname.endsWith('/pixel_furniture_placement')) data=[...s.placements.entries()].map(([item_id,pos])=>({item_id,x:pos.x,y:pos.y}));
+      else if(url.pathname.endsWith('/save_pixel_room_layout')) {
+        const activeState=state(activeUser); const {p_placements}=route.request().postDataJSON();
+        for (const p of p_placements) { const item=catalog.find(i=>i.item_id===p.itemId); if(!item||item.category!=='furniture'||!activeState.owned.has(p.itemId)) { data={ok:false,reason:'not_owned',message:'not owned'}; return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(data)}); } }
+        activeState.placements=new Map(p_placements.map(p=>[p.itemId,{x:p.x,y:p.y}]));
+        data={ok:true,count:p_placements.length};
+      }
       else if(url.pathname.endsWith('/purchase_pixel_item')) {
         const {p_item_id}=route.request().postDataJSON(); const item=catalog.find(i=>i.item_id===p_item_id);
         if(s.owned.has(p_item_id)) data={ok:false,reason:'already_owned'};
@@ -74,8 +81,8 @@ try {
       await page.locator(`[data-furniture="${type}"]`).waitFor();
     }
     await page.screenshot({path:`${out}/room-${width}.png`,animations:'disabled'});
-    const storage=await page.evaluate(()=>JSON.parse(localStorage.getItem('pixelRoom:student-A:v1')));
-    assert.equal(storage.furniture.length,6);
+    // Furniture placement is server-side now (pixel_furniture_placement), not localStorage.
+    assert.equal(state('student-A').placements.size,6);
     await page.reload(); await page.locator('[data-furniture="aquarium"]').waitFor();
     activeUser='student-B'; await page.getByLabel('검증 계정').selectOption(activeUser);
     await page.locator('.pr-actor [data-slot="hair"][data-row="0"]').first().waitFor();
