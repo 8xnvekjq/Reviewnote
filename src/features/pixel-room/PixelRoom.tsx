@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { FURNITURE, ROOM_HEIGHT, ROOM_WIDTH, defaultState, findSpawn, isCellFree, loadRoom, placeFurniture, planWalk, removeFurniture, storageKey, validateRoom } from './model';
 import type { Cell, FurnitureType, Placement, RoomState, StorageLike } from './model';
-import { AvatarSprite, FurnitureSprite } from './sprites';
+import { AvatarSprite, DoormatSprite, FurnitureSprite } from './sprites';
 import type { PixelItem } from './shop/types';
 import { usePixelShop } from './usePixelShop';
 import { ShopPanel, Wardrobe } from './shop/CustomizationPanel';
@@ -404,6 +404,14 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
             if (next && event.target === event.currentTarget) { event.preventDefault(); if (held === next) setHeld(null); }
           }} onBlur={() => setHeld(null)}>
           <div className="pr-grid">{cells.map(cell => <button key={`${cell.x}-${cell.y}`} type="button" tabIndex={decorating ? 0 : -1} aria-label={`${cell.x + 1}열 ${cell.y + 1}행에 배치`} onClick={() => chooseCell(cell)} />)}</div>
+          {/* 출입구 카펫 — 가구가 아니라 항상 고정인 바닥 장식(구매/소유/배치 대상 아님). 문 칸을
+             중심으로 좌우 반 칸씩 걸쳐 놓아 실제 러그 자산의 가로로 넓은 비율(48x32)이 작아 보이지
+             않게 한다 — z-index를 항상 0(가구/캐릭터보다 아래)으로 고정해서, 옆 칸에 가구가 놓여도
+             카펫 위에 자연스럽게 덮여서 시각적으로 절대 튀지 않는다(배치 금지 규칙 자체는
+             RESERVED_ROOM_CELLS 그대로 유지 — 문 칸만 막는다). pointer-events:none이라
+             (.pr-furniture와 동일 처리) 눌러도 그대로 아래 바닥 칸 버튼이 반응해서 자연스럽게 문
+             쪽으로 걸어간다. */}
+          <div className="pr-doormat" style={{ left: `${(ROOM_DOOR.x - 0.5) * 10}%`, top: `${ROOM_DOOR.y * 12.5}%`, width: '20%', height: '12.5%' }}><DoormatSprite /></div>
           {activeRoom.furniture.map(item => <div key={item.type} data-furniture={item.type} className={`pr-furniture ${selected === item.type ? 'pr-selected' : ''}`} style={{ left: `${item.x * 10}%`, top: `${item.y * 12.5}%`, width: `${FURNITURE[item.type].width * 10}%`, height: `${FURNITURE[item.type].height * 12.5}%`, zIndex: item.y + FURNITURE[item.type].height }}><FurnitureSprite type={item.type} /></div>)}
           <button type="button" className="pr-actor" data-x={actor.x} data-y={actor.y} data-direction={direction} data-shirt={shop.equipped.top ?? 'default'} style={{ left: `${actor.x * 10 - 6}%`, bottom: `${(ROOM_HEIGHT - actor.y - 1) * 12.5}%`, zIndex: actor.y + 1, pointerEvents: decorating ? 'none' : 'auto' }} tabIndex={decorating ? -1 : 0} onClick={event => { event.stopPropagation(); speak(); }} aria-label={`내 캐릭터, ${actor.x + 1}열 ${actor.y + 1}행. 눌러서 말 걸어보기`}>
             {speech && <span className="pr-bubble" role="status">{speech}</span>}

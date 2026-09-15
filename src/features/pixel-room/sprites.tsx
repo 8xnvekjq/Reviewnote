@@ -1,15 +1,17 @@
-import { AVATAR_ROW_BY_SLOT, avatarSheets, furnitureArt } from './assets';
-import type { AvatarDirection, AvatarLayers } from './assets';
+import { AVATAR_ROW_BY_SLOT, avatarSheets, doormatArt, furnitureArt } from './assets';
+import type { AvatarDirection, AvatarLayers, FurnitureArt } from './assets';
 import type { FurnitureType } from './model';
-import type { PixelAvatarSlot, PublicAvatarAppearance } from './shop/types';
+import type { AppearanceLayerKey, PublicAvatarAppearance } from './shop/types';
 
-const layers: { key: keyof AvatarLayers; height: number; slot: PixelAvatarSlot | null }[] = [
-  { key: 'body', height: 160, slot: null }, { key: 'eyes', height: 128, slot: 'eyes' },
+// 'skin'은 구매/소유 대상이 아닌 무료 기본 appearance라 PixelAvatarSlot(상점 카탈로그 슬롯)에는
+// 없지만, 렌더링 레이어로는 다른 슬롯과 완전히 동일하게 다룬다(행 선택 매커니즘 재사용).
+const layers: { key: keyof AvatarLayers; height: number; slot: AppearanceLayerKey | null }[] = [
+  { key: 'body', height: 160, slot: 'skin' }, { key: 'eyes', height: 128, slot: 'eyes' },
   { key: 'bottoms', height: 448, slot: 'bottom' }, { key: 'shoes', height: 320, slot: 'shoes' },
   { key: 'tops', height: 928, slot: 'top' }, { key: 'hair', height: 800, slot: 'hair' },
 ];
 // Unset/unknown asset keys resolve to the original row 0; server equipment selects all other rows.
-function rowForSlot(slot: PixelAvatarSlot | null, assetKey: string | null): number {
+function rowForSlot(slot: AppearanceLayerKey | null, assetKey: string | null): number {
   if (!slot || !assetKey) return 0;
   return AVATAR_ROW_BY_SLOT[slot][assetKey] ?? 0;
 }
@@ -37,7 +39,14 @@ export function AvatarSprite({ direction, frame, walking, appearance }: { direct
     <svg className="pr-avatar-body" viewBox={`0 ${HEAD_SPLIT} 32 ${32 - HEAD_SPLIT}`} preserveAspectRatio="none" aria-hidden="true" overflow="hidden">{renderLayers(sheets, frame, appearance)}</svg>
   </div>;
 }
-export function FurnitureSprite({ type }: { type: FurnitureType }) {
-  const art = furnitureArt[type];
+function ArtSprite({ art }: { art: FurnitureArt }) {
   return <svg viewBox={`${art.x} ${art.y} ${art.width} ${art.height}`} aria-hidden="true" style={{ aspectRatio: `${art.width} / ${art.height}` }} overflow="hidden"><image href={art.src} width={art.sheetWidth} height={art.sheetHeight} /></svg>;
+}
+export function FurnitureSprite({ type }: { type: FurnitureType }) {
+  return <ArtSprite art={furnitureArt[type]} />;
+}
+// 출입구 카펫 — 가구 시스템(model.ts/ownership) 밖의 순수 바닥 장식. FurnitureSprite와 같은
+// ArtSprite 렌더 방식을 그대로 재사용한다.
+export function DoormatSprite() {
+  return <ArtSprite art={doormatArt} />;
 }

@@ -1,6 +1,6 @@
 import { supabase } from '../services/supabase';
 import type { PixelItem, PixelAvatarSlot, PublicAvatarAppearance, PurchasePixelItemResult } from '../features/pixel-room/shop/types';
-import { toPublicAvatarAppearance, EMPTY_APPEARANCE, type EquipmentRow } from './pixelShopAppearance';
+import { toPublicAvatarAppearance, EMPTY_APPEARANCE, type EquipmentRow, type BaseAppearanceRow } from './pixelShopAppearance';
 
 export { toPublicAvatarAppearance } from './pixelShopAppearance';
 
@@ -56,12 +56,14 @@ export async function fetchOwnedPixelItemIds(userId: string): Promise<string[]> 
 }
 
 /** This user's equipped avatar appearance, shaped for the shared PublicAvatarAppearance contract
- * (assetKey values, no PII — safe to eventually show other students). No row yet -> all-null (defaults). */
+ * (assetKey values, no PII — safe to eventually show other students). No row yet -> all-null (defaults).
+ * skin_tone/eye_color are the free base-appearance columns — pass-through values (no catalog
+ * lookup), unlike top/bottom/shoes/hair which are item_id and need the catalog join. */
 export async function fetchEquippedAppearance(userId: string): Promise<PublicAvatarAppearance> {
   const [{ data: equipRow, error: equipError }, catalog] = await Promise.all([
     supabase
       .from('pixel_avatar_equipment')
-      .select('top, bottom, shoes, hair, eyes')
+      .select('top, bottom, shoes, hair, eyes, skin_tone, eye_color')
       .eq('user_id', userId)
       .maybeSingle(),
     fetchPixelCatalog(),
@@ -70,7 +72,21 @@ export async function fetchEquippedAppearance(userId: string): Promise<PublicAva
   if (!equipRow) return EMPTY_APPEARANCE;
 
   const assetKeyByItemId = new Map(catalog.map(item => [item.itemId, item.assetKey]));
-  return toPublicAvatarAppearance(equipRow as Partial<EquipmentRow>, assetKeyByItemId);
+  return toPublicAvatarAppearance(equipRow as Partial<EquipmentRow>, assetKeyByItemId, equipRow as Partial<BaseAppearanceRow>);
+}
+
+export type SetPixelBaseAppearanceResult =
+  | { ok: true; skinTone: string | null; eyeColor: string | null }
+  | { ok: false; reason: 'invalid_value' | 'unknown'; message: string };
+
+/** 무료 기본 appearance(피부색/눈동자색) 설정 — 구매/소유 개념이 없어 equip_pixel_item과 별개의
+ * RPC로 처리한다. null은 "기본값(row 0)으로 되돌리기"를 뜻한다. */
+export async function setPixelBaseAppearance(skinTone: string | null, eyeColor: string | null): Promise<SetPixelBaseAppearanceResult> {
+  const { data, error } = await supabase.rpc('set_pixel_base_appearance', { p_skin_tone: skinTone, p_eye_color: eyeColor });
+  if (error) {
+    return { ok: false, reason: 'unknown', message: error.message || '외형을 저장하지 못했어요.' };
+  }
+  return data as SetPixelBaseAppearanceResult;
 }
 
 /** Spend points to own an item. Server looks up price/existence itself — no price is ever sent

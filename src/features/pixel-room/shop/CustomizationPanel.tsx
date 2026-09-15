@@ -3,27 +3,66 @@ import { AvatarSprite, FurnitureSprite } from '../sprites';
 import type { FurnitureType, RoomState } from '../model';
 import type { usePixelShop } from '../usePixelShop';
 import type { PixelAvatarSlot, PixelItem } from './types';
-import { AVATAR_SLOTS, SLOT_LABELS } from './appearanceRows';
+import { AVATAR_SLOTS, EYE_COLOR_OPTIONS, SKIN_TONE_OPTIONS, SLOT_LABELS } from './appearanceRows';
 
 type Shop = ReturnType<typeof usePixelShop>;
 interface Props { shop: Shop; setMessage: (message: string) => void; busy: boolean }
+// 장착 아이템(상의/하의/신발/헤어) 탭 + 무료 기본 appearance('base') 탭 — 상점 카탈로그가 없는
+// 탭이라 PixelAvatarSlot이 아니라 이 파일 안에서만 쓰는 별도 유니언으로 둔다.
+type WardrobeTab = PixelAvatarSlot | 'base';
 export function Wardrobe({ shop, setMessage, busy, onShop }: Props & { onShop: () => void }) {
-  const [slot, setSlot] = useState<PixelAvatarSlot>('hair');
+  const [tab, setTab] = useState<WardrobeTab>('hair');
   const [back, setBack] = useState(false);
-  const entries = shop.catalog.filter(item => item.category === 'avatar' && item.slot === slot && shop.ownedIds.has(item.itemId));
+  const entries = tab === 'base' ? [] : shop.catalog.filter(item => item.category === 'avatar' && item.slot === tab && shop.ownedIds.has(item.itemId));
   return <div className="pr-wardrobe">
     <div className="pr-outfit-heading"><div className="pr-outfit-preview"><AvatarSprite direction={back ? 'Back' : 'Front'} frame={0} walking={false} appearance={shop.equipped} /></div><div><h2>오늘의 나, 새롭게</h2><p>헤어부터 신발까지 하나씩 골라 보세요.</p><button className="pr-preview-turn" onClick={() => setBack(!back)}>{back ? '앞모습 보기' : '뒷모습 보기'}</button></div></div>
-    <div className="pr-category-tabs" aria-label="장착 부위">{AVATAR_SLOTS.map(key => <button key={key} aria-pressed={slot === key} onClick={() => setSlot(key)}>{SLOT_LABELS[key]}</button>)}</div>
-    {!shop.ready || shop.loadError ? <p className="pr-tool-hint">{shop.loadError ? '장착 정보를 불러오지 못했어요.' : '장착 정보를 불러오는 중…'}</p> : <div className="pr-wardrobe-grid">
+    <div className="pr-category-tabs" aria-label="장착 부위">{AVATAR_SLOTS.map(key => <button key={key} aria-pressed={tab === key} onClick={() => setTab(key)}>{SLOT_LABELS[key]}</button>)}<button aria-pressed={tab === 'base'} onClick={() => setTab('base')}>기본 외형</button></div>
+    {!shop.ready || shop.loadError ? <p className="pr-tool-hint">{shop.loadError ? '장착 정보를 불러오지 못했어요.' : '장착 정보를 불러오는 중…'}</p>
+      : tab === 'base' ? <BaseAppearancePicker shop={shop} setMessage={setMessage} busy={busy} />
+      : <div className="pr-wardrobe-grid">
       {[null, ...entries].map(item => {
         const key = item?.assetKey ?? null;
-        return <button key={item?.itemId ?? 'default'} aria-pressed={shop.equipped[slot] === key} disabled={busy || shop.mutating} onClick={async () => {
-          const ok = await shop.equip(slot, item?.itemId ?? null);
-          setMessage(ok ? `${item?.displayName ?? `기본 ${SLOT_LABELS[slot]}`} 장착 완료.` : '장착 확인에 실패했어요. 다시 불러온 뒤 시도해 주세요.');
-        }}><span className="pr-item-avatar"><AvatarSprite direction="Front" frame={0} walking={false} appearance={{ ...shop.equipped, [slot]: key }} /></span><strong>{item?.displayName ?? `기본 ${SLOT_LABELS[slot]}`}</strong></button>;
+        return <button key={item?.itemId ?? 'default'} aria-pressed={shop.equipped[tab] === key} disabled={busy || shop.mutating} onClick={async () => {
+          const ok = await shop.equip(tab, item?.itemId ?? null);
+          setMessage(ok ? `${item?.displayName ?? `기본 ${SLOT_LABELS[tab]}`} 장착 완료.` : '장착 확인에 실패했어요. 다시 불러온 뒤 시도해 주세요.');
+        }}><span className="pr-item-avatar"><AvatarSprite direction="Front" frame={0} walking={false} appearance={{ ...shop.equipped, [tab]: key }} /></span><strong>{item?.displayName ?? `기본 ${SLOT_LABELS[tab]}`}</strong></button>;
       })}
     </div>}
     <button className="pr-preview-turn" onClick={onShop}>상점에서 다른 스타일 찾기 →</button>
+  </div>;
+}
+
+// 피부색/눈동자색 — 구매/소유 없이 무료로 바로 바뀐다. 눈동자색은 실제 캐릭터에서는 작아서 잘
+// 안 보이므로, 확대한 얼굴 미리보기를 따로 둔다(요청사항: "확대 preview에서 확인 가능하면 충분").
+function BaseAppearancePicker({ shop, setMessage, busy }: Props) {
+  const disabled = busy || shop.mutating;
+  return <div className="pr-base-appearance">
+    <div className="pr-face-zoom" aria-hidden="true"><AvatarSprite direction="Front" frame={0} walking={false} appearance={shop.equipped} /></div>
+    <p className="pr-tool-hint">피부색과 눈동자색은 무료로 바로 바꿀 수 있어요.</p>
+    <div className="pr-base-appearance-group">
+      <h3>피부색</h3>
+      <div className="pr-swatch-row">
+        {SKIN_TONE_OPTIONS.map(({ key, label }) => {
+          const value = key === 'tan' ? null : key; // 'tan' === 기본값(row 0) === null, 서버 표현과 동일하게
+          return <button key={key} type="button" className={`pr-swatch pr-swatch-skin-${key}`} aria-pressed={(shop.equipped.skin ?? 'tan') === key} aria-label={label} disabled={disabled} onClick={async () => {
+            const ok = await shop.setBaseAppearance(value, shop.equipped.eyes);
+            setMessage(ok ? `${label} 피부색으로 바꿨어요.` : '피부색을 바꾸지 못했어요. 다시 시도해 주세요.');
+          }} />;
+        })}
+      </div>
+    </div>
+    <div className="pr-base-appearance-group">
+      <h3>눈동자색</h3>
+      <div className="pr-swatch-row">
+        {EYE_COLOR_OPTIONS.map(({ key, label }) => {
+          const value = key === 'navy' ? null : key;
+          return <button key={key} type="button" className={`pr-swatch pr-swatch-eye-${key}`} aria-pressed={(shop.equipped.eyes ?? 'navy') === key} aria-label={label} disabled={disabled} onClick={async () => {
+            const ok = await shop.setBaseAppearance(shop.equipped.skin, value);
+            setMessage(ok ? `${label} 눈동자색으로 바꿨어요.` : '눈동자색을 바꾸지 못했어요. 다시 시도해 주세요.');
+          }} />;
+        })}
+      </div>
+    </div>
   </div>;
 }
 

@@ -15,7 +15,7 @@ import './plaza.css';
 import { PlazaActivities } from './PlazaActivities';
 import { REACTIONS } from './plazaInteractions';
 
-const EMPTY_APPEARANCE: PublicAvatarAppearance = { top: null, bottom: null, shoes: null, hair: null, eyes: null };
+const EMPTY_APPEARANCE: PublicAvatarAppearance = { top: null, bottom: null, shoes: null, hair: null, eyes: null, skin: null };
 const KEYS: Record<string, PlazaDirection> = { ArrowDown: 'Front', s: 'Front', ArrowUp: 'Back', w: 'Back', ArrowLeft: 'Left', a: 'Left', ArrowRight: 'Right', d: 'Right' };
 // Cell size as a % of the board box — 16 cols / 12 rows, mirrors ROOM's 10%/12.5% cell math one
 // level down (100/16, 100/8) for the wider plaza grid.
