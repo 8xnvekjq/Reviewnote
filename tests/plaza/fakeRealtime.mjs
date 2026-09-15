@@ -103,6 +103,7 @@ export const supabase = {
   },
 };
 Object.assign(window, { plazaTransport: {
+  audit() { return { active: channels.filter(ch => ch.active).map(ch => ch.id), created: joinCounter }; },
   fail(id) { const ch = channels.findLast(ch => ch.id === id && ch.active); ch.active = false; ch.status('CHANNEL_ERROR'); },
   last(id) { const entries = entriesFor(id); return entries[entries.length - 1]; },
   entryCount(id) { return entriesFor(id).length; },

@@ -7,6 +7,7 @@ import type { PixelItem } from './shop/types';
 import { usePixelShop } from './usePixelShop';
 import { ShopPanel, Wardrobe } from './shop/CustomizationPanel';
 import Plaza from './plaza/Plaza';
+import FrontYard from './yard/FrontYard';
 import { fetchPixelFurniturePlacement, savePixelRoomLayout } from '../../utils/pixelShop';
 import './pixel-room.css';
 
@@ -18,24 +19,20 @@ const cells = Array.from({ length: ROOM_WIDTH * ROOM_HEIGHT }, (_, i) => ({ x: i
 type WalkStep = { cell: Cell; direction: Direction };
 type Panel = 'clothes' | 'furniture' | 'shop';
 
-// Pixel World Phase 2A rework — where you are. A third location (e.g. a future fishing spot)
-// plugs in the same way the plaza did: one more union member here, one more door-cell constant +
-// reach-effect (below), and one more conditionally-rendered branch in the JSX — the transition
-// plumbing itself (overlay/sessionId/lock) doesn't change. Deliberately NOT a generic
-// location-graph/config system — with only two places that would be speculative.
-type Location = 'room' | 'plaza';
+// Three small scenes share the existing fade/transition lock; only Plaza owns realtime.
+type Location = 'room' | 'yard' | 'plaza';
 
 // The room's one door: bottom row, center-ish. Reaching this cell (by tap-to-move, keyboard, or
 // the D-pad — anything that ends in setActor) is the only way into the plaza now; there is no
-// fallback toggle. ROOM_SPAWN_FROM_PLAZA is one cell "in front of" the door, facing 'Back' — away
+// fallback toggle. ROOM_SPAWN_FROM_YARD is one cell "in front of" the door, facing 'Back' — away
 // from the door, deeper into the room — so arriving reads as continuing the walk you were already
 // on, not turning around to face the door you just came through.
 const ROOM_DOOR: Cell = { x: 4, y: 7 };
-const ROOM_SPAWN_FROM_PLAZA: { cell: Cell; direction: Direction } = { cell: { x: 4, y: 6 }, direction: 'Back' };
+const ROOM_SPAWN_FROM_YARD: { cell: Cell; direction: Direction } = { cell: { x: 4, y: 6 }, direction: 'Back' };
 // Furniture can never cover the door or its landing cell — otherwise a fully-decorated room could
 // wall off the only way to the plaza (model.ts's canPlace has no door concept, so this is enforced
 // here instead, client-side, without touching that file's tested contract).
-const RESERVED_ROOM_CELLS: Cell[] = [ROOM_DOOR, ROOM_SPAWN_FROM_PLAZA.cell];
+const RESERVED_ROOM_CELLS: Cell[] = [ROOM_DOOR, ROOM_SPAWN_FROM_YARD.cell];
 function coversReservedCell(type: FurnitureType, position: Cell): boolean {
   const size = FURNITURE[type];
   return RESERVED_ROOM_CELLS.some(cell => cell.x >= position.x && cell.x < position.x + size.width && cell.y >= position.y && cell.y < position.y + size.height);
@@ -86,6 +83,7 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
   // comment on why a stable id matters for Presence's dedup. Everything below this remains the
   // room's own state; the plaza owns its own movement state entirely inside Plaza.tsx.
   const [location, setLocation] = useState<Location>('room');
+  const [yardFrom, setYardFrom] = useState<'room' | 'plaza'>('room');
   const [sessionId] = useState(() => crypto.randomUUID());
   const [overlayActive, setOverlayActive] = useState(false);
   const transitionLockRef = useRef(false);
@@ -219,7 +217,8 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
     setWalkQueue([]);
     setOverlayActive(true);
     window.setTimeout(() => {
-      if (next === 'room') { setActor(ROOM_SPAWN_FROM_PLAZA.cell); setDirection(ROOM_SPAWN_FROM_PLAZA.direction); }
+      if (next === 'room') { setActor(ROOM_SPAWN_FROM_YARD.cell); setDirection(ROOM_SPAWN_FROM_YARD.direction); }
+      if (next === 'yard') setYardFrom(location === 'plaza' ? 'plaza' : 'room');
       setLocation(next);
       window.setTimeout(() => {
         setOverlayActive(false);
@@ -238,7 +237,7 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
   useEffect(() => {
     if (skipDoorCheckRef.current) { skipDoorCheckRef.current = false; return; }
     if (location !== 'room' || decorating) return;
-    if (actor.x === ROOM_DOOR.x && actor.y === ROOM_DOOR.y) transitionTo('plaza');
+    if (actor.x === ROOM_DOOR.x && actor.y === ROOM_DOOR.y) transitionTo('yard');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actor, location, decorating]);
 
@@ -390,11 +389,12 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
       }}>{decorating ? '꾸미기 완료' : '꾸미기'}</button>}
     </header>
     {location === 'room' && storageError && <p className="pr-storage-error" role="alert">{storageError}</p>}
-    {location === 'plaza' && <Plaza userId={userId} sessionId={sessionId} onReachEntrance={() => transitionTo('room')} />}
+    {location === 'plaza' && <Plaza userId={userId} sessionId={sessionId} onReachEntrance={() => transitionTo('yard')} />}
+    {location === 'yard' && <FrontYard from={yardFrom} appearance={shop.equipped} onExit={transitionTo} />}
     {location === 'room' && <div className={`pr-room-frame ${decorating ? 'pr-decorating' : ''}`}>
       <div className="pr-wall" aria-hidden="true"><div className="pr-window"><i /><i /><i /><i /></div><span>HOME, SWEET HOME</span></div>
       <div className="pr-stage">
-        <div ref={board} className={`pr-board ${decorating ? 'pr-board-edit' : ''}`} tabIndex={0} role="group" aria-label="내 방. 바닥을 눌러 이동하거나 방향키/WASD로 이동. 아래쪽 문 칸으로 걸어가면 광장으로 이동해요." aria-describedby="pr-instructions"
+        <div ref={board} className={`pr-board ${decorating ? 'pr-board-edit' : ''}`} tabIndex={0} role="group" aria-label="내 방. 바닥을 눌러 이동하거나 방향키/WASD로 이동. 아래쪽 카펫을 지나면 집 앞으로 나가요." aria-describedby="pr-instructions"
           onKeyDown={event => {
             if (event.target !== event.currentTarget || decorating || event.altKey || event.ctrlKey || event.metaKey) return;
             const next = keys[event.key.length === 1 ? event.key.toLowerCase() : event.key];
