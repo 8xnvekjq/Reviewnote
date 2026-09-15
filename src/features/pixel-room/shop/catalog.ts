@@ -49,4 +49,15 @@ export const PIXEL_CATALOG: readonly PixelItem[] = [
   { itemId: 'furniture_tallplant', category: 'furniture', slot: 'furniture', price: 80, assetKey: 'tallplant', displayName: '키 큰 초록 식물', tier: 2, stackable: false },
   { itemId: 'furniture_floorlamp', category: 'furniture', slot: 'furniture', price: 100, assetKey: 'floorlamp', displayName: '격자 갓 스탠드', tier: 2, stackable: false },
   { itemId: 'pet_dog', category: 'pet', slot: 'pet', price: 200, assetKey: 'dog', displayName: '우리 집 강아지', tier: 2, stackable: false },
+  // 헤어가 긴머리/여성형 실루엣(번/단발/긴머리/옆머리)에 치우쳐 있어 짧은 스타일을 보강한다.
+  // crop_*은 atlas에 이미 있던, 한 번도 팔지 않은 rows 0-4(볼륨 없는 단정한 숏컷) — 새 PNG 없음.
+  // 다크브라운(row 0)은 다른 슬롯과 같은 이유로 팔지 않는다: hair:null일 때의 기본값이라 이미
+  // 모든 유저가 공짜로 보고 있다. buzz_*은 그 실루엣을 침식해 만든 새 rows 25-28(진짜 버즈컷,
+  // 두피가 비쳐 보이는 얇은 테두리).
+  { itemId: 'hair_crop_blonde', category: 'avatar', slot: 'hair', price: 100, assetKey: 'crop_blonde', displayName: '블론드 숏컷', tier: 1, stackable: false },
+  { itemId: 'hair_crop_black', category: 'avatar', slot: 'hair', price: 100, assetKey: 'crop_black', displayName: '블랙 숏컷', tier: 1, stackable: false },
+  { itemId: 'hair_buzz', category: 'avatar', slot: 'hair', price: 90, assetKey: 'buzz', displayName: '까까머리', tier: 1, stackable: false },
+  { itemId: 'hair_buzz_blonde', category: 'avatar', slot: 'hair', price: 90, assetKey: 'buzz_blonde', displayName: '블론드 까까머리', tier: 1, stackable: false },
+  { itemId: 'hair_buzz_black', category: 'avatar', slot: 'hair', price: 90, assetKey: 'buzz_black', displayName: '블랙 까까머리', tier: 1, stackable: false },
+  { itemId: 'hair_buzz_brown', category: 'avatar', slot: 'hair', price: 90, assetKey: 'buzz_brown', displayName: '브라운 까까머리', tier: 1, stackable: false },
 ];

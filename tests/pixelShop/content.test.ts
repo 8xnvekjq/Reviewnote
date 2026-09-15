@@ -7,7 +7,7 @@ import type { FurnitureType } from '../../src/features/pixel-room/model.ts';
 import { toPublicAvatarAppearance } from '../../src/utils/pixelShopAppearance.ts';
 
 test('every avatar product maps to a real, bounded atlas row in its own slot', () => {
-  const rowCounts = { top: 29, bottom: 14, shoes: 10, hair: 25, eyes: 4 };
+  const rowCounts = { top: 29, bottom: 14, shoes: 10, hair: 29, eyes: 4 };
   const ids = new Set<string>();
   for (const item of PIXEL_CATALOG) {
     assert.ok(!ids.has(item.itemId)); ids.add(item.itemId);
@@ -17,8 +17,8 @@ test('every avatar product maps to a real, bounded atlas row in its own slot', (
     const row = AVATAR_ROW_BY_SLOT[item.slot][item.assetKey];
     assert.ok(Number.isInteger(row) && row > 0 && row < rowCounts[item.slot]);
   }
-  assert.equal(ids.size, 40);
-  assert.equal(PIXEL_CATALOG.filter(item => item.slot === 'hair').length, 12);
+  assert.equal(ids.size, 46);
+  assert.equal(PIXEL_CATALOG.filter(item => item.slot === 'hair').length, 18);
   assert.equal(PIXEL_CATALOG.filter(item => item.slot === 'top').length, 10);
   assert.equal(PIXEL_CATALOG.filter(item => item.slot === 'bottom').length, 4);
   assert.equal(PIXEL_CATALOG.filter(item => item.category === 'furniture').length, 12);

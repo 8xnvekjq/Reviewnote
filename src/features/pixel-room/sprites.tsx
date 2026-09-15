@@ -8,7 +8,7 @@ import type { AppearanceLayerKey, PublicAvatarAppearance } from './shop/types';
 const layers: { key: keyof AvatarLayers; height: number; slot: AppearanceLayerKey | null }[] = [
   { key: 'body', height: 160, slot: 'skin' }, { key: 'eyes', height: 128, slot: 'eyes' },
   { key: 'bottoms', height: 448, slot: 'bottom' }, { key: 'shoes', height: 320, slot: 'shoes' },
-  { key: 'tops', height: 928, slot: 'top' }, { key: 'hair', height: 800, slot: 'hair' },
+  { key: 'tops', height: 928, slot: 'top' }, { key: 'hair', height: 928, slot: 'hair' },
 ];
 // Unset/unknown asset keys resolve to the original row 0; server equipment selects all other rows.
 function rowForSlot(slot: AppearanceLayerKey | null, assetKey: string | null): number {
