@@ -353,3 +353,56 @@ PR #92 병합 직후 사용자가 "새 헤어가 실제 상점에 안 보인다"
 `supabase/migrations/20260916020000_pixel_world_short_hair.sql`을 추가해 실제 DB에 6개 행을
 넣었고, REST(anon key)로 직접 조회해 6개 전부가 반환되는 것까지 확인했다(SQL SELECT만이 아니라
 앱이 실제로 호출하는 것과 동일한 HTTP 경로). 이미지/atlas는 이미 정상이라 다시 건드리지 않았다.
+
+## 후속 작업 — 농장 작물 크기 시스템 (2026-09-18)
+
+Astra가 구현한 토마토 농장 MVP(PR #94, `20260917155631_pixel_tomato_farm.sql` — 밭 2칸, 24시간
+성장, 무료 물주기, 물주기를 놓쳐도 안 죽음, `pixel_farm_crops`/`pixel_farm_plots`/
+`pixel_farm_care` 3테이블 + revision CAS 기반 `act_pixel_farm` RPC) 위에, 기존 구조를 다시 설계
+하지 않고 그대로 확장해 "작물 크기" 시스템을 추가했다.
+
+- **계산**: `size = clamp(40 + careRatio*30 + (luckRoll-0.5)*40, 10, 100)`. `careRatio =
+  min(1, care_count / maxCareDays)`이고 `maxCareDays`는 그 작물의 planted~ready 구간이 걸치는
+  한국시간 캘린더 날짜 수(고정 24시간 성장에서는 항상 2 — 하루 최대 1회 물주기 제한과 결합해
+  care_count의 자연스러운 상한이 된다). `luckRoll = (random()+random()+random())/3`으로 0..1
+  사이에서 평평하지 않고 0.5 근처에 몰리는 종형 분포를 만들어, 결과가 "완전 랜덤" 느낌이 아니라
+  "대체로 무난하고 가끔 크게 엇나가는" 행운으로 읽히게 했다.
+- **물주기 반영**: care_count가 늘수록(=maxCareDays에 가까워질수록) careRatio가 올라가고 크기
+  기대값이 오른다. 실제 SQL로 300회씩 시뮬레이션한 결과 완전물주기 평균 69.7(범위 54–86) vs
+  무물주기 평균 39.6(범위 23–57) — 약 30점 차(10~100 척도에서 큰 차이)로 "성실하면 평균적으로
+  유리"가 뚜렷하지만, 각 그룹 내부 편차가 30점 이상이라 매번 결과가 달라지고 두 그룹 범위가
+  살짝 겹친다(운 좋은 무물주기가 운 나쁜 완전물주기를 이길 수 있음) — "항상 가장 크지도, 못 줬다고
+  실패하지도 않음"을 만족한다.
+- **서버 확정/재추첨·중복 방지**: 크기는 기존 harvest 분기(`pixel_private.farm_action`의 마지막
+  `else`) 안에서, 기존 revision CAS(`p.revision <> p_revision`이면 즉시 `changed` 반환) +
+  `for update` 행 잠금과 **같은** 원자적 경로 안에 계산을 끼워 넣었다 — 새 잠금/새 플로우를 만들지
+  않았다. 새로고침/재시도는 이미 소모된 revision으로 들어와 `changed`만 받고 harvest 분기 자체가
+  실행되지 않으므로 크기가 다시 뽑히지 않는다. 수확 완료 후 `plot.crop_id`가 비므로 같은 크롭을
+  다시 harvest할 방법이 구조적으로 없다(중복 수확 불가). 클라이언트가 보내는 어떤 시간값도 쓰지
+  않고 전부 `clock_timestamp()`(서버 시각)만 사용한다.
+- **저장**: `pixel_farm_crops`에 `size_score`(1~100) · `size_calc_version`(현재 1) ·
+  `size_inputs`(jsonb: careCount/maxCareDays/careRatio/luckRoll/base/careBonusMax/luckSpread)를
+  추가(`20260918090000_pixel_farm_crop_size.sql`) — 나중에 같은 버전 번호로 재계산해 결과를
+  검증할 수 있다. `size_score`는 수확 전엔 절대 채워지지 않는다는 CHECK 제약이 있고(harvest 전
+  강제로 넣으려 하면 제약 위반), 이 새 컬럼도 다른 모든 pixel_farm_* 컬럼과 마찬가지로
+  `authenticated`에 UPDATE 권한이 없어 클라이언트의 직접 위조가 원천 차단된다(SQL로 직접
+  `update ... set size_score=100` 시도 → `insufficient_privilege` 확인). `get_pixel_farm()`은
+  `bestSize`/`lastHarvestSize`(개인 최고·최근 기록)도 함께 내려준다.
+- **UX**: 새 모달 없이 기존 `.pr-farm-feedback`(수확/물주기 때마다 쓰던 가벼운 인월드 문구
+  버블)에 "이번 토마토는 큰 토마토예요 (78/100)" 식으로 바로 보여준다. 밭 팝업의 기존
+  "지금까지 수확 N개" 줄에 `· 최고 기록 N · 최근 N`을 추가해 개인 기록도 가볍게 확인 가능
+  (전시대·타 학생 비교는 이번에 만들지 않음).
+- **확장 여지**: `size_calc_version`이 있어 나중에 실제 복습 성실도를 반영하는 v2 공식을 추가해도
+  기존에 수확된 작물의 기록은 그대로 v1로 남는다(재해석되지 않음). 포인트 경제·상점·비료·작물
+  추가는 이번에 전혀 건드리지 않았다.
+- 검증: `tests/plaza/farm.test.ts`에 `computeCropSize`/`cropCareRatio`/`maxCareDaysFor`/
+  `sizeLabel` 단위 테스트 + 5,000회 시뮬레이션 분포 테스트(완전/절반/무물주기 평균이 단조증가,
+  각 그룹 항상 [10,100] 안, 완전물주기가 항상 최상위 등급은 아님, 무물주기도 항상 하위 등급은
+  아님, 그룹 간 범위 겹침 존재) 추가 — 전체 유닛 테스트 88/88 통과. `tests/pixel-room/farm-server.sql`
+  에 크기 1회 확정/저장값 일치/재시도 안전/직접 위조 거부/bestSize·lastHarvestSize 정확성/
+  무물주기도 정상 수확을 실제 Supabase에서 검증(전부 롤백). `tests/pixel-room/farm.browser.mjs`에
+  수확 시 크기 노출 문구 + 최고·최근 기록 표시 + 새로고침/새 세션 지속성 검증 추가, 3개 뷰포트
+  전부 통과. 기존 회귀 테스트(`base-appearance`/`doormat`/`furniture-race`/`yard`(2뷰포트)/`dog`/
+  `pixelShop/browser`(3뷰포트)/`plaza/interactions`/`plaza/landscape`(2뷰포트)) 전부 재실행해
+  회귀 없음 확인. `npm run build` clean, `npm run lint`에는 무관한 기존 `src/App.tsx` 오류만
+  있음(미수정 파일).

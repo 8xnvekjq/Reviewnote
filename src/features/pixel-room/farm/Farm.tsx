@@ -51,7 +51,7 @@ export function Farm({ actor, moving, walkTo }: { actor: YardCell; moving: boole
         <p>{crop ? growthLabel(crop, farm.now) : '씨앗은 무료 · 24시간 후 수확'}</p>
         {crop && <small>{watered ? '오늘 물주기 완료' : '오늘의 물을 주세요'} · 돌봄 {crop.careCount}회</small>}
         {!crop && <small>물주기를 놓쳐도 시들지 않아요.</small>}
-        <span className="pr-farm-total">지금까지 수확 {farm.snapshot.harvestCount}개</span>
+        <span className="pr-farm-total">지금까지 수확 {farm.snapshot.harvestCount}개{farm.snapshot.bestSize ? ` · 최고 기록 ${farm.snapshot.bestSize}` : ''}{farm.snapshot.lastHarvestSize ? ` · 최근 ${farm.snapshot.lastHarvestSize}` : ''}</span>
       </>}
       <p className="pr-farm-feedback" role="status">{farm.message || (farm.error ? '연결을 확인하고 다시 불러와 주세요.' : '')}</p>
       {farm.error ? <button type="button" className="pr-farm-action" disabled={farm.busy} onClick={() => void farm.refresh()}>다시 확인</button>
