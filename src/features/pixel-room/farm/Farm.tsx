@@ -48,7 +48,7 @@ export function Farm({ actor, moving, walkTo }: { actor: YardCell; moving: boole
       <button className="pr-farm-close" type="button" aria-label="밭 닫기" onClick={close}>×</button>
       <strong>{crop ? names[stage] : '작은 토마토 밭'}</strong>
       {!farm.snapshot ? <p>{farm.error ? '밭을 불러오지 못했어요.' : '밭을 확인하고 있어요…'}</p> : <>
-        <p>{crop ? growthLabel(crop, farm.now) : '씨앗은 무료 · 24시간 후 수확'}</p>
+        <p>{crop ? growthLabel(crop, farm.now) : '씨앗은 무료 · 4일 후 수확'}</p>
         {crop && <small>{watered ? '오늘 물주기 완료' : '오늘의 물을 주세요'} · 돌봄 {crop.careCount}회</small>}
         {!crop && <small>물주기를 놓쳐도 시들지 않아요.</small>}
         <span className="pr-farm-total">지금까지 수확 {farm.snapshot.harvestCount}개{farm.snapshot.bestSize ? ` · 최고 기록 ${farm.snapshot.bestSize}` : ''}{farm.snapshot.lastHarvestSize ? ` · 최근 ${farm.snapshot.lastHarvestSize}` : ''}</span>

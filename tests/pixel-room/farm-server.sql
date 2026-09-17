@@ -15,7 +15,7 @@ begin
   r := public.act_pixel_farm(0,'plant',0);
   c := (r#>>'{plots,0,crop,id}')::uuid;
   if c is null or r->>'result'<>'ok' then raise exception 'plant failed %',r; end if;
-  if (r#>>'{plots,0,crop,readyAt}')::timestamptz - (r#>>'{plots,0,crop,plantedAt}')::timestamptz <> interval '24 hours' then raise exception 'growth duration'; end if;
+  if (r#>>'{plots,0,crop,readyAt}')::timestamptz - (r#>>'{plots,0,crop,plantedAt}')::timestamptz <> interval '4 days' then raise exception 'growth duration'; end if;
   r := public.act_pixel_farm(0,'plant',0);
   if r->>'result'<>'changed' or (r#>>'{plots,0,crop,id}')::uuid<>c then raise exception 'duplicate plant'; end if;
   r := public.act_pixel_farm(0,'water',1);
@@ -83,9 +83,12 @@ begin
   execute 'reset role';
 end $$;
 
--- Crop size: computed exactly once at harvest, stored/returned consistently, audited, retry-safe,
--- forgery-denied, and never appears before harvest. Uses two fresh profiles (the ones above are
--- no longer farm-free after the lifecycle block).
+-- Crop size mechanics (computed exactly once at harvest, stored/returned consistently, audited,
+-- retry-safe, forgery-denied, never appears before harvest). Uses a manually-aged 24h-shaped span
+-- (same backdating technique as the lifecycle block above) purely so the test doesn't need to wait
+-- out a real 4-day window — the real production 4-day duration and its care-day cap are separately
+-- verified end-to-end further below. size_calc_version is 2 regardless of a crop's own span length
+-- (it reflects which FORMULA the server applied, not that specific crop's duration).
 do $$
 declare a uuid; b uuid; c uuid; r jsonb; denied boolean; size1 int; size2 int; version1 int; inputs jsonb; best int; last int;
 begin
@@ -117,7 +120,7 @@ begin
 
   select size_score,size_calc_version,size_inputs into size2,version1,inputs from public.pixel_farm_crops where id=c;
   if size2 <> size1 then raise exception 'stored size % does not match returned size %', size2, size1; end if;
-  if version1 <> 1 then raise exception 'unexpected calc version %', version1; end if;
+  if version1 <> 2 then raise exception 'unexpected calc version %', version1; end if;
   if (inputs->>'careCount')::int <> 2 or (inputs->>'maxCareDays')::int <> 2 then raise exception 'unexpected size_inputs %', inputs; end if;
   if inputs->>'careRatio' is null or inputs->>'luckRoll' is null then raise exception 'size_inputs missing audit fields %', inputs; end if;
 
@@ -149,5 +152,113 @@ begin
   if exists(select 1 from public.pixel_farm_crops where user_id=a and size_score is not null) then raise exception 'cross-user size read leaked'; end if;
   execute 'reset role';
 end $$;
-select 'PASS: lifecycle, KST daily care, revisions/retries, stale replant, missed watering, history, server time, unchanged points, RLS/anonymous denial, crop size computed once/stored/audited/retry-safe/forgery-denied/best+last surfaced/unwatered-never-fails; all rolled back' as result;
+
+-- 4-day growth + review-linked bonus: real 4-day duration, "4 of 4 days watered" care cap, and the
+-- profiles.bonus_points snapshot-diff (via the real increment_bonus_points RPC, not forgery) that
+-- drives the review bonus chance.
+do $$
+declare a uuid; b uuid; c uuid; r jsonb; denied boolean;
+  points_before int; points_after int; size1 int; inputs jsonb; rev bigint;
+begin
+  select id into a from public.profiles where not exists(select 1 from public.pixel_farm_plots where user_id=profiles.id) limit 1;
+  select id into b from public.profiles where id<>a and not exists(select 1 from public.pixel_farm_plots where user_id=profiles.id) limit 1;
+  if a is null or b is null then raise exception 'Two fresh profiles required for the 4-day block'; end if;
+
+  select bonus_points into points_before from public.profiles where id=a;
+  perform set_config('request.jwt.claim.sub',a::text,true);
+  execute 'set local role authenticated';
+  r := public.act_pixel_farm(0,'plant',0);
+  c := (r#>>'{plots,0,crop,id}')::uuid;
+  if (r#>>'{plots,0,crop,readyAt}')::timestamptz - (r#>>'{plots,0,crop,plantedAt}')::timestamptz <> interval '4 days' then
+    raise exception 'growth duration is not 4 days: %', r;
+  end if;
+  execute 'reset role';
+  if (select review_points_at_plant from public.pixel_farm_crops where id=c) <> points_before then
+    raise exception 'review_points_at_plant snapshot mismatch';
+  end if;
+
+  -- Water on 4 distinct KST days.
+  execute 'set local role authenticated';
+  r := public.act_pixel_farm(0,'water',1);
+  rev := (r#>>'{plots,0,revision}')::bigint;
+  if (r#>>'{plots,0,crop,careCount}')::int <> 1 then raise exception 'water 1 failed %', r; end if;
+  for i in 1..3 loop
+    execute 'reset role';
+    update public.pixel_farm_care set care_day=care_day-1,watered_at=watered_at-interval '1 day' where crop_id=c;
+    update public.pixel_farm_crops set last_watered_on=last_watered_on-1 where id=c;
+    execute 'set local role authenticated';
+    r := public.act_pixel_farm(0,'water',rev);
+    rev := (r#>>'{plots,0,revision}')::bigint;
+  end loop;
+  if (r#>>'{plots,0,crop,careCount}')::int <> 4 then raise exception 'expected careCount=4 after 4 distinct days, got %', r; end if;
+
+  -- A 5th day, still before ready_at, is refused by the new "4 of 4" cap.
+  execute 'reset role';
+  update public.pixel_farm_care set care_day=care_day-1,watered_at=watered_at-interval '1 day' where crop_id=c;
+  update public.pixel_farm_crops set last_watered_on=last_watered_on-1 where id=c;
+  execute 'set local role authenticated';
+  r := public.act_pixel_farm(0,'water',rev);
+  if r->>'result'<>'already_watered' or (r#>>'{plots,0,crop,careCount}')::int<>4 then
+    raise exception '5th watering day should be refused (care_count cap), got %', r;
+  end if;
+
+  -- Not ready before 4 real days actually pass.
+  r := public.act_pixel_farm(0,'harvest',rev);
+  if r->>'result'<>'growing' then raise exception 'harvest should still be refused before 4 real days pass: %', r; end if;
+
+  -- Age past ready_at, then award real review points via the same RPC review combo/streak/quest
+  -- code uses (not direct forgery) to simulate genuine review activity during the growth window.
+  execute 'reset role';
+  update public.pixel_farm_crops set planted_at=clock_timestamp()-interval '4 days 1 hour',ready_at=clock_timestamp()-interval '1 hour' where id=c;
+  execute 'set local role authenticated';
+  perform public.increment_bonus_points(a, 60);
+  execute 'reset role';
+  select bonus_points into points_after from public.profiles where id=a;
+  execute 'set local role authenticated';
+
+  r := public.act_pixel_farm(0,'harvest',rev);
+  if r->>'result'<>'ok' then raise exception 'harvest failed %', r; end if;
+  size1 := (r#>>'{harvest,sizeScore}')::int;
+  if size1 is null or size1<1 or size1>100 then raise exception 'invalid sizeScore %', r; end if;
+
+  select size_inputs into inputs from public.pixel_farm_crops where id=c;
+  if (select size_calc_version from public.pixel_farm_crops where id=c) <> 2 then raise exception 'expected calc version 2'; end if;
+  if (inputs->>'maxCareDays')::int <> 4 then raise exception 'expected maxCareDays=4, got %', inputs; end if;
+  if (inputs->>'careCount')::int <> 4 then raise exception 'expected careCount=4, got %', inputs; end if;
+  if (inputs->>'reviewGained')::int <> (points_after - points_before) then
+    raise exception 'reviewGained mismatch: inputs=% expected=%', inputs->>'reviewGained', points_after-points_before;
+  end if;
+  if (inputs->>'reviewGained')::int <> 60 then raise exception 'expected reviewGained=60, got %', inputs; end if;
+  if inputs->>'bonusChance' is null or inputs->>'bonusAmount' is null then raise exception 'missing bonus audit fields %', inputs; end if;
+
+  denied:=false;
+  begin update public.pixel_farm_crops set review_points_at_plant=999999 where id=c; exception when insufficient_privilege then denied:=true; end;
+  if not denied then raise exception 'direct review_points_at_plant forgery allowed'; end if;
+
+  execute 'reset role';
+end $$;
+
+-- A crop that predates this migration (no review_points_at_plant snapshot, legacy 24h span) must
+-- still harvest safely — reviewGained defaults to 0 rather than erroring, and it keeps its own
+-- true (smaller) maxCareDays instead of being judged against the 4-day standard it never had.
+do $$
+declare a uuid; c uuid; r jsonb; inputs jsonb;
+begin
+  select id into a from public.profiles where not exists(select 1 from public.pixel_farm_plots where user_id=profiles.id) limit 1;
+  if a is null then raise exception 'Fresh profile required for legacy-crop block'; end if;
+  perform set_config('request.jwt.claim.sub',a::text,true);
+  execute 'set local role authenticated';
+  r := public.act_pixel_farm(0,'plant',0);
+  c := (r#>>'{plots,0,crop,id}')::uuid;
+  execute 'reset role';
+  update public.pixel_farm_crops set review_points_at_plant=null, planted_at=clock_timestamp()-interval '25 hours', ready_at=clock_timestamp()-interval '1 hour' where id=c;
+  execute 'set local role authenticated';
+  r := public.act_pixel_farm(0,'harvest',1);
+  if r->>'result'<>'ok' then raise exception 'legacy crop harvest failed: %', r; end if;
+  select size_inputs into inputs from public.pixel_farm_crops where id=c;
+  if (inputs->>'maxCareDays')::int <> 2 then raise exception 'legacy crop should keep maxCareDays=2, got %', inputs; end if;
+  if (inputs->>'reviewGained')::int <> 0 then raise exception 'legacy crop (no snapshot) should default reviewGained=0, got %', inputs; end if;
+  execute 'reset role';
+end $$;
+select 'PASS: lifecycle, KST daily care, revisions/retries, stale replant, missed watering, history, server time, unchanged points, RLS/anonymous denial, crop size computed once/stored/audited/retry-safe/forgery-denied/best+last surfaced/unwatered-never-fails, real 4-day duration + 4-of-4 care cap, review snapshot-diff via the real RPC, legacy pre-migration crop compatibility; all rolled back' as result;
 rollback;
