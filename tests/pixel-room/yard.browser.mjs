@@ -1,6 +1,7 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
+import { emptyFarm } from './emptyFarm.mjs';
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 await mkdir('node_modules/.cache/front-yard', { recursive: true });
 try {
@@ -8,6 +9,7 @@ try {
     const page = await browser.newPage({ viewport, hasTouch: viewport.width === 390 });
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
+    await page.route('**/src/utils/pixelFarm.ts', route => route.fulfill({contentType:'application/javascript',body:`export const fetchPixelFarm=async()=>(${JSON.stringify(emptyFarm())}); export const actPixelFarm=async()=>{throw new Error('Unexpected farm action in movement test');};`}));
     await page.route('**/src/services/supabase.ts', route => route.fulfill({ contentType: 'application/javascript', body: "export { supabase } from '/tests/plaza/fakeRealtime.mjs';" }));
     await page.route('**/src/utils/pixelShop.ts', route => route.fulfill({ contentType: 'application/javascript', body: `
       export const fetchEquippedAppearance = async () => ({top:null,bottom:null,shoes:null,hair:null,eyes:null,skin:null});
