@@ -9,11 +9,18 @@ await mkdir(out, { recursive: true });
 const hour = 3600000;
 const empty = now => ({ serverNow: new Date(now).toISOString(), today: '2026-09-18', harvestCount: 0, bestSize: null, lastHarvestSize: null, plots: [0,1].map(index => ({index,revision:0,crop:null})) });
 const initialNow = Date.parse('2026-09-18T01:00:00Z');
-// Deterministic stand-in for the server's random luck roll (kept neutral at .5, i.e. no bonus/malus)
-// so browser-test assertions can check exact sizes. Randomness/distribution is covered by the pure
-// computeCropSize unit tests and the real-DB roundtrip in farm-server.sql, not here.
-const MOCK_MAX_CARE_DAYS = 2;
+// Deterministic stand-ins for the server's random rolls (luck kept neutral, review bonus keyed off
+// careCount so plot0/plot1 below deterministically differ) so browser-test assertions can check
+// exact sizes. Randomness/distribution is covered by the pure computeCropSize/computeCropSizeV2
+// unit tests and the real-DB roundtrip in farm-server.sql, not here.
+const MOCK_MAX_CARE_DAYS = 4; // matches FARM_GROWTH_DAYS
 function mockSize(careCount) { return Math.round(40 + Math.min(1, careCount / MOCK_MAX_CARE_DAYS) * 30); }
+function mockHarvest(careCount) {
+  const base = mockSize(careCount);
+  const bonusApplied = careCount > 0; // stand-in for a review-linked bonus proc
+  const size = Math.max(10, Math.min(100, base + (bonusApplied ? 10 : 0)));
+  return { size, bonusApplied };
+}
 function server() {
   const state = empty(initialNow);
   let now = initialNow, serial = 0;
@@ -30,13 +37,13 @@ function server() {
       const plot = state.plots[args.p_plot];
       let result = 'ok', harvest;
       if (plot.revision !== args.p_revision) result = 'changed';
-      else if (args.p_action === 'plant' && !plot.crop) { plot.crop = { id:`crop-${++serial}`, plantedAt:new Date(now).toISOString(), readyAt:new Date(now+24*hour).toISOString(), lastWateredOn:null,careCount:0 }; plot.revision++; }
+      else if (args.p_action === 'plant' && !plot.crop) { plot.crop = { id:`crop-${++serial}`, plantedAt:new Date(now).toISOString(), readyAt:new Date(now+96*hour).toISOString(), lastWateredOn:null,careCount:0 }; plot.revision++; }
       else if (args.p_action === 'water' && plot.crop && plot.crop.lastWateredOn !== api.snapshot().today) { plot.crop.careCount++; plot.crop.lastWateredOn=api.snapshot().today; plot.revision++; }
       else if (args.p_action === 'harvest' && plot.crop && now >= Date.parse(plot.crop.readyAt)) {
-        const size = mockSize(plot.crop.careCount);
+        const { size, bonusApplied } = mockHarvest(plot.crop.careCount);
         state.bestSize = state.bestSize === null ? size : Math.max(state.bestSize, size);
         state.lastHarvestSize = size;
-        plot.crop=null; plot.revision++; state.harvestCount++; harvest={sizeScore:size};
+        plot.crop=null; plot.revision++; state.harvestCount++; harvest={sizeScore:size,bonusApplied};
       }
       else result = 'growing';
       if (api.loseResponse) { api.loseResponse=false; return route.fulfill({status:503,json:{message:'test lost response after commit'}}); }
@@ -120,8 +127,9 @@ try {
     await page.getByRole('button',{name:'토마토 심기',exact:true}).click();
     await page.getByRole('button',{name:'물주기 · 무료',exact:true}).waitFor();
     await page.getByRole('button',{name:'밭 닫기'}).click();
-    // Maturation from server time on focus, including an entirely unwatered plot.
-    api.advance(25*hour);
+    // Maturation from server time on focus, including an entirely unwatered plot. 97h clears the
+    // real 96h (4-day) production duration.
+    api.advance(97*hour);
     await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
     await page.waitForFunction(()=>document.querySelector('[data-plot="0"]')?.getAttribute('data-stage')==='ripe');
     await page.screenshot({path:`${out}/${viewport.width}-ripe.png`});
@@ -129,11 +137,12 @@ try {
     await page.getByRole('button',{name:'토마토 수확하기',exact:true}).click();
     // Size is revealed immediately in the light in-world feedback bubble, and persists as a
     // best/last-record summary (survives being purely transient — see the reload/fresh-context
-    // checks below).
-    await page.getByText(/이번 토마토는 .+예요 \(55\/100\)/).waitFor();
-    await page.getByText('지금까지 수확 1개 · 최고 기록 55 · 최근 55',{exact:true}).waitFor();
+    // checks below). plot0 was watered once (careCount>0 in the mock), so it also carries the
+    // review-bonus hint text.
+    await page.getByText(/이번 토마토는 .+예요 \(58\/100\) · 꾸준한 복습 보너스!/).waitFor();
+    await page.getByText('지금까지 수확 1개 · 최고 기록 58 · 최근 58',{exact:true}).waitFor();
     assert.equal(api.state.plots[0].crop,null);
-    assert.equal(api.state.bestSize,55); assert.equal(api.state.lastHarvestSize,55);
+    assert.equal(api.state.bestSize,58); assert.equal(api.state.lastHarvestSize,58);
     await page.getByRole('button',{name:'토마토 심기',exact:true}).click();
     await page.getByRole('button',{name:'물주기 · 무료',exact:true}).waitFor();
     assert.notEqual(api.state.plots[0].crop.id,cropId);
@@ -144,13 +153,14 @@ try {
     await other.page.getByRole('button',{name:'토마토 수확하기',exact:true}).waitFor();
     await other.page.getByRole('button',{name:'토마토 수확하기',exact:true}).click();
     // Unwatered plot still produces a valid (smaller) size — never a failure/no-harvest state —
-    // and the best-record persists across the fresh context while the last-record updates.
-    await other.page.getByText('지금까지 수확 2개 · 최고 기록 55 · 최근 40',{exact:true}).waitFor();
-    assert.equal(api.state.bestSize,55); assert.equal(api.state.lastHarvestSize,40);
+    // and gets no review-bonus hint (mock careCount=0). The best-record persists across the fresh
+    // context while the last-record updates.
+    await other.page.getByText('지금까지 수확 2개 · 최고 기록 58 · 최근 40',{exact:true}).waitFor();
+    assert.equal(api.state.bestSize,58); assert.equal(api.state.lastHarvestSize,40);
     assert.deepEqual(other.errors,[]);
     await second.close();
     assert.deepEqual(errors,[]);
-    console.log(`PASS ${viewport.width}: in-world approach, plant/water/lost-response recovery, dog clearance, reload/fresh-context persistence, server-time growth, harvest/replant, no map height loss, crop size reveal + best/last record`);
+    console.log(`PASS ${viewport.width}: in-world approach, plant/water/lost-response recovery, dog clearance, reload/fresh-context persistence, 4-day server-time growth, harvest/replant, no map height loss, crop size + review-bonus reveal + best/last record`);
     await context.close();
   }
 } finally {await browser.close();}

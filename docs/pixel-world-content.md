@@ -406,3 +406,78 @@ Astra가 구현한 토마토 농장 MVP(PR #94, `20260917155631_pixel_tomato_far
   `pixelShop/browser`(3뷰포트)/`plaza/interactions`/`plaza/landscape`(2뷰포트)) 전부 재실행해
   회귀 없음 확인. `npm run build` clean, `npm run lint`에는 무관한 기존 `src/App.tsx` 오류만
   있음(미수정 파일).
+
+## 후속 작업 — 4일 성장 + 복습 확률 연계 (2026-09-18)
+
+토마토 성장 기간을 24시간→4일로 바꾸고, 실제 복습 활동이 작물 크기에 "확률적으로 간접" 연계되도록
+확장했다. 기존 harvest 분기(revision CAS + 행 잠금)를 그대로 재사용했고 물주기 기반 기본 크기
+공식(`computeCropSize`)은 전혀 바꾸지 않았다 — 복습은 그 위에 얹는 별도의 확률 레이어로만
+추가했다.
+
+- **4일 성장**: `ready_at = planted_at + interval '4 days'`. care ratio 분모는 "4일 중 며칠 물을
+  줬는지"를 그대로 뜻하도록 고정 4로 캡을 씌웠다(실제 96시간 창은 달력 경계상 5개 날짜에 걸칠 수
+  있지만 — 심은 날 일부 + 온전한 날 3개 + 준비되는 날 일부 — 그 5번째 날 새벽의 아주 좁은 틈을
+  물주기 액션 자체에서 `care_count>=4`로 막아 "4일 중 며칠"이라는 의미를 정확히 지킨다). 이미
+  진행 중이던 구 24시간 작물(마이그레이션 당시 실 DB에 2개 있었음)은 자기 실제 planted~ready
+  구간으로 계산되는 원래의 더 작은 분모(2)를 그대로 유지해, 한 번도 주어진 적 없는 4일 기준으로
+  불리하게 평가되지 않는다. 물주기를 놓쳐도 안 죽고, 수확 가능 상태에 만료 기한이 없는 것도 기존
+  그대로다(코드에 별도 만료 로직이 없다는 것을 재확인).
+- **실제 사용한 복습 데이터**: 스키마 전체를 확인한 결과, 이 프로젝트에는 "하루 단위로 신뢰
+  가능한 복습 이력"을 남기는 append-only 로그가 전혀 없다(`review_check_*`는 교사 채점이라
+  가장 신뢰도가 높지만 DB 전체에 세션 3개·문항 10개뿐으로 극히 드묾; `mistakes.analysis`의
+  `pointLog`/`reviews`는 학생이 자기 행을 직접 수정할 수 있는 jsonb라 위조·반복 체크에 취약).
+  대신 **`profiles.bonus_points`**를 썼다 — 이 컬럼은 `increment_bonus_points()` RPC를 통해서만
+  바뀌고, 그 RPC는 오직 복습 콤보 점수/스트릭 마일스톤/일일 복습 퀘스트 코드
+  (`src/features/mistakes/useReviewState.ts`)에서만 호출된다. 상점 구매·가챠·관리자 지급은 전부
+  별개 컬럼(`point_adjustment`)을 쓰므로 `bonus_points`는 절대 섞이지 않는다. 로그인 횟수나 접속
+  시간은 전혀 쓰지 않았다.
+- **확률에 반영되는 방식**: 심을 때 `pixel_farm_crops.review_points_at_plant`에 그 순간의
+  `bonus_points`를 스냅샷하고, 수확 때 현재값과의 차이(`reviewGained`, 음수면 0)를 그 작물의
+  "이번 성장 기간에 딴 복습 콤보 점수"로 쓴다. `reviewRatio = min(1, reviewGained/50)`(4일에 50점
+  이상이면 1.0), `bonusChance = 12% + reviewRatio×28%`(12~40%). 독립된 두 번째 주사위
+  (`random() < bonusChance`)가 통과해야만 보너스가 발생하고, 발생 시에만 `+6~18`(평균 12)이
+  **더해진다** — 복습 점수를 크기에 직접 더하지 않는다는 요구를 그대로 지켰다.
+- **최종 공식**: `baseSize = computeCropSize(...)`(기존 물주기+행운 공식, 불변) →
+  `finalSize = clamp(baseSize + (보너스 발동 시 6~18, 아니면 0), 10, 100)`. `size_calc_version=2`,
+  `size_inputs`에 careCount/maxCareDays/careRatio/luckRoll/baseSize + reviewGained/reviewRatio/
+  bonusChance/bonusRoll/bonusAmount를 전부 기록해 나중에 재계산·검증 가능하다. 마이그레이션 이전
+  크롭(`review_points_at_plant` null)은 reviewGained=0으로 안전하게 처리된다(에러 없음, 데이터
+  없는 척 지어내지 않고 정직하게 0).
+- **재추첨/중복 방지**: 새 동시성 로직을 만들지 않고 기존 harvest 분기(같은 revision CAS +
+  `for update` 행 잠금) 안에서 계산한다 — 재시도는 `changed`만 받아 harvest 로직 자체가 실행되지
+  않으므로 크기도, 보너스 주사위도 다시 굴러가지 않는다. `review_points_at_plant`도 다른
+  `pixel_farm_*` 컬럼과 동일하게 `authenticated`에 UPDATE 권한이 없어 직접 위조가 막힌다.
+  **정직하게 밝히는 한계**: `bonus_points`는 리뷰 체크박스를 O→빈칸→O로 반복 토글하면 각 사이클마다
+  다시 배점되는 기존 버그(이 라운드 밖의 복습 시스템 자체의 문제)가 있어 완전히 위조 불가능하지는
+  않다 — 다만 그 취약점은 이미 실제 사용 가능한 포인트를 직접 불리는 데 쓸 수 있어 더 가치가 크고,
+  농장 쪽은 크롭 하나당 한 번만 소비되는 작고 확률적인 보너스라 추가로 노출되는 실익이 낮다.
+- 검증: `tests/plaza/farm.test.ts`에 `maxCareDaysFor`(레거시 24h vs 신규 4일 캡)/`growthLabel`
+  (일/시간/분 단위 전환)/`reviewRatioFor`/`bonusChanceFor`/`computeBonusAmount`/
+  `computeCropSizeV2` 단위 테스트 + 물주기(0/2/4)×복습(낮음/중간/높음) 9-조합 4,000회 시뮬레이션을
+  추가 — 전체 유닛 테스트 93/93 통과. `tests/pixel-room/farm-server.sql`에 실제 4일 성장/4일 중
+  4일 캡/`increment_bonus_points` 실제 RPC로 복습 점수를 만들어 스냅샷-diff 검증/버전2 확인/감사
+  필드 확인/직접 위조 거부/레거시 크롭 호환을 실제 Supabase에서 검증(전부 롤백). 기존 lifecycle
+  블록도 4일 기준으로 갱신해 재실행, 통과. `tests/pixel-room/farm.browser.mjs`를 96시간 성장 +
+  결정론적 복습 보너스 목(mock)으로 갱신, 3개 뷰포트 전부 통과. 기존 회귀 테스트
+  (`base-appearance`/`doormat`/`furniture-race`/`yard`(2뷰포트)/`dog`/`pixelShop/browser`
+  (3뷰포트)/`plaza/interactions`/`plaza/landscape`(2뷰포트)) 전부 재실행해 회귀 없음 확인.
+  `npm run build` clean, `npm run lint`에는 무관한 기존 `src/App.tsx` 오류만 있음(미수정 파일).
+- 시뮬레이션 결과(물주기×복습, N=4000, 크기 10~100):
+
+  | 물주기 | 복습 | 평균 | 최소 | 최대 | 보너스 발동률 |
+  |---|---|---|---|---|---|
+  | 0/4 | 낮음 | 41.5 | 21 | 71 | 12.7% |
+  | 0/4 | 중간 | 43.2 | 22 | 72 | 26.6% |
+  | 0/4 | 높음 | 44.6 | 21 | 73 | 39.6% |
+  | 2/4 | 낮음 | 56.1 | 37 | 84 | 11.9% |
+  | 2/4 | 중간 | 58.4 | 37 | 87 | 26.6% |
+  | 2/4 | 높음 | 59.7 | 37 | 89 | 40.2% |
+  | 4/4 | 낮음 | 71.7 | 51 | 100 | 11.9% |
+  | 4/4 | 중간 | 73.1 | 52 | 100 | 26.4% |
+  | 4/4 | 높음 | 74.5 | 51 | 100 | 39.1% |
+
+  물주기 한 단계(0→2→4)마다 평균이 약 15점씩 뚜렷하게 오르는 반면, 같은 물주기에서 복습이
+  낮음→높음으로 가도 평균은 약 3점만 오른다(물주기 효과의 1/5 수준) — "물주기가 가장 이해하기
+  쉬운 핵심 요소, 복습은 보조적인 확률 편향"이 수치로도 확인된다. 모든 조합에서 최소~최대 범위가
+  넓게 겹쳐 있어 복습이 낮아도 운 좋게 큰 작물이, 복습이 높아도 운 나쁘게 작은 작물이 얼마든지
+  나올 수 있다.
