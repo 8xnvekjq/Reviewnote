@@ -1,6 +1,6 @@
 import { supabase } from '../services/supabase';
 import type { FarmAction, FarmSnapshot } from '../features/pixel-room/farm/farmModel';
-export interface FarmResult extends FarmSnapshot { result?: 'ok' | 'changed' | 'already_watered' | 'ready' | 'growing' }
+export interface FarmResult extends FarmSnapshot { result?: 'ok' | 'changed' | 'already_watered' | 'ready' | 'growing'; harvest?: { sizeScore: number } }
 async function request(name: string, args?: Record<string, unknown>): Promise<FarmResult> {
   const { data, error } = await supabase.rpc(name, args).abortSignal(AbortSignal.timeout(12000));
   if (error) throw error;

@@ -82,5 +82,72 @@ begin
   if not denied then raise exception 'anonymous action allowed'; end if;
   execute 'reset role';
 end $$;
-select 'PASS: lifecycle, KST daily care, revisions/retries, stale replant, missed watering, history, server time, unchanged points, RLS/anonymous denial; all rolled back' as result;
+
+-- Crop size: computed exactly once at harvest, stored/returned consistently, audited, retry-safe,
+-- forgery-denied, and never appears before harvest. Uses two fresh profiles (the ones above are
+-- no longer farm-free after the lifecycle block).
+do $$
+declare a uuid; b uuid; c uuid; r jsonb; denied boolean; size1 int; size2 int; version1 int; inputs jsonb; best int; last int;
+begin
+  select id into a from public.profiles where not exists(select 1 from public.pixel_farm_plots where user_id=profiles.id) limit 1;
+  select id into b from public.profiles where id<>a and not exists(select 1 from public.pixel_farm_plots where user_id=profiles.id) limit 1;
+  if a is null or b is null then raise exception 'Two fresh profiles required for size block'; end if;
+  perform set_config('request.jwt.claim.sub',a::text,true);
+  execute 'set local role authenticated';
+
+  -- Water twice across two KST days while still growing, then ripen and harvest.
+  r := public.act_pixel_farm(0,'plant',0);
+  c := (r#>>'{plots,0,crop,id}')::uuid;
+  r := public.act_pixel_farm(0,'water',1);
+  execute 'reset role';
+  update public.pixel_farm_care set care_day=care_day-1,watered_at=watered_at-interval '1 day' where crop_id=c;
+  update public.pixel_farm_crops set last_watered_on=last_watered_on-1 where id=c;
+  execute 'set local role authenticated';
+  r := public.act_pixel_farm(0,'water',2);
+  if (r#>>'{plots,0,crop,careCount}')::int<>2 then raise exception 'expected 2 waterings before ripening, got %', r; end if;
+  if exists(select 1 from public.pixel_farm_crops where id=c and size_score is not null) then raise exception 'size set before harvest'; end if;
+
+  execute 'reset role';
+  update public.pixel_farm_crops set planted_at=clock_timestamp()-interval '25 hours',ready_at=clock_timestamp()-interval '1 hour' where id=c;
+  execute 'set local role authenticated';
+  r := public.act_pixel_farm(0,'harvest',3);
+  if r->>'result'<>'ok' then raise exception 'harvest failed %', r; end if;
+  size1 := (r#>>'{harvest,sizeScore}')::int;
+  if size1 is null or size1 < 1 or size1 > 100 then raise exception 'harvest payload missing/invalid sizeScore: %', r; end if;
+
+  select size_score,size_calc_version,size_inputs into size2,version1,inputs from public.pixel_farm_crops where id=c;
+  if size2 <> size1 then raise exception 'stored size % does not match returned size %', size2, size1; end if;
+  if version1 <> 1 then raise exception 'unexpected calc version %', version1; end if;
+  if (inputs->>'careCount')::int <> 2 or (inputs->>'maxCareDays')::int <> 2 then raise exception 'unexpected size_inputs %', inputs; end if;
+  if inputs->>'careRatio' is null or inputs->>'luckRoll' is null then raise exception 'size_inputs missing audit fields %', inputs; end if;
+
+  -- Retry with the already-consumed revision must not re-roll, duplicate-harvest, or re-emit a payload.
+  r := public.act_pixel_farm(0,'harvest',3);
+  if r->>'result'<>'changed' then raise exception 'stale harvest retry accepted'; end if;
+  if (select size_score from public.pixel_farm_crops where id=c) <> size1 then raise exception 'retry mutated stored size'; end if;
+  if r ? 'harvest' then raise exception 'retry re-emitted a harvest payload'; end if;
+
+  denied:=false;
+  begin update public.pixel_farm_crops set size_score=100 where id=c; exception when insufficient_privilege then denied:=true; end;
+  if not denied then raise exception 'direct size_score forgery allowed'; end if;
+
+  r := public.get_pixel_farm();
+  best := (r->>'bestSize')::int; last := (r->>'lastHarvestSize')::int;
+  if best <> size1 or last <> size1 then raise exception 'bestSize/lastHarvestSize mismatch: best=% last=% expected=%', best, last, size1; end if;
+
+  -- Zero watering must still harvest successfully with a valid size (never fails/dies).
+  r := public.act_pixel_farm(1,'plant',0);
+  execute 'reset role';
+  update public.pixel_farm_crops set planted_at=clock_timestamp()-interval '25 hours',ready_at=clock_timestamp()-interval '1 hour' where user_id=a and plot_index=1;
+  execute 'set local role authenticated';
+  r := public.act_pixel_farm(1,'harvest',1);
+  if r->>'result'<>'ok' then raise exception 'unwatered harvest failed %', r; end if;
+  size2 := (r#>>'{harvest,sizeScore}')::int;
+  if size2 is null or size2 < 1 or size2 > 100 then raise exception 'unwatered harvest produced no valid size: %', r; end if;
+
+  perform set_config('request.jwt.claim.sub',b::text,true);
+  if exists(select 1 from public.pixel_farm_crops where user_id=a and size_score is not null) then raise exception 'cross-user size read leaked'; end if;
+  execute 'reset role';
+end $$;
+select 'PASS: lifecycle, KST daily care, revisions/retries, stale replant, missed watering, history, server time, unchanged points, RLS/anonymous denial, crop size computed once/stored/audited/retry-safe/forgery-denied/best+last surfaced/unwatered-never-fails; all rolled back' as result;
 rollback;

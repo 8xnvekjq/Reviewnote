@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { actPixelFarm, fetchPixelFarm } from '../../../utils/pixelFarm';
+import { sizeLabel } from './farmModel';
 import type { FarmAction, FarmSnapshot } from './farmModel';
 
 export function useFarm() {
@@ -40,7 +41,8 @@ export function useFarm() {
       const next = await actPixelFarm(index, action, plot.revision);
       if (!alive.current) return;
       accept(next);
-      setMessage(next.result === 'ok' ? ({ plant: '심었어요. 첫 물을 주세요!', water: '물을 줬어요. 오늘의 돌봄 +1', harvest: '수확 기록에 보관했어요!' })[action]
+      const harvestMessage = next.harvest ? `수확 기록에 보관했어요! 이번 토마토는 ${sizeLabel(next.harvest.sizeScore)}예요 (${next.harvest.sizeScore}/100)` : '수확 기록에 보관했어요!';
+      setMessage(next.result === 'ok' ? ({ plant: '심었어요. 첫 물을 주세요!', water: '물을 줬어요. 오늘의 돌봄 +1', harvest: harvestMessage })[action]
         : next.result === 'changed' ? '다른 곳에서 바뀐 밭을 불러왔어요.' : next.result === 'already_watered' ? '오늘은 이미 물을 줬어요.' : next.result === 'ready' ? '다 익었어요. 수확해 주세요!' : '아직 자라고 있어요. 조금만 기다려 주세요.');
     } catch { if (alive.current) { setError(true); setMessage('저장 결과를 확인하지 못했어요. 다시 확인해 주세요.'); } }
     finally { inFlight.current = false; if (alive.current) setBusy(false); }
