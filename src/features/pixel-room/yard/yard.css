@@ -5,7 +5,6 @@
 .pr-yard-board .pr-yard-tree { position:absolute; width:12.5%; height:33.333%; pointer-events:none; }
 .pr-yard-fence { position:absolute; left:62.5%; width:25%; height:8.333%; display:flex; pointer-events:none; z-index:3; }
 .pr-yard-fence svg { min-width:0; }
-.pr-yard-garden { position:absolute; left:65%; top:35%; width:19%; height:34%; border:2px dashed #65994e55; border-radius:22%; pointer-events:none; color:#f4dfa2; display:flex; align-items:flex-end; justify-content:space-between; }
 .pr-yard-sign { position:absolute; left:49%; bottom:9%; background:#9c643c; color:#fff0c8; padding:4px 7px; font-size:clamp(9px,2vw,13px); border-bottom:3px solid #765132; pointer-events:none; z-index:2; }
 .pr-yard-door,.pr-yard-gate { position:absolute; background:transparent; border:0; cursor:pointer; z-index:20; }
 .pr-yard-door { left:31.25%; top:41.666%; width:12.5%; height:16.667%; }

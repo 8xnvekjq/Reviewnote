@@ -7,6 +7,7 @@
 import { createRequire } from 'node:module';
 import { mkdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
+import { emptyFarm } from './emptyFarm.mjs';
 import { PIXEL_CATALOG } from '../../src/features/pixel-room/shop/catalog.ts';
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
@@ -25,7 +26,8 @@ async function withMockedPage(context, state, run) {
     const method = route.request().method();
     if (url.hostname === '127.0.0.1') return route.continue();
     let data = [];
-    if (url.pathname.endsWith('/pixel_item_catalog')) data = catalog;
+    if (url.pathname.endsWith('/get_pixel_farm')) data = emptyFarm();
+    else if (url.pathname.endsWith('/pixel_item_catalog')) data = catalog;
     else if (url.pathname.endsWith('/pixel_item_ownership')) data = [...state.owned].map(item_id => ({ item_id }));
     else if (url.pathname.endsWith('/pixel_avatar_equipment')) data = state.equipment;
     else if (url.pathname.endsWith('/pixel_furniture_placement')) data = [...state.placements.entries()].map(([item_id, pos]) => ({ item_id, x: pos.x, y: pos.y }));
