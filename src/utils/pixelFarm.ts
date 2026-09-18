@@ -1,5 +1,5 @@
 import { supabase } from '../services/supabase';
-import type { FarmAction, FarmSnapshot, HarvestedCrop, TopSubmittedCrop } from '../features/pixel-room/farm/farmModel';
+import type { FarmAction, FarmSnapshot, HarvestedCrop, WeeklyCropContest } from '../features/pixel-room/farm/farmModel';
 export interface FarmResult extends FarmSnapshot { result?: 'ok' | 'changed' | 'already_watered' | 'ready' | 'growing'; harvest?: { sizeScore: number; bonusApplied?: boolean } }
 async function request(name: string, args?: Record<string, unknown>): Promise<FarmResult> {
   const { data, error } = await supabase.rpc(name, args).abortSignal(AbortSignal.timeout(12000));
@@ -44,13 +44,11 @@ export async function submitFarmCrop(cropId: string): Promise<SubmitFarmCropResu
   return data as SubmitFarmCropResult;
 }
 
-/** The plaza's exhibit — the single largest submitted crop across all students, or null if nobody
- * has submitted one yet. Resolved entirely server-side (get_top_submitted_crop) so this client never
- * sees or needs raw profile rows for the submitter label. */
-export async function fetchTopSubmittedCrop(): Promise<TopSubmittedCrop | null> {
-  const { data, error } = await supabase.rpc('get_top_submitted_crop');
+/** The plaza's weekly tomato contest — this KST week's top 3 (more on ties) plus the caller's own
+ * best-of-the-week, all resolved server-side (get_weekly_crop_contest) so this client never sees or
+ * needs raw profile rows or other students' farm/review data. */
+export async function fetchWeeklyCropContest(): Promise<WeeklyCropContest> {
+  const { data, error } = await supabase.rpc('get_weekly_crop_contest');
   if (error) throw error;
-  const row = (data || [])[0] as { crop_id: string; crop_type: string; size_score: number; submitted_at: string; submitter_label: string } | undefined;
-  if (!row) return null;
-  return { cropId: row.crop_id, cropType: row.crop_type, sizeScore: row.size_score, submittedAt: row.submitted_at, submitterLabel: row.submitter_label };
+  return data as WeeklyCropContest;
 }

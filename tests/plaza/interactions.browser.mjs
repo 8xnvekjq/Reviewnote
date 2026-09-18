@@ -9,12 +9,12 @@ try {
   page.on('pageerror', error => { errors.push(error.message); console.log('BROWSER ERROR', error.stack); });
   await page.route('**/src/services/supabase.ts', route => route.fulfill({ contentType: 'application/javascript', body: "export { supabase } from '/tests/plaza/fakeRealtime.mjs';" }));
   await page.route('**/src/utils/pixelShop.ts', route => route.fulfill({ contentType: 'application/javascript', body: 'export async function fetchEquippedAppearance(){return {top:null,bottom:null,shoes:null,hair:null,eyes:null}}' }));
-  // window.__topCrop is read fresh on every call (not baked in at route-registration time), so a
-  // later addInitScript can override it before a reload without re-registering this route. The
+  // window.__weeklyContest is read fresh on every call (not baked in at route-registration time),
+  // so a later addInitScript can override it before a reload without re-registering this route. The
   // trailing '*' matters: Vite serves recently-edited local files with a '?t=<timestamp>' cache-bust
   // query, which a bare '**/....ts' glob (anchored at both ends) does not match.
-  await page.addInitScript(() => { window.__topCrop = null; });
-  await page.route('**/src/utils/pixelFarm.ts*', route => route.fulfill({ contentType: 'application/javascript', body: 'export async function fetchTopSubmittedCrop(){return window.__topCrop}' }));
+  await page.addInitScript(() => { window.__weeklyContest = { weekStart: new Date().toISOString(), top: [], mine: { sizeScore: null, rank: null, participantCount: 0 } }; });
+  await page.route('**/src/utils/pixelFarm.ts*', route => route.fulfill({ contentType: 'application/javascript', body: 'export async function fetchWeeklyCropContest(){return window.__weeklyContest}' }));
   await page.goto('http://127.0.0.1:5174/tests/plaza/landscape.html?peer');
   assert.ok(await page.getByRole('button', { name: '우물의 오늘 한마디 읽기' }).isDisabled());
   await page.locator('.pr-well-target').dispatchEvent('click');
@@ -90,23 +90,36 @@ try {
   await page.getByText('이번 방문 동안만 기억해요.').waitFor();
   assert.ok(await page.locator('.pr-well-message').count(), 'solo activity still works with storage blocked');
 
-  // Podium exhibit — empty case first (window.__topCrop is still null from the addInitScript near
-  // the top of this file), then a fixture crop after a reload confirms the filled state.
+  // Weekly contest podium/board — empty case first (window.__weeklyContest is still the empty
+  // fixture from the addInitScript near the top of this file), then a fixture with a 2-way tie
+  // after a reload confirms the filled, ranked state.
   await page.locator('.pr-crop-exhibit-target').click();
   await page.locator('.pr-crop-exhibit-card').waitFor();
-  assert.ok((await page.locator('.pr-crop-exhibit-card').innerText()).includes('아직 아무도 출품하지 않았어요'));
+  assert.ok((await page.locator('.pr-crop-exhibit-card').innerText()).includes('아직 이번 주 출품이 없어요'));
+  assert.ok((await page.locator('.pr-crop-exhibit-card').innerText()).includes('이번 주 내 출품 기록이 아직 없어요'));
   assert.equal(await page.locator('.pr-crop-exhibit-tomato').count(), 0, 'no tomato drawn on an empty podium');
   await page.locator('.pr-crop-exhibit-card>button').click();
   assert.equal(await page.locator('.pr-crop-exhibit-card').count(), 0);
 
-  const fixtureCrop = { cropId: 'fixture-crop-1', cropType: 'tomato', sizeScore: 88, submittedAt: new Date().toISOString(), submitterLabel: '토망고' };
-  await page.addInitScript(crop => { window.__topCrop = crop; }, fixtureCrop);
+  const fixtureContest = {
+    weekStart: new Date().toISOString(),
+    top: [
+      { rank: 1, sizeScore: 88, submitterLabel: '토망고' },
+      { rank: 2, sizeScore: 75, submitterLabel: '김규민' },
+      { rank: 2, sizeScore: 75, submitterLabel: '이용준' },
+    ],
+    mine: { sizeScore: 75, rank: 2, participantCount: 3 },
+  };
+  await page.addInitScript(contest => { window.__weeklyContest = contest; }, fixtureContest);
   await page.reload();
   await page.locator('.pr-crop-exhibit-target').click();
   await page.locator('.pr-crop-exhibit-card').waitFor();
-  assert.match(await page.locator('.pr-crop-exhibit-size').innerText(), /88\/100/);
-  assert.ok((await page.locator('.pr-crop-exhibit-card').innerText()).includes('토망고'));
-  assert.equal(await page.locator('.pr-crop-exhibit-tomato').count(), 1, 'tomato drawn once a crop is submitted');
+  const cardText = await page.locator('.pr-crop-exhibit-card').innerText();
+  assert.ok(cardText.includes('1위') && cardText.includes('토망고') && cardText.includes('88/100'), 'sole leader shown plain');
+  assert.ok(cardText.includes('공동 2위'), 'a 2-way tie for 2nd is shown as "공동 2위", not artificially split');
+  assert.equal(await page.locator('.pr-crop-exhibit-ranking li').count(), 3, 'all 3 ranked rows render (2 tied for 2nd)');
+  assert.ok(cardText.includes('내 이번 주 최고 기록') && cardText.includes('75/100') && cardText.includes('공동 2위'), 'my own record uses the same tie-aware label');
+  assert.equal(await page.locator('.pr-crop-exhibit-tomato').count(), 1, 'tomato drawn once someone leads this week');
   const boardBox = await page.locator('.pr-plaza-board').boundingBox();
   const cardBox = await page.locator('.pr-crop-exhibit-card').boundingBox();
   assert.ok(cardBox.x >= boardBox.x - 1 && cardBox.x + cardBox.width <= boardBox.x + boardBox.width + 1, 'exhibit card stays on-board');
@@ -115,5 +128,5 @@ try {
   assert.equal(await page.locator('.pr-crop-exhibit-card').count(), 0);
 
   assert.deepEqual(errors, []);
-  console.log('PASS bidirectional reactions, throttle/expiry, daily well + reload, reconnect, crop exhibit (empty + filled podium)');
+  console.log('PASS bidirectional reactions, throttle/expiry, daily well + reload, reconnect, weekly crop contest (empty + ranked/tied podium)');
 } finally { await browser.close(); }

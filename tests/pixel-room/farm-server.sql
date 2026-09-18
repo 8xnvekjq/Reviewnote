@@ -307,12 +307,13 @@ begin
   execute 'reset role';
 end $$;
 
--- 수확물 출품/전시 (20260921100000_pixel_farm_crop_submission.sql): submit_farm_crop의 원자성 +
--- 중복/타인 방지, get_top_submitted_crop의 안전한 표시명 + "더 큰 작물이 나오면 교체" 동작.
+-- 수확물 출품 (20260921100000_pixel_farm_crop_submission.sql): submit_farm_crop의 원자성 +
+-- 중복/타인 방지. 전시/랭킹 쪽 검증은 이 아래 "주간 토마토 대회" 블록에서 한다
+-- (get_top_submitted_crop은 20260922090000에서 get_weekly_crop_contest로 대체됨).
 do $$
 declare
-  a uuid; b uuid; c1 uuid; c2 uuid; r jsonb; denied boolean;
-  points_before int; points_after int; reward1 int; sz1 int; sz2 int; topcrop record;
+  a uuid; b uuid; c1 uuid; r jsonb; denied boolean;
+  points_before int; points_after int; reward1 int; sz1 int;
 begin
   select id into a from public.profiles where not exists(select 1 from public.pixel_farm_plots where user_id=profiles.id) limit 1;
   select id into b from public.profiles where id<>a and not exists(select 1 from public.pixel_farm_plots where user_id=profiles.id) limit 1;
@@ -359,41 +360,164 @@ begin
   select coalesce(bonus_points,0)+coalesce(point_adjustment,0) into points_after from public.profiles where id=b;
   if points_after <> points_before then raise exception 'cross-user submit attempt credited b anyway'; end if;
 
-  -- get_top_submitted_crop: sees a's submitted crop, with a non-empty, safe (not raw uuid/email) label.
-  select * into topcrop from public.get_top_submitted_crop();
-  if topcrop.crop_id <> c1 then raise exception 'top crop mismatch after first submission: %', topcrop; end if;
-  if topcrop.submitter_label is null or topcrop.submitter_label = '' then raise exception 'empty submitter label'; end if;
-  execute 'reset role';
-
-  -- A second submitted crop (from b) replaces the exhibit only if it is strictly bigger.
-  perform set_config('request.jwt.claim.sub',b::text,true);
-  execute 'set local role authenticated';
-  r := public.act_pixel_farm(0,'plant',0);
-  c2 := (r#>>'{plots,0,crop,id}')::uuid;
-  execute 'reset role';
-  update public.pixel_farm_crops set planted_at=clock_timestamp()-interval '4 days 1 hour',ready_at=clock_timestamp()-interval '1 hour' where id=c2;
-  execute 'set local role authenticated';
-  r := public.act_pixel_farm(0,'harvest',1);
-  sz2 := (r#>>'{harvest,sizeScore}')::int;
-  perform public.submit_farm_crop(c2);
-  execute 'reset role';
-
-  select * into topcrop from public.get_top_submitted_crop();
-  if sz2 > sz1 then
-    if topcrop.crop_id <> c2 then raise exception 'bigger submission (size %) should have replaced the exhibit (still showing %, size %)', sz2, topcrop.crop_id, sz1; end if;
-  else
-    if topcrop.crop_id <> c1 then raise exception 'smaller/equal submission (size %) should not have replaced the exhibit (size %)', sz2, sz1; end if;
-  end if;
-
-  -- Anonymous/unauthenticated denial on both new RPCs (matches the app-wide pattern above).
+  -- Anonymous/unauthenticated denial (matches the app-wide pattern above).
   execute 'set local role anon';
   denied:=false;
   begin perform public.submit_farm_crop(c1); exception when insufficient_privilege then denied:=true; end;
   if not denied then raise exception 'anonymous submit_farm_crop allowed'; end if;
-  denied:=false;
-  begin perform public.get_top_submitted_crop(); exception when insufficient_privilege then denied:=true; end;
-  if not denied then raise exception 'anonymous get_top_submitted_crop allowed'; end if;
   execute 'reset role';
 end $$;
-select 'PASS: lifecycle, KST daily care, revisions/retries, stale replant, missed watering, history, server time, unchanged points, RLS/anonymous denial, crop size computed once/stored/audited/retry-safe/forgery-denied/best+last surfaced/unwatered-never-fails, real 4-day duration + 4-of-4 care cap, review snapshot-diff via the real RPC (including the live pre-harvest hint), legacy pre-migration crop compatibility, harvested crop collection (single RLS-scoped row, no duplicate on retry, no cross-user leak), crop submission (atomic status+points, no duplicate credit, cross-user denial, exhibit replaces only for a strictly bigger crop, anonymous denial); all rolled back' as result;
+
+-- 주간 토마토 대회 (20260922090000_pixel_farm_weekly_contest.sql): 새 테이블 없이 submitted_at/
+-- size_score만으로 KST 월요일 기준 주간 최고 기록을 계산하는 get_weekly_crop_contest 검증.
+--
+-- 주의: 이 앱은 이미 실제 학생들이 쓰고 있어서 "이번 주" 대회에 테스트와 무관한 진짜 출품이 이미
+-- 있을 수 있다(실제로 검증 중 발견함 — 처음엔 "정확히 내가 만든 것만 있다"고 가정했다가 실패했다).
+-- 그래서 top 배열의 절대 길이/순위 번호는 절대 단언하지 않는다 — 오직 (1) 호출자 본인에게만
+-- 스코프된 mine 필드(다른 실제 학생 데이터와 무관), (2) 동일 시각에 두 번 호출한 값의 델타만
+-- 신뢰한다. 동점 검증도 "순위가 1이다"가 아니라 "a와 b의 순위가 서로 같다"로 확인한다.
+do $$
+declare
+  a uuid; b uuid; c uuid; r jsonb; denied boolean;
+  c1 uuid; c2 uuid; c3 uuid; sz1 int; sz2 int;
+  contest jsonb; entry jsonb; a_size int; a_rank int; b_rank int;
+  baseline_participants int; top_len_before int; top_len_after int; top_len_backdated int;
+begin
+  select id into a from public.profiles where not exists(select 1 from public.pixel_farm_plots where user_id=profiles.id) limit 1;
+  select id into b from public.profiles where id<>a and not exists(select 1 from public.pixel_farm_plots where user_id=profiles.id) limit 1;
+  select id into c from public.profiles where id<>a and id<>b and not exists(select 1 from public.pixel_farm_plots where user_id=profiles.id) limit 1;
+  if a is null or b is null or c is null then raise exception 'Three fresh profiles required for the weekly-contest block'; end if;
+
+  -- Baseline, read by an uninvolved non-participant BEFORE a/b touch anything, so later assertions
+  -- can check deltas instead of assuming an empty board.
+  perform set_config('request.jwt.claim.sub',c::text,true);
+  execute 'set local role authenticated';
+  contest := public.get_weekly_crop_contest();
+  execute 'reset role';
+  baseline_participants := (contest#>>'{mine,participantCount}')::int;
+  top_len_before := jsonb_array_length(contest->'top');
+
+  -- a harvests+submits twice this week (plot 0 then plot 1). Only the LARGER of the two must count
+  -- as a's weekly best — not the most recent, not both averaged/summed. This lives entirely in
+  -- "mine" (scoped to the caller), so it's unaffected by whatever else is on the board.
+  perform set_config('request.jwt.claim.sub',a::text,true);
+  execute 'set local role authenticated';
+  r := public.act_pixel_farm(0,'plant',0);
+  c1 := (r#>>'{plots,0,crop,id}')::uuid;
+  execute 'reset role';
+  update public.pixel_farm_crops set planted_at=clock_timestamp()-interval '4 days 1 hour',ready_at=clock_timestamp()-interval '1 hour' where id=c1;
+  execute 'set local role authenticated';
+  r := public.act_pixel_farm(0,'harvest',1);
+  sz1 := (r#>>'{harvest,sizeScore}')::int;
+  perform public.submit_farm_crop(c1);
+  r := public.act_pixel_farm(1,'plant',0);
+  c2 := (r#>>'{plots,1,crop,id}')::uuid;
+  execute 'reset role';
+  update public.pixel_farm_crops set planted_at=clock_timestamp()-interval '4 days 1 hour',ready_at=clock_timestamp()-interval '1 hour' where id=c2;
+  execute 'set local role authenticated';
+  r := public.act_pixel_farm(1,'harvest',1);
+  sz2 := (r#>>'{harvest,sizeScore}')::int;
+  perform public.submit_farm_crop(c2);
+  contest := public.get_weekly_crop_contest();
+  execute 'reset role';
+
+  a_size := (contest#>>'{mine,sizeScore}')::int;
+  a_rank := (contest#>>'{mine,rank}')::int;
+  if a_size <> greatest(sz1, sz2) then
+    raise exception 'weekly best should be the LARGER of a''s two submissions (% and %), got %', sz1, sz2, a_size;
+  end if;
+  if a_rank is null then raise exception 'a just submitted this week and should have a real rank, got null'; end if;
+  top_len_after := jsonb_array_length(contest->'top');
+  if top_len_after < top_len_before then raise exception 'top list should never shrink just from a new submission: % -> %', top_len_before, top_len_after; end if;
+  -- Structural check on whatever's actually in the list (real students' rows included) — only the
+  -- safe projection, never a raw id.
+  if jsonb_array_length(contest->'top') > 0 then
+    entry := contest->'top'->0;
+    if (entry ? 'userId') or (entry ? 'user_id') then raise exception 'weekly contest leaked a raw user id: %', entry; end if;
+    if not (entry ? 'rank' and entry ? 'sizeScore' and entry ? 'submitterLabel') then
+      raise exception 'weekly contest entry missing expected fields: %', entry;
+    end if;
+  end if;
+
+  -- b submits a crop forced to the EXACT same size as a's best -> a natural tie: whatever rank
+  -- number they land on, a and b must land on the SAME one (never split by submission order).
+  perform set_config('request.jwt.claim.sub',b::text,true);
+  execute 'set local role authenticated';
+  r := public.act_pixel_farm(0,'plant',0);
+  c3 := (r#>>'{plots,0,crop,id}')::uuid;
+  execute 'reset role';
+  update public.pixel_farm_crops set planted_at=clock_timestamp()-interval '4 days 1 hour',ready_at=clock_timestamp()-interval '1 hour' where id=c3;
+  execute 'set local role authenticated';
+  r := public.act_pixel_farm(0,'harvest',1);
+  execute 'reset role';
+  update public.pixel_farm_crops set size_score=a_size where id=c3;
+  execute 'set local role authenticated';
+  perform public.submit_farm_crop(c3);
+  contest := public.get_weekly_crop_contest();
+  b_rank := (contest#>>'{mine,rank}')::int;
+  execute 'reset role';
+  perform set_config('request.jwt.claim.sub',a::text,true);
+  execute 'set local role authenticated';
+  a_rank := ((public.get_weekly_crop_contest())#>>'{mine,rank}')::int;
+  execute 'reset role';
+  if a_rank <> b_rank then raise exception 'a and b now have the identical size % but different ranks (a=% b=%) — ties must share a rank', a_size, a_rank, b_rank; end if;
+
+  -- c still never submitted: null mine, and participantCount grew by exactly 2 (a and b) over the
+  -- untouched baseline — a delta check, not an absolute one, since real students may already be on
+  -- the board.
+  perform set_config('request.jwt.claim.sub',c::text,true);
+  execute 'set local role authenticated';
+  contest := public.get_weekly_crop_contest();
+  execute 'reset role';
+  if contest#>'{mine,sizeScore}' <> 'null'::jsonb or contest#>'{mine,rank}' <> 'null'::jsonb then
+    raise exception 'a student who never submitted should have null mine.sizeScore/rank, got %', contest->'mine';
+  end if;
+  if (contest#>>'{mine,participantCount}')::int <> baseline_participants + 2 then
+    raise exception 'participantCount should grow by exactly 2 (a, b) over the baseline %, got %', baseline_participants, contest#>>'{mine,participantCount}';
+  end if;
+
+  -- Week rollover: backdating b's crop into last (KST) week must remove it from THIS week's contest
+  -- (the top list shrinks back to what it was right after a's own submissions, before b's) — while
+  -- the same data is still findable by asking for THAT past week explicitly (nothing is deleted; a
+  -- week's results are always reconstructible from submitted_at alone).
+  execute 'reset role';
+  update public.pixel_farm_crops set submitted_at=submitted_at - interval '8 days' where id=c3;
+  perform set_config('request.jwt.claim.sub',a::text,true);
+  execute 'set local role authenticated';
+  contest := public.get_weekly_crop_contest();
+  execute 'reset role';
+  top_len_backdated := jsonb_array_length(contest->'top');
+  if top_len_backdated <> top_len_after then
+    raise exception 'backdating b out of this week should return the top list to its pre-tie size % (still counting a), got %', top_len_after, top_len_backdated;
+  end if;
+  if (contest#>>'{mine,sizeScore}')::int <> a_size then raise exception 'a''s own weekly best should be unaffected by b''s backdating, expected %, got %', a_size, contest#>>'{mine,sizeScore}'; end if;
+
+  perform set_config('request.jwt.claim.sub',a::text,true);
+  execute 'set local role authenticated';
+  contest := public.get_weekly_crop_contest(now() - interval '8 days');
+  execute 'reset role';
+  if not exists (
+    select 1 from jsonb_array_elements(contest->'top') top_entry
+     where (top_entry->>'sizeScore')::int = a_size
+  ) then
+    raise exception 'querying last week explicitly should still find b''s now-backdated (size %) submission: %', a_size, contest->'top';
+  end if;
+
+  -- A week with genuinely nobody in it (far enough in the past that this brand-new feature could
+  -- not possibly have any real data there either) comes back empty, not an error.
+  perform set_config('request.jwt.claim.sub',a::text,true);
+  execute 'set local role authenticated';
+  contest := public.get_weekly_crop_contest(now() - interval '3650 days');
+  execute 'reset role';
+  if jsonb_array_length(contest->'top') <> 0 then raise exception 'a genuinely empty past week should have no entries: %', contest->'top'; end if;
+  if contest#>'{mine,participantCount}' <> '0'::jsonb then raise exception 'empty week should report 0 participants: %', contest->'mine'; end if;
+
+  -- Anonymous denial (matches the app-wide pattern above).
+  execute 'set local role anon';
+  denied:=false;
+  begin perform public.get_weekly_crop_contest(); exception when insufficient_privilege then denied:=true; end;
+  if not denied then raise exception 'anonymous get_weekly_crop_contest allowed'; end if;
+  execute 'reset role';
+end $$;
+select 'PASS: lifecycle, KST daily care, revisions/retries, stale replant, missed watering, history, server time, unchanged points, RLS/anonymous denial, crop size computed once/stored/audited/retry-safe/forgery-denied/best+last surfaced/unwatered-never-fails, real 4-day duration + 4-of-4 care cap, review snapshot-diff via the real RPC (including the live pre-harvest hint), legacy pre-migration crop compatibility, harvested crop collection (single RLS-scoped row, no duplicate on retry, no cross-user leak), crop submission (atomic status+points, no duplicate credit, cross-user denial, anonymous denial), weekly tomato contest (per-user best-of-week only, natural ties, non-participant view, week rollover excludes/past-week still reconstructible, empty week, anonymous denial, no raw user id leaked); all rolled back' as result;
 rollback;

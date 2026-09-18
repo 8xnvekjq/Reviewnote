@@ -32,10 +32,27 @@ export interface HarvestedCrop {
   id: string; cropType: string; sizeScore: number; harvestedAt: string; careCount: number;
   status: FarmCropStatus; submittedAt: string | null; rewardPoints: number | null;
 }
-// The plaza's exhibited crop — the single largest 'submitted' row across all students, plus a safe
-// display label (see get_top_submitted_crop() — resolved server-side, same COALESCE(nickname,
-// display_name) the weekly leaderboard already shows cross-student; never a raw user id/email).
-export interface TopSubmittedCrop { cropId: string; cropType: string; sizeScore: number; submittedAt: string; submitterLabel: string }
+// The plaza exhibit/leaderboard — this KST week's (Mon 00:00 - next Mon 00:00) best submitted size
+// per student, ranked. Resolved entirely server-side (get_weekly_crop_contest) with only a safe
+// display label per entry (same COALESCE(nickname, display_name) the weekly review leaderboard
+// already shows cross-student) — never a raw user id/email, never another student's review/mistake
+// data. Ties share the same rank (RANK(), not ROW_NUMBER()) rather than being split by submission
+// order — see weeklyRankLabel below for how that's surfaced as "공동 N위".
+export interface WeeklyCropRankEntry { rank: number; sizeScore: number; submitterLabel: string }
+export interface WeeklyCropContest {
+  weekStart: string;
+  top: WeeklyCropRankEntry[];
+  // null sizeScore/rank means "haven't submitted anything this week yet" — participantCount still
+  // reflects everyone else's turnout, so "0 submissions this week" and "you're just not in it yet"
+  // read differently instead of collapsing to the same blank state.
+  mine: { sizeScore: number | null; rank: number | null; participantCount: number };
+}
+// "2위" normally, "공동 2위" when another entry shares the same rank — computed client-side from the
+// already-fetched list (the server just emits RANK()'s raw integer; ties are a display concern).
+export function weeklyRankLabel(rank: number, allRanks: number[]): string {
+  const tied = allRanks.filter(r => r === rank).length > 1;
+  return `${tied ? '공동 ' : ''}${rank}위`;
+}
 export interface FarmSnapshot { serverNow: string; today: string; harvestCount: number; bestSize: number | null; lastHarvestSize: number | null; plots: FarmPlot[] }
 export type FarmAction = 'plant' | 'water' | 'harvest';
 export type FarmStage = 'empty' | 'sprout' | 'leaf' | 'fruit' | 'ripe';
