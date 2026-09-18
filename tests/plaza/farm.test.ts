@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { FARM_BEDS, farmStage, farmDay, growthLabel, isFarmCell, computeCropSize, cropCareRatio, maxCareDaysFor, rollLuck, sizeLabel, FARM_GROWTH_DAYS, reviewRatioFor, bonusChanceFor, computeBonusAmount, computeCropSizeV2, REVIEW_RATIO_CAP, SCARECROW_CELL, farmMoisture, computeSubmitReward } from '../../src/features/pixel-room/farm/farmModel.ts';
+import { FARM_BEDS, farmStage, farmDay, growthLabel, isFarmCell, computeCropSize, cropCareRatio, maxCareDaysFor, rollLuck, sizeLabel, FARM_GROWTH_DAYS, reviewRatioFor, bonusChanceFor, computeBonusAmount, computeCropSizeV2, REVIEW_RATIO_CAP, SCARECROW_CELL, farmMoisture, computeSubmitReward, weeklyRankLabel } from '../../src/features/pixel-room/farm/farmModel.ts';
 import { pickScarecrowLine } from '../../src/features/pixel-room/farm/scarecrowLines.ts';
 import { YARD_SPAWNS, yardPath, yardWalkable, yardExit } from '../../src/features/pixel-room/yard/yardModel.ts';
 import { yardDogWorld } from '../../src/features/pixel-room/pet/dogWorld.ts';
@@ -278,4 +278,12 @@ test('computeSubmitReward: a flat base plus a size-proportional top-up, staying 
     assert.ok(reward >= previous, 'reward is monotonic in size — a bigger tomato never pays less');
     previous = reward;
   }
+});
+
+test('weeklyRankLabel: plain "N위" alone, "공동 N위" only when another entry shares the same rank', () => {
+  assert.equal(weeklyRankLabel(1, [1]), '1위'); // sole leader
+  assert.equal(weeklyRankLabel(1, [1, 1, 3]), '공동 1위'); // two-way tie for 1st, next rank correctly skips to 3
+  assert.equal(weeklyRankLabel(3, [1, 1, 3]), '3위'); // the non-tied entry in the same list stays plain
+  assert.equal(weeklyRankLabel(2, [1, 2, 2, 2]), '공동 2위'); // three-way tie
+  assert.equal(weeklyRankLabel(5, []), '5위'); // no sibling data at all (rank outside the fetched list) never crashes
 });
