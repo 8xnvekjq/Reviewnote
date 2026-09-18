@@ -29,6 +29,13 @@ export function ScarecrowSprite() {
 // farm beds' bigger popover) for a short, transient in-world speech bubble, same pattern as the
 // player's own "말 걸어보기" bubble in the room (see PixelRoom.tsx's speak()). No persistent
 // panel/modal is ever added.
+//
+// The bubble is a SIBLING of the sprite button, not a child of it — the button needs a row-based
+// z-index (SCARECROW_CELL.y+1) so the player/dog can walk in front of or behind the sprite
+// correctly, but that same z-index caps every element nested inside it too (it opens a new
+// stacking context), which is exactly what used to bury the bubble behind a crop bed drawn with a
+// higher fixed z-index. Keeping the bubble outside that button lets it use its own much higher
+// z-index (see farm.css) and always render on top, regardless of where the scarecrow stands.
 export function Scarecrow({ snapshot, now }: { snapshot: FarmSnapshot | null; now: number }) {
   const [line, setLine] = useState('');
   const timer = useRef<number | undefined>(undefined);
@@ -38,10 +45,11 @@ export function Scarecrow({ snapshot, now }: { snapshot: FarmSnapshot | null; no
     setLine(pickScarecrowLine(snapshot, now));
     timer.current = window.setTimeout(() => setLine(''), 3200);
   }
-  return <button type="button" className="pr-scarecrow" data-cell={`${SCARECROW_CELL.x}-${SCARECROW_CELL.y}`}
-    style={{ left: `${SCARECROW_CELL.x / 16 * 100}%`, top: `${(SCARECROW_CELL.y - 0.25) / 12 * 100}%`, zIndex: SCARECROW_CELL.y + 1 }}
-    aria-label="농장 허수아비 · 눌러서 말 걸어보기" onClick={poke}>
+  return <div className="pr-scarecrow-wrap" style={{ left: `${SCARECROW_CELL.x / 16 * 100}%`, top: `${(SCARECROW_CELL.y - 0.25) / 12 * 100}%` }}>
+    <button type="button" className="pr-scarecrow" data-cell={`${SCARECROW_CELL.x}-${SCARECROW_CELL.y}`}
+      style={{ zIndex: SCARECROW_CELL.y + 1 }} aria-label="농장 허수아비 · 눌러서 말 걸어보기" onClick={poke}>
+      <ScarecrowSprite />
+    </button>
     {line && <span className="pr-scarecrow-bubble" role="status">{line}</span>}
-    <ScarecrowSprite />
-  </button>;
+  </div>;
 }

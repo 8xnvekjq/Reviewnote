@@ -267,5 +267,44 @@ begin
   if (inputs->>'reviewGained')::int <> 0 then raise exception 'legacy crop (no snapshot) should default reviewGained=0, got %', inputs; end if;
   execute 'reset role';
 end $$;
-select 'PASS: lifecycle, KST daily care, revisions/retries, stale replant, missed watering, history, server time, unchanged points, RLS/anonymous denial, crop size computed once/stored/audited/retry-safe/forgery-denied/best+last surfaced/unwatered-never-fails, real 4-day duration + 4-of-4 care cap, review snapshot-diff via the real RPC (including the live pre-harvest hint), legacy pre-migration crop compatibility; all rolled back' as result;
+
+-- 농작물 collection: a harvested crop is already a real, single, RLS-scoped
+-- pixel_farm_crops row (reused as-is, see 20260920090000_pixel_farm_crop_collection.sql). No new
+-- RPC — this checks the exact direct-table-read shape fetchHarvestedCrops() uses.
+do $$
+declare a uuid; b uuid; c uuid; r jsonb; rows_a int; rows_b int; leaked int;
+begin
+  select id into a from public.profiles where not exists(select 1 from public.pixel_farm_plots where user_id=profiles.id) limit 1;
+  select id into b from public.profiles where id<>a and not exists(select 1 from public.pixel_farm_plots where user_id=profiles.id) limit 1;
+  if a is null or b is null then raise exception 'Two fresh profiles required for the crop-collection block'; end if;
+  perform set_config('request.jwt.claim.sub',a::text,true);
+  execute 'set local role authenticated';
+  r := public.act_pixel_farm(0,'plant',0);
+  c := (r#>>'{plots,0,crop,id}')::uuid;
+  execute 'reset role';
+  update public.pixel_farm_crops set planted_at=clock_timestamp()-interval '4 days 1 hour',ready_at=clock_timestamp()-interval '1 hour' where id=c;
+  execute 'set local role authenticated';
+  r := public.act_pixel_farm(0,'harvest',1);
+  if r->>'result'<>'ok' then raise exception 'harvest failed %', r; end if;
+
+  select count(*) into rows_a from public.pixel_farm_crops where user_id=a and harvested_at is not null;
+  if rows_a <> 1 then raise exception 'expected exactly 1 harvested row for a, got %', rows_a; end if;
+  if not exists(select 1 from public.pixel_farm_crops where id=c and status='stored') then raise exception 'status not stored by default'; end if;
+
+  -- Duplicate-harvest retry (already covered generically elsewhere) must not add a second row.
+  r := public.act_pixel_farm(0,'harvest',1);
+  select count(*) into rows_a from public.pixel_farm_crops where user_id=a and harvested_at is not null;
+  if rows_a <> 1 then raise exception 'duplicate harvest attempt created a second collection row: %', rows_a; end if;
+
+  -- User b must never see a's harvested rows via the same direct-read query shape, with or
+  -- without an explicit user_id filter (RLS must be what actually enforces this, not the filter).
+  perform set_config('request.jwt.claim.sub',b::text,true);
+  select count(*) into leaked from public.pixel_farm_crops where user_id=a and harvested_at is not null;
+  if leaked <> 0 then raise exception 'RLS leak: user b read user a''s harvested crop(s)'; end if;
+  select count(*) into rows_b from public.pixel_farm_crops where harvested_at is not null;
+  if rows_b <> 0 then raise exception 'RLS leak without explicit filter: got % rows for b', rows_b; end if;
+
+  execute 'reset role';
+end $$;
+select 'PASS: lifecycle, KST daily care, revisions/retries, stale replant, missed watering, history, server time, unchanged points, RLS/anonymous denial, crop size computed once/stored/audited/retry-safe/forgery-denied/best+last surfaced/unwatered-never-fails, real 4-day duration + 4-of-4 care cap, review snapshot-diff via the real RPC (including the live pre-harvest hint), legacy pre-migration crop compatibility, harvested crop collection (single RLS-scoped row, no duplicate on retry, no cross-user leak); all rolled back' as result;
 rollback;
