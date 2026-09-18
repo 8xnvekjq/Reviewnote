@@ -13,6 +13,8 @@ import { yardDogWorld } from '../pet/dogWorld';
 import { Farm } from '../farm/Farm';
 import { Scarecrow } from '../farm/Scarecrow';
 import { useFarm } from '../farm/useFarm';
+import { useFarmInventory } from '../farm/useFarmInventory';
+import { CropCollection } from '../farm/CropCollection';
 
 const cells = Array.from({ length: 192 }, (_, i) => ({ x: i % 16, y: Math.floor(i / 16) }));
 const deltas: Record<PlazaDirection, YardCell> = { Front: { x: 0, y: 1 }, Back: { x: 0, y: -1 }, Left: { x: -1, y: 0 }, Right: { x: 1, y: 0 } };
@@ -29,9 +31,20 @@ const Landscape = memo(function Landscape() {
   </>;
 });
 
-interface Props { dogActive?: boolean; from: YardDestination; appearance: PublicAvatarAppearance; onExit: (destination: YardDestination) => void }
-export default function FrontYard({ from, appearance, onExit, dogActive = false }: Props) {
+interface Props { dogActive?: boolean; from: YardDestination; appearance: PublicAvatarAppearance; userId: string; onExit: (destination: YardDestination) => void }
+export default function FrontYard({ from, appearance, onExit, dogActive = false, userId }: Props) {
   const farm = useFarm();
+  const inventory = useFarmInventory(userId);
+  const [cropsOpen, setCropsOpen] = useState(false);
+  // Refetch the collection right after a new harvest lands (harvestCount only ever increments
+  // once per real harvest, so this fires exactly once per new item — no polling of its own).
+  const lastHarvestCount = useRef<number | null>(null);
+  useEffect(() => {
+    const count = farm.snapshot?.harvestCount;
+    if (count === undefined) return;
+    if (lastHarvestCount.current !== null && count !== lastHarvestCount.current) void inventory.refresh();
+    lastHarvestCount.current = count;
+  }, [farm.snapshot?.harvestCount, inventory]);
   const [actor, setActor] = useState<YardCell>(() => YARD_SPAWNS[from]);
   const [direction, setDirection] = useState<PlazaDirection>(from === 'room' ? 'Front' : 'Back');
   const [held, setHeld] = useState<PlazaDirection | null>(null);
@@ -83,6 +96,14 @@ export default function FrontYard({ from, appearance, onExit, dogActive = false 
       <Scarecrow snapshot={farm.snapshot} now={farm.now} />
       <div className="pr-plaza-actor" aria-hidden="true" data-x={actor.x} data-y={actor.y} data-direction={direction} style={{ left: `${(actor.x - .6) / 16 * 100}%`, bottom: `${(11 - actor.y) / 12 * 100}%`, width: '13.75%', height: '18%', zIndex: actor.y + 2 }}><span className="pr-shadow" /><AvatarSprite direction={direction} frame={moving ? frame : 0} walking={moving} appearance={appearance} /></div>
     </div></div>
-    <p className="pr-instructions pr-plaza-instructions">오른쪽 밭을 눌러 토마토를 키워 보세요.</p>
+    <div className="pr-below-room"><p className="pr-instructions pr-plaza-instructions">오른쪽 밭을 눌러 토마토를 키워 보세요.</p></div>
+    <div className="pr-sheet">
+      <div className="pr-sheet-trigger">
+        <button type="button" aria-pressed={cropsOpen} aria-expanded={cropsOpen} aria-controls="pr-yard-sheet-panel" onClick={() => setCropsOpen(open => !open)}>농작물 <small>{inventory.crops?.length ?? 0}</small></button>
+      </div>
+      {cropsOpen && <div className="pr-sheet-panel pr-panel-crops" id="pr-yard-sheet-panel">
+        <CropCollection inventory={inventory} />
+      </div>}
+    </div>
   </div>;
 }

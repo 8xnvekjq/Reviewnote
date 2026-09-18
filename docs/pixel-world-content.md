@@ -526,3 +526,65 @@ Astra가 구현한 토마토 농장 MVP(PR #94, `20260917155631_pixel_tomato_far
   (390/1440)/`dog`/`pixelShop/browser`(3뷰포트)/`plaza/interactions`/`plaza/landscape`
   (390/1440)) 전부 재실행해 회귀 없음 확인. `npm run build` clean, `npm run lint`에는 이번 변경
   파일 관련 오류 없음.
+
+## 후속 작업 — 허수아비 말풍선 가림 수정 + 농작물 수집 탭 (2026-09-19)
+
+허수아비 말풍선이 밭에 가려 잘 안 보인다는 문제와, 수확물을 실제로 모을 수 있는 "농작물" 수집
+탭을 추가해 달라는 요청.
+
+- **말풍선 가림의 진짜 원인**: 단순 위치 문제가 아니라 CSS 스태킹 컨텍스트 함정이었다.
+  `.pr-scarecrow` 버튼이 `position:absolute`와 동시에 인라인 `z-index`(행 기반, 플레이어/강아지
+  와의 앞뒤 정렬용)를 갖고 있었는데, 이 조합은 그 버튼을 새로운 스태킹 컨텍스트로 만든다. 말풍선
+  `<span>`이 그 버튼의 **자식**이었기 때문에, 말풍선 자신의 z-index를 아무리 높여도 버튼 바깥의
+  형제 요소(`.pr-farm-bed`, 고정 z-index:15)를 절대 이길 수 없었다 — 겹치기만 하면 항상 밭 뒤로
+  숨었다. 고쳐야 할 것은 위치가 아니라 구조: 말풍선을 버튼의 **형제**로 빼서 z-index 없는 바깥
+  wrap div 아래 나란히 두고(`Scarecrow.tsx`), 말풍선 자체 z-index를 60으로 올려 앱 전역에서
+  경쟁하게 했다. wrap에는 의도적으로 z-index를 주지 않았다 — 주면 똑같은 함정이 한 단계 위에서
+  재발한다.
+- **위치도 함께 조정**: 허수아비를 첫 번째 밭 바로 위(`SCARECROW_CELL = {x:11, y:3}`)로
+  옮겼다. `y=3`은 강아지 마당 로밍 박스(`y 4~9`) 바깥이라 강아지 경로와 절대 겹치지 않고,
+  `x=11`은 말풍선(`max-width:min(150px, 38cqw)`, 고정 px 대신 보드 실제 폭에 비례)이 320px
+  모바일 폭에서도 보드 밖으로 안 튀어나오게 하는 여유 지점이다. 처음 `{13,6}`/`{12,6}`으로
+  시도했다가 Playwright bounding-box로 390px/320px에서 말풍선이 보드 오른쪽을 넘치는 것을
+  발견해 위치와 CSS `max-width` 방식을 함께 수정했고, `y=6`이 강아지 로밍 박스 안이라
+  `farm.test.ts`의 기존 2칸-폭 경로 테스트를 실제로 깨뜨리는 것도 발견해 `y=3`으로 박스 바깥에
+  두는 것으로 완전히 해결했다. 기존 대사 로테이션/상황별 힌트 구조는 그대로다.
+- **수확물 저장 구조**: 새 테이블이나 RPC 없이, 이미 있던 `pixel_farm_crops`를 그대로 수집
+  목록으로 재사용한다. 수확은 원래부터 revision-CAS + 행 잠금으로 정확히 한 번만 확정되는
+  불변 행이라 — 그 행 자체가 이미 "토마토 종류/최종 크기/수확 시각"을 가진 완전한 수집 항목이다.
+  같은 토마토를 여러 번 수확해도 매번 새 `plant`가 새 `pixel_farm_crops` 행을 만들기 때문에
+  자동으로 별개 레코드로 남는다(합쳐지거나 덮어써지지 않음). 유일한 스키마 변경은 컬럼 하나
+  추가: `status text not null default 'stored' check (status in ('stored'))`
+  (`20260920090000_pixel_farm_crop_collection.sql`). CHECK를 일부러 좁게 잡아서, 나중에
+  대회 제출/판매/전시 같은 생애주기를 추가할 때 이 컬럼만 `'submitted'`/`'sold'`/`'exhibited'`로
+  넓히면 되고 기존 행("stored")은 그대로 읽힌다. 읽기는 이미 있던
+  `pixel_farm_crops_read`(`user_id = auth.uid()`) RLS만으로 충분해 새 권한도 필요 없었다
+  (`fetchHarvestedCrops()`가 직접 `select`).
+- **농작물 탭 UX**: 마당 하단에 기존 `.pr-sheet` 시트 패턴(옷장/가구 서랍과 동일 스타일)을 쓰는
+  "농작물" 버튼을 추가했고, 누르면 보유 개수가 뱃지로 보이고 펼치면 `.pr-catalog` 그리드에 카드
+  형태로 각 수확 기록을 보여준다(토마토 스프라이트 · 크기 라벨+점수 · 수확 날짜, KST 기준
+  `formatHarvestDate`). `useFarmInventory()`가 `pixel_farm_crops`를 직접 읽어와 로컬 상태로
+  들고, `FrontYard`가 `useFarm()`의 `harvestCount` 변화를 감지해 수확이 일어날 때만 다시
+  불러온다(불필요한 폴링 없음). 모바일에서도 기존 시트 패널의 `max-height:40cqh` + 스크롤을
+  그대로 물려받아 자연스럽게 흐른다.
+- **향후 대회/전시 확장 방식(이번엔 구현 안 함)**: `status` 컬럼을 넓히는 마이그레이션 하나로
+  "저장됨 → 제출됨/판매됨/전시됨" 전환을 표현할 수 있게 설계해 뒀다. 예를 들어 대회 제출은
+  `status='submitted'` + 제출 시각 컬럼을 추가하는 정도로, 제출 시 판매처럼 포인트를 지급하는
+  로직은 harvest 분기와 동일한 CAS 패턴(현재 status가 정확히 'stored'일 때만 갱신)을 쓰면
+  중복 제출을 막을 수 있다. 광장에 가장 큰 제출작 하나를 전시하는 기능은
+  `status='submitted' order by size_score desc limit 1`류의 조회로 추가 테이블 없이 가능하고,
+  주간 전시/랭킹은 제출 시각을 주 단위로 묶는 조회만 얹으면 된다 — 지금 스키마를 바꾸지 않고도
+  전부 위에 얹을 수 있는 구조다.
+- 검증: `tests/pixel-room/farm-server.sql`에 새 블록 추가해 실제 Supabase에서 확인(전부
+  롤백) — 수확 1건당 정확히 1개의 `status='stored'` 행 생성, 동일 revision으로 재요청해도
+  2번째 행이 생기지 않음(중복 수확 방지 그대로 작동), 다른 사용자가 RLS로 남의 수확 행을
+  0건 조회(명시적 `user_id` 필터 여부 모두). 이번 라운드에서 새로 추가/수정된 블록을 포함한
+  **전체 `farm-server.sql`을 한 번에 통째로 실행**해 마지막에 단일 `PASS` 메시지와 함께
+  `rollback`까지 클린하게 끝나는 것도 재확인했다. `tests/plaza/farm.test.ts`의 기존 허수아비
+  walkability 테스트는 `SCARECROW_CELL`을 직접 import해 위치 변경을 자동으로 따라가며 통과
+  (19/19, 전체 98/98). `tests/pixel-room/farm.browser.mjs`에 말풍선이 보드 경계 안에 머무는지
+  bounding-box 검증과 스크린샷, 수확 1회/2회(별도 브라우저 컨텍스트) 후 농작물 탭에 카드가
+  1개/2개로 정확히 늘어나는지 확인을 추가, 320/390/1440 전부 통과. 기존 회귀
+  (`base-appearance`/`doormat`/`furniture-race`/`yard`(390/1440)/`dog`/`pixelShop/browser`
+  (3뷰포트)/`plaza/interactions`/`plaza/landscape`(390/1440)) 전부 재실행해 회귀 없음 확인.
+  `npm run build` clean, `npm run lint`에는 이번 변경 파일 관련 오류 없음.

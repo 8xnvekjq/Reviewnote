@@ -400,7 +400,7 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
     </header>
     {location === 'room' && storageError && <p className="pr-storage-error" role="alert">{storageError}</p>}
     {location === 'plaza' && <Plaza userId={userId} sessionId={sessionId} onReachEntrance={() => transitionTo('yard')} />}
-    {location === 'yard' && <FrontYard from={yardFrom} appearance={shop.equipped} dogActive={pet.ready && !pet.error && pet.active === DOG_ITEM_ID && shop.ownedIds.has(DOG_ITEM_ID)} onExit={transitionTo} />}
+    {location === 'yard' && <FrontYard from={yardFrom} appearance={shop.equipped} userId={userId} dogActive={pet.ready && !pet.error && pet.active === DOG_ITEM_ID && shop.ownedIds.has(DOG_ITEM_ID)} onExit={transitionTo} />}
     {location === 'room' && <div className={`pr-room-frame ${decorating ? 'pr-decorating' : ''}`}>
       <div className="pr-wall" aria-hidden="true"><div className="pr-window"><i /><i /><i /><i /></div><span>HOME, SWEET HOME</span></div>
       <div className="pr-stage">

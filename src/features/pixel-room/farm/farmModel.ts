@@ -2,9 +2,18 @@ export const FARM_BEDS = [{ x: 11, y: 4 }, { x: 11, y: 7 }] as const;
 export function isFarmCell({ x, y }: { x: number; y: number }): boolean {
   return FARM_BEDS.some(bed => x >= bed.x && x < bed.x + 2 && y >= bed.y && y < bed.y + 2);
 }
-// The scarecrow guide stands just south of the second plot — a fixed, solid decoration (same
-// "treat as a wall" treatment as the beds themselves), not a walkable/passable tile.
-export const SCARECROW_CELL = { x: 12, y: 9 } as const;
+// The scarecrow guide stands just above the first plot — a fixed, solid decoration (same "treat
+// as a wall" treatment as the beds themselves), not a walkable/passable tile.
+// - y=3 is deliberately OUTSIDE the dog's yard roaming box (yardDogWorld restricts it to y 4-9):
+//   an earlier attempt placed the scarecrow inside that box, in the gap between the two beds
+//   (y=6), which combined with the beds' own 2x2 cutouts narrowed the dog's remaining paths enough
+//   to fail "dog retains two-cell-wide routes..." for a player standing at either approach cell.
+//   Standing above the roaming box entirely sidesteps that whole class of bottleneck.
+// - x=11 keeps the speech bubble's box (~150px wide, see Scarecrow.tsx/farm.css) clear of both
+//   board edges even on a 320px-wide mobile viewport; what actually fixed "hidden behind the crop"
+//   for the bubble itself is its z-index escaping the scarecrow's row-based stacking context (see
+//   Scarecrow.tsx) — the exact x/y here is about board-edge clearance and dog mobility, not that.
+export const SCARECROW_CELL = { x: 11, y: 3 } as const;
 export interface FarmCrop {
   id: string; plantedAt: string; readyAt: string; careCount: number; lastWateredOn: string | null;
   // Live, forward-looking estimate — a snapshot-diff of profiles.bonus_points computed by the
@@ -15,6 +24,10 @@ export interface FarmCrop {
   reviewGained: number;
 }
 export interface FarmPlot { index: number; revision: number; crop: FarmCrop | null }
+// One collection entry — a harvested pixel_farm_crops row, read directly (existing SELECT grant +
+// RLS, see 20260920090000_pixel_farm_crop_collection.sql). id doubles as the link back to that
+// row's own size_inputs/size_calc_version for later audit, even though this view doesn't show them.
+export interface HarvestedCrop { id: string; cropType: string; sizeScore: number; harvestedAt: string; careCount: number; status: string }
 export interface FarmSnapshot { serverNow: string; today: string; harvestCount: number; bestSize: number | null; lastHarvestSize: number | null; plots: FarmPlot[] }
 export type FarmAction = 'plant' | 'water' | 'harvest';
 export type FarmStage = 'empty' | 'sprout' | 'leaf' | 'fruit' | 'ripe';
@@ -91,6 +104,12 @@ export function computeCropSize({ careCount, maxCareDays, luckRoll }: { careCoun
 }
 export function sizeLabel(score: number): string {
   return score >= 90 ? '아주 큰 토마토' : score >= 70 ? '큰 토마토' : score >= 50 ? '보통 크기 토마토' : score >= 30 ? '작은 토마토' : '아주 작은 토마토';
+}
+// Korea-time calendar date for display in the crop collection — independent of device timezone,
+// same convention as farmDay().
+export function formatHarvestDate(harvestedAt: string): string {
+  const [, month, day] = farmDay(Date.parse(harvestedAt)).split('-');
+  return `${Number(month)}월 ${Number(day)}일`;
 }
 
 // --- v2: watering stays the primary, easy-to-read driver (unchanged formula above); review

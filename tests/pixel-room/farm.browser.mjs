@@ -23,6 +23,7 @@ function mockHarvest(careCount) {
 }
 function server() {
   const state = empty(initialNow);
+  state.harvested = []; // pixel_farm_crops rows with harvested_at set — the "농작물" collection
   let now = initialNow, serial = 0;
   const api = { state, loseResponse: false, failRead: false, requests: [], advance: ms => { now += ms; }, snapshot: () => structuredClone({ ...state, serverNow: new Date(now).toISOString(), today: new Date(now + 9*hour).toISOString().slice(0,10) }) };
   api.route = async route => {
@@ -32,6 +33,9 @@ function server() {
     if (url.pathname.endsWith('/get_pixel_farm')) {
       if (api.failRead) return route.fulfill({status:503,json:{message:'test unavailable'}});
       data = api.snapshot();
+    } else if (url.pathname.endsWith('/pixel_farm_crops') && route.request().method() === 'GET') {
+      // fetchHarvestedCrops()'s direct table read — newest first, same as the real order() call.
+      data = [...state.harvested].sort((a,b) => Date.parse(b.harvested_at) - Date.parse(a.harvested_at));
     } else if (url.pathname.endsWith('/act_pixel_farm')) {
       const args = route.request().postDataJSON(); api.requests.push(args);
       const plot = state.plots[args.p_plot];
@@ -43,6 +47,7 @@ function server() {
         const { size, bonusApplied } = mockHarvest(plot.crop.careCount);
         state.bestSize = state.bestSize === null ? size : Math.max(state.bestSize, size);
         state.lastHarvestSize = size;
+        state.harvested.push({ id: plot.crop.id, crop_type: 'tomato', size_score: size, harvested_at: new Date(now).toISOString(), care_count: plot.crop.careCount, status: 'stored' });
         plot.crop=null; plot.revision++; state.harvestCount++; harvest={sizeScore:size,bonusApplied};
       }
       else result = 'growing';
@@ -93,11 +98,19 @@ try {
     // The scarecrow is a fixed decoration: a solid grid cell (blocks walking, no separate approach
     // step needed) that pops a short transient speech bubble on tap — never a persistent panel.
     assert.equal(await page.locator('.pr-scarecrow').count(),1);
-    assert.ok(await page.locator('.pr-grid button').nth(9*16+12).isDisabled(), 'scarecrow cell is solid, matching yardWalkable');
+    assert.ok(await page.locator('.pr-grid button').nth(3*16+11).isDisabled(), 'scarecrow cell is solid, matching yardWalkable');
     assert.equal(await page.locator('.pr-scarecrow-bubble').count(),0);
     await page.locator('.pr-scarecrow').click();
     const firstLine = await page.locator('.pr-scarecrow-bubble').innerText();
     assert.ok(firstLine.length>0);
+    // The bubble must stay inside the board and not sit behind a bed — new placement (beside the
+    // gap between the plots, open ground) plus the sprite/bubble sibling z-index fix together are
+    // what this checks; a regression of either would put the bubble outside the board or (if the
+    // sibling fix regressed) visually behind a bed even though the box math still looked fine.
+    const boardBox=await page.locator('.pr-yard-board').boundingBox();
+    const bubbleBox=await page.locator('.pr-scarecrow-bubble').boundingBox();
+    assert.ok(bubbleBox.x>=boardBox.x-1 && bubbleBox.y>=boardBox.y-1 && bubbleBox.x+bubbleBox.width<=boardBox.x+boardBox.width+1,'scarecrow bubble stays on-board');
+    await page.screenshot({path:`${out}/${viewport.width}-scarecrow.png`});
     await page.locator('.pr-scarecrow-bubble').waitFor({state:'hidden',timeout:5000});
     const before=await page.locator('.pr-yard-board').boundingBox();
     await bed(page);
@@ -128,7 +141,8 @@ try {
     });
     assert.ok(sample.length);
     for(const [x,y] of sample) assert.ok(!([4,5,7,8].includes(y)&&x<=12&&x+1>=11),'dog avoids crop footprint');
-    for(const [x,y] of sample) assert.ok(!(x===12&&y===9)&&!(x===11&&y===9),'dog avoids the scarecrow footprint too');
+    // (the scarecrow now stands at y=3, outside the dog's own y4-9 roaming box entirely, so there
+    // is no dog-vs-scarecrow footprint to check here anymore — see farmModel.ts's SCARECROW_CELL.)
     // Reload gets the same persisted crop, including today's care.
     await enter(page); await bed(page);
     await page.getByRole('button',{name:'오늘은 촉촉해요',exact:true}).waitFor();
@@ -159,6 +173,15 @@ try {
     await page.getByRole('button',{name:'토마토 심기',exact:true}).click();
     await page.getByRole('button',{name:'물주기 · 무료',exact:true}).waitFor();
     assert.notEqual(api.state.plots[0].crop.id,cropId);
+    // The 농작물(collection) tab is a separate bottom sheet from the per-plot popover — close that
+    // popover first (same reason earlier steps close the shop sheet before touching the grid).
+    await page.getByRole('button',{name:'밭 닫기'}).click();
+    await page.getByRole('button',{name:/^농작물/}).click();
+    const firstCard=page.locator('.pr-crop-card').first();
+    await firstCard.waitFor();
+    assert.equal(await page.locator('.pr-crop-card').count(),1);
+    assert.match(await firstCard.innerText(),/58\/100/);
+    await page.getByRole('button',{name:/^농작물/}).click(); // close it again before continuing
     // A fresh browser context (no local storage) sees the same farm.
     const second=await browser.newContext({viewport,hasTouch:viewport.width<=390});
     const other=await setup(second,api);
@@ -170,6 +193,13 @@ try {
     // context while the last-record updates.
     await other.page.getByText('지금까지 수확 2개 · 최고 기록 58 · 최근 40',{exact:true}).waitFor();
     assert.equal(api.state.bestSize,58); assert.equal(api.state.lastHarvestSize,40);
+    // Two separate harvests -> two separate collection entries (never merged/deduped), visible
+    // from this brand-new session too (server-backed, not local storage).
+    await other.page.getByRole('button',{name:'밭 닫기'}).click();
+    await other.page.getByRole('button',{name:/^농작물/}).click();
+    await other.page.locator('.pr-crop-card').nth(1).waitFor();
+    assert.equal(await other.page.locator('.pr-crop-card').count(),2);
+    await other.page.screenshot({path:`${out}/${viewport.width}-crops.png`});
     assert.deepEqual(other.errors,[]);
     await second.close();
     assert.deepEqual(errors,[]);
