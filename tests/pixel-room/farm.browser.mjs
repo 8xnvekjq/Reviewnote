@@ -37,7 +37,7 @@ function server() {
       const plot = state.plots[args.p_plot];
       let result = 'ok', harvest;
       if (plot.revision !== args.p_revision) result = 'changed';
-      else if (args.p_action === 'plant' && !plot.crop) { plot.crop = { id:`crop-${++serial}`, plantedAt:new Date(now).toISOString(), readyAt:new Date(now+96*hour).toISOString(), lastWateredOn:null,careCount:0 }; plot.revision++; }
+      else if (args.p_action === 'plant' && !plot.crop) { plot.crop = { id:`crop-${++serial}`, plantedAt:new Date(now).toISOString(), readyAt:new Date(now+96*hour).toISOString(), lastWateredOn:null,careCount:0,reviewGained:0 }; plot.revision++; }
       else if (args.p_action === 'water' && plot.crop && plot.crop.lastWateredOn !== api.snapshot().today) { plot.crop.careCount++; plot.crop.lastWateredOn=api.snapshot().today; plot.revision++; }
       else if (args.p_action === 'harvest' && plot.crop && now >= Date.parse(plot.crop.readyAt)) {
         const { size, bonusApplied } = mockHarvest(plot.crop.careCount);
@@ -90,6 +90,15 @@ try {
     await enter(page);
     assert.equal(await page.locator('.pr-dog').count(),1);
     assert.equal(await page.locator('.pr-farm-bubble').count(),0);
+    // The scarecrow is a fixed decoration: a solid grid cell (blocks walking, no separate approach
+    // step needed) that pops a short transient speech bubble on tap — never a persistent panel.
+    assert.equal(await page.locator('.pr-scarecrow').count(),1);
+    assert.ok(await page.locator('.pr-grid button').nth(9*16+12).isDisabled(), 'scarecrow cell is solid, matching yardWalkable');
+    assert.equal(await page.locator('.pr-scarecrow-bubble').count(),0);
+    await page.locator('.pr-scarecrow').click();
+    const firstLine = await page.locator('.pr-scarecrow-bubble').innerText();
+    assert.ok(firstLine.length>0);
+    await page.locator('.pr-scarecrow-bubble').waitFor({state:'hidden',timeout:5000});
     const before=await page.locator('.pr-yard-board').boundingBox();
     await bed(page);
     const bubble=await page.locator('.pr-farm-bubble').boundingBox();
@@ -98,6 +107,7 @@ try {
     await page.getByRole('button',{name:'토마토 심기',exact:true}).click();
     await page.getByRole('button',{name:'물주기 · 무료',exact:true}).waitFor();
     assert.equal(await page.locator('[data-plot="0"]').getAttribute('data-stage'),'sprout');
+    assert.equal(await page.locator('[data-plot="0"]').getAttribute('data-moisture'),'moist'); // freshly planted reads as moist
     const cropId=api.state.plots[0].crop.id;
     // Server commits the water, but the response is lost: reload state, never resend blindly.
     api.loseResponse=true;
@@ -118,6 +128,7 @@ try {
     });
     assert.ok(sample.length);
     for(const [x,y] of sample) assert.ok(!([4,5,7,8].includes(y)&&x<=12&&x+1>=11),'dog avoids crop footprint');
+    for(const [x,y] of sample) assert.ok(!(x===12&&y===9)&&!(x===11&&y===9),'dog avoids the scarecrow footprint too');
     // Reload gets the same persisted crop, including today's care.
     await enter(page); await bed(page);
     await page.getByRole('button',{name:'오늘은 촉촉해요',exact:true}).waitFor();
@@ -132,6 +143,8 @@ try {
     api.advance(97*hour);
     await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
     await page.waitForFunction(()=>document.querySelector('[data-plot="0"]')?.getAttribute('data-stage')==='ripe');
+    // Never-watered plot1, aged 97h: soil visibly dry — a nudge, not a failure (it still grows fine).
+    assert.equal(await page.locator('[data-plot="1"]').getAttribute('data-moisture'),'dry');
     await page.screenshot({path:`${out}/${viewport.width}-ripe.png`});
     await bed(page);
     await page.getByRole('button',{name:'토마토 수확하기',exact:true}).click();
@@ -160,7 +173,7 @@ try {
     assert.deepEqual(other.errors,[]);
     await second.close();
     assert.deepEqual(errors,[]);
-    console.log(`PASS ${viewport.width}: in-world approach, plant/water/lost-response recovery, dog clearance, reload/fresh-context persistence, 4-day server-time growth, harvest/replant, no map height loss, crop size + review-bonus reveal + best/last record`);
+    console.log(`PASS ${viewport.width}: in-world approach, plant/water/lost-response recovery, dog clearance (beds + scarecrow), reload/fresh-context persistence, 4-day server-time growth, moisture tiers, harvest/replant, no map height loss, crop size + review-bonus reveal + best/last record, scarecrow tap-to-speak`);
     await context.close();
   }
 } finally {await browser.close();}

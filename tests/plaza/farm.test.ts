@@ -1,12 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { FARM_BEDS, farmStage, farmDay, growthLabel, isFarmCell, computeCropSize, cropCareRatio, maxCareDaysFor, rollLuck, sizeLabel, FARM_GROWTH_DAYS, reviewRatioFor, bonusChanceFor, computeBonusAmount, computeCropSizeV2, REVIEW_RATIO_CAP } from '../../src/features/pixel-room/farm/farmModel.ts';
+import { FARM_BEDS, farmStage, farmDay, growthLabel, isFarmCell, computeCropSize, cropCareRatio, maxCareDaysFor, rollLuck, sizeLabel, FARM_GROWTH_DAYS, reviewRatioFor, bonusChanceFor, computeBonusAmount, computeCropSizeV2, REVIEW_RATIO_CAP, SCARECROW_CELL, farmMoisture } from '../../src/features/pixel-room/farm/farmModel.ts';
+import { pickScarecrowLine } from '../../src/features/pixel-room/farm/scarecrowLines.ts';
 import { YARD_SPAWNS, yardPath, yardWalkable, yardExit } from '../../src/features/pixel-room/yard/yardModel.ts';
 import { yardDogWorld } from '../../src/features/pixel-room/pet/dogWorld.ts';
 import { advanceDog, dogFits } from '../../src/features/pixel-room/pet/dogModel.ts';
 const planted = Date.parse('2026-09-18T00:00:00Z');
 const hour = 3600000;
-const crop = { id: 'test', plantedAt: new Date(planted).toISOString(), readyAt: new Date(planted + 24 * hour).toISOString(), careCount: 0, lastWateredOn: null };
+const crop = { id: 'test', plantedAt: new Date(planted).toISOString(), readyAt: new Date(planted + 24 * hour).toISOString(), careCount: 0, lastWateredOn: null, reviewGained: 0 };
 test('growth stage boundaries use server timestamps; no care never kills a crop', () => {
   assert.equal(farmStage(null, planted), 'empty');
   for (const [hours, stage] of [[0,'sprout'],[5.99,'sprout'],[6,'leaf'],[17.99,'leaf'],[18,'fruit'],[23.99,'fruit'],[24,'ripe'],[240,'ripe']] as const) assert.equal(farmStage(crop, planted + hours * hour), stage);
@@ -15,7 +16,7 @@ test('growth stage boundaries use server timestamps; no care never kills a crop'
 });
 test('growthLabel scales through days/hours/minutes for the real 4-day (96h) production duration', () => {
   assert.equal(FARM_GROWTH_DAYS, 4);
-  const crop4 = { id: 't4', plantedAt: new Date(planted).toISOString(), readyAt: new Date(planted + 96 * hour).toISOString(), careCount: 0, lastWateredOn: null };
+  const crop4 = { id: 't4', plantedAt: new Date(planted).toISOString(), readyAt: new Date(planted + 96 * hour).toISOString(), careCount: 0, lastWateredOn: null, reviewGained: 0 };
   assert.equal(growthLabel(crop4, planted), '수확까지 약 4일');
   assert.equal(growthLabel(crop4, planted + 50 * hour), '수확까지 약 2일'); // 46h left -> rounds up to 2 days
   assert.equal(growthLabel(crop4, planted + 73 * hour), '수확까지 약 23시간');
@@ -34,6 +35,17 @@ test('farm footprints block walking; both approach cells are reachable from eith
       const path = yardPath(from, approach);
       assert.deepEqual(path.at(-1), approach);
       assert.ok(path.every(p => yardWalkable(p) && !yardExit(p)));
+    }
+  }
+});
+test('the scarecrow guide is a solid fixed decoration (blocks walking) but never disconnects either farm approach', () => {
+  assert.equal(yardWalkable(SCARECROW_CELL), false);
+  for (const bed of FARM_BEDS) {
+    for (const from of Object.values(YARD_SPAWNS)) {
+      const approach = { x: bed.x - 1, y: bed.y + 1 };
+      const path = yardPath(from, approach);
+      assert.ok(path.length > 0, `still reachable from ${JSON.stringify(from)} with the scarecrow in place`);
+      assert.ok(path.every(p => !(p.x === SCARECROW_CELL.x && p.y === SCARECROW_CELL.y)));
     }
   }
 });
@@ -210,4 +222,47 @@ test('distribution: watering (0/2/4 of 4 days) x review activity (low/mid/high) 
     assert.ok(Math.min(...results[care].high.map(x => x.size)) <= Math.max(...results[care].low.map(x => x.size)),
       `review should never fully separate outcomes at water=${care} — overlap must remain possible`);
   }
+});
+
+test('farmMoisture: day-granularity moist/normal/dry, derived purely from lastWateredOn/plantedAt (no new stored state)', () => {
+  assert.equal(farmMoisture(null, planted), 'normal'); // empty plot: not applicable, but never throws
+  const day = 24 * hour;
+  const freshlyPlanted = { ...crop, plantedAt: new Date(planted).toISOString(), lastWateredOn: null };
+  assert.equal(farmMoisture(freshlyPlanted, planted), 'moist'); // planting day itself reads as moist
+  assert.equal(farmMoisture(freshlyPlanted, planted + day), 'normal'); // one day unwatered: still fine
+  assert.equal(farmMoisture(freshlyPlanted, planted + 2 * day), 'dry'); // two+ days: visibly dry
+  assert.equal(farmMoisture(freshlyPlanted, planted + 10 * day), 'dry'); // stays dry, never a new/different state (no death state)
+  const wateredToday = { ...crop, lastWateredOn: farmDay(planted) };
+  assert.equal(farmMoisture(wateredToday, planted), 'moist');
+  assert.equal(farmMoisture(wateredToday, planted + day), 'normal');
+  assert.equal(farmMoisture(wateredToday, planted + 2 * day), 'dry');
+});
+
+function mkCrop(overrides: Partial<typeof crop> = {}) { return { ...crop, ...overrides }; }
+function mkSnapshot(crops: (typeof crop | null)[]) {
+  return { serverNow: new Date(planted).toISOString(), today: farmDay(planted), harvestCount: 0, bestSize: null, lastHarvestSize: null,
+    plots: crops.map((c, index) => ({ index, revision: 0, crop: c })) };
+}
+test('pickScarecrowLine: never throws, always returns a real line, and a null/empty farm only ever draws from a sensible pool', () => {
+  const random = lcg(7);
+  assert.equal(typeof pickScarecrowLine(null, planted, random), 'string');
+  assert.ok(pickScarecrowLine(null, planted, random).length > 0);
+  const emptySnap = mkSnapshot([null, null]);
+  for (let i = 0; i < 200; i++) assert.ok(pickScarecrowLine(emptySnap, planted, random).length > 0);
+});
+test('pickScarecrowLine: draws contextual lines noticeably more when they apply, but still keeps the generic rotation alive (never 0% or 100%)', () => {
+  const random = lcg(2026);
+  // A ripe crop should surface the "수확 가능" line family a clear, non-trivial fraction of the time.
+  const ripeSnap = mkSnapshot([mkCrop({ readyAt: new Date(planted - hour).toISOString(), plantedAt: new Date(planted - 5 * hour).toISOString() }), null]);
+  const N = 2000;
+  const draws = Array.from({ length: N }, () => pickScarecrowLine(ripeSnap, planted, random));
+  const ripeHits = draws.filter(line => line.includes('수확') || line.includes('익었')).length;
+  assert.ok(ripeHits > N * 0.2, `expected a meaningful share of ripe-context lines, got ${ripeHits}/${N}`);
+  assert.ok(ripeHits < N * 0.9, `generic rotation should still surface sometimes, got ${ripeHits}/${N}`);
+});
+test('pickScarecrowLine: a crop with strong review activity can surface the review-linked hint', () => {
+  const random = lcg(4242);
+  const reviewySnap = mkSnapshot([mkCrop({ reviewGained: REVIEW_RATIO_CAP, lastWateredOn: farmDay(planted) }), null]);
+  const draws = Array.from({ length: 3000 }, () => pickScarecrowLine(reviewySnap, planted, random));
+  assert.ok(draws.some(line => line.includes('복습')), 'expected the review-linked hint to appear at least once over many draws');
 });

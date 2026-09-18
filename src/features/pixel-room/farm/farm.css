@@ -14,3 +14,8 @@
 .pr-farm-action { width:100%; min-height:44px; margin-top:8px; border:1px solid #3e6b3d; border-radius:6px; background:#537e49; color:#fff9e8; font:inherit; font-weight:700; cursor:pointer; touch-action:manipulation; }
 .pr-farm-action:disabled { background:#d6d9b8; border-color:#9fa67f; color:#526044; cursor:default; }
 .pr-farm-action:focus-visible,.pr-farm-close:focus-visible { outline:2px solid #346b98; outline-offset:2px; }
+.pr-scarecrow { position:absolute; width:6.25%; height:10.4167%; padding:0; border:0; background:none; cursor:pointer; touch-action:manipulation; }
+.pr-scarecrow svg { display:block; width:100%; height:100%; }
+.pr-scarecrow:focus-visible { outline:2px solid #fff0c0; outline-offset:2px; border-radius:4px; }
+.pr-scarecrow-bubble { position:absolute; bottom:100%; left:50%; transform:translateX(-50%); margin-bottom:4px; width:max-content; max-width:130px; background:#fff4d9; color:#4f422f; font-size:10px; line-height:1.4; padding:5px 8px; border-radius:9px; border:1.5px solid #8c704c; box-shadow:0 3px 0 #51452b33; z-index:20; pointer-events:none; }
+.pr-scarecrow-bubble::after { content:''; position:absolute; top:100%; left:50%; transform:translateX(-50%); width:8px; height:8px; background:#fff4d9; border-right:1.5px solid #8c704c; border-bottom:1.5px solid #8c704c; transform:translateX(-50%) rotate(45deg); margin-top:-4px; }

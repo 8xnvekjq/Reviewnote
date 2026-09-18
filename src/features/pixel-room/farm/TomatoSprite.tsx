@@ -1,10 +1,14 @@
-import type { FarmStage } from './farmModel';
+import type { FarmMoisture, FarmStage } from './farmModel';
 
-// Original tiny pixel illustration: one coherent silhouette through all growth stages.
-export function TomatoSprite({ stage, wet }: { stage: FarmStage; wet: boolean }) {
+// Original tiny pixel illustration: one coherent silhouette through all growth stages. Soil reads
+// as three simple tiers (moist/normal/dry) — a pure display cue, not a new scoring rule.
+const SOIL_FILL: Record<FarmMoisture, string> = { moist: '#714830', normal: '#99653c', dry: '#c2986a' };
+const SOIL_LINE: Record<FarmMoisture, string> = { moist: '#543b2e', normal: '#7a4f32', dry: '#8a6a45' };
+export function TomatoSprite({ stage, moisture }: { stage: FarmStage; moisture: FarmMoisture }) {
   return <svg viewBox="0 0 32 32" aria-hidden="true" shapeRendering="crispEdges">
-    <path fill="#684531" d="M2 18h28v12H2z" /><path fill={wet ? '#714830' : '#99653c'} d="M2 17h28v11H2z" />
-    <path stroke={wet ? '#543b2e' : '#7a4f32'} strokeWidth="1" d="M5 21h22M5 25h22" />
+    <path fill="#684531" d="M2 18h28v12H2z" /><path fill={SOIL_FILL[moisture]} d="M2 17h28v11H2z" />
+    <path stroke={SOIL_LINE[moisture]} strokeWidth="1" d="M5 21h22M5 25h22" />
+    {moisture === 'dry' && <path stroke="#8a6a45" strokeWidth="1" d="M7 20l3 3M23 23l3-3M14 27l2 2" />}
     <path fill="#be915a" d="M1 17h2v12H1zM29 17h2v12h-2zM1 29h30v2H1z" />
     {stage === 'empty' ? <><path fill="#c89860" d="M9 19h2v2H9zM20 23h2v2h-2z" /><path fill="#e6d3a3" d="M22 12h7v5h-7z" /><path fill="#97774d" d="M24 17h2v4h-2z" /></> : <>
       {stage !== 'sprout' && <path fill="#b78c56" d="M19 3h2v22h-2z" />}
@@ -16,6 +20,6 @@ export function TomatoSprite({ stage, wet }: { stage: FarmStage; wet: boolean })
         <path fill="#e8b77d" d="M8 14h2v1H8zM19 19h2v1h-2z" /><path fill="#3d713e" d="M9 12h3v2H9zM20 17h3v2h-3zM19 8h3v2h-3z" />
       </>}
     </>}
-    {wet && <path fill="#83c7ce" d="M4 24h2v2H4zM26 20h2v2h-2z" />}
+    {moisture === 'moist' && <path fill="#83c7ce" d="M4 24h2v2H4zM26 20h2v2h-2z" />}
   </svg>;
 }

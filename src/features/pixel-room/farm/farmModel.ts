@@ -2,7 +2,18 @@ export const FARM_BEDS = [{ x: 11, y: 4 }, { x: 11, y: 7 }] as const;
 export function isFarmCell({ x, y }: { x: number; y: number }): boolean {
   return FARM_BEDS.some(bed => x >= bed.x && x < bed.x + 2 && y >= bed.y && y < bed.y + 2);
 }
-export interface FarmCrop { id: string; plantedAt: string; readyAt: string; careCount: number; lastWateredOn: string | null }
+// The scarecrow guide stands just south of the second plot — a fixed, solid decoration (same
+// "treat as a wall" treatment as the beds themselves), not a walkable/passable tile.
+export const SCARECROW_CELL = { x: 12, y: 9 } as const;
+export interface FarmCrop {
+  id: string; plantedAt: string; readyAt: string; careCount: number; lastWateredOn: string | null;
+  // Live, forward-looking estimate — a snapshot-diff of profiles.bonus_points computed by the
+  // server on every fetch (see get_pixel_farm()), not a stored column. It can only ever move up
+  // while the crop is still growing (bonus_points itself only decreases if a review is reverted),
+  // and the number actually LOCKED IN at harvest is computed fresh at that moment regardless of
+  // what this live estimate said a moment earlier — this field is purely an in-progress hint.
+  reviewGained: number;
+}
 export interface FarmPlot { index: number; revision: number; crop: FarmCrop | null }
 export interface FarmSnapshot { serverNow: string; today: string; harvestCount: number; bestSize: number | null; lastHarvestSize: number | null; plots: FarmPlot[] }
 export type FarmAction = 'plant' | 'water' | 'harvest';
@@ -16,6 +27,24 @@ export function farmStage(crop: FarmCrop | null, now: number): FarmStage {
 }
 export function farmDay(now: number): string {
   return new Date(now + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+function farmDaysBetween(earlier: string, later: string): number {
+  return Math.round((Date.parse(`${later}T00:00:00Z`) - Date.parse(`${earlier}T00:00:00Z`)) / 86400000);
+}
+// Soil moisture — a pure display/judgment-call layer, not a new scoring axis: it never changes how
+// size is computed (careCount/careRatio, unchanged, still drives that). Derived entirely from data
+// already on the crop (lastWateredOn, plantedAt) — no new server storage. Day-granularity on
+// purpose (matches the existing once/day watering cadence) rather than an hour-by-hour countdown a
+// player would have to learn: freshly planted or watered TODAY reads as moist; one day without
+// water is still fine ("normal"); two or more days makes the soil visibly dry — a nudge to go
+// water, never a threat (a dry crop still grows and can still be harvested normally).
+export type FarmMoisture = 'dry' | 'normal' | 'moist';
+export function farmMoisture(crop: FarmCrop | null, now: number): FarmMoisture {
+  if (!crop) return 'normal';
+  const today = farmDay(now);
+  const anchor = crop.lastWateredOn ?? farmDay(Date.parse(crop.plantedAt));
+  const daysSince = farmDaysBetween(anchor, today);
+  return daysSince <= 0 ? 'moist' : daysSince === 1 ? 'normal' : 'dry';
 }
 export function growthLabel(crop: FarmCrop, now: number): string {
   const minutes = Math.max(0, Math.ceil((Date.parse(crop.readyAt) - now) / 60000));
