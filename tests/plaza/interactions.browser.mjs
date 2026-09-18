@@ -9,6 +9,12 @@ try {
   page.on('pageerror', error => { errors.push(error.message); console.log('BROWSER ERROR', error.stack); });
   await page.route('**/src/services/supabase.ts', route => route.fulfill({ contentType: 'application/javascript', body: "export { supabase } from '/tests/plaza/fakeRealtime.mjs';" }));
   await page.route('**/src/utils/pixelShop.ts', route => route.fulfill({ contentType: 'application/javascript', body: 'export async function fetchEquippedAppearance(){return {top:null,bottom:null,shoes:null,hair:null,eyes:null}}' }));
+  // window.__topCrop is read fresh on every call (not baked in at route-registration time), so a
+  // later addInitScript can override it before a reload without re-registering this route. The
+  // trailing '*' matters: Vite serves recently-edited local files with a '?t=<timestamp>' cache-bust
+  // query, which a bare '**/....ts' glob (anchored at both ends) does not match.
+  await page.addInitScript(() => { window.__topCrop = null; });
+  await page.route('**/src/utils/pixelFarm.ts*', route => route.fulfill({ contentType: 'application/javascript', body: 'export async function fetchTopSubmittedCrop(){return window.__topCrop}' }));
   await page.goto('http://127.0.0.1:5174/tests/plaza/landscape.html?peer');
   assert.ok(await page.getByRole('button', { name: '우물의 오늘 한마디 읽기' }).isDisabled());
   await page.locator('.pr-well-target').dispatchEvent('click');
@@ -83,6 +89,31 @@ try {
   await page.getByRole('button', { name: '우물의 오늘 한마디 읽기' }).click();
   await page.getByText('이번 방문 동안만 기억해요.').waitFor();
   assert.ok(await page.locator('.pr-well-message').count(), 'solo activity still works with storage blocked');
+
+  // Podium exhibit — empty case first (window.__topCrop is still null from the addInitScript near
+  // the top of this file), then a fixture crop after a reload confirms the filled state.
+  await page.locator('.pr-crop-exhibit-target').click();
+  await page.locator('.pr-crop-exhibit-card').waitFor();
+  assert.ok((await page.locator('.pr-crop-exhibit-card').innerText()).includes('아직 아무도 출품하지 않았어요'));
+  assert.equal(await page.locator('.pr-crop-exhibit-tomato').count(), 0, 'no tomato drawn on an empty podium');
+  await page.locator('.pr-crop-exhibit-card>button').click();
+  assert.equal(await page.locator('.pr-crop-exhibit-card').count(), 0);
+
+  const fixtureCrop = { cropId: 'fixture-crop-1', cropType: 'tomato', sizeScore: 88, submittedAt: new Date().toISOString(), submitterLabel: '토망고' };
+  await page.addInitScript(crop => { window.__topCrop = crop; }, fixtureCrop);
+  await page.reload();
+  await page.locator('.pr-crop-exhibit-target').click();
+  await page.locator('.pr-crop-exhibit-card').waitFor();
+  assert.match(await page.locator('.pr-crop-exhibit-size').innerText(), /88\/100/);
+  assert.ok((await page.locator('.pr-crop-exhibit-card').innerText()).includes('토망고'));
+  assert.equal(await page.locator('.pr-crop-exhibit-tomato').count(), 1, 'tomato drawn once a crop is submitted');
+  const boardBox = await page.locator('.pr-plaza-board').boundingBox();
+  const cardBox = await page.locator('.pr-crop-exhibit-card').boundingBox();
+  assert.ok(cardBox.x >= boardBox.x - 1 && cardBox.x + cardBox.width <= boardBox.x + boardBox.width + 1, 'exhibit card stays on-board');
+  await page.screenshot({ path: 'node_modules/.cache/plaza-interactions/crop-exhibit.png' });
+  await page.locator('.pr-crop-exhibit-card>button').click();
+  assert.equal(await page.locator('.pr-crop-exhibit-card').count(), 0);
+
   assert.deepEqual(errors, []);
-  console.log('PASS bidirectional reactions, throttle/expiry, daily well + reload, reconnect');
+  console.log('PASS bidirectional reactions, throttle/expiry, daily well + reload, reconnect, crop exhibit (empty + filled podium)');
 } finally { await browser.close(); }

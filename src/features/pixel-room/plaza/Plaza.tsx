@@ -14,6 +14,7 @@ import { PlazaLandscape } from './PlazaLandscape';
 import './plaza.css';
 import { PlazaActivities } from './PlazaActivities';
 import { REACTIONS } from './plazaInteractions';
+import { CropExhibit } from './CropExhibit';
 
 const EMPTY_APPEARANCE: PublicAvatarAppearance = { top: null, bottom: null, shoes: null, hair: null, eyes: null, skin: null };
 const KEYS: Record<string, PlazaDirection> = { ArrowDown: 'Front', s: 'Front', ArrowUp: 'Back', w: 'Back', ArrowLeft: 'Left', a: 'Left', ArrowRight: 'Right', d: 'Right' };
@@ -172,6 +173,7 @@ export default function Plaza({ userId, sessionId, onReachEntrance }: Props) {
           if (next && event.target === event.currentTarget) { event.preventDefault(); if (held === next) setHeld(null); }
         }} onBlur={() => setHeld(null)}>
         <PlazaLandscape />
+        <CropExhibit />
         {[...reactions.values()].some(event => event.kind === 'wish') && <div className="pr-well-ripple" aria-hidden="true">✧</div>}
         <div className="pr-grid pr-plaza-grid">{boardCells.map(cell => <button key={`${cell.x}-${cell.y}`} type="button" tabIndex={-1} aria-hidden="true" disabled={!isWalkablePlaza(cell)} onClick={() => { board.current?.focus({ preventScroll: true }); walkTo(cell); }} />)}</div>
         {/* Other players — appearance only, no nickname/title/email/any identifying text. */}

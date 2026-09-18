@@ -1,12 +1,8 @@
 import { memo } from 'react';
 import town from './assets/tiny-town.png';
-import { COURTYARD, PATHS, SCENERY, inRect } from './plazaLayout';
-import type { PlazaRect } from './plazaLayout';
+import { COURTYARD, PATHS, SCENERY, inRect, rectStyle } from './plazaLayout';
 import { PLAZA_WIDTH, PLAZA_HEIGHT } from './types';
 
-function rectStyle(rect: PlazaRect) {
-  return { left: `${rect.x / PLAZA_WIDTH * 100}%`, top: `${rect.y / PLAZA_HEIGHT * 100}%`, width: `${rect.w / PLAZA_WIDTH * 100}%`, height: `${rect.h / PLAZA_HEIGHT * 100}%` };
-}
 function Tile({ id }: { id: number }) {
   return <svg viewBox={`${id % 12 * 16} ${Math.floor(id / 12) * 16} 16 16`} overflow="hidden"><image href={town} width="192" height="176" /></svg>;
 }
@@ -34,6 +30,7 @@ export const PlazaLandscape = memo(function PlazaLandscape() {
       {item.kind === 'fence' && Array.from({ length: item.w }, (_, i) => <Tile key={i} id={i === 0 ? 80 : i === item.w - 1 ? 82 : 81} />)}
       {item.kind === 'bench' && <><i /><i /><span /></>}
       {item.kind === 'notice' && <><div className="pr-hub-notice-roof" /><div className="pr-hub-notice-paper"><i /><i /><i /></div><span /></>}
+      {item.kind === 'podium' && <><span className="pr-hub-podium-top" /><span className="pr-hub-podium-base" /></>}
     </div>)}
     <div className="pr-hub-doorstep" aria-hidden="true" style={rectStyle({ x: 8, y: 11, w: 1, h: 1 })}>↓</div>
   </>;

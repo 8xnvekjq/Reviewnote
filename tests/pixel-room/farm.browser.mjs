@@ -47,12 +47,24 @@ function server() {
         const { size, bonusApplied } = mockHarvest(plot.crop.careCount);
         state.bestSize = state.bestSize === null ? size : Math.max(state.bestSize, size);
         state.lastHarvestSize = size;
-        state.harvested.push({ id: plot.crop.id, crop_type: 'tomato', size_score: size, harvested_at: new Date(now).toISOString(), care_count: plot.crop.careCount, status: 'stored' });
+        state.harvested.push({ id: plot.crop.id, crop_type: 'tomato', size_score: size, harvested_at: new Date(now).toISOString(), care_count: plot.crop.careCount, status: 'stored', submitted_at: null, reward_points: null });
         plot.crop=null; plot.revision++; state.harvestCount++; harvest={sizeScore:size,bonusApplied};
       }
       else result = 'growing';
       if (api.loseResponse) { api.loseResponse=false; return route.fulfill({status:503,json:{message:'test lost response after commit'}}); }
       data = {...api.snapshot(),result,...(harvest?{harvest}:{})};
+    } else if (url.pathname.endsWith('/submit_farm_crop')) {
+      // Mirrors pixel_private.submit_farm_crop's own shape/CAS — same status='stored' gate, same
+      // 10 + round(size*0.4) formula (see farmModel.ts's computeSubmitReward, kept in sync).
+      const { p_crop_id } = route.request().postDataJSON();
+      const row = state.harvested.find(r => r.id === p_crop_id);
+      if (!row) data = { ok:false, reason:'not_found', message:'작물을 찾을 수 없어요.' };
+      else if (row.status !== 'stored') data = { ok:false, reason:'already_submitted', message:'이미 출품했거나 아직 보관 중인 작물이 아니에요.' };
+      else {
+        const reward = 10 + Math.round(row.size_score * 0.4);
+        row.status = 'submitted'; row.submitted_at = new Date(now).toISOString(); row.reward_points = reward;
+        data = { ok:true, cropId: row.id, rewardPoints: reward, submittedAt: row.submitted_at, status:'submitted' };
+      }
     } else return route.abort();
     return route.fulfill({status:200,json:data});
   };
@@ -181,6 +193,20 @@ try {
     await firstCard.waitFor();
     assert.equal(await page.locator('.pr-crop-card').count(),1);
     assert.match(await firstCard.innerText(),/58\/100/);
+    // 출품(submission): stored -> submitted, one-time reward = 10 + round(58*0.4) = 33.
+    assert.ok(await firstCard.locator('.pr-crop-submit').innerText().then(t=>t.includes('+33P')),'preview shows the same formula the server will pay out');
+    await firstCard.locator('.pr-crop-submit').click();
+    await firstCard.locator('.pr-crop-badge-submitted').waitFor();
+    assert.match(await firstCard.innerText(),/출품(됨|\s*완료).*\+33P/);
+    assert.equal(await firstCard.locator('.pr-crop-submit').count(),0,'submit button never comes back once submitted');
+    assert.equal(api.state.harvested[0].status,'submitted');
+    assert.equal(api.state.harvested[0].reward_points,33);
+    await page.getByRole('button',{name:/^농작물/}).click(); // close it again before continuing
+    // Persists after reload — server-backed status, not local-only UI state.
+    await enter(page);
+    await page.getByRole('button',{name:/^농작물/}).click();
+    await page.locator('.pr-crop-card').first().locator('.pr-crop-badge-submitted').waitFor();
+    assert.match(await page.locator('.pr-crop-card').first().innerText(),/출품됨 · \+33P/);
     await page.getByRole('button',{name:/^농작물/}).click(); // close it again before continuing
     // A fresh browser context (no local storage) sees the same farm.
     const second=await browser.newContext({viewport,hasTouch:viewport.width<=390});
@@ -203,7 +229,7 @@ try {
     assert.deepEqual(other.errors,[]);
     await second.close();
     assert.deepEqual(errors,[]);
-    console.log(`PASS ${viewport.width}: in-world approach, plant/water/lost-response recovery, dog clearance (beds + scarecrow), reload/fresh-context persistence, 4-day server-time growth, moisture tiers, harvest/replant, no map height loss, crop size + review-bonus reveal + best/last record, scarecrow tap-to-speak`);
+    console.log(`PASS ${viewport.width}: in-world approach, plant/water/lost-response recovery, dog clearance (beds + scarecrow), reload/fresh-context persistence, 4-day server-time growth, moisture tiers, harvest/replant, no map height loss, crop size + review-bonus reveal + best/last record, scarecrow tap-to-speak, crop submission (reward formula preview, badge, reload persistence)`);
     await context.close();
   }
 } finally {await browser.close();}
