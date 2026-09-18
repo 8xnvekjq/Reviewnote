@@ -1,4 +1,4 @@
-import { isFarmCell } from '../farm/farmModel';
+import { isFarmCell, SCARECROW_CELL } from '../farm/farmModel';
 export type YardCell = { x: number; y: number };
 export type YardDestination = 'room' | 'plaza';
 export const YARD_WIDTH = 16;
@@ -13,6 +13,7 @@ export function yardExit(cell: YardCell): YardDestination | null {
 }
 export function yardWalkable({ x, y }: YardCell): boolean {
   if (isFarmCell({ x, y })) return false;
+  if (x === SCARECROW_CELL.x && y === SCARECROW_CELL.y) return false;
   if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= YARD_WIDTH || y >= YARD_HEIGHT) return false;
   if (x >= 3 && x <= 8 && y >= 1 && y <= 6) return x === 6 && y === 6;
   if ((x <= 1 && (y === 4 || y === 10)) || (x >= 14 && y === 3)) return false;

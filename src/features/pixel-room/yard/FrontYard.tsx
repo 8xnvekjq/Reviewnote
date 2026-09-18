@@ -11,6 +11,8 @@ import './yard.css';
 import { Dog } from '../pet/Dog';
 import { yardDogWorld } from '../pet/dogWorld';
 import { Farm } from '../farm/Farm';
+import { Scarecrow } from '../farm/Scarecrow';
+import { useFarm } from '../farm/useFarm';
 
 const cells = Array.from({ length: 192 }, (_, i) => ({ x: i % 16, y: Math.floor(i / 16) }));
 const deltas: Record<PlazaDirection, YardCell> = { Front: { x: 0, y: 1 }, Back: { x: 0, y: -1 }, Left: { x: -1, y: 0 }, Right: { x: 1, y: 0 } };
@@ -29,6 +31,7 @@ const Landscape = memo(function Landscape() {
 
 interface Props { dogActive?: boolean; from: YardDestination; appearance: PublicAvatarAppearance; onExit: (destination: YardDestination) => void }
 export default function FrontYard({ from, appearance, onExit, dogActive = false }: Props) {
+  const farm = useFarm();
   const [actor, setActor] = useState<YardCell>(() => YARD_SPAWNS[from]);
   const [direction, setDirection] = useState<PlazaDirection>(from === 'room' ? 'Front' : 'Back');
   const [held, setHeld] = useState<PlazaDirection | null>(null);
@@ -76,7 +79,8 @@ export default function FrontYard({ from, appearance, onExit, dogActive = false 
       <button type="button" className="pr-yard-door" aria-label="집 문으로 걸어가기" onClick={() => walkTo(YARD_DOOR)} />
       <button type="button" className="pr-yard-gate" aria-label="길을 따라 광장으로 걸어가기" onClick={() => walkTo(YARD_GATE)}>↓</button>
       {dogActive && <Dog world={yardDogWorld(actor)} />}
-      <Farm actor={actor} moving={moving} walkTo={walkTo} />
+      <Farm farm={farm} actor={actor} moving={moving} walkTo={walkTo} />
+      <Scarecrow snapshot={farm.snapshot} now={farm.now} />
       <div className="pr-plaza-actor" aria-hidden="true" data-x={actor.x} data-y={actor.y} data-direction={direction} style={{ left: `${(actor.x - .6) / 16 * 100}%`, bottom: `${(11 - actor.y) / 12 * 100}%`, width: '13.75%', height: '18%', zIndex: actor.y + 2 }}><span className="pr-shadow" /><AvatarSprite direction={direction} frame={moving ? frame : 0} walking={moving} appearance={appearance} /></div>
     </div></div>
     <p className="pr-instructions pr-plaza-instructions">오른쪽 밭을 눌러 토마토를 키워 보세요.</p>

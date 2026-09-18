@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import { FARM_BEDS, farmDay, farmStage, growthLabel } from './farmModel';
+import { FARM_BEDS, farmDay, farmMoisture, farmStage, growthLabel } from './farmModel';
 import type { FarmAction } from './farmModel';
-import { useFarm } from './useFarm';
+import type { useFarm } from './useFarm';
 import { TomatoSprite } from './TomatoSprite';
 import type { YardCell } from '../yard/yardModel';
 import './farm.css';
 
 const names = { empty: '빈 밭', sprout: '토마토 새싹', leaf: '자라는 토마토', fruit: '초록 토마토', ripe: '익은 토마토' };
-export function Farm({ actor, moving, walkTo }: { actor: YardCell; moving: boolean; walkTo: (cell: YardCell) => void }) {
-  const farm = useFarm();
+const moistureLabel = { moist: '흙이 촉촉해요', normal: '흙이 적당해요', dry: '흙이 말랐어요' };
+// farm is owned by the caller (FrontYard) and shared with <Scarecrow> so both react to the exact
+// same snapshot — a second independent useFarm() here would poll/fetch separately and could show
+// the scarecrow and the beds slightly out of sync.
+export function Farm({ farm, actor, moving, walkTo }: { farm: ReturnType<typeof useFarm>; actor: YardCell; moving: boolean; walkTo: (cell: YardCell) => void }) {
   const [selected, setSelected] = useState<number | null>(null);
   const popover = useRef<HTMLDivElement>(null);
   const near = selected !== null && actor.x === FARM_BEDS[selected].x - 1 && actor.y === FARM_BEDS[selected].y + 1 && !moving;
@@ -35,11 +38,11 @@ export function Farm({ actor, moving, walkTo }: { actor: YardCell; moving: boole
     {FARM_BEDS.map((bed, index) => {
       const current = farm.snapshot?.plots.find(p => p.index === index)?.crop ?? null;
       const currentStage = farmStage(current, farm.now);
-      return <button key={index} type="button" className="pr-farm-bed" data-plot={index} data-stage={currentStage}
+      return <button key={index} type="button" className="pr-farm-bed" data-plot={index} data-stage={currentStage} data-moisture={farmMoisture(current, farm.now)}
         style={{ left: `${bed.x / 16 * 100}%`, top: `${bed.y / 12 * 100}%` }}
         aria-label={`${index + 1}번 밭 · ${farm.snapshot ? names[currentStage] : '농장 확인'} · 돌보러 가기`}
         aria-expanded={selected === index && near} onClick={() => { wasNear.current = false; farm.clearMessage(); setSelected(index); walkTo({ x: bed.x - 1, y: bed.y + 1 }); }}>
-        <TomatoSprite stage={currentStage} wet={!!current && current.lastWateredOn === farmDay(farm.now)} />
+        <TomatoSprite stage={currentStage} moisture={farmMoisture(current, farm.now)} />
         <span className="pr-farm-marker" aria-hidden="true">{!farm.snapshot ? '…' : currentStage === 'ripe' ? '✓' : currentStage === 'empty' ? '+' : ''}</span>
       </button>;
     })}
@@ -49,7 +52,7 @@ export function Farm({ actor, moving, walkTo }: { actor: YardCell; moving: boole
       <strong>{crop ? names[stage] : '작은 토마토 밭'}</strong>
       {!farm.snapshot ? <p>{farm.error ? '밭을 불러오지 못했어요.' : '밭을 확인하고 있어요…'}</p> : <>
         <p>{crop ? growthLabel(crop, farm.now) : '씨앗은 무료 · 4일 후 수확'}</p>
-        {crop && <small>{watered ? '오늘 물주기 완료' : '오늘의 물을 주세요'} · 돌봄 {crop.careCount}회</small>}
+        {crop && <small>{moistureLabel[farmMoisture(crop, farm.now)]}{watered ? '' : ' · 오늘의 물을 주세요'} · 돌봄 {crop.careCount}회</small>}
         {!crop && <small>물주기를 놓쳐도 시들지 않아요.</small>}
         <span className="pr-farm-total">지금까지 수확 {farm.snapshot.harvestCount}개{farm.snapshot.bestSize ? ` · 최고 기록 ${farm.snapshot.bestSize}` : ''}{farm.snapshot.lastHarvestSize ? ` · 최근 ${farm.snapshot.lastHarvestSize}` : ''}</span>
       </>}

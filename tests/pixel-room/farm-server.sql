@@ -216,6 +216,13 @@ begin
   select bonus_points into points_after from public.profiles where id=a;
   execute 'set local role authenticated';
 
+  -- Live, pre-harvest hint: get_pixel_farm() already reflects the review gain on the still-growing
+  -- crop (no new column — same review_points_at_plant snapshot the harvest branch will use).
+  r := public.get_pixel_farm();
+  if (r#>>'{plots,0,crop,reviewGained}')::int <> points_after - points_before then
+    raise exception 'live reviewGained mismatch before harvest: got % expected %', r#>>'{plots,0,crop,reviewGained}', points_after-points_before;
+  end if;
+
   r := public.act_pixel_farm(0,'harvest',rev);
   if r->>'result'<>'ok' then raise exception 'harvest failed %', r; end if;
   size1 := (r#>>'{harvest,sizeScore}')::int;
@@ -260,5 +267,5 @@ begin
   if (inputs->>'reviewGained')::int <> 0 then raise exception 'legacy crop (no snapshot) should default reviewGained=0, got %', inputs; end if;
   execute 'reset role';
 end $$;
-select 'PASS: lifecycle, KST daily care, revisions/retries, stale replant, missed watering, history, server time, unchanged points, RLS/anonymous denial, crop size computed once/stored/audited/retry-safe/forgery-denied/best+last surfaced/unwatered-never-fails, real 4-day duration + 4-of-4 care cap, review snapshot-diff via the real RPC, legacy pre-migration crop compatibility; all rolled back' as result;
+select 'PASS: lifecycle, KST daily care, revisions/retries, stale replant, missed watering, history, server time, unchanged points, RLS/anonymous denial, crop size computed once/stored/audited/retry-safe/forgery-denied/best+last surfaced/unwatered-never-fails, real 4-day duration + 4-of-4 care cap, review snapshot-diff via the real RPC (including the live pre-harvest hint), legacy pre-migration crop compatibility; all rolled back' as result;
 rollback;
