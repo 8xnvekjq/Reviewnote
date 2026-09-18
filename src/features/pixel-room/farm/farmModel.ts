@@ -24,10 +24,18 @@ export interface FarmCrop {
   reviewGained: number;
 }
 export interface FarmPlot { index: number; revision: number; crop: FarmCrop | null }
+export type FarmCropStatus = 'stored' | 'submitted';
 // One collection entry — a harvested pixel_farm_crops row, read directly (existing SELECT grant +
 // RLS, see 20260920090000_pixel_farm_crop_collection.sql). id doubles as the link back to that
 // row's own size_inputs/size_calc_version for later audit, even though this view doesn't show them.
-export interface HarvestedCrop { id: string; cropType: string; sizeScore: number; harvestedAt: string; careCount: number; status: string }
+export interface HarvestedCrop {
+  id: string; cropType: string; sizeScore: number; harvestedAt: string; careCount: number;
+  status: FarmCropStatus; submittedAt: string | null; rewardPoints: number | null;
+}
+// The plaza's exhibited crop — the single largest 'submitted' row across all students, plus a safe
+// display label (see get_top_submitted_crop() — resolved server-side, same COALESCE(nickname,
+// display_name) the weekly leaderboard already shows cross-student; never a raw user id/email).
+export interface TopSubmittedCrop { cropId: string; cropType: string; sizeScore: number; submittedAt: string; submitterLabel: string }
 export interface FarmSnapshot { serverNow: string; today: string; harvestCount: number; bestSize: number | null; lastHarvestSize: number | null; plots: FarmPlot[] }
 export type FarmAction = 'plant' | 'water' | 'harvest';
 export type FarmStage = 'empty' | 'sprout' | 'leaf' | 'fruit' | 'ripe';
@@ -141,4 +149,15 @@ export function computeCropSizeV2({ careCount, maxCareDays, luckRoll, reviewGain
   const bonusApplied = bonusRoll < chance;
   const bonusAmount = bonusApplied ? computeBonusAmount(bonusAmountRoll) : 0;
   return { size: Math.max(10, Math.min(100, baseSize + bonusAmount)), bonusApplied };
+}
+
+// --- Submission (see supabase/migrations/20260921100000_pixel_farm_crop_submission.sql — server
+// mirrors this exact formula; keep both in sync). A flat base plus a size-proportional top-up, so a
+// bigger tomato is worth visibly more without turning farming into the main point source: at the
+// shop's own price scale (25P cheapest top/planter .. 120P hair/furniture .. 200P dog/bed), one
+// harvest is worth a fraction of the cheapest item, not a free expensive one.
+export const FARM_SUBMIT_BASE_POINTS = 10;
+export const FARM_SUBMIT_SIZE_MULTIPLIER = 0.4; // size 10..100 -> +4..+40
+export function computeSubmitReward(sizeScore: number): number {
+  return FARM_SUBMIT_BASE_POINTS + Math.round(sizeScore * FARM_SUBMIT_SIZE_MULTIPLIER);
 }

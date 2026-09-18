@@ -588,3 +588,81 @@ Astra가 구현한 토마토 농장 MVP(PR #94, `20260917155631_pixel_tomato_far
   (`base-appearance`/`doormat`/`furniture-race`/`yard`(390/1440)/`dog`/`pixelShop/browser`
   (3뷰포트)/`plaza/interactions`/`plaza/landscape`(390/1440)) 전부 재실행해 회귀 없음 확인.
   `npm run build` clean, `npm run lint`에는 이번 변경 파일 관련 오류 없음.
+
+## 후속 작업 — 수확물 출품/전시 시스템 (2026-09-19)
+
+"수확 → 보관 → 출품 → 포인트 지급 → 광장 전시" 흐름을 완성해 달라는 요청. 농작물 탭의 보관 중인
+토마토를 출품하면 크기에 비례한 포인트를 받고, 전체 출품작 중 가장 큰 것 하나가 광장에 실제
+전시된다.
+
+- **출품 lifecycle**: `pixel_farm_crops.status`를 `'stored'` → `'submitted'`로 넓혔다(향후
+  `'sold'`/`'exhibited'`도 CHECK만 더 넓히면 됨). 컬럼 2개 추가: `submitted_at`(출품 시각),
+  `reward_points`(그 시점에 지급된 보상 — 나중에 공식이 바뀌어도 과거 기록은 그대로 남는다).
+  DB 레벨 CHECK로 두 방향 다 잠갔다: `submitted`면 반드시 `harvested_at`이 있어야 하고(자라는
+  중인 크롭은 출품 불가), `stored`인 동안은 `submitted_at`/`reward_points`가 절대 채워지지
+  않는다 — RPC 로직 하나에만 기대지 않는다.
+- **포인트 보상 공식**: `10 + round(size_score * 0.4)` — size 10~100 전체 범위에서 14~50P.
+  Pixel World 상점가(25P 최저가 상의/화분 ~ 80~120P대 헤어/가구 ~ 200P 강아지/침대)를 기준으로
+  인플레 없이, "몇 번 부지런히 수확하면 원하는 상품 하나" 정도로 맞췄다. 클라이언트
+  (`farmModel.ts`의 `computeSubmitReward`, 농작물 탭에서 출품 전 미리보기로 씀)와 서버
+  (`pixel_private.submit_farm_crop`)가 정확히 같은 공식이며, 최종 지급액은 항상 서버 계산이
+  유일한 권위다.
+- **서버 원자성/중복 방지**: 새 RPC `submit_farm_crop(p_crop_id)` — 크롭 행을 `FOR UPDATE`로
+  잠그고 `status='stored'`(+`harvested_at is not null`)일 때만 진행, 같은 함수 호출(=같은
+  트랜잭션) 안에서 크롭 `status`/`submitted_at`/`reward_points` 갱신과
+  `profiles.point_adjustment` 증가를 함께 처리한다 — 예외가 나면 전체 롤백이라 "출품만 되고
+  포인트가 안 들어오는" 반쪽 실패가 생길 수 없다. 재시도/중복 클릭은 두 번째 호출이 이미
+  `status<>'stored'`인 같은 행을 보고 `already_submitted`로 거부되어 두 번째 보상이 절대
+  발생하지 않는다(harvest 분기와 동일한 락 패턴). 포인트는 `bonus_points`가 아니라
+  `point_adjustment`에 더한다 — `bonus_points`는 크롭의 `reviewGained`(복습 보너스 확률) 계산에
+  쓰이는 "진짜 복습 활동" 신호라, 여기서 건드리면 지금 자라는 중인 다른 크롭들의 복습 보너스까지
+  오염된다. `private`/`public` 함수 분리(harden_public_security_surface 마이그레이션의 기존
+  관례)를 그대로 따라 `pixel_private.submit_farm_crop`(SECURITY DEFINER)과
+  `public.submit_farm_crop`(SECURITY INVOKER 래퍼)로 나눴다.
+- **광장 전시 UX**: 상시 하단 패널이 아니라 광장 안의 실제 오브젝트로 구현했다. 공지판과 마주보는
+  위치(`plazaLayout.ts`의 `PODIUM`, 공지판과 좌우 대칭)에 고정된 받침대(순수 CSS 도형, 기존
+  벤치/공지판과 같은 스타일)를 뒀고, 전시 중인 토마토가 있으면 그 위에 실제 `TomatoSprite`(농장
+  탭과 같은 컴포넌트 재사용)가 서 있다. 탭하면 크기·출품자·날짜가 담긴 작은 카드가 뜬다(우물
+  팝업과 같은 톤/크기, `calc(100% - 24px)` 기반 폭이라 좁은 화면에서도 보드를 넘치지 않음).
+  받침대(정적 장식)는 `PlazaLandscape.tsx`가, 그 위 토마토(매번 다를 수 있는 데이터)는 새
+  `CropExhibit.tsx`가 그린다 — 우물(정적)과 `PlazaActivities.tsx`(동적 팝업 로직)의 기존 분리와
+  같은 구조. 서버 조회는 광장 입장(마운트) 시 한 번뿐 — 새 realtime 채널은 추가하지 않았다(느리게
+  바뀌는 "지금까지 최고 기록" 게시판이라 다음에 들어올 때 갱신되는 것으로 충분하다는 판단).
+- **출품자 표시 방식**: 실명/이메일을 그대로 노출하지 않는다. 이미 이 앱이 주간 랭킹·최근 활동
+  피드에서 다른 학생에게 공개해 온 것과 같은 `COALESCE(nickname, display_name)` 표시명을
+  서버(`get_top_submitted_crop`)에서 미리 계산해 라벨 하나만 클라이언트로 내려준다 — 클라이언트는
+  `profiles` 테이블에 직접 접근할 필요가 전혀 없다. 광장의 실시간 캐릭터 이동 레이어
+  (`PlazaPlayerState`)는 애초에 닉네임을 전혀 보내지 않는 것과는 별개 판단이다: 그건 "지금 어디서
+  움직이고 있는지"라는 더 예민한 실시간 위치 정보라 더 엄격하게 다루고, 여긴 이미 앱 전역에서
+  검증된 정적 표시명을 재사용하는 "누가 무엇을 출품했는지" 게시판이다. 둘 다(닉네임/표시명) 비어
+  있으면 "이름 없는 농부"로 폴백한다.
+- 발견했지만 이번 범위 밖(고치지 않음): `profiles.bonus_points`/`point_adjustment` 두 컬럼이
+  `authenticated` 역할에 컬럼 단위 UPDATE 권한이 열려 있고, 신원 보호 트리거
+  (`protect_profile_identity`)는 `email`/`display_name`/`is_admin`만 지키고 이 두 포인트
+  컬럼은 다루지 않는다 — 즉 학생이 PostgREST로 자기 프로필 행에 직접 PATCH를 보내면 포인트를
+  스스로 올릴 수 있는 구멍이 이미 있었다(이번에 만든 게 아니라 기존 상태). 이번 `submit_farm_crop`
+  자체는 안전하지만(크롭 테이블은 애초에 `authenticated`에 UPDATE 권한이 없음, 확인함), 포인트
+  경제 전체의 더 근본적인 문제라 이번 PR 범위(출품/전시)를 벗어난다고 판단해 고치지 않았다.
+- 이번에 하지 않은 것(요청대로): 주간 리셋, 여러 작물 대회, 시즌 보상, 1~3등 전체 랭킹, 별도
+  대회 참가비, 농작물 거래.
+- 검증: `tests/pixel-room/farm-server.sql`에 새 블록 추가해 실제 Supabase에서 확인(전부 롤백) —
+  출품 시 크롭 상태 갱신과 포인트 지급의 델타가 정확히 일치(원자성), 중복 출품 시 재크레딧 없음,
+  타인의 크롭 출품 시도는 `not_found`로 거부되고 포인트도 지급 안 됨, 더 큰 작물 출품 시 전시
+  교체·같거나 작으면 교체 안 됨, 두 RPC 모두 익명 접근 거부. 이번 라운드에서 새로 추가/수정된
+  블록을 포함한 **전체 `farm-server.sql`을 한 번에 통째로 실행**해 마지막에 단일 `PASS` 메시지와
+  함께 `rollback`까지 클린하게 끝나는 것도 재확인했다. `tests/plaza/farm.test.ts`에
+  `computeSubmitReward`(공식·범위·단조성) 단위 테스트, `tests/plaza/layout.test.ts`에 새 받침대
+  footprint가 광장 전체 도달 가능성을 깨지 않는지 확인 추가(전체 유닛 테스트 122/122).
+  `tests/pixel-room/farm.browser.mjs`에 출품 버튼의 미리보기 금액이 실제 지급액과 일치, 출품 후
+  배지로 전환, 재입장 후에도 서버에 저장된 상태 유지 확인 추가(320/390/1440). 개발 중 실제로
+  발견한 실수 두 가지도 여기서 고쳤다: (1) 토마토 `<span>`을 절대위치 버튼의 자식으로 뒀다가
+  퍼센트 크기가 버튼 기준으로 계산돼 몇 픽셀로 쪼그라든 버그(허수아비 말풍선 사건과 같은 유형 —
+  형제로 분리해서 해결) — (2) Playwright 라우트 스텁 글롭이 Vite의 `?t=<timestamp>` 캐시버스팅
+  쿼리 때문에 매칭 안 되던 문제(글롭 끝에 `*` 추가). `tests/plaza/interactions.browser.mjs`에
+  받침대 탭→카드(빈 상태/채워진 상태)→닫기, 카드가 보드 경계 안에 머무는지 확인 추가(390/1440
+  포함, 스크린샷 확인). 기존 회귀(`base-appearance`/`doormat`/`furniture-race`/`yard`
+  (390/1440)/`dog`/`pixelShop/browser`(3뷰포트)/`plaza/interactions`/`plaza/landscape`
+  (390/1440)/`pixel-room/farm.browser.mjs`(320/390/1440)) 전부 재실행해 회귀 없음 확인.
+  `npm run build` clean, `npm run lint`에는 이번 변경 파일 관련 오류/경고 없음(처음에
+  `rectStyle`을 컴포넌트 파일에서 export해 fast-refresh 경고가 났던 것을 `plazaLayout.ts`로
+  옮겨 해결).

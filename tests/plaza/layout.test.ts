@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import './register-typescript.mjs';
 const { findSpawn, PLAZA_ENTRANCE, isWalkablePlaza, planWalk } = await import('../../src/features/pixel-room/plaza/plazaModel.ts');
+const { PODIUM } = await import('../../src/features/pixel-room/plaza/plazaLayout.ts');
 
 test('every open plaza cell connects to spawn and the home entrance', () => {
   const spawn = findSpawn();
@@ -28,4 +29,13 @@ test('well and benches block their bases, while paths go around them', () => {
     assert.ok(isWalkablePlaza(cell));
     previous = cell;
   }
+});
+test('the crop exhibit podium blocks its own footprint but never disconnects the courtyard (mirrors the notice board it sits opposite)', () => {
+  for (let x = PODIUM.footprint.x; x < PODIUM.footprint.x + PODIUM.footprint.w; x++)
+    for (let y = PODIUM.footprint.y; y < PODIUM.footprint.y + PODIUM.footprint.h; y++)
+      assert.equal(isWalkablePlaza({ x, y }), false);
+  // Same full-grid reachability guarantee as the top test above, scoped to right around the podium
+  // — a targeted regression check in case a future edit narrows this specific corner of the map.
+  for (const target of [{ x: 3, y: 3 }, { x: 6, y: 3 }, { x: 4, y: 4 }, { x: 5, y: 4 }])
+    assert.ok(planWalk(findSpawn(), target).length > 0, `still reachable near the podium: ${JSON.stringify(target)}`);
 });

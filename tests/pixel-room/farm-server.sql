@@ -306,5 +306,94 @@ begin
 
   execute 'reset role';
 end $$;
-select 'PASS: lifecycle, KST daily care, revisions/retries, stale replant, missed watering, history, server time, unchanged points, RLS/anonymous denial, crop size computed once/stored/audited/retry-safe/forgery-denied/best+last surfaced/unwatered-never-fails, real 4-day duration + 4-of-4 care cap, review snapshot-diff via the real RPC (including the live pre-harvest hint), legacy pre-migration crop compatibility, harvested crop collection (single RLS-scoped row, no duplicate on retry, no cross-user leak); all rolled back' as result;
+
+-- 수확물 출품/전시 (20260921100000_pixel_farm_crop_submission.sql): submit_farm_crop의 원자성 +
+-- 중복/타인 방지, get_top_submitted_crop의 안전한 표시명 + "더 큰 작물이 나오면 교체" 동작.
+do $$
+declare
+  a uuid; b uuid; c1 uuid; c2 uuid; r jsonb; denied boolean;
+  points_before int; points_after int; reward1 int; sz1 int; sz2 int; topcrop record;
+begin
+  select id into a from public.profiles where not exists(select 1 from public.pixel_farm_plots where user_id=profiles.id) limit 1;
+  select id into b from public.profiles where id<>a and not exists(select 1 from public.pixel_farm_plots where user_id=profiles.id) limit 1;
+  if a is null or b is null then raise exception 'Two fresh profiles required for the submission block'; end if;
+
+  perform set_config('request.jwt.claim.sub',a::text,true);
+  execute 'set local role authenticated';
+  r := public.act_pixel_farm(0,'plant',0);
+  c1 := (r#>>'{plots,0,crop,id}')::uuid;
+  execute 'reset role';
+  update public.pixel_farm_crops set planted_at=clock_timestamp()-interval '4 days 1 hour',ready_at=clock_timestamp()-interval '1 hour' where id=c1;
+  execute 'set local role authenticated';
+  r := public.act_pixel_farm(0,'harvest',1);
+  if r->>'result'<>'ok' then raise exception 'harvest failed %', r; end if;
+  sz1 := (r#>>'{harvest,sizeScore}')::int;
+
+  -- Status change + point credit happen in the same call/transaction: the delta must exactly equal
+  -- the reward returned, matching computeSubmitReward's own formula (kept in sync client-side).
+  select coalesce(bonus_points,0)+coalesce(point_adjustment,0) into points_before from public.profiles where id=a;
+  r := public.submit_farm_crop(c1);
+  if r->>'ok' <> 'true' then raise exception 'submit failed %', r; end if;
+  reward1 := (r->>'rewardPoints')::int;
+  if reward1 <> 10 + round(sz1*0.4) then raise exception 'reward formula mismatch: size=% reward=%', sz1, reward1; end if;
+  select coalesce(bonus_points,0)+coalesce(point_adjustment,0) into points_after from public.profiles where id=a;
+  if points_after - points_before <> reward1 then
+    raise exception 'points credited (%) do not match rewardPoints (%) — status change and point credit must happen atomically', points_after-points_before, reward1;
+  end if;
+  if not exists(select 1 from public.pixel_farm_crops where id=c1 and status='submitted' and submitted_at is not null and reward_points=reward1) then
+    raise exception 'crop row not updated to submitted/reward_points as expected';
+  end if;
+
+  -- Duplicate submit (retry/double-click): no second row-worth of credit.
+  r := public.submit_farm_crop(c1);
+  if r->>'ok' <> 'false' or r->>'reason' <> 'already_submitted' then raise exception 'duplicate submit not rejected: %', r; end if;
+  select coalesce(bonus_points,0)+coalesce(point_adjustment,0) into points_after from public.profiles where id=a;
+  if points_after - points_before <> reward1 then raise exception 'duplicate submit re-credited points: total delta now %', points_after-points_before; end if;
+
+  -- User b cannot submit a's crop (not their row -> not_found, never "already_submitted" which
+  -- would leak that the id exists at all) and gets no points from trying.
+  perform set_config('request.jwt.claim.sub',b::text,true);
+  select coalesce(bonus_points,0)+coalesce(point_adjustment,0) into points_before from public.profiles where id=b;
+  r := public.submit_farm_crop(c1);
+  if r->>'ok' <> 'false' or r->>'reason' <> 'not_found' then raise exception 'cross-user submit not blocked as not_found: %', r; end if;
+  select coalesce(bonus_points,0)+coalesce(point_adjustment,0) into points_after from public.profiles where id=b;
+  if points_after <> points_before then raise exception 'cross-user submit attempt credited b anyway'; end if;
+
+  -- get_top_submitted_crop: sees a's submitted crop, with a non-empty, safe (not raw uuid/email) label.
+  select * into topcrop from public.get_top_submitted_crop();
+  if topcrop.crop_id <> c1 then raise exception 'top crop mismatch after first submission: %', topcrop; end if;
+  if topcrop.submitter_label is null or topcrop.submitter_label = '' then raise exception 'empty submitter label'; end if;
+  execute 'reset role';
+
+  -- A second submitted crop (from b) replaces the exhibit only if it is strictly bigger.
+  perform set_config('request.jwt.claim.sub',b::text,true);
+  execute 'set local role authenticated';
+  r := public.act_pixel_farm(0,'plant',0);
+  c2 := (r#>>'{plots,0,crop,id}')::uuid;
+  execute 'reset role';
+  update public.pixel_farm_crops set planted_at=clock_timestamp()-interval '4 days 1 hour',ready_at=clock_timestamp()-interval '1 hour' where id=c2;
+  execute 'set local role authenticated';
+  r := public.act_pixel_farm(0,'harvest',1);
+  sz2 := (r#>>'{harvest,sizeScore}')::int;
+  perform public.submit_farm_crop(c2);
+  execute 'reset role';
+
+  select * into topcrop from public.get_top_submitted_crop();
+  if sz2 > sz1 then
+    if topcrop.crop_id <> c2 then raise exception 'bigger submission (size %) should have replaced the exhibit (still showing %, size %)', sz2, topcrop.crop_id, sz1; end if;
+  else
+    if topcrop.crop_id <> c1 then raise exception 'smaller/equal submission (size %) should not have replaced the exhibit (size %)', sz2, sz1; end if;
+  end if;
+
+  -- Anonymous/unauthenticated denial on both new RPCs (matches the app-wide pattern above).
+  execute 'set local role anon';
+  denied:=false;
+  begin perform public.submit_farm_crop(c1); exception when insufficient_privilege then denied:=true; end;
+  if not denied then raise exception 'anonymous submit_farm_crop allowed'; end if;
+  denied:=false;
+  begin perform public.get_top_submitted_crop(); exception when insufficient_privilege then denied:=true; end;
+  if not denied then raise exception 'anonymous get_top_submitted_crop allowed'; end if;
+  execute 'reset role';
+end $$;
+select 'PASS: lifecycle, KST daily care, revisions/retries, stale replant, missed watering, history, server time, unchanged points, RLS/anonymous denial, crop size computed once/stored/audited/retry-safe/forgery-denied/best+last surfaced/unwatered-never-fails, real 4-day duration + 4-of-4 care cap, review snapshot-diff via the real RPC (including the live pre-harvest hint), legacy pre-migration crop compatibility, harvested crop collection (single RLS-scoped row, no duplicate on retry, no cross-user leak), crop submission (atomic status+points, no duplicate credit, cross-user denial, exhibit replaces only for a strictly bigger crop, anonymous denial); all rolled back' as result;
 rollback;

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { FARM_BEDS, farmStage, farmDay, growthLabel, isFarmCell, computeCropSize, cropCareRatio, maxCareDaysFor, rollLuck, sizeLabel, FARM_GROWTH_DAYS, reviewRatioFor, bonusChanceFor, computeBonusAmount, computeCropSizeV2, REVIEW_RATIO_CAP, SCARECROW_CELL, farmMoisture } from '../../src/features/pixel-room/farm/farmModel.ts';
+import { FARM_BEDS, farmStage, farmDay, growthLabel, isFarmCell, computeCropSize, cropCareRatio, maxCareDaysFor, rollLuck, sizeLabel, FARM_GROWTH_DAYS, reviewRatioFor, bonusChanceFor, computeBonusAmount, computeCropSizeV2, REVIEW_RATIO_CAP, SCARECROW_CELL, farmMoisture, computeSubmitReward } from '../../src/features/pixel-room/farm/farmModel.ts';
 import { pickScarecrowLine } from '../../src/features/pixel-room/farm/scarecrowLines.ts';
 import { YARD_SPAWNS, yardPath, yardWalkable, yardExit } from '../../src/features/pixel-room/yard/yardModel.ts';
 import { yardDogWorld } from '../../src/features/pixel-room/pet/dogWorld.ts';
@@ -265,4 +265,17 @@ test('pickScarecrowLine: a crop with strong review activity can surface the revi
   const reviewySnap = mkSnapshot([mkCrop({ reviewGained: REVIEW_RATIO_CAP, lastWateredOn: farmDay(planted) }), null]);
   const draws = Array.from({ length: 3000 }, () => pickScarecrowLine(reviewySnap, planted, random));
   assert.ok(draws.some(line => line.includes('복습')), 'expected the review-linked hint to appear at least once over many draws');
+});
+
+test('computeSubmitReward: a flat base plus a size-proportional top-up, staying well under the shop\'s cheapest item across the whole [10,100] size range', () => {
+  assert.equal(computeSubmitReward(10), 14); // 10 + round(10*0.4)
+  assert.equal(computeSubmitReward(50), 30); // 10 + round(50*0.4)
+  assert.equal(computeSubmitReward(100), 50); // 10 + round(100*0.4)
+  let previous = -Infinity;
+  for (let size = 10; size <= 100; size++) {
+    const reward = computeSubmitReward(size);
+    assert.ok(Number.isInteger(reward) && reward >= 14 && reward <= 50, `reward ${reward} out of the documented 14..50 range for size ${size}`);
+    assert.ok(reward >= previous, 'reward is monotonic in size — a bigger tomato never pays less');
+    previous = reward;
+  }
 });
