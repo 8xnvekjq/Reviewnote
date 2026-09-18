@@ -126,6 +126,16 @@ try {
     await page.locator('.pr-scarecrow-bubble').waitFor({state:'hidden',timeout:5000});
     const before=await page.locator('.pr-yard-board').boundingBox();
     await bed(page);
+    // bed() only resolves once the player has actually arrived at the approach cell (bed.x-1,
+    // bed.y+1) — the .pr-farm-bed z-index used to be a flat 15 regardless of row, so the crop always
+    // rendered in front of the player/dog no matter where they stood. It's now row-based (bed.y+1,
+    // matching .pr-plaza-actor's/.pr-dog's own y-based depth sorting), so the player tending the bed
+    // must render clearly in front of it here.
+    const approachZ = await page.evaluate(() => ({
+      actor: Number(getComputedStyle(document.querySelector('.pr-plaza-actor')).zIndex),
+      bed: Number(getComputedStyle(document.querySelector('[data-plot="0"]')).zIndex),
+    }));
+    assert.ok(approachZ.actor > approachZ.bed, `player tending the bed must render in front of it (actor z=${approachZ.actor}, bed z=${approachZ.bed})`);
     const bubble=await page.locator('.pr-farm-bubble').boundingBox();
     assert.ok(bubble.x>=before.x && bubble.y>=before.y && bubble.x+bubble.width<=before.x+before.width && bubble.y+bubble.height<=before.y+before.height, 'bubble stays in board');
     assert.equal((await page.locator('.pr-yard-board').boundingBox()).height,before.height,'no extra panel reduces map');
@@ -147,12 +157,20 @@ try {
     await page.keyboard.press('Escape');
     await page.locator('.pr-farm-bubble').waitFor({state:'hidden'});
     assert.equal(await page.locator('.pr-farm-bubble').count(),0);
-    // The dog stays outside the beds while the player tends a crop.
+    // The dog stays outside the beds while the player tends a crop, and — same row-based z-index fix
+    // as the approach-cell check above — is never rendered behind a bed it's actually standing in
+    // front of (or in front of one it's actually behind), across many sampled positions/frames.
     const sample=await page.evaluate(async()=>{
-      const seen=[]; for(let i=0;i<40;i++){const dog=document.querySelector('.pr-dog');if(dog)seen.push([Number(dog.dataset.x),Number(dog.dataset.y)]);await new Promise(r=>setTimeout(r,50));}return seen;
+      const seen=[]; for(let i=0;i<40;i++){const dog=document.querySelector('.pr-dog');if(dog)seen.push([Number(dog.dataset.x),Number(dog.dataset.y),Number(getComputedStyle(dog).zIndex)]);await new Promise(r=>setTimeout(r,50));}return seen;
     });
     assert.ok(sample.length);
-    for(const [x,y] of sample) assert.ok(!([4,5,7,8].includes(y)&&x<=12&&x+1>=11),'dog avoids crop footprint');
+    for(const [x,y,z] of sample) {
+      assert.ok(!([4,5,7,8].includes(y)&&x<=12&&x+1>=11),'dog avoids crop footprint');
+      for (const bedY of [4,7]) {
+        if (y > bedY+1) assert.ok(z > bedY+1, `dog in front of bed(y=${bedY}) must out-rank it (dog y=${y} z=${z})`);
+        else if (y < bedY) assert.ok(z < bedY+1, `dog behind bed(y=${bedY}) must be out-ranked by it (dog y=${y} z=${z})`);
+      }
+    }
     // (the scarecrow now stands at y=3, outside the dog's own y4-9 roaming box entirely, so there
     // is no dog-vs-scarecrow footprint to check here anymore — see farmModel.ts's SCARECROW_CELL.)
     // Reload gets the same persisted crop, including today's care.
@@ -229,7 +247,7 @@ try {
     assert.deepEqual(other.errors,[]);
     await second.close();
     assert.deepEqual(errors,[]);
-    console.log(`PASS ${viewport.width}: in-world approach, plant/water/lost-response recovery, dog clearance (beds + scarecrow), reload/fresh-context persistence, 4-day server-time growth, moisture tiers, harvest/replant, no map height loss, crop size + review-bonus reveal + best/last record, scarecrow tap-to-speak, crop submission (reward formula preview, badge, reload persistence)`);
+    console.log(`PASS ${viewport.width}: in-world approach, plant/water/lost-response recovery, dog clearance (beds + scarecrow), row-based bed z-index (player/dog render in front when in front), reload/fresh-context persistence, 4-day server-time growth, moisture tiers, harvest/replant, no map height loss, crop size + review-bonus reveal + best/last record, scarecrow tap-to-speak, crop submission (reward formula preview, badge, reload persistence)`);
     await context.close();
   }
 } finally {await browser.close();}

@@ -39,7 +39,13 @@ export function Farm({ farm, actor, moving, walkTo }: { farm: ReturnType<typeof 
       const current = farm.snapshot?.plots.find(p => p.index === index)?.crop ?? null;
       const currentStage = farmStage(current, farm.now);
       return <button key={index} type="button" className="pr-farm-bed" data-plot={index} data-stage={currentStage} data-moisture={farmMoisture(current, farm.now)}
-        style={{ left: `${bed.x / 16 * 100}%`, top: `${bed.y / 12 * 100}%` }}
+        // +1 to match the yard's dog (Math.floor(y)+1 in Dog.tsx) — this stays tie-free against the
+        // dog at every reachable row near a bed (its own footprint rows are unwalkable, so it can
+        // never land exactly on bed.y). The player (.pr-plaza-actor uses y+2, not y+1, a pre-existing
+        // yard-specific offset) ties with this at exactly one row above a bed instead — a corner
+        // position, not the approach cell where tending actually happens, and far less likely to be
+        // noticed than the dog visibly vanishing behind a bed it's standing in front of would be.
+        style={{ left: `${bed.x / 16 * 100}%`, top: `${bed.y / 12 * 100}%`, zIndex: bed.y + 1 }}
         aria-label={`${index + 1}번 밭 · ${farm.snapshot ? names[currentStage] : '농장 확인'} · 돌보러 가기`}
         aria-expanded={selected === index && near} onClick={() => { wasNear.current = false; farm.clearMessage(); setSelected(index); walkTo({ x: bed.x - 1, y: bed.y + 1 }); }}>
         <TomatoSprite stage={currentStage} moisture={farmMoisture(current, farm.now)} />
