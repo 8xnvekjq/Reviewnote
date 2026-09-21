@@ -8,6 +8,7 @@ import {
   fetchReviewCheckItems,
   startReviewCheckSession,
   submitReviewCheckSession,
+  requestReviewCheckAiGrading,
   type ReviewCheckSession,
   type ReviewCheckItem,
 } from '../../utils/reviewCheckClient';
@@ -203,6 +204,7 @@ function ReviewCheckQuiz({
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [grading, setGrading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (items.length === 0) {
@@ -229,10 +231,16 @@ function ReviewCheckQuiz({
     try {
       const payload = items.map(it => ({ mistakeId: it.mistakeId, answer: (answers[it.mistakeId] || '').trim() }));
       await submitReviewCheckSession(session.id, payload);
+      // 제출 자체는 이미 성공했으니, AI 채점이 실패하거나 느려도 이 결과를 기다리다 학생을 막지
+      // 않는다(requestReviewCheckAiGrading은 절대 throw하지 않음) — 실패해도 곧바로 이어지는
+      // onSubmitted()가 기존 "선생님이 채점하면..." 대기 화면으로 자연스럽게 폴백시켜 준다.
+      setGrading(true);
+      await requestReviewCheckAiGrading(session.id);
       onSubmitted();
     } catch (err: any) {
       setError(err?.message || '제출하지 못했어요. 잠시 후 다시 시도해 주세요.');
       setSubmitting(false);
+      setGrading(false);
     }
   };
 
@@ -258,7 +266,7 @@ function ReviewCheckQuiz({
       <div style={{ marginTop: 16 }}>
         {isLast ? (
           <button type="button" className="rn-button rn-button-primary" onClick={handleSubmit} disabled={submitting} style={{ width: '100%' }}>
-            {submitting ? '제출 중...' : '제출하기'}
+            {grading ? '채점 중...' : submitting ? '제출 중...' : '제출하기'}
           </button>
         ) : (
           <button type="button" className="rn-button rn-button-primary" onClick={handleNext} style={{ width: '100%' }}>다음</button>
