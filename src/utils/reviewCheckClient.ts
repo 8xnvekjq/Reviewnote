@@ -6,6 +6,8 @@ import { supabase } from '../services/supabase';
 
 export type ReviewCheckStatus = 'in_progress' | 'submitted' | 'graded';
 export type ReviewCheckGrade = 'correct' | 'incorrect' | null;
+export type AiGradeVerdict = 'correct' | 'incorrect' | 'manual_review';
+export type GradedSource = 'ai' | 'admin';
 
 export interface ReviewCheckSession {
   id: string;
@@ -29,6 +31,16 @@ export interface ReviewCheckItem {
   position: number;
   submittedAnswer: string | null;
   grade: ReviewCheckGrade;
+  // AI 자동채점 결과 — review-check-grade Edge Function이 채웠다면 존재, 아니라면(아직 미실행 /
+  // 구버전 데이터) 전부 null. admin이 직접 O/X를 눌러 확정한 grade를 덮어쓰지 않는다.
+  aiVerdict: AiGradeVerdict | null;
+  aiConfidence: number | null;
+  aiReason: string | null;
+  aiNormalizedStudentAnswer: string | null;
+  aiCanonicalAnswer: string | null;
+  aiGradedAt: string | null;
+  aiGradingVersion: number | null;
+  gradedSource: GradedSource | null;
 }
 
 function mapSession(row: any): ReviewCheckSession {
@@ -56,6 +68,14 @@ function mapItem(row: any): ReviewCheckItem {
     position: row.position,
     submittedAnswer: row.submitted_answer,
     grade: row.grade,
+    aiVerdict: row.ai_verdict,
+    aiConfidence: row.ai_confidence,
+    aiReason: row.ai_reason,
+    aiNormalizedStudentAnswer: row.ai_normalized_student_answer,
+    aiCanonicalAnswer: row.ai_canonical_answer,
+    aiGradedAt: row.ai_graded_at,
+    aiGradingVersion: row.ai_grading_version,
+    gradedSource: row.graded_source,
   };
 }
 
@@ -157,4 +177,27 @@ export async function updateReviewCheckItemGrade(
   });
   if (error) throw error;
   return data;
+}
+
+// 제출 직후 AI 자동채점을 요청한다 — 이 호출은 학생 제출 흐름의 필수 경로가 아니라 "되면 좋은"
+// 보강 기능이다. 실패해도(네트워크 오류, Edge Function 장애 등) 절대 밖으로 throw하지 않고 그냥
+// null을 돌려준다 — 호출부는 이미 존재하는 "선생님이 채점하면..." 대기 화면으로 자연스럽게
+// 폴백하면 되므로, 이 실패 하나 때문에 제출 자체가 실패한 것처럼 보이면 안 된다.
+export async function requestReviewCheckAiGrading(
+  sessionId: string,
+): Promise<{ allGraded: boolean; gradedCount: number; manualReviewCount: number } | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke('review-check-grade', {
+      body: { sessionId },
+    });
+    if (error) throw error;
+    return {
+      allGraded: !!data?.allGraded,
+      gradedCount: data?.gradedCount ?? 0,
+      manualReviewCount: data?.manualReviewCount ?? 0,
+    };
+  } catch (err) {
+    console.error('Failed to request review check AI grading:', err);
+    return null;
+  }
 }

@@ -32,6 +32,26 @@ function reviewStateLabel(state: string): string {
   return '-';
 }
 
+// AI 자동채점 결과를 정답/학생답 블록 옆에 한 줄로 보여준다 — admin이 이 문항을 다시 판단할
+// 필요가 있는지(ai_verdict가 없거나 manual_review) 한눈에 구분되도록 색을 다르게 준다.
+function ReviewCheckAiHint({ item }: { item: ReviewCheckItem }) {
+  if (!item.aiVerdict) return null;
+  if (item.aiVerdict === 'manual_review') {
+    return (
+      <div className="rn-reviewcheck-ai-hint is-manual">
+        AI: 확인 필요{item.aiReason ? ` · ${item.aiReason}` : ''}
+      </div>
+    );
+  }
+  const label = item.aiVerdict === 'correct' ? '정답' : '오답';
+  const confidencePct = item.aiConfidence != null ? Math.round(item.aiConfidence * 100) : null;
+  return (
+    <div className="rn-reviewcheck-ai-hint is-confident">
+      AI: {label}{confidencePct != null ? ` (신뢰도 ${confidencePct}%)` : ''}
+    </div>
+  );
+}
+
 // 관리자 전용 "복습체크" 전체화면 오버레이 — 전체메뉴 "복습체크" 화면의 학생 목록에서 학생을
 // 선택하면 열린다. 안에서 목록 <-> 상세(채점/수정) <-> 문제별 상세를 전환한다(새 창 없음).
 //
@@ -158,8 +178,23 @@ function ReviewCheckGrading({
   mistakeById: Map<string, MistakeEntry>;
   onGraded: () => void;
 }) {
-  const [index, setIndex] = useState(0);
-  const [judgments, setJudgments] = useState<Record<string, 'correct' | 'incorrect'>>({});
+  // AI가 이미 자신 있게 채점한 문항(item.grade가 채워져 있음 — manual_review는 grade가 계속
+  // null이라 여기 해당 안 됨)은 admin이 다시 고를 필요가 없으니, 그 문항으로 매번 다시 눈길이
+  // 가지 않도록 아직 결정 안 된 첫 문항부터 바로 보여준다("확인 필요만 모아서 빠르게").
+  const [index, setIndex] = useState(() => {
+    const firstUndecided = items.findIndex(it => it.grade !== 'correct' && it.grade !== 'incorrect');
+    return firstUndecided === -1 ? 0 : firstUndecided;
+  });
+  // AI가 이미 confident하게 매긴 grade는 admin이 다시 판단할 필요가 없도록 미리 채워 둔다 —
+  // 그래도 judge()는 그대로 동작해서 admin이 클릭 한 번으로 언제든 뒤집을 수 있다(AI 판정이
+  // 최종은 아니고 admin의 판단이 항상 우선한다).
+  const [judgments, setJudgments] = useState<Record<string, 'correct' | 'incorrect'>>(() => {
+    const initial: Record<string, 'correct' | 'incorrect'> = {};
+    for (const it of items) {
+      if (it.grade === 'correct' || it.grade === 'incorrect') initial[it.mistakeId] = it.grade;
+    }
+    return initial;
+  });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -216,10 +251,19 @@ function ReviewCheckGrading({
         <div className="label">학생 답</div>
         <div className="value">{current.submittedAnswer?.trim() || '(빈 답안)'}</div>
       </div>
+      <ReviewCheckAiHint item={current} />
 
       <div className="rn-reviewcheck-ox-row">
-        <button type="button" className="rn-reviewcheck-ox-btn is-correct" onClick={() => judge('correct')}>O 정답</button>
-        <button type="button" className="rn-reviewcheck-ox-btn is-incorrect" onClick={() => judge('incorrect')}>X 오답</button>
+        <button
+          type="button"
+          className={`rn-reviewcheck-ox-btn is-correct ${judgments[current.mistakeId] === 'correct' ? 'is-active' : ''}`}
+          onClick={() => judge('correct')}
+        >O 정답</button>
+        <button
+          type="button"
+          className={`rn-reviewcheck-ox-btn is-incorrect ${judgments[current.mistakeId] === 'incorrect' ? 'is-active' : ''}`}
+          onClick={() => judge('incorrect')}
+        >X 오답</button>
       </div>
 
       <button
@@ -304,6 +348,11 @@ function ReviewCheckGradedReview({
                   <div className="label">학생 답</div>
                   <div className="value">{it.submittedAnswer?.trim() || '(빈 답안)'}</div>
                 </div>
+                {it.gradedSource && (
+                  <div className="rn-reviewcheck-ai-hint is-source">
+                    {it.gradedSource === 'ai' ? 'AI 자동채점' : '선생님 채점'}{it.gradedSource === 'ai' && it.aiReason ? ` · ${it.aiReason}` : ''}
+                  </div>
+                )}
               </div>
             </button>
             <div className="rn-reviewcheck-graded-ox">
@@ -364,6 +413,15 @@ function ReviewCheckGradedDetail({
         <div className="label">학생 답</div>
         <div className="value">{it.submittedAnswer?.trim() || '(빈 답안)'}</div>
       </div>
+      {it.gradedSource && (
+        <div className="rn-reviewcheck-answer-block">
+          <div className="label">채점 방식</div>
+          <div className="value">{it.gradedSource === 'ai' ? 'AI 자동채점' : '선생님 직접채점'}</div>
+          {it.gradedSource === 'ai' && it.aiReason && (
+            <div className="rn-reviewcheck-ai-hint is-source" style={{ marginTop: 4 }}>{it.aiReason}</div>
+          )}
+        </div>
+      )}
       {mistake && (
         <div className="rn-reviewcheck-answer-block">
           <div className="label">기존 채점 정보 (오답노트 복습 이력)</div>
