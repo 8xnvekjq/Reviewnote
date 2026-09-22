@@ -1,0 +1,53 @@
+-- Real purchase/ownership/activation verification; every change rolls back.
+begin;
+do $$
+declare a uuid; b uuid; before_points integer; r jsonb; denied boolean;
+begin
+  select id into a from public.profiles where greatest(0,bonus_points+point_adjustment)>=350
+    and not exists(select 1 from public.pixel_item_ownership where user_id=profiles.id and item_id in ('pet_duck','pet_dog')) limit 1;
+  select id into b from public.profiles where id<>a and not exists(select 1 from public.pixel_item_ownership where user_id=profiles.id and item_id='pet_duck') limit 1;
+  if a is null or b is null then raise exception 'Eligible test profiles needed'; end if;
+  select greatest(0,bonus_points+point_adjustment) into before_points from public.profiles where id=a;
+  perform set_config('request.jwt.claim.sub',a::text,true);
+  execute 'set local role authenticated';
+  r:=public.purchase_pixel_item('pet_duck');
+  if r->>'ok'<>'true' or (r->>'newBalance')::int<>before_points-150 then raise exception 'duck purchase/price %',r; end if;
+  r:=public.purchase_pixel_item('pet_duck');
+  if r->>'reason'<>'already_owned' then raise exception 'duplicate purchase accepted'; end if;
+  insert into public.pixel_pet_equipment(user_id,active_pet) values(a,'pet_duck') on conflict(user_id) do update set active_pet=excluded.active_pet;
+  if not exists(select 1 from public.pixel_pet_equipment where active_pet='pet_duck' and user_id=a) then raise exception 'duck activation'; end if;
+  update public.pixel_pet_equipment set active_pet=null where user_id=a;
+  r:=public.purchase_pixel_item('pet_dog');
+  if r->>'ok'<>'true' or (r->>'newBalance')::int<>before_points-350 then raise exception 'dog purchase regression'; end if;
+  update public.pixel_pet_equipment set active_pet='pet_dog' where user_id=a;
+  update public.pixel_pet_equipment set active_pet='pet_duck' where user_id=a;
+  if (select count(*) from public.pixel_pet_equipment where user_id=a)<>1 then raise exception 'multiple active companions'; end if;
+  denied:=false;
+  begin update public.pixel_pet_equipment set active_pet='pet_cat' where user_id=a; exception when check_violation then denied:=true; end;
+  if not denied then raise exception 'unsupported pet allowed'; end if;
+  execute 'reset role';
+  perform set_config('request.jwt.claim.sub',b::text,true);
+  execute 'set local role authenticated';
+  if exists(select 1 from public.pixel_pet_equipment where user_id=a) then raise exception 'cross-account read'; end if;
+  denied:=false;
+  begin insert into public.pixel_pet_equipment(user_id,active_pet) values(b,'pet_duck') on conflict(user_id) do update set active_pet=excluded.active_pet;
+  exception when foreign_key_violation then denied:=true; end;
+  if not denied then raise exception 'unowned activation'; end if;
+  denied:=false;
+  begin insert into public.pixel_pet_equipment(user_id,active_pet) values(a,null) on conflict(user_id) do update set active_pet=null;
+  exception when insufficient_privilege then denied:=true; end;
+  if not denied then raise exception 'cross-account write'; end if;
+  execute 'reset role';
+  update public.profiles set point_adjustment=-bonus_points where id=b;
+  execute 'set local role authenticated';
+  r:=public.purchase_pixel_item('pet_duck');
+  if r->>'ok'='true' then raise exception 'insufficient funds accepted'; end if;
+  execute 'reset role';
+  execute 'set local role anon';
+  denied:=false;
+  begin perform 1 from public.pixel_pet_equipment; exception when insufficient_privilege then denied:=true; end;
+  if not denied then raise exception 'anonymous read'; end if;
+  execute 'reset role';
+end $$;
+select 'PASS duck/dog purchase and exact debit, duplicate purchase, swap/deactivate, one active pet, ownership FK, RLS, invalid pet, insufficient funds and anonymous denial; rollback follows' as result;
+rollback;

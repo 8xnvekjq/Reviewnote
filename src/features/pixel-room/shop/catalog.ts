@@ -1,6 +1,7 @@
 import type { PixelItem } from './types';
 
-// Existing CC0 atlas art only. Keep IDs stable for server ownership; prices come from the server.
+// Avatar/furniture use existing atlas art; pet artwork provenance lives in pet/assets.
+// Keep IDs stable for server ownership; prices come from the server.
 // Asset selection and zero-based rows are documented in docs/pixel-world-content.md.
 export const PIXEL_CATALOG: readonly PixelItem[] = [
   { itemId: 'top_sage', category: 'avatar', slot: 'top', price: 25, assetKey: 'sage', displayName: '세이지 티셔츠', tier: 1, stackable: false },
@@ -49,6 +50,7 @@ export const PIXEL_CATALOG: readonly PixelItem[] = [
   { itemId: 'furniture_tallplant', category: 'furniture', slot: 'furniture', price: 80, assetKey: 'tallplant', displayName: '키 큰 초록 식물', tier: 2, stackable: false },
   { itemId: 'furniture_floorlamp', category: 'furniture', slot: 'furniture', price: 100, assetKey: 'floorlamp', displayName: '격자 갓 스탠드', tier: 2, stackable: false },
   { itemId: 'pet_dog', category: 'pet', slot: 'pet', price: 200, assetKey: 'dog', displayName: '우리 집 강아지', tier: 2, stackable: false },
+  { itemId: 'pet_duck', category: 'pet', slot: 'pet', price: 150, assetKey: 'duck', displayName: '까딱 오리', tier: 2, stackable: false },
   // 헤어가 긴머리/여성형 실루엣(번/단발/긴머리/옆머리)에 치우쳐 있어 짧은 스타일을 보강한다.
   // crop_*은 atlas에 이미 있던, 한 번도 팔지 않은 rows 0-4(볼륨 없는 단정한 숏컷) — 새 PNG 없음.
   // 다크브라운(row 0)은 다른 슬롯과 같은 이유로 팔지 않는다: hair:null일 때의 기본값이라 이미

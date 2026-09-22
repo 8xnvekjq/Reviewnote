@@ -8,7 +8,8 @@ import { YARD_DOOR, YARD_GATE, YARD_SPAWNS, yardExit, yardPath, yardWalkable } f
 import type { YardCell, YardDestination } from './yardModel';
 import '../plaza/plaza.css';
 import './yard.css';
-import { Dog } from '../pet/Dog';
+import { Companion } from '../pet/Companion';
+import type { PetId } from '../pet/petKinds';
 import { yardDogWorld } from '../pet/dogWorld';
 import { Farm } from '../farm/Farm';
 import { Scarecrow } from '../farm/Scarecrow';
@@ -31,8 +32,8 @@ const Landscape = memo(function Landscape() {
   </>;
 });
 
-interface Props { dogActive?: boolean; from: YardDestination; appearance: PublicAvatarAppearance; userId: string; onExit: (destination: YardDestination) => void }
-export default function FrontYard({ from, appearance, onExit, dogActive = false, userId }: Props) {
+interface Props { activePet?: PetId | null; from: YardDestination; appearance: PublicAvatarAppearance; userId: string; onExit: (destination: YardDestination) => void }
+export default function FrontYard({ from, appearance, onExit, activePet = null, userId }: Props) {
   const farm = useFarm();
   const inventory = useFarmInventory(userId);
   const [cropsOpen, setCropsOpen] = useState(false);
@@ -91,7 +92,7 @@ export default function FrontYard({ from, appearance, onExit, dogActive = false,
       <div className="pr-grid pr-plaza-grid">{cells.map(cell => <button type="button" key={`${cell.x}-${cell.y}`} tabIndex={-1} aria-hidden="true" disabled={!yardWalkable(cell)} onClick={() => walkTo(cell)} />)}</div>
       <button type="button" className="pr-yard-door" aria-label="집 문으로 걸어가기" onClick={() => walkTo(YARD_DOOR)} />
       <button type="button" className="pr-yard-gate" aria-label="길을 따라 광장으로 걸어가기" onClick={() => walkTo(YARD_GATE)}>↓</button>
-      {dogActive && <Dog world={yardDogWorld(actor)} />}
+      {activePet && <Companion key={activePet} pet={activePet} world={yardDogWorld(actor)} />}
       <Farm farm={farm} actor={actor} moving={moving} walkTo={walkTo} />
       <Scarecrow snapshot={farm.snapshot} now={farm.now} />
       <div className="pr-plaza-actor" aria-hidden="true" data-x={actor.x} data-y={actor.y} data-direction={direction} style={{ left: `${(actor.x - .6) / 16 * 100}%`, bottom: `${(11 - actor.y) / 12 * 100}%`, width: '13.75%', height: '18%', zIndex: actor.y + 2 }}><span className="pr-shadow" /><AvatarSprite direction={direction} frame={moving ? frame : 0} walking={moving} appearance={appearance} /></div>

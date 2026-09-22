@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { DogSprite } from '../pet/Dog';
+import { PetPreview } from '../pet/Companion';
+import { isPetId } from '../pet/petKinds';
 import type { usePet } from '../pet/usePet';
 import { AvatarSprite, FurnitureSprite } from '../sprites';
 import type { FurnitureType, RoomState } from '../model';
@@ -77,6 +78,7 @@ export function ShopPanel({ shop, pet, room, setMessage, busy, onPurchase, onPla
   return <div className="pr-shop">
     <div className="pr-shop-heading"><div><h2>작은 변화, 나다운 공간</h2><p>직접 입어 본 모습으로 골라요.</p></div><p className="pr-shop-balance"><strong>{shop.balance.toLocaleString()}P</strong></p></div>
     <div className="pr-category-tabs" aria-label="상품 분류">{[['all', '전체'], ...AVATAR_SLOTS.map(slot => [slot, SLOT_LABELS[slot]]), ['furniture', '가구'], ['pet', '펫']].map(([key, label]) => <button key={key} aria-pressed={category === key} onClick={() => { setCategory(key); setConfirming(null); }}>{label}</button>)}</div>
+    {category === 'pet' && <p className="pr-tool-hint">방과 마당에서 한 마리씩 함께 지내요. 다른 펫을 선택하면 이전 친구는 쉬어요.</p>}
     {!shop.ready ? <p role="status">구매 정보를 불러오는 중이에요…</p> : shop.loadError ? <div className="pr-shop-empty"><p>구매 정보를 불러오지 못했어요.</p><button className="rn-button rn-button-secondary" onClick={shop.reload}>다시 시도</button></div> : <div className="pr-shop-grid">{filtered.map(item => {
       const owned = shop.ownedIds.has(item.itemId);
       const avatar = item.category === 'avatar';
@@ -86,12 +88,12 @@ export function ShopPanel({ shop, pet, room, setMessage, busy, onPurchase, onPla
       const short = Math.max(0, item.price - shop.balance);
       return <article key={item.itemId} data-item={item.itemId} className={`pr-shop-card ${active ? 'pr-shop-active' : ''} ${item.tier === 3 ? 'pr-shop-goal' : ''}`}>
         <span className="pr-item-kind">{avatar ? SLOT_LABELS[item.slot as PixelAvatarSlot] : isPet ? '방과 마당의 친구' : item.tier === 3 ? '모으고 싶은 가구' : '가구'}</span>
-        <span className={`pr-shop-art ${avatar ? 'pr-item-avatar' : ''}`} aria-hidden="true">{avatar ? <AvatarSprite direction="Front" frame={0} walking={false} appearance={{ ...shop.equipped, [item.slot]: item.assetKey }} /> : isPet ? <DogSprite /> : <FurnitureSprite type={item.assetKey as FurnitureType} />}</span>
+        <span className={`pr-shop-art ${avatar ? 'pr-item-avatar' : ''}`} aria-hidden="true">{avatar ? <AvatarSprite direction="Front" frame={0} walking={false} appearance={{ ...shop.equipped, [item.slot]: item.assetKey }} /> : isPet ? <PetPreview pet={item.itemId} /> : <FurnitureSprite type={item.assetKey as FurnitureType} />}</span>
         {isPet && pet.error && <p role="alert">펫 설정을 확인하지 못했어요. <button onClick={pet.reload}>다시 확인</button></p>}
         <strong className="pr-shop-name">{item.displayName}</strong>
         <span className="pr-shop-status">{owned ? (active ? avatar ? '장착 중' : isPet ? '함께 사는 중' : '배치됨' : '보유 중') : `${item.price}P`}</span>
         {owned ? <button className="pr-shop-action" disabled={disabled || (avatar && active)} onClick={async () => {
-          if (isPet) { const ok = await pet.activate(!active); setMessage(ok ? active ? '강아지가 잠시 쉬어요.' : '강아지가 함께 살아요.' : '펫 설정을 저장하지 못했어요. 다시 시도해 주세요.'); return; }
+          if (isPet) { const ok = isPetId(item.itemId) && await pet.activate(active ? null : item.itemId); setMessage(ok ? active ? `${item.displayName} 친구가 잠시 쉬어요.` : `${item.displayName} 친구가 함께 살아요.` : '펫 설정을 저장하지 못했어요. 다시 시도해 주세요.'); return; }
           if (!avatar) { onPlace(item.assetKey as FurnitureType); return; }
           const ok = await shop.equip(item.slot as PixelAvatarSlot, item.itemId);
           setMessage(ok ? `${item.displayName} 장착 완료.` : '장착 확인에 실패했어요. 다시 시도해 주세요.');
