@@ -16,12 +16,13 @@ interface MistakeCardProps {
   isOwnNote?: boolean;    // 내 오답 여부 (admin이 타인 오답 볼 때 false)
   equippedStamp?: string; // 학생이 장착한 레어 도장 (예: 🔥, ⭐, 👑, 🐾, 💎)
   hasScaffolding?: boolean; // 스캐폴딩 힌트(선생님 또는 본인)가 있는지 여부
+  isReviewCheckWeak?: boolean; // 복습체크에서 가장 최근에 틀린(아직 마스터 못한) 문제인지 여부
   onToggleHidden?: (id: string, hidden: boolean) => void; // 시험범위 제외 등으로 카드 숨기기 (전달 안 되면 버튼 자체를 숨김)
   checkpointRegenStatus?: 'generating' | 'success' | 'failed'; // 정리하기(초기화) 후 단계형 체크리스트 재생성 진행 상태
   onRetryCheckpointGeneration?: () => void; // 재생성 실패 시 "다시 시도"
 }
 
-export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDelete, studentName, isOwnNote = true, equippedStamp, hasScaffolding, onToggleHidden, checkpointRegenStatus, onRetryCheckpointGeneration }) => {
+export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDelete, studentName, isOwnNote = true, equippedStamp, hasScaffolding, isReviewCheckWeak, onToggleHidden, checkpointRegenStatus, onRetryCheckpointGeneration }) => {
   const needsHelp = resolveNeedsHelp(entry.reviews, entry.analysis?.needsHelp);
   const completedCount = (entry.reviews || []).filter(r => r === 'O').length;
   const isCompleted = completedCount === 3;
@@ -52,6 +53,9 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
           {(hasScaffolding || entry.teacherScaffoldingHint?.trim()) && <span className="rn-note-scaffold-badge" title="스캐폴딩 힌트가 있어요" aria-label="스캐폴딩 힌트가 있어요">🧩</span>}
           {/* 복습체크 완벽! — 카드 높이를 늘리지 않도록 이미지 위 작은 배지 하나로만 표시. */}
           {entry.reviewCheckMasteredAt && <span className="rn-note-mastered-badge" title="복습체크에서 완벽! 판정을 받았어요" aria-label="복습체크 완벽">완벽!</span>}
+          {/* 복습체크 약함 — 마스터(완벽!)와 동시에 뜨지 않는다(마스터면 mastered_at이 이미
+              세워져 있어 위 조건이 먼저 참이 됨). 최근 복습체크에서 틀린 문제만 표시. */}
+          {!entry.reviewCheckMasteredAt && isReviewCheckWeak && <span className="rn-note-weak-badge" title="복습체크에서 최근에 틀렸어요 · 다시 복습해 보세요" aria-label="복습체크 약함">약함</span>}
         </div>
         <div className="rn-note-body">
           <h3 className="rn-note-title"><LaTeXRenderer text={entry.title} className="line-clamp-2" /></h3>

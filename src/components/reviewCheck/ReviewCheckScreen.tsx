@@ -6,12 +6,16 @@ import '../../styles/reviewCheck.css';
 import {
   fetchLatestReviewCheckSession,
   fetchReviewCheckItems,
+  fetchStudentReviewCheckSessions,
   startReviewCheckSession,
   submitReviewCheckSession,
   requestReviewCheckAiGrading,
   type ReviewCheckSession,
   type ReviewCheckItem,
 } from '../../utils/reviewCheckClient';
+import { AppIcon } from '../ui/AppIcon';
+import { LaTeXRenderer } from '../LaTeXRenderer';
+import { ReviewCheckImageZoom } from './ReviewCheckImageZoom';
 
 interface Props {
   currentUserId: string;
@@ -30,7 +34,14 @@ type ViewState =
   | { kind: 'start'; recentGraded: ReviewCheckSession | null }
   | { kind: 'quiz'; session: ReviewCheckSession; items: ReviewCheckItem[] }
   | { kind: 'waiting' }
+  | { kind: 'history' }
+  | { kind: 'historyDetail'; session: ReviewCheckSession }
   | { kind: 'error'; message: string };
+
+function formatDateLabel(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getMonth() + 1}/${String(d.getDate()).padStart(2, '0')}`;
+}
 
 // 학생용 "복습체크" — 범위 선택 -> 최대 5문제 -> 주관식 제출 -> 채점 대기, 만 알면 되도록
 // 화면 하나에 한 흐름만 보여준다. DB 상태(session 원본/RLS/RPC)는 여기서 절대 노출하지 않는다.
@@ -92,21 +103,41 @@ export function ReviewCheckScreen({ currentUserId, schoolGrade, mistakes }: Prop
       />
     );
   }
+  if (view.kind === 'history') {
+    return (
+      <ReviewCheckStudentHistoryList
+        studentId={currentUserId}
+        onBack={load}
+        onSelect={session => setView({ kind: 'historyDetail', session })}
+      />
+    );
+  }
+  if (view.kind === 'historyDetail') {
+    return (
+      <ReviewCheckStudentHistoryDetail
+        session={view.session}
+        mistakeById={mistakeById}
+        onBack={() => setView({ kind: 'history' })}
+      />
+    );
+  }
   return (
     <ReviewCheckStart
       schoolGrade={schoolGrade}
       recentGraded={view.recentGraded}
       onStarted={load}
+      onShowHistory={() => setView({ kind: 'history' })}
     />
   );
 }
 
 function ReviewCheckStart({
-  schoolGrade, recentGraded, onStarted,
+  schoolGrade, recentGraded, onStarted, onShowHistory,
 }: {
   schoolGrade?: string;
   recentGraded: ReviewCheckSession | null;
   onStarted: () => void;
+  onShowHistory: () => void;
 }) {
   const [grade, setGrade] = useState(() => defaultGradeFor(schoolGrade));
   const chapters = MATH_CURRICULUM[grade] || [];
@@ -151,7 +182,13 @@ function ReviewCheckStart({
 
   return (
     <div>
-      <p className="rn-caption" style={{ marginBottom: 14 }}>복습 완료한 문제 중 최대 5문제를 다시 풀어보고, 선생님 채점을 받아요.</p>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 14 }}>
+        <p className="rn-caption" style={{ margin: 0 }}>복습 완료한 문제 중 최대 5문제를 다시 풀어보고, 선생님 채점을 받아요.</p>
+        <button type="button" className="rn-reviewcheck-history-link" onClick={onShowHistory} style={{ flex: 'none' }}>
+          지난 기록 보기
+          <AppIcon name="arrow" width={12} height={12} />
+        </button>
+      </div>
 
       {recentGraded && (
         <div className="rn-surface" style={{ padding: 16, marginBottom: 14 }}>
@@ -206,6 +243,8 @@ function ReviewCheckQuiz({
   const [submitting, setSubmitting] = useState(false);
   const [grading, setGrading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 확대 오버레이는 이 컴포넌트를 언마운트하지 않고 위에 겹쳐 그려지므로, 닫아도 answers는 그대로 남는다.
+  const [zoomOpen, setZoomOpen] = useState(false);
 
   if (items.length === 0) {
     return (
@@ -250,7 +289,10 @@ function ReviewCheckQuiz({
         {index + 1} / {items.length}
       </div>
       {mistake && (
-        <img src={mistake.imageUrl} alt={mistake.title} style={{ width: '100%', borderRadius: 12, marginBottom: 14, display: 'block' }} />
+        <button type="button" className="rn-reviewcheck-zoomable-image" onClick={() => setZoomOpen(true)} aria-label="문제 이미지 확대해서 보기">
+          <img src={mistake.imageUrl} alt={mistake.title} />
+          <span className="rn-reviewcheck-zoom-hint">🔍 눌러서 확대</span>
+        </button>
       )}
       <div className="rn-examprep-range-field" style={{ width: '100%' }}>
         <label htmlFor="rc-answer">내 답</label>
@@ -273,6 +315,188 @@ function ReviewCheckQuiz({
         )}
       </div>
       {error && <div className="rn-examprep-warning" style={{ marginTop: 10 }}>⚠ {error}</div>}
+      {zoomOpen && mistake && (
+        <ReviewCheckImageZoom src={mistake.imageUrl} alt={mistake.title} onClose={() => setZoomOpen(false)} />
+      )}
+    </div>
+  );
+}
+
+// 학생 본인의 복습체크 기록 목록 — 관리자 오버레이의 history-row와 같은 카드 스타일을 재사용하되,
+// in_progress(아직 풀이 중) 세션은 "완료된 기록"이 아니므로 이 목록에서 제외한다. submitted인데
+// 아직 관리자 확인이 안 끝난 세션은 correctCount/totalCount가 아직 최종값이 아닐 수 있어 구체적인
+// 숫자 대신 "선생님 확인 중"으로만 안내한다(에러처럼 보이지 않게).
+function ReviewCheckStudentHistoryList({
+  studentId, onBack, onSelect,
+}: {
+  studentId: string;
+  onBack: () => void;
+  onSelect: (session: ReviewCheckSession) => void;
+}) {
+  const [sessions, setSessions] = useState<ReviewCheckSession[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchStudentReviewCheckSessions(studentId)
+      .then(rows => { if (!cancelled) setSessions(rows); })
+      .catch((err: any) => { if (!cancelled) setError(err?.message || '불러오는 중 문제가 발생했어요.'); });
+    return () => { cancelled = true; };
+  }, [studentId]);
+
+  const records = useMemo(() => (sessions || []).filter(s => s.status !== 'in_progress'), [sessions]);
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={onBack}>
+          <AppIcon name="arrow" width={14} height={14} style={{ transform: 'rotate(180deg)' }} />
+          돌아가기
+        </button>
+        <h3 className="rn-section" style={{ fontSize: 14, fontWeight: 750, margin: 0 }}>지난 기록</h3>
+        <span style={{ width: 60 }} />
+      </div>
+      {error && <div className="rn-examprep-warning">⚠ {error}</div>}
+      {!error && sessions === null && <div className="rn-empty"><span>불러오는 중...</span></div>}
+      {!error && sessions !== null && records.length === 0 && (
+        <div className="rn-empty"><span>아직 복습체크 기록이 없어요.</span></div>
+      )}
+      {!error && records.length > 0 && (
+        <div className="rn-reviewcheck-history-list">
+          {records.map(s => (
+            <button type="button" key={s.id} className="rn-reviewcheck-history-row" onClick={() => onSelect(s)}>
+              <span className="date">{formatDateLabel(s.createdAt)}</span>
+              {s.status === 'graded' ? (
+                <span className="result">{s.correctCount} / {s.totalCount}문제 정답</span>
+              ) : (
+                <span className="pending">선생님 확인 중 · {s.totalCount}문제</span>
+              )}
+              <AppIcon name="arrow" width={14} />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 학생 본인의 복습체크 기록 상세 — 관리자용 채점 화면과 같은 정보(문제 이미지/정답/학생답/AI 풀이)를
+// 보여주되, O/X를 매기거나 고칠 수 있는 어떤 컨트롤도 없다(읽기 전용). 최종 결과는 반드시
+// item.grade를 그대로 렌더한다 — admin이 override했다면 aiVerdict가 아니라 이 필드에만 진짜 최종
+// 판정이 반영돼 있다.
+function ReviewCheckStudentHistoryDetail({
+  session, mistakeById, onBack,
+}: {
+  session: ReviewCheckSession;
+  mistakeById: Map<string, MistakeEntry>;
+  onBack: () => void;
+}) {
+  const [items, setItems] = useState<ReviewCheckItem[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [index, setIndex] = useState(0);
+  const [zoomImage, setZoomImage] = useState<{ src: string; alt: string } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchReviewCheckItems(session.id)
+      .then(rows => { if (!cancelled) setItems(rows); })
+      .catch((err: any) => { if (!cancelled) setError(err?.message || '불러오는 중 문제가 발생했어요.'); });
+    return () => { cancelled = true; };
+  }, [session.id]);
+
+  const header = (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+      <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={onBack}>
+        <AppIcon name="arrow" width={14} height={14} style={{ transform: 'rotate(180deg)' }} />
+        목록
+      </button>
+      <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--rn-muted)' }}>{formatDateLabel(session.createdAt)}</span>
+    </div>
+  );
+
+  if (error) {
+    return <div className="rn-surface" style={{ padding: 16 }}>{header}<div className="rn-empty"><span>{error}</span></div></div>;
+  }
+  if (!items) {
+    return <div className="rn-surface" style={{ padding: 16 }}>{header}<div className="rn-empty"><span>불러오는 중...</span></div></div>;
+  }
+  if (items.length === 0) {
+    return <div className="rn-surface" style={{ padding: 16 }}>{header}<div className="rn-empty"><span>이 기록에는 문제가 없어요.</span></div></div>;
+  }
+
+  const current = items[index];
+  const mistake = mistakeById.get(current.mistakeId);
+  const resultLabel = current.grade === 'correct' ? 'O 정답' : current.grade === 'incorrect' ? 'X 오답' : '확인 중';
+  const resultClass = current.grade === 'correct' ? 'is-correct' : current.grade === 'incorrect' ? 'is-incorrect' : 'is-pending';
+
+  return (
+    <div className="rn-surface" style={{ padding: 16 }}>
+      {header}
+      <div style={{ textAlign: 'center', fontSize: 12.5, fontWeight: 700, color: 'var(--rn-muted)', marginBottom: 10 }}>
+        {index + 1} / {items.length}
+      </div>
+
+      {mistake && (
+        <button
+          type="button"
+          className="rn-reviewcheck-zoomable-image"
+          onClick={() => setZoomImage({ src: mistake.imageUrl, alt: mistake.title })}
+          aria-label="문제 이미지 확대해서 보기"
+        >
+          <img src={mistake.imageUrl} alt={mistake.title} />
+          <span className="rn-reviewcheck-zoom-hint">🔍 눌러서 확대</span>
+        </button>
+      )}
+      {mistake?.title && <h3 style={{ fontSize: 14, fontWeight: 750, margin: '0 0 10px' }}>{mistake.title}</h3>}
+
+      <div className="rn-reviewcheck-answer-block">
+        <div className="label">내가 쓴 답</div>
+        <div className="value">{current.submittedAnswer?.trim() || '(빈 답안)'}</div>
+      </div>
+      <div className="rn-reviewcheck-answer-block">
+        <div className="label">저장된 정답</div>
+        <div className="value">{mistake?.analysis?.finalAnswer?.trim() || '저장된 정답 없음'}</div>
+      </div>
+
+      <div className={`rn-reviewcheck-result-badge ${resultClass}`}>
+        {resultLabel}
+        {current.grade === null && <span className="rn-reviewcheck-result-sub">선생님이 확인하고 있어요, 조금만 기다려 주세요</span>}
+      </div>
+
+      {mistake?.analysis?.solvingProcess && (
+        <details className="rn-reviewcheck-collapse">
+          <summary>AI 풀이 다시 보기</summary>
+          <LaTeXRenderer text={mistake.analysis.solvingProcess} className="rn-reviewcheck-solving" />
+        </details>
+      )}
+
+      {mistake?.userActionPlan && (
+        <div className="rn-reviewcheck-answer-block">
+          <div className="label">나의 학습 대책</div>
+          <div className="value">{mistake.userActionPlan}</div>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+        <button
+          type="button"
+          className="rn-button rn-button-ghost"
+          style={{ flex: 1 }}
+          disabled={index === 0}
+          onClick={() => setIndex(i => i - 1)}
+        >‹ 이전 문제</button>
+        <button
+          type="button"
+          className="rn-button rn-button-ghost"
+          style={{ flex: 1 }}
+          disabled={index === items.length - 1}
+          onClick={() => setIndex(i => i + 1)}
+        >다음 문제 ›</button>
+      </div>
+
+      {zoomImage && (
+        <ReviewCheckImageZoom src={zoomImage.src} alt={zoomImage.alt} onClose={() => setZoomImage(null)} />
+      )}
     </div>
   );
 }
