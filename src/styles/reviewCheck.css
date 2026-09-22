@@ -2,8 +2,17 @@
 
 /* 관리자 전체화면 오버레이 — 새 window/tab 없이 앱 안에서 목록<->상세를 오간다. */
 .rn-reviewcheck-overlay { position: fixed; inset: 0; z-index: 60; background: var(--rn-bg, #0b0d12); display: flex; flex-direction: column; }
-.rn-reviewcheck-overlay-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--rn-line); flex: none; }
+/* "닫기"/"복습체크 내역" 뒤로가기 버튼이 노치/상태바에 가려 안 눌리던 문제 — 앱 기본 헤더
+   (.rn-header, design-system.css)와 동일한 safe-area-inset-top 패턴을 그대로 적용한다. 이
+   오버레이는 앱 셸을 완전히 덮는 position:fixed라 .rn-header의 안전영역 보정을 못 물려받는다. */
+.rn-reviewcheck-overlay-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: calc(env(safe-area-inset-top, 0px) + 12px) 16px 12px; border-bottom: 1px solid var(--rn-line); flex: none; }
 .rn-reviewcheck-overlay-body { flex: 1; overflow-y: auto; padding: 16px; max-width: 640px; margin: 0 auto; width: 100%; box-sizing: border-box; }
+
+/* 화면 안의 "뒤로가기/목록" 헤더가 스크롤에 딸려 위로 사라져(긴 AI 풀이 등을 읽다 보면) 다시
+   손이 닿는 곳까지 스크롤해 올려야만 눌리던 문제 — 각자의 스크롤 컨테이너 상단에 붙박이로
+   고정해서 스크롤 위치와 무관하게 항상 같은 자리에서 눌리게 한다. */
+.rn-reviewcheck-sticky-header { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; padding-block: 10px 12px; margin-bottom: 4px; background: var(--rn-surface); }
+.rn-reviewcheck-sticky-header.is-on-page-bg { background: var(--rn-bg, #0b0d12); }
 
 .rn-reviewcheck-history-list { display: grid; gap: 8px; }
 .rn-reviewcheck-history-row { display: flex; align-items: center; gap: 10px; padding: 12px 14px; min-height: 52px; border-radius: var(--rn-radius-md); background: var(--rn-surface); border: 1px solid var(--rn-line); text-align: left; box-sizing: border-box; width: 100%; }
