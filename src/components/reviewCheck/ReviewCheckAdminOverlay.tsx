@@ -18,6 +18,12 @@ interface Props {
   studentId: string;
   studentName: string;
   onClose: () => void;
+  // "문제카드 보기" — 원본 문제카드 상세(MistakeDetailModal)를 여는 진짜 소유자는 App.tsx다.
+  // 여기서는 새 모달을 따로 만들지 않고 그 전역 상태 세터(setSelectedEntry)를 그대로 받아
+  // 호출만 한다 — 그래야 기존 모달을 완전히 재사용하면서, 열고 닫아도 이 오버레이 안의 채점
+  // 진행 상태(judgments/index 등)는 전혀 건드리지 않는다(단순히 별개의 전역 오버레이가 그 위에
+  // 뜰 뿐이라 언마운트가 일어나지 않음).
+  onViewMistake: (entry: MistakeEntry) => void;
 }
 
 function formatDateLabel(iso: string): string {
@@ -52,6 +58,22 @@ function ReviewCheckAiHint({ item }: { item: ReviewCheckItem }) {
   );
 }
 
+// 문제 이미지 + "문제카드 보기" 오버레이 버튼 — 원본 문제카드(이미지/AI 풀이/대책 등 전체 내용)를
+// 다시 확인하고 싶을 때, 새 상세 UI를 만들지 않고 App.tsx가 이미 소유한 전역 MistakeDetailModal을
+// 그대로 연다(onViewMistake = setSelectedEntry). 이미지 위 작은 배지형 버튼이라 자리를 더 차지하지
+// 않는다.
+function ReviewCheckProblemImage({ mistake, onViewMistake }: { mistake: MistakeEntry; onViewMistake: (entry: MistakeEntry) => void }) {
+  return (
+    <div className="rn-reviewcheck-problem-image-wrap">
+      <img src={mistake.imageUrl} alt={mistake.title} />
+      <button type="button" className="rn-reviewcheck-view-card-btn" onClick={() => onViewMistake(mistake)}>
+        <span aria-hidden="true">🔍</span>
+        문제카드 보기
+      </button>
+    </div>
+  );
+}
+
 // 관리자 전용 "복습체크" 전체화면 오버레이 — 전체메뉴 "복습체크" 화면의 학생 목록에서 학생을
 // 선택하면 열린다. 안에서 목록 <-> 상세(채점/수정) <-> 문제별 상세를 전환한다(새 창 없음).
 //
@@ -59,7 +81,7 @@ function ReviewCheckAiHint({ item }: { item: ReviewCheckItem }) {
 // 학생의 mistakes만 직접 scoped query로 가져온다. 예전에는 AdminPanel이 이미 로드해 둔 "전체
 // 학생 mistakes"를 그대로 넘겨줬지만, 그 책임을 여기로 옮기면서(어드민 패널에는 더 이상 복습체크
 // 관련 상태가 없음) 오버레이가 스스로 필요한 데이터를 책임지는 편이 더 자연스럽다.
-export function ReviewCheckAdminOverlay({ studentId, studentName, onClose }: Props) {
+export function ReviewCheckAdminOverlay({ studentId, studentName, onClose, onViewMistake }: Props) {
   const [sessions, setSessions] = useState<ReviewCheckSession[] | null>(null);
   const [mistakeById, setMistakeById] = useState<Map<string, MistakeEntry> | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -103,6 +125,7 @@ export function ReviewCheckAdminOverlay({ studentId, studentName, onClose }: Pro
             session={selected}
             mistakeById={mistakeById}
             onChanged={load}
+            onViewMistake={onViewMistake}
           />
         ) : (
           <ReviewCheckHistoryList sessions={sessions} onSelect={setSelectedId} />
@@ -136,11 +159,12 @@ function ReviewCheckHistoryList({ sessions, onSelect }: { sessions: ReviewCheckS
 }
 
 function ReviewCheckSessionDetail({
-  session, mistakeById, onChanged,
+  session, mistakeById, onChanged, onViewMistake,
 }: {
   session: ReviewCheckSession;
   mistakeById: Map<string, MistakeEntry>;
   onChanged: () => void;
+  onViewMistake: (entry: MistakeEntry) => void;
 }) {
   const [items, setItems] = useState<ReviewCheckItem[] | null>(null);
 
@@ -160,10 +184,10 @@ function ReviewCheckSessionDetail({
   }
 
   if (session.status === 'submitted') {
-    return <ReviewCheckGrading session={session} items={items} mistakeById={mistakeById} onGraded={onChanged} />;
+    return <ReviewCheckGrading session={session} items={items} mistakeById={mistakeById} onGraded={onChanged} onViewMistake={onViewMistake} />;
   }
   if (session.status === 'graded') {
-    return <ReviewCheckGradedReview session={session} items={items} mistakeById={mistakeById} onEdited={onChanged} />;
+    return <ReviewCheckGradedReview session={session} items={items} mistakeById={mistakeById} onEdited={onChanged} onViewMistake={onViewMistake} />;
   }
   return <div className="rn-empty"><span>학생이 아직 풀이 중이에요.</span></div>;
 }
@@ -171,12 +195,13 @@ function ReviewCheckSessionDetail({
 // 채점 UX 핵심: 문제 이미지 -> 기존 정답 -> 학생 답 -> 큰 O/X. 한 번 누르면 자동으로 다음
 // 문제로 — 5문제를 연속으로 빠르게 채점할 수 있게.
 function ReviewCheckGrading({
-  session, items, mistakeById, onGraded,
+  session, items, mistakeById, onGraded, onViewMistake,
 }: {
   session: ReviewCheckSession;
   items: ReviewCheckItem[];
   mistakeById: Map<string, MistakeEntry>;
   onGraded: () => void;
+  onViewMistake: (entry: MistakeEntry) => void;
 }) {
   // AI가 이미 자신 있게 채점한 문항(item.grade가 채워져 있음 — manual_review는 grade가 계속
   // null이라 여기 해당 안 됨)은 admin이 다시 고를 필요가 없으니, 그 문항으로 매번 다시 눈길이
@@ -241,7 +266,7 @@ function ReviewCheckGrading({
         </div>
       </div>
 
-      {mistake && <img src={mistake.imageUrl} alt={mistake.title} style={{ width: '100%', borderRadius: 12, marginBottom: 12, display: 'block' }} />}
+      {mistake && <ReviewCheckProblemImage mistake={mistake} onViewMistake={onViewMistake} />}
 
       <div className="rn-reviewcheck-answer-block">
         <div className="label">문제카드 정답</div>
@@ -284,12 +309,13 @@ function ReviewCheckGrading({
 // 전체 상세(큰 이미지 + 기존 채점 정보 + Prev/Next)로 들어간다. 리스트의 O/X 토글은 그대로 둬서
 // 목록에서 바로 빠르게 정정도 가능하게 유지한다.
 function ReviewCheckGradedReview({
-  session, items, mistakeById, onEdited,
+  session, items, mistakeById, onEdited, onViewMistake,
 }: {
   session: ReviewCheckSession;
   items: ReviewCheckItem[];
   mistakeById: Map<string, MistakeEntry>;
   onEdited: () => void;
+  onViewMistake: (entry: MistakeEntry) => void;
 }) {
   const [localItems, setLocalItems] = useState(items);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -319,6 +345,7 @@ function ReviewCheckGradedReview({
         onNavigate={setDetailIndex}
         onToggle={handleToggle}
         onBack={() => setDetailIndex(null)}
+        onViewMistake={onViewMistake}
       />
     );
   }
@@ -380,7 +407,7 @@ function ReviewCheckGradedReview({
 // 학생 답안, 정답/채점 결과, 그 문제의 기존 채점 정보(O/X/★ 복습 이력)까지 한 화면에서 충분히
 // 확인할 수 있게 하고, Prev/Next로 채점된 문제들을 이어서 훑어볼 수 있다.
 function ReviewCheckGradedDetail({
-  items, index, mistakeById, pendingId, onNavigate, onToggle, onBack,
+  items, index, mistakeById, pendingId, onNavigate, onToggle, onBack, onViewMistake,
 }: {
   items: ReviewCheckItem[];
   index: number;
@@ -389,6 +416,7 @@ function ReviewCheckGradedDetail({
   onNavigate: (index: number) => void;
   onToggle: (mistakeId: string, grade: 'correct' | 'incorrect') => void;
   onBack: () => void;
+  onViewMistake: (entry: MistakeEntry) => void;
 }) {
   const it = items[index];
   const mistake = mistakeById.get(it.mistakeId);
@@ -403,7 +431,7 @@ function ReviewCheckGradedDetail({
         <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--rn-muted)' }}>{index + 1} / {items.length}</span>
       </div>
 
-      {mistake && <img src={mistake.imageUrl} alt={mistake.title} style={{ width: '100%', borderRadius: 12, marginBottom: 12, display: 'block' }} />}
+      {mistake && <ReviewCheckProblemImage mistake={mistake} onViewMistake={onViewMistake} />}
 
       <div className="rn-reviewcheck-answer-block">
         <div className="label">문제카드 정답</div>

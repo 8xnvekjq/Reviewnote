@@ -1908,7 +1908,7 @@ function App() {
             라우팅한다(BottomNavigation의 reviewCheckMenuAdmin/Student와 짝). */}
         <Screen when={activeTab === 'reviewCheck' && isAdmin}>
           <LazyScreenBoundary>
-            <ReviewCheckAdminScreen />
+            <ReviewCheckAdminScreen onViewMistake={setSelectedEntry} />
           </LazyScreenBoundary>
         </Screen>
 

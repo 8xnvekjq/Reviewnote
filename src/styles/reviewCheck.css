@@ -14,6 +14,12 @@
 .rn-reviewcheck-sticky-header { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; padding-block: 10px 12px; margin-bottom: 4px; background: var(--rn-surface); }
 .rn-reviewcheck-sticky-header.is-on-page-bg { background: var(--rn-bg, #0b0d12); }
 
+/* 관리자 채점 화면의 "문제카드 보기" — 이미지 위 작은 배지형 버튼이라 세로 공간을 추가로 잡아
+   먹지 않는다(모바일 고려). 누르면 App.tsx가 소유한 기존 MistakeDetailModal을 그대로 연다. */
+.rn-reviewcheck-problem-image-wrap { position: relative; margin-bottom: 12px; }
+.rn-reviewcheck-problem-image-wrap img { width: 100%; border-radius: 12px; display: block; }
+.rn-reviewcheck-view-card-btn { position: absolute; top: 8px; right: 8px; display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: #fff; background: rgba(0, 0, 0, .6); border: none; padding: 5px 9px; border-radius: 999px; cursor: pointer; backdrop-filter: blur(4px); }
+
 .rn-reviewcheck-history-list { display: grid; gap: 8px; }
 .rn-reviewcheck-history-row { display: flex; align-items: center; gap: 10px; padding: 12px 14px; min-height: 52px; border-radius: var(--rn-radius-md); background: var(--rn-surface); border: 1px solid var(--rn-line); text-align: left; box-sizing: border-box; width: 100%; }
 .rn-reviewcheck-history-row .date { font-size: 12px; font-weight: 700; color: var(--rn-muted); flex: none; width: 44px; }
