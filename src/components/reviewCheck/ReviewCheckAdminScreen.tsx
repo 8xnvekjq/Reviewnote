@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { MistakeEntry } from '../../types';
 import { supabase } from '../../services/supabase';
 import { fetchAllReviewCheckSessions, type ReviewCheckSession } from '../../utils/reviewCheckClient';
 import { ReviewCheckAdminOverlay } from './ReviewCheckAdminOverlay';
@@ -12,6 +13,11 @@ interface StudentRow {
   schoolGrade: string;
 }
 
+interface Props {
+  // "문제카드 보기" — App.tsx가 소유한 전역 setSelectedEntry를 그대로 전달받는다(새 모달 없음).
+  onViewMistake: (entry: MistakeEntry) => void;
+}
+
 // 전체메뉴 "복습체크"의 어드민 전용 진입점 — 채점/학생별 시험 관리를 한 곳에 모은다. 이전에는
 // AdminPanel(가입자 현황 대시보드)의 학생 카드 안에 배지+버튼으로 끼어 있었는데, 어드민 패널
 // 본연의 역할(가입자 통계/최근 활동)과 무관한 기능이 섞여 있었다 — 그 기능 전체를 여기로 옮기고
@@ -21,7 +27,7 @@ interface StudentRow {
 // 그 RPC는 학생에게 노출해도 안전한 정보만 주는 용도로 관리자 계정을 의도적으로 제외하는 등
 // 공개 범위가 다르게 설계돼 있다(App.tsx 주석 참고). 여기서는 AdminPanel과 동일하게 관리자
 // 전용 직접 조회(관리자만 RLS로 전체 프로필을 볼 수 있음)로 학생 목록을 가져온다.
-export function ReviewCheckAdminScreen() {
+export function ReviewCheckAdminScreen({ onViewMistake }: Props) {
   const [students, setStudents] = useState<StudentRow[] | null>(null);
   const [sessions, setSessions] = useState<ReviewCheckSession[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -138,6 +144,7 @@ export function ReviewCheckAdminScreen() {
           studentId={selected.id}
           studentName={selected.name}
           onClose={() => { setSelected(null); loadSessions(); }}
+          onViewMistake={onViewMistake}
         />
       )}
     </div>

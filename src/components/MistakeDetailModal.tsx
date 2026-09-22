@@ -1122,7 +1122,11 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   return (
     <div
       ref={modalRootRef}
-      className="rn-detail-backdrop fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4 modal-backdrop-enter"
+      // z-[95] — 복습체크 관리자 전체화면 오버레이(z-index:60)와 그 안의 이미지 확대(z-index:90)
+      // 위에서도 이 모달이 항상 최상단에 떠야 한다("문제카드 보기" 버튼으로 그 오버레이 안에서
+      // 열리는 경우 포함). 기존 z-50 값은 그 사이 어떤 것도 쓰고 있지 않아(51~94 구간 미사용
+      // 확인) 다른 화면 겹침에는 영향이 없다.
+      className="rn-detail-backdrop fixed inset-0 z-[95] flex items-end justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4 modal-backdrop-enter"
       onClick={handleBackdropClick}
     >
       <div role="dialog" aria-modal="true" aria-labelledby="rn-detail-title" className="rn-detail-sheet w-full max-w-3xl bg-slate-900 border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-slide-up">
