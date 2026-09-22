@@ -348,7 +348,7 @@ function ReviewCheckStudentHistoryList({
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+      <div className="rn-reviewcheck-sticky-header is-on-page-bg">
         <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={onBack}>
           <AppIcon name="arrow" width={14} height={14} style={{ transform: 'rotate(180deg)' }} />
           돌아가기
@@ -405,7 +405,7 @@ function ReviewCheckStudentHistoryDetail({
   }, [session.id]);
 
   const header = (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+    <div className="rn-reviewcheck-sticky-header">
       <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={onBack}>
         <AppIcon name="arrow" width={14} height={14} style={{ transform: 'rotate(180deg)' }} />
         목록
