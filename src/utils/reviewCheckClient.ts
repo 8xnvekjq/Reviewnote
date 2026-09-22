@@ -201,3 +201,38 @@ export async function requestReviewCheckAiGrading(
     return null;
   }
 }
+
+// 문제카드 "약함" 표시용 — review_check_mastered_at은 "정답 확정" 시점에만 세워지고 "오답 확정"
+// 시점엔 다시 null로 리셋되므로(private.apply_review_check_outcome 참고), null 하나만으로는
+// "한 번도 복습체크 안 함"과 "복습체크에서 최근에 틀림"을 구분할 수 없다. 그래서 문제별로 실제
+// review_check_items 이력을 직접 훑어 "가장 최근에 확정된 판정"을 계산한다 — 새 컬럼/테이블
+// 없이 기존 세션/문항 데이터만으로 구하는 순수 파생값이다. 파생 로직 자체는 supabase를 import하지
+// 않는 별도 순수 파일(reviewCheckLatestVerdict.ts)에 있다 — 그래야 Vite 없이도 유닛 테스트 가능.
+import { reduceLatestVerdictByMistake, type LatestReviewCheckVerdict } from './reviewCheckLatestVerdict';
+export type { LatestReviewCheckVerdict } from './reviewCheckLatestVerdict';
+export { reduceLatestVerdictByMistake } from './reviewCheckLatestVerdict';
+
+// 이 학생의 복습체크 전체 이력(모든 세션)에서, 문제(mistake)별로 가장 최근에 확정된 O/X 판정만
+// 뽑아낸다. 관리자가 AI 판정을 뒤집은 경우에도 grade 컬럼 자체가 이미 최종값이므로(AI 채점
+// RPC와 admin 채점 RPC가 같은 grade 컬럼을 공유) 별도의 "admin override 반영" 로직이 필요 없다.
+export async function fetchLatestReviewCheckVerdictByMistake(
+  studentId: string,
+): Promise<Map<string, LatestReviewCheckVerdict>> {
+  const sessions = await fetchStudentReviewCheckSessions(studentId); // 이미 created_at desc(최신순)
+  if (sessions.length === 0) return new Map();
+
+  const sessionOrder = new Map(sessions.map((s, i) => [s.id, i]));
+  const { data, error } = await supabase
+    .from('review_check_items')
+    .select('mistake_id, grade, session_id')
+    .in('session_id', sessions.map(s => s.id))
+    .not('grade', 'is', null);
+  if (error) throw error;
+
+  const itemsInSessionRecencyOrder = (data || [])
+    .slice()
+    .sort((a, b) => (sessionOrder.get(a.session_id) ?? 0) - (sessionOrder.get(b.session_id) ?? 0))
+    .map(row => ({ mistakeId: row.mistake_id as string, grade: row.grade as LatestReviewCheckVerdict }));
+
+  return reduceLatestVerdictByMistake(itemsInSessionRecencyOrder);
+}

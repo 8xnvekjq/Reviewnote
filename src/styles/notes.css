@@ -32,6 +32,9 @@
 .rn-note-scaffold-badge{position:absolute;bottom:8px;right:8px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--rn-success);border:1px solid var(--rn-success);opacity:.94;font-size:13px;backdrop-filter:blur(4px)}
 /* 복습체크에서 O 판정을 받아 "완벽!" 확정된 문제 — 이미지 우상단에 조용한 금색 배지 하나만. */
 .rn-note-mastered-badge{position:absolute;top:8px;right:8px;padding:3px 8px;border-radius:999px;background:var(--rn-warning);color:#3a2c06;font-size:10.5px;font-weight:800;backdrop-filter:blur(4px)}
+/* 복습체크에서 최근에 틀린(아직 마스터 못한) 문제 — 완벽!과 같은 자리, 같은 크기지만 "성공"이
+   아니라 "다시 볼 것"이라는 뜻이 드러나도록 danger 톤으로만 구분한다. */
+.rn-note-weak-badge{position:absolute;top:8px;right:8px;padding:3px 8px;border-radius:999px;background:var(--rn-danger);color:#3a0a12;font-size:10.5px;font-weight:800;backdrop-filter:blur(4px)}
 /* 상단 베젤 제거로 이미지 바로 아래가 body의 유일한 상단 여백이 되므로, 기존에 좁은
    화면(<359px)에서만 쓰던 tighter padding을 기본값으로 승격(카드 전체 compact화). */
 .rn-note-body{padding:8px 14px 4px}.rn-note-context{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;margin-top:3px}

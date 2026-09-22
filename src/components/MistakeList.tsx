@@ -52,6 +52,7 @@ interface MistakeListProps {
   equippedStamp?: string;
   profilesStampMap?: Record<string, string>;
   scaffoldedMistakeIds?: Set<string>;
+  weakMistakeIds?: Set<string>; // 복습체크에서 가장 최근에 틀린(아직 마스터 못한) 오답 id 집합
   onToggleHidden?: (id: string, hidden: boolean) => void; // 시험범위 제외 등으로 카드 숨기기/해제
   checkpointRegenStatusMap?: Record<string, 'generating' | 'success' | 'failed'>; // 정리하기(초기화) 후 체크리스트 재생성 진행 상태
   onRetryCheckpointGeneration?: (entry: MistakeEntry) => void; // 재생성 실패 시 "다시 시도"
@@ -80,6 +81,7 @@ export const MistakeList: React.FC<MistakeListProps> = ({
   equippedStamp,
   profilesStampMap = {},
   scaffoldedMistakeIds,
+  weakMistakeIds,
   onToggleHidden,
   checkpointRegenStatusMap = {},
   onRetryCheckpointGeneration,
@@ -483,6 +485,7 @@ export const MistakeList: React.FC<MistakeListProps> = ({
                   isOwnNote={!isAdmin || entry.userId === currentUserId}
                   equippedStamp={entry.userId ? profilesStampMap[entry.userId] : equippedStamp}
                   hasScaffolding={scaffoldedMistakeIds?.has(entry.id)}
+                  isReviewCheckWeak={weakMistakeIds?.has(entry.id)}
                   onToggleHidden={onToggleHidden}
                   checkpointRegenStatus={checkpointRegenStatusMap[entry.id]}
                   onRetryCheckpointGeneration={onRetryCheckpointGeneration ? () => onRetryCheckpointGeneration(entry) : undefined}

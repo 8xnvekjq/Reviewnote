@@ -31,6 +31,7 @@ import type { EquippedItems } from './types';
 import { applyThemeColor } from './utils/theme';
 import { loadStreakState, reconcileStreakState, getKSTDateString, type StreakState } from './utils/streak';
 import { canViewOwnExamPrep } from './utils/examPrepAccess';
+import { fetchLatestReviewCheckVerdictByMistake } from './utils/reviewCheckClient';
 
 // PR9: 관리자 전용 화면(AdminPanel/ScaffoldingPanel)과 럭키상점(GachaStore)은 첫 화면(오답노트
 // 목록)을 보여주는 데는 필요 없는데, 지금까지는 일반 import라 학생 계정에서도 초기 번들에
@@ -401,6 +402,27 @@ function App() {
     if (session?.user?.id && !isAdmin) {
       checkUnseenScaffoldings();
     }
+  }, [session?.user?.id, isAdmin]);
+
+  // 문제카드 "약함" 표시 — 학생 본인의 복습체크 전체 이력에서 파생되는 값이라 mistakes 자체와는
+  // 별개 쿼리로 가져온다("마스터" 배지는 review_check_mastered_at이 mistakes 로우에 이미 실려
+  // 오지만, "약함"은 review_check_items 이력을 직접 훑어야 해서 새 쿼리가 필요하다). 관리자
+  // 화면에서는 아직 계산하지 않는다(학생 1명 단위 쿼리라, 여러 학생을 한 번에 보는 관리자 뷰까지
+  // 확장하려면 별도 설계가 필요 — 이번 범위 밖). 카드 자체가 먼저 렌더된 뒤 배지만 한 박자 늦게
+  // 붙어도 괜찮다(초기 렌더를 막지 않음).
+  const [weakMistakeIds, setWeakMistakeIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!session?.user?.id || isAdmin) { setWeakMistakeIds(new Set()); return; }
+    let cancelled = false;
+    fetchLatestReviewCheckVerdictByMistake(session.user.id)
+      .then(verdictByMistake => {
+        if (cancelled) return;
+        const weak = new Set<string>();
+        verdictByMistake.forEach((verdict, mistakeId) => { if (verdict === 'incorrect') weak.add(mistakeId); });
+        setWeakMistakeIds(weak);
+      })
+      .catch(err => console.error('Failed to load review check weak status:', err));
+    return () => { cancelled = true; };
   }, [session?.user?.id, isAdmin]);
 
   const handleCloseNewScaffoldingModal = async () => {
@@ -1796,6 +1818,7 @@ function App() {
             equippedStamp={equippedItems.stamp}
             profilesStampMap={profilesStampMap}
             scaffoldedMistakeIds={scaffoldedMistakeIds}
+            weakMistakeIds={weakMistakeIds}
             onToggleHidden={handleToggleHidden}
             checkpointRegenStatusMap={checkpointRegenStatus}
             onRetryCheckpointGeneration={regenerateCheckpointsWithProgress}
