@@ -8,8 +8,8 @@ import { usePixelShop } from './usePixelShop';
 import { ShopPanel, Wardrobe } from './shop/CustomizationPanel';
 import Plaza from './plaza/Plaza';
 import FrontYard from './yard/FrontYard';
-import { Dog } from './pet/Dog';
-import { DOG_ITEM_ID } from './pet/dogModel';
+import { Companion } from './pet/Companion';
+import { isPetId } from './pet/petKinds';
 import { roomDogWorld } from './pet/dogWorld';
 import { usePet } from './pet/usePet';
 import { fetchPixelFurniturePlacement, savePixelRoomLayout } from '../../utils/pixelShop';
@@ -264,8 +264,8 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
       return;
     }
     if (item.category === 'pet') {
-      const ok = await pet.activate(true);
-      setMessage(ok ? '강아지가 우리 집에 왔어요!' : '구매 완료! 펫 탭에서 함께 살기를 다시 눌러 주세요.');
+      const ok = isPetId(item.itemId) && await pet.activate(item.itemId);
+      setMessage(ok ? `${item.displayName} 친구가 우리 집에 왔어요!` : '구매 완료! 펫 탭에서 함께 살기를 다시 눌러 주세요.');
       return;
     }
     const type = item.assetKey as FurnitureType;
@@ -400,7 +400,7 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
     </header>
     {location === 'room' && storageError && <p className="pr-storage-error" role="alert">{storageError}</p>}
     {location === 'plaza' && <Plaza userId={userId} sessionId={sessionId} onReachEntrance={() => transitionTo('yard')} />}
-    {location === 'yard' && <FrontYard from={yardFrom} appearance={shop.equipped} userId={userId} dogActive={pet.ready && !pet.error && pet.active === DOG_ITEM_ID && shop.ownedIds.has(DOG_ITEM_ID)} onExit={transitionTo} />}
+    {location === 'yard' && <FrontYard from={yardFrom} appearance={shop.equipped} userId={userId} activePet={pet.ready && !pet.error && pet.active && shop.ownedIds.has(pet.active) ? pet.active : null} onExit={transitionTo} />}
     {location === 'room' && <div className={`pr-room-frame ${decorating ? 'pr-decorating' : ''}`}>
       <div className="pr-wall" aria-hidden="true"><div className="pr-window"><i /><i /><i /><i /></div><span>HOME, SWEET HOME</span></div>
       <div className="pr-stage">
@@ -423,7 +423,7 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
              쪽으로 걸어간다. */}
           <div className="pr-doormat" style={{ left: `${(ROOM_DOOR.x - 0.5) * 10}%`, top: `${ROOM_DOOR.y * 12.5}%`, width: '20%', height: '12.5%' }}><DoormatSprite /></div>
           {activeRoom.furniture.map(item => <div key={item.type} data-furniture={item.type} className={`pr-furniture ${selected === item.type ? 'pr-selected' : ''}`} style={{ left: `${item.x * 10}%`, top: `${item.y * 12.5}%`, width: `${FURNITURE[item.type].width * 10}%`, height: `${FURNITURE[item.type].height * 12.5}%`, zIndex: item.y + FURNITURE[item.type].height }}><FurnitureSprite type={item.type} /></div>)}
-          {roomReady && shop.ready && !shop.loadError && pet.ready && !pet.error && pet.active === DOG_ITEM_ID && shop.ownedIds.has(DOG_ITEM_ID) && <Dog key={JSON.stringify(activeRoom.furniture)} world={roomDogWorld(activeRoom, actor)} paused={decorating} />}
+          {roomReady && shop.ready && !shop.loadError && pet.ready && !pet.error && pet.active && shop.ownedIds.has(pet.active) && <Companion pet={pet.active} key={`${pet.active}:${JSON.stringify(activeRoom.furniture)}`} world={roomDogWorld(activeRoom, actor)} paused={decorating} />}
           <button type="button" className="pr-actor" data-x={actor.x} data-y={actor.y} data-direction={direction} data-shirt={shop.equipped.top ?? 'default'} style={{ left: `${actor.x * 10 - 6}%`, bottom: `${(ROOM_HEIGHT - actor.y - 1) * 12.5}%`, zIndex: actor.y + 1, pointerEvents: decorating ? 'none' : 'auto' }} tabIndex={decorating ? -1 : 0} onClick={event => { event.stopPropagation(); speak(); }} aria-label={`내 캐릭터, ${actor.x + 1}열 ${actor.y + 1}행. 눌러서 말 걸어보기`}>
             {speech && <span className="pr-bubble" role="status">{speech}</span>}
             <span className="pr-shadow" /><AvatarSprite direction={direction} frame={held || walkQueue.length > 0 ? frame : 0} walking={!!held || walkQueue.length > 0} appearance={shop.equipped} />
