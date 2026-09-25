@@ -1,3 +1,4 @@
+import { PlazaShopDialog } from './shop/PlazaShopDialog';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { FURNITURE, ROOM_HEIGHT, ROOM_WIDTH, defaultState, findSpawn, isCellFree, loadRoom, placeFurniture, planWalk, removeFurniture, storageKey, validateRoom } from './model';
@@ -21,7 +22,7 @@ const keys: Record<string, Direction> = { ArrowDown: 'Front', s: 'Front', ArrowU
 const names: Record<FurnitureType, string> = { bed: '포근한 침대', desk: '나무 책상', chair: '작은 의자', bookshelf: '나의 책장', plant: '초록 화분', decoration: '작은 장식', roundtable: '레이스 원형 테이블', television: '레트로 TV 장식장', aquarium: '작은 바다 수조', globe: '여행자의 지구본', tallplant: '키 큰 초록 식물', floorlamp: '격자 갓 스탠드' };
 const cells = Array.from({ length: ROOM_WIDTH * ROOM_HEIGHT }, (_, i) => ({ x: i % ROOM_WIDTH, y: Math.floor(i / ROOM_WIDTH) }));
 type WalkStep = { cell: Cell; direction: Direction };
-type Panel = 'clothes' | 'furniture' | 'shop';
+type Panel = 'clothes' | 'furniture';
 
 // Three small scenes share the existing fade/transition lock; only Plaza owns realtime.
 type Location = 'room' | 'yard' | 'plaza';
@@ -101,6 +102,7 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
   const [walkQueue, setWalkQueue] = useState<WalkStep[]>([]);
   const [decorating, setDecorating] = useState(false);
   const [panel, setPanel] = useState<Panel>('clothes');
+  const [plazaShopOpen, setPlazaShopOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [dpadOpen, setDpadOpen] = useState(false);
   const [selected, setSelected] = useState<FurnitureType | null>(null);
@@ -268,6 +270,7 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
       setMessage(ok ? `${item.displayName} 친구가 우리 집에 왔어요!` : '구매 완료! 펫 탭에서 함께 살기를 다시 눌러 주세요.');
       return;
     }
+    if (location !== 'room') { setMessage(`${item.displayName} 구매 완료! 집의 가구 보관함에서 놓을 수 있어요.`); return; }
     const type = item.assetKey as FurnitureType;
     enterDecorating();
     setSelected(type);
@@ -383,6 +386,7 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
     exitDecorating(`${names[selected]} 배치 완료! 이제 방을 누르면 그 자리로 걸어가요.`);
   }
   const placed = selected && room.furniture.some(item => item.type === selected);
+  function explainShop() { setSheetOpen(false); setMessage('새 아이템은 광장 오른쪽의 작은 상점에서 만나요. 카펫을 지나 마당 → 광장으로 걸어가세요.'); }
   function openPanel(next: Panel) { setSheetOpen(open => !(open && panel === next)); setPanel(next); }
   return <section className="pr-shell" aria-label="Pixel Room" style={roomStyle}>
     <h1 className="sr-only">나만의 Pixel Room</h1>
@@ -399,7 +403,8 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
       }}>{decorating ? '꾸미기 완료' : '꾸미기'}</button>}
     </header>
     {location === 'room' && storageError && <p className="pr-storage-error" role="alert">{storageError}</p>}
-    {location === 'plaza' && <Plaza userId={userId} sessionId={sessionId} onReachEntrance={() => transitionTo('yard')} />}
+    {location === 'plaza' && <Plaza equippedAppearance={shop.equipped} onOpenShop={() => { setMessage('마음에 드는 것을 골라 보세요. 펫은 집과 마당에서 만나요.'); setPlazaShopOpen(true); }} userId={userId} sessionId={sessionId} onReachEntrance={() => transitionTo('yard')} />}
+    {location === 'plaza' && plazaShopOpen && <PlazaShopDialog onClose={() => setPlazaShopOpen(false)}><p role="status">{message}</p><ShopPanel shop={shop} pet={pet} room={activeRoom} busy={!!purchasingId} setMessage={setMessage} onPurchase={handlePurchase} canPlace={false} onPlace={() => {}} /></PlazaShopDialog>}
     {location === 'yard' && <FrontYard from={yardFrom} appearance={shop.equipped} userId={userId} activePet={pet.ready && !pet.error && pet.active && shop.ownedIds.has(pet.active) ? pet.active : null} onExit={transitionTo} />}
     {location === 'room' && <div className={`pr-room-frame ${decorating ? 'pr-decorating' : ''}`}>
       <div className="pr-wall" aria-hidden="true"><div className="pr-window"><i /><i /><i /><i /></div><span>HOME, SWEET HOME</span></div>
@@ -445,22 +450,21 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
       <div className="pr-sheet-trigger">
         <button aria-pressed={sheetOpen && panel === 'clothes'} aria-expanded={sheetOpen && panel === 'clothes'} aria-controls="pr-sheet-panel" onClick={() => openPanel('clothes')}>옷</button>
         <button aria-pressed={sheetOpen && panel === 'furniture'} aria-expanded={sheetOpen && panel === 'furniture'} aria-controls="pr-sheet-panel" onClick={() => openPanel('furniture')}>가구 <small>{ownedFurnitureTypes.size}</small></button>
-        <button aria-pressed={sheetOpen && panel === 'shop'} aria-expanded={sheetOpen && panel === 'shop'} aria-controls="pr-sheet-panel" onClick={() => openPanel('shop')}>상점 <small>{shop.ownedIds.size}/{shop.catalog.length}</small></button>
       </div>
       {sheetOpen && <div className={`pr-sheet-panel pr-panel-${panel}`} id="pr-sheet-panel">
         {/* Visual-only duplicate: the live region that actually announces changes stays the one
            in .pr-below-room (always mounted) — this one is just here because the sheet panel
            visually covers that region while open, per Codex review finding #10. */}
         <p className="pr-sheet-status" aria-hidden="true">{message}</p>
-        {panel === 'clothes' ? <Wardrobe shop={shop} busy={!!purchasingId} setMessage={setMessage} onShop={() => setPanel('shop')} />
-          : panel === 'furniture' ? <>
+        {panel === 'clothes' ? <Wardrobe shop={shop} busy={!!purchasingId} setMessage={setMessage} onShop={explainShop} />
+          : <>
             <p className="pr-tool-hint">{decorating ? '가구를 선택 → 방의 칸을 터치. 배치한 가구도 다시 옮길 수 있어요.' : '꾸미기를 켜면 가구를 놓고 옮길 수 있어요.'}</p>
             {ownedFurnitureTypes.size === 0
-              ? <div className="pr-shop-empty"><p>아직 보유한 가구가 없어요.</p><button type="button" className="rn-button rn-button-secondary" onClick={() => setPanel('shop')}>상점 둘러보기</button></div>
+              ? <div className="pr-shop-empty"><p>아직 보유한 가구가 없어요.</p><button type="button" className="rn-button rn-button-secondary" onClick={explainShop}>광장 상점 안내</button></div>
               : <div className="pr-catalog">{(Object.keys(FURNITURE) as FurnitureType[]).filter(type => ownedFurnitureTypes.has(type)).map(type => <button key={type} aria-pressed={selected === type} onClick={() => { enterDecorating(); setSelected(selected === type ? null : type); setMessage(`${names[type]}: 원하는 칸을 눌러 주세요.`); }}><span className="pr-catalog-art"><FurnitureSprite type={type} /></span><strong>{names[type]}</strong><small>{room.furniture.some(item => item.type === type) ? '배치 중' : '보유 1개'}</small></button>)}</div>}
             {placed && <button className="rn-button rn-button-secondary pr-remove" onClick={() => { persist(removeFurniture(room, selected)); exitDecorating(`${names[selected]}을 보관함으로 돌려놓았어요. 이제 방을 누르면 그 자리로 걸어가요.`); }}>선택한 가구 치우기</button>}
-          </>
-          : <ShopPanel shop={shop} pet={pet} room={activeRoom} busy={!!purchasingId} setMessage={setMessage} onPurchase={handlePurchase} onPlace={type => { enterDecorating(); setSelected(type); setMessage(`${names[type]}: 원하는 칸을 눌러 주세요.`); }} />}
+          </>}
+
 
       </div>}
     </div>}

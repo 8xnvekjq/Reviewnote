@@ -1,3 +1,4 @@
+import { PLAZA_SHOP, nearPlazaShop, rectStyle } from './plazaLayout';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PLAZA_HEIGHT, PLAZA_MOVE_TICK_MS, PLAZA_WIDTH } from './types';
 import type { PlazaDirection } from './types';
@@ -43,6 +44,8 @@ function actorStyle(cell: Cell, zBoost: number) {
 const cells: Cell[] = Array.from({ length: PLAZA_WIDTH * PLAZA_HEIGHT }, (_, i) => ({ x: i % PLAZA_WIDTH, y: Math.floor(i / PLAZA_WIDTH) }));
 
 interface Props {
+  equippedAppearance?: PublicAvatarAppearance;
+  onOpenShop?: () => void;
   userId: string;
   sessionId: string;
   onReachEntrance: () => void;
@@ -59,13 +62,15 @@ interface Props {
  * player reached the door via onReachEntrance. sessionId is now a stable prop generated once by
  * PixelRoom.tsx (not regenerated on every mount) so Presence's per-key dedup collapses cleanly
  * across repeated room<->plaza round trips instead of leaving ghost entries behind. */
-export default function Plaza({ userId, sessionId, onReachEntrance }: Props) {
-  const [appearance, setAppearance] = useState<PublicAvatarAppearance>(EMPTY_APPEARANCE);
+export default function Plaza({ userId, sessionId, onReachEntrance, equippedAppearance, onOpenShop }: Props) {
+  const [loadedAppearance, setAppearance] = useState<PublicAvatarAppearance>(EMPTY_APPEARANCE);
+  const appearance = equippedAppearance ?? loadedAppearance;
   useEffect(() => {
+    if (equippedAppearance) return;
     let cancelled = false;
     fetchEquippedAppearance(userId).then(next => { if (!cancelled) setAppearance(next); }).catch(() => {});
     return () => { cancelled = true; };
-  }, [userId]);
+  }, [userId, equippedAppearance]);
 
   const { players, paths, updateMyState, ready, reactions, sendReaction } = usePlazaRealtime(sessionId, appearance);
   // This component only ever renders `renderedPlayers`, never the raw realtime list — see
@@ -174,13 +179,17 @@ export default function Plaza({ userId, sessionId, onReachEntrance }: Props) {
         }} onBlur={() => setHeld(null)}>
         <PlazaLandscape />
         <CropExhibit />
+        {onOpenShop && <button type="button" className="pr-plaza-shop-target" style={rectStyle(PLAZA_SHOP)} aria-label={nearPlazaShop(actor) ? '상점 보기' : '상점 · 매대 앞으로 다가오세요'} aria-disabled={!nearPlazaShop(actor)} onClick={() => {
+          if (!nearPlazaShop(actor)) return;
+          setHeld(null); setWalkQueue([]); onOpenShop();
+        }}><span>{nearPlazaShop(actor) ? '상점 보기' : '작은 상점'}</span></button>}
         {[...reactions.values()].some(event => event.kind === 'wish') && <div className="pr-well-ripple" aria-hidden="true">✧</div>}
         <div className="pr-grid pr-plaza-grid">{boardCells.map(cell => <button key={`${cell.x}-${cell.y}`} type="button" tabIndex={-1} aria-hidden="true" disabled={!isWalkablePlaza(cell)} onClick={() => { board.current?.focus({ preventScroll: true }); walkTo(cell); }} />)}</div>
         {/* Other players — appearance only, no nickname/title/email/any identifying text. */}
         {renderedPlayers.map(player => <div key={player.sessionId} className="pr-plaza-other" aria-hidden="true" style={actorStyle({ x: player.x, y: player.y }, 1)}>
           <span className="pr-shadow" /><AvatarSprite direction={player.direction} frame={player.moving ? othersFrame : 0} walking={player.moving} appearance={player.appearance} />
         </div>)}
-        <div className="pr-plaza-actor" aria-hidden="true" style={actorStyle(actor, 2)}>
+        <div className="pr-plaza-actor" data-x={actor.x} data-y={actor.y} aria-hidden="true" style={actorStyle(actor, 2)}>
           <span className="pr-shadow" /><AvatarSprite direction={direction} frame={moving ? frame : 0} walking={moving} appearance={appearance} />
         </div>
         {[{ sessionId, ...actor }, ...renderedPlayers].map(player => {
@@ -192,6 +201,6 @@ export default function Plaza({ userId, sessionId, onReachEntrance }: Props) {
     </div>
     <span className="sr-only" role="status">{[...reactions.values()].filter(event => event.sessionId !== sessionId).map(event => `누군가 ${REACTIONS[event.kind].label}`).join(' · ')}</span>
     <button className="pr-hub-home" onClick={() => walkTo(PLAZA_ENTRANCE)}>↓ 집 앞으로 가는 길</button>
-    <p id="pr-plaza-instructions" className="pr-instructions pr-plaza-instructions" role="status">내 캐릭터를 눌러 인사 · 우물 곁에서 우물을 눌러 쉬어 가요</p>
+    <p id="pr-plaza-instructions" className="pr-instructions pr-plaza-instructions" role="status">내 캐릭터로 인사 · 우물에서 쉬기 · 오른쪽 매대 앞에서 상점 보기</p>
   </div>;
 }

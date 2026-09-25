@@ -1,3 +1,4 @@
+import { ShopStallArt } from './ShopStallArt';
 import { memo } from 'react';
 import town from './assets/tiny-town.png';
 import { COURTYARD, PATHS, SCENERY, inRect, rectStyle } from './plazaLayout';
@@ -24,6 +25,7 @@ export const PlazaLandscape = memo(function PlazaLandscape() {
   return <>
     <div className="pr-hub-ground" aria-hidden="true">{terrain.map(({ x, y }) => <Tile key={`${x}-${y}`} id={pathTile(x, y)} />)}</div>
     {SCENERY.map((item, index) => <div key={index} className={`pr-hub-scenery pr-hub-${item.kind}`} aria-hidden="true" style={{ ...rectStyle(item), zIndex: item.footprint.y + item.footprint.h }}>
+      {item.kind === 'shop' && <ShopStallArt />}
       {item.kind === 'tree' && <svg viewBox="64 0 16 32" overflow="hidden"><image href={town} width="192" height="176" /></svg>}
       {item.kind === 'well' && <svg viewBox="128 112 16 32" overflow="hidden"><image href={town} width="192" height="176" /></svg>}
       {item.kind === 'bush' && <Tile id={28} />}

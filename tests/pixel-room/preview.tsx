@@ -1,5 +1,5 @@
 // Local fixture using real menu, shell and lazy room; no network/account writes.
-import { lazy, useMemo, useState } from 'react';
+import { StrictMode, lazy, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../../src/index.css';
 import '../../src/styles/design-system.css';
@@ -51,4 +51,4 @@ export function Preview() {
     <Screen when={tab !== 'pixelRoom'}><h1 className="rn-title">오답노트</h1><p>전체메뉴에서 Pixel Room에 들어오세요.</p></Screen>
   </AppShell></div>;
 }
-createRoot(document.getElementById('root')!).render(<Preview />);
+createRoot(document.getElementById('root')!).render(<StrictMode><Preview /></StrictMode>);
