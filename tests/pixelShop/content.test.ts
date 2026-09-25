@@ -1,3 +1,5 @@
+import { fashionFor } from '../../src/features/pixel-room/shop/fashion.ts';
+import { FASHION_PATHS } from '../../src/features/pixel-room/shop/fashionPaths.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PIXEL_CATALOG } from '../../src/features/pixel-room/shop/catalog.ts';
@@ -6,7 +8,7 @@ import { FURNITURE, defaultState, placeFurniture, validateRoom, isCellFree } fro
 import type { FurnitureType } from '../../src/features/pixel-room/model.ts';
 import { toPublicAvatarAppearance } from '../../src/utils/pixelShopAppearance.ts';
 
-test('every avatar product maps to a real, bounded atlas row in its own slot', () => {
+test('every avatar product maps to a bounded atlas row or custom garment in its own slot', () => {
   const rowCounts = { top: 29, bottom: 14, shoes: 10, hair: 29, eyes: 4 };
   const ids = new Set<string>();
   for (const item of PIXEL_CATALOG) {
@@ -14,15 +16,51 @@ test('every avatar product maps to a real, bounded atlas row in its own slot', (
     assert.ok(item.price >= 20 && item.price <= 800);
     if (item.slot === 'furniture') { assert.ok(Object.hasOwn(FURNITURE, item.assetKey)); continue; }
     if (item.slot === 'pet') { continue; } // pets render via their own sprite system, not AVATAR_ROW_BY_SLOT
+    if (fashionFor(item.slot,item.assetKey)) continue;
     const row = AVATAR_ROW_BY_SLOT[item.slot][item.assetKey];
     assert.ok(Number.isInteger(row) && row > 0 && row < rowCounts[item.slot]);
   }
-  assert.equal(ids.size, 47);
+  assert.equal(ids.size, 53);
   assert.equal(PIXEL_CATALOG.filter(item => item.slot === 'hair').length, 18);
-  assert.equal(PIXEL_CATALOG.filter(item => item.slot === 'top').length, 10);
-  assert.equal(PIXEL_CATALOG.filter(item => item.slot === 'bottom').length, 4);
+  assert.equal(PIXEL_CATALOG.filter(item => item.slot === 'top').length, 13);
+  assert.equal(PIXEL_CATALOG.filter(item => item.slot === 'bottom').length, 7);
   assert.equal(PIXEL_CATALOG.filter(item => item.category === 'furniture').length, 12);
   assert.equal(PIXEL_CATALOG.filter(item => item.category === 'pet').length, 2);
+});
+
+test('custom garments cover every direction and animation without leaving the sprite frame', () => {
+  assert.equal(Object.keys(FASHION_PATHS).length, 8);
+  for (const poses of Object.values(FASHION_PATHS)) {
+    for (const frames of Object.values(poses)) {
+      assert.equal(frames.length, 4);
+      for (const shades of frames) {
+        assert.equal(shades.length, 4);
+        assert.ok(shades.join('').length > 0);
+        for (const path of shades) {
+          const runs = [...path.matchAll(/M(\d+) (\d+)h(\d+)v1h-(\d+)z/g)];
+          assert.equal(runs.map(match => match[0]).join(''), path);
+          for (const [, x, y, width, back] of runs) {
+            assert.equal(width, back);
+            assert.ok(Number(x) + Number(width) <= 32 && Number(y) < 32);
+          }
+        }
+      }
+    }
+  }
+});
+
+test('six garments retain server equipment keys in shared appearance and reject incorrect slots', () => {
+  const keys = new Map(PIXEL_CATALOG.map(item => [item.itemId, item.assetKey]));
+  const garments = PIXEL_CATALOG.filter(item => fashionFor(item.slot, item.assetKey));
+  assert.equal(garments.length, 6);
+  for (const item of garments) {
+    const equipment = {top:null, bottom:null, shoes:null, hair:null, eyes:null, [item.slot]:item.itemId};
+    const appearance = toPublicAvatarAppearance(equipment, keys);
+    assert.equal(appearance[item.slot as 'top' | 'bottom'], item.assetKey);
+    assert.equal(fashionFor(item.slot === 'top' ? 'bottom' : 'top', item.assetKey), null);
+  }
+  assert.equal(fashionFor('top', '__proto__'), null);
+  assert.equal(fashionFor('top', null), null);
 });
 
 test('server equipment maps all four product slots independently into shared appearance', () => {
