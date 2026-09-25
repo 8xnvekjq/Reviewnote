@@ -1,0 +1,4 @@
+import { createRoot } from 'react-dom/client';
+import { AvatarSprite } from '../../src/features/pixel-room/sprites';
+const colors=[['blouse_black','bootcut_blue'],['blouse_ivory','bootcut_charcoal'],['blouse_rose','bootcut_cream']];
+createRoot(document.getElementById('root')!).render(<main style={{background:'#e7dcc0',padding:20,color:'#303039'}}><h1>퍼프 블라우스 · 부츠컷</h1>{colors.map(([top,bottom])=><section key={top}><h2>{top} / {bottom}</h2>{[false,true].map(walking=><div key={String(walking)} style={{display:'flex',gap:8,flexWrap:'wrap'}}>{(['Front','Back','Left','Right'] as const).flatMap(direction=>[0,1,2,3].map(frame=><div key={`${direction}${frame}`} style={{width:80}}><AvatarSprite direction={direction} walking={walking} frame={frame} appearance={{top,bottom,hair:'bob',shoes:null,eyes:null,skin:null}}/><small>{walking?'Walk':'Idle'} {direction} {frame}</small></div>))}</div>)}</section>)}</main>);

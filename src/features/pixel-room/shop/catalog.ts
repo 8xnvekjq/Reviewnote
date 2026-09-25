@@ -62,4 +62,10 @@ export const PIXEL_CATALOG: readonly PixelItem[] = [
   { itemId: 'hair_buzz_blonde', category: 'avatar', slot: 'hair', price: 90, assetKey: 'buzz_blonde', displayName: '블론드 까까머리', tier: 1, stackable: false },
   { itemId: 'hair_buzz_black', category: 'avatar', slot: 'hair', price: 90, assetKey: 'buzz_black', displayName: '블랙 까까머리', tier: 1, stackable: false },
   { itemId: 'hair_buzz_brown', category: 'avatar', slot: 'hair', price: 90, assetKey: 'buzz_brown', displayName: '브라운 까까머리', tier: 1, stackable: false },
+  { itemId: 'top_blouse_black', category: 'avatar', slot: 'top', price: 120, assetKey: 'blouse_black', displayName: '블랙 퍼프 블라우스', tier: 2, stackable: false },
+  { itemId: 'top_blouse_ivory', category: 'avatar', slot: 'top', price: 120, assetKey: 'blouse_ivory', displayName: '아이보리 퍼프 블라우스', tier: 2, stackable: false },
+  { itemId: 'top_blouse_rose', category: 'avatar', slot: 'top', price: 120, assetKey: 'blouse_rose', displayName: '로즈 퍼프 블라우스', tier: 2, stackable: false },
+  { itemId: 'bottom_bootcut_blue', category: 'avatar', slot: 'bottom', price: 120, assetKey: 'bootcut_blue', displayName: '워싱 블루 부츠컷', tier: 2, stackable: false },
+  { itemId: 'bottom_bootcut_charcoal', category: 'avatar', slot: 'bottom', price: 120, assetKey: 'bootcut_charcoal', displayName: '차콜 부츠컷', tier: 2, stackable: false },
+  { itemId: 'bottom_bootcut_cream', category: 'avatar', slot: 'bottom', price: 120, assetKey: 'bootcut_cream', displayName: '크림 부츠컷', tier: 2, stackable: false },
 ];

@@ -2,6 +2,8 @@ import { AVATAR_ROW_BY_SLOT, avatarSheets, doormatArt, furnitureArt } from './as
 import type { AvatarDirection, AvatarLayers, FurnitureArt } from './assets';
 import type { FurnitureType } from './model';
 import type { AppearanceLayerKey, PublicAvatarAppearance } from './shop/types';
+import { fashionFor } from './shop/fashion';
+import { FASHION_PATHS } from './shop/fashionPaths';
 
 // 'skin'은 구매/소유 대상이 아닌 무료 기본 appearance라 PixelAvatarSlot(상점 카탈로그 슬롯)에는
 // 없지만, 렌더링 레이어로는 다른 슬롯과 완전히 동일하게 다룬다(행 선택 매커니즘 재사용).
@@ -15,10 +17,19 @@ function rowForSlot(slot: AppearanceLayerKey | null, assetKey: string | null): n
   if (!slot || !assetKey) return 0;
   return AVATAR_ROW_BY_SLOT[slot][assetKey] ?? 0;
 }
-function renderLayers(sheets: AvatarLayers, frame: number, appearance: PublicAvatarAppearance) {
+function renderLayers(sheets: AvatarLayers, frame: number, appearance: PublicAvatarAppearance, pose: keyof typeof FASHION_PATHS) {
   return layers.map(layer => {
     const src = sheets[layer.key];
     if (!src) return null;
+    const key = layer.slot ? appearance[layer.slot] : null;
+    const fashion = fashionFor(layer.slot, key);
+    if (fashion) {
+      return <g key={layer.key} data-slot={layer.slot} data-style={key} shapeRendering="crispEdges">
+        {FASHION_PATHS[pose][fashion.kind][frame % 4].map((path, shade) => (
+          <path key={shade} d={path} fill={fashion.colors[shade]} />
+        ))}
+      </g>;
+    }
     const row = rowForSlot(layer.slot, layer.slot ? appearance[layer.slot] : null);
     return <image key={layer.key} data-slot={layer.slot ?? 'body'} data-row={row} href={src} x={-frame * 32} y={-row * 32} width={128} height={layer.height} />;
   });
@@ -34,7 +45,7 @@ function renderLayers(sheets: AvatarLayers, frame: number, appearance: PublicAva
 export function AvatarSprite({ direction, frame, walking, appearance }: { direction: AvatarDirection; frame: number; walking: boolean; appearance: PublicAvatarAppearance }) {
   const sheets = avatarSheets[walking ? 'Walk' : 'Idle'][direction];
   return <div className="pr-avatar">
-    <svg viewBox="0 0 32 32" aria-hidden="true" overflow="hidden">{renderLayers(sheets, frame, appearance)}</svg>
+    <svg viewBox="0 0 32 32" aria-hidden="true" overflow="hidden">{renderLayers(sheets, frame, appearance, `${walking ? 'Walk' : 'Idle'}_${direction}`)}</svg>
   </div>;
 }
 function ArtSprite({ art }: { art: FurnitureArt }) {
