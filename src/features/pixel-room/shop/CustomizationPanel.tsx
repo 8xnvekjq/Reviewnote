@@ -31,7 +31,7 @@ export function Wardrobe({ shop, setMessage, busy, onShop }: Props & { onShop: (
         }}><span className="pr-item-avatar"><AvatarSprite direction="Front" frame={0} walking={false} appearance={{ ...shop.equipped, [tab]: key }} /></span><strong>{item?.displayName ?? `기본 ${SLOT_LABELS[tab]}`}</strong></button>;
       })}
     </div>}
-    <button className="pr-preview-turn" onClick={onShop}>상점에서 다른 스타일 찾기 →</button>
+    <button className="pr-preview-turn" onClick={onShop}>새 스타일은 광장 상점에서 →</button>
   </div>;
 }
 
@@ -69,7 +69,7 @@ function BaseAppearancePicker({ shop, setMessage, busy }: Props) {
   </div>;
 }
 
-export function ShopPanel({ shop, pet, room, setMessage, busy, onPurchase, onPlace }: Props & { pet: ReturnType<typeof usePet>; room: RoomState; onPurchase: (item: PixelItem) => Promise<void>; onPlace: (type: FurnitureType) => void }) {
+export function ShopPanel({ shop, pet, room, setMessage, busy, onPurchase, onPlace, canPlace = true }: Props & { canPlace?: boolean; pet: ReturnType<typeof usePet>; room: RoomState; onPurchase: (item: PixelItem) => Promise<void>; onPlace: (type: FurnitureType) => void }) {
   const [category, setCategory] = useState<string>('all');
   const [confirming, setConfirming] = useState<string | null>(null);
   const featured = ['hair_buns', 'top_vest', 'furniture_aquarium', 'hair_long', 'bottom_denim', 'shoes_low'];
@@ -92,12 +92,12 @@ export function ShopPanel({ shop, pet, room, setMessage, busy, onPurchase, onPla
         {isPet && pet.error && <p role="alert">펫 설정을 확인하지 못했어요. <button onClick={pet.reload}>다시 확인</button></p>}
         <strong className="pr-shop-name">{item.displayName}</strong>
         <span className="pr-shop-status">{owned ? (active ? avatar ? '장착 중' : isPet ? '함께 사는 중' : '배치됨' : '보유 중') : `${item.price}P`}</span>
-        {owned ? <button className="pr-shop-action" disabled={disabled || (avatar && active)} onClick={async () => {
+        {owned ? <button className="pr-shop-action" disabled={disabled || (avatar && active) || (!avatar && !isPet && !canPlace)} onClick={async () => {
           if (isPet) { const ok = isPetId(item.itemId) && await pet.activate(active ? null : item.itemId); setMessage(ok ? active ? `${item.displayName} 친구가 잠시 쉬어요.` : `${item.displayName} 친구가 함께 살아요.` : '펫 설정을 저장하지 못했어요. 다시 시도해 주세요.'); return; }
           if (!avatar) { onPlace(item.assetKey as FurnitureType); return; }
           const ok = await shop.equip(item.slot as PixelAvatarSlot, item.itemId);
           setMessage(ok ? `${item.displayName} 장착 완료.` : '장착 확인에 실패했어요. 다시 시도해 주세요.');
-        }}>{avatar ? active ? '장착 중' : '장착하기' : isPet ? active ? '잠시 쉬게 하기' : '함께 살기' : active ? '옮기기' : '방에 놓기'}</button> : short > 0 ? <span className="pr-shop-hint">{short}P 더 모으면 만나요</span> : confirming === item.itemId ? <div className="pr-shop-confirm"><p>{item.price}P로 구매하고 {avatar ? '바로 장착' : isPet ? '함께 살기' : '방에 배치'}할까요?</p><div className="pr-shop-confirm-actions"><button disabled={disabled} onClick={async () => { await onPurchase(item); setConfirming(null); }}>{disabled ? '처리 중…' : '구매'}</button><button disabled={disabled} onClick={() => setConfirming(null)}>취소</button></div></div> : <button className="pr-shop-action" disabled={disabled} onClick={() => setConfirming(item.itemId)}>구매하기</button>}
+        }}>{avatar ? active ? '장착 중' : '장착하기' : isPet ? active ? '잠시 쉬게 하기' : '함께 살기' : !canPlace ? '집에서 배치' : active ? '옮기기' : '방에 놓기'}</button> : short > 0 ? <span className="pr-shop-hint">{short}P 더 모으면 만나요</span> : confirming === item.itemId ? <div className="pr-shop-confirm"><p>{item.price}P로 구매하고 {avatar ? '바로 장착' : isPet ? '함께 살기' : canPlace ? '방에 배치' : '보관'}할까요?</p><div className="pr-shop-confirm-actions"><button disabled={disabled} onClick={async () => { await onPurchase(item); setConfirming(null); }}>{disabled ? '처리 중…' : '구매'}</button><button disabled={disabled} onClick={() => setConfirming(null)}>취소</button></div></div> : <button className="pr-shop-action" disabled={disabled} onClick={() => setConfirming(item.itemId)}>구매하기</button>}
       </article>;
     })}</div>}
   </div>;

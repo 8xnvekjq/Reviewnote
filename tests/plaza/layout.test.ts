@@ -2,7 +2,21 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import './register-typescript.mjs';
 const { findSpawn, PLAZA_ENTRANCE, isWalkablePlaza, planWalk } = await import('../../src/features/pixel-room/plaza/plazaModel.ts');
-const { PODIUM } = await import('../../src/features/pixel-room/plaza/plazaLayout.ts');
+const { PODIUM, PLAZA_SHOP, nearPlazaShop } = await import('../../src/features/pixel-room/plaza/plazaLayout.ts');
+
+test('shop has a blocked counter and three reachable approach cells, with no access from behind', () => {
+  for (let x = 12; x <= 14; x++) {
+    for (let y = 5; y <= 6; y++) assert.equal(isWalkablePlaza({ x, y }), false);
+    const front = { x, y: 7 };
+    assert.ok(nearPlazaShop(front));
+    assert.ok(planWalk(findSpawn(), front).length);
+    assert.ok(planWalk(front, PLAZA_ENTRANCE).length);
+  }
+  assert.equal(nearPlazaShop({ x: 13, y: 4 }), false);
+  assert.equal(nearPlazaShop(findSpawn()), false);
+  assert.equal(nearPlazaShop({ x: 11, y: 7 }), false);
+  assert.equal(PLAZA_SHOP.footprint.y + PLAZA_SHOP.footprint.h, 7);
+});
 
 test('every open plaza cell connects to spawn and the home entrance', () => {
   const spawn = findSpawn();
