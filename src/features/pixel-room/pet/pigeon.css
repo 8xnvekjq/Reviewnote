@@ -1,0 +1,3 @@
+.pr-pigeon { position:absolute; pointer-events:none; }
+.pr-pigeon-sprite { width:100%; height:100%; display:block; image-rendering:pixelated; overflow:visible; }
+.pr-shop-art .pr-pigeon-sprite { width:90%; max-height:110px; }
