@@ -1,4 +1,5 @@
 import type { DocumentSize } from './useHandwritingInput';
+import type { DocRect } from './drawingWorld';
 
 // PR2(저장 합성) 전용 유틸 — HandwritingOverlay의 저장 버튼에서만 쓰인다.
 //
@@ -34,6 +35,10 @@ export interface FlattenHandwritingInput {
   backgroundImageUrl?: string;
   /** canvasRef.current.exportSvg()의 결과 — undo/지우개 mask가 이미 반영된 최종 상태. */
   svgMarkup: string;
+  /** SVG 박스가 차지하는 문서 좌표 사각형(필기 월드). 생략하면 문서 사각형과 같다고 본다. */
+  svgRect?: DocRect;
+  /** 저장할 영역(문서 좌표, computeExportRect). 생략하면 문서 전체 — 기존 저장 결과와 동일. */
+  outputRect?: DocRect;
   /** 출력 최대 변 길이(모바일 메모리 보호). 기본 2048px. */
   maxOutputLongSide?: number;
 }
@@ -131,11 +136,16 @@ export async function flattenHandwriting({
   documentSize,
   backgroundImageUrl,
   svgMarkup,
+  svgRect,
+  outputRect,
   maxOutputLongSide = DEFAULT_MAX_OUTPUT_LONG_SIDE,
 }: FlattenHandwritingInput): Promise<Blob> {
   const startedAt = performance.now();
-  const output = computeOutputSize(documentSize, maxOutputLongSide);
-  logDev('start', { documentSize, output });
+  const docRect: DocRect = { x: 0, y: 0, width: documentSize.width, height: documentSize.height };
+  const outRect = outputRect ?? docRect;
+  const strokeRect = svgRect ?? docRect;
+  const output = computeOutputSize(outRect, maxOutputLongSide);
+  logDev('start', { documentSize, outRect, output });
 
   let backgroundImg: HTMLImageElement | null = null;
   let backgroundDecodedAt = startedAt;
@@ -171,22 +181,32 @@ export async function flattenHandwriting({
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, output.width, output.height);
 
-    // 2) 원본 이미지 전체를 contain으로 배치 — 절대 자르지 않는다.
+    // 문서 좌표 → 출력 픽셀. 저장 영역(outRect)의 왼쪽 위가 출력 (0,0)이고 배율은 output.scale.
+    const toOut = (r: DocRect) => ({
+      x: (r.x - outRect.x) * output.scale,
+      y: (r.y - outRect.y) * output.scale,
+      width: r.width * output.scale,
+      height: r.height * output.scale,
+    });
+
+    // 2) 원본 이미지 전체를 문서 사각형 안에 contain으로 배치 — 절대 자르지 않는다.
     if (backgroundImg) {
+      const doc = toOut(docRect);
       const rect = containRect(
         backgroundImg.naturalWidth || backgroundImg.width,
         backgroundImg.naturalHeight || backgroundImg.height,
-        output.width,
-        output.height,
+        doc.width,
+        doc.height,
       );
-      ctx.drawImage(backgroundImg, rect.x, rect.y, rect.width, rect.height);
+      ctx.drawImage(backgroundImg, doc.x + rect.x, doc.y + rect.y, rect.width, rect.height);
     }
 
     // 3) 필기(지우개 mask 반영된 SVG)를 같은 문서 좌표계로 겹친다. svgImg의 실제 크기는
-    // documentSize와 정확히 같으므로(react-sketch-canvas의 exportSvg가 자기 DOM 노드의
-    // offsetWidth/offsetHeight로 viewBox를 잡음), 캔버스 전체(output.width×height)에 맞춰
-    // 그리면 배경과 정확히 같은 배율로 스케일된다 — 별도 좌표 보정이 필요 없다.
-    ctx.drawImage(svgImg, 0, 0, output.width, output.height);
+    // SVG 박스(=strokeRect, 필기 월드)와 정확히 같으므로(react-sketch-canvas의 exportSvg가 자기
+    // DOM 노드의 offsetWidth/offsetHeight로 viewBox를 잡음), 그 사각형을 출력 좌표로 옮겨 그리면
+    // 배경과 정확히 같은 배율로 맞는다. 저장 영역 밖으로 나간 부분은 canvas가 알아서 잘라낸다.
+    const strokes = toOut(strokeRect);
+    ctx.drawImage(svgImg, strokes.x, strokes.y, strokes.width, strokes.height);
   } catch (err) {
     if (err instanceof FlattenError) throw err;
     throw new FlattenError('compose', '이미지 합성 중 오류가 발생했습니다.', err);
