@@ -24,8 +24,10 @@ export const PATHS: PlazaRect[] = [
 // 'well' (static, here) vs. PlazaActivities.tsx (dynamic, the well's popup logic).
 export const PODIUM: PlazaScenery = { kind: 'podium', x: 4, y: 2, w: 2, h: 2, footprint: { x: 4, y: 3, w: 2, h: 1 } };
 export const PLAZA_SHOP: PlazaScenery = { kind: 'shop', x: 12, y: 4, w: 3, h: 3, footprint: { x: 12, y: 5, w: 3, h: 2 } };
+// The three counter-front cells. Standing on one of them makes a tap on the stall open the shop.
+export const PLAZA_SHOP_APPROACH = [{ x: 12, y: 7 }, { x: 13, y: 7 }, { x: 14, y: 7 }] as const;
 export function nearPlazaShop(cell: { x: number; y: number }): boolean {
-  return cell.y === 7 && cell.x >= 12 && cell.x <= 14;
+  return PLAZA_SHOP_APPROACH.some(front => front.x === cell.x && front.y === cell.y);
 }
 export const SCENERY: PlazaScenery[] = [
   PLAZA_SHOP,

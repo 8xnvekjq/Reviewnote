@@ -20,12 +20,12 @@ test('every avatar product maps to a bounded atlas row or custom garment in its 
     const row = AVATAR_ROW_BY_SLOT[item.slot][item.assetKey];
     assert.ok(Number.isInteger(row) && row > 0 && row < rowCounts[item.slot]);
   }
-  assert.equal(ids.size, 53);
+  assert.equal(ids.size, 54);
   assert.equal(PIXEL_CATALOG.filter(item => item.slot === 'hair').length, 18);
   assert.equal(PIXEL_CATALOG.filter(item => item.slot === 'top').length, 13);
   assert.equal(PIXEL_CATALOG.filter(item => item.slot === 'bottom').length, 7);
   assert.equal(PIXEL_CATALOG.filter(item => item.category === 'furniture').length, 12);
-  assert.equal(PIXEL_CATALOG.filter(item => item.category === 'pet').length, 2);
+  assert.equal(PIXEL_CATALOG.filter(item => item.category === 'pet').length, 3);
 });
 
 test('custom garments cover every direction and animation without leaving the sprite frame', () => {

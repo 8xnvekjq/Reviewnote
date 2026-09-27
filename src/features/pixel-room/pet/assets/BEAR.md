@@ -66,3 +66,5 @@ Constraints: crisp square stepped edges, binary transparency, no antialiasing, n
 ```
 
 Review preview, intentionally excluded from the asset commit: `scratch/bear-preview.png`. It contains the whole sheet at 8× nearest-neighbor scale and a shared-baseline comparison with a composited front-facing character frame, the dog, the duck at its existing 32px logical display size, and the 48px bear, all enlarged by the same factor.
+
+Runtime (`Bear.tsx`, `bearModel.ts`): drawn in a 3×3-cell box over a 3-cell-wide footprint (dog/duck: 2), so the wider body never overlaps furniture. Reuses the dog's collision-aware route search with that span; slower steps (600ms indoors, 420ms in the yard), 2-step indoor / 4-step yard outings, long sits with blinks and an occasional paw wave. Like the dog and duck it lives in the room and yard only, never the plaza, and shares the one-active-companion `pixel_pet_equipment.active_pet` row (`pet_dog`, `pet_duck`, `pet_bear` or null).

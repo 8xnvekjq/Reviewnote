@@ -1,0 +1,3 @@
+.pr-bear { position:absolute; pointer-events:none; }
+.pr-bear-sprite { width:100%; height:100%; display:block; image-rendering:pixelated; overflow:hidden; }
+.pr-shop-art .pr-bear-sprite { width:96%; max-height:96px; }
