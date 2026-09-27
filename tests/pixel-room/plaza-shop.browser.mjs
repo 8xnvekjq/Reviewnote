@@ -48,9 +48,12 @@ async function plaza(page){
   await page.getByRole('button',{name:'길을 따라 광장으로 걸어가기',exact:true}).click();
   await page.locator('.pr-plaza-actor').waitFor();
 }
-async function open(page){
-  if(await page.locator('.pr-plaza-shop-target').getAttribute('aria-disabled')==='true') await page.locator('.pr-plaza-grid button').nth(7*16+13).click();
-  await page.getByRole('button',{name:'상점 보기',exact:true}).click();
+const nearShop=async page=>{const {x,y}=await page.locator('.pr-plaza-actor').evaluate(el=>({...el.dataset}));return +y===7&&+x>=12&&+x<=14;};
+async function tapStall(page,touch){const stall=page.locator('.pr-plaza-shop-target');if(touch)await stall.tap();else await stall.click();}
+// The stall itself is the only way in: tap it at the counter, or tap it from afar to walk there first.
+async function open(page,touch=false){
+  if(!await nearShop(page)){await tapStall(page,touch);await page.locator('.pr-plaza-shop-target[data-near=true]').waitFor();}
+  await tapStall(page,touch);
   await page.locator('dialog[open]').waitFor();
 }
 async function buy(page,id){const card=page.locator(`[data-item="${id}"]`);await card.getByRole('button',{name:'구매하기',exact:true}).click();await card.getByRole('button',{name:'구매',exact:true}).click();}
@@ -61,11 +64,24 @@ try{
   const {page,errors}=await setup(context,state);await page.goto(url);await page.locator('.pr-actor').waitFor();
   assert.equal(await page.locator('.pr-sheet-trigger button').filter({hasText:'상점'}).count(),0);
   await plaza(page);
-  await page.locator('.pr-plaza-shop-target').evaluate(el=>el.click());
+  const touch=viewport.width===390;
+  // No separate "open shop" button: the stall has no visible label and is the tap target itself.
+  assert.equal(await page.getByRole('button',{name:/상점 (보기|열기)$/}).count(),0);
+  assert.equal((await page.locator('.pr-plaza-shop-target').innerText()).trim(),'');
+  assert.equal(await page.locator('.pr-plaza-shop-target').getAttribute('data-near'),'false');
+  // Far tap: walks to the counter, never opens on its own (also not after arriving).
+  await tapStall(page,touch);
   assert.equal(await page.locator('dialog[open]').count(),0,'far tap cannot open shop');
+  await page.locator('.pr-plaza-shop-target[data-near=true]').waitFor();
+  assert.ok(await nearShop(page));
+  await page.waitForTimeout(600);
+  assert.equal(await page.locator('dialog[open]').count(),0,'arriving does not auto-open');
   await page.screenshot({path:`${out}/${viewport.width}-plaza.png`});
+  // Walk away via the floor, then back: tapping the stall from the path also only walks.
+  await page.locator('.pr-plaza-grid button').nth(9*16+8).click();
+  await page.locator('.pr-plaza-shop-target[data-near=false]').waitFor();
   const connection=await page.evaluate(()=>window.plazaTransport.audit());
-  await open(page);
+  await open(page,touch);
   const position=await page.locator('.pr-plaza-actor').evaluate(el=>({...el.dataset}));
   await buy(page,'top_blouse_black');await page.locator('.pr-plaza-actor [data-style="blouse_black"]').waitFor({state:'attached'});
   await buy(page,'hair_buns');await buy(page,'shoes_low');
@@ -75,19 +91,23 @@ try{
   await buy(page,'pet_duck');await page.locator('[data-item=pet_duck]').getByRole('button',{name:'잠시 쉬게 하기',exact:true}).waitFor();assert.equal(state.active,'pet_duck');
   await page.locator('[data-item="pet_duck"]').getByRole('button',{name:'잠시 쉬게 하기',exact:true}).click();await page.locator('[data-item=pet_duck]').getByRole('button',{name:'함께 살기',exact:true}).waitFor();assert.equal(state.active,null);
   await page.locator('[data-item="pet_duck"]').getByRole('button',{name:'함께 살기',exact:true}).click();await page.locator('[data-item=pet_duck]').getByRole('button',{name:'잠시 쉬게 하기',exact:true}).waitFor();assert.equal(state.active,'pet_duck');
+  await page.locator('[data-item=pet_bear] .pr-bear-sprite').waitFor();
+  await buy(page,'pet_bear');await page.locator('[data-item=pet_bear]').getByRole('button',{name:'잠시 쉬게 하기',exact:true}).waitFor();assert.equal(state.active,'pet_bear');
+  await page.locator('[data-item=pet_duck]').getByRole('button',{name:'함께 살기',exact:true}).waitFor();
+  await page.locator('[data-item="pet_duck"]').getByRole('button',{name:'함께 살기',exact:true}).click();await page.locator('[data-item=pet_bear]').getByRole('button',{name:'함께 살기',exact:true}).waitFor();assert.equal(state.active,'pet_duck');
   await page.screenshot({path:`${out}/${viewport.width}-shop.png`});
   await page.locator('.pr-category-tabs button').filter({hasText:'가구',exact:true}).click();await buy(page,'furniture_chair');
   await page.getByRole('button',{name:'상점 닫고 광장으로'}).click();
   assert.deepEqual(await page.locator('.pr-plaza-actor').evaluate(el=>({...el.dataset})),position);
   assert.deepEqual(await page.evaluate(()=>window.plazaTransport.audit()),connection,'shop never reconnects plaza');
-  assert.equal(await page.locator('.pr-duck,.pr-dog').count(),0);
+  assert.equal(await page.locator('.pr-duck,.pr-dog,.pr-bear').count(),0);
   await open(page);await page.keyboard.press('Escape');await page.locator('.pr-plaza-shop-dialog').waitFor({state:'detached'});
   assert.equal(await page.evaluate(()=>document.body.scrollWidth>innerWidth),false);
   await page.getByRole('button',{name:'↓ 집 앞으로 가는 길',exact:true}).click();await page.locator('.pr-yard-board .pr-duck').waitFor();
   await page.getByRole('button',{name:'집 문으로 걸어가기',exact:true}).click();await page.locator('.pr-actor').waitFor();await page.locator('.pr-duck').waitFor();
   await page.reload();await page.locator('.pr-actor [data-style="blouse_black"]').waitFor();await page.locator('.pr-duck').waitFor();
   assert.deepEqual(errors,[]);await context.close();
-  console.log(`PASS ${viewport.width}: walk to shop, distance gate, clothes/hair/shoes/pets/furniture purchases, activation, close/Escape, retained position, home return and reload`);
+  console.log(`PASS ${viewport.width}: stall-only entry (no open button), far tap walks without opening, near tap opens, clothes/hair/shoes/pets/furniture purchases, activation, close/Escape, retained position, home return and reload`);
  }
 }finally{await browser.close();}
 

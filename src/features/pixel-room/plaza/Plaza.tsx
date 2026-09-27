@@ -1,4 +1,4 @@
-import { PLAZA_SHOP, nearPlazaShop, rectStyle } from './plazaLayout';
+import { PLAZA_SHOP, PLAZA_SHOP_APPROACH, nearPlazaShop, rectStyle } from './plazaLayout';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PLAZA_HEIGHT, PLAZA_MOVE_TICK_MS, PLAZA_WIDTH } from './types';
 import type { PlazaDirection } from './types';
@@ -163,6 +163,12 @@ export default function Plaza({ userId, sessionId, onReachEntrance, equippedAppe
     setWalkQueue(steps);
   }
 
+  function walkToShop() {
+    const routes = PLAZA_SHOP_APPROACH.map(cell => planWalk(actor, cell)).filter(steps => steps.length > 0);
+    if (routes.length) { setHeld(null); setWalkQueue(routes.reduce((best, steps) => steps.length < best.length ? steps : best)); }
+  }
+  const nearShop = nearPlazaShop(actor);
+
   const boardCells = useMemo(() => cells, []);
 
   return <div className="pr-room-frame pr-plaza-frame">
@@ -179,10 +185,12 @@ export default function Plaza({ userId, sessionId, onReachEntrance, equippedAppe
         }} onBlur={() => setHeld(null)}>
         <PlazaLandscape />
         <CropExhibit />
-        {onOpenShop && <button type="button" className="pr-plaza-shop-target" style={rectStyle(PLAZA_SHOP)} aria-label={nearPlazaShop(actor) ? '상점 보기' : '상점 · 매대 앞으로 다가오세요'} aria-disabled={!nearPlazaShop(actor)} onClick={() => {
-          if (!nearPlazaShop(actor)) return;
+        {/* The stall itself is the target, like a farm bed: tap it from the counter to browse, or from
+           afar to walk up to the counter (arriving does not open it — tap the stall again). */}
+        {onOpenShop && <button type="button" className="pr-plaza-shop-target" data-near={nearShop} style={rectStyle(PLAZA_SHOP)} aria-label={nearShop ? '작은 상점 · 눌러서 둘러보기' : '작은 상점 · 매대 앞으로 걸어가기'} onClick={() => {
+          if (!nearShop) { board.current?.focus({ preventScroll: true }); walkToShop(); return; }
           setHeld(null); setWalkQueue([]); onOpenShop();
-        }}><span>{nearPlazaShop(actor) ? '상점 보기' : '작은 상점'}</span></button>}
+        }} />}
         {[...reactions.values()].some(event => event.kind === 'wish') && <div className="pr-well-ripple" aria-hidden="true">✧</div>}
         <div className="pr-grid pr-plaza-grid">{boardCells.map(cell => <button key={`${cell.x}-${cell.y}`} type="button" tabIndex={-1} aria-hidden="true" disabled={!isWalkablePlaza(cell)} onClick={() => { board.current?.focus({ preventScroll: true }); walkTo(cell); }} />)}</div>
         {/* Other players — appearance only, no nickname/title/email/any identifying text. */}
@@ -201,6 +209,6 @@ export default function Plaza({ userId, sessionId, onReachEntrance, equippedAppe
     </div>
     <span className="sr-only" role="status">{[...reactions.values()].filter(event => event.sessionId !== sessionId).map(event => `누군가 ${REACTIONS[event.kind].label}`).join(' · ')}</span>
     <button className="pr-hub-home" onClick={() => walkTo(PLAZA_ENTRANCE)}>↓ 집 앞으로 가는 길</button>
-    <p id="pr-plaza-instructions" className="pr-instructions pr-plaza-instructions" role="status">내 캐릭터로 인사 · 우물에서 쉬기 · 오른쪽 매대 앞에서 상점 보기</p>
+    <p id="pr-plaza-instructions" className="pr-instructions pr-plaza-instructions" role="status">내 캐릭터로 인사 · 우물에서 쉬기 · 상점은 앞에서 톡</p>
   </div>;
 }
