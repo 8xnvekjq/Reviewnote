@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { DocRect } from './drawingWorld';
 
 // PR1(입력 품질 + 문서 좌표계 기반) 전용 훅.
 //
@@ -53,10 +54,14 @@ interface UseHandwritingInputOptions {
   viewportRef: React.RefObject<HTMLDivElement | null>;
   /** 고정 문서 크기. 아직 확정되지 않았으면 null(이 동안 입력은 훅 바깥에서 막아야 함). */
   documentSize: DocumentSize | null;
+  /** 실제 필기 가능 영역(문서 좌표, drawingWorld.ts). 필기 시작 판정과 팬 범위의 기준. */
+  drawingWorld: DocRect | null;
   /** false면(저장 중/확인창 등) 이번 augmentation을 건너뛰고 라이브러리 기본 동작만 통과시킨다. */
   enabled: boolean;
   /** DEV 콘솔 로그 태그 구분용(향후 여러 창이 동시에 열릴 때를 대비). */
   debugLabel: string;
+  /** 핀치/팬을 시작하려고 댄 첫 손가락이 남긴 짧은 획(점)을 지워달라는 요청 — 라이브러리 undo로 처리. */
+  onStrayStroke?: () => void;
 }
 
 interface CaptureHandlers {
@@ -77,7 +82,16 @@ interface UseHandwritingInputResult {
 
 const IDENTITY_CAMERA: Camera = { scale: 1, x: 0, y: 0 };
 const PINCH_MAX_MULTIPLIER = 4.5; // 기존 문제 이미지 확대창(1~4.5배)과 동일한 배율 참고
-const PAN_SLACK_PX = 80; // 문서가 뷰포트 밖으로 완전히 사라지지 않도록 남겨두는 여유
+// 맞춤 배율보다 조금 더 축소할 수 있게 해, 문서 밖에 쓴 필기까지 한눈에 다시 볼 수 있게 한다.
+// 월드가 문서의 3배라 이 배율에서도 월드가 뷰포트보다 커서 빈 레터박스가 생기지 않는다.
+const PINCH_MIN_MULTIPLIER = 0.5;
+const PAN_SLACK_PX = 80; // 필기 월드가 뷰포트 밖으로 완전히 사라지지 않도록 남겨두는 여유
+// 두 손가락 제스처는 첫 손가락이 먼저 닿는 순간 라이브러리가 획을 시작해 버려서, 두 번째 손가락이
+// 닿으면 그 자리에 점/짧은 선이 남는다(팬할 때마다 빨간 점). 이 시간·거리 안에서 핀치로 바뀐 획만
+// "제스처의 일부"로 보고 지운다 — 그보다 길게 그린 실제 필기는 건드리지 않는다. 두 포인터가 모두
+// 손가락일 때만 적용한다 — 펜으로 찍은 짧은 획(i의 점 등) 도중 손바닥이 닿아도 펜 획은 지우지 않는다.
+const STRAY_STROKE_MAX_MS = 300;
+const STRAY_STROKE_MAX_TRAVEL_PX = 30;
 
 function logDev(label: string, event: string, data?: Record<string, unknown>) {
   if (!import.meta.env.DEV) return;
@@ -146,8 +160,10 @@ function dispatchSyntheticPointerEvent(
 export function useHandwritingInput({
   viewportRef,
   documentSize,
+  drawingWorld,
   enabled,
   debugLabel,
+  onStrayStroke,
 }: UseHandwritingInputOptions): UseHandwritingInputResult {
   const [camera, setCamera] = useState<Camera>(IDENTITY_CAMERA);
   const [viewportSize, setViewportSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
@@ -159,7 +175,10 @@ export function useHandwritingInput({
   const fitScaleRef = useRef(1);
   const cameraRef = useRef<Camera>(IDENTITY_CAMERA);
   const viewportRectRef = useRef<{ left: number; top: number } | null>(null);
+  const strokeStartRef = useRef<{ time: number; x: number; y: number; travel: number; pointerType: string } | null>(null);
+  const onStrayStrokeRef = useRef(onStrayStroke);
   cameraRef.current = camera;
+  onStrayStrokeRef.current = onStrayStroke;
 
   // 뷰포트 실측 — 헤더/툴바 높이 변화, 창 리사이즈 전부 여기로 반영된다(컴포넌트가 직접
   // "창 크기 - 크롬 높이"를 계산할 필요 없음).
@@ -206,6 +225,7 @@ export function useHandwritingInput({
       gestureStateRef.current = 'idle';
       drawingPointerIdRef.current = null;
       pinchStartRef.current = null;
+      strokeStartRef.current = null;
     } else if (gestureStateRef.current === 'pinching') {
       // 손가락 하나가 남아도 자동으로 drawing을 재개하지 않는다 — 전부 뗄 때까지 대기.
       gestureStateRef.current = 'awaiting-release';
@@ -262,19 +282,20 @@ export function useHandwritingInput({
         viewportRectRef.current = { left: rect.left, top: rect.top };
       }
 
-      // 문서 바깥(레터박스 여백)에서 시작한 pointer는 애초에 추적하지 않는다 — 그 여백은
+      // 필기 월드 바깥에서 시작한 pointer는 애초에 추적하지 않는다 — 그 영역은
       // react-sketch-canvas의 DOM 서브트리 바깥이라 실제 이벤트도 라이브러리에 전달되지 않는데,
       // 여기서만 pinch로 취급하면 "핀치는 시작됐지만 첫 손가락은 계속 라이브러리에 그림을 그리는"
-      // 불일치가 생긴다(리뷰에서 확인된 문제).
-      if (documentSize && viewportRectRef.current) {
+      // 불일치가 생긴다(리뷰에서 확인된 문제). 기준은 문서가 아니라 월드다 — 문서 밖 흰 여백도
+      // 필기 영역이다(drawingWorld.ts).
+      if (drawingWorld && viewportRectRef.current) {
         const cam = cameraRef.current;
-        const docLeft = viewportRectRef.current.left + cam.x;
-        const docTop = viewportRectRef.current.top + cam.y;
-        const docWidth = documentSize.width * cam.scale;
-        const docHeight = documentSize.height * cam.scale;
-        const inside = e.clientX >= docLeft && e.clientX <= docLeft + docWidth && e.clientY >= docTop && e.clientY <= docTop + docHeight;
+        const worldLeft = viewportRectRef.current.left + cam.x + drawingWorld.x * cam.scale;
+        const worldTop = viewportRectRef.current.top + cam.y + drawingWorld.y * cam.scale;
+        const worldWidth = drawingWorld.width * cam.scale;
+        const worldHeight = drawingWorld.height * cam.scale;
+        const inside = e.clientX >= worldLeft && e.clientX <= worldLeft + worldWidth && e.clientY >= worldTop && e.clientY <= worldTop + worldHeight;
         if (!inside) {
-          logDev(debugLabel, 'pointerdown-outside-document', { pointerId: e.pointerId });
+          logDev(debugLabel, 'pointerdown-outside-world', { pointerId: e.pointerId });
           return;
         }
       }
@@ -288,6 +309,7 @@ export function useHandwritingInput({
         // 첫 pointer — 이 실제 이벤트를 그대로 흘려보내 라이브러리가 정상적으로 stroke를 시작하게 둔다.
         drawingPointerIdRef.current = e.pointerId;
         gestureStateRef.current = 'drawing';
+        strokeStartRef.current = { time: e.timeStamp, x: e.clientX, y: e.clientY, travel: 0, pointerType: e.pointerType };
         return;
       }
 
@@ -295,6 +317,16 @@ export function useHandwritingInput({
         // 두 번째 pointer — 이 실제 이벤트만은 라이브러리로 그대로 흘려보낸다(막지 않음). 라이브러리
         // 자신이 "두 번째 pointerdown이 오면 현재 stroke를 그 자리에서 확정한다"는 동작을 갖고 있다
         // (조사서 + 리뷰에서 실제 설치본 실행으로 확인).
+        const start = strokeStartRef.current;
+        if (
+          start && start.pointerType === 'touch' && e.pointerType === 'touch'
+          && e.timeStamp - start.time <= STRAY_STROKE_MAX_MS && start.travel <= STRAY_STROKE_MAX_TRAVEL_PX
+        ) {
+          // 라이브러리의 "획 확정"은 이 capture 핸들러 다음(bubble)에 실행된다 — 확정된 뒤에 지우도록 미룬다.
+          setTimeout(() => onStrayStrokeRef.current?.(), 0);
+          logDev(debugLabel, 'pinch-discards-stray-stroke', { ms: Math.round(e.timeStamp - start.time), travel: Math.round(start.travel) });
+        }
+        strokeStartRef.current = null;
         beginPinch(pointers);
         return;
       }
@@ -325,7 +357,7 @@ export function useHandwritingInput({
         if (pointers.size < 2) return;
         const start = pinchStartRef.current;
         const rect = viewportRectRef.current;
-        if (!start || !rect || !documentSize) return;
+        if (!start || !rect || !drawingWorld) return;
         const ids = Array.from(pointers.keys()).slice(0, 2);
         const p1 = pointers.get(ids[0])!;
         const p2 = pointers.get(ids[1])!;
@@ -337,18 +369,21 @@ export function useHandwritingInput({
         const docAnchorY = (start.midY - rect.top - start.camera.y) / start.camera.scale;
         const minScale = fitScaleRef.current;
         let nextScale = start.camera.scale * (distance / start.distance);
-        nextScale = Math.min(minScale * PINCH_MAX_MULTIPLIER, Math.max(minScale, nextScale));
+        nextScale = Math.min(minScale * PINCH_MAX_MULTIPLIER, Math.max(minScale * PINCH_MIN_MULTIPLIER, nextScale));
 
+        // 카메라 x/y는 계속 "문서 (0,0)의 화면 위치"다. 팬 범위만 문서 대신 월드 기준으로 제한한다.
         let nextX = midX - rect.left - docAnchorX * nextScale;
         let nextY = midY - rect.top - docAnchorY * nextScale;
-        nextX = clampAxis(nextX, viewportSize.width, documentSize.width * nextScale);
-        nextY = clampAxis(nextY, viewportSize.height, documentSize.height * nextScale);
+        nextX = clampAxis(nextX + drawingWorld.x * nextScale, viewportSize.width, drawingWorld.width * nextScale) - drawingWorld.x * nextScale;
+        nextY = clampAxis(nextY + drawingWorld.y * nextScale, viewportSize.height, drawingWorld.height * nextScale) - drawingWorld.y * nextScale;
 
         setCamera({ scale: nextScale, x: nextX, y: nextY });
         return;
       }
 
       if (gestureStateRef.current !== 'drawing' || drawingPointerIdRef.current !== e.pointerId) return;
+      const strokeStart = strokeStartRef.current;
+      if (strokeStart) strokeStart.travel = Math.max(strokeStart.travel, Math.hypot(e.clientX - strokeStart.x, e.clientY - strokeStart.y));
 
       const target = e.target;
       if (!target) return;
@@ -444,7 +479,7 @@ export function useHandwritingInput({
       onPointerCancelCapture: handlePointerCancelCapture,
       onLostPointerCaptureCapture: handleLostPointerCaptureCapture,
     };
-  }, [enabled, documentSize, viewportSize, viewportRef, debugLabel]);
+  }, [enabled, drawingWorld, viewportSize, viewportRef, debugLabel]);
 
   return { camera, captureHandlers, finalizeActiveStroke };
 }

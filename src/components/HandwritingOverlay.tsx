@@ -5,6 +5,7 @@ import { ReactSketchCanvas, type ReactSketchCanvasRef, type CanvasPath } from 'r
 import { supabase } from '../services/supabase';
 import { useHandwritingInput, type DocumentSize } from '../features/handwriting/useHandwritingInput';
 import { flattenHandwriting, blobToDataUrl } from '../features/handwriting/flattenHandwriting';
+import { computeExportRect, getDrawingWorld, type DocRect } from '../features/handwriting/drawingWorld';
 
 // 문서(캔버스) 좌표계의 "기준 해상도" — 문제 사진의 실제 카메라 해상도(수천 px일 수 있음)를 그대로
 // 쓰지 않고 화면비만 유지한 채 이 값으로 정규화한다. PR1은 "라이브 편집 중 좌표계"만 다루고,
@@ -221,13 +222,18 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
     ? referenceImageDocSize
     : blankDocSize;
 
+  // 실제 필기 가능 영역 — 문서 바깥 흰 여백까지. documentSize는 useMemo/state 값이라 참조가 안정적이다.
+  const drawingWorld = useMemo<DocRect | null>(() => (documentSize ? getDrawingWorld(documentSize) : null), [documentSize]);
+
   const { camera, captureHandlers, finalizeActiveStroke } = useHandwritingInput({
     viewportRef,
     documentSize,
+    drawingWorld,
     enabled: !isSaving && !showClearConfirm,
     // 두 창이 동시에 열릴 수 있으므로 DEV 로그에서 어느 창인지 구분한다 — mistakeId는 두 창이
     // 공유하므로 배경 유무로 구분하는 편이 실제 원인 추적에 더 유용하다.
     debugLabel: backgroundImageUrl ? 'problem' : 'extra',
+    onStrayStroke: () => canvasRef.current?.undo(),
   });
 
   // documentSize가 null → 값으로 바뀔 때(마운트 후 문서 크기가 처음 확정될 때) 아래 JSX가
@@ -404,7 +410,7 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
   // 않는다 — exportSvg()(undo/지우개 mask가 반영된 최종 상태)만 재사용하고, 배경 합성은
   // flattenHandwriting이 직접 offscreen canvas에서 한다(PR2, 검은 배경/crop 버그의 근본 수정).
   const handleSave = async () => {
-    if (isSaving || !canvasRef.current || !documentSize) return;
+    if (isSaving || !canvasRef.current || !documentSize || !drawingWorld) return;
     // readOnly prop은 이후의 pointerdown/move/up/cancel을 전부 끊어버릴 뿐, 이 순간 이미 눌려 있던
     // pointer의 stroke를 라이브러리 스스로 정상 종료시켜주지는 않는다(리뷰에서 실제 설치본 실행으로
     // 확인) — readOnly를 켜기(=isSaving을 true로 만들기) 전에 먼저 진행 중이던 stroke를 확정한다.
@@ -420,12 +426,15 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
       if (!canvasRef.current) throw new Error('캔버스를 찾을 수 없습니다.');
 
       const svgMarkup = await canvasRef.current.exportSvg();
+      // 문서 밖에 쓴 필기가 저장 이미지에서 잘리지 않도록 저장 범위를 필기까지 넓힌다(없으면 문서 그대로).
+      const exportRect = computeExportRect(documentSize, drawingWorld, await canvasRef.current.exportPaths());
 
       // snapshot — "저장 시작 시점"(=이 시점)의 값만 이후 계속 쓴다. 두 창이 동시에 열려 있을 때
       // 아래 runExclusiveSave가 이 창의 실제 합성/업로드를 뒤로 미루더라도(다른 창이 먼저 저장
       // 중이면), 그 사이 모달이 닫히거나 문제가 전환돼 selectedEntry/props가 바뀌어도 이 저장
       // 작업의 대상(mistakeId 등)은 절대 바뀌지 않는다.
       const snapshotDocumentSize = documentSize;
+      const snapshotDrawingWorld = drawingWorld;
       const snapshotBackgroundUrl = backgroundImageUrl;
       const snapshotCaption = backgroundImageUrl ? '✏️ 직접 손으로 쓴 풀이' : '📝 추가 필기장';
       const snapshotMistakeId = mistakeId;
@@ -441,6 +450,8 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
           documentSize: snapshotDocumentSize,
           backgroundImageUrl: snapshotBackgroundUrl,
           svgMarkup,
+          svgRect: snapshotDrawingWorld,
+          outputRect: exportRect,
         });
         const dataUrl = await blobToDataUrl(blob);
 
@@ -535,7 +546,7 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
           onPointerCancelCapture={captureHandlers.onPointerCancelCapture}
           onLostPointerCaptureCapture={captureHandlers.onLostPointerCaptureCapture}
         >
-          {documentSize ? (
+          {documentSize && drawingWorld ? (
             <div
               style={{
                 position: 'absolute',
@@ -545,43 +556,62 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
                 height: documentSize.height,
                 transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.scale})`,
                 transformOrigin: '0 0',
+                // 카메라는 손가락을 즉시 따라가야 한다. 동작 줄이기 설정의 `.rn-writing-window *
+                // { transition-duration: .01ms }`(detail.css)는 property 기본값 all 때문에 transform도
+                // 한 프레임 늦게 따라가게 만들어, 팬 직후 첫 획의 시작점이 이전 카메라로 계산됐다.
+                transition: 'none',
               }}
             >
-              <ReactSketchCanvas
-                ref={canvasRef}
-                // 획 굵기는 문서(=react-sketch-canvas 내부) 좌표 단위라, 카메라 배율을 그대로 두면
-                // 기본 축소 상태(예: 1600 단위 문서를 360px 창에 맞춤, scale≈0.22)에서 화면에는
-                // 3px가 아니라 1px도 안 되게 그려진다(리뷰에서 확인된 회귀). 배율의 역수를 곱해
-                // "지금 화면에 보이는 굵기"가 항상 기존과 같은 3px/16px가 되도록 보정한다.
-                strokeWidth={3 / camera.scale}
-                eraserWidth={16 / camera.scale}
-                strokeColor={strokeColor}
-                // 화면 배경(bg-white)이 이미 흰색이라 캔버스 자체는 투명해도 빈 필기장은 그대로
-                // 흰 종이처럼 보인다 — 대신 exportSvg()가 내보내는 배경 rect도 투명해진다(canvasColor
-                // 값 그대로 채워지던 걸 없앰). exportWithBackgroundImage=false와 맞물려 exportSvg()
-                // 결과가 "필기 획만 있는, 원격 이미지 참조도 없는" 순수 벡터가 되어(설치본 K() 함수
-                // 기준 확인) flattenHandwriting이 그 위에 흰 배경 + 원본 사진을 안전하게 겹칠 수 있다.
-                canvasColor="transparent"
-                backgroundImage={backgroundImageUrl || ''}
-                // 항상 false — 저장(export)에서는 라이브러리의 배경 합성을 쓰지 않는다. 실시간
-                // 화면에는 영향 없음(backgroundImage prop만으로 표시됨, 이 값은 export 전용).
-                // flattenHandwriting(PR2)이 문제 이미지 전체를 직접 그려 넣는다.
-                exportWithBackgroundImage={false}
-                // slice(cover, 잘라냄)를 meet(contain, 안 잘림)으로 되돌린다 — 검은 배경 버그의
-                // 본질은 meet가 아니라 meet가 남기는 여백이 투명이었던 것. 저장은 이제
-                // flattenHandwriting이 흰 배경을 먼저 채우므로, 화면도 다시 원본을 자르지 않는
-                // meet로 복귀해도 안전하다. documentSize가 사진 비율과 이미 일치해 실제로는
-                // 여백 자체가 거의 생기지 않는다.
-                preserveBackgroundImageAspectRatio="xMidYMid meet"
-                onChange={(paths: CanvasPath[]) => setHasStrokes(paths.length > 0)}
-                // 저장 중에는 새 입력을 받지 않는다(기존 획/undo/export API는 계속 정상 동작) —
-                // useHandwritingInput의 enabled=false는 우리 augmentation만 멈추지, 라이브러리 자체
-                // pointer 리스너는 막지 못하므로 이 prop이 실제 "입력 동결"을 담당한다.
-                readOnly={isSaving}
-                width="100%"
-                height="100%"
-                style={{ border: 'none' }}
-              />
+              {/* 문제 이미지는 문서 사각형에만 깐다. 예전엔 react-sketch-canvas의 backgroundImage로
+                  SVG 박스 전체에 깔았는데, 이제 SVG 박스는 문서보다 큰 월드라서 그대로 두면 이미지가
+                  월드 전체로 늘어난다. 문서가 이미 사진 비율이라 contain = 예전 meet와 같은 모습. */}
+              {backgroundImageUrl && !imageLoadFailed && (
+                <img
+                  src={backgroundImageUrl}
+                  alt=""
+                  draggable={false}
+                  className="absolute inset-0 w-full h-full object-contain select-none pointer-events-none"
+                />
+              )}
+              {/* 필기 SVG 박스 = 월드. 문서 좌표 (world.x, world.y)에서 시작해 문서 밖 여백까지 덮는다
+                  — 확대/팬으로 이동한 흰 공간에서도 실제로 필기가 된다(drawingWorld.ts). */}
+              <div
+                style={{
+                  position: 'absolute',
+                  left: drawingWorld.x,
+                  top: drawingWorld.y,
+                  width: drawingWorld.width,
+                  height: drawingWorld.height,
+                }}
+              >
+                <ReactSketchCanvas
+                  ref={canvasRef}
+                  // 획 굵기는 문서(=react-sketch-canvas 내부) 좌표 단위라, 카메라 배율을 그대로 두면
+                  // 기본 축소 상태(예: 1600 단위 문서를 360px 창에 맞춤, scale≈0.22)에서 화면에는
+                  // 3px가 아니라 1px도 안 되게 그려진다(리뷰에서 확인된 회귀). 배율의 역수를 곱해
+                  // "지금 화면에 보이는 굵기"가 항상 기존과 같은 3px/16px가 되도록 보정한다.
+                  strokeWidth={3 / camera.scale}
+                  eraserWidth={16 / camera.scale}
+                  strokeColor={strokeColor}
+                  // 화면 배경(bg-white)이 이미 흰색이라 캔버스 자체는 투명해도 빈 필기장은 그대로
+                  // 흰 종이처럼 보인다 — 대신 exportSvg()가 내보내는 배경 rect도 투명해진다(canvasColor
+                  // 값 그대로 채워지던 걸 없앰). exportWithBackgroundImage=false와 맞물려 exportSvg()
+                  // 결과가 "필기 획만 있는, 원격 이미지 참조도 없는" 순수 벡터가 되어(설치본 K() 함수
+                  // 기준 확인) flattenHandwriting이 그 위에 흰 배경 + 원본 사진을 안전하게 겹칠 수 있다.
+                  canvasColor="transparent"
+                  // 배경 이미지는 위의 <img>가 문서 사각형에만 그린다 — 캔버스는 필기 획만 가진다.
+                  // 저장도 flattenHandwriting(PR2)이 문제 이미지 전체를 직접 그려 넣는다.
+                  exportWithBackgroundImage={false}
+                  onChange={(paths: CanvasPath[]) => setHasStrokes(paths.length > 0)}
+                  // 저장 중에는 새 입력을 받지 않는다(기존 획/undo/export API는 계속 정상 동작) —
+                  // useHandwritingInput의 enabled=false는 우리 augmentation만 멈추지, 라이브러리 자체
+                  // pointer 리스너는 막지 못하므로 이 prop이 실제 "입력 동결"을 담당한다.
+                  readOnly={isSaving}
+                  width="100%"
+                  height="100%"
+                  style={{ border: 'none' }}
+                />
+              </div>
             </div>
           ) : (
             <div className="absolute inset-0 flex items-center justify-center text-[11px] text-slate-400 font-bold">
