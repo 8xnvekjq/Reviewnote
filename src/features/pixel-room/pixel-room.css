@@ -9,6 +9,9 @@
 .pr-shell { max-width:680px; margin:0 auto; height:100%; display:flex; flex-direction:column; overflow-y:auto; overflow-x:hidden; position:relative; color:var(--rn-text); gap:6px; container-type:size; container-name:pr-shell; }
 .pr-toolbar { flex:0 0 auto; display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px; padding-top:2px; }
 .pr-toolbar .rn-button:first-child { padding-left:0; }
+/* 뒤로가기만 왼쪽, 꾸미기·배경음악 토글은 오른쪽에 붙여 둔다(장면마다 꾸미기 버튼이 있다 없다 해도 음악 버튼 자리가 안 흔들림). */
+.pr-toolbar > :first-child { margin-right:auto; }
+.pr-bgm-toggle { min-width:40px; padding-inline:10px; line-height:1; }
 .pr-storage-error { flex:0 0 auto; background:#6d432933; border:1px solid #e9b57755; color:#f2ce9c; padding:8px 10px; border-radius:8px; font-size:11px; line-height:1.5; }
 
 /* min-height keeps the room from collapsing to nothing in a pathologically short viewport (e.g. a
