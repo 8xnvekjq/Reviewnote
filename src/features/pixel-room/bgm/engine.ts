@@ -142,6 +142,16 @@ export class PixelBgm {
     }, FADE_SECONDS * 1000 + 100);
   }
 
+  /**
+   * 재생 중이어야 하는데 컨텍스트가 suspended로 남아 있으면(자동재생 정책이 첫 resume을 거절한
+   * 경우 등) 다시 resume을 시도한다. 사용자 입력 핸들러에서 매번 불러도 되게 싸게 끝난다.
+   */
+  ensureRunning() {
+    if (!this.playing || this.hidden || !this.ctx || this.ctx.state !== 'suspended') return;
+    void this.ctx.resume();
+    this.startTimer();
+  }
+
   /** 탭이 숨겨지면 시계째 멈췄다가, 돌아오면 같은 자리에서 이어간다. */
   setHidden(hidden: boolean) {
     this.hidden = hidden;
