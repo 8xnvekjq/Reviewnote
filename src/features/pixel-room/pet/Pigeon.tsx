@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import sheet from './assets/pigeon.png';
 import { dogFits } from './dogModel';
-import type { DogWorld } from './dogModel';
-import { PIGEON_LAND_MS, PIGEON_TAKEOFF_MS, advancePigeon, pigeonAirborne, pigeonLift, pigeonPosition, spawnPigeon } from './pigeonModel';
+import { PIGEON_LAND_MS, PIGEON_TAKEOFF_MS, advancePigeon, holdPigeon, pigeonAirborne, pigeonLift, pigeonPosition, spawnPigeon } from './pigeonModel';
+import { PetInteractionFx } from './PetInteractionFx';
+import { petTapProps, usePetLink } from './usePetInteraction';
+import { interactionBeat } from './petInteraction';
+import type { PetProps } from './petInteraction';
 import type { PigeonAction, PigeonState } from './pigeonModel';
 import './pigeon.css';
 
@@ -28,7 +31,7 @@ export function PigeonSprite({ action = 'idle', elapsed = 0, right = false, lift
     <svg y={-lift} width="32" height="32" viewBox={`${frame * 32} ${row * 32} 32 32`} overflow="hidden"><image href={sheet} width="128" height="192" /></svg>
   </svg>;
 }
-export function Pigeon({ world, paused = false }: { world: DogWorld; paused?: boolean }) {
+export function Pigeon({ world, paused = false, interaction = null, onTap, link }: PetProps) {
   const worldRef = useRef(world); worldRef.current = world;
   const pausedRef = useRef(paused); pausedRef.current = paused;
   const [snapshot, setSnapshot] = useState<{ state: PigeonState | null; now: number }>(() => { const now = performance.now(); return { state: spawnPigeon(world, now), now }; });
@@ -41,17 +44,28 @@ export function Pigeon({ world, paused = false }: { world: DogWorld; paused?: bo
     frame = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(frame);
   }, []);
+  useEffect(() => {
+    if (!interaction) return;
+    setSnapshot(previous => previous.state ? { ...previous, state: holdPigeon(previous.state, interaction.player, interaction.start, interaction.until) } : previous);
+  }, [interaction]);
   const { state, now } = snapshot;
   // Grounded: yield at once when the player or furniture takes our cells (like the dog/duck).
   // Airborne: only the landing cell matters; the model re-targets it if it gets taken.
-  if (!state || !dogFits(world, state.cell) || (state.action !== 'fly' && !dogFits(world, state.from))) return null;
+  const visible = !!state && dogFits(world, state.cell) && (state.action === 'fly' || dogFits(world, state.from));
+  usePetLink(link, visible ? state.cell : null, 2);
+  if (!state || !visible) return null;
+  const beat = !paused && state.held && now < state.held.until ? interactionBeat('pet_pigeon', now - state.held.start) : null;
   const position = paused ? state.cell : pigeonPosition(state, world, now);
   const walking = state.action === 'walk' && (state.cell.x !== state.from.x || state.cell.y !== state.from.y);
-  const action = paused ? 'rest' : walking ? 'walk' : state.action === 'walk' ? 'idle' : state.action;
-  const airborne = !paused && pigeonAirborne(state);
-  return <div className="pr-pigeon" aria-hidden="true" data-action={action} data-airborne={airborne} data-x={state.cell.x} data-y={state.cell.y} data-from-x={state.from.x} data-from-y={state.from.y}
+  const action = (paused ? 'rest' : beat ? beat.action : walking ? 'walk' : state.action === 'walk' ? 'idle' : state.action) as PigeonAction;
+  const airborne = !paused && !beat && pigeonAirborne(state);
+  // The peck row runs 1.32s; loop it for the whole feeding beat.
+  const elapsed = paused ? 0 : beat ? (action === 'peck' ? beat.elapsed % 1320 : beat.elapsed) : now - state.entered;
+  return <div className="pr-pigeon" data-action={action} data-interaction={beat?.stage} data-airborne={airborne} data-x={state.cell.x} data-y={state.cell.y} data-from-x={state.from.x} data-from-y={state.from.y}
     // A 2×3-cell box: the extra top cell is headroom for flight. Airborne birds draw above furniture.
-    style={{ left: `${position.x / world.width * 100}%`, bottom: `${(world.height - position.y - 1) / world.height * 100}%`, width: `${200 / world.width}%`, height: `${300 / world.height}%`, zIndex: airborne ? world.height + 2 : Math.floor(position.y) + 1 }}>
-    <PigeonSprite action={action} elapsed={paused ? 0 : now - state.entered} right={state.right} lift={paused ? 0 : pigeonLift(state, world, now)} />
+    style={{ left: `${position.x / world.width * 100}%`, bottom: `${(world.height - position.y - 1) / world.height * 100}%`, width: `${200 / world.width}%`, height: `${300 / world.height}%`, zIndex: airborne ? world.height + 2 : Math.floor(position.y) + 1 }} {...petTapProps('pet_pigeon', paused ? undefined : onTap)}>
+    <PigeonSprite action={action} elapsed={elapsed} right={state.right} lift={paused || beat ? 0 : pigeonLift(state, world, now)} />
+    {beat && <PetInteractionFx pet="pet_pigeon" stage={beat.stage} heart={beat.heart} right={state.right} />}
+    {onTap && !paused && <span className="pr-pet-hit" />}
   </div>;
 }

@@ -1,4 +1,4 @@
-import { dogFits, dogRoute, spawnDog } from './dogModel';
+import { dogFits, dogRoute, holdPet, spawnDog, stepHold } from './dogModel';
 import type { DogState, DogWorld, PetCell } from './dogModel';
 export type DuckAction = 'idle' | 'walk' | 'tilt' | 'peck' | 'hop';
 export type DuckState = Omit<DogState, 'action'> & { action: DuckAction };
@@ -9,6 +9,9 @@ export function spawnDuck(world: DogWorld, now: number): DuckState | null {
 export function duckStepMs(world: DogWorld): number { return world.outdoors ? 250 : 340; }
 export function advanceDuck(state: DuckState | null, world: DogWorld, now: number, paused: boolean, random = Math.random): DuckState | null {
   if (!state || !dogFits(world, state.cell) || !dogFits(world, state.from)) return spawnDuck(world, now);
+  const hold = stepHold(state, now, paused);
+  if (hold.frozen) return state;
+  state = hold.state;
   if (paused) return { ...state, from: state.cell, route: [], action: 'idle', entered: now, due: now + 1800 };
   if (now < state.due) return state;
   if (state.action !== 'walk') {
@@ -24,6 +27,7 @@ export function advanceDuck(state: DuckState | null, world: DogWorld, now: numbe
   const duration = action === 'hop' ? 900 : action === 'peck' ? 1400 : (world.outdoors ? 1100 : 2100) + random() * 1500;
   return { ...state, from: state.cell, route: [], action, entered: now, due: now + duration };
 }
+export const holdDuck = (state: DuckState, player: PetCell, now: number, until: number) => holdPet(state, player, now, until, 'idle');
 export function duckPosition(state: DuckState, world: DogWorld, now: number): PetCell {
   const t = state.action === 'walk' ? Math.min(1, Math.max(0, (now - state.entered) / duckStepMs(world))) : 1;
   return { x: state.from.x + (state.cell.x - state.from.x) * t, y: state.from.y + (state.cell.y - state.from.y) * t };

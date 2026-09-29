@@ -12,7 +12,11 @@ import FrontYard from './yard/FrontYard';
 import { Companion } from './pet/Companion';
 import { isPetId } from './pet/petKinds';
 import { roomDogWorld } from './pet/dogWorld';
+import { pickApproach } from './pet/dogModel';
 import { usePet } from './pet/usePet';
+import { usePetInteraction } from './pet/usePetInteraction';
+import { PlaceSparkles, StepDust } from './stepFx';
+import { hopProps, useStepTrail } from './useStepTrail';
 import { useBgm } from './bgm/useBgm';
 import { fetchPixelFurniturePlacement, savePixelRoomLayout } from '../../utils/pixelShop';
 import './pixel-room.css';
@@ -57,6 +61,11 @@ function stepDirection(from: Cell, to: Cell): Direction {
   if (to.x > from.x) return 'Right';
   if (to.x < from.x) return 'Left';
   return to.y > from.y ? 'Front' : 'Back';
+}
+function toSteps(from: Cell, path: Cell[]): WalkStep[] {
+  const steps: WalkStep[] = [];
+  for (const cell of path) { steps.push({ cell, direction: stepDirection(from, cell) }); from = cell; }
+  return steps;
 }
 function browserStorage(): StorageLike | undefined { try { return window.localStorage; } catch { return undefined; } }
 // 장착 칭호/말투/테마는 새 프로필을 만들지 않고 기존 equipped state를 재사용한다. 단, 이 파일은
@@ -119,6 +128,9 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
   const [storageError, setStorageError] = useState('');
   const [speech, setSpeech] = useState('');
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
+  // The piece of furniture that was just set down plays a squash-and-sparkle once.
+  const [placedFx, setPlacedFx] = useState<{ type: FurnitureType; id: number } | null>(null);
+  const placedTimer = useRef<number | undefined>(undefined);
   const board = useRef<HTMLDivElement>(null);
   const speechTimer = useRef<number | undefined>(undefined);
   const shop = usePixelShop(userId, pointsBalance, onPixelPurchase);
@@ -358,23 +370,38 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
     return () => { clearTimeout(timer); window.removeEventListener('blur', stop); document.removeEventListener('visibilitychange', stop); };
   }, [walkQueue, decorating, held, location, activeRoom]);
 
-  function begin(next: Direction) { setWalkQueue([]); setDirection(next); setHeld(next); }
+  const roomPet = roomReady && shop.ready && !shop.loadError && pet.ready && !pet.error && pet.active && shop.ownedIds.has(pet.active) ? pet.active : null;
+  const walking = !!held || walkQueue.length > 0;
+  const trail = useStepTrail(actor);
+  // Tap-to-feed: walk to the nearest free cell beside the pet. A route over the door cell would
+  // leave the room mid-approach, so those are skipped.
+  function approachPet(targets: Cell[]) {
+    const best = pickApproach(targets, target => {
+      const path = planWalk(activeRoom, actor, target);
+      return path.some(cell => cell.x === ROOM_DOOR.x && cell.y === ROOM_DOOR.y) ? [] : path;
+    });
+    if (!best.length) return false;
+    setHeld(null);
+    setWalkQueue(toSteps(actor, best));
+    return true;
+  }
+  const petTalk = usePetInteraction({ pet: roomPet, actor, walking, disabled: decorating || location !== 'room', approach: approachPet, say: setMessage });
+  useEffect(() => () => window.clearTimeout(placedTimer.current), []);
+
+  function begin(next: Direction) { petTalk.cancelApproach(); setWalkQueue([]); setDirection(next); setHeld(next); }
   function walkTo(target: Cell) {
     if (decorating || (target.x === actor.x && target.y === actor.y)) return;
     const path = planWalk(activeRoom, actor, target);
     if (path.length === 0) { setMessage('그 칸에는 갈 수 없어요. 가구가 없는 바닥을 눌러 주세요.'); return; }
-    const steps: WalkStep[] = [];
-    let from = actor;
-    for (const cell of path) { steps.push({ cell, direction: stepDirection(from, cell) }); from = cell; }
     setHeld(null);
-    setWalkQueue(steps);
+    setWalkQueue(toSteps(actor, path));
   }
   // 꾸미기 모드에 진입/재진입할 때마다 시트를 가구 탭으로 열어 catalog가 바로 보이게 하고,
   // 나갈 때는 방을 다시 꽉 채워 보여주기 위해 시트도 함께 접는다.
   function enterDecorating() { setDecorating(true); setHeld(null); setWalkQueue([]); setPanel('furniture'); setSheetOpen(true); }
   function exitDecorating(nextMessage: string) { setDecorating(false); setSelected(null); setSheetOpen(false); setMessage(nextMessage); }
   function chooseCell(cell: Cell) {
-    if (!decorating) { board.current?.focus({ preventScroll: true }); walkTo(cell); return; }
+    if (!decorating) { board.current?.focus({ preventScroll: true }); petTalk.cancelApproach(); walkTo(cell); return; }
     if (!shop.ready || shop.loadError || !roomReady) { setMessage('보유 정보를 불러온 뒤 배치할 수 있어요.'); return; }
     if (selected && !ownedFurnitureTypes.has(selected)) { setSelected(null); return; }
     if (!selected) {
@@ -387,6 +414,9 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
     const next = placeFurniture(activeRoom, selected, cell, actor);
     if (!next) { setMessage('가구와 캐릭터가 없는, 방 안의 빈 공간을 골라 주세요.'); return; }
     persist(next);
+    window.clearTimeout(placedTimer.current);
+    setPlacedFx({ type: selected, id: Date.now() });
+    placedTimer.current = window.setTimeout(() => setPlacedFx(null), 900);
     exitDecorating(`${names[selected]} 배치 완료! 이제 방을 누르면 그 자리로 걸어가요.`);
   }
   const placed = selected && room.furniture.some(item => item.type === selected);
@@ -432,11 +462,12 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
              (.pr-furniture와 동일 처리) 눌러도 그대로 아래 바닥 칸 버튼이 반응해서 자연스럽게 문
              쪽으로 걸어간다. */}
           <div className="pr-doormat" style={{ left: `${(ROOM_DOOR.x - 0.5) * 10}%`, top: `${ROOM_DOOR.y * 12.5}%`, width: '20%', height: '12.5%' }}><DoormatSprite /></div>
-          {activeRoom.furniture.map(item => <div key={item.type} data-furniture={item.type} className={`pr-furniture ${selected === item.type ? 'pr-selected' : ''}`} style={{ left: `${item.x * 10}%`, top: `${item.y * 12.5}%`, width: `${FURNITURE[item.type].width * 10}%`, height: `${FURNITURE[item.type].height * 12.5}%`, zIndex: item.y + FURNITURE[item.type].height }}><FurnitureSprite type={item.type} /></div>)}
-          {roomReady && shop.ready && !shop.loadError && pet.ready && !pet.error && pet.active && shop.ownedIds.has(pet.active) && <Companion pet={pet.active} key={`${pet.active}:${JSON.stringify(activeRoom.furniture)}`} world={roomDogWorld(activeRoom, actor)} paused={decorating} />}
-          <button type="button" className="pr-actor" data-x={actor.x} data-y={actor.y} data-direction={direction} data-shirt={shop.equipped.top ?? 'default'} style={{ left: `${actor.x * 10 - 6}%`, bottom: `${(ROOM_HEIGHT - actor.y - 1) * 12.5}%`, zIndex: actor.y + 1, pointerEvents: decorating ? 'none' : 'auto' }} tabIndex={decorating ? -1 : 0} onClick={event => { event.stopPropagation(); speak(); }} aria-label={`내 캐릭터, ${actor.x + 1}열 ${actor.y + 1}행. 눌러서 말 걸어보기`}>
+          {activeRoom.furniture.map(item => <div key={item.type} data-furniture={item.type} data-placed={placedFx?.type === item.type || undefined} className={`pr-furniture ${selected === item.type ? 'pr-selected' : ''}`} style={{ left: `${item.x * 10}%`, top: `${item.y * 12.5}%`, width: `${FURNITURE[item.type].width * 10}%`, height: `${FURNITURE[item.type].height * 12.5}%`, zIndex: item.y + FURNITURE[item.type].height }}><FurnitureSprite type={item.type} />{placedFx?.type === item.type && <PlaceSparkles key={placedFx.id} />}</div>)}
+          {roomPet && <Companion pet={roomPet} key={`${roomPet}:${JSON.stringify(activeRoom.furniture)}`} world={roomDogWorld(activeRoom, actor)} paused={decorating} interaction={petTalk.interaction} onTap={petTalk.tap} link={petTalk.link} />}
+          <StepDust puffs={trail.puffs} cols={ROOM_WIDTH} rows={ROOM_HEIGHT} />
+          <button type="button" className="pr-actor" {...hopProps(trail.step)} data-x={actor.x} data-y={actor.y} data-direction={direction} data-shirt={shop.equipped.top ?? 'default'} style={{ left: `${actor.x * 10 - 6}%`, bottom: `${(ROOM_HEIGHT - actor.y - 1) * 12.5}%`, zIndex: actor.y + 1, pointerEvents: decorating ? 'none' : 'auto' }} tabIndex={decorating ? -1 : 0} onClick={event => { event.stopPropagation(); speak(); }} aria-label={`내 캐릭터, ${actor.x + 1}열 ${actor.y + 1}행. 눌러서 말 걸어보기`}>
             {speech && <span className="pr-bubble" role="status">{speech}</span>}
-            <span className="pr-shadow" /><AvatarSprite direction={direction} frame={held || walkQueue.length > 0 ? frame : 0} walking={!!held || walkQueue.length > 0} appearance={shop.equipped} />
+            <span className="pr-shadow" /><AvatarSprite direction={direction} frame={walking ? frame : 0} walking={walking} appearance={shop.equipped} />
           </button>
         </div>
       </div>

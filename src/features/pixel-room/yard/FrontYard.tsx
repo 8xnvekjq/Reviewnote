@@ -4,13 +4,17 @@ import type { PublicAvatarAppearance } from '../shop/types';
 import type { PlazaDirection } from '../plaza/types';
 import { PLAZA_MOVE_TICK_MS } from '../plaza/types';
 import town from '../plaza/assets/tiny-town.png';
-import { YARD_DOOR, YARD_GATE, YARD_SPAWNS, yardExit, yardPath, yardWalkable } from './yardModel';
+import { YARD_DOOR, YARD_GATE, YARD_HEIGHT, YARD_SPAWNS, YARD_WIDTH, yardExit, yardPath, yardWalkable } from './yardModel';
 import type { YardCell, YardDestination } from './yardModel';
 import '../plaza/plaza.css';
 import './yard.css';
 import { Companion } from '../pet/Companion';
 import type { PetId } from '../pet/petKinds';
 import { yardDogWorld } from '../pet/dogWorld';
+import { pickApproach } from '../pet/dogModel';
+import { usePetInteraction } from '../pet/usePetInteraction';
+import { StepDust } from '../stepFx';
+import { hopProps, useStepTrail } from '../useStepTrail';
 import { Farm } from '../farm/Farm';
 import { Scarecrow } from '../farm/Scarecrow';
 import { useFarm } from '../farm/useFarm';
@@ -51,6 +55,7 @@ export default function FrontYard({ from, appearance, onExit, activePet = null, 
   const [held, setHeld] = useState<PlazaDirection | null>(null);
   const [queue, setQueue] = useState<YardCell[]>([]);
   const [frame, setFrame] = useState(0);
+  const [message, setMessage] = useState('오른쪽 밭을 눌러 토마토를 키워 보세요.');
   const leaving = useRef(false);
   const board = useRef<HTMLDivElement>(null);
   const onExitRef = useRef(onExit);
@@ -79,25 +84,36 @@ export default function FrontYard({ from, appearance, onExit, activePet = null, 
     window.addEventListener('blur', stop); document.addEventListener('visibilitychange', stop);
     return () => { window.removeEventListener('blur', stop); document.removeEventListener('visibilitychange', stop); };
   }, []);
-  function walkTo(cell: YardCell) { if (!leaving.current) { setHeld(null); setQueue(yardPath(actor, cell)); board.current?.focus({ preventScroll: true }); } }
   const moving = !!held || queue.length > 0;
+  const trail = useStepTrail(actor);
+  // Tap-to-feed: the nearest reachable cell beside the pet, never a doorway (that would leave the yard).
+  function approachPet(targets: YardCell[]) {
+    if (leaving.current) return false;
+    const best = pickApproach(targets, target => yardExit(target) ? [] : yardPath(actor, target));
+    if (!best.length) return false;
+    setHeld(null); setQueue(best);
+    return true;
+  }
+  const petTalk = usePetInteraction({ pet: activePet, actor, walking: moving, disabled: false, approach: approachPet, say: setMessage });
+  function walkTo(cell: YardCell) { if (!leaving.current) { petTalk.cancelApproach(); setHeld(null); setQueue(yardPath(actor, cell)); board.current?.focus({ preventScroll: true }); } }
   return <div className="pr-room-frame pr-plaza-frame pr-yard-frame">
     <header className="pr-hub-heading"><div><span>PIXEL WORLD · HOME</span><h2>우리 집 앞, 작은 뜰</h2></div><span className="pr-hub-weather" aria-hidden="true">☀</span></header>
     <div className="pr-stage"><div ref={board} className="pr-board pr-plaza-board pr-yard-board" tabIndex={0} role="group" aria-label="집 앞. 위쪽 집 문은 내 방, 아래쪽 길은 광장으로 이어져요." onKeyDown={event => {
       if (event.target !== event.currentTarget || event.altKey || event.ctrlKey || event.metaKey) return;
       const next = keys[event.key.length === 1 ? event.key.toLowerCase() : event.key];
-      if (next) { event.preventDefault(); if (!event.repeat) { setQueue([]); setHeld(next); } }
+      if (next) { event.preventDefault(); if (!event.repeat) { petTalk.cancelApproach(); setQueue([]); setHeld(next); } }
     }} onKeyUp={event => { if (keys[event.key.length === 1 ? event.key.toLowerCase() : event.key] === held) setHeld(null); }} onBlur={() => setHeld(null)}>
       <Landscape />
       <div className="pr-grid pr-plaza-grid">{cells.map(cell => <button type="button" key={`${cell.x}-${cell.y}`} tabIndex={-1} aria-hidden="true" disabled={!yardWalkable(cell)} onClick={() => walkTo(cell)} />)}</div>
       <button type="button" className="pr-yard-door" aria-label="집 문으로 걸어가기" onClick={() => walkTo(YARD_DOOR)} />
       <button type="button" className="pr-yard-gate" aria-label="길을 따라 광장으로 걸어가기" onClick={() => walkTo(YARD_GATE)}>↓</button>
-      {activePet && <Companion key={activePet} pet={activePet} world={yardDogWorld(actor)} />}
+      {activePet && <Companion key={activePet} pet={activePet} world={yardDogWorld(actor)} interaction={petTalk.interaction} onTap={petTalk.tap} link={petTalk.link} />}
+      <StepDust puffs={trail.puffs} cols={YARD_WIDTH} rows={YARD_HEIGHT} />
       <Farm farm={farm} actor={actor} moving={moving} walkTo={walkTo} />
       <Scarecrow snapshot={farm.snapshot} now={farm.now} />
-      <div className="pr-plaza-actor" aria-hidden="true" data-x={actor.x} data-y={actor.y} data-direction={direction} style={{ left: `${(actor.x - .6) / 16 * 100}%`, bottom: `${(11 - actor.y) / 12 * 100}%`, width: '13.75%', height: '18%', zIndex: actor.y + 2 }}><span className="pr-shadow" /><AvatarSprite direction={direction} frame={moving ? frame : 0} walking={moving} appearance={appearance} /></div>
+      <div className="pr-plaza-actor" aria-hidden="true" {...hopProps(trail.step)} data-x={actor.x} data-y={actor.y} data-direction={direction} style={{ left: `${(actor.x - .6) / 16 * 100}%`, bottom: `${(11 - actor.y) / 12 * 100}%`, width: '13.75%', height: '18%', zIndex: actor.y + 2 }}><span className="pr-shadow" /><AvatarSprite direction={direction} frame={moving ? frame : 0} walking={moving} appearance={appearance} /></div>
     </div></div>
-    <div className="pr-below-room"><p className="pr-instructions pr-plaza-instructions">오른쪽 밭을 눌러 토마토를 키워 보세요.</p></div>
+    <div className="pr-below-room"><p className="pr-instructions pr-plaza-instructions" role="status">{message}</p></div>
     <div className="pr-sheet">
       <div className="pr-sheet-trigger">
         <button type="button" aria-pressed={cropsOpen} aria-expanded={cropsOpen} aria-controls="pr-yard-sheet-panel" onClick={() => setCropsOpen(open => !open)}>농작물 <small>{inventory.crops?.length ?? 0}</small></button>

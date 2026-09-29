@@ -1,4 +1,4 @@
-import { dogFits, dogRoute, spawnDog } from './dogModel';
+import { dogFits, dogRoute, holdPet, spawnDog, stepHold } from './dogModel';
 import type { DogState, DogWorld, PetCell } from './dogModel';
 // Mostly a ground bird (strut, head bob, peck, rest) that now and then hops into a short, low
 // flight to another free cell: takeoff -> fly -> land. Flight passes over furniture but only ever
@@ -42,6 +42,9 @@ export function advancePigeon(state: PigeonState | null, world: DogWorld, now: n
   }
   // The takeoff cell may be walked on once airborne; only grounded poses need both cells free.
   if (!state || !dogFits(world, state.cell) || (state.action !== 'fly' && !dogFits(world, state.from))) return spawnPigeon(world, now);
+  const hold = stepHold(state, now, paused);
+  if (hold.frozen) return state;
+  state = hold.state;
   if (paused) return state.action === 'rest' && !state.route.length ? state : { ...state, from: state.cell, route: [], to: undefined, action: 'rest', entered: now, due: now + 1800 };
   if (now < state.due) return state;
   if (state.action === 'takeoff' && state.to) {
@@ -67,6 +70,8 @@ export function advancePigeon(state: PigeonState | null, world: DogWorld, now: n
   const duration = action === 'peck' ? 1300 : action === 'bob' ? 1000 : action === 'rest' ? (world.outdoors ? 2200 : 3600) + random() * 2000 : (world.outdoors ? 900 : 1800) + random() * 1400;
   return { ...state, from: state.cell, route: [], to: undefined, action, entered: now, due: now + duration };
 }
+// A bird in the air settles straight onto its landing cell to eat; it resumes grounded.
+export const holdPigeon = (state: PigeonState, player: PetCell, now: number, until: number) => holdPet({ ...state, to: undefined }, player, now, until, state.action === 'rest' ? 'rest' : 'idle');
 export function pigeonPosition(state: PigeonState, world: DogWorld, now: number): PetCell {
   const span = state.action === 'walk' ? pigeonStepMs(world) : state.action === 'fly' ? pigeonFlightMs(state.from, state.cell) : 0;
   const t = span ? Math.min(1, Math.max(0, (now - state.entered) / span)) : 1;

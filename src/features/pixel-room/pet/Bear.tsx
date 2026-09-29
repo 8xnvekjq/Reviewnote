@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import sheet from './assets/bear.png';
-import { BEAR_SPAN, BEAR_WAVE_MS, advanceBear, bearFits, bearPosition, spawnBear } from './bearModel';
+import { BEAR_SPAN, BEAR_WAVE_MS, advanceBear, bearFits, bearPosition, holdBear, spawnBear } from './bearModel';
+import { PetInteractionFx } from './PetInteractionFx';
+import { petTapProps, usePetLink } from './usePetInteraction';
+import { interactionBeat } from './petInteraction';
+import type { PetProps } from './petInteraction';
 import type { BearAction, BearState } from './bearModel';
-import type { DogWorld } from './dogModel';
 import './bear.css';
 
 // 192×192 sheet of 48×48 cells (see assets/BEAR.md): rows idle / walk / sit / wave, 4 frames each.
@@ -21,7 +24,7 @@ export function BearSprite({ action = 'idle', elapsed = 0, right = false }: { ac
     <svg width="48" height="48" viewBox={`${frame * 48} ${row * 48} 48 48`} overflow="hidden"><image href={sheet} width="192" height="192" /></svg>
   </svg>;
 }
-export function Bear({ world, paused = false }: { world: DogWorld; paused?: boolean }) {
+export function Bear({ world, paused = false, interaction = null, onTap, link }: PetProps) {
   const worldRef = useRef(world); worldRef.current = world;
   const pausedRef = useRef(paused); pausedRef.current = paused;
   const [snapshot, setSnapshot] = useState<{ state: BearState | null; now: number }>(() => { const now = performance.now(); return { state: spawnBear(world, now), now }; });
@@ -34,14 +37,23 @@ export function Bear({ world, paused = false }: { world: DogWorld; paused?: bool
     frame = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(frame);
   }, []);
+  useEffect(() => {
+    if (!interaction) return;
+    setSnapshot(previous => previous.state ? { ...previous, state: holdBear(previous.state, interaction.player, interaction.start, interaction.until) } : previous);
+  }, [interaction]);
   const { state, now } = snapshot;
   // Like the dog: yield at once when the player or new furniture takes part of our footprint.
-  if (!state || !bearFits(world, state.cell) || !bearFits(world, state.from)) return null;
+  const visible = !!state && bearFits(world, state.cell) && bearFits(world, state.from);
+  usePetLink(link, visible ? state.cell : null, BEAR_SPAN);
+  if (!state || !visible) return null;
+  const beat = !paused && state.held && now < state.held.until ? interactionBeat('pet_bear', now - state.held.start) : null;
   const position = paused ? state.cell : bearPosition(state, world, now);
   const walking = state.action === 'walk' && (state.cell.x !== state.from.x || state.cell.y !== state.from.y);
-  const action = paused ? 'sit' : walking ? 'walk' : state.action === 'walk' ? 'idle' : state.action;
-  return <div className="pr-bear" aria-hidden="true" data-action={action} data-x={state.cell.x} data-y={state.cell.y} data-from-x={state.from.x} data-from-y={state.from.y}
-    style={{ left: `${position.x / world.width * 100}%`, bottom: `${(world.height - position.y - 1) / world.height * 100}%`, width: `${BEAR_SPAN * 100 / world.width}%`, height: `${BEAR_SPAN * 100 / world.height}%`, zIndex: Math.floor(position.y) + 1 }}>
-    <BearSprite action={action} elapsed={now - state.entered} right={state.right} />
+  const action = (paused ? 'sit' : beat ? beat.action : walking ? 'walk' : state.action === 'walk' ? 'idle' : state.action) as BearAction;
+  return <div className="pr-bear" data-action={action} data-interaction={beat?.stage} data-x={state.cell.x} data-y={state.cell.y} data-from-x={state.from.x} data-from-y={state.from.y}
+    style={{ left: `${position.x / world.width * 100}%`, bottom: `${(world.height - position.y - 1) / world.height * 100}%`, width: `${BEAR_SPAN * 100 / world.width}%`, height: `${BEAR_SPAN * 100 / world.height}%`, zIndex: Math.floor(position.y) + 1 }} {...petTapProps('pet_bear', paused ? undefined : onTap)}>
+    <BearSprite action={action} elapsed={beat ? beat.elapsed : now - state.entered} right={state.right} />
+    {beat && <PetInteractionFx pet="pet_bear" stage={beat.stage} heart={beat.heart} right={state.right} />}
+    {onTap && !paused && <span className="pr-pet-hit" />}
   </div>;
 }

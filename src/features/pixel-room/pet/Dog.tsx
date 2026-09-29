@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import sheet from './assets/dog.png';
-import { advanceDog, dogFits, dogMoving, dogPosition, spawnDog } from './dogModel';
-import type { DogAction, DogState, DogWorld } from './dogModel';
+import { advanceDog, dogFits, dogMoving, dogPosition, holdDog, spawnDog } from './dogModel';
+import type { DogAction, DogState } from './dogModel';
+import { PetInteractionFx } from './PetInteractionFx';
+import { petTapProps, usePetLink } from './usePetInteraction';
+import { interactionBeat } from './petInteraction';
+import type { PetProps } from './petInteraction';
 import './dog.css';
 
 // 192×192 sheet of 32×32 cells (see assets/DOG.md): bark, walk, run, sit transition, idle sit, idle stand.
@@ -22,7 +26,7 @@ export function DogSprite({ action = 'idle', elapsed = 0, outdoors = false, righ
   const [row, frame] = dogFrame(action, outdoors, elapsed);
   return <svg viewBox={`${frame * 32} ${row * 32} 32 32`} className="pr-dog-sprite" style={{ transform: right ? 'scaleX(-1)' : undefined }} aria-hidden="true"><image href={sheet} width="192" height="192" /></svg>;
 }
-export function Dog({ world, paused = false }: { world: DogWorld; paused?: boolean }) {
+export function Dog({ world, paused = false, interaction = null, onTap, link }: PetProps) {
   const worldRef = useRef(world); worldRef.current = world;
   const pausedRef = useRef(paused); pausedRef.current = paused;
   const [snapshot, setSnapshot] = useState<{ state: DogState | null; now: number }>(() => { const now = performance.now(); return { state: spawnDog(world, now), now }; });
@@ -39,13 +43,23 @@ export function Dog({ world, paused = false }: { world: DogWorld; paused?: boole
     frame = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(frame);
   }, []);
+  useEffect(() => {
+    if (!interaction) return;
+    setSnapshot(previous => previous.state ? { ...previous, state: holdDog(previous.state, interaction.player, interaction.start, interaction.until) } : previous);
+  }, [interaction]);
   const { state, now } = snapshot;
   // Yield immediately when the player steps into our footprint; never block their movement.
-  if (!state || !dogFits(world, state.cell) || !dogFits(world, state.from)) return null;
+  const visible = !!state && dogFits(world, state.cell) && dogFits(world, state.from);
+  usePetLink(link, visible ? state.cell : null, 2);
+  if (!state || !visible) return null;
+  const beat = !paused && state.held && now < state.held.until ? interactionBeat('pet_dog', now - state.held.start) : null;
   const position = paused ? state.cell : dogPosition(state, world, now);
-  const action = paused ? 'sit' : dogMoving(state) ? 'walk' : state.action === 'walk' ? 'idle' : state.action;
-  return <div className="pr-dog" data-action={action} data-x={state.cell.x} data-y={state.cell.y} data-from-x={state.from.x} data-from-y={state.from.y} style={{ left: `${position.x / world.width * 100}%`, bottom: `${(world.height - position.y - 1) / world.height * 100}%`, width: `${200 / world.width}%`, height: `${200 / world.height}%`, zIndex: Math.floor(position.y) + 1 }} aria-hidden="true">
-    <DogSprite action={action} elapsed={paused ? 600 : action === 'walk' ? now : now - state.entered} outdoors={world.outdoors} right={state.right} />
+  const action = (paused ? 'sit' : beat ? beat.action : dogMoving(state) ? 'walk' : state.action === 'walk' ? 'idle' : state.action) as DogAction;
+  const elapsed = paused ? 600 : beat ? beat.elapsed : action === 'walk' ? now : now - state.entered;
+  return <div className="pr-dog" data-action={action} data-interaction={beat?.stage} data-x={state.cell.x} data-y={state.cell.y} data-from-x={state.from.x} data-from-y={state.from.y} style={{ left: `${position.x / world.width * 100}%`, bottom: `${(world.height - position.y - 1) / world.height * 100}%`, width: `${200 / world.width}%`, height: `${200 / world.height}%`, zIndex: Math.floor(position.y) + 1 }} {...petTapProps('pet_dog', paused ? undefined : onTap)}>
+    <DogSprite action={action} elapsed={elapsed} outdoors={world.outdoors} right={state.right} />
     {action === 'bark' && <span className="pr-dog-bark">멍!</span>}
+    {beat && <PetInteractionFx pet="pet_dog" stage={beat.stage} heart={beat.heart} right={state.right} />}
+    {onTap && !paused && <span className="pr-pet-hit" />}
   </div>;
 }

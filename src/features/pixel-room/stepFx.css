@@ -1,0 +1,29 @@
+/* Per-step hop: data-step flips 0/1 on every real step, and swapping between two identical
+   keyframes restarts the animation without remounting the sprite. The shadow stays grounded. */
+@keyframes pr-hop-a { 0%,100% { transform:translateY(0); } 40% { transform:translateY(-5%); } }
+@keyframes pr-hop-b { 0%,100% { transform:translateY(0); } 40% { transform:translateY(-5%); } }
+.pr-actor[data-step="1"] .pr-avatar,.pr-yard-board .pr-plaza-actor[data-step="1"] .pr-avatar { animation:pr-hop-a 170ms ease-out; }
+.pr-actor[data-step="0"] .pr-avatar,.pr-yard-board .pr-plaza-actor[data-step="0"] .pr-avatar { animation:pr-hop-b 170ms ease-out; }
+
+/* Dust: three square "pixels" kicked up at the heel of the cell just left. */
+.pr-dust { position:absolute; width:0; height:0; pointer-events:none; }
+.pr-dust i { position:absolute; bottom:2px; width:5px; height:5px; background:#fbf3df; box-shadow:0 2px 0 #a8875a55; opacity:0; animation:pr-dust 420ms ease-out forwards; }
+.pr-dust i:nth-child(1) { left:-9px; --dx:-8px; }
+.pr-dust i:nth-child(2) { left:4px; --dx:8px; animation-delay:30ms; }
+.pr-dust i:nth-child(3) { left:-2px; bottom:7px; width:4px; height:4px; --dx:0px; animation-delay:60ms; }
+@keyframes pr-dust { 0% { opacity:1; transform:translate(0,0) scale(1); } 60% { opacity:.8; } 100% { opacity:0; transform:translate(var(--dx),-8px) scale(.5); } }
+
+/* Furniture set down: a quick squash-and-stretch from its base plus three pixel sparkles. */
+.pr-furniture[data-placed] > svg { transform-origin:50% 100%; animation:pr-place 420ms cubic-bezier(.3,1.5,.5,1); }
+@keyframes pr-place { 0% { transform:scale(1.12,.8); } 45% { transform:scale(.95,1.08); } 75% { transform:scale(1.02,.98); } 100% { transform:none; } }
+.pr-sparkles { position:absolute; left:-6%; right:-6%; top:-8%; height:70%; pointer-events:none; }
+.pr-furniture .pr-sparkles svg { position:absolute; bottom:auto; width:22%; max-width:14px; height:auto; image-rendering:pixelated; opacity:0; animation:pr-sparkle 700ms ease-out forwards; }
+.pr-furniture .pr-sparkles svg:nth-child(1) { left:0; top:35%; }
+.pr-furniture .pr-sparkles svg:nth-child(2) { right:2%; top:5%; animation-delay:110ms; }
+.pr-furniture .pr-sparkles svg:nth-child(3) { left:42%; top:-12%; animation-delay:220ms; }
+@keyframes pr-sparkle { 0% { opacity:0; transform:scale(.3); } 30% { opacity:1; transform:scale(1.1); } 100% { opacity:0; transform:translateY(-40%) scale(.6); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .pr-actor .pr-avatar,.pr-yard-board .pr-plaza-actor .pr-avatar,.pr-furniture[data-placed] > svg { animation:none !important; }
+  .pr-dust,.pr-sparkles { display:none; }
+}

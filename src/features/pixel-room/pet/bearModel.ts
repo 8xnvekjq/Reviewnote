@@ -1,4 +1,4 @@
-import { dogFits, dogRoute, spawnDog } from './dogModel';
+import { dogFits, dogRoute, holdPet, spawnDog, stepHold } from './dogModel';
 import type { DogState, DogWorld, PetCell } from './dogModel';
 // The bear is the big one: a 3-cell footprint (dog/duck use 2) so its wider body never overlaps
 // furniture, slower steps and longer sits so it reads heavy but calm.
@@ -14,6 +14,9 @@ export function bearStepMs(world: DogWorld): number { return world.outdoors ? 42
 export const BEAR_WAVE_MS = 1300;
 export function advanceBear(state: BearState | null, world: DogWorld, now: number, paused: boolean, random = Math.random): BearState | null {
   if (!state || !bearFits(world, state.cell) || !bearFits(world, state.from)) return spawnBear(world, now);
+  const hold = stepHold(state, now, paused);
+  if (hold.frozen) return state;
+  state = hold.state;
   if (paused) return state.action === 'sit' && !state.route.length ? { ...state, from: state.cell, due: now + 1800 } : { ...state, from: state.cell, route: [], action: 'sit', entered: now, due: now + 1800 };
   if (now < state.due) return state;
   if (state.action !== 'walk') {
@@ -28,6 +31,7 @@ export function advanceBear(state: BearState | null, world: DogWorld, now: numbe
   const duration = action === 'wave' ? BEAR_WAVE_MS : action === 'sit' ? (world.outdoors ? 2600 : 4200) + random() * 2500 : (world.outdoors ? 1500 : 2600) + random() * 1800;
   return { ...state, from: state.cell, route: [], action, entered: now, due: now + duration };
 }
+export const holdBear = (state: BearState, player: PetCell, now: number, until: number) => holdPet(state, player, now, until, state.action === 'sit' ? 'sit' : 'idle', BEAR_SPAN);
 export function bearPosition(state: BearState, world: DogWorld, now: number): PetCell {
   const t = state.action === 'walk' ? Math.min(1, Math.max(0, (now - state.entered) / bearStepMs(world))) : 1;
   return { x: state.from.x + (state.cell.x - state.from.x) * t, y: state.from.y + (state.cell.y - state.from.y) * t };
