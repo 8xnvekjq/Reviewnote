@@ -39,3 +39,6 @@ CLAUDE.md
 
 # Local HTML study materials
 html/
+
+# Pixel World BGM review render (npm run bgm:preview)
+scratch/pixel-bgm-preview.wav

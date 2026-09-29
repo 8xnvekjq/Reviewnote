@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "test:plaza-reconnect": "node tests/plaza/reconnect.browser.mjs",
     "test:plaza-lifecycle": "node tests/plaza/lifecycle.browser.mjs",
-    "test:handwriting-world": "node tests/handwriting/world.browser.mjs"
+    "test:handwriting-world": "node tests/handwriting/world.browser.mjs",
+    "test:pixel-bgm": "node --test tests/pixel-room/bgm.test.ts && node tests/pixel-room/bgm.browser.mjs",
+    "bgm:preview": "node scripts/render-pixel-bgm-preview.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.0",

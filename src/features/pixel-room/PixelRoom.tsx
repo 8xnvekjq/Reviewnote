@@ -13,6 +13,7 @@ import { Companion } from './pet/Companion';
 import { isPetId } from './pet/petKinds';
 import { roomDogWorld } from './pet/dogWorld';
 import { usePet } from './pet/usePet';
+import { useBgm } from './bgm/useBgm';
 import { fetchPixelFurniturePlacement, savePixelRoomLayout } from '../../utils/pixelShop';
 import './pixel-room.css';
 
@@ -84,6 +85,9 @@ export default function PixelRoom(props: Props) {
 
 function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, pointsBalance = 0, onPixelPurchase }: Props & { userId: string }) {
   const pet = usePet(userId);
+  // 배경음악은 방·마당·광장을 모두 감싸는 이 셸에 붙어 있어서 장면을 오가도 끊기지 않는다.
+  const shellRef = useRef<HTMLElement>(null);
+  const bgm = useBgm(shellRef);
   // Orchestrator state (Phase 2A rework): which screen is showing, the transition overlay, and a
   // sessionId generated ONCE per component lifetime (not per plaza visit) — see Plaza.tsx's own
   // comment on why a stable id matters for Presence's dedup. Everything below this remains the
@@ -388,7 +392,7 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
   const placed = selected && room.furniture.some(item => item.type === selected);
   function explainShop() { setSheetOpen(false); setMessage('새 아이템은 광장 오른쪽의 작은 상점에서 만나요. 카펫을 지나 마당 → 광장으로 걸어가세요.'); }
   function openPanel(next: Panel) { setSheetOpen(open => !(open && panel === next)); setPanel(next); }
-  return <section className="pr-shell" aria-label="Pixel Room" style={roomStyle}>
+  return <section ref={shellRef} className="pr-shell" aria-label="Pixel Room" style={roomStyle}>
     <h1 className="sr-only">나만의 Pixel Room</h1>
     {/* Full-screen fade — the ONLY transition between room and plaza (Phase 2A rework). While this
        is opaque, `location` has already swapped and the destination is mounted underneath it, so
@@ -401,6 +405,7 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
         if (decorating) exitDecorating('방을 누르면 그 자리로 걸어가요.');
         else { enterDecorating(); setMessage('가구를 고르고 방의 원하는 칸을 눌러 주세요.'); }
       }}>{decorating ? '꾸미기 완료' : '꾸미기'}</button>}
+      <button type="button" className={`rn-button rn-button-compact pr-bgm-toggle ${bgm.enabled ? 'rn-button-primary' : 'rn-button-secondary'}`} aria-pressed={bgm.enabled} aria-label="배경음악" title={bgm.enabled ? '배경음악 끄기' : '배경음악 켜기'} onClick={bgm.toggle}><span aria-hidden="true">🎵</span></button>
     </header>
     {location === 'room' && storageError && <p className="pr-storage-error" role="alert">{storageError}</p>}
     {location === 'plaza' && <Plaza equippedAppearance={shop.equipped} onOpenShop={() => { setMessage('마음에 드는 것을 골라 보세요. 펫은 집과 마당에서 만나요.'); setPlazaShopOpen(true); }} userId={userId} sessionId={sessionId} onReachEntrance={() => transitionTo('yard')} />}
