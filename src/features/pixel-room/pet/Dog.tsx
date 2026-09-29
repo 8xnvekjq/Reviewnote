@@ -4,10 +4,22 @@ import { advanceDog, dogFits, dogMoving, dogPosition, spawnDog } from './dogMode
 import type { DogAction, DogState, DogWorld } from './dogModel';
 import './dog.css';
 
+// 192×192 sheet of 32×32 cells (see assets/DOG.md): bark, walk, run, sit transition, idle sit, idle stand.
+function dogFrame(action: DogAction, outdoors: boolean, elapsed: number): [row: number, frame: number] {
+  if (action === 'bark') return [0, Math.floor(elapsed / 150) % 4];
+  if (action === 'walk') return [outdoors ? 2 : 1, Math.floor(elapsed / 90) % 6];
+  if (action === 'sit') {
+    if (elapsed < 450) return [3, Math.floor(elapsed / 150) % 3];
+    // Seated c0, slow inhale c1, back to c2 (= c0), then a short c3 blink.
+    const t = (elapsed - 450) % 3800;
+    return [4, t < 1200 ? 0 : t < 2400 ? 1 : t < 3600 ? 2 : 3];
+  }
+  // Neutral c0 (shop preview at elapsed 0), exhale c1, tail sway c2, then a short c3 blink.
+  const t = elapsed % 3600;
+  return [5, t < 1200 ? 0 : t < 2400 ? 1 : t < 3400 ? 2 : 3];
+}
 export function DogSprite({ action = 'idle', elapsed = 0, outdoors = false, right = false }: { action?: DogAction; elapsed?: number; outdoors?: boolean; right?: boolean }) {
-  const row = action === 'bark' ? 0 : action === 'walk' ? outdoors ? 2 : 1 : action === 'sit' ? elapsed < 450 ? 3 : 4 : 5;
-  const count = [4, 6, 6, 3, 4, 4][row];
-  const frame = Math.floor(elapsed / (action === 'walk' ? 90 : 150)) % count;
+  const [row, frame] = dogFrame(action, outdoors, elapsed);
   return <svg viewBox={`${frame * 32} ${row * 32} 32 32`} className="pr-dog-sprite" style={{ transform: right ? 'scaleX(-1)' : undefined }} aria-hidden="true"><image href={sheet} width="192" height="192" /></svg>;
 }
 export function Dog({ world, paused = false }: { world: DogWorld; paused?: boolean }) {
