@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import './register-typescript.mjs';
-const { advanceDog, holdDog, holdPet, petApproachCells, petNear, releasePet, spawnDog, stepHold } = await import('../../src/features/pixel-room/pet/dogModel.ts');
+const { advanceDog, facePet, holdDog, holdPet, petApproachCells, petNear, releasePet, spawnDog, stepHold } = await import('../../src/features/pixel-room/pet/dogModel.ts');
 const { advanceBear, holdBear, BEAR_SPAN } = await import('../../src/features/pixel-room/pet/bearModel.ts');
 const { advanceDuck, holdDuck } = await import('../../src/features/pixel-room/pet/duckModel.ts');
 const { advancePigeon, holdPigeon } = await import('../../src/features/pixel-room/pet/pigeonModel.ts');
@@ -20,6 +20,24 @@ test('petNear is Chebyshev distance ≤ 1 to any cell of the 1-row footprint', (
   assert.ok(!petNear({ x: 7, y: 3 }, pet, 2));
   assert.ok(petNear({ x: 7, y: 3 }, pet, BEAR_SPAN));
   assert.ok(!petNear({ x: 8, y: 3 }, pet, BEAR_SPAN));
+});
+
+test('facePet turns the player toward the footprint: sides first, then up/down', () => {
+  const pet = { x: 4, y: 3 };
+  // span 2 covers x=4..5.
+  assert.equal(facePet({ x: 3, y: 3 }, pet), 'Right');
+  assert.equal(facePet({ x: 6, y: 3 }, pet), 'Left');
+  assert.equal(facePet({ x: 4, y: 2 }, pet), 'Front');
+  assert.equal(facePet({ x: 5, y: 4 }, pet), 'Back');
+  // Diagonals prefer left/right.
+  assert.equal(facePet({ x: 3, y: 2 }, pet), 'Right');
+  assert.equal(facePet({ x: 6, y: 4 }, pet), 'Left');
+  // The bear's 3-wide footprint puts x=6 above/below it, not beside it.
+  assert.equal(facePet({ x: 6, y: 4 }, pet, BEAR_SPAN), 'Back');
+  assert.equal(facePet({ x: 7, y: 2 }, pet, BEAR_SPAN), 'Left');
+  // Every approach cell gets a facing; standing on the footprint does not.
+  for (const span of [2, 3]) for (const cell of petApproachCells(pet, span)) assert.ok(facePet(cell, pet, span));
+  assert.equal(facePet({ x: 5, y: 3 }, pet), null);
 });
 
 test('approach cells are exactly the ring around the footprint, sides first', () => {

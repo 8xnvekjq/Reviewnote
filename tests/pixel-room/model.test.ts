@@ -147,6 +147,28 @@ test('planWalk routes around furniture instead of stopping at it, and refuses un
   assert.deepEqual(planWalk(boxed, { x: 0, y: 0 }, { x: 3, y: 3 }), []);
 });
 
+test('planWalk walks around avoided cells (the door) unless one is the target', () => {
+  const room = defaultState();
+  const door = { x: 4, y: 7 };
+  // Along the bottom row the straight route crosses the door; with it avoided the route detours a row up.
+  assert.ok(planWalk(room, { x: 3, y: 7 }, { x: 5, y: 7 }).some(c => c.x === door.x && c.y === door.y));
+  const around = planWalk(room, { x: 3, y: 7 }, { x: 5, y: 7 }, [door]);
+  assert.equal(around.length, 4);
+  assert.deepEqual(around.at(-1), { x: 5, y: 7 });
+  assert.ok(!around.some(c => c.x === door.x && c.y === door.y));
+  const across = planWalk(room, { x: 0, y: 7 }, { x: 9, y: 7 }, [door]);
+  assert.deepEqual(across.at(-1), { x: 9, y: 7 });
+  assert.ok(!across.some(c => c.x === door.x && c.y === door.y));
+  // The door as the destination is still reachable.
+  assert.deepEqual(planWalk(room, { x: 3, y: 7 }, door, [door]), [door]);
+  assert.deepEqual(planWalk(room, { x: 4, y: 5 }, door, [door]).at(-1), door);
+  // Sealed off except through the door: no route at all rather than stepping on it.
+  // (One of each type: a 3-wide desk over (3..5,6) plus single-cell pieces either side of the corridor.)
+  const sealed = ([['desk', { x: 3, y: 6 }], ['chair', { x: 2, y: 7 }], ['plant', { x: 6, y: 7 }]] as const).reduce((state, [type, cell]) => placeFurniture(state, type, cell)!, room);
+  assert.equal(planWalk(sealed, { x: 3, y: 7 }, { x: 5, y: 7 }).length, 2);
+  assert.deepEqual(planWalk(sealed, { x: 3, y: 7 }, { x: 5, y: 7 }, [door]), []);
+});
+
 test('asset footprints fit exactly at their final valid column', () => {
   const room = defaultState();
   for (const [type, size] of Object.entries(FURNITURE)) {

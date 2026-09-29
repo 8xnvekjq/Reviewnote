@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
-import { petApproachCells, petNear } from './dogModel';
-import type { PetCell } from './dogModel';
+import { facePet, petApproachCells, petNear } from './dogModel';
+import type { PetCell, PetFacing } from './dogModel';
 import { PET_INTERACTIONS } from './petInteraction';
 import type { PetInteraction } from './petInteraction';
 import type { PetId } from './petKinds';
@@ -12,11 +12,12 @@ export type PetLink = { current: { cell: PetCell; span: number } | null };
 /**
  * Tap-to-feed flow shared by the room and the yard. Near (Chebyshev ≤ 1 to the footprint): feed
  * at once. Far: `approach` walks the player to one of the ring cells; on arrival we feed only if
- * the pet is still next to us. Taps during an interaction, or while `disabled`, are ignored.
+ * the pet is still next to us. Either way `face` turns the player toward the pet as the feed starts.
+ * Taps during an interaction, or while `disabled`, are ignored.
  */
-export function usePetInteraction({ pet, actor, walking, disabled, approach, say }: {
+export function usePetInteraction({ pet, actor, walking, disabled, approach, say, face }: {
   pet: PetId | null; actor: PetCell; walking: boolean; disabled: boolean;
-  approach: (targets: PetCell[]) => boolean; say: (message: string) => void;
+  approach: (targets: PetCell[]) => boolean; say: (message: string) => void; face: (direction: PetFacing) => void;
 }) {
   const link = useRef<PetLink['current']>(null);
   const [interaction, setInteraction] = useState<PetInteraction | null>(null);
@@ -24,9 +25,12 @@ export function usePetInteraction({ pet, actor, walking, disabled, approach, say
   const timer = useRef<number | undefined>(undefined);
   const nextId = useRef(0);
   const sayRef = useRef(say); sayRef.current = say;
+  const faceRef = useRef(face); faceRef.current = face;
 
-  function start(kind: PetId) {
+  function start(kind: PetId, at: NonNullable<PetLink['current']>) {
     const script = PET_INTERACTIONS[kind];
+    const facing = facePet(actor, at.cell, at.span);
+    if (facing) faceRef.current(facing);
     const now = performance.now();
     setInteraction({ id: ++nextId.current, pet: kind, player: actor, start: now, until: now + script.ms });
     sayRef.current(script.start);
@@ -37,7 +41,7 @@ export function usePetInteraction({ pet, actor, walking, disabled, approach, say
     if (!pet || disabled || interaction) return;
     const at = link.current;
     if (!at) return;
-    if (petNear(actor, at.cell, at.span)) { pending.current = null; start(pet); return; }
+    if (petNear(actor, at.cell, at.span)) { pending.current = null; start(pet, at); return; }
     if (!approach(petApproachCells(at.cell, at.span))) { pending.current = null; say(PET_INTERACTIONS[pet].blocked); return; }
     pending.current = pet;
     say(PET_INTERACTIONS[pet].approach);
@@ -49,7 +53,7 @@ export function usePetInteraction({ pet, actor, walking, disabled, approach, say
     pending.current = null;
     if (disabled) return; // editing or leaving interrupted the approach; not the pet's doing
     const at = link.current;
-    if (kind === pet && at && petNear(actor, at.cell, at.span)) start(kind);
+    if (kind === pet && at && petNear(actor, at.cell, at.span)) start(kind, at);
     else sayRef.current(PET_INTERACTIONS[kind].away);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [walking, actor.x, actor.y]);

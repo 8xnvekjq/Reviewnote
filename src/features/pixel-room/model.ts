@@ -101,11 +101,12 @@ export function findSpawn(state: RoomState): Cell | null {
  * furniture-covered or genuinely unreachable targets all -> []; a reachable target always
  * returns the actual shortest route, never a partial one, so the walk never stops short for
  * no visible reason. */
-export function planWalk(state: RoomState, from: Cell, to: Cell): Cell[] {
+export function planWalk(state: RoomState, from: Cell, to: Cell, avoid: Cell[] = []): Cell[] {
   if (!isCellFree(state, to) || (from.x === to.x && from.y === to.y)) return [];
   const key = (cell: Cell) => cell.y * ROOM_WIDTH + cell.x;
   const cameFrom = new Map<number, Cell>();
-  const visited = new Set<number>([key(from)]);
+  // `avoid` cells (e.g. the door) are walked around; one is only entered when it is the target itself.
+  const visited = new Set<number>([key(from), ...avoid.filter(cell => cell.x !== to.x || cell.y !== to.y).map(key)]);
   const queue: Cell[] = [from];
   const steps: Cell[] = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
   for (let i = 0; i < queue.length; i++) {

@@ -2,7 +2,8 @@
 // tests/pixelShop/browser.mjs). Verifies the new entrance doormat: always visible (no purchase/
 // ownership needed), never blocks clicks (walking onto/through it still works exactly like any
 // other floor cell, including reaching the plaza), and furniture still can't be placed on the
-// reserved door cells with the doormat present.
+// reserved door cells with the doormat present. Floor taps route around the door cell unless it is
+// the destination.
 import { createRequire } from 'node:module';
 import { mkdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
@@ -62,6 +63,31 @@ try {
   // Leave decorating mode first — the rejected placement above left it on, and clicking a cell
   // while decorating tries to place/select furniture rather than walk.
   await page.getByRole('button', { name: '꾸미기 완료', exact: true }).click();
+
+  // Floor taps along the bottom row walk AROUND the door cell: corner to corner, the player never
+  // steps on it and stays in the room (only tapping the door itself leaves).
+  async function walkWatchingDoor(target) {
+    const watch = page.evaluate(async ({ x, y }) => {
+      let onDoor = false; const start = performance.now();
+      while (performance.now() - start < 8000) {
+        const actor = document.querySelector('.pr-actor');
+        if (!actor) return { onDoor, arrived: false };
+        if (actor.dataset.x === '4' && actor.dataset.y === '7') onDoor = true;
+        if (+actor.dataset.x === x && +actor.dataset.y === y) return { onDoor, arrived: true };
+        await new Promise(r => requestAnimationFrame(r));
+      }
+      return { onDoor, arrived: false };
+    }, target);
+    await page.getByRole('button', { name: `${target.x + 1}열 ${target.y + 1}행에 배치`, exact: true }).click();
+    return watch;
+  }
+  const spawn = await page.locator('.pr-actor').evaluate(el => ({ x: +el.dataset.x, y: +el.dataset.y }));
+  if (spawn.x !== 0 || spawn.y !== 7) assert.deepEqual(await walkWatchingDoor({ x: 0, y: 7 }), { onDoor: false, arrived: true });
+  assert.deepEqual(await walkWatchingDoor({ x: 9, y: 7 }), { onDoor: false, arrived: true }, '맨 아래 줄 반대편 칸을 탭해도 문 칸을 지나지 않는다');
+  await page.waitForTimeout(400);
+  assert.equal(await page.locator('.pr-yard-board').count(), 0, 'still in the room');
+  assert.equal(await page.locator('.pr-actor').count(), 1);
+
   await page.getByRole('button', { name: '5열 8행에 배치', exact: true }).click();
   await page.waitForFunction(() => {
     const actor = document.querySelector('.pr-actor');

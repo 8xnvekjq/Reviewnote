@@ -72,6 +72,13 @@ export function petNear(player: PetCell, cell: PetCell, span = 2): boolean {
   const gap = footprintGap(player, cell, span);
   return Math.max(gap.x, gap.y) <= 1;
 }
+export type PetFacing = 'Front' | 'Back' | 'Left' | 'Right';
+/** Which way the player turns to face the pet's footprint: sideways first (diagonals included), else up/down; null if standing on it. */
+export function facePet(player: PetCell, cell: PetCell, span = 2): PetFacing | null {
+  if (player.x < cell.x) return 'Right';
+  if (player.x > cell.x + span - 1) return 'Left';
+  return player.y < cell.y ? 'Front' : player.y > cell.y ? 'Back' : null;
+}
 /** The ring of cells around a footprint, sides first (feeding from beside reads best), then front, then back. */
 export function petApproachCells(cell: PetCell, span = 2): PetCell[] {
   const sides = [{ x: cell.x - 1, y: cell.y }, { x: cell.x + span, y: cell.y }];
