@@ -2,7 +2,7 @@ export const DOG_ITEM_ID = 'pet_dog';
 export type PetCell = { x: number; y: number };
 export type DogAction = 'idle' | 'walk' | 'sit' | 'bark';
 export interface DogWorld { width: number; height: number; outdoors: boolean; free: (cell: PetCell) => boolean }
-export interface DogState { cell: PetCell; from: PetCell; route: PetCell[]; action: DogAction; right: boolean; entered: number; due: number }
+export interface DogState { cell: PetCell; from: PetCell; route: PetCell[]; action: DogAction; right: boolean; entered: number; due: number; held?: PetHold }
 const same = (a: PetCell, b: PetCell) => a.x === b.x && a.y === b.y;
 // `span` is the footprint width in cells: 2 for the dog/duck, 3 for the big bear.
 export function dogFits(world: DogWorld, cell: PetCell, span = 2): boolean {
@@ -36,6 +36,9 @@ export function dogRoute(world: DogWorld, start: PetCell, random: () => number, 
 export function dogStepMs(world: DogWorld): number { return world.outdoors ? 260 : 480; }
 export function advanceDog(state: DogState | null, world: DogWorld, now: number, paused: boolean, random = Math.random): DogState | null {
   if (!state || !dogFits(world, state.cell) || !dogFits(world, state.from)) return spawnDog(world, now);
+  const hold = stepHold(state, now, paused);
+  if (hold.frozen) return state;
+  state = hold.state;
   if (paused) return { ...state, from: state.cell, action: 'sit', route: [], entered: now - 600, due: now + 1400 };
   if (now < state.due) return state;
   if (state.action !== 'walk') {
@@ -54,3 +57,53 @@ export function dogPosition(state: DogState, world: DogWorld, now: number): PetC
   return { x: state.from.x + (state.cell.x - state.from.x) * t, y: state.from.y + (state.cell.y - state.from.y) * t };
 }
 export function dogMoving(state: DogState): boolean { return state.action === 'walk' && !same(state.cell, state.from); }
+
+// Pet interaction (tap to feed): a short "hold" that parks any pet in place, facing the player,
+// then hands it back to its own wandering state machine. Shared by every *Model's advance step.
+// `action` is the pose the pet resumes with once released.
+export interface PetHold { start: number; until: number; action: string }
+type Holdable = Omit<DogState, 'action'> & { action: string };
+const footprintGap = (player: PetCell, cell: PetCell, span: number) => ({
+  x: player.x < cell.x ? cell.x - player.x : player.x > cell.x + span - 1 ? player.x - (cell.x + span - 1) : 0,
+  y: Math.abs(player.y - cell.y),
+});
+/** Chebyshev distance ≤ 1 between the player and any cell of the pet's 1-row footprint. */
+export function petNear(player: PetCell, cell: PetCell, span = 2): boolean {
+  const gap = footprintGap(player, cell, span);
+  return Math.max(gap.x, gap.y) <= 1;
+}
+/** The ring of cells around a footprint, sides first (feeding from beside reads best), then front, then back. */
+export function petApproachCells(cell: PetCell, span = 2): PetCell[] {
+  const sides = [{ x: cell.x - 1, y: cell.y }, { x: cell.x + span, y: cell.y }];
+  const row = (y: number) => Array.from({ length: span + 2 }, (_, i) => ({ x: cell.x - 1 + i, y }));
+  return [...sides, ...row(cell.y + 1), ...row(cell.y - 1)];
+}
+/** Cheapest route to a ring cell (from petApproachCells); the two side cells get a two-step head start. */
+export function pickApproach<C extends PetCell>(targets: PetCell[], plan: (target: PetCell) => C[]): C[] {
+  let best: C[] = [], bestCost = Infinity;
+  targets.forEach((target, index) => {
+    const path = plan(target);
+    const cost = path.length + (index < 2 ? 0 : 2);
+    if (path.length && cost < bestCost) { best = path; bestCost = cost; }
+  });
+  return best;
+}
+/** Park the pet on its current cell, facing the player, until `until`; afterwards it resumes as `resume`. */
+export function holdPet<S extends Holdable>(state: S, player: PetCell, now: number, until: number, resume: S['action'], span = 2): S {
+  const center = state.cell.x + (span - 1) / 2;
+  const right = player.x === center ? state.right : player.x > center;
+  const action = state.held ? state.held.action : resume;
+  return { ...state, from: state.cell, route: [], right, entered: now, due: until, held: { start: now, until, action } };
+}
+/** Hand the pet back to its own behavior: the pose it had before, with a short beat before it moves on. */
+export function releasePet<S extends Holdable>(state: S, now: number): S {
+  if (!state.held) return state;
+  return { ...state, held: undefined, action: state.held.action as S['action'], from: state.cell, route: [], entered: now, due: now + 700 };
+}
+/** Advance-step guard: while held the state is frozen; once the hold expires (or editing pauses) it is released. */
+export function stepHold<S extends Holdable>(state: S, now: number, paused: boolean): { state: S; frozen: boolean } {
+  if (!state.held) return { state, frozen: false };
+  if (!paused && now < state.held.until) return { state, frozen: true };
+  return { state: releasePet(state, now), frozen: false };
+}
+export const holdDog = (state: DogState, player: PetCell, now: number, until: number) => holdPet(state, player, now, until, state.action === 'sit' ? 'sit' : 'idle');

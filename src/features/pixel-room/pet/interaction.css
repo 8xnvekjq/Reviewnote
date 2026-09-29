@@ -1,0 +1,50 @@
+/* Tappable pets: the wrapper box keeps pointer-events:none (it is mostly transparent headroom and
+   must not swallow floor taps); only this body-sized hit area takes the tap and bubbles to it. */
+.pr-pet-hit { position:absolute; left:12%; right:12%; top:32%; bottom:4%; pointer-events:auto; cursor:pointer; }
+.pr-bear .pr-pet-hit { left:12%; right:12%; top:18%; bottom:4%; }
+.pr-duck .pr-pet-hit { left:16%; right:16%; top:36%; bottom:4%; }
+.pr-pigeon .pr-pet-hit { left:18%; right:18%; top:58%; bottom:2%; }
+[data-tappable]:focus { outline:none; }
+[data-tappable]:focus-visible { outline:2px solid var(--pr-theme-accent,#496e5d); outline-offset:1px; border-radius:6px; }
+
+/* Props face the player: data-side is the side the pet is looking toward. */
+.pr-pet-treat { position:absolute; display:block; pointer-events:none; z-index:2; }
+.pr-pet-treat svg,.pr-pet-heart svg { display:block; width:100%; height:auto; image-rendering:pixelated; overflow:visible; }
+.pr-pet-treat[data-side=left] { --dir:-1; }
+.pr-pet-treat[data-side=right] { --dir:1; }
+/* Anchors are the mouth (sprite pixel coordinates / sprite size), then the treat's own half-size. */
+.pr-pet-treat-pet_bear { width:16.7%; top:36%; }
+.pr-pet-treat-pet_bear[data-side=left] { left:25%; }
+.pr-pet-treat-pet_bear[data-side=right] { right:25%; }
+.pr-pet-treat-pet_dog { width:25%; top:38%; }
+.pr-pet-treat-pet_dog[data-side=left] { left:6%; }
+.pr-pet-treat-pet_dog[data-side=right] { right:6%; }
+.pr-pet-treat-pet_duck,.pr-pet-treat-pet_pigeon { width:31%; bottom:3%; }
+.pr-pet-treat-pet_duck[data-side=left],.pr-pet-treat-pet_pigeon[data-side=left] { left:-8%; }
+.pr-pet-treat-pet_duck[data-side=right],.pr-pet-treat-pet_pigeon[data-side=right] { right:-8%; }
+
+/* Honey/bone: tossed from the player's side in a low arc, then gulped. */
+.pr-pet-treat-fly { animation:pr-treat-fly 600ms ease-out forwards; }
+@keyframes pr-treat-fly {
+  0% { opacity:0; transform:translate(calc(var(--dir) * 260%), 150%); }
+  15% { opacity:1; }
+  55% { transform:translate(calc(var(--dir) * 110%), -80%); }
+  85% { opacity:1; transform:translate(0,0) scale(1); }
+  100% { opacity:0; transform:translate(0,0) scale(.4); }
+}
+/* Crumbs/seeds: sprinkled down onto the floor, then pecked away bit by bit. */
+.pr-pet-treat-grain { animation:pr-grain-fall 500ms ease-in forwards; }
+.pr-pet-treat-grain[data-stage=peck] { animation:pr-grain-eaten 1350ms steps(4,end) forwards; }
+@keyframes pr-grain-fall { 0% { opacity:0; transform:translate(calc(var(--dir) * 40%), -220%); } 30% { opacity:1; } 100% { opacity:1; transform:none; } }
+@keyframes pr-grain-eaten { 0% { opacity:1; clip-path:inset(0); } 100% { opacity:.2; clip-path:inset(0 0 0 70%); } }
+
+.pr-pet-heart { position:absolute; left:50%; top:-6%; width:22%; margin-left:-11%; pointer-events:none; z-index:3; animation:pr-heart 1000ms ease-out forwards; }
+.pr-pet-heart-pet_bear { width:14.6%; margin-left:-7.3%; top:2%; }
+.pr-pigeon .pr-pet-heart { top:26%; }
+@keyframes pr-heart { 0% { opacity:0; transform:translateY(40%) scale(.5); } 25% { opacity:1; transform:translateY(0) scale(1.15); } 40% { transform:scale(1); } 100% { opacity:0; transform:translateY(-70%); } }
+
+.pr-pet-say { position:absolute; top:-2%; left:58%; white-space:nowrap; background:#fff7da; color:#70583e; border:1px solid #ba9a68; border-radius:8px; padding:2px 5px; font-size:10px; pointer-events:none; z-index:3; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pr-pet-treat,.pr-pet-heart { animation:none !important; }
+}
