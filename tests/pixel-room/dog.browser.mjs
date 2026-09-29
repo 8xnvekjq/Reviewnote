@@ -1,5 +1,5 @@
 // Real PixelRoom component + real browser, intercepted REST (same pattern as
-// tests/pixelShop/browser.mjs). Verifies the first pet (dog): buy -> auto-activate in the room,
+// tests/pixelShop/browser.mjs). Verifies the first pet (dog): an owned, active dog appears in the room,
 // present with calmer indoor behavior, present with livelier outdoor behavior in the front yard,
 // completely absent in the plaza, reappears correctly on yard/room re-entry, never overlaps
 // furniture or the door/doormat cells, and the active-pet flag persists across reload and a
@@ -84,24 +84,16 @@ async function observeDog(page, ms) {
 try {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
   const state = makeState();
+  state.owned = new Set(['pet_dog', 'furniture_chair']);
+  state.activePet = 'pet_dog';
 
   await withMockedPage(context, state, async page => {
     await page.goto('http://127.0.0.1:5174/tests/pixel-room/?tab=pixelRoom&user=dog-user&testBalance=10000');
     await page.locator('.pr-actor').waitFor();
 
-    // No dog before purchase.
-    assert.equal(await page.locator('.pr-dog').count(), 0);
-
-    // Buy in the room shop -> auto-activates (handlePurchase's pet branch) -> appears immediately.
-    const trigger = page.locator('.pr-sheet-trigger button').filter({ hasText: '상점' });
-    if (await trigger.getAttribute('aria-expanded') !== 'true') await trigger.click();
-    await page.locator('.pr-category-tabs button').filter({ hasText: '펫', exact: true }).click();
-    const card = page.locator('[data-item="pet_dog"]');
-    await card.getByRole('button', { name: '구매하기', exact: true }).click();
-    await card.getByRole('button', { name: '구매', exact: true }).click();
-    await page.waitForFunction(() => !document.querySelector('.pr-shop-confirm button:disabled'));
-    assert.equal(state.activePet, 'pet_dog');
-    await page.locator('.pr-doormat').waitFor(); // sanity: page still fully rendered, not crashed
+    // The shop now lives in the plaza (covered by plaza-shop/bear browser tests); here the dog is
+    // already owned and active on the (mocked) server, so it must appear in the room right away.
+    await page.locator('.pr-doormat').waitFor(); // sanity: page fully rendered, not crashed
     await page.waitForFunction(() => !!document.querySelector('.pr-dog'), { timeout: 3000 });
     await page.screenshot({ path: `${out}/room-with-dog.png` });
 
@@ -113,9 +105,6 @@ try {
     }
     const roomUniqueCells = new Set(roomObs.cells.map(c => `${c.x},${c.y}`)).size;
     assert.ok(roomUniqueCells >= 1, 'dog should occupy at least one valid cell indoors');
-
-    // Close the sheet drawer — it covers the bottom row (where the door/doormat live) while open.
-    await page.locator('.pr-sheet-trigger button').filter({ hasText: '상점' }).click();
 
     // Room -> yard: dog reappears (outdoors world).
     await page.getByRole('button', { name: '5열 8행에 배치', exact: true }).click();
@@ -154,17 +143,11 @@ try {
     await page.waitForFunction(() => document.querySelector('.pr-room-frame') && !document.querySelector('.pr-yard-board'), { timeout: 5000 });
     await page.waitForFunction(() => !!document.querySelector('.pr-dog'), { timeout: 3000 });
 
-    // Furniture collision: buy a chair (purchase auto-enters decorating mode with it selected,
-    // same as the pet purchase flow), then confirm the dog never renders on that cell over a
-    // real observation window (it must avoid/route around it, or respawn elsewhere).
-    await page.locator('.pr-sheet-trigger button').filter({ hasText: '상점' }).click();
-    await page.locator('.pr-category-tabs button').filter({ hasText: '가구', exact: true }).click();
-    const chairCard = page.locator('[data-item="furniture_chair"]');
-    await chairCard.getByRole('button', { name: '구매하기', exact: true }).click();
-    await chairCard.getByRole('button', { name: '구매', exact: true }).click();
-    await page.waitForFunction(() => !document.querySelector('.pr-shop-confirm button:disabled'));
-    // Purchase leaves the furniture sheet open (enterDecorating) — close it before touching the
-    // grid below, same as the earlier room->yard step.
+    // Furniture collision: pick the owned chair from the furniture sheet (enters decorating mode
+    // with it selected), close the sheet, place it, then confirm the dog never renders on that
+    // cell over a real observation window (it must avoid/route around it, or respawn elsewhere).
+    await page.locator('.pr-sheet-trigger button').filter({ hasText: '가구' }).click();
+    await page.locator('.pr-catalog button').filter({ hasText: '작은 의자' }).click();
     await page.locator('.pr-sheet-trigger button').filter({ hasText: '가구' }).click();
     await page.getByRole('button', { name: '2열 3행에 배치', exact: true }).click(); // x=1,y=2 — placing exits decorating mode automatically
     await page.waitForFunction(() => document.querySelector('[data-furniture="chair"]'), { timeout: 3000 });
@@ -194,7 +177,7 @@ try {
   });
   await freshContext.close();
 
-  console.log('PASS: dog purchase auto-activates, calmer indoors / livelier outdoors, absent in the plaza, survives repeated room<->yard<->plaza transitions, avoids furniture/door, and the active flag persists across reload and a fresh session');
+  console.log('PASS: owned active dog appears, calmer indoors / livelier outdoors, absent in the plaza, survives repeated room<->yard<->plaza transitions, avoids furniture/door, and the active flag persists across reload and a fresh session');
 } finally {
   await browser.close();
 }
