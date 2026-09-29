@@ -11,6 +11,8 @@
 // delays the catalog response LONGER than shop.ready's own resolution but SHORTER than the
 // furniture-placement fetch, so that in the buggy code the tear-down reliably lands while the
 // furniture fetch is still in flight — a deterministic repro, not a flaky timing coincidence.
+// The chair starts owned on the mocked server (like dog.browser.mjs) and is picked from the room's
+// 가구 panel; buying is covered by plaza-shop/bear. Dev server port: PIXEL_TEST_PORT (default 5174).
 import { createRequire } from 'node:module';
 import { mkdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
@@ -23,13 +25,14 @@ const browser = await chromium.launch({ channel: 'msedge', headless: true });
 const catalog = PIXEL_CATALOG.map(i => ({ item_id: i.itemId, category: i.category, slot: i.slot, price: i.price, asset_key: i.assetKey, display_name: i.displayName, tier: i.tier, stackable: false }));
 const CATALOG_DELAY_MS = 180;   // arrives after shop.ready
 const FURNITURE_FETCH_DELAY_MS = 450; // still in flight when the (buggy) tear-down would hit
+const PORT = process.env.PIXEL_TEST_PORT || '5174';
 
 const delay = ms => new Promise(r => setTimeout(r, ms));
 
 try {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
   const userId = 'race-user';
-  const state = { owned: new Set(), equipment: { top: null, bottom: null, shoes: null, hair: null, eyes: null }, balance: 10000, placements: new Map() };
+  const state = { owned: new Set(['furniture_chair']), equipment: { top: null, bottom: null, shoes: null, hair: null, eyes: null }, balance: 10000, placements: new Map() };
   const savedLayoutCalls = [];
 
   await context.route('**/*', async route => {
@@ -46,12 +49,6 @@ try {
     } else if (url.pathname.endsWith('/pixel_furniture_placement')) {
       await delay(FURNITURE_FETCH_DELAY_MS);
       data = [...state.placements.entries()].map(([item_id, pos]) => ({ item_id, x: pos.x, y: pos.y }));
-    } else if (url.pathname.endsWith('/purchase_pixel_item')) {
-      const { p_item_id } = route.request().postDataJSON();
-      const item = catalog.find(i => i.item_id === p_item_id);
-      if (state.owned.has(p_item_id)) data = { ok: false, reason: 'already_owned' };
-      else if (!item || state.balance < item.price) data = { ok: false, reason: 'insufficient_balance' };
-      else { state.owned.add(p_item_id); state.balance -= item.price; data = { ok: true, itemId: p_item_id, newBalance: state.balance }; }
     } else if (url.pathname.endsWith('/equip_pixel_item')) {
       const { p_slot, p_item_id } = route.request().postDataJSON();
       const item = catalog.find(i => i.item_id === p_item_id);
@@ -78,25 +75,19 @@ try {
   const page = await context.newPage();
   const pageErrors = [];
   page.on('pageerror', e => pageErrors.push(e.message));
-  await page.goto(`http://127.0.0.1:5174/tests/pixel-room/?tab=pixelRoom&user=${userId}&testBalance=10000`);
+  await page.goto(`http://127.0.0.1:${PORT}/tests/pixel-room/?tab=pixelRoom&user=${userId}&testBalance=10000`);
   await page.locator('.pr-actor').waitFor();
 
-  // Buy a furniture item — purchase itself only needs shop.ready (not roomReady), so this
-  // should always succeed regardless of the bug.
-  const openShop = async () => {
-    const trigger = page.locator('.pr-sheet-trigger button').filter({ hasText: '상점' });
-    if (await trigger.getAttribute('aria-expanded') !== 'true') await trigger.click();
-    await page.locator('[data-item="furniture_chair"]').waitFor();
-  };
-  await openShop();
-  const card = page.locator('[data-item="furniture_chair"]');
-  await card.getByRole('button', { name: '구매하기', exact: true }).click();
-  await card.getByRole('button', { name: '구매', exact: true }).click();
-  await page.waitForFunction(() => !document.querySelector('.pr-shop-confirm button:disabled'));
+  // Pick the owned chair from the 가구 panel as soon as it lists it — that only needs shop.ready
+  // (not roomReady), so it lands while the furniture layout fetch is still in flight. Picking
+  // enters decorating mode with the chair selected; then close the sheet so it doesn't cover the room.
+  const furnitureTab = page.locator('.pr-sheet-trigger button').filter({ hasText: '가구' });
+  await furnitureTab.click();
+  await page.locator('.pr-catalog button').filter({ hasText: '작은 의자' }).click();
+  await furnitureTab.click();
 
-  // Purchasing furniture auto-enters decorating mode with it selected (handlePurchase). Clicking
-  // a cell THIS early can legitimately land inside the genuine loading window (the furniture
-  // layout fetch is still in flight) — that single "보유 정보를 불러온 뒤 배치할 수 있어요" is
+  // Clicking a cell THIS early can legitimately land inside the genuine loading window (the
+  // furniture layout fetch is still in flight) — that single "보유 정보를 불러온 뒤 배치할 수 있어요" is
   // expected UX, not the bug. The bug was that this stayed stuck FOREVER even after loading
   // genuinely finished. So: click once (may be blocked), wait past the mocked load delay, then
   // click again — the retry must succeed.

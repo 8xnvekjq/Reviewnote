@@ -9,6 +9,7 @@ import { mkdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { emptyFarm } from './emptyFarm.mjs';
 import { PIXEL_CATALOG } from '../../src/features/pixel-room/shop/catalog.ts';
+import { facePet } from '../../src/features/pixel-room/pet/dogModel.ts';
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const out = process.env.UI_OUTPUT || 'node_modules/.cache/pixel-pet-interaction';
@@ -50,6 +51,14 @@ const actorCell = page => page.locator('.pr-actor').evaluate(read);
 const cellButton = (page, { x, y }) => page.getByRole('button', { name: `${x + 1}열 ${y + 1}행에 배치`, exact: true });
 const near = (player, pet, span) => Math.max(player.x < pet.x ? pet.x - player.x : player.x > pet.x + span - 1 ? player.x - (pet.x + span - 1) : 0, Math.abs(player.y - pet.y)) <= 1;
 const message = page => page.locator('#pr-instructions').textContent();
+// As a feed starts the player turns to the pet (sides first, then up/down).
+async function assertFacesPet(page, actorSel, petSel, span) {
+  const { actor, pet } = await page.evaluate(({ actorSel, petSel }) => {
+    const a = document.querySelector(actorSel).dataset, p = document.querySelector(petSel).dataset;
+    return { actor: { x: +a.x, y: +a.y, direction: a.direction }, pet: { x: +p.x, y: +p.y } };
+  }, { actorSel, petSel });
+  assert.equal(actor.direction, facePet(actor, pet, span), `player at ${actor.x},${actor.y} faces the pet at ${pet.x},${pet.y}`);
+}
 
 // Walk to the free corner farthest from the pet so the next tap is a real "far" tap.
 async function walkAway(page, sel) {
@@ -80,6 +89,7 @@ async function feedFromAfar(page, sel, span, awayText) {
     assert.notDeepEqual(after, before, 'a far tap walks the player first');
     if (outcome === 'fed') {
       assert.ok(near(after, await page.locator(sel).evaluate(read), span), 'feeding only starts next to the pet');
+      await assertFacesPet(page, '.pr-actor', sel, span);
       return;
     }
     await walkAway(page, sel);
@@ -156,6 +166,7 @@ try {
       await bear.focus();
       await page.keyboard.press('Enter');
       await page.locator('.pr-bear[data-interaction]').waitFor({ timeout: 500 });
+      await assertFacesPet(page, '.pr-actor', '.pr-bear', 3);
       const watched = await watchInteraction(page, '.pr-bear', 3300);
       assert.deepEqual(watched.stages, ['treat', 'eat', 'love', 'wave']);
       assert.deepEqual(watched.actions.sort(), ['idle', 'sit', 'wave']);
@@ -237,6 +248,7 @@ try {
     }
     const yardActor = await page.locator('.pr-yard-board .pr-plaza-actor').evaluate(read);
     assert.ok(near(yardActor, await page.locator('.pr-yard-board .pr-dog').evaluate(read), 2));
+    await assertFacesPet(page, '.pr-yard-board .pr-plaza-actor', '.pr-yard-board .pr-dog', 2);
     await page.locator('.pr-yard-board .pr-dog:not([data-interaction])').waitFor({ timeout: 3500 });
     assert.equal(await yardStatus.textContent(), '강아지가 간식을 먹고 신이 났어요!');
     assert.deepEqual(errors, []);

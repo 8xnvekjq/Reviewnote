@@ -94,7 +94,7 @@ export default function FrontYard({ from, appearance, onExit, activePet = null, 
     setHeld(null); setQueue(best);
     return true;
   }
-  const petTalk = usePetInteraction({ pet: activePet, actor, walking: moving, disabled: false, approach: approachPet, say: setMessage });
+  const petTalk = usePetInteraction({ pet: activePet, actor, walking: moving, disabled: false, approach: approachPet, say: setMessage, face: setDirection });
   function walkTo(cell: YardCell) { if (!leaving.current) { petTalk.cancelApproach(); setHeld(null); setQueue(yardPath(actor, cell)); board.current?.focus({ preventScroll: true }); } }
   return <div className="pr-room-frame pr-plaza-frame pr-yard-frame">
     <header className="pr-hub-heading"><div><span>PIXEL WORLD · HOME</span><h2>우리 집 앞, 작은 뜰</h2></div><span className="pr-hub-weather" aria-hidden="true">☀</span></header>

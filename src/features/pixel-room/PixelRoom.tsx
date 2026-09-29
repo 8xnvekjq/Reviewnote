@@ -373,11 +373,11 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
   const roomPet = roomReady && shop.ready && !shop.loadError && pet.ready && !pet.error && pet.active && shop.ownedIds.has(pet.active) ? pet.active : null;
   const walking = !!held || walkQueue.length > 0;
   const trail = useStepTrail(actor);
-  // Tap-to-feed: walk to the nearest free cell beside the pet. A route over the door cell would
-  // leave the room mid-approach, so those are skipped.
+  // Tap-to-feed: walk to the nearest free cell beside the pet. Routes go around the door cell, and
+  // the door itself is never a feeding spot (stepping on it leaves the room).
   function approachPet(targets: Cell[]) {
     const best = pickApproach(targets, target => {
-      const path = planWalk(activeRoom, actor, target);
+      const path = planWalk(activeRoom, actor, target, [ROOM_DOOR]);
       return path.some(cell => cell.x === ROOM_DOOR.x && cell.y === ROOM_DOOR.y) ? [] : path;
     });
     if (!best.length) return false;
@@ -385,13 +385,14 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
     setWalkQueue(toSteps(actor, best));
     return true;
   }
-  const petTalk = usePetInteraction({ pet: roomPet, actor, walking, disabled: decorating || location !== 'room', approach: approachPet, say: setMessage });
+  const petTalk = usePetInteraction({ pet: roomPet, actor, walking, disabled: decorating || location !== 'room', approach: approachPet, say: setMessage, face: setDirection });
   useEffect(() => () => window.clearTimeout(placedTimer.current), []);
 
   function begin(next: Direction) { petTalk.cancelApproach(); setWalkQueue([]); setDirection(next); setHeld(next); }
+  // Floor taps walk around the door cell unless the door is the destination (arrows/D-pad still step on it).
   function walkTo(target: Cell) {
     if (decorating || (target.x === actor.x && target.y === actor.y)) return;
-    const path = planWalk(activeRoom, actor, target);
+    const path = planWalk(activeRoom, actor, target, [ROOM_DOOR]);
     if (path.length === 0) { setMessage('그 칸에는 갈 수 없어요. 가구가 없는 바닥을 눌러 주세요.'); return; }
     setHeld(null);
     setWalkQueue(toSteps(actor, path));
