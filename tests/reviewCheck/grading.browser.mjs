@@ -67,8 +67,8 @@ function studentServer({ allGraded }) {
         };
         return route.fulfill({ status: 200, json: { allGraded: true, gradedCount: state.items.length, manualReviewCount: 0 } });
       }
-      // 일부(여기선 전부)가 manual_review로 남아 세션이 여전히 'submitted' — 기존 대기 화면이
-      // 그대로 자연스럽게 유지되는지 확인하기 위한 케이스.
+      // 일부(여기선 전부)가 manual_review로 남아 세션이 여전히 'submitted' — 결과 화면이 "선생님
+      // 확인 중"을 에러처럼 보이지 않게 차분히 보여주는지 확인하기 위한 케이스.
       return route.fulfill({ status: 200, json: { allGraded: false, gradedCount: 0, manualReviewCount: 1 } });
     }
     return route.abort();
@@ -144,7 +144,9 @@ async function withPage(context, api, path) {
 }
 
 try {
-  // (a) 학생 제출 -> AI가 전부 확신 있게 채점(allGraded:true) -> 리로드 없이 곧바로 결과 화면.
+  // (a) 학생 제출 -> AI가 전부 확신 있게 채점(allGraded:true) -> 리로드 없이 곧바로 "이번 복습체크
+  // 결과" 화면(점수 + 격려 + 문항별 O/X). 문항을 누르면 기록 상세가 그 문항부터 열리고, "새 복습체크
+  // 시작"을 누르면 시작 화면으로 간다.
   {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const api = studentServer({ allGraded: true });
@@ -152,18 +154,37 @@ try {
     await page.locator('#rc-answer').waitFor();
     await page.locator('#rc-answer').fill('5');
     await page.getByRole('button', { name: '제출하기' }).click();
-    // "선생님이 채점하면..." 대기 화면에 멈추지 않고, 곧바로 결과(복습체크 결과) 요약이 뜬다.
-    await page.getByText('복습체크 결과').waitFor({ timeout: 5000 });
+    await page.getByText('이번 복습체크 결과').waitFor({ timeout: 5000 });
     assert.equal(await page.getByText('복습체크 제출 완료').count(), 0, '결과가 바로 나오면 대기 화면이 남아있으면 안 됨');
+    assert.equal(await page.getByText('선생님 확인 중').count(), 0);
+    assert.equal((await page.locator('.rn-rcresult-score').innerText()).replace(/\s+/g, ' ').trim(), '1 / 1');
+    await page.getByText('전부 맞혔어요!').waitFor();
+    assert.equal(await page.locator('.rn-rcresult-badge.is-correct').count(), 1);
+    await page.locator('.rn-rcresult-row .line', { hasText: /^정답\s*5$/ }).first().waitFor();
     assert.equal(api.gradeRequests.length, 1);
     assert.equal(api.gradeRequests[0].sessionId, 'session-1');
     await page.screenshot({ path: `${out}/student-allgraded.png` });
+
+    // 문항 탭 -> 기존 학생 기록 상세(읽기 전용)를 그 문항부터, "결과"로 되돌아오기.
+    await page.getByRole('button', { name: '1번 문제 자세히 보기' }).click();
+    await page.getByText('내가 쓴 답').waitFor();
+    await page.getByText('O 정답').waitFor();
+    assert.equal(await page.locator('.rn-reviewcheck-ox-btn').count(), 0);
+    await page.getByRole('button', { name: '결과' }).click();
+    await page.getByText('이번 복습체크 결과').waitFor();
+
+    // "새 복습체크 시작" -> 시작 화면(세션이 graded이므로 범위 선택이 다시 보인다).
+    await page.getByRole('button', { name: '새 복습체크 시작' }).click();
+    await page.getByRole('button', { name: '복습체크 시작' }).waitFor();
+    assert.equal(await page.getByText('이번 복습체크 결과').count(), 0);
     assert.deepEqual(errors, []);
     await context.close();
-    console.log('PASS (a): AI가 전부 확신 채점하면 대기 화면 없이 곧바로 결과가 보인다');
+    console.log('PASS (a): AI가 전부 확신 채점하면 곧바로 결과 화면(점수/격려/O,X) -> 상세 -> 새 복습체크 시작');
   }
 
-  // (b) 학생 제출 -> 일부 manual_review로 남음(allGraded:false) -> 기존 대기 화면이 정상적으로 유지.
+  // (b) 학생 제출 -> manual_review로 남음(allGraded:false) -> 결과 화면이 "AI 채점 완료 N · 선생님 확인
+  // 중 M" 진행 상태와 차분한 "확인 중" 배지를 보여준다. "확인"을 누르면 다시 연 상태(submitted)와
+  // 같은 화면이 버튼 없이 유지된다.
   {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const api = studentServer({ allGraded: false });
@@ -172,13 +193,22 @@ try {
     await page.locator('#rc-answer').fill('5');
     await page.getByRole('button', { name: '제출하기' }).click();
     await page.getByText('복습체크 제출 완료').waitFor({ timeout: 5000 });
-    await page.getByText('선생님이 채점하면').waitFor();
-    assert.equal(await page.getByText('복습체크 결과').count(), 0, '아직 채점 안 끝났으면 결과 요약이 보이면 안 됨');
+    await page.getByText('AI 채점 완료 0문제').waitFor();
+    await page.getByText('선생님 확인 중 1문제').waitFor();
+    assert.equal(await page.getByText('이번 복습체크 결과').count(), 0, '아직 채점 안 끝났으면 최종 결과 제목이 보이면 안 됨');
+    assert.equal(await page.locator('.rn-rcresult-score').count(), 0, '아직 채점 안 끝났으면 점수가 보이면 안 됨');
+    assert.equal(await page.locator('.rn-rcresult-badge.is-pending').count(), 1);
+    assert.equal(await page.locator('.rn-examprep-warning').count(), 0, 'manual_review는 에러 박스로 보이면 안 됨');
     assert.equal(api.gradeRequests.length, 1);
     await page.screenshot({ path: `${out}/student-waiting.png` });
+
+    await page.getByRole('button', { name: '확인' }).click();
+    await page.getByText('선생님 확인 중 1문제').waitFor();
+    await page.getByRole('button', { name: '확인' }).waitFor({ state: 'detached' });
+    assert.equal(await page.getByRole('button', { name: '복습체크 시작' }).count(), 0, '선생님 확인 전에는 새 복습체크를 시작하는 화면으로 가면 안 됨');
     assert.deepEqual(errors, []);
     await context.close();
-    console.log('PASS (b): manual_review가 남으면 기존 대기 화면이 깨지지 않고 그대로 보인다');
+    console.log('PASS (b): manual_review가 남으면 결과 화면이 채점 진행 상태와 차분한 "확인 중"을 보여준다');
   }
 
   // (c) admin 채점 화면: AI가 이미 확신 채점한 문항은 O/X가 미리 선택돼 있고(그래도 덮어쓰기

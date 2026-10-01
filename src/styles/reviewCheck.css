@@ -39,7 +39,8 @@
 .rn-reviewcheck-zoom-overlay { position: fixed; inset: 0; z-index: 90; background: rgba(0, 0, 0, .92); display: flex; align-items: center; justify-content: center; touch-action: none; }
 .rn-reviewcheck-zoom-stage { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: none; }
 .rn-reviewcheck-zoom-stage img { max-width: 92vw; max-height: 92vh; object-fit: contain; user-select: none; -webkit-user-drag: none; pointer-events: none; }
-.rn-reviewcheck-zoom-close { position: absolute; top: 14px; right: 14px; width: 40px; height: 40px; border-radius: 50%; border: none; background: rgba(255, 255, 255, .14); color: #fff; font-size: 18px; font-weight: 800; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 1; }
+.rn-reviewcheck-zoom-tip { position: absolute; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); padding: 6px 12px; border-radius: 999px; background: rgba(255, 255, 255, .12); color: rgba(255, 255, 255, .8); font-size: 12px; font-weight: 700; white-space: nowrap; pointer-events: none; }
+.rn-reviewcheck-zoom-close { position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); right: calc(14px + env(safe-area-inset-right, 0px)); width: 40px; height: 40px; border-radius: 50%; border: none; background: rgba(255, 255, 255, .14); color: #fff; font-size: 18px; font-weight: 800; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 1; }
 
 /* 학생 기록상세 — 최종 O/X는 버튼이 아니라 읽기전용 배지(is-pending은 "확인 중" — 에러 아님) */
 .rn-reviewcheck-result-badge { margin: 10px 0; padding: 12px; border-radius: var(--rn-radius-md); text-align: center; font-size: 17px; font-weight: 800; }
@@ -95,3 +96,16 @@
 .rn-reviewcheck-graded-info { flex: 1; min-width: 0; }
 .rn-reviewcheck-graded-ox { flex: none; display: flex; flex-direction: column; gap: 6px; justify-content: center; }
 .rn-reviewcheck-graded-ox .rn-reviewcheck-ox-btn { width: 44px; }
+
+/* 시작 화면 최근 결과 카드(ReviewCheckResultCard) — 카드 전체가 버튼, 아래에 전체 기록 보기 */
+.rn-reviewcheck-result-block { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.rn-reviewcheck-result-card { display: flex; flex-direction: column; align-items: stretch; gap: 2px; width: 100%; padding: 16px; text-align: left; font: inherit; color: inherit; cursor: pointer; transition: border-color var(--rn-fast, .15s); }
+.rn-reviewcheck-result-card:hover { border-color: var(--rn-accent); }
+.rn-reviewcheck-result-card:focus-visible { outline: 2px solid var(--rn-accent); outline-offset: 2px; }
+.rn-reviewcheck-result-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rn-reviewcheck-result-card-more { display: inline-flex; align-items: center; gap: 4px; flex: none; font-size: 12px; font-weight: 700; color: var(--rn-muted); }
+.rn-reviewcheck-result-card-meta { font-size: 12.5px; color: var(--rn-muted); margin-top: 2px; overflow-wrap: anywhere; }
+.rn-reviewcheck-result-card-score { font-size: 22px; font-weight: 800; color: var(--rn-text); margin-top: 6px; }
+.rn-reviewcheck-result-card-summary { font-size: 12.5px; color: var(--rn-muted); margin-top: 2px; }
+.rn-reviewcheck-result-card-summary.is-perfect { color: var(--rn-success); font-weight: 700; }
+.rn-reviewcheck-history-button { width: 100%; justify-content: center; gap: 6px; }

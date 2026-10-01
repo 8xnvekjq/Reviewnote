@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { MistakeEntry } from '../../types';
 import { MATH_CURRICULUM, GRADE_LIST } from '../../types';
 import '../../styles/examPrep.css';
@@ -16,11 +16,17 @@ import {
 import { AppIcon } from '../ui/AppIcon';
 import { LaTeXRenderer } from '../LaTeXRenderer';
 import { ReviewCheckImageZoom } from './ReviewCheckImageZoom';
+import { ReviewCheckResultCard } from './ReviewCheckResultCard';
+import { ReviewCheckProgressSummary } from './ReviewCheckProgressSummary';
+import { ReviewCheckSubmitResult } from './ReviewCheckSubmitResult';
+import { HandwritingOverlay, type HandwritingOverlayBounds, type HandwritingOverlayHandle } from '../HandwritingOverlay';
 
 interface Props {
   currentUserId: string;
   schoolGrade?: string;
   mistakes: MistakeEntry[];
+  // 시작 화면 "나의 복습 흐름"에서 틀린 문제를 누르면 App.tsx의 오답카드(MistakeDetailModal)를 연다.
+  onOpenMistake?: (mistakeId: string) => void;
 }
 
 const FALLBACK_GRADE = MATH_CURRICULUM['공통수학2'] ? '공통수학2' : GRADE_LIST[0];
@@ -33,7 +39,9 @@ type ViewState =
   | { kind: 'loading' }
   | { kind: 'start'; recentGraded: ReviewCheckSession | null }
   | { kind: 'quiz'; session: ReviewCheckSession; items: ReviewCheckItem[] }
-  | { kind: 'waiting' }
+  // 제출 결과/채점 진행 화면 — justSubmitted는 "방금 제출한 직후"(하단 버튼 노출)인지, 다시 열었는데
+  // 아직 선생님 확인이 남은 submitted 세션인지를 구분한다. openIndex가 있으면 그 문항 상세를 연다.
+  | { kind: 'submitResult'; session: ReviewCheckSession; justSubmitted: boolean; openIndex?: number }
   | { kind: 'history' }
   | { kind: 'historyDetail'; session: ReviewCheckSession }
   | { kind: 'error'; message: string };
@@ -45,7 +53,7 @@ function formatDateLabel(iso: string): string {
 
 // 학생용 "복습체크" — 범위 선택 -> 최대 5문제 -> 주관식 제출 -> 채점 대기, 만 알면 되도록
 // 화면 하나에 한 흐름만 보여준다. DB 상태(session 원본/RLS/RPC)는 여기서 절대 노출하지 않는다.
-export function ReviewCheckScreen({ currentUserId, schoolGrade, mistakes }: Props) {
+export function ReviewCheckScreen({ currentUserId, schoolGrade, mistakes, onOpenMistake }: Props) {
   const [view, setView] = useState<ViewState>({ kind: 'loading' });
   const mistakeById = useMemo(() => new Map(mistakes.map(m => [m.id, m])), [mistakes]);
 
@@ -63,7 +71,7 @@ export function ReviewCheckScreen({ currentUserId, schoolGrade, mistakes }: Prop
         return;
       }
       if (latest.status === 'submitted') {
-        setView({ kind: 'waiting' });
+        setView({ kind: 'submitResult', session: latest, justSubmitted: false });
         return;
       }
       setView({ kind: 'start', recentGraded: latest });
@@ -85,21 +93,36 @@ export function ReviewCheckScreen({ currentUserId, schoolGrade, mistakes }: Prop
       </div>
     );
   }
-  if (view.kind === 'waiting') {
+  if (view.kind === 'submitResult') {
+    if (view.openIndex !== undefined) {
+      return (
+        <ReviewCheckStudentHistoryDetail
+          session={view.session}
+          mistakeById={mistakeById}
+          initialIndex={view.openIndex}
+          backLabel="결과"
+          onBack={() => setView({ ...view, openIndex: undefined })}
+        />
+      );
+    }
     return (
-      <div className="rn-surface" style={{ padding: 24, textAlign: 'center' }}>
-        <div style={{ fontSize: 15, fontWeight: 750, marginBottom: 6 }}>복습체크 제출 완료</div>
-        <p className="rn-caption">선생님이 채점하면<br />결과를 확인할 수 있어요.</p>
-      </div>
+      <ReviewCheckSubmitResult
+        session={view.session}
+        mistakeById={mistakeById}
+        justSubmitted={view.justSubmitted}
+        onOpenItem={index => setView({ ...view, openIndex: index })}
+        onDone={load}
+      />
     );
   }
   if (view.kind === 'quiz') {
     return (
       <ReviewCheckQuiz
+        currentUserId={currentUserId}
         session={view.session}
         items={view.items}
         mistakeById={mistakeById}
-        onSubmitted={load}
+        onSubmitted={() => setView({ kind: 'submitResult', session: view.session, justSubmitted: true })}
       />
     );
   }
@@ -123,21 +146,27 @@ export function ReviewCheckScreen({ currentUserId, schoolGrade, mistakes }: Prop
   }
   return (
     <ReviewCheckStart
+      studentId={currentUserId}
       schoolGrade={schoolGrade}
       recentGraded={view.recentGraded}
       onStarted={load}
       onShowHistory={() => setView({ kind: 'history' })}
+      onOpenRecent={session => setView({ kind: 'historyDetail', session })}
+      progressSummary={<ReviewCheckProgressSummary studentId={currentUserId} mistakes={mistakes} onOpenMistake={onOpenMistake} />}
     />
   );
 }
 
 function ReviewCheckStart({
-  schoolGrade, recentGraded, onStarted, onShowHistory,
+  studentId, schoolGrade, recentGraded, onStarted, onShowHistory, onOpenRecent, progressSummary,
 }: {
+  studentId: string;
   schoolGrade?: string;
   recentGraded: ReviewCheckSession | null;
   onStarted: () => void;
   onShowHistory: () => void;
+  onOpenRecent: (session: ReviewCheckSession) => void;
+  progressSummary?: ReactNode;
 }) {
   const [grade, setGrade] = useState(() => defaultGradeFor(schoolGrade));
   const chapters = MATH_CURRICULUM[grade] || [];
@@ -182,24 +211,16 @@ function ReviewCheckStart({
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 14 }}>
-        <p className="rn-caption" style={{ margin: 0 }}>복습 완료한 문제 중 최대 5문제를 다시 풀어보고, 선생님 채점을 받아요.</p>
-        <button type="button" className="rn-reviewcheck-history-link" onClick={onShowHistory} style={{ flex: 'none' }}>
-          지난 기록 보기
-          <AppIcon name="arrow" width={12} height={12} />
-        </button>
-      </div>
+      <p className="rn-caption" style={{ margin: '0 0 14px' }}>복습 완료한 문제 중 최대 5문제를 다시 풀어보고, 선생님 채점을 받아요.</p>
 
-      {recentGraded && (
-        <div className="rn-surface" style={{ padding: 16, marginBottom: 14 }}>
-          <h3 className="rn-section" style={{ fontSize: 14, fontWeight: 750, marginBottom: 6 }}>복습체크 결과</h3>
-          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--rn-text)' }}>{recentGraded.correctCount} / {recentGraded.totalCount}</div>
-          <div style={{ fontSize: 12.5, color: 'var(--rn-success)', marginTop: 4 }}>완벽! {recentGraded.correctCount}문제</div>
-          {recentGraded.totalCount - recentGraded.correctCount > 0 && (
-            <div style={{ fontSize: 12.5, color: 'var(--rn-muted)' }}>다시 복습 {recentGraded.totalCount - recentGraded.correctCount}문제</div>
-          )}
-        </div>
-      )}
+      <ReviewCheckResultCard
+        studentId={studentId}
+        recentGraded={recentGraded}
+        onOpenRecent={onOpenRecent}
+        onShowHistory={onShowHistory}
+      />
+
+      {progressSummary}
 
       <div className="rn-examprep-range-bar">
         <div className="rn-examprep-range-field">
@@ -231,8 +252,9 @@ function ReviewCheckStart({
 }
 
 function ReviewCheckQuiz({
-  session, items, mistakeById, onSubmitted,
+  currentUserId, session, items, mistakeById, onSubmitted,
 }: {
+  currentUserId: string;
   session: ReviewCheckSession;
   items: ReviewCheckItem[];
   mistakeById: Map<string, MistakeEntry>;
@@ -245,6 +267,19 @@ function ReviewCheckQuiz({
   const [error, setError] = useState<string | null>(null);
   // 확대 오버레이는 이 컴포넌트를 언마운트하지 않고 위에 겹쳐 그려지므로, 닫아도 answers는 그대로 남는다.
   const [zoomOpen, setZoomOpen] = useState(false);
+  // 풀이노트 — 오답카드(MistakeDetailModal)의 "문제 위 필기창 + 추가 필기장" 구성을 그대로 쓰되
+  // 저장은 하지 않는다(runExclusiveSave를 넘기지 않으면 저장 버튼이 사라진다). 연습용 메모라
+  // 다음 문제로 넘어가면 두 창 모두 닫고 새로 시작한다.
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [extraOpen, setExtraOpen] = useState(false);
+  const [front, setFront] = useState<'problem' | 'extra'>('problem');
+  const [extraHint, setExtraHint] = useState<HandwritingOverlayBounds | null>(null);
+  const noteRef = useRef<HandwritingOverlayHandle>(null);
+  useEffect(() => {
+    setNoteOpen(false);
+    setExtraOpen(false);
+    setExtraHint(null);
+  }, [index]);
 
   if (items.length === 0) {
     return (
@@ -272,7 +307,7 @@ function ReviewCheckQuiz({
       await submitReviewCheckSession(session.id, payload);
       // 제출 자체는 이미 성공했으니, AI 채점이 실패하거나 느려도 이 결과를 기다리다 학생을 막지
       // 않는다(requestReviewCheckAiGrading은 절대 throw하지 않음) — 실패해도 곧바로 이어지는
-      // onSubmitted()가 기존 "선생님이 채점하면..." 대기 화면으로 자연스럽게 폴백시켜 준다.
+      // onSubmitted()의 결과 화면이 아직 채점 안 된 문항을 "선생님 확인 중"으로 보여준다.
       setGrading(true);
       await requestReviewCheckAiGrading(session.id);
       onSubmitted();
@@ -293,6 +328,11 @@ function ReviewCheckQuiz({
           <img src={mistake.imageUrl} alt={mistake.title} />
           <span className="rn-reviewcheck-zoom-hint">🔍 눌러서 확대</span>
         </button>
+      )}
+      {mistake && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+          <button type="button" className="rn-button rn-button-secondary rn-button-compact" onClick={() => { setNoteOpen(true); setFront('problem'); }} aria-label="풀이노트 열기">✎ 풀이노트</button>
+        </div>
       )}
       <div className="rn-examprep-range-field" style={{ width: '100%' }}>
         <label htmlFor="rc-answer">내 답</label>
@@ -317,6 +357,35 @@ function ReviewCheckQuiz({
       {error && <div className="rn-examprep-warning" style={{ marginTop: 10 }}>⚠ {error}</div>}
       {zoomOpen && mistake && (
         <ReviewCheckImageZoom src={mistake.imageUrl} alt={mistake.title} onClose={() => setZoomOpen(false)} />
+      )}
+      {noteOpen && mistake && (
+        <HandwritingOverlay
+          key={`problem-${current.mistakeId}`}
+          ref={noteRef}
+          mistakeId={current.mistakeId}
+          studentId={currentUserId}
+          currentUserId={currentUserId}
+          backgroundImageUrl={mistake.imageUrl}
+          onClose={() => { setNoteOpen(false); setFront('extra'); }}
+          onFocus={() => setFront('problem')}
+          isFront={front === 'problem' || !extraOpen}
+          onRequestExtraNotebook={() => {
+            if (!extraOpen) { setExtraHint(noteRef.current?.getBounds() ?? null); setExtraOpen(true); }
+            setFront('extra');
+          }}
+        />
+      )}
+      {extraOpen && (
+        <HandwritingOverlay
+          key={`extra-${current.mistakeId}`}
+          mistakeId={current.mistakeId}
+          studentId={currentUserId}
+          currentUserId={currentUserId}
+          initialPositionHint={extraHint ?? undefined}
+          onClose={() => { setExtraOpen(false); setExtraHint(null); setFront('problem'); }}
+          onFocus={() => setFront('extra')}
+          isFront={front === 'extra' || !noteOpen}
+        />
       )}
     </div>
   );
@@ -385,15 +454,17 @@ function ReviewCheckStudentHistoryList({
 // item.grade를 그대로 렌더한다 — admin이 override했다면 aiVerdict가 아니라 이 필드에만 진짜 최종
 // 판정이 반영돼 있다.
 function ReviewCheckStudentHistoryDetail({
-  session, mistakeById, onBack,
+  session, mistakeById, onBack, initialIndex = 0, backLabel = '목록',
 }: {
   session: ReviewCheckSession;
   mistakeById: Map<string, MistakeEntry>;
   onBack: () => void;
+  initialIndex?: number;
+  backLabel?: string;
 }) {
   const [items, setItems] = useState<ReviewCheckItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(initialIndex);
   const [zoomImage, setZoomImage] = useState<{ src: string; alt: string } | null>(null);
 
   useEffect(() => {
@@ -408,7 +479,7 @@ function ReviewCheckStudentHistoryDetail({
     <div className="rn-reviewcheck-sticky-header">
       <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={onBack}>
         <AppIcon name="arrow" width={14} height={14} style={{ transform: 'rotate(180deg)' }} />
-        목록
+        {backLabel}
       </button>
       <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--rn-muted)' }}>{formatDateLabel(session.createdAt)}</span>
     </div>

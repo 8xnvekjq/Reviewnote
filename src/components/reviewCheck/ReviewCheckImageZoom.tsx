@@ -19,12 +19,10 @@ export function ReviewCheckImageZoom({ src, alt, onClose }: Props) {
   const initialDistanceRef = useRef(0);
   const initialScaleRef = useRef(1);
   const isDraggingRef = useRef(false);
-  const lastTapRef = useRef(0);
-
-  const reset = () => {
-    setScale(1);
-    setPosition({ x: 0, y: 0 });
-  };
+  // 한 번의 터치 제스처(첫 손가락 ~ 마지막 손가락이 떨어질 때까지)가 "그냥 탭"이었는지 추적한다.
+  // 오답카드처럼 화면을 한 번 톡 치면 닫히되, 끌어서 이동하거나 두 손가락으로 확대한 제스처는
+  // 닫지 않는다. 닫기 버튼이 화면 맨 위라 태블릿에서 손이 잘 닿지 않던 문제의 주 해결책이다.
+  const tapRef = useRef({ x: 0, y: 0, cancelled: false });
 
   const updateScale = (next: number) => {
     const bounded = Math.max(1, Math.min(4.5, next));
@@ -34,25 +32,26 @@ export function ReviewCheckImageZoom({ src, alt, onClose }: Props) {
 
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     if (e.touches.length === 1) {
-      const now = Date.now();
-      if (now - lastTapRef.current < 300) {
-        // 더블탭 — 확대 상태면 원위치, 아니면 2.5배로 토글
-        if (scale > 1) reset(); else updateScale(2.5);
-      }
-      lastTapRef.current = now;
-
-      isDraggingRef.current = scale > 1;
       const touch = e.touches[0];
+      tapRef.current = { x: touch.clientX, y: touch.clientY, cancelled: false };
+      isDraggingRef.current = scale > 1;
       touchStartRef.current = { x: touch.clientX - position.x, y: touch.clientY - position.y };
     } else if (e.touches.length === 2) {
+      tapRef.current.cancelled = true;
       isDraggingRef.current = false;
       const [t1, t2] = [e.touches[0], e.touches[1]];
       initialDistanceRef.current = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
       initialScaleRef.current = scale;
+    } else {
+      tapRef.current.cancelled = true;
     }
   };
 
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      if (Math.hypot(touch.clientX - tapRef.current.x, touch.clientY - tapRef.current.y) > 10) tapRef.current.cancelled = true;
+    }
     if (e.touches.length === 1 && isDraggingRef.current) {
       const touch = e.touches[0];
       const dx = touch.clientX - touchStartRef.current.x;
@@ -71,9 +70,16 @@ export function ReviewCheckImageZoom({ src, alt, onClose }: Props) {
     }
   };
 
-  const handleTouchEnd = () => {
+  const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
     isDraggingRef.current = false;
-    if (scale <= 1) reset();
+    if (scale <= 1) setPosition({ x: 0, y: 0 });
+    if (e.touches.length > 0) return; // 핀치 중 한 손가락만 뗀 경우 — 제스처가 아직 안 끝났다
+    // 탭으로 닫을 때는 뒤따르는 합성 click을 막는다. 안 그러면 오버레이가 사라진 자리의 문제
+    // 이미지 버튼이 그 click을 받아 확대창이 곧바로 다시 열린다.
+    if (e.type === 'touchend' && !tapRef.current.cancelled) {
+      e.preventDefault();
+      onClose();
+    }
   };
 
   useEffect(() => {
@@ -82,18 +88,16 @@ export function ReviewCheckImageZoom({ src, alt, onClose }: Props) {
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
+  // 마우스(데스크톱)는 화면 아무 곳이나 클릭하면 닫힌다. 터치는 위 handleTouchEnd가 처리한다.
   return createPortal(
     <div className="rn-reviewcheck-zoom-overlay" role="dialog" aria-modal="true" aria-label="문제 이미지 확대" onClick={onClose}>
-      <button type="button" className="rn-reviewcheck-zoom-close" onClick={onClose} aria-label="확대 닫기">✕</button>
       <div
         className="rn-reviewcheck-zoom-stage"
-        onClick={e => e.stopPropagation()}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
-        onDoubleClick={reset}
-        onWheel={e => { e.preventDefault(); updateScale(scale + (e.deltaY < 0 ? 0.2 : -0.2)); }}
+        onWheel={e => updateScale(scale + (e.deltaY < 0 ? 0.2 : -0.2))}
       >
         <img
           src={src}
@@ -102,6 +106,8 @@ export function ReviewCheckImageZoom({ src, alt, onClose }: Props) {
           style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})` }}
         />
       </div>
+      <button type="button" className="rn-reviewcheck-zoom-close" onClick={onClose} aria-label="확대 닫기">✕</button>
+      <span className="rn-reviewcheck-zoom-tip" aria-hidden="true">화면을 톡 누르면 닫혀요 · 두 손가락으로 확대</span>
     </div>,
     document.body,
   );

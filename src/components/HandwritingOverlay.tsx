@@ -38,12 +38,14 @@ interface HandwritingOverlayProps {
   currentUserId: string;
   backgroundImageUrl?: string; // 있으면 이 이미지를 배경으로 깔고 그 위에 필기(문제 위 필기). 없으면 흰 캔버스(추가 필기장) — 이 창의 평생 고정값, 내부에서 바꾸지 않는다.
   onClose: () => void;
-  onSaved: () => void; // 저장 성공 시 부모(스캐폴딩 목록)에 새로고침을 알림
+  onSaved?: () => void; // 저장 성공 시 부모(스캐폴딩 목록)에 새로고침을 알림
   onFocus?: () => void; // 이 창을 앞으로 가져와 달라는 요청(클릭/드래그 등 상호작용 시)
   isFront: boolean; // 두 창이 동시에 열려 있을 때 어느 쪽이 위에 그려질지
   onRequestExtraNotebook?: () => void; // 있으면 "＋ 새 필기장" 버튼 노출 — 문제 위 필기창에서만 전달됨
   initialPositionHint?: HandwritingOverlayBounds; // 있으면 이 사각형 기준 대각선 오프셋으로 초기 위치를 잡음(추가 필기장 전용)
-  runExclusiveSave: (task: () => Promise<void>) => Promise<void>; // 두 창의 raster export/저장이 겹치지 않게 하는 공유 락
+  // 두 창의 raster export/저장이 겹치지 않게 하는 공유 락. 없으면 저장 없는 연습용 필기창(복습체크)으로
+  // 동작한다 — 저장 버튼을 숨기고 그 외 도구는 그대로 쓴다.
+  runExclusiveSave?: (task: () => Promise<void>) => Promise<void>;
 }
 
 // 문제 이미지를 배경으로 보여주게 되면서(재풀이 흐름) 기존 흰 캔버스 전용 기본 크기(320x260)로는
@@ -410,7 +412,7 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
   // 않는다 — exportSvg()(undo/지우개 mask가 반영된 최종 상태)만 재사용하고, 배경 합성은
   // flattenHandwriting이 직접 offscreen canvas에서 한다(PR2, 검은 배경/crop 버그의 근본 수정).
   const handleSave = async () => {
-    if (isSaving || !canvasRef.current || !documentSize || !drawingWorld) return;
+    if (!runExclusiveSave || isSaving || !canvasRef.current || !documentSize || !drawingWorld) return;
     // readOnly prop은 이후의 pointerdown/move/up/cancel을 전부 끊어버릴 뿐, 이 순간 이미 눌려 있던
     // pointer의 stroke를 라이브러리 스스로 정상 종료시켜주지는 않는다(리뷰에서 실제 설치본 실행으로
     // 확인) — readOnly를 켜기(=isSaving을 true로 만들기) 전에 먼저 진행 중이던 stroke를 확정한다.
@@ -472,7 +474,7 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
       // 슬롯을 잘못 건드리게 되므로 절대 호출하지 않는다.
       if (!isMountedRef.current) return;
 
-      onSaved();
+      onSaved?.();
       setSavedFlash(true);
       setTimeout(() => {
         if (!isMountedRef.current) return;
@@ -715,17 +717,18 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
             )}
           </div>
 
-          <div className="flex items-center gap-1.5">
-
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={isSaving || !documentSize}
-              className="rn-button rn-button-primary"
-            >
-              {isSaving ? '저장 중...' : '💾 저장하기'}
-            </button>
-          </div>
+          {runExclusiveSave && (
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={isSaving || !documentSize}
+                className="rn-button rn-button-primary"
+              >
+                {isSaving ? '저장 중...' : '💾 저장하기'}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* 전체 지우기 확인창 — 실수 터치로 필기가 통째로 날아가지 않도록 창 전체를 덮는다 */}
