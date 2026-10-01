@@ -161,6 +161,11 @@
 .exam-body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 12px 10px calc(env(safe-area-inset-bottom) + 20px); }
 .exam-paper { width: min(100%, 980px); margin-inline: auto; }
 .exam-paper-meta { margin: 0 2px 6px; }
+.exam-category-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.exam-page-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+.exam-page-nav [aria-pressed="true"] { outline: 2px solid var(--rn-accent); }
+.exam-original-scroll { max-width: 100%; overflow-x: auto; }
+.exam-thumb-paper.exam-thumb-original img { height: 100%; object-fit: contain; }
 .exam-save-failed { color: var(--rn-warning); }
 .exam-paper [data-testid="exam-ink-canvas"] { background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 0 var(--rn-line); }
 .exam-paper-foot { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }

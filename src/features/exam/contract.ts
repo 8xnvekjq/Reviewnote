@@ -11,10 +11,11 @@ export type ExamElective = '확률과 통계' | '미적분' | '기하';
 export type ExamMode = 'real' | 'free';
 
 export type ExamPaperKind = 'csat' | 'school' | 'hanneung';
-export type ExamAnswerType = 'choice5' | 'digits' | 'choice10';
+export type ExamAnswerType = 'choice4' | 'choice5' | 'digits' | 'choice10';
 /** 선택 필드는 기존 운영 RPC 응답과의 호환용. 새 RPC는 모두 제공한다. */
 export interface ExamPaperMetadata {
   kind?: ExamPaperKind;
+  hanneungLevel?: 'advanced' | 'basic' | null;
   schoolName?: string | null;
   year?: number | null;
   grade?: number | null;

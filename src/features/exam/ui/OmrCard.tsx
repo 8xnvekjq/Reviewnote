@@ -37,7 +37,7 @@ export function OmrCard({ questions, items, onPick }: {
                   <span className="exam-omr-ten-answer"><ExamAnswer question={q} answer={item?.answer ?? null} /></span>
                 ) : q.isChoice ? (
                   <span className="exam-omr-bubbles" aria-hidden="true">
-                    {CHOICE_MARKS.map((mark, i) => (
+                    {CHOICE_MARKS.slice(0, q.answerType === 'choice4' ? 4 : 5).map((mark, i) => (
                       <span key={mark} className={item?.answer === String(i + 1) ? 'is-marked' : undefined}>{i + 1}</span>
                     ))}
                   </span>

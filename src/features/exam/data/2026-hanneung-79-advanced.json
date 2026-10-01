@@ -1,0 +1,485 @@
+{
+  "id": "2026-hanneung-79-advanced",
+  "title": "2026 제79회 한국사능력검정시험 심화",
+  "kind": "hanneung",
+  "hanneungLevel": "advanced",
+  "year": 2026,
+  "examDate": "2026-08-09",
+  "source": "국사편찬위원회",
+  "timeLimitMinutes": 80,
+  "questionCount": 50,
+  "maxScore": 100,
+  "published": true,
+  "electives": [],
+  "sourceUrl": "https://www.historyexam.go.kr/pst/list.do?bbs=dat",
+  "timingSourceUrl": "https://www.historyexam.go.kr/pageLink.do?link=apyexmInfo",
+  "gradeSourceUrl": "https://www.historyexam.go.kr/pageLink.do?link=examGuideline",
+  "sourceSha256": "fa82e6c8977670c1b55778b061e33ee367c55cd3f8707806f63d70d8353453d7",
+  "answersSha256": "ea380c4a1f4f24ebd4c95ad171aa7ace3fc0654284fbe2d7be4d5b1f675ec393",
+  "pageEnds": [
+    4,
+    9,
+    13,
+    17,
+    21,
+    25,
+    29,
+    34,
+    38,
+    42,
+    46,
+    50
+  ],
+  "questions": [
+    {
+      "number": 1,
+      "section": "common",
+      "pageNumber": 1,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-01.png",
+      "answerType": "choice5",
+      "answer": "2",
+      "points": 1
+    },
+    {
+      "number": 2,
+      "section": "common",
+      "pageNumber": 1,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-01.png",
+      "answerType": "choice5",
+      "answer": "4",
+      "points": 1
+    },
+    {
+      "number": 3,
+      "section": "common",
+      "pageNumber": 1,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-01.png",
+      "answerType": "choice5",
+      "answer": "2",
+      "points": 2
+    },
+    {
+      "number": 4,
+      "section": "common",
+      "pageNumber": 1,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-01.png",
+      "answerType": "choice5",
+      "answer": "1",
+      "points": 1
+    },
+    {
+      "number": 5,
+      "section": "common",
+      "pageNumber": 2,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-02.png",
+      "answerType": "choice5",
+      "answer": "2",
+      "points": 3
+    },
+    {
+      "number": 6,
+      "section": "common",
+      "pageNumber": 2,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-02.png",
+      "answerType": "choice5",
+      "answer": "1",
+      "points": 3
+    },
+    {
+      "number": 7,
+      "section": "common",
+      "pageNumber": 2,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-02.png",
+      "answerType": "choice5",
+      "answer": "3",
+      "points": 1
+    },
+    {
+      "number": 8,
+      "section": "common",
+      "pageNumber": 2,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-02.png",
+      "answerType": "choice5",
+      "answer": "2",
+      "points": 2
+    },
+    {
+      "number": 9,
+      "section": "common",
+      "pageNumber": 2,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-02.png",
+      "answerType": "choice5",
+      "answer": "5",
+      "points": 2
+    },
+    {
+      "number": 10,
+      "section": "common",
+      "pageNumber": 3,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-03.png",
+      "answerType": "choice5",
+      "answer": "3",
+      "points": 2
+    },
+    {
+      "number": 11,
+      "section": "common",
+      "pageNumber": 3,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-03.png",
+      "answerType": "choice5",
+      "answer": "5",
+      "points": 2
+    },
+    {
+      "number": 12,
+      "section": "common",
+      "pageNumber": 3,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-03.png",
+      "answerType": "choice5",
+      "answer": "5",
+      "points": 2
+    },
+    {
+      "number": 13,
+      "section": "common",
+      "pageNumber": 3,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-03.png",
+      "answerType": "choice5",
+      "answer": "1",
+      "points": 3
+    },
+    {
+      "number": 14,
+      "section": "common",
+      "pageNumber": 4,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-04.png",
+      "answerType": "choice5",
+      "answer": "3",
+      "points": 2
+    },
+    {
+      "number": 15,
+      "section": "common",
+      "pageNumber": 4,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-04.png",
+      "answerType": "choice5",
+      "answer": "3",
+      "points": 2
+    },
+    {
+      "number": 16,
+      "section": "common",
+      "pageNumber": 4,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-04.png",
+      "answerType": "choice5",
+      "answer": "3",
+      "points": 1
+    },
+    {
+      "number": 17,
+      "section": "common",
+      "pageNumber": 4,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-04.png",
+      "answerType": "choice5",
+      "answer": "4",
+      "points": 2
+    },
+    {
+      "number": 18,
+      "section": "common",
+      "pageNumber": 5,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-05.png",
+      "answerType": "choice5",
+      "answer": "5",
+      "points": 3
+    },
+    {
+      "number": 19,
+      "section": "common",
+      "pageNumber": 5,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-05.png",
+      "answerType": "choice5",
+      "answer": "5",
+      "points": 2
+    },
+    {
+      "number": 20,
+      "section": "common",
+      "pageNumber": 5,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-05.png",
+      "answerType": "choice5",
+      "answer": "4",
+      "points": 2
+    },
+    {
+      "number": 21,
+      "section": "common",
+      "pageNumber": 5,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-05.png",
+      "answerType": "choice5",
+      "answer": "2",
+      "points": 1
+    },
+    {
+      "number": 22,
+      "section": "common",
+      "pageNumber": 6,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-06.png",
+      "answerType": "choice5",
+      "answer": "4",
+      "points": 3
+    },
+    {
+      "number": 23,
+      "section": "common",
+      "pageNumber": 6,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-06.png",
+      "answerType": "choice5",
+      "answer": "4",
+      "points": 2
+    },
+    {
+      "number": 24,
+      "section": "common",
+      "pageNumber": 6,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-06.png",
+      "answerType": "choice5",
+      "answer": "3",
+      "points": 2
+    },
+    {
+      "number": 25,
+      "section": "common",
+      "pageNumber": 6,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-06.png",
+      "answerType": "choice5",
+      "answer": "1",
+      "points": 3
+    },
+    {
+      "number": 26,
+      "section": "common",
+      "pageNumber": 7,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-07.png",
+      "answerType": "choice5",
+      "answer": "3",
+      "points": 2
+    },
+    {
+      "number": 27,
+      "section": "common",
+      "pageNumber": 7,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-07.png",
+      "answerType": "choice5",
+      "answer": "1",
+      "points": 1
+    },
+    {
+      "number": 28,
+      "section": "common",
+      "pageNumber": 7,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-07.png",
+      "answerType": "choice5",
+      "answer": "5",
+      "points": 1
+    },
+    {
+      "number": 29,
+      "section": "common",
+      "pageNumber": 7,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-07.png",
+      "answerType": "choice5",
+      "answer": "1",
+      "points": 2
+    },
+    {
+      "number": 30,
+      "section": "common",
+      "pageNumber": 8,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-08.png",
+      "answerType": "choice5",
+      "answer": "2",
+      "points": 2
+    },
+    {
+      "number": 31,
+      "section": "common",
+      "pageNumber": 8,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-08.png",
+      "answerType": "choice5",
+      "answer": "2",
+      "points": 3
+    },
+    {
+      "number": 32,
+      "section": "common",
+      "pageNumber": 8,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-08.png",
+      "answerType": "choice5",
+      "answer": "1",
+      "points": 2
+    },
+    {
+      "number": 33,
+      "section": "common",
+      "pageNumber": 8,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-08.png",
+      "answerType": "choice5",
+      "answer": "4",
+      "points": 2
+    },
+    {
+      "number": 34,
+      "section": "common",
+      "pageNumber": 8,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-08.png",
+      "answerType": "choice5",
+      "answer": "2",
+      "points": 2
+    },
+    {
+      "number": 35,
+      "section": "common",
+      "pageNumber": 9,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-09.png",
+      "answerType": "choice5",
+      "answer": "2",
+      "points": 1
+    },
+    {
+      "number": 36,
+      "section": "common",
+      "pageNumber": 9,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-09.png",
+      "answerType": "choice5",
+      "answer": "1",
+      "points": 3
+    },
+    {
+      "number": 37,
+      "section": "common",
+      "pageNumber": 9,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-09.png",
+      "answerType": "choice5",
+      "answer": "3",
+      "points": 3
+    },
+    {
+      "number": 38,
+      "section": "common",
+      "pageNumber": 9,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-09.png",
+      "answerType": "choice5",
+      "answer": "5",
+      "points": 2
+    },
+    {
+      "number": 39,
+      "section": "common",
+      "pageNumber": 10,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-10.png",
+      "answerType": "choice5",
+      "answer": "5",
+      "points": 2
+    },
+    {
+      "number": 40,
+      "section": "common",
+      "pageNumber": 10,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-10.png",
+      "answerType": "choice5",
+      "answer": "4",
+      "points": 2
+    },
+    {
+      "number": 41,
+      "section": "common",
+      "pageNumber": 10,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-10.png",
+      "answerType": "choice5",
+      "answer": "1",
+      "points": 1
+    },
+    {
+      "number": 42,
+      "section": "common",
+      "pageNumber": 10,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-10.png",
+      "answerType": "choice5",
+      "answer": "4",
+      "points": 2
+    },
+    {
+      "number": 43,
+      "section": "common",
+      "pageNumber": 11,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-11.png",
+      "answerType": "choice5",
+      "answer": "3",
+      "points": 2
+    },
+    {
+      "number": 44,
+      "section": "common",
+      "pageNumber": 11,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-11.png",
+      "answerType": "choice5",
+      "answer": "4",
+      "points": 2
+    },
+    {
+      "number": 45,
+      "section": "common",
+      "pageNumber": 11,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-11.png",
+      "answerType": "choice5",
+      "answer": "5",
+      "points": 2
+    },
+    {
+      "number": 46,
+      "section": "common",
+      "pageNumber": 11,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-11.png",
+      "answerType": "choice5",
+      "answer": "1",
+      "points": 2
+    },
+    {
+      "number": 47,
+      "section": "common",
+      "pageNumber": 12,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-12.png",
+      "answerType": "choice5",
+      "answer": "2",
+      "points": 2
+    },
+    {
+      "number": 48,
+      "section": "common",
+      "pageNumber": 12,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-12.png",
+      "answerType": "choice5",
+      "answer": "5",
+      "points": 2
+    },
+    {
+      "number": 49,
+      "section": "common",
+      "pageNumber": 12,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-12.png",
+      "answerType": "choice5",
+      "answer": "2",
+      "points": 2
+    },
+    {
+      "number": 50,
+      "section": "common",
+      "pageNumber": 12,
+      "imageUrl": "/exams/2026-hanneung-79-advanced/page-12.png",
+      "answerType": "choice5",
+      "answer": "3",
+      "points": 3
+    }
+  ]
+}

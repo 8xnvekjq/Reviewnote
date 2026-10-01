@@ -3,6 +3,9 @@
 // persistKey 를 주면 localStorage 에 상태를 남겨 새로고침 후 "이어 풀기"도 흉내낼 수 있다.
 // v2: 시험지 2개(두 번째는 같은 문항을 쓰는 연습용 복제본) · 시험지별 진행/결과 요약 · 채점해 본 문항 잠금(checked).
 import schoolJson from '../data/2026-dongbuk-g1-s2-mid-common2.json';
+import advancedJson from '../data/2026-hanneung-79-advanced.json';
+import basicJson from '../data/2026-hanneung-79-basic.json';
+import { hanneungGrade } from './hanneungLogic.ts';
 import paperJson from '../data/2025-06-math.json';
 import imagesJson from '../data/2025-06-math.images.json';
 import type {
@@ -55,6 +58,13 @@ const MOCK_PAPERS = [
   { id: MOCK_PAPER_ID, title: PAPER.title, examDate: PAPER.examDate, source: PAPER.source },
   { id: MOCK_PAPER_B_ID, title: '연습용 시험지 B (목)', examDate: '2024-09-04', source: '테스트용 목 데이터' },
 ];
+const HANNEUNG = [advancedJson, basicJson];
+const HANNEUNG_META: ExamPaperSummary[] = HANNEUNG.map(paper => ({
+  id: paper.id, title: paper.title, examDate: paper.examDate, source: paper.source,
+  kind: 'hanneung', hanneungLevel: paper.hanneungLevel as 'advanced' | 'basic',
+  year: paper.year, questionCount: 50, maxScore: 100, published: true,
+  timeLimitMinutes: paper.timeLimitMinutes, electives: [], inProgress: null, lastResult: null, resultCount: 0,
+}));
 /** 목 전용 최고점(원점수 100점) 표준점수·백분위 — 실제 값이 아니다. */
 const MOCK_TOP = { standard: 152, percentile: 100 };
 const SECTION_KEY: Record<'common' | ExamElective, string> = { common: 'c', '확률과 통계': 'prob', '미적분': 'calc', '기하': 'geom' };
@@ -81,6 +91,8 @@ export function buildMockQuestions(elective: ExamElective): ExamQuestion[] {
 }
 
 function correctAnswerFor(question: ExamQuestion): string {
+  const historyPaper = HANNEUNG.find(paper => question.id.startsWith(paper.id));
+  if (historyPaper) return historyPaper.questions[question.number - 1].answer;
   if (question.id.startsWith('school-')) return schoolJson.questions.find(q => q.number === question.number)?.answer ?? '';
   return PAPER.answers[question.section]?.[String(question.number)] ?? '';
 }
@@ -107,7 +119,7 @@ export interface MockExamClientOptions {
 }
 
 export function createMockExamClient(options: MockExamClientOptions = {}): ExamClient {
-  const papers = options.admin ? [...MOCK_PAPERS, SCHOOL_META] : MOCK_PAPERS;
+  const papers = [...MOCK_PAPERS, ...HANNEUNG_META, ...(options.admin ? [SCHOOL_META] : [])];
   const store = new Map<string, StoredAttempt>();
   let seq = 0;
 
@@ -150,7 +162,8 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
     const { attempt } = entry;
     const byId = new Map(items.map(item => [item.questionId, item]));
     const school = attempt.paperId === MOCK_SCHOOL_ID;
-    const rates = school ? [] : PAPER.wrongRates.byElective[attempt.elective ?? '미적분'] ?? [];
+    const historyMeta = HANNEUNG_META.find(paper => paper.id === attempt.paperId);
+    const rates = school || historyMeta ? [] : PAPER.wrongRates.byElective[attempt.elective ?? '미적분'] ?? [];
     const resultItems: ExamResultItem[] = attempt.questions.map(question => {
       const item = byId.get(question.id);
       const correctAnswer = correctAnswerFor(question);
@@ -178,6 +191,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
     const rawByGrade = PAPER.gradeCuts.rawByElective[attempt.elective ?? '미적분'] ?? [];
     return {
       ...(school ? SCHOOL_META : {}),
+      ...historyMeta,
       attemptId: attempt.id,
       round: roundFor(attempt),
       paperTitle: paperTitle(attempt.paperId),
@@ -187,7 +201,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       correctCount: resultItems.filter(item => item.isCorrect).length,
       totalCount: resultItems.length,
       totalTimeMs: resultItems.reduce((sum, item) => sum + item.timeSpentMs, 0),
-      estimatedGrade: school ? null : estimateGrade(score, rawByGrade),
+      estimatedGrade: school ? null : historyMeta ? hanneungGrade(score, historyMeta.hanneungLevel) : estimateGrade(score, rawByGrade),
       gradeCut: {
         rawByGrade: school ? [] : rawByGrade,
         standardByGrade: school ? [] : PAPER.gradeCuts.standard,
@@ -238,8 +252,8 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
         return {
           ...meta,
           ...(meta.id === MOCK_SCHOOL_ID ? SCHOOL_META : {}),
-          timeLimitMinutes: meta.id === MOCK_SCHOOL_ID ? 50 : PAPER.timeLimitMinutes,
-          electives: meta.id === MOCK_SCHOOL_ID ? [] : [...ELECTIVES],
+          timeLimitMinutes: HANNEUNG_META.find(paper => paper.id === meta.id)?.timeLimitMinutes ?? (meta.id === MOCK_SCHOOL_ID ? 50 : PAPER.timeLimitMinutes),
+          electives: meta.id === MOCK_SCHOOL_ID || HANNEUNG_META.some(paper => paper.id === meta.id) ? [] : [...ELECTIVES],
           inProgress: active ? {
             attemptId: active.attempt.id,
             round: roundFor(active.attempt),
@@ -269,17 +283,24 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       if (existing) throw new Error('이 시험지는 풀던 시험이 있어요. 이어 풀기로 열어 주세요.');
       if (!papers.some(p => p.id === paperId)) throw new Error('이 시험지를 찾지 못했어요.');
       const school = paperId === MOCK_SCHOOL_ID;
+      const historyMeta = HANNEUNG_META.find(paper => paper.id === paperId);
+      const historyPaper = HANNEUNG.find(paper => paper.id === paperId);
       seq += 1;
       const attempt: ExamAttempt = {
+        ...(school ? { ...SCHOOL_META, paperTitle: SCHOOL_META.title } : {}),
+        ...historyMeta,
         id: `attempt-${seq}`,
         paperId,
         mode,
-        elective: school ? null : elective,
-        ...(school ? { ...SCHOOL_META, paperTitle: SCHOOL_META.title } : {}),
+        elective: school || historyMeta ? null : elective,
         startedAt: new Date().toISOString(),
-        timeLimitMinutes: mode === 'real' ? options.timeLimitMinutes ?? (school ? 50 : PAPER.timeLimitMinutes) : null,
+        timeLimitMinutes: mode === 'real' ? options.timeLimitMinutes ?? historyMeta?.timeLimitMinutes ?? (school ? 50 : PAPER.timeLimitMinutes) : null,
         status: 'in_progress',
-        questions: school ? schoolQuestions() : buildMockQuestions(elective ?? '미적분'),
+        questions: historyPaper ? historyPaper.questions.map(question => ({
+          id: `${paperId}-${question.number}`, number: question.number, section: 'common',
+          imageUrl: question.imageUrl, points: question.points, isChoice: true,
+          answerType: question.answerType as ExamQuestion['answerType'],
+        })) : school ? schoolQuestions() : buildMockQuestions(elective ?? '미적분'),
         items: [],
         visitOrder: [],
       };
@@ -345,7 +366,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
         .filter(entry => entry.result && (!paperId || entry.attempt.paperId === paperId))
         .map(entry => {
           const r = entry.result!;
-          return { ...(r.kind === 'school' ? SCHOOL_META : {}), attemptId: r.attemptId, paperTitle: r.paperTitle, mode: r.mode, elective: r.elective, score: r.score, estimatedGrade: r.estimatedGrade, submittedAt: r.submittedAt };
+          return { ...(r.kind === 'school' ? SCHOOL_META : {}), kind: r.kind, hanneungLevel: r.hanneungLevel, attemptId: r.attemptId, paperTitle: r.paperTitle, mode: r.mode, elective: r.elective, score: r.score, estimatedGrade: r.estimatedGrade, submittedAt: r.submittedAt };
         })
         .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
     },

@@ -71,6 +71,7 @@ function mapMetadata(r: Row): ExamPaperMetadata {
   if (r.kind == null) return {};
   return {
     kind: r.kind === 'school' ? 'school' : r.kind === 'hanneung' ? 'hanneung' : 'csat',
+    hanneungLevel: r.hanneungLevel === 'advanced' || r.hanneungLevel === 'basic' ? r.hanneungLevel : null,
     schoolName: asNullableString(r.schoolName), year: asNullableNumber(r.year),
     grade: asNullableNumber(r.grade), semester: asNullableNumber(r.semester),
     examTerm: r.examTerm === 'mid' || r.examTerm === 'final' ? r.examTerm : null,
@@ -82,7 +83,7 @@ function mapMetadata(r: Row): ExamPaperMetadata {
 function mapAnswerMetadata(r: Row): ExamAnswerMetadata {
   if (r.answerType == null) return {};
   return {
-    answerType: r.answerType === 'choice10' ? 'choice10' : r.answerType === 'digits' ? 'digits' : 'choice5',
+    answerType: r.answerType === 'choice10' ? 'choice10' : r.answerType === 'digits' ? 'digits' : r.answerType === 'choice4' ? 'choice4' : 'choice5',
     choices: Array.isArray(r.choices) ? r.choices.filter((c): c is string => typeof c === 'string') : null,
   };
 }
@@ -110,6 +111,7 @@ export function sanitizeExamAnswer(raw: string | number | null | undefined, isCh
   const v = normalizeExamAnswer(raw);
   if (v == null) return null;
   if (isChoice === 'choice10') return /^([1-9]|10)$/.test(v) ? v : null;
+  if (isChoice === 'choice4') return /^[1-4]$/.test(v) ? v : null;
   if (isChoice === true || isChoice === 'choice5') return /^[1-5]$/.test(v) ? v : null;
   return /^[0-9]{1,3}$/.test(v) ? v : null;
 }
@@ -286,7 +288,7 @@ export function mapExamResult(raw: unknown): ExamResult {
     correctCount: asNumber(r.correctCount),
     totalCount: asNumber(r.totalCount),
     totalTimeMs: asNumber(r.totalTimeMs),
-    estimatedGrade: r.kind === 'school' ? null : asNullableNumber(r.estimatedGrade) ?? estimateExamGrade(rawByGrade, score),
+    estimatedGrade: r.kind === 'school' ? null : r.kind === 'hanneung' ? asNullableNumber(r.estimatedGrade) : asNullableNumber(r.estimatedGrade) ?? estimateExamGrade(rawByGrade, score),
     gradeCut: {
       rawByGrade,
       standardByGrade: numbers(cut.standardByGrade),

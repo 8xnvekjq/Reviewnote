@@ -29,6 +29,7 @@ const migV2 = fs.readFileSync(path.join(root, 'supabase/migrations/2026100218000
 const migBatch2 = fs.readFileSync(path.join(root, 'supabase/migrations/20261002190000_exam_papers_batch2.sql'), 'utf8');
 const migRounds = fs.readFileSync(path.join(root, 'supabase/migrations/20261002200000_exam_rounds.sql'), 'utf8');
 const migSchool = fs.readFileSync(path.join(root, 'supabase/migrations/20261002210000_exam_school_papers.sql'), 'utf8');
+const migHanneung = fs.readFileSync(path.join(root, 'supabase/migrations/20261003000000_exam_hanneung.sql'), 'utf8');
 
 test('exam migration applies and the RPC flow behaves (PGlite)', { skip: PGliteCtor ? false : '@electric-sql/pglite 미설치' }, async () => {
 const db = new PGliteCtor!();
@@ -476,4 +477,66 @@ assert.equal((await as(S1, `select get_exam_result($1) r`, [f.id]))[0].r.round, 
 await fails(null, `select start_exam_attempt($1,'free',null)`, [schoolId], /permission denied/);
 await fails(S1, `select private.exam_valid_typed_answer('7','choice10')`, [], /permission denied/);
 await fails(S1, `select get_exam_result($1)`, [schoolReal.id], /EXAM_ATTEMPT_NOT_FOUND/);
+await db.exec(migHanneung);
+await db.exec(migHanneung);
+for (const level of ['advanced', 'basic']) {
+  const paperId = `2026-hanneung-79-${level}`;
+  const data = JSON.parse(fs.readFileSync(path.join(root, `src/features/exam/data/${paperId}.json`), 'utf8'));
+  const card = (await as(S1, `select list_exam_papers_for_me() r`))[0].r.find(paper => paper.id === paperId);
+  assert.equal(card.published, true);
+  assert.equal(card.hanneungLevel, level);
+  assert.equal(card.timeLimitMinutes, level === 'basic' ? 70 : 80);
+  assert.equal(card.questionCount, 50);
+  assert.deepEqual(card.electives, []);
+  const seeded = (await db.query(`select q.number,q.points,q.image_url,q.answer_type,k.answer from exam_questions q join exam_answer_keys k on k.question_id=q.id where q.paper_id=$1 order by number`, [paperId])).rows;
+  assert.equal(seeded.length, 50);
+  for (const [index, row] of seeded.entries()) {
+    assert.equal(row.answer, data.questions[index].answer);
+    assert.equal(Number(row.points), data.questions[index].points);
+    assert.equal(row.image_url, data.questions[index].imageUrl);
+    assert.equal(row.answer_type, level === 'basic' ? 'choice4' : 'choice5');
+  }
+  const attempt = (await as(S1, `select start_exam_attempt($1,'real',null) r`, [paperId]))[0].r;
+  assert.equal(attempt.questions.length, 50);
+  assert.equal(attempt.timeLimitMinutes, card.timeLimitMinutes);
+  assert.equal(attempt.hanneungLevel, level);
+  assert.ok(!JSON.stringify(attempt.questions).includes('answer"'));
+  assert.ok(attempt.items.every(item => item.checked === null));
+  await fails(S2, `select get_exam_result($1)`, [attempt.id], /EXAM_ATTEMPT_NOT_FOUND/);
+  await fails(S1, `select check_exam_answer($1,$2,'1')`, [attempt.id, attempt.questions[0].id], /EXAM_REAL_MODE_LOCKED/);
+  const answers = attempt.questions.map(question => ({ questionId: question.id, answer: data.questions[question.number - 1].answer }));
+  await as(S1, `select save_exam_progress($1,$2::jsonb,$3::int[])`, [attempt.id, JSON.stringify(answers), [23, 49, 50, 51]]);
+  const saved = (await as(S1, `select get_active_exam_attempt($1) r`, [paperId]))[0].r;
+  assert.deepEqual(saved.visitOrder, [23, 49, 50]);
+  assert.equal(saved.items.length, 50);
+  const result = (await as(S1, `select submit_exam_attempt($1,$2::jsonb,null) r`, [attempt.id, JSON.stringify(answers)]))[0].r;
+  assert.equal(result.score, 100);
+  assert.equal(result.correctCount, 50);
+  assert.equal(result.estimatedGrade, level === 'basic' ? 4 : 1);
+  assert.equal(result.gradeCut, null);
+  assert.equal(result.hanneungLevel, level);
+  const history = (await as(S1, `select list_my_paper_history($1) r`, [paperId]))[0].r;
+  assert.equal(history[0].items.length, 50);
+  assert.equal(history[0].hanneungLevel, level);
+  assert.equal(buildHistoryRows(mapExamPaperHistory(history), '미적분', 50)[49].cells[0].item?.isCorrect, true);
+  assert.equal((await as(S1, `select list_my_exam_results($1) r`, [paperId]))[0].r[0].estimatedGrade, result.estimatedGrade);
+  assert.equal((await as(S1, `select list_exam_papers_for_me() r`))[0].r.find(paper => paper.id === paperId).lastResult.estimatedGrade, result.estimatedGrade);
+  const free = (await as(S1, `select start_exam_attempt($1,'free',null) r`, [paperId]))[0].r;
+  const invalid = level === 'basic' ? '5' : '6';
+  await fails(S1, `select check_exam_answer($1,$2,$3)`, [free.id, free.questions[0].id, invalid], /EXAM_INVALID_ANSWER/);
+  const wrong = data.questions[0].answer === '1' ? '2' : '1';
+  const checked = (await as(S1, `select check_exam_answer($1,$2,$3) r`, [free.id, free.questions[0].id, wrong]))[0].r;
+  assert.equal(checked.isCorrect, false);
+  assert.equal(checked.correctAnswer, data.questions[0].answer);
+  const failed = (await as(S1, `select submit_exam_attempt($1,'[]',null) r`, [free.id]))[0].r;
+  assert.equal(failed.estimatedGrade, null);
+  for (const [score, grade] of [[59, null], [60, 3], [69, 3], [70, 2], [79, 2], [80, 1], [100, 1]]) {
+    const actual = (await db.query(`select private.exam_hanneung_grade($1,$2) grade`, [score, level])).rows[0].grade;
+    assert.equal(actual, grade == null ? null : grade + (level === 'basic' ? 3 : 0));
+  }
+}
+await assert.rejects(db.query(`update exam_questions set number=31 where paper_id='2025-06-math' and number=1`), /EXAM_INVALID_QUESTION/);
+await fails(S1, `select private.exam_hanneung_grade(100,'basic')`, [], /permission denied/);
+assert.equal((await as(S2, `select get_exam_result($1) r`, [csatAgain.id]))[0].r.estimatedGrade, 1);
+assert.equal((await as(AD, `select get_exam_result($1) r`, [schoolFullAttempt.id]))[0].r.estimatedGrade, null);
 });

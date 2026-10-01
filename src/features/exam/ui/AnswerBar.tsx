@@ -39,7 +39,7 @@ export function AnswerBar({ question, answer, unsure, onAnswer, onUnsure, free }
       <div className="exam-answerbar-inner">
         {answerType !== 'digits' ? (
           <div className={`exam-choices${ten ? ' exam-choices-ten' : ''}`} role="group" aria-label={`${question.number}번 답 고르기`}>
-            {(ten ? CHOICE10_MARKS : CHOICE_MARKS).map((mark, index) => {
+            {(ten ? CHOICE10_MARKS : question.answerType === 'choice4' ? CHOICE_MARKS.slice(0, 4) : CHOICE_MARKS).map((mark, index) => {
               const selected = answer === String(index + 1);
               return (
                 <button
