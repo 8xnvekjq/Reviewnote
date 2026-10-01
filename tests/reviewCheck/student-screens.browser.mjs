@@ -189,7 +189,7 @@ try {
 
   // (d)(e) 시험(퀴즈) 중 문제 이미지 확대 — 390px 모바일 뷰포트에서 탭해서 열고, 닫아도 입력하던 답 유지.
   {
-    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true });
     const api = quizZoomServer();
     const { page, errors } = await withPage(context, api, 'student-screens.html?user=student-1');
 
@@ -203,6 +203,26 @@ try {
     await page.getByRole('dialog', { name: '문제 이미지 확대' }).waitFor({ state: 'hidden' });
 
     assert.equal(await page.locator('#rc-answer').inputValue(), 'x=3', '확대를 열었다 닫아도 입력하던 답이 남아있어야 함');
+
+    // 확대창은 화면을 한 번 톡 치면 닫히고(닫기 버튼이 손에 닿지 않는 태블릿 대응), 그 탭이
+    // 아래 문제 이미지 버튼에 떨어져 확대창을 다시 여는 일(고스트 클릭)도 없어야 한다.
+    await page.getByRole('button', { name: '문제 이미지 확대해서 보기' }).click();
+    const zoom = page.getByRole('dialog', { name: '문제 이미지 확대' });
+    await zoom.waitFor();
+    await page.touchscreen.tap(195, 422);
+    await zoom.waitFor({ state: 'hidden' });
+    await page.waitForTimeout(400);
+    assert.equal(await zoom.count(), 0, '탭으로 닫은 뒤 확대창이 다시 열리면 안 됨');
+
+    // 풀이노트 — 문제 위 필기창과 추가 필기장이 열리고, 저장 버튼은 없다.
+    await page.getByRole('button', { name: '풀이노트 열기' }).click();
+    await page.getByRole('dialog', { name: '손 필기 풀이창' }).waitFor();
+    assert.equal(await page.getByRole('button', { name: /저장하기/ }).count(), 0, '복습체크 풀이노트에는 저장 버튼이 없어야 함');
+    await page.getByRole('button', { name: /새 필기장/ }).click();
+    await page.getByText('풀이노트 · 추가 필기장').waitFor();
+    for (let i = 0; i < 2; i++) await page.getByRole('button', { name: '필기창 닫기' }).first().click();
+    await page.getByRole('dialog', { name: '손 필기 풀이창' }).first().waitFor({ state: 'hidden' });
+    assert.equal(await page.locator('#rc-answer').inputValue(), 'x=3', '풀이노트를 열고 닫아도 답이 남아있어야 함');
 
     await page.screenshot({ path: `${out}/quiz-zoom.png` });
     assert.deepEqual(errors, []);

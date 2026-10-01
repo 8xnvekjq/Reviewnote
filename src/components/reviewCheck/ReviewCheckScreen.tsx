@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { MistakeEntry } from '../../types';
 import { MATH_CURRICULUM, GRADE_LIST } from '../../types';
 import '../../styles/examPrep.css';
@@ -16,6 +16,7 @@ import {
 import { AppIcon } from '../ui/AppIcon';
 import { LaTeXRenderer } from '../LaTeXRenderer';
 import { ReviewCheckImageZoom } from './ReviewCheckImageZoom';
+import { HandwritingOverlay, type HandwritingOverlayBounds, type HandwritingOverlayHandle } from '../HandwritingOverlay';
 
 interface Props {
   currentUserId: string;
@@ -96,6 +97,7 @@ export function ReviewCheckScreen({ currentUserId, schoolGrade, mistakes }: Prop
   if (view.kind === 'quiz') {
     return (
       <ReviewCheckQuiz
+        currentUserId={currentUserId}
         session={view.session}
         items={view.items}
         mistakeById={mistakeById}
@@ -231,8 +233,9 @@ function ReviewCheckStart({
 }
 
 function ReviewCheckQuiz({
-  session, items, mistakeById, onSubmitted,
+  currentUserId, session, items, mistakeById, onSubmitted,
 }: {
+  currentUserId: string;
   session: ReviewCheckSession;
   items: ReviewCheckItem[];
   mistakeById: Map<string, MistakeEntry>;
@@ -245,6 +248,19 @@ function ReviewCheckQuiz({
   const [error, setError] = useState<string | null>(null);
   // 확대 오버레이는 이 컴포넌트를 언마운트하지 않고 위에 겹쳐 그려지므로, 닫아도 answers는 그대로 남는다.
   const [zoomOpen, setZoomOpen] = useState(false);
+  // 풀이노트 — 오답카드(MistakeDetailModal)의 "문제 위 필기창 + 추가 필기장" 구성을 그대로 쓰되
+  // 저장은 하지 않는다(runExclusiveSave를 넘기지 않으면 저장 버튼이 사라진다). 연습용 메모라
+  // 다음 문제로 넘어가면 두 창 모두 닫고 새로 시작한다.
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [extraOpen, setExtraOpen] = useState(false);
+  const [front, setFront] = useState<'problem' | 'extra'>('problem');
+  const [extraHint, setExtraHint] = useState<HandwritingOverlayBounds | null>(null);
+  const noteRef = useRef<HandwritingOverlayHandle>(null);
+  useEffect(() => {
+    setNoteOpen(false);
+    setExtraOpen(false);
+    setExtraHint(null);
+  }, [index]);
 
   if (items.length === 0) {
     return (
@@ -294,6 +310,11 @@ function ReviewCheckQuiz({
           <span className="rn-reviewcheck-zoom-hint">🔍 눌러서 확대</span>
         </button>
       )}
+      {mistake && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+          <button type="button" className="rn-button rn-button-secondary rn-button-compact" onClick={() => { setNoteOpen(true); setFront('problem'); }} aria-label="풀이노트 열기">✎ 풀이노트</button>
+        </div>
+      )}
       <div className="rn-examprep-range-field" style={{ width: '100%' }}>
         <label htmlFor="rc-answer">내 답</label>
         <input
@@ -317,6 +338,35 @@ function ReviewCheckQuiz({
       {error && <div className="rn-examprep-warning" style={{ marginTop: 10 }}>⚠ {error}</div>}
       {zoomOpen && mistake && (
         <ReviewCheckImageZoom src={mistake.imageUrl} alt={mistake.title} onClose={() => setZoomOpen(false)} />
+      )}
+      {noteOpen && mistake && (
+        <HandwritingOverlay
+          key={`problem-${current.mistakeId}`}
+          ref={noteRef}
+          mistakeId={current.mistakeId}
+          studentId={currentUserId}
+          currentUserId={currentUserId}
+          backgroundImageUrl={mistake.imageUrl}
+          onClose={() => { setNoteOpen(false); setFront('extra'); }}
+          onFocus={() => setFront('problem')}
+          isFront={front === 'problem' || !extraOpen}
+          onRequestExtraNotebook={() => {
+            if (!extraOpen) { setExtraHint(noteRef.current?.getBounds() ?? null); setExtraOpen(true); }
+            setFront('extra');
+          }}
+        />
+      )}
+      {extraOpen && (
+        <HandwritingOverlay
+          key={`extra-${current.mistakeId}`}
+          mistakeId={current.mistakeId}
+          studentId={currentUserId}
+          currentUserId={currentUserId}
+          initialPositionHint={extraHint ?? undefined}
+          onClose={() => { setExtraOpen(false); setExtraHint(null); setFront('problem'); }}
+          onFocus={() => setFront('extra')}
+          isFront={front === 'extra' || !noteOpen}
+        />
       )}
     </div>
   );
