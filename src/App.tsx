@@ -46,6 +46,7 @@ const ReviewCheckAdminScreen = lazy(() => import('./components/reviewCheck/Revie
 const ScaffoldingPanel = lazy(() => import('./components/ScaffoldingPanel').then(m => ({ default: m.ScaffoldingPanel })));
 const GachaStore = lazy(() => import('./components/GachaStore').then(m => ({ default: m.GachaStore })));
 const PixelRoom = lazy(() => import('./features/pixel-room/PixelRoom'));
+const ExamPracticeEntry = lazy(() => import('./features/exam/ExamPracticeEntry'));
 
 interface ProfileDirectoryRow {
   id: string;
@@ -1906,6 +1907,13 @@ function App() {
         {/* 어드민은 채점/학생별 시험 관리 화면(ReviewCheckAdminScreen)으로, 학생은 본인 셀프
             테스트 화면(ReviewCheckScreen)으로 — 같은 tab('reviewCheck')을 역할에 따라 다르게
             라우팅한다(BottomNavigation의 reviewCheckMenuAdmin/Student와 짝). */}
+        <Screen when={activeTab === 'examPractice' && !!session?.user?.id}>
+          <LazyScreenBoundary>
+            {/* 나갈 때 오답노트를 다시 읽는다 — OMR 결과에서 고른 문항이 오답노트에 바로 보이게. */}
+            <ExamPracticeEntry currentUserId={session?.user?.id || ''} onExit={() => { refreshMistakesLight(); setActiveTab('notes'); }} />
+          </LazyScreenBoundary>
+        </Screen>
+
         <Screen when={activeTab === 'reviewCheck' && isAdmin}>
           <LazyScreenBoundary>
             <ReviewCheckAdminScreen onViewMistake={setSelectedEntry} />
