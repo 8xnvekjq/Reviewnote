@@ -13,7 +13,7 @@ import { QuestionOverview } from './QuestionOverview';
 import { loadInk, saveInk } from './inkStore';
 import {
   countAnswered, createStopwatch, crossedAlerts, elapsedFor, formatClock, normalizeShortAnswer, pauseStopwatch, remainingMs,
-  switchStopwatch, toggleChoice, type StopwatchState,
+  switchStopwatch, toggleChoice, questionAnswerType, type StopwatchState,
 } from './examLogic';
 
 const SAVE_DEBOUNCE_MS = 2500;
@@ -47,7 +47,7 @@ function initialItems(attempt: ExamAttempt): Record<string, LocalItem> {
   for (const item of attempt.items) {
     if (!map[item.questionId]) continue;
     const q = attempt.questions.find(x => x.id === item.questionId);
-    const answer = q && !q.isChoice ? normalizeShortAnswer(item.answer) : item.answer;
+    const answer = q && questionAnswerType(q) === 'digits' ? normalizeShortAnswer(item.answer) : item.answer;
     const checked = item.checked ? { isCorrect: item.checked.isCorrect, correctAnswer: item.checked.correctAnswer } : null;
     map[item.questionId] = { answer, unsure: item.unsure, visits: item.visits, checked };
   }
@@ -84,7 +84,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
   const visitOrderRef = useRef<number[]>([...attempt.visitOrder]);
   const swRef = useRef<StopwatchState>(createStopwatch(Object.fromEntries(attempt.items.map(item => [item.questionId, item.timeSpentMs]))));
   const inkRef = useRef<ExamInkCanvasHandle>(null);
-  // 문항을 넘길 때 이미지를 그때그때 받으며 깜박이지 않게 30문항을 미리 받아 둔다.
+  // 문항을 넘길 때 깜박이지 않게 이 시험의 문항 이미지를 미리 받아 둔다.
   useEffect(() => { preloadInkImages(questions.map(q => q.imageUrl)); }, [questions]);
   const saveTimer = useRef<number | null>(null);
   const inkTimers = useRef(new Map<string, number>());
@@ -303,9 +303,9 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
       if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
       if (e.key === 'ArrowLeft') { e.preventDefault(); goTo(index - 1); }
       else if (e.key === 'ArrowRight') { e.preventDefault(); goTo(index + 1); }
-      else if (question.isChoice && /^[1-5]$/.test(e.key)) {
+      else if (questionAnswerType(question) !== 'digits' && (question.answerType === 'choice10' ? /^[0-9]$/ : /^[1-5]$/).test(e.key)) {
         e.preventDefault();
-        setAnswer(toggleChoice(itemsRef.current[question.id]?.answer ?? null, Number(e.key)));
+        setAnswer(toggleChoice(itemsRef.current[question.id]?.answer ?? null, e.key === '0' ? 10 : Number(e.key)));
       }
     };
     window.addEventListener('keydown', onKey);

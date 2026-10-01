@@ -49,7 +49,7 @@ export function ExamPracticeScreen({ client, currentUserId, onExit }: { client: 
     setStartKey(k => k + 1); // 이어 풀기·지난 결과 목록 새로 읽기
   };
 
-  const start = async (paper: ExamPaperSummary, mode: ExamMode, elective: ExamElective) => {
+  const start = async (paper: ExamPaperSummary, mode: ExamMode, elective: ExamElective | null) => {
     enterFullscreen();
     setBusy(true);
     setError(null);

@@ -2,11 +2,13 @@
 // 정답은 data json 에서 읽어 채점하고, 실전 모드 채점 요청은 거부한다.
 // persistKey 를 주면 localStorage 에 상태를 남겨 새로고침 후 "이어 풀기"도 흉내낼 수 있다.
 // v2: 시험지 2개(두 번째는 같은 문항을 쓰는 연습용 복제본) · 시험지별 진행/결과 요약 · 채점해 본 문항 잠금(checked).
+import schoolJson from '../data/2026-dongbuk-g1-s2-mid-common2.json';
 import paperJson from '../data/2025-06-math.json';
 import imagesJson from '../data/2025-06-math.images.json';
 import type {
   ExamAttempt, ExamClient, ExamElective, ExamItemState, ExamMode, ExamPaperSummary, ExamQuestion, ExamResult, ExamResultItem,
 } from '../contract.ts';
+import { sanitizeExamAnswer } from '../examMappers';
 import { countAnswered, ELECTIVES, estimateGrade, isAnswerCorrect, keepCheckedAnswers } from './examLogic.ts';
 
 interface WrongRateRow { number: number; wrongRate: number; choiceRates: number[] | null }
@@ -33,6 +35,22 @@ const IMAGES = imagesJson as unknown as ImageData;
 export const MOCK_PAPER_ID = '2025-06-math';
 /** 시험지마다 따로 진행되는지 보려는 두 번째 목 시험지(문항·정답은 첫 시험지와 같다). */
 export const MOCK_PAPER_B_ID = 'mock-practice-b';
+export const MOCK_SCHOOL_ID = schoolJson.id;
+const SCHOOL_META: ExamPaperSummary = {
+  id: schoolJson.id, title: schoolJson.title, examDate: '', source: schoolJson.source,
+  kind: 'school', schoolName: schoolJson.schoolName, year: schoolJson.year,
+  grade: schoolJson.grade, semester: schoolJson.semester, examTerm: 'mid',
+  questionCount: schoolJson.questionCount, maxScore: schoolJson.maxScore, published: false,
+  timeLimitMinutes: schoolJson.timeLimitMinutes, electives: [],
+  inProgress: null, lastResult: null, resultCount: 0,
+};
+function schoolQuestions(): ExamQuestion[] {
+  return schoolJson.questions.map(q => ({
+    id: `school-${q.number}`, number: q.number, section: 'common', imageUrl: q.imageUrl,
+    isChoice: q.answerType !== 'digits', answerType: q.answerType as ExamQuestion['answerType'],
+    points: q.points, choices: q.choices ?? null,
+  }));
+}
 const MOCK_PAPERS = [
   { id: MOCK_PAPER_ID, title: PAPER.title, examDate: PAPER.examDate, source: PAPER.source },
   { id: MOCK_PAPER_B_ID, title: '연습용 시험지 B (목)', examDate: '2024-09-04', source: '테스트용 목 데이터' },
@@ -63,6 +81,7 @@ export function buildMockQuestions(elective: ExamElective): ExamQuestion[] {
 }
 
 function correctAnswerFor(question: ExamQuestion): string {
+  if (question.id.startsWith('school-')) return schoolJson.questions.find(q => q.number === question.number)?.answer ?? '';
   return PAPER.answers[question.section]?.[String(question.number)] ?? '';
 }
 
@@ -73,6 +92,8 @@ interface StoredAttempt {
 }
 
 export interface MockExamClientOptions {
+  /** 비공개 내신 검토를 위한 관리자 하네스. 기본값은 학생. */
+  admin?: boolean;
   /** 실전 모드 제한시간 덮어쓰기(분, 소수 가능) — 자동 제출 테스트용. */
   timeLimitMinutes?: number;
   /** 주면 localStorage 에 상태 저장(새로고침 이어 풀기 테스트). */
@@ -86,6 +107,7 @@ export interface MockExamClientOptions {
 }
 
 export function createMockExamClient(options: MockExamClientOptions = {}): ExamClient {
+  const papers = options.admin ? [...MOCK_PAPERS, SCHOOL_META] : MOCK_PAPERS;
   const store = new Map<string, StoredAttempt>();
   let seq = 0;
 
@@ -118,7 +140,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
   };
   const clone = <T,>(value: T): T => structuredClone(value);
 
-  const paperTitle = (paperId: string) => MOCK_PAPERS.find(p => p.id === paperId)?.title ?? PAPER.title;
+  const paperTitle = (paperId: string) => papers.find(p => p.id === paperId)?.title ?? PAPER.title;
   const roundFor = (attempt: ExamAttempt) => [...store.values()]
     .filter(entry => entry.attempt.paperId === attempt.paperId)
     .sort((a, b) => a.attempt.startedAt.localeCompare(b.attempt.startedAt) || a.attempt.id.localeCompare(b.attempt.id))
@@ -127,7 +149,8 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
   const grade = (entry: StoredAttempt, items: ExamItemState[]): ExamResult => {
     const { attempt } = entry;
     const byId = new Map(items.map(item => [item.questionId, item]));
-    const rates = PAPER.wrongRates.byElective[attempt.elective] ?? [];
+    const school = attempt.paperId === MOCK_SCHOOL_ID;
+    const rates = school ? [] : PAPER.wrongRates.byElective[attempt.elective ?? '미적분'] ?? [];
     const resultItems: ExamResultItem[] = attempt.questions.map(question => {
       const item = byId.get(question.id);
       const correctAnswer = correctAnswerFor(question);
@@ -139,6 +162,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
         section: question.section,
         imageUrl: question.imageUrl,
         isChoice: question.isChoice,
+        answerType: question.answerType, choices: question.choices,
         points: question.points,
         answer,
         correctAnswer,
@@ -151,8 +175,9 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       };
     });
     const score = resultItems.reduce((sum, item) => sum + (item.isCorrect ? item.points : 0), 0);
-    const rawByGrade = PAPER.gradeCuts.rawByElective[attempt.elective] ?? [];
+    const rawByGrade = PAPER.gradeCuts.rawByElective[attempt.elective ?? '미적분'] ?? [];
     return {
+      ...(school ? SCHOOL_META : {}),
       attemptId: attempt.id,
       round: roundFor(attempt),
       paperTitle: paperTitle(attempt.paperId),
@@ -162,13 +187,13 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       correctCount: resultItems.filter(item => item.isCorrect).length,
       totalCount: resultItems.length,
       totalTimeMs: resultItems.reduce((sum, item) => sum + item.timeSpentMs, 0),
-      estimatedGrade: estimateGrade(score, rawByGrade),
+      estimatedGrade: school ? null : estimateGrade(score, rawByGrade),
       gradeCut: {
-        rawByGrade,
-        standardByGrade: PAPER.gradeCuts.standard,
-        percentileByGrade: PAPER.gradeCuts.percentile,
-        topStandard: PAPER.gradeCuts.topStandardByElective?.[attempt.elective] ?? MOCK_TOP.standard,
-        topPercentile: PAPER.gradeCuts.topPercentileByElective?.[attempt.elective] ?? MOCK_TOP.percentile,
+        rawByGrade: school ? [] : rawByGrade,
+        standardByGrade: school ? [] : PAPER.gradeCuts.standard,
+        percentileByGrade: school ? [] : PAPER.gradeCuts.percentile,
+        topStandard: school ? null : PAPER.gradeCuts.topStandardByElective?.[attempt.elective ?? '미적분'] ?? MOCK_TOP.standard,
+        topPercentile: school ? null : PAPER.gradeCuts.topPercentileByElective?.[attempt.elective ?? '미적분'] ?? MOCK_TOP.percentile,
         source: PAPER.gradeCuts.source,
       },
       items: resultItems,
@@ -204,7 +229,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       record('listPapers', []);
       await wait();
       const entries = [...store.values()];
-      return MOCK_PAPERS.map((meta): ExamPaperSummary => {
+      return papers.map((meta): ExamPaperSummary => {
         const mine = entries.filter(entry => entry.attempt.paperId === meta.id);
         const active = [...mine].reverse().find(entry => entry.attempt.status === 'in_progress');
         const results = mine.map(entry => entry.result).filter((r): r is ExamResult => r != null)
@@ -212,8 +237,9 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
         const last = results[0];
         return {
           ...meta,
-          timeLimitMinutes: PAPER.timeLimitMinutes,
-          electives: [...ELECTIVES],
+          ...(meta.id === MOCK_SCHOOL_ID ? SCHOOL_META : {}),
+          timeLimitMinutes: meta.id === MOCK_SCHOOL_ID ? 50 : PAPER.timeLimitMinutes,
+          electives: meta.id === MOCK_SCHOOL_ID ? [] : [...ELECTIVES],
           inProgress: active ? {
             attemptId: active.attempt.id,
             round: roundFor(active.attempt),
@@ -235,22 +261,25 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       const active = [...store.values()].reverse().find(entry => entry.attempt.paperId === paperId && entry.attempt.status === 'in_progress');
       return active ? clone(active.attempt) : null;
     },
-    async startAttempt(paperId, mode: ExamMode, elective: ExamElective) {
+    async startAttempt(paperId, mode: ExamMode, elective: ExamElective | null) {
       record('startAttempt', [paperId, mode, elective]);
       await wait();
       // 서버처럼: 시험지마다 진행 중인 시도는 하나. 같은 시험지는 이어 풀기만.
       const existing = [...store.values()].find(entry => entry.attempt.paperId === paperId && entry.attempt.status === 'in_progress');
       if (existing) throw new Error('이 시험지는 풀던 시험이 있어요. 이어 풀기로 열어 주세요.');
+      if (!papers.some(p => p.id === paperId)) throw new Error('이 시험지를 찾지 못했어요.');
+      const school = paperId === MOCK_SCHOOL_ID;
       seq += 1;
       const attempt: ExamAttempt = {
         id: `attempt-${seq}`,
         paperId,
         mode,
-        elective,
+        elective: school ? null : elective,
+        ...(school ? { ...SCHOOL_META, paperTitle: SCHOOL_META.title } : {}),
         startedAt: new Date().toISOString(),
-        timeLimitMinutes: mode === 'real' ? options.timeLimitMinutes ?? PAPER.timeLimitMinutes : null,
+        timeLimitMinutes: mode === 'real' ? options.timeLimitMinutes ?? (school ? 50 : PAPER.timeLimitMinutes) : null,
         status: 'in_progress',
-        questions: buildMockQuestions(elective),
+        questions: school ? schoolQuestions() : buildMockQuestions(elective ?? '미적분'),
         items: [],
         visitOrder: [],
       };
@@ -282,6 +311,8 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       const existing = attempt.items.find(item => item.questionId === questionId);
       if (existing?.checked) return { ...existing.checked };
       const correctAnswer = correctAnswerFor(question);
+      answer = sanitizeExamAnswer(answer, question.answerType ?? question.isChoice) ?? '';
+      if (!answer) throw new Error('채점할 답을 먼저 입력해 주세요.');
       const checked = { isCorrect: isAnswerCorrect(answer, correctAnswer, question.isChoice), correctAnswer };
       if (existing) Object.assign(existing, { answer, checked });
       else attempt.items.push({ questionId, answer, unsure: false, timeSpentMs: 0, visits: 1, checked });
@@ -314,7 +345,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
         .filter(entry => entry.result && (!paperId || entry.attempt.paperId === paperId))
         .map(entry => {
           const r = entry.result!;
-          return { attemptId: r.attemptId, paperTitle: r.paperTitle, mode: r.mode, elective: r.elective, score: r.score, estimatedGrade: r.estimatedGrade, submittedAt: r.submittedAt };
+          return { ...(r.kind === 'school' ? SCHOOL_META : {}), attemptId: r.attemptId, paperTitle: r.paperTitle, mode: r.mode, elective: r.elective, score: r.score, estimatedGrade: r.estimatedGrade, submittedAt: r.submittedAt };
         })
         .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
     },

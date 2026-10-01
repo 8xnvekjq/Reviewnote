@@ -28,6 +28,7 @@ const mig = fs.readFileSync(path.join(root, 'supabase/migrations/20261002120000_
 const migV2 = fs.readFileSync(path.join(root, 'supabase/migrations/20261002180000_exam_practice_v2.sql'), 'utf8');
 const migBatch2 = fs.readFileSync(path.join(root, 'supabase/migrations/20261002190000_exam_papers_batch2.sql'), 'utf8');
 const migRounds = fs.readFileSync(path.join(root, 'supabase/migrations/20261002200000_exam_rounds.sql'), 'utf8');
+const migSchool = fs.readFileSync(path.join(root, 'supabase/migrations/20261002210000_exam_school_papers.sql'), 'utf8');
 
 test('exam migration applies and the RPC flow behaves (PGlite)', { skip: PGliteCtor ? false : '@electric-sql/pglite 미설치' }, async () => {
 const db = new PGliteCtor!();
@@ -397,4 +398,82 @@ const permission = (await db.query(`select
   p.prosecdef, p.proconfig from pg_proc p where p.oid = 'public.list_my_paper_history(text,uuid)'::regprocedure`)).rows[0];
 assert.equal(permission.anon, false); assert.equal(permission.student, true); assert.equal(permission.helper, false);
 assert.equal(permission.prosecdef, true); assert.deepEqual(permission.proconfig, ['search_path=""']);
+
+// 내신: 운영 4개 다음에 적용, 재적용 안전성·실제 RLS/RPC·소수 배점까지 확인.
+await db.exec(migSchool);
+await db.exec(migSchool);
+const schoolId = '2026-dongbuk-g1-s2-mid-common2';
+const schoolData = JSON.parse(fs.readFileSync(path.join(root, `src/features/exam/data/${schoolId}.json`), 'utf8'));
+assert.equal((await as(S1, `select id from exam_papers where id=$1`, [schoolId])).length, 0);
+assert.equal((await as(S1, `select id from exam_questions where paper_id=$1`, [schoolId])).length, 0);
+assert.ok(!(await as(S1, `select list_exam_papers_for_me() r`))[0].r.some(p => p.id === schoolId));
+await fails(S1, `select start_exam_attempt($1,'free',null)`, [schoolId], /EXAM_PAPER_NOT_FOUND/);
+await fails(S1, `select list_my_paper_history($1)`, [schoolId], /EXAM_PAPER_NOT_FOUND/);
+const schoolCard = (await as(AD, `select list_exam_papers_for_me() r`))[0].r.find(p => p.id === schoolId);
+assert.equal(schoolCard.kind, 'school'); assert.equal(schoolCard.published, false);
+assert.equal(schoolCard.year, 2026); assert.equal(schoolCard.questionCount, 21);
+assert.equal(schoolCard.maxScore, 100); assert.equal(schoolCard.timeLimitMinutes, 50);
+assert.equal(schoolCard.examDate, null); assert.deepEqual(schoolCard.electives, []);
+assert.equal((await as(AD, `select id from exam_questions where paper_id=$1`, [schoolId])).length, 21);
+await fails(S1, `select solution_text from exam_questions where paper_id=$1`, [schoolId], /permission denied/);
+const schoolRows = (await db.query(`select q.*, k.answer from exam_questions q join exam_answer_keys k on k.question_id=q.id where paper_id=$1 order by number`, [schoolId])).rows;
+assert.equal(schoolRows.length, 21);
+for (const [index, row] of schoolRows.entries()) {
+  const source = schoolData.questions[index];
+  assert.equal(Number(row.points), source.points); assert.equal(row.answer, source.answer);
+  assert.equal(row.answer_type, source.answerType); assert.deepEqual(row.choices, source.choices ?? null);
+  assert.equal(row.curriculum_chapter, source.curriculumChapter);
+}
+assert.equal(schoolRows.reduce((sum, q) => sum + Number(q.points), 0), 100);
+const schoolFree = (await as(AD, `select start_exam_attempt($1,'free',null) r`, [schoolId]))[0].r;
+assert.equal(schoolFree.elective, null); assert.equal(schoolFree.questions.length, 21);
+const ten = schoolFree.questions.find(q => q.number === 18);
+assert.equal(ten.answerType, 'choice10'); assert.equal(ten.choices.length, 10);
+assert.ok(!JSON.stringify(schoolFree.questions).includes('answer"'));
+assert.ok(schoolFree.items.every(i => i.checked === null));
+assert.equal((await as(S1, `select answer_type, choices from exam_questions where paper_id=$1`, [schoolId])).length, 0);
+await fails(AD, `select check_exam_answer($1,$2,'11')`, [schoolFree.id, ten.id], /EXAM_INVALID_ANSWER/);
+await fails(AD, `select check_exam_answer($1,$2,'0')`, [schoolFree.id, ten.id], /EXAM_INVALID_ANSWER/);
+const checkedTen = (await as(AD, `select check_exam_answer($1,$2,'10') r`, [schoolFree.id, ten.id]))[0].r;
+assert.deepEqual(checkedTen, { isCorrect: false, correctAnswer: '7' });
+assert.deepEqual((await as(AD, `select check_exam_answer($1,$2,'7') r`, [schoolFree.id, ten.id]))[0].r, checkedTen, '10번째 선지도 유효하며 채점 뒤 잠금');
+await as(AD, `select submit_exam_attempt($1,'[]'::jsonb,null)`, [schoolFree.id]);
+const schoolReal = (await as(AD, `select start_exam_attempt($1,'real',null) r`, [schoolId]))[0].r;
+assert.equal(schoolReal.timeLimitMinutes, 50);
+await fails(AD, `select check_exam_answer($1,$2,'7')`, [schoolReal.id, ten.id], /EXAM_REAL_MODE_LOCKED/);
+const schoolAnswers = [1, 18].map(n => ({ questionId: schoolReal.questions.find(q => q.number === n).id, answer: schoolData.questions[n-1].answer, unsure: n === 18, timeSpentMs: 100, visits: 1 }));
+await as(AD, `select save_exam_progress($1,$2::jsonb,$3::int[])`, [schoolReal.id, JSON.stringify(schoolAnswers), [18, 21, 22, 99]]);
+const schoolSaved = (await as(AD, `select get_active_exam_attempt($1) r`, [schoolId]))[0].r;
+assert.deepEqual(schoolSaved.visitOrder, [18, 21]);
+const schoolResult = (await as(AD, `select submit_exam_attempt($1,$2::jsonb,null) r`, [schoolReal.id, JSON.stringify(schoolAnswers)]))[0].r;
+assert.equal(schoolResult.score, 9.4); assert.equal(schoolResult.correctCount, 2);
+assert.equal(schoolResult.totalCount, 21); assert.equal(schoolResult.maxScore, 100);
+assert.equal(schoolResult.estimatedGrade, null); assert.equal(schoolResult.gradeCut, null);
+assert.equal(schoolResult.items.find(i => i.number === 18).isCorrect, true);
+assert.deepEqual(schoolResult.items.find(i => i.number === 18).choices, ten.choices);
+assert.equal((await as(AD, `select list_my_exam_results($1) r`, [schoolId]))[0].r[0].estimatedGrade, null);
+const schoolHistory = (await as(AD, `select list_my_paper_history($1) r`, [schoolId]))[0].r;
+assert.deepEqual(schoolHistory.map(a => a.estimatedGrade), [null, null]);
+assert.equal(schoolHistory[1].year, 2026); assert.equal(schoolHistory[1].items.length, 21);
+assert.equal(schoolHistory[1].items[17].answerType, 'choice10');
+assert.equal((await as(AD, `select list_exam_papers_for_me() r`))[0].r.find(p => p.id === schoolId).lastResult.estimatedGrade, null);
+const schoolMistake = (await as(AD, `select add_exam_questions_to_mistakes($1,$2::uuid[],'https://reviewnote.test') r`, [schoolReal.id, [ten.id]]))[0].r[0];
+const savedMistake = (await as(AD, `select analysis, grade, chapter from mistakes where id=$1`, [schoolMistake.mistakeId]))[0];
+assert.equal(savedMistake.analysis.finalAnswer, '$\\sqrt{23}$', '변환한 정답은 원래 수식으로 오답노트에 저장');
+assert.equal(savedMistake.grade, '공통수학2'); assert.equal(savedMistake.chapter, '원의 방정식');
+assert.equal((await as(AD, `select add_exam_questions_to_mistakes($1,$2::uuid[],'https://reviewnote.test') r`, [schoolReal.id, [ten.id]]))[0].r[0].created, false);
+const schoolFullAttempt = (await as(AD, `select start_exam_attempt($1,'free',null) r`, [schoolId]))[0].r;
+const schoolFullItems = schoolFullAttempt.questions.map(q => ({ questionId: q.id, answer: schoolData.questions[q.number-1].answer }));
+const schoolFull = (await as(AD, `select submit_exam_attempt($1,$2::jsonb,null) r`, [schoolFullAttempt.id, JSON.stringify(schoolFullItems)]))[0].r;
+assert.equal(schoolFull.score, 100); assert.equal(schoolFull.correctCount, 21); assert.equal(schoolFull.estimatedGrade, null);
+// 새 RPC에서도 기존 수능 만점·등급·30문항과 기존 회차를 유지한다.
+const csatAgain = (await as(S2, `select start_exam_attempt('2025-11-math','free','미적분') r`))[0].r;
+const csatFull = (await as(S2, `select submit_exam_attempt($1,$2::jsonb,null) r`, [csatAgain.id, JSON.stringify(allKeys.map(r => ({ questionId: r.id, answer: r.answer })))]))[0].r;
+assert.equal(csatFull.score, 100); assert.equal(csatFull.estimatedGrade, 1);
+assert.equal(csatFull.totalCount, 30); assert.equal(csatFull.kind, 'csat');
+assert.equal(csatFull.gradeCut.topStandard, 140);
+assert.equal((await as(S1, `select get_exam_result($1) r`, [f.id]))[0].r.round, 2);
+await fails(null, `select start_exam_attempt($1,'free',null)`, [schoolId], /permission denied/);
+await fails(S1, `select private.exam_valid_typed_answer('7','choice10')`, [], /permission denied/);
+await fails(S1, `select get_exam_result($1)`, [schoolReal.id], /EXAM_ATTEMPT_NOT_FOUND/);
 });

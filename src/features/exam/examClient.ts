@@ -56,7 +56,7 @@ export const examClient: ExamClient = {
       const { data, error } = await supabase.rpc('save_exam_progress', {
         p_attempt_id: attemptId,
         p_items: toExamItemsPayload(items),
-        p_visit_order: toVisitOrderPayload(visitOrder),
+        p_visit_order: toVisitOrderPayload(visitOrder, 32767),
       });
       if (error) {
         console.warn('[exam] 진행 상황 저장 실패:', error.message);
@@ -82,7 +82,7 @@ export const examClient: ExamClient = {
     const data = await callRpc('submit_exam_attempt', {
       p_attempt_id: attemptId,
       p_items: toExamItemsPayload(items),
-      p_visit_order: toVisitOrderPayload(visitOrder),
+      p_visit_order: toVisitOrderPayload(visitOrder, 32767),
     });
     return mapExamResult(data);
   },

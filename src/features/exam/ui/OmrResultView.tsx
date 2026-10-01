@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ExamClient, ExamResult, ExamResultItem, InkStroke } from '../contract';
 import { ExamInkCanvas } from '../ink/ExamInkCanvas';
 import { loadInk } from './inkStore';
+import { ExamAnswer } from './ExamAnswer';
 import { displayAnswer, ELECTIVE_SHORT, estimateStandardScore, formatClock, formatDuration, mistakeCandidates, praiseLine, roundLabel } from './examLogic';
 
 interface Props {
@@ -29,12 +30,13 @@ export function OmrResultView({ client, result: initial, onBack, backLabel }: Pr
   const candidates = useMemo(() => mistakeCandidates(result.items), [result.items]);
   const pendingCandidates = candidates.filter(item => !item.addedMistakeId);
   const cuts = result.gradeCut;
+  const school = result.kind === 'school';
   // 서버가 v2 이전 결과를 주면 top 값이 없을 수 있다 — 그땐 1등급컷 값으로 본다.
-  const estimate = useMemo(() => estimateStandardScore(result.score, {
+  const estimate = useMemo(() => school ? { standard: null, percentile: null } : estimateStandardScore(result.score, {
     ...cuts,
     topStandard: cuts.topStandard ?? null,
     topPercentile: cuts.topPercentile ?? null,
-  }), [result.score, cuts]);
+  }), [result.score, cuts, school]);
 
   const togglePick = (questionId: string) => {
     setPicked(prev => {
@@ -74,17 +76,19 @@ export function OmrResultView({ client, result: initial, onBack, backLabel }: Pr
       <section className="rn-surface exam-score-card" aria-label="OMR 결과 요약">
         <p className="rn-eyebrow">OMR 결과</p>
         <h2 className="exam-result-title">{result.paperTitle}{roundLabel(result.round) && ` · ${roundLabel(result.round)}`}</h2>
-        <p className="rn-caption">{result.mode === 'real' ? '실전 모드' : '자유 모드'} · {result.elective}</p>
+        <p className="rn-caption">{result.mode === 'real' ? '실전 모드' : '자유 모드'}{result.elective && ` · ${result.elective}`}</p>
         <div className="exam-score-grid">
           <div className="exam-score-main">
             <span className="exam-score-label">원점수</span>
-            <strong data-testid="exam-score">{result.score}</strong><span>/ 100</span>
+            <strong data-testid="exam-score">{result.score}</strong><span>/ {result.maxScore ?? 100}</span>
           </div>
           <dl className="exam-score-stats">
             <div><dt>맞은 개수</dt><dd data-testid="exam-correct-count">{result.correctCount} / {result.totalCount}</dd></div>
+            <div><dt>정답률</dt><dd>{result.totalCount ? Math.round(result.correctCount / result.totalCount * 100) : 0}%</dd></div>
             <div><dt>총 시간</dt><dd>{formatDuration(result.totalTimeMs)}</dd></div>
           </dl>
         </div>
+        {!school && <>
         <dl className="exam-score-tiles" data-testid="exam-score-tiles">
           <div className="exam-score-tile is-grade">
             <dt>추정 등급</dt>
@@ -104,7 +108,7 @@ export function OmrResultView({ client, result: initial, onBack, backLabel }: Pr
           <br /><span className="exam-source">출처: {cuts.source}</span>
         </p>
         <details className="exam-cuts">
-          <summary>등급컷 표 보기 ({ELECTIVE_SHORT[result.elective]})</summary>
+          <summary>등급컷 표 보기 ({result.elective ? ELECTIVE_SHORT[result.elective] : ''})</summary>
           <table>
             <thead><tr><th>등급</th><th>원점수(추정)</th><th>표준점수</th><th>백분위</th></tr></thead>
             <tbody>
@@ -116,6 +120,7 @@ export function OmrResultView({ client, result: initial, onBack, backLabel }: Pr
             </tbody>
           </table>
         </details>
+        </>}
       </section>
 
       <section className="rn-surface exam-candidates" aria-label="오답노트 후보" data-testid="exam-candidates">
@@ -179,8 +184,8 @@ export function OmrResultView({ client, result: initial, onBack, backLabel }: Pr
                   <span className="exam-item-num">{item.number}</span>
                   <span className="exam-item-ox" aria-label={item.isCorrect ? '맞음' : '틀림'}>{item.isCorrect ? 'O' : 'X'}</span>
                   <span className="exam-item-answers">
-                    <span>내 답 <b>{displayAnswer(item.answer, item.isChoice)}</b></span>
-                    <span>정답 <b>{displayAnswer(item.correctAnswer, item.isChoice)}</b></span>
+                    <span>내 답 <b><ExamAnswer question={item} answer={item.answer} /></b></span>
+                    <span>정답 <b><ExamAnswer question={item} answer={item.correctAnswer} /></b></span>
                   </span>
                   <span className="exam-item-unsure" aria-label={item.unsure ? '애매 표시' : undefined}>{item.unsure ? '🤔' : ''}</span>
                   <span className="exam-item-time">{formatClock(item.timeSpentMs)}</span>
@@ -201,7 +206,7 @@ export function OmrResultView({ client, result: initial, onBack, backLabel }: Pr
           <div className="exam-viewer" onClick={e => e.stopPropagation()} data-testid="exam-viewer">
             <div className="exam-sheet-head">
               <h2>{viewing.number}번 <span className={viewing.isCorrect ? 'is-correct' : 'is-wrong'}>{viewing.isCorrect ? 'O' : 'X'}</span></h2>
-              <span className="rn-caption">내 답 {displayAnswer(viewing.answer, viewing.isChoice)} · 정답 {displayAnswer(viewing.correctAnswer, viewing.isChoice)} · {formatClock(viewing.timeSpentMs)}</span>
+              <span className="rn-caption">내 답 <ExamAnswer question={viewing} answer={viewing.answer} /> · 정답 <ExamAnswer question={viewing} answer={viewing.correctAnswer} /> · {formatClock(viewing.timeSpentMs)}</span>
               <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={() => setViewing(null)}>닫기</button>
             </div>
             {viewing.nationalChoiceRates && (

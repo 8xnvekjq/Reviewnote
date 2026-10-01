@@ -11,6 +11,7 @@ const params = new URLSearchParams(location.search);
 const log: Array<{ method: string; args: unknown[] }> = [];
 (window as unknown as { __examLog: typeof log }).__examLog = log;
 const client = createMockExamClient({
+  admin: params.get('admin') === '1',
   timeLimitMinutes: params.has('limit') ? Number(params.get('limit')) : undefined,
   persistKey: params.get('persist') === '1' ? 'exam-practice-harness' : undefined,
   failSave: params.get('failSave') === '1',

@@ -1,8 +1,10 @@
 // 상단 답안 줄: 객관식 ①~⑤ 체크(하나만, 다시 누르면 해제) / 단답 백·십·일 휠 + 🤔 + (자유 모드) 채점해 보기.
 // v2: 채점해 본 문항은 답을 잠근다(①~⑤·휠·비우기 비활성, O/X 결과는 계속 보임). 🤔 는 계속 바꿀 수 있다.
 import type { ExamQuestion } from '../contract';
+import { ExamAnswer } from './ExamAnswer';
+import { LaTeXRenderer } from '../../../components/LaTeXRenderer';
 import { DigitWheel } from './DigitWheel';
-import { answerFromDigits, CHOICE_MARKS, digitsFromAnswer, displayAnswer, toggleChoice } from './examLogic';
+import { answerFromDigits, CHOICE_MARKS, digitsFromAnswer, CHOICE10_MARKS, questionAnswerType, toggleChoice } from './examLogic';
 
 export interface FreeCheck { isCorrect: boolean; correctAnswer: string }
 
@@ -29,13 +31,15 @@ export function AnswerBar({ question, answer, unsure, onAnswer, onUnsure, free }
   const digits = digitsFromAnswer(answer);
   const check = free?.check ?? null;
   const locked = check != null;
+  const answerType = questionAnswerType(question);
+  const ten = answerType === 'choice10';
 
   return (
     <div className={`exam-answerbar${locked ? ' is-locked' : ''}`} data-testid="exam-answerbar" data-locked={locked || undefined}>
       <div className="exam-answerbar-inner">
-        {question.isChoice ? (
-          <div className="exam-choices" role="group" aria-label={`${question.number}번 답 고르기`}>
-            {CHOICE_MARKS.map((mark, index) => {
+        {answerType !== 'digits' ? (
+          <div className={`exam-choices${ten ? ' exam-choices-ten' : ''}`} role="group" aria-label={`${question.number}번 답 고르기`}>
+            {(ten ? CHOICE10_MARKS : CHOICE_MARKS).map((mark, index) => {
               const selected = answer === String(index + 1);
               return (
                 <button
@@ -48,7 +52,8 @@ export function AnswerBar({ question, answer, unsure, onAnswer, onUnsure, free }
                   data-choice={index + 1}
                   onClick={() => onAnswer(toggleChoice(answer, index + 1))}
                 >
-                  {mark}
+                  <span>{mark}</span>
+                  {ten && <LaTeXRenderer inline text={`$${question.choices?.[index] ?? ''}$`} className="exam-choice-math" />}
                 </button>
               );
             })}
@@ -111,7 +116,7 @@ export function AnswerBar({ question, answer, unsure, onAnswer, onUnsure, free }
                 {check.isCorrect ? 'O 정답이에요!' : 'X 다시 볼까요?'}
                 {!check.isCorrect && (
                   free.revealed
-                    ? <em> 정답 {displayAnswer(check.correctAnswer, question.isChoice)}</em>
+                    ? <em> 정답 <ExamAnswer question={question} answer={check.correctAnswer} /></em>
                     : <button type="button" className="exam-link" onClick={free.onReveal}>정답 보기</button>
                 )}
               </span>

@@ -6,6 +6,9 @@
 
 import type {
   ExamAttempt,
+  ExamAnswerType,
+  ExamPaperMetadata,
+  ExamAnswerMetadata,
   ExamElective,
   ExamItemState,
   ExamMode,
@@ -17,7 +20,7 @@ import type {
   ExamResultItem,
 } from './contract';
 
-export type ExamResultSummary = Pick<ExamResult, 'attemptId' | 'paperTitle' | 'mode' | 'elective' | 'score' | 'estimatedGrade' | 'submittedAt'>;
+export type ExamResultSummary = Pick<ExamResult, 'attemptId' | 'paperTitle' | 'mode' | 'elective' | 'score' | 'estimatedGrade' | 'submittedAt' | keyof ExamPaperMetadata>;
 
 const ELECTIVES: readonly ExamElective[] = ['확률과 통계', '미적분', '기하'];
 const CIRCLED = '①②③④⑤';
@@ -47,12 +50,13 @@ function asNullableNumber(value: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function asElective(value: unknown): ExamElective {
+function asElective(value: unknown): ExamElective | null {
+  if (value === null) return null;
   return ELECTIVES.includes(value as ExamElective) ? (value as ExamElective) : '미적분';
 }
 
 function asSection(value: unknown): 'common' | ExamElective {
-  return value === 'common' ? 'common' : asElective(value);
+  return value === 'common' ? 'common' : asElective(value) ?? '미적분';
 }
 
 function asMode(value: unknown): ExamMode {
@@ -61,6 +65,26 @@ function asMode(value: unknown): ExamMode {
 
 function asArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
+}
+
+function mapMetadata(r: Row): ExamPaperMetadata {
+  if (r.kind == null) return {};
+  return {
+    kind: r.kind === 'school' ? 'school' : r.kind === 'hanneung' ? 'hanneung' : 'csat',
+    schoolName: asNullableString(r.schoolName), year: asNullableNumber(r.year),
+    grade: asNullableNumber(r.grade), semester: asNullableNumber(r.semester),
+    examTerm: r.examTerm === 'mid' || r.examTerm === 'final' ? r.examTerm : null,
+    questionCount: asNumber(r.questionCount, 30), maxScore: asNumber(r.maxScore, 100),
+    published: r.published !== false,
+  };
+}
+
+function mapAnswerMetadata(r: Row): ExamAnswerMetadata {
+  if (r.answerType == null) return {};
+  return {
+    answerType: r.answerType === 'choice10' ? 'choice10' : r.answerType === 'digits' ? 'digits' : 'choice5',
+    choices: Array.isArray(r.choices) ? r.choices.filter((c): c is string => typeof c === 'string') : null,
+  };
 }
 
 function mapRound(r: Row): { round?: number } {
@@ -81,11 +105,12 @@ export function normalizeExamAnswer(raw: string | number | null | undefined): st
   return v;
 }
 
-/** 저장 가능한 답만 통과(객관식 1~5, 단답 0~999). 그 외는 null — 서버도 같은 값은 버린다. */
-export function sanitizeExamAnswer(raw: string | number | null | undefined, isChoice: boolean): string | null {
+/** 답 유형별 유효 범위만 통과(choice5 1~5, choice10 1~10, digits 0~999). */
+export function sanitizeExamAnswer(raw: string | number | null | undefined, isChoice: boolean | ExamAnswerType): string | null {
   const v = normalizeExamAnswer(raw);
   if (v == null) return null;
-  if (isChoice) return /^[1-5]$/.test(v) ? v : null;
+  if (isChoice === 'choice10') return /^([1-9]|10)$/.test(v) ? v : null;
+  if (isChoice === true || isChoice === 'choice5') return /^[1-5]$/.test(v) ? v : null;
   return /^[0-9]{1,3}$/.test(v) ? v : null;
 }
 
@@ -151,6 +176,7 @@ function mapExamPaperLastResult(raw: unknown): ExamPaperSummary['lastResult'] {
 export function mapExamPaper(row: unknown): ExamPaperSummary {
   const r = asRow(row);
   return {
+    ...mapMetadata(r),
     id: asString(r.id),
     title: asString(r.title),
     examDate: asString(r.examDate),
@@ -170,6 +196,7 @@ export function mapExamQuestion(raw: unknown): ExamQuestion {
     number: asNumber(r.number),
     section: asSection(r.section),
     imageUrl: asString(r.imageUrl),
+    ...mapAnswerMetadata(r),
     isChoice: r.isChoice === true,
     points: asNumber(r.points),
   };
@@ -201,6 +228,8 @@ export function mapExamAttempt(raw: unknown, clientNowMs: number = Date.now()): 
   const questions = asArray(r.questions).map(mapExamQuestion).sort((a, b) => a.number - b.number);
   return {
     id: asString(r.id),
+    ...mapMetadata(r),
+    ...(r.paperTitle != null ? { paperTitle: asString(r.paperTitle) } : {}),
     paperId: asString(r.paperId),
     mode: asMode(r.mode),
     elective: asElective(r.elective),
@@ -209,7 +238,7 @@ export function mapExamAttempt(raw: unknown, clientNowMs: number = Date.now()): 
     status: r.status === 'submitted' ? 'submitted' : 'in_progress',
     questions,
     items: asArray(r.items).map(mapExamItemState),
-    visitOrder: asArray(r.visitOrder).map((n) => asNumber(n)).filter((n) => n >= 1 && n <= 30),
+    visitOrder: asArray(r.visitOrder).map((n) => asNumber(n)).filter((n) => Number.isInteger(n) && n >= 1 && n <= asNumber(r.questionCount, 30)),
   };
 }
 
@@ -226,6 +255,7 @@ export function mapExamResultItem(raw: unknown): ExamResultItem {
     number: asNumber(r.number),
     section: asSection(r.section),
     imageUrl: asString(r.imageUrl),
+    ...mapAnswerMetadata(r),
     isChoice: r.isChoice === true,
     points: asNumber(r.points),
     answer: asNullableString(r.answer),
@@ -248,6 +278,7 @@ export function mapExamResult(raw: unknown): ExamResult {
   return {
     attemptId: asString(r.attemptId),
     ...mapRound(r),
+    ...mapMetadata(r),
     paperTitle: asString(r.paperTitle),
     mode: asMode(r.mode),
     elective: asElective(r.elective),
@@ -255,7 +286,7 @@ export function mapExamResult(raw: unknown): ExamResult {
     correctCount: asNumber(r.correctCount),
     totalCount: asNumber(r.totalCount),
     totalTimeMs: asNumber(r.totalTimeMs),
-    estimatedGrade: asNullableNumber(r.estimatedGrade) ?? estimateExamGrade(rawByGrade, score),
+    estimatedGrade: r.kind === 'school' ? null : asNullableNumber(r.estimatedGrade) ?? estimateExamGrade(rawByGrade, score),
     gradeCut: {
       rawByGrade,
       standardByGrade: numbers(cut.standardByGrade),
@@ -273,11 +304,12 @@ export function mapExamResultSummary(raw: unknown): ExamResultSummary {
   const r = asRow(raw);
   return {
     attemptId: asString(r.attemptId),
+    ...mapMetadata(r),
     paperTitle: asString(r.paperTitle),
     mode: asMode(r.mode),
     elective: asElective(r.elective),
     score: asNumber(r.score),
-    estimatedGrade: asNumber(r.estimatedGrade),
+    estimatedGrade: asNullableNumber(r.estimatedGrade),
     submittedAt: asString(r.submittedAt),
   };
 }
@@ -288,6 +320,8 @@ export function mapExamPaperHistory(raw: unknown): ExamPaperHistoryAttempt[] {
     const r = asRow(value);
     const submitted = r.status === 'submitted';
     return {
+      ...mapMetadata(r),
+      ...(r.paperTitle != null ? { paperTitle: asString(r.paperTitle) } : {}),
       attemptId: asString(r.attemptId),
       round: mapRound(r).round ?? 1,
       startedAt: asString(r.startedAt),
@@ -301,6 +335,7 @@ export function mapExamPaperHistory(raw: unknown): ExamPaperHistoryAttempt[] {
       items: asArray(r.items).map(value => {
         const item = asRow(value);
         return {
+          ...mapAnswerMetadata(item),
           number: asNumber(item.number), section: asSection(item.section),
           isCorrect: submitted && typeof item.isCorrect === 'boolean' ? item.isCorrect : null,
           unsure: item.unsure === true, answered: item.answered === true,
@@ -329,8 +364,8 @@ export function toExamItemsPayload(items: readonly ExamItemState[]): ExamItemSta
   }));
 }
 
-export function toVisitOrderPayload(visitOrder: readonly number[]): number[] {
-  return visitOrder.filter((n) => Number.isInteger(n) && n >= 1 && n <= 30);
+export function toVisitOrderPayload(visitOrder: readonly number[], maximum = 30): number[] {
+  return visitOrder.filter((n) => Number.isInteger(n) && n >= 1 && n <= maximum);
 }
 
 /** mistakes.image_url이 절대 URL이 되도록 RPC에 넘길 origin('https://host[:port]'). */

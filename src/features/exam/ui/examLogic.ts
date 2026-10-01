@@ -1,5 +1,5 @@
 // 기출문제 풀이 화면의 순수 로직 — React/DOM 없이 node --test 로 검증한다(tests/exam/practice.test.ts).
-import type { ExamElective, ExamHistoryItem, ExamItemState, ExamPaperHistoryAttempt, ExamResultItem } from '../contract.ts';
+import type { ExamElective, ExamQuestion, ExamAnswerType, ExamHistoryItem, ExamItemState, ExamPaperHistoryAttempt, ExamResultItem } from '../contract.ts';
 
 export const MINUTE_MS = 60_000;
 /** 실전 모드에서 남은 시간 알림을 띄우는 시점(남은 ms). 큰 것부터. */
@@ -178,6 +178,11 @@ export function isAnswerCorrect(answer: string | null, correct: string, isChoice
 export const ELECTIVES: ExamElective[] = ['확률과 통계', '미적분', '기하'];
 export const ELECTIVE_SHORT: Record<ExamElective, string> = { '확률과 통계': '확통', '미적분': '미적분', '기하': '기하' };
 export const CHOICE_MARKS = ['①', '②', '③', '④', '⑤'] as const;
+export const CHOICE10_MARKS = [...CHOICE_MARKS, '⑥', '⑦', '⑧', '⑨', '⑩'];
+
+export function questionAnswerType(q: Pick<ExamQuestion, 'isChoice' | 'answerType'>): ExamAnswerType {
+  return q.answerType ?? (q.isChoice ? 'choice5' : 'digits');
+}
 
 /** 답을 화면용으로: 객관식 '3' → '③', 단답 그대로, 미응답 '—'. */
 export function displayAnswer(answer: string | null, isChoice: boolean): string {
@@ -278,8 +283,9 @@ export function roundLabel(round: number | undefined): string {
 
 /** 공통은 모두, 선택 문항은 화면에서 선택한 과목의 회차만 비교한다. */
 export function historyItem(attempt: ExamPaperHistoryAttempt, number: number, elective: ExamElective): ExamHistoryItem | null {
-  if (number > 22 && attempt.elective !== elective) return null;
-  return attempt.items.find(item => item.number === number && item.section === (number <= 22 ? 'common' : elective)) ?? null;
+  const section = attempt.items.find(item => item.number === number)?.section;
+  if (section !== 'common' && attempt.elective !== elective) return null;
+  return attempt.items.find(item => item.number === number && (item.section === 'common' || item.section === elective)) ?? null;
 }
 
 export interface HistoryQuestionRow {
@@ -290,9 +296,9 @@ export interface HistoryQuestionRow {
 }
 
 /** 입력 순서와 무관하게 회차 순 비교. 진행 중 정오는 비교에서 제외하고 미응답은 제출 오답에 포함한다. */
-export function buildHistoryRows(history: readonly ExamPaperHistoryAttempt[], elective: ExamElective): HistoryQuestionRow[] {
+export function buildHistoryRows(history: readonly ExamPaperHistoryAttempt[], elective: ExamElective, questionCount = 30): HistoryQuestionRow[] {
   const attempts = [...history].sort((a, b) => a.round - b.round);
-  return Array.from({ length: 30 }, (_, index) => {
+  return Array.from({ length: questionCount }, (_, index) => {
     const number = index + 1;
     const comparable = attempts.filter(a => a.status === 'submitted' && historyItem(a, number, elective));
     const submittedItems = comparable.map(a => historyItem(a, number, elective)!);

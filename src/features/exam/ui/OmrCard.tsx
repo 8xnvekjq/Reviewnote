@@ -1,5 +1,6 @@
 // 제출 전 OMR 검토 카드. 전체 문제 보기(QuestionOverview)와 같은 규칙(padStatus)으로 "응답/미응답/🤔" 상태를 보여 준다.
 import type { ExamItemState, ExamQuestion } from '../contract';
+import { ExamAnswer } from './ExamAnswer';
 import { CHOICE_MARKS, padStatus } from './examLogic';
 
 type ItemLike = Pick<ExamItemState, 'answer' | 'unsure'>;
@@ -32,7 +33,9 @@ export function OmrCard({ questions, items, onPick }: {
                 onClick={() => onPick(index)}
               >
                 <span className="exam-omr-num">{q.number}</span>
-                {q.isChoice ? (
+                {q.answerType === 'choice10' ? (
+                  <span className="exam-omr-ten-answer"><ExamAnswer question={q} answer={item?.answer ?? null} /></span>
+                ) : q.isChoice ? (
                   <span className="exam-omr-bubbles" aria-hidden="true">
                     {CHOICE_MARKS.map((mark, i) => (
                       <span key={mark} className={item?.answer === String(i + 1) ? 'is-marked' : undefined}>{i + 1}</span>

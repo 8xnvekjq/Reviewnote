@@ -586,5 +586,83 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   console.log(`ok — paper round history (${viewport.width}×${viewport.height})`);
 }
 
+// ── 내신: 작성만. 코디네이터가 Vite·브라우저를 실행해 검증한다. ──
+const SCHOOL = '2026-dongbuk-g1-s2-mid-common2';
+{
+  const { context, page } = await open(PORTRAIT);
+  assert.equal(await paperCard(page, SCHOOL).count(), 0, '학생은 비공개 내신을 볼 수 없음');
+  await context.close();
+}
+for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
+  const { context, page, errors } = await open(viewport, '?admin=1&persist=1');
+  assert.match(await paperCard(page, SCHOOL).innerText(), /2026.*동북고/s);
+  assert.match(await paperCard(page, SCHOOL).innerText(), /21문항/);
+  assert.match(await paperCard(page, SCHOOL).innerText(), /검토 중\(학생 비공개\)/);
+  await noHorizontalOverflow(page, `school-start/${viewport.width}`);
+  await paperCard(page, SCHOOL).click();
+  await page.getByTestId('exam-setup').waitFor();
+  assert.equal(await page.getByRole('radiogroup', { name: '선택과목' }).count(), 0);
+  assert.match(await page.getByRole('radio', { name: /실전 모드/ }).innerText(), /50분/);
+  await page.getByRole('radio', { name: /자유 모드/ }).click();
+  await page.getByTestId('exam-start-button').click();
+  await page.getByTestId('exam-solve').waitFor();
+  await goToByOverview(page, 18);
+  const choice = n => page.locator(`.exam-choices-ten .exam-choice[data-choice="${n}"]`);
+  assert.equal(await page.locator('.exam-choices-ten .exam-choice').count(), 10);
+  assert.equal(await page.locator('.exam-choices-ten .katex').count(), 10);
+  const positions = await page.locator('.exam-choices-ten .exam-choice').evaluateAll(nodes => nodes.map(el => ({ x: el.getBoundingClientRect().x, y: el.getBoundingClientRect().y })));
+  assert.equal(new Set(positions.map(p => Math.round(p.y))).size, 2, '2줄');
+  assert.equal(new Set(positions.map(p => Math.round(p.x))).size, 5, '5열');
+  await choice(10).click();
+  assert.equal(await choice(10).getAttribute('aria-pressed'), 'true');
+  await choice(10).click();
+  assert.equal(await choice(10).getAttribute('aria-pressed'), 'false');
+  await choice(7).click();
+  await page.getByRole('button', { name: '애매해요 표시' }).click();
+  await noHorizontalOverflow(page, `school-ten/${viewport.width}`);
+  await page.getByRole('button', { name: '제출', exact: true }).click();
+  await page.getByTestId('exam-review').waitFor();
+  const omrAnswer = page.locator('.exam-omr-row[data-number="18"]');
+  assert.match(await omrAnswer.innerText(), /⑦/);
+  assert.equal(await omrAnswer.locator('.katex').count(), 1, 'OMR 검토에 선지 수식');
+  await noHorizontalOverflow(page, `school-review/${viewport.width}`);
+  await omrAnswer.click();
+  await page.getByRole('button', { name: '채점해 보기', exact: true }).click();
+  await page.getByTestId('exam-freecheck').waitFor();
+  assert.equal(await page.getByTestId('exam-freecheck').getAttribute('data-correct'), 'true');
+  assert.equal(await choice(10).isDisabled(), true);
+  // 새로고침 뒤에도 입력·채점 잠금과 선지가 유지된다.
+  await page.reload();
+  await page.getByTestId('exam-start').waitFor();
+  await paperCard(page, SCHOOL).click();
+  await page.getByTestId('exam-solve').waitFor();
+  await goToByOverview(page, 18);
+  await page.getByTestId('exam-lock-note').waitFor();
+  assert.equal(await choice(7).getAttribute('aria-pressed'), 'true');
+  assert.equal(await choice(10).isDisabled(), true);
+  await page.getByRole('button', { name: '제출', exact: true }).click();
+  await page.getByRole('button', { name: '제출하기', exact: true }).click();
+  await page.getByTestId('exam-submit-confirm').click();
+  await page.getByTestId('exam-result').waitFor();
+  assert.equal(await page.getByTestId('exam-score').innerText(), '5');
+  assert.match(await page.getByTestId('exam-correct-count').innerText(), /1 \/ 21/);
+  assert.match(await page.locator('.exam-result-title').innerText(), /2026 동북고/);
+  assert.match(await page.locator('.exam-score-card').innerText(), /정답률/);
+  assert.doesNotMatch(await page.locator('.exam-score-card').innerText(), /등급|표준점수|백분위|미적분/);
+  assert.equal(await page.getByTestId('exam-score-tiles').count(), 0);
+  assert.equal(await page.locator('.exam-item-row[data-number="18"] .katex').count(), 2);
+  await noHorizontalOverflow(page, `school-result/${viewport.width}`);
+  await page.getByRole('button', { name: '← 시험지 목록', exact: true }).click();
+  await page.locator(`[data-testid="exam-history-open"][data-paper-id="${SCHOOL}"]`).click();
+  await page.getByTestId('exam-history-table').waitFor();
+  assert.equal(await page.getByTestId('exam-history-table').locator('tbody tr').count(), 21);
+  assert.equal(await page.getByTestId('exam-history-elective').count(), 0);
+  assert.doesNotMatch(await page.getByTestId('exam-history').innerText(), /등급|미적분/);
+  assert.match(await page.getByTestId('exam-history').innerText(), /2026 동북고/);
+  await noHorizontalOverflow(page, `school-history/${viewport.width}`);
+  assert.deepEqual(errors, []);
+  await context.close();
+}
+
 await browser.close();
 console.log('exam practice browser tests passed');
