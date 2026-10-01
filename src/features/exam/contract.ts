@@ -18,6 +18,24 @@ export interface ExamPaperSummary {
   source: string;        // '한국교육과정평가원'
   timeLimitMinutes: number;
   electives: ExamElective[];
+  // ── v2: 시험지 카드(A4 비율)에 진행 정도 표시. 시험지마다 따로 이어 풀 수 있다(서버도 시험지별 진행 중 1개). ──
+  /** 이 시험지의 내 진행 중 시도(없으면 null). */
+  inProgress: ExamPaperProgress | null;
+  /** 가장 최근에 제출한 내 결과(없으면 null). */
+  lastResult: { attemptId: string; score: number; estimatedGrade: number | null; submittedAt: string } | null;
+  /** 제출한 횟수. */
+  resultCount: number;
+}
+
+/** 시험지 카드에 보여 줄 진행 정도. */
+export interface ExamPaperProgress {
+  attemptId: string;
+  mode: ExamMode;
+  elective: ExamElective;
+  startedAt: string;
+  timeLimitMinutes: number | null;
+  answeredCount: number;  // 답한 문항 수(0~30)
+  elapsedMs: number;      // 문항 스톱워치 합계(진행된 시간)
 }
 
 /** 학생이 받는 문항. 정답은 절대 포함하지 않는다(서버 RLS로도 막는다). */
@@ -37,6 +55,9 @@ export interface ExamItemState {
   unsure: boolean;       // 🤔 애매 표시
   timeSpentMs: number;   // 문항 스톱워치 누적
   visits: number;        // 이 문항을 연 횟수
+  /** v2: 자유 모드에서 "채점해 보기"를 한 문항이면 그 결과. 이 문항의 답은 더 이상 바꿀 수 없다
+   *  (화면은 입력을 잠그고, 서버도 이후 저장·제출에서 이 문항의 답을 바꾸지 않는다). */
+  checked?: { isCorrect: boolean; correctAnswer: string } | null;
 }
 
 export interface ExamAttempt {
@@ -80,11 +101,14 @@ export interface ExamResult {
   totalTimeMs: number;
   /** 종로학원 확정 등급컷(원점수=추정) 기준 추정 등급 1~9. */
   estimatedGrade: number;
-  gradeCut: { rawByGrade: number[]; standardByGrade: number[]; percentileByGrade: number[]; source: string };
+  /** v2: topStandard/topPercentile = 원점수 100점(최고점)일 때 값(선택과목별). 없으면 null.
+   *  표준점수·백분위 추정은 (100, top) + (등급컷 원점수, 등급컷 표준점수/백분위) 점들을 잇는 선형 보간. */
+  gradeCut: { rawByGrade: number[]; standardByGrade: number[]; percentileByGrade: number[]; topStandard: number | null; topPercentile: number | null; source: string };
   items: ExamResultItem[];
   submittedAt: string;
 }
 
+// v2 표준점수·백분위(추정)는 화면에서 gradeCut으로 계산한다(ui/examLogic.ts의 estimateStandardScore).
 /** 서버/데이터 작업(W1)이 src/features/exam/examClient.ts 에서 export 하는 함수들. */
 export interface ExamClient {
   listPapers(): Promise<ExamPaperSummary[]>;
@@ -93,7 +117,8 @@ export interface ExamClient {
   startAttempt(paperId: string, mode: ExamMode, elective: ExamElective): Promise<ExamAttempt>;
   /** 진행 상황 자동 저장(디바운스는 호출 측 책임). 실패해도 throw 대신 false. */
   saveProgress(attemptId: string, items: ExamItemState[], visitOrder: number[]): Promise<boolean>;
-  /** 자유 모드 전용: 문항 하나를 바로 채점. 실전 모드면 서버가 거부한다. */
+  /** 자유 모드 전용: 문항 하나를 바로 채점. 실전 모드면 서버가 거부한다.
+   *  v2: 서버가 이 답을 저장하고 문항을 잠근다(checked). 이미 잠긴 문항을 다시 부르면 처음 결과를 그대로 돌려준다. */
   checkAnswer(attemptId: string, questionId: string, answer: string): Promise<{ isCorrect: boolean; correctAnswer: string }>;
   /** 제출 + 서버 채점. 이후 정답 공개. */
   submitAttempt(attemptId: string, items: ExamItemState[], visitOrder: number[]): Promise<ExamResult>;
