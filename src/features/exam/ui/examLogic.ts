@@ -188,3 +188,85 @@ export function displayAnswer(answer: string | null, isChoice: boolean): string 
   }
   return answer;
 }
+
+// ── v2: 표준점수·백분위 추정 / 진행 시간 ──
+
+/** 표준점수·백분위 추정에 쓰는 등급컷(ExamResult.gradeCut 과 같은 모양). */
+export interface GradeCutAnchors {
+  rawByGrade: readonly number[];
+  standardByGrade: readonly number[];
+  percentileByGrade: readonly number[];
+  topStandard: number | null;
+  topPercentile: number | null;
+}
+
+/** 표준점수 추정 하한(비현실적으로 낮은 값은 여기서 자른다). */
+export const MIN_STANDARD_SCORE = 50;
+
+/** (원점수, 값) 점들을 원점수 내림차순으로 이은 꺾은선 위의 값. 맨 아래 점 아래는 마지막 두 점 기울기로 연장. */
+function interpolateAnchors(raw: number, points: Array<[number, number]>): number | null {
+  // 같은 원점수가 겹치면(동점 컷) 위쪽 값 하나만 둔다.
+  const sorted = [...points].sort((a, b) => b[0] - a[0]).filter((p, i, arr) => i === 0 || p[0] < arr[i - 1][0]);
+  if (sorted.length === 0) return null;
+  if (raw >= sorted[0][0]) return sorted[0][1];
+  for (let i = 1; i < sorted.length; i += 1) {
+    const [x1, y1] = sorted[i - 1];
+    const [x0, y0] = sorted[i];
+    if (raw >= x0) return y0 + ((raw - x0) / (x1 - x0)) * (y1 - y0);
+  }
+  if (sorted.length === 1) return sorted[0][1];
+  const [xa, ya] = sorted[sorted.length - 2];
+  const [xb, yb] = sorted[sorted.length - 1];
+  return yb + ((raw - xb) / (xa - xb)) * (ya - yb);
+}
+
+function anchorPoints(raws: readonly number[], values: readonly number[], top: number | null): Array<[number, number]> {
+  const points: Array<[number, number]> = [];
+  if (top != null && Number.isFinite(top)) points.push([100, top]);
+  raws.forEach((raw, k) => {
+    const value = values[k];
+    if (Number.isFinite(raw) && value != null && Number.isFinite(value)) points.push([raw, value]);
+  });
+  return points;
+}
+
+/** 원점수 → 추정 표준점수·백분위(정수). (100, top) + (등급컷 원점수, 등급컷 값) 점들을 잇는 선형 보간.
+ *  top 이 null 이면 1등급컷 위는 1등급컷 값 그대로, 8등급컷 아래는 마지막 두 점 기울기로 연장하되
+ *  표준점수는 MIN_STANDARD_SCORE 아래로, 백분위는 0~100 밖으로 나가지 않는다. 데이터가 없으면 null. */
+export function estimateStandardScore(raw: number, gradeCut: GradeCutAnchors): { standard: number | null; percentile: number | null } {
+  const score = Math.min(100, Math.max(0, raw));
+  const standard = interpolateAnchors(score, anchorPoints(gradeCut.rawByGrade, gradeCut.standardByGrade, gradeCut.topStandard));
+  const percentile = interpolateAnchors(score, anchorPoints(gradeCut.rawByGrade, gradeCut.percentileByGrade, gradeCut.topPercentile));
+  return {
+    standard: standard == null ? null : Math.max(MIN_STANDARD_SCORE, Math.round(standard)),
+    percentile: percentile == null ? null : Math.min(100, Math.max(0, Math.round(percentile))),
+  };
+}
+
+/** 시험지 카드의 진행 시간: 1시간 미만은 mm:ss, 넘으면 'h시간 m분'. */
+export function formatElapsed(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  if (total < 3600) return formatClock(ms);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  return `${h}시간 ${m}분`;
+}
+
+/** 진행 막대 비율(0~1). */
+export function progressRatio(answered: number, total: number): number {
+  if (!(total > 0)) return 0;
+  return Math.min(1, Math.max(0, answered / total));
+}
+
+// ── v2: 채점해 보기 잠금 ──
+
+/** "채점해 보기"를 한 문항(checked)은 답을 바꿀 수 없다. 서버(목 포함)는 저장·제출 때 잠긴 문항의 답·결과를 이전 값으로 지킨다. */
+export function keepCheckedAnswers<T extends Pick<ExamItemState, 'questionId' | 'answer' | 'checked'>>(prev: readonly T[], next: readonly T[]): T[] {
+  const locked = new Map(prev.filter(item => item.checked).map(item => [item.questionId, item]));
+  const merged = next.map(item => {
+    const old = locked.get(item.questionId);
+    return old ? { ...item, answer: old.answer, checked: old.checked } : item;
+  });
+  for (const [questionId, old] of locked) if (!next.some(item => item.questionId === questionId)) merged.push(old);
+  return merged;
+}

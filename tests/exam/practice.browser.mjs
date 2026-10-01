@@ -1,4 +1,5 @@
 // 기출문제 풀이 화면(시작 → 전체화면 풀이 → OMR 검토 → OMR 결과)을 mock client 하네스로 검증한다.
+// v2: 채점해 보기 잠금(새로고침 후에도), 전체 문제 보기(썸네일·스톱워치), 시험지별 진행 카드(A4), 결과 표준점수·백분위.
 // 실행: (vite dev 서버가 http://127.0.0.1:5174 에 떠 있어야 함) node tests/exam/practice.browser.mjs
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
@@ -30,7 +31,13 @@ async function noHorizontalOverflow(page, label) {
   assert.ok(scrollWidth <= clientWidth, `${label}: horizontal overflow ${scrollWidth} > ${clientWidth}`);
 }
 
-async function startExam(page, modeTitle, elective) {
+const PAPER_A = '2025-06-math';
+const PAPER_B = 'mock-practice-b';
+const paperCard = (page, paperId = PAPER_A) => page.locator(`[data-testid="exam-paper-card"][data-paper-id="${paperId}"]`);
+
+async function startExam(page, modeTitle, elective, paperId = PAPER_A) {
+  await paperCard(page, paperId).click();
+  await page.getByTestId('exam-setup').waitFor();
   await page.getByRole('radio', { name: new RegExp(modeTitle) }).click();
   await page.getByRole('radio', { name: new RegExp(elective) }).click();
   await page.getByTestId('exam-start-button').click();
@@ -53,9 +60,14 @@ async function stopwatchMs(page) {
   return Number(await page.getByTestId('exam-stopwatch').getAttribute('data-ms'));
 }
 
-async function goToByPad(page, number) {
-  await page.getByTestId('exam-counter').click();
-  await page.locator(`.exam-pad-cell[data-number="${number}"]`).click();
+const thumb = (page, number) => page.locator(`.exam-thumb[data-number="${number}"]`);
+
+/** 전체 문제 보기(썸네일 격자)에서 문항을 눌러 이동. */
+async function goToByOverview(page, number) {
+  await page.getByTestId('exam-overview-open').click();
+  await page.getByTestId('exam-overview').waitFor();
+  await thumb(page, number).click();
+  await page.getByTestId('exam-overview').waitFor({ state: 'detached' });
   assert.equal(await question(page), String(number));
 }
 
@@ -135,7 +147,7 @@ async function spinWheel(page, place, steps) {
   assert.ok(q1Back >= q1Time && q1Back < q1Time + 1500, `q1 time kept (${q1Time} → ${q1Back})`);
 
   // 단답(22번): 휠로 231
-  await goToByPad(page, 22);
+  await goToByOverview(page, 22);
   assert.equal(await page.getByTestId('exam-short-value').innerText(), '미입력');
   await spinWheel(page, '백의 자리', 2);
   await spinWheel(page, '십의 자리', 3);
@@ -162,11 +174,17 @@ async function spinWheel(page, place, steps) {
   assert.equal(await question(page), '22');
   assert.equal(await page.getByTestId('exam-short-value').innerText(), '231');
 
-  // 번호판 상태
+  // 전체 문제 보기: 썸네일(이미지) 30개, 상태 배지
   await page.getByTestId('exam-counter').click();
-  assert.equal(await page.locator('.exam-pad-cell[data-number="1"]').getAttribute('data-status'), 'unsure');
-  assert.equal(await page.locator('.exam-pad-cell[data-number="22"]').getAttribute('data-status'), 'answered');
-  assert.equal(await page.locator('.exam-pad-cell[data-number="3"]').getAttribute('data-status'), 'empty');
+  await page.getByTestId('exam-overview').waitFor();
+  assert.equal(await page.locator('.exam-thumb').count(), 30);
+  assert.equal(await page.locator('.exam-thumb img').count(), 30);
+  assert.equal(await thumb(page, 1).getAttribute('data-status'), 'unsure');
+  assert.equal(await thumb(page, 22).getAttribute('data-status'), 'answered');
+  assert.equal(await thumb(page, 3).getAttribute('data-status'), 'empty');
+  assert.match(await thumb(page, 22).getAttribute('class'), /is-current/);
+  await noHorizontalOverflow(page, 'overview/landscape');
+  await page.screenshot({ path: `${out}/overview-landscape.png` });
   await page.getByRole('button', { name: '닫기' }).click();
 
   // 자동 저장(디바운스) 호출 확인
@@ -195,6 +213,10 @@ async function spinWheel(page, place, steps) {
   assert.equal(await page.getByTestId('exam-score').innerText(), '8');
   assert.match(await page.getByTestId('exam-correct-count').innerText(), /3 \/ 30/);
   assert.equal(await page.getByTestId('exam-grade').innerText(), '8등급'); // 미적분 8등급 컷 = 8
+  // 8점 = 8등급컷 정확히 → 표준점수 71, 백분위 4
+  assert.equal(await page.getByTestId('exam-standard').innerText(), '71');
+  assert.equal(await page.getByTestId('exam-percentile').innerText(), '4');
+  assert.match(await page.locator('.exam-grade-note').innerText(), /추정/);
   assert.match(await page.locator('.exam-grade-note').innerText(), /종로학원/);
   assert.match(await page.locator('.exam-item-row[data-number="22"]').innerText(), /전국 오답률 92% 문제를 맞혔어요!/);
   assert.equal(await page.locator('.exam-item-row[data-number="1"]').getAttribute('data-correct'), 'true');
@@ -245,30 +267,59 @@ async function spinWheel(page, place, steps) {
   assert.equal(await page.getByTestId('exam-freecheck').getAttribute('data-correct'), 'false');
   await page.getByRole('button', { name: '정답 보기' }).click();
   assert.match(await page.getByTestId('exam-freecheck').innerText(), /정답 ④/);
-  // 답을 바꾸면 지난 채점 표시는 사라진다
-  await page.locator('.exam-choice[data-choice="4"]').click();
+  // 채점한 문항은 답이 잠긴다: ①~⑤ 비활성, 안내 문구, 채점 버튼 숨김, O/X 는 그대로. 🤔 는 바꿀 수 있다.
+  await page.getByTestId('exam-lock-note').waitFor();
+  assert.equal(await page.getByTestId('exam-answerbar').getAttribute('data-locked'), 'true');
+  for (let n = 1; n <= 5; n += 1) assert.equal(await page.locator(`.exam-choice[data-choice="${n}"]`).isDisabled(), true);
+  await page.locator('.exam-choice[data-choice="4"]').click({ force: true });
+  assert.equal(await page.locator('.exam-choice[data-choice="3"]').getAttribute('aria-pressed'), 'true');
+  await page.locator('body').click({ position: { x: 5, y: PORTRAIT.height - 5 } });
+  await page.keyboard.press('4');
+  assert.equal(await page.locator('.exam-choice[data-choice="3"]').getAttribute('aria-pressed'), 'true');
+  assert.equal(await check.count(), 0);
+  assert.equal(await page.getByTestId('exam-freecheck').getAttribute('data-correct'), 'false');
+  await page.getByRole('button', { name: '애매해요 표시' }).click();
+  assert.equal(await page.getByRole('button', { name: '애매해요 표시' }).getAttribute('aria-pressed'), 'true');
+  // 다른 문항으로 갔다 와도 잠금·결과 유지
+  await page.getByRole('button', { name: '다음 문항' }).click();
   assert.equal(await page.getByTestId('exam-freecheck').count(), 0);
-  await check.click();
-  await page.getByTestId('exam-freecheck').waitFor();
-  assert.equal(await page.getByTestId('exam-freecheck').getAttribute('data-correct'), 'true');
+  await page.getByRole('button', { name: '이전 문항' }).click();
+  assert.equal(await page.getByTestId('exam-freecheck').getAttribute('data-correct'), 'false');
+  assert.equal(await page.locator('.exam-choice[data-choice="4"]').isDisabled(), true);
 
   // 단답 채점(22번 231)
-  await goToByPad(page, 22);
+  await goToByOverview(page, 22);
   await spinWheel(page, '백의 자리', 2);
   await spinWheel(page, '십의 자리', 3);
   await spinWheel(page, '일의 자리', 1);
   await check.click();
   await page.getByTestId('exam-freecheck').waitFor();
   assert.equal(await page.getByTestId('exam-freecheck').getAttribute('data-correct'), 'true');
+  // 단답도 잠김: 휠·비우기 비활성, 휠을 굴려도 값 그대로
+  assert.equal(await page.getByRole('spinbutton', { name: '일의 자리' }).getAttribute('aria-disabled'), 'true');
+  assert.equal(await page.getByRole('button', { name: '비우기' }).isDisabled(), true);
+  const ones = page.getByRole('spinbutton', { name: '일의 자리' });
+  const onesBox = await ones.boundingBox();
+  await page.mouse.move(onesBox.x + onesBox.width / 2, onesBox.y + onesBox.height / 2);
+  await page.mouse.wheel(0, 120);
+  await page.waitForTimeout(200);
+  assert.equal(await page.getByTestId('exam-short-value').innerText(), '231');
 
-  // 번호판·OMR 검토도 세로에서 넘치지 않음
+  // 전체 문제 보기에 채점 결과 배지, OMR 검토도 세로에서 넘치지 않음
   await page.getByTestId('exam-counter').click();
-  await noHorizontalOverflow(page, 'pad/portrait');
+  await page.getByTestId('exam-overview').waitFor();
+  assert.equal(await thumb(page, 1).getAttribute('data-checked'), 'false');
+  assert.equal(await thumb(page, 22).getAttribute('data-checked'), 'true');
+  await noHorizontalOverflow(page, 'overview/portrait');
+  await page.screenshot({ path: `${out}/overview-portrait.png` });
   await page.getByRole('button', { name: 'OMR 카드 보기' }).click();
   await noHorizontalOverflow(page, 'review/portrait');
   await page.getByRole('button', { name: '제출하기' }).click();
   await page.getByTestId('exam-submit-confirm').click();
   await page.getByTestId('exam-result').waitFor();
+  // 채점해 본 답이 그대로 제출됐다: 1번 ③(틀림), 22번 231(맞음)
+  assert.equal(await page.locator('.exam-item-row[data-number="1"]').getAttribute('data-correct'), 'false');
+  assert.equal(await page.locator('.exam-item-row[data-number="22"]').getAttribute('data-correct'), 'true');
   await noHorizontalOverflow(page, 'result/portrait');
   await page.screenshot({ path: `${out}/result-portrait.png`, fullPage: true });
   assert.deepEqual(errors, []);
@@ -285,10 +336,11 @@ async function spinWheel(page, place, steps) {
   await page.getByRole('button', { name: '나가기' }).click();
   await page.getByRole('alertdialog', { name: '나가기 확인' }).waitFor();
   await page.getByTestId('exam-exit-confirm').click();
-  await page.getByTestId('exam-resume').waitFor();
+  await page.locator(`[data-testid="exam-paper-card"][data-state="in-progress"]`).waitFor();
   await page.reload();
-  await page.getByTestId('exam-resume').waitFor();
-  await page.getByRole('button', { name: '이어 풀기' }).click();
+  await page.locator(`[data-testid="exam-paper-card"][data-state="in-progress"]`).waitFor();
+  assert.match(await paperCard(page).innerText(), /푼 문제 1\/30/);
+  await paperCard(page).click();
   await page.getByTestId('exam-solve').waitFor();
   assert.equal(await page.locator('.exam-choice[data-choice="5"]').getAttribute('aria-pressed'), 'true');
   await page.waitForFunction(() => document.querySelector('[data-testid="exam-body"] .exam-ink')?.getAttribute('data-stroke-count') === '1');
@@ -303,6 +355,9 @@ async function spinWheel(page, place, steps) {
   await startExam(page, '실전 모드', '미적분');
   await page.getByTestId('exam-result').waitFor({ timeout: 15_000 });
   assert.equal(await page.getByTestId('exam-score').innerText(), '0');
+  // 0점: 8등급컷 아래 기울기로 연장(미적분 표준 63), 백분위는 0으로 잘림
+  assert.equal(await page.getByTestId('exam-standard').innerText(), '63');
+  assert.equal(await page.getByTestId('exam-percentile').innerText(), '0');
   assert.deepEqual(errors, []);
   await context.close();
   console.log('ok — auto submit at 0');
@@ -311,13 +366,132 @@ async function spinWheel(page, place, steps) {
 // ── 5. 폰 세로에서도 가로 넘침 없음 ─────────────────────────────────────────────
 {
   const { context, page } = await open({ width: 390, height: 844 });
+  await noHorizontalOverflow(page, 'start/phone');
+  await page.screenshot({ path: `${out}/start-phone.png`, fullPage: true });
   await startExam(page, '실전 모드', '미적분');
   await noHorizontalOverflow(page, 'solve/phone');
-  await goToByPad(page, 22);
+  await page.getByTestId('exam-overview-open').click();
+  await page.getByTestId('exam-overview').waitFor();
+  await noHorizontalOverflow(page, 'overview/phone');
+  await page.screenshot({ path: `${out}/overview-phone.png` });
+  await page.getByRole('button', { name: '닫기' }).click();
+  await goToByOverview(page, 22);
   await noHorizontalOverflow(page, 'short/phone');
   await page.screenshot({ path: `${out}/solve-phone.png` });
   await context.close();
   console.log('ok — phone layout');
+}
+
+// ── 6. v2: 채점해 본 문항은 새로고침·이어 풀기 뒤에도 잠김 ───────────────────────────
+{
+  const { context, page, errors } = await open(LANDSCAPE, '?persist=1');
+  await startExam(page, '자유 모드', '미적분');
+  await page.locator('.exam-choice[data-choice="2"]').click();
+  await page.getByRole('button', { name: '채점해 보기' }).click();
+  await page.getByTestId('exam-lock-note').waitFor();
+  await page.getByRole('button', { name: '나가기' }).click();
+  await page.getByTestId('exam-exit-confirm').click();
+  await page.reload();
+  await paperCard(page).waitFor();
+  await paperCard(page).click();
+  await page.getByTestId('exam-solve').waitFor();
+  assert.equal(await question(page), '1');
+  await page.getByTestId('exam-lock-note').waitFor();
+  assert.equal(await page.getByTestId('exam-freecheck').getAttribute('data-correct'), 'false');
+  assert.equal(await page.locator('.exam-choice[data-choice="2"]').getAttribute('aria-pressed'), 'true');
+  assert.equal(await page.locator('.exam-choice[data-choice="4"]').isDisabled(), true);
+  assert.equal(await page.getByRole('button', { name: '채점해 보기' }).count(), 0);
+  // 서버(목)도 잠긴 답을 지킨다: 저장분에 다른 답이 와도 ② 유지
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('exam-practice-harness')).attempts[0].attempt.items.find(i => i.questionId === 'q-c-01'));
+  assert.equal(saved.answer, '2');
+  assert.equal(saved.checked.isCorrect, false);
+  assert.deepEqual(errors, []);
+  await context.close();
+  console.log('ok — checked answer stays locked after reload');
+}
+
+// ── 7. v2: 전체 문제 보기 — 썸네일로 이동, 열린 동안 스톱워치는 보던 문항에 쌓임 ─────────────
+{
+  const { context, page, errors } = await open(PORTRAIT);
+  await startExam(page, '자유 모드', '기하');
+  await page.waitForTimeout(800);
+  await page.getByTestId('exam-overview-open').click();
+  await page.getByTestId('exam-overview').waitFor();
+  const before = await stopwatchMs(page);
+  await page.waitForTimeout(1500);
+  const during = await stopwatchMs(page);
+  assert.ok(during >= before + 1000, `stopwatch keeps running on q1 while overview is open (${before} → ${during})`);
+  await thumb(page, 5).click();
+  await page.getByTestId('exam-overview').waitFor({ state: 'detached' });
+  assert.equal(await question(page), '5');
+  assert.ok(await stopwatchMs(page) < 1000, 'q5 starts fresh');
+  await goToByOverview(page, 1);
+  const q1 = await stopwatchMs(page);
+  assert.ok(q1 >= during && q1 < during + 1500, `q1 kept its time (${during} → ${q1})`);
+  // 썸네일은 번호 순서
+  await page.getByTestId('exam-overview-open').click();
+  const numbers = await page.locator('.exam-thumb').evaluateAll(els => els.map(el => Number(el.getAttribute('data-number'))));
+  assert.deepEqual(numbers, Array.from({ length: 30 }, (_, i) => i + 1));
+  assert.deepEqual(errors, []);
+  await context.close();
+  console.log('ok — overview thumbnails + stopwatch');
+}
+
+// ── 8. v2: 시험지마다 따로 진행 — A 풀다 나와서 B 시작, 둘 다 카드에 진행 표시 ──────────────
+for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
+  const { context, page, errors } = await open(viewport);
+  assert.equal(await page.getByTestId('exam-paper-card').count() >= 2, true);
+  assert.equal(await paperCard(page, PAPER_A).getAttribute('data-state'), 'new');
+  // 카드는 A4 비율(세로/가로 ≈ 1.414, 내용이 넘치면 더 길어질 수만 있다)
+  const box = await paperCard(page, PAPER_A).boundingBox();
+  assert.ok(box.height / box.width >= 1.4, `A4 card ratio ${box.height / box.width}`);
+  await noHorizontalOverflow(page, `start/${viewport.width}`);
+
+  await startExam(page, '자유 모드', '확통', PAPER_A);
+  await page.locator('.exam-choice[data-choice="1"]').click();
+  await page.getByRole('button', { name: '나가기' }).click();
+  await page.getByTestId('exam-exit-confirm').click();
+  await page.locator(`[data-testid="exam-paper-card"][data-paper-id="${PAPER_A}"][data-state="in-progress"]`).waitFor();
+
+  await startExam(page, '실전 모드', '기하', PAPER_B);
+  await page.locator('.exam-choice[data-choice="2"]').click();
+  await page.getByRole('button', { name: '다음 문항' }).click();
+  await page.locator('.exam-choice[data-choice="3"]').click();
+  await page.getByRole('button', { name: '나가기' }).click();
+  await page.getByTestId('exam-exit-confirm').click();
+  await page.locator(`[data-testid="exam-paper-card"][data-paper-id="${PAPER_B}"][data-state="in-progress"]`).waitFor();
+
+  assert.equal(await paperCard(page, PAPER_A).getAttribute('data-state'), 'in-progress');
+  assert.match(await paperCard(page, PAPER_A).innerText(), /푼 문제 1\/30/);
+  assert.match(await paperCard(page, PAPER_A).innerText(), /자유 · 확통/);
+  assert.match(await paperCard(page, PAPER_B).innerText(), /푼 문제 2\/30/);
+  assert.match(await paperCard(page, PAPER_B).innerText(), /실전 · 기하/);
+  assert.match(await paperCard(page, PAPER_B).innerText(), /이어 풀기/);
+  assert.equal(await paperCard(page, PAPER_A).locator('[role="progressbar"]').getAttribute('aria-valuenow'), '1');
+  await noHorizontalOverflow(page, `start-progress/${viewport.width}`);
+  await page.screenshot({ path: `${out}/papers-${viewport.width}.png`, fullPage: true });
+
+  // 진행 중인 시험지는 이어 풀기만: 누르면 바로 그 시험(A는 자유 모드)으로
+  await paperCard(page, PAPER_A).click();
+  await page.getByTestId('exam-solve').waitFor();
+  assert.equal(await page.getByTestId('exam-solve').getAttribute('data-mode'), 'free');
+  assert.equal(await page.locator('.exam-choice[data-choice="1"]').getAttribute('aria-pressed'), 'true');
+  // 끝까지 내서 결과(표준점수·백분위) → 카드에 최근 점수
+  await page.getByRole('button', { name: '제출', exact: true }).click();
+  await page.getByRole('button', { name: '제출하기' }).click();
+  await page.getByTestId('exam-submit-confirm').click();
+  await page.getByTestId('exam-result').waitFor();
+  assert.match(await page.getByTestId('exam-standard').innerText(), /^\d+$/);
+  assert.match(await page.getByTestId('exam-percentile').innerText(), /^\d+$/);
+  await noHorizontalOverflow(page, `result/${viewport.width}`);
+  await page.getByRole('button', { name: '← 시험지 목록' }).click();
+  await page.locator(`[data-testid="exam-paper-card"][data-paper-id="${PAPER_A}"][data-state="done"]`).waitFor();
+  assert.match(await paperCard(page, PAPER_A).innerText(), /최근 \d+점/);
+  assert.match(await paperCard(page, PAPER_A).innerText(), /1번 풀었어요/);
+  assert.equal(await paperCard(page, PAPER_B).getAttribute('data-state'), 'in-progress');
+  assert.deepEqual(errors, []);
+  await context.close();
+  console.log(`ok — papers progress separately (${viewport.width}×${viewport.height})`);
 }
 
 await browser.close();

@@ -1,5 +1,6 @@
 // 전체화면 풀이: 상단 바(나가기·필기도구·이전/다음·번호·스톱워치·남은 시간) + 상단 답안 줄 + 문항 이미지/필기.
-// 번호판·OMR 검토·나가기/제출 확인은 이 화면 위에 겹쳐 띄운다(전체화면을 유지한 채).
+// 전체 문제 보기·OMR 검토·나가기/제출 확인은 이 화면 위에 겹쳐 띄운다(전체화면을 유지한 채).
+// v2: 자유 모드에서 채점해 본 문항(checked)은 답을 잠근다 — 이어 풀기로 다시 열어도 서버 payload 의 items[].checked 로 유지.
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { ExamAttempt, ExamClient, ExamInkCanvasHandle, ExamItemState, ExamResult, InkStroke, InkTool } from '../contract';
 import { ExamInkCanvas, preloadInkImages } from '../ink/ExamInkCanvas';
@@ -7,7 +8,8 @@ import { ExamInkCanvas, preloadInkImages } from '../ink/ExamInkCanvas';
 /** 문항 이미지 표시 너비(CSS px) — 모든 문항이 같은 원본 너비로 잘려 있어 글자 크기가 항상 같다. */
 const QUESTION_IMAGE_WIDTH = 480;
 import { AnswerBar, type FreeCheck } from './AnswerBar';
-import { NumberPad, OmrCard, PadLegend } from './OmrCard';
+import { OmrCard } from './OmrCard';
+import { QuestionOverview } from './QuestionOverview';
 import { loadInk, saveInk } from './inkStore';
 import {
   countAnswered, createStopwatch, crossedAlerts, elapsedFor, formatClock, normalizeShortAnswer, pauseStopwatch, remainingMs,
@@ -28,8 +30,8 @@ const SIZES = [
   { value: 7, label: '굵게' },
 ];
 
-interface LocalItem { answer: string | null; unsure: boolean; visits: number }
-type Overlay = null | 'pad' | 'review' | 'exit' | 'submit';
+interface LocalItem { answer: string | null; unsure: boolean; visits: number; checked: FreeCheck | null }
+type Overlay = null | 'overview' | 'review' | 'exit' | 'submit';
 
 interface Props {
   client: ExamClient;
@@ -41,12 +43,13 @@ interface Props {
 
 function initialItems(attempt: ExamAttempt): Record<string, LocalItem> {
   const map: Record<string, LocalItem> = {};
-  for (const q of attempt.questions) map[q.id] = { answer: null, unsure: false, visits: 0 };
+  for (const q of attempt.questions) map[q.id] = { answer: null, unsure: false, visits: 0, checked: null };
   for (const item of attempt.items) {
     if (!map[item.questionId]) continue;
     const q = attempt.questions.find(x => x.id === item.questionId);
     const answer = q && !q.isChoice ? normalizeShortAnswer(item.answer) : item.answer;
-    map[item.questionId] = { answer, unsure: item.unsure, visits: item.visits };
+    const checked = item.checked ? { isCorrect: item.checked.isCorrect, correctAnswer: item.checked.correctAnswer } : null;
+    map[item.questionId] = { answer, unsure: item.unsure, visits: item.visits, checked };
   }
   return map;
 }
@@ -72,7 +75,6 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
-  const [freeChecks, setFreeChecks] = useState<Record<string, FreeCheck>>({});
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
   const [checking, setChecking] = useState(false);
   const [historyTick, setHistoryTick] = useState(0); // 실행 취소/다시 실행 버튼 상태 갱신용
@@ -100,7 +102,14 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
     const t = Date.now();
     return questions.map(q => {
       const item = itemsRef.current[q.id];
-      return { questionId: q.id, answer: item?.answer ?? null, unsure: item?.unsure ?? false, timeSpentMs: Math.round(elapsedFor(swRef.current, q.id, t)), visits: item?.visits ?? 0 };
+      return {
+        questionId: q.id,
+        answer: item?.answer ?? null,
+        unsure: item?.unsure ?? false,
+        timeSpentMs: Math.round(elapsedFor(swRef.current, q.id, t)),
+        visits: item?.visits ?? 0,
+        checked: item?.checked ?? null,
+      };
     });
   }, [questions]);
 
@@ -267,7 +276,10 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
     scheduleSave();
   }, [scheduleSave]);
 
-  const setAnswer = useCallback((next: string | null) => updateItem(question.id, { answer: next }), [question.id, updateItem]);
+  const setAnswer = useCallback((next: string | null) => {
+    if (itemsRef.current[question.id]?.checked) return; // 채점해 본 문항은 잠김
+    updateItem(question.id, { answer: next });
+  }, [question.id, updateItem]);
 
   const onInkChange = (next: InkStroke[]) => {
     const qid = question.id;
@@ -302,12 +314,13 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
 
   const runFreeCheck = async () => {
     const answer = items[question.id]?.answer;
-    if (answer == null) return;
+    if (answer == null || items[question.id]?.checked) return;
     const qid = question.id;
     setChecking(true);
     try {
       const res = await client.checkAnswer(attempt.id, qid, answer);
-      setFreeChecks(prev => ({ ...prev, [qid]: { answer, ...res } }));
+      // 서버가 이 답을 저장하고 문항을 잠갔다 — 화면도 같은 답으로 잠근다.
+      updateItem(qid, { answer, checked: { isCorrect: res.isCorrect, correctAnswer: res.correctAnswer } });
       setRevealed(prev => ({ ...prev, [qid]: false }));
     } catch (error) {
       setToast(error instanceof Error ? error.message : '채점하지 못했어요. 잠시 뒤 다시 해 볼까요?');
@@ -315,6 +328,8 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
       setChecking(false);
     }
   };
+
+  const closeOverlay = useCallback(() => setOverlay(null), []);
 
   const confirmExit = async () => {
     swRef.current = pauseStopwatch(swRef.current, Date.now());
@@ -326,7 +341,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
   const emptyCount = questions.length - answeredCount;
   const unsureCount = Object.values(items).filter(item => item.unsure).length;
   const elapsed = elapsedFor(swRef.current, question.id, now);
-  const current = items[question.id] ?? { answer: null, unsure: false, visits: 0 };
+  const current = items[question.id] ?? { answer: null, unsure: false, visits: 0, checked: null };
   void historyTick;
   const canUndo = inkRef.current?.canUndo() ?? false;
   const canRedo = inkRef.current?.canRedo() ?? false;
@@ -369,10 +384,13 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
           </div>
           <div className="exam-nav">
             <button type="button" className="rn-icon-button exam-nav-btn" aria-label="이전 문항" disabled={index === 0} onClick={() => goTo(index - 1)}>◀</button>
-            <button type="button" className="exam-nav-count" aria-label="번호판 열기" aria-haspopup="dialog" onClick={() => setOverlay('pad')} data-testid="exam-counter">
+            <button type="button" className="exam-nav-count" aria-label={`${question.number}번 / ${questions.length} — 전체 문제 보기`} aria-haspopup="dialog" onClick={() => setOverlay('overview')} data-testid="exam-counter">
               <strong>{question.number}</strong> / {questions.length}
             </button>
             <button type="button" className="rn-icon-button exam-nav-btn" aria-label="다음 문항" disabled={index === questions.length - 1} onClick={() => goTo(index + 1)}>▶</button>
+            <button type="button" className="exam-overview-open" aria-haspopup="dialog" onClick={() => setOverlay('overview')} data-testid="exam-overview-open">
+              <span aria-hidden="true">▦</span> 전체 문제
+            </button>
           </div>
           <span className="exam-stopwatch" title="이 문항에 쓴 시간" data-testid="exam-stopwatch" data-ms={Math.round(elapsed)}>
             <span aria-hidden="true">⏱</span> {formatClock(elapsed)}
@@ -396,7 +414,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
         onAnswer={setAnswer}
         onUnsure={next => updateItem(question.id, { unsure: next })}
         free={isReal ? undefined : {
-          check: freeChecks[question.id] ?? null,
+          check: current.checked,
           checking,
           revealed: revealed[question.id] ?? false,
           onCheck: () => { void runFreeCheck(); },
@@ -434,19 +452,16 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
 
       {toast && <div className="exam-toast" role="status" aria-live="assertive">{toast}</div>}
 
-      {overlay === 'pad' && (
-        <div className="exam-overlay" role="dialog" aria-modal="true" aria-label="번호판" onClick={() => setOverlay(null)}>
-          <div className="exam-sheet" onClick={e => e.stopPropagation()}>
-            <div className="exam-sheet-head">
-              <h2>번호판</h2>
-              <span className="rn-caption">응답 {answeredCount} / {questions.length}</span>
-              <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={() => setOverlay(null)}>닫기</button>
-            </div>
-            <NumberPad questions={questions} items={items} currentIndex={index} onPick={i => { goTo(i); setOverlay(null); }} />
-            <PadLegend />
-            <button type="button" className="rn-button rn-button-secondary exam-sheet-wide" onClick={() => setOverlay('review')}>OMR 카드 보기</button>
-          </div>
-        </div>
+      {overlay === 'overview' && (
+        <QuestionOverview
+          questions={questions}
+          items={items}
+          currentIndex={index}
+          answeredCount={answeredCount}
+          onPick={i => { goTo(i); setOverlay(null); }}
+          onClose={closeOverlay}
+          onOpenOmr={() => setOverlay('review')}
+        />
       )}
 
       {(overlay === 'review' || overlay === 'submit') && (
