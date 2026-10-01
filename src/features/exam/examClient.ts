@@ -3,6 +3,7 @@ import type { ExamClient } from './contract';
 import {
   ExamClientError,
   mapAddedMistakes,
+  mapCheckedAnswer,
   mapExamAttempt,
   mapExamPaper,
   mapExamResult,
@@ -13,7 +14,7 @@ import {
 } from './examMappers';
 
 // 기출문제 풀이 서버 경계. 상태 전이·채점은 전부 SECURITY DEFINER RPC
-// (supabase/migrations/20261002120000_exam_practice.sql)가 하고, 여기는 얇은 타입 래퍼다.
+// (supabase/migrations/20261002120000_exam_practice.sql, v2: 20261002180000_exam_practice_v2.sql)가 하고, 여기는 얇은 타입 래퍼다.
 // 실패하면 학생에게 그대로 보여 줘도 되는 한국어 문구를 담은 ExamClientError를 throw한다
 // (saveProgress만 예외: 계약대로 false).
 
@@ -30,18 +31,8 @@ async function callRpc(name: string, args: Record<string, unknown>): Promise<unk
 
 export const examClient: ExamClient = {
   async listPapers() {
-    let response;
-    try {
-      response = await supabase
-        .from('exam_papers')
-        .select('id, title, exam_date, source, time_limit_minutes, electives')
-        .eq('published', true)
-        .order('exam_date', { ascending: false });
-    } catch (err) {
-      throw new ExamClientError(err);
-    }
-    if (response.error) throw new ExamClientError(response.error);
-    return (response.data ?? []).map(mapExamPaper);
+    const data = await callRpc('list_exam_papers_for_me', {});
+    return Array.isArray(data) ? data.map(mapExamPaper) : [];
   },
 
   async getActiveAttempt(paperId) {
@@ -77,8 +68,8 @@ export const examClient: ExamClient = {
       p_attempt_id: attemptId,
       p_question_id: questionId,
       p_answer: answer,
-    }) as { isCorrect?: unknown; correctAnswer?: unknown } | null;
-    return { isCorrect: data?.isCorrect === true, correctAnswer: String(data?.correctAnswer ?? '') };
+    });
+    return mapCheckedAnswer(data) ?? { isCorrect: false, correctAnswer: '' };
   },
 
   async submitAttempt(attemptId, items, visitOrder) {

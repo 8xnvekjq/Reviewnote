@@ -23,6 +23,7 @@ try {
 
 const root = path.resolve(import.meta.dirname, '../..');
 const mig = fs.readFileSync(path.join(root, 'supabase/migrations/20261002120000_exam_practice.sql'), 'utf8');
+const migV2 = fs.readFileSync(path.join(root, 'supabase/migrations/20261002180000_exam_practice_v2.sql'), 'utf8');
 
 test('exam migration applies and the RPC flow behaves (PGlite)', { skip: PGliteCtor ? false : '@electric-sql/pglite 미설치' }, async () => {
 const db = new PGliteCtor!();
@@ -59,6 +60,7 @@ insert into auth.users values ('00000000-0000-0000-0000-00000000000a','s1'),('00
 insert into private.app_admins values ('00000000-0000-0000-0000-0000000000ad');
 `);
 await db.exec(mig);
+await db.exec(migV2); // v2(채점해 보기 잠금·진행 정도·최고점)를 이어서 적용 — 아래 v1 흐름도 v2 함수로 돈다.
 const S1 = '00000000-0000-0000-0000-00000000000a', S2 = '00000000-0000-0000-0000-00000000000b', AD = '00000000-0000-0000-0000-0000000000ad';
 async function as(uid: string | null, sql: string, params: unknown[] = []): Promise<any[]> {
   await db.exec(`reset role; select set_config('request.jwt.claim.sub', '${uid ?? ''}', false); set role ${uid ? 'authenticated' : 'anon'};`);
@@ -175,4 +177,95 @@ for (const [s, g] of [[100, 1], [87, 1], [86, 2], [77, 2], [76, 3], [10, 8], [9,
 // chapters present
 const ch = (await db.query(`select section, number, curriculum_grade, curriculum_chapter from exam_questions order by section, number`)).rows;
 assert.ok(ch.every(r => r.curriculum_grade && r.curriculum_chapter));
+
+// ── v2: 채점해 보기 잠금 · 시험지별 진행 정도 · 최고점 기준값 ──
+await fails(null, `select list_exam_papers_for_me()`, [], /permission denied/);
+const l0 = (await as(S2, `select list_exam_papers_for_me() r`))[0].r;
+assert.deepEqual(l0, [{ id: '2025-06-math', title: '2025학년도 6월 모의평가 수학', examDate: '2024-06-04', source: '한국교육과정평가원', timeLimitMinutes: 100, electives: ['확률과 통계', '미적분', '기하'], inProgress: null, lastResult: null, resultCount: 0 }]);
+// 두 번째(더 최근) 시험지 + 비공개 시험지
+await db.exec(`
+insert into exam_papers (id, title, exam_date, source, subject, school_grade, time_limit_minutes, electives, grade_cuts, published)
+select '2099-06-math', '테스트 시험지', '2025-06-04', source, subject, school_grade, time_limit_minutes, electives,
+       grade_cuts - 'topByElective', true from exam_papers where id = '2025-06-math';
+insert into exam_questions (paper_id, number, section, image_url, is_choice, points, curriculum_grade, curriculum_chapter)
+select '2099-06-math', number, section, image_url, is_choice, points, curriculum_grade, curriculum_chapter from exam_questions where paper_id = '2025-06-math';
+insert into exam_answer_keys (question_id, answer)
+select q2.id, k.answer from exam_questions q1 join exam_answer_keys k on k.question_id = q1.id
+  join exam_questions q2 on q2.paper_id = '2099-06-math' and q2.section = q1.section and q2.number = q1.number
+ where q1.paper_id = '2025-06-math';
+insert into exam_papers (id, title, exam_date, source, subject, school_grade, time_limit_minutes, electives, published)
+values ('hidden', '비공개', '2030-01-01', 's', '수학', '고3', 100, array['미적분'], false);
+`);
+// 두 시험지 동시 진행(시험지마다 진행 중 시도 하나씩)
+const vA = (await as(S2, `select start_exam_attempt('2025-06-math','free','기하') r`))[0].r;
+const vB = (await as(S2, `select start_exam_attempt('2099-06-math','real','미적분') r`))[0].r;
+assert.notEqual(vA.id, vB.id); assert.equal(vB.paperId, '2099-06-math');
+assert.equal((await as(S2, `select get_active_exam_attempt('2025-06-math') r`))[0].r.id, vA.id);
+assert.equal((await as(S2, `select get_active_exam_attempt('2099-06-math') r`))[0].r.id, vB.id);
+assert.equal((await as(S2, `select count(*)::int c from exam_attempts where status = 'in_progress'`))[0].c, 2);
+assert.ok(vA.items.every(i => i.checked === null), 'fresh items carry no answer');
+const gk = Object.fromEntries((await db.query(`select q.number, k.answer from exam_questions q join exam_answer_keys k on k.question_id=q.id where q.paper_id='2025-06-math' and q.section in ('common','기하')`)).rows.map(r => [r.number, r.answer]));
+const qA = (n: number) => vA.questions[n - 1].id;
+// 채점해 보기: 빈 답·형식 오류 거부(잠그지 않음), 정상 답은 저장 + 잠금
+await fails(S2, `select check_exam_answer($1, $2, '')`, [vA.id, qA(1)], /EXAM_INVALID_ANSWER/);
+await fails(S2, `select check_exam_answer($1, $2, null)`, [vA.id, qA(1)], /EXAM_INVALID_ANSWER/);
+await fails(S2, `select check_exam_answer($1, $2, '9')`, [vA.id, qA(1)], /EXAM_INVALID_ANSWER/);
+assert.equal((await db.query(`select checked_at from exam_attempt_items where attempt_id=$1 and question_id=$2`, [vA.id, qA(1)])).rows[0].checked_at, null);
+await fails(S2, `select check_exam_answer($1, $2, '1')`, [vB.id, vB.questions[0].id], /EXAM_REAL_MODE_LOCKED/);
+const wrong1 = gk[1] === '1' ? '2' : '1';
+const k1 = (await as(S2, `select check_exam_answer($1, $2, $3) r`, [vA.id, qA(1), `0${gk[1]}`]))[0].r;
+assert.deepEqual(k1, { isCorrect: true, correctAnswer: gk[1] });
+const k1again = (await as(S2, `select check_exam_answer($1, $2, $3) r`, [vA.id, qA(1), wrong1]))[0].r;
+assert.deepEqual(k1again, k1, 'locked item ignores the new answer');
+const wrong30 = gk[30] === '7' ? '8' : '7';
+const k30 = (await as(S2, `select check_exam_answer($1, $2, $3) r`, [vA.id, qA(30), wrong30]))[0].r;
+assert.deepEqual(k30, { isCorrect: false, correctAnswer: gk[30] });
+assert.deepEqual((await as(S2, `select check_exam_answer($1, $2, '') r`, [vA.id, qA(30)]))[0].r, k30, 'locked item answers even with an empty retry');
+// 시도 payload: 잠긴 문항만 checked, 나머지는 null(정답 노출 없음)
+const pA = (await as(S2, `select get_active_exam_attempt('2025-06-math') r`))[0].r;
+const item = (n: number) => pA.items.find(i => i.questionId === qA(n));
+assert.deepEqual(item(1).checked, { isCorrect: true, correctAnswer: gk[1] }); assert.equal(item(1).answer, gk[1]);
+assert.deepEqual(item(30).checked, { isCorrect: false, correctAnswer: gk[30] }); assert.equal(item(30).answer, wrong30);
+assert.equal(pA.items.filter(i => i.checked !== null).length, 2);
+assert.ok(pA.items.filter(i => i.questionId !== qA(1) && i.questionId !== qA(30)).every(i => i.checked === null && !('correctAnswer' in i)));
+// 잠긴 문항은 save로 답이 안 바뀌고, 🤔·시간·방문수는 바뀐다
+const saveItems = [
+  { questionId: qA(1), answer: wrong1, unsure: true, timeSpentMs: 3000, visits: 2 },
+  { questionId: qA(30), answer: gk[30], unsure: true, timeSpentMs: 7000, visits: 4 },
+  { questionId: qA(2), answer: '3', unsure: false, timeSpentMs: 1000, visits: 1 },
+  { questionId: qA(3), answer: '05', unsure: false, timeSpentMs: 500, visits: 1 },
+];
+assert.equal((await as(S2, `select save_exam_progress($1, $2::jsonb, null) r`, [vA.id, JSON.stringify(saveItems)]))[0].r, true);
+const lockedRows = (await db.query(`select question_id, answer, unsure, time_spent_ms, visits from exam_attempt_items where attempt_id=$1 and question_id = any($2::uuid[])`, [vA.id, [qA(1), qA(30)]])).rows;
+const byQ = Object.fromEntries(lockedRows.map(r => [r.question_id, r]));
+assert.equal(byQ[qA(1)].answer, gk[1]); assert.equal(byQ[qA(1)].unsure, true); assert.equal(Number(byQ[qA(1)].time_spent_ms), 3000); assert.equal(byQ[qA(1)].visits, 2);
+assert.equal(byQ[qA(30)].answer, wrong30); assert.equal(Number(byQ[qA(30)].time_spent_ms), 7000);
+// 진행 정도 목록: 시행일 최신순, 비공개 제외, 시험지별 진행 중 시도
+await as(S2, `select save_exam_progress($1, $2::jsonb, null)`, [vB.id, JSON.stringify([{ questionId: vB.questions[4].id, answer: '2', unsure: false, timeSpentMs: 42, visits: 1 }])]);
+const l1 = (await as(S2, `select list_exam_papers_for_me() r`))[0].r;
+assert.deepEqual(l1.map(p => p.id), ['2099-06-math', '2025-06-math']);
+assert.deepEqual(l1[1].inProgress, { attemptId: vA.id, mode: 'free', elective: '기하', startedAt: l1[1].inProgress.startedAt, timeLimitMinutes: null, answeredCount: 4, elapsedMs: 11500 });
+assert.equal(Date.parse(l1[1].inProgress.startedAt), Date.parse(vA.startedAt));
+assert.deepEqual({ ...l1[0].inProgress, startedAt: null }, { attemptId: vB.id, mode: 'real', elective: '미적분', startedAt: null, timeLimitMinutes: 100, answeredCount: 1, elapsedMs: 42 });
+assert.equal(l1[1].lastResult, null); assert.equal(l1[1].resultCount, 0);
+// 제출: 잠긴 문항은 제출 payload로도 답이 안 바뀐다 + 최고점 기준값
+const subA = (await as(S2, `select submit_exam_attempt($1, $2::jsonb, null) r`, [vA.id, JSON.stringify(saveItems)]))[0].r;
+const r30 = subA.items.find(i => i.number === 30); assert.equal(r30.answer, wrong30); assert.equal(r30.isCorrect, false);
+assert.equal(subA.items.find(i => i.number === 1).isCorrect, true);
+assert.equal(subA.gradeCut.topStandard, 151); assert.equal(subA.gradeCut.topPercentile, 100);
+assert.deepEqual(subA.gradeCut.rawByGrade, [82, 72, 60, 50, 33, 21, 14, 10]);
+await fails(S2, `select check_exam_answer($1, $2, '1')`, [vA.id, qA(5)], /EXAM_NOT_IN_PROGRESS/);
+const subB = (await as(S2, `select submit_exam_attempt($1, '[]'::jsonb, null) r`, [vB.id]))[0].r;
+assert.equal(subB.gradeCut.topStandard, null); assert.equal(subB.gradeCut.topPercentile, null);
+assert.equal((await as(S1, `select get_exam_result($1) r`, [f.id]))[0].r.gradeCut.topStandard, 145, '확률과 통계 최고점');
+assert.equal((await as(S1, `select get_exam_result($1) r`, [a1.id]))[0].r.gradeCut.topPercentile, 100, '미적분 최고점');
+const l2 = (await as(S2, `select list_exam_papers_for_me() r`))[0].r;
+assert.equal(l2[1].inProgress, null); assert.equal(l2[1].resultCount, 1);
+assert.deepEqual(l2[1].lastResult, { attemptId: vA.id, score: subA.score, estimatedGrade: subA.estimatedGrade, submittedAt: subA.submittedAt });
+assert.equal(l2[0].inProgress, null); assert.equal(l2[0].resultCount, 1); assert.equal(l2[0].lastResult.attemptId, vB.id);
+// 여러 번 제출했으면 가장 최근 것이 lastResult
+const l3 = (await as(S1, `select list_exam_papers_for_me() r`))[0].r;
+const s1Paper = l3.find(p => p.id === '2025-06-math');
+assert.equal(s1Paper.resultCount, 2); assert.equal(s1Paper.lastResult.attemptId, f.id); assert.equal(s1Paper.inProgress, null);
+assert.deepEqual(l3.find(p => p.id === '2099-06-math'), { ...l2[0], inProgress: null, lastResult: null, resultCount: 0 });
 });

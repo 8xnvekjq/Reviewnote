@@ -8,6 +8,7 @@ import {
   examRemainingMs,
   isExamAnswerCorrect,
   mapAddedMistakes,
+  mapCheckedAnswer,
   mapExamAttempt,
   mapExamPaper,
   mapExamResult,
@@ -92,7 +93,10 @@ test('attempt payload maps to the contract shape', () => {
       { id: 'q1', number: 1, section: 'common', imageUrl: '/exams/2025-06-math/c-01.png', isChoice: true, points: 2 },
       { id: 'q23', number: 23, section: '기하', imageUrl: '/exams/2025-06-math/geom-23.png', isChoice: true, points: 2 },
     ],
-    items: [{ questionId: 'q1', answer: '4', unsure: true, timeSpentMs: 1200, visits: 2 }, { questionId: 'q2', answer: null, unsure: false, timeSpentMs: 0, visits: 0 }],
+    items: [
+      { questionId: 'q1', answer: '4', unsure: true, timeSpentMs: 1200, visits: 2, checked: { isCorrect: true, correctAnswer: '4' } },
+      { questionId: 'q2', answer: null, unsure: false, timeSpentMs: 0, visits: 0, checked: null },
+    ],
   }, now);
   assert.equal(attempt.startedAt, '2026-10-02T09:00:00.000Z');
   assert.equal(attempt.mode, 'real');
@@ -100,8 +104,9 @@ test('attempt payload maps to the contract shape', () => {
   assert.deepEqual(attempt.questions.map((q) => q.number), [1, 2, 23]);
   assert.equal(attempt.questions[2].section, '기하');
   assert.deepEqual(attempt.visitOrder, [1, 2, 2]);
-  assert.deepEqual(attempt.items[0], { questionId: 'q1', answer: '4', unsure: true, timeSpentMs: 1200, visits: 2 });
+  assert.deepEqual(attempt.items[0], { questionId: 'q1', answer: '4', unsure: true, timeSpentMs: 1200, visits: 2, checked: { isCorrect: true, correctAnswer: '4' } });
   assert.equal(attempt.items[1].answer, null);
+  assert.equal(attempt.items[1].checked, null);
   assert.equal(mapExamAttempt({ mode: 'free', timeLimitMinutes: null, startedAt: '2026-10-02T09:00:00Z' }, now).timeLimitMinutes, null);
 });
 
@@ -116,7 +121,7 @@ test('result payload maps national stats, cuts and falls back to a computed grad
     totalCount: 30,
     totalTimeMs: 3_600_000,
     estimatedGrade: null,
-    gradeCut: { rawByGrade: [80, 70, 59, 49, 32, 19, 12, 8], standardByGrade: [135, 126], percentileByGrade: [96, 89], source: '종로학원' },
+    gradeCut: { rawByGrade: [80, 70, 59, 49, 32, 19, 12, 8], standardByGrade: [135, 126], percentileByGrade: [96, 89], topStandard: 152, topPercentile: '100', source: '종로학원' },
     submittedAt: '2026-10-02T10:00:00+00:00',
     items: [
       { questionId: 'q30', number: 30, section: '미적분', imageUrl: '/x.png', isChoice: false, points: 4, answer: null, correctAnswer: '25', isCorrect: false, unsure: false, timeSpentMs: 0, nationalWrongRate: 94.8, nationalChoiceRates: null, addedMistakeId: null },
@@ -131,13 +136,31 @@ test('result payload maps national stats, cuts and falls back to a computed grad
   assert.equal(result.items[1].nationalChoiceRates, null);
   assert.equal(result.items[1].answer, null);
   assert.equal(result.gradeCut.source, '종로학원');
-  assert.equal(mapExamResult({ estimatedGrade: 4, score: 10, gradeCut: { rawByGrade: [80] } }).estimatedGrade, 4);
+  assert.equal(result.gradeCut.topStandard, 152);
+  assert.equal(result.gradeCut.topPercentile, 100);
+  const bare = mapExamResult({ estimatedGrade: 4, score: 10, gradeCut: { rawByGrade: [80], topStandard: null } });
+  assert.equal(bare.estimatedGrade, 4);
+  assert.equal(bare.gradeCut.topStandard, null);
+  assert.equal(bare.gradeCut.topPercentile, null);
 });
 
 test('papers, summaries and added mistakes map from rows', () => {
-  assert.deepEqual(mapExamPaper({ id: '2025-06-math', title: 't', exam_date: '2024-06-04', source: 's', time_limit_minutes: 100, electives: ['확률과 통계', '미적분', '기하', '물리'] }), {
+  const bare = { id: '2025-06-math', title: 't', examDate: '2024-06-04', source: 's', timeLimitMinutes: 100, electives: ['확률과 통계', '미적분', '기하', '물리'] };
+  assert.deepEqual(mapExamPaper({ ...bare, inProgress: null, lastResult: null, resultCount: 0 }), {
     id: '2025-06-math', title: 't', examDate: '2024-06-04', source: 's', timeLimitMinutes: 100, electives: ['확률과 통계', '미적분', '기하'],
+    inProgress: null, lastResult: null, resultCount: 0,
   });
+  const withProgress = mapExamPaper({
+    ...bare,
+    inProgress: { attemptId: 'a2', mode: 'free', elective: '기하', startedAt: '2026-10-02T09:00:00+00:00', timeLimitMinutes: null, answeredCount: 7, elapsedMs: '61000' },
+    lastResult: { attemptId: 'a1', score: 84, estimatedGrade: null, submittedAt: '2026-10-01T10:00:00+00:00' },
+    resultCount: 3,
+  });
+  assert.deepEqual(withProgress.inProgress, { attemptId: 'a2', mode: 'free', elective: '기하', startedAt: '2026-10-02T09:00:00+00:00', timeLimitMinutes: null, answeredCount: 7, elapsedMs: 61000 });
+  assert.deepEqual(withProgress.lastResult, { attemptId: 'a1', score: 84, estimatedGrade: null, submittedAt: '2026-10-01T10:00:00+00:00' });
+  assert.equal(withProgress.resultCount, 3);
+  assert.equal(mapExamPaper({ ...bare, inProgress: { mode: 'real', timeLimitMinutes: 100 }, lastResult: 'x' }).inProgress, null);
+  assert.equal(mapExamPaper(bare).resultCount, 0);
   assert.deepEqual(mapExamResultSummary({ attemptId: 'a', paperTitle: 't', mode: 'real', elective: '기하', score: 88, estimatedGrade: 1, submittedAt: 'z', extra: 1 }), {
     attemptId: 'a', paperTitle: 't', mode: 'real', elective: '기하', score: 88, estimatedGrade: 1, submittedAt: 'z',
   });
@@ -145,11 +168,21 @@ test('papers, summaries and added mistakes map from rows', () => {
   assert.deepEqual(mapAddedMistakes(null), []);
 });
 
+test('checked answers map from check_exam_answer and attempt items', () => {
+  assert.deepEqual(mapCheckedAnswer({ isCorrect: true, correctAnswer: '108' }), { isCorrect: true, correctAnswer: '108' });
+  assert.deepEqual(mapCheckedAnswer({ isCorrect: 'yes', correctAnswer: 4 }), { isCorrect: false, correctAnswer: '4' });
+  assert.equal(mapCheckedAnswer(null), null);
+  assert.equal(mapCheckedAnswer({ isCorrect: true }), null);
+  assert.equal(examErrorMessage({ message: 'EXAM_INVALID_ANSWER' }), '채점할 답을 먼저 입력해 주세요.');
+});
+
 test('payloads sent to the server are cleaned up', () => {
   assert.deepEqual(toExamItemsPayload([{ questionId: 'q', answer: ' 07 ', unsure: true, timeSpentMs: 1234.6, visits: -2 }]), [
     { questionId: 'q', answer: '7', unsure: true, timeSpentMs: 1235, visits: 0 },
   ]);
   assert.deepEqual(toExamItemsPayload([{ questionId: 'q', answer: null, unsure: false, timeSpentMs: Number.NaN, visits: 1 }])[0].timeSpentMs, 0);
+  // checked는 서버가 정하는 값이라 보내지 않는다.
+  assert.equal('checked' in toExamItemsPayload([{ questionId: 'q', answer: '1', unsure: false, timeSpentMs: 0, visits: 0, checked: { isCorrect: true, correctAnswer: '1' } }])[0], false);
   assert.deepEqual(toVisitOrderPayload([1, 0, 30, 31, 2.5, 3]), [1, 30, 3]);
   assert.equal(toMistakeOrigin('https://reviewnote.app/'), 'https://reviewnote.app');
   assert.equal(toMistakeOrigin('http://127.0.0.1:5174'), 'http://127.0.0.1:5174');
