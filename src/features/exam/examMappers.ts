@@ -11,6 +11,7 @@ import type {
   ExamMode,
   ExamPaperProgress,
   ExamPaperSummary,
+  ExamPaperHistoryAttempt,
   ExamQuestion,
   ExamResult,
   ExamResultItem,
@@ -60,6 +61,11 @@ function asMode(value: unknown): ExamMode {
 
 function asArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
+}
+
+function mapRound(r: Row): { round?: number } {
+  const round = asNumber(r.round);
+  return Number.isInteger(round) && round > 0 ? { round } : {};
 }
 
 /** 서버와 같은 규칙: 공백 제거, ①~⑤ → 1~5, 숫자만이면 앞자리 0 제거('007' → '7', '000' → '0'). 빈 값은 null. */
@@ -118,6 +124,7 @@ function mapExamPaperProgress(raw: unknown): ExamPaperProgress | null {
   if (r.attemptId == null) return null;
   return {
     attemptId: asString(r.attemptId),
+    ...mapRound(r),
     mode: asMode(r.mode),
     elective: asElective(r.elective),
     startedAt: asString(r.startedAt),
@@ -133,6 +140,7 @@ function mapExamPaperLastResult(raw: unknown): ExamPaperSummary['lastResult'] {
   if (r.attemptId == null) return null;
   return {
     attemptId: asString(r.attemptId),
+    ...mapRound(r),
     score: asNumber(r.score),
     estimatedGrade: asNullableNumber(r.estimatedGrade),
     submittedAt: asString(r.submittedAt),
@@ -239,6 +247,7 @@ export function mapExamResult(raw: unknown): ExamResult {
   const score = asNumber(r.score);
   return {
     attemptId: asString(r.attemptId),
+    ...mapRound(r),
     paperTitle: asString(r.paperTitle),
     mode: asMode(r.mode),
     elective: asElective(r.elective),
@@ -271,6 +280,35 @@ export function mapExamResultSummary(raw: unknown): ExamResultSummary {
     estimatedGrade: asNumber(r.estimatedGrade),
     submittedAt: asString(r.submittedAt),
   };
+}
+
+/** 허용 필드만 복사하고 진행 중 정오를 한 번 더 숨긴다. */
+export function mapExamPaperHistory(raw: unknown): ExamPaperHistoryAttempt[] {
+  return asArray(raw).map(value => {
+    const r = asRow(value);
+    const submitted = r.status === 'submitted';
+    return {
+      attemptId: asString(r.attemptId),
+      round: mapRound(r).round ?? 1,
+      startedAt: asString(r.startedAt),
+      submittedAt: submitted ? asNullableString(r.submittedAt) : null,
+      status: submitted ? 'submitted' as const : 'in_progress' as const,
+      mode: asMode(r.mode),
+      elective: asElective(r.elective),
+      score: submitted ? asNullableNumber(r.score) : null,
+      estimatedGrade: submitted ? asNullableNumber(r.estimatedGrade) : null,
+      totalTimeMs: Math.max(0, asNumber(r.totalTimeMs)),
+      items: asArray(r.items).map(value => {
+        const item = asRow(value);
+        return {
+          number: asNumber(item.number), section: asSection(item.section),
+          isCorrect: submitted && typeof item.isCorrect === 'boolean' ? item.isCorrect : null,
+          unsure: item.unsure === true, answered: item.answered === true,
+          timeSpentMs: Math.max(0, asNumber(item.timeSpentMs)),
+        };
+      }).sort((a, b) => a.number - b.number),
+    };
+  }).sort((a, b) => a.round - b.round);
 }
 
 export function mapAddedMistakes(raw: unknown): Array<{ questionId: string; mistakeId: string }> {

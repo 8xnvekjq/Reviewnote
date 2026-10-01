@@ -1,5 +1,5 @@
 // 기출문제 풀이 화면의 순수 로직 — React/DOM 없이 node --test 로 검증한다(tests/exam/practice.test.ts).
-import type { ExamElective, ExamItemState, ExamResultItem } from '../contract.ts';
+import type { ExamElective, ExamHistoryItem, ExamItemState, ExamPaperHistoryAttempt, ExamResultItem } from '../contract.ts';
 
 export const MINUTE_MS = 60_000;
 /** 실전 모드에서 남은 시간 알림을 띄우는 시점(남은 ms). 큰 것부터. */
@@ -269,4 +269,57 @@ export function keepCheckedAnswers<T extends Pick<ExamItemState, 'questionId' | 
   });
   for (const [questionId, old] of locked) if (!next.some(item => item.questionId === questionId)) merged.push(old);
   return merged;
+}
+
+// ── 회차 기록: 회차 자체는 서버가 계산하고 여기서는 비교·표시만 한다. ──
+export function roundLabel(round: number | undefined): string {
+  return round != null && Number.isInteger(round) && round > 0 ? `${round}차` : '';
+}
+
+/** 공통은 모두, 선택 문항은 화면에서 선택한 과목의 회차만 비교한다. */
+export function historyItem(attempt: ExamPaperHistoryAttempt, number: number, elective: ExamElective): ExamHistoryItem | null {
+  if (number > 22 && attempt.elective !== elective) return null;
+  return attempt.items.find(item => item.number === number && item.section === (number <= 22 ? 'common' : elective)) ?? null;
+}
+
+export interface HistoryQuestionRow {
+  number: number;
+  persistentWrong: boolean;
+  timeChange: string | null;
+  cells: Array<{ attemptId: string; item: ExamHistoryItem | null; newlyCorrect: boolean }>;
+}
+
+/** 입력 순서와 무관하게 회차 순 비교. 진행 중 정오는 비교에서 제외하고 미응답은 제출 오답에 포함한다. */
+export function buildHistoryRows(history: readonly ExamPaperHistoryAttempt[], elective: ExamElective): HistoryQuestionRow[] {
+  const attempts = [...history].sort((a, b) => a.round - b.round);
+  return Array.from({ length: 30 }, (_, index) => {
+    const number = index + 1;
+    const comparable = attempts.filter(a => a.status === 'submitted' && historyItem(a, number, elective));
+    const submittedItems = comparable.map(a => historyItem(a, number, elective)!);
+    let previous: ExamHistoryItem | null = null;
+    const cells = attempts.map(a => {
+      const item = historyItem(a, number, elective);
+      const newlyCorrect = a.status === 'submitted' && item?.isCorrect === true && previous?.isCorrect === false;
+      if (a.status === 'submitted' && item) previous = item;
+      return { attemptId: a.attemptId, item, newlyCorrect };
+    });
+    const last = submittedItems.at(-1), before = submittedItems.at(-2);
+    return {
+      number, cells,
+      persistentWrong: submittedItems.length > 0 && submittedItems.every(i => i.isCorrect === false),
+      timeChange: last && before ? formatTimeChange(before.timeSpentMs, last.timeSpentMs) : null,
+    };
+  });
+}
+
+export function formatTimeChange(beforeMs: number, afterMs: number): string {
+  return `${formatDuration(beforeMs)} → ${formatDuration(afterMs)}`;
+}
+
+/** 정오와 🤔·미응답을 함께 표시. 진행 중에는 저장한 응답 여부만 보여 준다. */
+export function historyCellLabel(item: ExamHistoryItem | null, submitted: boolean): string {
+  if (!item) return '-';
+  const mark = !submitted || item.isCorrect == null ? (item.answered ? '응답' : '미응답')
+    : item.isCorrect ? 'O' : item.answered ? 'X' : 'X 미응답';
+  return `${mark}${item.unsure ? ' 🤔' : ''}`;
 }

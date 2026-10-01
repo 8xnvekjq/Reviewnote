@@ -6,6 +6,7 @@ import {
   mapCheckedAnswer,
   mapExamAttempt,
   mapExamPaper,
+  mapExamPaperHistory,
   mapExamResult,
   mapExamResultSummary,
   toExamItemsPayload,
@@ -30,6 +31,11 @@ async function callRpc(name: string, args: Record<string, unknown>): Promise<unk
 }
 
 export const examClient: ExamClient = {
+  async listPaperHistory(paperId, studentId) {
+    return mapExamPaperHistory(await callRpc('list_my_paper_history', {
+      p_paper_id: paperId, p_student_id: studentId ?? null,
+    }));
+  },
   async listPapers() {
     const data = await callRpc('list_exam_papers_for_me', {});
     return Array.isArray(data) ? data.map(mapExamPaper) : [];

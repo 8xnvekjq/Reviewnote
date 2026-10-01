@@ -5,12 +5,14 @@ import type { ExamAttempt, ExamClient, ExamElective, ExamMode, ExamPaperSummary,
 import { ExamStartView } from './ui/ExamStartView';
 import { ExamSolveView } from './ui/ExamSolveView';
 import { OmrResultView } from './ui/OmrResultView';
+import { ExamHistoryView } from './ui/ExamHistoryView';
 import '../../styles/examPractice.css';
 
 type Phase =
-  | { kind: 'start' }
+  | { kind: 'start'; paperId?: string }
+  | { kind: 'history'; paper: ExamPaperSummary }
   | { kind: 'solve'; attempt: ExamAttempt }
-  | { kind: 'result'; result: ExamResult };
+  | { kind: 'result'; result: ExamResult; historyPaper?: ExamPaperSummary };
 
 type FullscreenDoc = Document & { webkitFullscreenElement?: Element | null; webkitExitFullscreen?: () => Promise<void> | void };
 type FullscreenEl = HTMLElement & { webkitRequestFullscreen?: () => Promise<void> | void };
@@ -42,6 +44,7 @@ export function ExamPracticeScreen({ client, currentUserId, onExit }: { client: 
 
   const backToStart = () => {
     leaveFullscreen();
+    setError(null);
     setPhase({ kind: 'start' });
     setStartKey(k => k + 1); // 이어 풀기·지난 결과 목록 새로 읽기
   };
@@ -70,12 +73,32 @@ export function ExamPracticeScreen({ client, currentUserId, onExit }: { client: 
     setBusy(true);
     setError(null);
     try {
-      setPhase({ kind: 'result', result: await client.getResult(attemptId) });
+      setPhase({ kind: 'result', result: await client.getResult(attemptId), historyPaper: phase.kind === 'history' ? phase.paper : undefined });
     } catch (e) {
       setError(e instanceof Error ? e.message : '결과를 불러오지 못했어요.');
     } finally {
       setBusy(false);
     }
+  };
+
+  const continueHistory = async (paper: ExamPaperSummary, inProgress: boolean) => {
+    if (!inProgress) {
+      setError(null);
+      setPhase({ kind: 'start', paperId: paper.id });
+      setStartKey(k => k + 1);
+      return;
+    }
+    enterFullscreen();
+    setBusy(true);
+    setError(null);
+    try {
+      const attempt = await client.getActiveAttempt(paper.id);
+      if (attempt) setPhase({ kind: 'solve', attempt });
+      else { leaveFullscreen(); setPhase({ kind: 'start', paperId: paper.id }); setStartKey(k => k + 1); }
+    } catch (e) {
+      leaveFullscreen();
+      setError(e instanceof Error ? e.message : '풀던 시험을 불러오지 못했어요.');
+    } finally { setBusy(false); }
   };
 
   return (
@@ -90,8 +113,15 @@ export function ExamPracticeScreen({ client, currentUserId, onExit }: { client: 
           onStart={(paper, mode, elective) => { void start(paper, mode, elective); }}
           onResume={resume}
           onOpenResult={id => { void openResult(id); }}
+          onOpenHistory={paper => { setError(null); setPhase({ kind: 'history', paper }); }}
+          initialPaperId={phase.paperId}
           onExit={onExit}
         />
+      )}
+      {phase.kind === 'history' && (
+        <ExamHistoryView client={client} paper={phase.paper} busy={busy} error={error}
+          onBack={backToStart} onContinue={active => { void continueHistory(phase.paper, active); }}
+          onOpenResult={id => { void openResult(id); }} />
       )}
       {phase.kind === 'solve' && (
         <ExamSolveView
@@ -103,7 +133,9 @@ export function ExamPracticeScreen({ client, currentUserId, onExit }: { client: 
         />
       )}
       {phase.kind === 'result' && (
-        <OmrResultView key={phase.result.attemptId} client={client} result={phase.result} onBack={backToStart} />
+        <OmrResultView key={phase.result.attemptId} client={client} result={phase.result}
+          backLabel={phase.historyPaper ? '← 풀이 기록' : undefined}
+          onBack={() => { if (phase.historyPaper) { setError(null); setPhase({ kind: 'history', paper: phase.historyPaper }); } else backToStart(); }} />
       )}
     </div>
   );
