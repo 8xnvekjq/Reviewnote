@@ -35,6 +35,22 @@ const PAPER_A = '2025-06-math';
 const PAPER_B = 'mock-practice-b';
 const paperCard = (page, paperId = PAPER_A) => page.locator(`[data-testid="exam-paper-card"][data-paper-id="${paperId}"]`);
 
+async function noPaperCardOverlap(page) {
+  const cards = await page.getByTestId('exam-paper-card').evaluateAll(nodes => nodes.map(node => {
+    const card = node.getBoundingClientRect();
+    const children = [...node.children].map(child => child.getBoundingClientRect());
+    return {
+      title: node.querySelector('.exam-paper-title').textContent,
+      contained: children.every(child => child.top >= card.top && child.bottom <= card.bottom),
+      separated: children.every((child, index) => index === 0 || child.top >= children[index - 1].bottom),
+      bodyFits: node.querySelector('.exam-paper-body').scrollHeight <= node.querySelector('.exam-paper-body').clientHeight + 1,
+    };
+  }));
+  for (const card of cards) {
+    assert.ok(card.contained && card.separated && card.bodyFits, `${card.title}: 카드 내용 겹침·넘침 없음`);
+  }
+}
+
 async function startExam(page, modeTitle, elective, paperId = PAPER_A) {
   await paperCard(page, paperId).click();
   await page.getByTestId('exam-setup').waitFor();
@@ -489,6 +505,18 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   assert.match(await paperCard(page, PAPER_A).innerText(), /최근 1차 · \d+점/);
   assert.match(await paperCard(page, PAPER_A).innerText(), /1번 풀었어요/);
   assert.equal(await paperCard(page, PAPER_B).getAttribute('data-state'), 'in-progress');
+  await startExam(page, '실전 모드', '미적분', PAPER_A);
+  await page.getByRole('button', { name: '나가기' }).click();
+  await page.getByTestId('exam-exit-confirm').click();
+  await paperCard(page, PAPER_A).getByTestId('exam-paper-progress').waitFor();
+  assert.equal(await paperCard(page, PAPER_A).getByTestId('exam-paper-last').count(), 1);
+  await noPaperCardOverlap(page);
+  await noHorizontalOverflow(page, `start-progress-and-result/${viewport.width}`);
+  if (viewport.width === 390) {
+    await page.setViewportSize({ width: 320, height: 740 });
+    await noPaperCardOverlap(page);
+    await noHorizontalOverflow(page, 'start-progress-and-result/320');
+  }
   assert.deepEqual(errors, []);
   await context.close();
   console.log(`ok — papers progress separately (${viewport.width}×${viewport.height})`);
