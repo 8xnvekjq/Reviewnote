@@ -109,6 +109,7 @@ export interface AdminUserStat {
   email: string;
   mistakeCount: number;      // 전체 오답노트 수
   completedCount: number;    // 복습완료(O 3회) 수
+  hiddenActiveCount: number; // 숨긴(시험범위 제외) 미완료 오답 수 — "진행중"에서 뺀다
   lastActivity: string | null; // 최근 활동일 (ISO string)
   weeklyScore: number;       // 주간 복습 랭킹 점수
   weeklyTotalCount: number;  // 이번주 등록된 오답 수

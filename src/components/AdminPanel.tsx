@@ -105,6 +105,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
           email: p.email || '(이메일 없음)',
           mistakeCount: 0,
           completedCount: 0,
+          hiddenActiveCount: 0,
           lastActivity: null,
           weeklyScore: 0,
           weeklyTotalCount: 0,
@@ -177,6 +178,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
 
         if (isCompleted) {
           stat.completedCount += 1;
+        } else if (m.is_hidden) {
+          // 학생이 시험범위 제외로 숨긴 미완료 오답 — 학생 화면에서도 진행 목록에 안 보이므로
+          // "진행중"과 진행률 분모에서 빼고 따로 작게 센다.
+          stat.hiddenActiveCount += 1;
         }
 
         // 이번주 등록된 오답 집계 (신규 등록 오답)
@@ -580,9 +585,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
           최신 값이라 학년을 바꿔도 이 모달 안에서 바로 최신 상태로 보인다. ── */}
       {selectedStudent && (() => {
         const isEmailValid = selectedStudent.email && selectedStudent.email.includes('@');
-        const activeNotes = selectedStudent.mistakeCount - selectedStudent.completedCount;
-        const completionRate = selectedStudent.mistakeCount > 0
-          ? Math.round((selectedStudent.completedCount / selectedStudent.mistakeCount) * 100)
+        const hiddenActive = selectedStudent.hiddenActiveCount;
+        const activeNotes = selectedStudent.mistakeCount - selectedStudent.completedCount - hiddenActive;
+        // 진행률은 숨긴 미완료 오답을 뺀(학생이 실제로 복습 대상으로 보는) 오답 기준
+        const visibleNotes = selectedStudent.completedCount + activeNotes;
+        const completionRate = visibleNotes > 0
+          ? Math.round((selectedStudent.completedCount / visibleNotes) * 100)
           : 0;
         const realName = (selectedStudent as any).displayName || (selectedStudent as any).username;
         const nick = selectedStudent.nickname;
@@ -710,13 +718,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
                     <div className="bg-indigo-950/50 border border-indigo-800/40 rounded-xl p-3 text-center">
                       <div className="text-xl font-black text-indigo-300">{activeNotes}</div>
                       <div className="text-[10px] text-indigo-500 font-bold mt-0.5">진행중</div>
+                      {hiddenActive > 0 && (
+                        <div className="text-[9px] text-slate-500 font-semibold mt-0.5" title="시험범위 제외로 숨긴 미완료 오답">숨김 {hiddenActive}</div>
+                      )}
                     </div>
                     <div className="bg-emerald-950/50 border border-emerald-800/40 rounded-xl p-3 text-center">
                       <div className="text-xl font-black text-emerald-300">{selectedStudent.completedCount}</div>
                       <div className="text-[10px] text-emerald-500 font-bold mt-0.5">복습완료</div>
                     </div>
                   </div>
-                  {selectedStudent.mistakeCount > 0 && (
+                  {visibleNotes > 0 && (
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] text-slate-500 font-bold">복습 진행률</span>
