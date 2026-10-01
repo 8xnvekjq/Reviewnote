@@ -1,6 +1,10 @@
 /* 기출문제 풀이 — design-system.css 의 --rn-* 토큰 위에서만 만든다.
    풀이 화면(.exam-solve)은 position:fixed 로 앱 상단바·하단 탭까지 덮는다(전체화면 API가 없어도). */
 .exam-practice { width: 100%; min-width: 0; color: var(--rn-text); }
+.exam-review-badge { font-size: 11px; line-height: 1.4; color: #784a00; background: #fff1cc; padding: 4px 6px; border-radius: 6px; }
+.exam-answer-math { display: inline-flex; align-items: center; gap: 5px; min-width: 0; max-width: 100%; }
+.exam-answer-math > span:last-child { min-width: 0; overflow-x: auto; }
+.exam-omr-ten-answer { min-width: 0; font-size: 13px; }
 .exam-practice *, .exam-practice *::before, .exam-practice *::after { box-sizing: border-box; }
 .exam-error { color: var(--rn-danger); font-size: 13px; margin: 8px 0; }
 .exam-link { background: none; border: 0; padding: 0 2px; color: var(--rn-accent); font: inherit; text-decoration: underline; cursor: pointer; }
@@ -119,6 +123,10 @@
 .exam-choice { width: 52px; height: 52px; border-radius: 14px; font-size: 26px; line-height: 1; background: var(--rn-elevated); border: 2px solid var(--rn-line); color: var(--rn-text); touch-action: manipulation; transition: background var(--rn-fast), border-color var(--rn-fast), transform var(--rn-fast); }
 .exam-choice:active { transform: scale(.95); }
 .exam-choice.is-selected { background: rgb(var(--color-indigo-600)); border-color: rgb(var(--color-indigo-300)); color: #fff; }
+.exam-choices.exam-choices-ten { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); width: min(100%, 680px); gap: 6px; }
+.exam-choices-ten .exam-choice { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 100%; min-width: 0; height: auto; min-height: 76px; padding: 8px 2px; font-size: 14px; }
+.exam-choice-math { display: block; max-width: 100%; min-width: 0; overflow-x: auto; font-size: 15px; }
+.exam-choices-ten .katex { font-size: 1em; }
 .exam-unsure { display: grid; justify-items: center; min-width: 52px; min-height: 52px; padding: 4px 8px; border-radius: 14px; background: var(--rn-elevated); border: 2px solid var(--rn-line); font-size: 20px; line-height: 1.1; filter: grayscale(.8); opacity: .8; touch-action: manipulation; }
 .exam-unsure small { font-size: 10.5px; font-weight: 700; color: var(--rn-muted); }
 .exam-unsure.is-on { filter: none; opacity: 1; border-color: var(--rn-warning); background: rgb(242 199 119 / .16); }

@@ -1,5 +1,4 @@
-// 기출문제 풀이 — 세 작업(서버/데이터, 필기 엔진, 풀이 화면)이 공유하는 계약.
-// 여기 있는 타입과 시그니처만 믿고 병렬로 구현한다. 바꿔야 하면 임의로 바꾸지 말고 보고서에 적는다.
+// 기출문제 풀이 — 서버/데이터, 필기 엔진, 풀이 화면이 공유하는 계약.
 //
 // 시험 데이터 원본: src/features/exam/data/2025-06-math.json (정답·배점·등급컷·전국 오답률)
 // 문항 이미지: public/exams/2025-06-math/{c|prob|calc|geom}-NN.png (한 장에 한 문항,
@@ -11,10 +10,30 @@ export type ExamElective = '확률과 통계' | '미적분' | '기하';
  *  자유 모드: 시간 제한 없음, 문항마다 "채점해 보기" 가능. */
 export type ExamMode = 'real' | 'free';
 
-export interface ExamPaperSummary {
+export type ExamPaperKind = 'csat' | 'school' | 'hanneung';
+export type ExamAnswerType = 'choice5' | 'digits' | 'choice10';
+/** 선택 필드는 기존 운영 RPC 응답과의 호환용. 새 RPC는 모두 제공한다. */
+export interface ExamPaperMetadata {
+  kind?: ExamPaperKind;
+  schoolName?: string | null;
+  year?: number | null;
+  grade?: number | null;
+  semester?: number | null;
+  examTerm?: 'mid' | 'final' | null;
+  questionCount?: number;
+  maxScore?: number;
+  published?: boolean;
+}
+export interface ExamAnswerMetadata {
+  answerType?: ExamAnswerType;
+  /** 선지만 공개. 정답 번호는 제출/채점 RPC 외에는 제공하지 않는다. */
+  choices?: string[] | null;
+}
+
+export interface ExamPaperSummary extends ExamPaperMetadata {
   id: string;            // 예: '2025-06-math'
   title: string;         // '2025학년도 6월 모의평가 수학'
-  examDate: string;      // '2024-06-04'
+  examDate: string;      // '2024-06-04'. 시행일이 없는 원본은 빈 문자열로 매핑.
   source: string;        // '한국교육과정평가원'
   timeLimitMinutes: number;
   electives: ExamElective[];
@@ -32,27 +51,27 @@ export interface ExamPaperProgress {
   round?: number;
   attemptId: string;
   mode: ExamMode;
-  elective: ExamElective;
+  elective: ExamElective | null;
   startedAt: string;
   timeLimitMinutes: number | null;
-  answeredCount: number;  // 답한 문항 수(0~30)
+  answeredCount: number;  // 답한 문항 수(시험지 questionCount 이하)
   elapsedMs: number;      // 문항 스톱워치 합계(진행된 시간)
 }
 
 /** 학생이 받는 문항. 정답은 절대 포함하지 않는다(서버 RLS로도 막는다). */
-export interface ExamQuestion {
+export interface ExamQuestion extends ExamAnswerMetadata {
   id: string;            // 서버 문항 id (uuid)
-  number: number;        // 1~30
+  number: number;        // 시험지 안의 문항 번호
   section: 'common' | ExamElective;
   imageUrl: string;      // '/exams/2025-06-math/c-01.png'
-  isChoice: boolean;     // true: ①~⑤ 객관식, false: 0~999 단답
-  points: number;        // 2 | 3 | 4
+  isChoice: boolean;     // true: choice5/choice10, false: digits. 이전 RPC 호환용.
+  points: number;        // 양수 배점(소수 가능)
 }
 
 /** 문항 하나에 대한 학생의 현재 상태(자동 저장 단위). */
 export interface ExamItemState {
   questionId: string;
-  answer: string | null; // 객관식 '1'~'5', 단답 '0'~'999'(앞자리 0 없이), 미응답 null
+  answer: string | null; // choice5 '1'~'5', choice10 '1'~'10', digits '0'~'999', 미응답 null
   unsure: boolean;       // 🤔 애매 표시
   timeSpentMs: number;   // 문항 스톱워치 누적
   visits: number;        // 이 문항을 연 횟수
@@ -61,20 +80,21 @@ export interface ExamItemState {
   checked?: { isCorrect: boolean; correctAnswer: string } | null;
 }
 
-export interface ExamAttempt {
+export interface ExamAttempt extends ExamPaperMetadata {
+  paperTitle?: string;
   id: string;
   paperId: string;
   mode: ExamMode;
-  elective: ExamElective;
+  elective: ExamElective | null;
   startedAt: string;     // ISO, 실전 모드 남은 시간 = startedAt + timeLimit - now (서버 시각 기준 보정은 구현 재량)
   timeLimitMinutes: number | null; // 자유 모드는 null
   status: 'in_progress' | 'submitted';
-  questions: ExamQuestion[];       // 1~30 순서
+  questions: ExamQuestion[];       // 문항 번호 순서, 개수는 시험지 데이터 기준
   items: ExamItemState[];          // 저장돼 있던 진행 상황(이어 풀기)
   visitOrder: number[];            // 문항을 연 순서(번호), 리포트용
 }
 
-export interface ExamResultItem {
+export interface ExamResultItem extends ExamAnswerMetadata {
   questionId: string;
   number: number;
   section: 'common' | ExamElective;
@@ -91,19 +111,19 @@ export interface ExamResultItem {
   addedMistakeId: string | null;        // 오답노트에 추가했으면 그 mistakes.id
 }
 
-export interface ExamResult {
+export interface ExamResult extends ExamPaperMetadata {
   /** 같은 학생·시험지에서 시작 순서로 계산한 회차. 이전 서버와의 호환을 위해 선택 필드. */
   round?: number;
   attemptId: string;
   paperTitle: string;
   mode: ExamMode;
-  elective: ExamElective;
-  score: number;          // 원점수 0~100
+  elective: ExamElective | null;
+  score: number;          // 원점수 0~maxScore, 소수 가능
   correctCount: number;
-  totalCount: number;     // 30
+  totalCount: number;     // 이 시도에 포함된 실제 문항 수
   totalTimeMs: number;
-  /** 종로학원 확정 등급컷(원점수=추정) 기준 추정 등급 1~9. */
-  estimatedGrade: number;
+  /** 수능·모평 추정 등급 1~9. 내신은 null. */
+  estimatedGrade: number | null;
   /** v2: topStandard/topPercentile = 원점수 100점(최고점)일 때 값(선택과목별). 없으면 null.
    *  표준점수·백분위 추정은 (100, top) + (등급컷 원점수, 등급컷 표준점수/백분위) 점들을 잇는 선형 보간. */
   gradeCut: { rawByGrade: number[]; standardByGrade: number[]; percentileByGrade: number[]; topStandard: number | null; topPercentile: number | null; source: string };
@@ -113,7 +133,7 @@ export interface ExamResult {
 
 // v2 표준점수·백분위(추정)는 화면에서 gradeCut으로 계산한다(ui/examLogic.ts의 estimateStandardScore).
 /** 기록 화면 전용. 진행 중에는 채점 여부와 관계없이 isCorrect가 null이다. 정답은 포함하지 않는다. */
-export interface ExamHistoryItem {
+export interface ExamHistoryItem extends ExamAnswerMetadata {
   number: number;
   section: 'common' | ExamElective;
   isCorrect: boolean | null;
@@ -122,14 +142,15 @@ export interface ExamHistoryItem {
   timeSpentMs: number;
 }
 
-export interface ExamPaperHistoryAttempt {
+export interface ExamPaperHistoryAttempt extends ExamPaperMetadata {
+  paperTitle?: string;
   attemptId: string;
   round: number;
   startedAt: string;
   submittedAt: string | null;
   status: 'in_progress' | 'submitted';
   mode: ExamMode;
-  elective: ExamElective;
+  elective: ExamElective | null;
   score: number | null;
   estimatedGrade: number | null;
   totalTimeMs: number;
@@ -143,7 +164,7 @@ export interface ExamClient {
   listPapers(): Promise<ExamPaperSummary[]>;
   /** 진행 중인 시도가 있으면 그것을 돌려준다(이어 풀기). 없으면 null. */
   getActiveAttempt(paperId: string): Promise<ExamAttempt | null>;
-  startAttempt(paperId: string, mode: ExamMode, elective: ExamElective): Promise<ExamAttempt>;
+  startAttempt(paperId: string, mode: ExamMode, elective: ExamElective | null): Promise<ExamAttempt>;
   /** 진행 상황 자동 저장(디바운스는 호출 측 책임). 실패해도 throw 대신 false. */
   saveProgress(attemptId: string, items: ExamItemState[], visitOrder: number[]): Promise<boolean>;
   /** 자유 모드 전용: 문항 하나를 바로 채점. 실전 모드면 서버가 거부한다.
@@ -152,7 +173,7 @@ export interface ExamClient {
   /** 제출 + 서버 채점. 이후 정답 공개. */
   submitAttempt(attemptId: string, items: ExamItemState[], visitOrder: number[]): Promise<ExamResult>;
   getResult(attemptId: string): Promise<ExamResult>;
-  listMyResults(paperId?: string): Promise<Array<Pick<ExamResult, 'attemptId' | 'paperTitle' | 'mode' | 'elective' | 'score' | 'estimatedGrade' | 'submittedAt'>>>;
+  listMyResults(paperId?: string): Promise<Array<Pick<ExamResult, 'attemptId' | 'paperTitle' | 'mode' | 'elective' | 'score' | 'estimatedGrade' | 'submittedAt' | keyof ExamPaperMetadata>>>;
   /** 학생이 OMR 결과에서 고른 문항(틀린 문제·🤔 문제 후보)을 오답노트(mistakes)에 추가. 이미 추가된 건 건너뜀. */
   addToMistakes(attemptId: string, questionIds: string[]): Promise<Array<{ questionId: string; mistakeId: string }>>;
 }

@@ -1,17 +1,17 @@
 // 시작 화면: A4 비율 시험지 카드 격자 → (진행 중이면) 이어 풀기 / (아니면) 모드(실전/자유) → 선택과목 → 시작. 아래엔 지난 OMR 결과.
 // v2: 시험지마다 따로 진행한다 — 한 시험지를 풀다 나와도 다른 시험지는 새로 시작할 수 있고, 같은 시험지는 이어 풀기만.
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import type { ExamAttempt, ExamClient, ExamElective, ExamMode, ExamPaperSummary, ExamResult } from '../contract';
+import type { ExamAttempt, ExamClient, ExamElective, ExamMode, ExamPaperSummary, ExamResult, ExamPaperMetadata } from '../contract';
 import { ELECTIVE_SHORT, ELECTIVES, formatClock, formatElapsed, progressRatio, remainingMs, roundLabel } from './examLogic';
 
-type PastResult = Pick<ExamResult, 'attemptId' | 'paperTitle' | 'mode' | 'elective' | 'score' | 'estimatedGrade' | 'submittedAt'>;
+type PastResult = Pick<ExamResult, 'attemptId' | 'paperTitle' | 'mode' | 'elective' | 'score' | 'estimatedGrade' | 'submittedAt' | keyof ExamPaperMetadata>;
 
 interface Props {
   client: ExamClient;
   currentUserId: string;
   busy: boolean;
   error: string | null;
-  onStart: (paper: ExamPaperSummary, mode: ExamMode, elective: ExamElective) => void;
+  onStart: (paper: ExamPaperSummary, mode: ExamMode, elective: ExamElective | null) => void;
   onResume: (attempt: ExamAttempt) => void;
   onOpenResult: (attemptId: string) => void;
   onOpenHistory: (paper: ExamPaperSummary) => void;
@@ -23,7 +23,7 @@ const MODES: Array<{ value: ExamMode; title: string; desc: string }> = [
   { value: 'real', title: '실전 모드', desc: '100분 타이머, 제출하기 전엔 정답이 보이지 않아요.' },
   { value: 'free', title: '자유 모드', desc: '시간 제한 없이, 문항마다 채점해 볼 수 있어요.' },
 ];
-const TOTAL_QUESTIONS = 30;
+
 
 function electiveKey(userId: string) { return `rn-exam-elective:${userId}`; }
 
@@ -34,12 +34,14 @@ function formatDate(iso: string) {
 }
 
 function PaperCard({ paper, selected, busy, now, onClick }: { paper: ExamPaperSummary; selected: boolean; busy: boolean; now: number; onClick: () => void }) {
+  const total = paper.questionCount ?? 30;
+  const school = paper.kind === 'school';
   const progress = paper.inProgress ?? null;
   const last = paper.lastResult ?? null;
   const count = paper.resultCount ?? 0;
   const remaining = progress ? remainingMs(progress.startedAt, progress.timeLimitMinutes, now) : null;
   const cta = progress ? '이어 풀기' : count > 0 ? '다시 풀기' : '새로 풀기';
-  const ratio = progress ? progressRatio(progress.answeredCount, TOTAL_QUESTIONS) : 0;
+  const ratio = progress ? progressRatio(progress.answeredCount, total) : 0;
 
   return (
     <button
@@ -55,30 +57,32 @@ function PaperCard({ paper, selected, busy, now, onClick }: { paper: ExamPaperSu
     >
       <span className="exam-paper-sheet-head" aria-hidden="true">
         <span>수학 영역</span>
-        <span>{paper.timeLimitMinutes}분 · 30문항</span>
+        <span>{paper.timeLimitMinutes}분 · {total}문항</span>
       </span>
       <strong className="exam-paper-title">{paper.title}</strong>
-      <span className="exam-paper-date">{formatDate(paper.examDate)} 시행</span>
+      {paper.examDate && <span className="exam-paper-date">{formatDate(paper.examDate)} 시행</span>}
+      {school && <span className="exam-paper-date">{paper.year} {paper.schoolName} · {paper.grade}학년 {paper.semester}학기 {paper.examTerm === 'mid' ? '중간' : '기말'}</span>}
+      {paper.published === false && <span className="exam-review-badge">검토 중(학생 비공개)</span>}
 
       <span className="exam-paper-body">
         {progress && (
           <span className="exam-paper-progress" data-testid="exam-paper-progress">
             <span className="exam-paper-line"><b>{roundLabel(progress.round)} 진행 중</b></span>
-            <span className="exam-progress-bar" role="progressbar" aria-label="푼 문제" aria-valuemin={0} aria-valuemax={TOTAL_QUESTIONS} aria-valuenow={progress.answeredCount}>
+            <span className="exam-progress-bar" role="progressbar" aria-label="푼 문제" aria-valuemin={0} aria-valuemax={total} aria-valuenow={progress.answeredCount}>
               <i style={{ '--ratio': ratio } as CSSProperties} />
             </span>
             <span className="exam-paper-line">
-              푼 문제 <b>{progress.answeredCount}/{TOTAL_QUESTIONS}</b> · 진행 <b>{formatElapsed(progress.elapsedMs)}</b>
+              푼 문제 <b>{progress.answeredCount}/{total}</b> · 진행 <b>{formatElapsed(progress.elapsedMs)}</b>
             </span>
             <span className="exam-paper-line is-muted">
-              {progress.mode === 'real' ? '실전' : '자유'} · {ELECTIVE_SHORT[progress.elective]}
+              {progress.mode === 'real' ? '실전' : '자유'}{progress.elective && ` · ${ELECTIVE_SHORT[progress.elective]}`}
               {remaining != null && ` · 남은 ${formatClock(remaining)}`}
             </span>
           </span>
         )}
         {last && (
           <span className="exam-paper-last" data-testid="exam-paper-last">
-            <span className="exam-paper-line">최근 {roundLabel(last.round) && `${roundLabel(last.round)} · `}<b>{last.score}점</b>{last.estimatedGrade != null && <> · <b>{last.estimatedGrade}등급</b></>}</span>
+            <span className="exam-paper-line">최근 {roundLabel(last.round) && `${roundLabel(last.round)} · `}<b>{last.score}점{school && ` / ${paper.maxScore ?? 100}`}</b>{!school && last.estimatedGrade != null && <> · <b>{last.estimatedGrade}등급</b></>}</span>
             <span className="exam-paper-line is-muted">{count}번 풀었어요</span>
           </span>
         )}
@@ -165,8 +169,12 @@ export function ExamStartView({ client, currentUserId, busy, error, onStart, onR
       {papers && papers.length > 0 && (
         <>
           <p className="rn-caption">시험지를 눌러 시작해요. 풀던 시험지는 이어서 풀 수 있어요.</p>
-          <div className="exam-paper-list" aria-label="시험지">
-            {papers.map(p => (
+          {(['csat', 'school', 'hanneung'] as const).map(kind => {
+            const group = papers.filter(p => (p.kind ?? 'csat') === kind);
+            return group.length > 0 ? <section key={kind} aria-label={kind === 'school' ? '내신' : kind === 'csat' ? '수능·모평' : '한능검'}>
+            <h2 className="exam-setup-title">{kind === 'school' ? '내신' : kind === 'csat' ? '수능·모평' : '한능검'}</h2>
+            <div className="exam-paper-list" aria-label="시험지">
+            {group.map(p => (
               <div key={p.id} className="exam-paper-entry">
                 <PaperCard paper={p} selected={p.id === paperId} busy={busy || resuming != null} now={now} onClick={() => onCard(p)} />
                 <button type="button" className="rn-button rn-button-ghost rn-button-compact exam-history-open"
@@ -174,7 +182,8 @@ export function ExamStartView({ client, currentUserId, busy, error, onStart, onR
                   aria-label={`${p.title} 풀이 기록 보기`} data-testid="exam-history-open" data-paper-id={p.id}>풀이 기록 보기</button>
               </div>
             ))}
-          </div>
+          </div></section> : null;
+          })}
         </>
       )}
       {(resumeError || (!showSetup && error)) && <p className="exam-error" role="alert">{resumeError || error}</p>}
@@ -192,6 +201,7 @@ export function ExamStartView({ client, currentUserId, busy, error, onStart, onR
             ))}
           </div>
 
+          {paper.electives.length > 0 && <>
           <h2 className="exam-setup-title">선택과목</h2>
           <div className="exam-option-grid exam-option-grid-3" role="radiogroup" aria-label="선택과목">
             {paper.electives.map(e => (
@@ -202,15 +212,16 @@ export function ExamStartView({ client, currentUserId, busy, error, onStart, onR
             ))}
           </div>
 
+          </>}
           {error && <p className="exam-error" role="alert">{error}</p>}
           <button
             type="button"
             className="rn-button rn-button-primary exam-start-button"
-            disabled={!elective || busy}
-            onClick={() => { if (elective) onStart(paper, mode, elective); }}
+            disabled={(paper.electives.length > 0 && !elective) || busy}
+            onClick={() => { if (!paper.electives.length || elective) onStart(paper, mode, paper.electives.length ? elective : null); }}
             data-testid="exam-start-button"
           >
-            {busy ? '준비 중…' : elective ? `${mode === 'real' ? '실전' : '자유'} 모드로 시작하기` : '선택과목을 골라 주세요'}
+            {busy ? '준비 중…' : (!paper.electives.length || elective) ? `${mode === 'real' ? '실전' : '자유'} 모드로 시작하기` : '선택과목을 골라 주세요'}
           </button>
           <p className="rn-caption exam-start-hint">시작하면 화면이 꽉 차게 바뀌어요. 애플펜슬로 문제 위에 바로 풀 수 있어요.</p>
         </section>
@@ -223,8 +234,8 @@ export function ExamStartView({ client, currentUserId, busy, error, onStart, onR
             {past.map(r => (
               <li key={r.attemptId}>
                 <button type="button" className="exam-past-row" onClick={() => onOpenResult(r.attemptId)}>
-                  <span><strong>{r.score}점</strong> · 추정 {r.estimatedGrade}등급</span>
-                  <span className="rn-caption">{r.paperTitle} · {r.mode === 'real' ? '실전' : '자유'} · {ELECTIVE_SHORT[r.elective]} · {formatDate(r.submittedAt)}</span>
+                  <span><strong>{r.score}점{r.kind === 'school' && ` / ${r.maxScore ?? 100}`}</strong>{r.kind !== 'school' && r.estimatedGrade != null && ` · 추정 ${r.estimatedGrade}등급`}</span>
+                  <span className="rn-caption">{r.paperTitle} · {r.mode === 'real' ? '실전' : '자유'}{r.elective && ` · ${ELECTIVE_SHORT[r.elective]}`} · {formatDate(r.submittedAt)}</span>
                 </button>
               </li>
             ))}

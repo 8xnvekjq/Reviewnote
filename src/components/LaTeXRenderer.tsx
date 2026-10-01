@@ -6,6 +6,7 @@ interface LaTeXRendererProps {
   text: string;
   className?: string;
   isPrintMode?: boolean; // 인쇄 모드 여부
+  inline?: boolean;
 }
 
 /**
@@ -223,8 +224,8 @@ const parseMarkdownWithMath = (text: string, isPrintMode = false): string => {
   return result;
 };
 
-export const LaTeXRenderer: React.FC<LaTeXRendererProps> = ({ text, className = '', isPrintMode = false }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
+export const LaTeXRenderer: React.FC<LaTeXRendererProps> = ({ text, className = '', isPrintMode = false, inline = false }) => {
+  const containerRef = useRef<HTMLDivElement & HTMLSpanElement>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -232,6 +233,8 @@ export const LaTeXRenderer: React.FC<LaTeXRendererProps> = ({ text, className = 
     // Render and inject pre-compiled math HTML safely
     containerRef.current.innerHTML = parseMarkdownWithMath(text, isPrintMode);
   }, [text, isPrintMode]);
+
+  if (inline) return <span ref={containerRef} className={`${className} katex-rendered-text`} />;
 
   return (
     <div 
