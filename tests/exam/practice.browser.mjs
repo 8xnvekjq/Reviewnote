@@ -41,7 +41,7 @@ async function noPaperCardOverlap(page) {
     const children = [...node.children].map(child => child.getBoundingClientRect());
     return {
       title: node.querySelector('.exam-paper-title').textContent,
-      contained: children.every(child => child.top >= card.top && child.bottom <= card.bottom),
+      contained: children.every(child => child.top >= card.top + 12 && child.bottom <= card.bottom - 12 && child.left >= card.left + 12 && child.right <= card.right - 12),
       separated: children.every((child, index) => index === 0 || child.top >= children[index - 1].bottom),
       bodyFits: node.querySelector('.exam-paper-body').scrollHeight <= node.querySelector('.exam-paper-body').clientHeight + 1,
     };
@@ -458,9 +458,9 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   const { context, page, errors } = await open(viewport);
   assert.equal(await page.getByTestId('exam-paper-card').count() >= 2, true);
   assert.equal(await paperCard(page, PAPER_A).getAttribute('data-state'), 'new');
-  // 카드는 A4 비율(세로/가로 ≈ 1.414, 내용이 넘치면 더 길어질 수만 있다)
   const box = await paperCard(page, PAPER_A).boundingBox();
-  assert.ok(box.height / box.width >= 1.4, `A4 card ratio ${box.height / box.width}`);
+  assert.ok(box.height >= 250, `card height ${box.height}`);
+  await noPaperCardOverlap(page);
   await noHorizontalOverflow(page, `start/${viewport.width}`);
 
   await startExam(page, '자유 모드', '확통', PAPER_A);
@@ -503,7 +503,7 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   await page.getByRole('button', { name: '← 시험지 목록' }).click();
   await page.locator(`[data-testid="exam-paper-card"][data-paper-id="${PAPER_A}"][data-state="done"]`).waitFor();
   assert.match(await paperCard(page, PAPER_A).innerText(), /최근 1차 · \d+점/);
-  assert.match(await paperCard(page, PAPER_A).innerText(), /1번 풀었어요/);
+  assert.doesNotMatch(await paperCard(page, PAPER_A).innerText(), /번 풀었어요|시행/);
   assert.equal(await paperCard(page, PAPER_B).getAttribute('data-state'), 'in-progress');
   await startExam(page, '실전 모드', '미적분', PAPER_A);
   await page.getByRole('button', { name: '나가기' }).click();

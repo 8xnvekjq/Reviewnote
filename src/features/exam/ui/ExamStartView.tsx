@@ -64,8 +64,6 @@ function PaperCard({ paper, selected, busy, now, onClick }: { paper: ExamPaperSu
         <span>{paper.timeLimitMinutes}분 · {total}문항</span>
       </span>
       <strong className="exam-paper-title">{paper.title}</strong>
-      {paper.examDate && <span className="exam-paper-date">{formatDate(paper.examDate)} 시행</span>}
-      {school && <span className="exam-paper-date">{paper.year} {paper.schoolName} · {paper.grade}학년 {paper.semester}학기 {paper.examTerm === 'mid' ? '중간' : '기말'}</span>}
       {paper.published === false && <span className="exam-review-badge">검토 중(학생 비공개)</span>}
 
       <span className="exam-paper-body">
@@ -87,7 +85,6 @@ function PaperCard({ paper, selected, busy, now, onClick }: { paper: ExamPaperSu
         {last && (
           <span className="exam-paper-last" data-testid="exam-paper-last">
             <span className="exam-paper-line">최근 {roundLabel(last.round) && `${roundLabel(last.round)} · `}<b>{last.score}점{school && ` / ${paper.maxScore ?? 100}`}</b>{!school && last.estimatedGrade != null && <> · <b>{last.estimatedGrade}등급</b></>}</span>
-            <span className="exam-paper-line is-muted">{count}번 풀었어요</span>
           </span>
         )}
         {!progress && !last && <span className="exam-paper-line is-muted">아직 풀지 않았어요</span>}
