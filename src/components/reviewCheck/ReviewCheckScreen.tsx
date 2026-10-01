@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { MistakeEntry } from '../../types';
 import { MATH_CURRICULUM, GRADE_LIST } from '../../types';
 import '../../styles/examPrep.css';
@@ -17,12 +17,15 @@ import { AppIcon } from '../ui/AppIcon';
 import { LaTeXRenderer } from '../LaTeXRenderer';
 import { ReviewCheckImageZoom } from './ReviewCheckImageZoom';
 import { ReviewCheckResultCard } from './ReviewCheckResultCard';
+import { ReviewCheckProgressSummary } from './ReviewCheckProgressSummary';
 import { HandwritingOverlay, type HandwritingOverlayBounds, type HandwritingOverlayHandle } from '../HandwritingOverlay';
 
 interface Props {
   currentUserId: string;
   schoolGrade?: string;
   mistakes: MistakeEntry[];
+  // 시작 화면 "나의 복습 흐름"에서 틀린 문제를 누르면 App.tsx의 오답카드(MistakeDetailModal)를 연다.
+  onOpenMistake?: (mistakeId: string) => void;
 }
 
 const FALLBACK_GRADE = MATH_CURRICULUM['공통수학2'] ? '공통수학2' : GRADE_LIST[0];
@@ -47,7 +50,7 @@ function formatDateLabel(iso: string): string {
 
 // 학생용 "복습체크" — 범위 선택 -> 최대 5문제 -> 주관식 제출 -> 채점 대기, 만 알면 되도록
 // 화면 하나에 한 흐름만 보여준다. DB 상태(session 원본/RLS/RPC)는 여기서 절대 노출하지 않는다.
-export function ReviewCheckScreen({ currentUserId, schoolGrade, mistakes }: Props) {
+export function ReviewCheckScreen({ currentUserId, schoolGrade, mistakes, onOpenMistake }: Props) {
   const [view, setView] = useState<ViewState>({ kind: 'loading' });
   const mistakeById = useMemo(() => new Map(mistakes.map(m => [m.id, m])), [mistakes]);
 
@@ -132,12 +135,13 @@ export function ReviewCheckScreen({ currentUserId, schoolGrade, mistakes }: Prop
       onStarted={load}
       onShowHistory={() => setView({ kind: 'history' })}
       onOpenRecent={session => setView({ kind: 'historyDetail', session })}
+      progressSummary={<ReviewCheckProgressSummary studentId={currentUserId} mistakes={mistakes} onOpenMistake={onOpenMistake} />}
     />
   );
 }
 
 function ReviewCheckStart({
-  studentId, schoolGrade, recentGraded, onStarted, onShowHistory, onOpenRecent,
+  studentId, schoolGrade, recentGraded, onStarted, onShowHistory, onOpenRecent, progressSummary,
 }: {
   studentId: string;
   schoolGrade?: string;
@@ -145,6 +149,7 @@ function ReviewCheckStart({
   onStarted: () => void;
   onShowHistory: () => void;
   onOpenRecent: (session: ReviewCheckSession) => void;
+  progressSummary?: ReactNode;
 }) {
   const [grade, setGrade] = useState(() => defaultGradeFor(schoolGrade));
   const chapters = MATH_CURRICULUM[grade] || [];
@@ -197,6 +202,8 @@ function ReviewCheckStart({
         onOpenRecent={onOpenRecent}
         onShowHistory={onShowHistory}
       />
+
+      {progressSummary}
 
       <div className="rn-examprep-range-bar">
         <div className="rn-examprep-range-field">

@@ -42,6 +42,12 @@ const mistakes: MistakeEntry[] = [
 
 createRoot(document.getElementById('root')!).render(
   <div style={{ maxWidth: 480, margin: '0 auto', padding: 16 }}>
-    <ReviewCheckScreen currentUserId={userId} schoolGrade="고1" mistakes={mistakes} />
+    <ReviewCheckScreen
+      currentUserId={userId}
+      schoolGrade="고1"
+      mistakes={mistakes}
+      // 실제 앱에선 App.tsx가 오답카드(MistakeDetailModal)를 연다 — 여기선 어떤 문제가 요청됐는지만 남긴다.
+      onOpenMistake={id => { document.body.dataset.openedMistake = id; }}
+    />
   </div>,
 );
