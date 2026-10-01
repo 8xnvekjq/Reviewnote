@@ -407,7 +407,8 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       className="exam-ink"
       data-ready={cssWidth > 0 && aspect > 0 ? 'true' : 'false'}
       data-pen-detected={penSeen ? 'true' : 'false'}
-      style={{ position: 'relative', width: '100%', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' } as CSSProperties}
+      data-stroke-count={strokes.length}
+      style={{ position: 'relative', width: '100%', background: '#fff', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' } as CSSProperties}
     >
       <img
         ref={imgRef}

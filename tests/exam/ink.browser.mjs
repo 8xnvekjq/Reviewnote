@@ -168,7 +168,7 @@ try {
   await fire('pointermove', 'touch', 33, [[0.4, 1.45]]);
   await fire('pointerup', 'touch', 33, [[0.4, 1.45]]);
   assert.equal((await strokes()).length, touchBefore + 2, 'palm/finger touches are ignored once a pen was seen');
-  assert.match(await input.evaluate(el => getComputedStyle(el).touchAction), /pan/, 'fingers scroll instead');
+  assert.match(await input.evaluate(el => getComputedStyle(el).touchAction), /pan|manipulation/, 'fingers scroll instead');
 
   assert.deepEqual(errors, []);
   console.log('PASS exam ink: pen, hold→line/circle with resize, stroke eraser, undo/redo/clear, resize keeps position, readOnly, palm rejection');

@@ -116,7 +116,11 @@ export function ExamStartView({ client, currentUserId, busy, error, onStart, onR
         </section>
       )}
 
-      {paper && (
+      {paper && active && (
+        <p className="rn-caption exam-start-hint">풀던 시험을 제출하면 새 시험을 시작할 수 있어요.</p>
+      )}
+
+      {paper && !active && (
         <section className="exam-setup" aria-label="풀이 설정">
           <h2 className="exam-setup-title">어떻게 풀까요?</h2>
           <div className="exam-option-grid" role="radiogroup" aria-label="모드">

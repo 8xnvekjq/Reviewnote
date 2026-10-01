@@ -38,10 +38,10 @@ async function startExam(page, modeTitle, elective) {
 }
 
 const question = page => page.getByTestId('exam-solve').getAttribute('data-question');
-const strokeCount = page => page.locator('[data-testid="exam-body"] svg').getAttribute('data-stroke-count');
+const strokeCount = page => page.locator('[data-testid="exam-body"] .exam-ink').getAttribute('data-stroke-count');
 
 async function drawStroke(page) {
-  const box = await page.locator('[data-testid="exam-body"] svg').boundingBox();
+  const box = await page.locator('[data-testid="exam-body"] .exam-ink').boundingBox();
   assert.ok(box, 'ink canvas visible');
   await page.mouse.move(box.x + box.width * 0.2, box.y + box.height * 0.3);
   await page.mouse.down();
@@ -217,7 +217,7 @@ async function spinWheel(page, place, steps) {
   // 문항 크게 보기 + 내 필기(읽기 전용, IndexedDB 에서 복원)
   await page.locator('.exam-item-row[data-number="1"]').click();
   await page.getByTestId('exam-viewer').waitFor();
-  await page.waitForFunction(() => document.querySelector('[data-testid="exam-viewer"] svg')?.getAttribute('data-stroke-count') === '1');
+  await page.waitForFunction(() => document.querySelector('[data-testid="exam-viewer"] .exam-ink')?.getAttribute('data-stroke-count') === '1');
   await page.getByRole('button', { name: '닫기' }).click();
 
   // 시험지 목록 → 지난 결과
@@ -291,7 +291,7 @@ async function spinWheel(page, place, steps) {
   await page.getByRole('button', { name: '이어 풀기' }).click();
   await page.getByTestId('exam-solve').waitFor();
   assert.equal(await page.locator('.exam-choice[data-choice="5"]').getAttribute('aria-pressed'), 'true');
-  await page.waitForFunction(() => document.querySelector('[data-testid="exam-body"] svg')?.getAttribute('data-stroke-count') === '1');
+  await page.waitForFunction(() => document.querySelector('[data-testid="exam-body"] .exam-ink')?.getAttribute('data-stroke-count') === '1');
   assert.deepEqual(errors, []);
   await context.close();
   console.log('ok — exit, reload, resume');
