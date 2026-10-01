@@ -7,9 +7,9 @@ import type { Pt } from './shapeSnap.ts';
  * 좌표계: x는 이미지 너비 기준 0~1, y도 같은 단위(이미지 너비 = 1)로 잰다.
  * 그래서 이미지 높이는 naturalHeight/naturalWidth, 캔버스 전체 높이는 그 + inkExtraBelow(그).
  */
-export const INK_EXTRA_BELOW = 0.6;
+export const INK_EXTRA_BELOW = 1;
 /** 1번처럼 납작한 문항도 풀이 공간이 모자라지 않게 아래 여백은 최소 이미지 너비의 절반. */
-export const INK_MIN_EXTRA = 0.5;
+export const INK_MIN_EXTRA = 1.4;
 
 /** 문항 이미지 아래 여백 높이(이미지 너비 = 1 단위). aspect = naturalHeight / naturalWidth. */
 export function inkExtraBelow(aspect: number): number {

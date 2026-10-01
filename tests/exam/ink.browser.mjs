@@ -127,7 +127,7 @@ try {
   const box = await input.boundingBox();
   const img = await page.locator('.exam-ink img').boundingBox();
   assert.ok(Math.abs(box.width - img.width) < 1 && Math.abs(box.x - img.x) < 1 && Math.abs(box.y - img.y) < 1, 'canvas covers the image exactly');
-  assert.ok(Math.abs(box.height - img.height * 1.6) < 2, 'canvas adds 60% writing room below the image (c-15 is tall enough to skip the minimum)');
+  assert.ok(Math.abs(box.height - (img.height + Math.max(img.height, img.width * 1.4))) < 2, 'canvas adds writing room below the image: as tall as the image, at least 1.4 widths');
   await page.setViewportSize({ width: 390, height: 844 }); // 세로 폰
   await page.waitForTimeout(150);
   assert.ok(await inkAt(sample.x, sample.y), 'still in place on a narrow phone');
@@ -168,7 +168,20 @@ try {
   await fire('pointermove', 'touch', 33, [[0.4, 1.45]]);
   await fire('pointerup', 'touch', 33, [[0.4, 1.45]]);
   assert.equal((await strokes()).length, touchBefore + 2, 'palm/finger touches are ignored once a pen was seen');
-  assert.match(await input.evaluate(el => getComputedStyle(el).touchAction), /pan|manipulation/, 'fingers scroll instead');
+  // 손가락은 캔버스가 직접 스크롤로 처리한다(touch-action pan은 iPad에서 펜 획까지 끊었다) — 펜 입력은 늘 캔버스가 받는다.
+  assert.equal(await input.evaluate(el => getComputedStyle(el).touchAction), 'none', 'the pen is never handed to native scrolling');
+
+  // 실기기 버그 회귀: 펜으로 쓰다 잠깐 멈춰도(짧은 획 + 0.7초 정지) 획이 도형으로 바뀌거나 끊기지 않고 이어진다.
+  const beforePause = (await strokes()).length;
+  await fire('pointerdown', 'pen', 34, [[0.2, 1.6]]);
+  await fire('pointermove', 'pen', 34, [[0.21, 1.6], [0.22, 1.6], [0.23, 1.6], [0.24, 1.6]]); // 짧고 곧은 첫 획(약 30px) — 예전 18px 기준이면 직선으로 바뀌었다
+  await page.waitForTimeout(750);
+  await fire('pointermove', 'pen', 34, Array.from({ length: 20 }, (_, i) => [0.22 + i * 0.02, 1.62 + Math.sin(i / 2) * 0.03]));
+  await fire('pointerup', 'pen', 34, [[0.6, 1.62]]);
+  list = await strokes();
+  assert.equal(list.length, beforePause + 1, 'the paused stroke is committed as one stroke');
+  assert.ok(!list.at(-1).shape, 'a mid-writing pause does not turn handwriting into a shape');
+  assert.ok(Math.max(...list.at(-1).points.map(p => p.x)) > 0.55, 'writing after the pause is kept (the stroke did not stop at the pause)');
 
   assert.deepEqual(errors, []);
   console.log('PASS exam ink: pen, hold→line/circle with resize, stroke eraser, undo/redo/clear, resize keeps position, readOnly, palm rejection');

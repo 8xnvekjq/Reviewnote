@@ -110,12 +110,12 @@ export function prepareCanvas(canvas: HTMLCanvasElement, cssWidth: number, cssHe
   return resized;
 }
 
-export function resetTransform(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, cssWidth: number) {
+/** 캔버스를 비우고 기준 공간 → 백버퍼 픽셀 변환을 건다. unitDevicePx = 정규화 1(이미지 너비)이 차지하는 백버퍼 픽셀 수. */
+export function resetTransform(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, unitDevicePx: number) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const scale = canvas.width / REF;
-  // 가로 기준으로 정규화했으므로 가로·세로 같은 배율. cssWidth는 0 나눗셈 방지용 확인만.
-  if (cssWidth > 0) ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  // 가로 기준으로 정규화했으므로 가로·세로 같은 배율.
+  if (unitDevicePx > 0) ctx.setTransform(unitDevicePx / REF, 0, 0, unitDevicePx / REF, 0, 0);
 }
 
 /** iOS 캔버스 한 장 최대 픽셀(약 16.7M)을 넘지 않는 배율. */

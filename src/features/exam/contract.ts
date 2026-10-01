@@ -132,5 +132,8 @@ export interface ExamInkCanvasProps {
   /** 꾹 눌러 직선/원 변환(기본 true). 펜을 떼지 않고 ~500ms 멈추면 판정. */
   shapeSnap?: boolean;
   readOnly?: boolean;
+  /** 문항 이미지를 이 너비(CSS px) 이하로 고정해 글자 크기를 일정하게 한다. 필기 영역은 컨테이너 전체 너비를 쓴다.
+   *  좌표 정규화 기준(1)은 실제로 보이는 이미지 너비. 없으면 컨테이너 너비 = 이미지 너비. */
+  imageMaxWidth?: number;
 }
 export interface ExamInkCanvasHandle { undo(): void; redo(): void; clear(): void; canUndo(): boolean; canRedo(): boolean }
