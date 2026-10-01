@@ -590,11 +590,23 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
 const SCHOOL = '2026-dongbuk-g1-s2-mid-common2';
 {
   const { context, page } = await open(PORTRAIT);
+  await page.getByRole('button', { name: '고1', exact: true }).click();
   assert.equal(await paperCard(page, SCHOOL).count(), 0, '학생은 비공개 내신을 볼 수 없음');
   await context.close();
 }
 for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   const { context, page, errors } = await open(viewport, '?admin=1&persist=1');
+  assert.equal(await page.getByRole('button', { name: '고3', exact: true }).getAttribute('aria-pressed'), 'true');
+  await paperCard(page).click();
+  await page.getByTestId('exam-setup').waitFor();
+  assert.equal(await paperCard(page, SCHOOL).count(), 0);
+  await page.getByRole('button', { name: '고2', exact: true }).click();
+  assert.equal(await page.getByTestId('exam-paper-card').count(), 0);
+  assert.equal(await page.getByTestId('exam-setup').count(), 0);
+  assert.equal(await page.getByText('아직 고2 시험지가 없어요.').count(), 1);
+  await noHorizontalOverflow(page, `grade-empty/${viewport.width}`);
+  await page.getByRole('button', { name: '고1', exact: true }).click();
+  assert.equal(await paperCard(page).count(), 0);
   assert.match(await paperCard(page, SCHOOL).innerText(), /2026.*동북고/s);
   assert.match(await paperCard(page, SCHOOL).innerText(), /21문항/);
   assert.match(await paperCard(page, SCHOOL).innerText(), /검토 중\(학생 비공개\)/);
@@ -654,6 +666,7 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   assert.equal(await page.locator('.exam-item-row[data-number="18"] .katex').count(), 2);
   await noHorizontalOverflow(page, `school-result/${viewport.width}`);
   await page.getByRole('button', { name: '← 시험지 목록', exact: true }).click();
+  await page.getByRole('button', { name: '고1', exact: true }).click();
   await page.locator(`[data-testid="exam-history-open"][data-paper-id="${SCHOOL}"]`).click();
   await page.getByTestId('exam-history-table').waitFor();
   assert.equal(await page.getByTestId('exam-history-table').locator('tbody tr').count(), 21);
