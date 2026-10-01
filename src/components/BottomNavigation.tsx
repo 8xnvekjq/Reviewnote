@@ -24,7 +24,6 @@ const completedMenu: MenuEntry = { tab: 'completed', label: '복습완료 보관
 const scaffoldingMenu: MenuEntry = { tab: 'scaffolding', label: '선생님 풀이 힌트', description: '막힌 문제를 함께 풀어봐요', icon: 'book' };
 const guideMenu: MenuEntry = { tab: 'guide', label: '이용안내', description: '오답노트와 럭키상점 사용법', icon: 'help' };
 const hiddenMenu: MenuEntry = { tab: 'hidden', label: '숨긴 카드', description: '제외한 문제 확인과 다시 꺼내기', icon: 'eye', emoji: '🙈' };
-const menus: MenuEntry[] = [statsMenu, completedMenu, scaffoldingMenu, guideMenu, hiddenMenu];
 const examPracticeMenu: MenuEntry = { tab: 'examPractice', label: '📝 기출문제 풀이', description: '평가원 모의고사를 실전처럼 풀고 OMR 결과 보기', icon: 'book' };
 const pixelRoomMenu: MenuEntry = { tab: 'pixelRoom', label: '🎮 Pixel Room', description: '내 캐릭터와 작은 방 꾸미기', icon: 'user' };
 // 시트 안의 한 행. key는 "최근 사용" 기록용 고유 키(탭이 아닌 수업자료는 'slides').
@@ -77,7 +76,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, s
     <div className="rn-dock-inner">
       <nav className="rn-bottom-nav bottom-nav-safe" aria-label="주요 메뉴">
         {tabs.map(item => <button type="button" key={item.tab} className={`rn-nav-item ${item.tab === 'camera' ? 'rn-nav-camera' : ''}`} aria-current={activeTab === item.tab ? 'page' : undefined} onClick={() => select(item.tab)}><AppIcon name={item.icon} /><span>{item.label}</span></button>)}
-        <button type="button" className="rn-nav-item" aria-expanded={menuOpen} aria-haspopup="dialog" aria-current={menus.some(m => m.tab === activeTab) ? 'page' : undefined} onClick={openMenu}><AppIcon name="menu" /><span>전체메뉴</span></button>
+        <button type="button" className="rn-nav-item" aria-expanded={menuOpen} aria-haspopup="dialog" aria-current={visibleItems.some(item => item.key === activeTab) ? 'page' : undefined} onClick={openMenu}><AppIcon name="menu" /><span>전체메뉴</span></button>
       </nav>
     </div>
     <Sheet open={menuOpen} onClose={() => setMenuOpen(false)} title="나의 학습 공간">
