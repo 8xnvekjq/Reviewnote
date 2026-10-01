@@ -5,6 +5,7 @@ import { formatDate } from '../utils/date';
 import { GACHA_ITEMS, getTitleBadgeStyle } from '../utils/gachaCatalog';
 import { RecentActivityFeed } from './RecentActivityFeed';
 import { CatPawIcon } from './CatPawIcon';
+import { AdminStudentReviewCheckSummary } from './admin/AdminStudentReviewCheckSummary';
 
 interface AdminPanelProps {
   onBack?: () => void;
@@ -773,54 +774,42 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
                   </div>
                 )}
 
-                {/* 장착 아이템 */}
-                <div className="space-y-2">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">🎽 장착 아이템</span>
-                {equippedSlots.map(slot => {
-                  const catalogItem = slot.value
-                    ? GACHA_ITEMS.find(g => g.category === slot.category && g.effectValue === slot.value)
-                    : undefined;
+                {/* 최근 복습체크 현황 — 데이터 로딩/취소 처리는 컴포넌트 안에서 */}
+                <AdminStudentReviewCheckSummary
+                  studentId={selectedStudent.userId}
+                  onOpenGrading={onSelectTab ? () => { setSelectedStudentId(null); onSelectTab('reviewCheck'); } : undefined}
+                />
 
+                {/* 장착 아이템 — 아이콘 한 줄(이름은 툴팁). 장착한 슬롯만 표시 */}
+                {(() => {
+                  const equipped = equippedSlots.filter(slot => slot.value);
                   return (
-                    <div
-                      key={slot.category}
-                      className="flex items-center space-x-3 bg-slate-950 border border-slate-800 rounded-xl p-2.5"
-                    >
-                      <span className="text-2xl flex-none flex items-center justify-center">
-                        {catalogItem?.icon === '🐾' ? <CatPawIcon className="w-6 h-6" /> : (catalogItem?.icon || '—')}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">{slot.label}</span>
-                        {catalogItem ? (
-                          <>
-                            <div className="flex items-center space-x-1.5">
-                              <span className={`text-[8px] font-black px-1.5 py-0.2 rounded bg-gradient-to-r ${catalogItem.color} text-white flex-none`}>
-                                {catalogItem.rarity}
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">🎽 장착 아이템</span>
+                      {equipped.length === 0 ? (
+                        <p className="text-[10px] text-slate-600">장착 아이템 없음</p>
+                      ) : (
+                        <div className="flex items-center gap-1.5" data-testid="admin-equipped-icons">
+                          {equipped.map(slot => {
+                            const catalogItem = GACHA_ITEMS.find(g => g.category === slot.category && g.effectValue === slot.value);
+                            const tooltip = `${slot.label}: ${catalogItem?.name || slot.value}`;
+                            return (
+                              <span
+                                key={slot.category}
+                                title={tooltip}
+                                aria-label={tooltip}
+                                role="img"
+                                className="w-8 h-8 flex items-center justify-center text-lg bg-slate-950 border border-slate-800 rounded-lg cursor-default"
+                              >
+                                {catalogItem?.icon === '🐾' ? <CatPawIcon className="w-5 h-5" /> : (catalogItem?.icon || '🎁')}
                               </span>
-                              <span className="text-xs font-bold text-white truncate">{catalogItem.name}</span>
-                            </div>
-                            <p className="text-[10px] text-slate-500 truncate mt-0.5">{catalogItem.description}</p>
-                            {/* 칭호는 실제 헤더에 보이는 것과 동일한 스타일로 미리보기 (희귀도별 공통 색이 아닌 실제 발광 효과) */}
-                            {slot.category === 'TITLE' && catalogItem.effectValue && (() => {
-                              const titleBadge = getTitleBadgeStyle(catalogItem.effectValue);
-                              return (
-                                <div className="mt-1.5">
-                                  <span className={`text-[9px] px-2 py-0.5 rounded-full border inline-flex items-center space-x-1 ${titleBadge.style}`}>
-                                    <span>{titleBadge.icon}</span>
-                                    <span>{catalogItem.effectValue}</span>
-                                  </span>
-                                </div>
-                              );
-                            })()}
-                          </>
-                        ) : (
-                          <span className="text-xs text-slate-600">미장착 (기본값)</span>
-                        )}
-                      </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   );
-                })}
-                </div>
+                })()}
               </div>
             </div>
           </div>
