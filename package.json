@@ -17,6 +17,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.110.0",
     "katex": "^0.17.0",
+    "perfect-freehand": "^1.2.3",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-sketch-canvas": "^8.0.0",
