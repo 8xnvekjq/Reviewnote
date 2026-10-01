@@ -1918,6 +1918,7 @@ function App() {
               currentUserId={session?.user?.id || ''}
               schoolGrade={profilesGradeMap[session?.user?.id || '']}
               mistakes={mistakes}
+              onOpenMistake={id => { const m = mistakes.find(x => x.id === id); if (m) setSelectedEntry(m); }}
             />
           </LazyScreenBoundary>
         </Screen>

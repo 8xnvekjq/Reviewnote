@@ -1,0 +1,28 @@
+/* 복습체크 시작 화면 "나의 복습 흐름"(ReviewCheckProgressSummary) — reviewCheck.css와 같은
+   --rn-* 토큰만 사용. 차트 라이브러리 없이 순수 CSS 막대로 그린다. */
+.rn-reviewcheck-progress { padding: 16px; margin-bottom: 14px; }
+.rn-reviewcheck-progress-stats { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--rn-muted); }
+.rn-reviewcheck-progress-stats b { color: var(--rn-text); font-weight: 800; }
+.rn-reviewcheck-progress-stats .is-up { color: var(--rn-success); font-weight: 700; }
+.rn-reviewcheck-progress-stats .is-down { color: var(--rn-warning); font-weight: 700; }
+
+/* 최근 5회 정답률 — 오래된 회차가 왼쪽. 막대 높이 = 정답 / 전체 */
+.rn-reviewcheck-trend { display: flex; align-items: flex-end; gap: 8px; list-style: none; margin: 12px 0 0; padding: 0; }
+.rn-reviewcheck-trend-col { flex: 1 1 0; min-width: 0; max-width: 64px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.rn-reviewcheck-trend-value { font-size: 11px; font-weight: 750; color: var(--rn-text); }
+.rn-reviewcheck-trend-track { position: relative; width: 100%; max-width: 28px; height: 56px; border-radius: 6px; background: var(--rn-elevated); overflow: hidden; }
+.rn-reviewcheck-trend-bar { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 6px; background: var(--rn-accent); }
+.rn-reviewcheck-trend-col:last-child .rn-reviewcheck-trend-bar { background: var(--rn-success); }
+.rn-reviewcheck-trend-date { font-size: 10.5px; font-weight: 700; color: var(--rn-muted); }
+
+/* 최근 채점 회차 문항별 썸네일 + O/X — 좁은 화면에서는 가로 스크롤(페이지 자체는 넘치지 않음) */
+.rn-reviewcheck-item-strip { display: flex; gap: 8px; list-style: none; margin: 0; padding: 0 0 2px; overflow-x: auto; }
+.rn-reviewcheck-item-strip > li { flex: none; }
+.rn-reviewcheck-item-thumb { position: relative; display: block; width: 56px; height: 56px; padding: 0; border-radius: var(--rn-radius-sm); border: 1px solid var(--rn-line); background: var(--rn-elevated); overflow: hidden; }
+.rn-reviewcheck-item-thumb.is-button { cursor: pointer; border-color: var(--rn-danger); }
+.rn-reviewcheck-item-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.rn-reviewcheck-item-noimg { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: var(--rn-muted); }
+.rn-reviewcheck-item-mark { position: absolute; right: 3px; bottom: 3px; min-width: 20px; height: 20px; padding: 0 4px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 900; color: #fff; box-sizing: border-box; }
+.rn-reviewcheck-item-mark.is-correct { background: #2f9e74; }
+.rn-reviewcheck-item-mark.is-incorrect { background: #d9556a; }
+.rn-reviewcheck-item-mark.is-pending { background: rgba(0, 0, 0, .55); }
