@@ -27,6 +27,10 @@ const MODES: Array<{ value: ExamMode; title: string; desc: string }> = [
 
 function electiveKey(userId: string) { return `rn-exam-elective:${userId}`; }
 
+function paperGrade(paper: ExamPaperMetadata) {
+  return (paper.kind ?? 'csat') === 'csat' ? 3 : paper.grade;
+}
+
 function formatDate(iso: string) {
   const d = new Date(iso.length === 10 ? `${iso}T00:00:00` : iso);
   if (Number.isNaN(d.getTime())) return iso;
@@ -97,6 +101,7 @@ function PaperCard({ paper, selected, busy, now, onClick }: { paper: ExamPaperSu
 export function ExamStartView({ client, currentUserId, busy, error, onStart, onResume, onOpenResult, onOpenHistory, onExit, initialPaperId }: Props) {
   const [papers, setPapers] = useState<ExamPaperSummary[] | null>(null);
   const [paperId, setPaperId] = useState<string | null>(initialPaperId ?? null);
+  const [grade, setGrade] = useState(3);
   const [past, setPast] = useState<PastResult[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [resumeError, setResumeError] = useState<string | null>(null);
@@ -114,13 +119,19 @@ export function ExamStartView({ client, currentUserId, busy, error, onStart, onR
   useEffect(() => {
     let alive = true;
     client.listPapers()
-      .then(list => { if (alive) setPapers(list); })
+      .then(list => {
+        if (!alive) return;
+        setPapers(list);
+        const initialPaper = list.find(candidate => candidate.id === initialPaperId);
+        if (initialPaper) setGrade(paperGrade(initialPaper) ?? 3);
+      })
       .catch(() => { if (alive) setLoadError('시험지를 불러오지 못했어요. 잠시 뒤 다시 열어 주세요.'); });
     void client.listMyResults().then(r => { if (alive) setPast(r); }).catch(() => {});
     return () => { alive = false; };
-  }, [client]);
+  }, [client, initialPaperId]);
 
-  const paper = papers?.find(p => p.id === paperId) ?? null;
+  const visiblePapers = papers?.filter(candidate => candidate.kind === 'hanneung' || paperGrade(candidate) === grade) ?? [];
+  const paper = visiblePapers.find(p => p.id === paperId) ?? null;
   const showSetup = paper != null && !paper.inProgress;
 
   useEffect(() => {
@@ -161,16 +172,32 @@ export function ExamStartView({ client, currentUserId, busy, error, onStart, onR
       <p className="rn-eyebrow">기출문제 풀이</p>
       <h1 className="rn-title">시험지 고르기</h1>
 
+      <div className="exam-option-grid exam-option-grid-3" role="group" aria-label="학년 선택">
+        {[1, 2, 3].map(value => (
+          <button key={value} type="button" aria-pressed={grade === value}
+            className={`exam-option exam-option-small${grade === value ? ' is-on' : ''}`}
+            disabled={!papers || busy || resuming != null}
+            onClick={() => {
+              if (grade === value) return;
+              setGrade(value);
+              setPaperId(null);
+              setResumeError(null);
+            }}>
+            <strong>고{value}</strong>
+          </button>
+        ))}
+      </div>
+
       {loadError && <p className="exam-error" role="alert">{loadError}</p>}
       {!papers && !loadError && <div className="rn-loading"><div className="rn-skeleton rn-loading-card" /></div>}
 
-      {papers && papers.length === 0 && <div className="rn-empty">아직 풀 수 있는 시험지가 없어요.</div>}
+      {papers && visiblePapers.length === 0 && <div className="rn-empty">아직 고{grade} 시험지가 없어요.</div>}
 
-      {papers && papers.length > 0 && (
+      {visiblePapers.length > 0 && (
         <>
           <p className="rn-caption">시험지를 눌러 시작해요. 풀던 시험지는 이어서 풀 수 있어요.</p>
           {(['csat', 'school', 'hanneung'] as const).map(kind => {
-            const group = papers.filter(p => (p.kind ?? 'csat') === kind);
+            const group = visiblePapers.filter(p => (p.kind ?? 'csat') === kind);
             return group.length > 0 ? <section key={kind} aria-label={kind === 'school' ? '내신' : kind === 'csat' ? '수능·모평' : '한능검'}>
             <h2 className="exam-setup-title">{kind === 'school' ? '내신' : kind === 'csat' ? '수능·모평' : '한능검'}</h2>
             <div className="exam-paper-list" aria-label="시험지">
