@@ -31,9 +31,10 @@
 
 /* ── 풀이(전체화면) ── */
 .exam-solve { position: fixed; inset: 0; z-index: 2000; display: flex; flex-direction: column; width: 100vw; height: 100vh; height: 100dvh; overflow: hidden; background: var(--rn-bg); color: var(--rn-text); padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
-.exam-topbar { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: calc(env(safe-area-inset-top) + 6px) 10px 6px; background: var(--rn-surface); border-bottom: 1px solid var(--rn-line); min-width: 0; }
+.exam-topbar { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: calc(env(safe-area-inset-top) + 16px) 18px 8px; background: var(--rn-surface); border-bottom: 1px solid var(--rn-line); min-width: 0; }
 .exam-topbar-main { display: contents; }
-.exam-exit { padding-inline: 10px; }
+/* 화면 모서리는 손가락·케이스에 가려 누르기 어렵다 — 가장자리에서 띄우고 터치 영역을 넉넉히. */
+.exam-exit { padding-inline: 14px; min-height: 44px; }
 .exam-nav { display: flex; align-items: center; gap: 4px; margin-inline: auto; }
 .exam-nav-btn { min-width: 44px; padding: 0 10px; }
 .exam-nav-count { min-height: 44px; min-width: 76px; padding: 0 10px; border-radius: var(--rn-radius-sm); background: var(--rn-elevated); border: 1px solid var(--rn-line); color: var(--rn-muted); font-size: 14px; font-variant-numeric: tabular-nums; }
@@ -42,7 +43,7 @@
 .exam-stopwatch { color: var(--rn-muted); }
 .exam-remaining { padding: 4px 10px; border-radius: 99px; background: var(--rn-elevated); }
 .exam-remaining.is-low { color: #1b1b1b; background: var(--rn-warning); }
-.exam-submit-open { padding-inline: 14px; }
+.exam-submit-open { padding-inline: 18px; min-height: 44px; }
 .exam-tools { order: 10; display: flex; align-items: center; gap: 8px; flex: 1 1 100%; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; padding-bottom: 2px; }
 .exam-tools::-webkit-scrollbar { display: none; }
 .exam-tool-group { display: flex; align-items: center; gap: 4px; flex: none; padding-right: 8px; border-right: 1px solid var(--rn-line); }
@@ -56,7 +57,7 @@
 .exam-size { width: 36px; height: 40px; display: grid; place-items: center; border-radius: 10px; border: 1px solid transparent; background: transparent; }
 .exam-size i { display: block; border-radius: 50%; background: var(--rn-text); }
 .exam-size.is-on { background: var(--rn-elevated); border-color: var(--rn-line); }
-@media (min-width: 1100px) {
+@media (min-width: 1280px) { /* iPad 가로(1180)는 도구 줄을 둘째 줄로 내려 잘리지 않게 */
   .exam-topbar { flex-wrap: nowrap; }
   .exam-tools { order: 0; flex: 0 1 auto; }
 }
@@ -97,7 +98,7 @@
 .exam-paper-meta { margin: 0 2px 6px; }
 .exam-save-failed { color: var(--rn-warning); }
 .exam-paper [data-testid="exam-ink-canvas"] { background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 0 var(--rn-line); }
-.exam-paper-foot { display: flex; justify-content: space-between; gap: 10px; margin-top: 16px; }
+.exam-paper-foot { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
 
 /* 겹침 화면 */
 .exam-toast { position: fixed; left: 50%; top: calc(env(safe-area-inset-top) + 120px); transform: translateX(-50%); z-index: 2100; max-width: calc(100vw - 32px); padding: 10px 16px; border-radius: 99px; background: var(--rn-warning); color: #1b1b1b; font-weight: 750; font-size: 14px; box-shadow: 0 8px 24px rgb(0 0 0 / .35); }

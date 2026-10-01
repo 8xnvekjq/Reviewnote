@@ -10,16 +10,39 @@ import { recognizeShape, resizeShape, shapeToPoints } from './shapeSnap.ts';
 import type { Pt, SnapShape } from './shapeSnap.ts';
 
 /** 꾹 누름 판정 시간·허용 움직임(CSS px). */
-const HOLD_MS = 500;
-const HOLD_SLOP_PX = 5;
-/** 이보다 작은 획은 도형으로 바꾸지 않는다(CSS px). */
-const SHAPE_MIN_PX = 18;
+// 글씨를 쓰다 잠깐 멈춘 것을 도형으로 오인하지 않게 넉넉히(0.5초·5px은 필기 중에도 자주 걸렸다).
+const HOLD_MS = 650;
+const HOLD_SLOP_PX = 3;
+/** 이보다 짧은 획은 도형으로 바꾸지 않는다(CSS px, 획 길이). */
+const SHAPE_MIN_PX = 40;
 /** 지우개 반지름(CSS px). */
 const ERASER_RADIUS_PX = 11;
 const SNAP_ANIM_MS = 180;
 
 /** 펜이 한 번이라도 감지되면 이후(문항을 옮겨 다시 마운트돼도) 손가락은 그리지 않는다. */
 let penEverDetected = false;
+
+/** 문항 이미지 비율 캐시 — 문항을 오갈 때 이미지가 다시 로드되기 전에도 같은 높이로 바로 그려 깜박임을 없앤다. */
+const aspectCache = new Map<string, number>();
+/** 시험 시작 때 문항 이미지를 미리 받아 두고 비율도 캐시한다. */
+export function preloadInkImages(urls: string[]) {
+  for (const url of urls) {
+    if (aspectCache.has(url)) continue;
+    const img = new Image();
+    img.decoding = 'async';
+    img.onload = () => { if (img.naturalWidth) aspectCache.set(url, img.naturalHeight / img.naturalWidth); };
+    img.src = url;
+  }
+}
+
+/** 가장 가까운 세로 스크롤 조상(손가락 스크롤을 직접 처리할 때 쓴다). */
+function scrollParentOf(el: HTMLElement): HTMLElement | null {
+  for (let node = el.parentElement; node; node = node.parentElement) {
+    const oy = getComputedStyle(node).overflowY;
+    if ((oy === 'auto' || oy === 'scroll') && node.scrollHeight > node.clientHeight) return node;
+  }
+  return (document.scrollingElement as HTMLElement | null) ?? null;
+}
 
 interface DrawGesture {
   kind: 'draw';
@@ -35,6 +58,13 @@ interface DrawGesture {
   holdTimer: number | null;
   snap: { base: SnapShape; anchor: Pt; current: SnapShape; startedAt: number } | null;
 }
+interface PanGesture {
+  kind: 'pan';
+  pointerId: number;
+  lastX: number;
+  lastY: number;
+  scroller: HTMLElement | null;
+}
 interface EraseGesture {
   kind: 'erase';
   pointerId: number;
@@ -43,26 +73,35 @@ interface EraseGesture {
   last: Pt;
   recorded: boolean;
 }
-type Gesture = DrawGesture | EraseGesture;
+type Gesture = DrawGesture | EraseGesture | PanGesture;
 
 const CANVAS_STYLE: CSSProperties = { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', display: 'block' };
 
 export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>(function ExamInkCanvas(props, ref) {
-  const { imageUrl, strokes, readOnly = false, penOnlyWhenPenDetected = true } = props;
+  const { imageUrl, strokes, readOnly = false, imageMaxWidth } = props;
   const wrapRef = useRef<HTMLDivElement>(null);
   const highlightRef = useRef<HTMLCanvasElement>(null);
   const penRef = useRef<HTMLCanvasElement>(null);
   const liveRef = useRef<HTMLCanvasElement>(null);
   const [cssWidth, setCssWidth] = useState(0);
-  const [aspect, setAspect] = useState(0); // naturalHeight / naturalWidth
+  const [aspect, setAspect] = useState(() => aspectCache.get(imageUrl) ?? 0); // naturalHeight / naturalWidth
   const [dprWanted, setDprWanted] = useState(() => (typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1));
   const [penSeen, setPenSeen] = useState(penEverDetected);
   const [liveHighlighter, setLiveHighlighter] = useState(false);
 
-  const imageHeight = cssWidth * aspect;
-  const extraHeight = cssWidth * inkExtraBelow(aspect);
+  // 정규화 기준(1) = 실제로 보이는 이미지 너비. 필기 영역(캔버스)은 컨테이너 전체 너비.
+  const imgW = imageMaxWidth ? Math.min(imageMaxWidth, cssWidth) : cssWidth;
+  const imageHeight = imgW * aspect;
+  const extraHeight = imgW * inkExtraBelow(aspect);
   const cssHeight = imageHeight + extraHeight;
   const dpr = safeDpr(cssWidth, cssHeight, dprWanted);
+  const geomRef = useRef({ cssWidth, imgW });
+  geomRef.current = { cssWidth, imgW };
+  /** 정규화 1이 차지하는 백버퍼 픽셀 수(캔버스 변환용). */
+  const unitDevicePx = (canvas: HTMLCanvasElement) => {
+    const g = geomRef.current;
+    return g.cssWidth > 0 ? (canvas.width / g.cssWidth) * g.imgW : 0;
+  };
 
   // 최신 props를 네이티브 이벤트 핸들러에서 읽기 위한 ref.
   const propsRef = useRef(props);
@@ -88,7 +127,10 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
 
   const onImageLoad = useCallback((event: SyntheticEvent<HTMLImageElement>) => {
     const img = event.currentTarget;
-    if (img.naturalWidth) setAspect(img.naturalHeight / img.naturalWidth);
+    if (img.naturalWidth) {
+      aspectCache.set(img.getAttribute('src') ?? img.src, img.naturalHeight / img.naturalWidth);
+      setAspect(img.naturalHeight / img.naturalWidth);
+    }
   }, []);
   const imgRef = useCallback((img: HTMLImageElement | null) => {
     if (img?.complete && img.naturalWidth) setAspect(img.naturalHeight / img.naturalWidth);
@@ -107,12 +149,13 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       && drawn.strokes.length <= strokes.length && drawn.strokes.every((s, i) => strokes[i] === s);
     const from = appendOnly ? drawn.strokes.length : 0;
     if (!appendOnly) {
-      resetTransform(hctx, hl, cssWidth);
-      resetTransform(pctx, pen, cssWidth);
+      resetTransform(hctx, hl, unitDevicePx(hl));
+      resetTransform(pctx, pen, unitDevicePx(pen));
     }
     for (let i = from; i < strokes.length; i++) drawStroke(strokes[i].tool === 'highlighter' ? hctx : pctx, strokes[i]);
     drawnRef.current = { strokes, width: hl.width, height: hl.height };
-  }, [strokes, cssWidth, cssHeight, dpr]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [strokes, cssWidth, cssHeight, dpr, imgW]);
 
   // ── 진행 중 획 렌더(별도 레이어, rAF) ──
   const renderLive = useCallback(() => {
@@ -122,12 +165,12 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     if (!canvas || !wrap) return;
     const ctx = canvas.getContext('2d', { desynchronized: true } as CanvasRenderingContext2DSettings);
     if (!ctx) return;
-    resetTransform(ctx, canvas, 1);
+    resetTransform(ctx, canvas, unitDevicePx(canvas));
     const g = gestureRef.current;
-    if (!g) return;
+    if (!g || g.kind === 'pan') return;
     const REF = INK_REFERENCE_WIDTH;
     if (g.kind === 'erase') {
-      const w = wrap.clientWidth || 1;
+      const w = geomRef.current.imgW || wrap.clientWidth || 1;
       const r = (ERASER_RADIUS_PX / w) * REF;
       ctx.beginPath();
       ctx.arc(g.last.x * REF, g.last.y * REF, r, 0, Math.PI * 2);
@@ -160,6 +203,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     }
     const pts = g.predicted.length ? [...g.points, ...g.predicted] : g.points;
     paint(ctx, { path: freehandPath(g.tool, g.size, pts, false), mode: 'fill', width: 0 }, g.color);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const scheduleLive = useCallback(() => {
     if (!rafRef.current) rafRef.current = requestAnimationFrame(renderLive);
@@ -170,7 +214,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     if (!live || !cssWidth || !cssHeight) return;
     prepareCanvas(live, cssWidth, cssHeight, dpr);
     renderLive();
-  }, [cssWidth, cssHeight, dpr, renderLive]);
+  }, [cssWidth, cssHeight, dpr, imgW, renderLive]);
 
   // ── 변경 + 실행 취소 기록 ──
   const commit = useCallback((next: InkStroke[], before: InkStroke[]) => {
@@ -209,8 +253,9 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     if (!canvas || readOnly) return;
     let rect = canvas.getBoundingClientRect();
 
+    const unit = () => geomRef.current.imgW || rect.width || 1;
     const toPoint = (e: PointerEvent, start: number): InkPoint => {
-      const w = rect.width || 1;
+      const w = unit();
       const pressure = e.pointerType === 'pen' ? (e.pressure > 0 ? e.pressure : 0.5) : SIMULATED_PRESSURE;
       // 펜 압력이 정확히 0.5로 들어와 '흉내 모드'로 오인되는 일을 막는다.
       const p = e.pointerType === 'pen' && pressure === SIMULATED_PRESSURE ? 0.5001 : pressure;
@@ -227,10 +272,14 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     const armHold = (g: DrawGesture) => {
       clearHold(g);
       if (propsRef.current.shapeSnap === false || g.snap) return;
+      // 짧은 획(글자 한 획 등)은 꾹 눌러도 도형 판정을 하지 않는다.
+      let len = 0;
+      for (let i = 1; i < g.points.length; i++) len += Math.hypot(g.points[i].x - g.points[i - 1].x, g.points[i].y - g.points[i - 1].y);
+      if (len * unit() < SHAPE_MIN_PX) return;
       g.holdTimer = window.setTimeout(() => {
         g.holdTimer = null;
         if (gestureRef.current !== g || g.snap) return;
-        const w = rect.width || 1;
+        const w = unit();
         // 꾹 누르는 동안 쌓인 미세한 점은 빼고 판정
         const pts = g.points.slice(0, g.holdIndex + 1);
         const shape = recognizeShape(pts, { minSize: SHAPE_MIN_PX / w });
@@ -270,7 +319,14 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       if (gestureRef.current) return; // 두 번째 손가락·손바닥은 무시
       if (e.pointerType === 'pen' && !penEverDetected) { penEverDetected = true; setPenSeen(true); }
       const p = propsRef.current;
-      if (e.pointerType === 'touch' && penEverDetected && p.penOnlyWhenPenDetected !== false) return; // 스크롤에 양보
+      if (e.pointerType === 'touch' && penEverDetected && p.penOnlyWhenPenDetected !== false) {
+        // 손가락은 그리지 않고 직접 스크롤한다. 캔버스 touch-action을 pan으로 두면 iPad Safari가
+        // 애플펜슬 획까지 스크롤로 가로채 획이 0.5초 만에 끊겼다 — 그래서 touch-action은 항상 none.
+        e.preventDefault();
+        try { canvas.setPointerCapture(e.pointerId); } catch { /* 합성 이벤트 등 */ }
+        gestureRef.current = { kind: 'pan', pointerId: e.pointerId, lastX: e.clientX, lastY: e.clientY, scroller: scrollParentOf(canvas) };
+        return;
+      }
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       e.preventDefault();
       rect = canvas.getBoundingClientRect();
@@ -297,7 +353,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     };
 
     const eraseAlong = (g: EraseGesture, to: Pt) => {
-      const w = rect.width || 1;
+      const w = unit();
       const hits = strokesHitAlong(g.working, g.last, to, ERASER_RADIUS_PX / w);
       g.last = to;
       if (!hits.length) return;
@@ -311,12 +367,17 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       const g = gestureRef.current;
       if (!g || e.pointerId !== g.pointerId) return;
       e.preventDefault();
+      if (g.kind === 'pan') {
+        g.scroller?.scrollBy(g.lastX - e.clientX, g.lastY - e.clientY);
+        g.lastX = e.clientX; g.lastY = e.clientY;
+        return;
+      }
       if (g.kind === 'erase') {
         for (const ev of eventsOf(e)) eraseAlong(g, toPoint(ev, 0));
         scheduleLive();
         return;
       }
-      const w = rect.width || 1;
+      const w = unit();
       if (g.snap) {
         const last = toPoint(e, g.startTime);
         g.points.push(last);
@@ -398,7 +459,8 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
 
   useEffect(() => () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); }, []);
 
-  const touchAction = readOnly ? 'auto' : (penSeen && penOnlyWhenPenDetected ? 'pan-x pan-y pinch-zoom' : 'none');
+  // 손가락 스크롤은 pan 제스처가 직접 처리한다(touch-action pan은 iPad에서 펜 획을 끊었다).
+  const touchAction = readOnly ? 'auto' : 'none';
   const highlighterLayer: CSSProperties = { ...CANVAS_STYLE, opacity: HIGHLIGHTER_OPACITY, mixBlendMode: 'multiply', pointerEvents: 'none' };
 
   return (
@@ -416,7 +478,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
         alt="문항"
         draggable={false}
         onLoad={onImageLoad}
-        style={{ display: 'block', width: '100%', height: 'auto', pointerEvents: 'none', background: '#fff' }}
+        style={{ display: 'block', width: imgW || '100%', maxWidth: '100%', height: imgW && aspect ? imgW * aspect : 'auto', pointerEvents: 'none', background: '#fff' }}
       />
       {/* 문항 아래 빈 공간에도 쓸 수 있게 여백(이미지 높이의 60%, 최소 너비의 절반) */}
       <div aria-hidden style={{ height: extraHeight }} />

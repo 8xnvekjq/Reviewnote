@@ -2,7 +2,10 @@
 // 번호판·OMR 검토·나가기/제출 확인은 이 화면 위에 겹쳐 띄운다(전체화면을 유지한 채).
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { ExamAttempt, ExamClient, ExamInkCanvasHandle, ExamItemState, ExamResult, InkStroke, InkTool } from '../contract';
-import { ExamInkCanvas } from '../ink/ExamInkCanvas';
+import { ExamInkCanvas, preloadInkImages } from '../ink/ExamInkCanvas';
+
+/** 문항 이미지 표시 너비(CSS px) — 모든 문항이 같은 원본 너비로 잘려 있어 글자 크기가 항상 같다. */
+const QUESTION_IMAGE_WIDTH = 480;
 import { AnswerBar, type FreeCheck } from './AnswerBar';
 import { NumberPad, OmrCard, PadLegend } from './OmrCard';
 import { loadInk, saveInk } from './inkStore';
@@ -79,6 +82,8 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
   const visitOrderRef = useRef<number[]>([...attempt.visitOrder]);
   const swRef = useRef<StopwatchState>(createStopwatch(Object.fromEntries(attempt.items.map(item => [item.questionId, item.timeSpentMs]))));
   const inkRef = useRef<ExamInkCanvasHandle>(null);
+  // 문항을 넘길 때 이미지를 그때그때 받으며 깜박이지 않게 30문항을 미리 받아 둔다.
+  useEffect(() => { preloadInkImages(questions.map(q => q.imageUrl)); }, [questions]);
   const saveTimer = useRef<number | null>(null);
   const inkTimers = useRef(new Map<string, number>());
   const strokesRef = useRef(strokes);
@@ -416,13 +421,14 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
             size={size}
             penOnlyWhenPenDetected
             shapeSnap
+            imageMaxWidth={QUESTION_IMAGE_WIDTH}
           />
-          <div className="exam-paper-foot">
-            <button type="button" className="rn-button rn-button-secondary" disabled={index === 0} onClick={() => goTo(index - 1)}>◀ 이전</button>
-            {index === questions.length - 1
-              ? <button type="button" className="rn-button rn-button-primary" onClick={() => setOverlay('review')}>OMR 확인하기</button>
-              : <button type="button" className="rn-button rn-button-secondary" onClick={() => goTo(index + 1)}>다음 ▶</button>}
-          </div>
+          {/* 이전·다음은 상단 화살표로 충분하다. 마지막 문항에서만 OMR 확인으로 이어 준다. */}
+          {index === questions.length - 1 && (
+            <div className="exam-paper-foot">
+              <button type="button" className="rn-button rn-button-primary" onClick={() => setOverlay('review')}>OMR 확인하기</button>
+            </div>
+          )}
         </div>
       </main>
 

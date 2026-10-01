@@ -11,9 +11,10 @@ test('stroke width is normalized to the image width and highlighters are wider',
   assert.ok(strokeWidth({ tool: 'highlighter', size: 7 }) > strokeWidth({ tool: 'pen', size: 7 }));
 });
 
-test('writing room below the image is 60% of its height but never too small', () => {
-  assert.equal(inkExtraBelow(1.1), 1.1 * 0.6);
-  assert.equal(inkExtraBelow(0.25), 0.5, 'flat question 1 still gets half a width of room');
+test('writing room below the image is as tall as the image but never less than 1.4 widths', () => {
+  assert.equal(inkExtraBelow(2.4), 2.4, 'a long question gets as much room as itself');
+  assert.equal(inkExtraBelow(1.1), 1.4, 'medium questions still get plenty of solving room');
+  assert.equal(inkExtraBelow(0.25), 1.4, 'flat question 1 gets the same generous room');
   assert.equal(inkExtraBelow(0), 0, 'nothing until the image has loaded');
 });
 

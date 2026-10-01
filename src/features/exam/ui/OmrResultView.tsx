@@ -195,6 +195,7 @@ export function OmrResultView({ client, result: initial, onBack }: Props) {
                 color="#1f2937"
                 size={4}
                 readOnly
+                imageMaxWidth={480}
               />
             </div>
           </div>
