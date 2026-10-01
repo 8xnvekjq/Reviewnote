@@ -16,6 +16,7 @@ import {
 import { AppIcon } from '../ui/AppIcon';
 import { LaTeXRenderer } from '../LaTeXRenderer';
 import { ReviewCheckImageZoom } from './ReviewCheckImageZoom';
+import { ReviewCheckResultCard } from './ReviewCheckResultCard';
 import { HandwritingOverlay, type HandwritingOverlayBounds, type HandwritingOverlayHandle } from '../HandwritingOverlay';
 
 interface Props {
@@ -125,21 +126,25 @@ export function ReviewCheckScreen({ currentUserId, schoolGrade, mistakes }: Prop
   }
   return (
     <ReviewCheckStart
+      studentId={currentUserId}
       schoolGrade={schoolGrade}
       recentGraded={view.recentGraded}
       onStarted={load}
       onShowHistory={() => setView({ kind: 'history' })}
+      onOpenRecent={session => setView({ kind: 'historyDetail', session })}
     />
   );
 }
 
 function ReviewCheckStart({
-  schoolGrade, recentGraded, onStarted, onShowHistory,
+  studentId, schoolGrade, recentGraded, onStarted, onShowHistory, onOpenRecent,
 }: {
+  studentId: string;
   schoolGrade?: string;
   recentGraded: ReviewCheckSession | null;
   onStarted: () => void;
   onShowHistory: () => void;
+  onOpenRecent: (session: ReviewCheckSession) => void;
 }) {
   const [grade, setGrade] = useState(() => defaultGradeFor(schoolGrade));
   const chapters = MATH_CURRICULUM[grade] || [];
@@ -184,24 +189,14 @@ function ReviewCheckStart({
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 14 }}>
-        <p className="rn-caption" style={{ margin: 0 }}>복습 완료한 문제 중 최대 5문제를 다시 풀어보고, 선생님 채점을 받아요.</p>
-        <button type="button" className="rn-reviewcheck-history-link" onClick={onShowHistory} style={{ flex: 'none' }}>
-          지난 기록 보기
-          <AppIcon name="arrow" width={12} height={12} />
-        </button>
-      </div>
+      <p className="rn-caption" style={{ margin: '0 0 14px' }}>복습 완료한 문제 중 최대 5문제를 다시 풀어보고, 선생님 채점을 받아요.</p>
 
-      {recentGraded && (
-        <div className="rn-surface" style={{ padding: 16, marginBottom: 14 }}>
-          <h3 className="rn-section" style={{ fontSize: 14, fontWeight: 750, marginBottom: 6 }}>복습체크 결과</h3>
-          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--rn-text)' }}>{recentGraded.correctCount} / {recentGraded.totalCount}</div>
-          <div style={{ fontSize: 12.5, color: 'var(--rn-success)', marginTop: 4 }}>완벽! {recentGraded.correctCount}문제</div>
-          {recentGraded.totalCount - recentGraded.correctCount > 0 && (
-            <div style={{ fontSize: 12.5, color: 'var(--rn-muted)' }}>다시 복습 {recentGraded.totalCount - recentGraded.correctCount}문제</div>
-          )}
-        </div>
-      )}
+      <ReviewCheckResultCard
+        studentId={studentId}
+        recentGraded={recentGraded}
+        onOpenRecent={onOpenRecent}
+        onShowHistory={onShowHistory}
+      />
 
       <div className="rn-examprep-range-bar">
         <div className="rn-examprep-range-field">

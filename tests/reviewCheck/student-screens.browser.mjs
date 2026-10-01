@@ -16,12 +16,14 @@ function ts(minutesAgo) { return new Date(Date.now() - minutesAgo * 60000).toISO
 // 하나는 정답(mistake-1, finalAnswer 있음), 하나는 오답(mistake-2, finalAnswer 없음 — fallback
 // 문구 검증용)으로 섞었다. submitted 세션의 문항은 grade:null(manual_review)로 남겨 "확인 중"
 // 차분한 상태를 검증한다.
-function historyServer() {
+// 옵션: graded(최근 채점 세션 필드 덮어쓰기), failList(목록 조회만 500), empty(세션 0개).
+function historyServer({ graded = {}, failList = false, empty = false } = {}) {
   const sessionGraded = {
     id: 'session-graded', student_id: 'student-1', grade: '공통수학2',
     start_chapter: '평면좌표', end_chapter: '평면좌표', status: 'graded',
     total_count: 2, correct_count: 1, created_at: ts(0),
     submitted_at: ts(5), graded_at: ts(1), graded_by: 'teacher-1',
+    ...graded,
   };
   const sessionSubmitted = {
     id: 'session-submitted', student_id: 'student-1', grade: '공통수학2',
@@ -37,7 +39,7 @@ function historyServer() {
   };
   // 이미 created_at 내림차순(가장 최근 먼저) — fetchLatestReviewCheckSession(limit 1)과
   // fetchStudentReviewCheckSessions 둘 다 이 순서를 그대로 믿는다.
-  const sessions = [sessionGraded, sessionSubmitted, sessionInProgress];
+  const sessions = empty ? [] : [sessionGraded, sessionSubmitted, sessionInProgress];
 
   const itemsBySession = {
     'session-graded': [
@@ -78,8 +80,12 @@ function historyServer() {
       // fetchLatestReviewCheckSession은 .limit(1).maybeSingle() -> 단일 객체.
       // fetchStudentReviewCheckSessions는 limit 없음 -> 배열.
       if (url.searchParams.has('limit')) {
-        return route.fulfill({ status: 200, json: sessions[0] });
+        // maybeSingle()은 0건이면 406 대신 빈 배열을 기대한다(Accept 헤더) — null 처리.
+        return sessions[0]
+          ? route.fulfill({ status: 200, json: sessions[0] })
+          : route.fulfill({ status: 200, json: [] });
       }
+      if (failList) return route.fulfill({ status: 500, json: { message: 'list failed' } });
       return route.fulfill({ status: 200, json: sessions });
     }
     if (path.endsWith('/rest/v1/review_check_items') && req.method() === 'GET') {
@@ -144,7 +150,7 @@ try {
 
     // 최신 세션이 graded라 시작 화면에 "복습체크 결과" 요약이 먼저 보인다.
     await page.getByText('복습체크 결과').waitFor();
-    await page.getByRole('button', { name: '지난 기록 보기' }).click();
+    await page.getByRole('button', { name: '전체 기록 보기 (2회)' }).click();
 
     // (a) 목록: in_progress 세션은 "기록"이 아니므로 제외 -> 2건만 보여야 함.
     await page.getByText('지난 기록').waitFor();
@@ -185,6 +191,69 @@ try {
     assert.deepEqual(errors, []);
     await context.close();
     console.log('PASS (a-c): 학생 기록 목록/상세 — in_progress 제외, 최종 grade 렌더, 채점 컨트롤 없음, manual_review는 차분한 상태');
+  }
+
+  // (f) 시작 화면 최근 결과 카드 — 날짜·범위 한 줄, 0개 맞혀도 "완벽"이 아니라 중립 문구,
+  // 카드를 누르면 상세로 바로 가고 상세의 "목록"은 기록 목록으로 간다. 키보드(Enter)로도 열린다.
+  {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const createdAt = new Date(2026, 8, 30, 15, 0).toISOString();
+    const api = historyServer({ graded: { correct_count: 0, created_at: createdAt, start_chapter: '평면좌표', end_chapter: '무리함수' } });
+    const { page, errors } = await withPage(context, api, 'student-screens.html?user=student-1');
+
+    const card = page.getByRole('button', { name: /복습체크 결과/ });
+    await card.waitFor();
+    await page.getByText('9/30 · 공통수학2 · 평면좌표 ~ 무리함수').waitFor();
+    await page.getByText('맞힌 문제 0개 · 다시 볼 문제 2개').waitFor();
+    assert.equal(await page.getByText(/완벽/).count(), 0, '다 맞히지 않았으면 축하 문구가 나오면 안 됨');
+    await page.getByRole('button', { name: '전체 기록 보기 (2회)' }).waitFor();
+    await page.screenshot({ path: `${out}/start-result-card.png` });
+
+    await card.focus();
+    await page.keyboard.press('Enter');
+    await page.getByText('내가 쓴 답').waitFor();
+    await page.getByRole('button', { name: '목록' }).click();
+    await page.locator('.rn-reviewcheck-history-row').first().waitFor();
+    await page.getByText('지난 기록').waitFor();
+
+    assert.deepEqual(errors, []);
+    await context.close();
+    console.log('PASS (f): 최근 결과 카드 — 날짜/범위, 중립 문구, 카드 -> 상세 -> 목록');
+  }
+
+  // (g) 전부 맞힌 경우에만 축하 문구. 기록 개수를 못 불러와도 "전체 기록 보기"는 동작한다.
+  {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const api = historyServer({ graded: { correct_count: 2 }, failList: true });
+    const { page, errors } = await withPage(context, api, 'student-screens.html?user=student-1');
+
+    await page.getByText('완벽해요! 2문제 모두 맞혔어요').waitFor();
+    await page.getByText('평면좌표', { exact: false }).first().waitFor();
+    const historyButton = page.getByRole('button', { name: '전체 기록 보기', exact: true });
+    await historyButton.waitFor();
+    await historyButton.click();
+    await page.getByText('지난 기록').waitFor();
+
+    assert.deepEqual(errors, []);
+    await context.close();
+    console.log('PASS (g): 전부 정답일 때만 축하 문구, 개수 조회 실패해도 기록 버튼 동작');
+  }
+
+  // (h) 기록이 하나도 없는 학생 — 결과 카드는 없지만 기록 화면 진입 버튼은 남아 있다.
+  {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const api = historyServer({ empty: true });
+    const { page, errors } = await withPage(context, api, 'student-screens.html?user=student-1');
+
+    const historyButton = page.getByRole('button', { name: '전체 기록 보기', exact: true });
+    await historyButton.waitFor();
+    assert.equal(await page.getByText('복습체크 결과').count(), 0);
+    await historyButton.click();
+    await page.getByText('아직 복습체크 기록이 없어요.').waitFor();
+
+    assert.deepEqual(errors, []);
+    await context.close();
+    console.log('PASS (h): 기록 없는 학생도 기록 화면으로 갈 수 있다');
   }
 
   // (d)(e) 시험(퀴즈) 중 문제 이미지 확대 — 390px 모바일 뷰포트에서 탭해서 열고, 닫아도 입력하던 답 유지.
