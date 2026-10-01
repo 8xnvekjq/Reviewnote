@@ -160,7 +160,7 @@ try {
     assert.equal((await page.locator('.rn-rcresult-score').innerText()).replace(/\s+/g, ' ').trim(), '1 / 1');
     await page.getByText('전부 맞혔어요!').waitFor();
     assert.equal(await page.locator('.rn-rcresult-badge.is-correct').count(), 1);
-    await page.locator('.rn-rcresult-row').getByText('5', { exact: true }).first().waitFor();
+    await page.locator('.rn-rcresult-row .line', { hasText: /^정답\s*5$/ }).first().waitFor();
     assert.equal(api.gradeRequests.length, 1);
     assert.equal(api.gradeRequests[0].sessionId, 'session-1');
     await page.screenshot({ path: `${out}/student-allgraded.png` });
