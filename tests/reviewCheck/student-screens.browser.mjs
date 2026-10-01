@@ -126,6 +126,82 @@ function quizZoomServer() {
   return api;
 }
 
+// --- 제출 직후 결과 mock 서버 --------------------------------------------------------------
+// 세 문항 퀴즈를 제출하면 review-check-grade가 gradesAfterAi대로 채점한다(null = manual_review로
+// 남음). 하나라도 null이면 세션은 'submitted'로 남고, 전부 채워지면 'graded'로 넘어간다.
+function submitResultServer(gradesAfterAi) {
+  const mistakeIds = ['mistake-1', 'mistake-2', 'mistake-3'];
+  const state = {
+    session: {
+      id: 'session-r1', student_id: 'student-1', grade: '공통수학2',
+      start_chapter: '평면좌표', end_chapter: '이차함수와 그래프', status: 'in_progress',
+      total_count: 3, correct_count: 0, created_at: ts(0),
+      submitted_at: null, graded_at: null, graded_by: null,
+    },
+    items: mistakeIds.map((mid, i) => ({
+      id: `item-r${i + 1}`, session_id: 'session-r1', mistake_id: mid, position: i,
+      submitted_answer: null, grade: null,
+      ai_verdict: null, ai_confidence: null, ai_reason: null,
+      ai_normalized_student_answer: null, ai_canonical_answer: null,
+      ai_graded_at: null, ai_grading_version: null, graded_source: null,
+    })),
+  };
+  const api = { state };
+  api.route = async route => {
+    const req = route.request();
+    const url = new URL(req.url());
+    if (url.hostname === '127.0.0.1') return route.continue();
+    const path = url.pathname;
+
+    if (path.endsWith('/rest/v1/review_check_sessions') && req.method() === 'GET') {
+      return route.fulfill({ status: 200, json: state.session });
+    }
+    if (path.endsWith('/rest/v1/review_check_items') && req.method() === 'GET') {
+      return route.fulfill({ status: 200, json: state.items });
+    }
+    if (path.endsWith('/rest/v1/rpc/submit_review_check_session')) {
+      const body = req.postDataJSON();
+      state.items = state.items.map(it => {
+        const ans = (body.p_answers || []).find(a => a.mistakeId === it.mistake_id);
+        return ans ? { ...it, submitted_answer: ans.answer } : it;
+      });
+      state.session = { ...state.session, status: 'submitted', submitted_at: ts(0) };
+      return route.fulfill({ status: 200, json: null });
+    }
+    if (path.endsWith('/functions/v1/review-check-grade')) {
+      state.items = state.items.map((it, i) => ({
+        ...it,
+        grade: gradesAfterAi[i],
+        ai_verdict: gradesAfterAi[i] ?? 'manual_review',
+        graded_source: gradesAfterAi[i] ? 'ai' : null,
+      }));
+      const allGraded = gradesAfterAi.every(g => g !== null);
+      if (allGraded) {
+        state.session = {
+          ...state.session, status: 'graded',
+          correct_count: gradesAfterAi.filter(g => g === 'correct').length, graded_at: ts(0),
+        };
+      }
+      return route.fulfill({ status: 200, json: {
+        allGraded,
+        gradedCount: gradesAfterAi.filter(g => g !== null).length,
+        manualReviewCount: gradesAfterAi.filter(g => g === null).length,
+      } });
+    }
+    return route.abort();
+  };
+  return api;
+}
+
+async function solveAndSubmit(page, answers) {
+  for (let i = 0; i < answers.length; i++) {
+    await page.locator('#rc-answer').waitFor();
+    await page.locator('#rc-answer').fill(answers[i]);
+    if (i < answers.length - 1) await page.getByRole('button', { name: '다음' }).click();
+  }
+  await page.getByRole('button', { name: '제출하기' }).click();
+}
+
 async function withPage(context, api, path) {
   await context.route('**/*', api.route);
   const page = await context.newPage();
@@ -228,6 +304,60 @@ try {
     assert.deepEqual(errors, []);
     await context.close();
     console.log('PASS (d-e): 시험 중 문제 이미지 확대 — 탭하면 열리고, 닫아도 입력하던 답이 그대로 유지된다');
+  }
+  // (f) 제출 직후 결과 — 일부만 AI 채점(O, X, manual_review). 진행 상태 + 이미 판정된 O/X + 차분한
+  // "확인 중", 문항 탭 -> 그 문항부터 상세, "결과"로 돌아오기. 390px 모바일.
+  {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const api = submitResultServer(['correct', 'incorrect', null]);
+    const { page, errors } = await withPage(context, api, 'student-screens.html?user=student-1');
+
+    await solveAndSubmit(page, ['5', '오답임', '모르겠어요']);
+    await page.getByText('복습체크 제출 완료').waitFor({ timeout: 5000 });
+    await page.getByText('AI 채점 완료 2문제').waitFor();
+    await page.getByText('선생님 확인 중 1문제').waitFor();
+    assert.equal(await page.locator('.rn-rcresult-row').count(), 3);
+    assert.equal(await page.locator('.rn-rcresult-badge.is-correct').count(), 1);
+    assert.equal(await page.locator('.rn-rcresult-badge.is-incorrect').count(), 1);
+    assert.equal(await page.locator('.rn-rcresult-badge.is-pending').count(), 1);
+    assert.equal(await page.locator('.rn-examprep-warning').count(), 0, '확인 중 문항은 에러처럼 보이면 안 됨');
+    // 내 답 / 저장된 정답(없으면 fallback)이 목록에 함께 보인다.
+    await page.locator('.rn-rcresult-row').nth(2).getByText('x=3').waitFor();
+    await page.locator('.rn-rcresult-row').nth(1).getByText('저장된 정답 없음').waitFor();
+    // 가로 스크롤 없이 390px에 들어가야 한다.
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), '390px에서 가로 스크롤이 생기면 안 됨');
+    await page.screenshot({ path: `${out}/submit-result-partial.png`, fullPage: true });
+
+    await page.getByRole('button', { name: '2번 문제 자세히 보기' }).click();
+    await page.getByText('2 / 3').waitFor();
+    await page.getByText('X 오답').waitFor();
+    await page.getByRole('button', { name: '결과' }).click();
+    await page.getByText('AI 채점 완료 2문제').waitFor();
+
+    assert.deepEqual(errors, []);
+    await context.close();
+    console.log('PASS (f): 제출 직후 일부 채점 — 진행 상태, 판정된 O/X, 차분한 확인 중, 문항 상세 이동');
+  }
+
+  // (g) 제출 직후 결과 — 전부 AI 채점(1문제 오답). 점수 + 틀린 수에 맞는 격려, 태블릿(820px).
+  {
+    const context = await browser.newContext({ viewport: { width: 820, height: 1180 } });
+    const api = submitResultServer(['correct', 'incorrect', 'correct']);
+    const { page, errors } = await withPage(context, api, 'student-screens.html?user=student-1');
+
+    await solveAndSubmit(page, ['5', '오답임', 'x=3']);
+    await page.getByText('이번 복습체크 결과').waitFor({ timeout: 5000 });
+    assert.equal((await page.locator('.rn-rcresult-score').innerText()).replace(/\s+/g, ' ').trim(), '2 / 3');
+    await page.getByText('딱 한 문제만 다시 보면 돼요').waitFor();
+    assert.equal(await page.getByText('선생님 확인 중').count(), 0);
+    await page.screenshot({ path: `${out}/submit-result-graded-tablet.png`, fullPage: true });
+
+    await page.getByRole('button', { name: '새 복습체크 시작' }).click();
+    await page.getByRole('button', { name: '복습체크 시작' }).waitFor();
+
+    assert.deepEqual(errors, []);
+    await context.close();
+    console.log('PASS (g): 제출 직후 전부 채점 — 점수/격려 문구, 새 복습체크 시작 -> 시작 화면');
   }
 } finally {
   await browser.close();

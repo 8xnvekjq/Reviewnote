@@ -16,6 +16,7 @@ import {
 import { AppIcon } from '../ui/AppIcon';
 import { LaTeXRenderer } from '../LaTeXRenderer';
 import { ReviewCheckImageZoom } from './ReviewCheckImageZoom';
+import { ReviewCheckSubmitResult } from './ReviewCheckSubmitResult';
 import { HandwritingOverlay, type HandwritingOverlayBounds, type HandwritingOverlayHandle } from '../HandwritingOverlay';
 
 interface Props {
@@ -34,7 +35,9 @@ type ViewState =
   | { kind: 'loading' }
   | { kind: 'start'; recentGraded: ReviewCheckSession | null }
   | { kind: 'quiz'; session: ReviewCheckSession; items: ReviewCheckItem[] }
-  | { kind: 'waiting' }
+  // 제출 결과/채점 진행 화면 — justSubmitted는 "방금 제출한 직후"(하단 버튼 노출)인지, 다시 열었는데
+  // 아직 선생님 확인이 남은 submitted 세션인지를 구분한다. openIndex가 있으면 그 문항 상세를 연다.
+  | { kind: 'submitResult'; session: ReviewCheckSession; justSubmitted: boolean; openIndex?: number }
   | { kind: 'history' }
   | { kind: 'historyDetail'; session: ReviewCheckSession }
   | { kind: 'error'; message: string };
@@ -64,7 +67,7 @@ export function ReviewCheckScreen({ currentUserId, schoolGrade, mistakes }: Prop
         return;
       }
       if (latest.status === 'submitted') {
-        setView({ kind: 'waiting' });
+        setView({ kind: 'submitResult', session: latest, justSubmitted: false });
         return;
       }
       setView({ kind: 'start', recentGraded: latest });
@@ -86,12 +89,26 @@ export function ReviewCheckScreen({ currentUserId, schoolGrade, mistakes }: Prop
       </div>
     );
   }
-  if (view.kind === 'waiting') {
+  if (view.kind === 'submitResult') {
+    if (view.openIndex !== undefined) {
+      return (
+        <ReviewCheckStudentHistoryDetail
+          session={view.session}
+          mistakeById={mistakeById}
+          initialIndex={view.openIndex}
+          backLabel="결과"
+          onBack={() => setView({ ...view, openIndex: undefined })}
+        />
+      );
+    }
     return (
-      <div className="rn-surface" style={{ padding: 24, textAlign: 'center' }}>
-        <div style={{ fontSize: 15, fontWeight: 750, marginBottom: 6 }}>복습체크 제출 완료</div>
-        <p className="rn-caption">선생님이 채점하면<br />결과를 확인할 수 있어요.</p>
-      </div>
+      <ReviewCheckSubmitResult
+        session={view.session}
+        mistakeById={mistakeById}
+        justSubmitted={view.justSubmitted}
+        onOpenItem={index => setView({ ...view, openIndex: index })}
+        onDone={load}
+      />
     );
   }
   if (view.kind === 'quiz') {
@@ -101,7 +118,7 @@ export function ReviewCheckScreen({ currentUserId, schoolGrade, mistakes }: Prop
         session={view.session}
         items={view.items}
         mistakeById={mistakeById}
-        onSubmitted={load}
+        onSubmitted={() => setView({ kind: 'submitResult', session: view.session, justSubmitted: true })}
       />
     );
   }
@@ -288,7 +305,7 @@ function ReviewCheckQuiz({
       await submitReviewCheckSession(session.id, payload);
       // 제출 자체는 이미 성공했으니, AI 채점이 실패하거나 느려도 이 결과를 기다리다 학생을 막지
       // 않는다(requestReviewCheckAiGrading은 절대 throw하지 않음) — 실패해도 곧바로 이어지는
-      // onSubmitted()가 기존 "선생님이 채점하면..." 대기 화면으로 자연스럽게 폴백시켜 준다.
+      // onSubmitted()의 결과 화면이 아직 채점 안 된 문항을 "선생님 확인 중"으로 보여준다.
       setGrading(true);
       await requestReviewCheckAiGrading(session.id);
       onSubmitted();
@@ -435,15 +452,17 @@ function ReviewCheckStudentHistoryList({
 // item.grade를 그대로 렌더한다 — admin이 override했다면 aiVerdict가 아니라 이 필드에만 진짜 최종
 // 판정이 반영돼 있다.
 function ReviewCheckStudentHistoryDetail({
-  session, mistakeById, onBack,
+  session, mistakeById, onBack, initialIndex = 0, backLabel = '목록',
 }: {
   session: ReviewCheckSession;
   mistakeById: Map<string, MistakeEntry>;
   onBack: () => void;
+  initialIndex?: number;
+  backLabel?: string;
 }) {
   const [items, setItems] = useState<ReviewCheckItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(initialIndex);
   const [zoomImage, setZoomImage] = useState<{ src: string; alt: string } | null>(null);
 
   useEffect(() => {
@@ -458,7 +477,7 @@ function ReviewCheckStudentHistoryDetail({
     <div className="rn-reviewcheck-sticky-header">
       <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={onBack}>
         <AppIcon name="arrow" width={14} height={14} style={{ transform: 'rotate(180deg)' }} />
-        목록
+        {backLabel}
       </button>
       <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--rn-muted)' }}>{formatDateLabel(session.createdAt)}</span>
     </div>
