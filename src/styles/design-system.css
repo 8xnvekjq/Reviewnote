@@ -88,6 +88,13 @@
 .rn-menu-row strong { display: block; font-size: 14px; }
 .rn-menu-row small { font-size: 12px; color: var(--rn-muted); }
 .rn-menu-row[aria-current=page], .rn-menu-row:active { background: var(--rn-elevated); }
+.rn-menu-section + .rn-menu-section, .rn-menu-recent + .rn-menu-section { margin-top: var(--rn-space-4); }
+.rn-menu-section-title { padding: 0 12px var(--rn-space-1); color: var(--rn-muted); font-size: 11px; font-weight: 700; letter-spacing: .08em; line-height: 1.6; }
+.rn-menu-recent-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--rn-space-2); }
+.rn-menu-recent-card { display: flex; flex-direction: column; align-items: flex-start; gap: var(--rn-space-2); min-width: 0; min-height: 76px; padding: var(--rn-space-3); text-align: left; border: 1px solid var(--rn-line); border-radius: var(--rn-radius-md); background: var(--rn-surface); transition: background var(--rn-fast); }
+.rn-menu-recent-card > svg { flex: none; color: var(--rn-accent); }
+.rn-menu-recent-card strong { display: block; max-width: 100%; font-size: 14px; line-height: 1.35; overflow-wrap: anywhere; }
+.rn-menu-recent-card[aria-current=page], .rn-menu-recent-card:active { background: var(--rn-elevated); }
 @media (min-width: 768px) { .rn-main { padding: 28px 32px 36px; } .rn-sheet[open] { align-items: center; } .rn-sheet-panel { border-radius: 28px; max-height: 88dvh; } }
 @media (max-height: 500px) and (orientation: landscape) { .rn-header { padding-block: 6px; } .rn-nav-item { min-height: 44px; flex-direction: row; gap: 6px; } .rn-bottom-nav { padding-top: 3px; } }
 @media (prefers-reduced-motion: reduce) { .rn-skeleton, .rn-sheet-panel { animation: none; } .rn-button, .rn-icon-button, .rn-nav-item { transition: none; } }
