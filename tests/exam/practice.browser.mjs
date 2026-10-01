@@ -720,5 +720,54 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   console.log(`ok — school paper: 10-choice, no grades, history (${viewport.width}×${viewport.height})`);
 }
 
+for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
+  for (const level of ['advanced', 'basic']) {
+    const { context, page, errors } = await open(viewport, '?persist=1');
+    const paperId = `2026-hanneung-79-${level}`;
+    assert.equal(await paperCard(page, paperId).count(), 0);
+    await page.getByRole('button', { name: '한능검', exact: true }).click();
+    assert.equal(await page.getByTestId('exam-paper-card').count(), 2);
+    await noPaperCardOverlap(page);
+    await paperCard(page, paperId).click();
+    assert.match(await page.getByTestId('exam-setup').innerText(), level === 'basic' ? /70분/ : /80분/);
+    await page.getByTestId('exam-start-button').click();
+    await page.getByTestId('exam-solve').waitFor();
+    assert.match(await page.getByTestId('exam-counter').innerText(), /1\s*\/\s*50/);
+    assert.equal(await page.locator('.exam-choice').count(), level === 'basic' ? 4 : 5);
+    assert.match(await page.locator('.exam-page-nav').innerText(), /원본 1 \/ 12쪽/);
+    await page.locator('.exam-choice[data-choice="1"]').click();
+    if (level === 'basic') {
+      await page.keyboard.press('5');
+      assert.equal(await page.locator('.exam-choice.is-selected').getAttribute('data-choice'), '1');
+    }
+    await page.getByRole('button', { name: '원본 확대', exact: true }).click();
+    await noHorizontalOverflow(page, `hanneung-zoom/${viewport.width}`);
+    await page.getByRole('button', { name: '화면에 맞추기', exact: true }).click();
+    await page.getByRole('button', { name: '다음 문항', exact: true }).click();
+    assert.match(await page.locator('.exam-page-nav').innerText(), /원본 1 \/ 12쪽/);
+    await goToByOverview(page, 50);
+    assert.match(await page.locator('.exam-page-nav').innerText(), /원본 12 \/ 12쪽/);
+    await page.getByRole('button', { name: '나가기', exact: true }).click();
+    await page.getByTestId('exam-exit-confirm').click();
+    await page.getByTestId('exam-start').waitFor();
+    await page.reload();
+    await page.getByRole('button', { name: '한능검', exact: true }).click();
+    await paperCard(page, paperId).click();
+    await page.getByTestId('exam-solve').waitFor();
+    assert.equal(await question(page), '50');
+    await page.getByRole('button', { name: '제출', exact: true }).click();
+    assert.equal(await page.locator('.exam-omr-row').count(), 50);
+    assert.equal(await page.locator('.exam-omr-row[data-number="1"] .exam-omr-bubbles span').count(), level === 'basic' ? 4 : 5);
+    await page.getByRole('button', { name: '제출하기', exact: true }).click();
+    await page.getByTestId('exam-submit-confirm').click();
+    await page.getByTestId('exam-result').waitFor();
+    assert.equal(await page.getByTestId('exam-hanneung-grade').innerText(), '미합격');
+    assert.equal(await page.getByTestId('exam-score-tiles').count(), 0);
+    await noHorizontalOverflow(page, `hanneung-result/${viewport.width}`);
+    assert.deepEqual(errors, []);
+    await context.close();
+  }
+}
+
 await browser.close();
 console.log('exam practice browser tests passed');

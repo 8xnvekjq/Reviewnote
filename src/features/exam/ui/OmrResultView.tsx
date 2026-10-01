@@ -4,6 +4,7 @@ import type { ExamClient, ExamResult, ExamResultItem, InkStroke } from '../contr
 import { ExamInkCanvas } from '../ink/ExamInkCanvas';
 import { loadInk } from './inkStore';
 import { ExamAnswer } from './ExamAnswer';
+import { resultGradeLabel } from './hanneungLogic';
 import { displayAnswer, ELECTIVE_SHORT, estimateStandardScore, formatClock, formatDuration, mistakeCandidates, praiseLine, roundLabel } from './examLogic';
 
 interface Props {
@@ -20,6 +21,7 @@ export function OmrResultView({ client, result: initial, onBack, backLabel }: Pr
   const [adding, setAdding] = useState(false);
   const [addMessage, setAddMessage] = useState<string | null>(null);
   const [viewing, setViewing] = useState<ExamResultItem | null>(null);
+  const [pageZoom, setPageZoom] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -30,7 +32,7 @@ export function OmrResultView({ client, result: initial, onBack, backLabel }: Pr
   const candidates = useMemo(() => mistakeCandidates(result.items), [result.items]);
   const pendingCandidates = candidates.filter(item => !item.addedMistakeId);
   const cuts = result.gradeCut;
-  const school = result.kind === 'school';
+  const school = result.kind === 'school' || result.kind === 'hanneung';
   // 서버가 v2 이전 결과를 주면 top 값이 없을 수 있다 — 그땐 1등급컷 값으로 본다.
   const estimate = useMemo(() => school ? { standard: null, percentile: null } : estimateStandardScore(result.score, {
     ...cuts,
@@ -88,6 +90,10 @@ export function OmrResultView({ client, result: initial, onBack, backLabel }: Pr
             <div><dt>총 시간</dt><dd>{formatDuration(result.totalTimeMs)}</dd></div>
           </dl>
         </div>
+        {result.kind === 'hanneung' && <div className="exam-grade-note">
+          <strong data-testid="exam-hanneung-grade">{resultGradeLabel(result, result.estimatedGrade)}</strong>
+          <p className="rn-caption">80점·70점·60점 이상이면 {result.hanneungLevel === 'basic' ? '4급·5급·6급' : '1급·2급·3급'} 기준이에요. 연습 결과이며 공식 인증은 아니에요.</p>
+        </div>}
         {!school && <>
         <dl className="exam-score-tiles" data-testid="exam-score-tiles">
           <div className="exam-score-tile is-grade">
@@ -213,16 +219,21 @@ export function OmrResultView({ client, result: initial, onBack, backLabel }: Pr
               <p className="rn-caption">전국 선택 비율: {viewing.nationalChoiceRates.map((rate, i) => `${displayAnswer(String(i + 1), true)} ${rate}%`).join(' · ')}</p>
             )}
             <div className="exam-viewer-paper">
+              {result.kind === 'hanneung' && <button type="button" className="rn-button rn-button-compact" aria-pressed={pageZoom} onClick={() => setPageZoom(prev => !prev)}>{pageZoom ? '화면에 맞추기' : '원본 확대'}</button>}
+              <div className={result.kind === 'hanneung' ? 'exam-original-scroll' : undefined}>
+              <div style={result.kind === 'hanneung' && pageZoom ? { minWidth: 1100 } : undefined}>
               <ExamInkCanvas
                 imageUrl={viewing.imageUrl}
-                strokes={ink.get(viewing.questionId) ?? []}
+                strokes={ink.get(result.kind === 'hanneung' ? result.items.find(item => item.imageUrl === viewing.imageUrl)!.questionId : viewing.questionId) ?? []}
                 onChange={() => {}}
                 tool="pen"
                 color="#1f2937"
                 size={4}
                 readOnly
-                imageMaxWidth={480}
+                imageMaxWidth={result.kind === 'hanneung' ? (pageZoom ? 1100 : 980) : 480}
               />
+              </div>
+              </div>
             </div>
           </div>
         </div>

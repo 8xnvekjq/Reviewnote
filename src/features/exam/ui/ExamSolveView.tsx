@@ -62,6 +62,9 @@ function initialIndex(attempt: ExamAttempt): number {
 
 export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
   const questions = attempt.questions;
+  const hanneung = attempt.kind === 'hanneung';
+  const [pageZoom, setPageZoom] = useState(false);
+  const [pagePan, setPagePan] = useState(hanneung);
   const isReal = attempt.mode === 'real';
   const [items, setItems] = useState(() => initialItems(attempt));
   const [index, setIndex] = useState(() => initialIndex(attempt));
@@ -80,12 +83,15 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
   const [historyTick, setHistoryTick] = useState(0); // 실행 취소/다시 실행 버튼 상태 갱신용
 
   const question = questions[index];
+  const pageQuestions = questions.filter(candidate => candidate.imageUrl === question.imageUrl);
+  const inkKey = hanneung ? pageQuestions[0].id : question.id;
+  const pageUrls = [...new Set(questions.map(candidate => candidate.imageUrl))];
   const itemsRef = useRef(items);
   const visitOrderRef = useRef<number[]>([...attempt.visitOrder]);
   const swRef = useRef<StopwatchState>(createStopwatch(Object.fromEntries(attempt.items.map(item => [item.questionId, item.timeSpentMs]))));
   const inkRef = useRef<ExamInkCanvasHandle>(null);
   // 문항을 넘길 때 깜박이지 않게 이 시험의 문항 이미지를 미리 받아 둔다.
-  useEffect(() => { preloadInkImages(questions.map(q => q.imageUrl)); }, [questions]);
+  useEffect(() => { if (!hanneung) preloadInkImages(questions.map(q => q.imageUrl)); }, [questions, hanneung]);
   const saveTimer = useRef<number | null>(null);
   const inkTimers = useRef(new Map<string, number>());
   const strokesRef = useRef(strokes);
@@ -282,7 +288,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
   }, [question.id, updateItem]);
 
   const onInkChange = (next: InkStroke[]) => {
-    const qid = question.id;
+    const qid = inkKey;
     touchedInk.current.add(qid);
     setStrokes(prev => new Map(prev).set(qid, next));
     strokesRef.current = new Map(strokesRef.current).set(qid, next);
@@ -303,7 +309,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
       if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
       if (e.key === 'ArrowLeft') { e.preventDefault(); goTo(index - 1); }
       else if (e.key === 'ArrowRight') { e.preventDefault(); goTo(index + 1); }
-      else if (questionAnswerType(question) !== 'digits' && (question.answerType === 'choice10' ? /^[0-9]$/ : /^[1-5]$/).test(e.key)) {
+      else if (questionAnswerType(question) !== 'digits' && (question.answerType === 'choice10' ? /^[0-9]$/ : question.answerType === 'choice4' ? /^[1-4]$/ : /^[1-5]$/).test(e.key)) {
         e.preventDefault();
         setAnswer(toggleChoice(itemsRef.current[question.id]?.answer ?? null, e.key === '0' ? 10 : Number(e.key)));
       }
@@ -357,7 +363,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
           <div className="exam-tools" role="toolbar" aria-label="필기 도구">
             <div className="exam-tool-group">
               {([['pen', '펜', '✏️'], ['highlighter', '형광펜', '🖍️'], ['eraser', '지우개', '🧽']] as const).map(([value, label, icon]) => (
-                <button key={value} type="button" className={`exam-tool${tool === value ? ' is-on' : ''}`} aria-pressed={tool === value} aria-label={label} title={label} onClick={() => setTool(value)}>
+                <button key={value} type="button" className={`exam-tool${tool === value && !pagePan ? ' is-on' : ''}`} aria-pressed={tool === value && !pagePan} aria-label={label} title={label} onClick={() => { setTool(value); setPagePan(false); }}>
                   <span aria-hidden="true">{icon}</span>
                 </button>
               ))}
@@ -377,8 +383,8 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
             <div className="exam-tool-group">
               <button type="button" className="exam-tool" aria-label="실행 취소" title="실행 취소" disabled={!canUndo} onClick={() => { inkRef.current?.undo(); setHistoryTick(t => t + 1); }}>↶</button>
               <button type="button" className="exam-tool" aria-label="다시 실행" title="다시 실행" disabled={!canRedo} onClick={() => { inkRef.current?.redo(); setHistoryTick(t => t + 1); }}>↷</button>
-              <button type="button" className="exam-tool exam-tool-text" disabled={!(strokes.get(question.id)?.length)} onClick={() => { inkRef.current?.clear(); setHistoryTick(t => t + 1); }}>
-                이 문항 필기 지우기
+              <button type="button" className="exam-tool exam-tool-text" disabled={!(strokes.get(inkKey)?.length)} onClick={() => { inkRef.current?.clear(); setHistoryTick(t => t + 1); }}>
+                {hanneung ? '이 페이지 필기 지우기' : '이 문항 필기 지우기'}
               </button>
             </div>
           </div>
@@ -428,19 +434,30 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
             {question.number}번 · {question.points}점 · {question.isChoice ? '객관식' : '단답형'}
             {saveState === 'failed' && <span className="exam-save-failed"> · 저장이 잠깐 안 됐어요(다시 시도할게요)</span>}
           </div>
+          {hanneung && <nav className="exam-page-nav" aria-label="원본 페이지 문항">
+            <span className="rn-caption">원본 {pageUrls.indexOf(question.imageUrl) + 1} / {pageUrls.length}쪽</span>
+            {pageQuestions.map(candidate => <button key={candidate.id} type="button" className="rn-button rn-button-compact" aria-pressed={candidate.id === question.id} onClick={() => goTo(questions.indexOf(candidate))}>{candidate.number}번</button>)}
+            <button type="button" className="rn-button rn-button-compact" aria-pressed={pageZoom} onClick={() => setPageZoom(prev => !prev)}>{pageZoom ? '화면에 맞추기' : '원본 확대'}</button>
+            <button type="button" className="rn-button rn-button-compact" aria-pressed={pagePan} onClick={() => setPagePan(prev => !prev)}>{pagePan ? '필기하기' : '화면 이동'}</button>
+          </nav>}
+          <div className={hanneung ? 'exam-original-scroll' : undefined}>
+          <div style={hanneung && pageZoom ? { minWidth: 1100 } : undefined}>
           <ExamInkCanvas
-            key={question.id}
+            key={inkKey}
             ref={inkRef}
             imageUrl={question.imageUrl}
-            strokes={strokes.get(question.id) ?? []}
+            strokes={strokes.get(inkKey) ?? []}
             onChange={onInkChange}
             tool={tool}
             color={color}
             size={size}
             penOnlyWhenPenDetected
             shapeSnap
-            imageMaxWidth={QUESTION_IMAGE_WIDTH}
+            readOnly={hanneung && pagePan}
+            imageMaxWidth={hanneung ? (pageZoom ? 1100 : 980) : QUESTION_IMAGE_WIDTH}
           />
+          </div>
+          </div>
           {/* 이전·다음은 상단 화살표로 충분하다. 마지막 문항에서만 OMR 확인으로 이어 준다. */}
           {index === questions.length - 1 && (
             <div className="exam-paper-foot">
@@ -454,6 +471,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
 
       {overlay === 'overview' && (
         <QuestionOverview
+          wholePages={hanneung}
           questions={questions}
           items={items}
           currentIndex={index}

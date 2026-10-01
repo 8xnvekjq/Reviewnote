@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { ExamAttempt, ExamClient, ExamElective, ExamMode, ExamPaperSummary, ExamResult, ExamPaperMetadata } from '../contract';
 import { ELECTIVE_SHORT, ELECTIVES, formatClock, formatElapsed, progressRatio, remainingMs, roundLabel } from './examLogic';
+import { resultGradeLabel } from './hanneungLogic';
 
 type PastResult = Pick<ExamResult, 'attemptId' | 'paperTitle' | 'mode' | 'elective' | 'score' | 'estimatedGrade' | 'submittedAt' | keyof ExamPaperMetadata>;
 
@@ -28,6 +29,7 @@ const MODES: Array<{ value: ExamMode; title: string; desc: string }> = [
 function electiveKey(userId: string) { return `rn-exam-elective:${userId}`; }
 
 function paperGrade(paper: ExamPaperMetadata) {
+  if (paper.kind === 'hanneung') return 'hanneung';
   return (paper.kind ?? 'csat') === 'csat' ? 3 : paper.grade;
 }
 
@@ -60,7 +62,7 @@ function PaperCard({ paper, selected, busy, now, onClick }: { paper: ExamPaperSu
       data-state={progress ? 'in-progress' : count > 0 ? 'done' : 'new'}
     >
       <span className="exam-paper-sheet-head" aria-hidden="true">
-        <span>수학 영역</span>
+        <span>{paper.kind === 'hanneung' ? `한국사 ${paper.hanneungLevel === 'basic' ? '기본' : '심화'}` : '수학 영역'}</span>
         <span>{paper.timeLimitMinutes}분 · {total}문항</span>
       </span>
       <strong className="exam-paper-title">{paper.title}</strong>
@@ -84,7 +86,7 @@ function PaperCard({ paper, selected, busy, now, onClick }: { paper: ExamPaperSu
         )}
         {last && (
           <span className="exam-paper-last" data-testid="exam-paper-last">
-            <span className="exam-paper-line">최근 {roundLabel(last.round) && `${roundLabel(last.round)} · `}<b>{last.score}점{school && ` / ${paper.maxScore ?? 100}`}</b>{!school && last.estimatedGrade != null && <> · <b>{last.estimatedGrade}등급</b></>}</span>
+            <span className="exam-paper-line">최근 {roundLabel(last.round) && `${roundLabel(last.round)} · `}<b>{last.score}점{school && ` / ${paper.maxScore ?? 100}`}</b>{resultGradeLabel(paper, last.estimatedGrade) && <> · <b>{resultGradeLabel(paper, last.estimatedGrade)}</b></>}</span>
           </span>
         )}
         {!progress && !last && <span className="exam-paper-line is-muted">아직 풀지 않았어요</span>}
@@ -98,7 +100,7 @@ function PaperCard({ paper, selected, busy, now, onClick }: { paper: ExamPaperSu
 export function ExamStartView({ client, currentUserId, busy, error, onStart, onResume, onOpenResult, onOpenHistory, onExit, initialPaperId }: Props) {
   const [papers, setPapers] = useState<ExamPaperSummary[] | null>(null);
   const [paperId, setPaperId] = useState<string | null>(initialPaperId ?? null);
-  const [grade, setGrade] = useState(3);
+  const [grade, setGrade] = useState<number | 'hanneung'>(3);
   const [past, setPast] = useState<PastResult[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [resumeError, setResumeError] = useState<string | null>(null);
@@ -127,7 +129,7 @@ export function ExamStartView({ client, currentUserId, busy, error, onStart, onR
     return () => { alive = false; };
   }, [client, initialPaperId]);
 
-  const visiblePapers = papers?.filter(candidate => candidate.kind === 'hanneung' || paperGrade(candidate) === grade) ?? [];
+  const visiblePapers = papers?.filter(candidate => paperGrade(candidate) === grade) ?? [];
   const paper = visiblePapers.find(p => p.id === paperId) ?? null;
   const showSetup = paper != null && !paper.inProgress;
 
@@ -169,8 +171,8 @@ export function ExamStartView({ client, currentUserId, busy, error, onStart, onR
       <p className="rn-eyebrow">기출문제 풀이</p>
       <h1 className="rn-title">시험지 고르기</h1>
 
-      <div className="exam-option-grid exam-option-grid-3" role="group" aria-label="학년 선택">
-        {[1, 2, 3].map(value => (
+      <div className="exam-option-grid exam-category-grid" role="group" aria-label="시험 분류">
+        {([1, 2, 3, 'hanneung'] as const).map(value => (
           <button key={value} type="button" aria-pressed={grade === value}
             className={`exam-option exam-option-small${grade === value ? ' is-on' : ''}`}
             disabled={!papers || busy || resuming != null}
@@ -180,7 +182,7 @@ export function ExamStartView({ client, currentUserId, busy, error, onStart, onR
               setPaperId(null);
               setResumeError(null);
             }}>
-            <strong>고{value}</strong>
+            <strong>{value === 'hanneung' ? '한능검' : `고${value}`}</strong>
           </button>
         ))}
       </div>
@@ -188,7 +190,7 @@ export function ExamStartView({ client, currentUserId, busy, error, onStart, onR
       {loadError && <p className="exam-error" role="alert">{loadError}</p>}
       {!papers && !loadError && <div className="rn-loading"><div className="rn-skeleton rn-loading-card" /></div>}
 
-      {papers && visiblePapers.length === 0 && <div className="rn-empty">아직 고{grade} 시험지가 없어요.</div>}
+      {papers && visiblePapers.length === 0 && <div className="rn-empty">아직 {grade === 'hanneung' ? '한능검' : `고${grade}`} 시험지가 없어요.</div>}
 
       {visiblePapers.length > 0 && (
         <>
@@ -258,7 +260,7 @@ export function ExamStartView({ client, currentUserId, busy, error, onStart, onR
             {past.map(r => (
               <li key={r.attemptId}>
                 <button type="button" className="exam-past-row" onClick={() => onOpenResult(r.attemptId)}>
-                  <span><strong>{r.score}점{r.kind === 'school' && ` / ${r.maxScore ?? 100}`}</strong>{r.kind !== 'school' && r.estimatedGrade != null && ` · 추정 ${r.estimatedGrade}등급`}</span>
+                  <span><strong>{r.score}점{r.kind === 'school' && ` / ${r.maxScore ?? 100}`}</strong>{resultGradeLabel(r, r.estimatedGrade) && ` · ${resultGradeLabel(r, r.estimatedGrade)}`}</span>
                   <span className="rn-caption">{r.paperTitle} · {r.mode === 'real' ? '실전' : '자유'}{r.elective && ` · ${ELECTIVE_SHORT[r.elective]}`} · {formatDate(r.submittedAt)}</span>
                 </button>
               </li>

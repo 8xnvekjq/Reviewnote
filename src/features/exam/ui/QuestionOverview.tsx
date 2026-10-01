@@ -7,6 +7,7 @@ import { padStatus } from './examLogic';
 type ItemLike = Pick<ExamItemState, 'answer' | 'unsure' | 'checked'>;
 
 interface Props {
+  wholePages?: boolean;
   questions: ExamQuestion[];
   items: Record<string, ItemLike>;
   currentIndex: number;
@@ -16,7 +17,7 @@ interface Props {
   onOpenOmr: () => void;
 }
 
-export function QuestionOverview({ questions, items, currentIndex, answeredCount, onPick, onClose, onOpenOmr }: Props) {
+export function QuestionOverview({ questions, items, currentIndex, answeredCount, onPick, onClose, onOpenOmr, wholePages }: Props) {
   const currentRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -72,8 +73,8 @@ export function QuestionOverview({ questions, items, currentIndex, answeredCount
                   data-checked={checked ? String(checked.isCorrect) : undefined}
                   onClick={() => onPick(index)}
                 >
-                  <span className="exam-thumb-paper">
-                    <img src={q.imageUrl} alt="" decoding="async" draggable={false} />
+                  <span className={`exam-thumb-paper${wholePages ? ' exam-thumb-original' : ''}`}>
+                    <img src={q.imageUrl} alt="" decoding="async" loading="lazy" draggable={false} />
                   </span>
                   <span className="exam-thumb-num">{q.number}</span>
                   <span className="exam-thumb-badges" aria-hidden="true">
