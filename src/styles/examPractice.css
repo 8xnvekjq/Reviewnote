@@ -4,6 +4,9 @@
 .exam-review-badge { font-size: 11px; line-height: 1.4; color: #784a00; background: #fff1cc; padding: 4px 6px; border-radius: 6px; }
 .exam-answer-math { display: inline-flex; align-items: center; gap: 5px; min-width: 0; max-width: 100%; }
 .exam-answer-math > span:last-child { min-width: 0; overflow-x: auto; }
+.exam-answer-math > .katex-rendered-text, .exam-choice-math { padding-block: 3px; line-height: normal; scrollbar-width: none; }
+.exam-answer-math > .katex-rendered-text::-webkit-scrollbar, .exam-choice-math::-webkit-scrollbar { display: none; }
+.exam-answer-math .katex, .exam-choice-math .katex { display: inline-block; }
 .exam-omr-ten-answer { min-width: 0; font-size: 13px; }
 .exam-practice *, .exam-practice *::before, .exam-practice *::after { box-sizing: border-box; }
 .exam-error { color: var(--rn-danger); font-size: 13px; margin: 8px 0; }
