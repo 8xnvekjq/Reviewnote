@@ -541,7 +541,9 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
       if (index > 1) return;
       const time = index === 0 ? 540000 : 240000;
       const q = entry.attempt.questions.find(q => q.number === 23);
-      entry.attempt.items.push({ questionId: q.id, answer: null, unsure: false, timeSpentMs: time, visits: 1 });
+      const existing = entry.attempt.items.find(i => i.questionId === q.id);
+      if (existing) existing.timeSpentMs = time; // 이미 있는 문항 기록을 고친다(덧붙이면 첫 기록이 읽힌다)
+      else entry.attempt.items.push({ questionId: q.id, answer: null, unsure: false, timeSpentMs: time, visits: 1 });
       entry.result.items.find(i => i.number === 23).timeSpentMs = time;
     });
     localStorage.setItem('exam-practice-harness', JSON.stringify(saved));
