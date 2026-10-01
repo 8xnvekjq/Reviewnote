@@ -3,15 +3,16 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ExamClient, ExamResult, ExamResultItem, InkStroke } from '../contract';
 import { ExamInkCanvas } from '../ink/ExamInkCanvas';
 import { loadInk } from './inkStore';
-import { displayAnswer, ELECTIVE_SHORT, estimateStandardScore, formatClock, formatDuration, mistakeCandidates, praiseLine } from './examLogic';
+import { displayAnswer, ELECTIVE_SHORT, estimateStandardScore, formatClock, formatDuration, mistakeCandidates, praiseLine, roundLabel } from './examLogic';
 
 interface Props {
   client: ExamClient;
   result: ExamResult;
   onBack: () => void;
+  backLabel?: string;
 }
 
-export function OmrResultView({ client, result: initial, onBack }: Props) {
+export function OmrResultView({ client, result: initial, onBack, backLabel }: Props) {
   const [result, setResult] = useState(initial);
   const [ink, setInk] = useState<Map<string, InkStroke[]>>(() => new Map());
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
@@ -67,12 +68,12 @@ export function OmrResultView({ client, result: initial, onBack }: Props) {
   return (
     <div className="exam-result" data-testid="exam-result">
       <div className="exam-result-head">
-        <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={onBack}>← 시험지 목록</button>
+        <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={onBack}>{backLabel ?? '← 시험지 목록'}</button>
       </div>
 
       <section className="rn-surface exam-score-card" aria-label="OMR 결과 요약">
         <p className="rn-eyebrow">OMR 결과</p>
-        <h2 className="exam-result-title">{result.paperTitle}</h2>
+        <h2 className="exam-result-title">{result.paperTitle}{roundLabel(result.round) && ` · ${roundLabel(result.round)}`}</h2>
         <p className="rn-caption">{result.mode === 'real' ? '실전 모드' : '자유 모드'} · {result.elective}</p>
         <div className="exam-score-grid">
           <div className="exam-score-main">

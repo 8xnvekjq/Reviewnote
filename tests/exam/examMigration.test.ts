@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { mapExamPaperHistory } from '../../src/features/exam/examMappers.ts';
+import { buildHistoryRows } from '../../src/features/exam/ui/examLogic.ts';
 
 // 기출문제 마이그레이션을 메모리 Postgres(PGlite)에 실제로 적용하고 RLS·RPC 흐름을 끝까지 돌려 본다.
 // PGlite는 프로젝트 의존성이 아니라서 없으면 건너뛴다. 돌리려면:
@@ -25,6 +27,7 @@ const root = path.resolve(import.meta.dirname, '../..');
 const mig = fs.readFileSync(path.join(root, 'supabase/migrations/20261002120000_exam_practice.sql'), 'utf8');
 const migV2 = fs.readFileSync(path.join(root, 'supabase/migrations/20261002180000_exam_practice_v2.sql'), 'utf8');
 const migBatch2 = fs.readFileSync(path.join(root, 'supabase/migrations/20261002190000_exam_papers_batch2.sql'), 'utf8');
+const migRounds = fs.readFileSync(path.join(root, 'supabase/migrations/20261002200000_exam_rounds.sql'), 'utf8');
 
 test('exam migration applies and the RPC flow behaves (PGlite)', { skip: PGliteCtor ? false : '@electric-sql/pglite 미설치' }, async () => {
 const db = new PGliteCtor!();
@@ -309,4 +312,89 @@ assert.equal(fullN.gradeCut.topStandard, 140, '2025 수능 미적분 최고점 �
 assert.equal(fullN.gradeCut.standardByGrade[1], 123, '2025 수능 미적분 2등급 표준점수 컷(과목별 값)');
 const papersNow = (await as(S2, `select list_exam_papers_for_me() r`))[0].r.map(p => p.id);
 for (const pid of BATCH2) assert.ok(papersNow.includes(pid), pid);
+
+// 회차 기록: 운영 v2·batch2 다음 적용. 다시 적용해도 기존 함수·권한을 유지한다.
+await db.exec(migRounds);
+await db.exec(migRounds);
+await db.query(`update exam_attempts set started_at = case id when $1::uuid then '2026-01-01'::timestamptz else '2026-01-02'::timestamptz end
+  where id in ($1, $2)`, [a1.id, f.id]);
+const oldHistory = (await as(S1, `select list_my_paper_history('2025-06-math') r`))[0].r;
+assert.deepEqual(oldHistory.map(a => a.round), [1, 2]);
+assert.deepEqual(oldHistory.map(a => a.attemptId), [a1.id, f.id]);
+assert.equal((await as(S1, `select get_exam_result($1) r`, [f.id]))[0].r.round, 2);
+const upgraded = (await as(S2, `select get_exam_result($1) r`, [vA.id]))[0].r;
+const { round: upgradedRound, ...unchanged } = upgraded;
+assert.equal(upgradedRound, 1); assert.deepEqual(unchanged, subA, '결과 payload 기존 필드를 그대로 유지');
+await fails(null, `select list_my_paper_history('2025-06-math')`, [], /permission denied/);
+await db.exec(`set role authenticated; select set_config('request.jwt.claim.sub', '', false)`);
+try { await assert.rejects(db.query(`select list_my_paper_history('2025-06-math')`), /EXAM_AUTH_REQUIRED/); }
+finally { await db.exec('reset role'); }
+await fails(S1, `select list_my_paper_history('2025-06-math', $1)`, [S2], /EXAM_ATTEMPT_NOT_FOUND/);
+await fails(S1, `select list_my_paper_history('missing')`, [], /EXAM_PAPER_NOT_FOUND/);
+const otherHistory = (await as(S2, `select list_my_paper_history('2025-06-math') r`))[0].r;
+assert.deepEqual(otherHistory.map(a => a.attemptId), [vA.id], '학생은 자기 기록만');
+assert.deepEqual((await as(AD, `select list_my_paper_history('2025-06-math', $1) r`, [S1]))[0].r, oldHistory, '관리자는 지정 학생 기록 조회');
+assert.deepEqual((await as(AD, `select list_my_paper_history('2025-06-math') r`))[0].r, [], '기본 조회는 관리자도 자기 기록');
+const round3 = (await as(S1, `select start_exam_attempt('2025-06-math','free','미적분') r`))[0].r;
+await db.query(`update exam_attempts set started_at = '2026-01-03' where id = $1`, [round3.id]);
+await as(S1, `select check_exam_answer($1, $2, $3)`, [round3.id, keys[1].id, keys[1].answer]);
+const ongoing = (await as(S1, `select list_my_paper_history('2025-06-math') r`))[0].r.at(-1);
+assert.equal(ongoing.round, 3); assert.equal(ongoing.status, 'in_progress');
+assert.equal(ongoing.score, null); assert.equal(ongoing.estimatedGrade, null);
+assert.equal(ongoing.items.length, 30); assert.equal(ongoing.items[0].answered, true);
+assert.ok(ongoing.items.every(i => i.isCorrect === null), '채점해 본 문항도 진행 중 기록에서 정오 비노출');
+assert.equal(JSON.stringify(ongoing).includes('correctAnswer'), false);
+assert.equal(JSON.stringify(ongoing).includes('checked'), false);
+const roundsCard = (await as(S1, `select list_exam_papers_for_me() r`))[0].r.find(p => p.id === '2025-06-math');
+assert.equal(roundsCard.inProgress.round, 3); assert.equal(roundsCard.lastResult.round, 2);
+
+const wrong2 = keys[2].answer === '1' ? '2' : '1';
+const wrong23 = keys[23].answer === '1' ? '2' : '1';
+function roundItems(attempt, correct23, time) {
+  return attempt.questions.filter(q => [1, 2, 23].includes(q.number)).map(q => ({
+    questionId: q.id, answer: q.number === 1 ? keys[1].answer : q.number === 2 ? wrong2 : correct23 ? keys[23].answer : wrong23,
+    unsure: q.number === 2, timeSpentMs: time, visits: 1,
+  }));
+}
+await as(S1, `select submit_exam_attempt($1, $2::jsonb, null)`, [round3.id, JSON.stringify(roundItems(round3, false, 540000))]);
+const round4 = (await as(S1, `select start_exam_attempt('2025-06-math','real','기하') r`))[0].r;
+await db.query(`update exam_attempts set started_at = '2026-01-04' where id = $1`, [round4.id]);
+await as(S1, `select submit_exam_attempt($1, '[]'::jsonb, null)`, [round4.id]);
+const round5 = (await as(S1, `select start_exam_attempt('2025-06-math','free','미적분') r`))[0].r;
+await db.query(`update exam_attempts set started_at = '2026-01-05' where id = $1`, [round5.id]);
+await as(S1, `select submit_exam_attempt($1, $2::jsonb, null)`, [round5.id, JSON.stringify(roundItems(round5, true, 240000))]);
+const fiveRounds = (await as(S1, `select list_my_paper_history('2025-06-math') r`))[0].r;
+assert.deepEqual(fiveRounds.map(a => a.round), [1, 2, 3, 4, 5]);
+assert.deepEqual(fiveRounds.slice(2).map(a => a.elective), ['미적분', '기하', '미적분']);
+assert.equal(fiveRounds[3].items[22].section, '기하');
+assert.equal(fiveRounds[2].items[22].isCorrect, false); assert.equal(fiveRounds[4].items[22].isCorrect, true);
+assert.equal(fiveRounds[2].items[22].timeSpentMs, 540000); assert.equal(fiveRounds[4].items[22].timeSpentMs, 240000);
+assert.ok(fiveRounds.every(a => a.items.find(i => i.number === 22).isCorrect === false), '계속 틀린 문항 판정 재료');
+const comparisonRows = buildHistoryRows(mapExamPaperHistory(fiveRounds), '미적분');
+assert.equal(comparisonRows[21].persistentWrong, true);
+assert.equal(comparisonRows[0].cells[4].newlyCorrect, true);
+assert.equal(comparisonRows[22].cells[3].item, null, '다른 선택과목 회차는 비교에서 제외');
+assert.equal(comparisonRows[22].cells[4].newlyCorrect, true);
+assert.equal(comparisonRows[22].timeChange, '9분 → 4분');
+assert.equal(fiveRounds[4].totalTimeMs, 720000); assert.equal(fiveRounds[4].items[1].unsure, true);
+assert.equal(fiveRounds[3].items[0].answered, false);
+assert.equal((await as(S1, `select get_exam_result($1) r`, [round5.id]))[0].r.round, 5);
+assert.equal((await as(S1, `select list_exam_papers_for_me() r`))[0].r.find(p => p.id === '2025-06-math').lastResult.round, 5);
+// 동시각에도 모든 payload가 동일한 결정적 순서를 쓴다.
+await db.query(`update exam_attempts set started_at = '2026-01-05' where id = $1`, [round4.id]);
+const tied = (await as(S1, `select list_my_paper_history('2025-06-math') r`))[0].r;
+for (const a of tied) assert.equal((await as(S1, `select get_exam_result($1) r`, [a.attemptId]))[0].r.round, a.round);
+const tiedLast = (await as(S1, `select list_exam_papers_for_me() r`))[0].r.find(p => p.id === '2025-06-math').lastResult;
+assert.equal(tiedLast.round, tied.find(a => a.attemptId === tiedLast.attemptId).round);
+const emptyNewPaper = (await as(S1, `select list_my_paper_history('2026-11-math') r`))[0].r;
+assert.deepEqual(emptyNewPaper, [], '새 시험지는 빈 기록');
+const newPaperRound = (await as(S2, `select list_my_paper_history('2025-11-math') r`))[0].r;
+assert.equal(newPaperRound[0].round, 1, '시험지별로 회차를 다시 센다');
+const permission = (await db.query(`select
+  has_function_privilege('anon', 'public.list_my_paper_history(text,uuid)', 'execute') anon,
+  has_function_privilege('authenticated', 'public.list_my_paper_history(text,uuid)', 'execute') student,
+  has_function_privilege('authenticated', 'private.exam_attempt_round(uuid)', 'execute') helper,
+  p.prosecdef, p.proconfig from pg_proc p where p.oid = 'public.list_my_paper_history(text,uuid)'::regprocedure`)).rows[0];
+assert.equal(permission.anon, false); assert.equal(permission.student, true); assert.equal(permission.helper, false);
+assert.equal(permission.prosecdef, true); assert.deepEqual(permission.proconfig, ['search_path=""']);
 });

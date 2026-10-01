@@ -486,12 +486,104 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   await noHorizontalOverflow(page, `result/${viewport.width}`);
   await page.getByRole('button', { name: '← 시험지 목록' }).click();
   await page.locator(`[data-testid="exam-paper-card"][data-paper-id="${PAPER_A}"][data-state="done"]`).waitFor();
-  assert.match(await paperCard(page, PAPER_A).innerText(), /최근 \d+점/);
+  assert.match(await paperCard(page, PAPER_A).innerText(), /최근 1차 · \d+점/);
   assert.match(await paperCard(page, PAPER_A).innerText(), /1번 풀었어요/);
   assert.equal(await paperCard(page, PAPER_B).getAttribute('data-state'), 'in-progress');
   assert.deepEqual(errors, []);
   await context.close();
   console.log(`ok — papers progress separately (${viewport.width}×${viewport.height})`);
+}
+
+// ── 9. 회차 기록: 카드 → 기록 → 선택과목 비교 → OMR → 기록 / 이어 풀기 ─────────────
+// 시나리오 작성만. 이 작업에서는 Vite와 브라우저를 실행하지 않는다.
+for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
+  const { context, page, errors } = await open(viewport, '?persist=1');
+  const historyButton = () => page.locator(`[data-testid="exam-history-open"][data-paper-id="${PAPER_A}"]`);
+  const submitCurrent = async () => {
+    await page.getByRole('button', { name: '제출', exact: true }).click();
+    await page.getByRole('button', { name: '제출하기', exact: true }).click();
+    await page.getByTestId('exam-submit-confirm').click();
+    await page.getByTestId('exam-result').waitFor();
+    await page.getByRole('button', { name: '← 시험지 목록' }).click();
+    await paperCard(page).waitFor();
+  };
+  // 빈 기록에서 새 회차를 시작하면 기존 모드·선택과목 설정으로 이어진다.
+  await historyButton().click();
+  await page.getByTestId('exam-history-continue').waitFor();
+  assert.match(await page.getByTestId('exam-history').innerText(), /아직 풀이 기록이 없어요/);
+  assert.equal(await page.getByRole('button', { name: '계속 틀리는 문제만 다시 풀기', exact: true }).isDisabled(), true);
+  await page.getByTestId('exam-history-continue').click();
+  await page.getByTestId('exam-setup').waitFor();
+  await page.getByRole('radio', { name: /자유 모드/ }).click();
+  await page.getByRole('radio', { name: /미적분/ }).click();
+  await page.getByTestId('exam-start-button').click();
+  await page.getByTestId('exam-solve').waitFor();
+  await page.locator('.exam-choice[data-choice="2"]').click(); // 1차 1번 오답
+  await page.getByRole('button', { name: '애매해요 표시' }).click();
+  await submitCurrent();
+  await startExam(page, '자유 모드', '미적분');
+  await page.locator('.exam-choice[data-choice="4"]').click(); // 2차 새로 맞힘
+  await submitCurrent();
+  await startExam(page, '자유 모드', '기하'); // 3차 선택과목 변경
+  await submitCurrent();
+  await startExam(page, '자유 모드', '미적분'); // 4차 진행 중, 채점했어도 기록에 정오 비공개
+  await page.locator('.exam-choice[data-choice="4"]').click();
+  await page.getByRole('button', { name: '채점해 보기', exact: true }).click();
+  await page.getByTestId('exam-lock-note').waitFor();
+  await page.getByRole('button', { name: '나가기', exact: true }).click();
+  await page.getByTestId('exam-exit-confirm').click();
+  await page.getByTestId('exam-start').waitFor();
+  // 저장된 목 기록에 문항 시간을 넣어 시간 비교 표시도 확인한다.
+  await page.evaluate(() => {
+    const saved = JSON.parse(localStorage.getItem('exam-practice-harness'));
+    saved.attempts.forEach((entry, index) => {
+      entry.attempt.startedAt = new Date(Date.UTC(2026, 9, index + 1, 9)).toISOString();
+      if (index > 1) return;
+      const time = index === 0 ? 540000 : 240000;
+      const q = entry.attempt.questions.find(q => q.number === 23);
+      const existing = entry.attempt.items.find(i => i.questionId === q.id);
+      if (existing) existing.timeSpentMs = time; // 이미 있는 문항 기록을 고친다(덧붙이면 첫 기록이 읽힌다)
+      else entry.attempt.items.push({ questionId: q.id, answer: null, unsure: false, timeSpentMs: time, visits: 1 });
+      entry.result.items.find(i => i.number === 23).timeSpentMs = time;
+    });
+    localStorage.setItem('exam-practice-harness', JSON.stringify(saved));
+  });
+  await page.reload();
+  await paperCard(page).waitFor();
+  assert.match(await paperCard(page).innerText(), /4차 진행 중/);
+  assert.match(await paperCard(page).innerText(), /최근 3차 · 0점/);
+  await historyButton().click();
+  await page.getByTestId('exam-history-table').waitFor();
+  assert.equal(await page.getByTestId('exam-history-attempt').count(), 4);
+  await page.getByTestId('exam-history-trend').waitFor();
+  const table = page.getByTestId('exam-history-table');
+  assert.equal(await table.locator('tbody tr').count(), 30);
+  assert.match(await table.locator('tr[data-number="1"] td[data-round="1"]').innerText(), /X.*🤔/s);
+  assert.match(await table.locator('tr[data-number="1"] td[data-round="2"]').innerText(), /O.*새로 맞힘/s);
+  const pendingCell = await table.locator('tr[data-number="1"] td[data-round="4"]').innerText();
+  assert.match(pendingCell, /응답/); assert.doesNotMatch(pendingCell, /[OX]|새로 맞힘/);
+  assert.equal(await table.locator('tr[data-number="30"]').getAttribute('data-persistent-wrong'), 'true');
+  assert.equal(await table.locator('tr[data-number="23"] td[data-round="3"]').innerText(), '-');
+  assert.match(await table.locator('tr[data-number="23"] .exam-history-time').innerText(), /9분 → 4분/);
+  await page.getByTestId('exam-history-elective').selectOption('기하');
+  assert.equal(await table.locator('tr[data-number="23"] td[data-round="1"]').innerText(), '-');
+  assert.match(await table.locator('tr[data-number="23"] td[data-round="3"]').innerText(), /X 미응답/);
+  await noHorizontalOverflow(page, `history/${viewport.width}`);
+  await page.getByTestId('exam-history-scroll').evaluate(el => { el.scrollLeft = el.scrollWidth; });
+  await noHorizontalOverflow(page, `history-scrolled/${viewport.width}`);
+  // 제출 회차는 OMR로, 뒤로 돌아오면 같은 시험지의 기록으로.
+  await page.locator('[data-testid="exam-history-attempt"][data-round="2"]').click();
+  await page.getByTestId('exam-result').waitFor();
+  assert.match(await page.locator('.exam-result-title').innerText(), /· 2차/);
+  await page.getByRole('button', { name: '← 풀이 기록', exact: true }).click();
+  await page.getByTestId('exam-history-table').waitFor();
+  await page.getByTestId('exam-history-continue').click();
+  await page.getByTestId('exam-solve').waitFor();
+  assert.equal(await page.getByTestId('exam-solve').getAttribute('data-mode'), 'free');
+  await page.getByTestId('exam-lock-note').waitFor();
+  assert.deepEqual(errors, []);
+  await context.close();
+  console.log(`ok — paper round history (${viewport.width}×${viewport.height})`);
 }
 
 await browser.close();

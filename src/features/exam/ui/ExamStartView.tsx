@@ -2,7 +2,7 @@
 // v2: 시험지마다 따로 진행한다 — 한 시험지를 풀다 나와도 다른 시험지는 새로 시작할 수 있고, 같은 시험지는 이어 풀기만.
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { ExamAttempt, ExamClient, ExamElective, ExamMode, ExamPaperSummary, ExamResult } from '../contract';
-import { ELECTIVE_SHORT, ELECTIVES, formatClock, formatElapsed, progressRatio, remainingMs } from './examLogic';
+import { ELECTIVE_SHORT, ELECTIVES, formatClock, formatElapsed, progressRatio, remainingMs, roundLabel } from './examLogic';
 
 type PastResult = Pick<ExamResult, 'attemptId' | 'paperTitle' | 'mode' | 'elective' | 'score' | 'estimatedGrade' | 'submittedAt'>;
 
@@ -14,6 +14,8 @@ interface Props {
   onStart: (paper: ExamPaperSummary, mode: ExamMode, elective: ExamElective) => void;
   onResume: (attempt: ExamAttempt) => void;
   onOpenResult: (attemptId: string) => void;
+  onOpenHistory: (paper: ExamPaperSummary) => void;
+  initialPaperId?: string;
   onExit: () => void;
 }
 
@@ -61,6 +63,7 @@ function PaperCard({ paper, selected, busy, now, onClick }: { paper: ExamPaperSu
       <span className="exam-paper-body">
         {progress && (
           <span className="exam-paper-progress" data-testid="exam-paper-progress">
+            <span className="exam-paper-line"><b>{roundLabel(progress.round)} 진행 중</b></span>
             <span className="exam-progress-bar" role="progressbar" aria-label="푼 문제" aria-valuemin={0} aria-valuemax={TOTAL_QUESTIONS} aria-valuenow={progress.answeredCount}>
               <i style={{ '--ratio': ratio } as CSSProperties} />
             </span>
@@ -75,7 +78,7 @@ function PaperCard({ paper, selected, busy, now, onClick }: { paper: ExamPaperSu
         )}
         {last && (
           <span className="exam-paper-last" data-testid="exam-paper-last">
-            <span className="exam-paper-line">최근 <b>{last.score}점</b>{last.estimatedGrade != null && <> · 추정 <b>{last.estimatedGrade}등급</b></>}</span>
+            <span className="exam-paper-line">최근 {roundLabel(last.round) && `${roundLabel(last.round)} · `}<b>{last.score}점</b>{last.estimatedGrade != null && <> · <b>{last.estimatedGrade}등급</b></>}</span>
             <span className="exam-paper-line is-muted">{count}번 풀었어요</span>
           </span>
         )}
@@ -87,9 +90,9 @@ function PaperCard({ paper, selected, busy, now, onClick }: { paper: ExamPaperSu
   );
 }
 
-export function ExamStartView({ client, currentUserId, busy, error, onStart, onResume, onOpenResult, onExit }: Props) {
+export function ExamStartView({ client, currentUserId, busy, error, onStart, onResume, onOpenResult, onOpenHistory, onExit, initialPaperId }: Props) {
   const [papers, setPapers] = useState<ExamPaperSummary[] | null>(null);
-  const [paperId, setPaperId] = useState<string | null>(null);
+  const [paperId, setPaperId] = useState<string | null>(initialPaperId ?? null);
   const [past, setPast] = useState<PastResult[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [resumeError, setResumeError] = useState<string | null>(null);
@@ -164,12 +167,17 @@ export function ExamStartView({ client, currentUserId, busy, error, onStart, onR
           <p className="rn-caption">시험지를 눌러 시작해요. 풀던 시험지는 이어서 풀 수 있어요.</p>
           <div className="exam-paper-list" aria-label="시험지">
             {papers.map(p => (
-              <PaperCard key={p.id} paper={p} selected={p.id === paperId} busy={busy || resuming != null} now={now} onClick={() => onCard(p)} />
+              <div key={p.id} className="exam-paper-entry">
+                <PaperCard paper={p} selected={p.id === paperId} busy={busy || resuming != null} now={now} onClick={() => onCard(p)} />
+                <button type="button" className="rn-button rn-button-ghost rn-button-compact exam-history-open"
+                  disabled={busy || resuming != null} onClick={() => onOpenHistory(p)}
+                  aria-label={`${p.title} 풀이 기록 보기`} data-testid="exam-history-open" data-paper-id={p.id}>풀이 기록 보기</button>
+              </div>
             ))}
           </div>
         </>
       )}
-      {resumeError && <p className="exam-error" role="alert">{resumeError}</p>}
+      {(resumeError || (!showSetup && error)) && <p className="exam-error" role="alert">{resumeError || error}</p>}
 
       {paper && showSetup && (
         <section ref={setupRef} className="rn-surface exam-setup" aria-label="풀이 설정" data-testid="exam-setup">

@@ -8,6 +8,8 @@
 /* ── 시작 ── */
 .exam-start { display: grid; gap: 14px; max-width: 760px; margin-inline: auto; min-width: 0; }
 .exam-start-head { margin-bottom: -4px; }
+.exam-paper-entry { display: grid; min-width: 0; align-content: start; gap: 8px; }
+.exam-history-open { width: 100%; white-space: normal; }
 /* 시험지 카드: A4 비율(1:1.414) 종이처럼. 폰 2열 · 태블릿 3~4열. */
 .exam-paper-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 @media (min-width: 640px) { .exam-paper-list { grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: 14px; } }
@@ -24,6 +26,38 @@
 .exam-paper-line { font-size: 12px; line-height: 1.35; color: #2b2a26; overflow-wrap: anywhere; }
 .exam-paper-line b { font-weight: 850; font-variant-numeric: tabular-nums; }
 .exam-paper-line.is-muted { color: #6b665b; }
+
+/* 회차 기록: 많은 회차도 표 안에서만 스크롤하고 페이지 너비는 유지한다. */
+.exam-history { display: grid; gap: 14px; min-width: 0; max-width: 860px; margin-inline: auto; }
+.exam-history > button { justify-self: start; }
+.exam-history h1 { overflow-wrap: anywhere; }
+.exam-history-actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: start; }
+.exam-history-actions > *, .exam-history-actions button { max-width: 100%; white-space: normal; }
+.exam-history-actions p { margin-top: 6px; }
+.exam-history-trend { margin: 0; padding: 14px; min-width: 0; }
+.exam-history-trend figcaption { font-weight: 800; }
+.exam-history-trend svg { display: block; width: 100%; max-width: 440px; height: auto; margin-inline: auto; overflow: visible; }
+.exam-history-trend text { fill: var(--rn-muted); font-size: 10px; }
+.exam-trend-guide { stroke: var(--rn-line); stroke-width: 1; }
+.exam-trend-line { fill: none; stroke: var(--rn-accent); stroke-width: 2; }
+.exam-history-trend circle { fill: var(--rn-accent); }
+.exam-history-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.exam-history-attempt { width: 100%; min-width: 0; overflow-wrap: anywhere; }
+.exam-history-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-block: 12px; font-size: 13px; }
+.exam-history-filter select { max-width: 100%; padding: 8px; border-radius: 8px; border: 1px solid var(--rn-line); color: var(--rn-text); background: var(--rn-bg); }
+.exam-history section { min-width: 0; }
+.exam-history-scroll { width: 100%; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; border: 1px solid var(--rn-line); border-radius: 10px; }
+.exam-history-table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13px; text-align: center; }
+.exam-history-table caption { text-align: left; padding: 12px; color: var(--rn-muted); }
+.exam-history-table th, .exam-history-table td { min-width: 96px; padding: 10px 8px; border-bottom: 1px solid var(--rn-line); vertical-align: middle; }
+.exam-history-table th:first-child { position: sticky; left: 0; z-index: 1; background: var(--rn-bg); min-width: 116px; border-right: 1px solid var(--rn-line); }
+.exam-history-table small { display: block; margin-top: 4px; font-size: 11px; }
+.exam-history-table td small { color: var(--rn-muted); }
+.exam-history-table .is-newly-correct { color: var(--rn-success); background: color-mix(in srgb, var(--rn-success) 12%, transparent); }
+.exam-history-table .is-newly-correct small:last-child { color: var(--rn-success); font-weight: 800; }
+.exam-history-wrong { color: var(--rn-danger); }
+.exam-history-table tr[data-persistent-wrong] th { box-shadow: inset 3px 0 var(--rn-danger); }
+.exam-history-time { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .exam-progress-bar { display: block; height: 8px; border-radius: 99px; background: #e6e1d4; overflow: hidden; margin-bottom: 2px; }
 .exam-progress-bar i { display: block; height: 100%; width: calc(var(--ratio, 0) * 100%); min-width: 4px; border-radius: inherit; background: rgb(var(--color-indigo-500)); }
 .exam-paper-cta { flex: none; display: grid; place-items: center; min-height: 36px; border-radius: 10px; font-size: 13px; font-weight: 800; background: #ece8dd; color: #2b2a26; }

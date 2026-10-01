@@ -22,13 +22,14 @@ export interface ExamPaperSummary {
   /** 이 시험지의 내 진행 중 시도(없으면 null). */
   inProgress: ExamPaperProgress | null;
   /** 가장 최근에 제출한 내 결과(없으면 null). */
-  lastResult: { attemptId: string; score: number; estimatedGrade: number | null; submittedAt: string } | null;
+  lastResult: { attemptId: string; score: number; estimatedGrade: number | null; submittedAt: string; round?: number } | null;
   /** 제출한 횟수. */
   resultCount: number;
 }
 
 /** 시험지 카드에 보여 줄 진행 정도. */
 export interface ExamPaperProgress {
+  round?: number;
   attemptId: string;
   mode: ExamMode;
   elective: ExamElective;
@@ -91,6 +92,8 @@ export interface ExamResultItem {
 }
 
 export interface ExamResult {
+  /** 같은 학생·시험지에서 시작 순서로 계산한 회차. 이전 서버와의 호환을 위해 선택 필드. */
+  round?: number;
   attemptId: string;
   paperTitle: string;
   mode: ExamMode;
@@ -109,8 +112,34 @@ export interface ExamResult {
 }
 
 // v2 표준점수·백분위(추정)는 화면에서 gradeCut으로 계산한다(ui/examLogic.ts의 estimateStandardScore).
-/** 서버/데이터 작업(W1)이 src/features/exam/examClient.ts 에서 export 하는 함수들. */
+/** 기록 화면 전용. 진행 중에는 채점 여부와 관계없이 isCorrect가 null이다. 정답은 포함하지 않는다. */
+export interface ExamHistoryItem {
+  number: number;
+  section: 'common' | ExamElective;
+  isCorrect: boolean | null;
+  unsure: boolean;
+  answered: boolean;
+  timeSpentMs: number;
+}
+
+export interface ExamPaperHistoryAttempt {
+  attemptId: string;
+  round: number;
+  startedAt: string;
+  submittedAt: string | null;
+  status: 'in_progress' | 'submitted';
+  mode: ExamMode;
+  elective: ExamElective;
+  score: number | null;
+  estimatedGrade: number | null;
+  totalTimeMs: number;
+  items: ExamHistoryItem[];
+}
+
+/** src/features/exam/examClient.ts의 서버 경계. */
 export interface ExamClient {
+  /** 학생은 자기 기록만. studentId 지정은 관리자에게만 허용한다. */
+  listPaperHistory(paperId: string, studentId?: string): Promise<ExamPaperHistoryAttempt[]>;
   listPapers(): Promise<ExamPaperSummary[]>;
   /** 진행 중인 시도가 있으면 그것을 돌려준다(이어 풀기). 없으면 null. */
   getActiveAttempt(paperId: string): Promise<ExamAttempt | null>;

@@ -119,6 +119,10 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
   const clone = <T,>(value: T): T => structuredClone(value);
 
   const paperTitle = (paperId: string) => MOCK_PAPERS.find(p => p.id === paperId)?.title ?? PAPER.title;
+  const roundFor = (attempt: ExamAttempt) => [...store.values()]
+    .filter(entry => entry.attempt.paperId === attempt.paperId)
+    .sort((a, b) => a.attempt.startedAt.localeCompare(b.attempt.startedAt) || a.attempt.id.localeCompare(b.attempt.id))
+    .findIndex(entry => entry.attempt.id === attempt.id) + 1;
 
   const grade = (entry: StoredAttempt, items: ExamItemState[]): ExamResult => {
     const { attempt } = entry;
@@ -150,6 +154,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
     const rawByGrade = PAPER.gradeCuts.rawByElective[attempt.elective] ?? [];
     return {
       attemptId: attempt.id,
+      round: roundFor(attempt),
       paperTitle: paperTitle(attempt.paperId),
       mode: attempt.mode,
       elective: attempt.elective,
@@ -172,6 +177,29 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
   };
 
   return {
+    async listPaperHistory(paperId, studentId) {
+      record('listPaperHistory', [paperId, studentId]);
+      await wait();
+      if (studentId) throw new Error('이 기록을 볼 수 없어요.'); // 단일 학생 목
+      return [...store.values()].filter(entry => entry.attempt.paperId === paperId).map(entry => {
+        const { attempt, result } = entry;
+        return {
+          attemptId: attempt.id, round: roundFor(attempt), startedAt: attempt.startedAt,
+          submittedAt: result?.submittedAt ?? null, status: attempt.status,
+          mode: attempt.mode, elective: attempt.elective,
+          score: result?.score ?? null, estimatedGrade: result?.estimatedGrade ?? null,
+          totalTimeMs: attempt.items.reduce((sum, item) => sum + item.timeSpentMs, 0),
+          items: attempt.questions.map(q => {
+            const item = attempt.items.find(i => i.questionId === q.id);
+            const graded = result?.items.find(i => i.questionId === q.id);
+            return {
+              number: q.number, section: q.section, isCorrect: attempt.status === 'submitted' ? graded?.isCorrect ?? false : null,
+              unsure: item?.unsure ?? false, answered: item?.answer != null, timeSpentMs: item?.timeSpentMs ?? 0,
+            };
+          }),
+        };
+      }).sort((a, b) => a.round - b.round);
+    },
     async listPapers() {
       record('listPapers', []);
       await wait();
@@ -188,6 +216,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
           electives: [...ELECTIVES],
           inProgress: active ? {
             attemptId: active.attempt.id,
+            round: roundFor(active.attempt),
             mode: active.attempt.mode,
             elective: active.attempt.elective,
             startedAt: active.attempt.startedAt,
@@ -195,7 +224,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
             answeredCount: countAnswered(active.attempt.items),
             elapsedMs: active.attempt.items.reduce((sum, item) => sum + item.timeSpentMs, 0),
           } : null,
-          lastResult: last ? { attemptId: last.attemptId, score: last.score, estimatedGrade: last.estimatedGrade, submittedAt: last.submittedAt } : null,
+          lastResult: last ? { attemptId: last.attemptId, round: roundFor(must(last.attemptId).attempt), score: last.score, estimatedGrade: last.estimatedGrade, submittedAt: last.submittedAt } : null,
           resultCount: results.length,
         };
       });
@@ -263,7 +292,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       record('submitAttempt', [attemptId, items, visitOrder]);
       await wait();
       const entry = must(attemptId);
-      if (entry.result) return clone(entry.result);
+      if (entry.result) return clone({ ...entry.result, round: roundFor(entry.attempt) });
       entry.attempt.items = keepCheckedAnswers(entry.attempt.items, clone(items));
       entry.attempt.visitOrder = [...visitOrder];
       entry.attempt.status = 'submitted';
@@ -276,7 +305,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       await wait();
       const entry = must(attemptId);
       if (!entry.result) throw new Error('아직 제출하지 않은 시험이에요.');
-      return clone({ ...entry.result, items: entry.result.items.map(item => ({ ...item, addedMistakeId: entry.mistakes[item.questionId] ?? null })) });
+      return clone({ ...entry.result, round: roundFor(entry.attempt), items: entry.result.items.map(item => ({ ...item, addedMistakeId: entry.mistakes[item.questionId] ?? null })) });
     },
     async listMyResults(paperId) {
       record('listMyResults', [paperId]);
