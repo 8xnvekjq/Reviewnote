@@ -1,9 +1,10 @@
 // 상단 답안 줄: 객관식 ①~⑤ 체크(하나만, 다시 누르면 해제) / 단답 백·십·일 휠 + 🤔 + (자유 모드) 채점해 보기.
+// v2: 채점해 본 문항은 답을 잠근다(①~⑤·휠·비우기 비활성, O/X 결과는 계속 보임). 🤔 는 계속 바꿀 수 있다.
 import type { ExamQuestion } from '../contract';
 import { DigitWheel } from './DigitWheel';
 import { answerFromDigits, CHOICE_MARKS, digitsFromAnswer, displayAnswer, toggleChoice } from './examLogic';
 
-export interface FreeCheck { answer: string; isCorrect: boolean; correctAnswer: string }
+export interface FreeCheck { isCorrect: boolean; correctAnswer: string }
 
 interface Props {
   question: ExamQuestion;
@@ -13,6 +14,7 @@ interface Props {
   onUnsure: (next: boolean) => void;
   /** 자유 모드일 때만 */
   free?: {
+    /** 채점해 본 결과(있으면 이 문항은 잠김). */
     check: FreeCheck | null;
     checking: boolean;
     revealed: boolean;
@@ -25,10 +27,11 @@ const PLACES = ['백의 자리', '십의 자리', '일의 자리'];
 
 export function AnswerBar({ question, answer, unsure, onAnswer, onUnsure, free }: Props) {
   const digits = digitsFromAnswer(answer);
-  const check = free?.check && free.check.answer === answer ? free.check : null;
+  const check = free?.check ?? null;
+  const locked = check != null;
 
   return (
-    <div className="exam-answerbar" data-testid="exam-answerbar">
+    <div className={`exam-answerbar${locked ? ' is-locked' : ''}`} data-testid="exam-answerbar" data-locked={locked || undefined}>
       <div className="exam-answerbar-inner">
         {question.isChoice ? (
           <div className="exam-choices" role="group" aria-label={`${question.number}번 답 고르기`}>
@@ -40,6 +43,7 @@ export function AnswerBar({ question, answer, unsure, onAnswer, onUnsure, free }
                   type="button"
                   className={`exam-choice${selected ? ' is-selected' : ''}`}
                   aria-pressed={selected}
+                  disabled={locked}
                   aria-label={`${index + 1}번`}
                   data-choice={index + 1}
                   onClick={() => onAnswer(toggleChoice(answer, index + 1))}
@@ -58,6 +62,7 @@ export function AnswerBar({ question, answer, unsure, onAnswer, onUnsure, free }
                   label={PLACES[index]}
                   value={d}
                   dim={answer == null}
+                  disabled={locked}
                   onChange={next => {
                     const nextDigits = [...digits];
                     nextDigits[index] = next;
@@ -70,7 +75,7 @@ export function AnswerBar({ question, answer, unsure, onAnswer, onUnsure, free }
               <output className="exam-short-value" data-testid="exam-short-value" aria-live="polite">
                 {answer == null ? '미입력' : answer}
               </output>
-              <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={() => onAnswer(null)} disabled={answer == null}>
+              <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={() => onAnswer(null)} disabled={answer == null || locked}>
                 비우기
               </button>
             </div>
@@ -91,14 +96,16 @@ export function AnswerBar({ question, answer, unsure, onAnswer, onUnsure, free }
 
         {free && (
           <div className="exam-freecheck">
-            <button
-              type="button"
-              className="rn-button rn-button-secondary rn-button-compact"
-              disabled={answer == null || free.checking}
-              onClick={free.onCheck}
-            >
-              {free.checking ? '채점 중…' : '채점해 보기'}
-            </button>
+            {!locked && (
+              <button
+                type="button"
+                className="rn-button rn-button-secondary rn-button-compact"
+                disabled={answer == null || free.checking}
+                onClick={free.onCheck}
+              >
+                {free.checking ? '채점 중…' : '채점해 보기'}
+              </button>
+            )}
             {check && (
               <span className={`exam-freecheck-mark ${check.isCorrect ? 'is-correct' : 'is-wrong'}`} data-testid="exam-freecheck" data-correct={check.isCorrect}>
                 {check.isCorrect ? 'O 정답이에요!' : 'X 다시 볼까요?'}
@@ -109,6 +116,7 @@ export function AnswerBar({ question, answer, unsure, onAnswer, onUnsure, free }
                 )}
               </span>
             )}
+            {locked && <span className="exam-freecheck-lock rn-caption" data-testid="exam-lock-note">🔒 채점한 문항은 답을 바꿀 수 없어요</span>}
           </div>
         )}
       </div>

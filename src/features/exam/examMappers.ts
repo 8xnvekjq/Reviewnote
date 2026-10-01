@@ -9,6 +9,7 @@ import type {
   ExamElective,
   ExamItemState,
   ExamMode,
+  ExamPaperProgress,
   ExamPaperSummary,
   ExamQuestion,
   ExamResult,
@@ -111,15 +112,46 @@ export function alignToClientClock(startedAt: string, serverNow: string | null |
   return new Date(started + (clientNowMs - server)).toISOString();
 }
 
+function mapExamPaperProgress(raw: unknown): ExamPaperProgress | null {
+  if (raw == null || typeof raw !== 'object') return null;
+  const r = asRow(raw);
+  if (r.attemptId == null) return null;
+  return {
+    attemptId: asString(r.attemptId),
+    mode: asMode(r.mode),
+    elective: asElective(r.elective),
+    startedAt: asString(r.startedAt),
+    timeLimitMinutes: asNullableNumber(r.timeLimitMinutes),
+    answeredCount: asNumber(r.answeredCount),
+    elapsedMs: asNumber(r.elapsedMs),
+  };
+}
+
+function mapExamPaperLastResult(raw: unknown): ExamPaperSummary['lastResult'] {
+  if (raw == null || typeof raw !== 'object') return null;
+  const r = asRow(raw);
+  if (r.attemptId == null) return null;
+  return {
+    attemptId: asString(r.attemptId),
+    score: asNumber(r.score),
+    estimatedGrade: asNullableNumber(r.estimatedGrade),
+    submittedAt: asString(r.submittedAt),
+  };
+}
+
+/** list_exam_papers_for_me RPC 응답의 한 줄 → ExamPaperSummary(시험지 + 내 진행 정도). */
 export function mapExamPaper(row: unknown): ExamPaperSummary {
   const r = asRow(row);
   return {
     id: asString(r.id),
     title: asString(r.title),
-    examDate: asString(r.exam_date),
+    examDate: asString(r.examDate),
     source: asString(r.source),
-    timeLimitMinutes: asNumber(r.time_limit_minutes, 100),
+    timeLimitMinutes: asNumber(r.timeLimitMinutes, 100),
     electives: asArray(r.electives).filter((e): e is ExamElective => ELECTIVES.includes(e as ExamElective)),
+    inProgress: mapExamPaperProgress(r.inProgress),
+    lastResult: mapExamPaperLastResult(r.lastResult),
+    resultCount: asNumber(r.resultCount),
   };
 }
 
@@ -143,7 +175,16 @@ export function mapExamItemState(raw: unknown): ExamItemState {
     unsure: r.unsure === true,
     timeSpentMs: asNumber(r.timeSpentMs),
     visits: asNumber(r.visits),
+    checked: mapCheckedAnswer(r.checked),
   };
+}
+
+/** check_exam_answer 응답 / 시도 payload의 items[].checked → { isCorrect, correctAnswer }. 없으면 null. */
+export function mapCheckedAnswer(raw: unknown): { isCorrect: boolean; correctAnswer: string } | null {
+  if (raw == null || typeof raw !== 'object') return null;
+  const r = asRow(raw);
+  if (r.correctAnswer == null) return null;
+  return { isCorrect: r.isCorrect === true, correctAnswer: asString(r.correctAnswer) };
 }
 
 /** start/get_active RPC 응답 → ExamAttempt. startedAt은 기기 시계 기준으로 보정된다. */
@@ -210,6 +251,8 @@ export function mapExamResult(raw: unknown): ExamResult {
       rawByGrade,
       standardByGrade: numbers(cut.standardByGrade),
       percentileByGrade: numbers(cut.percentileByGrade),
+      topStandard: asNullableNumber(cut.topStandard),
+      topPercentile: asNullableNumber(cut.topPercentile),
       source: asString(cut.source),
     },
     items: asArray(r.items).map(mapExamResultItem).sort((a, b) => a.number - b.number),
@@ -267,6 +310,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   EXAM_NOT_SUBMITTED: '아직 제출하지 않은 시험이에요.',
   EXAM_REAL_MODE_LOCKED: '실전 모드에서는 제출 전에 정답을 볼 수 없어요.',
   EXAM_QUESTION_NOT_FOUND: '이 시험에 없는 문항이에요.',
+  EXAM_INVALID_ANSWER: '채점할 답을 먼저 입력해 주세요.',
   EXAM_INVALID_ORIGIN: '오답노트에 추가하지 못했어요. 앱을 새로고침한 뒤 다시 시도해 주세요.',
 };
 

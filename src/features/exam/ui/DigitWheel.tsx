@@ -8,19 +8,21 @@ const DIGITS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 interface DragState { pointerId: number; startY: number; startValue: number; lastY: number; lastT: number; velocity: number; moved: boolean }
 
-export function DigitWheel({ value, label, dim, onChange }: { value: number; label: string; dim?: boolean; onChange: (next: number) => void }) {
+export function DigitWheel({ value, label, dim, disabled, onChange }: { value: number; label: string; dim?: boolean; disabled?: boolean; onChange: (next: number) => void }) {
   const [dragPx, setDragPx] = useState(0);
   const [dragging, setDragging] = useState(false);
   const drag = useRef<DragState | null>(null);
   const wheelAcc = useRef(0);
 
   const set = (next: number) => {
+    if (disabled) return; // 채점해 본 문항은 잠김
     const v = clampDigit(next);
     if (v !== value) onChange(v);
     else if (dim) onChange(v); // 아직 비어 있던 칸을 같은 값으로 "확정"
   };
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (disabled) return;
     e.currentTarget.setPointerCapture?.(e.pointerId);
     drag.current = { pointerId: e.pointerId, startY: e.clientY, startValue: value, lastY: e.clientY, lastT: e.timeStamp, velocity: 0, moved: false };
     setDragging(true);
@@ -67,9 +69,10 @@ export function DigitWheel({ value, label, dim, onChange }: { value: number; lab
   const offset = -value * ITEM_H + dragPx;
   return (
     <div
-      className={`exam-wheel${dim ? ' is-dim' : ''}${dragging ? ' is-dragging' : ''}`}
+      className={`exam-wheel${dim ? ' is-dim' : ''}${dragging ? ' is-dragging' : ''}${disabled ? ' is-locked' : ''}`}
       role="spinbutton"
-      tabIndex={0}
+      tabIndex={disabled ? -1 : 0}
+      aria-disabled={disabled || undefined}
       aria-label={label}
       aria-valuemin={0}
       aria-valuemax={9}

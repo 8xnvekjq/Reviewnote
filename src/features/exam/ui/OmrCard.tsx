@@ -1,50 +1,8 @@
-// 제출 전 OMR 검토 카드 + 풀이 중 번호판. 둘 다 "응답/미응답/🤔" 상태를 같은 규칙(padStatus)으로 보여 준다.
+// 제출 전 OMR 검토 카드. 전체 문제 보기(QuestionOverview)와 같은 규칙(padStatus)으로 "응답/미응답/🤔" 상태를 보여 준다.
 import type { ExamItemState, ExamQuestion } from '../contract';
 import { CHOICE_MARKS, padStatus } from './examLogic';
 
 type ItemLike = Pick<ExamItemState, 'answer' | 'unsure'>;
-
-export function NumberPad({ questions, items, currentIndex, onPick }: {
-  questions: ExamQuestion[];
-  items: Record<string, ItemLike>;
-  currentIndex: number;
-  onPick: (index: number) => void;
-}) {
-  return (
-    <div className="exam-pad" role="list" aria-label="문항 번호판">
-      {questions.map((q, index) => {
-        const status = padStatus(items[q.id]);
-        const label = status === 'unsure' ? '애매' : status === 'answered' ? '응답' : '미응답';
-        return (
-          <button
-            key={q.id}
-            type="button"
-            role="listitem"
-            className={`exam-pad-cell is-${status}${index === currentIndex ? ' is-current' : ''}`}
-            aria-current={index === currentIndex ? 'step' : undefined}
-            aria-label={`${q.number}번 ${label}`}
-            data-number={q.number}
-            data-status={status}
-            onClick={() => onPick(index)}
-          >
-            {q.number}
-            {status === 'unsure' && <span className="exam-pad-flag" aria-hidden="true">🤔</span>}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-export function PadLegend() {
-  return (
-    <div className="exam-pad-legend rn-caption">
-      <span><i className="is-answered" />응답</span>
-      <span><i className="is-empty" />미응답</span>
-      <span><i className="is-unsure" />🤔 애매</span>
-    </div>
-  );
-}
 
 /** 실제 OMR 카드처럼: 번호 | ①~⑤ 마킹(객관식) 또는 숫자 칸(단답). 줄을 누르면 그 문항으로. */
 export function OmrCard({ questions, items, onPick }: {
