@@ -12,6 +12,7 @@
 --    - exam_attempt_payload: items[].checked = 잠긴 문항만 { isCorrect, correctAnswer }, 나머지는 null.
 -- 2) list_exam_papers_for_me(): 공개 시험지 + 내 진행 중 시도 + 최근 제출 결과 + 제출 횟수(시행일 최신순).
 -- 3) grade_cuts.topByElective(원점수 100점일 때 표준점수·백분위) → 결과 gradeCut.topStandard/topPercentile.
+--    grade_cuts.standardByElective/percentileByElective가 있으면 gradeCut.standardByGrade/percentileByGrade로 우선 사용.
 --
 -- 적용 순서: 20261002120000_exam_practice.sql 다음에 이 파일 하나를 그대로 실행(트랜잭션으로 감쌈).
 
@@ -191,8 +192,12 @@ begin
 end;
 $function$;
 
--- 2) 최고점 기준값 --------------------------------------------------------------------------------
+-- 2) 최고점 기준값 · 선택과목별 등급컷 ------------------------------------------------------------
 -- grade_cuts.topByElective[선택과목] = { standard, percentile } — 원점수 100점일 때 값. 없으면 null.
+-- grade_cuts.standardByElective / percentileByElective[선택과목] = [1등급..k등급] — 선택과목마다
+-- 표준점수·백분위 컷이 다른 시험지(수능 등)용. 있으면 그것을, 없으면 공통 standard/percentile을 쓴다.
+-- 등급컷 배열 길이는 8이 아닐 수 있다(하위 등급 미발표 시 7 등). exam_estimate_grade는 컷 개수를 세는
+-- 방식이라 길이와 상관없이 동작한다(컷이 k개면 마지막 컷 미만은 k+1등급).
 
 create or replace function private.exam_result_payload(p_attempt_id uuid)
 returns jsonb
@@ -214,8 +219,8 @@ as $function$
     'estimatedGrade', a.estimated_grade,
     'gradeCut', jsonb_build_object(
       'rawByGrade', coalesce(p.grade_cuts->'rawByElective'->a.elective, '[]'::jsonb),
-      'standardByGrade', coalesce(p.grade_cuts->'standard', '[]'::jsonb),
-      'percentileByGrade', coalesce(p.grade_cuts->'percentile', '[]'::jsonb),
+      'standardByGrade', coalesce(p.grade_cuts->'standardByElective'->a.elective, p.grade_cuts->'standard', '[]'::jsonb),
+      'percentileByGrade', coalesce(p.grade_cuts->'percentileByElective'->a.elective, p.grade_cuts->'percentile', '[]'::jsonb),
       'topStandard', coalesce(p.grade_cuts->'topByElective'->a.elective->'standard', 'null'::jsonb),
       'topPercentile', coalesce(p.grade_cuts->'topByElective'->a.elective->'percentile', 'null'::jsonb),
       'source', coalesce(p.grade_cuts->>'source', '')

@@ -255,8 +255,23 @@ assert.equal(subA.items.find(i => i.number === 1).isCorrect, true);
 assert.equal(subA.gradeCut.topStandard, 151); assert.equal(subA.gradeCut.topPercentile, 100);
 assert.deepEqual(subA.gradeCut.rawByGrade, [82, 72, 60, 50, 33, 21, 14, 10]);
 await fails(S2, `select check_exam_answer($1, $2, '1')`, [vA.id, qA(5)], /EXAM_NOT_IN_PROGRESS/);
+// 선택과목별 표준점수·백분위 컷(수능 등) + 하위 등급 미발표(7개) 컷
+await db.query(`update exam_papers set grade_cuts = grade_cuts
+  || jsonb_build_object('standardByElective', '{"미적분":[137,128,117,107,93,82,76]}'::jsonb,
+                        'percentileByElective', '{"미적분":[97,90,77,60,40,23,11]}'::jsonb)
+  || jsonb_build_object('rawByElective', (grade_cuts->'rawByElective') || '{"미적분":[80,70,59,49,32,19,12]}'::jsonb)
+  where id = '2099-06-math'`);
 const subB = (await as(S2, `select submit_exam_attempt($1, '[]'::jsonb, null) r`, [vB.id]))[0].r;
 assert.equal(subB.gradeCut.topStandard, null); assert.equal(subB.gradeCut.topPercentile, null);
+assert.deepEqual(subB.gradeCut.standardByGrade, [137, 128, 117, 107, 93, 82, 76]);
+assert.deepEqual(subB.gradeCut.percentileByGrade, [97, 90, 77, 60, 40, 23, 11]);
+assert.equal(subB.gradeCut.rawByGrade.length, 7);
+assert.equal(subB.score, 0); assert.equal(subB.estimatedGrade, 8, '7 cuts: below the last cut is grade 8');
+assert.deepEqual(subA.gradeCut.standardByGrade, [135, 126, 116, 107, 92, 81, 75, 71], 'falls back to shared standard');
+assert.deepEqual(subA.gradeCut.percentileByGrade, [96, 89, 76, 61, 40, 22, 12, 4]);
+for (const [sc, g] of [[100, 1], [80, 1], [79, 2], [12, 7], [11, 8], [0, 8]]) {
+  assert.equal((await db.query(`select private.exam_estimate_grade('[80,70,59,49,32,19,12]'::jsonb, $1) g`, [sc])).rows[0].g, g);
+}
 assert.equal((await as(S1, `select get_exam_result($1) r`, [f.id]))[0].r.gradeCut.topStandard, 145, '확률과 통계 최고점');
 assert.equal((await as(S1, `select get_exam_result($1) r`, [a1.id]))[0].r.gradeCut.topPercentile, 100, '미적분 최고점');
 const l2 = (await as(S2, `select list_exam_papers_for_me() r`))[0].r;

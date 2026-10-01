@@ -61,6 +61,11 @@ test('estimated grade uses the elective raw-score cuts (score >= cut → that gr
   assert.equal(estimateExamGrade(cuts, 9), 9);
   assert.equal(estimateExamGrade(cuts, 0), 9);
   assert.equal(estimateExamGrade([], 50), 0);
+  // 하위 등급 미발표(컷 7개)여도 개수로 센다
+  const seven = [80, 70, 59, 49, 32, 19, 12];
+  assert.equal(estimateExamGrade(seven, 80), 1);
+  assert.equal(estimateExamGrade(seven, 12), 7);
+  assert.equal(estimateExamGrade(seven, 11), 8);
 });
 
 test('startedAt is shifted into the device clock so remaining time follows the server', () => {
