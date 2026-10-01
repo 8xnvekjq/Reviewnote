@@ -622,6 +622,19 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   const choice = n => page.locator(`.exam-choices-ten .exam-choice[data-choice="${n}"]`);
   assert.equal(await page.locator('.exam-choices-ten .exam-choice').count(), 10);
   assert.equal(await page.locator('.exam-choices-ten .katex').count(), 10);
+  const mathBounds = await page.locator('.exam-choice-math').evaluateAll(nodes => nodes.map(node => {
+    const container = node.getBoundingClientRect();
+    const formula = node.querySelector('.katex').getBoundingClientRect();
+    return {
+      top: formula.top - container.top,
+      bottom: container.bottom - formula.bottom,
+      height: node.closest('button').getBoundingClientRect().height,
+    };
+  }));
+  for (const bounds of mathBounds) {
+    assert.ok(bounds.top >= 0 && bounds.bottom >= 0, '루트·분수가 수식 영역 안에 표시됨');
+    assert.equal(Math.round(bounds.height), 76, '선지 버튼 높이 유지');
+  }
   const positions = await page.locator('.exam-choices-ten .exam-choice').evaluateAll(nodes => nodes.map(el => ({ x: el.getBoundingClientRect().x, y: el.getBoundingClientRect().y })));
   assert.equal(new Set(positions.map(p => Math.round(p.y))).size, 2, '2줄');
   assert.equal(new Set(positions.map(p => Math.round(p.x))).size, 5, '5열');
