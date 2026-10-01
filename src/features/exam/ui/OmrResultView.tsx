@@ -1,9 +1,9 @@
-// OMR 결과: 점수·맞은 개수·총 시간·추정 등급(+등급컷 표 접기) / 문항별 줄 / 오답노트 후보 고르기.
+// OMR 결과: 원점수·추정 등급·추정 표준점수·추정 백분위 + 맞은 개수·총 시간(+등급컷 표 접기) / 문항별 줄 / 오답노트 후보 고르기.
 import { useEffect, useMemo, useState } from 'react';
 import type { ExamClient, ExamResult, ExamResultItem, InkStroke } from '../contract';
 import { ExamInkCanvas } from '../ink/ExamInkCanvas';
 import { loadInk } from './inkStore';
-import { displayAnswer, ELECTIVE_SHORT, formatClock, formatDuration, mistakeCandidates, praiseLine } from './examLogic';
+import { displayAnswer, ELECTIVE_SHORT, estimateStandardScore, formatClock, formatDuration, mistakeCandidates, praiseLine } from './examLogic';
 
 interface Props {
   client: ExamClient;
@@ -28,6 +28,12 @@ export function OmrResultView({ client, result: initial, onBack }: Props) {
   const candidates = useMemo(() => mistakeCandidates(result.items), [result.items]);
   const pendingCandidates = candidates.filter(item => !item.addedMistakeId);
   const cuts = result.gradeCut;
+  // 서버가 v2 이전 결과를 주면 top 값이 없을 수 있다 — 그땐 1등급컷 값으로 본다.
+  const estimate = useMemo(() => estimateStandardScore(result.score, {
+    ...cuts,
+    topStandard: cuts.topStandard ?? null,
+    topPercentile: cuts.topPercentile ?? null,
+  }), [result.score, cuts]);
 
   const togglePick = (questionId: string) => {
     setPicked(prev => {
@@ -70,16 +76,30 @@ export function OmrResultView({ client, result: initial, onBack }: Props) {
         <p className="rn-caption">{result.mode === 'real' ? '실전 모드' : '자유 모드'} · {result.elective}</p>
         <div className="exam-score-grid">
           <div className="exam-score-main">
+            <span className="exam-score-label">원점수</span>
             <strong data-testid="exam-score">{result.score}</strong><span>/ 100</span>
           </div>
           <dl className="exam-score-stats">
             <div><dt>맞은 개수</dt><dd data-testid="exam-correct-count">{result.correctCount} / {result.totalCount}</dd></div>
             <div><dt>총 시간</dt><dd>{formatDuration(result.totalTimeMs)}</dd></div>
-            <div><dt>추정 등급</dt><dd data-testid="exam-grade">{result.estimatedGrade}등급</dd></div>
           </dl>
         </div>
+        <dl className="exam-score-tiles" data-testid="exam-score-tiles">
+          <div className="exam-score-tile is-grade">
+            <dt>추정 등급</dt>
+            <dd data-testid="exam-grade">{result.estimatedGrade}<small>등급</small></dd>
+          </div>
+          <div className="exam-score-tile">
+            <dt>추정 표준점수</dt>
+            <dd data-testid="exam-standard">{estimate.standard ?? '—'}</dd>
+          </div>
+          <div className="exam-score-tile">
+            <dt>추정 백분위</dt>
+            <dd data-testid="exam-percentile">{estimate.percentile ?? '—'}</dd>
+          </div>
+        </dl>
         <p className="rn-caption exam-grade-note">
-          등급은 종로학원 확정 등급컷 기준이에요. 원점수 컷은 추정치라 참고만 해 주세요.
+          등급·표준점수·백분위는 종로학원 확정 등급컷을 기준으로 어림한 추정값이에요. 참고로만 봐 주세요.
           <br /><span className="exam-source">출처: {cuts.source}</span>
         </p>
         <details className="exam-cuts">

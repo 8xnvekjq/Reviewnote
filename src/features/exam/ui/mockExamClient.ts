@@ -1,12 +1,13 @@
 // 테스트·브라우저 하네스용 메모리 ExamClient. 실제 서버(W1 examClient.ts)를 흉내만 낸다:
 // 정답은 data json 에서 읽어 채점하고, 실전 모드 채점 요청은 거부한다.
 // persistKey 를 주면 localStorage 에 상태를 남겨 새로고침 후 "이어 풀기"도 흉내낼 수 있다.
+// v2: 시험지 2개(두 번째는 같은 문항을 쓰는 연습용 복제본) · 시험지별 진행/결과 요약 · 채점해 본 문항 잠금(checked).
 import paperJson from '../data/2025-06-math.json';
 import imagesJson from '../data/2025-06-math.images.json';
 import type {
   ExamAttempt, ExamClient, ExamElective, ExamItemState, ExamMode, ExamPaperSummary, ExamQuestion, ExamResult, ExamResultItem,
 } from '../contract.ts';
-import { ELECTIVES, estimateGrade, isAnswerCorrect } from './examLogic.ts';
+import { countAnswered, ELECTIVES, estimateGrade, isAnswerCorrect, keepCheckedAnswers } from './examLogic.ts';
 
 interface WrongRateRow { number: number; wrongRate: number; choiceRates: number[] | null }
 interface PaperData {
@@ -17,7 +18,12 @@ interface PaperData {
   answers: Record<string, Record<string, string>>;
   points: Record<string, number>;
   isChoice: Record<string, boolean>;
-  gradeCuts: { source: string; rawByElective: Record<string, number[]>; standard: number[]; percentile: number[] };
+  gradeCuts: {
+    source: string; rawByElective: Record<string, number[]>; standard: number[]; percentile: number[];
+    /** 데이터에 있으면 쓰고, 없으면 목 기본값(MOCK_TOP). */
+    topStandardByElective?: Record<string, number | null>;
+    topPercentileByElective?: Record<string, number | null>;
+  };
   wrongRates: { byElective: Record<string, WrongRateRow[]> };
 }
 type ImageData = Record<string, Record<string, { file: string }>>;
@@ -25,6 +31,14 @@ type ImageData = Record<string, Record<string, { file: string }>>;
 const PAPER = paperJson as unknown as PaperData;
 const IMAGES = imagesJson as unknown as ImageData;
 export const MOCK_PAPER_ID = '2025-06-math';
+/** 시험지마다 따로 진행되는지 보려는 두 번째 목 시험지(문항·정답은 첫 시험지와 같다). */
+export const MOCK_PAPER_B_ID = 'mock-practice-b';
+const MOCK_PAPERS = [
+  { id: MOCK_PAPER_ID, title: PAPER.title, examDate: PAPER.examDate, source: PAPER.source },
+  { id: MOCK_PAPER_B_ID, title: '연습용 시험지 B (목)', examDate: '2024-09-04', source: '테스트용 목 데이터' },
+];
+/** 목 전용 최고점(원점수 100점) 표준점수·백분위 — 실제 값이 아니다. */
+const MOCK_TOP = { standard: 152, percentile: 100 };
 const SECTION_KEY: Record<'common' | ExamElective, string> = { common: 'c', '확률과 통계': 'prob', '미적분': 'calc', '기하': 'geom' };
 
 export function mockQuestionId(section: 'common' | ExamElective, number: number): string {
@@ -104,6 +118,8 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
   };
   const clone = <T,>(value: T): T => structuredClone(value);
 
+  const paperTitle = (paperId: string) => MOCK_PAPERS.find(p => p.id === paperId)?.title ?? PAPER.title;
+
   const grade = (entry: StoredAttempt, items: ExamItemState[]): ExamResult => {
     const { attempt } = entry;
     const byId = new Map(items.map(item => [item.questionId, item]));
@@ -134,7 +150,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
     const rawByGrade = PAPER.gradeCuts.rawByElective[attempt.elective] ?? [];
     return {
       attemptId: attempt.id,
-      paperTitle: PAPER.title,
+      paperTitle: paperTitle(attempt.paperId),
       mode: attempt.mode,
       elective: attempt.elective,
       score,
@@ -146,6 +162,8 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
         rawByGrade,
         standardByGrade: PAPER.gradeCuts.standard,
         percentileByGrade: PAPER.gradeCuts.percentile,
+        topStandard: PAPER.gradeCuts.topStandardByElective?.[attempt.elective] ?? MOCK_TOP.standard,
+        topPercentile: PAPER.gradeCuts.topPercentileByElective?.[attempt.elective] ?? MOCK_TOP.percentile,
         source: PAPER.gradeCuts.source,
       },
       items: resultItems,
@@ -157,15 +175,30 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
     async listPapers() {
       record('listPapers', []);
       await wait();
-      const paper: ExamPaperSummary = {
-        id: MOCK_PAPER_ID,
-        title: PAPER.title,
-        examDate: PAPER.examDate,
-        source: PAPER.source,
-        timeLimitMinutes: PAPER.timeLimitMinutes,
-        electives: [...ELECTIVES],
-      };
-      return [paper];
+      const entries = [...store.values()];
+      return MOCK_PAPERS.map((meta): ExamPaperSummary => {
+        const mine = entries.filter(entry => entry.attempt.paperId === meta.id);
+        const active = [...mine].reverse().find(entry => entry.attempt.status === 'in_progress');
+        const results = mine.map(entry => entry.result).filter((r): r is ExamResult => r != null)
+          .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+        const last = results[0];
+        return {
+          ...meta,
+          timeLimitMinutes: PAPER.timeLimitMinutes,
+          electives: [...ELECTIVES],
+          inProgress: active ? {
+            attemptId: active.attempt.id,
+            mode: active.attempt.mode,
+            elective: active.attempt.elective,
+            startedAt: active.attempt.startedAt,
+            timeLimitMinutes: active.attempt.timeLimitMinutes,
+            answeredCount: countAnswered(active.attempt.items),
+            elapsedMs: active.attempt.items.reduce((sum, item) => sum + item.timeSpentMs, 0),
+          } : null,
+          lastResult: last ? { attemptId: last.attemptId, score: last.score, estimatedGrade: last.estimatedGrade, submittedAt: last.submittedAt } : null,
+          resultCount: results.length,
+        };
+      });
     },
     async getActiveAttempt(paperId) {
       record('getActiveAttempt', [paperId]);
@@ -176,6 +209,9 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
     async startAttempt(paperId, mode: ExamMode, elective: ExamElective) {
       record('startAttempt', [paperId, mode, elective]);
       await wait();
+      // 서버처럼: 시험지마다 진행 중인 시도는 하나. 같은 시험지는 이어 풀기만.
+      const existing = [...store.values()].find(entry => entry.attempt.paperId === paperId && entry.attempt.status === 'in_progress');
+      if (existing) throw new Error('이 시험지는 풀던 시험이 있어요. 이어 풀기로 열어 주세요.');
       seq += 1;
       const attempt: ExamAttempt = {
         id: `attempt-${seq}`,
@@ -199,7 +235,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       if (options.failSave) return false;
       const entry = store.get(attemptId);
       if (!entry || entry.attempt.status !== 'in_progress') return false;
-      entry.attempt.items = clone(items);
+      entry.attempt.items = keepCheckedAnswers(entry.attempt.items, clone(items));
       entry.attempt.visitOrder = [...visitOrder];
       persist();
       return true;
@@ -207,22 +243,31 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
     async checkAnswer(attemptId, questionId, answer) {
       record('checkAnswer', [attemptId, questionId, answer]);
       await wait();
-      const { attempt } = must(attemptId);
+      const entry = must(attemptId);
+      const { attempt } = entry;
       if (attempt.mode !== 'free') throw new Error('실전 모드에서는 제출 전에 채점할 수 없어요.');
+      if (attempt.status !== 'in_progress') throw new Error('이미 제출한 시험이에요.');
       const question = attempt.questions.find(q => q.id === questionId);
       if (!question) throw new Error('문항을 찾지 못했어요.');
+      // v2: 한 번 채점한 문항은 잠긴다 — 다시 불러도 처음 결과 그대로.
+      const existing = attempt.items.find(item => item.questionId === questionId);
+      if (existing?.checked) return { ...existing.checked };
       const correctAnswer = correctAnswerFor(question);
-      return { isCorrect: isAnswerCorrect(answer, correctAnswer, question.isChoice), correctAnswer };
+      const checked = { isCorrect: isAnswerCorrect(answer, correctAnswer, question.isChoice), correctAnswer };
+      if (existing) Object.assign(existing, { answer, checked });
+      else attempt.items.push({ questionId, answer, unsure: false, timeSpentMs: 0, visits: 1, checked });
+      persist();
+      return { ...checked };
     },
     async submitAttempt(attemptId, items, visitOrder) {
       record('submitAttempt', [attemptId, items, visitOrder]);
       await wait();
       const entry = must(attemptId);
       if (entry.result) return clone(entry.result);
-      entry.attempt.items = clone(items);
+      entry.attempt.items = keepCheckedAnswers(entry.attempt.items, clone(items));
       entry.attempt.visitOrder = [...visitOrder];
       entry.attempt.status = 'submitted';
-      entry.result = grade(entry, items);
+      entry.result = grade(entry, entry.attempt.items);
       persist();
       return clone(entry.result);
     },

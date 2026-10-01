@@ -1,4 +1,4 @@
-// 기출문제 풀이 — 시작 → 전체화면 풀이(번호판·OMR 검토 포함) → OMR 결과.
+// 기출문제 풀이 — 시작(시험지 카드) → 전체화면 풀이(전체 문제 보기·OMR 검토 포함) → OMR 결과.
 // 서버 함수는 props 의 client(ExamClient)로만 부른다(실서비스는 examClient.ts, 테스트는 ui/mockExamClient.ts).
 import { useState } from 'react';
 import type { ExamAttempt, ExamClient, ExamElective, ExamMode, ExamPaperSummary, ExamResult } from './contract';
