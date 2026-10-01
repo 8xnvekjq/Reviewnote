@@ -15,9 +15,7 @@ alter table public.exam_papers alter column exam_date drop not null;
 alter table public.exam_questions drop constraint if exists exam_questions_points_check;
 alter table public.exam_questions alter column points type numeric using points::numeric;
 alter table public.exam_questions add constraint exam_questions_points_check check (points > 0);
-alter table public.exam_questions drop constraint if exists exam_questions_check;
-alter table public.exam_questions drop constraint if exists exam_questions_number_check;
-alter table public.exam_questions add constraint exam_questions_number_check check (number > 0);
+-- 번호 제약(1~30, 22번까지 공통)은 그대로 둔다. 첫 내신 시험지(21문항·전부 공통)가 이미 만족한다.
 alter table public.exam_questions
   add column if not exists answer_type text,
   add column if not exists choices jsonb;

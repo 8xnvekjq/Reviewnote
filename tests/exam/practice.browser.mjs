@@ -620,6 +620,7 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   await choice(7).click();
   await page.getByRole('button', { name: '애매해요 표시' }).click();
   await noHorizontalOverflow(page, `school-ten/${viewport.width}`);
+  await page.screenshot({ path: `node_modules/.cache/exam-practice/school-ten-${viewport.width}.png` });
   await page.getByRole('button', { name: '제출', exact: true }).click();
   await page.getByTestId('exam-review').waitFor();
   const omrAnswer = page.locator('.exam-omr-row[data-number="18"]');
@@ -662,6 +663,7 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   await noHorizontalOverflow(page, `school-history/${viewport.width}`);
   assert.deepEqual(errors, []);
   await context.close();
+  console.log(`ok — school paper: 10-choice, no grades, history (${viewport.width}×${viewport.height})`);
 }
 
 await browser.close();
