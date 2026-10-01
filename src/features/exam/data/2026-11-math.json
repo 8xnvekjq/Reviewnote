@@ -1,0 +1,1073 @@
+{
+ "id": "2026-11-math",
+ "title": "2026학년도 대학수학능력시험 수학",
+ "examDate": "2025-11-13",
+ "source": "한국교육과정평가원",
+ "schoolGrade": "고3",
+ "subject": "수학",
+ "timeLimitMinutes": 100,
+ "pdfSource": {
+  "questions": "https://horaeng.com/wp-content/uploads/2026학년도-대학수학능력시험-수학-문제.pdf",
+  "answers": "https://horaeng.com/wp-content/uploads/2026학년도-대학수학능력시험-수학-정답.pdf"
+ },
+ "answers": {
+  "common": {
+   "1": "1",
+   "12": "2",
+   "2": "4",
+   "13": "5",
+   "3": "5",
+   "14": "4",
+   "4": "3",
+   "15": "4",
+   "5": "3",
+   "16": "9",
+   "6": "2",
+   "17": "16",
+   "7": "5",
+   "18": "12",
+   "8": "1",
+   "19": "15",
+   "9": "4",
+   "20": "130",
+   "10": "3",
+   "21": "65",
+   "11": "3",
+   "22": "457"
+  },
+  "확률과 통계": {
+   "23": "3",
+   "24": "1",
+   "25": "2",
+   "26": "5",
+   "27": "4",
+   "28": "2",
+   "29": "977",
+   "30": "262"
+  },
+  "미적분": {
+   "23": "3",
+   "24": "4",
+   "25": "3",
+   "26": "1",
+   "27": "2",
+   "28": "5",
+   "29": "97",
+   "30": "11"
+  },
+  "기하": {
+   "23": "3",
+   "24": "1",
+   "25": "5",
+   "26": "2",
+   "27": "4",
+   "28": "4",
+   "29": "360",
+   "30": "221"
+  }
+ },
+ "points": {
+  "1": 2,
+  "2": 2,
+  "3": 3,
+  "4": 3,
+  "5": 3,
+  "6": 3,
+  "7": 3,
+  "8": 3,
+  "9": 4,
+  "10": 4,
+  "11": 4,
+  "12": 4,
+  "13": 4,
+  "14": 4,
+  "15": 4,
+  "16": 3,
+  "17": 3,
+  "18": 3,
+  "19": 3,
+  "20": 4,
+  "21": 4,
+  "22": 4,
+  "23": 2,
+  "24": 3,
+  "25": 3,
+  "26": 3,
+  "27": 3,
+  "28": 4,
+  "29": 4,
+  "30": 4
+ },
+ "isChoice": {
+  "1": true,
+  "2": true,
+  "3": true,
+  "4": true,
+  "5": true,
+  "6": true,
+  "7": true,
+  "8": true,
+  "9": true,
+  "10": true,
+  "11": true,
+  "12": true,
+  "13": true,
+  "14": true,
+  "15": true,
+  "16": false,
+  "17": false,
+  "18": false,
+  "19": false,
+  "20": false,
+  "21": false,
+  "22": false,
+  "23": true,
+  "24": true,
+  "25": true,
+  "26": true,
+  "27": true,
+  "28": true,
+  "29": false,
+  "30": false
+ },
+ "gradeCuts": {
+  "source": "종로학원 확정 등급컷 — 원점수는 추정, 표준점수·백분위는 평가원 채점 결과 기준. https://b.jongro.co.kr/exam/ex251113/go3_cut.asp",
+  "rawByElective": {
+   "확률과 통계": [
+    87,
+    82,
+    76,
+    65,
+    41,
+    24,
+    17,
+    13
+   ],
+   "미적분": [
+    85,
+    80,
+    73,
+    62,
+    37,
+    20,
+    14,
+    10
+   ],
+   "기하": [
+    85,
+    81,
+    74,
+    63,
+    37,
+    20,
+    14,
+    10
+   ]
+  },
+  "topByElective": {
+   "확률과 통계": {
+    "standard": 137,
+    "percentile": 100
+   },
+   "미적분": {
+    "standard": 139,
+    "percentile": 100
+   },
+   "기하": {
+    "standard": 139,
+    "percentile": 100
+   }
+  },
+  "standardByElective": {
+   "확률과 통계": [
+    128,
+    124,
+    119,
+    111,
+    92,
+    79,
+    74,
+    71
+   ],
+   "미적분": [
+    128,
+    124,
+    119,
+    111,
+    92,
+    79,
+    74,
+    71
+   ],
+   "기하": [
+    128,
+    124,
+    119,
+    111,
+    92,
+    79,
+    74,
+    71
+   ]
+  },
+  "percentileByElective": {
+   "확률과 통계": [
+    96,
+    88,
+    76,
+    60,
+    40,
+    23,
+    12,
+    5
+   ],
+   "미적분": [
+    96,
+    88,
+    76,
+    60,
+    40,
+    23,
+    12,
+    5
+   ],
+   "기하": [
+    96,
+    88,
+    76,
+    60,
+    40,
+    23,
+    12,
+    5
+   ]
+  },
+  "standard": [
+   128,
+   124,
+   119,
+   111,
+   92,
+   79,
+   74,
+   71
+  ],
+  "percentile": [
+   96,
+   88,
+   76,
+   60,
+   40,
+   23,
+   12,
+   5
+  ]
+ },
+ "wrongRates": {
+  "source": "EBSi 역대 오답률 TOP15 (선지별 선택 비율 포함)",
+  "byElective": {
+   "기하": [
+    {
+     "rank": 1,
+     "number": 21,
+     "wrongRate": 97.6,
+     "points": 4,
+     "answer": "65",
+     "choiceRates": null
+    },
+    {
+     "rank": 2,
+     "number": 22,
+     "wrongRate": 96.7,
+     "points": 4,
+     "answer": "457",
+     "choiceRates": null
+    },
+    {
+     "rank": 3,
+     "number": 30,
+     "wrongRate": 96.0,
+     "points": 4,
+     "answer": "221",
+     "choiceRates": null
+    },
+    {
+     "rank": 4,
+     "number": 29,
+     "wrongRate": 86.9,
+     "points": 4,
+     "answer": "360",
+     "choiceRates": null
+    },
+    {
+     "rank": 5,
+     "number": 20,
+     "wrongRate": 70.1,
+     "points": 4,
+     "answer": "130",
+     "choiceRates": null
+    },
+    {
+     "rank": 6,
+     "number": 15,
+     "wrongRate": 61.9,
+     "points": 4,
+     "answer": "4",
+     "choiceRates": [
+      14.8,
+      23.7,
+      12.4,
+      38.1,
+      11.1
+     ]
+    },
+    {
+     "rank": 7,
+     "number": 28,
+     "wrongRate": 58.1,
+     "points": 4,
+     "answer": "4",
+     "choiceRates": [
+      11.4,
+      22.5,
+      10.1,
+      41.9,
+      14.1
+     ]
+    },
+    {
+     "rank": 8,
+     "number": 14,
+     "wrongRate": 53.0,
+     "points": 4,
+     "answer": "4",
+     "choiceRates": [
+      12.4,
+      14.5,
+      14.6,
+      47.0,
+      11.5
+     ]
+    },
+    {
+     "rank": 9,
+     "number": 19,
+     "wrongRate": 51.3,
+     "points": 3,
+     "answer": "15",
+     "choiceRates": null
+    },
+    {
+     "rank": 10,
+     "number": 11,
+     "wrongRate": 50.0,
+     "points": 4,
+     "answer": "3",
+     "choiceRates": [
+      16.8,
+      13.4,
+      50.0,
+      8.6,
+      11.2
+     ]
+    },
+    {
+     "rank": 11,
+     "number": 13,
+     "wrongRate": 42.6,
+     "points": 4,
+     "answer": "5",
+     "choiceRates": [
+      5.2,
+      9.4,
+      9.7,
+      18.3,
+      57.4
+     ]
+    },
+    {
+     "rank": 12,
+     "number": 10,
+     "wrongRate": 38.9,
+     "points": 4,
+     "answer": "3",
+     "choiceRates": [
+      4.4,
+      11.4,
+      61.1,
+      16.2,
+      6.8
+     ]
+    },
+    {
+     "rank": 13,
+     "number": 18,
+     "wrongRate": 38.3,
+     "points": 3,
+     "answer": "12",
+     "choiceRates": null
+    },
+    {
+     "rank": 14,
+     "number": 8,
+     "wrongRate": 37.0,
+     "points": 3,
+     "answer": "1",
+     "choiceRates": [
+      63.0,
+      7.2,
+      4.9,
+      9.9,
+      15.0
+     ]
+    },
+    {
+     "rank": 15,
+     "number": 27,
+     "wrongRate": 36.6,
+     "points": 3,
+     "answer": "4",
+     "choiceRates": [
+      5.0,
+      10.1,
+      15.4,
+      63.4,
+      6.0
+     ]
+    }
+   ],
+   "미적분": [
+    {
+     "rank": 1,
+     "number": 21,
+     "wrongRate": 97.6,
+     "points": 4,
+     "answer": "65",
+     "choiceRates": null
+    },
+    {
+     "rank": 2,
+     "number": 30,
+     "wrongRate": 96.9,
+     "points": 4,
+     "answer": "11",
+     "choiceRates": null
+    },
+    {
+     "rank": 3,
+     "number": 22,
+     "wrongRate": 96.7,
+     "points": 4,
+     "answer": "457",
+     "choiceRates": null
+    },
+    {
+     "rank": 4,
+     "number": 29,
+     "wrongRate": 81.6,
+     "points": 4,
+     "answer": "97",
+     "choiceRates": null
+    },
+    {
+     "rank": 5,
+     "number": 28,
+     "wrongRate": 72.0,
+     "points": 4,
+     "answer": "5",
+     "choiceRates": [
+      10.5,
+      33.7,
+      8.5,
+      19.3,
+      28.0
+     ]
+    },
+    {
+     "rank": 6,
+     "number": 20,
+     "wrongRate": 70.1,
+     "points": 4,
+     "answer": "130",
+     "choiceRates": null
+    },
+    {
+     "rank": 7,
+     "number": 15,
+     "wrongRate": 61.9,
+     "points": 4,
+     "answer": "4",
+     "choiceRates": [
+      14.8,
+      23.7,
+      12.4,
+      38.1,
+      11.1
+     ]
+    },
+    {
+     "rank": 8,
+     "number": 14,
+     "wrongRate": 53.0,
+     "points": 4,
+     "answer": "4",
+     "choiceRates": [
+      12.4,
+      14.5,
+      14.6,
+      47.0,
+      11.5
+     ]
+    },
+    {
+     "rank": 9,
+     "number": 19,
+     "wrongRate": 51.3,
+     "points": 3,
+     "answer": "15",
+     "choiceRates": null
+    },
+    {
+     "rank": 10,
+     "number": 11,
+     "wrongRate": 50.0,
+     "points": 4,
+     "answer": "3",
+     "choiceRates": [
+      16.8,
+      13.4,
+      50.0,
+      8.6,
+      11.2
+     ]
+    },
+    {
+     "rank": 11,
+     "number": 13,
+     "wrongRate": 42.6,
+     "points": 4,
+     "answer": "5",
+     "choiceRates": [
+      5.2,
+      9.4,
+      9.7,
+      18.3,
+      57.4
+     ]
+    },
+    {
+     "rank": 12,
+     "number": 10,
+     "wrongRate": 38.9,
+     "points": 4,
+     "answer": "3",
+     "choiceRates": [
+      4.4,
+      11.4,
+      61.1,
+      16.2,
+      6.8
+     ]
+    },
+    {
+     "rank": 13,
+     "number": 18,
+     "wrongRate": 38.3,
+     "points": 3,
+     "answer": "12",
+     "choiceRates": null
+    },
+    {
+     "rank": 14,
+     "number": 8,
+     "wrongRate": 37.0,
+     "points": 3,
+     "answer": "1",
+     "choiceRates": [
+      63.0,
+      7.2,
+      4.9,
+      9.9,
+      15.0
+     ]
+    },
+    {
+     "rank": 15,
+     "number": 27,
+     "wrongRate": 36.8,
+     "points": 3,
+     "answer": "2",
+     "choiceRates": [
+      6.6,
+      63.2,
+      7.6,
+      12.7,
+      10.0
+     ]
+    }
+   ],
+   "확률과 통계": [
+    {
+     "rank": 1,
+     "number": 30,
+     "wrongRate": 98.5,
+     "points": 4,
+     "answer": "262",
+     "choiceRates": null
+    },
+    {
+     "rank": 2,
+     "number": 21,
+     "wrongRate": 97.6,
+     "points": 4,
+     "answer": "65",
+     "choiceRates": null
+    },
+    {
+     "rank": 3,
+     "number": 22,
+     "wrongRate": 96.7,
+     "points": 4,
+     "answer": "457",
+     "choiceRates": null
+    },
+    {
+     "rank": 4,
+     "number": 29,
+     "wrongRate": 81.3,
+     "points": 4,
+     "answer": "977",
+     "choiceRates": null
+    },
+    {
+     "rank": 5,
+     "number": 20,
+     "wrongRate": 70.1,
+     "points": 4,
+     "answer": "130",
+     "choiceRates": null
+    },
+    {
+     "rank": 6,
+     "number": 28,
+     "wrongRate": 69.4,
+     "points": 4,
+     "answer": "2",
+     "choiceRates": [
+      9.8,
+      30.6,
+      15.2,
+      28.6,
+      15.8
+     ]
+    },
+    {
+     "rank": 7,
+     "number": 15,
+     "wrongRate": 61.9,
+     "points": 4,
+     "answer": "4",
+     "choiceRates": [
+      14.8,
+      23.7,
+      12.4,
+      38.1,
+      11.1
+     ]
+    },
+    {
+     "rank": 8,
+     "number": 14,
+     "wrongRate": 53.0,
+     "points": 4,
+     "answer": "4",
+     "choiceRates": [
+      12.4,
+      14.5,
+      14.6,
+      47.0,
+      11.5
+     ]
+    },
+    {
+     "rank": 9,
+     "number": 19,
+     "wrongRate": 51.3,
+     "points": 3,
+     "answer": "15",
+     "choiceRates": null
+    },
+    {
+     "rank": 10,
+     "number": 11,
+     "wrongRate": 50.0,
+     "points": 4,
+     "answer": "3",
+     "choiceRates": [
+      16.8,
+      13.4,
+      50.0,
+      8.6,
+      11.2
+     ]
+    },
+    {
+     "rank": 11,
+     "number": 26,
+     "wrongRate": 47.6,
+     "points": 3,
+     "answer": "5",
+     "choiceRates": [
+      5.1,
+      11.1,
+      11.8,
+      19.6,
+      52.4
+     ]
+    },
+    {
+     "rank": 12,
+     "number": 24,
+     "wrongRate": 44.8,
+     "points": 3,
+     "answer": "1",
+     "choiceRates": [
+      55.2,
+      9.5,
+      12.0,
+      17.6,
+      5.7
+     ]
+    },
+    {
+     "rank": 13,
+     "number": 13,
+     "wrongRate": 42.6,
+     "points": 4,
+     "answer": "5",
+     "choiceRates": [
+      5.2,
+      9.4,
+      9.7,
+      18.3,
+      57.4
+     ]
+    },
+    {
+     "rank": 14,
+     "number": 27,
+     "wrongRate": 39.1,
+     "points": 3,
+     "answer": "4",
+     "choiceRates": [
+      7.7,
+      10.1,
+      11.0,
+      60.9,
+      10.3
+     ]
+    },
+    {
+     "rank": 15,
+     "number": 10,
+     "wrongRate": 38.9,
+     "points": 4,
+     "answer": "3",
+     "choiceRates": [
+      4.4,
+      11.4,
+      61.1,
+      16.2,
+      6.8
+     ]
+    }
+   ]
+  }
+ },
+ "images": {
+  "common": {
+   "1": {
+    "file": "c-01.png",
+    "page": 21,
+    "w": 1014,
+    "h": 185
+   },
+   "2": {
+    "file": "c-02.png",
+    "page": 21,
+    "w": 1014,
+    "h": 250
+   },
+   "3": {
+    "file": "c-03.png",
+    "page": 21,
+    "w": 1020,
+    "h": 232
+   },
+   "4": {
+    "file": "c-04.png",
+    "page": 21,
+    "w": 1020,
+    "h": 415
+   },
+   "5": {
+    "file": "c-05.png",
+    "page": 22,
+    "w": 1014,
+    "h": 157
+   },
+   "6": {
+    "file": "c-06.png",
+    "page": 22,
+    "w": 1014,
+    "h": 421
+   },
+   "7": {
+    "file": "c-07.png",
+    "page": 22,
+    "w": 1020,
+    "h": 1077
+   },
+   "8": {
+    "file": "c-08.png",
+    "page": 23,
+    "w": 1014,
+    "h": 302
+   },
+   "9": {
+    "file": "c-09.png",
+    "page": 23,
+    "w": 1014,
+    "h": 395
+   },
+   "10": {
+    "file": "c-10.png",
+    "page": 23,
+    "w": 1020,
+    "h": 430
+   },
+   "11": {
+    "file": "c-11.png",
+    "page": 24,
+    "w": 1014,
+    "h": 977
+   },
+   "12": {
+    "file": "c-12.png",
+    "page": 24,
+    "w": 1020,
+    "h": 387
+   },
+   "13": {
+    "file": "c-13.png",
+    "page": 25,
+    "w": 1014,
+    "h": 384
+   },
+   "14": {
+    "file": "c-14.png",
+    "page": 25,
+    "w": 1020,
+    "h": 1450
+   },
+   "15": {
+    "file": "c-15.png",
+    "page": 26,
+    "w": 1014,
+    "h": 957
+   },
+   "16": {
+    "file": "c-16.png",
+    "page": 26,
+    "w": 1020,
+    "h": 261
+   },
+   "17": {
+    "file": "c-17.png",
+    "page": 26,
+    "w": 1020,
+    "h": 120
+   },
+   "18": {
+    "file": "c-18.png",
+    "page": 27,
+    "w": 1014,
+    "h": 153
+   },
+   "19": {
+    "file": "c-19.png",
+    "page": 27,
+    "w": 1014,
+    "h": 247
+   },
+   "20": {
+    "file": "c-20.png",
+    "page": 27,
+    "w": 1020,
+    "h": 1798
+   },
+   "21": {
+    "file": "c-21.png",
+    "page": 28,
+    "w": 1014,
+    "h": 949
+   },
+   "22": {
+    "file": "c-22.png",
+    "page": 28,
+    "w": 1020,
+    "h": 478
+   }
+  },
+  "확률과 통계": {
+   "23": {
+    "file": "prob-23.png",
+    "page": 29,
+    "w": 1014,
+    "h": 209
+   },
+   "24": {
+    "file": "prob-24.png",
+    "page": 29,
+    "w": 1020,
+    "h": 415
+   },
+   "25": {
+    "file": "prob-25.png",
+    "page": 30,
+    "w": 1014,
+    "h": 836
+   },
+   "26": {
+    "file": "prob-26.png",
+    "page": 30,
+    "w": 1020,
+    "h": 436
+   },
+   "27": {
+    "file": "prob-27.png",
+    "page": 31,
+    "w": 1014,
+    "h": 504
+   },
+   "28": {
+    "file": "prob-28.png",
+    "page": 31,
+    "w": 1020,
+    "h": 1200
+   },
+   "29": {
+    "file": "prob-29.png",
+    "page": 32,
+    "w": 1014,
+    "h": 986
+   },
+   "30": {
+    "file": "prob-30.png",
+    "page": 32,
+    "w": 1020,
+    "h": 550
+   }
+  },
+  "미적분": {
+   "23": {
+    "file": "calc-23.png",
+    "page": 33,
+    "w": 1014,
+    "h": 190
+   },
+   "24": {
+    "file": "calc-24.png",
+    "page": 33,
+    "w": 1020,
+    "h": 245
+   },
+   "25": {
+    "file": "calc-25.png",
+    "page": 34,
+    "w": 1014,
+    "h": 458
+   },
+   "26": {
+    "file": "calc-26.png",
+    "page": 34,
+    "w": 1020,
+    "h": 1036
+   },
+   "27": {
+    "file": "calc-27.png",
+    "page": 35,
+    "w": 1014,
+    "h": 535
+   },
+   "28": {
+    "file": "calc-28.png",
+    "page": 35,
+    "w": 1020,
+    "h": 704
+   },
+   "29": {
+    "file": "calc-29.png",
+    "page": 36,
+    "w": 1014,
+    "h": 879
+   },
+   "30": {
+    "file": "calc-30.png",
+    "page": 36,
+    "w": 1020,
+    "h": 778
+   }
+  },
+  "기하": {
+   "23": {
+    "file": "geom-23.png",
+    "page": 37,
+    "w": 1014,
+    "h": 228
+   },
+   "24": {
+    "file": "geom-24.png",
+    "page": 37,
+    "w": 1020,
+    "h": 152
+   },
+   "25": {
+    "file": "geom-25.png",
+    "page": 38,
+    "w": 1014,
+    "h": 303
+   },
+   "26": {
+    "file": "geom-26.png",
+    "page": 38,
+    "w": 1020,
+    "h": 427
+   },
+   "27": {
+    "file": "geom-27.png",
+    "page": 39,
+    "w": 1014,
+    "h": 1154
+   },
+   "28": {
+    "file": "geom-28.png",
+    "page": 39,
+    "w": 1020,
+    "h": 1322
+   },
+   "29": {
+    "file": "geom-29.png",
+    "page": 40,
+    "w": 1014,
+    "h": 1086
+   },
+   "30": {
+    "file": "geom-30.png",
+    "page": 40,
+    "w": 1020,
+    "h": 471
+   }
+  }
+ }
+}

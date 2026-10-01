@@ -73,7 +73,7 @@ export function QuestionOverview({ questions, items, currentIndex, answeredCount
                   onClick={() => onPick(index)}
                 >
                   <span className="exam-thumb-paper">
-                    <img src={q.imageUrl} alt="" loading="lazy" decoding="async" draggable={false} />
+                    <img src={q.imageUrl} alt="" decoding="async" draggable={false} />
                   </span>
                   <span className="exam-thumb-num">{q.number}</span>
                   <span className="exam-thumb-badges" aria-hidden="true">

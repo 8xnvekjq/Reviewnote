@@ -24,6 +24,7 @@ try {
 const root = path.resolve(import.meta.dirname, '../..');
 const mig = fs.readFileSync(path.join(root, 'supabase/migrations/20261002120000_exam_practice.sql'), 'utf8');
 const migV2 = fs.readFileSync(path.join(root, 'supabase/migrations/20261002180000_exam_practice_v2.sql'), 'utf8');
+const migBatch2 = fs.readFileSync(path.join(root, 'supabase/migrations/20261002190000_exam_papers_batch2.sql'), 'utf8');
 
 test('exam migration applies and the RPC flow behaves (PGlite)', { skip: PGliteCtor ? false : '@electric-sql/pglite 미설치' }, async () => {
 const db = new PGliteCtor!();
@@ -283,4 +284,29 @@ const l3 = (await as(S1, `select list_exam_papers_for_me() r`))[0].r;
 const s1Paper = l3.find(p => p.id === '2025-06-math');
 assert.equal(s1Paper.resultCount, 2); assert.equal(s1Paper.lastResult.attemptId, f.id); assert.equal(s1Paper.inProgress, null);
 assert.deepEqual(l3.find(p => p.id === '2099-06-math'), { ...l2[0], inProgress: null, lastResult: null, resultCount: 0 });
+
+// 시험지 5개 추가 시드: v2 위에 적용되고, 다시 적용해도 중복이 생기지 않는다.
+await db.exec(migBatch2);
+await db.exec(migBatch2);
+const BATCH2 = ['2025-09-math', '2025-11-math', '2026-06-math', '2026-09-math', '2026-11-math'];
+for (const pid of BATCH2) {
+  const c = (await db.query(`select (select count(*) from exam_questions where paper_id = $1)::int q,
+      (select count(*) from exam_answer_keys k join exam_questions q on q.id = k.question_id where q.paper_id = $1)::int k,
+      (select count(*) from exam_question_national_stats s join exam_questions q on q.id = s.question_id where q.paper_id = $1)::int st,
+      (select count(*) from exam_questions where paper_id = $1 and curriculum_chapter is null)::int nochap`, [pid])).rows[0];
+  assert.deepEqual(c, { q: 46, k: 46, st: 45, nochap: 0 }, pid);
+  for (const e of ['확률과 통계', '미적분', '기하']) {
+    const pts = (await db.query(`select sum(points)::int s from exam_questions where paper_id = $1 and (section = 'common' or section = $2)`, [pid, e])).rows[0].s;
+    assert.equal(pts, 100, `${pid} ${e} 배점 합 100`);
+  }
+}
+// 새 시험지로 실제 풀이 흐름: 2025 수능 미적분 만점 → 1등급, 결과 최고점·과목별 표준점수 컷.
+const allKeys = (await db.query(`select q.id, k.answer from exam_questions q join exam_answer_keys k on k.question_id = q.id where q.paper_id = '2025-11-math' and q.section in ('common', '미적분')`)).rows;
+const sN = (await as(S2, `select start_exam_attempt('2025-11-math', 'free', '미적분') r`))[0].r;
+const fullN = (await as(S2, `select submit_exam_attempt($1, $2::jsonb, '{}') r`, [sN.id, JSON.stringify(allKeys.map(r => ({ questionId: r.id, answer: r.answer, unsure: false, timeSpentMs: 1000, visits: 1 })))]))[0].r;
+assert.equal(fullN.score, 100); assert.equal(fullN.estimatedGrade, 1);
+assert.equal(fullN.gradeCut.topStandard, 140, '2025 수능 미적분 최고점 표준점수');
+assert.equal(fullN.gradeCut.standardByGrade[1], 123, '2025 수능 미적분 2등급 표준점수 컷(과목별 값)');
+const papersNow = (await as(S2, `select list_exam_papers_for_me() r`))[0].r.map(p => p.id);
+for (const pid of BATCH2) assert.ok(papersNow.includes(pid), pid);
 });
