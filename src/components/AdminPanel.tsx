@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { AdminUserStat, DailyReviewStat } from '../types';
 import { supabase } from '../services/supabase';
 import { formatDate } from '../utils/date';
@@ -6,6 +6,8 @@ import { GACHA_ITEMS, getTitleBadgeStyle } from '../utils/gachaCatalog';
 import { RecentActivityFeed } from './RecentActivityFeed';
 import { CatPawIcon } from './CatPawIcon';
 import { AdminStudentReviewCheckSummary } from './admin/AdminStudentReviewCheckSummary';
+
+const AdminStudentExamSummary = lazy(() => import('./admin/AdminStudentExamSummary'));
 
 interface AdminPanelProps {
   onBack?: () => void;
@@ -786,6 +788,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
                 )}
 
                 {/* 최근 복습체크 현황 — 데이터 로딩/취소 처리는 컴포넌트 안에서 */}
+                <Suspense fallback={<p className="text-sm text-slate-400">시험 기록을 불러오는 중…</p>}>
+                  <AdminStudentExamSummary key={selectedStudent.userId} studentId={selectedStudent.userId}
+                    studentName={realName || nick || '학생'}
+                    onPractice={onSelectTab ? () => { setSelectedStudentId(null); onSelectTab('examPractice'); } : undefined} />
+                </Suspense>
                 <AdminStudentReviewCheckSummary
                   studentId={selectedStudent.userId}
                   onOpenGrading={onSelectTab ? () => { setSelectedStudentId(null); onSelectTab('reviewCheck'); } : undefined}

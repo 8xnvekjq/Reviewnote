@@ -160,6 +160,8 @@ export interface ExamPaperHistoryAttempt extends ExamPaperMetadata {
 
 /** src/features/exam/examClient.ts의 서버 경계. */
 export interface ExamClient {
+  getInk(attemptId: string): Promise<ExamInkDocument[]>;
+  saveInk(attemptId: string, questionId: string, strokes: InkStroke[], revision: number, legacyImport?: boolean): Promise<number>;
   /** 학생은 자기 기록만. studentId 지정은 관리자에게만 허용한다. */
   listPaperHistory(paperId: string, studentId?: string): Promise<ExamPaperHistoryAttempt[]>;
   listPapers(): Promise<ExamPaperSummary[]>;
@@ -193,6 +195,29 @@ export interface InkStroke {
   /** 꾹 눌러 도형으로 바뀐 획이면 도형 정보(렌더는 이걸 우선). */
   shape?: { kind: 'line'; from: [number, number]; to: [number, number] }
     | { kind: 'ellipse'; cx: number; cy: number; rx: number; ry: number; rotation: number };
+}
+
+export interface ExamInkDocument {
+  questionId: string;
+  strokes: InkStroke[];
+  revision: number;
+  updatedAt?: string;
+}
+
+export interface AdminExamAttemptSummary {
+  attemptId: string;
+  paperId: string;
+  paperTitle: string;
+  round: number;
+  status: 'in_progress' | 'submitted';
+  mode: ExamMode;
+  elective: ExamElective | null;
+  startedAt: string;
+  submittedAt: string | null;
+  score: number | null;
+  maxScore: number;
+  answeredCount: number;
+  questionCount: number;
 }
 
 export interface ExamInkCanvasProps {

@@ -10,7 +10,7 @@ const QUESTION_IMAGE_WIDTH = 480;
 import { AnswerBar, type FreeCheck } from './AnswerBar';
 import { OmrCard } from './OmrCard';
 import { QuestionOverview } from './QuestionOverview';
-import { loadInk, saveInk } from './inkStore';
+import { useExamInk } from './useExamInk';
 import {
   countAnswered, createStopwatch, crossedAlerts, elapsedFor, formatClock, normalizeShortAnswer, pauseStopwatch, remainingMs,
   switchStopwatch, toggleChoice, questionAnswerType, type StopwatchState,
@@ -68,7 +68,8 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
   const isReal = attempt.mode === 'real';
   const [items, setItems] = useState(() => initialItems(attempt));
   const [index, setIndex] = useState(() => initialIndex(attempt));
-  const [strokes, setStrokes] = useState<Map<string, InkStroke[]>>(() => new Map());
+  const inkSync = useExamInk(client, attempt.id, questions.map(q => q.id));
+  const strokes = inkSync.strokes;
   const [tool, setTool] = useState<InkTool>('pen');
   const [color, setColor] = useState(PEN_COLORS[0].value);
   const [size, setSize] = useState(SIZES[1].value);
@@ -94,14 +95,12 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
   useEffect(() => { if (!hanneung) preloadInkImages(questions.map(q => q.imageUrl)); }, [questions, hanneung]);
   const saveTimer = useRef<number | null>(null);
   const inkTimers = useRef(new Map<string, number>());
-  const strokesRef = useRef(strokes);
   const submittedRef = useRef(false);
+  const autoSubmitTriedRef = useRef(false);
   const openedRef = useRef<string | null>(null);
   const prevRemaining = useRef<number | null>(null);
-  const touchedInk = useRef(new Set<string>());
 
   useEffect(() => { itemsRef.current = items; }, [items]);
-  useEffect(() => { strokesRef.current = strokes; }, [strokes]);
 
   // ── 저장 ──
   const snapshot = useCallback((): ExamItemState[] => {
@@ -134,29 +133,11 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
     saveTimer.current = window.setTimeout(() => { saveTimer.current = null; void saveNow(); }, SAVE_DEBOUNCE_MS);
   }, [saveNow]);
 
-  const flushInk = useCallback(() => {
-    const pending: Promise<boolean>[] = [];
-    for (const [qid, timer] of inkTimers.current) {
-      window.clearTimeout(timer);
-      pending.push(saveInk(attempt.id, qid, strokesRef.current.get(qid) ?? []));
-    }
+  const flushInk = useCallback(async () => {
+    for (const timer of inkTimers.current.values()) window.clearTimeout(timer);
     inkTimers.current.clear();
-    return Promise.all(pending);
-  }, [attempt.id]);
-
-  // 이어 풀기: IndexedDB 의 필기 복원(이미 새로 그린 문항은 덮어쓰지 않음)
-  useEffect(() => {
-    let alive = true;
-    void loadInk(attempt.id).then(saved => {
-      if (!alive || saved.size === 0) return;
-      setStrokes(prev => {
-        const next = new Map(prev);
-        for (const [qid, list] of saved) if (!touchedInk.current.has(qid)) next.set(qid, list);
-        return next;
-      });
-    });
-    return () => { alive = false; };
-  }, [attempt.id]);
+    return inkSync.flush();
+  }, [inkSync]);
 
   // ── 문항 열기: visits+1, visitOrder 기록, 스톱워치 전환 ──
   useEffect(() => {
@@ -241,8 +222,8 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
     setSubmitError(null);
     swRef.current = pauseStopwatch(swRef.current, Date.now());
     if (saveTimer.current != null) { window.clearTimeout(saveTimer.current); saveTimer.current = null; }
-    void flushInk();
     try {
+      if (!await flushInk()) throw new Error('필기를 서버에 저장하지 못했어요. 저장 상태를 확인하고 다시 제출해 주세요.');
       const result = await client.submitAttempt(attempt.id, snapshot(), [...visitOrderRef.current]);
       onSubmitted(result);
     } catch (error) {
@@ -259,11 +240,12 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
     const crossed = crossedAlerts(prevRemaining.current, remaining);
     prevRemaining.current = remaining;
     if (crossed.length) setToast(`${Math.round(crossed[crossed.length - 1] / 60000)}분 남았어요. 차분하게 마무리해요!`);
-    if (remaining <= 0 && !submittedRef.current) {
+    if (remaining <= 0 && !submittedRef.current && !autoSubmitTriedRef.current && inkSync.ready) {
+      autoSubmitTriedRef.current = true;
       setToast('시간이 다 되어 자동으로 제출할게요.');
       void submit(true);
     }
-  }, [remaining, submit]);
+  }, [remaining, submit, inkSync.ready]);
 
   useEffect(() => {
     if (!toast) return;
@@ -288,15 +270,14 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
   }, [question.id, updateItem]);
 
   const onInkChange = (next: InkStroke[]) => {
+    if (submittedRef.current) return;
     const qid = inkKey;
-    touchedInk.current.add(qid);
-    setStrokes(prev => new Map(prev).set(qid, next));
-    strokesRef.current = new Map(strokesRef.current).set(qid, next);
+    inkSync.change(qid, next);
     const old = inkTimers.current.get(qid);
     if (old != null) window.clearTimeout(old);
     inkTimers.current.set(qid, window.setTimeout(() => {
       inkTimers.current.delete(qid);
-      void saveInk(attempt.id, qid, strokesRef.current.get(qid) ?? []);
+      void inkSync.flush();
     }, INK_SAVE_DEBOUNCE_MS));
     setHistoryTick(t => t + 1);
   };
@@ -339,7 +320,12 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
 
   const confirmExit = async () => {
     swRef.current = pauseStopwatch(swRef.current, Date.now());
-    await Promise.all([flushInk(), saveNow()]);
+    const results = await Promise.all([flushInk(), saveNow()]);
+    if (results.some(ok => !ok)) {
+      setOverlay(null);
+      setToast('서버에 저장하지 못했어요. 화면을 닫지 말고 저장을 다시 시도해 주세요.');
+      return;
+    }
     onExit();
   };
 
@@ -434,6 +420,19 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
             {question.number}번 · {question.points}점 · {question.isChoice ? '객관식' : '단답형'}
             {saveState === 'failed' && <span className="exam-save-failed"> · 저장이 잠깐 안 됐어요(다시 시도할게요)</span>}
           </div>
+          <div className="exam-ink-sync" role="status" data-testid="exam-ink-sync">
+            {inkSync.status === 'loading' ? '저장된 필기를 불러오는 중…'
+              : inkSync.status === 'saved' ? '필기 서버 저장 완료 · 다른 기기에서도 볼 수 있어요'
+              : inkSync.status === 'pending' || inkSync.status === 'saving' ? '필기 저장 중…'
+              : inkSync.status === 'conflict' ? '다른 기기에서 풀이가 변경됐어요. 이 기기 필기를 덮어쓰지 않았어요.'
+              : '필기를 서버와 동기화하지 못했어요. 화면을 닫지 말고 다시 시도해 주세요.'}
+            {inkSync.status === 'failed' && <button type="button" className="rn-button rn-button-compact" onClick={() => {
+              if (inkSync.ready) void inkSync.flush(); else void inkSync.load().then(() => inkSync.flush());
+            }}>다시 시도</button>}
+            {inkSync.status === 'conflict' && <button type="button" className="rn-button rn-button-compact" onClick={() => {
+              if (window.confirm('이 기기의 미저장 필기 대신 서버에 저장된 필기를 사용할까요?')) void inkSync.load(true);
+            }}>서버 필기 사용</button>}
+          </div>
           {hanneung && <nav className="exam-page-nav" aria-label="원본 페이지 문항">
             <span className="rn-caption">원본 {pageUrls.indexOf(question.imageUrl) + 1} / {pageUrls.length}쪽</span>
             {pageQuestions.map(candidate => <button key={candidate.id} type="button" className="rn-button rn-button-compact" aria-pressed={candidate.id === question.id} onClick={() => goTo(questions.indexOf(candidate))}>{candidate.number}번</button>)}
@@ -443,7 +442,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
           <div className={hanneung ? 'exam-original-scroll' : undefined}>
           <div style={hanneung && pageZoom ? { minWidth: 1100 } : undefined}>
           <ExamInkCanvas
-            key={inkKey}
+            key={`${inkKey}:${inkSync.generation}`}
             ref={inkRef}
             imageUrl={question.imageUrl}
             strokes={strokes.get(inkKey) ?? []}
@@ -453,7 +452,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
             size={size}
             penOnlyWhenPenDetected
             shapeSnap
-            readOnly={hanneung && pagePan}
+            readOnly={!inkSync.ready || submitting || (hanneung && pagePan)}
             imageMaxWidth={hanneung ? (pageZoom ? 1100 : 980) : QUESTION_IMAGE_WIDTH}
           />
           </div>

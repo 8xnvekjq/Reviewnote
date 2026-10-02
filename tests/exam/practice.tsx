@@ -6,6 +6,8 @@ import '../../src/index.css';
 import '../../src/styles/design-system.css';
 import { ExamPracticeScreen } from '../../src/features/exam/ExamPracticeScreen';
 import { createMockExamClient } from '../../src/features/exam/ui/mockExamClient';
+import AdminStudentExamSummary from '../../src/components/admin/AdminStudentExamSummary';
+import type { AdminExamAttemptSummary, ExamAttempt } from '../../src/features/exam/contract';
 
 const params = new URLSearchParams(location.search);
 const log: Array<{ method: string; args: unknown[] }> = [];
@@ -19,7 +21,34 @@ const client = createMockExamClient({
   log,
 });
 
-createRoot(document.getElementById('root')!).render(
+const adminRows: AdminExamAttemptSummary[] = [];
+const adminAttempts = new Map<string, ExamAttempt>();
+if (params.get('records') === '1') {
+  const completed = await client.startAttempt('2025-06-math', 'free', '미적분');
+  await client.saveInk(completed.id, completed.questions[0].id, [{ id: 'example', tool: 'pen', color: '#2563eb', size: 4,
+    points: [{ x: .15, y: .6, pressure: .5, t: 0 }, { x: .7, y: .8, pressure: .5, t: 200 }] }], 0);
+  const items = completed.questions.map(question => ({ questionId: question.id, answer: '1', unsure: false, visits: 1, timeSpentMs: 15000 }));
+  const result = await client.submitAttempt(completed.id, items, []);
+  adminAttempts.set(completed.id, { ...completed, status: 'submitted', items });
+  const active = await client.startAttempt('2025-06-math', 'free', '미적분');
+  adminAttempts.set(active.id, active);
+  for (const [index, attempt] of [completed, active].entries()) adminRows.push({
+    attemptId: attempt.id, paperId: attempt.paperId, paperTitle: '2025학년도 6월 모의평가 수학', round: index + 1,
+    status: index === 0 ? 'submitted' : 'in_progress', mode: attempt.mode, elective: attempt.elective,
+    startedAt: attempt.startedAt, submittedAt: index === 0 ? result.submittedAt : null,
+    score: index === 0 ? result.score : null, maxScore: 100, answeredCount: index === 0 ? 30 : 0, questionCount: 30,
+  });
+}
+const adminApi = {
+  listAttempts: async () => adminRows,
+  getAttempt: async (id: string) => adminAttempts.get(id)!,
+  getInk: client.getInk, getResult: client.getResult,
+};
+
+createRoot(document.getElementById('root')!).render(params.get('records') === '1' ?
+  <div className="rn-app" style={{ padding: 16, maxWidth: 680, margin: 'auto' }}>
+    <AdminStudentExamSummary studentId="student-1" studentName="테스트 학생" api={adminApi} onPractice={() => { location.search = ''; }} />
+  </div> :
   <div className="rn-app" style={{ display: 'flex', flexDirection: 'column' }}>
     <header className="rn-header" data-testid="fake-app-header"><div className="rn-header-inner"><strong>Reviewnote</strong></div></header>
     <main className="rn-main">
