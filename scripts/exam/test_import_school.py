@@ -11,10 +11,11 @@ from pathlib import Path
 
 from PIL import Image, ImageChops
 
-from import_school import ROOT, NeedsExceptions, blank_boundary, crop_questions, detect_layout, find_starts, ink_rows, make_data, prepare_config, resolve_pdf, run, seed_sql
+from import_school import START, ROOT, NeedsExceptions, blank_boundary, crop_questions, detect_layout, find_starts, ink_rows, make_data, prepare_config, resolve_pdf, run, seed_sql
 import fitz
 
-CONFIGS = sorted((ROOT / 'scripts/exam/school-configs').glob('20*.json'))
+# 기준 시험지 두 개(1차 출력과 비교). 새로 추가되는 학교 설정은 각자 확인 화면으로 검증한다.
+CONFIGS = [ROOT / 'scripts/exam/school-configs' / f'{name}.json' for name in ('2024-yeongpa-g2-s2-mid-calc1', '2026-dongbuk-g1-s2-mid-common2')]
 
 
 def strip_blank_rows(image):
@@ -30,6 +31,14 @@ def sql_body(sql):
     body = sql[sql.index('insert into public.exam_papers'):]
     # 5 and 5.0 are the same SQL numeric value. Leave quoted text untouched.
     return re.sub(r'(?<=, )(\d+)\.0(?=, )', r'\1', body).strip()
+
+
+class LabelTests(unittest.TestCase):
+    def test_bracket_tag_before_number(self):
+        # 둔촌고: 서답형 번호 앞에 "[서답형3]" 줄이 붙는다.
+        self.assertEqual(START.match('[서답형3]\n21.\n21) 중심이').group(2), '21')
+        self.assertEqual(START.match('3.\n3) 수직선').group(2), '3')
+        self.assertIsNone(START.match('[보기] ㄱ. 원'))
 
 
 class CroppingTests(unittest.TestCase):
