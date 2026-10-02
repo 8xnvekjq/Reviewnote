@@ -423,6 +423,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
           <div className="exam-paper-meta rn-caption">
             {question.sourceRound && <span data-testid="exam-question-source">제{question.sourceRound}회 {question.sourceNumber}번 · </span>}
             {question.number}번 · {question.points}점 · {question.isChoice ? '객관식' : '단답형'}
+            {question.sourceLabel && <span data-testid="worksheet-source"> · {question.sourceLabel}</span>}
             {saveState === 'failed' && <span className="exam-save-failed"> · 저장이 잠깐 안 됐어요(다시 시도할게요)</span>}
           </div>
           {/* 시험 중 방해가 되지 않도록 저장 중·완료는 말하지 않고, 사용자가 해야 할 일이 있을 때만 보인다. */}

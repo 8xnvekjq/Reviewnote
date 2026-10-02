@@ -38,8 +38,9 @@ test('era metadata and question sources survive RPC mapping and suppress grades'
   assert.equal(attempt.practiceEra, 'goryeo');
   assert.equal(attempt.questions[0].sourceNumber, 12);
   assert.equal(attempt.questions[0].sourceRound, 74);
-  const result = mapExamResult({ ...payload, items: payload.questions, estimatedGrade: null });
+  const result = mapExamResult({ ...payload, items: payload.questions, estimatedGrade: 1 });
   assert.equal(result.items[0].sourcePaperId, payload.questions[0].sourcePaperId);
+  assert.equal(result.estimatedGrade, null, 'era practice never exposes a grade, even with a legacy payload');
   assert.equal(resultGradeLabel(result, null), '');
 });
 test('regeneration discovers new rounds and preserves revisions until membership or keys change', () => {

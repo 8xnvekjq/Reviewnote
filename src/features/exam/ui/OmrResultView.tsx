@@ -87,7 +87,7 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar
   const eraOf = useMemo(() => new Map(topics?.questions.map(topic => [topic.number, topic.era]) ?? []), [topics]);
   const pendingCandidates = candidates.filter(item => !item.addedMistakeId);
   const cuts = result.gradeCut;
-  const school = result.kind === 'school' || result.kind === 'hanneung';
+  const school = result.kind === 'school' || result.kind === 'worksheet' || result.kind === 'hanneung';
   // 서버가 v2 이전 결과를 주면 top 값이 없을 수 있다 — 그땐 1등급컷 값으로 본다.
   const estimate = useMemo(() => school ? { standard: null, percentile: null } : estimateStandardScore(result.score, {
     ...cuts,
@@ -249,6 +249,8 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar
                   <span className="exam-item-ox" aria-label={item.isCorrect ? '맞음' : '틀림'}>{item.isCorrect ? 'O' : 'X'}</span>
                   <span className="exam-item-answers">
                     {item.sourceRound && <span data-testid="exam-result-source">제{item.sourceRound}회 {item.sourceNumber}번</span>}
+
+                    {item.sourceLabel && <span className="rn-caption">{item.sourceLabel}</span>}
                     {eraOf.has(item.number) && <span className="exam-era-chip">{eraLabel(eraOf.get(item.number)!)}</span>}
                     <span>{reviewing ? '학생 답' : '내 답'} <b><ExamAnswer question={item} answer={item.answer} /></b></span>
                     <span>정답 <b><ExamAnswer question={item} answer={item.correctAnswer} /></b></span>

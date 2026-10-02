@@ -72,7 +72,8 @@ function asArray(value: unknown): unknown[] {
 function mapMetadata(r: Row): ExamPaperMetadata {
   if (r.kind == null) return {};
   return {
-    kind: r.kind === 'school' ? 'school' : r.kind === 'hanneung' ? 'hanneung' : 'csat',
+    kind: r.kind === 'worksheet' ? 'worksheet' : r.kind === 'school' ? 'school' : r.kind === 'hanneung' ? 'hanneung' : 'csat',
+    unitName: asNullableString(r.unitName),
     practiceEra: HANNEUNG_ERAS.find(era => era.id === r.practiceEra)?.id ?? null,
     hanneungLevel: r.hanneungLevel === 'advanced' || r.hanneungLevel === 'basic' ? r.hanneungLevel : null,
     schoolName: asNullableString(r.schoolName), year: asNullableNumber(r.year),
@@ -88,6 +89,7 @@ function mapAnswerMetadata(r: Row): ExamAnswerMetadata {
   if (r.answerType == null) return source;
   return {
     ...source,
+    sourceLabel: asNullableString(r.sourceLabel),
     answerType: r.answerType === 'choice10' ? 'choice10' : r.answerType === 'digits' ? 'digits' : r.answerType === 'choice4' ? 'choice4' : 'choice5',
     choices: Array.isArray(r.choices) ? r.choices.filter((c): c is string => typeof c === 'string') : null,
   };
@@ -188,7 +190,7 @@ export function mapExamPaper(row: unknown): ExamPaperSummary {
     title: asString(r.title),
     examDate: asString(r.examDate),
     source: asString(r.source),
-    timeLimitMinutes: asNumber(r.timeLimitMinutes, 100),
+    timeLimitMinutes: r.kind === 'worksheet' ? null : asNumber(r.timeLimitMinutes, 100),
     electives: asArray(r.electives).filter((e): e is ExamElective => ELECTIVES.includes(e as ExamElective)),
     inProgress: mapExamPaperProgress(r.inProgress),
     lastResult: mapExamPaperLastResult(r.lastResult),
@@ -294,7 +296,7 @@ export function mapExamResult(raw: unknown): ExamResult {
     correctCount: asNumber(r.correctCount),
     totalCount: asNumber(r.totalCount),
     totalTimeMs: asNumber(r.totalTimeMs),
-    estimatedGrade: r.kind === 'school' ? null : r.kind === 'hanneung' ? asNullableNumber(r.estimatedGrade) : asNullableNumber(r.estimatedGrade) ?? estimateExamGrade(rawByGrade, score),
+    estimatedGrade: r.practiceEra || r.kind === 'school' || r.kind === 'worksheet' ? null : r.kind === 'hanneung' ? asNullableNumber(r.estimatedGrade) : asNullableNumber(r.estimatedGrade) ?? estimateExamGrade(rawByGrade, score),
     gradeCut: {
       rawByGrade,
       standardByGrade: numbers(cut.standardByGrade),

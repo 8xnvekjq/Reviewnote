@@ -54,6 +54,7 @@ function InProgressReview({ target, api }: { target: ReviewTarget; api: AdminExa
         <button type="button" className="rn-button rn-button-compact" aria-label="다음 문항" disabled={index === data.attempt.questions.length - 1} onClick={() => setIndex(n => n + 1)}>다음 ▶</button>
       </div>
       {!data.ink.get(inkKey!)?.length && <p className="rn-caption">이 문항에 서버로 저장된 필기가 없어요.</p>}
+      {question.sourceLabel && <p className="rn-caption">{question.sourceLabel}</p>}
       <div className="exam-admin-paper">
         <ExamInkReplay key={`${question.id}:${reload}`} imageUrl={question.imageUrl}
           client={api} attemptId={target.attemptId} questionId={inkKey!}

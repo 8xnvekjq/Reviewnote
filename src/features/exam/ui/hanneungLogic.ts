@@ -6,7 +6,7 @@ export function hanneungGrade(score: number, level: ExamPaperMetadata['hanneungL
 }
 
 export function resultGradeLabel(paper: ExamPaperMetadata, grade: number | null): string {
-  if (paper.practiceEra || paper.kind === 'school') return '';
+  if (paper.practiceEra || paper.kind === 'school' || paper.kind === 'worksheet') return '';
   if (paper.kind === 'hanneung') return grade == null ? '미합격' : `예상 ${grade}급`;
   return grade == null ? '' : `추정 ${grade}등급`;
 }

@@ -10,7 +10,7 @@ export type ExamElective = '확률과 통계' | '미적분' | '기하';
  *  자유 모드: 시간 제한 없음, 문항마다 "채점해 보기" 가능. */
 export type ExamMode = 'real' | 'free';
 
-export type ExamPaperKind = 'csat' | 'school' | 'hanneung';
+export type ExamPaperKind = 'csat' | 'school' | 'hanneung' | 'worksheet';
 export type ExamAnswerType = 'choice4' | 'choice5' | 'digits' | 'choice10';
 /** 선택 필드는 기존 운영 RPC 응답과의 호환용. 새 RPC는 모두 제공한다. */
 export interface ExamPaperMetadata {
@@ -19,6 +19,7 @@ export interface ExamPaperMetadata {
   practiceEra?: import('./ui/hanneungEra').HanneungEra | null;
   hanneungLevel?: 'advanced' | 'basic' | null;
   schoolName?: string | null;
+  unitName?: string | null;
   year?: number | null;
   grade?: number | null;
   semester?: number | null;
@@ -31,6 +32,8 @@ export interface ExamAnswerMetadata {
   sourcePaperId?: string | null;
   sourceNumber?: number | null;
   sourceRound?: number | null;
+
+  sourceLabel?: string | null;
   answerType?: ExamAnswerType;
   /** 선지만 공개. 정답 번호는 제출/채점 RPC 외에는 제공하지 않는다. */
   choices?: string[] | null;
@@ -41,7 +44,7 @@ export interface ExamPaperSummary extends ExamPaperMetadata {
   title: string;         // '2025학년도 6월 모의평가 수학'
   examDate: string;      // '2024-06-04'. 시행일이 없는 원본은 빈 문자열로 매핑.
   source: string;        // '한국교육과정평가원'
-  timeLimitMinutes: number;
+  timeLimitMinutes: number | null;
   electives: ExamElective[];
   // ── v2: 시험지 카드(A4 비율)에 진행 정도 표시. 시험지마다 따로 이어 풀 수 있다(서버도 시험지별 진행 중 1개). ──
   /** 이 시험지의 내 진행 중 시도(없으면 null). */
