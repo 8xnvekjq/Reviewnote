@@ -8,11 +8,11 @@ export function useExamInk(client: ExamClient, attemptId: string, questionIds: s
   const sync = useMemo(() => new InkSync(client, attemptId, redraw, undefined, new Set(ids.split(','))), [client, attemptId, ids]);
   useEffect(() => {
     let active = true;
-    void sync.load().then(() => { if (active && sync.pending) void sync.flush(); });
+    void sync.load().then(() => { if (active && sync.pending) void sync.flush({ background: true }); });
     const retry = () => {
       if (sync.status === 'conflict') return;
-      if (!sync.ready) void sync.load().then(() => { if (active && sync.pending) void sync.flush(); });
-      else if (sync.pending) void sync.flush();
+      if (!sync.ready) void sync.load().then(() => { if (active && sync.pending) void sync.flush({ background: true }); });
+      else if (sync.pending) void sync.flush({ background: true });
     };
     const refresh = () => {
       if (document.hidden) { if (sync.pending) void sync.flush(); return; }

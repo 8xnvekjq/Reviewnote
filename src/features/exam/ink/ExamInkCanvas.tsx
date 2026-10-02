@@ -9,6 +9,8 @@ import { drawShape, drawStroke, freehandPath, paint, prepareCanvas, resetTransfo
 import { recognizeShape, resizeShape, shapeToPoints } from './shapeSnap.ts';
 import type { Pt, SnapShape } from './shapeSnap.ts';
 
+const round = (value: number, scale: number) => Math.round(value * scale) / scale;
+
 /** 꾹 누름 판정 시간·허용 움직임(CSS px). */
 // 글씨를 쓰다 잠깐 멈춘 것을 도형으로 오인하지 않게 넉넉히(0.5초·5px은 필기 중에도 자주 걸렸다).
 const HOLD_MS = 650;
@@ -256,10 +258,11 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     const unit = () => geomRef.current.imgW || rect.width || 1;
     const toPoint = (e: PointerEvent, start: number): InkPoint => {
       const w = unit();
-      const pressure = e.pointerType === 'pen' ? (e.pressure > 0 ? e.pressure : 0.5) : SIMULATED_PRESSURE;
+      const pressure = e.pointerType === 'pen' ? round(e.pressure > 0 ? e.pressure : 0.5, 1e3) : SIMULATED_PRESSURE;
       // 펜 압력이 정확히 0.5로 들어와 '흉내 모드'로 오인되는 일을 막는다.
-      const p = e.pointerType === 'pen' && pressure === SIMULATED_PRESSURE ? 0.5001 : pressure;
-      return { x: (e.clientX - rect.left) / w, y: (e.clientY - rect.top) / w, pressure: p, t: Math.max(0, Math.round(e.timeStamp - start)) };
+      const p = e.pointerType === 'pen' && pressure === SIMULATED_PRESSURE ? 0.501 : pressure;
+      // 좌표는 이미지 너비의 1/10000 단위로 반올림(눈에 보이지 않는 차이) — 서버로 가는 필기 크기를 줄인다.
+      return { x: round((e.clientX - rect.left) / w, 1e4), y: round((e.clientY - rect.top) / w, 1e4), pressure: p, t: Math.max(0, Math.round(e.timeStamp - start)) };
     };
     const eventsOf = (e: PointerEvent) => {
       const list = typeof e.getCoalescedEvents === 'function' ? e.getCoalescedEvents() : [];
