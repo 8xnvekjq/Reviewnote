@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "pdf": "reference/school-exams/2024-영파여고-2학년-2학기-중간-미적분1/영파여자고등학교_2학년_2024_2학기중간_수학2_선택,공통_문제_정답.hwp.pdf",
+  "referenceRoot": "C:/Users/8xnve/Documents/ReviewNotes/reference/school-exams",
+  "paper": {
+    "id": "2024-yeongpa-g2-s2-mid-calc1",
+    "title": "2024 영파여고 2학년 2학기 중간 미적분1",
+    "kind": "school",
+    "schoolName": "영파여고",
+    "year": 2024,
+    "grade": 2,
+    "semester": 2,
+    "examTerm": "mid",
+    "subject": "미적분1",
+    "subjectNote": "선생님 폴더 이름 기준 미적분1; 원본 시험지 표기는 수학2",
+    "source": "영파여고",
+    "schoolGrade": "고2",
+    "examDate": null,
+    "examDateNote": "원본에는 연도·학기·중간고사만 있고 정확한 시행일은 없음",
+    "timeLimitMinutes": 50,
+    "questionCount": 21,
+    "originalMaxScore": 25,
+    "pointScale": 4,
+    "maxScore": 100,
+    "electives": [],
+    "published": false
+  },
+  "slug": "yeongpa",
+  "migrationTimestamp": "20261003080000",
+  "pointScale": 4,
+  "curriculumGrade": "미적분Ⅰ",
+  "includeOriginalNumber": true,
+  "includeOriginalPoints": true,
+  "questions": [
+    {
+      "number": 19,
+      "answerType": "choice10",
+      "answer": "9",
+      "originalNumber": "19(1)",
+      "choices": [
+        "\\begin{cases}2 & (t>1)\\\\1 & (t=1)\\\\0 & (-2\\le t<1)\\\\0 & (t<-2)\\end{cases}",
+        "\\begin{cases}2 & (t>1)\\\\1 & (t=1)\\\\0 & (-3\\le t<1)\\\\1 & (t<-3)\\end{cases}",
+        "\\begin{cases}2 & (t>1)\\\\1 & (t=1)\\\\0 & (-2\\le t<1)\\\\2 & (t<-2)\\end{cases}",
+        "\\begin{cases}2 & (t>2)\\\\1 & (1\\le t\\le2)\\\\0 & (-2\\le t<1)\\\\1 & (t<-2)\\end{cases}",
+        "\\begin{cases}1 & (t>1)\\\\1 & (t=1)\\\\0 & (-2\\le t<1)\\\\1 & (t<-2)\\end{cases}",
+        "\\begin{cases}2 & (t>1)\\\\0 & (t=1)\\\\0 & (-2\\le t<1)\\\\1 & (t<-2)\\end{cases}",
+        "\\begin{cases}2 & (t\\ge1)\\\\0 & (-2\\le t<1)\\\\1 & (t<-2)\\end{cases}",
+        "\\begin{cases}2 & (t>1)\\\\1 & (t=1)\\\\0 & (-2<t<1)\\\\1 & (t\\le-2)\\end{cases}",
+        "\\begin{cases}2 & (t>1)\\\\1 & (t=1)\\\\0 & (-2\\le t<1)\\\\1 & (t<-2)\\end{cases}",
+        "\\begin{cases}2 & (t>1)\\\\2 & (t=1)\\\\0 & (-2\\le t<1)\\\\1 & (t<-2)\\end{cases}"
+      ],
+      "originalAnswer": "\\begin{cases}2 & (t>1)\\\\1 & (t=1)\\\\0 & (-2\\le t<1)\\\\1 & (t<-2)\\end{cases}",
+      "distractorReasons": [
+        "왼쪽 일차함수의 교점을 누락",
+        "x 경계 -3을 매개변수 t 경계로 혼동",
+        "x<-3 제한을 무시해 교점 하나를 추가",
+        "1<t≤2에서 포물선 교점 두 개를 하나로 셈",
+        "t>1에서 두 교점 중 하나를 누락",
+        "접선과 만나는 점을 교점에서 제외",
+        "t=1을 두 교점 구간에 포함",
+        "t=-2에서 x=-3을 왼쪽 가지의 교점으로 포함",
+        "정답",
+        "t=1의 접점을 중근 두 개로 셈"
+      ],
+      "sourcePart": 1,
+      "imageSegments": [
+        [
+          null,
+          191
+        ]
+      ],
+      "sourceAnswerText": "\n\n\n\n\n\n\n\n≤\n"
+    },
+    {
+      "number": 20,
+      "original": 19,
+      "answerType": "digits",
+      "answer": "8",
+      "originalNumber": "19(2)",
+      "sourcePart": 2,
+      "imageSegments": [
+        [
+          null,
+          159
+        ],
+        [
+          211,
+          238
+        ]
+      ]
+    },
+    {
+      "number": 21,
+      "original": 20,
+      "answerType": "choice10",
+      "answer": "6",
+      "originalNumber": "20",
+      "choices": [
+        "4x+10",
+        "2x+14",
+        "2x+5",
+        "x+10",
+        "2x+12",
+        "2x+10",
+        "2x+16",
+        "2x-10",
+        "2x",
+        "2x+8"
+      ],
+      "originalAnswer": "2x+10",
+      "distractorReasons": [
+        "이차항 미분에서 계수 2를 한 번 더 곱함",
+        "g'(2)를 f'(0)-2로 오인: c-2=12",
+        "g(2)=f'(0)에서 2c-c를 2c로 처리",
+        "2xy를 xy로 오인해 이차항 계수를 절반으로 처리",
+        "극한값 12를 f'(0)으로 오인",
+        "정답",
+        "g(2)=f'(0)을 g(2)=f'(2)+2로 오인: 2c-10=c+6",
+        "f(0)=-10의 부호를 뒤집어 (나)에 대입",
+        "상수 10을 놓쳐 f(0)=0으로 두고 (나)를 대입",
+        "g'(2)=f'(2)-2를 f'(2)로 오인"
+      ],
+      "sourceAnswerText": ""
+    }
+  ],
+  "chapters": {
+    "1": "함수의 극한",
+    "2": "미분계수와 도함수",
+    "3": "미분계수와 도함수",
+    "4": "함수의 극한",
+    "5": "함수의 극한",
+    "6": "함수의 극한",
+    "7": "극대·극소와 그래프",
+    "8": "함수의 연속",
+    "9": "함수의 극한",
+    "10": "미분계수와 도함수",
+    "11": "함수의 극한",
+    "12": "접선의 방정식과 평균값 정리",
+    "13": "미분계수와 도함수",
+    "14": "미분계수와 도함수",
+    "15": "함수의 연속",
+    "16": "함수의 연속",
+    "17": "미분계수와 도함수",
+    "18": "함수의 극한",
+    "19": "함수의 극한",
+    "20": "함수의 연속",
+    "21": "미분계수와 도함수"
+  }
+}

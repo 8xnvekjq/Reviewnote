@@ -1,0 +1,334 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "School exam import configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "pdf",
+    "paper",
+    "slug",
+    "migrationTimestamp",
+    "curriculumGrade"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "pdf": {
+      "type": "string"
+    },
+    "referenceRoot": {
+      "type": "string"
+    },
+    "paper": {
+      "type": "object",
+      "required": [
+        "id",
+        "title",
+        "kind",
+        "schoolName",
+        "year",
+        "grade",
+        "semester",
+        "examTerm",
+        "subject",
+        "source",
+        "schoolGrade",
+        "examDate",
+        "timeLimitMinutes",
+        "questionCount",
+        "maxScore",
+        "electives",
+        "published"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "kind": {
+          "const": "school"
+        },
+        "electives": {
+          "const": []
+        },
+        "published": {
+          "const": false
+        },
+        "questionCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxScore": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "timeLimitMinutes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "grade": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "year": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "semester": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "examTerm": {
+          "enum": [
+            "mid",
+            "final"
+          ]
+        },
+        "examDate": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "schoolName": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "schoolGrade": {
+          "type": "string"
+        },
+        "examDateNote": {
+          "type": "string"
+        },
+        "subjectNote": {
+          "type": "string"
+        }
+      }
+    },
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]+$"
+    },
+    "migrationTimestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{14}$"
+    },
+    "pointScale": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "curriculumGrade": {
+      "type": "string"
+    },
+    "includeOriginalNumber": {
+      "type": "boolean"
+    },
+    "includeOriginalPoints": {
+      "type": "boolean"
+    },
+    "layout": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "questionPages": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "answerPages": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2,
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "bodyTop": {
+          "type": "number",
+          "minimum": 0
+        },
+        "bodyBottom": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "pageBodyTop": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "columnDivider": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "blankRunPx": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "pageBodyBottom": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "questions": {
+      "type": "array",
+      "minItems": 0,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [],
+        "properties": {
+          "number": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "original": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "answerType": {
+            "enum": [
+              "choice5",
+              "choice10",
+              "digits"
+            ]
+          },
+          "answer": {
+            "type": [
+              "string",
+              "integer"
+            ]
+          },
+          "points": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "chapter": {
+            "type": "string"
+          },
+          "originalNumber": {
+            "type": "string"
+          },
+          "sourcePart": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "sourceAnswerText": {
+            "type": "string"
+          },
+          "originalAnswer": {
+            "type": "string"
+          },
+          "choices": {
+            "type": "array",
+            "minItems": 10,
+            "maxItems": 10,
+            "items": {
+              "type": "string"
+            }
+          },
+          "distractorReasons": {
+            "type": "array",
+            "minItems": 10,
+            "maxItems": 10,
+            "items": {
+              "type": "string"
+            }
+          },
+          "imageSegments": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "answerType": {
+                  "const": "choice10"
+                }
+              },
+              "required": [
+                "answerType"
+              ]
+            },
+            "then": {
+              "required": [
+                "answer",
+                "choices",
+                "originalAnswer",
+                "distractorReasons"
+              ]
+            }
+          }
+        ],
+        "anyOf": [
+          {
+            "required": [
+              "number"
+            ]
+          },
+          {
+            "required": [
+              "original"
+            ]
+          }
+        ]
+      }
+    },
+    "chapters": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[1-9][0-9]*$"
+      },
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  }
+}
