@@ -1,0 +1,505 @@
+{
+  "paperId": "2026-hanneung-78-advanced",
+  "questions": [
+    {
+      "number": 1,
+      "era": "prehistory",
+      "field": "문화",
+      "keywords": [
+        "신석기 시대"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 2,
+      "era": "prehistory",
+      "field": "정치",
+      "keywords": [
+        "고조선"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 3,
+      "era": "prehistory",
+      "field": "사회",
+      "keywords": [
+        "동예와 부여"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 4,
+      "era": "three-kingdoms",
+      "field": "정치",
+      "keywords": [
+        "관산성 전투"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 5,
+      "era": "three-kingdoms",
+      "field": "문화",
+      "keywords": [
+        "고구려 고분 벽화"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 6,
+      "era": "three-kingdoms",
+      "field": "사회",
+      "keywords": [
+        "백제 사비 시기"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 7,
+      "era": "three-kingdoms",
+      "field": "정치",
+      "keywords": [
+        "대야성 전투"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 8,
+      "era": "north-south",
+      "field": "정치",
+      "keywords": [
+        "신라 하대"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 9,
+      "era": "north-south",
+      "field": "문화",
+      "keywords": [
+        "발해 문화유산"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 10,
+      "era": "north-south",
+      "field": "정치",
+      "keywords": [
+        "후삼국"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 11,
+      "era": "goryeo",
+      "field": "정치",
+      "keywords": [
+        "광종"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 12,
+      "era": "goryeo",
+      "field": "경제",
+      "keywords": [
+        "고려 경제"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 13,
+      "era": "goryeo",
+      "field": "정치",
+      "keywords": [
+        "여진 정벌"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 14,
+      "era": "goryeo",
+      "field": "문화",
+      "keywords": [
+        "직지심체요절"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 15,
+      "era": "goryeo",
+      "field": "정치",
+      "keywords": [
+        "고려 지방 제도"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 16,
+      "era": "goryeo",
+      "field": "정치",
+      "keywords": [
+        "공민왕"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 17,
+      "era": "goryeo",
+      "field": "문화",
+      "keywords": [
+        "의천"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 18,
+      "era": "goryeo",
+      "field": "정치",
+      "keywords": [
+        "문벌 귀족 사회"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 19,
+      "era": "joseon-early",
+      "field": "정치",
+      "keywords": [
+        "단종 복위 운동"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 20,
+      "era": "joseon-early",
+      "field": "정치",
+      "keywords": [
+        "의금부"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 21,
+      "era": "joseon-early",
+      "field": "문화",
+      "keywords": [
+        "신숙주"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 22,
+      "era": "joseon-early",
+      "field": "정치",
+      "keywords": [
+        "진주성 전투"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 23,
+      "era": "joseon-late",
+      "field": "정치",
+      "keywords": [
+        "나선 정벌"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 24,
+      "era": "joseon-late",
+      "field": "정치",
+      "keywords": [
+        "정조"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 25,
+      "era": "joseon-late",
+      "field": "경제",
+      "keywords": [
+        "상평통보"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 26,
+      "era": "joseon-late",
+      "field": "문화",
+      "keywords": [
+        "김정희"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 27,
+      "era": "joseon-late",
+      "field": "사회",
+      "keywords": [
+        "향전"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 28,
+      "era": "opening",
+      "field": "정치",
+      "keywords": [
+        "강화도 조약"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 29,
+      "era": "opening",
+      "field": "정치",
+      "keywords": [
+        "갑신정변"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 30,
+      "era": "opening",
+      "field": "문화",
+      "keywords": [
+        "근대 교육 기관"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 31,
+      "era": "opening",
+      "field": "경제",
+      "keywords": [
+        "화폐 정리 사업"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 32,
+      "era": "opening",
+      "field": "정치",
+      "keywords": [
+        "동학 농민 운동"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 33,
+      "era": "opening",
+      "field": "정치",
+      "keywords": [
+        "13도 창의군"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 34,
+      "era": "opening",
+      "field": "문화",
+      "keywords": [
+        "대한매일신보"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 35,
+      "era": "colonial",
+      "field": "정치",
+      "keywords": [
+        "안창호"
+      ],
+      "confidence": "low",
+      "note": "시대 경계가 걸친 문항 — 문제 자료 기준으로 분류"
+    },
+    {
+      "number": 36,
+      "era": "colonial",
+      "field": "경제",
+      "keywords": [
+        "토지 조사 사업"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 37,
+      "era": "colonial",
+      "field": "경제",
+      "keywords": [
+        "암태도 소작 쟁의"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 38,
+      "era": "colonial",
+      "field": "정치",
+      "keywords": [
+        "6·10 만세 운동"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 39,
+      "era": "colonial",
+      "field": "사회",
+      "keywords": [
+        "형평 운동"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 40,
+      "era": "colonial",
+      "field": "사회",
+      "keywords": [
+        "전시 동원 체제"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 41,
+      "era": "colonial",
+      "field": "문화",
+      "keywords": [
+        "조선어 학회"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 42,
+      "era": "colonial",
+      "field": "정치",
+      "keywords": [
+        "조선 의용대"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 43,
+      "era": "colonial",
+      "field": "사회",
+      "keywords": [
+        "근대 도시 문화"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 44,
+      "era": "modern",
+      "field": "정치",
+      "keywords": [
+        "5·10 총선거"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 45,
+      "era": "modern",
+      "field": "정치",
+      "keywords": [
+        "6·25 전쟁"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 46,
+      "era": "modern",
+      "field": "정치",
+      "keywords": [
+        "4·19 혁명"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 47,
+      "era": "modern",
+      "field": "경제",
+      "keywords": [
+        "경부 고속 도로"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 48,
+      "era": "modern",
+      "field": "정치",
+      "keywords": [
+        "6월 민주 항쟁"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 49,
+      "era": "modern",
+      "field": "정치",
+      "keywords": [
+        "김대중 정부"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 50,
+      "era": "cross",
+      "field": "사회",
+      "keywords": [
+        "부산 지역사"
+      ],
+      "confidence": "high",
+      "note": ""
+    }
+  ]
+}

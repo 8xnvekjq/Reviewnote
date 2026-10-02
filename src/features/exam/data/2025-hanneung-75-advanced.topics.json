@@ -1,0 +1,505 @@
+{
+  "paperId": "2025-hanneung-75-advanced",
+  "questions": [
+    {
+      "number": 1,
+      "era": "prehistory",
+      "field": "문화",
+      "keywords": [
+        "청동기 시대"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 2,
+      "era": "prehistory",
+      "field": "정치",
+      "keywords": [
+        "고조선"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 3,
+      "era": "three-kingdoms",
+      "field": "문화",
+      "keywords": [
+        "신라 금관"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 4,
+      "era": "three-kingdoms",
+      "field": "정치",
+      "keywords": [
+        "대가야"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 5,
+      "era": "three-kingdoms",
+      "field": "경제",
+      "keywords": [
+        "고구려"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 6,
+      "era": "north-south",
+      "field": "정치",
+      "keywords": [
+        "신라 하대"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 7,
+      "era": "three-kingdoms",
+      "field": "정치",
+      "keywords": [
+        "고구려 천리장성"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 8,
+      "era": "north-south",
+      "field": "정치",
+      "keywords": [
+        "발해"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 9,
+      "era": "three-kingdoms",
+      "field": "문화",
+      "keywords": [
+        "백제 역사 유적"
+      ],
+      "confidence": "low",
+      "note": "시대 경계가 걸친 문항 — 문제 자료 기준으로 분류"
+    },
+    {
+      "number": 10,
+      "era": "north-south",
+      "field": "정치",
+      "keywords": [
+        "후삼국"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 11,
+      "era": "goryeo",
+      "field": "정치",
+      "keywords": [
+        "성종"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 12,
+      "era": "goryeo",
+      "field": "정치",
+      "keywords": [
+        "삼별초"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 13,
+      "era": "goryeo",
+      "field": "문화",
+      "keywords": [
+        "최충"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 14,
+      "era": "goryeo",
+      "field": "정치",
+      "keywords": [
+        "묘청의 난"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 15,
+      "era": "goryeo",
+      "field": "사회",
+      "keywords": [
+        "홍건적 침입"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 16,
+      "era": "goryeo",
+      "field": "경제",
+      "keywords": [
+        "고려 화폐"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 17,
+      "era": "goryeo",
+      "field": "문화",
+      "keywords": [
+        "고려 과학 기술"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 18,
+      "era": "goryeo",
+      "field": "문화",
+      "keywords": [
+        "고려 불상"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 19,
+      "era": "joseon-early",
+      "field": "정치",
+      "keywords": [
+        "제1차 왕자의 난"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 20,
+      "era": "joseon-early",
+      "field": "정치",
+      "keywords": [
+        "사헌부"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 21,
+      "era": "joseon-early",
+      "field": "정치",
+      "keywords": [
+        "여진 정벌"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 22,
+      "era": "joseon-early",
+      "field": "정치",
+      "keywords": [
+        "사화"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 23,
+      "era": "joseon-early",
+      "field": "정치",
+      "keywords": [
+        "병자호란"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 24,
+      "era": "joseon-late",
+      "field": "정치",
+      "keywords": [
+        "영조"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 25,
+      "era": "joseon-late",
+      "field": "사회",
+      "keywords": [
+        "정조 시기 한양"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 26,
+      "era": "joseon-late",
+      "field": "경제",
+      "keywords": [
+        "조선 후기 경제"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 27,
+      "era": "joseon-late",
+      "field": "정치",
+      "keywords": [
+        "세도 정치"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 28,
+      "era": "opening",
+      "field": "정치",
+      "keywords": [
+        "갑신정변"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 29,
+      "era": "opening",
+      "field": "사회",
+      "keywords": [
+        "동학"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 30,
+      "era": "opening",
+      "field": "정치",
+      "keywords": [
+        "러일 전쟁"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 31,
+      "era": "opening",
+      "field": "정치",
+      "keywords": [
+        "최익현"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 32,
+      "era": "opening",
+      "field": "정치",
+      "keywords": [
+        "이준"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 33,
+      "era": "opening",
+      "field": "정치",
+      "keywords": [
+        "안중근"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 34,
+      "era": "colonial",
+      "field": "정치",
+      "keywords": [
+        "1910년대 무단 통치"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 35,
+      "era": "colonial",
+      "field": "사회",
+      "keywords": [
+        "을축년 대홍수"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 36,
+      "era": "colonial",
+      "field": "정치",
+      "keywords": [
+        "3·1 운동"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 37,
+      "era": "colonial",
+      "field": "정치",
+      "keywords": [
+        "대한 광복회"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 38,
+      "era": "cross",
+      "field": "정치",
+      "keywords": [
+        "근대 헌법 문서"
+      ],
+      "confidence": "low",
+      "note": "시대 경계가 걸친 문항 — 문제 자료 기준으로 분류"
+    },
+    {
+      "number": 39,
+      "era": "colonial",
+      "field": "정치",
+      "keywords": [
+        "멕시코 이주 동포"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 40,
+      "era": "colonial",
+      "field": "경제",
+      "keywords": [
+        "암태도 소작 쟁의"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 41,
+      "era": "colonial",
+      "field": "문화",
+      "keywords": [
+        "조선어 학회"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 42,
+      "era": "colonial",
+      "field": "문화",
+      "keywords": [
+        "1930년대 대중문화"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 43,
+      "era": "colonial",
+      "field": "정치",
+      "keywords": [
+        "한국광복군"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 44,
+      "era": "colonial",
+      "field": "정치",
+      "keywords": [
+        "전시 동원 체제"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 45,
+      "era": "modern",
+      "field": "정치",
+      "keywords": [
+        "남북 협상"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 46,
+      "era": "modern",
+      "field": "정치",
+      "keywords": [
+        "발췌 개헌"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 47,
+      "era": "modern",
+      "field": "사회",
+      "keywords": [
+        "여성 노동 운동"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 48,
+      "era": "modern",
+      "field": "정치",
+      "keywords": [
+        "4·19 혁명"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 49,
+      "era": "modern",
+      "field": "정치",
+      "keywords": [
+        "하나회 청산"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 50,
+      "era": "cross",
+      "field": "사회",
+      "keywords": [
+        "제주도 지역사"
+      ],
+      "confidence": "high",
+      "note": ""
+    }
+  ]
+}

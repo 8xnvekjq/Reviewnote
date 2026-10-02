@@ -3,10 +3,11 @@
 Requires PyMuPDF, numpy and Pillow. --out-dir is a repository-shaped sandbox.
 """
 import argparse
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 import hashlib
 import html
 import json
+import tempfile
 from pathlib import Path
 import re
 
@@ -169,13 +170,20 @@ def add_round(round_number, year, exam_date, questions, answers, out=ROOT, sheet
         fitz.Pixmap(fitz.csRGB, piece.shape[1], piece.shape[0], piece.tobytes(), False).save(str(images / f'q-{n:02d}.jpg'), jpg_quality=85)
     for name, value in [(f'{pid}.json', paper), (f'{pid}.topics.json', topics)]:
         (data_dir / name).write_text(json.dumps(value, ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
-    migration = existing_seeds[0] if existing_seeds else migrations / f'{datetime.now(timezone.utc):%Y%m%d%H%M%S}_exam_hanneung_{round_number}_advanced_seed.sql'
+    # 시각이 아니라 기존 마이그레이션 다음 번호로 — 한능검 스키마(20261003000000)보다 앞서면 새 DB 재구성 때 실패한다.
+    stamps = [datetime.strptime(path.name[:14], '%Y%m%d%H%M%S') for path in migrations.glob('[0-9]' * 14 + '_*.sql')]
+    next_stamp = (max(stamps) + timedelta(seconds=1)) if stamps else datetime.now(timezone.utc)
+    migration = existing_seeds[0] if existing_seeds else migrations / f'{next_stamp:%Y%m%d%H%M%S}_exam_hanneung_{round_number}_advanced_seed.sql'
     migration.write_text(seed_sql(paper), encoding='utf-8')
     (out / f'scripts/exam/publish_hanneung_{round_number}.sql').write_text(
         f"-- 검토 후에만 실행. 시드 적용은 별도 절차입니다.\nupdate public.exam_papers set published = true where id = {quote(pid)};\n", encoding='utf-8')
-    era_sheets(pieces, out)
+    # 검토용 파일(정답 포함)은 저장소에 쓰지 않는다 — 저장소 모드면 임시 폴더로.
+    review = out if out.resolve() != ROOT.resolve() else Path(tempfile.gettempdir()) / f'hanneung-{round_number}-review'
+    review.mkdir(parents=True, exist_ok=True)
+    era_sheets(pieces, review)
     if sheet:
-        write_sheet(out, paper, pages, warnings)
+        write_sheet(review, paper, pages, warnings)
+    print(f'review files: {review}')
     for warning in warnings:
         print('WARNING:', warning)
     print(f'wrote {pid} to {out}; unpublished; era tags require review')
