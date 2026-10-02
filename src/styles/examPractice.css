@@ -1,6 +1,7 @@
 /* 기출문제 풀이 — design-system.css 의 --rn-* 토큰 위에서만 만든다.
    풀이 화면(.exam-solve)은 position:fixed 로 앱 상단바·하단 탭까지 덮는다(전체화면 API가 없어도). */
 .exam-practice { width: 100%; min-width: 0; color: var(--rn-text); }
+.exam-ink-sync:empty { display: none; }
 .exam-ink-sync { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-block: 8px; font-size: 12px; color: var(--rn-text-muted, #94a3b8); }
 .exam-admin-summary { display: grid; gap: 10px; padding-top: 16px; border-top: 1px solid var(--rn-line, #334155); }
 .exam-admin-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
