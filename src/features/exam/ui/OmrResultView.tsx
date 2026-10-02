@@ -83,7 +83,7 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar
 
   const candidates = useMemo(() => mistakeCandidates(result.items), [result.items]);
   // 한능검 시대 태그가 있는 시험지만 시대별 결과를 보여 준다.
-  const topics = result.kind === 'hanneung' ? hanneungTopicsFor(resultPaperId(result)) : null;
+  const topics = useMemo(() => result.kind === 'hanneung' ? result.practiceEra ? { paperId: result.paperId ?? '', questions: result.items.map(item => ({ number: item.number, era: result.practiceEra!, field: '정치' as const, keywords: [], confidence: 'high' as const, note: '' })) } : hanneungTopicsFor(resultPaperId(result)) : null, [result]);
   const eraOf = useMemo(() => new Map(topics?.questions.map(topic => [topic.number, topic.era]) ?? []), [topics]);
   const pendingCandidates = candidates.filter(item => !item.addedMistakeId);
   const cuts = result.gradeCut;
@@ -137,8 +137,8 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar
         <p className="rn-caption">{result.mode === 'real' ? '실전 모드' : '자유 모드'}{result.elective && ` · ${result.elective}`}</p>
         <div className="exam-score-grid">
           <div className="exam-score-main">
-            <span className="exam-score-label">원점수</span>
-            <strong data-testid="exam-score">{result.score}</strong><span>/ {result.maxScore ?? 100}</span>
+            <span className="exam-score-label">{result.practiceEra ? '맞은 문항' : '원점수'}</span>
+            <strong data-testid="exam-score">{result.practiceEra ? result.correctCount : result.score}</strong><span>/ {result.practiceEra ? result.totalCount : result.maxScore ?? 100}</span>
           </div>
           <dl className="exam-score-stats">
             <div><dt>맞은 개수</dt><dd data-testid="exam-correct-count">{result.correctCount} / {result.totalCount}</dd></div>
@@ -146,7 +146,7 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar
             <div><dt>총 시간</dt><dd>{formatDuration(result.totalTimeMs)}</dd></div>
           </dl>
         </div>
-        {result.kind === 'hanneung' && <div className="exam-grade-note">
+        {result.kind === 'hanneung' && !result.practiceEra && <div className="exam-grade-note">
           <strong data-testid="exam-hanneung-grade">{resultGradeLabel(result, result.estimatedGrade)}</strong>
           <p className="rn-caption">80점·70점·60점 이상이면 {result.hanneungLevel === 'basic' ? '4급·5급·6급' : '1급·2급·3급'} 기준이에요. 연습 결과이며 공식 인증은 아니에요.</p>
         </div>}
@@ -248,6 +248,7 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar
                   <span className="exam-item-num">{item.number}</span>
                   <span className="exam-item-ox" aria-label={item.isCorrect ? '맞음' : '틀림'}>{item.isCorrect ? 'O' : 'X'}</span>
                   <span className="exam-item-answers">
+                    {item.sourceRound && <span data-testid="exam-result-source">제{item.sourceRound}회 {item.sourceNumber}번</span>}
                     {eraOf.has(item.number) && <span className="exam-era-chip">{eraLabel(eraOf.get(item.number)!)}</span>}
                     <span>{reviewing ? '학생 답' : '내 답'} <b><ExamAnswer question={item} answer={item.answer} /></b></span>
                     <span>정답 <b><ExamAnswer question={item} answer={item.correctAnswer} /></b></span>
@@ -270,7 +271,7 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar
         <div className="exam-overlay exam-overlay-full exam-viewer-overlay" role="dialog" aria-modal="true" aria-label={`${viewing.number}번 크게 보기`} onClick={() => setViewing(null)}>
           <div className="exam-viewer" onClick={e => e.stopPropagation()} data-testid="exam-viewer">
             <div className="exam-sheet-head">
-              <h2>{viewing.number}번 <span className={viewing.isCorrect ? 'is-correct' : 'is-wrong'}>{viewing.isCorrect ? 'O' : 'X'}</span></h2>
+              <h2>{viewing.number}번 {viewing.sourceRound && <small>제{viewing.sourceRound}회 {viewing.sourceNumber}번</small>} <span className={viewing.isCorrect ? 'is-correct' : 'is-wrong'}>{viewing.isCorrect ? 'O' : 'X'}</span></h2>
               <span className="rn-caption">{reviewing ? '학생 답' : '내 답'} <ExamAnswer question={viewing} answer={viewing.answer} /> · 정답 <ExamAnswer question={viewing} answer={viewing.correctAnswer} /> · {formatClock(viewing.timeSpentMs)}</span>
               <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={() => setViewing(null)}>닫기</button>
             </div>
@@ -323,6 +324,7 @@ function EraSection({ stats }: { stats: EraStat[] }) {
                 {isWeak && <span className="exam-era-badge">{weak!.kind === 'needs-work' ? '보충 필요' : '가장 약한 시대'}</span>}
                 <span className="exam-era-nums">
                   <span data-testid="exam-era-correct">{stat.correct}/{stat.total}문항</span>
+                  <span>{percent}%</span>
                   <span>{stat.earned}/{stat.points}점</span>
                 </span>
               </div>

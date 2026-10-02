@@ -31,3 +31,9 @@
 
 - `exam/add_hanneung_round.py`: `--round --year --exam-date --questions --answers`로 정답·배점 추출, 자동 문항 자르기, 비공개 시드와 시대 검토 PNG를 생성합니다. 선택: `--out-dir`, `--sheet`, `--force`. 절차는 `exam/HANNEUNG.md`를 참조합니다.
 - `exam/test_add_hanneung_round.py`: 실제 79회 PDF 회귀 및 잘못된 입력 차단 unittest.
+
+## 한능검 시대별 묶음 생성
+
+`node scripts/exam/build_hanneung_era_sets.mjs`는 모든 `*-advanced.topics.json`에서 시대 묶음 공개 목록(정답 없음)과 `20261003100001_exam_era_seed.sql`을 재생성합니다. 적용 전에는 기본 명령을 사용하고, 이미 적용된 뒤 변경할 때는 `node scripts/exam/build_hanneung_era_sets.mjs supabase/migrations/<새 타임스탬프>_exam_era_seed.sql`로 새 시드를 만드세요. 운영 DB에 자동 적용하지 않습니다.
+
+원본 시험지와 정답키가 모두 존재해야 하며, 원본이 모두 공개된 묶음만 학생에게 공개됩니다. 원본 공개 후 같은 시드를 다시 실행하면 묶음도 공개됩니다. 구성·이미지·정답이 바뀌면 새 버전 ID를 만들고 이전 묶음은 비공개로 전환하여 기존 응시·필기·결과는 보존합니다. 묶음은 문항당 1점(맞은 개수), 자유 모드만 허용합니다.

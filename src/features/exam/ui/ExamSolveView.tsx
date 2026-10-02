@@ -421,6 +421,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
       <main className="exam-body" data-testid="exam-body">
         <div className="exam-paper">
           <div className="exam-paper-meta rn-caption">
+            {question.sourceRound && <span data-testid="exam-question-source">제{question.sourceRound}회 {question.sourceNumber}번 · </span>}
             {question.number}번 · {question.points}점 · {question.isChoice ? '객관식' : '단답형'}
             {saveState === 'failed' && <span className="exam-save-failed"> · 저장이 잠깐 안 됐어요(다시 시도할게요)</span>}
           </div>

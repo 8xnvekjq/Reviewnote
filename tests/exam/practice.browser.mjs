@@ -1027,5 +1027,36 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   console.log('ok — students do not see paper activity');
 }
 
+// Era practice: author-only in this worktree; coordinator runs the browser suite.
+for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
+  const { context, page, errors } = await open(viewport);
+  await page.getByRole('button', { name: '한능검', exact: true }).click();
+  const cards = page.getByTestId('exam-era-card');
+  assert.equal(await cards.count(), 10);
+  const goryeo = cards.filter({ has: page.locator('.exam-paper-title', { hasText: /^고려$/ }) });
+  await goryeo.click();
+  assert.equal(await page.getByRole('radio', { name: /실전 모드/ }).count(), 0);
+  await page.getByTestId('exam-start-button').click();
+  await page.getByTestId('exam-solve').waitFor();
+  assert.equal(await page.getByTestId('exam-solve').getAttribute('data-mode'), 'free');
+  assert.match(await page.getByTestId('exam-question-source').innerText(), /제74회 \d+번/);
+  await page.locator('.exam-choice').first().click();
+  await page.getByRole('button', { name: '채점해 보기', exact: true }).click();
+  await page.getByTestId('exam-freecheck').waitFor();
+  await noHorizontalOverflow(page, `era solve/${viewport.width}`);
+  await page.getByRole('button', { name: '제출', exact: true }).click();
+  await page.getByRole('button', { name: '제출하기', exact: true }).click();
+  await page.getByTestId('exam-submit-confirm').click();
+  await page.getByTestId('exam-result').waitFor();
+  assert.equal(await page.getByTestId('exam-hanneung-grade').count(), 0);
+  assert.equal(await page.getByTestId('exam-grade').count(), 0);
+  assert.equal(await page.getByTestId('exam-standard').count(), 0);
+  assert.match(await page.getByTestId('exam-result-source').first().innerText(), /제74회 \d+번/);
+  assert.equal(await page.locator('.exam-era[data-era="goryeo"]').count(), 1);
+  await noHorizontalOverflow(page, `era result/${viewport.width}`);
+  assert.deepEqual(errors, []);
+  await context.close();
+}
+
 await browser.close();
 console.log('exam practice browser tests passed');

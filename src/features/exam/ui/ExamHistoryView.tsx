@@ -95,7 +95,7 @@ export function ExamHistoryView({ client, paper, busy, error, onBack, onContinue
                 <button type="button" className="exam-past-row exam-history-attempt" disabled={busy}
                   onClick={() => a.status === 'submitted' ? onOpenResult(a.attemptId) : onContinue(true)}
                   data-testid="exam-history-attempt" data-round={a.round}>
-                  <strong>{roundLabel(a.round)}{a.status === 'in_progress' ? ' 진행 중' : ` · ${a.score}점${paper.kind === 'school' ? ` / ${paper.maxScore ?? 100}` : paper.kind === 'hanneung' ? a.estimatedGrade == null ? ' · 미합격' : ` · 예상 ${a.estimatedGrade}급` : ` · 추정 ${a.estimatedGrade ?? '—'}등급`}`}</strong>
+                  <strong>{roundLabel(a.round)}{a.status === 'in_progress' ? ' 진행 중' : paper.practiceEra ? ` · ${a.score}/${paper.questionCount}문항` : ` · ${a.score}점${paper.kind === 'school' ? ` / ${paper.maxScore ?? 100}` : paper.kind === 'hanneung' ? a.estimatedGrade == null ? ' · 미합격' : ` · 예상 ${a.estimatedGrade}급` : ` · 추정 ${a.estimatedGrade ?? '—'}등급`}`}</strong>
                   <span className="rn-caption">{historyDate(a.startedAt)} · {a.mode === 'real' ? '실전' : '자유'}{a.elective && ` · ${a.elective}`} · 총 {formatDuration(a.totalTimeMs)}</span>
                 </button>
               </li>)}
