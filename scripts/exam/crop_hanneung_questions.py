@@ -111,7 +111,8 @@ def split_page(img, first_page, count, tpl):
         starts = [block_top(rows, y) for y, _ in markers]
         scores += [s for _, s in markers]
         for a, b in zip(starts, starts[1:] + [len(rows)]):
-            pieces.append(trim(col[a:b]))
+            # 시작 줄(점 3개 이상) 위의 글자 꼭대기·위 여백까지 포함한다. 문항 사이 여백(90px+)보다 작게.
+            pieces.append(trim(col[max(0, a - PAD):b]))
     if len(pieces) != count:
         raise SystemExit(f'expected {count} questions on this page, found {len(pieces)}')
     return pieces, min(scores)
