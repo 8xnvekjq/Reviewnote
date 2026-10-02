@@ -493,7 +493,8 @@ for (const level of ['advanced', 'basic']) {
   for (const [index, row] of seeded.entries()) {
     assert.equal(row.answer, data.questions[index].answer);
     assert.equal(Number(row.points), data.questions[index].points);
-    assert.equal(row.image_url, data.questions[index].imageUrl);
+    // 첫 한능검 시드는 원본 페이지였다. 심화는 20261003040000에서 문항별 이미지로 바뀐다(아래에서 검증).
+    assert.equal(row.image_url, `/exams/${paperId}/page-${String(data.questions[index].pageNumber).padStart(2, '0')}.png`);
     assert.equal(row.answer_type, level === 'basic' ? 'choice4' : 'choice5');
   }
   const attempt = (await as(S1, `select start_exam_attempt($1,'real',null) r`, [paperId]))[0].r;
@@ -648,4 +649,16 @@ for (const paper of activity) {
   const times = paper.students.map(row => Date.parse(row.submittedAt ?? row.startedAt));
   assert.deepEqual(times, [...times].sort((a, b) => b - a), 'most recent first');
 }
+// 한능검 심화는 문항별 이미지로 바뀌고(한 이미지에 한 문항), 기본은 페이지 통째 그대로.
+await db.exec(fs.readFileSync(path.join(root, 'supabase/migrations/20261003040000_exam_hanneung_advanced_cropped.sql'), 'utf8'));
+const advancedImages = (await db.query(`select number, image_url from exam_questions where paper_id = '2026-hanneung-79-advanced' order by number`)).rows;
+assert.equal(advancedImages.length, 50);
+assert.equal(new Set(advancedImages.map(row => row.image_url)).size, 50, 'one image per question');
+assert.equal(advancedImages[0].image_url, '/exams/2026-hanneung-79-advanced/q-01.jpg');
+assert.equal(advancedImages[49].image_url, '/exams/2026-hanneung-79-advanced/q-50.jpg');
+for (const row of advancedImages) assert.ok(fs.existsSync(path.join(root, 'public', row.image_url)), row.image_url);
+const basicImages = (await db.query(`select count(distinct image_url)::int n from exam_questions where paper_id = '2026-hanneung-79-basic'`)).rows[0].n;
+assert.equal(basicImages, 12, 'basic keeps whole pages');
+const advancedJson = JSON.parse(fs.readFileSync(path.join(root, 'src/features/exam/data/2026-hanneung-79-advanced.json'), 'utf8'));
+assert.deepEqual(advancedJson.questions.map(q => q.imageUrl), advancedImages.map(row => row.image_url), 'data JSON matches the migration');
 });

@@ -5,7 +5,7 @@ import { ExamInkReplay } from '../ink/ExamInkReplay';
 import { useExamInk } from './useExamInk';
 import { ExamAnswer } from './ExamAnswer';
 import { resultGradeLabel } from './hanneungLogic';
-import { displayAnswer, ELECTIVE_SHORT, estimateStandardScore, formatClock, formatDuration, mistakeCandidates, praiseLine, roundLabel } from './examLogic';
+import { displayAnswer, ELECTIVE_SHORT, estimateStandardScore, formatClock, formatDuration, mistakeCandidates, praiseLine, roundLabel, usesWholePages } from './examLogic';
 
 type Props = {
   result: ExamResult;
@@ -71,6 +71,7 @@ function ReviewResult({ client, result, onBack, backLabel, studentName }: {
 function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar, studentName }: BodyProps) {
   const [result, setResult] = useState(initial);
   const reviewing = studentName != null;
+  const wholePages = usesWholePages(initial.items);
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
   const [adding, setAdding] = useState(false);
   const [addMessage, setAddMessage] = useState<string | null>(null);
@@ -268,17 +269,17 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar
               <p className="rn-caption">전국 선택 비율: {viewing.nationalChoiceRates.map((rate, i) => `${displayAnswer(String(i + 1), true)} ${rate}%`).join(' · ')}</p>
             )}
             <div className="exam-viewer-paper">
-              {result.kind === 'hanneung' && <button type="button" className="rn-button rn-button-compact" aria-pressed={pageZoom} onClick={() => setPageZoom(prev => !prev)}>{pageZoom ? '화면에 맞추기' : '원본 확대'}</button>}
-              <div className={result.kind === 'hanneung' ? 'exam-original-scroll' : undefined}>
-              <div style={result.kind === 'hanneung' && pageZoom ? { minWidth: 1100 } : undefined}>
+              {wholePages && <button type="button" className="rn-button rn-button-compact" aria-pressed={pageZoom} onClick={() => setPageZoom(prev => !prev)}>{pageZoom ? '화면에 맞추기' : '원본 확대'}</button>}
+              <div className={wholePages ? 'exam-original-scroll' : undefined}>
+              <div style={wholePages && pageZoom ? { minWidth: 1100 } : undefined}>
               <ExamInkReplay
                 key={viewing.questionId}
                 client={client}
                 attemptId={result.attemptId}
-                questionId={result.kind === 'hanneung' ? result.items.find(item => item.imageUrl === viewing.imageUrl)!.questionId : viewing.questionId}
+                questionId={wholePages ? result.items.find(item => item.imageUrl === viewing.imageUrl)!.questionId : viewing.questionId}
                 imageUrl={viewing.imageUrl}
-                strokes={ink.get(result.kind === 'hanneung' ? result.items.find(item => item.imageUrl === viewing.imageUrl)!.questionId : viewing.questionId) ?? []}
-                imageMaxWidth={result.kind === 'hanneung' ? (pageZoom ? 1100 : 980) : 480}
+                strokes={ink.get(wholePages ? result.items.find(item => item.imageUrl === viewing.imageUrl)!.questionId : viewing.questionId) ?? []}
+                imageMaxWidth={wholePages ? (pageZoom ? 1100 : 980) : 480}
               />
               </div>
               </div>

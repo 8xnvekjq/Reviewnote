@@ -736,19 +736,31 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
     await page.getByTestId('exam-solve').waitFor();
     assert.match(await page.getByTestId('exam-counter').innerText(), /1\s*\/\s*50/);
     assert.equal(await page.locator('.exam-choice').count(), level === 'basic' ? 4 : 5);
-    assert.match(await page.locator('.exam-page-nav').innerText(), /원본 1 \/ 12쪽/);
+    const bodyImage = () => page.locator('[data-testid="exam-body"] .exam-ink img').first().getAttribute('src');
+    if (level === 'basic') {
+      // 기본: 원본 페이지 통째(페이지 이동·확대).
+      assert.match(await page.locator('.exam-page-nav').innerText(), /원본 1 \/ 12쪽/);
+    } else {
+      // 심화: 수능처럼 한 화면에 한 문항(문항별로 자른 이미지), 원본 페이지 이동·확대 없음.
+      assert.equal(await page.locator('.exam-page-nav').count(), 0);
+      assert.match(await bodyImage(), /2026-hanneung-79-advanced\/q-01\.jpg$/);
+      await page.screenshot({ path: `${out}/hanneung-advanced-q1-${viewport.width}.png` });
+    }
     await page.locator('.exam-choice[data-choice="1"]').click();
     if (level === 'basic') {
       await page.keyboard.press('5');
       assert.equal(await page.locator('.exam-choice.is-selected').getAttribute('data-choice'), '1');
+      await page.getByRole('button', { name: '원본 확대', exact: true }).click();
+      await noHorizontalOverflow(page, `hanneung-zoom/${viewport.width}`);
+      await page.getByRole('button', { name: '화면에 맞추기', exact: true }).click();
     }
-    await page.getByRole('button', { name: '원본 확대', exact: true }).click();
-    await noHorizontalOverflow(page, `hanneung-zoom/${viewport.width}`);
-    await page.getByRole('button', { name: '화면에 맞추기', exact: true }).click();
     await page.getByRole('button', { name: '다음 문항', exact: true }).click();
-    assert.match(await page.locator('.exam-page-nav').innerText(), /원본 1 \/ 12쪽/);
+    if (level === 'basic') assert.match(await page.locator('.exam-page-nav').innerText(), /원본 1 \/ 12쪽/);
+    else assert.match(await bodyImage(), /q-02\.jpg$/);
+    await noHorizontalOverflow(page, `hanneung-question/${level}/${viewport.width}`);
     await goToByOverview(page, 50);
-    assert.match(await page.locator('.exam-page-nav').innerText(), /원본 12 \/ 12쪽/);
+    if (level === 'basic') assert.match(await page.locator('.exam-page-nav').innerText(), /원본 12 \/ 12쪽/);
+    else assert.match(await bodyImage(), /q-50\.jpg$/);
     await page.getByRole('button', { name: '나가기', exact: true }).click();
     await page.getByTestId('exam-exit-confirm').click();
     await page.getByTestId('exam-start').waitFor();

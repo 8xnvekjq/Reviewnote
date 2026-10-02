@@ -3,7 +3,12 @@
 - 출처: 국사편찬위원회 한국사능력검정시험 공식 자료실. 시행일 2026-08-09.
 - 심화 50문항·100점·80분, 기본 50문항·100점·70분. 사전 안내 시간 제외.
 - 심화 80/70/60점 이상은 예상 1/2/3급, 기본은 예상 4/5/6급. 공식 인증이 아닌 연습 결과.
-- 문제 PDF는 자르거나 내용을 바꾸지 않고 전체 12페이지씩 3배 해상도로 렌더링한다. 정답 PDF는 공개 자산에 넣지 않는다.
+- 기본: 문제 PDF를 자르지 않고 전체 12페이지씩 3배 해상도로 렌더링한다(원본 페이지 이동·확대).
+- 심화: 선생님 결정(2026-10-03)으로 수능처럼 한 화면에 한 문항 — `python scripts/exam/crop_hanneung_questions.py <문제 PDF> 2026-hanneung-79-advanced`
+  가 "[N점]" 표시로 문항 시작을 찾아 `q-NN.jpg`(3배, JPEG 85)로 자르고 데이터 JSON의 imageUrl을 바꾼다. DB는 `20261003040000_exam_hanneung_advanced_cropped.sql`.
+  원본은 공공누리 4유형(변경 금지) 자료라, 문항을 잘라 쓰는 것은 선생님이 판단·결정한 사항이다.
+- 화면은 시험지 종류가 아니라 "여러 문항이 한 이미지를 같이 쓰는지"(usesWholePages)로 페이지 모드를 정한다.
+- 정답 PDF는 공개 자산에 넣지 않는다.
 - 원본은 메인 체크아웃의 `reference/hanneung/2026-79/`에 보관하며 git에 추가하지 않는다.
 - 생성: `python scripts/exam/import_hanneung.py <원본 폴더 절대경로>` → `python scripts/exam/build_hanneung_migration.py`.
 - JSON의 정답은 SQL 생성·테스트에만 사용한다. 운영 프런트엔드에서 import하지 않는다.
