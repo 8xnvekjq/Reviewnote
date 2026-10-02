@@ -12,7 +12,8 @@ import fitz
 from PIL import Image, ImageChops
 
 ROOT = Path(__file__).resolve().parents[2]
-START = re.compile(r'^(?:(\d+)\s+)?(\d+)\.')
+# 번호 앞에 "[서답형1]" 같은 꼬리표 줄이 붙는 학교가 있다(둔촌고).
+START = re.compile(r'^(?:\s*\[[^\]\n]{1,12}\]\s*)?(?:(\d+)\s+)?(\d+)\.')
 PUA_DIGITS = str.maketrans({chr(0xe034 + i): str(i + 1) for i in range(9)} | {chr(0xe03d): '0'})
 
 
@@ -392,6 +393,10 @@ def make_data(doc, config, starts):
                 raise ValueError(f'Question {number}: choice10 needs ten choices and reasons')
             if spec['choices'][int(answer) - 1] != spec.get('originalAnswer'):
                 raise ValueError(f'Question {number}: selected choice disagrees with originalAnswer')
+            # KaTeX는 쉼표에서 줄을 바꾸지 않는다 — 좌표 여러 개짜리 선지는 칸 밖으로 잘린다(둔촌고 22번).
+            long = [i + 1 for i, choice in enumerate(spec['choices']) if choice.count('),') >= 2 and r'\allowbreak' not in choice]
+            if long:
+                warnings.append(f'Question {number}: choices {long} list several points without \\allowbreak after "),"; they may be clipped')
         auto_points = points.get((original, spec['sourcePart']) if spec.get('sourcePart') else original)
         if auto_points is not None and spec.get('points') is not None and abs(auto_points - spec['points']) > 1e-6:
             raise ValueError(f'Question {number}: PDF/config points mismatch')
