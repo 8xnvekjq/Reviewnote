@@ -622,4 +622,30 @@ assert.equal((await as(S1, `select get_exam_ink_replay($1,$2) r`, [replayAttempt
 await as(S1, `select submit_exam_attempt($1,'[]',null)`, [replayAttempt.id]);
 assert.equal((await as(S1, replaySql, args))[0].r, 1, 'a lost acknowledgement can be recovered after submission');
 await fails(S1, replaySql, [replayAttempt.id, rq, ink, 2, JSON.stringify([events[0]]), '11111111-0000-0000-0000-000000000003'], /EXAM_INK_SUBMITTED/);
+// Exam practice panel (admin): latest attempt per student for each paper, submitted results first.
+await db.exec(`create table public.profiles (id uuid primary key, email text, display_name text, nickname text);
+insert into public.profiles values ('${S1}', 's1@x.com', '학생일', null), ('${S2}', 's2@x.com', '', '둘이');`);
+await db.exec(fs.readFileSync(path.join(root, 'supabase/migrations/20261003030000_exam_admin_paper_activity.sql'), 'utf8'));
+assert.equal((await as(S1, `select admin_list_exam_paper_activity() r`))[0].r, null, 'students get nothing');
+await fails(null, `select admin_list_exam_paper_activity()`, [], /permission denied/);
+const adminAttemptForActivity = (await as(AD, `select start_exam_attempt('2026-hanneung-79-basic','free',null) r`))[0].r;
+const activity = (await as(AD, `select admin_list_exam_paper_activity() r`))[0].r;
+const hanneungActivity = activity.find(row => row.paperId === '2026-hanneung-79-basic');
+assert.ok(hanneungActivity, 'paper with attempts is listed');
+assert.ok(hanneungActivity.students.every(row => row.studentId !== AD), 'admin attempts are excluded');
+assert.ok(!JSON.stringify(activity).includes(adminAttemptForActivity.id));
+const s1Row = hanneungActivity.students.find(row => row.studentId === S1);
+assert.equal(s1Row.studentName, '학생일');
+assert.equal(s1Row.status, 'submitted', 'a submitted attempt wins over a newer in-progress one');
+assert.equal(typeof s1Row.score, 'number');
+const s1Attempts = (await db.query(`select count(*)::int n from exam_attempts where student_id = $1 and paper_id = '2026-hanneung-79-basic'`, [S1])).rows[0].n;
+assert.equal(s1Row.attemptCount, s1Attempts);
+const latestSubmitted = (await db.query(`select id from exam_attempts where student_id = $1 and paper_id = '2026-hanneung-79-basic' and status = 'submitted' order by submitted_at desc, id desc limit 1`, [S1])).rows[0].id;
+assert.equal(s1Row.attemptId, latestSubmitted);
+for (const paper of activity) {
+  const ids = paper.students.map(row => row.studentId);
+  assert.equal(new Set(ids).size, ids.length, 'one row per student');
+  const times = paper.students.map(row => Date.parse(row.submittedAt ?? row.startedAt));
+  assert.deepEqual(times, [...times].sort((a, b) => b - a), 'most recent first');
+}
 });

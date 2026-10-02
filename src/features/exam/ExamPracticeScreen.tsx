@@ -1,7 +1,7 @@
 // 기출문제 풀이 — 시작(시험지 카드) → 전체화면 풀이(전체 문제 보기·OMR 검토 포함) → OMR 결과.
 // 서버 함수는 props 의 client(ExamClient)로만 부른다(실서비스는 examClient.ts, 테스트는 ui/mockExamClient.ts).
 import { useState } from 'react';
-import type { ExamAttempt, ExamClient, ExamElective, ExamMode, ExamPaperSummary, ExamResult } from './contract';
+import type { ExamAttempt, ExamClient, ExamElective, ExamMode, ExamPaperSummary, ExamResult, AdminExamApi } from './contract';
 import { ExamStartView } from './ui/ExamStartView';
 import { ExamSolveView } from './ui/ExamSolveView';
 import { OmrResultView } from './ui/OmrResultView';
@@ -36,7 +36,11 @@ function leaveFullscreen() {
   } catch { /* 무시 */ }
 }
 
-export function ExamPracticeScreen({ client, currentUserId, onExit }: { client: ExamClient; currentUserId: string; onExit: () => void }) {
+export function ExamPracticeScreen({ client, currentUserId, onExit, admin }: {
+  client: ExamClient; currentUserId: string; onExit: () => void;
+  /** 관리자 기능(시험지별 학생 응시 현황·학생 풀이 검토). 서버가 관리자가 아니면 빈 결과를 준다. */
+  admin?: AdminExamApi;
+}) {
   const [phase, setPhase] = useState<Phase>({ kind: 'start' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -108,6 +112,7 @@ export function ExamPracticeScreen({ client, currentUserId, onExit }: { client: 
           key={startKey}
           client={client}
           currentUserId={currentUserId}
+          admin={admin}
           busy={busy}
           error={error}
           onStart={(paper, mode, elective) => { void start(paper, mode, elective); }}

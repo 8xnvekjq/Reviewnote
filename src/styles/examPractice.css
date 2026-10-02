@@ -14,7 +14,7 @@
 .exam-admin-detail { display: grid; gap: 12px; min-width: 0; }
 .exam-admin-detail select { background: var(--rn-surface, #0f172a); color: inherit; border: 1px solid var(--rn-line, #334155); border-radius: 8px; padding: 6px; }
 .exam-admin-answer { font-size: 13px; }
-.exam-admin-paper { background: white; border-radius: 10px; overflow: hidden; }
+.exam-admin-paper { min-width: 0; background: white; border-radius: 10px; overflow: hidden; }
 .exam-replay-controls { display: grid; gap: 10px; padding: 12px; background: var(--rn-surface, #0f172a); color: var(--rn-text, #e2e8f0); font-size: 13px; }
 .exam-replay-buttons { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .exam-replay-buttons > strong { margin-right: auto; }
@@ -308,3 +308,31 @@
 .exam-viewer-paper { margin-top: 10px; background: #fff; border-radius: 10px; overflow: hidden; }
 
 @media (prefers-reduced-motion: reduce) { .exam-wheel-track, .exam-choice { transition: none; } }
+
+/* 관리자: 전체 화면 학생 풀이 검토 */
+.exam-admin-review { position: fixed; inset: 0; z-index: 2040; display: flex; flex-direction: column; background: var(--rn-bg, #020617); color: var(--rn-text, #e2e8f0); }
+.exam-admin-review-bar { display: flex; align-items: center; gap: 12px; padding: calc(env(safe-area-inset-top) + 12px) 16px 10px; border-bottom: 1px solid var(--rn-line, #334155); background: var(--rn-surface, #0f172a); }
+.exam-admin-review-title { display: grid; min-width: 0; flex: 1; gap: 2px; }
+.exam-admin-review-title strong { font-size: 16px; overflow-wrap: anywhere; }
+.exam-admin-review-title span { font-size: 12px; color: var(--rn-text-muted, #94a3b8); overflow-wrap: anywhere; }
+.exam-admin-review-badge { flex: none; font-size: 11px; font-weight: 700; color: #784a00; background: #fff1cc; padding: 4px 8px; border-radius: 999px; }
+.exam-admin-review-body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px 16px calc(env(safe-area-inset-bottom) + 24px); }
+.exam-admin-review-body > .exam-admin-detail, .exam-admin-review-body > p { max-width: 860px; margin-inline: auto; }
+.exam-admin-qnav { display: flex; flex-wrap: wrap; gap: 6px; }
+.exam-admin-qchip { min-width: 40px; min-height: 36px; padding: 4px 8px; border: 1px solid var(--rn-line, #334155); border-radius: 8px; background: transparent; color: var(--rn-text-muted, #94a3b8); font-size: 13px; }
+.exam-admin-qchip.is-answered { color: var(--rn-text, #e2e8f0); background: var(--rn-surface, #0f172a); }
+.exam-admin-qchip.is-on { border-color: #60a5fa; color: #fff; background: #1d4ed8; }
+
+/* 관리자: 기출문제 풀이 패널 — 시험지별 학생 응시 현황 */
+.exam-admin-activity { display: grid; gap: 6px; min-width: 0; font-size: 12px; }
+.exam-admin-activity.is-empty { margin: 0; color: var(--rn-text-muted, #94a3b8); text-align: center; }
+.exam-admin-activity-latest { display: grid; gap: 2px; width: 100%; padding: 8px 10px; text-align: left; border: 1px solid var(--rn-line, #334155); border-radius: 10px; background: var(--rn-surface, #0f172a); color: inherit; }
+.exam-admin-activity-latest strong { font-size: 13px; overflow-wrap: anywhere; }
+.exam-admin-activity-latest span { overflow-wrap: anywhere; }
+.exam-admin-activity-label { font-size: 11px; color: var(--rn-text-muted, #94a3b8); }
+.exam-admin-activity-more summary { cursor: pointer; padding: 4px 2px; color: #93c5fd; }
+.exam-admin-activity-more ul { display: grid; gap: 4px; list-style: none; margin: 4px 0 0; padding: 0; }
+.exam-admin-activity-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; width: 100%; padding: 6px 8px; text-align: left; border: 1px solid var(--rn-line, #334155); border-radius: 8px; background: transparent; color: inherit; }
+.exam-admin-activity-name { min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
+.exam-admin-activity-score { font-weight: 700; white-space: nowrap; }
+.exam-admin-activity-meta { grid-column: 1 / -1; color: var(--rn-text-muted, #94a3b8); font-size: 11px; }

@@ -7,7 +7,7 @@ import '../../src/styles/design-system.css';
 import { ExamPracticeScreen } from '../../src/features/exam/ExamPracticeScreen';
 import { createMockExamClient } from '../../src/features/exam/ui/mockExamClient';
 import AdminStudentExamSummary from '../../src/components/admin/AdminStudentExamSummary';
-import type { AdminExamAttemptSummary, ExamAttempt } from '../../src/features/exam/contract';
+import type { AdminExamApi, AdminExamAttemptSummary, AdminPaperStudentActivity, ExamAttempt } from '../../src/features/exam/contract';
 import { inkDelta } from '../../src/features/exam/ink/inkReplay';
 
 const params = new URLSearchParams(location.search);
@@ -24,7 +24,8 @@ const client = createMockExamClient({
 
 const adminRows: AdminExamAttemptSummary[] = [];
 const adminAttempts = new Map<string, ExamAttempt>();
-if (params.get('records') === '1') {
+const adminMode = params.get('records') === '1' || params.get('activity') === '1';
+if (adminMode) {
   const completed = await client.startAttempt('2025-06-math', 'free', '미적분');
   const strokes = [{ id: 'example', tool: 'pen' as const, color: '#2563eb', size: 4,
     points: [{ x: .15, y: .6, pressure: .5, t: 0 }, { x: .7, y: .8, pressure: .5, t: 200 }] }];
@@ -42,10 +43,15 @@ if (params.get('records') === '1') {
     score: index === 0 ? result.score : null, maxScore: 100, answeredCount: index === 0 ? 30 : 0, questionCount: 30,
   });
 }
-const adminApi = {
+// 시험지별 응시 현황(관리자): 같은 mock 응시 두 건을 두 학생의 최근 응시로 보여 준다.
+const activityRows: AdminPaperStudentActivity[] = adminRows.map((row, index) => ({
+  ...row, studentId: `s${index + 1}`, studentName: index === 0 ? '김학생' : '이학생', attemptCount: index === 0 ? 2 : 1, inProgress: index === 0,
+}));
+const adminApi: AdminExamApi = {
   listAttempts: async () => adminRows,
   getAttempt: async (id: string) => adminAttempts.get(id)!,
   getInk: client.getInk, getInkReplay: client.getInkReplay, getResult: client.getResult,
+  listPaperActivity: async () => params.get('activity') === '1' ? [{ paperId: '2025-06-math', students: activityRows }] : null,
 };
 
 createRoot(document.getElementById('root')!).render(params.get('records') === '1' ?
@@ -59,6 +65,7 @@ createRoot(document.getElementById('root')!).render(params.get('records') === '1
         <ExamPracticeScreen
           client={client}
           currentUserId={params.get('user') || 'student-1'}
+          admin={adminApi}
           onExit={() => { document.body.dataset.exited = '1'; }}
         />
       </div>

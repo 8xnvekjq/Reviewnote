@@ -243,6 +243,30 @@ export interface AdminExamAttemptSummary {
   questionCount: number;
 }
 
+/** 기출문제 풀이 패널(관리자): 시험지마다 학생별 가장 최근 응시(채점된 응시 우선). */
+export interface AdminPaperStudentActivity extends AdminExamAttemptSummary {
+  studentId: string;
+  studentName: string;
+  attemptCount: number;
+  inProgress: boolean;
+}
+export interface AdminPaperActivity {
+  paperId: string;
+  /** 가장 최근 응시가 맨 앞. */
+  students: AdminPaperStudentActivity[];
+}
+
+/** 관리자 읽기 전용 검토에 필요한 서버 호출 묶음. */
+export interface AdminExamApi {
+  listAttempts(studentId: string, offset?: number): Promise<AdminExamAttemptSummary[]>;
+  getAttempt(attemptId: string): Promise<ExamAttempt>;
+  getInk(attemptId: string): Promise<ExamInkDocument[]>;
+  getInkReplay(attemptId: string, questionId: string): Promise<InkReplayData>;
+  getResult(attemptId: string): Promise<ExamResult>;
+  /** 관리자가 아니면 null. */
+  listPaperActivity(): Promise<AdminPaperActivity[] | null>;
+}
+
 export interface ExamInkCanvasProps {
   /** 문항 이미지 위에 겹쳐 그린다. 컨테이너 크기에 맞춰 이미지와 같은 영역을 덮는다. */
   imageUrl: string;

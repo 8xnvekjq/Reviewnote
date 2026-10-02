@@ -1,5 +1,5 @@
 import { supabase } from '../../services/supabase';
-import type { AdminExamAttemptSummary, ExamClient, ExamInkDocument, InkReplayData } from './contract';
+import type { AdminExamApi, AdminExamAttemptSummary, AdminPaperActivity, ExamClient, ExamInkDocument, InkReplayData } from './contract';
 import {
   ExamClientError,
   mapAddedMistakes,
@@ -132,4 +132,15 @@ export const adminExamClient = {
   async getAttempt(attemptId: string) {
     return mapExamAttempt(await callRpc('admin_get_exam_attempt', { p_attempt_id: attemptId }));
   },
+  async listPaperActivity(): Promise<AdminPaperActivity[] | null> {
+    return await callRpc('admin_list_exam_paper_activity', {}) as AdminPaperActivity[] | null;
+  },
+};
+
+/** 관리자 읽기 전용 검토(학생 결과·필기·필기 재생). 서버 함수가 관리자만 허용한다. */
+export const adminExamApi: AdminExamApi = {
+  ...adminExamClient,
+  getInk: (attemptId: string) => examClient.getInk(attemptId),
+  getInkReplay: (attemptId: string, questionId: string) => examClient.getInkReplay(attemptId, questionId),
+  getResult: (attemptId: string) => examClient.getResult(attemptId),
 };
