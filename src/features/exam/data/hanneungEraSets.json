@@ -1,0 +1,1872 @@
+[
+  {
+    "id": "hanneung-era-prehistory-32b4e9281717",
+    "era": "prehistory",
+    "title": "선사·초기 국가 모아 풀기",
+    "members": [
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 1,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-01.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 2,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-02.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 1,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-01.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 2,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-02.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 1,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-01.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 2,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-02.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 1,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-01.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 2,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-02.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 3,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-03.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 1,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-01.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 2,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-02.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 3,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-03.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 1,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-01.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 2,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-02.jpg"
+      }
+    ]
+  },
+  {
+    "id": "hanneung-era-three-kingdoms-b848df210086",
+    "era": "three-kingdoms",
+    "title": "삼국·가야 모아 풀기",
+    "members": [
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 3,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-03.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 4,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-04.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 5,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-05.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 3,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-03.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 4,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-04.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 5,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-05.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 7,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-07.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 9,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-09.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 3,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-03.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 4,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-04.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 4,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-04.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 5,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-05.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 6,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-06.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 8,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-08.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 4,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-04.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 5,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-05.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 6,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-06.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 7,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-07.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 3,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-03.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 4,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-04.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 6,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-06.jpg"
+      }
+    ]
+  },
+  {
+    "id": "hanneung-era-north-south-9232b10c1bac",
+    "era": "north-south",
+    "title": "남북국 모아 풀기",
+    "members": [
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 6,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-06.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 7,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-07.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 8,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-08.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 9,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-09.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 10,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-10.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 6,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-06.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 8,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-08.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 10,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-10.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 5,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-05.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 6,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-06.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 7,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-07.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 8,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-08.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 9,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-09.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 10,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-10.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 7,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-07.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 9,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-09.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 10,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-10.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 8,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-08.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 9,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-09.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 10,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-10.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 5,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-05.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 7,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-07.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 8,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-08.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 9,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-09.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 10,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-10.jpg"
+      }
+    ]
+  },
+  {
+    "id": "hanneung-era-goryeo-8f9e8092aad9",
+    "era": "goryeo",
+    "title": "고려 모아 풀기",
+    "members": [
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 11,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-11.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 12,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-12.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 13,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-13.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 14,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-14.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 15,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-15.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 16,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-16.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 17,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-17.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 18,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-18.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 11,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-11.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 12,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-12.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 13,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-13.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 14,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-14.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 15,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-15.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 16,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-16.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 17,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-17.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 18,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-18.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 11,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-11.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 12,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-12.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 13,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-13.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 14,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-14.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 15,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-15.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 16,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-16.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 17,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-17.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 18,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-18.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 11,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-11.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 13,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-13.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 14,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-14.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 15,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-15.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 16,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-16.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 17,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-17.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 18,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-18.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 11,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-11.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 12,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-12.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 13,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-13.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 14,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-14.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 15,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-15.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 16,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-16.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 17,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-17.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 18,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-18.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 11,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-11.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 12,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-12.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 13,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-13.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 14,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-14.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 15,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-15.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 16,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-16.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 17,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-17.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 18,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-18.jpg"
+      }
+    ]
+  },
+  {
+    "id": "hanneung-era-joseon-early-af779d7deace",
+    "era": "joseon-early",
+    "title": "조선 전기 모아 풀기",
+    "members": [
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 19,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-19.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 20,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-20.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 21,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-21.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 23,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-23.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 19,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-19.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 20,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-20.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 21,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-21.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 22,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-22.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 23,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-23.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 19,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-19.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 20,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-20.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 21,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-21.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 22,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-22.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 19,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-19.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 20,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-20.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 21,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-21.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 22,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-22.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 19,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-19.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 20,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-20.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 21,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-21.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 22,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-22.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 19,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-19.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 20,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-20.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 22,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-22.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 24,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-24.jpg"
+      }
+    ]
+  },
+  {
+    "id": "hanneung-era-joseon-late-325575954f50",
+    "era": "joseon-late",
+    "title": "조선 후기 모아 풀기",
+    "members": [
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 22,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-22.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 24,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-24.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 25,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-25.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 26,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-26.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 27,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-27.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 24,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-24.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 25,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-25.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 26,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-26.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 27,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-27.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 23,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-23.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 24,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-24.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 25,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-25.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 26,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-26.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 27,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-27.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 23,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-23.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 24,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-24.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 25,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-25.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 26,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-26.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 28,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-28.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 23,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-23.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 24,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-24.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 25,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-25.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 26,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-26.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 27,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-27.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 21,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-21.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 23,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-23.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 25,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-25.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 26,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-26.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 27,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-27.jpg"
+      }
+    ]
+  },
+  {
+    "id": "hanneung-era-opening-a2abe1fc4183",
+    "era": "opening",
+    "title": "개항기·대한제국 모아 풀기",
+    "members": [
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 28,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-28.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 29,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-29.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 30,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-30.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 31,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-31.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 32,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-32.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 34,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-34.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 35,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-35.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 28,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-28.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 29,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-29.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 30,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-30.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 31,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-31.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 32,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-32.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 33,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-33.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 28,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-28.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 29,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-29.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 30,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-30.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 31,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-31.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 32,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-32.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 33,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-33.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 34,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-34.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 35,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-35.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 29,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-29.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 30,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-30.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 31,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-31.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 33,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-33.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 35,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-35.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 28,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-28.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 29,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-29.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 30,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-30.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 31,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-31.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 32,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-32.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 33,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-33.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 34,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-34.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 28,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-28.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 29,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-29.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 30,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-30.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 31,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-31.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 32,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-32.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 33,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-33.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 34,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-34.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 35,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-35.jpg"
+      }
+    ]
+  },
+  {
+    "id": "hanneung-era-colonial-402c2cff5418",
+    "era": "colonial",
+    "title": "일제 강점기 모아 풀기",
+    "members": [
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 33,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-33.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 36,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-36.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 37,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-37.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 38,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-38.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 39,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-39.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 40,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-40.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 41,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-41.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 42,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-42.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 43,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-43.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 34,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-34.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 35,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-35.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 36,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-36.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 37,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-37.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 39,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-39.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 40,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-40.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 41,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-41.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 42,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-42.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 43,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-43.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 44,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-44.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 36,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-36.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 37,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-37.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 38,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-38.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 39,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-39.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 40,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-40.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 41,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-41.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 42,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-42.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 43,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-43.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 32,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-32.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 34,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-34.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 36,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-36.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 37,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-37.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 38,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-38.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 39,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-39.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 40,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-40.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 41,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-41.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 42,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-42.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 43,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-43.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 44,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-44.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 35,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-35.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 36,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-36.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 37,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-37.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 38,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-38.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 39,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-39.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 40,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-40.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 41,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-41.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 42,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-42.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 43,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-43.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 36,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-36.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 37,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-37.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 38,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-38.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 39,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-39.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 40,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-40.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 41,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-41.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 42,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-42.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 43,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-43.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 44,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-44.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 46,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-46.jpg"
+      }
+    ]
+  },
+  {
+    "id": "hanneung-era-modern-2b5b12af802c",
+    "era": "modern",
+    "title": "현대 모아 풀기",
+    "members": [
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 44,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-44.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 45,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-45.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 46,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-46.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 47,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-47.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 48,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-48.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 49,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-49.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 45,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-45.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 46,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-46.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 47,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-47.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 48,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-48.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 49,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-49.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 44,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-44.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 45,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-45.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 47,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-47.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 48,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-48.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 49,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-49.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 45,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-45.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 46,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-46.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 47,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-47.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 48,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-48.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 49,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-49.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 44,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-44.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 45,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-45.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 46,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-46.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 47,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-47.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 48,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-48.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 49,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-49.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 45,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-45.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 47,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-47.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 48,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-48.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 49,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-49.jpg"
+      }
+    ]
+  },
+  {
+    "id": "hanneung-era-cross-633402719aae",
+    "era": "cross",
+    "title": "시대 통합 모아 풀기",
+    "members": [
+      {
+        "sourcePaperId": "2025-hanneung-74-advanced",
+        "sourceNumber": 50,
+        "sourceRound": 74,
+        "imageUrl": "/exams/2025-hanneung-74-advanced/q-50.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 38,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-38.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-75-advanced",
+        "sourceNumber": 50,
+        "sourceRound": 75,
+        "imageUrl": "/exams/2025-hanneung-75-advanced/q-50.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 46,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-46.jpg"
+      },
+      {
+        "sourcePaperId": "2025-hanneung-76-advanced",
+        "sourceNumber": 50,
+        "sourceRound": 76,
+        "imageUrl": "/exams/2025-hanneung-76-advanced/q-50.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 12,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-12.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 27,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-27.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-77-advanced",
+        "sourceNumber": 50,
+        "sourceRound": 77,
+        "imageUrl": "/exams/2026-hanneung-77-advanced/q-50.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-78-advanced",
+        "sourceNumber": 50,
+        "sourceRound": 78,
+        "imageUrl": "/exams/2026-hanneung-78-advanced/q-50.jpg"
+      },
+      {
+        "sourcePaperId": "2026-hanneung-79-advanced",
+        "sourceNumber": 50,
+        "sourceRound": 79,
+        "imageUrl": "/exams/2026-hanneung-79-advanced/q-50.jpg"
+      }
+    ]
+  }
+]

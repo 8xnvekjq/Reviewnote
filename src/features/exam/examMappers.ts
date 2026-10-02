@@ -4,6 +4,8 @@
 // (private.exam_normalize_answer / private.exam_estimate_grade)과 같은 규칙을 클라이언트에서
 // 미리 보여 주거나 입력을 다듬는 용도.
 
+import { HANNEUNG_ERAS } from './ui/hanneungEra.ts';
+
 import type {
   ExamAttempt,
   ExamAnswerType,
@@ -71,6 +73,7 @@ function mapMetadata(r: Row): ExamPaperMetadata {
   if (r.kind == null) return {};
   return {
     kind: r.kind === 'school' ? 'school' : r.kind === 'hanneung' ? 'hanneung' : 'csat',
+    practiceEra: HANNEUNG_ERAS.find(era => era.id === r.practiceEra)?.id ?? null,
     hanneungLevel: r.hanneungLevel === 'advanced' || r.hanneungLevel === 'basic' ? r.hanneungLevel : null,
     schoolName: asNullableString(r.schoolName), year: asNullableNumber(r.year),
     grade: asNullableNumber(r.grade), semester: asNullableNumber(r.semester),
@@ -81,8 +84,10 @@ function mapMetadata(r: Row): ExamPaperMetadata {
 }
 
 function mapAnswerMetadata(r: Row): ExamAnswerMetadata {
-  if (r.answerType == null) return {};
+  const source = r.sourcePaperId == null ? {} : { sourcePaperId: asString(r.sourcePaperId), sourceNumber: asNullableNumber(r.sourceNumber), sourceRound: asNullableNumber(r.sourceRound) };
+  if (r.answerType == null) return source;
   return {
+    ...source,
     answerType: r.answerType === 'choice10' ? 'choice10' : r.answerType === 'digits' ? 'digits' : r.answerType === 'choice4' ? 'choice4' : 'choice5',
     choices: Array.isArray(r.choices) ? r.choices.filter((c): c is string => typeof c === 'string') : null,
   };

@@ -15,6 +15,8 @@ export type ExamAnswerType = 'choice4' | 'choice5' | 'digits' | 'choice10';
 /** 선택 필드는 기존 운영 RPC 응답과의 호환용. 새 RPC는 모두 제공한다. */
 export interface ExamPaperMetadata {
   kind?: ExamPaperKind;
+  /** 시대 묶음: 기존 한능검 paper 기반 RPC를 재사용한다. */
+  practiceEra?: import('./ui/hanneungEra').HanneungEra | null;
   hanneungLevel?: 'advanced' | 'basic' | null;
   schoolName?: string | null;
   year?: number | null;
@@ -26,6 +28,9 @@ export interface ExamPaperMetadata {
   published?: boolean;
 }
 export interface ExamAnswerMetadata {
+  sourcePaperId?: string | null;
+  sourceNumber?: number | null;
+  sourceRound?: number | null;
   answerType?: ExamAnswerType;
   /** 선지만 공개. 정답 번호는 제출/채점 RPC 외에는 제공하지 않는다. */
   choices?: string[] | null;

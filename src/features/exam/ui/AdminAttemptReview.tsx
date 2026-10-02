@@ -49,7 +49,7 @@ function InProgressReview({ target, api }: { target: ReviewTarget; api: AdminExa
       </nav>
       <div className="exam-admin-actions">
         <button type="button" className="rn-button rn-button-compact" aria-label="이전 문항" disabled={index === 0} onClick={() => setIndex(n => n - 1)}>◀ 이전</button>
-        <p className="exam-admin-answer"><strong>{question.number}번</strong> · 학생 답 <strong><ExamAnswer question={question} answer={item?.answer ?? null} /></strong>
+        <p className="exam-admin-answer"><strong>{question.number}번</strong>{question.sourceRound && <> · 제{question.sourceRound}회 {question.sourceNumber}번</>} · 학생 답 <strong><ExamAnswer question={question} answer={item?.answer ?? null} /></strong>
           {' · '}{formatDuration(item?.timeSpentMs ?? 0)}{item?.unsure ? ' · 🤔 애매 표시' : ''}</p>
         <button type="button" className="rn-button rn-button-compact" aria-label="다음 문항" disabled={index === data.attempt.questions.length - 1} onClick={() => setIndex(n => n + 1)}>다음 ▶</button>
       </div>

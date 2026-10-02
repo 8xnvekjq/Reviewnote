@@ -805,4 +805,77 @@ const ypStudent = (await as(S1, `select start_exam_attempt($1,'real',null) r`, [
 assert.equal(ypStudent.grade, 2); assert.equal(ypStudent.questions.length, 21); assert.equal(ypStudent.timeLimitMinutes, 50);
 assert.ok((await as(S1,'select list_exam_papers_for_me() r'))[0].r.some(p => p.id===yeongpaId));
 await fails(S1,`select check_exam_answer($1,$2,'9')`,[ypStudent.id,ypStudent.questions[18].id],/EXAM_REAL_MODE_LOCKED/);
+// Era practice reuses all paper-scoped RPCs, with private copied keys and immutable membership.
+{
+for (const file of fs.readdirSync(path.join(root, 'supabase/migrations')).filter(f => /^2026100309000[1-5]_exam_hanneung/.test(f)).sort()) {
+  await db.exec(fs.readFileSync(path.join(root, 'supabase/migrations', file), 'utf8'));
+}
+await db.exec(fs.readFileSync(path.join(root, 'supabase/migrations/20261003100000_exam_era_schema.sql'), 'utf8'));
+const eraSeed = fs.readFileSync(path.join(root, 'supabase/migrations/20261003100001_exam_era_seed.sql'), 'utf8');
+await db.exec(eraSeed);
+assert.equal((await as(S1, 'select list_exam_papers_for_me() r'))[0].r.filter(p => p.practiceEra).length, 0, 'unpublished sources stay private');
+await db.exec(`update exam_papers set published=true where kind='hanneung' and practice_era is null`);
+await db.exec(eraSeed); await db.exec(eraSeed);
+const eraCards = (await as(S1, 'select list_exam_papers_for_me() r'))[0].r.filter(p => p.practiceEra);
+assert.equal(eraCards.length, 10);
+const manifest = JSON.parse(fs.readFileSync(path.join(root, 'src/features/exam/data/hanneungEraSets.json'), 'utf8'));
+assert.equal((await db.query(`select count(*)::int n from exam_questions q join exam_papers p on p.id=q.paper_id where p.practice_era is not null`)).rows[0].n, 300);
+for (const card of eraCards) {
+  const members = manifest.find(set => set.id === card.id).members;
+  const rows = (await db.query(`select q.number,q.source_paper_id,q.source_number,q.source_round,q.image_url,k.answer,original_key.answer original_answer from exam_questions q join exam_answer_keys k on k.question_id=q.id join exam_questions original on original.paper_id=q.source_paper_id and original.number=q.source_number and original.section='common' join exam_answer_keys original_key on original_key.question_id=original.id where q.paper_id=$1 order by q.number`, [card.id])).rows;
+  assert.equal(rows.length, members.length);
+  for (const [i, row] of rows.entries()) {
+    assert.deepEqual([row.number,row.source_paper_id,row.source_number,row.source_round,row.image_url], [i+1,members[i].sourcePaperId,members[i].sourceNumber,members[i].sourceRound,members[i].imageUrl]);
+    assert.equal(row.answer, row.original_answer);
+  }
+}
+const bundle = eraCards.find(p => p.practiceEra==='goryeo');
+await fails(S1, `select start_exam_attempt($1,'real',null)`, [bundle.id], /EXAM_INVALID_MODE/);
+const eraAttempt = (await as(S1, `select start_exam_attempt($1,'free',null) r`, [bundle.id]))[0].r;
+assert.equal(eraAttempt.practiceEra, 'goryeo'); assert.equal(eraAttempt.timeLimitMinutes, null);
+assert.ok(eraAttempt.questions.every(q => !('answer' in q) && !('correctAnswer' in q) && q.sourceRound));
+assert.equal((await as(S1, 'select * from exam_answer_keys')).length, 0);
+await fails(S1, 'select private.exam_result_payload($1)', [eraAttempt.id], /permission denied/);
+await fails(S2, 'select admin_get_exam_attempt($1)', [eraAttempt.id], /EXAM_ADMIN_REQUIRED/);
+const first = eraAttempt.questions[0];
+const eraStroke = st('era-ink');
+const eraEvent = ev('era-draw', 'draw', [{index:0,stroke:eraStroke}]);
+await as(S1, 'select save_exam_ink_delta($1,$2,0,false,$3::jsonb,$4::uuid,$5)', [eraAttempt.id,first.id,JSON.stringify([eraEvent]),bid(99),idsHash(['era-ink'])]);
+assert.equal((await as(AD,'select get_exam_ink($1) r',[eraAttempt.id]))[0].r[0].strokes[0].id,'era-ink');
+const key = (await db.query('select answer from exam_answer_keys where question_id=$1',[first.id])).rows[0].answer;
+const checkedEra = (await as(S1, `select check_exam_answer($1,$2,$3) r`, [eraAttempt.id,first.id,key]))[0].r;
+assert.equal(checkedEra.isCorrect,true);
+const eraItems = eraAttempt.questions.map(q => ({questionId:q.id,answer:q.id===first.id?'9':null,unsure:true,timeSpentMs:1000,visits:1}));
+const eraResult = (await as(S1, `select submit_exam_attempt($1,$2::jsonb,$3::int[]) r`, [eraAttempt.id,JSON.stringify(eraItems),[1]]))[0].r;
+assert.equal(eraResult.correctCount,1); assert.equal(eraResult.score,1); assert.equal(eraResult.estimatedGrade,null); assert.equal(eraResult.gradeCut,null);
+assert.equal(eraResult.items[0].answer,key,'checked answer stays locked'); assert.equal(eraResult.items[0].sourceRound,first.sourceRound);
+await fails(S2, 'select get_exam_result($1)', [eraAttempt.id], /EXAM_ATTEMPT_NOT_FOUND/);
+const addedEra = (await as(S1, `select add_exam_questions_to_mistakes($1,$2::uuid[],'https://reviewnote.test') r`, [eraAttempt.id,[eraAttempt.questions[1].id]]))[0].r;
+assert.equal(addedEra.length,1);
+assert.equal((await as(AD,'select get_exam_result($1) r',[eraAttempt.id]))[0].r.practiceEra,'goryeo');
+const nextEra = (await as(S1, `select start_exam_attempt($1,'free',null) r`, [bundle.id]))[0].r;
+const eraHistory = (await as(S1,'select list_my_paper_history($1,null) r',[bundle.id]))[0].r;
+assert.deepEqual(eraHistory.map(a => a.round),[1,2]); assert.ok(eraHistory.every(a => a.estimatedGrade==null));
+assert.equal((await as(S1,'select get_active_exam_attempt($1) r',[bundle.id]))[0].r.id,nextEra.id);
+const large = eraCards.find(p => p.questionCount>50);
+const largeAttempt = (await as(S1, `select start_exam_attempt($1,'free',null) r`, [large.id]))[0].r;
+assert.ok(largeAttempt.questions.at(-1).number>50);
+await as(S1, `select submit_exam_attempt($1,'[]',null)`, [largeAttempt.id]);
+await assert.rejects(db.query(`insert into exam_questions (paper_id,number,section,image_url,is_choice,points,answer_type) values ('2026-hanneung-79-advanced',51,'common','/bad',true,1,'choice5')`), /EXAM_INVALID_QUESTION/);
+await db.exec(eraSeed);
+assert.equal((await as(S1,'select get_active_exam_attempt($1) r',[bundle.id]))[0].r.id,nextEra.id);
+assert.equal((await as(S1,'select get_exam_result($1) r',[eraAttempt.id]))[0].r.items[0].questionId,first.id);
+assert.equal((await as(S1,'select get_exam_ink($1) r',[eraAttempt.id]))[0].r[0].strokes[0].id,'era-ink');
+// Existing paper kinds still use their original timing, points and grade rules after the new migration.
+const regressionUser = '00000000-0000-0000-0000-00000000000c';
+await db.query('insert into auth.users values ($1,$2)',[regressionUser,'era-regression']);
+for (const [paperId, elective, count, grade] of [['2025-06-math','미적분',30,1],['2026-hanneung-79-advanced',null,50,1],[yeongpaId,null,21,null]] as const) {
+  const original = (await as(regressionUser, `select start_exam_attempt($1,'real',$2) r`,[paperId,elective]))[0].r;
+  assert.equal(original.questions.length,count); assert.equal(original.practiceEra,null); assert.ok(original.timeLimitMinutes>0);
+  const keys = new Map((await db.query('select question_id,answer from exam_answer_keys')).rows.map(row => [row.question_id,row.answer]));
+  const originalItems = original.questions.map(q => ({questionId:q.id,answer:keys.get(q.id)}));
+  const graded = (await as(regressionUser, `select submit_exam_attempt($1,$2::jsonb,null) r`,[original.id,JSON.stringify(originalItems)]))[0].r;
+  assert.equal(graded.score,100); assert.equal(graded.estimatedGrade,grade);
+}
+}
 });
