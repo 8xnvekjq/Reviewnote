@@ -2,7 +2,7 @@
 // 전체 문제 보기·OMR 검토·나가기/제출 확인은 이 화면 위에 겹쳐 띄운다(전체화면을 유지한 채).
 // v2: 자유 모드에서 채점해 본 문항(checked)은 답을 잠근다 — 이어 풀기로 다시 열어도 서버 payload 의 items[].checked 로 유지.
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import type { ExamAttempt, ExamClient, ExamInkCanvasHandle, ExamItemState, ExamResult, InkStroke, InkTool } from '../contract';
+import type { ExamAttempt, ExamClient, ExamInkCanvasHandle, ExamItemState, ExamResult, InkChangeKind, InkStroke, InkTool } from '../contract';
 import { ExamInkCanvas, preloadInkImages } from '../ink/ExamInkCanvas';
 
 /** 문항 이미지 표시 너비(CSS px) — 모든 문항이 같은 원본 너비로 잘려 있어 글자 크기가 항상 같다. */
@@ -269,10 +269,10 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
     updateItem(question.id, { answer: next });
   }, [question.id, updateItem]);
 
-  const onInkChange = (next: InkStroke[]) => {
+  const onInkChange = (next: InkStroke[], kind?: InkChangeKind) => {
     if (submittedRef.current) return;
     const qid = inkKey;
-    inkSync.change(qid, next);
+    inkSync.change(qid, next, kind);
     const old = inkTimers.current.get(qid);
     if (old != null) window.clearTimeout(old);
     inkTimers.current.set(qid, window.setTimeout(() => {

@@ -1,7 +1,7 @@
 // OMR 결과: 원점수·추정 등급·추정 표준점수·추정 백분위 + 맞은 개수·총 시간(+등급컷 표 접기) / 문항별 줄 / 오답노트 후보 고르기.
 import { useMemo, useState } from 'react';
 import type { ExamClient, ExamResult, ExamResultItem } from '../contract';
-import { ExamInkCanvas } from '../ink/ExamInkCanvas';
+import { ExamInkReplay } from '../ink/ExamInkReplay';
 import { useExamInk } from './useExamInk';
 import { ExamAnswer } from './ExamAnswer';
 import { resultGradeLabel } from './hanneungLogic';
@@ -227,14 +227,13 @@ export function OmrResultView({ client, result: initial, onBack, backLabel }: Pr
               {result.kind === 'hanneung' && <button type="button" className="rn-button rn-button-compact" aria-pressed={pageZoom} onClick={() => setPageZoom(prev => !prev)}>{pageZoom ? '화면에 맞추기' : '원본 확대'}</button>}
               <div className={result.kind === 'hanneung' ? 'exam-original-scroll' : undefined}>
               <div style={result.kind === 'hanneung' && pageZoom ? { minWidth: 1100 } : undefined}>
-              <ExamInkCanvas
+              <ExamInkReplay
+                key={viewing.questionId}
+                client={client}
+                attemptId={result.attemptId}
+                questionId={result.kind === 'hanneung' ? result.items.find(item => item.imageUrl === viewing.imageUrl)!.questionId : viewing.questionId}
                 imageUrl={viewing.imageUrl}
                 strokes={ink.get(result.kind === 'hanneung' ? result.items.find(item => item.imageUrl === viewing.imageUrl)!.questionId : viewing.questionId) ?? []}
-                onChange={() => {}}
-                tool="pen"
-                color="#1f2937"
-                size={4}
-                readOnly
                 imageMaxWidth={result.kind === 'hanneung' ? (pageZoom ? 1100 : 980) : 480}
               />
               </div>

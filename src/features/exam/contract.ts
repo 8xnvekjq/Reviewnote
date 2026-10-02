@@ -161,7 +161,8 @@ export interface ExamPaperHistoryAttempt extends ExamPaperMetadata {
 /** src/features/exam/examClient.ts의 서버 경계. */
 export interface ExamClient {
   getInk(attemptId: string): Promise<ExamInkDocument[]>;
-  saveInk(attemptId: string, questionId: string, strokes: InkStroke[], revision: number, legacyImport?: boolean): Promise<number>;
+  saveInk(attemptId: string, questionId: string, strokes: InkStroke[], revision: number, legacyImport?: boolean, events?: InkReplayEvent[], batchId?: string): Promise<number>;
+  getInkReplay(attemptId: string, questionId: string): Promise<InkReplayData>;
   /** 학생은 자기 기록만. studentId 지정은 관리자에게만 허용한다. */
   listPaperHistory(paperId: string, studentId?: string): Promise<ExamPaperHistoryAttempt[]>;
   listPapers(): Promise<ExamPaperSummary[]>;
@@ -202,6 +203,28 @@ export interface ExamInkDocument {
   strokes: InkStroke[];
   revision: number;
   updatedAt?: string;
+  lastBatchId?: string | null;
+}
+
+export type InkChangeKind = 'draw' | 'erase' | 'undo' | 'redo' | 'clear' | 'restore';
+export interface InkReplayEvent {
+  id: string;
+  kind: InkChangeKind;
+  at: number;
+  added: Array<{ index: number; stroke: InkStroke }>;
+  removed: string[];
+}
+export interface InkReplayBatch {
+  id: string;
+  revision: number;
+  baseRevision: number;
+  baseline: InkStroke[] | null;
+  events: InkReplayEvent[];
+}
+export interface InkReplayData {
+  batches: InkReplayBatch[];
+  strokes: InkStroke[];
+  revision: number;
 }
 
 export interface AdminExamAttemptSummary {
@@ -224,7 +247,7 @@ export interface ExamInkCanvasProps {
   /** 문항 이미지 위에 겹쳐 그린다. 컨테이너 크기에 맞춰 이미지와 같은 영역을 덮는다. */
   imageUrl: string;
   strokes: InkStroke[];                       // 제어 컴포넌트: 문항별 획은 부모(W3)가 들고 있다
-  onChange: (next: InkStroke[]) => void;
+  onChange: (next: InkStroke[], kind?: InkChangeKind) => void;
   tool: InkTool;
   color: string;
   size: number;

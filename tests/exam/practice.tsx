@@ -8,6 +8,7 @@ import { ExamPracticeScreen } from '../../src/features/exam/ExamPracticeScreen';
 import { createMockExamClient } from '../../src/features/exam/ui/mockExamClient';
 import AdminStudentExamSummary from '../../src/components/admin/AdminStudentExamSummary';
 import type { AdminExamAttemptSummary, ExamAttempt } from '../../src/features/exam/contract';
+import { inkDelta } from '../../src/features/exam/ink/inkReplay';
 
 const params = new URLSearchParams(location.search);
 const log: Array<{ method: string; args: unknown[] }> = [];
@@ -25,8 +26,10 @@ const adminRows: AdminExamAttemptSummary[] = [];
 const adminAttempts = new Map<string, ExamAttempt>();
 if (params.get('records') === '1') {
   const completed = await client.startAttempt('2025-06-math', 'free', '미적분');
-  await client.saveInk(completed.id, completed.questions[0].id, [{ id: 'example', tool: 'pen', color: '#2563eb', size: 4,
-    points: [{ x: .15, y: .6, pressure: .5, t: 0 }, { x: .7, y: .8, pressure: .5, t: 200 }] }], 0);
+  const strokes = [{ id: 'example', tool: 'pen' as const, color: '#2563eb', size: 4,
+    points: [{ x: .15, y: .6, pressure: .5, t: 0 }, { x: .7, y: .8, pressure: .5, t: 200 }] }];
+  const events = [inkDelta([], strokes, 'draw'), inkDelta(strokes, [], 'erase'), inkDelta([], strokes, 'undo')];
+  await client.saveInk(completed.id, completed.questions[0].id, strokes, 0, false, events, crypto.randomUUID());
   const items = completed.questions.map(question => ({ questionId: question.id, answer: '1', unsure: false, visits: 1, timeSpentMs: 15000 }));
   const result = await client.submitAttempt(completed.id, items, []);
   adminAttempts.set(completed.id, { ...completed, status: 'submitted', items });
@@ -42,7 +45,7 @@ if (params.get('records') === '1') {
 const adminApi = {
   listAttempts: async () => adminRows,
   getAttempt: async (id: string) => adminAttempts.get(id)!,
-  getInk: client.getInk, getResult: client.getResult,
+  getInk: client.getInk, getInkReplay: client.getInkReplay, getResult: client.getResult,
 };
 
 createRoot(document.getElementById('root')!).render(params.get('records') === '1' ?

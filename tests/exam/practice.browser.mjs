@@ -784,8 +784,23 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   await paperCard(second, PAPER_A).click();
   await second.waitForFunction(() => document.querySelector('[data-testid="exam-body"] .exam-ink')?.getAttribute('data-stroke-count') === '1');
   assert.equal(await strokeCount(second), '1');
+  await second.getByRole('button', { name: '제출', exact: true }).click();
+  await second.getByRole('button', { name: '제출하기', exact: true }).click();
+  await second.getByTestId('exam-submit-confirm').click();
+  await second.getByTestId('exam-result').waitFor();
+  await second.locator('.exam-item-row[data-number="1"]').click();
+  await second.getByRole('button', { name: '필기 순서 보기', exact: true }).click();
+  const slider = second.getByRole('slider', { name: '필기 재생 위치' });
+  await slider.waitFor();
+  await slider.focus(); await slider.press('End');
+  await second.waitForFunction(() => document.querySelector('[data-testid="exam-viewer"] .exam-ink')?.getAttribute('data-stroke-count') === '1');
+  await slider.press('Home');
+  await second.waitForFunction(() => document.querySelector('[data-testid="exam-viewer"] .exam-ink')?.getAttribute('data-stroke-count') === '0');
+  await second.getByRole('button', { name: '재생', exact: true }).click();
+  await second.waitForFunction(() => document.querySelector('[data-testid="exam-replay-position"]')?.textContent.includes('1 / 1'));
+  await second.screenshot({ path: `${out}/student-replay.png` });
   await other.close(); await context.close();
-  console.log('ok — ink restored on a second device without IndexedDB');
+  console.log('ok — ink and server replay restored on a second device without IndexedDB');
 }
 
 // Administrator can inspect both submitted and active attempts without editing a student's work.
@@ -802,6 +817,25 @@ for (const viewport of [LANDSCAPE, { width: 390, height: 844 }]) {
   await page.locator('.exam-admin-paper .exam-ink').waitFor();
   assert.equal(await page.locator('.exam-admin-paper .exam-ink').getAttribute('data-stroke-count'), '1');
   assert.match(await page.locator('.exam-admin-answer').innerText(), /정답/);
+  await page.getByRole('button', { name: '필기 순서 보기', exact: true }).click();
+  const slider = page.getByRole('slider', { name: '필기 재생 위치' });
+  await slider.waitFor();
+  await slider.focus(); await slider.press('Home');
+  assert.equal(await page.locator('.exam-admin-paper .exam-ink').getAttribute('data-stroke-count'), '0');
+  await slider.press('ArrowRight');
+  assert.equal(await page.locator('.exam-admin-paper .exam-ink').getAttribute('data-stroke-count'), '1');
+  await slider.press('ArrowRight');
+  assert.equal(await page.locator('.exam-admin-paper .exam-ink').getAttribute('data-stroke-count'), '0');
+  await slider.press('End');
+  assert.equal(await page.locator('.exam-admin-paper .exam-ink').getAttribute('data-stroke-count'), '1');
+  await slider.press('ArrowLeft');
+  assert.equal(await page.locator('.exam-admin-paper .exam-ink').getAttribute('data-stroke-count'), '0');
+  await page.getByRole('button', { name: '다음 필기 단계', exact: true }).click();
+  assert.equal(await page.locator('.exam-admin-paper .exam-ink').getAttribute('data-stroke-count'), '1');
+  await page.getByRole('combobox', { name: '배속', exact: true }).selectOption('4');
+  await page.getByRole('button', { name: '처음', exact: true }).click();
+  await page.getByRole('button', { name: '재생', exact: true }).click();
+  await page.waitForFunction(() => document.querySelector('[data-testid="exam-replay-position"]')?.textContent.includes('3 / 3'));
   const box = await page.locator('.exam-admin-paper .exam-ink').boundingBox();
   await page.mouse.move(box.x + 30, box.y + 30); await page.mouse.down();
   await page.mouse.move(box.x + 80, box.y + 90); await page.mouse.up();
