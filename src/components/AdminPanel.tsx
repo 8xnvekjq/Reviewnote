@@ -61,10 +61,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
 
       if (profilesError) throw profilesError;
 
-      // Fetch all mistakes
+      // 통계에 쓰는 컬럼만 받는다. analysis(AI 분석 본문)를 통째로 받으면 전체 오답이 약 5.8MB인데,
+      // 여기서 쓰는 건 그 안의 pointLog·reviewLog뿐이라(약 0.1MB) JSON 경로로 두 배열만 꺼낸다.
       const { data: mistakes, error: mistakesError } = await supabase
         .from('mistakes')
-        .select('*')
+        .select('user_id, date, updated_at, reviews, is_hidden, point_log:analysis->pointLog, review_log:analysis->reviewLog')
         .order('date', { ascending: false });
 
       if (mistakesError) throw mistakesError;
@@ -203,7 +204,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
         // 날짜에 영구 귀속된 append-only 로그)를 기준으로 합산한다. "정리하기"로 O가 다른 칸에
         // 옮겨가면 그 칸의 날짜(reviewDates)가 바뀌어버려 원래 이번 주에 딴 점수가 지난 주로
         // 잘못 재배정되는 문제가 있었음 — pointLog는 정리하기가 건드리지 않으므로 항상 정확하다.
-        const pointLog: { date: string; points: number }[] = m.analysis?.pointLog || [];
+        const pointLog: { date: string; points: number }[] = m.point_log || [];
         const comboScore = pointLog.reduce((sum, entry) => {
           return sum + (isDateInCurrentWeek(entry.date) ? (entry.points || 0) : 0);
         }, 0);
@@ -223,7 +224,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
         //  관통하는 별도 시도 ID가 필요한데, 이번 범위(시도/정정 횟수 미집계)에서는 필요치 않다고
         //  판단해 허용하고 문서로만 남김.)
         // ★(보류)는 코드 전반의 관례(정리 대상·취약 판정에서 X와 동일 취급)를 따라 오답에 합산한다.
-        const reviewLog: { date: string; state: 'O' | 'X' | 'star' | ''; slot: number }[] = m.analysis?.reviewLog || [];
+        const reviewLog: { date: string; state: 'O' | 'X' | 'star' | ''; slot: number }[] = m.review_log || [];
         const latestBySlot = new Map<number, { date: string; state: 'O' | 'X' | 'star' | '' }>();
         reviewLog.forEach(entry => latestBySlot.set(entry.slot, entry)); // 배열은 항상 시간순 추가라 마지막에 덮어쓴 값이 최신
         latestBySlot.forEach(entry => {
@@ -342,27 +343,40 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
     isMountedRef.current = true;
     fetchAdminStats(true);
 
+    // 수업 중에는 학생들의 복습 체크가 연달아 들어온다. 변경마다 바로 전체를 다시 받지 않고,
+    // 마지막 변경 후 잠깐 조용해지면 한 번만 다시 받는다. 탭이 숨겨져 있으면 돌아올 때 받는다.
+    const REFETCH_DEBOUNCE_MS = 3000;
+    let refetchTimer: ReturnType<typeof setTimeout> | null = null;
+    let missedWhileHidden = false;
+    const scheduleRefetch = () => {
+      if (document.hidden) { missedWhileHidden = true; return; }
+      if (refetchTimer) clearTimeout(refetchTimer);
+      refetchTimer = setTimeout(() => { refetchTimer = null; fetchAdminStats(false); }, REFETCH_DEBOUNCE_MS);
+    };
+    const onVisibility = () => {
+      if (!document.hidden && missedWhileHidden) { missedWhileHidden = false; fetchAdminStats(false); }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
     // ⚡ Realtime 실시간 동기화: profiles 및 mistakes 테이블 변경 시 즉시 배경 갱신 (깜빡임 0건)
     const channel = supabase
       .channel('admin-dashboard-realtime')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'profiles' },
-        () => {
-          fetchAdminStats(false);
-        }
+        scheduleRefetch
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'mistakes' },
-        () => {
-          fetchAdminStats(false);
-        }
+        scheduleRefetch
       )
       .subscribe();
 
     return () => {
       isMountedRef.current = false;
+      if (refetchTimer) clearTimeout(refetchTimer);
+      document.removeEventListener('visibilitychange', onVisibility);
       supabase.removeChannel(channel);
     };
   }, []);
