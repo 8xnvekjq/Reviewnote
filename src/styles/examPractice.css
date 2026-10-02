@@ -336,3 +336,22 @@
 .exam-admin-activity-name { min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
 .exam-admin-activity-score { font-weight: 700; white-space: nowrap; }
 .exam-admin-activity-meta { grid-column: 1 / -1; color: var(--rn-text-muted, #94a3b8); font-size: 11px; }
+
+/* ── 한능검 시대별 결과 ── */
+.exam-eras { padding: 16px 18px; display: grid; gap: 6px; }
+.exam-eras h3 { font-size: var(--rn-section); font-weight: 750; }
+.exam-era-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 8px; margin-top: 4px; }
+.exam-era { display: grid; gap: 6px; align-content: start; min-width: 0; padding: 10px 12px; border-radius: 12px; background: var(--rn-elevated); border: 1px solid var(--rn-line); }
+.exam-era.is-weak { border-color: var(--rn-danger); }
+.exam-era-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.exam-era-head strong { font-size: 14px; font-weight: 800; }
+.exam-era-badge { font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 999px; color: var(--rn-danger); border: 1px solid currentColor; }
+.exam-era-nums { margin-left: auto; display: flex; gap: 8px; font-size: 12.5px; color: var(--rn-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.exam-era-bar { height: 8px; border-radius: 999px; background: var(--rn-line); overflow: hidden; }
+.exam-era-bar span { display: block; height: 100%; border-radius: inherit; background: var(--rn-success); }
+.exam-era.is-weak .exam-era-bar span { background: var(--rn-danger); }
+.exam-era-lectures { display: grid; gap: 4px; }
+.exam-era-lectures li { display: grid; gap: 0; min-width: 0; }
+.exam-era-lectures a { display: inline-flex; align-items: center; min-height: 36px; font-size: 13px; font-weight: 700; color: var(--rn-accent); overflow-wrap: anywhere; }
+.exam-era-provider { font-size: 11px; color: var(--rn-muted); }
+.exam-era-chip { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--rn-elevated); border: 1px solid var(--rn-line); color: var(--rn-muted); white-space: nowrap; }

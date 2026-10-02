@@ -28,8 +28,11 @@ const client = createMockExamClient({
 const adminRows: AdminExamAttemptSummary[] = [];
 const adminAttempts = new Map<string, ExamAttempt>();
 const adminMode = params.get('records') === '1' || params.get('activity') === '1';
+// ?recordsPaper=2026-hanneung-79-advanced: 관리자 검토 화면을 한능검 심화 응시로 띄운다(시대별 결과 확인용).
+const recordsPaper = params.get('recordsPaper') || '2025-06-math';
+const recordsMath = recordsPaper === '2025-06-math';
 if (adminMode) {
-  const completed = await client.startAttempt('2025-06-math', 'free', '미적분');
+  const completed = await client.startAttempt(recordsPaper, 'free', recordsMath ? '미적분' : null);
   const strokes = [{ id: 'example', tool: 'pen' as const, color: '#2563eb', size: 4,
     points: [{ x: .15, y: .6, pressure: .5, t: 0 }, { x: .7, y: .8, pressure: .5, t: 200 }] }];
   const events = [inkDelta([], strokes, 'draw'), inkDelta(strokes, [], 'erase'), inkDelta([], strokes, 'undo')];
@@ -38,13 +41,13 @@ if (adminMode) {
   const items = completed.questions.map(question => ({ questionId: question.id, answer: '1', unsure: false, visits: 1, timeSpentMs: 15000 }));
   const result = await client.submitAttempt(completed.id, items, []);
   adminAttempts.set(completed.id, { ...completed, status: 'submitted', items });
-  const active = await client.startAttempt('2025-06-math', 'free', '미적분');
+  const active = await client.startAttempt(recordsPaper, 'free', recordsMath ? '미적분' : null);
   adminAttempts.set(active.id, active);
   for (const [index, attempt] of [completed, active].entries()) adminRows.push({
-    attemptId: attempt.id, paperId: attempt.paperId, paperTitle: '2025학년도 6월 모의평가 수학', round: index + 1,
+    attemptId: attempt.id, paperId: attempt.paperId, paperTitle: result.paperTitle, round: index + 1,
     status: index === 0 ? 'submitted' : 'in_progress', mode: attempt.mode, elective: attempt.elective,
     startedAt: attempt.startedAt, submittedAt: index === 0 ? result.submittedAt : null,
-    score: index === 0 ? result.score : null, maxScore: 100, answeredCount: index === 0 ? 30 : 0, questionCount: 30,
+    score: index === 0 ? result.score : null, maxScore: 100, answeredCount: index === 0 ? items.length : 0, questionCount: completed.questions.length,
   });
 }
 // 시험지별 응시 현황(관리자): 같은 mock 응시 두 건을 두 학생의 최근 응시로 보여 준다.

@@ -15,6 +15,14 @@
 - 학생 공개 요청에 따라 새 시드는 `published=true`, 재적용은 `on conflict do nothing`이다.
 - 해설은 구현하지 않는다. 원본 사이트 추가 다운로드나 접수 자동화는 하지 않는다.
 
+## 시대별 결과·개념 강의 (결과 화면)
+
+- 문항 시대 태그: `src/features/exam/data/<paperId>.topics.json` — 번호·`era`(10개 시대 id)·`field`(정치/경제/사회/문화)·`keywords`·`confidence`·`note`.
+  프런트엔드에 번들되므로 정답·배점·선지에서 뽑은 키워드는 넣지 않는다. 79회 심화는 문항 이미지를 하나씩 보고 태깅했다(`low`는 note에 이유).
+- 다른 회차는 태그 파일을 만들고 `src/features/exam/data/hanneungTopics.ts` 목록에 한 줄 추가하면 결과 화면에 "시대별 결과"가 나온다(없으면 섹션 숨김).
+- 시대별 무료 강의: `src/features/exam/data/hanneungLectures.ts`(데이터만). 지금은 YouTube 「최태성 1TV」 [심화별개념8] 재생목록.
+  바꿀 때는 URL을 실제로 열어 제목·채널을 확인할 것. 집계·약한 시대(60% 미만, 없으면 최저 1개) 로직은 `ui/hanneungEra.ts`.
+
 ## 마이그레이션 영향
 
 `20261003000000_exam_hanneung.sql`은 기존 배포 파일을 수정하지 않는다.
