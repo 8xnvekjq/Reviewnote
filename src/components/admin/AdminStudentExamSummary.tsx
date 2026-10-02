@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { AdminExamAttemptSummary, ExamAttempt, ExamResult, InkStroke } from '../../features/exam/contract';
 import { adminExamClient, examClient } from '../../features/exam/examClient';
-import { ExamInkCanvas } from '../../features/exam/ink/ExamInkCanvas';
+import { ExamInkReplay } from '../../features/exam/ink/ExamInkReplay';
 import { ExamAnswer } from '../../features/exam/ui/ExamAnswer';
 import { formatDuration } from '../../features/exam/ui/examLogic';
 import '../../styles/examPractice.css';
@@ -10,6 +10,7 @@ const dateLabel = (value: string) => new Date(value).toLocaleString('ko-KR', { m
 const studentExamApi = {
   ...adminExamClient,
   getInk: examClient.getInk,
+  getInkReplay: examClient.getInkReplay,
   getResult: examClient.getResult,
 };
 type Api = typeof studentExamApi;
@@ -62,9 +63,9 @@ function AttemptDetail({ row, studentName, api, onBack }: {
       </p>
       {!data.ink.get(data.attempt.kind === 'hanneung' ? pageKey! : question.id)?.length && <p className="rn-caption">이 문항에 서버로 저장된 필기가 없어요. 예전 기기 필기는 학생이 그 기기에서 시험을 열면 옮겨져요.</p>}
       <div className="exam-admin-paper">
-        <ExamInkCanvas key={`${question.id}:${reload}`} imageUrl={question.imageUrl}
+        <ExamInkReplay key={`${question.id}:${reload}`} imageUrl={question.imageUrl}
+          client={api} attemptId={row.attemptId} questionId={data.attempt.kind === 'hanneung' ? pageKey! : question.id}
           strokes={data.ink.get(data.attempt.kind === 'hanneung' ? pageKey! : question.id) ?? []}
-          onChange={() => {}} tool="pen" color="#1f2937" size={4} readOnly
           imageMaxWidth={data.attempt.kind === 'hanneung' ? 980 : 480} />
       </div>
     </>}

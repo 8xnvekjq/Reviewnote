@@ -219,7 +219,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
   // ── 변경 + 실행 취소 기록 ──
   const commit = useCallback((next: InkStroke[], before: InkStroke[]) => {
     historyRef.current = recordChange(historyRef.current, before);
-    propsRef.current.onChange(next);
+    propsRef.current.onChange(next, next.length === 0 ? 'clear' : 'draw');
   }, []);
 
   useImperativeHandle(ref, () => ({
@@ -228,14 +228,14 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       const result = undoHistory(historyRef.current, propsRef.current.strokes);
       if (!result) return;
       historyRef.current = result.history;
-      propsRef.current.onChange(result.strokes);
+      propsRef.current.onChange(result.strokes, 'undo');
     },
     redo() {
       if (gestureRef.current) return;
       const result = redoHistory(historyRef.current, propsRef.current.strokes);
       if (!result) return;
       historyRef.current = result.history;
-      propsRef.current.onChange(result.strokes);
+      propsRef.current.onChange(result.strokes, 'redo');
     },
     clear() {
       if (gestureRef.current) return;
@@ -360,7 +360,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       const remove = new Set(hits);
       g.working = g.working.filter(s => !remove.has(s.id));
       if (!g.recorded) { historyRef.current = recordChange(historyRef.current, g.before); g.recorded = true; }
-      propsRef.current.onChange(g.working);
+      propsRef.current.onChange(g.working, 'erase');
     };
 
     const onPointerMove = (e: PointerEvent) => {

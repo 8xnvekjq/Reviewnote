@@ -1,6 +1,6 @@
 // IndexedDB is a recovery cache. Server revisions protect edits made on other devices.
 // IndexedDB 가 없거나(사생활 보호 모드 등) 실패해도 풀이는 계속돼야 하므로 모든 함수가 조용히 실패한다.
-import type { InkStroke } from '../contract.ts';
+import type { InkReplayEvent, InkStroke } from '../contract.ts';
 
 const DB_NAME = 'reviewnote-exam-ink';
 const STORE = 'strokes';
@@ -30,7 +30,19 @@ export function inkKey(attemptId: string, questionId: string): string {
   return `${attemptId}::${questionId}`;
 }
 
-export interface InkDraft { strokes: InkStroke[]; revision: number; pending: boolean; legacyImport?: boolean }
+export interface InkUpload {
+  id: string;
+  strokes: InkStroke[];
+  events: InkReplayEvent[];
+  revision: number;
+  legacyImport?: boolean;
+}
+export interface InkDraft {
+  strokes: InkStroke[]; revision: number; pending: boolean; legacyImport?: boolean;
+  events?: InkReplayEvent[];
+  upload?: InkUpload;
+  baseStrokes?: InkStroke[];
+}
 
 export async function loadInkDrafts(attemptId: string): Promise<Map<string, InkDraft>> {
   const db = await openDb();

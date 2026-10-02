@@ -1,4 +1,5 @@
-import type { ExamClient, InkStroke } from '../contract.ts';
+import type { ExamClient, InkChangeKind, InkStroke } from '../contract.ts';
+import { applyInkEvent, inkDelta } from '../ink/inkReplay.ts';
 import { loadInk, loadInkDrafts, saveInkDraft, type InkDraft } from './inkStore.ts';
 
 export interface InkCache {
@@ -55,23 +56,37 @@ export class InkSync {
       // Authenticate the attempt BEFORE reading/importing any old local data.
       const remote = await this.client.getInk(this.attemptId);
       const [drafts, legacy] = await Promise.all([this.storage.read(this.attemptId), this.storage.legacy(this.attemptId)]);
+      // Cache writes may be unavailable in private browsing; do not lose in-memory pending work on retry.
+      for (const [id, doc] of this.documents) if (doc.pending) drafts.set(id, doc);
       const next = new Map<string, InkDraft>(remote.map(row => [row.questionId,
-        { strokes: row.strokes, revision: row.revision, pending: false }]));
+        { strokes: row.strokes, baseStrokes: row.strokes, revision: row.revision, pending: false }]));
       let conflict = false;
-      for (const [id, local] of drafts) {
+      for (const [id, cached] of drafts) {
+        let local = cached;
         if (this.questionIds && !this.questionIds.has(id)) continue;
         const server = next.get(id);
         if (!discardDrafts && local.pending) {
-          if (JSON.stringify(server?.strokes) === JSON.stringify(local.strokes)) continue; // lost acknowledgement
+          const acknowledged = local.upload && remote.find(row => row.questionId === id)?.lastBatchId === local.upload.id;
+          if (acknowledged) {
+            const sent = new Set(local.upload!.events.map(event => event.id));
+            const events = (local.events ?? []).filter(event => !sent.has(event.id));
+            if (!events.length) continue;
+            local = { ...local, revision: server!.revision, baseStrokes: server!.strokes, upload: undefined, events, legacyImport: false };
+          }
+          // Old drafts had no operation log. Import them as a clearly labelled restored state.
+          if (!local.events?.length && !local.upload) {
+            if (JSON.stringify(server?.strokes) === JSON.stringify(local.strokes)) continue;
+            local = { ...local, events: [inkDelta(server?.strokes ?? [], local.strokes, 'restore')] };
+          }
           if ((server?.revision ?? 0) !== local.revision) conflict = true;
-          next.set(id, local);
+          next.set(id, { ...local, baseStrokes: local.baseStrokes ?? server?.strokes ?? [] });
         }
       }
       for (const [id, strokes] of legacy) {
         if (this.questionIds && !this.questionIds.has(id)) continue;
         // A clean draft or empty server document is a tombstone: never resurrect erased legacy ink.
         if (!discardDrafts && !next.has(id) && !drafts.has(id) && strokes.length) {
-          next.set(id, { strokes, revision: 0, pending: true, legacyImport: true });
+          next.set(id, { strokes, baseStrokes: [], revision: 0, pending: true, legacyImport: true, events: [inkDelta([], strokes, 'restore')] });
         }
       }
       if (discardDrafts) {
@@ -90,10 +105,13 @@ export class InkSync {
     this.notify();
   }
 
-  change(questionId: string, strokes: InkStroke[]) {
+  change(questionId: string, strokes: InkStroke[], kind: InkChangeKind = 'draw') {
     if (!this.ready || this.status === 'conflict') return;
-    const draft = { ...this.documents.get(questionId), strokes,
-      revision: this.documents.get(questionId)?.revision ?? 0, pending: true };
+    const previous = this.documents.get(questionId);
+    const event = inkDelta(previous?.strokes ?? [], strokes, kind);
+    if (!event.added.length && !event.removed.length) return;
+    const draft = { ...previous, strokes,
+      revision: previous?.revision ?? 0, pending: true, events: [...(previous?.events ?? []), event] };
     this.documents.set(questionId, draft);
     this.persist(questionId, draft); // every completed stroke, not only after debounce
     this.status = 'pending';
@@ -113,9 +131,28 @@ export class InkSync {
     try {
       while (this.pending) {
         const [id, draft] = [...this.documents].find(([, doc]) => doc.pending)!;
-        const revision = await this.client.saveInk(this.attemptId, id, draft.strokes, draft.revision, draft.legacyImport);
+        const eventsToSend = [];
+        let bytes = 0;
+        for (const event of draft.events ?? []) {
+          const size = new TextEncoder().encode(JSON.stringify(event)).length;
+          if (eventsToSend.length && (eventsToSend.length >= 64 || bytes + size > 4 * 1024 * 1024)) break;
+          eventsToSend.push(event); bytes += size;
+        }
+        const upload = draft.upload ?? { id: crypto.randomUUID(), strokes: eventsToSend.reduce(applyInkEvent, draft.baseStrokes ?? []),
+          events: eventsToSend, revision: draft.revision, legacyImport: draft.legacyImport };
+        if (!draft.upload) {
+          const uploading = { ...draft, upload };
+          this.documents.set(id, uploading);
+          this.persist(id, uploading);
+        }
+        // Persist the exact batch before sending. Retries reuse it even if new strokes arrive meanwhile.
+        await this.cacheWrites;
+        const revision = await this.client.saveInk(this.attemptId, id, upload.strokes, upload.revision,
+          upload.legacyImport, upload.events, upload.id);
         const latest = this.documents.get(id)!;
-        const saved = { ...latest, revision, pending: latest !== draft, legacyImport: false };
+        const sent = new Set(upload.events.map(event => event.id));
+        const events = (latest.events ?? []).filter(event => !sent.has(event.id));
+        const saved = { ...latest, revision, baseStrokes: upload.strokes, pending: events.length > 0, events, upload: undefined, legacyImport: false };
         this.documents.set(id, saved);
         this.persist(id, saved);
       }
