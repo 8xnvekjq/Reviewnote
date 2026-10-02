@@ -45,6 +45,14 @@ def page_columns(img, first_page):
     """머리말(첫 쪽은 제목까지)·쪽번호를 빼고 좌우 두 단으로 나눈다."""
     h, w, _ = img.shape
     top = int(h * (0.145 if first_page else 0.062))
+    if first_page:
+        # Locate the long rule beneath the cover title, ignoring short text
+        # strokes and pictures further down the question area.
+        band = img[int(h * 0.08):int(h * 0.20), int(w * 0.055):int(w * 0.94)]
+        rules = np.flatnonzero((band.mean(axis=2) < INK).mean(axis=1) > 0.75)
+        if len(rules):
+            first_rule = np.split(rules, np.flatnonzero(np.diff(rules) > 1) + 1)[0]
+            top = int(h * 0.08) + int(first_rule[-1]) + 10
     bottom = int(h * 0.945)
     mid = w // 2
     return [img[top:bottom, int(w * 0.035):mid - 6], img[top:bottom, mid + 6:int(w * 0.975)]]
@@ -53,11 +61,19 @@ def page_columns(img, first_page):
 RIGHT = 0.85  # 단 오른쪽 15% — 문항 머리줄의 "[N점]"이 있는 자리
 
 
+def canonical_marker_template():
+    """Reviewed 79th-round 점] raster; independent of cover/question wording."""
+    pix = fitz.Pixmap(str(Path(__file__).with_name('hanneung-marker.png')))
+    return np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width).astype(float)
+
+
 def marker_template(col):
     """첫 쪽 왼쪽 단 첫 문항의 "[N점]"에서 공통 부분 "점]"을 떼어 템플릿으로 쓴다."""
     gray = col.mean(axis=2)
     region = gray[:, int(gray.shape[1] * RIGHT):]
     rows = (region < INK).any(axis=1)
+    if not rows.any():
+        raise ValueError('cannot find a question marker template on the first page')
     y = int(np.argmax(rows))
     end = y
     while end < len(rows) and rows[end]:
@@ -70,15 +86,22 @@ def marker_template(col):
 
 def find_markers(col, tpl, threshold=0.8):
     """단 안에서 "점]"과 모양이 맞는 머리줄의 y(단 기준)를 위에서부터."""
-    from numpy.lib.stride_tricks import sliding_window_view
     gray = col.mean(axis=2)
     region = gray[:, int(gray.shape[1] * RIGHT):].astype(float)
     th, tw = tpl.shape
     t = tpl - tpl.mean()
     tn = np.sqrt((t * t).sum())
-    win = sliding_window_view(region, (th, tw))
-    wz = win - win.mean(axis=(2, 3))[..., None, None]
-    cc = (wz * t).sum(axis=(2, 3)) / (np.sqrt((wz * wz).sum(axis=(2, 3))) * tn + 1e-6)
+    try:
+        import cv2
+    except ImportError:
+        from numpy.lib.stride_tricks import sliding_window_view
+        win = sliding_window_view(region, (th, tw))
+        wz = win - win.mean(axis=(2, 3))[..., None, None]
+        cc = (wz * t).sum(axis=(2, 3)) / (np.sqrt((wz * wz).sum(axis=(2, 3))) * tn + 1e-6)
+    else:
+        # Same normalized correlation; optional acceleration avoids the large
+        # temporary sliding-window array when checking many rounds.
+        cc = cv2.matchTemplate(region.astype(np.float32), tpl.astype(np.float32), cv2.TM_CCOEFF_NORMED)
     ys, xs = np.where(cc > threshold)
     taken = []
     for score, y in sorted(zip(cc[ys, xs], ys), reverse=True):
@@ -103,19 +126,39 @@ def block_top(gray_rows, y, max_gap=50):
     return top
 
 
-def split_page(img, first_page, count, tpl):
+def split_page(img, first_page, count, tpl, *, detailed=False):
     pieces, scores = [], []
     for col in page_columns(img, first_page):
         rows = (col.mean(axis=2) < INK).sum(axis=1) > 2
         markers = find_markers(col, tpl)
         starts = [block_top(rows, y) for y, _ in markers]
+        if markers:
+            # The number sits further left than circled choices. Its ink band
+            # anchors a heading without recognizing/comparing numeral glyphs.
+            # This also handles a points label on the following line: looking
+            # only at all-column blank gaps can walk into the previous answer.
+            y = markers[0][0]
+            header = col[max(0, y - 100):y + tpl.shape[0]].mean(axis=2) < INK
+            xs = np.flatnonzero(header.any(axis=0))
+            left = int(xs[0])
+            number_rows = (col[:, left:left + 20].mean(axis=2) < INK).sum(axis=1) > 2
+            for index, (y, _) in enumerate(markers):
+                candidates = np.flatnonzero(number_rows[max(0, y - 100):y + tpl.shape[0]]) + max(0, y - 100)
+                if len(candidates):
+                    groups = np.split(candidates, np.flatnonzero(np.diff(candidates) > 10) + 1)
+                    anchor = min(groups, key=lambda group: min(abs(group - y)))[0]
+                    if starts[index] < anchor - 10:
+                        nearby = np.flatnonzero(rows[max(0, anchor - 8):anchor + 1])
+                        starts[index] = max(0, anchor - 8) + int(nearby[0]) if len(nearby) else int(anchor)
         scores += [s for _, s in markers]
         for a, b in zip(starts, starts[1:] + [len(rows)]):
             # 시작 줄(점 3개 이상) 위의 글자 꼭대기·위 여백까지 포함한다. 문항 사이 여백(90px+)보다 작게.
             pieces.append(trim(col[max(0, a - PAD):b]))
-    if len(pieces) != count:
+    if count is not None and len(pieces) != count:
         raise SystemExit(f'expected {count} questions on this page, found {len(pieces)}')
-    return pieces, min(scores)
+    if not scores:
+        raise ValueError('no question markers found on this page')
+    return pieces, scores if detailed else min(scores)
 
 
 def main():
@@ -129,7 +172,7 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     number = 0
     report = []
-    tpl = marker_template(page_columns(render(doc[0]), True)[0])
+    tpl = canonical_marker_template()
     for index, page in enumerate(doc):
         count = ends[index] - (ends[index - 1] if index else 0)
         pieces, worst = split_page(render(page), index == 0, count, tpl)

@@ -26,3 +26,8 @@
 
 ## 📌 규칙 준수 사항
 - 새로운 기능이나 스크립트가 추가될 경우, 이 `README.md` 문서에 스크립트의 용도와 매개변수를 항상 갱신합니다.
+
+## 한능검 심화 회차 추가
+
+- `exam/add_hanneung_round.py`: `--round --year --exam-date --questions --answers`로 정답·배점 추출, 자동 문항 자르기, 비공개 시드와 시대 검토 PNG를 생성합니다. 선택: `--out-dir`, `--sheet`, `--force`. 절차는 `exam/HANNEUNG.md`를 참조합니다.
+- `exam/test_add_hanneung_round.py`: 실제 79회 PDF 회귀 및 잘못된 입력 차단 unittest.
