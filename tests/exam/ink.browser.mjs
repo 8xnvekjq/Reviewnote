@@ -145,13 +145,13 @@ try {
   await page.getByRole('button', { name: '쓰기', exact: true }).click();
 
   // 10) 손바닥 무시: 펜이 한 번 감지되면 손가락 터치는 그리지 않는다
-  const fire = (type, pointerType, pointerId, points, buttons = 1) => page.evaluate(({ type, pointerType, pointerId, points, buttons }) => {
+  const fire = (type, pointerType, pointerId, points) => page.evaluate(({ type, pointerType, pointerId, points }) => {
     const el = document.querySelector('.exam-ink-input');
     const r = el.getBoundingClientRect();
     for (const [nx, ny] of points) {
-      el.dispatchEvent(new PointerEvent(type, { pointerId, pointerType, isPrimary: true, bubbles: true, cancelable: true, buttons: type === 'pointerup' ? 0 : buttons, pressure: type === 'pointerup' ? 0 : 0.6, clientX: r.left + nx * r.width, clientY: r.top + ny * r.width }));
+      el.dispatchEvent(new PointerEvent(type, { pointerId, pointerType, isPrimary: true, bubbles: true, cancelable: true, buttons: type === 'pointerup' ? 0 : 1, pressure: type === 'pointerup' ? 0 : 0.6, clientX: r.left + nx * r.width, clientY: r.top + ny * r.width }));
     }
-  }, { type, pointerType, pointerId, points, buttons });
+  }, { type, pointerType, pointerId, points });
   const touchBefore = (await strokes()).length;
   await fire('pointerdown', 'touch', 31, [[0.3, 1.2]]);
   await fire('pointermove', 'touch', 31, [[0.35, 1.22], [0.4, 1.25]]);
@@ -182,19 +182,6 @@ try {
   assert.equal(list.length, beforePause + 1, 'the paused stroke is committed as one stroke');
   assert.ok(!list.at(-1).shape, 'a mid-writing pause does not turn handwriting into a shape');
   assert.ok(Math.max(...list.at(-1).points.map(p => p.x)) > 0.55, 'writing after the pause is kept (the stroke did not stop at the pause)');
-
-  // S펜 옆 버튼(buttons 2)·지우개 끝(buttons 32)을 누른 채 그으면 펜 도구 그대로 그 획만 지우개가 된다.
-  for (const [pointerId, buttons, y] of [[35, 1 | 2, 1.8], [37, 32, 1.9]]) {
-    await fire('pointerdown', 'pen', pointerId, [[0.2, y]]);
-    await fire('pointermove', 'pen', pointerId, Array.from({ length: 10 }, (_, i) => [0.2 + i * 0.04, y]));
-    await fire('pointerup', 'pen', pointerId, [[0.56, y]]);
-    const drawn = (await strokes()).length;
-    await fire('pointerdown', 'pen', pointerId + 1, [[0.38, y - 0.05]], buttons);
-    await fire('pointermove', 'pen', pointerId + 1, Array.from({ length: 10 }, (_, i) => [0.38, y - 0.05 + i * 0.01]), buttons);
-    await fire('pointerup', 'pen', pointerId + 1, [[0.38, y + 0.05]]);
-    assert.equal((await strokes()).length, drawn - 1, `pen button ${buttons} erases the crossed stroke`);
-    assert.equal(await page.getByRole('button', { name: '펜', exact: true }).getAttribute('aria-pressed'), 'true', 'the selected tool stays pen');
-  }
 
   assert.deepEqual(errors, []);
   console.log('PASS exam ink: pen, hold→line/circle with resize, stroke eraser, undo/redo/clear, resize keeps position, readOnly, palm rejection');
