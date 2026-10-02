@@ -766,4 +766,43 @@ const basicImages = (await db.query(`select count(distinct image_url)::int n fro
 assert.equal(basicImages, 12, 'basic keeps whole pages');
 const advancedJson = JSON.parse(fs.readFileSync(path.join(root, 'src/features/exam/data/2026-hanneung-79-advanced.json'), 'utf8'));
 assert.deepEqual(advancedJson.questions.map(q => q.imageUrl), advancedImages.map(row => row.image_url), 'data JSON matches the migration');
+// 영파여고: 새 시드만 두 번 적용해 멱등성·비공개 RLS·100점 및 서답형 변환을 검증한다.
+const yeongpaId = '2024-yeongpa-g2-s2-mid-calc1';
+const yeongpaData = JSON.parse(fs.readFileSync(path.join(root, `src/features/exam/data/${yeongpaId}.json`), 'utf8'));
+const yeongpaMig = fs.readFileSync(path.join(root, 'supabase/migrations/20261003060000_exam_yeongpa_school_seed.sql'), 'utf8');
+await db.exec(yeongpaMig); await db.exec(yeongpaMig);
+assert.equal((await as(S1, 'select id from exam_papers where id=$1', [yeongpaId])).length, 0);
+assert.equal((await as(S1, 'select id from exam_questions where paper_id=$1', [yeongpaId])).length, 0);
+await fails(S1, `select start_exam_attempt($1,'free',null)`, [yeongpaId], /EXAM_PAPER_NOT_FOUND/);
+const yeongpaCard = (await as(AD, 'select list_exam_papers_for_me() r'))[0].r.find(p => p.id===yeongpaId);
+assert.deepEqual([yeongpaCard.grade,yeongpaCard.year,yeongpaCard.published,yeongpaCard.examDate,yeongpaCard.maxScore], [2,2024,false,null,100]);
+const yeongpaRows = (await db.query('select q.*, k.answer from exam_questions q join exam_answer_keys k on k.question_id=q.id where paper_id=$1 order by number', [yeongpaId])).rows;
+assert.equal(yeongpaRows.length, 21);
+for (const [i,row] of yeongpaRows.entries()) {
+  const q = yeongpaData.questions[i];
+  assert.deepEqual([row.number,row.image_url,Number(row.points),row.answer_type,row.choices,row.answer,row.curriculum_grade,row.curriculum_chapter], [q.number,q.imageUrl,q.points,q.answerType,q.choices??null,q.answer,q.curriculumGrade,q.curriculumChapter]);
+}
+const yp = (await as(AD, `select start_exam_attempt($1,'free',null) r`, [yeongpaId]))[0].r;
+assert.equal(yp.questions.length, 21); assert.equal(yp.elective, null); assert.equal(yp.timeLimitMinutes, null);
+assert.ok(yp.questions.every(q => !('answer' in q) && !('originalAnswer' in q)));
+for (const number of [19,21]) {
+  const q = yp.questions.find(q => q.number===number);
+  assert.equal(q.choices.length, 10);
+  await fails(AD, `select check_exam_answer($1,$2,'11')`, [yp.id,q.id], /EXAM_INVALID_ANSWER/);
+  const checked = (await as(AD, `select check_exam_answer($1,$2,$3) r`, [yp.id,q.id,yeongpaData.questions[number-1].answer]))[0].r;
+  assert.equal(checked.isCorrect, true);
+}
+const ypResult = (await as(AD, `select submit_exam_attempt($1,$2::jsonb,null) r`, [yp.id,JSON.stringify(yp.questions.map(q => ({questionId:q.id,answer:yeongpaData.questions[q.number-1].answer})))]))[0].r;
+assert.equal(ypResult.score, 100); assert.equal(ypResult.correctCount, 21); assert.equal(ypResult.estimatedGrade, null); assert.equal(ypResult.gradeCut, null);
+for (const number of [19,21]) {
+  const added = (await as(AD, `select add_exam_questions_to_mistakes($1,$2::uuid[],'https://reviewnote.test') r`, [yp.id,[yp.questions.find(q => q.number===number).id]]))[0].r[0];
+  const saved = (await db.query('select analysis from mistakes where id=$1',[added.mistakeId])).rows[0];
+  assert.equal(saved.analysis.finalAnswer, '$'+yeongpaData.questions[number-1].originalAnswer+'$');
+}
+// Only the in-memory test DB is published; the checked-in seed remains false.
+await db.exec(fs.readFileSync(path.join(root,'scripts/exam/publish_yeongpa.sql'),'utf8'));
+const ypStudent = (await as(S1, `select start_exam_attempt($1,'real',null) r`, [yeongpaId]))[0].r;
+assert.equal(ypStudent.grade, 2); assert.equal(ypStudent.questions.length, 21); assert.equal(ypStudent.timeLimitMinutes, 50);
+assert.ok((await as(S1,'select list_exam_papers_for_me() r'))[0].r.some(p => p.id===yeongpaId));
+await fails(S1,`select check_exam_answer($1,$2,'9')`,[ypStudent.id,ypStudent.questions[18].id],/EXAM_REAL_MODE_LOCKED/);
 });

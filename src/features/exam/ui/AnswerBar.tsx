@@ -33,12 +33,14 @@ export function AnswerBar({ question, answer, unsure, onAnswer, onUnsure, free }
   const locked = check != null;
   const answerType = questionAnswerType(question);
   const ten = answerType === 'choice10';
+  // 구간별 함수식처럼 긴 선지는 칸을 좁히지 않고, 좁은 화면에서는 선지 줄을 옆으로 밀어 본다.
+  const wide = ten && (question.choices ?? []).some(choice => choice.includes('\\begin{cases}') || choice.length > 24);
 
   return (
     <div className={`exam-answerbar${locked ? ' is-locked' : ''}`} data-testid="exam-answerbar" data-locked={locked || undefined}>
       <div className="exam-answerbar-inner">
         {answerType !== 'digits' ? (
-          <div className={`exam-choices${ten ? ' exam-choices-ten' : ''}`} role="group" aria-label={`${question.number}번 답 고르기`}>
+          <div className={`exam-choices${ten ? ' exam-choices-ten' : ''}${wide ? ' is-wide' : ''}`} role="group" aria-label={`${question.number}번 답 고르기`}>
             {(ten ? CHOICE10_MARKS : question.answerType === 'choice4' ? CHOICE_MARKS.slice(0, 4) : CHOICE_MARKS).map((mark, index) => {
               const selected = answer === String(index + 1);
               return (
