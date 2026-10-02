@@ -64,6 +64,7 @@ const question = page => page.getByTestId('exam-solve').getAttribute('data-quest
 const strokeCount = page => page.locator('[data-testid="exam-body"] .exam-ink').getAttribute('data-stroke-count');
 
 async function drawStroke(page) {
+  await page.locator('[data-testid="exam-body"] .exam-ink').waitFor();
   const box = await page.locator('[data-testid="exam-body"] .exam-ink').boundingBox();
   assert.ok(box, 'ink canvas visible');
   await page.mouse.move(box.x + box.width * 0.2, box.y + box.height * 0.3);
@@ -775,7 +776,7 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   const { context, page } = await open(LANDSCAPE, '?persist=1');
   await startExam(page, '자유 모드', '미적', PAPER_A);
   await drawStroke(page);
-  await page.waitForFunction(() => document.querySelector('[data-testid="exam-ink-sync"]')?.textContent.includes('필기 서버 저장 완료'));
+  await page.waitForFunction(() => document.querySelector('[data-testid="exam-ink-sync"]')?.getAttribute('data-status') === 'saved');
   const remote = await page.evaluate(() => localStorage.getItem('exam-practice-harness'));
   const other = await browser.newContext({ viewport: PORTRAIT });
   await other.addInitScript(value => localStorage.setItem('exam-practice-harness', value), remote);
@@ -797,7 +798,8 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   await slider.press('Home');
   await second.waitForFunction(() => document.querySelector('[data-testid="exam-viewer"] .exam-ink')?.getAttribute('data-stroke-count') === '0');
   await second.getByRole('button', { name: '재생', exact: true }).click();
-  await second.waitForFunction(() => document.querySelector('[data-testid="exam-replay-position"]')?.textContent.includes('1 / 1'));
+  await second.waitForFunction(() => document.querySelector('[data-testid="exam-replay-position"]')?.getAttribute('data-step') === '1');
+  assert.equal(await second.getByRole('button', { name: '재생', exact: true }).count(), 1); // 끝나면 자동 정지
   await second.screenshot({ path: `${out}/student-replay.png` });
   await other.close(); await context.close();
   console.log('ok — ink and server replay restored on a second device without IndexedDB');
@@ -820,22 +822,33 @@ for (const viewport of [LANDSCAPE, { width: 390, height: 844 }]) {
   await page.getByRole('button', { name: '필기 순서 보기', exact: true }).click();
   const slider = page.getByRole('slider', { name: '필기 재생 위치' });
   await slider.waitFor();
+  // React가 다시 그린 뒤의 상태를 기다린다(버튼 클릭 직후에는 아직 반영 전일 수 있음).
+  const expectReplay = (ink, step) => page.waitForFunction(([ink, step]) =>
+    document.querySelector('.exam-admin-paper .exam-ink')?.getAttribute('data-stroke-count') === ink
+    && document.querySelector('[data-testid="exam-replay-position"]')?.getAttribute('data-step') === step, [ink, step], { timeout: 3000 });
   await slider.focus(); await slider.press('Home');
-  assert.equal(await page.locator('.exam-admin-paper .exam-ink').getAttribute('data-stroke-count'), '0');
-  await slider.press('ArrowRight');
-  assert.equal(await page.locator('.exam-admin-paper .exam-ink').getAttribute('data-stroke-count'), '1');
-  await slider.press('ArrowRight');
-  assert.equal(await page.locator('.exam-admin-paper .exam-ink').getAttribute('data-stroke-count'), '0');
-  await slider.press('End');
-  assert.equal(await page.locator('.exam-admin-paper .exam-ink').getAttribute('data-stroke-count'), '1');
-  await slider.press('ArrowLeft');
-  assert.equal(await page.locator('.exam-admin-paper .exam-ink').getAttribute('data-stroke-count'), '0');
-  await page.getByRole('button', { name: '다음 필기 단계', exact: true }).click();
-  assert.equal(await page.locator('.exam-admin-paper .exam-ink').getAttribute('data-stroke-count'), '1');
-  await page.getByRole('combobox', { name: '배속', exact: true }).selectOption('4');
+  await expectReplay('0', '0');
+  // 이전/다음은 획 경계로 이동(그리기 → 지우기 → 실행 취소 순서의 기록).
+  const next = page.getByRole('button', { name: '다음 필기 단계', exact: true });
+  const prev = page.getByRole('button', { name: '이전 필기 단계', exact: true });
+  await next.click(); await expectReplay('1', '1');
+  await next.click(); await expectReplay('0', '2');
+  await prev.click(); await expectReplay('1', '1');
+  await slider.focus(); await slider.press('End');
+  await expectReplay('1', '3');
+  // 슬라이더는 시간 축: 값의 최대가 획 수(3)가 아니라 재생 시간(ms)이다.
+  const max = Number(await slider.getAttribute('max'));
+  assert.ok(max > 3, `slider max should be milliseconds, got ${max}`);
+  assert.match(await page.getByTestId('exam-replay-position').innerText(), /^\d+:\d{2} \/ \d+:\d{2}/);
+  // 재생하면 슬라이더 값이 시간에 따라 조금씩 늘어난다(획마다 한 칸씩 뛰지 않음).
   await page.getByRole('button', { name: '처음', exact: true }).click();
+  await page.getByRole('combobox', { name: '배속', exact: true }).selectOption('1');
   await page.getByRole('button', { name: '재생', exact: true }).click();
-  await page.waitForFunction(() => document.querySelector('[data-testid="exam-replay-position"]')?.textContent.includes('3 / 3'));
+  const samples = [];
+  for (let i = 0; i < 6; i++) { await page.waitForTimeout(120); samples.push(Number(await slider.inputValue())); }
+  assert.ok(new Set(samples).size >= 4, `slider should move smoothly: ${samples}`);
+  await page.getByRole('combobox', { name: '배속', exact: true }).selectOption('4');
+  await page.waitForFunction(() => document.querySelector('[data-testid="exam-replay-position"]')?.getAttribute('data-step') === '3');
   const box = await page.locator('.exam-admin-paper .exam-ink').boundingBox();
   await page.mouse.move(box.x + 30, box.y + 30); await page.mouse.down();
   await page.mouse.move(box.x + 80, box.y + 90); await page.mouse.up();

@@ -420,12 +420,11 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
             {question.number}번 · {question.points}점 · {question.isChoice ? '객관식' : '단답형'}
             {saveState === 'failed' && <span className="exam-save-failed"> · 저장이 잠깐 안 됐어요(다시 시도할게요)</span>}
           </div>
-          <div className="exam-ink-sync" role="status" data-testid="exam-ink-sync">
-            {inkSync.status === 'loading' ? '저장된 필기를 불러오는 중…'
-              : inkSync.status === 'saved' ? '필기 서버 저장 완료 · 다른 기기에서도 볼 수 있어요'
-              : inkSync.status === 'pending' || inkSync.status === 'saving' ? '필기 저장 중…'
-              : inkSync.status === 'conflict' ? '다른 기기에서 풀이가 변경됐어요. 이 기기 필기를 덮어쓰지 않았어요.'
-              : '필기를 서버와 동기화하지 못했어요. 화면을 닫지 말고 다시 시도해 주세요.'}
+          {/* 시험 중 방해가 되지 않도록 저장 중·완료는 말하지 않고, 사용자가 해야 할 일이 있을 때만 보인다. */}
+          <div className="exam-ink-sync" role="status" data-testid="exam-ink-sync" data-status={inkSync.status}>
+            {inkSync.status === 'conflict' ? '다른 기기에서 풀이가 변경됐어요. 이 기기 필기를 덮어쓰지 않았어요.'
+              : inkSync.status === 'failed' ? '필기를 서버와 동기화하지 못했어요. 화면을 닫지 말고 다시 시도해 주세요.'
+              : null}
             {inkSync.status === 'failed' && <button type="button" className="rn-button rn-button-compact" onClick={() => {
               if (inkSync.ready) void inkSync.flush(); else void inkSync.load().then(() => inkSync.flush());
             }}>다시 시도</button>}

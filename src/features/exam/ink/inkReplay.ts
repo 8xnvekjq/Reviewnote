@@ -71,3 +71,77 @@ export function buildInkTimeline(data: InkReplayData) {
     },
   };
 }
+
+/** 생각하느라 멈춘 시간은 이 길이로 줄여 재생한다(실제 간격이 더 짧으면 그대로). */
+export const REPLAY_MAX_PAUSE_MS = 1500;
+/** 처음(0초)은 빈 화면에서 시작하도록 첫 단계 앞에 두는 여유. */
+const REPLAY_LEAD_IN_MS = 300;
+/** 시각 정보가 없는 단계(예전 필기·저장 상태) 사이 간격. */
+const REPLAY_UNKNOWN_GAP_MS = 400;
+/** 한 획을 그린 시간 상한(비정상 값 방지). */
+const REPLAY_MAX_STROKE_MS = 15000;
+
+type InkTimeline = ReturnType<typeof buildInkTimeline>;
+
+function drawnStroke(step: ReplayStep) {
+  const event = step.event;
+  if (!event || event.kind !== 'draw' || event.removed.length > 0 || event.added.length !== 1) return null;
+  return event.added[0];
+}
+
+/**
+ * 단계 목록을 시간 축으로 펼친다. 획은 실제로 그린 속도대로, 획 사이의 긴 대기는 줄여서 놓는다.
+ * frame(ms)는 그 시각의 필기(그리는 중인 획은 그때까지 그린 부분만)를 돌려준다.
+ */
+export function buildInkClock(timeline: InkTimeline) {
+  const { steps } = timeline;
+  const starts: number[] = [];
+  const ends: number[] = [];
+  let clock = 0;
+  let previousEnd = 0; // 직전 단계가 끝난 실제 시각(ms, 0이면 모름)
+  steps.forEach((step, index) => {
+    const added = drawnStroke(step);
+    const lastT = added ? Math.max(0, ...added.stroke.points.map(point => point.t)) : 0;
+    // 지우기·실행 취소처럼 순간인 단계도 1ms를 줘서, 시작 시각에는 아직 일어나지 않은 상태로 보이게 한다.
+    const duration = Math.max(1, Math.min(REPLAY_MAX_STROKE_MS, Number.isFinite(lastT) ? lastT : 0));
+    const realStart = step.at > 0 ? step.at - (added ? duration : 0) : 0;
+    const gap = index === 0 ? REPLAY_LEAD_IN_MS
+      : realStart > 0 && previousEnd > 0 ? Math.min(REPLAY_MAX_PAUSE_MS, Math.max(0, realStart - previousEnd))
+      : REPLAY_UNKNOWN_GAP_MS;
+    clock += gap;
+    starts.push(clock);
+    clock += duration;
+    ends.push(clock);
+    previousEnd = step.at > 0 ? step.at : 0;
+  });
+  const total = clock;
+  /** time 시각까지 끝난 단계 수. */
+  const completedAt = (time: number) => {
+    let low = 0, high = steps.length;
+    while (low < high) { const mid = (low + high) >> 1; if (ends[mid] <= time) low = mid + 1; else high = mid; }
+    return low;
+  };
+  return {
+    total, starts, ends, completedAt,
+    frame(time: number): InkStroke[] {
+      const t = Math.max(0, Math.min(total, time));
+      const done = completedAt(t);
+      const base = timeline.at(done);
+      const next = steps[done];
+      const added = next && starts[done] <= t ? drawnStroke(next) : null;
+      if (!added) return base;
+      const elapsed = t - starts[done];
+      const points = added.stroke.points.filter(point => point.t <= elapsed);
+      if (points.length === 0) return base;
+      const partial: InkStroke = { ...added.stroke, points, shape: undefined };
+      const out = base.slice();
+      out.splice(Math.min(added.index, out.length), 0, partial);
+      return out;
+    },
+  };
+}
+
+export function formatReplayTime(ms: number) {
+  const seconds = Math.floor(Math.max(0, ms) / 1000);
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}
