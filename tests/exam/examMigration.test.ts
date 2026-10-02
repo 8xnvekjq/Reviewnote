@@ -813,6 +813,11 @@ for (const file of fs.readdirSync(path.join(root, 'supabase/migrations')).filter
 await db.exec(fs.readFileSync(path.join(root, 'supabase/migrations/20261003100000_exam_era_schema.sql'), 'utf8'));
 const eraSeed = fs.readFileSync(path.join(root, 'supabase/migrations/20261003100001_exam_era_seed.sql'), 'utf8');
 await db.exec(eraSeed);
+// Apply worksheet definitions before either feature is exercised on this same database.
+await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261003130000_exam_worksheets.sql'),'utf8'));
+for (const name of ['limits','derivatives']) {
+  await db.exec(fs.readFileSync(path.join(root,`supabase/migrations/2026100313000${name==='limits'?1:2}_exam_youngpa_worksheet_${name}_seed.sql`),'utf8'));
+}
 assert.equal((await as(S1, 'select list_exam_papers_for_me() r'))[0].r.filter(p => p.practiceEra).length, 0, 'unpublished sources stay private');
 await db.exec(`update exam_papers set published=true where kind='hanneung' and practice_era is null`);
 await db.exec(eraSeed); await db.exec(eraSeed);
@@ -848,6 +853,7 @@ assert.equal(checkedEra.isCorrect,true);
 const eraItems = eraAttempt.questions.map(q => ({questionId:q.id,answer:q.id===first.id?'9':null,unsure:true,timeSpentMs:1000,visits:1}));
 const eraResult = (await as(S1, `select submit_exam_attempt($1,$2::jsonb,$3::int[]) r`, [eraAttempt.id,JSON.stringify(eraItems),[1]]))[0].r;
 assert.equal(eraResult.correctCount,1); assert.equal(eraResult.score,1); assert.equal(eraResult.estimatedGrade,null); assert.equal(eraResult.gradeCut,null);
+assert.equal(eraResult.items[0].sourcePaperId,first.sourcePaperId); assert.equal(eraResult.items[0].sourceNumber,first.sourceNumber);
 assert.equal(eraResult.items[0].answer,key,'checked answer stays locked'); assert.equal(eraResult.items[0].sourceRound,first.sourceRound);
 await fails(S2, 'select get_exam_result($1)', [eraAttempt.id], /EXAM_ATTEMPT_NOT_FOUND/);
 const addedEra = (await as(S1, `select add_exam_questions_to_mistakes($1,$2::uuid[],'https://reviewnote.test') r`, [eraAttempt.id,[eraAttempt.questions[1].id]]))[0].r;
@@ -878,4 +884,38 @@ for (const [paperId, elective, count, grade] of [['2025-06-math','미적분',30,
   assert.equal(graded.score,100); assert.equal(graded.estimatedGrade,grade);
 }
 }
+
+
+// Worksheet provenance, grading and permissions (no live DB involved).
+assert.equal((await as(S1, `select * from exam_papers where kind='worksheet'`)).length,0);
+const wsAdmin = (await as(AD, `select start_exam_attempt('youngpa-worksheet-derivatives','free',null) r`))[0].r;
+assert.equal(wsAdmin.questions.length,14); assert.equal(wsAdmin.unitName,'미분계수와 도함수');
+assert.ok(wsAdmin.questions.every(q => q.sourceLabel && !q.correctAnswer));
+await db.exec(`update exam_papers set published=true where kind='worksheet'`);
+await fails(S1,`select start_exam_attempt('youngpa-worksheet-derivatives','real',null)`,[],/EXAM_INVALID_MODE/);
+const ws=(await as(S1,`select start_exam_attempt('youngpa-worksheet-derivatives','free',null) r`))[0].r;
+assert.equal(ws.timeLimitMinutes,null); assert.equal(ws.elective,null);
+const wsQ=ws.questions[0].id;
+assert.equal((await as(S1,'select * from exam_answer_keys where question_id=$1',[wsQ])).length,0);
+await as(S1,`select check_exam_answer($1,$2,'4')`,[ws.id,wsQ]);
+const wsResult=(await as(S1,'select submit_exam_attempt($1,$2::jsonb,null) r',[ws.id,JSON.stringify(ws.questions.map(q=>({questionId:q.id,answer:'4',timeSpentMs:1000,visits:1})))]))[0].r;
+assert.equal(wsResult.estimatedGrade,null); assert.equal(wsResult.gradeCut,null);
+assert.equal(wsResult.maxScore,51); assert.equal(wsResult.items.length,14);
+assert.equal(wsResult.items[0].sourceLabel,ws.questions[0].sourceLabel);
+assert.equal(wsResult.unitName,ws.unitName);
+const combinedResults=(await as(S1,'select list_my_exam_results() r'))[0].r;
+assert.ok(combinedResults.some(r=>r.practiceEra==='goryeo' && r.estimatedGrade===null));
+assert.ok(combinedResults.some(r=>r.kind==='worksheet' && r.unitName===ws.unitName && r.estimatedGrade===null));
+const combinedCards=(await as(S1,'select list_exam_papers_for_me() r'))[0].r;
+assert.ok(combinedCards.some(p=>p.practiceEra==='goryeo' && p.lastResult.estimatedGrade===null));
+assert.ok(combinedCards.some(p=>p.kind==='worksheet' && p.unitName===ws.unitName && p.lastResult?.estimatedGrade===null));
+const limits=(await as(S1,`select start_exam_attempt('youngpa-worksheet-limits','free',null) r`))[0].r;
+assert.equal(limits.questions.length,28);
+const history=(await as(S1,`select list_my_paper_history('youngpa-worksheet-derivatives') r`))[0].r;
+assert.equal(history[0].estimatedGrade,null);
+const wsMistake=(await as(S1,`select add_exam_questions_to_mistakes($1,$2::uuid[],'https://reviewnotes.test') r`,[ws.id,[wsQ]]))[0].r;
+assert.equal(wsMistake.length,1);
+const mistake=(await as(S1,'select grade,chapter from mistakes where id=$1',[wsMistake[0].mistakeId]))[0];
+assert.deepEqual(mistake,{grade:'미적분Ⅰ',chapter:'미분계수와 도함수'});
+
 });

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "pdf": "학력평가 기출문제(미분계수와 도함수).pdf",
+  "referenceRoot": "C:\\Users\\8xnve\\Documents\\ReviewNotes\\reference\\youngpa-sub-print",
+  "migrationTimestamp": "20261003130002",
+  "paper": {
+    "id": "youngpa-worksheet-derivatives",
+    "title": "영파여고 미적분Ⅰ 학력평가 기출 — 미분계수와 도함수",
+    "kind": "worksheet",
+    "schoolName": "영파여고",
+    "grade": 2,
+    "schoolGrade": "고2",
+    "subject": "미적분Ⅰ",
+    "source": "영파여고 학력평가 기출 모음",
+    "unitName": "미분계수와 도함수",
+    "questionCount": 14,
+    "timeLimitMinutes": null,
+    "electives": []
+  }
+}

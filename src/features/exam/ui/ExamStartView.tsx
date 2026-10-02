@@ -84,7 +84,7 @@ function PaperActivity({ students, onOpen }: { students: AdminPaperStudentActivi
 function PaperCard({ paper, selected, busy, now, onClick }: { paper: ExamPaperSummary; selected: boolean; busy: boolean; now: number; onClick: () => void }) {
   const total = paper.questionCount ?? 30;
   const era = paper.practiceEra;
-  const school = paper.kind === 'school';
+  const school = paper.kind === 'school' || paper.kind === 'worksheet';
   const progress = paper.inProgress ?? null;
   const last = paper.lastResult ?? null;
   const count = paper.resultCount ?? 0;
@@ -106,9 +106,10 @@ function PaperCard({ paper, selected, busy, now, onClick }: { paper: ExamPaperSu
     >
       <span className="exam-paper-sheet-head" aria-hidden="true">
         <span>{era ? '시대별 모아 풀기' : paper.kind === 'hanneung' ? `한국사 ${paper.hanneungLevel === 'basic' ? '기본' : '심화'}` : '수학 영역'}</span>
-        <span>{era ? '자유 모드' : `${paper.timeLimitMinutes}분`} · {total}문항</span>
+        <span>{era ? '자유 모드' : paper.kind === 'worksheet' ? '시간 제한 없음' : `${paper.timeLimitMinutes}분`} · {total}문항</span>
       </span>
       <strong className="exam-paper-title">{era ? HANNEUNG_ERAS.find(row => row.id === era)?.label : paper.title}</strong>
+      {paper.kind === 'worksheet' && <span className="rn-caption">{paper.schoolName} · {paper.unitName}</span>}
       {paper.published === false && <span className="exam-review-badge">검토 중(학생 비공개)</span>}
 
       <span className="exam-paper-body">
@@ -250,10 +251,10 @@ export function ExamStartView({ client, currentUserId, admin, busy, error, onSta
       {visiblePapers.length > 0 && (
         <>
           <p className="rn-caption">시험지를 눌러 시작해요. 풀던 시험지는 이어서 풀 수 있어요.</p>
-          {(['era', 'csat', 'school', 'hanneung'] as const).map(kind => {
+          {(['era', 'csat', 'school', 'worksheet', 'hanneung'] as const).map(kind => {
             const group = kind === 'era' ? HANNEUNG_ERAS.flatMap(era => visiblePapers.filter(p => p.practiceEra === era.id)) : visiblePapers.filter(p => !p.practiceEra && (p.kind ?? 'csat') === kind);
-            return group.length > 0 ? <section key={kind} aria-label={kind === 'era' ? '시대별 모아 풀기' : kind === 'school' ? '내신' : kind === 'csat' ? '수능·모평' : '한능검'}>
-            <h2 className="exam-setup-title">{kind === 'era' ? '시대별 모아 풀기' : kind === 'school' ? '내신' : kind === 'csat' ? '수능·모평' : '한능검'}</h2>
+            return group.length > 0 ? <section key={kind} aria-label={kind === 'era' ? '시대별 모아 풀기' : kind === 'worksheet' ? '학교 프린트' : kind === 'school' ? '내신' : kind === 'csat' ? '수능·모평' : '한능검'}>
+            <h2 className="exam-setup-title">{kind === 'era' ? '시대별 모아 풀기' : kind === 'worksheet' ? '학교 프린트' : kind === 'school' ? '내신' : kind === 'csat' ? '수능·모평' : '한능검'}</h2>
             <div className={kind === 'era' ? 'exam-era-card-list' : 'exam-paper-list'} aria-label={kind === 'era' ? '시대 묶음' : '시험지'}>
             {group.map(p => (
               <div key={p.id} className="exam-paper-entry">
@@ -275,8 +276,8 @@ export function ExamStartView({ client, currentUserId, admin, busy, error, onSta
           <p className="rn-caption exam-setup-paper">{paper.title}</p>
           <h2 className="exam-setup-title">어떻게 풀까요?</h2>
           <div className="exam-option-grid" role="radiogroup" aria-label="모드">
-            {(paper.practiceEra ? MODES.filter(m => m.value === 'free') : MODES).map(m => (
-              <button key={m.value} type="button" role="radio" aria-checked={(paper.practiceEra ? 'free' : mode) === m.value} className={`exam-option${(paper.practiceEra ? 'free' : mode) === m.value ? ' is-on' : ''}`} onClick={() => setMode(m.value)}>
+            {((paper.practiceEra || paper.kind === 'worksheet') ? MODES.filter(m => m.value === 'free') : MODES).map(m => (
+              <button key={m.value} type="button" role="radio" aria-checked={((paper.practiceEra || paper.kind === 'worksheet') ? 'free' : mode) === m.value} className={`exam-option${((paper.practiceEra || paper.kind === 'worksheet') ? 'free' : mode) === m.value ? ' is-on' : ''}`} onClick={() => setMode(m.value)}>
                 <strong>{m.title}</strong>
                 <span>{m.value === 'real' ? m.desc.replace('100분', `${paper.timeLimitMinutes}분`) : m.desc}</span>
               </button>
@@ -300,10 +301,10 @@ export function ExamStartView({ client, currentUserId, admin, busy, error, onSta
             type="button"
             className="rn-button rn-button-primary exam-start-button"
             disabled={(paper.electives.length > 0 && !elective) || busy}
-            onClick={() => { if (!paper.electives.length || elective) onStart(paper, paper.practiceEra ? 'free' : mode, paper.electives.length ? elective : null); }}
+            onClick={() => { if (!paper.electives.length || elective) onStart(paper, (paper.practiceEra || paper.kind === 'worksheet') ? 'free' : mode, paper.electives.length ? elective : null); }}
             data-testid="exam-start-button"
           >
-            {busy ? '준비 중…' : (!paper.electives.length || elective) ? `${!paper.practiceEra && mode === 'real' ? '실전' : '자유'} 모드로 시작하기` : '선택과목을 골라 주세요'}
+            {busy ? '준비 중…' : (!paper.electives.length || elective) ? `${!paper.practiceEra && paper.kind !== 'worksheet' && mode === 'real' ? '실전' : '자유'} 모드로 시작하기` : '선택과목을 골라 주세요'}
           </button>
           <p className="rn-caption exam-start-hint">시작하면 화면이 꽉 차게 바뀌어요. 애플펜슬로 문제 위에 바로 풀 수 있어요.</p>
         </section>
@@ -319,7 +320,7 @@ export function ExamStartView({ client, currentUserId, admin, busy, error, onSta
             {past.map(r => (
               <li key={r.attemptId}>
                 <button type="button" className="exam-past-row" onClick={() => onOpenResult(r.attemptId)}>
-                  <span><strong>{r.practiceEra ? `${r.score}/${r.questionCount}문항` : `${r.score}점`}{r.kind === 'school' && ` / ${r.maxScore ?? 100}`}</strong>{resultGradeLabel(r, r.estimatedGrade) && ` · ${resultGradeLabel(r, r.estimatedGrade)}`}</span>
+                  <span><strong>{r.practiceEra ? `${r.score}/${r.questionCount}문항` : `${r.score}점`}{(r.kind === 'school' || r.kind === 'worksheet') && ` / ${r.maxScore ?? 100}`}</strong>{resultGradeLabel(r, r.estimatedGrade) && ` · ${resultGradeLabel(r, r.estimatedGrade)}`}</span>
                   <span className="rn-caption">{r.paperTitle} · {r.mode === 'real' ? '실전' : '자유'}{r.elective && ` · ${ELECTIVE_SHORT[r.elective]}`} · {formatDate(r.submittedAt)}</span>
                 </button>
               </li>

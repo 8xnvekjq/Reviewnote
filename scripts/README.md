@@ -37,3 +37,8 @@
 `node scripts/exam/build_hanneung_era_sets.mjs`는 모든 `*-advanced.topics.json`에서 시대 묶음 공개 목록(정답 없음)과 `20261003100001_exam_era_seed.sql`을 재생성합니다. 적용 전에는 기본 명령을 사용하고, 이미 적용된 뒤 변경할 때는 `node scripts/exam/build_hanneung_era_sets.mjs supabase/migrations/<새 타임스탬프>_exam_era_seed.sql`로 새 시드를 만드세요. 운영 DB에 자동 적용하지 않습니다.
 
 원본 시험지와 정답키가 모두 존재해야 하며, 원본이 모두 공개된 묶음만 학생에게 공개됩니다. 원본 공개 후 같은 시드를 다시 실행하면 묶음도 공개됩니다. 구성·이미지·정답이 바뀌면 새 버전 ID를 만들고 이전 묶음은 비공개로 전환하여 기존 응시·필기·결과는 보존합니다. 묶음은 문항당 1점(맞은 개수), 자유 모드만 허용합니다.
+
+## 학교 프린트 가져오기
+
+- `exam/import_worksheet.py <설정 JSON> [--out-dir <폴더>] [--sheet] [--force]`: 문제·정답·배점·출처 추출, 단/쪽을 넘는 해설 합성, 비공개 시드 및 로컬 확인 HTML을 생성합니다. 기존 `import_school.py`의 레이아웃·자르기 루틴을 공유합니다. 앱의 해설 보기는 현재 미지원이며 정답 JSON·확인 HTML·해설 이미지는 git 제외 로컬 폴더에만 생성합니다. 절차는 `exam/WORKSHEET_IMPORT.md`를 참조합니다.
+- `exam/test_import_worksheet.py`: 정답 예외·실제 PDF 문항 수·이어 붙이기·public 해설 비노출 검사.
