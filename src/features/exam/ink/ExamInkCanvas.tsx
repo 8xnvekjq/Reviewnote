@@ -335,7 +335,10 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       rect = canvas.getBoundingClientRect();
       try { canvas.setPointerCapture(e.pointerId); } catch { /* 합성 이벤트 등 */ }
       const start = e.timeStamp;
-      if (p.tool === 'eraser') {
+      // S펜·와콤 등: 펜 옆 버튼(buttons 2)이나 지우개 끝(buttons 32)을 누른 채 닿으면 그 획만 지우개로 쓴다.
+      // (애플펜슬 두 번 톡톡은 웹에 전달되지 않는다.)
+      const penEraser = e.pointerType === 'pen' && (e.buttons & (2 | 32)) !== 0;
+      if (p.tool === 'eraser' || penEraser) {
         const pt = toPoint(e, start);
         const g: EraseGesture = { kind: 'erase', pointerId: e.pointerId, before: p.strokes, working: p.strokes, last: pt, recorded: false };
         gestureRef.current = g;
