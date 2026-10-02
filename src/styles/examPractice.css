@@ -150,6 +150,7 @@
 .exam-choices-ten .exam-choice { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 100%; min-width: 0; height: auto; min-height: 76px; padding: 8px 2px; font-size: 14px; }
 .exam-choice-math { display: block; max-width: 100%; min-width: 0; overflow-x: auto; font-size: 15px; }
 .exam-choices-ten .katex { font-size: 1em; }
+.exam-choices-ten.is-wide { grid-template-columns: repeat(5, minmax(132px, 1fr)); width: min(100%, 760px); max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: 4px; }
 .exam-unsure { display: grid; justify-items: center; min-width: 52px; min-height: 52px; padding: 4px 8px; border-radius: 14px; background: var(--rn-elevated); border: 2px solid var(--rn-line); font-size: 20px; line-height: 1.1; filter: grayscale(.8); opacity: .8; touch-action: manipulation; }
 .exam-unsure small { font-size: 10.5px; font-weight: 700; color: var(--rn-muted); }
 .exam-unsure.is-on { filter: none; opacity: 1; border-color: var(--rn-warning); background: rgb(242 199 119 / .16); }
