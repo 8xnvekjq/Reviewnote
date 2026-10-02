@@ -6,7 +6,7 @@ import { createPortal } from 'react-dom';
 import type { AdminExamApi, AdminExamAttemptSummary, ExamAttempt, ExamResult, InkStroke } from '../contract';
 import { ExamInkReplay } from '../ink/ExamInkReplay';
 import { ExamAnswer } from './ExamAnswer';
-import { formatDuration } from './examLogic';
+import { formatDuration, usesWholePages } from './examLogic';
 import { OmrResultView } from './OmrResultView';
 
 export type ReviewTarget = Pick<AdminExamAttemptSummary, 'attemptId' | 'paperTitle' | 'round' | 'status' | 'mode' | 'elective' | 'score' | 'maxScore'>;
@@ -27,7 +27,7 @@ function InProgressReview({ target, api }: { target: ReviewTarget; api: AdminExa
   }, [api, target.attemptId, reload]);
   const question = data?.attempt.questions[index];
   const item = question && data?.attempt.items.find(i => i.questionId === question.id);
-  const hanneung = data?.attempt.kind === 'hanneung';
+  const hanneung = data ? usesWholePages(data.attempt.questions) : false;
   const inkKey = question && (hanneung ? data!.attempt.questions.find(q => q.imageUrl === question.imageUrl)!.id : question.id);
   const answered = data ? data.attempt.items.filter(i => i.answer != null).length : 0;
 

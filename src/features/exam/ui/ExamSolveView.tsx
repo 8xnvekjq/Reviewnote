@@ -13,7 +13,7 @@ import { QuestionOverview } from './QuestionOverview';
 import { useExamInk } from './useExamInk';
 import {
   countAnswered, createStopwatch, crossedAlerts, elapsedFor, formatClock, normalizeShortAnswer, pauseStopwatch, remainingMs,
-  switchStopwatch, toggleChoice, questionAnswerType, type StopwatchState,
+  switchStopwatch, toggleChoice, questionAnswerType, usesWholePages, type StopwatchState,
 } from './examLogic';
 
 const SAVE_DEBOUNCE_MS = 2500;
@@ -62,7 +62,8 @@ function initialIndex(attempt: ExamAttempt): number {
 
 export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
   const questions = attempt.questions;
-  const hanneung = attempt.kind === 'hanneung';
+  // 원본 페이지를 통째로 쓰는 시험지(한능검 기본)만 페이지 이동·확대·페이지 단위 필기를 쓴다.
+  const hanneung = usesWholePages(questions);
   const [pageZoom, setPageZoom] = useState(false);
   const [pagePan, setPagePan] = useState(hanneung);
   const isReal = attempt.mode === 'real';

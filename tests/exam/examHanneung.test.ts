@@ -20,7 +20,7 @@ test('한능검 급수 경계와 4지선다 검증', () => {
   assert.equal(attempt.questions[0].answerType, 'choice4');
 });
 
-test('79회 심화·기본은 공개 50문항·100점·원본 12페이지', () => {
+test('79회 심화·기본은 공개 50문항·100점 — 기본은 원본 12페이지, 심화는 문항별 이미지', () => {
   for (const level of ['advanced', 'basic']) {
     const data = JSON.parse(readFileSync(new URL(`../../src/features/exam/data/2026-hanneung-79-${level}.json`, import.meta.url), 'utf8'));
     assert.equal(data.published, true);
@@ -37,7 +37,7 @@ test('79회 심화·기본은 공개 50문항·100점·원본 12페이지', () =
       assert.ok(existsSync(new URL(`../../public${question.imageUrl}`, import.meta.url)));
       pages.add(question.imageUrl);
     }
-    assert.equal(pages.size, 12);
+    assert.equal(pages.size, level === 'basic' ? 12 : 50);
     assert.match(data.sourceSha256, /^[a-f0-9]{64}$/);
   }
 });

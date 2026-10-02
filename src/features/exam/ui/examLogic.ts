@@ -329,3 +329,16 @@ export function historyCellLabel(item: ExamHistoryItem | null, submitted: boolea
     : item.isCorrect ? 'O' : item.answered ? 'X' : 'X 미응답';
   return `${mark}${item.unsure ? ' 🤔' : ''}`;
 }
+
+/**
+ * 여러 문항이 한 이미지(원본 페이지)를 같이 쓰는 시험지인지 — 한능검 기본처럼 페이지 통째로 넣은 경우.
+ * 이때만 원본 페이지 이동·확대·페이지 단위 필기를 쓴다. 문항별로 자른 시험지(수능·내신·한능검 심화)는 아니다.
+ */
+export function usesWholePages(questions: ReadonlyArray<{ imageUrl: string }>): boolean {
+  const seen = new Set<string>();
+  for (const q of questions) {
+    if (seen.has(q.imageUrl)) return true;
+    seen.add(q.imageUrl);
+  }
+  return false;
+}
