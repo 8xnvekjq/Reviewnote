@@ -1,0 +1,486 @@
+{
+ "id": "2026-hanneung-77-advanced",
+ "title": "2026 제77회 한국사능력검정시험 심화",
+ "kind": "hanneung",
+ "hanneungLevel": "advanced",
+ "year": 2026,
+ "examDate": "2026-02-07",
+ "source": "국사편찬위원회",
+ "timeLimitMinutes": 80,
+ "questionCount": 50,
+ "maxScore": 100,
+ "published": false,
+ "electives": [],
+ "sourceUrl": "https://www.historyexam.go.kr/pst/list.do?bbs=dat",
+ "timingSourceUrl": "https://www.historyexam.go.kr/pageLink.do?link=apyexmInfo",
+ "gradeSourceUrl": "https://www.historyexam.go.kr/pageLink.do?link=examGuideline",
+ "sourceSha256": "c3ff51d9273f7812a2b84d7fac4e8e1cb9aa642e80a4f53ebfc2a8afc5503e88",
+ "answersSha256": "71b9b6ef633f0e70b6a9b3c4565ec2f02a1ba2ef5f805f34d77d41427913b304",
+ "pageEnds": [
+  4,
+  9,
+  13,
+  17,
+  21,
+  25,
+  30,
+  34,
+  38,
+  42,
+  46,
+  50
+ ],
+ "questionImages": "cropped",
+ "questions": [
+  {
+   "number": 1,
+   "section": "common",
+   "pageNumber": 1,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-01.jpg",
+   "answerType": "choice5",
+   "answer": "3",
+   "points": 1
+  },
+  {
+   "number": 2,
+   "section": "common",
+   "pageNumber": 1,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-02.jpg",
+   "answerType": "choice5",
+   "answer": "5",
+   "points": 2
+  },
+  {
+   "number": 3,
+   "section": "common",
+   "pageNumber": 1,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-03.jpg",
+   "answerType": "choice5",
+   "answer": "2",
+   "points": 2
+  },
+  {
+   "number": 4,
+   "section": "common",
+   "pageNumber": 1,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-04.jpg",
+   "answerType": "choice5",
+   "answer": "4",
+   "points": 2
+  },
+  {
+   "number": 5,
+   "section": "common",
+   "pageNumber": 2,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-05.jpg",
+   "answerType": "choice5",
+   "answer": "3",
+   "points": 2
+  },
+  {
+   "number": 6,
+   "section": "common",
+   "pageNumber": 2,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-06.jpg",
+   "answerType": "choice5",
+   "answer": "2",
+   "points": 3
+  },
+  {
+   "number": 7,
+   "section": "common",
+   "pageNumber": 2,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-07.jpg",
+   "answerType": "choice5",
+   "answer": "2",
+   "points": 1
+  },
+  {
+   "number": 8,
+   "section": "common",
+   "pageNumber": 2,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-08.jpg",
+   "answerType": "choice5",
+   "answer": "3",
+   "points": 2
+  },
+  {
+   "number": 9,
+   "section": "common",
+   "pageNumber": 2,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-09.jpg",
+   "answerType": "choice5",
+   "answer": "2",
+   "points": 2
+  },
+  {
+   "number": 10,
+   "section": "common",
+   "pageNumber": 3,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-10.jpg",
+   "answerType": "choice5",
+   "answer": "4",
+   "points": 2
+  },
+  {
+   "number": 11,
+   "section": "common",
+   "pageNumber": 3,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-11.jpg",
+   "answerType": "choice5",
+   "answer": "4",
+   "points": 2
+  },
+  {
+   "number": 12,
+   "section": "common",
+   "pageNumber": 3,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-12.jpg",
+   "answerType": "choice5",
+   "answer": "1",
+   "points": 3
+  },
+  {
+   "number": 13,
+   "section": "common",
+   "pageNumber": 3,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-13.jpg",
+   "answerType": "choice5",
+   "answer": "4",
+   "points": 1
+  },
+  {
+   "number": 14,
+   "section": "common",
+   "pageNumber": 4,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-14.jpg",
+   "answerType": "choice5",
+   "answer": "5",
+   "points": 2
+  },
+  {
+   "number": 15,
+   "section": "common",
+   "pageNumber": 4,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-15.jpg",
+   "answerType": "choice5",
+   "answer": "1",
+   "points": 3
+  },
+  {
+   "number": 16,
+   "section": "common",
+   "pageNumber": 4,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-16.jpg",
+   "answerType": "choice5",
+   "answer": "4",
+   "points": 2
+  },
+  {
+   "number": 17,
+   "section": "common",
+   "pageNumber": 4,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-17.jpg",
+   "answerType": "choice5",
+   "answer": "1",
+   "points": 2
+  },
+  {
+   "number": 18,
+   "section": "common",
+   "pageNumber": 5,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-18.jpg",
+   "answerType": "choice5",
+   "answer": "5",
+   "points": 1
+  },
+  {
+   "number": 19,
+   "section": "common",
+   "pageNumber": 5,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-19.jpg",
+   "answerType": "choice5",
+   "answer": "1",
+   "points": 1
+  },
+  {
+   "number": 20,
+   "section": "common",
+   "pageNumber": 5,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-20.jpg",
+   "answerType": "choice5",
+   "answer": "5",
+   "points": 3
+  },
+  {
+   "number": 21,
+   "section": "common",
+   "pageNumber": 5,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-21.jpg",
+   "answerType": "choice5",
+   "answer": "4",
+   "points": 2
+  },
+  {
+   "number": 22,
+   "section": "common",
+   "pageNumber": 6,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-22.jpg",
+   "answerType": "choice5",
+   "answer": "5",
+   "points": 2
+  },
+  {
+   "number": 23,
+   "section": "common",
+   "pageNumber": 6,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-23.jpg",
+   "answerType": "choice5",
+   "answer": "1",
+   "points": 2
+  },
+  {
+   "number": 24,
+   "section": "common",
+   "pageNumber": 6,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-24.jpg",
+   "answerType": "choice5",
+   "answer": "3",
+   "points": 3
+  },
+  {
+   "number": 25,
+   "section": "common",
+   "pageNumber": 6,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-25.jpg",
+   "answerType": "choice5",
+   "answer": "3",
+   "points": 1
+  },
+  {
+   "number": 26,
+   "section": "common",
+   "pageNumber": 7,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-26.jpg",
+   "answerType": "choice5",
+   "answer": "4",
+   "points": 2
+  },
+  {
+   "number": 27,
+   "section": "common",
+   "pageNumber": 7,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-27.jpg",
+   "answerType": "choice5",
+   "answer": "5",
+   "points": 1
+  },
+  {
+   "number": 28,
+   "section": "common",
+   "pageNumber": 7,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-28.jpg",
+   "answerType": "choice5",
+   "answer": "3",
+   "points": 2
+  },
+  {
+   "number": 29,
+   "section": "common",
+   "pageNumber": 7,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-29.jpg",
+   "answerType": "choice5",
+   "answer": "4",
+   "points": 2
+  },
+  {
+   "number": 30,
+   "section": "common",
+   "pageNumber": 7,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-30.jpg",
+   "answerType": "choice5",
+   "answer": "3",
+   "points": 3
+  },
+  {
+   "number": 31,
+   "section": "common",
+   "pageNumber": 8,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-31.jpg",
+   "answerType": "choice5",
+   "answer": "2",
+   "points": 2
+  },
+  {
+   "number": 32,
+   "section": "common",
+   "pageNumber": 8,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-32.jpg",
+   "answerType": "choice5",
+   "answer": "3",
+   "points": 2
+  },
+  {
+   "number": 33,
+   "section": "common",
+   "pageNumber": 8,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-33.jpg",
+   "answerType": "choice5",
+   "answer": "2",
+   "points": 1
+  },
+  {
+   "number": 34,
+   "section": "common",
+   "pageNumber": 8,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-34.jpg",
+   "answerType": "choice5",
+   "answer": "2",
+   "points": 2
+  },
+  {
+   "number": 35,
+   "section": "common",
+   "pageNumber": 9,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-35.jpg",
+   "answerType": "choice5",
+   "answer": "5",
+   "points": 3
+  },
+  {
+   "number": 36,
+   "section": "common",
+   "pageNumber": 9,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-36.jpg",
+   "answerType": "choice5",
+   "answer": "4",
+   "points": 2
+  },
+  {
+   "number": 37,
+   "section": "common",
+   "pageNumber": 9,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-37.jpg",
+   "answerType": "choice5",
+   "answer": "1",
+   "points": 1
+  },
+  {
+   "number": 38,
+   "section": "common",
+   "pageNumber": 9,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-38.jpg",
+   "answerType": "choice5",
+   "answer": "5",
+   "points": 2
+  },
+  {
+   "number": 39,
+   "section": "common",
+   "pageNumber": 10,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-39.jpg",
+   "answerType": "choice5",
+   "answer": "5",
+   "points": 2
+  },
+  {
+   "number": 40,
+   "section": "common",
+   "pageNumber": 10,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-40.jpg",
+   "answerType": "choice5",
+   "answer": "2",
+   "points": 3
+  },
+  {
+   "number": 41,
+   "section": "common",
+   "pageNumber": 10,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-41.jpg",
+   "answerType": "choice5",
+   "answer": "1",
+   "points": 2
+  },
+  {
+   "number": 42,
+   "section": "common",
+   "pageNumber": 10,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-42.jpg",
+   "answerType": "choice5",
+   "answer": "5",
+   "points": 3
+  },
+  {
+   "number": 43,
+   "section": "common",
+   "pageNumber": 11,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-43.jpg",
+   "answerType": "choice5",
+   "answer": "2",
+   "points": 2
+  },
+  {
+   "number": 44,
+   "section": "common",
+   "pageNumber": 11,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-44.jpg",
+   "answerType": "choice5",
+   "answer": "4",
+   "points": 1
+  },
+  {
+   "number": 45,
+   "section": "common",
+   "pageNumber": 11,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-45.jpg",
+   "answerType": "choice5",
+   "answer": "1",
+   "points": 2
+  },
+  {
+   "number": 46,
+   "section": "common",
+   "pageNumber": 11,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-46.jpg",
+   "answerType": "choice5",
+   "answer": "1",
+   "points": 2
+  },
+  {
+   "number": 47,
+   "section": "common",
+   "pageNumber": 12,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-47.jpg",
+   "answerType": "choice5",
+   "answer": "2",
+   "points": 3
+  },
+  {
+   "number": 48,
+   "section": "common",
+   "pageNumber": 12,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-48.jpg",
+   "answerType": "choice5",
+   "answer": "2",
+   "points": 2
+  },
+  {
+   "number": 49,
+   "section": "common",
+   "pageNumber": 12,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-49.jpg",
+   "answerType": "choice5",
+   "answer": "2",
+   "points": 2
+  },
+  {
+   "number": 50,
+   "section": "common",
+   "pageNumber": 12,
+   "imageUrl": "/exams/2026-hanneung-77-advanced/q-50.jpg",
+   "answerType": "choice5",
+   "answer": "3",
+   "points": 2
+  }
+ ]
+}

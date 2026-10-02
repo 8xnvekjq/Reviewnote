@@ -1,0 +1,505 @@
+{
+  "paperId": "2026-hanneung-77-advanced",
+  "questions": [
+    {
+      "number": 1,
+      "era": "prehistory",
+      "field": "문화",
+      "keywords": [
+        "청동기 시대"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 2,
+      "era": "prehistory",
+      "field": "정치",
+      "keywords": [
+        "고조선"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 3,
+      "era": "prehistory",
+      "field": "사회",
+      "keywords": [
+        "동예"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 4,
+      "era": "three-kingdoms",
+      "field": "문화",
+      "keywords": [
+        "신라 천마총"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 5,
+      "era": "three-kingdoms",
+      "field": "정치",
+      "keywords": [
+        "무령왕"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 6,
+      "era": "three-kingdoms",
+      "field": "정치",
+      "keywords": [
+        "백제 부흥 운동"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 7,
+      "era": "north-south",
+      "field": "정치",
+      "keywords": [
+        "발해"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 8,
+      "era": "three-kingdoms",
+      "field": "경제",
+      "keywords": [
+        "백제 한성 시기"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 9,
+      "era": "north-south",
+      "field": "정치",
+      "keywords": [
+        "궁예"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 10,
+      "era": "north-south",
+      "field": "사회",
+      "keywords": [
+        "청해진"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 11,
+      "era": "goryeo",
+      "field": "정치",
+      "keywords": [
+        "거란"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 12,
+      "era": "cross",
+      "field": "사회",
+      "keywords": [
+        "생태·환경사"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 13,
+      "era": "goryeo",
+      "field": "문화",
+      "keywords": [
+        "고려 문화유산"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 14,
+      "era": "goryeo",
+      "field": "정치",
+      "keywords": [
+        "고려 황제국 체제"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 15,
+      "era": "goryeo",
+      "field": "문화",
+      "keywords": [
+        "안향"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 16,
+      "era": "goryeo",
+      "field": "정치",
+      "keywords": [
+        "최충헌"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 17,
+      "era": "goryeo",
+      "field": "문화",
+      "keywords": [
+        "김부식과 일연"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 18,
+      "era": "goryeo",
+      "field": "정치",
+      "keywords": [
+        "위화도 회군"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 19,
+      "era": "joseon-early",
+      "field": "정치",
+      "keywords": [
+        "사간원"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 20,
+      "era": "joseon-early",
+      "field": "문화",
+      "keywords": [
+        "세조"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 21,
+      "era": "joseon-early",
+      "field": "문화",
+      "keywords": [
+        "류성룡"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 22,
+      "era": "joseon-early",
+      "field": "정치",
+      "keywords": [
+        "병자호란"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 23,
+      "era": "joseon-late",
+      "field": "사회",
+      "keywords": [
+        "초량 왜관"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 24,
+      "era": "joseon-late",
+      "field": "정치",
+      "keywords": [
+        "숙종"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 25,
+      "era": "joseon-late",
+      "field": "경제",
+      "keywords": [
+        "조선 후기 경제"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 26,
+      "era": "joseon-late",
+      "field": "문화",
+      "keywords": [
+        "박제가"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 27,
+      "era": "cross",
+      "field": "사회",
+      "keywords": [
+        "충주 지역사"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 28,
+      "era": "joseon-late",
+      "field": "정치",
+      "keywords": [
+        "임술 농민 봉기"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 29,
+      "era": "opening",
+      "field": "정치",
+      "keywords": [
+        "신미양요"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 30,
+      "era": "opening",
+      "field": "정치",
+      "keywords": [
+        "을미개혁"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 31,
+      "era": "opening",
+      "field": "정치",
+      "keywords": [
+        "임오군란"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 32,
+      "era": "colonial",
+      "field": "정치",
+      "keywords": [
+        "하와이 이주 동포"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 33,
+      "era": "opening",
+      "field": "정치",
+      "keywords": [
+        "을사늑약"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 34,
+      "era": "colonial",
+      "field": "정치",
+      "keywords": [
+        "대한민국 임시 정부"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 35,
+      "era": "opening",
+      "field": "문화",
+      "keywords": [
+        "육영 공원"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 36,
+      "era": "colonial",
+      "field": "정치",
+      "keywords": [
+        "의열단"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 37,
+      "era": "colonial",
+      "field": "경제",
+      "keywords": [
+        "토지 조사 사업"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 38,
+      "era": "colonial",
+      "field": "정치",
+      "keywords": [
+        "신간회"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 39,
+      "era": "colonial",
+      "field": "경제",
+      "keywords": [
+        "산미 증식 계획"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 40,
+      "era": "colonial",
+      "field": "문화",
+      "keywords": [
+        "대중가요"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 41,
+      "era": "colonial",
+      "field": "정치",
+      "keywords": [
+        "한국 독립군"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 42,
+      "era": "colonial",
+      "field": "정치",
+      "keywords": [
+        "김구"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 43,
+      "era": "colonial",
+      "field": "사회",
+      "keywords": [
+        "일제 강점기 기념일"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 44,
+      "era": "colonial",
+      "field": "사회",
+      "keywords": [
+        "국가 총동원법"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 45,
+      "era": "modern",
+      "field": "경제",
+      "keywords": [
+        "농지 개혁"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 46,
+      "era": "modern",
+      "field": "정치",
+      "keywords": [
+        "여운형"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 47,
+      "era": "modern",
+      "field": "경제",
+      "keywords": [
+        "행정 수도 계획"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 48,
+      "era": "modern",
+      "field": "정치",
+      "keywords": [
+        "유신 체제 말기"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 49,
+      "era": "modern",
+      "field": "정치",
+      "keywords": [
+        "보도 지침"
+      ],
+      "confidence": "high",
+      "note": ""
+    },
+    {
+      "number": 50,
+      "era": "cross",
+      "field": "정치",
+      "keywords": [
+        "천도"
+      ],
+      "confidence": "high",
+      "note": ""
+    }
+  ]
+}

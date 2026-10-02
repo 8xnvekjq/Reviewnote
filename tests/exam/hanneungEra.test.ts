@@ -67,6 +67,28 @@ test('79회 심화 태그 파일: 1~50 빠짐·중복 없음, 허용 값만, 정
   assert.equal(readJson('2026-hanneung-79-advanced.json').questions.length, topics.questions.length);
 });
 
+test('등록된 모든 회차 태그 파일: 1~50번, 허용 값, 검토 완료, 정답 정보 없음, 레지스트리 등록', () => {
+  const registry = readFileSync(new URL('../../src/features/exam/data/hanneungTopics.ts', import.meta.url), 'utf8');
+  for (const paperId of ['2025-hanneung-74-advanced', '2025-hanneung-75-advanced', '2025-hanneung-76-advanced', '2026-hanneung-77-advanced', '2026-hanneung-78-advanced', '2026-hanneung-79-advanced']) {
+    const name = `${paperId}.topics.json`;
+    const tags: HanneungTopicFile = readJson(name);
+    assert.equal(tags.paperId, paperId);
+    assert.ok(registry.includes(`'./${name}'`), `${paperId} 레지스트리 등록`);
+    assert.deepEqual(tags.questions.map(q => q.number), Array.from({ length: 50 }, (_, i) => i + 1), paperId);
+    for (const q of tags.questions) {
+      assert.ok(ERA_IDS.includes(q.era), `${paperId} ${q.number}번 era`);
+      assert.ok((HANNEUNG_FIELDS as readonly string[]).includes(q.field), `${paperId} ${q.number}번 field`);
+      assert.ok(q.keywords.length >= 1 && q.keywords.length <= 4 && q.keywords.every(k => k.trim().length > 0));
+      // 도구가 만든 "번호 구간 추정" 초안이 검토 없이 등록되지 않게.
+      assert.ok(!q.keywords.includes('시대 검토 필요') && !q.note.includes('번호 구간 추정'), `${paperId} ${q.number}번 미검토`);
+      if (q.confidence === 'low') assert.ok(q.note.length > 0);
+    }
+    const raw = readFileSync(new URL(`../../src/features/exam/data/${name}`, import.meta.url), 'utf8');
+    assert.doesNotMatch(raw, /"(answer|correctAnswer|points|answerType|choices|isCorrect)"/);
+    assert.equal(readJson(`${paperId}.json`).questions.length, 50);
+  }
+});
+
 test('시대별 강의: 모든 시대에 1~2개, https URL, 제공자·제목 있음', () => {
   assert.deepEqual(Object.keys(HANNEUNG_LECTURES).sort(), [...ERA_IDS].sort());
   for (const era of ERA_IDS) {
