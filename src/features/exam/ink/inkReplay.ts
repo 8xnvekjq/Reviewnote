@@ -11,6 +11,12 @@ export function inkDelta(before: InkStroke[], after: InkStroke[], kind: InkChang
   };
 }
 
+/** 서버(save_exam_ink_delta)와 결과 필기를 맞춰 보는 값: 획 id를 순서대로 '\n'으로 이은 문자열의 SHA-256(hex). */
+export async function inkIdsHash(strokes: InkStroke[]): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(strokes.map(stroke => stroke.id).join('\n')));
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
 export function applyInkEvent(strokes: InkStroke[], event: InkReplayEvent): InkStroke[] {
   const removed = new Set(event.removed);
   const next = strokes.filter(stroke => !removed.has(stroke.id));

@@ -12,7 +12,7 @@ import type {
   ExamAttempt, ExamClient, ExamElective, ExamInkDocument, ExamItemState, ExamMode, ExamPaperSummary, ExamQuestion, ExamResult, ExamResultItem, InkReplayBatch,
 } from '../contract.ts';
 import { sanitizeExamAnswer } from '../examMappers';
-import { applyInkEvent } from '../ink/inkReplay';
+import { applyInkEvent, inkIdsHash } from '../ink/inkReplay';
 import { countAnswered, ELECTIVES, estimateGrade, isAnswerCorrect, keepCheckedAnswers } from './examLogic.ts';
 
 interface WrongRateRow { number: number; wrongRate: number; choiceRates: number[] | null }
@@ -115,6 +115,8 @@ export interface MockExamClientOptions {
   latencyMs?: number;
   /** saveProgress 가 false 를 돌려주게(저장 실패 흉내). */
   failSave?: boolean;
+  /** 필기 저장 요청 수·요청 본문 바이트(서버로 가는 양 측정). */
+  inkStats?: { requests: number; bytes: number };
   /** 호출 기록(테스트에서 검사). */
   log?: Array<{ method: string; args: unknown[] }>;
 }
@@ -230,24 +232,29 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       const doc = ink.get(attemptId)?.find(row => row.questionId === questionId);
       return clone({ batches: replay.get(`${attemptId}:${questionId}`) ?? [], strokes: doc?.strokes ?? [], revision: doc?.revision ?? 0 });
     },
-    async saveInk(attemptId, questionId, strokes, revision, legacyImport, events, batchId) {
+    // save_exam_ink_delta 흉내: 이벤트를 서버 쪽 필기에 적용하고 결과 획 id 해시를 대조한다.
+    async saveInk(attemptId, questionId, request) {
+      const { revision, legacyImport, events, batchId, idsHash } = request;
       const entry = must(attemptId);
+      if (options.inkStats) { options.inkStats.requests++; options.inkStats.bytes += new TextEncoder().encode(JSON.stringify(request)).length; }
       if (options.failSave) throw new Error('offline');
       const docs = ink.get(attemptId) ?? [];
       const old = docs.find(row => row.questionId === questionId);
       const key = `${attemptId}:${questionId}`;
       const batches = replay.get(key) ?? [];
-      const duplicate = batchId && batches.find(batch => batch.id === batchId);
-      if (duplicate) return duplicate.revision;
+      const duplicate = batches.find(batch => batch.id === batchId);
+      if (duplicate) {
+        if (duplicate.baseRevision !== revision || JSON.stringify(duplicate.events) !== JSON.stringify(events)) throw new Error('EXAM_REPLAY_BATCH_MISMATCH');
+        return duplicate.revision;
+      }
       if ((old?.revision ?? 0) !== revision) throw new Error('EXAM_INK_CONFLICT');
       if (entry.attempt.status === 'submitted' && !(legacyImport && !old)) throw new Error('EXAM_INK_SUBMITTED');
-      if (events && batchId) {
-        const final = events.reduce(applyInkEvent, old?.strokes ?? []);
-        if (JSON.stringify(final) !== JSON.stringify(strokes)) throw new Error('EXAM_REPLAY_FINAL_MISMATCH');
-        replay.set(key, [...batches, { id: batchId, revision: revision + 1, baseRevision: revision,
-          baseline: batches.at(-1)?.revision === revision ? null : clone(old?.strokes ?? []), events: clone(events) }]);
-      }
-      const next = { questionId, strokes: clone(strokes), revision: revision + 1, lastBatchId: batchId ?? null };
+      if (!events.length) throw new Error('EXAM_REPLAY_TOO_LARGE');
+      const strokes = events.reduce(applyInkEvent, old?.strokes ?? []);
+      if (await inkIdsHash(strokes) !== idsHash) throw new Error('EXAM_REPLAY_FINAL_MISMATCH');
+      replay.set(key, [...batches, { id: batchId, revision: revision + 1, baseRevision: revision,
+        baseline: batches.at(-1)?.revision === revision ? null : clone(old?.strokes ?? []), events: clone(events) }]);
+      const next = { questionId, strokes: clone(strokes), revision: revision + 1, lastBatchId: batchId };
       ink.set(attemptId, [...docs.filter(row => row.questionId !== questionId), next]);
       persist();
       return next.revision;

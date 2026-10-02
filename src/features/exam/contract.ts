@@ -161,7 +161,8 @@ export interface ExamPaperHistoryAttempt extends ExamPaperMetadata {
 /** src/features/exam/examClient.ts의 서버 경계. */
 export interface ExamClient {
   getInk(attemptId: string): Promise<ExamInkDocument[]>;
-  saveInk(attemptId: string, questionId: string, strokes: InkStroke[], revision: number, legacyImport?: boolean, events?: InkReplayEvent[], batchId?: string): Promise<number>;
+  /** 바뀐 내용(events)만 보낸다. 결과 필기 전체 대신 결과 획 id 목록의 해시로 서버 결과와 맞춘다. */
+  saveInk(attemptId: string, questionId: string, request: InkSaveRequest): Promise<number>;
   getInkReplay(attemptId: string, questionId: string): Promise<InkReplayData>;
   /** 학생은 자기 기록만. studentId 지정은 관리자에게만 허용한다. */
   listPaperHistory(paperId: string, studentId?: string): Promise<ExamPaperHistoryAttempt[]>;
@@ -213,6 +214,14 @@ export interface InkReplayEvent {
   at: number;
   added: Array<{ index: number; stroke: InkStroke }>;
   removed: string[];
+}
+/** save_exam_ink_delta 요청. idsHash = 결과 획 id를 순서대로 '\n'으로 이은 문자열의 SHA-256(hex, inkIdsHash). */
+export interface InkSaveRequest {
+  revision: number;
+  legacyImport: boolean;
+  events: InkReplayEvent[];
+  batchId: string;
+  idsHash: string;
 }
 export interface InkReplayBatch {
   id: string;
