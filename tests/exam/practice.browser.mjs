@@ -777,10 +777,56 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
     await page.getByTestId('exam-result').waitFor();
     assert.equal(await page.getByTestId('exam-hanneung-grade').innerText(), '미합격');
     assert.equal(await page.getByTestId('exam-score-tiles').count(), 0);
+    if (level === 'basic') {
+      // 기본은 시대 태그 파일이 없어 시대별 결과를 보여 주지 않는다.
+      assert.equal(await page.getByTestId('exam-eras').count(), 0);
+      assert.equal(await page.locator('.exam-era-chip').count(), 0);
+    } else {
+      // 심화: 시대별 결과(표 순서 10개 시대), 1번만 오답으로 답해 모두 0% → 전부 "보충 필요" + 강의 링크.
+      const eras = page.getByTestId('exam-eras');
+      await eras.waitFor();
+      assert.deepEqual(await eras.locator('.exam-era').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-era'))),
+        ['prehistory', 'three-kingdoms', 'north-south', 'goryeo', 'joseon-early', 'joseon-late', 'opening', 'colonial', 'modern', 'cross']);
+      assert.equal(await eras.locator('.exam-era[data-weak]').count(), 10);
+      assert.match(await eras.locator('.exam-era[data-era="prehistory"]').innerText(), /0\/2문항[\s\S]*0\/2점[\s\S]*보충 필요|보충 필요[\s\S]*0\/2문항/);
+      const links = eras.getByTestId('exam-era-lecture');
+      assert.ok(await links.count() >= 10);
+      for (const link of await links.all()) {
+        assert.equal(await link.getAttribute('target'), '_blank');
+        assert.equal(await link.getAttribute('rel'), 'noopener noreferrer');
+        assert.match(await link.getAttribute('href'), /^https:\/\/www\.youtube\.com\//);
+      }
+      assert.equal(await page.locator('.exam-item-row[data-number="1"] .exam-era-chip').innerText(), '선사·초기 국가');
+      assert.equal(await page.locator('.exam-item-row[data-number="50"] .exam-era-chip').innerText(), '시대 통합');
+      await eras.screenshot({ path: `${out}/hanneung-eras-${viewport.width}.png` });
+    }
     await noHorizontalOverflow(page, `hanneung-result/${viewport.width}`);
     assert.deepEqual(errors, []);
     await context.close();
   }
+}
+
+// 관리자 검토(같은 결과 본문)에서도 한능검 심화 시대별 결과가 보인다. 모든 답을 1로 냈으므로 정답이 1인 문항만 맞는다.
+for (const viewport of [LANDSCAPE, { width: 390, height: 844 }]) {
+  const context = await browser.newContext({ viewport });
+  const page = await context.newPage();
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto(`${BASE}?records=1&recordsPaper=2026-hanneung-79-advanced`);
+  await page.locator('.exam-admin-attempt').first().click();
+  const review = page.getByTestId('admin-exam-review');
+  await review.getByTestId('exam-result').waitFor();
+  const eras = review.getByTestId('exam-eras');
+  await eras.waitFor();
+  assert.equal(await eras.locator('.exam-era').count(), 10);
+  assert.ok(await eras.locator('.exam-era[data-weak]').count() >= 1);
+  assert.match(await eras.innerText(), /보충 필요|가장 약한 시대/);
+  assert.equal(await review.locator('.exam-item-row .exam-era-chip').count(), 50);
+  await noHorizontalOverflow(page, `admin-review-eras/${viewport.width}`);
+  await eras.screenshot({ path: `${out}/admin-review-eras-${viewport.width}.png` });
+  assert.deepEqual(errors, []);
+  await context.close();
+  console.log(`ok — admin review shows hanneung era results (${viewport.width}×${viewport.height})`);
 }
 
 // A fresh browser has no IndexedDB; only the mock server snapshot is copied across devices.

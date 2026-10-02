@@ -116,6 +116,8 @@ export interface ExamResult extends ExamPaperMetadata {
   /** 같은 학생·시험지에서 시작 순서로 계산한 회차. 이전 서버와의 호환을 위해 선택 필드. */
   round?: number;
   attemptId: string;
+  /** 시험지 id. 이전 서버 응답에는 없을 수 있다(그땐 문항 imageUrl 경로로 찾는다). */
+  paperId?: string;
   paperTitle: string;
   mode: ExamMode;
   elective: ExamElective | null;

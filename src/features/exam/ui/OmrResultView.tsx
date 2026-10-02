@@ -1,10 +1,13 @@
-// OMR 결과: 원점수·추정 등급·추정 표준점수·추정 백분위 + 맞은 개수·총 시간(+등급컷 표 접기) / 문항별 줄 / 오답노트 후보 고르기.
+// OMR 결과: 원점수·추정 등급·추정 표준점수·추정 백분위 + 맞은 개수·총 시간(+등급컷 표 접기) / 한능검 시대별 결과 / 문항별 줄 / 오답노트 후보 고르기.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { AdminExamApi, ExamClient, ExamResult, ExamResultItem, InkStroke } from '../contract';
 import { ExamInkReplay } from '../ink/ExamInkReplay';
 import { useExamInk } from './useExamInk';
 import { ExamAnswer } from './ExamAnswer';
 import { resultGradeLabel } from './hanneungLogic';
+import { eraLabel, eraStats, resultPaperId, weakEras, type EraStat, type HanneungEra } from './hanneungEra';
+import { hanneungTopicsFor } from '../data/hanneungTopics';
+import { HANNEUNG_LECTURES } from '../data/hanneungLectures';
 import { displayAnswer, ELECTIVE_SHORT, estimateStandardScore, formatClock, formatDuration, mistakeCandidates, praiseLine, roundLabel, usesWholePages } from './examLogic';
 
 type Props = {
@@ -79,6 +82,9 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar
   const [pageZoom, setPageZoom] = useState(false);
 
   const candidates = useMemo(() => mistakeCandidates(result.items), [result.items]);
+  // 한능검 시대 태그가 있는 시험지만 시대별 결과를 보여 준다.
+  const topics = result.kind === 'hanneung' ? hanneungTopicsFor(resultPaperId(result)) : null;
+  const eraOf = useMemo(() => new Map(topics?.questions.map(topic => [topic.number, topic.era]) ?? []), [topics]);
   const pendingCandidates = candidates.filter(item => !item.addedMistakeId);
   const cuts = result.gradeCut;
   const school = result.kind === 'school' || result.kind === 'hanneung';
@@ -179,6 +185,8 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar
         </>}
       </section>
 
+      {topics && <EraSection stats={eraStats(result.items, topics)} />}
+
       {!reviewing && <section className="rn-surface exam-candidates" aria-label="오답노트 후보" data-testid="exam-candidates">
         <h3>오답노트 후보</h3>
         {candidates.length === 0 ? (
@@ -240,6 +248,7 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar
                   <span className="exam-item-num">{item.number}</span>
                   <span className="exam-item-ox" aria-label={item.isCorrect ? '맞음' : '틀림'}>{item.isCorrect ? 'O' : 'X'}</span>
                   <span className="exam-item-answers">
+                    {eraOf.has(item.number) && <span className="exam-era-chip">{eraLabel(eraOf.get(item.number)!)}</span>}
                     <span>{reviewing ? '학생 답' : '내 답'} <b><ExamAnswer question={item} answer={item.answer} /></b></span>
                     <span>정답 <b><ExamAnswer question={item} answer={item.correctAnswer} /></b></span>
                   </span>
@@ -288,5 +297,54 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar
         </div>
       )}
     </div>
+  );
+}
+
+/** 한능검 시대별 결과: 시대마다 맞은 수·점수·막대, 약한 시대에는 무료 개념 강의 링크. */
+function EraSection({ stats }: { stats: EraStat[] }) {
+  const weak = weakEras(stats);
+  const weakSet = new Set<HanneungEra>(weak?.eras ?? []);
+  return (
+    <section className="rn-surface exam-eras" aria-label="시대별 결과" data-testid="exam-eras">
+      <h3>시대별 결과</h3>
+      <p className="rn-caption">
+        {weak?.kind === 'needs-work' ? '정답률 60% 미만인 시대는 개념 강의로 먼저 보충해 봐요.'
+          : weak ? '모든 시대가 60% 이상이에요! 가장 약한 시대만 한 번 더 볼까요?'
+          : '모든 시대를 다 맞혔어요!'}
+      </p>
+      <ul className="exam-era-list">
+        {stats.map(stat => {
+          const isWeak = weakSet.has(stat.era);
+          const percent = Math.round(stat.rate * 100);
+          return (
+            <li key={stat.era} className={`exam-era${isWeak ? ' is-weak' : ''}`} data-era={stat.era} data-weak={isWeak || undefined}>
+              <div className="exam-era-head">
+                <strong>{stat.label}</strong>
+                {isWeak && <span className="exam-era-badge">{weak!.kind === 'needs-work' ? '보충 필요' : '가장 약한 시대'}</span>}
+                <span className="exam-era-nums">
+                  <span data-testid="exam-era-correct">{stat.correct}/{stat.total}문항</span>
+                  <span>{stat.earned}/{stat.points}점</span>
+                </span>
+              </div>
+              <div className="exam-era-bar" role="img" aria-label={`정답률 ${percent}%`}>
+                <span style={{ width: `${percent}%` }} />
+              </div>
+              {isWeak && HANNEUNG_LECTURES[stat.era].length > 0 && (
+                <ul className="exam-era-lectures" aria-label={`${stat.label} 개념 강의`}>
+                  {HANNEUNG_LECTURES[stat.era].map(lecture => (
+                    <li key={lecture.url}>
+                      <a href={lecture.url} target="_blank" rel="noopener noreferrer" data-testid="exam-era-lecture">
+                        ▶ {lecture.title}
+                      </a>
+                      <span className="exam-era-provider">{lecture.provider}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }

@@ -281,6 +281,7 @@ export function mapExamResult(raw: unknown): ExamResult {
     attemptId: asString(r.attemptId),
     ...mapRound(r),
     ...mapMetadata(r),
+    ...(r.paperId != null ? { paperId: asString(r.paperId) } : {}),
     paperTitle: asString(r.paperTitle),
     mode: asMode(r.mode),
     elective: asElective(r.elective),

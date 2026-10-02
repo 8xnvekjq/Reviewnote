@@ -200,6 +200,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       ...(school ? SCHOOL_META : {}),
       ...historyMeta,
       attemptId: attempt.id,
+      paperId: attempt.paperId,
       round: roundFor(attempt),
       paperTitle: paperTitle(attempt.paperId),
       mode: attempt.mode,
