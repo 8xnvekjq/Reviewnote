@@ -1,8 +1,8 @@
 // OMR 결과: 원점수·추정 등급·추정 표준점수·추정 백분위 + 맞은 개수·총 시간(+등급컷 표 접기) / 문항별 줄 / 오답노트 후보 고르기.
-import { useEffect, useMemo, useState } from 'react';
-import type { ExamClient, ExamResult, ExamResultItem, InkStroke } from '../contract';
+import { useMemo, useState } from 'react';
+import type { ExamClient, ExamResult, ExamResultItem } from '../contract';
 import { ExamInkCanvas } from '../ink/ExamInkCanvas';
-import { loadInk } from './inkStore';
+import { useExamInk } from './useExamInk';
 import { ExamAnswer } from './ExamAnswer';
 import { resultGradeLabel } from './hanneungLogic';
 import { displayAnswer, ELECTIVE_SHORT, estimateStandardScore, formatClock, formatDuration, mistakeCandidates, praiseLine, roundLabel } from './examLogic';
@@ -16,18 +16,13 @@ interface Props {
 
 export function OmrResultView({ client, result: initial, onBack, backLabel }: Props) {
   const [result, setResult] = useState(initial);
-  const [ink, setInk] = useState<Map<string, InkStroke[]>>(() => new Map());
+  const inkSync = useExamInk(client, initial.attemptId, initial.items.map(item => item.questionId));
+  const ink = inkSync.strokes;
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
   const [adding, setAdding] = useState(false);
   const [addMessage, setAddMessage] = useState<string | null>(null);
   const [viewing, setViewing] = useState<ExamResultItem | null>(null);
   const [pageZoom, setPageZoom] = useState(false);
-
-  useEffect(() => {
-    let alive = true;
-    void loadInk(initial.attemptId).then(map => { if (alive) setInk(map); });
-    return () => { alive = false; };
-  }, [initial.attemptId]);
 
   const candidates = useMemo(() => mistakeCandidates(result.items), [result.items]);
   const pendingCandidates = candidates.filter(item => !item.addedMistakeId);
@@ -74,6 +69,16 @@ export function OmrResultView({ client, result: initial, onBack, backLabel }: Pr
       <div className="exam-result-head">
         <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={onBack}>{backLabel ?? '← 시험지 목록'}</button>
       </div>
+      <p className="rn-caption" role="status">
+        {inkSync.status === 'loading' ? '필기를 불러오는 중…' : inkSync.status === 'saved' ? '서버에 저장된 필기도 문항별로 볼 수 있어요.'
+          : inkSync.status === 'pending' || inkSync.status === 'saving' ? '이 기기의 필기를 서버에 옮기는 중…'
+          : '필기 동기화를 완료하지 못했어요.'}
+        {(inkSync.status === 'failed' || inkSync.status === 'conflict') && <button type="button" className="rn-button rn-button-compact" onClick={() => {
+          if (inkSync.status === 'conflict') {
+            if (window.confirm('이 기기의 미저장 필기 대신 서버에 저장된 필기를 사용할까요?')) void inkSync.load(true);
+          } else void inkSync.load().then(() => inkSync.flush());
+        }}>{inkSync.status === 'conflict' ? '서버 필기 사용' : '다시 시도'}</button>}
+      </p>
 
       <section className="rn-surface exam-score-card" aria-label="OMR 결과 요약">
         <p className="rn-eyebrow">OMR 결과</p>

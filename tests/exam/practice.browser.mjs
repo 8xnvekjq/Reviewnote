@@ -5,7 +5,7 @@ import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 
-const BASE = 'http://127.0.0.1:5174/tests/exam/practice.html';
+const BASE = `${process.env.EXAM_TEST_BASE_URL || 'http://127.0.0.1:5174'}/tests/exam/practice.html`;
 const out = 'node_modules/.cache/exam-practice';
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
@@ -459,7 +459,7 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   assert.equal(await page.getByTestId('exam-paper-card').count() >= 2, true);
   assert.equal(await paperCard(page, PAPER_A).getAttribute('data-state'), 'new');
   const box = await paperCard(page, PAPER_A).boundingBox();
-  assert.ok(box.height >= 250, `card height ${box.height}`);
+  assert.ok(box.height >= 249.5, `card height ${box.height}`); // CSS subpixel rounding
   await noPaperCardOverlap(page);
   await noHorizontalOverflow(page, `start/${viewport.width}`);
 
@@ -688,6 +688,7 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   // 새로고침 뒤에도 입력·채점 잠금과 선지가 유지된다.
   await page.reload();
   await page.getByTestId('exam-start').waitFor();
+  await page.getByRole('button', { name: '고1', exact: true }).click();
   await paperCard(page, SCHOOL).click();
   await page.getByTestId('exam-solve').waitFor();
   await goToByOverview(page, 18);
@@ -767,6 +768,53 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
     assert.deepEqual(errors, []);
     await context.close();
   }
+}
+
+// A fresh browser has no IndexedDB; only the mock server snapshot is copied across devices.
+{
+  const { context, page } = await open(LANDSCAPE, '?persist=1');
+  await startExam(page, '자유 모드', '미적', PAPER_A);
+  await drawStroke(page);
+  await page.waitForFunction(() => document.querySelector('[data-testid="exam-ink-sync"]')?.textContent.includes('필기 서버 저장 완료'));
+  const remote = await page.evaluate(() => localStorage.getItem('exam-practice-harness'));
+  const other = await browser.newContext({ viewport: PORTRAIT });
+  await other.addInitScript(value => localStorage.setItem('exam-practice-harness', value), remote);
+  const second = await other.newPage();
+  await second.goto(`${BASE}?persist=1`);
+  await paperCard(second, PAPER_A).click();
+  await second.waitForFunction(() => document.querySelector('[data-testid="exam-body"] .exam-ink')?.getAttribute('data-stroke-count') === '1');
+  assert.equal(await strokeCount(second), '1');
+  await other.close(); await context.close();
+  console.log('ok — ink restored on a second device without IndexedDB');
+}
+
+// Administrator can inspect both submitted and active attempts without editing a student's work.
+for (const viewport of [LANDSCAPE, { width: 390, height: 844 }]) {
+  const context = await browser.newContext({ viewport });
+  const page = await context.newPage();
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto(`${BASE}?records=1`);
+  await page.locator('.exam-admin-attempt').first().waitFor();
+  assert.equal(await page.locator('.exam-admin-attempt').count(), 2);
+  assert.match(await page.locator('.exam-admin-attempt').first().innerText(), /100점/);
+  await page.locator('.exam-admin-attempt').first().click();
+  await page.locator('.exam-admin-paper .exam-ink').waitFor();
+  assert.equal(await page.locator('.exam-admin-paper .exam-ink').getAttribute('data-stroke-count'), '1');
+  assert.match(await page.locator('.exam-admin-answer').innerText(), /정답/);
+  const box = await page.locator('.exam-admin-paper .exam-ink').boundingBox();
+  await page.mouse.move(box.x + 30, box.y + 30); await page.mouse.down();
+  await page.mouse.move(box.x + 80, box.y + 90); await page.mouse.up();
+  assert.equal(await page.locator('.exam-admin-paper .exam-ink').getAttribute('data-stroke-count'), '1');
+  await noHorizontalOverflow(page, `admin-student-solution/${viewport.width}`);
+  await page.screenshot({ path: `${out}/admin-student-${viewport.width}.png`, fullPage: true });
+  await page.getByRole('button', { name: '← 응시 목록', exact: true }).click();
+  await page.locator('.exam-admin-attempt').nth(1).click();
+  await page.locator('.exam-admin-paper .exam-ink').waitFor();
+  assert.doesNotMatch(await page.locator('.exam-admin-answer').innerText(), /정답/);
+  assert.equal(await page.getByRole('button', { name: '제출하기', exact: true }).count(), 0);
+  assert.deepEqual(errors, []);
+  await context.close();
 }
 
 await browser.close();

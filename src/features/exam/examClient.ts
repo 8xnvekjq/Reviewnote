@@ -1,5 +1,5 @@
 import { supabase } from '../../services/supabase';
-import type { ExamClient } from './contract';
+import type { AdminExamAttemptSummary, ExamClient, ExamInkDocument } from './contract';
 import {
   ExamClientError,
   mapAddedMistakes,
@@ -31,6 +31,19 @@ async function callRpc(name: string, args: Record<string, unknown>): Promise<unk
 }
 
 export const examClient: ExamClient = {
+  async getInk(attemptId) {
+    return await callRpc('get_exam_ink', { p_attempt_id: attemptId }) as ExamInkDocument[];
+  },
+  async saveInk(attemptId, questionId, strokes, revision, legacyImport = false) {
+    // Preserve conflict codes; the generic error mapper hides unknown server codes.
+    const { data, error } = await supabase.rpc('save_exam_ink', {
+      p_attempt_id: attemptId, p_question_id: questionId, p_strokes: strokes,
+      p_revision: revision, p_legacy_import: legacyImport,
+    });
+    if (error) throw new Error(error.message);
+    if (!Number.isInteger(data) || data < 1) throw new Error('필기 저장을 확인하지 못했어요.');
+    return data as number;
+  },
   async listPaperHistory(paperId, studentId) {
     return mapExamPaperHistory(await callRpc('list_my_paper_history', {
       p_paper_id: paperId, p_student_id: studentId ?? null,
@@ -105,5 +118,14 @@ export const examClient: ExamClient = {
       p_origin: toMistakeOrigin(window.location.origin),
     });
     return mapAddedMistakes(data);
+  },
+};
+
+export const adminExamClient = {
+  async listAttempts(studentId: string, offset = 0): Promise<AdminExamAttemptSummary[]> {
+    return await callRpc('admin_list_student_exam_attempts', { p_student_id: studentId, p_offset: offset }) as AdminExamAttemptSummary[];
+  },
+  async getAttempt(attemptId: string) {
+    return mapExamAttempt(await callRpc('admin_get_exam_attempt', { p_attempt_id: attemptId }));
   },
 };

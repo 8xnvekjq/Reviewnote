@@ -1,6 +1,19 @@
 /* 기출문제 풀이 — design-system.css 의 --rn-* 토큰 위에서만 만든다.
    풀이 화면(.exam-solve)은 position:fixed 로 앱 상단바·하단 탭까지 덮는다(전체화면 API가 없어도). */
 .exam-practice { width: 100%; min-width: 0; color: var(--rn-text); }
+.exam-ink-sync { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-block: 8px; font-size: 12px; color: var(--rn-text-muted, #94a3b8); }
+.exam-admin-summary { display: grid; gap: 10px; padding-top: 16px; border-top: 1px solid var(--rn-line, #334155); }
+.exam-admin-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+.exam-admin-summary h3, .exam-admin-summary h4 { font-weight: 700; overflow-wrap: anywhere; }
+.exam-admin-attempts { display: grid; gap: 8px; list-style: none; margin: 0; padding: 0; }
+.exam-admin-attempt { width: 100%; display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; text-align: left; padding: 12px; border: 1px solid var(--rn-line, #334155); border-radius: 12px; background: var(--rn-surface, #0f172a); }
+.exam-admin-attempt > span { min-width: 0; overflow-wrap: anywhere; }
+.exam-admin-attempt small { display: block; margin-top: 4px; color: var(--rn-text-muted, #94a3b8); font-size: 11px; }
+.exam-admin-score { white-space: nowrap; font-weight: 700; }
+.exam-admin-detail { display: grid; gap: 12px; min-width: 0; }
+.exam-admin-detail select { background: var(--rn-surface, #0f172a); color: inherit; border: 1px solid var(--rn-line, #334155); border-radius: 8px; padding: 6px; }
+.exam-admin-answer { font-size: 13px; }
+.exam-admin-paper { background: white; border-radius: 10px; overflow: hidden; }
 .exam-review-badge { font-size: 11px; line-height: 1.4; color: #784a00; background: #fff1cc; padding: 4px 6px; border-radius: 6px; }
 .exam-answer-math { display: inline-flex; align-items: center; gap: 5px; min-width: 0; max-width: 100%; }
 .exam-answer-math > span:last-child { min-width: 0; overflow-x: auto; }

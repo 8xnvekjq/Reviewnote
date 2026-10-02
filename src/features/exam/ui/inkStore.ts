@@ -1,4 +1,4 @@
-// 문항별 필기를 IndexedDB 에 저장(키: attemptId + questionId). 서버엔 올리지 않는다.
+// IndexedDB is a recovery cache. Server revisions protect edits made on other devices.
 // IndexedDB 가 없거나(사생활 보호 모드 등) 실패해도 풀이는 계속돼야 하므로 모든 함수가 조용히 실패한다.
 import type { InkStroke } from '../contract.ts';
 
@@ -11,9 +11,10 @@ function openDb(): Promise<IDBDatabase | null> {
   dbPromise = new Promise(resolve => {
     try {
       if (typeof indexedDB === 'undefined') { resolve(null); return; }
-      const req = indexedDB.open(DB_NAME, 1);
+      const req = indexedDB.open(DB_NAME, 2);
       req.onupgradeneeded = () => {
         if (!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE);
+        if (!req.result.objectStoreNames.contains('drafts')) req.result.createObjectStore('drafts');
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => resolve(null);
@@ -27,6 +28,42 @@ function openDb(): Promise<IDBDatabase | null> {
 
 export function inkKey(attemptId: string, questionId: string): string {
   return `${attemptId}::${questionId}`;
+}
+
+export interface InkDraft { strokes: InkStroke[]; revision: number; pending: boolean; legacyImport?: boolean }
+
+export async function loadInkDrafts(attemptId: string): Promise<Map<string, InkDraft>> {
+  const db = await openDb();
+  const result = new Map<string, InkDraft>();
+  if (!db) return result;
+  return new Promise(resolve => {
+    try {
+      const tx = db.transaction('drafts', 'readonly');
+      const prefix = `${attemptId}::`;
+      const req = tx.objectStore('drafts').openCursor(IDBKeyRange.bound(prefix, `${prefix}\uffff`));
+      req.onsuccess = () => {
+        const cursor = req.result;
+        if (!cursor) return;
+        result.set(String(cursor.key).slice(prefix.length), cursor.value as InkDraft);
+        cursor.continue();
+      };
+      tx.oncomplete = () => resolve(result);
+      tx.onerror = tx.onabort = () => resolve(result);
+    } catch { resolve(result); }
+  });
+}
+
+export async function saveInkDraft(attemptId: string, questionId: string, draft: InkDraft): Promise<boolean> {
+  const db = await openDb();
+  if (!db) return false;
+  return new Promise(resolve => {
+    try {
+      const tx = db.transaction('drafts', 'readwrite');
+      tx.objectStore('drafts').put(draft, inkKey(attemptId, questionId));
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = tx.onabort = () => resolve(false);
+    } catch { resolve(false); }
+  });
 }
 
 export async function saveInk(attemptId: string, questionId: string, strokes: InkStroke[]): Promise<boolean> {

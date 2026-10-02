@@ -9,7 +9,7 @@ import { hanneungGrade } from './hanneungLogic.ts';
 import paperJson from '../data/2025-06-math.json';
 import imagesJson from '../data/2025-06-math.images.json';
 import type {
-  ExamAttempt, ExamClient, ExamElective, ExamItemState, ExamMode, ExamPaperSummary, ExamQuestion, ExamResult, ExamResultItem,
+  ExamAttempt, ExamClient, ExamElective, ExamInkDocument, ExamItemState, ExamMode, ExamPaperSummary, ExamQuestion, ExamResult, ExamResultItem,
 } from '../contract.ts';
 import { sanitizeExamAnswer } from '../examMappers';
 import { countAnswered, ELECTIVES, estimateGrade, isAnswerCorrect, keepCheckedAnswers } from './examLogic.ts';
@@ -121,6 +121,7 @@ export interface MockExamClientOptions {
 export function createMockExamClient(options: MockExamClientOptions = {}): ExamClient {
   const papers = [...MOCK_PAPERS, ...HANNEUNG_META, ...(options.admin ? [SCHOOL_META] : [])];
   const store = new Map<string, StoredAttempt>();
+  const ink = new Map<string, ExamInkDocument[]>();
   let seq = 0;
 
   const load = () => {
@@ -128,15 +129,16 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
     try {
       const raw = localStorage.getItem(options.persistKey);
       if (!raw) return;
-      const parsed = JSON.parse(raw) as { seq: number; attempts: StoredAttempt[] };
+      const parsed = JSON.parse(raw) as { seq: number; attempts: StoredAttempt[]; ink?: [string, ExamInkDocument[]][] };
       seq = parsed.seq;
       for (const entry of parsed.attempts) store.set(entry.attempt.id, entry);
+      for (const [id, docs] of parsed.ink ?? []) ink.set(id, docs);
     } catch { /* 깨진 저장분은 무시 */ }
   };
   const persist = () => {
     if (!options.persistKey) return;
     try {
-      localStorage.setItem(options.persistKey, JSON.stringify({ seq, attempts: [...store.values()] }));
+      localStorage.setItem(options.persistKey, JSON.stringify({ seq, attempts: [...store.values()], ink: [...ink] }));
     } catch { /* 저장 실패는 무시 */ }
   };
   load();
@@ -216,6 +218,22 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
   };
 
   return {
+    async getInk(attemptId) {
+      must(attemptId);
+      return clone(ink.get(attemptId) ?? []);
+    },
+    async saveInk(attemptId, questionId, strokes, revision, legacyImport) {
+      const entry = must(attemptId);
+      if (options.failSave) throw new Error('offline');
+      const docs = ink.get(attemptId) ?? [];
+      const old = docs.find(row => row.questionId === questionId);
+      if ((old?.revision ?? 0) !== revision) throw new Error('EXAM_INK_CONFLICT');
+      if (entry.attempt.status === 'submitted' && !(legacyImport && !old)) throw new Error('EXAM_INK_SUBMITTED');
+      const next = { questionId, strokes: clone(strokes), revision: revision + 1 };
+      ink.set(attemptId, [...docs.filter(row => row.questionId !== questionId), next]);
+      persist();
+      return next.revision;
+    },
     async listPaperHistory(paperId, studentId) {
       record('listPaperHistory', [paperId, studentId]);
       await wait();
