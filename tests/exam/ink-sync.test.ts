@@ -177,3 +177,43 @@ test('in-memory edits survive retry when IndexedDB is unavailable', async () => 
   assert.equal(await a.flush(), true);
   assert.equal(s.rows.get('q1')?.strokes.length, 1);
 });
+
+test('background saves back off after a failure; explicit saves still go through immediately', async () => {
+  const s = server(); let calls = 0;
+  const client = { ...s.client, saveInk: async (...args: Parameters<typeof s.client.saveInk>) => { calls++; return s.client.saveInk(...args); } };
+  const a = new InkSync(client, 'attempt', undefined, cache().storage);
+  await a.load();
+  s.state.offline = true;
+  a.change('q1', [stroke('a')]);
+  assert.equal(await a.flush({ background: true }), false);
+  assert.equal(calls, 1);
+  // Within the backoff window an automatic retry does not reach the server.
+  assert.equal(await a.flush({ background: true }), false);
+  assert.equal(calls, 1);
+  s.state.offline = false;
+  // Submit / exit / "다시 시도" are explicit and ignore the backoff.
+  assert.equal(await a.flush(), true);
+  assert.equal(calls, 2);
+  // Success resets the backoff.
+  a.change('q1', [stroke('a'), stroke('b')]);
+  assert.equal(await a.flush({ background: true }), true);
+  assert.equal(calls, 3);
+});
+
+test('server sync kill switch keeps ink on the device and sends nothing', async () => {
+  const s = server(); const c = cache(); let calls = 0;
+  const client = { ...s.client, saveInk: async (...args: Parameters<typeof s.client.saveInk>) => { calls++; return s.client.saveInk(...args); } };
+  const a = new InkSync(client, 'attempt', undefined, c.storage, undefined, true);
+  await a.load();
+  a.change('q1', [stroke('local')]);
+  assert.equal(await a.flush(), true);
+  assert.equal(calls, 0);
+  assert.equal(a.pending, true);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(c.drafts.get('q1')?.strokes[0].id, 'local');
+  // Turning sync back on uploads what accumulated.
+  const later = new InkSync(client, 'attempt', undefined, c.storage);
+  await later.load();
+  assert.equal(await later.flush(), true);
+  assert.equal(s.rows.get('q1')?.strokes[0].id, 'local');
+});

@@ -10,6 +10,12 @@ export interface InkCache {
 const cache: InkCache = { legacy: loadInk, read: loadInkDrafts, write: saveInkDraft };
 export type InkSyncStatus = 'loading' | 'saved' | 'pending' | 'saving' | 'failed' | 'conflict';
 
+/** 비상 스위치: VITE_EXAM_INK_SERVER_SYNC=off 로 배포하면 필기는 이 기기에만 남고 서버로 보내지 않는다(다시 켜면 쌓인 필기를 보낸다). */
+const SERVER_SYNC_OFF = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_EXAM_INK_SERVER_SYNC === 'off';
+/** 자동 저장이 실패하면 5초→10초→…→최대 2분 동안 자동 재시도를 쉰다. 제출·나가기·다시 시도 버튼은 바로 보낸다. */
+const BACKOFF_BASE_MS = 5000;
+const BACKOFF_MAX_MS = 120000;
+
 /** One serialized writer per attempt. Revisions are never guessed or advanced on a failed request. */
 export class InkSync {
   documents = new Map<string, InkDraft>();
@@ -24,14 +30,18 @@ export class InkSync {
   private notify: () => void;
   private storage: InkCache;
   private questionIds?: Set<string>;
+  private failures = 0;
+  private nextTryAt = 0;
+  private serverSyncOff: boolean;
 
   constructor(client: Pick<ExamClient, 'getInk' | 'saveInk'>, attemptId: string,
-    notify: () => void = () => {}, storage: InkCache = cache, questionIds?: Set<string>) {
+    notify: () => void = () => {}, storage: InkCache = cache, questionIds?: Set<string>, serverSyncOff = SERVER_SYNC_OFF) {
     this.client = client;
     this.attemptId = attemptId;
     this.notify = notify;
     this.storage = storage;
     this.questionIds = questionIds;
+    this.serverSyncOff = serverSyncOff;
   }
 
   get strokes() { return new Map([...this.documents].map(([id, doc]) => [id, doc.strokes])); }
@@ -118,9 +128,12 @@ export class InkSync {
     this.notify();
   }
 
-  flush(): Promise<boolean> {
+  /** background: 자동 저장(디바운스·주기 재시도). 최근에 실패했으면 백오프 동안 서버에 보내지 않는다. */
+  flush(options: { background?: boolean } = {}): Promise<boolean> {
     if (this.saving) return this.saving;
     if (!this.ready || this.status === 'conflict') return Promise.resolve(false);
+    if (options.background && Date.now() < this.nextTryAt) return Promise.resolve(false);
+    if (this.serverSyncOff) return Promise.resolve(true); // 이 기기(IndexedDB)에는 획마다 이미 저장돼 있다.
     this.saving = this.flushNow().finally(() => { this.saving = null; });
     return this.saving;
   }
@@ -157,6 +170,8 @@ export class InkSync {
         this.persist(id, saved);
       }
       await this.cacheWrites;
+      this.failures = 0;
+      this.nextTryAt = 0;
       this.status = 'saved';
       this.notify();
       return true;
@@ -164,6 +179,10 @@ export class InkSync {
       const message = error instanceof Error ? error.message : '';
       this.status = /EXAM_INK_CONFLICT|EXAM_INK_SUBMITTED/.test(message) ? 'conflict' : 'failed';
       if (this.status === 'conflict') this.ready = false;
+      else {
+        this.failures++;
+        this.nextTryAt = Date.now() + Math.min(BACKOFF_MAX_MS, BACKOFF_BASE_MS * 2 ** (this.failures - 1));
+      }
       this.notify();
       return false;
     }

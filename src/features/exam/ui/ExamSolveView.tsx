@@ -17,7 +17,8 @@ import {
 } from './examLogic';
 
 const SAVE_DEBOUNCE_MS = 2500;
-const INK_SAVE_DEBOUNCE_MS = 800;
+// 획마다 문항 필기 전체가 서버로 가므로 너무 자주 보내지 않는다. 문항 이동·화면 숨김·제출 때는 바로 보낸다.
+const INK_SAVE_DEBOUNCE_MS = 5000;
 const PEN_COLORS = [
   { value: '#1f2937', label: '검정' },
   { value: '#2563eb', label: '파랑' },
@@ -134,22 +135,24 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
     saveTimer.current = window.setTimeout(() => { saveTimer.current = null; void saveNow(); }, SAVE_DEBOUNCE_MS);
   }, [saveNow]);
 
-  const flushInk = useCallback(async () => {
+  const flushInk = useCallback(async (options?: { background?: boolean }) => {
     for (const timer of inkTimers.current.values()) window.clearTimeout(timer);
     inkTimers.current.clear();
-    return inkSync.flush();
+    return inkSync.flush(options);
   }, [inkSync]);
 
   // ── 문항 열기: visits+1, visitOrder 기록, 스톱워치 전환 ──
   useEffect(() => {
     if (openedRef.current === question.id) return;
+    // 문항을 옮기면 앞 문항 필기를 기다리지 않고 보낸다(디바운스가 5초라서).
+    if (openedRef.current != null && inkTimers.current.size > 0) void flushInk({ background: true });
     openedRef.current = question.id;
     visitOrderRef.current.push(question.number);
     setItems(prev => ({ ...prev, [question.id]: { ...prev[question.id], visits: (prev[question.id]?.visits ?? 0) + 1 } }));
     swRef.current = switchStopwatch(swRef.current, document.hidden ? null : question.id, Date.now());
     if (document.hidden) swRef.current = { ...swRef.current, activeId: question.id };
     scheduleSave();
-  }, [question.id, question.number, scheduleSave]);
+  }, [question.id, question.number, scheduleSave, flushInk]);
 
   // 검토 화면에선 문항 스톱워치를 멈춘다
   useEffect(() => {
@@ -278,7 +281,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
     if (old != null) window.clearTimeout(old);
     inkTimers.current.set(qid, window.setTimeout(() => {
       inkTimers.current.delete(qid);
-      void inkSync.flush();
+      void inkSync.flush({ background: true });
     }, INK_SAVE_DEBOUNCE_MS));
     setHistoryTick(t => t + 1);
   };
