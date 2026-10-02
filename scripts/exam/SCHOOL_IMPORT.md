@@ -26,13 +26,14 @@ Python 3.10+, PyMuPDF, Pillow가 필요합니다 (`python -m pip install pymupdf
     "schoolGrade": "고1",
     "examDate": null,
     "timeLimitMinutes": 50,
-    "questionCount": 21,
     "maxScore": 100,
     "electives": [],
     "published": false
   }
 }
 ```
+
+`paper.questionCount`는 선택 사항입니다. 표지의 원본 문항 수에 분리 예외를 반영해 계산하며, 표기가 없으면 감지값을 쓰고 확인 경고를 표시합니다. 설정값이 표지에서 계산한 최종값과 다르거나 표지 배점 합계 × `pointScale`이 `maxScore`와 다르면 실패합니다.
 
 2. `python scripts/exam/import_school.py 설정.json --out-dir .orca-task/review --sheet`를 실행합니다. 문제/정답 쪽, 중앙 세로선이나 문항 x 분포를 이용한 1단/2단, 반복 머리말/꼬리말 및 첫 쪽 표는 자동 감지합니다. 번호 1..N과 정답/배점도 자동 생성합니다. 원본 25점→100점은 `pointScale: 4`로 지정합니다. 일반 객관식은 `choice5`, 숫자 서답형은 `digits`입니다.
 3. 수식 서답형처럼 애매한 문항은 번호와 **“이 문항은 설정에 예외로 적어 주세요”** 안내로 멈춥니다. 이때 파일은 생성하지 않습니다. 일반 문항의 해석 개수는 안내에 표시합니다. `questions`에는 그 예외만 추가하고 다시 실행합니다. AI가 필요한 경우 아래 프롬프트에 해당 문항 이미지 한 장과 원래 정답만 제공합니다.
