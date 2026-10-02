@@ -21,6 +21,29 @@ def normalize(text):
     return re.sub(r'\s|\x01', '', text.translate(PUA_DIGITS))
 
 
+def parse_cover(text):
+    """Read section totals, including tables with labels ahead of value cells."""
+    text = text.translate(PUA_DIGITS).replace('\x01', '')
+    labels = re.findall(r'선\s*택\s*형|서\s*답\s*형|객\s*관\s*식|주\s*관\s*식|서\s*술\s*형', text)
+    counts = re.findall(r'(\d+)\s*문\s*항', text)
+    points = re.findall(r'(\d+(?:\.\d+)?)\s*점', text)
+    if not labels or len(counts) != len(labels):
+        return None
+    return dict(questionCount=sum(map(int, counts)),
+                points=sum(map(float, points)) if len(points) == len(labels) else None)
+
+
+def read_cover(doc):
+    """Only inspect cover/header text, never question bodies or answer tables."""
+    for index, page in enumerate(doc):
+        anchors = [b[1] for b in page.get_text('blocks') if START.match(b[4])]
+        bottom = min(anchors, default=page.rect.height) if index == 0 else min([page.rect.height * .16] + anchors)
+        result = parse_cover(page.get_text(clip=fitz.Rect(0, 0, page.rect.width, bottom)))
+        if result is not None:
+            return result
+    return None
+
+
 def resolve_pdf(config, config_path):
     path = Path(config['pdf'])
     candidates = [path] if path.is_absolute() else [ROOT / path, config_path.parent / path]
@@ -150,6 +173,14 @@ def prepare_config(doc, config):
     resolved = copy.deepcopy(config)
     resolved['layout'], resolved['_autoLayout'] = detect_layout(doc, config.get('layout'))
     starts = find_starts(doc, resolved['layout'])
+    cover = resolved['_cover'] = read_cover(doc)
+    resolved['_warnings'] = []
+    if cover is None:
+        resolved['_warnings'].append('표지에서 문항 수를 못 읽어 감지값 사용 — 확인 필요')
+    elif cover['questionCount'] != len(starts):
+        raise ValueError(f"Cover original question count {cover['questionCount']} disagrees with detected question count {len(starts)}; 사람이 확인해 주세요")
+    if cover and cover['points'] is not None and abs(cover['points'] * config.get('pointScale', 1) - config['paper']['maxScore']) > 1e-6:
+        raise ValueError(f"Points total: cover original points {cover['points']:g} × pointScale {config.get('pointScale', 1):g} disagrees with maxScore {config['paper']['maxScore']}; 사람이 확인해 주세요")
     if sorted(starts) != list(range(1, max(starts) + 1)):
         raise ValueError('Found original question count/numbers are not contiguous')
     answers, points = read_keys(doc, resolved, starts)
@@ -205,7 +236,19 @@ def prepare_config(doc, config):
                 normal.append(spec)
     if ambiguous:
         raise NeedsExceptions(sorted(set(ambiguous)), normal)
-    expected = config['paper']['questionCount']
+    derived = (cover['questionCount'] if cover else len(starts)) + sum(len(specs) - 1 for specs in exceptions.values())
+    expected = config['paper'].get('questionCount', derived)
+    if cover and expected != derived:
+        raise ValueError(f'Configured question count {expected} disagrees with cover-derived final question count {derived} (original {cover["questionCount"]}, exceptions applied); 사람이 확인해 주세요')
+    # Keep the established JSON field order even when this setting is omitted.
+    paper = {}
+    for field, value in resolved['paper'].items():
+        if field != 'questionCount':
+            paper[field] = value
+        if field == 'timeLimitMinutes':
+            paper['questionCount'] = expected
+    paper.setdefault('questionCount', expected)  # timeLimitMinutes가 없는 설정에서도 빠지지 않게
+    resolved['paper'] = paper
     if len(questions) != expected or sorted(q['number'] for q in questions) != list(range(1, expected + 1)):
         raise ValueError('Configured/detected question count/numbers disagree with questionCount')
     resolved['questions'] = questions
@@ -357,7 +400,7 @@ def make_data(doc, config, starts):
     metadata = dict(config['paper'])
     answers, points = read_keys(doc, config, starts)
     questions = []
-    warnings = []
+    warnings = list(config.get('_warnings', []))
     original_totals = {}
     for spec in config['questions']:
         number, original = spec['number'], spec['original']
@@ -447,7 +490,7 @@ def seed_sql(data):
     return sql
 
 
-def review_html(data, warnings, specs=None, layout=None, auto_layout=None):
+def review_html(data, warnings, specs=None, layout=None, auto_layout=None, cover=None):
     escape = lambda value: html.escape(str(value))
     cards = []
     originals = {q['number']: q.get('originalNumber', str(q['original']) + (f'({q["sourcePart"]})' if q.get('sourcePart') else '')) for q in specs or []}
@@ -455,6 +498,7 @@ def review_html(data, warnings, specs=None, layout=None, auto_layout=None):
         label = f"{q['number']}번 · 원래 {originals.get(q['number'], q.get('originalNumber', q['number']))} · {q['answerType']} · 정답 {q['answer']} · {q['points']}점 · {q.get('curriculumChapter', '')}"
         cards.append(f'<article><h2>{escape(label)}</h2><img loading="lazy" src="public{escape(q["imageUrl"])}" alt="{escape(label)}"></article>')
     rows = ''.join('<tr><th>' + escape(field) + '</th><td>' + escape(json.dumps(value, ensure_ascii=False)) + '</td><td>' + escape(json.dumps((layout or {}).get(field), ensure_ascii=False)) + '</td></tr>' for field, value in (auto_layout or {}).items())
+    rows = '<tr><th>표지 문항 수/배점(읽은 값)</th><td>' + escape(json.dumps(cover, ensure_ascii=False) if cover else '표기 없음') + '</td><td>원본 기준</td></tr><tr><th>최종 문항 수</th><td colspan="2">' + escape(data['questionCount']) + '</td></tr>' + rows
     table = '<h2>레이아웃 자동 감지 (PDF 좌표)</h2><table><thead><tr><th>항목</th><th>자동값</th><th>적용값 (설정 우선)</th></tr></thead><tbody>' + rows + '</tbody></table>' if rows else ''
     return '<!doctype html><html lang="ko"><meta charset="utf-8"><title>' + escape(data['title']) + '</title><style>body{font-family:system-ui;margin:24px;background:#eee}aside{color:#b00020}table{border-collapse:collapse;margin-bottom:20px;background:white}th,td{border:1px solid #ccc;padding:6px;text-align:left}main{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}article{background:white;padding:14px}h2{font-size:14px}img{width:100%;height:auto}@media(max-width:900px){main{grid-template-columns:1fr}}@media print{main{grid-template-columns:repeat(2,1fr)}article{break-inside:avoid}}</style><h1>' + escape(data['title']) + '</h1>' + table + '<aside>' + ''.join('<p>' + escape(w) + '</p>' for w in warnings) + '</aside><main>' + ''.join(cards) + '</main></html>\n'
 
@@ -488,7 +532,7 @@ def run(config_path, out_dir=None, sheet=False, force=False):
         out / 'scripts/exam' / f'publish_{config["slug"]}.sql': 'update public.exam_papers\nset published = true\nwhere id = ' + quote(data_id) + "\n  and kind = 'school'\n  and published = false\nreturning id, title, grade, published;\n",
     }
     if sheet:
-        files[out / f'review-{data_id}.html'] = review_html(data, warnings, config['questions'], config['layout'], config['_autoLayout'])
+        files[out / f'review-{data_id}.html'] = review_html(data, warnings, config['questions'], config['layout'], config['_autoLayout'], config['_cover'])
     for path, contents in files.items():
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(contents, encoding='utf-8')

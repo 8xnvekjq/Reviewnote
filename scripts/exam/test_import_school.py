@@ -11,7 +11,7 @@ from pathlib import Path
 
 from PIL import Image, ImageChops
 
-from import_school import START, ROOT, NeedsExceptions, blank_boundary, crop_questions, detect_layout, find_starts, ink_rows, make_data, prepare_config, resolve_pdf, run, seed_sql
+from import_school import START, ROOT, NeedsExceptions, blank_boundary, crop_questions, detect_layout, find_starts, ink_rows, make_data, parse_cover, prepare_config, read_cover, resolve_pdf, run, seed_sql
 import fitz
 
 # 기준 시험지 두 개(1차 출력과 비교). 새로 추가되는 학교 설정은 각자 확인 화면으로 검증한다.
@@ -31,6 +31,102 @@ def sql_body(sql):
     body = sql[sql.index('insert into public.exam_papers'):]
     # 5 and 5.0 are the same SQL numeric value. Leave quoted text untouched.
     return re.sub(r'(?<=, )(\d+)\.0(?=, )', r'\1', body).strip()
+
+
+class CoverTests(unittest.TestCase):
+    def test_inline_aliases(self):
+        for labels in [('선택형', '서답형'), ('객관식', '주관식'), ('선택형', '서술형')]:
+            self.assertEqual(parse_cover(f'{labels[0]} 18문항 80점\n{labels[1]} 4문항 20점'), dict(questionCount=22, points=100))
+
+    def test_table_and_adjacent_subject_digit(self):
+        self.assertEqual(parse_cover('선택형\n서답형\n도함수활용1\n18문항\n19점\n2문항\n6점'), dict(questionCount=20, points=25))
+
+    def test_missing_cover(self):
+        self.assertIsNone(parse_cover('공통수학2\n1. 문제 [4.4점]'))
+
+    def test_count_without_points(self):
+        self.assertEqual(parse_cover('선택형 18문항\n서답형 2문항'), dict(questionCount=20, points=None))
+
+    def test_header_fallback_excludes_body(self):
+        with fitz.open() as doc:
+            page = doc.new_page()
+            page.insert_text((40, 150), '1. Problem', fontsize=10)
+            page.insert_text((40, 200), '선택형 99문항 99점', fontname='korea', fontsize=10)
+            self.assertIsNone(read_cover(doc))
+            page = doc.new_page()
+            page.insert_text((40, 40), '선택형 18문항 80점 서답형 4문항 20점', fontname='korea', fontsize=10)
+            self.assertEqual(read_cover(doc), dict(questionCount=22, points=100))
+
+    def configs(self):
+        for path in sorted((ROOT / 'scripts/exam/school-configs').glob('20*.json')):
+            config = json.loads(path.read_text(encoding='utf-8'))
+            yield path, config, resolve_pdf(config, path)
+
+    def test_three_real_covers(self):
+        expected = {'dunchon': dict(questionCount=22, points=100), 'yeongpa': dict(questionCount=20, points=25), 'dongbuk': None}
+        for _, config, pdf in self.configs():
+            with self.subTest(school=config['slug']), fitz.open(pdf) as doc:
+                self.assertEqual(read_cover(doc), expected[config['slug']])
+
+    def test_omitted_count_identical_output_bytes(self):
+        for _, config, pdf in self.configs():
+            if config['slug'] == 'dongbuk':
+                continue
+            self.assertNotIn('questionCount', config['paper'])
+            config['pdf'] = str(pdf)
+            with tempfile.TemporaryDirectory() as tmp:
+                folder = Path(tmp)
+                path = folder / 'config.json'
+                outputs = []
+                for explicit in (True, False):
+                    candidate = copy.deepcopy(config)
+                    if explicit:
+                        candidate['paper']['questionCount'] = 22 if config['slug'] == 'dunchon' else 21
+                    path.write_text(json.dumps(candidate), encoding='utf-8')
+                    out = folder / str(explicit)
+                    run(path, out, True)
+                    outputs.append({p.relative_to(out): p.read_bytes() for p in out.rglob('*') if p.is_file()})
+                self.assertEqual(outputs[0], outputs[1])
+                sheet = next(value.decode('utf-8') for key, value in outputs[0].items() if key.suffix == '.html')
+                self.assertIn('표지 문항 수/배점(읽은 값)', sheet)
+                self.assertIn('최종 문항 수', sheet)
+
+    def test_config_cover_mismatch_leaves_no_output(self):
+        for _, config, pdf in self.configs():
+            if config['slug'] == 'dongbuk':
+                continue
+            config['pdf'] = str(pdf)
+            config['paper']['questionCount'] = 99
+            with tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp) / 'bad.json'
+                path.write_text(json.dumps(config), encoding='utf-8')
+                out = Path(tmp) / 'out'
+                with self.assertRaisesRegex(ValueError, 'cover-derived final question count'):
+                    run(path, out)
+                self.assertFalse(out.exists())
+
+    def test_no_cover_uses_detected_count_and_warns(self):
+        _, config, pdf = next(c for c in self.configs() if c[1]['slug'] == 'dongbuk')
+        config['paper'].pop('questionCount')
+        with fitz.open(pdf) as doc:
+            prepared, starts = prepare_config(doc, config)
+            data, warnings = make_data(doc, prepared, starts)
+        self.assertEqual(data['questionCount'], 21)
+        self.assertIn('표지에서 문항 수를 못 읽어 감지값 사용 — 확인 필요', warnings)
+
+    def test_cover_point_scale_mismatch_leaves_no_output(self):
+        for _, config, pdf in self.configs():
+            if config['slug'] == 'dongbuk':
+                continue
+            config['pdf'] = str(pdf)
+            config['pointScale'] = 2
+            with tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp) / 'bad.json'
+                path.write_text(json.dumps(config), encoding='utf-8')
+                out = Path(tmp) / 'out'
+                with self.assertRaisesRegex(ValueError, 'cover original points.*pointScale.*maxScore'):
+                    run(path, out)
+                self.assertFalse(out.exists())
 
 
 class LabelTests(unittest.TestCase):

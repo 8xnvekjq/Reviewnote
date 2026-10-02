@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "pdf": "reference/school-exams/2026-둔촌고-1학년-2학기-중간-공통수학2/둔촌고등학교_1학년_2026_2학기중간_공통수학2_선택,공통_문제_정답.hwp.pdf",
+  "referenceRoot": "C:/Users/8xnve/Documents/ReviewNotes/reference/school-exams",
   "slug": "dunchon",
   "migrationTimestamp": "20261003090000",
   "curriculumGrade": "공통수학2",
@@ -20,7 +21,6 @@
     "examDate": null,
     "examDateNote": "원본에는 연도·학기·중간고사만 있고 정확한 시행일은 없음",
     "timeLimitMinutes": 50,
-    "questionCount": 22,
     "maxScore": 100,
     "electives": [],
     "published": false
