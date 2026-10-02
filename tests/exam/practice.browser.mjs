@@ -816,15 +816,28 @@ for (const viewport of [LANDSCAPE, { width: 390, height: 844 }]) {
   assert.equal(await page.locator('.exam-admin-attempt').count(), 2);
   assert.match(await page.locator('.exam-admin-attempt').first().innerText(), /100점/);
   await page.locator('.exam-admin-attempt').first().click();
-  await page.locator('.exam-admin-paper .exam-ink').waitFor();
-  assert.equal(await page.locator('.exam-admin-paper .exam-ink').getAttribute('data-stroke-count'), '1');
-  assert.match(await page.locator('.exam-admin-answer').innerText(), /정답/);
+  // 제출한 응시: 화면 전체를 덮는 읽기 전용 OMR 결과(오답노트 담기 없음).
+  const review = page.getByTestId('admin-exam-review');
+  await review.waitFor();
+  const reviewBox = await review.boundingBox();
+  assert.ok(reviewBox.width >= viewport.width - 1 && reviewBox.height >= viewport.height - 1, 'review covers the whole screen');
+  assert.match(await review.innerText(), /테스트 학생 학생/);
+  assert.match(await review.innerText(), /읽기 전용/);
+  await review.getByTestId('exam-result').waitFor();
+  assert.equal(await review.getByTestId('exam-candidates').count(), 0);
+  assert.match(await review.locator('.exam-item-row[data-number="1"]').innerText(), /학생 답/);
+  await noHorizontalOverflow(page, `admin-review-result/${viewport.width}`);
+  await page.screenshot({ path: `${out}/admin-review-result-${viewport.width}.png` });
+  await review.locator('.exam-item-row[data-number="1"]').click();
+  const inkSel = '[data-testid="exam-viewer"] .exam-ink';
+  await page.locator(inkSel).waitFor();
+  await page.waitForFunction(sel => document.querySelector(sel)?.getAttribute('data-stroke-count') === '1', inkSel);
   await page.getByRole('button', { name: '필기 순서 보기', exact: true }).click();
   const slider = page.getByRole('slider', { name: '필기 재생 위치' });
   await slider.waitFor();
   // React가 다시 그린 뒤의 상태를 기다린다(버튼 클릭 직후에는 아직 반영 전일 수 있음).
   const expectReplay = (ink, step) => page.waitForFunction(([ink, step]) =>
-    document.querySelector('.exam-admin-paper .exam-ink')?.getAttribute('data-stroke-count') === ink
+    document.querySelector('[data-testid="exam-viewer"] .exam-ink')?.getAttribute('data-stroke-count') === ink
     && document.querySelector('[data-testid="exam-replay-position"]')?.getAttribute('data-step') === step, [ink, step], { timeout: 3000 });
   await slider.focus(); await slider.press('Home');
   await expectReplay('0', '0');
@@ -849,19 +862,78 @@ for (const viewport of [LANDSCAPE, { width: 390, height: 844 }]) {
   assert.ok(new Set(samples).size >= 4, `slider should move smoothly: ${samples}`);
   await page.getByRole('combobox', { name: '배속', exact: true }).selectOption('4');
   await page.waitForFunction(() => document.querySelector('[data-testid="exam-replay-position"]')?.getAttribute('data-step') === '3');
-  const box = await page.locator('.exam-admin-paper .exam-ink').boundingBox();
+  const box = await page.locator(inkSel).boundingBox();
   await page.mouse.move(box.x + 30, box.y + 30); await page.mouse.down();
   await page.mouse.move(box.x + 80, box.y + 90); await page.mouse.up();
-  assert.equal(await page.locator('.exam-admin-paper .exam-ink').getAttribute('data-stroke-count'), '1');
+  assert.equal(await page.locator(inkSel).getAttribute('data-stroke-count'), '1');
   await noHorizontalOverflow(page, `admin-student-solution/${viewport.width}`);
   await page.screenshot({ path: `${out}/admin-student-${viewport.width}.png`, fullPage: true });
-  await page.getByRole('button', { name: '← 응시 목록', exact: true }).click();
+  // 크게 보기 → 닫기, Esc로 검토 화면 닫기.
+  await page.getByTestId('exam-viewer').getByRole('button', { name: '닫기', exact: true }).click();
+  await page.keyboard.press('Escape');
+  await review.waitFor({ state: 'detached' });
+  // 풀이 중인 응시: 문항 칩·학생 답·필기를 크게(아직 정답 없음).
   await page.locator('.exam-admin-attempt').nth(1).click();
+  await review.waitFor();
   await page.locator('.exam-admin-paper .exam-ink').waitFor();
   assert.doesNotMatch(await page.locator('.exam-admin-answer').innerText(), /정답/);
   assert.equal(await page.getByRole('button', { name: '제출하기', exact: true }).count(), 0);
+  await page.getByRole('button', { name: '다음 문항', exact: true }).click();
+  assert.equal(await page.locator('.exam-admin-qchip.is-on').innerText(), '2');
+  await noHorizontalOverflow(page, `admin-review-progress/${viewport.width}`);
+  await page.screenshot({ path: `${out}/admin-review-progress-${viewport.width}.png` });
+  await page.locator('.exam-admin-review-bar').getByRole('button', { name: '← 닫기', exact: true }).click();
+  await review.waitFor({ state: 'detached' });
   assert.deepEqual(errors, []);
   await context.close();
+}
+
+// 기출문제 풀이 패널(관리자): 시험지 카드 아래 최근 응시자·학생별 최근 점수, 누르면 전체 화면 검토.
+for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
+  const context = await browser.newContext({ viewport });
+  const page = await context.newPage();
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto(`${BASE}?activity=1`);
+  const entry = page.locator('.exam-paper-entry').filter({ has: page.locator('[data-testid="exam-paper-card"][data-paper-id="2025-06-math"]') });
+  const activity = entry.getByTestId('exam-admin-activity');
+  await activity.waitFor();
+  const latest = activity.getByTestId('exam-admin-latest');
+  assert.match(await latest.innerText(), /최근 응시/);
+  assert.match(await latest.innerText(), /김학생/);
+  assert.match(await latest.innerText(), /100점/);
+  assert.match(await latest.innerText(), /\d+\.\d+ \d{2}:\d{2}/);
+  await activity.locator('summary').click();
+  assert.equal(await activity.getByTestId('exam-admin-student').count(), 2);
+  assert.match(await activity.getByTestId('exam-admin-student').nth(0).innerText(), /총 2회/);
+  assert.match(await activity.getByTestId('exam-admin-student').nth(1).innerText(), /이학생[\s\S]*풀이 중/);
+  await noHorizontalOverflow(page, `admin-activity/${viewport.width}`);
+  await page.screenshot({ path: `${out}/admin-activity-${viewport.width}.png`, fullPage: true });
+  await activity.getByTestId('exam-admin-student').nth(1).click();
+  const review = page.getByTestId('admin-exam-review');
+  await review.waitFor();
+  assert.match(await review.innerText(), /이학생 학생/);
+  await page.locator('.exam-admin-paper .exam-ink').waitFor();
+  await page.locator('.exam-admin-review-bar').getByRole('button', { name: '← 닫기', exact: true }).click();
+  await review.waitFor({ state: 'detached' });
+  await latest.click();
+  await review.getByTestId('exam-result').waitFor();
+  await page.keyboard.press('Escape');
+  await review.waitFor({ state: 'detached' });
+  assert.deepEqual(errors, []);
+  await context.close();
+  console.log(`ok — admin paper activity and full-screen review (${viewport.width}×${viewport.height})`);
+}
+// 학생(관리자 아님)에게는 응시 현황이 보이지 않는다.
+{
+  const context = await browser.newContext({ viewport: LANDSCAPE });
+  const page = await context.newPage();
+  await page.goto(BASE);
+  await page.getByTestId('exam-paper-card').first().waitFor();
+  await page.waitForTimeout(300);
+  assert.equal(await page.getByTestId('exam-admin-activity').count(), 0);
+  await context.close();
+  console.log('ok — students do not see paper activity');
 }
 
 await browser.close();

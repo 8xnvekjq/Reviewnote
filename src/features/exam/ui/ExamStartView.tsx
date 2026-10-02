@@ -1,7 +1,8 @@
 // 시작 화면: A4 비율 시험지 카드 격자 → (진행 중이면) 이어 풀기 / (아니면) 모드(실전/자유) → 선택과목 → 시작. 아래엔 지난 OMR 결과.
 // v2: 시험지마다 따로 진행한다 — 한 시험지를 풀다 나와도 다른 시험지는 새로 시작할 수 있고, 같은 시험지는 이어 풀기만.
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import type { ExamAttempt, ExamClient, ExamElective, ExamMode, ExamPaperSummary, ExamResult, ExamPaperMetadata } from '../contract';
+import type { AdminExamApi, AdminPaperStudentActivity, ExamAttempt, ExamClient, ExamElective, ExamMode, ExamPaperSummary, ExamResult, ExamPaperMetadata } from '../contract';
+import { AdminAttemptReview } from './AdminAttemptReview';
 import { ELECTIVE_SHORT, ELECTIVES, formatClock, formatElapsed, progressRatio, remainingMs, roundLabel } from './examLogic';
 import { resultGradeLabel } from './hanneungLogic';
 
@@ -10,6 +11,7 @@ type PastResult = Pick<ExamResult, 'attemptId' | 'paperTitle' | 'mode' | 'electi
 interface Props {
   client: ExamClient;
   currentUserId: string;
+  admin?: AdminExamApi;
   busy: boolean;
   error: string | null;
   onStart: (paper: ExamPaperSummary, mode: ExamMode, elective: ExamElective | null) => void;
@@ -37,6 +39,45 @@ function formatDate(iso: string) {
   const d = new Date(iso.length === 10 ? `${iso}T00:00:00` : iso);
   if (Number.isNaN(d.getTime())) return iso;
   return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`;
+}
+
+function activityDate(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return `${d.getMonth() + 1}.${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function activityScore(row: AdminPaperStudentActivity) {
+  return row.status === 'submitted' ? `${row.score ?? 0}/${row.maxScore}점` : `풀이 중 ${row.answeredCount}/${row.questionCount}`;
+}
+
+/** 관리자: 시험지 카드 아래 — 가장 최근 응시자 한 줄 + 학생별 최근 점수 목록(누르면 전체 화면 검토). */
+function PaperActivity({ students, onOpen }: { students: AdminPaperStudentActivity[]; onOpen: (row: AdminPaperStudentActivity) => void }) {
+  const latest = students[0];
+  if (!latest) return <p className="exam-admin-activity is-empty" data-testid="exam-admin-activity">아직 응시한 학생이 없어요</p>;
+  return (
+    <div className="exam-admin-activity" data-testid="exam-admin-activity">
+      <button type="button" className="exam-admin-activity-latest" onClick={() => onOpen(latest)} data-testid="exam-admin-latest">
+        <span className="exam-admin-activity-label">최근 응시</span>
+        <strong>{latest.studentName}</strong>
+        <span><b>{activityScore(latest)}</b> · {activityDate(latest.submittedAt ?? latest.startedAt)}</span>
+      </button>
+      <details className="exam-admin-activity-more">
+        <summary>학생별 최근 점수 ({students.length}명)</summary>
+        <ul>
+          {students.map(row => (
+            <li key={row.studentId}>
+              <button type="button" className="exam-admin-activity-row" onClick={() => onOpen(row)} data-testid="exam-admin-student">
+                <span className="exam-admin-activity-name">{row.studentName}</span>
+                <span className="exam-admin-activity-score">{activityScore(row)}</span>
+                <span className="exam-admin-activity-meta">{row.round}차{row.attemptCount > 1 ? ` (총 ${row.attemptCount}회)` : ''}{row.status === 'submitted' && row.inProgress ? ' · 다시 푸는 중' : ''} · {activityDate(row.submittedAt ?? row.startedAt)}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </details>
+    </div>
+  );
 }
 
 function PaperCard({ paper, selected, busy, now, onClick }: { paper: ExamPaperSummary; selected: boolean; busy: boolean; now: number; onClick: () => void }) {
@@ -97,7 +138,7 @@ function PaperCard({ paper, selected, busy, now, onClick }: { paper: ExamPaperSu
   );
 }
 
-export function ExamStartView({ client, currentUserId, busy, error, onStart, onResume, onOpenResult, onOpenHistory, onExit, initialPaperId }: Props) {
+export function ExamStartView({ client, currentUserId, admin, busy, error, onStart, onResume, onOpenResult, onOpenHistory, onExit, initialPaperId }: Props) {
   const [papers, setPapers] = useState<ExamPaperSummary[] | null>(null);
   const [paperId, setPaperId] = useState<string | null>(initialPaperId ?? null);
   const [grade, setGrade] = useState<number | 'hanneung'>(3);
@@ -112,6 +153,8 @@ export function ExamStartView({ client, currentUserId, busy, error, onStart, onR
       return ELECTIVES.includes(saved as ExamElective) ? saved as ExamElective : null;
     } catch { return null; }
   });
+  const [activity, setActivity] = useState<Map<string, AdminPaperStudentActivity[]> | null>(null);
+  const [reviewing, setReviewing] = useState<AdminPaperStudentActivity | null>(null);
   const setupRef = useRef<HTMLElement>(null);
   const [now] = useState(() => Date.now());
 
@@ -128,6 +171,16 @@ export function ExamStartView({ client, currentUserId, busy, error, onStart, onR
     void client.listMyResults().then(r => { if (alive) setPast(r); }).catch(() => {});
     return () => { alive = false; };
   }, [client, initialPaperId]);
+
+  // 관리자만 시험지별 학생 응시 현황을 받는다(학생이면 서버가 null).
+  useEffect(() => {
+    if (!admin) return;
+    let alive = true;
+    admin.listPaperActivity()
+      .then(rows => { if (alive && rows) setActivity(new Map(rows.map(row => [row.paperId, row.students]))); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [admin]);
 
   const visiblePapers = papers?.filter(candidate => paperGrade(candidate) === grade) ?? [];
   const paper = visiblePapers.find(p => p.id === paperId) ?? null;
@@ -206,6 +259,7 @@ export function ExamStartView({ client, currentUserId, busy, error, onStart, onR
                 <button type="button" className="rn-button rn-button-ghost rn-button-compact exam-history-open"
                   disabled={busy || resuming != null} onClick={() => onOpenHistory(p)}
                   aria-label={`${p.title} 풀이 기록 보기`} data-testid="exam-history-open" data-paper-id={p.id}>풀이 기록 보기</button>
+                {activity && <PaperActivity students={activity.get(p.id) ?? []} onOpen={setReviewing} />}
               </div>
             ))}
           </div></section> : null;
@@ -252,6 +306,9 @@ export function ExamStartView({ client, currentUserId, busy, error, onStart, onR
           <p className="rn-caption exam-start-hint">시작하면 화면이 꽉 차게 바뀌어요. 애플펜슬로 문제 위에 바로 풀 수 있어요.</p>
         </section>
       )}
+
+      {reviewing && admin && <AdminAttemptReview key={reviewing.attemptId} target={reviewing} studentName={reviewing.studentName}
+        api={admin} onClose={() => setReviewing(null)} />}
 
       {past.length > 0 && (
         <section className="exam-past" aria-label="지난 OMR 결과">
