@@ -8,17 +8,20 @@ import { ExamPracticeScreen } from '../../src/features/exam/ExamPracticeScreen';
 import { createMockExamClient } from '../../src/features/exam/ui/mockExamClient';
 import AdminStudentExamSummary from '../../src/components/admin/AdminStudentExamSummary';
 import type { AdminExamApi, AdminExamAttemptSummary, AdminPaperStudentActivity, ExamAttempt } from '../../src/features/exam/contract';
-import { inkDelta } from '../../src/features/exam/ink/inkReplay';
+import { inkDelta, inkIdsHash } from '../../src/features/exam/ink/inkReplay';
 
 const params = new URLSearchParams(location.search);
 const log: Array<{ method: string; args: unknown[] }> = [];
 (window as unknown as { __examLog: typeof log }).__examLog = log;
+const inkStats = { requests: 0, bytes: 0 }; // 필기 저장 요청 수·본문 바이트
+(window as unknown as { __inkStats: typeof inkStats }).__inkStats = inkStats;
 const client = createMockExamClient({
   admin: params.get('admin') === '1',
   timeLimitMinutes: params.has('limit') ? Number(params.get('limit')) : undefined,
   persistKey: params.get('persist') === '1' ? 'exam-practice-harness' : undefined,
   failSave: params.get('failSave') === '1',
   latencyMs: params.has('latency') ? Number(params.get('latency')) : 0,
+  inkStats,
   log,
 });
 
@@ -30,7 +33,8 @@ if (adminMode) {
   const strokes = [{ id: 'example', tool: 'pen' as const, color: '#2563eb', size: 4,
     points: [{ x: .15, y: .6, pressure: .5, t: 0 }, { x: .7, y: .8, pressure: .5, t: 200 }] }];
   const events = [inkDelta([], strokes, 'draw'), inkDelta(strokes, [], 'erase'), inkDelta([], strokes, 'undo')];
-  await client.saveInk(completed.id, completed.questions[0].id, strokes, 0, false, events, crypto.randomUUID());
+  await client.saveInk(completed.id, completed.questions[0].id,
+    { revision: 0, legacyImport: false, events, batchId: crypto.randomUUID(), idsHash: await inkIdsHash(strokes) });
   const items = completed.questions.map(question => ({ questionId: question.id, answer: '1', unsure: false, visits: 1, timeSpentMs: 15000 }));
   const result = await client.submitAttempt(completed.id, items, []);
   adminAttempts.set(completed.id, { ...completed, status: 'submitted', items });

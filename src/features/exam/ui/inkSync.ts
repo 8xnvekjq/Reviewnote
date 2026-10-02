@@ -1,5 +1,5 @@
 import type { ExamClient, InkChangeKind, InkStroke } from '../contract.ts';
-import { applyInkEvent, inkDelta } from '../ink/inkReplay.ts';
+import { applyInkEvent, inkDelta, inkIdsHash } from '../ink/inkReplay.ts';
 import { loadInk, loadInkDrafts, saveInkDraft, type InkDraft } from './inkStore.ts';
 
 export interface InkCache {
@@ -160,8 +160,9 @@ export class InkSync {
         }
         // Persist the exact batch before sending. Retries reuse it even if new strokes arrive meanwhile.
         await this.cacheWrites;
-        const revision = await this.client.saveInk(this.attemptId, id, upload.strokes, upload.revision,
-          upload.legacyImport, upload.events, upload.id);
+        // 서버에는 바뀐 내용(events)과 결과 획 id 해시만 보낸다. 옛 버전이 남긴 upload도 같은 batch 그대로 다시 보낸다.
+        const revision = await this.client.saveInk(this.attemptId, id, { revision: upload.revision,
+          legacyImport: upload.legacyImport ?? false, events: upload.events, batchId: upload.id, idsHash: await inkIdsHash(upload.strokes) });
         const latest = this.documents.get(id)!;
         const sent = new Set(upload.events.map(event => event.id));
         const events = (latest.events ?? []).filter(event => !sent.has(event.id));

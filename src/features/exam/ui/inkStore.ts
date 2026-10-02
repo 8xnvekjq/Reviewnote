@@ -32,6 +32,7 @@ export function inkKey(attemptId: string, questionId: string): string {
 
 export interface InkUpload {
   id: string;
+  /** 이 batch를 적용한 결과(로컬 상태용, 서버로는 id 해시만 보낸다). 옛 버전이 남긴 upload도 같은 모양이다. */
   strokes: InkStroke[];
   events: InkReplayEvent[];
   revision: number;

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { mapExamPaperHistory } from '../../src/features/exam/examMappers.ts';
 import { buildHistoryRows } from '../../src/features/exam/ui/examLogic.ts';
 
@@ -15,10 +16,12 @@ type Db = {
   query<T = any>(sql: string, params?: unknown[]): Promise<{ rows: T[] }>;
 };
 
-let PGliteCtor: (new () => Db) | null = null;
+let PGliteCtor: (new (options?: unknown) => Db) | null = null;
+let pgcrypto: unknown = null;
 try {
   const pkg = '@electric-sql/pglite';
   PGliteCtor = (await import(pkg)).PGlite;
+  pgcrypto = (await import(`${pkg}/contrib/pgcrypto`)).pgcrypto; // Supabase처럼 extensions 스키마에 둔다(필기 id 해시).
 } catch {
   PGliteCtor = null;
 }
@@ -32,8 +35,9 @@ const migSchool = fs.readFileSync(path.join(root, 'supabase/migrations/202610022
 const migHanneung = fs.readFileSync(path.join(root, 'supabase/migrations/20261003000000_exam_hanneung.sql'), 'utf8');
 
 test('exam migration applies and the RPC flow behaves (PGlite)', { skip: PGliteCtor ? false : '@electric-sql/pglite 미설치' }, async () => {
-const db = new PGliteCtor!();
+const db = new PGliteCtor!({ extensions: { pgcrypto } });
 await db.exec(`
+create schema extensions; create extension pgcrypto schema extensions;
 create role anon nologin; create role authenticated nologin; create role service_role nologin;
 create schema auth;
 create table auth.users (id uuid primary key, email text);
@@ -623,6 +627,107 @@ assert.equal((await as(S1, `select get_exam_ink_replay($1,$2) r`, [replayAttempt
 await as(S1, `select submit_exam_attempt($1,'[]',null)`, [replayAttempt.id]);
 assert.equal((await as(S1, replaySql, args))[0].r, 1, 'a lost acknowledgement can be recovered after submission');
 await fails(S1, replaySql, [replayAttempt.id, rq, ink, 2, JSON.stringify([events[0]]), '11111111-0000-0000-0000-000000000003'], /EXAM_INK_SUBMITTED/);
+// 바뀐 내용만 받는 필기 저장(save_exam_ink_delta): 결과 strokes 대신 결과 획 id 목록의 SHA-256만 받는다.
+const migDelta = fs.readFileSync(path.join(root, 'supabase/migrations/20261003050000_exam_ink_delta.sql'), 'utf8');
+await db.exec(migDelta);
+const deltaAttempt = (await as(S1, `select start_exam_attempt('2026-hanneung-79-basic','free',null) r`))[0].r;
+const dq = deltaAttempt.questions[0].id;
+const deltaSql = `select save_exam_ink_delta($1,$2,$3,$4,$5::jsonb,$6,$7) r`;
+const idsHash = (ids: string[]) => createHash('sha256').update(ids.join('\n')).digest('hex');
+const st = (id: string, x = 0.1) => ({ id, tool: 'pen', color: '#1f2937', size: 4, points: [{ x, y: 0.2, pressure: 0.5, t: 0 }] });
+const ev = (id: string, kind: string, added: Array<{ index: number | string; stroke: unknown }>, removed: unknown[] = []) => ({ id, kind, at: 1000, added, removed });
+const bid = (n: number) => `22222222-0000-0000-0000-${String(n).padStart(12, '0')}`;
+const delta = (revision: number, events: unknown[], ids: string[], batch: string, question = dq, legacy = false) =>
+  as(S1, deltaSql, [deltaAttempt.id, question, revision, legacy, JSON.stringify(events), batch, idsHash(ids)]);
+const deltaFails = (uid: string | null, revision: number | null, events: unknown, hash: string, re: RegExp, batch: string | null = bid(5), question = dq, legacy = false) =>
+  fails(uid, deltaSql, [deltaAttempt.id, question, revision, legacy, typeof events === 'string' ? events : JSON.stringify(events), batch, hash], re);
+const inkRow = async (question = dq) =>
+  (await db.query(`select strokes, revision from exam_attempt_ink where attempt_id=$1 and question_id=$2`, [deltaAttempt.id, question])).rows[0];
+const batchOf = async (id: string) => (await db.query(`select * from exam_ink_replay_batches where id=$1`, [id])).rows[0];
+const drawAB = [ev('d-a', 'draw', [{ index: 0, stroke: st('a') }]), ev('d-b', 'draw', [{ index: 1, stroke: st('b') }])];
+assert.equal((await delta(0, drawAB, ['a', 'b'], bid(1)))[0].r, 1);
+assert.equal((await delta(0, drawAB, ['a', 'b'], bid(1)))[0].r, 1, 'same batch retry is idempotent');
+await deltaFails(S1, 0, [drawAB[0]], idsHash(['a']), /EXAM_REPLAY_BATCH_MISMATCH/, bid(1));
+await deltaFails(S1, 0, drawAB, idsHash(['b', 'a']), /EXAM_REPLAY_BATCH_MISMATCH/, bid(1));
+assert.deepEqual((await inkRow()).strokes, [st('a'), st('b')]);
+const first = await batchOf(bid(1));
+assert.deepEqual(first.baseline, [], 'first batch keeps the (empty) baseline like save_exam_ink_replay');
+assert.equal(first.strokes_hash, (await db.query(`select md5(strokes::text) h from exam_attempt_ink where attempt_id=$1 and question_id=$2`, [deltaAttempt.id, dq])).rows[0].h, 'strokes_hash keeps meaning md5(strokes::text)');
+assert.equal((await as(S1, `select get_exam_ink($1) r`, [deltaAttempt.id]))[0].r[0].lastBatchId, bid(1));
+// 지우기(removed만) → 실행 취소로 되살리기 + 가운데 자리에 새 획
+assert.equal((await delta(1, [ev('e-a', 'erase', [], ['a'])], ['b'], bid(2)))[0].r, 2);
+assert.deepEqual((await inkRow()).strokes, [st('b')]);
+assert.equal((await batchOf(bid(2))).baseline, null, 'continuous log has no baseline');
+assert.equal((await delta(2, [ev('u-a', 'undo', [{ index: 0, stroke: st('a') }]), ev('d-c', 'draw', [{ index: 1, stroke: st('c') }])], ['a', 'c', 'b'], bid(3)))[0].r, 3);
+assert.deepEqual((await inkRow()).strokes, [st('a'), st('c'), st('b')]);
+// 같은 id를 지우고 다시 넣으면(획 수정) 새 본문으로 바뀐다
+assert.equal((await delta(3, [ev('m-c', 'draw', [{ index: 1, stroke: st('c', 0.9) }], ['c'])], ['a', 'c', 'b'], bid(4)))[0].r, 4);
+assert.deepEqual((await inkRow()).strokes, [st('a'), st('c', 0.9), st('b')]);
+// 거절된 요청은 아무것도 남기지 않는다
+const now = ['a', 'c', 'b'];
+await deltaFails(S1, 4, [ev('x', 'clear', [], now)], idsHash(['a']), /EXAM_REPLAY_FINAL_MISMATCH/);
+await deltaFails(S1, 4, [ev('x', 'clear', [], ['a'])], 'not-a-hash', /EXAM_REPLAY_INVALID/);
+await deltaFails(S1, 4, [ev('x', 'clear', [], ['a'])], idsHash(['c', 'b']), /EXAM_REPLAY_INVALID/, null);
+await deltaFails(S1, 3, [ev('x', 'erase', [], ['a'])], idsHash(['c', 'b']), /EXAM_INK_CONFLICT/);
+await deltaFails(S1, null, [ev('x', 'erase', [], ['a'])], idsHash(['c', 'b']), /EXAM_INK_CONFLICT/);
+await deltaFails(S1, 4, [ev('x', 'erase', [], ['zzz'])], idsHash(now), /EXAM_REPLAY_INVALID/);
+await deltaFails(S1, 4, [ev('x', 'erase', [], [7])], idsHash(now), /EXAM_REPLAY_INVALID/);
+await deltaFails(S1, 4, [ev('x', 'draw', [{ index: 0, stroke: st('b') }])], idsHash(['b', ...now]), /EXAM_REPLAY_INVALID/);
+await deltaFails(S1, 4, [ev('x', 'draw', [{ index: 9, stroke: st('n') }])], idsHash([...now, 'n']), /EXAM_REPLAY_INVALID/);
+await deltaFails(S1, 4, [ev('x', 'draw', [{ index: 1, stroke: st('n') }, { index: 1, stroke: st('m') }])], idsHash(['a', 'n', 'm', 'c', 'b']), /EXAM_REPLAY_INVALID/);
+await deltaFails(S1, 4, [ev('x', 'draw', [{ index: '0', stroke: st('n') }])], idsHash(['n', ...now]), /EXAM_REPLAY_INVALID/);
+await deltaFails(S1, 4, [ev('x', 'draw', [{ index: 0, stroke: { ...st('n'), color: 'red' } }])], idsHash(['n', ...now]), /EXAM_INK_INVALID/);
+await deltaFails(S1, 4, [ev('x', 'draw', [{ index: 0, stroke: { ...st('n'), points: [{ x: 500, y: 0, pressure: 0.5, t: 0 }] } }])], idsHash(['n', ...now]), /EXAM_INK_INVALID/);
+await deltaFails(S1, 4, [ev('x', 'draw', [{ index: 0, stroke: st('') }])], idsHash(['', ...now]), /EXAM_INK_INVALID/);
+await deltaFails(S1, 4, [ev('x', 'scribble', [], ['a'])], idsHash(['c', 'b']), /EXAM_REPLAY_INVALID/);
+await deltaFails(S1, 4, [{ ...ev('x', 'erase', [], ['a']), at: -1 }], idsHash(['c', 'b']), /EXAM_REPLAY_INVALID/);
+await deltaFails(S1, 4, [ev('x', 'erase', [], ['a']), ev('x', 'erase', [], ['c'])], idsHash(['b']), /EXAM_REPLAY_INVALID/);
+await deltaFails(S1, 4, '[]', idsHash(now), /EXAM_REPLAY_TOO_LARGE/);
+await deltaFails(S1, 4, '{}', idsHash(now), /EXAM_REPLAY_INVALID/);
+await deltaFails(S1, 0, drawAB, idsHash(['a', 'b']), /EXAM_QUESTION_NOT_FOUND/, bid(5), S2);
+const bulk = Array.from({ length: 1998 }, (_, i) => ({ index: i + 3, stroke: st(`n${i}`) }));
+await deltaFails(S1, 4, [ev('x', 'draw', bulk)], idsHash([...now, ...bulk.map(a => a.stroke.id)]), /EXAM_INK_TOO_LARGE/);
+await deltaFails(S2, 4, [ev('x', 'erase', [], ['a'])], idsHash(['c', 'b']), /EXAM_ATTEMPT_NOT_FOUND/);
+await deltaFails(AD, 4, [ev('x', 'erase', [], ['a'])], idsHash(['c', 'b']), /EXAM_ATTEMPT_NOT_FOUND/);
+await deltaFails(null, 4, [ev('x', 'erase', [], ['a'])], idsHash(['c', 'b']), /permission denied/);
+assert.equal((await inkRow()).revision, 4, 'rejected batches roll back');
+assert.equal((await db.query(`select count(*)::int n from exam_ink_replay_batches where attempt_id=$1`, [deltaAttempt.id])).rows[0].n, 4);
+// 전체 지우기 → 빈 필기(빈 문자열의 해시)
+assert.equal((await delta(4, [ev('clear', 'clear', [], now)], [], bid(5)))[0].r, 5);
+assert.deepEqual((await inkRow()).strokes, []);
+const deltaReplay = (await as(AD, `select get_exam_ink_replay($1,$2) r`, [deltaAttempt.id, dq]))[0].r;
+assert.deepEqual(deltaReplay.batches.map(b => b.revision), [1, 2, 3, 4, 5]);
+assert.equal(deltaReplay.batches[2].events[1].added[0].stroke.id, 'c');
+// 옛 함수가 저장한 batch를 새 함수로 재전송해도 같은 revision(옛 IndexedDB 초안의 upload)
+const dq2 = deltaAttempt.questions[1].id;
+const oldEvents = [ev('o-a', 'draw', [{ index: 0, stroke: st('a') }])];
+assert.equal((await as(S1, replaySql, [deltaAttempt.id, dq2, JSON.stringify([st('a')]), 0, JSON.stringify(oldEvents), bid(6)]))[0].r, 1);
+assert.equal((await delta(0, oldEvents, ['a'], bid(6), dq2))[0].r, 1);
+// 옛 save_exam_ink(전체 저장) 뒤에는 기록이 이어지지 않으므로 baseline이 남고, 중복 id인 옛 필기도 본문을 잃지 않는다
+assert.equal((await as(S1, saveInkSql, [deltaAttempt.id, dq2, JSON.stringify([st('a'), st('a', 0.5), st('z')]), 1, false]))[0].r, 2);
+assert.equal((await delta(2, [ev('d-y', 'draw', [{ index: 3, stroke: st('y') }])], ['a', 'a', 'z', 'y'], bid(7), dq2))[0].r, 3);
+assert.deepEqual((await inkRow(dq2)).strokes, [st('a'), st('a', 0.5), st('z'), st('y')]);
+assert.deepEqual((await batchOf(bid(7))).baseline, [st('a'), st('a', 0.5), st('z')]);
+// 제출 뒤: 잠금. 단 잃어버린 응답 복구와 1회 legacy import는 허용
+await as(S1, `select submit_exam_attempt($1,'[]',null)`, [deltaAttempt.id]);
+assert.equal((await delta(4, [ev('clear', 'clear', [], now)], [], bid(5)))[0].r, 5, 'lost acknowledgement recovered after submission');
+await deltaFails(S1, 5, [ev('late', 'draw', [{ index: 0, stroke: st('late') }])], idsHash(['late']), /EXAM_INK_SUBMITTED/, bid(8));
+await deltaFails(S1, 5, [ev('late', 'draw', [{ index: 0, stroke: st('late') }])], idsHash(['late']), /EXAM_INK_SUBMITTED/, bid(8), dq, true);
+const dq3 = deltaAttempt.questions[2].id;
+assert.equal((await delta(0, [ev('restore', 'restore', [{ index: 0, stroke: st('old') }])], ['old'], bid(9), dq3, true))[0].r, 1, 'one-time import for old submitted attempts');
+await deltaFails(S1, 1, [ev('again', 'clear', [], ['old'])], idsHash([]), /EXAM_INK_SUBMITTED/, bid(10), dq3, true);
+await deltaFails(S1, 0, [ev('new', 'draw', [{ index: 0, stroke: st('n') }])], idsHash(['n']), /EXAM_INK_SUBMITTED/, bid(11), deltaAttempt.questions[3].id);
+// 마이그레이션 텍스트·카탈로그: 권한·lock_timeout·search_path·기존 함수 미수정
+assert.match(migDelta, /security definer set search_path = '' set lock_timeout = '2s'/);
+assert.match(migDelta, /revoke all on function public\.save_exam_ink_delta\(uuid, uuid, integer, boolean, jsonb, uuid, text\) from public, anon, authenticated/);
+assert.match(migDelta, /grant execute on function public\.save_exam_ink_delta\(uuid, uuid, integer, boolean, jsonb, uuid, text\) to authenticated/);
+assert.doesNotMatch(migDelta, /function public\.save_exam_ink(_replay)?\s*\(/, 'old save functions are left untouched');
+assert.doesNotMatch(migDelta, /\b(alter|drop|create or replace)\b/i);
+const deltaFn = (await db.query(`select p.prosecdef, p.proconfig, has_function_privilege('anon', p.oid, 'execute') anon,
+  has_function_privilege('authenticated', p.oid, 'execute') auth from pg_proc p where p.proname = 'save_exam_ink_delta'`)).rows[0];
+assert.equal(deltaFn.prosecdef, true);
+assert.deepEqual([...deltaFn.proconfig].sort(), ['lock_timeout=2s', 'search_path=""']);
+assert.equal(deltaFn.anon, false); assert.equal(deltaFn.auth, true);
 // Exam practice panel (admin): latest attempt per student for each paper, submitted results first.
 await db.exec(`create table public.profiles (id uuid primary key, email text, display_name text, nickname text);
 insert into public.profiles values ('${S1}', 's1@x.com', '학생일', null), ('${S2}', 's2@x.com', '', '둘이');`);

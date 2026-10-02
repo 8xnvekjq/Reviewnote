@@ -37,12 +37,12 @@ export const examClient: ExamClient = {
   async getInkReplay(attemptId, questionId) {
     return await callRpc('get_exam_ink_replay', { p_attempt_id: attemptId, p_question_id: questionId }) as InkReplayData;
   },
-  async saveInk(attemptId, questionId, strokes, revision, legacyImport = false, events, batchId) {
+  async saveInk(attemptId, questionId, { revision, legacyImport, events, batchId, idsHash }) {
+    // 바뀐 내용만 보낸다(supabase/migrations/20261003050000_exam_ink_delta.sql). 필기 전체는 보내지 않는다.
     // Preserve conflict codes; the generic error mapper hides unknown server codes.
-    const { data, error } = await supabase.rpc(events && batchId ? 'save_exam_ink_replay' : 'save_exam_ink', {
-      p_attempt_id: attemptId, p_question_id: questionId, p_strokes: strokes,
-      p_revision: revision, p_legacy_import: legacyImport,
-      ...(events && batchId ? { p_events: events, p_batch_id: batchId } : {}),
+    const { data, error } = await supabase.rpc('save_exam_ink_delta', {
+      p_attempt_id: attemptId, p_question_id: questionId, p_revision: revision, p_legacy_import: legacyImport,
+      p_events: events, p_batch_id: batchId, p_ids_hash: idsHash,
     });
     if (error) throw new Error(error.message);
     if (!Number.isInteger(data) || data < 1) throw new Error('필기 저장을 확인하지 못했어요.');

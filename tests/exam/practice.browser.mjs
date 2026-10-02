@@ -817,6 +817,39 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   console.log('ok — ink and server replay restored on a second device without IndexedDB');
 }
 
+// 필기 저장은 바뀐 내용만 보낸다: 획이 쌓여도 한 획 추가 요청은 작게 유지되고, 다른 기기에서 그대로 복원된다.
+{
+  const { context, page, errors } = await open(LANDSCAPE, '?persist=1');
+  await startExam(page, '자유 모드', '미적', PAPER_A);
+  const stats = () => page.evaluate(() => ({ ...window.__inkStats }));
+  const sizes = [];
+  for (let i = 0; i < 6; i += 1) {
+    const before = await stats();
+    await drawStroke(page);
+    await page.waitForFunction(count => window.__inkStats.requests > count
+      && document.querySelector('[data-testid="exam-ink-sync"]')?.getAttribute('data-status') === 'saved', before.requests, { timeout: 15000 });
+    const after = await stats();
+    sizes.push(after.bytes - before.bytes);
+  }
+  assert.equal(await strokeCount(page), '6');
+  const doc = await page.evaluate(() => JSON.parse(localStorage.getItem('exam-practice-harness')).ink.flat(2).find(row => row?.strokes)?.strokes);
+  assert.equal(doc.length, 6);
+  const docBytes = new TextEncoder().encode(JSON.stringify(doc)).length;
+  assert.ok(sizes.every(size => size < 20 * 1024), `per-save bytes ${sizes}`);
+  assert.ok(sizes.at(-1) < docBytes / 2, `last save ${sizes.at(-1)}B is a delta, not the ${docBytes}B drawing`);
+  assert.ok(Math.max(...sizes) - Math.min(...sizes) < 2048, `request size does not grow with the drawing: ${sizes}`);
+  const remote = await page.evaluate(() => localStorage.getItem('exam-practice-harness'));
+  const other = await browser.newContext({ viewport: PORTRAIT });
+  await other.addInitScript(value => localStorage.setItem('exam-practice-harness', value), remote);
+  const second = await other.newPage();
+  await second.goto(`${BASE}?persist=1`);
+  await paperCard(second, PAPER_A).click();
+  await second.waitForFunction(() => document.querySelector('[data-testid="exam-body"] .exam-ink')?.getAttribute('data-stroke-count') === '6');
+  assert.deepEqual(errors, []);
+  await other.close(); await context.close();
+  console.log(`ok — ink saves send deltas (${sizes.join(', ')} bytes per save)`);
+}
+
 // Administrator can inspect both submitted and active attempts without editing a student's work.
 for (const viewport of [LANDSCAPE, { width: 390, height: 844 }]) {
   const context = await browser.newContext({ viewport });
