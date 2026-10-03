@@ -17,13 +17,16 @@
 .exam-admin-paper { min-width: 0; background: white; border-radius: 10px; overflow: hidden; }
 /* 필기 순서 보기: 위에는 얇은 줄(버튼·덧쓰기 도구)만, 재생 컨트롤은 화면 왼쪽에 떠 있는 반투명 작은 상자(스크롤해도 그대로). */
 .exam-replay-bar { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; min-width: 0; padding: 8px 10px; background: var(--rn-surface, #0f172a); color: var(--rn-text, #e2e8f0); font-size: 13px; }
-.exam-replay-dock { position: fixed; z-index: 30; left: calc(env(safe-area-inset-left) + 10px); top: 50%; transform: translateY(-50%); display: grid; gap: 6px; width: 168px; max-width: calc(100vw - 20px); padding: 8px 10px 10px; border-radius: 14px; border: 1px solid rgb(148 163 184 / .35); background: rgb(15 23 42 / .74); background: color-mix(in srgb, var(--rn-surface, #0f172a) 76%, transparent); color: var(--rn-text, #e2e8f0); font-size: 12px; box-shadow: 0 10px 28px rgb(0 0 0 / .28); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.exam-replay-dock { position: fixed; z-index: 30; left: calc(env(safe-area-inset-left) + 10px); top: 50%; transform: translateY(-50%); display: grid; gap: 6px; width: 156px; max-width: calc(100vw - 20px); padding: 6px 8px 8px; border-radius: 14px; border: 1px solid rgb(148 163 184 / .28); background: rgb(15 23 42 / .5); background: color-mix(in srgb, var(--rn-surface, #0f172a) 52%, transparent); color: var(--rn-text, #e2e8f0); font-size: 12px; box-shadow: 0 10px 28px rgb(0 0 0 / .28); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
 .exam-replay-dock p { margin: 0; }
+.exam-replay-dock, .exam-replay-dock * { box-sizing: border-box; }
+.exam-replay-dock > * { min-width: 0; }
+.exam-replay-dock:hover, .exam-replay-dock:focus-within { background: color-mix(in srgb, var(--rn-surface, #0f172a) 82%, transparent); }
 .exam-replay-dock.is-folded { display: flex; width: auto; gap: 4px; padding: 6px; border-radius: 999px; }
 .exam-replay-dock-head { display: flex; align-items: center; gap: 2px; }
 .exam-replay-dock-head > strong { margin-right: auto; font-size: 12px; }
 .exam-replay-buttons { display: flex; justify-content: space-between; gap: 2px; align-items: center; }
-.exam-replay-icon { min-width: 28px; min-height: 32px; padding: 0 4px; display: inline-grid; place-items: center; border-radius: 8px; border: 1px solid transparent; background: transparent; color: inherit; font-size: 15px; line-height: 1; touch-action: manipulation; }
+.exam-replay-icon { min-width: 26px; min-height: 30px; padding: 0 4px; display: inline-grid; place-items: center; border-radius: 8px; border: 1px solid transparent; background: transparent; color: inherit; font-size: 15px; line-height: 1; touch-action: manipulation; }
 .exam-replay-icon:hover:not(:disabled) { background: rgb(148 163 184 / .18); }
 .exam-replay-icon:disabled { opacity: .35; }
 .exam-replay-icon.is-play { min-width: 36px; background: #2563eb; color: #fff; border-radius: 999px; }
@@ -31,9 +34,9 @@
 .exam-replay-dock.is-folded .exam-replay-icon { min-width: 36px; min-height: 36px; }
 .exam-replay-slider { display: block; width: 100%; min-width: 0; height: 24px; margin: 0; accent-color: #60a5fa; cursor: pointer; }
 .exam-replay-dock output { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.exam-replay-speed { display: flex; align-items: center; gap: 6px; }
-.exam-replay-speed select { flex: 1; min-width: 0; padding: 3px 4px; border: 1px solid var(--rn-line, #334155); border-radius: 6px; background: transparent; color: inherit; font-size: 12px; }
-.exam-replay-speed option { color: #0f172a; }
+.exam-replay-speed { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; padding: 2px; border-radius: 8px; background: rgb(148 163 184 / .14); }
+.exam-replay-speed button { min-width: 0; min-height: 24px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: inherit; font-size: 11px; font-variant-numeric: tabular-nums; opacity: .7; }
+.exam-replay-speed button[aria-pressed="true"] { background: rgb(96 165 250 / .3); opacity: 1; font-weight: 700; }
 .exam-replay-note { font-size: 10.5px; line-height: 1.35; color: var(--rn-muted, #94a3b8); }
 .exam-replay-link { padding: 0; border: 0; background: none; color: #93c5fd; text-decoration: underline; font: inherit; }
 /* 폰 폭: 이미지를 가리지 않게 왼쪽 아래로 */

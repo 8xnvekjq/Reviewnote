@@ -285,10 +285,17 @@ const tuple = (p: Pt): [number, number] => [p.x, p.y];
 /** 닫힌 획에서 꼭짓점 3개 → 삼각형, 4개 → 사각형. 원처럼 고르게 도는 획은 꼭짓점이 많이 남아 걸러진다. */
 export function recognizePolygon(raw: Pt[], options: RecognizeOptions = {}): SnapShape | null {
   const minSize = options.minSize ?? DEFAULT_MIN_SIZE;
-  const points = dedupe(raw, minSize * 0.02);
+  let points = dedupe(raw, minSize * 0.02);
   if (points.length < 8) return null;
   const diagonal = bboxDiagonal(points);
   if (diagonal < minSize) return null;
+  // 시작점을 지나쳐 조금 더 그은 꼬리(손으로 닫을 때 흔하다)는 시작점에 가장 가까워진 곳에서 자른다.
+  // 남겨 두면 시작 꼭짓점이 두 번·꼬리 끝이 한 번 더 잡혀 사각형이 꼭짓점 6개가 된다.
+  let closest = points.length - 1;
+  for (let i = Math.floor(points.length * 0.75); i < points.length; i++) {
+    if (dist(points[i], points[0]) < dist(points[closest], points[0])) closest = i;
+  }
+  if (closest < points.length - 1) points = points.slice(0, closest + 1);
   const gap = dist(points[0], points[points.length - 1]);
   if (gap > Math.max(diagonal * 0.2, minSize * 0.5)) return null; // 닫혀 있어야
   if (pathLength(points) > diagonal * 3.6) return null; // 여러 바퀴 낙서

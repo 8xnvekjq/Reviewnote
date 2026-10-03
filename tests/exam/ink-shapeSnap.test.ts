@@ -285,3 +285,13 @@ test('a perfectly still pen (no more pointermove events) still counts as a hold'
   const still = holdStillStart(points, arrivals, 300 + 700, 650, 6);
   assert.equal(still, points.length - 1, 'the whole stroke is used, even with a large last step');
 });
+
+test('a rectangle whose end overshoots past the start corner is still a 4-vertex rectangle', () => {
+  const a = { x: 100, y: 100 }, b = { x: 400, y: 107 }, c = { x: 400, y: 268 }, d = { x: 100, y: 261 };
+  // A→B→C→D→A 다음 B 쪽으로 20% 더 그은 꼬리
+  const overshoot = { x: a.x + (b.x - a.x) * 0.2, y: a.y + (b.y - a.y) * 0.2 };
+  const stroke = [...lineOf(a, b, 30), ...lineOf(b, c, 20).slice(1), ...lineOf(c, d, 30).slice(1), ...lineOf(d, a, 20).slice(1), ...lineOf(a, overshoot, 6).slice(1)];
+  const shape = recognizePolygon(stroke, { minSize: 40 });
+  assert.equal(shape?.kind, 'polygon');
+  assert.equal(shape.kind === 'polygon' && shape.points.length, 4);
+});

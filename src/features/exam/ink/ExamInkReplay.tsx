@@ -31,6 +31,24 @@ interface Props {
   autoOpen?: boolean;
   notes?: ReplayNotes;
 }
+/** 재생 상자 아이콘(이모지 ⏮⏭⏸는 윈도우·안드로이드에서 파란 네모 이모지로 나와 SVG로 그린다). */
+const ICON_PATHS = {
+  first: 'M6 5v14M18 5 9 12l9 7z',
+  prev: 'M15 5l-7 7 7 7',
+  play: 'M8 5v14l11-7z',
+  pause: 'M8 5v14M16 5v14',
+  next: 'M9 5l7 7-7 7',
+  last: 'M18 5v14M6 5l9 7-9 7z',
+  fold: 'M15 6l-6 6 6 6',
+  unfold: 'M9 6l6 6-6 6',
+  close: 'M6 6l12 12M18 6 6 18',
+} as const;
+function ReplayIcon({ name }: { name: keyof typeof ICON_PATHS }) {
+  const filled = name === 'play' || name === 'first' || name === 'last';
+  return <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill={filled ? 'currentColor' : 'none'}
+    stroke="currentColor" strokeWidth={name === 'pause' ? 3 : 2.2} strokeLinecap="round" strokeLinejoin="round"><path d={ICON_PATHS[name]} /></svg>;
+}
+
 export function ExamInkReplay({ client, attemptId, questionId, imageUrl, strokes, imageMaxWidth, autoOpen = false, notes }: Props) {
   const [open, setOpen] = useState(autoOpen);
   const [data, setData] = useState<InkReplayData | null>(null);
@@ -120,13 +138,13 @@ export function ExamInkReplay({ client, attemptId, questionId, imageUrl, strokes
     {/* 재생 컨트롤은 화면 왼쪽에 떠 있는 작은 상자 — 풀이를 아래로 스크롤해도 늘 보이고 바로 멈출 수 있다. */}
     {open && <div className={`exam-replay-dock${folded ? ' is-folded' : ''}`} role="group" aria-label="필기 재생" data-testid="exam-replay-dock">
       {folded ? <>
-        <button type="button" className="exam-replay-icon" aria-label={playLabel} disabled={stepCount === 0} onClick={togglePlay}>{playing ? '⏸' : '▶'}</button>
-        <button type="button" className="exam-replay-icon" aria-label="재생 상자 펼치기" aria-expanded={false} onClick={() => setFolded(false)}>⇥</button>
+        <button type="button" className="exam-replay-icon" aria-label={playLabel} disabled={stepCount === 0} onClick={togglePlay}><ReplayIcon name={playing ? 'pause' : 'play'} /></button>
+        <button type="button" className="exam-replay-icon" aria-label="재생 상자 펼치기" aria-expanded={false} onClick={() => setFolded(false)}><ReplayIcon name="unfold" /></button>
       </> : <>
         <div className="exam-replay-dock-head">
           <strong>필기 과정</strong>
-          <button type="button" className="exam-replay-icon is-small" aria-label="재생 상자 접기" aria-expanded onClick={() => setFolded(true)}>⇤</button>
-          <button type="button" className="exam-replay-icon is-small" aria-label="재생 닫기" onClick={toggleOpen}>✕</button>
+          <button type="button" className="exam-replay-icon is-small" aria-label="재생 상자 접기" aria-expanded onClick={() => setFolded(true)}><ReplayIcon name="fold" /></button>
+          <button type="button" className="exam-replay-icon is-small" aria-label="재생 닫기" onClick={toggleOpen}><ReplayIcon name="close" /></button>
         </div>
         {!data && !error && <p role="status">필기 기록을 불러오는 중…</p>}
         {error && <p role="alert">기록을 불러오지 못했어요. <button type="button" className="exam-replay-link" onClick={() => { setError(false); setRetry(n => n + 1); }}>다시 시도</button></p>}
@@ -138,15 +156,15 @@ export function ExamInkReplay({ client, attemptId, questionId, imageUrl, strokes
             {formatReplayTime(time)} / {formatReplayTime(total)}{currentLabel ? ` · ${currentLabel}` : ''}
           </output>
           <div className="exam-replay-buttons">
-            <button type="button" className="exam-replay-icon" aria-label="처음" title="처음" disabled={time <= 0} onClick={() => seek(0)}>⏮</button>
-            <button type="button" className="exam-replay-icon" aria-label="이전 필기 단계" title="이전 단계" disabled={time <= 0} onClick={() => seek(previousBoundary())}>‹</button>
-            <button type="button" className="exam-replay-icon is-play" aria-label={playLabel} title={playLabel} disabled={stepCount === 0} onClick={togglePlay}>{playing ? '⏸' : '▶'}</button>
-            <button type="button" className="exam-replay-icon" aria-label="다음 필기 단계" title="다음 단계" disabled={time >= total} onClick={() => seek(nextBoundary())}>›</button>
-            <button type="button" className="exam-replay-icon" aria-label="마지막" title="마지막" disabled={time >= total} onClick={() => seek(total)}>⏭</button>
+            <button type="button" className="exam-replay-icon" aria-label="처음" title="처음" disabled={time <= 0} onClick={() => seek(0)}><ReplayIcon name="first" /></button>
+            <button type="button" className="exam-replay-icon" aria-label="이전 필기 단계" title="이전 단계" disabled={time <= 0} onClick={() => seek(previousBoundary())}><ReplayIcon name="prev" /></button>
+            <button type="button" className="exam-replay-icon is-play" aria-label={playLabel} title={playLabel} disabled={stepCount === 0} onClick={togglePlay}><ReplayIcon name={playing ? 'pause' : 'play'} /></button>
+            <button type="button" className="exam-replay-icon" aria-label="다음 필기 단계" title="다음 단계" disabled={time >= total} onClick={() => seek(nextBoundary())}><ReplayIcon name="next" /></button>
+            <button type="button" className="exam-replay-icon" aria-label="마지막" title="마지막" disabled={time >= total} onClick={() => seek(total)}><ReplayIcon name="last" /></button>
           </div>
-          <label className="exam-replay-speed">배속 <select value={speed} onChange={event => setSpeed(Number(event.target.value))}>
-            {[0.5, 1, 2, 4].map(value => <option key={value} value={value}>{value}배</option>)}
-          </select></label>
+          <div className="exam-replay-speed" role="group" aria-label="배속">
+            {[0.5, 1, 2, 4].map(value => <button key={value} type="button" aria-pressed={speed === value} onClick={() => setSpeed(value)}>{value}×</button>)}
+          </div>
           <p className="exam-replay-note">{stepCount === 0 ? '아직 저장된 필기 기록이 없어요.' : timeline.approximate
             ? '예전 필기는 남은 획·저장 상태만 보여요.'
             : `실제 쓴 속도로 재생해요(${REPLAY_MAX_PAUSE_MS / 1000}초보다 긴 멈춤은 줄임).`}</p>

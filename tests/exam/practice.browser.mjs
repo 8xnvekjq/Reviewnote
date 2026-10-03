@@ -1001,12 +1001,12 @@ for (const viewport of [LANDSCAPE, { width: 390, height: 844 }]) {
   assert.match(await page.getByTestId('exam-replay-position').innerText(), /^\d+:\d{2} \/ \d+:\d{2}/);
   // 재생하면 슬라이더 값이 시간에 따라 조금씩 늘어난다(획마다 한 칸씩 뛰지 않음).
   await page.getByRole('button', { name: '처음', exact: true }).click();
-  await page.getByRole('combobox', { name: '배속', exact: true }).selectOption('1');
+  await page.getByRole('group', { name: '배속', exact: true }).getByRole('button', { name: '1×', exact: true }).click();
   await page.getByRole('button', { name: '재생', exact: true }).click();
   const samples = [];
   for (let i = 0; i < 6; i++) { await page.waitForTimeout(120); samples.push(Number(await slider.inputValue())); }
   assert.ok(new Set(samples).size >= 4, `slider should move smoothly: ${samples}`);
-  await page.getByRole('combobox', { name: '배속', exact: true }).selectOption('4');
+  await page.getByRole('group', { name: '배속', exact: true }).getByRole('button', { name: '4×', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('[data-testid="exam-replay-position"]')?.getAttribute('data-step') === '3');
   const box = await page.locator(inkSel).boundingBox();
   await page.mouse.move(box.x + 30, box.y + 30); await page.mouse.down();
