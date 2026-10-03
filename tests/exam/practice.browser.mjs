@@ -1295,5 +1295,64 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   await context.close();
 }
 
+// Author-only: private broadcast lifecycle with a real solving tab and a separate admin tab.
+{
+  const context = await browser.newContext({ viewport: LANDSCAPE });
+  const student = await context.newPage();
+  const admin = await context.newPage();
+  const errors = [];
+  student.on('pageerror', e => errors.push(e.message));
+  admin.on('pageerror', e => errors.push(e.message));
+  await student.goto(`${BASE}?broadcast=student`);
+  await startExam(student, '자유 모드', '미적분');
+  await drawStroke(student);
+  await student.getByRole('button', { name: '이 문항 필기 지우기', exact: true }).click();
+  await student.waitForTimeout(1000);
+  assert.equal(await student.evaluate(() => window.__broadcast.log.length), 0, 'no admin means no student broadcasts');
+  await admin.goto(`${BASE}?broadcast=admin`);
+  await admin.getByTestId('broadcast-open').click();
+  await admin.getByTestId('exam-live-cell').waitFor();
+  await student.waitForFunction(() => window.__broadcast.log.length === 0);
+  // An admin watch heartbeat opens the student's send-only ink channel.
+  await admin.waitForFunction(() => window.__broadcast.log.some(m => m.payload.state === 'watching'));
+  await student.waitForFunction(() => window.__broadcast.topics.has('exam-live:2025-06-math'));
+  await drawStroke(student);
+  await admin.waitForFunction(() => document.querySelector('[data-testid="exam-live-cell"] .exam-ink')?.dataset.strokeCount === '1', null, { timeout: 1500 });
+  assert.equal(await student.evaluate(() => window.__inkStats.requests), 0, 'broadcast does not accelerate the five-second save');
+  await student.getByRole('button', { name: '이 문항 필기 지우기', exact: true }).click();
+  await admin.waitForFunction(() => document.querySelector('[data-testid="exam-live-cell"] .exam-ink')?.dataset.strokeCount === '0', null, { timeout: 1500 });
+  const beforeHidden = await student.evaluate(() => window.__broadcast.log.length);
+  await admin.evaluate(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await admin.waitForFunction(() => window.__broadcast.log.at(-1)?.payload.state === 'stopped');
+  await student.waitForTimeout(100);
+  await drawStroke(student);
+  await student.getByRole('button', { name: '실행 취소', exact: true }).click();
+  await student.waitForTimeout(1000);
+  assert.equal(await student.evaluate(() => window.__broadcast.log.length), beforeHidden, 'hidden admin suppresses broadcasting');
+  await admin.evaluate(() => {
+    delete document.hidden;
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await admin.waitForFunction(() => window.__broadcast.log.at(-1)?.payload.state === 'watching');
+  await admin.keyboard.press('Escape');
+  await admin.getByTestId('exam-live-view').waitFor({ state: 'detached' });
+  await student.waitForTimeout(100);
+  const sentAtClose = await student.evaluate(() => window.__broadcast.log.filter(m => m.event === 'ink').length);
+  await drawStroke(student);
+  await student.waitForTimeout(1000);
+  assert.equal(await student.evaluate(() => window.__broadcast.log.filter(m => m.event === 'ink').length), sentAtClose, 'stopped watch suppresses sending');
+  await admin.getByTestId('broadcast-open').click();
+  await admin.getByTestId('exam-live-cell').waitFor();
+  await admin.evaluate(() => window.__broadcast.setConnected(false));
+  await drawStroke(student);
+  // Dropped broadcasts still reconcile through the original save + polling paths.
+  await admin.waitForFunction(() => document.querySelector('[data-testid="exam-live-cell"] .exam-ink')?.dataset.strokeCount === '2', null, { timeout: 13000 });
+  assert.deepEqual(errors, []);
+  await context.close();
+}
+
 await browser.close();
 console.log('exam practice browser tests passed');

@@ -12,6 +12,7 @@ import { AnswerBar, type FreeCheck } from './AnswerBar';
 import { OmrCard } from './OmrCard';
 import { QuestionOverview } from './QuestionOverview';
 import { useExamInk } from './useExamInk';
+import { useInkBroadcast } from './useInkBroadcast';
 import {
   countAnswered, createStopwatch, crossedAlerts, elapsedFor, formatClock, normalizeShortAnswer, pauseStopwatch, remainingMs,
   switchStopwatch, toggleChoice, questionAnswerType, usesWholePages, type StopwatchState,
@@ -80,6 +81,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
   const [now, setNow] = useState(() => Date.now());
   const [toast, setToast] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const broadcastInk = useInkBroadcast(client.liveTransport, attempt.paperId, attempt.id, attempt.status === 'in_progress' && !submitting);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
@@ -277,6 +279,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
   const onInkChange = (next: InkStroke[], kind?: InkChangeKind) => {
     if (submittedRef.current) return;
     const qid = inkKey;
+    broadcastInk(qid, questions.find(q => q.id === qid)?.number ?? question.number, strokes.get(qid) ?? [], next);
     inkSync.change(qid, next, kind);
     const old = inkTimers.current.get(qid);
     if (old != null) window.clearTimeout(old);
