@@ -502,7 +502,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
 
 /** Explicit controls let browser tests change membership and draw/erase between real polling ticks. */
 export function createMockLiveExamApi() {
-  let count = 2;
+  let count = 2, listCalls = 0;
   const questions = buildMockQuestions('미적분');
   const docs = new Map<string, { revision: number; strokes: InkStroke[]; batches: Extract<LiveInkResponse, { mode: 'delta' }>['batches']; updatedAt: string }>();
   const id = (index: number) => `live-attempt-${index}`;
@@ -518,7 +518,12 @@ export function createMockLiveExamApi() {
   };
   for (let i = 0; i < 3; i++) update(i);
   const api: Pick<AdminExamApi, 'listLivePapers' | 'getLiveExam' | 'getLiveInk'> = {
-    listLivePapers: async () => count ? [{ paperId: MOCK_PAPER_ID, liveCount: count }] : [],
+    // 서버처럼 최근 10분 안에 필기한 학생만 센다(브라우저 테스트가 모의 시간으로 만료를 확인).
+    listLivePapers: async () => {
+      listCalls++;
+      const live = Array.from({ length: count }, (_, index) => docs.get(id(index))!).filter(doc => Date.now() - Date.parse(doc.updatedAt) < 10 * 60_000).length;
+      return live ? [{ paperId: MOCK_PAPER_ID, liveCount: live }] : [];
+    },
     getLiveExam: async paperId => paperId !== MOCK_PAPER_ID ? [] : Array.from({ length: count }, (_, index): AdminLiveStudent => {
       const doc = docs.get(id(index))!;
       return { attemptId: id(index), studentId: `live-student-${index}`, studentName: ['김학생', '이학생', '박학생'][index],
@@ -530,5 +535,5 @@ export function createMockLiveExamApi() {
       return { mode: 'delta', revision: doc.revision, batches: doc.batches.filter(batch => batch.revision > since) };
     },
   };
-  return { api, setCount: (n: number) => { count = Math.max(0, Math.min(3, n)); }, draw: (index: number) => update(index), erase: (index: number) => update(index, true) };
+  return { api, listCalls: () => listCalls, setCount: (n: number) => { count = Math.max(0, Math.min(3, n)); }, draw: (index: number) => update(index), erase: (index: number) => update(index, true) };
 }
