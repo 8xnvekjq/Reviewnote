@@ -64,6 +64,10 @@
 .exam-link { background: none; border: 0; padding: 0 2px; color: var(--rn-accent); font: inherit; text-decoration: underline; cursor: pointer; }
 
 /* ── 시작 ── */
+/* 화면 진입 애니메이션의 6px 슬라이드는 빼고 페이드만 — 슬라이드가 덜 끝난 순간과 끝난 뒤 카드 위치가 달라
+   (Live 배지가 생기고 사라지는 사이) 카드가 약 4px 흔들려 보였다. */
+@keyframes rn-exam-screen-fade { from { opacity: 0; } }
+.screen-enter:has(.exam-practice) { animation-name: rn-exam-screen-fade; }
 .exam-start { display: grid; gap: 14px; max-width: 760px; margin-inline: auto; min-width: 0; }
 .exam-start-head { margin-bottom: -4px; }
 .exam-paper-entry { position: relative; display: grid; min-width: 0; align-content: start; gap: 8px; }
