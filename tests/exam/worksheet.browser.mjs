@@ -24,7 +24,7 @@ try {
     await page.getByTestId('worksheet-source').waitFor();
     assert.match(await page.getByTestId('worksheet-source').innerText(), /2017년 9월 고2/);
     assert.equal(await page.getByTestId('exam-remaining').count(), 0);
-    await assertCompactTopbar(page);
+    await assertCompactTopbar(page, { freeCheck: true });
     await page.locator('.exam-choice[data-choice="4"]').click();
     await page.getByRole('button', { name: '채점해 보기', exact: true }).click();
     await page.getByRole('button', { name: '다음 문항', exact: true }).click();
