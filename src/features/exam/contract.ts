@@ -260,7 +260,8 @@ export interface InkReplayData {
 
 /** Only anonymous display fields and scoped drawing ids cross this boundary. */
 export interface PeerSolution {
-  label: { character: string; title: string | null; grade: string | null; isTeacher: boolean };
+  /** face: 풀이 작성자 기준으로 고정된 한 글자 이모지(새 서버). character는 구버전 응답 호환용. */
+  label: { face?: string; character?: string; title: string | null; grade: string | null; isTeacher: boolean };
   strokes: InkStroke[];
   /** Opaque comparison fingerprint: replay reselects and verifies the same drawing. */
   solutionKey: string;

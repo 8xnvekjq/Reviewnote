@@ -265,7 +265,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       if (!result || result.kind === 'hanneung' || item?.isCorrect !== false) throw new Error('EXAM_PEER_NOT_ALLOWED');
       if (item.number === 3) return null;
       const strokes = mockPeerStrokes();
-      return { label: { character: '하치와레', title: '꾸준한 도전자', grade: '고2', isTeacher: false },
+      return { label: { face: '🐱', character: '하치와레', title: '수학의 신', grade: '고2', isTeacher: false },
         strokes, solutionKey: 'mock-peer-fingerprint' };
     },
     async getPeerSolutionReplay(attemptId, questionId, solutionKey) {

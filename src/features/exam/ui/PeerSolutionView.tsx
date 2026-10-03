@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { PeerSolution } from '../contract';
 import { ExamInkReplay } from '../ink/ExamInkReplay';
-import { peerSolutionLabel, type PeerSolutionSession } from './peerSolution';
+import { peerSolutionLabel, peerSolutionLabelParts, type PeerSolutionSession } from './peerSolution';
 
 interface Props {
   session: PeerSolutionSession | null;
@@ -12,6 +12,20 @@ interface Props {
   imageUrl: string;
   /** 내 풀이(덧쓰기). peerButton은 그 툴바의 '원래 풀이로' 바로 오른쪽에 넣는 작은 버튼. */
   children: (peerButton: ReactNode) => ReactNode;
+}
+
+/** 머리 줄 라벨: 얼굴 + 장착 칭호(헤더·랭킹·활동 피드와 같은 getTitleBadgeStyle 배지 이펙트) + 학년. */
+export function PeerSolutionLabel({ label }: { label: PeerSolution['label'] }) {
+  const parts = peerSolutionLabelParts(label);
+  return <p className="exam-peer-label" data-testid="exam-peer-label" aria-label={peerSolutionLabel(label)}>
+    <span className="exam-peer-face" aria-hidden="true">{parts.face}</span>
+    {parts.isTeacher ? <span>선생님 풀이</span>
+      : parts.title ? <span className={`exam-peer-title px-2 py-0.5 rounded-full border text-[11px] ${parts.title.style}`} data-testid="exam-peer-title">
+        <span aria-hidden="true">{parts.title.icon}</span> <span>{parts.title.text}</span>
+      </span>
+      : <span>익명 학생</span>}
+    {parts.grade && <span className="exam-peer-grade">{parts.grade}</span>}
+  </p>;
 }
 
 /**
@@ -57,7 +71,7 @@ export function PeerSolutionSwitch({ session, eligible, attemptId, questionId, i
     {failed && <p className="exam-peer-note" role="status">풀이를 불러오지 못했어요. 다시 눌러 주세요.</p>}
     {showing && solution && <section className="exam-peer" aria-label="다른 학생의 풀이" data-testid="exam-peer-solution">
       <div className="exam-peer-head">
-        <p className="exam-peer-label" data-testid="exam-peer-label">{peerSolutionLabel(solution.label)}</p>
+        <PeerSolutionLabel label={solution.label} />
         <span className="exam-peer-caption">다른 풀이 · 읽기 전용</span>
         <button type="button" className="exam-tool exam-tool-text exam-peer-toggle" data-testid="exam-peer-toggle"
           aria-pressed onClick={() => { void toggle(); }}>내 풀이로</button>

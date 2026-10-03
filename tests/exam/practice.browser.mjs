@@ -342,7 +342,32 @@ async function spinWheel(page, place, steps) {
   await page.getByTestId('exam-peer-toggle').click();
   const peerView = page.getByTestId('exam-peer-solution');
   await peerView.waitFor();
-  assert.equal(await page.getByTestId('exam-peer-label').innerText(), '👩 꾸준한 도전자(고2)');
+  const peerLabel = page.getByTestId('exam-peer-label');
+  assert.equal(await peerLabel.getAttribute('aria-label'), '🐱 수학의 신(고2)');
+  assert.match((await peerLabel.innerText()).replace(/\s+/g, ' '), /^🐱 👑 수학의 신 ?\(고2\)$/);
+  // 칭호는 헤더·랭킹과 같은 getTitleBadgeStyle 배지 — '수학의 신'은 그라데이션+반짝임(animate-pulse) 그대로.
+  const peerTitle = peerLabel.getByTestId('exam-peer-title');
+  const titleLook = await peerTitle.evaluate(el => ({ cls: el.className, bg: getComputedStyle(el).backgroundImage, anim: getComputedStyle(el).animationName }));
+  assert.match(titleLook.cls, /bg-gradient-to-r/); assert.match(titleLook.cls, /animate-pulse/);
+  assert.match(titleLook.bg, /gradient/); assert.notEqual(titleLook.anim, 'none');
+  // 작은 머리 줄 안에 들어간다(라이트/다크, 가로 화면과 390px).
+  for (const size of [LANDSCAPE, { width: 390, height: 844 }]) {
+    await page.setViewportSize(size);
+    for (const theme of ['light','dark']) {
+      await page.evaluate(async value => { const { applyThemeColor } = await import('/src/utils/theme.ts'); applyThemeColor(value === 'light' ? '#FFFFFF' : undefined); }, theme);
+      const fit = await page.evaluate(() => {
+        const head = document.querySelector('.exam-peer-head').getBoundingClientRect();
+        const title = document.querySelector('[data-testid="exam-peer-title"]').getBoundingClientRect();
+        return { inside: title.left >= head.left - 1 && title.right <= head.right + 1, height: title.height };
+      });
+      assert.ok(fit.inside, `peer title badge stays inside the head (${theme}/${size.width})`);
+      assert.ok(fit.height <= 40, `peer title badge stays small: ${fit.height}px`);
+      await page.locator('.exam-peer-head').screenshot({ path: `${out}/peer-label-${theme}-${size.width}.png` });
+    }
+    await page.evaluate(async () => { const { applyThemeColor } = await import('/src/utils/theme.ts'); applyThemeColor(); });
+    await noHorizontalOverflow(page, `peer label/${size.width}`);
+  }
+  await page.setViewportSize(LANDSCAPE);
   assert.match(await peerView.innerText(), /다른 풀이 · 읽기 전용/);
   // 자동 재생이 처음(획 0개)부터 시작한다 — 끝까지 가면 3획(아래 End 확인).
   assert.equal(await peerView.getByTestId('exam-ink-replay').getAttribute('data-replaying'), 'true');
