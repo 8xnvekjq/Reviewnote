@@ -3,7 +3,7 @@ import type { ExamClient, InkReplayData, PeerSolution } from '../contract.ts';
 export type PeerSolutionApi = Pick<ExamClient, 'getPeerSolution' | 'getPeerSolutionReplay'>;
 
 /** 서버가 정한 캐릭터(요청자+문항 기준이라 작성자와 연결되지 않음)를 사람 얼굴 이모지로 바꿔 쓴다.
- *  🧑‍🏫·🧑‍🦱 같은 결합(ZWJ) 이모지는 글꼴·터미널에 따라 두 글자로 갈라지거나 옆 글씨와 겹쳐 보여 한 글자짜리만 쓴다. */
+ *  선생님·머리색 같은 결합(ZWJ) 이모지는 글꼴·터미널에 따라 두 글자로 갈라지거나 옆 글씨와 겹쳐 보여 한 글자짜리만 쓴다. */
 const FACES: Record<string, string> = {
   치이카와: '🧑', 하치와레: '👩', 우사기: '👨', 모몽가: '🧒', 쿠리만쥬: '👧', 랏코: '👦', 시사: '👱', 후루혼: '🧔',
 };
