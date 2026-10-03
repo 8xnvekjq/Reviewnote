@@ -4,6 +4,7 @@
 import { useRef, useState, type CSSProperties } from 'react';
 import type { ExamClient, ExamInkCanvasHandle, InkStroke, InkTool } from '../contract';
 import { ExamInkReplay } from '../ink/ExamInkReplay';
+import { LaserIcon } from './LaserIcon';
 
 const PEN_COLORS = [
   { value: '#1f2937', label: '검정' },
@@ -45,12 +46,17 @@ interface Props {
   imageMaxWidth?: number;
   /** 원래 필기를 다 불러왔을 때만 쓴다(불러오기 전에 쓰면 원래 필기가 덧쓰기에서 빠진다). */
   ready: boolean;
+  /** 관리자 검토: 열자마자 필기 순서를 자동 재생하고, 안내 문구를 관리자용으로. 덧쓴 필기는 학생 풀이에 저장되지 않는다. */
+  review?: boolean;
+  /** false면 덧쓴 필기를 어디에도 남기지 않는다(풀이 중 응시 검토 — 학생 필기가 계속 바뀌므로 예전 복사본이 새 필기를 가리지 않게). */
+  persist?: boolean;
 }
 
-export function ResultInkNotes({ client, attemptId, questionId, imageUrl, strokes, imageMaxWidth, ready }: Props) {
-  const key = resultNotesKey(attemptId, questionId);
+export function ResultInkNotes({ client, attemptId, questionId, imageUrl, strokes, imageMaxWidth, ready, review = false, persist = true }: Props) {
+  // 관리자가 덧쓴 필기는 학생 본인 키와 섞이지 않게 따로 둔다(같은 기기에서 둘 다 열 일은 드물지만).
+  const key = `${resultNotesKey(attemptId, questionId)}${review ? ':admin' : ''}`;
   // null = 아직 덧쓰지 않음 → 원래 필기를 그대로 보여 준다. 처음 쓰는 순간 원래 필기 + 새 획을 복사해 따로 둔다.
-  const [notes, setNotes] = useState<InkStroke[] | null>(() => readNotes(key));
+  const [notes, setNotes] = useState<InkStroke[] | null>(() => (persist ? readNotes(key) : null));
   const [tool, setTool] = useState<InkTool>('pen');
   const [color, setColor] = useState(PEN_COLORS[0].value);
   const [generation, setGeneration] = useState(0);
@@ -59,12 +65,12 @@ export function ResultInkNotes({ client, attemptId, questionId, imageUrl, stroke
   const shown = notes ?? strokes;
 
   const onChange = (next: InkStroke[]) => {
-    writeNotes(key, next);
+    if (persist) writeNotes(key, next);
     setNotes(next);
     setHistoryTick(t => t + 1);
   };
   const reset = () => {
-    writeNotes(key, null);
+    if (persist) writeNotes(key, null);
     setNotes(null);
     setGeneration(n => n + 1); // 캔버스 실행 취소 기록도 비운다
   };
@@ -74,15 +80,15 @@ export function ResultInkNotes({ client, attemptId, questionId, imageUrl, stroke
   const toolbar = (
     <div className="exam-notes-tools" role="toolbar" aria-label="덧쓰기 도구" data-testid="exam-notes-tools">
       <div className="exam-tool-group">
-        {([['pen', '펜', '✏️'], ['highlighter', '형광펜', '🖍️'], ['eraser', '지우개', '🧽']] as const).map(([value, label, icon]) => (
+        {([['pen', '펜', '✏️'], ['highlighter', '형광펜', '🖍️'], ['eraser', '지우개', '🧽'], ['laser', '레이저(남지 않음)', null]] as const).map(([value, label, icon]) => (
           <button key={value} type="button" className={`exam-tool${tool === value ? ' is-on' : ''}`} aria-pressed={tool === value} aria-label={label} title={label} disabled={!ready} onClick={() => setTool(value)}>
-            <span aria-hidden="true">{icon}</span>
+            {icon ? <span aria-hidden="true">{icon}</span> : <LaserIcon />}
           </button>
         ))}
       </div>
       <div className="exam-tool-group">
         {PEN_COLORS.map(c => (
-          <button key={c.value} type="button" className={`exam-color${color === c.value ? ' is-on' : ''}`} style={{ '--swatch': c.value } as CSSProperties} aria-pressed={color === c.value} aria-label={`${c.label}색`} disabled={!ready} onClick={() => { setColor(c.value); if (tool === 'eraser') setTool('pen'); }} />
+          <button key={c.value} type="button" className={`exam-color${color === c.value ? ' is-on' : ''}`} style={{ '--swatch': c.value } as CSSProperties} aria-pressed={color === c.value} aria-label={`${c.label}색`} disabled={!ready} onClick={() => { setColor(c.value); if (tool === 'eraser' || tool === 'laser') setTool('pen'); }} />
         ))}
       </div>
       <div className="exam-tool-group">
@@ -90,13 +96,13 @@ export function ResultInkNotes({ client, attemptId, questionId, imageUrl, stroke
         <button type="button" className="exam-tool" aria-label="다시 실행" title="다시 실행" disabled={!canRedo} onClick={() => { inkRef.current?.redo(); setHistoryTick(t => t + 1); }}>↷</button>
         <button type="button" className="exam-tool exam-tool-text" disabled={!notes} onClick={reset}>원래 풀이로</button>
       </div>
-      <p className="exam-notes-note">{ready
-        ? '여기서 쓴 필기는 이 기기에만 남아요. 답·점수와 서버의 원래 풀이는 바뀌지 않아요.'
-        : '원래 필기를 불러온 뒤에 이어 쓸 수 있어요.'}</p>
+      <p className="exam-notes-note">{!ready ? (review ? '학생 필기를 불러온 뒤에 쓸 수 있어요.' : '원래 필기를 불러온 뒤에 이어 쓸 수 있어요.')
+        : review ? '여기서 쓴 필기는 이 기기에서만 보여요. 학생 풀이에는 저장되지 않아요.'
+        : '여기서 쓴 필기는 이 기기에만 남아요. 답·점수와 서버의 원래 풀이는 바뀌지 않아요.'}</p>
     </div>
   );
 
   return <ExamInkReplay client={client} attemptId={attemptId} questionId={questionId} imageUrl={imageUrl}
-    strokes={strokes} imageMaxWidth={imageMaxWidth}
+    strokes={strokes} imageMaxWidth={imageMaxWidth} autoOpen={review}
     notes={{ strokes: shown, onChange, tool, color, size: 4, inkRef, toolbar, ready, canvasKey: generation }} />;
 }

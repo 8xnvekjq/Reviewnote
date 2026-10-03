@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref } from 'react';
 import type { ExamClient, ExamInkCanvasHandle, InkChangeKind, InkReplayData, InkStroke, InkTool } from '../contract';
 import { ExamInkCanvas } from './ExamInkCanvas';
 import { inkExtent, replayStrokeLists } from './inkFit';
@@ -42,11 +42,70 @@ const ICON_PATHS = {
   fold: 'M15 6l-6 6 6 6',
   unfold: 'M9 6l6 6-6 6',
   close: 'M6 6l12 12M18 6 6 18',
+  grip: 'M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01',
 } as const;
 function ReplayIcon({ name }: { name: keyof typeof ICON_PATHS }) {
   const filled = name === 'play' || name === 'first' || name === 'last';
   return <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill={filled ? 'currentColor' : 'none'}
-    stroke="currentColor" strokeWidth={name === 'pause' ? 3 : 2.2} strokeLinecap="round" strokeLinejoin="round"><path d={ICON_PATHS[name]} /></svg>;
+    stroke="currentColor" strokeWidth={name === 'pause' || name === 'grip' ? 3 : 2.2} strokeLinecap="round" strokeLinejoin="round"><path d={ICON_PATHS[name]} /></svg>;
+}
+
+/** 재생 상자 위치(화면 px, 왼쪽 위 기준). 끌어 옮긴 자리를 다음에도 쓴다(이 기기에서만). */
+const DOCK_POS_KEY = 'rn-exam-replay-dock-pos:v1';
+type DockPos = { x: number; y: number };
+function readDockPos(): DockPos | null {
+  try {
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(DOCK_POS_KEY) ?? 'null');
+    if (parsed && typeof parsed === 'object' && Number.isFinite((parsed as DockPos).x) && Number.isFinite((parsed as DockPos).y)) return parsed as DockPos;
+  } catch { /* 저장소를 못 쓰면 기본 자리 */ }
+  return null;
+}
+const clampDock = (pos: DockPos, el: HTMLElement | null): DockPos => {
+  const w = el?.offsetWidth ?? 160, h = el?.offsetHeight ?? 60;
+  return {
+    x: Math.max(4, Math.min(window.innerWidth - w - 4, pos.x)),
+    y: Math.max(4, Math.min(window.innerHeight - h - 4, pos.y)),
+  };
+};
+
+/** 재생 상자 위쪽 줄(손잡이)을 잡고 끌어 옮긴다. 버튼을 누른 건 끌기로 보지 않는다. */
+function useDockDrag() {
+  const dockRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<DockPos | null>(() => readDockPos());
+  const drag = useRef<{ id: number; dx: number; dy: number } | null>(null);
+  // 화면 크기가 바뀌어(가로·세로 전환 등) 상자가 화면 밖으로 나가지 않게
+  useEffect(() => {
+    if (!pos) return;
+    const fit = () => setPos(prev => prev && clampDock(prev, dockRef.current));
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pos === null]);
+  const onPointerDown = (event: ReactPointerEvent<HTMLElement>) => {
+    if ((event.target as HTMLElement).closest('button, input, select')) return;
+    const rect = dockRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    event.preventDefault();
+    drag.current = { id: event.pointerId, dx: event.clientX - rect.left, dy: event.clientY - rect.top };
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* 합성 이벤트 등 */ }
+  };
+  const onPointerMove = (event: ReactPointerEvent<HTMLElement>) => {
+    const d = drag.current;
+    if (!d || d.id !== event.pointerId) return;
+    setPos(clampDock({ x: event.clientX - d.dx, y: event.clientY - d.dy }, dockRef.current));
+  };
+  const onPointerUp = (event: ReactPointerEvent<HTMLElement>) => {
+    if (!drag.current || drag.current.id !== event.pointerId) return;
+    drag.current = null;
+    setPos(prev => {
+      if (prev) try { window.localStorage.setItem(DOCK_POS_KEY, JSON.stringify(prev)); } catch { /* 저장 불가 */ }
+      return prev;
+    });
+  };
+  const handle = { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp };
+  const style: CSSProperties | undefined = pos ? { left: pos.x, top: pos.y, bottom: 'auto', transform: 'none' } : undefined;
+  return { dockRef, handle, style };
 }
 
 export function ExamInkReplay({ client, attemptId, questionId, imageUrl, strokes, imageMaxWidth, autoOpen = false, notes }: Props) {
@@ -59,6 +118,7 @@ export function ExamInkReplay({ client, attemptId, questionId, imageUrl, strokes
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [folded, setFolded] = useState(false);
+  const dock = useDockDrag();
   const timeline = useMemo(() => data ? buildInkTimeline(data) : null, [data]);
   const clock = useMemo(() => timeline ? buildInkClock(timeline) : null, [timeline]);
   const total = clock?.total ?? 0;
@@ -133,15 +193,18 @@ export function ExamInkReplay({ client, attemptId, questionId, imageUrl, strokes
   return <div className="exam-ink-replay" data-testid="exam-ink-replay" data-replaying={open ? 'true' : 'false'}>
     <div className="exam-replay-bar">
       <button type="button" className="rn-button rn-button-compact" aria-expanded={open} onClick={toggleOpen}>{open ? '최종 풀이 보기' : '필기 순서 보기'}</button>
-      {notes && !open && notes.toolbar}
+      {/* 덧쓰기 도구는 재생 중에도 보인다 — 도구를 누르면 재생을 닫고 최종 풀이 위에 바로 쓴다. */}
+      {notes && <div className="exam-replay-notes" onClickCapture={() => { if (open) toggleOpen(); }}>{notes.toolbar}</div>}
     </div>
     {/* 재생 컨트롤은 화면 왼쪽에 떠 있는 작은 상자 — 풀이를 아래로 스크롤해도 늘 보이고 바로 멈출 수 있다. */}
-    {open && <div className={`exam-replay-dock${folded ? ' is-folded' : ''}`} role="group" aria-label="필기 재생" data-testid="exam-replay-dock">
+    {open && <div ref={dock.dockRef} style={dock.style} className={`exam-replay-dock${folded ? ' is-folded' : ''}`} role="group" aria-label="필기 재생" data-testid="exam-replay-dock">
       {folded ? <>
+        <span className="exam-replay-grip" aria-hidden="true" title="끌어서 옮기기" {...dock.handle}><ReplayIcon name="grip" /></span>
         <button type="button" className="exam-replay-icon" aria-label={playLabel} disabled={stepCount === 0} onClick={togglePlay}><ReplayIcon name={playing ? 'pause' : 'play'} /></button>
         <button type="button" className="exam-replay-icon" aria-label="재생 상자 펼치기" aria-expanded={false} onClick={() => setFolded(false)}><ReplayIcon name="unfold" /></button>
       </> : <>
-        <div className="exam-replay-dock-head">
+        <div className="exam-replay-dock-head" title="끌어서 옮기기" {...dock.handle}>
+          <span className="exam-replay-grip" aria-hidden="true"><ReplayIcon name="grip" /></span>
           <strong>필기 과정</strong>
           <button type="button" className="exam-replay-icon is-small" aria-label="재생 상자 접기" aria-expanded onClick={() => setFolded(true)}><ReplayIcon name="fold" /></button>
           <button type="button" className="exam-replay-icon is-small" aria-label="재생 닫기" onClick={toggleOpen}><ReplayIcon name="close" /></button>

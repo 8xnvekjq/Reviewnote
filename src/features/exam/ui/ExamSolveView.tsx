@@ -2,6 +2,7 @@
 // 전체 문제 보기·OMR 검토·나가기/제출 확인은 이 화면 위에 겹쳐 띄운다(전체화면을 유지한 채).
 // v2: 자유 모드에서 채점해 본 문항(checked)은 답을 잠근다 — 이어 풀기로 다시 열어도 서버 payload 의 items[].checked 로 유지.
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { LaserIcon } from './LaserIcon';
 import type { ExamAttempt, ExamClient, ExamInkCanvasHandle, ExamItemState, ExamResult, InkChangeKind, InkStroke, InkTool } from '../contract';
 import { ExamInkCanvas, preloadInkImages } from '../ink/ExamInkCanvas';
 
@@ -352,9 +353,9 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
           </button>
           <div className="exam-tools" role="toolbar" aria-label="필기 도구">
             <div className="exam-tool-group">
-              {([['pen', '펜', '✏️'], ['highlighter', '형광펜', '🖍️'], ['eraser', '지우개', '🧽'], ['laser', '레이저(남지 않음)', '🔴']] as const).map(([value, label, icon]) => (
+              {([['pen', '펜', '✏️'], ['highlighter', '형광펜', '🖍️'], ['eraser', '지우개', '🧽'], ['laser', '레이저(남지 않음)', null]] as const).map(([value, label, icon]) => (
                 <button key={value} type="button" className={`exam-tool${tool === value && !pagePan ? ' is-on' : ''}`} aria-pressed={tool === value && !pagePan} aria-label={label} title={label} onClick={() => { setTool(value); setPagePan(false); }}>
-                  <span aria-hidden="true">{icon}</span>
+                  {icon ? <span aria-hidden="true">{icon}</span> : <LaserIcon />}
                 </button>
               ))}
             </div>

@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { AdminExamApi, AdminExamAttemptSummary, ExamAttempt, ExamResult, InkStroke } from '../contract';
-import { ExamInkReplay } from '../ink/ExamInkReplay';
+import { ResultInkNotes } from './ResultInkNotes';
 import { ExamAnswer } from './ExamAnswer';
 import { formatDuration, usesWholePages } from './examLogic';
 import { OmrResultView } from './OmrResultView';
@@ -56,9 +56,10 @@ function InProgressReview({ target, api }: { target: ReviewTarget; api: AdminExa
       {!data.ink.get(inkKey!)?.length && <p className="rn-caption">이 문항에 서버로 저장된 필기가 없어요.</p>}
       {question.sourceLabel && <p className="rn-caption">{question.sourceLabel}</p>}
       <div className="exam-admin-paper">
-        <ExamInkReplay key={`${question.id}:${reload}`} imageUrl={question.imageUrl}
+        {/* 필기 순서 자동 재생 + 관리자가 이 기기에서만 보이는 필기(학생 풀이에는 저장 안 됨) */}
+        <ResultInkNotes key={`${question.id}:${reload}`} review persist={false} ready imageUrl={question.imageUrl}
           client={api} attemptId={target.attemptId} questionId={inkKey!}
-          strokes={data.ink.get(inkKey!) ?? []} imageMaxWidth={hanneung ? 980 : 480} autoOpen />
+          strokes={data.ink.get(inkKey!) ?? []} imageMaxWidth={hanneung ? 980 : 480} />
       </div>
     </>}
   </div>;

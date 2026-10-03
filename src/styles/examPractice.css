@@ -23,7 +23,10 @@
 .exam-replay-dock > * { min-width: 0; }
 .exam-replay-dock:hover, .exam-replay-dock:focus-within { background: color-mix(in srgb, var(--rn-surface, #0f172a) 82%, transparent); }
 .exam-replay-dock.is-folded { display: flex; width: auto; gap: 4px; padding: 6px; border-radius: 999px; }
-.exam-replay-dock-head { display: flex; align-items: center; gap: 2px; }
+.exam-replay-dock-head { display: flex; align-items: center; gap: 2px; margin: -6px -8px 0; padding: 6px 8px 2px; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.exam-replay-dock-head:active { cursor: grabbing; }
+.exam-replay-grip { display: inline-grid; place-items: center; width: 16px; min-height: 26px; color: var(--rn-muted, #94a3b8); cursor: grab; touch-action: none; }
+.exam-replay-dock.is-folded .exam-replay-grip { min-height: 36px; width: 18px; }
 .exam-replay-dock-head > strong { margin-right: auto; font-size: 12px; }
 .exam-replay-buttons { display: flex; justify-content: space-between; gap: 2px; align-items: center; }
 .exam-replay-icon { min-width: 26px; min-height: 30px; padding: 0 4px; display: inline-grid; place-items: center; border-radius: 8px; border: 1px solid transparent; background: transparent; color: inherit; font-size: 15px; line-height: 1; touch-action: manipulation; }
@@ -389,3 +392,4 @@
 .exam-era-card { aspect-ratio: auto; min-height: 180px; width: 100%; background: #f0f7ff; border-color: #c9ddf4; }
 .exam-era-card .exam-paper-body { min-height: 40px; }
 .exam-era-card .exam-paper-title { font-size: 1.1rem; }
+.exam-replay-notes { display: contents; }

@@ -290,8 +290,11 @@ try {
   assert.ok(await laserLit() > 100, 'laser glow is visible right after drawing');
   assert.ok(!(await inkAt(0.45, 1.725)), 'laser is not on the ink layer');
   await draw(lineSteps([0.1, 1.85], [0.8, 1.9], 20)); // 연달아 한 번 더
-  await page.waitForTimeout(1500);
-  assert.equal(await laserLit(), 0, 'laser fades out completely after about a second');
+  const litAfterLift = await laserLit();
+  await page.waitForTimeout(600);
+  assert.ok(await laserLit() >= litAfterLift * 0.9, 'the whole stroke stays for about a second after lifting');
+  await page.waitForTimeout(1400);
+  assert.equal(await laserLit(), 0, 'then fades out completely');
   assert.equal((await strokes()).length, shapeCount);
   assert.equal(await page.evaluate(() => window.__ink.handle().canUndo()), undoBefore, 'laser leaves no undo history');
   assert.equal(await page.evaluate(() => window.__ink.handle().canRedo()), redoBefore);
