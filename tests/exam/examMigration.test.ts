@@ -761,6 +761,13 @@ assert.equal(deltaFn.anon, false); assert.equal(deltaFn.auth, true);
 await db.exec(`create table public.profiles (id uuid primary key, email text, display_name text, nickname text);
 insert into public.profiles values ('${S1}', 's1@x.com', '학생일', null), ('${S2}', 's2@x.com', '', '둘이');`);
 await db.exec(fs.readFileSync(path.join(root, 'supabase/migrations/20261003030000_exam_admin_paper_activity.sql'), 'utf8'));
+// Apply Live RPCs to the real exam schemas too (standalone Live tests exercise all branches).
+await db.exec(fs.readFileSync(path.join(root, 'supabase/migrations/20261004130000_exam_admin_live_view.sql'), 'utf8'));
+const liveShapeRows = (await as(AD, `select admin_get_live_exam('2026-hanneung-79-basic') r`))[0].r;
+assert.ok(liveShapeRows.some(row => row.attemptId === shapeAttempt.id && row.questionId === sq));
+assert.ok(liveShapeRows.every(row => !('strokes' in row)));
+const liveShapeDelta = (await as(AD, 'select admin_get_live_ink($1,$2,0) r', [shapeAttempt.id,sq]))[0].r;
+assert.equal(liveShapeDelta.mode, 'delta'); assert.equal(liveShapeDelta.batches.length, 4);
 assert.equal((await as(S1, `select admin_list_exam_paper_activity() r`))[0].r, null, 'students get nothing');
 await fails(null, `select admin_list_exam_paper_activity()`, [], /permission denied/);
 const adminAttemptForActivity = (await as(AD, `select start_exam_attempt('2026-hanneung-79-basic','free',null) r`))[0].r;
