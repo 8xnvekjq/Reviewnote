@@ -6,15 +6,22 @@ import {
 } from './inkModel.ts';
 import type { InkHistory } from './inkModel.ts';
 import { drawShape, drawStroke, freehandPath, paint, prepareCanvas, resetTransform, safeDpr } from './inkRender.ts';
-import { recognizeShape, resizeShape, shapeToPoints } from './shapeSnap.ts';
+import { holdStillStart, recognizeShape, resizeShape, shapeCenter, shapeToPoints } from './shapeSnap.ts';
+import { drawLaser, LASER_MAX_POINTS } from './inkLaser.ts';
+import type { LaserTrail } from './inkLaser.ts';
 import type { Pt, SnapShape } from './shapeSnap.ts';
 
 const round = (value: number, scale: number) => Math.round(value * scale) / scale;
 
-/** 꾹 누름 판정 시간·허용 움직임(CSS px). */
-// 글씨를 쓰다 잠깐 멈춘 것을 도형으로 오인하지 않게 넉넉히(0.5초·5px은 필기 중에도 자주 걸렸다).
+/** 꾹 누름 판정 시간·허용 떨림(CSS px). */
+// 글씨를 쓰다 잠깐 멈춘 것을 도형으로 오인하지 않게 시간은 넉넉히(0.5초는 필기 중에도 자주 걸렸다).
+// 떨림은 "최근 HOLD_MS 동안 들어온 점들이 그 중심에서 HOLD_SLOP_PX 안"으로 본다. 예전처럼 마지막 기준점에서 3px을
+// 넘을 때마다 타이머를 다시 시작하면, 애플펜슬(240Hz·coalesced)은 가만히 누르고 있어도 ±2~4px 떨림이 계속 들어와
+// 타이머가 끝없이 리셋될 수 있었다(아이패드에서만 도형 변환이 전혀 안 되던 가장 유력한 원인).
 const HOLD_MS = 650;
-const HOLD_SLOP_PX = 3;
+const HOLD_SLOP_PX = 6;
+/** 펜이 완전히 멈추면 iPad Safari는 pointermove를 보내지 않으므로 타이머로도 확인한다. */
+const HOLD_POLL_MS = 50;
 /** 이보다 짧은 획은 도형으로 바꾸지 않는다(CSS px, 획 길이). */
 const SHAPE_MIN_PX = 40;
 /** 지우개 반지름(CSS px). */
@@ -55,10 +62,17 @@ interface DrawGesture {
   points: InkPoint[];
   predicted: InkPoint[];
   startTime: number;
-  holdAnchor: Pt;
-  holdIndex: number;
+  /** 점마다 받은 시각(performance.now()) — 꾹 누름 시간 창 계산용. */
+  arrivals: number[];
   holdTimer: number | null;
+  /** 이미 판정해 본 정지 시작 위치(같은 멈춤을 거듭 판정하지 않게). */
+  holdTried: number;
   snap: { base: SnapShape; anchor: Pt; current: SnapShape; startedAt: number } | null;
+}
+interface LaserGesture {
+  kind: 'laser';
+  pointerId: number;
+  trail: LaserTrail;
 }
 interface PanGesture {
   kind: 'pan';
@@ -75,7 +89,9 @@ interface EraseGesture {
   last: Pt;
   recorded: boolean;
 }
-type Gesture = DrawGesture | EraseGesture | PanGesture;
+type Gesture = DrawGesture | EraseGesture | PanGesture | LaserGesture;
+
+const prefersReducedMotion = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 const CANVAS_STYLE: CSSProperties = { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', display: 'block' };
 
@@ -85,6 +101,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
   const highlightRef = useRef<HTMLCanvasElement>(null);
   const penRef = useRef<HTMLCanvasElement>(null);
   const liveRef = useRef<HTMLCanvasElement>(null);
+  const laserRef = useRef<HTMLCanvasElement>(null);
   const [cssWidth, setCssWidth] = useState(0);
   const [aspect, setAspect] = useState(() => aspectCache.get(imageUrl) ?? 0); // naturalHeight / naturalWidth
   const [dprWanted, setDprWanted] = useState(() => (typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1));
@@ -110,6 +127,9 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
   const historyRef = useRef<InkHistory>(emptyHistory());
   const gestureRef = useRef<Gesture | null>(null);
   const rafRef = useRef(0);
+  const laserRafRef = useRef(0);
+  /** 아직 보이는 레이저 획(저장하지 않는다). */
+  const laserTrailsRef = useRef<LaserTrail[]>([]);
   const drawnRef = useRef<{ strokes: InkStroke[]; width: number; height: number } | null>(null);
   useLayoutEffect(() => { propsRef.current = props; });
 
@@ -169,7 +189,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     if (!ctx) return;
     resetTransform(ctx, canvas, unitDevicePx(canvas));
     const g = gestureRef.current;
-    if (!g || g.kind === 'pan') return;
+    if (!g || g.kind === 'pan' || g.kind === 'laser') return;
     const REF = INK_REFERENCE_WIDTH;
     if (g.kind === 'erase') {
       const w = geomRef.current.imgW || wrap.clientWidth || 1;
@@ -192,8 +212,8 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
         ctx.globalAlpha = eased;
         // 살짝 커지며 자리 잡는 느낌
         const s = g.snap.current;
-        const cx = (s.kind === 'line' ? (s.from[0] + s.to[0]) / 2 : s.cx) * REF;
-        const cy = (s.kind === 'line' ? (s.from[1] + s.to[1]) / 2 : s.cy) * REF;
+        const center = shapeCenter(s);
+        const cx = center.x * REF, cy = center.y * REF;
         const k = 0.94 + 0.06 * eased;
         ctx.translate(cx, cy); ctx.scale(k, k); ctx.translate(-cx, -cy);
         drawShape(ctx, s, g.tool, g.size, g.color);
@@ -211,12 +231,31 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     if (!rafRef.current) rafRef.current = requestAnimationFrame(renderLive);
   }, [renderLive]);
 
+  // ── 레이저(별도 레이어, rAF). 모든 빛이 사라지면 rAF를 멈춘다. ──
+  const renderLaser = useCallback(() => {
+    laserRafRef.current = 0;
+    const canvas = laserRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    resetTransform(ctx, canvas, unitDevicePx(canvas));
+    const glowPx = 9 * (canvas.width / Math.max(1, geomRef.current.cssWidth));
+    laserTrailsRef.current = drawLaser(ctx, laserTrailsRef.current, performance.now(), prefersReducedMotion(), glowPx);
+    if (laserTrailsRef.current.length) laserRafRef.current = requestAnimationFrame(renderLaser);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const scheduleLaser = useCallback(() => {
+    if (!laserRafRef.current) laserRafRef.current = requestAnimationFrame(renderLaser);
+  }, [renderLaser]);
+
   useLayoutEffect(() => {
-    const live = liveRef.current;
-    if (!live || !cssWidth || !cssHeight) return;
+    const live = liveRef.current, laser = laserRef.current;
+    if (!live || !laser || !cssWidth || !cssHeight) return;
     prepareCanvas(live, cssWidth, cssHeight, dpr);
+    prepareCanvas(laser, cssWidth, cssHeight, dpr);
     renderLive();
-  }, [cssWidth, cssHeight, dpr, imgW, renderLive]);
+    renderLaser();
+  }, [cssWidth, cssHeight, dpr, imgW, renderLive, renderLaser]);
 
   // ── 변경 + 실행 취소 기록 ──
   const commit = useCallback((next: InkStroke[], before: InkStroke[]) => {
@@ -270,28 +309,32 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     };
 
     const clearHold = (g: DrawGesture) => {
-      if (g.holdTimer !== null) { window.clearTimeout(g.holdTimer); g.holdTimer = null; }
+      if (g.holdTimer !== null) { window.clearInterval(g.holdTimer); g.holdTimer = null; }
     };
-    const armHold = (g: DrawGesture) => {
-      clearHold(g);
-      if (propsRef.current.shapeSnap === false || g.snap) return;
-      // 짧은 획(글자 한 획 등)은 꾹 눌러도 도형 판정을 하지 않는다.
+    /** 최근 HOLD_MS 동안 펜이 (떨림을 빼면) 멈춰 있었으면 멈추기 전까지의 획으로 도형 판정. */
+    const checkHold = (g: DrawGesture) => {
+      if (gestureRef.current !== g || g.snap) { clearHold(g); return; }
+      const w = unit();
+      const still = holdStillStart(g.points, g.arrivals, performance.now(), HOLD_MS, HOLD_SLOP_PX / w);
+      if (still < 0 || still === g.holdTried) return;
+      g.holdTried = still;
+      // 꾹 누르는 동안 쌓인 떨림 점은 빼고 판정. 짧은 획(글자 한 획 등)은 꾹 눌러도 도형 판정을 하지 않는다.
+      const pts = g.points.slice(0, still + 1);
       let len = 0;
-      for (let i = 1; i < g.points.length; i++) len += Math.hypot(g.points[i].x - g.points[i - 1].x, g.points[i].y - g.points[i - 1].y);
-      if (len * unit() < SHAPE_MIN_PX) return;
-      g.holdTimer = window.setTimeout(() => {
-        g.holdTimer = null;
-        if (gestureRef.current !== g || g.snap) return;
-        const w = unit();
-        // 꾹 누르는 동안 쌓인 미세한 점은 빼고 판정
-        const pts = g.points.slice(0, g.holdIndex + 1);
-        const shape = recognizeShape(pts, { minSize: SHAPE_MIN_PX / w });
-        if (!shape) return;
-        g.snap = { base: shape, anchor: g.points[g.points.length - 1], current: shape, startedAt: performance.now() };
-        g.predicted = [];
-        navigator.vibrate?.(8);
-        scheduleLive();
-      }, HOLD_MS);
+      for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+      if (len * w < SHAPE_MIN_PX) return;
+      const shape = recognizeShape(pts, { minSize: SHAPE_MIN_PX / w });
+      if (!shape) return;
+      clearHold(g);
+      g.snap = { base: shape, anchor: g.points[g.points.length - 1], current: shape, startedAt: performance.now() };
+      g.predicted = [];
+      navigator.vibrate?.(8);
+      scheduleLive();
+    };
+    /** 펜이 완전히 멈추면 pointermove가 오지 않으므로(iPad Safari) 주기적으로도 확인한다. */
+    const armHold = (g: DrawGesture) => {
+      if (propsRef.current.shapeSnap === false) return;
+      g.holdTimer = window.setInterval(() => checkHold(g), HOLD_POLL_MS);
     };
 
     const finishDraw = (g: DrawGesture) => {
@@ -344,10 +387,18 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
         return;
       }
       const first = toPoint(e, start);
+      if (p.tool === 'laser') {
+        // 레이저는 저장·실행 취소·재생 기록 없이 빛만 그리고 사라진다(도형 판정도 하지 않는다).
+        const trail: LaserTrail = { points: [{ x: first.x, y: first.y }], endedAt: null };
+        laserTrailsRef.current = [...laserTrailsRef.current, trail];
+        gestureRef.current = { kind: 'laser', pointerId: e.pointerId, trail };
+        scheduleLaser();
+        return;
+      }
       const g: DrawGesture = {
         kind: 'draw', pointerId: e.pointerId, tool: p.tool, color: p.color, size: p.size,
         points: [first], predicted: [], startTime: start,
-        holdAnchor: first, holdIndex: 0, holdTimer: null, snap: null,
+        arrivals: [performance.now()], holdTimer: null, holdTried: -1, snap: null,
       };
       gestureRef.current = g;
       setLiveHighlighter(p.tool === 'highlighter');
@@ -381,6 +432,18 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
         return;
       }
       const w = unit();
+      if (g.kind === 'laser') {
+        const pts = g.trail.points;
+        for (const ev of eventsOf(e)) {
+          const pt = toPoint(ev, 0);
+          const prev = pts[pts.length - 1];
+          if (Math.hypot(pt.x - prev.x, pt.y - prev.y) * w < 0.35) continue;
+          pts.push({ x: pt.x, y: pt.y });
+        }
+        if (pts.length > LASER_MAX_POINTS) pts.splice(0, pts.length - LASER_MAX_POINTS);
+        scheduleLaser();
+        return;
+      }
       if (g.snap) {
         const last = toPoint(e, g.startTime);
         g.points.push(last);
@@ -388,18 +451,17 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
         scheduleLive();
         return;
       }
+      const arrived = performance.now();
       for (const ev of eventsOf(e)) {
         const pt = toPoint(ev, g.startTime);
         const prev = g.points[g.points.length - 1];
         if (Math.hypot(pt.x - prev.x, pt.y - prev.y) * w < 0.35) continue; // 같은 자리 중복점
         g.points.push(pt);
+        g.arrivals.push(arrived);
       }
-      const last = g.points[g.points.length - 1];
-      if (Math.hypot(last.x - g.holdAnchor.x, last.y - g.holdAnchor.y) * w > HOLD_SLOP_PX) {
-        g.holdAnchor = last;
-        g.holdIndex = g.points.length - 1;
-        armHold(g);
-      }
+      // 떨림 점이 계속 들어오는 동안에도 판정(타이머가 늦게 돌 때 대비)
+      if (g.holdTimer !== null) checkHold(g);
+      if (g.snap) { scheduleLive(); return; }
       const predicted = typeof e.getPredictedEvents === 'function' ? e.getPredictedEvents() : [];
       g.predicted = predicted.slice(0, 2).map(ev => toPoint(ev, g.startTime));
       scheduleLive();
@@ -413,6 +475,9 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       if (g.kind === 'draw') {
         g.predicted = [];
         finishDraw(g);
+      } else if (g.kind === 'laser') {
+        g.trail.endedAt = performance.now();
+        scheduleLaser();
       }
       setLiveHighlighter(false);
       scheduleLive();
@@ -422,8 +487,17 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       const g = gestureRef.current;
       if (!g || e.pointerId !== g.pointerId) return;
       gestureRef.current = null;
-      if (g.kind === 'draw') clearHold(g);
-      // 지우개는 이미 반영된 상태로 둔다(실행 취소 가능). 그리던 획은 버린다.
+      try { canvas.releasePointerCapture(e.pointerId); } catch { /* 이미 해제됨 */ }
+      // 지우개는 이미 반영된 상태로 둔다(실행 취소 가능). 그리던 획은 버리지 않고 확정한다 — iPad Safari는 펜을
+      // 오래 누르고 있으면(꾹 눌러 도형) 시스템 제스처로 pointercancel을 보내기도 해, 버리면 획·도형이 통째로 사라진다.
+      if (g.kind === 'draw') {
+        g.predicted = [];
+        if (g.snap || g.points.length > 1) finishDraw(g);
+        else clearHold(g);
+      } else if (g.kind === 'laser') {
+        g.trail.endedAt = performance.now();
+        scheduleLaser();
+      }
       setLiveHighlighter(false);
       scheduleLive();
     };
@@ -458,9 +532,12 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       if (g?.kind === 'draw') clearHold(g);
       gestureRef.current = null;
     };
-  }, [readOnly, commit, scheduleLive]);
+  }, [readOnly, commit, scheduleLive, scheduleLaser]);
 
-  useEffect(() => () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); }, []);
+  useEffect(() => () => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    if (laserRafRef.current) cancelAnimationFrame(laserRafRef.current);
+  }, []);
 
   // 손가락 스크롤은 pan 제스처가 직접 처리한다(touch-action pan은 iPad에서 펜 획을 끊었다).
   const touchAction = readOnly ? 'auto' : 'none';
@@ -487,6 +564,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       <div aria-hidden style={{ height: extraHeight }} />
       <canvas ref={highlightRef} aria-hidden style={highlighterLayer} />
       <canvas ref={penRef} aria-hidden style={{ ...CANVAS_STYLE, pointerEvents: 'none' }} />
+      <canvas ref={laserRef} className="exam-ink-laser" aria-hidden style={{ ...CANVAS_STYLE, pointerEvents: 'none' }} />
       <canvas
         ref={liveRef}
         className="exam-ink-input"

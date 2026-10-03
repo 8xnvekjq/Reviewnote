@@ -195,7 +195,8 @@ export interface ExamClient {
 
 // ── 필기 엔진(W2): src/features/exam/ink/ExamInkCanvas.tsx ──
 
-export type InkTool = 'pen' | 'highlighter' | 'eraser';
+/** laser: 잠깐 가리키는 빛 — 획을 남기지 않는다(저장·실행 취소·재생 기록 없음). */
+export type InkTool = 'pen' | 'highlighter' | 'eraser' | 'laser';
 export interface InkPoint { x: number; y: number; pressure: number; t: number }
 /** 좌표는 문항 이미지 기준 정규화(0~1 가로, 세로는 이미지 높이/너비 비율 단위)로 저장해 화면 크기가 바뀌어도 같은 자리에 남는다. */
 export interface InkStroke {
@@ -205,9 +206,14 @@ export interface InkStroke {
   size: number;
   points: InkPoint[];
   /** 꾹 눌러 도형으로 바뀐 획이면 도형 정보(렌더는 이걸 우선). */
-  shape?: { kind: 'line'; from: [number, number]; to: [number, number] }
-    | { kind: 'ellipse'; cx: number; cy: number; rx: number; ry: number; rotation: number };
+  shape?: InkShape;
 }
+/** 꾹 눌러 바뀐 도형. polygon은 닫힌 꼭짓점 목록(삼각형·사각형), curve는 이 점들을 지나는 매끈한 곡선(Catmull-Rom). */
+export type InkShape =
+  | { kind: 'line'; from: [number, number]; to: [number, number] }
+  | { kind: 'ellipse'; cx: number; cy: number; rx: number; ry: number; rotation: number }
+  | { kind: 'polygon'; points: Array<[number, number]> }
+  | { kind: 'curve'; points: Array<[number, number]> };
 
 export interface ExamInkDocument {
   questionId: string;
@@ -296,7 +302,7 @@ export interface ExamInkCanvasProps {
   size: number;
   /** 애플펜슬 등 펜 입력이 감지되면 손가락 터치는 그리지 않고 스크롤/확대에 양보(손바닥 무시). */
   penOnlyWhenPenDetected?: boolean;
-  /** 꾹 눌러 직선/원 변환(기본 true). 펜을 떼지 않고 ~500ms 멈추면 판정. */
+  /** 꾹 눌러 직선/다각형/원/곡선 변환(기본 true). 펜을 떼지 않고 ~650ms 멈추면 판정. */
   shapeSnap?: boolean;
   readOnly?: boolean;
   /** 문항 이미지를 이 너비(CSS px) 이하로 고정해 글자 크기를 일정하게 한다. 필기 영역은 컨테이너 전체 너비를 쓴다.
