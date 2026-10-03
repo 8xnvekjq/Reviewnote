@@ -216,7 +216,7 @@ test('an open curve is smoothed into a gentle curve through the stroke', () => {
   assert.equal(recognizeShape(jitter(lineOf({ x: 0, y: 0 }, { x: 200, y: 90 }), 2))?.kind, 'line');
 });
 
-test('polygons and curves resize around their center and keep eraser hit testing', () => {
+test('polygons resize around their center, curves rotate/stretch from their start, and keep eraser hit testing', () => {
   const tri: SnapShape = { kind: 'polygon', points: [[0, 0], [100, 0], [50, 80]] };
   const center = shapeCenter(tri);
   assert.deepEqual(center, { x: 50, y: 40 });
@@ -228,9 +228,12 @@ test('polygons and curves resize around their center and keep eraser hit testing
   assert.ok(polylineHits(outline, { x: 25, y: 41 }, 2), 'on the left side');
   assert.ok(!polylineHits(outline, { x: 50, y: 30 }, 2), 'the middle is empty');
   const curve: SnapShape = { kind: 'curve', points: [[0, 0], [50, 40], [100, 0]] };
-  const half = resizeShape(curve, { x: 100, y: 0 }, { x: 75, y: 10 });
-  assert.ok(half.kind === 'curve');
-  near(half.points[2][0] - half.points[0][0], 50, 1e-9, 'width halves');
+  // 곡선은 직선처럼 시작점 고정, 펜 쪽 끝이 따라온다(돌리기 + 늘이기)
+  const turned = resizeShape(curve, { x: 100, y: 0 }, { x: 0, y: 50 });
+  assert.ok(turned.kind === 'curve');
+  assert.deepEqual(turned.points[0], [0, 0], 'start stays');
+  near(turned.points[2][0], 0, 1e-9); near(turned.points[2][1], 50, 1e-9, 'end follows the pen (rotated 90° and halved)');
+  near(turned.points[1][0], -20, 1e-9); near(turned.points[1][1], 25, 1e-9, 'the bulge rotates with it');
   const path = shapeToPoints(curve);
   assert.deepEqual(path[0], { x: 0, y: 0 });
   assert.deepEqual(path.at(-1), { x: 100, y: 0 });
@@ -294,4 +297,16 @@ test('a rectangle whose end overshoots past the start corner is still a 4-vertex
   const shape = recognizePolygon(stroke, { minSize: 40 });
   assert.equal(shape?.kind, 'polygon');
   assert.equal(shape.kind === 'polygon' && shape.points.length, 4);
+});
+
+test('a slightly wobbly hand-drawn line is still a line (endpoint can rotate), not a curve', () => {
+  // 가운데가 8% 정도 휜 직선(곡선 판정 전에 느슨한 직선으로 잡혀야 한다)
+  const wobbly = Array.from({ length: 61 }, (_, i) => { const t = i / 60; return { x: 200 * t, y: 16 * Math.sin(Math.PI * t) }; });
+  const shape = recognizeShape(wobbly, { minSize: 40 });
+  assert.equal(shape?.kind, 'line', JSON.stringify(shape));
+  const rotated = resizeShape(shape!, { x: 200, y: 0 }, { x: 0, y: 150 });
+  assert.deepEqual(rotated, { kind: 'line', from: [0, 0], to: [0, 150] });
+  // 확실히 휜 호(중간 높이 20%)는 곡선
+  const arc = Array.from({ length: 61 }, (_, i) => { const t = i / 60; return { x: 200 * t, y: 40 * Math.sin(Math.PI * t) }; });
+  assert.equal(recognizeShape(arc, { minSize: 40 })?.kind, 'curve');
 });

@@ -8,7 +8,7 @@ import type { InkHistory } from './inkModel.ts';
 import { fitExtraBelow, fitImageWidth } from './inkFit.ts';
 import { drawShape, drawStroke, freehandPath, paint, prepareCanvas, resetTransform, safeDpr } from './inkRender.ts';
 import { holdStillStart, recognizeShape, resizeShape, shapeCenter, shapeToPoints } from './shapeSnap.ts';
-import { drawLaser, LASER_MAX_POINTS } from './inkLaser.ts';
+import { drawLaser } from './inkLaser.ts';
 import type { LaserTrail } from './inkLaser.ts';
 import type { Pt, SnapShape } from './shapeSnap.ts';
 
@@ -92,7 +92,6 @@ interface EraseGesture {
 }
 type Gesture = DrawGesture | EraseGesture | PanGesture | LaserGesture;
 
-const prefersReducedMotion = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 const CANVAS_STYLE: CSSProperties = { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', display: 'block' };
 
@@ -242,7 +241,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     if (!ctx) return;
     resetTransform(ctx, canvas, unitDevicePx(canvas));
     const glowPx = 9 * (canvas.width / Math.max(1, geomRef.current.cssWidth));
-    laserTrailsRef.current = drawLaser(ctx, laserTrailsRef.current, performance.now(), prefersReducedMotion(), glowPx);
+    laserTrailsRef.current = drawLaser(ctx, laserTrailsRef.current, performance.now(), glowPx);
     if (laserTrailsRef.current.length) laserRafRef.current = requestAnimationFrame(renderLaser);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -442,7 +441,6 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
           if (Math.hypot(pt.x - prev.x, pt.y - prev.y) * w < 0.35) continue;
           pts.push({ x: pt.x, y: pt.y });
         }
-        if (pts.length > LASER_MAX_POINTS) pts.splice(0, pts.length - LASER_MAX_POINTS);
         scheduleLaser();
         return;
       }

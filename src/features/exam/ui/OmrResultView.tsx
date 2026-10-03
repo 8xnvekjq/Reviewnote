@@ -1,7 +1,6 @@
 // OMR 결과: 원점수·추정 등급·추정 표준점수·추정 백분위 + 맞은 개수·총 시간(+등급컷 표 접기) / 한능검 시대별 결과 / 문항별 줄 / 오답노트 후보 고르기.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { AdminExamApi, ExamClient, ExamResult, ExamResultItem, InkStroke } from '../contract';
-import { ExamInkReplay } from '../ink/ExamInkReplay';
 import { composeInkImage } from '../ink/inkComposite';
 import { useExamInk } from './useExamInk';
 import { ResultInkNotes } from './ResultInkNotes';
@@ -80,7 +79,7 @@ function ReviewResult({ client, result, onBack, backLabel, studentName }: {
   const inkBar = <p className="rn-caption" role="status">
     {failed ? '학생 필기를 불러오지 못했어요. 닫았다가 다시 열어 주세요.' : ink ? '문항을 누르면 학생 필기와 필기 순서를 크게 볼 수 있어요.' : '학생 필기를 불러오는 중…'}
   </p>;
-  return <OmrResultBody client={client} result={result} onBack={onBack} backLabel={backLabel} ink={ink ?? new Map()} inkBar={inkBar} studentName={studentName} />;
+  return <OmrResultBody client={client} result={result} onBack={onBack} backLabel={backLabel} ink={ink ?? new Map()} inkBar={inkBar} studentName={studentName} inkReady={ink !== null} />;
 }
 
 function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar, studentName, inkReady = false, loadOriginalInk }: BodyProps) {
@@ -321,16 +320,9 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar
               {wholePages && <button type="button" className="rn-button rn-button-compact" aria-pressed={pageZoom} onClick={() => setPageZoom(prev => !prev)}>{pageZoom ? '화면에 맞추기' : '원본 확대'}</button>}
               <div className={wholePages ? 'exam-original-scroll' : undefined}>
               <div style={wholePages && pageZoom ? { minWidth: 1100 } : undefined}>
-              {reviewing ? <ExamInkReplay
-                key={viewing.questionId}
-                client={client}
-                attemptId={result.attemptId}
-                questionId={inkKeyOf(viewing)}
-                imageUrl={viewing.imageUrl}
-                strokes={ink.get(inkKeyOf(viewing)) ?? []}
-                imageMaxWidth={wholePages ? (pageZoom ? 1100 : 980) : 480}
-                autoOpen
-              /> : <ResultInkNotes
+              {/* 관리자는 필기 순서가 자동 재생되고, 그 위에 이 기기에서만 보이는 필기를 할 수 있다(학생 풀이에는 저장 안 됨). */}
+              <ResultInkNotes
+                review={reviewing}
                 key={viewing.questionId}
                 client={client}
                 attemptId={result.attemptId}
@@ -339,7 +331,7 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar
                 strokes={ink.get(inkKeyOf(viewing)) ?? []}
                 imageMaxWidth={wholePages ? (pageZoom ? 1100 : 980) : 480}
                 ready={inkReady}
-              />}
+              />
               </div>
               </div>
             </div>

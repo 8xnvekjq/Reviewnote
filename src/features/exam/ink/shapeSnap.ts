@@ -12,6 +12,8 @@ export interface RecognizeOptions {
   minSize?: number;
   /** 가로/세로에서 이 각도(도) 이내면 수평·수직으로 스냅. 0이면 스냅 안 함. */
   axisSnapDegrees?: number;
+  /** 직선 판정을 느슨하게(다른 도형이 다 아닐 때 곡선보다 먼저 — 살짝 흔들린 직선이 곡선이 되지 않게). */
+  looseLine?: boolean;
 }
 
 const DEFAULT_MIN_SIZE = 20;
@@ -74,10 +76,10 @@ export function recognizeLine(raw: Pt[], options: RecognizeOptions = {}): SnapSh
   const to = points[points.length - 1];
   const chord = dist(from, to);
   if (chord < minSize) return null;
-  if (pathLength(points) / chord > 1.12) return null;
+  if (pathLength(points) / chord > (options.looseLine ? 1.18 : 1.12)) return null;
   let maxDeviation = 0;
   for (const p of points) maxDeviation = Math.max(maxDeviation, distanceToSegment(p, from, to));
-  if (maxDeviation / chord > 0.07) return null;
+  if (maxDeviation / chord > (options.looseLine ? 0.1 : 0.07)) return null;
   const end = snapLineToAxis(from, to, options.axisSnapDegrees ?? DEFAULT_AXIS_SNAP);
   return { kind: 'line', from: [from.x, from.y], to: [end.x, end.y] };
 }
@@ -435,7 +437,9 @@ export function curveSegments(points: Array<[number, number]>): Array<[Pt, Pt, P
  * 다각형을 원보다 먼저 본다: 둥근 사각형은 사각형으로 잡히고, 원은 꼭짓점이 많이 남아 다각형에서 걸러진다.
  */
 export function recognizeShape(points: Pt[], options: RecognizeOptions = {}): SnapShape | null {
-  return recognizeLine(points, options) ?? recognizePolygon(points, options) ?? recognizeEllipse(points, options) ?? recognizeCurve(points, options);
+  return recognizeLine(points, options) ?? recognizePolygon(points, options) ?? recognizeEllipse(points, options)
+    // 손으로 그은 직선은 조금 흔들려도 직선(끝점을 움직여 각도·길이 조절)이어야 한다 — 곡선보다 먼저 느슨하게 본다.
+    ?? recognizeLine(points, { ...options, looseLine: true }) ?? recognizeCurve(points, options);
 }
 
 /** 도형 중심(외접 사각형 가운데, 타원은 중심). 크기 조절·변환 애니메이션 기준. */
@@ -451,6 +455,15 @@ export function resizeShape(base: SnapShape, anchor: Pt, pointer: Pt, axisSnapDe
     const from = { x: base.from[0], y: base.from[1] };
     const end = snapLineToAxis(from, pointer, axisSnapDegrees);
     return { kind: 'line', from: base.from, to: [end.x, end.y] };
+  }
+  if (base.kind === 'curve') {
+    // 곡선도 직선처럼 시작점은 고정하고 펜 쪽 끝이 따라온다(돌리기 + 늘이기).
+    const [ox, oy] = base.points[0];
+    const ax = anchor.x - ox, ay = anchor.y - oy, px = pointer.x - ox, py = pointer.y - oy;
+    const d = ax * ax + ay * ay;
+    if (d < 1e-12) return base;
+    const re = (px * ax + py * ay) / d, im = (py * ax - px * ay) / d;
+    return { kind: 'curve', points: base.points.map(([x, y]) => [ox + (x - ox) * re - (y - oy) * im, oy + (x - ox) * im + (y - oy) * re]) };
   }
   const center = shapeCenter(base);
   const start = dist(anchor, center);
