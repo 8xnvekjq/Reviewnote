@@ -4,6 +4,8 @@ import type { AdminExamApi, ExamClient, ExamResult, ExamResultItem, InkStroke } 
 import { composeInkImage } from '../ink/inkComposite';
 import { useExamInk } from './useExamInk';
 import { ResultInkNotes } from './ResultInkNotes';
+import { PeerSolutionView } from './PeerSolutionView';
+import { PeerSolutionSession, type PeerSolutionApi } from './peerSolution';
 import { ExamAnswer } from './ExamAnswer';
 import { resultGradeLabel } from './hanneungLogic';
 import { eraLabel, eraStats, resultPaperId, weakEras, type EraStat, type HanneungEra } from './hanneungEra';
@@ -22,7 +24,7 @@ type Props = {
 );
 
 interface BodyProps {
-  client: Pick<ExamClient, 'getInkReplay'> & Partial<Pick<ExamClient, 'addToMistakes' | 'addOriginalSolutions'>>;
+  client: Pick<ExamClient, 'getInkReplay'> & Partial<Pick<ExamClient, 'addToMistakes' | 'addOriginalSolutions'> & PeerSolutionApi>;
   result: ExamResult;
   onBack: () => void;
   backLabel?: string;
@@ -91,6 +93,10 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar
   const [addMessage, setAddMessage] = useState<string | null>(null);
   const [viewing, setViewing] = useState<ExamResultItem | null>(null);
   const [pageZoom, setPageZoom] = useState(false);
+  const [peerShowing, setPeerShowing] = useState(false);
+  const peerSession = useMemo(() => !reviewing && client.getPeerSolution && client.getPeerSolutionReplay
+    ? new PeerSolutionSession(client as PeerSolutionApi, initial.attemptId) : null, [client, initial.attemptId, reviewing]);
+  const openQuestion = (item: ExamResultItem | null) => { setPeerShowing(false); setViewing(item); };
 
   const candidates = useMemo(() => mistakeCandidates(result.items), [result.items]);
   // 한능검 시대 태그가 있는 시험지만 시대별 결과를 보여 준다.
@@ -279,7 +285,7 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar
                   className={`exam-item-row ${item.isCorrect ? 'is-correct' : 'is-wrong'}`}
                   data-number={item.number}
                   data-correct={item.isCorrect}
-                  onClick={() => setViewing(item)}
+                  onClick={() => openQuestion(item)}
                 >
                   <span className="exam-item-num">{item.number}</span>
                   <span className="exam-item-ox" aria-label={item.isCorrect ? '맞음' : '틀림'}>{item.isCorrect ? 'O' : 'X'}</span>
@@ -306,17 +312,21 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar
       </section>
 
       {viewing && (
-        <div className="exam-overlay exam-overlay-full exam-viewer-overlay" role="dialog" aria-modal="true" aria-label={`${viewing.number}번 크게 보기`} onClick={() => setViewing(null)}>
+        <div className="exam-overlay exam-overlay-full exam-viewer-overlay" role="dialog" aria-modal="true" aria-label={`${viewing.number}번 크게 보기`} onClick={() => openQuestion(null)}>
           <div className="exam-viewer" onClick={e => e.stopPropagation()} data-testid="exam-viewer">
             <div className="exam-sheet-head">
               <h2>{viewing.number}번 {viewing.sourceRound && <small>제{viewing.sourceRound}회 {viewing.sourceNumber}번</small>} <span className={viewing.isCorrect ? 'is-correct' : 'is-wrong'}>{viewing.isCorrect ? 'O' : 'X'}</span></h2>
               <span className="rn-caption">{reviewing ? '학생 답' : '내 답'} <ExamAnswer question={viewing} answer={viewing.answer} /> · 정답 <ExamAnswer question={viewing} answer={viewing.correctAnswer} /> · {formatClock(viewing.timeSpentMs)}</span>
-              <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={() => setViewing(null)}>닫기</button>
+              <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={() => openQuestion(null)}>닫기</button>
             </div>
             {viewing.nationalChoiceRates && (
               <p className="rn-caption">전국 선택 비율: {viewing.nationalChoiceRates.map((rate, i) => `${displayAnswer(String(i + 1), true)} ${rate}%`).join(' · ')}</p>
             )}
             <div className="exam-viewer-paper">
+              {peerSession && result.kind !== 'hanneung' && viewing.isCorrect === false &&
+                <PeerSolutionView key={viewing.questionId} session={peerSession} attemptId={result.attemptId}
+                  questionId={viewing.questionId} imageUrl={viewing.imageUrl} onShowing={setPeerShowing} />}
+              <div hidden={peerShowing}>
               {wholePages && <button type="button" className="rn-button rn-button-compact" aria-pressed={pageZoom} onClick={() => setPageZoom(prev => !prev)}>{pageZoom ? '화면에 맞추기' : '원본 확대'}</button>}
               <div className={wholePages ? 'exam-original-scroll' : undefined}>
               <div style={wholePages && pageZoom ? { minWidth: 1100 } : undefined}>
@@ -332,6 +342,7 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar
                 imageMaxWidth={wholePages ? (pageZoom ? 1100 : 980) : 480}
                 ready={inkReady}
               />
+              </div>
               </div>
               </div>
             </div>
