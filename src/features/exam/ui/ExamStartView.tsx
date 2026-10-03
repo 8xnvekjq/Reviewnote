@@ -338,6 +338,7 @@ export function ExamStartView({ client, currentUserId, admin, busy, error, onSta
                 <button type="button" className="exam-past-row" onClick={() => onOpenResult(r.attemptId)}>
                   <span><strong>{r.practiceEra ? `${r.score}/${r.questionCount}문항` : `${r.score}점`}{(r.kind === 'school' || r.kind === 'worksheet') && ` / ${r.maxScore ?? 100}`}</strong>{resultGradeLabel(r, r.estimatedGrade) && ` · ${resultGradeLabel(r, r.estimatedGrade)}`}</span>
                   <span className="rn-caption">{r.paperTitle} · {r.mode === 'real' ? '실전' : '자유'}{r.elective && ` · ${ELECTIVE_SHORT[r.elective]}`} · {formatDate(r.submittedAt)}</span>
+                  <span className="exam-past-arrow" aria-hidden="true">›</span>
                 </button>
               </li>
             ))}

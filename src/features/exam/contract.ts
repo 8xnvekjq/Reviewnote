@@ -174,6 +174,8 @@ export interface ExamClient {
   /** 바뀐 내용(events)만 보낸다. 결과 필기 전체 대신 결과 획 id 목록의 해시로 서버 결과와 맞춘다. */
   saveInk(attemptId: string, questionId: string, request: InkSaveRequest): Promise<number>;
   getInkReplay(attemptId: string, questionId: string): Promise<InkReplayData>;
+  getPeerSolution(attemptId: string, questionId: string): Promise<PeerSolution | null>;
+  getPeerSolutionReplay(attemptId: string, questionId: string, solutionKey: string): Promise<InkReplayData>;
   /** 학생은 자기 기록만. studentId 지정은 관리자에게만 허용한다. */
   listPaperHistory(paperId: string, studentId?: string): Promise<ExamPaperHistoryAttempt[]>;
   listPapers(): Promise<ExamPaperSummary[]>;
@@ -253,6 +255,14 @@ export interface InkReplayData {
   batches: InkReplayBatch[];
   strokes: InkStroke[];
   revision: number;
+}
+
+/** Only anonymous display fields and scoped drawing ids cross this boundary. */
+export interface PeerSolution {
+  label: { character: string; title: string | null; grade: string | null; isTeacher: boolean };
+  strokes: InkStroke[];
+  /** Opaque comparison fingerprint: replay reselects and verifies the same drawing. */
+  solutionKey: string;
 }
 
 export interface AdminExamAttemptSummary {

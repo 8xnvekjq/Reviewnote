@@ -267,6 +267,7 @@ async function spinWheel(page, place, steps) {
   const viewerStrokes = () => page.locator(viewerInk).getAttribute('data-stroke-count');
   await page.locator('.exam-item-row[data-number="1"]').click();
   await page.getByTestId('exam-viewer').waitFor();
+  assert.equal(await page.getByTestId('exam-peer-toggle').count(), 0, 'correct questions do not offer peer solutions');
   await page.waitForFunction(sel => document.querySelector(sel)?.getAttribute('data-stroke-count') === '1', viewerInk);
   const notesTools = page.getByTestId('exam-notes-tools');
   await notesTools.waitFor();
@@ -311,9 +312,81 @@ async function spinWheel(page, place, steps) {
   assert.equal(await page.evaluate(() => window.__inkStats.requests), inkRequestsBefore, 'result-screen notes never hit the ink server');
   await page.getByTestId('exam-viewer').getByRole('button', { name: '닫기', exact: true }).click();
 
+  // 익명 동료 풀이: 요청은 클릭 때만, 재생은 재생 클릭 때만, 메모리 재사용과 내 덧쓰기 보존.
+  const peerCalls = method => page.evaluate(name => window.__examLog.filter(row => row.method === name).length, method);
+  assert.equal(await peerCalls('getPeerSolution'), 0);
+  await page.locator('.exam-item-row[data-number="2"]').click();
+  await page.getByTestId('exam-notes-tools').waitFor();
+  const myInk = page.getByTestId('exam-viewer').locator('.exam-ink');
+  const myCount = Number(await myInk.getAttribute('data-stroke-count'));
+  const myBox = await myInk.boundingBox();
+  await page.mouse.move(myBox.x + myBox.width * .2, myBox.y + 50); await page.mouse.down();
+  await page.mouse.move(myBox.x + myBox.width * .5, myBox.y + 90); await page.mouse.up();
+  assert.equal(Number(await myInk.getAttribute('data-stroke-count')), myCount + 1);
+  const storedInk = async () => page.evaluate(async () => {
+    const local = Object.fromEntries(Object.keys(localStorage).sort().map(key => [key, localStorage.getItem(key)]));
+    const databases = await indexedDB.databases();
+    const values = [];
+    for (const info of databases.sort((a,b) => a.name.localeCompare(b.name))) {
+      const db = await new Promise((resolve,reject) => { const r = indexedDB.open(info.name); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });
+      for (const name of [...db.objectStoreNames].sort()) {
+        const read = action => new Promise((resolve,reject) => { const r = db.transaction(name,'readonly').objectStore(name)[action](); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });
+        values.push({ db:info.name, store:name, keys:await read('getAllKeys'), rows:await read('getAll') });
+      }
+      db.close();
+    }
+    return { local, values };
+  });
+  const beforePeerStorage = await storedInk();
+  assert.equal(await peerCalls('getPeerSolution'), 0);
+  await page.getByTestId('exam-peer-toggle').click();
+  const peerView = page.getByTestId('exam-peer-solution');
+  await peerView.waitFor();
+  assert.equal(await page.getByTestId('exam-peer-label').innerText(), '하치와레 · [꾸준한 도전자] · 고2');
+  assert.match(await peerView.innerText(), /다른 풀이 · 읽기 전용/);
+  assert.equal(await peerView.locator('.exam-ink').getAttribute('data-stroke-count'), '3');
+  assert.equal(await peerView.getByTestId('exam-notes-tools').count(), 0);
+  assert.equal(await peerCalls('getPeerSolution'), 1); assert.equal(await peerCalls('getPeerSolutionReplay'), 0);
+  await peerView.getByRole('button', { name:'필기 순서 보기', exact:true }).click();
+  await peerView.getByTestId('exam-replay-dock').waitFor();
+  assert.equal(await peerCalls('getPeerSolutionReplay'), 1);
+  await peerView.getByRole('slider', { name:'필기 재생 위치' }).press('End');
+  await page.waitForFunction(() => document.querySelector('[data-testid="exam-peer-solution"] .exam-ink')?.dataset.strokeCount === '3');
+  await peerView.getByRole('button', { name:'최종 풀이 보기', exact:true }).click();
+  await peerView.getByRole('button', { name:'필기 순서 보기', exact:true }).click();
+  await peerView.getByTestId('exam-replay-dock').waitFor();
+  assert.equal(await peerCalls('getPeerSolutionReplay'), 1, 'replay reused in memory');
+  // Drag the anonymous dock: even its position must not write localStorage.
+  const peerGrip = peerView.getByTestId('exam-replay-dock').locator('.exam-replay-dock-head');
+  const gripBox = await peerGrip.boundingBox();
+  await page.mouse.move(gripBox.x + 8, gripBox.y + gripBox.height / 2); await page.mouse.down();
+  await page.mouse.move(gripBox.x + 30, gripBox.y - 20); await page.mouse.up();
+  assert.deepEqual(await storedInk(), beforePeerStorage, 'peer drawings, replay and position never persist');
+  await page.getByTestId('exam-peer-toggle').click();
+  assert.equal(await peerView.count(), 0);
+  assert.equal(Number(await myInk.getAttribute('data-stroke-count')), myCount + 1);
+  assert.equal(await page.getByTestId('exam-notes-tools').getByRole('button', { name:'실행 취소', exact:true }).isEnabled(),true);
+  await page.getByTestId('exam-peer-toggle').click(); await peerView.waitFor();
+  await page.getByTestId('exam-viewer').getByRole('button', { name:'닫기', exact:true }).click();
+  await page.locator('.exam-item-row[data-number="2"]').click();
+  assert.equal(Number(await page.getByTestId('exam-viewer').locator('.exam-ink').getAttribute('data-stroke-count')), myCount + 1);
+  await page.getByTestId('exam-peer-toggle').click(); await peerView.waitFor();
+  assert.equal(await peerCalls('getPeerSolution'), 1, 'same result screen reuses question ink');
+  await page.getByTestId('exam-viewer').getByRole('button', { name:'닫기', exact:true }).click();
+  await page.locator('.exam-item-row[data-number="3"]').click();
+  await page.getByTestId('exam-peer-toggle').click();
+  await page.getByText('아직 이 문제를 맞힌 다른 풀이가 없어요', { exact:true }).waitFor();
+  assert.equal(await page.getByTestId('exam-peer-toggle').isDisabled(),true);
+  await page.getByTestId('exam-viewer').getByRole('button', { name:'닫기', exact:true }).click();
+
   // 시험지 목록 → 지난 결과
   await page.getByRole('button', { name: '← 시험지 목록' }).click();
   await page.getByText('지난 OMR 결과').waitFor();
+  await page.locator('.exam-past-row').first().click();
+  await page.getByTestId('exam-result').waitFor();
+  await page.locator('.exam-item-row[data-number="2"]').click();
+  await page.getByTestId('exam-peer-toggle').click(); await peerView.waitFor();
+  assert.equal(await peerCalls('getPeerSolution'), 3, 'leaving the result screen releases its memory cache');
   assert.deepEqual(errors, []);
   await context.close();
   console.log('ok — real mode flow (1180×820)');
@@ -559,6 +632,15 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   await noHorizontalOverflow(page, `result/${viewport.width}`);
   await page.getByRole('button', { name: '← 시험지 목록' }).click();
   await page.locator(`[data-testid="exam-paper-card"][data-paper-id="${PAPER_A}"][data-state="done"]`).waitFor();
+  for (const theme of ['light','dark']) {
+    await page.evaluate(async value => {
+      const { applyThemeColor } = await import('/src/utils/theme.ts');
+      applyThemeColor(value === 'light' ? '#FFFFFF' : undefined);
+    },theme);
+    await page.locator('.exam-past').screenshot({ path:`${out}/past-omr-${theme}-${viewport.width}.png` });
+    await noHorizontalOverflow(page, `past OMR/${theme}/${viewport.width}`);
+  }
+  await page.evaluate(async () => { const { applyThemeColor } = await import('/src/utils/theme.ts'); applyThemeColor(); });
   assert.match(await paperCard(page, PAPER_A).innerText(), /최근 1차 · \d+점/);
   assert.doesNotMatch(await paperCard(page, PAPER_A).innerText(), /번 풀었어요|시행/);
   assert.equal(await paperCard(page, PAPER_B).getAttribute('data-state'), 'in-progress');
@@ -833,6 +915,9 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
     await page.getByTestId('exam-result').waitFor();
     assert.equal(await page.getByTestId('exam-hanneung-grade').innerText(), '미합격');
     assert.equal(await page.getByTestId('exam-score-tiles').count(), 0);
+    await page.locator('.exam-item-row[data-number="1"]').click();
+    assert.equal(await page.getByTestId('exam-peer-toggle').count(),0, 'hanneung excludes peer solutions');
+    await page.getByTestId('exam-viewer').getByRole('button', { name:'닫기',exact:true }).click();
     if (level === 'basic') {
       // 기본은 시대 태그 파일이 없어 시대별 결과를 보여 주지 않는다.
       assert.equal(await page.getByTestId('exam-eras').count(), 0);
@@ -976,6 +1061,7 @@ for (const viewport of [LANDSCAPE, { width: 390, height: 844 }]) {
   await noHorizontalOverflow(page, `admin-review-result/${viewport.width}`);
   await page.screenshot({ path: `${out}/admin-review-result-${viewport.width}.png` });
   await review.locator('.exam-item-row[data-number="1"]').click();
+  assert.equal(await page.getByTestId('exam-peer-toggle').count(),0, 'admin review excludes peer solutions');
   const inkSel = '[data-testid="exam-viewer"] .exam-ink';
   await page.locator(inkSel).waitFor();
   // 관리자가 문항을 열면 필기 순서를 바로 불러와 자동 재생한다(왼쪽에 떠 있는 작은 재생 상자).
@@ -1143,6 +1229,9 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   assert.equal(await page.getByTestId('exam-standard').count(), 0);
   assert.match(await page.getByTestId('exam-result-source').first().innerText(), /제74회 \d+번/);
   assert.equal(await page.locator('.exam-era[data-era="goryeo"]').count(), 1);
+  await page.locator('.exam-item-row').first().click();
+  assert.equal(await page.getByTestId('exam-peer-toggle').count(),0, 'era sets exclude peer solutions');
+  await page.getByTestId('exam-viewer').getByRole('button', { name:'닫기',exact:true }).click();
   await noHorizontalOverflow(page, `era result/${viewport.width}`);
   assert.deepEqual(errors, []);
   await context.close();

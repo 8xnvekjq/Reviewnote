@@ -1,5 +1,5 @@
 import { supabase } from '../../services/supabase';
-import type { AdminExamApi, AdminExamAttemptSummary, AdminLiveStudent, LiveInkResponse, AdminPaperActivity, ExamClient, ExamInkDocument, InkReplayData } from './contract';
+import type { AdminExamApi, AdminExamAttemptSummary, AdminLiveStudent, LiveInkResponse, AdminPaperActivity, ExamClient, ExamInkDocument, InkReplayData, PeerSolution } from './contract';
 import {
   ExamClientError,
   mapAddedMistakes,
@@ -39,6 +39,12 @@ export const examClient: ExamClient = {
   },
   async getInkReplay(attemptId, questionId) {
     return await callRpc('get_exam_ink_replay', { p_attempt_id: attemptId, p_question_id: questionId }) as InkReplayData;
+  },
+  async getPeerSolution(attemptId, questionId) {
+    return await callRpc('get_peer_solution', { p_attempt_id: attemptId, p_question_id: questionId }) as PeerSolution | null;
+  },
+  async getPeerSolutionReplay(attemptId, questionId, solutionKey) {
+    return await callRpc('get_peer_solution_replay', { p_attempt_id: attemptId, p_question_id: questionId, p_solution_key: solutionKey }) as InkReplayData;
   },
   async saveInk(attemptId, questionId, { revision, legacyImport, events, batchId, idsHash }) {
     // 바뀐 내용만 보낸다(supabase/migrations/20261003050000_exam_ink_delta.sql). 필기 전체는 보내지 않는다.
