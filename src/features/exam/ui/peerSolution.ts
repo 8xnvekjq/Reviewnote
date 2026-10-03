@@ -2,8 +2,18 @@ import type { ExamClient, InkReplayData, PeerSolution } from '../contract.ts';
 
 export type PeerSolutionApi = Pick<ExamClient, 'getPeerSolution' | 'getPeerSolutionReplay'>;
 
+/** 서버가 정한 캐릭터(요청자+문항 기준이라 작성자와 연결되지 않음)를 사람 얼굴 이모지로 바꿔 쓴다. */
+const FACES: Record<string, string> = {
+  치이카와: '🧑', 하치와레: '👩', 우사기: '👨', 모몽가: '🧒', 쿠리만쥬: '👧', 랏코: '👦', 시사: '🧑‍🦱', 후루혼: '👩‍🦰',
+};
+const FALLBACK_FACES = ['🧑', '👩', '👨', '🧒', '👧', '👦', '🧑‍🦱', '👩‍🦰'];
+
+/** "😀 칭호(학년)" — 칭호가 없으면 "익명 학생(학년)", 선생님 풀이는 "🧑‍🏫 선생님 풀이". */
 export function peerSolutionLabel(label: PeerSolution['label']): string {
-  return [label.isTeacher ? '선생님 풀이' : label.character, label.title && `[${label.title}]`, label.grade].filter(Boolean).join(' · ');
+  if (label.isTeacher) return '🧑‍🏫 선생님 풀이';
+  const face = FACES[label.character] ?? FALLBACK_FACES[[...label.character].reduce((sum, ch) => sum + ch.codePointAt(0)!, 0) % FALLBACK_FACES.length];
+  const grade = label.grade ? `(${label.grade})` : '';
+  return `${face} ${label.title || '익명 학생'}${grade}`;
 }
 
 /** One result screen owns this cache. Nothing is stored in browser storage or module state.

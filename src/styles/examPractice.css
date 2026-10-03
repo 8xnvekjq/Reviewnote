@@ -150,12 +150,12 @@
 .exam-past-row:active { transform: translateY(1px); }
 .theme-light .exam-past { color: #0f172a; }
 .theme-light .exam-past-row { --rn-text: #0f172a; --rn-accent: #4f46e5; --rn-line: #cbd5e1; }
-.exam-peer { display: grid; gap: 8px; margin-bottom: 12px; background: var(--rn-surface); color: var(--rn-text); }
-/* 크게 보기 종이(.exam-viewer-paper)는 흰 바탕이라, 익명 이름·안내는 표면색 띠 위에 둔다(흰 바탕에 밝은 글씨로 안 보였다). */
-.exam-peer > .rn-caption, .exam-peer-head { margin: 0; padding: 4px 12px; }
-.exam-peer-head { display: grid; gap: 2px; padding-bottom: 8px; }
-.exam-peer-head p { margin: 0; }
-.exam-peer-label { font-weight: 800; color: var(--rn-text); overflow-wrap: anywhere; }
+.exam-peer { display: grid; background: var(--rn-surface); color: var(--rn-text); }
+/* 크게 보기 종이(.exam-viewer-paper)는 흰 바탕 — 익명 이름 줄·안내는 표면색 띠로 붙이고 아래 여백을 두지 않는다(흰 빈칸이 생겼다). */
+.exam-peer-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 6px 10px; }
+.exam-peer-label { margin: 0; font-weight: 800; color: var(--rn-text); overflow-wrap: anywhere; }
+.exam-peer-caption { font-size: 12px; color: var(--rn-muted); margin-right: auto; }
+.exam-peer-note { margin: 0; padding: 6px 10px; font-size: 12.5px; color: var(--rn-muted); background: var(--rn-surface); }
 @media (max-width: 540px) {
   .exam-past-row { grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; }
   .exam-past-row .rn-caption { grid-column: 1; }
