@@ -1,11 +1,45 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import type { AdminExamApi } from '../contract';
 import { ExamInkCanvas } from '../ink/ExamInkCanvas';
 import { inkExtent } from '../ink/inkFit';
-import { useLiveExam } from './useLiveExam';
+import { inkImageReady, loadInkImage } from '../ink/inkImages';
+import { nextLiveFrame, type LiveFrame } from './liveFrame';
+import { useLiveExam, type LiveStudentView } from './useLiveExam';
 
 const noop = () => {};
+const NO_STROKES: LiveFrame['strokes'] = [];
+
+/** Image and ink switch together once the new question image is decoded (the previous frame stays meanwhile). */
+function useLiveFrame(row: LiveStudentView) {
+  const incoming = useMemo<LiveFrame>(() => ({ questionId: row.questionId, number: row.number, imageUrl: row.imageUrl,
+    strokes: row.ink?.strokes ?? NO_STROKES }), [row.questionId, row.number, row.imageUrl, row.ink?.strokes]);
+  const [shown, setShown] = useState<LiveFrame | null>(null);
+  const frame = nextLiveFrame(shown, incoming, inkImageReady);
+  if (frame !== shown) setShown(frame);
+  const [, setLoaded] = useState(0);
+  useEffect(() => {
+    if (!incoming.imageUrl || inkImageReady(incoming.imageUrl)) return;
+    let alive = true;
+    void loadInkImage(incoming.imageUrl).then(() => { if (alive) setLoaded(n => n + 1); });
+    return () => { alive = false; };
+  }, [incoming.imageUrl]);
+  return frame;
+}
+
+function LiveCell({ row, now, focused, wide, onOpen }: { row: LiveStudentView; now: number; focused: boolean; wide: boolean; onOpen: () => void }) {
+  const frame = useLiveFrame(row);
+  return <section className="exam-live-cell" data-testid="exam-live-cell" data-attempt-id={row.attemptId}>
+    <button type="button" className="exam-live-cell-open" aria-label={`${row.studentName} 풀이 확대`} onClick={() => { if (!focused) onOpen(); }}>
+      <strong>{row.studentName} · {frame?.number ?? row.number}번</strong><span>{Math.max(0, Math.floor((now - Date.parse(row.updatedAt)) / 1000))}초 전 갱신</span>
+      <div className="exam-live-canvas" data-question-id={frame?.questionId ?? ''}>
+        {frame
+          ? <ExamInkCanvas imageUrl={frame.imageUrl} strokes={frame.strokes} onChange={noop} tool="pen" color="#2563eb" size={3} readOnly fitToInk={inkExtent(frame.strokes)} imageMaxWidth={wide ? 760 : 480} />
+          : <div className="exam-live-image-pending" data-testid="exam-live-image-pending" role="status" aria-label="문항 이미지를 불러오는 중" />}
+      </div>
+    </button>
+  </section>;
+}
 export function AdminLiveView({ api, paperId, title, onClose }: { api: AdminExamApi; paperId: string; title: string; onClose: () => void }) {
   const { students, error, loading, broadcastConnected } = useLiveExam(api, paperId);
   const [focused, setFocused] = useState<string | null>(null);
@@ -68,17 +102,9 @@ export function AdminLiveView({ api, paperId, title, onClose }: { api: AdminExam
       {error && <p role="alert">갱신하지 못했어요. 잠시 뒤 자동으로 다시 시도해요.</p>}
       {!loading && !error && students.length === 0 && <p role="status">지금 풀고 있는 학생이 없어요</p>}
       <div className="exam-live-grid" style={{ '--live-columns': columns } as CSSProperties} data-focused={selected ? 'true' : 'false'}>
-        {displayed.map(row => <section className="exam-live-cell" key={row.attemptId} data-testid="exam-live-cell" data-attempt-id={row.attemptId}>
-          <button type="button" className="exam-live-cell-open" aria-label={`${row.studentName} 풀이 확대`} onClick={() => {
-            if (focused) return;
-            history.pushState({ ...history.state, examLive: token.current, focus: row.attemptId }, ''); setFocused(row.attemptId);
-          }}>
-            <strong>{row.studentName} · {row.number}번</strong><span>{Math.max(0, Math.floor((now - Date.parse(row.updatedAt)) / 1000))}초 전 갱신</span>
-            <div className="exam-live-canvas">
-              <ExamInkCanvas imageUrl={row.imageUrl} strokes={row.ink?.strokes ?? []} onChange={noop} tool="pen" color="#2563eb" size={3} readOnly fitToInk={inkExtent(row.ink?.strokes)} imageMaxWidth={selected ? 760 : 480} />
-            </div>
-          </button>
-        </section>)}
+        {displayed.map(row => <LiveCell key={row.attemptId} row={row} now={now} focused={!!focused} wide={!!selected} onOpen={() => {
+          history.pushState({ ...history.state, examLive: token.current, focus: row.attemptId }, ''); setFocused(row.attemptId);
+        }} />)}
       </div>
     </div>
   </div>, document.body);

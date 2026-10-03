@@ -530,5 +530,8 @@ export function createMockLiveExamApi() {
       return { mode: 'delta', revision: doc.revision, batches: doc.batches.filter(batch => batch.revision > since) };
     },
   };
-  return { api, setCount: (n: number) => { count = Math.max(0, Math.min(3, n)); }, draw: (index: number) => update(index), erase: (index: number) => update(index, true) };
+  // Live image-preload tests: the admin reads every question image of the paper through getAttempt.
+  const getAttempt = async (attemptId: string) => ({ id: attemptId, paperId: MOCK_PAPER_ID, questions } as unknown as ExamAttempt);
+  return { api: { ...api, getAttempt }, questions, setCount: (n: number) => { count = Math.max(0, Math.min(3, n)); },
+    draw: (index: number) => update(index), erase: (index: number) => update(index, true) };
 }

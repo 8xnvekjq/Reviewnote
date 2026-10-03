@@ -1357,5 +1357,83 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   await context.close();
 }
 
+// Author-only: Live gaps — a poll snapshot taken before the student's 5-second save must not erase
+// broadcast strokes, and a question switch never shows ink without its (slow) question image.
+{
+  const liveStroke = id => ({ id, tool: 'pen', color: '#ef4444', size: 3,
+    points: [{ x: .2, y: .5, pressure: .5, t: 0 }, { x: 1.2, y: .6, pressure: .5, t: 100 }] });
+  const openHintLive = async () => {
+    const opened = await open(LANDSCAPE, '?live=1&hint=1');
+    const questions = await opened.page.evaluate(() => window.__live.questions.map(q => ({ id: q.id, number: q.number, imageUrl: q.imageUrl })));
+    return { ...opened, questions };
+  };
+  const startLive = async page => {
+    await page.getByTestId('exam-live-badge').click();
+    await page.getByTestId('exam-live-view').waitFor();
+    await page.waitForFunction(() => document.querySelector('[data-attempt-id="live-attempt-0"] .exam-ink')?.dataset.strokeCount === '1');
+  };
+  const send = (page, sequence, question, added) => page.evaluate(m => window.__live.broadcast(m), { version: 1, attemptId: 'live-attempt-0',
+    questionId: question.id, number: question.number, sessionId: 'browser-student', sequence, added, removed: [] });
+
+  {
+    const { context, page, errors, questions } = await openHintLive();
+    await startLive(page);
+    await send(page, 1, questions[0], [{ index: 1, stroke: liveStroke('hint-1') }]);
+    await page.waitForFunction(() => document.querySelector('[data-attempt-id="live-attempt-0"] .exam-ink')?.dataset.strokeCount === '2', null, { timeout: 1500 });
+    // The server saves another stroke but not hint-1 yet: the authoritative refresh must keep hint-1.
+    await page.evaluate(() => window.__live.draw(0));
+    const counts = await page.evaluate(async () => {
+      const seen = [];
+      const until = Date.now() + 13000;
+      while (Date.now() < until) {
+        const n = Number(document.querySelector('[data-attempt-id="live-attempt-0"] .exam-ink')?.dataset.strokeCount);
+        seen.push(n);
+        if (n === 3) break;
+        await new Promise(resolve => requestAnimationFrame(resolve));
+      }
+      return seen;
+    });
+    assert.equal(counts.at(-1), 3, 'server stroke arrives by polling and the broadcast stroke is still there');
+    assert.ok(counts.every(n => n >= 2), `broadcast stroke never disappears (${[...new Set(counts)]})`);
+    assert.ok(await page.evaluate(() => window.__examLiveStats.vanishedOnPoll === 0), 'diagnostics: no stroke vanished on poll');
+    assert.deepEqual(errors, []);
+    await context.close();
+  }
+
+  {
+    const { context, page, errors, questions } = await openHintLive();
+    // Question 2's image is slow (preloading started when Live opened, but it is not decoded yet).
+    await page.route(url => url.href.includes(questions[1].imageUrl), async route => {
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      await route.continue();
+    });
+    await startLive(page);
+    const sampling = page.evaluate(async () => {
+      const seen = [];
+      const until = Date.now() + 9000;
+      while (Date.now() < until) {
+        const cell = document.querySelector('[data-attempt-id="live-attempt-0"]');
+        seen.push({ question: cell?.querySelector('.exam-live-canvas')?.dataset.questionId ?? '',
+          painted: cell?.querySelector('.exam-ink')?.dataset.imagePainted ?? 'none',
+          pending: !!cell?.querySelector('[data-testid="exam-live-image-pending"]'),
+          title: cell?.querySelector('strong')?.textContent ?? '' });
+        await new Promise(resolve => requestAnimationFrame(resolve));
+      }
+      return seen;
+    });
+    await send(page, 1, questions[1], [{ index: 0, stroke: liveStroke('q2-1') }]);
+    const samples = await sampling;
+    assert.ok(samples.every(x => x.pending || x.painted === 'true'), 'no frame shows ink without its question image');
+    const held = samples.filter(x => x.question === questions[0].id);
+    assert.ok(held.length > 10, 'previous question stays while the new image downloads');
+    assert.ok(held.every(x => x.title.includes(`${questions[0].number}번`)), 'title matches the frame that is shown');
+    assert.deepEqual(samples.at(-1), { question: questions[1].id, painted: 'true', pending: false, title: samples.at(-1).title });
+    assert.ok(samples.at(-1).title.includes(`${questions[1].number}번`));
+    await page.waitForFunction(() => document.querySelector('[data-attempt-id="live-attempt-0"] .exam-ink')?.dataset.strokeCount === '1');
+    assert.deepEqual(errors, []);
+    await context.close();
+  }
+}
+
 await browser.close();
 console.log('exam practice browser tests passed');

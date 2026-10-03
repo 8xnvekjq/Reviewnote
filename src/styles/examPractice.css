@@ -74,6 +74,9 @@
 .exam-live-cell-open { display: block; width: 100%; border: 0; padding: 12px; text-align: left; color: var(--rn-text); background: transparent; cursor: zoom-in; }
 .exam-live-cell-open > span { display: block; margin: 4px 0 12px; color: var(--rn-text-muted); font-size: 12px; }
 .exam-live-canvas { pointer-events: none; }
+.exam-live-image-pending { width: 100%; max-width: 480px; aspect-ratio: 4 / 3; border-radius: 8px; background: linear-gradient(90deg, var(--rn-line) 0%, var(--rn-surface) 50%, var(--rn-line) 100%); background-size: 200% 100%; animation: exam-live-pending 1.2s linear infinite; }
+@keyframes exam-live-pending { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@media (prefers-reduced-motion: reduce) { .exam-live-image-pending { animation: none; } }
 .exam-live-grid[data-focused="true"] { max-width: 1000px; margin-inline: auto; }
 .exam-live-grid[data-focused="true"] .exam-live-cell-open { cursor: default; }
 @media (max-width: 600px) { .exam-live-grid { grid-template-columns: minmax(0, 1fr); } .exam-live-view .exam-admin-review-bar { gap: 6px; padding-inline: 8px; } }

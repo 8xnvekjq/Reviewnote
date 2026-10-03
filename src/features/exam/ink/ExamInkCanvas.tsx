@@ -9,6 +9,7 @@ import { fitExtraBelow, fitImageWidth } from './inkFit.ts';
 import { drawShape, drawStroke, freehandPath, paint, prepareCanvas, resetTransform, safeDpr } from './inkRender.ts';
 import { holdStillStart, recognizeShape, resizeShape, shapeCenter, shapeToPoints } from './shapeSnap.ts';
 import { drawLaser } from './inkLaser.ts';
+import { aspectCache } from './inkImages.ts';
 import type { LaserTrail } from './inkLaser.ts';
 import type { Pt, SnapShape } from './shapeSnap.ts';
 
@@ -31,19 +32,6 @@ const SNAP_ANIM_MS = 180;
 
 /** 펜이 한 번이라도 감지되면 이후(문항을 옮겨 다시 마운트돼도) 손가락은 그리지 않는다. */
 let penEverDetected = false;
-
-/** 문항 이미지 비율 캐시 — 문항을 오갈 때 이미지가 다시 로드되기 전에도 같은 높이로 바로 그려 깜박임을 없앤다. */
-const aspectCache = new Map<string, number>();
-/** 시험 시작 때 문항 이미지를 미리 받아 두고 비율도 캐시한다. */
-export function preloadInkImages(urls: string[]) {
-  for (const url of urls) {
-    if (aspectCache.has(url)) continue;
-    const img = new Image();
-    img.decoding = 'async';
-    img.onload = () => { if (img.naturalWidth) aspectCache.set(url, img.naturalHeight / img.naturalWidth); };
-    img.src = url;
-  }
-}
 
 /** 가장 가까운 세로 스크롤 조상(손가락 스크롤을 직접 처리할 때 쓴다). */
 function scrollParentOf(el: HTMLElement): HTMLElement | null {
@@ -103,7 +91,12 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
   const liveRef = useRef<HTMLCanvasElement>(null);
   const laserRef = useRef<HTMLCanvasElement>(null);
   const [cssWidth, setCssWidth] = useState(0);
-  const [aspect, setAspect] = useState(() => aspectCache.get(imageUrl) ?? 0); // naturalHeight / naturalWidth
+  const [aspectState, setAspect] = useState(() => aspectCache.get(imageUrl) ?? 0);
+  // naturalHeight / naturalWidth. A preloaded image's ratio is known before its <img> loads, even when imageUrl changes in place.
+  const aspect = aspectCache.get(imageUrl) ?? aspectState;
+  /** 지금 <img>가 그리고 있는 주소. 이미지가 뜨기 전에 필기만 떠 있지 않게, 다를 때는 확정 획 레이어를 숨긴다. */
+  const [paintedUrl, setPaintedUrl] = useState<string | null>(null);
+  const imgElRef = useRef<HTMLImageElement | null>(null);
   const [dprWanted, setDprWanted] = useState(() => (typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1));
   const [penSeen, setPenSeen] = useState(penEverDetected);
   const [liveHighlighter, setLiveHighlighter] = useState(false);
@@ -154,10 +147,19 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       aspectCache.set(img.getAttribute('src') ?? img.src, img.naturalHeight / img.naturalWidth);
       setAspect(img.naturalHeight / img.naturalWidth);
     }
+    setPaintedUrl(img.getAttribute('src'));
   }, []);
+  const onImageError = useCallback((event: SyntheticEvent<HTMLImageElement>) => setPaintedUrl(event.currentTarget.getAttribute('src')), []);
   const imgRef = useCallback((img: HTMLImageElement | null) => {
-    if (img?.complete && img.naturalWidth) setAspect(img.naturalHeight / img.naturalWidth);
+    imgElRef.current = img;
+    if (img?.complete && img.naturalWidth) { setAspect(img.naturalHeight / img.naturalWidth); setPaintedUrl(img.getAttribute('src')); }
   }, []);
+  // Same element, new src (read-only Live cells): a cached, decoded image is complete immediately.
+  useLayoutEffect(() => {
+    const img = imgElRef.current;
+    if (img?.complete && img.naturalWidth && img.getAttribute('src') === imageUrl) setPaintedUrl(imageUrl);
+  }, [imageUrl]);
+  const imagePainted = paintedUrl === imageUrl;
 
   // ── 확정 획 렌더(형광펜 레이어 + 펜 레이어). 끝에 덧붙인 획만 있으면 그 획만 더 그린다. ──
   useLayoutEffect(() => {
@@ -541,7 +543,8 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
 
   // 손가락 스크롤은 pan 제스처가 직접 처리한다(touch-action pan은 iPad에서 펜 획을 끊었다).
   const touchAction = readOnly ? 'auto' : 'none';
-  const highlighterLayer: CSSProperties = { ...CANVAS_STYLE, opacity: HIGHLIGHTER_OPACITY, mixBlendMode: 'multiply', pointerEvents: 'none' };
+  const strokeVisibility = imagePainted ? 'visible' : 'hidden';
+  const highlighterLayer: CSSProperties = { ...CANVAS_STYLE, opacity: HIGHLIGHTER_OPACITY, mixBlendMode: 'multiply', pointerEvents: 'none', visibility: strokeVisibility };
 
   return (
     <div
@@ -550,6 +553,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       data-ready={cssWidth > 0 && aspect > 0 ? 'true' : 'false'}
       data-pen-detected={penSeen ? 'true' : 'false'}
       data-stroke-count={strokes.length}
+      data-image-painted={imagePainted ? 'true' : 'false'}
       style={{ position: 'relative', width: '100%', background: '#fff', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' } as CSSProperties}
     >
       <img
@@ -558,12 +562,13 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
         alt="문항"
         draggable={false}
         onLoad={onImageLoad}
+        onError={onImageError}
         style={{ display: 'block', width: imgW || '100%', maxWidth: '100%', height: imgW && aspect ? imgW * aspect : 'auto', pointerEvents: 'none', background: '#fff' }}
       />
       {/* 문항 아래 빈 공간에도 쓸 수 있게 여백(이미지 높이의 60%, 최소 너비의 절반) */}
       <div aria-hidden style={{ height: extraHeight }} />
       <canvas ref={highlightRef} aria-hidden style={highlighterLayer} />
-      <canvas ref={penRef} aria-hidden style={{ ...CANVAS_STYLE, pointerEvents: 'none' }} />
+      <canvas ref={penRef} aria-hidden style={{ ...CANVAS_STYLE, pointerEvents: 'none', visibility: strokeVisibility }} />
       <canvas ref={laserRef} className="exam-ink-laser" aria-hidden style={{ ...CANVAS_STYLE, pointerEvents: 'none' }} />
       <canvas
         ref={liveRef}

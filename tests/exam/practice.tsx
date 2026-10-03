@@ -143,7 +143,17 @@ function BroadcastAdminFixture() {
 if (params.get('live') === '1') {
   const live = createMockLiveExamApi();
   Object.assign(adminApi, live.api, { listPaperActivity: async () => [] });
-  (window as unknown as { __live: typeof live }).__live = live;
+  // `&hint=1`: an in-page broadcast bus, so tests can send student hints between real polling ticks.
+  const listeners = new Set<(payload: unknown) => void>();
+  if (params.get('hint') === '1') adminApi.liveTransport = {
+    open(_topic, event, receive, status) {
+      if (event === 'ink') listeners.add(receive);
+      queueMicrotask(() => status(true));
+      return { send() {}, close() { listeners.delete(receive); } };
+    },
+  };
+  (window as unknown as { __live: unknown }).__live = { ...live,
+    broadcast: (payload: unknown) => { for (const listener of listeners) listener(payload); } };
 }
 
 createRoot(document.getElementById('root')!).render(params.get('broadcast') === 'admin' ? <BroadcastAdminFixture /> : params.get('records') === '1' ?

@@ -4,7 +4,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { LaserIcon } from './LaserIcon';
 import type { ExamAttempt, ExamClient, ExamInkCanvasHandle, ExamItemState, ExamResult, InkChangeKind, InkStroke, InkTool } from '../contract';
-import { ExamInkCanvas, preloadInkImages } from '../ink/ExamInkCanvas';
+import { ExamInkCanvas } from '../ink/ExamInkCanvas';
+import { preloadInkImages } from '../ink/inkImages';
 
 /** 문항 이미지 표시 너비(CSS px) — 모든 문항이 같은 원본 너비로 잘려 있어 글자 크기가 항상 같다. */
 const QUESTION_IMAGE_WIDTH = 480;
