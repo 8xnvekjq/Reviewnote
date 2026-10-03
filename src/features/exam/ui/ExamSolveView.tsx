@@ -83,6 +83,11 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
   const [toast, setToast] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const broadcastInk = useInkBroadcast(client.liveTransport, attempt.paperId, attempt.id, attempt.status === 'in_progress' && !submitting);
+  // Live: after each server save, tell a watching admin which broadcasts that save contains.
+  useEffect(() => {
+    inkSync.onSaved = broadcastInk.saved;
+    return () => { if (inkSync.onSaved === broadcastInk.saved) inkSync.onSaved = undefined; };
+  }, [inkSync, broadcastInk]);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
@@ -280,8 +285,10 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
   const onInkChange = (next: InkStroke[], kind?: InkChangeKind) => {
     if (submittedRef.current) return;
     const qid = inkKey;
-    broadcastInk(qid, questions.find(q => q.id === qid)?.number ?? question.number, strokes.get(qid) ?? [], next);
-    inkSync.change(qid, next, kind);
+    const before = strokes.get(qid) ?? [];
+    const eventId = inkSync.change(qid, next, kind);
+    const inkQuestion = questions.find(q => q.id === qid);
+    broadcastInk.change(qid, inkQuestion?.number ?? question.number, before, next, eventId, inkQuestion?.imageUrl);
     const old = inkTimers.current.get(qid);
     if (old != null) window.clearTimeout(old);
     inkTimers.current.set(qid, window.setTimeout(() => {

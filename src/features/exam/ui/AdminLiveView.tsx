@@ -3,26 +3,33 @@ import { createPortal } from 'react-dom';
 import type { AdminExamApi } from '../contract';
 import { ExamInkCanvas } from '../ink/ExamInkCanvas';
 import { inkExtent } from '../ink/inkFit';
-import { inkImageReady, loadInkImage } from '../ink/inkImages';
+import { INK_IMAGE_RETRY_MS, inkImageFailed, inkImageReady, inkImageSettled, loadInkImage } from '../ink/inkImages';
 import { nextLiveFrame, type LiveFrame } from './liveFrame';
 import { useLiveExam, type LiveStudentView } from './useLiveExam';
 
 const noop = () => {};
 const NO_STROKES: LiveFrame['strokes'] = [];
 
-/** Image and ink switch together once the new question image is decoded (the previous frame stays meanwhile). */
+/** Image and ink switch together once the new question image is decoded (the previous frame stays meanwhile).
+ *  A failed or timed-out image (loader deadline) switches anyway with a notice; later updates retry it. */
 function useLiveFrame(row: LiveStudentView) {
   const incoming = useMemo<LiveFrame>(() => ({ questionId: row.questionId, number: row.number, imageUrl: row.imageUrl,
     strokes: row.ink?.strokes ?? NO_STROKES }), [row.questionId, row.number, row.imageUrl, row.ink?.strokes]);
   const [shown, setShown] = useState<LiveFrame | null>(null);
-  const frame = nextLiveFrame(shown, incoming, inkImageReady);
+  const frame = nextLiveFrame(shown, incoming, inkImageSettled);
   if (frame !== shown) setShown(frame);
   const [, setLoaded] = useState(0);
   useEffect(() => {
-    if (!incoming.imageUrl || inkImageReady(incoming.imageUrl)) return;
-    let alive = true;
-    void loadInkImage(incoming.imageUrl).then(() => { if (alive) setLoaded(n => n + 1); });
-    return () => { alive = false; };
+    const url = incoming.imageUrl;
+    if (!url || inkImageReady(url)) return;
+    let alive = true, timer: number | undefined;
+    const attempt = () => void loadInkImage(url).then(() => {
+      if (!alive) return;
+      setLoaded(n => n + 1);
+      if (inkImageFailed(url)) timer = window.setTimeout(attempt, INK_IMAGE_RETRY_MS);
+    });
+    attempt();
+    return () => { alive = false; window.clearTimeout(timer); };
   }, [incoming.imageUrl]);
   return frame;
 }
@@ -37,6 +44,7 @@ function LiveCell({ row, now, focused, wide, onOpen }: { row: LiveStudentView; n
           ? <ExamInkCanvas imageUrl={frame.imageUrl} strokes={frame.strokes} onChange={noop} tool="pen" color="#2563eb" size={3} readOnly fitToInk={inkExtent(frame.strokes)} imageMaxWidth={wide ? 760 : 480} />
           : <div className="exam-live-image-pending" data-testid="exam-live-image-pending" role="status" aria-label="문항 이미지를 불러오는 중" />}
       </div>
+      {frame && inkImageFailed(frame.imageUrl) && <small className="exam-live-image-failed" data-testid="exam-live-image-failed" role="status">문항 이미지를 불러오지 못했어요 · 다시 시도 중</small>}
     </button>
   </section>;
 }

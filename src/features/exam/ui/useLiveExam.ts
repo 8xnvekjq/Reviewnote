@@ -4,15 +4,18 @@ import { applyLiveInk, type LiveInkState } from '../ink/inkLive';
 import { preloadInkImages } from '../ink/inkImages';
 import { browserPollEnvironment, startLivePolling } from './livePolling';
 import {
-  acceptLiveSequence, addLiveHint, composeLiveView, liveSequenceGap, parseLiveInk, pruneLiveHints, vanishedStrokes, WATCH_INTERVAL_MS,
-  type LiveHintEntry,
+  acceptLiveSequence, composeLiveView, liveSequenceGap, parseLiveInk, parseLiveSaved, receiveLiveInk, receiveLiveSaved,
+  settleLiveHints, trustedLiveImage, vanishedStrokes, WATCH_INTERVAL_MS, type LiveHints, type LiveSequenceState,
 } from '../ink/inkBroadcast';
 import type { LiveChannel } from '../liveTransport';
 
 export type LiveStudentView = AdminLiveStudent & { ink: LiveInkState | null };
-/** Admin-console only: `window.__examLiveStats` and `[exam-live]` console lines. */
-export interface LiveDiagnostics { messages: number; sequenceGaps: number; vanishedOnPoll: number }
+/** Admin-console only: `window.__examLiveStats` and `[exam-live]` console lines.
+ *  `lateMessages` arrived after a later sequence (accepted, replayed in order); gaps minus late ≈ really lost. */
+export interface LiveDiagnostics { messages: number; savedSignals: number; sequenceGaps: number; lateMessages: number; vanishedOnPoll: number }
 const INK_CACHE_MAX = 240;
+/** Broadcasts of attempts the poll has not listed yet (first load, list changes) are kept for this many attempts. */
+const HINT_ATTEMPTS_MAX = 24;
 
 export function useLiveExam(api: AdminExamApi, paperId: string) {
   const [students, setStudents] = useState<LiveStudentView[]>([]);
@@ -22,17 +25,16 @@ export function useLiveExam(api: AdminExamApi, paperId: string) {
   useEffect(() => {
     setBroadcastConnected(false);
     let alive = true;
-    // Poll results only. Broadcasts live in `hints` and are replayed on top, so a server
-    // snapshot taken before the student's 5-second save can never erase newer strokes.
+    // Poll results only. Broadcasts live in `hints` and are replayed on top, so a server snapshot taken
+    // before the student's 5-second save can never erase newer strokes. Hints leave only on a save signal or TTL.
     let server: LiveStudentView[] = [];
-    let attempts = new Set<string>();
-    const hints = new Map<string, LiveHintEntry[]>();
+    const hints = new Map<string, LiveHints>();
     // RPC results only (never optimistic strokes): per question delta baselines and switch-back bases.
     const inkCache = new Map<string, LiveInkState>();
+    // Question images from polls and from validated broadcast paths of this paper. No extra DB request.
     const images = new Map<string, string>();
-    const questionsLoaded = new Set<string>();
-    const sequences = new Map<string, number>();
-    const stats: LiveDiagnostics = { messages: 0, sequenceGaps: 0, vanishedOnPoll: 0 };
+    const sequences = new Map<string, LiveSequenceState>();
+    const stats: LiveDiagnostics = { messages: 0, savedSignals: 0, sequenceGaps: 0, lateMessages: 0, vanishedOnPoll: 0 };
     (window as unknown as { __examLiveStats?: LiveDiagnostics }).__examLiveStats = stats;
     let shown = new Map<string, LiveStudentView>();
     const inkKey = (attemptId: string, questionId: string) => `${attemptId}:${questionId}`;
@@ -40,6 +42,14 @@ export function useLiveExam(api: AdminExamApi, paperId: string) {
       const key = inkKey(attemptId, questionId);
       inkCache.delete(key); inkCache.set(key, ink);
       if (inkCache.size > INK_CACHE_MAX) inkCache.delete(inkCache.keys().next().value!);
+    };
+    const settle = (attemptId: string, now: number) => {
+      const state = hints.get(attemptId);
+      if (!state) return;
+      const row = server.find(item => item.attemptId === attemptId);
+      const next = settleLiveHints(state, questionId => inkCache.get(inkKey(attemptId, questionId))?.revision, now, row?.questionId);
+      // Attempts the poll no longer lists keep only what can still be shown once they reappear.
+      if (next && (row || next.log.length || next.saved.length)) hints.set(attemptId, next); else hints.delete(attemptId);
     };
     const publish = (fromPoll: boolean) => {
       const views = server.map(row => composeLiveView(row, hints.get(row.attemptId),
@@ -58,18 +68,6 @@ export function useLiveExam(api: AdminExamApi, paperId: string) {
       shown = new Map(views.map(view => [view.attemptId, view]));
       setStudents(views);
     };
-    // Every question image of the paper, so a question switch never waits for a download.
-    const loadQuestions = async (attemptId: string) => {
-      if (questionsLoaded.has(attemptId) || questionsLoaded.size >= 12) return;
-      questionsLoaded.add(attemptId);
-      try {
-        const attempt = await api.getAttempt(attemptId);
-        if (!alive) return;
-        for (const question of attempt?.questions ?? []) images.set(question.id, question.imageUrl);
-        preloadInkImages([...images.values()]);
-        publish(false);
-      } catch { /* the polled imageUrl still arrives every five seconds */ }
-    };
     let watch: LiveChannel | undefined, broadcast: LiveChannel | undefined, watchReady = false, broadcastReady = false;
     const watcherId = crypto.randomUUID();
     const signal = (state: 'watching' | 'stopped') => watch?.send('watch', { watcherId, state });
@@ -77,17 +75,30 @@ export function useLiveExam(api: AdminExamApi, paperId: string) {
     try {
       broadcast = api.liveTransport?.open(`exam-live:${paperId}`, 'ink', value => {
         if (!alive || document.hidden) return;
-        const message = parseLiveInk(value);
-        if (!message || !attempts.has(message.attemptId)) return;
+        const message = parseLiveInk(value) ?? parseLiveSaved(value);
+        if (!message) return;
+        const known = hints.has(message.attemptId) || server.some(row => row.attemptId === message.attemptId);
+        if (!known && hints.size >= HINT_ATTEMPTS_MAX) return;
         const gap = liveSequenceGap(sequences, message);
+        const late = (sequences.get(`${message.attemptId}:${message.sessionId}`)?.max ?? 0) > message.sequence;
         if (!acceptLiveSequence(sequences, message)) return;
         stats.messages++;
+        if (late) stats.lateMessages++;
         if (gap) {
           stats.sequenceGaps += gap;
-          console.info(`[exam-live] 방송 순번 공백 ${gap}개 (누적 ${stats.sequenceGaps}/${stats.messages + stats.sequenceGaps})`);
+          console.info(`[exam-live] 방송 순번 공백 ${gap}개 (누적 ${stats.sequenceGaps}, 늦게 도착 ${stats.lateMessages}, 받은 ${stats.messages})`);
         }
-        hints.set(message.attemptId, addLiveHint(hints.get(message.attemptId), message, Date.now()));
-        if (!images.has(message.questionId)) void loadQuestions(message.attemptId);
+        const now = Date.now();
+        if ('kind' in message) {
+          stats.savedSignals++;
+          hints.set(message.attemptId, receiveLiveSaved(hints.get(message.attemptId), message, now));
+          // The poll may already hold that revision.
+          settle(message.attemptId, now);
+        } else {
+          const imageUrl = trustedLiveImage(paperId, message.imageUrl);
+          if (imageUrl) images.set(message.questionId, imageUrl);
+          hints.set(message.attemptId, receiveLiveInk(hints.get(message.attemptId), { ...message, imageUrl }, now));
+        }
         publish(false);
       }, ready => {
         broadcastReady = ready;
@@ -126,15 +137,9 @@ export function useLiveExam(api: AdminExamApi, paperId: string) {
           next.push({ ...row, ink });
         }
         server = next;
-        attempts = new Set(next.map(row => row.attemptId));
         const now = Date.now();
-        for (const [attemptId, log] of hints) {
-          const pruned = attempts.has(attemptId)
-            ? pruneLiveHints(log, questionId => inkCache.get(inkKey(attemptId, questionId))?.strokes, now) : [];
-          if (pruned.length) hints.set(attemptId, pruned); else hints.delete(attemptId);
-        }
+        for (const attemptId of [...hints.keys()]) settle(attemptId, now);
         preloadInkImages(next.map(row => row.imageUrl));
-        if (next[0] && !questionsLoaded.size) void loadQuestions(next[0].attemptId);
         if (alive) {
           publish(true);
           setLoading(false); setError(false);

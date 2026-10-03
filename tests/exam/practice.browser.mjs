@@ -1373,7 +1373,7 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
     await page.waitForFunction(() => document.querySelector('[data-attempt-id="live-attempt-0"] .exam-ink')?.dataset.strokeCount === '1');
   };
   const send = (page, sequence, question, added) => page.evaluate(m => window.__live.broadcast(m), { version: 1, attemptId: 'live-attempt-0',
-    questionId: question.id, number: question.number, sessionId: 'browser-student', sequence, added, removed: [] });
+    questionId: question.id, number: question.number, imageUrl: question.imageUrl, sessionId: 'browser-student', sequence, added, removed: [] });
 
   {
     const { context, page, errors, questions } = await openHintLive();
@@ -1402,7 +1402,7 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
 
   {
     const { context, page, errors, questions } = await openHintLive();
-    // Question 2's image is slow (preloading started when Live opened, but it is not decoded yet).
+    // Question 2's image is slow: its path arrives with the broadcast (no DB request) and is not decoded yet.
     await page.route(url => url.href.includes(questions[1].imageUrl), async route => {
       await new Promise(resolve => setTimeout(resolve, 5000));
       await route.continue();
