@@ -47,7 +47,10 @@ export function useLiveExam(api: AdminExamApi, paperId: string) {
       const state = hints.get(attemptId);
       if (!state) return;
       const row = server.find(item => item.attemptId === attemptId);
-      const next = settleLiveHints(state, questionId => inkCache.get(inkKey(attemptId, questionId))?.revision, now, row?.questionId);
+      // A sequential poll fills the cache before publishing its rows. For the shown question,
+      // confirm against the published canon, which composeLiveView actually replays hints on.
+      const next = settleLiveHints(state, questionId => questionId === row?.questionId
+        ? row.ink?.revision : inkCache.get(inkKey(attemptId, questionId))?.revision, now, row?.questionId);
       // Attempts the poll no longer lists keep only what can still be shown once they reappear.
       if (next && (row || next.log.length || next.saved.length)) hints.set(attemptId, next); else hints.delete(attemptId);
     };
