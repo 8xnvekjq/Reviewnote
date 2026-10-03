@@ -875,6 +875,34 @@ await assert.rejects(db.query("update exam_questions set section='미적분' whe
 await assert.rejects(db.query("update exam_questions set answer_type='choice4' where paper_id=$1 and number=1", [sangilId]), /EXAM_INVALID_QUESTION/);
 assert.equal((await as(AD, 'select published from exam_papers where id=$1', [sangilId]))[0].published, false);
 
+// Daedong's approved last multiple-choice question correction must survive SQL import and grading.
+const daedongId = '2025-daedong-g1-s2-mid-common2';
+const daedongData = JSON.parse(fs.readFileSync(path.join(root, `src/features/exam/data/${daedongId}.json`), 'utf8'));
+const daedongMig = fs.readFileSync(path.join(root, 'supabase/migrations/20261004160000_exam_daedong_school_seed.sql'), 'utf8');
+await db.exec(daedongMig); await db.exec(daedongMig);
+assert.equal((await as(S1, 'select id from exam_papers where id=$1', [daedongId])).length, 0);
+await fails(S1, `select start_exam_attempt($1,'free',null)`, [daedongId], /EXAM_PAPER_NOT_FOUND/);
+const daedongRows = (await db.query('select q.*, k.answer from exam_questions q join exam_answer_keys k on k.question_id=q.id where paper_id=$1 order by number', [daedongId])).rows;
+assert.equal(daedongRows.length, 22);
+for (const [i, row] of daedongRows.entries()) {
+  const q = daedongData.questions[i];
+  assert.deepEqual([row.number, Number(row.points), row.answer, row.answer_type, row.image_url, row.curriculum_chapter, row.choices],
+    [q.number, q.points, q.answer, q.answerType, q.imageUrl, q.curriculumChapter, q.choices ?? null]);
+}
+assert.equal(daedongRows.reduce((sum, row) => sum + Number(row.points), 0), 100);
+assert.equal(Number(daedongRows[18].points), 4.9);
+assert.equal(daedongData.questions[18].originalPoints, 4.7);
+assert.equal(Number(daedongRows[21].points), 8);
+assert.equal(daedongRows.slice(0, 19).reduce((sum, row) => sum + Number(row.points), 0), 80);
+assert.equal(daedongRows.slice(19).reduce((sum, row) => sum + Number(row.points), 0), 20);
+const daedongAttempt = (await as(AD, `select start_exam_attempt($1,'free',null) r`, [daedongId]))[0].r;
+assert.ok(daedongAttempt.questions.every(q => !('answer' in q) && !('originalAnswer' in q)));
+const daedongResult = (await as(AD, `select submit_exam_attempt($1,$2::jsonb,null) r`, [daedongAttempt.id,
+  JSON.stringify(daedongAttempt.questions.map(q => ({questionId:q.id, answer:daedongData.questions[q.number-1].answer}))) ]))[0].r;
+assert.equal(daedongResult.score, 100); assert.equal(daedongResult.correctCount, 22);
+assert.equal(daedongResult.estimatedGrade, null);
+assert.equal((await as(AD, 'select published from exam_papers where id=$1', [daedongId]))[0].published, false);
+
 
 for (const name of ['limits','derivatives']) {
   await db.exec(fs.readFileSync(path.join(root,`supabase/migrations/2026100313000${name==='limits'?1:2}_exam_youngpa_worksheet_${name}_seed.sql`),'utf8'));

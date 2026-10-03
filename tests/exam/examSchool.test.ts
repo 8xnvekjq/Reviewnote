@@ -9,6 +9,33 @@ import { buildHistoryRows, toggleChoice } from '../../src/features/exam/ui/examL
 const root = path.resolve(import.meta.dirname, '../..');
 const data = JSON.parse(fs.readFileSync(path.join(root, 'src/features/exam/data/2026-dongbuk-g1-s2-mid-common2.json'), 'utf8'));
 
+test('대동세무고 선택형 마지막 19번 배점으로 80/20점을 맞추고 22번 분수 정답은 유일하다', () => {
+  const paper = JSON.parse(fs.readFileSync(path.join(root, 'src/features/exam/data/2025-daedong-g1-s2-mid-common2.json'), 'utf8'));
+  assert.equal(paper.published, false); assert.equal(paper.questions.length, 22);
+  assert.equal(paper.questions.reduce((sum, q) => sum + q.points, 0), 100);
+  assert.equal(paper.questions[18].points, 4.9); assert.equal(paper.questions[18].originalPoints, 4.7);
+  assert.equal(paper.questions[21].points, 8); assert.ok(!('originalPoints' in paper.questions[21]));
+  assert.equal(paper.questions.slice(0, 19).reduce((sum, q) => sum + q.points, 0), 80);
+  assert.equal(paper.questions.slice(19).reduce((sum, q) => sum + q.points, 0), 20);
+  assert.deepEqual(paper.questions.slice(0, 19).map(q => q.answer), [...'2115314433241455223']);
+  // 3x-y+1=0 → y=x 대칭 → x-3y-1=0 → x방향 +1 → x-3y-2=0.
+  // 원의 중심 (0,a)를 지나는 직선이므로 -3a-2=0.
+  const values = [-1/3,2/3,2,4,-2,-10/3,0,4/3,-2/3,-1];
+  const q = paper.questions[21];
+  assert.equal(values.filter(a => Math.abs(-3*a-2) < 1e-10).length, 1);
+  assert.equal(-3*values[Number(q.answer)-1]-2, 0);
+  assert.equal(q.choices[Number(q.answer)-1], q.originalAnswer);
+  assert.equal(q.distractorReasons.length, 10);
+  assert.equal(new Set(q.choices).size, 10);
+  assert.equal(paper.questions[19].answer, String(2 ** (6 - 2)));
+  assert.equal(paper.questions[20].answer, String(Math.sqrt((2+2)**2+(3-1)**2-2**2)));
+  for (const item of paper.questions) {
+    assert.ok(MATH_CURRICULUM[item.curriculumGrade].includes(item.curriculumChapter));
+    assert.ok(fs.existsSync(path.join(root, 'public', item.imageUrl)));
+    assert.equal(sanitizeExamAnswer(item.answer, item.answerType), item.answer);
+  }
+});
+
 test('상일여고 서답형은 직접 계산한 정답이 유일하고 원본 오류를 교정한다', () => {
   const paper = JSON.parse(fs.readFileSync(path.join(root, 'src/features/exam/data/2026-sangil-g1-s2-mid-common2.json'), 'utf8'));
   assert.equal(paper.questions.length, 23); assert.equal(paper.published, false);
