@@ -33,6 +33,8 @@ export class InkSync {
   private failures = 0;
   private nextTryAt = 0;
   private serverSyncOff: boolean;
+  /** Called after each successful server save of one question (Live broadcast acknowledgement only; the request is unchanged). */
+  onSaved?: (questionId: string, revision: number, eventIds: string[]) => void;
 
   constructor(client: Pick<ExamClient, 'getInk' | 'saveInk'>, attemptId: string,
     notify: () => void = () => {}, storage: InkCache = cache, questionIds?: Set<string>, serverSyncOff = SERVER_SYNC_OFF) {
@@ -115,17 +117,19 @@ export class InkSync {
     this.notify();
   }
 
-  change(questionId: string, strokes: InkStroke[], kind: InkChangeKind = 'draw') {
-    if (!this.ready || this.status === 'conflict') return;
+  /** Returns the id of the recorded edit, or undefined when nothing will be saved. */
+  change(questionId: string, strokes: InkStroke[], kind: InkChangeKind = 'draw'): string | undefined {
+    if (!this.ready || this.status === 'conflict') return undefined;
     const previous = this.documents.get(questionId);
     const event = inkDelta(previous?.strokes ?? [], strokes, kind);
-    if (!event.added.length && !event.removed.length) return;
+    if (!event.added.length && !event.removed.length) return undefined;
     const draft = { ...previous, strokes,
       revision: previous?.revision ?? 0, pending: true, events: [...(previous?.events ?? []), event] };
     this.documents.set(questionId, draft);
     this.persist(questionId, draft); // every completed stroke, not only after debounce
     this.status = 'pending';
     this.notify();
+    return event.id;
   }
 
   /** background: 자동 저장(디바운스·주기 재시도). 최근에 실패했으면 백오프 동안 서버에 보내지 않는다. */
@@ -169,6 +173,7 @@ export class InkSync {
         const saved = { ...latest, revision, baseStrokes: upload.strokes, pending: events.length > 0, events, upload: undefined, legacyImport: false };
         this.documents.set(id, saved);
         this.persist(id, saved);
+        try { this.onSaved?.(id, revision, upload.events.map(event => event.id)); } catch { /* Live only */ }
       }
       await this.cacheWrites;
       this.failures = 0;

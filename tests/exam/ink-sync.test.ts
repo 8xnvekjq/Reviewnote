@@ -294,3 +294,59 @@ test('adding one stroke to a 300-stroke question sends a small request', async (
   assert.ok(last.bytes < 20 * 1024, `one-stroke save is ${last.bytes} bytes`);
   assert.equal(s.rows.get('q1')?.strokes.length, 301);
 });
+
+test('Live save signal: after each successful save only, with the saved edits; the save request is unchanged', async () => {
+  const s = server();
+  const sync = new InkSync(s.client, 'attempt', undefined, cache().storage);
+  const saved: Array<[string, number, string[]]> = [];
+  sync.onSaved = (questionId, revision, ids) => saved.push([questionId, revision, ids]);
+  await sync.load();
+  const e1 = sync.change('q1', [stroke('a')]);
+  const e2 = sync.change('q1', [stroke('a'), stroke('b')]);
+  assert.ok(e1 && e2 && e1 !== e2);
+  assert.equal(sync.change('q1', [stroke('a'), stroke('b')]), undefined, 'a no-op edit records nothing');
+  s.state.offline = true;
+  assert.equal(await sync.flush(), false);
+  assert.deepEqual(saved, [], 'a failed save sends no signal');
+  s.state.offline = false;
+  assert.equal(await sync.flush(), true);
+  assert.deepEqual(saved, [['q1', 1, [e1, e2]]]);
+  assert.deepEqual(Object.keys(s.requests.at(-1)!.request).sort(), ['batchId', 'events', 'idsHash', 'legacyImport', 'revision']);
+});
+
+test('Live end to end: student edits, broadcasts and saves; the admin drops hints only on the save proof', async () => {
+  const { createInkBatcher, receiveLiveInk, receiveLiveSaved, settleLiveHints, composeLiveView, parseLiveInk, parseLiveSaved } =
+    await import('../../src/features/exam/ink/inkBroadcast.ts');
+  const s = server();
+  const sync = new InkSync(s.client, 'attempt', undefined, cache().storage);
+  await sync.load();
+  let flush = () => {};
+  let hints: ReturnType<typeof receiveLiveInk> | undefined;
+  let lose = false;
+  const batch = createInkBatcher(message => {
+    if (lose) return;
+    const ink = parseLiveInk(message), signal = parseLiveSaved(message);
+    if (ink) hints = receiveLiveInk(hints, ink, 0);
+    if (signal) hints = receiveLiveSaved(hints, signal, 0);
+  }, { schedule(fn) { flush = fn; return 1; }, cancel() {} }, 'student');
+  sync.onSaved = (questionId, revision, ids) => batch.saved('attempt', questionId, revision, ids);
+  const edit = (next: InkStroke[]) => {
+    const before = sync.strokes.get('q1') ?? [];
+    batch.change('attempt', 'q1', 1, before, next, sync.change('q1', next));
+  };
+  const a = stroke('a'), b = stroke('b');
+  edit([a]); flush();
+  await sync.flush(); flush();                                // revision 1 = [a], signal: up to seq 1
+  edit([a, b]); flush();                                      // b: broadcast only
+  edit([b]); flush();                                         // erase a
+  lose = true; edit([a, b]); flush(); lose = false;           // undo, broadcast lost
+  const poll = () => ({ attemptId: 'attempt', questionId: 'q1', number: 1, imageUrl: '/q.png', updatedAt: '2026-10-04T00:00:00Z',
+    ink: { revision: s.rows.get('q1')!.revision, strokes: s.rows.get('q1')!.strokes } });
+  const view = () => composeLiveView(poll(), hints, () => undefined, () => undefined).ink!.strokes.map(x => x.id).sort();
+  hints = settleLiveHints(hints!, () => s.rows.get('q1')!.revision, 1, 'q1');
+  assert.deepEqual(view(), ['b'], 'before the save: what the admin was told (undo lost), canon [a] does not erase b');
+  await sync.flush(); flush();                                // revision 2 = [a, b], signal covers every sent message
+  hints = settleLiveHints(hints!, () => s.rows.get('q1')!.revision, 2, 'q1');
+  assert.deepEqual(hints?.log ?? [], []);
+  assert.deepEqual(view(), ['a', 'b'], 'the stale erase no longer reverts the saved undo');
+});

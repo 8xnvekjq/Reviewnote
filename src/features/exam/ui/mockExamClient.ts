@@ -535,5 +535,6 @@ export function createMockLiveExamApi() {
       return { mode: 'delta', revision: doc.revision, batches: doc.batches.filter(batch => batch.revision > since) };
     },
   };
-  return { api, listCalls: () => listCalls, setCount: (n: number) => { count = Math.max(0, Math.min(3, n)); }, draw: (index: number) => update(index), erase: (index: number) => update(index, true) };
+  return { api, questions, listCalls: () => listCalls, setCount: (n: number) => { count = Math.max(0, Math.min(3, n)); },
+    draw: (index: number) => update(index), erase: (index: number) => update(index, true) };
 }

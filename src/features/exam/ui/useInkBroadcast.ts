@@ -3,8 +3,19 @@ import type { InkStroke } from '../contract';
 import type { LiveChannel, LiveTransport } from '../liveTransport';
 import { createInkBatcher, watching } from '../ink/inkBroadcast';
 
-export function useInkBroadcast(transport: LiveTransport | undefined, paperId: string, attemptId: string, active: boolean) {
-  const change = useRef<(questionId: string, number: number, before: InkStroke[], after: InkStroke[]) => void>(() => {});
+export interface InkBroadcast {
+  /** `eventId`: the InkSync edit this change was recorded as (undefined = not saved to the server). */
+  change(questionId: string, number: number, before: InkStroke[], after: InkStroke[], eventId?: string, imageUrl?: string): void;
+  /** InkSync.onSaved: a save of the question at `revision` contained these edits. */
+  saved(questionId: string, revision: number, eventIds: string[]): void;
+}
+
+export function useInkBroadcast(transport: LiveTransport | undefined, paperId: string, attemptId: string, active: boolean): InkBroadcast {
+  const current = useRef<InkBroadcast>({ change() {}, saved() {} });
+  const stable = useRef<InkBroadcast>({
+    change: (...args) => current.current.change(...args),
+    saved: (...args) => current.current.saved(...args),
+  });
   useEffect(() => {
     if (!transport || !active) return;
     const watchers = new Map<string, number>();
@@ -12,8 +23,10 @@ export function useInkBroadcast(transport: LiveTransport | undefined, paperId: s
     const batcher = createInkBatcher(message => {
       try { if (watching(watchers, Date.now())) ink?.send('ink', message); } catch { /* exam UI stays quiet */ }
     }, { schedule: (fn, ms) => window.setTimeout(fn, ms), cancel: timer => window.clearTimeout(timer as number) }, crypto.randomUUID());
-    change.current = (qid, number, before, after) => {
-      if (inkReady && watching(watchers, Date.now())) batcher.change(attemptId, qid, number, before, after);
+    const live = () => inkReady && watching(watchers, Date.now());
+    current.current = {
+      change(qid, number, before, after, eventId, imageUrl) { if (live()) batcher.change(attemptId, qid, number, before, after, eventId, imageUrl); },
+      saved(qid, revision, eventIds) { if (live()) batcher.saved(attemptId, qid, revision, eventIds); },
     };
     let watch: LiveChannel | undefined;
     try {
@@ -30,7 +43,7 @@ export function useInkBroadcast(transport: LiveTransport | undefined, paperId: s
         }
       }, ready => { if (!ready) { watchers.clear(); batcher.clear(); } });
     } catch { /* optional */ }
-    return () => { disposed = true; change.current = () => {}; batcher.clear(); watch?.close(); ink?.close(); };
+    return () => { disposed = true; current.current = { change() {}, saved() {} }; batcher.clear(); watch?.close(); ink?.close(); };
   }, [transport, paperId, attemptId, active]);
-  return (qid: string, number: number, before: InkStroke[], after: InkStroke[]) => change.current(qid, number, before, after);
+  return stable.current;
 }
