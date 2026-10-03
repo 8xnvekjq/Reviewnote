@@ -302,5 +302,8 @@ export interface ExamInkCanvasProps {
   /** 문항 이미지를 이 너비(CSS px) 이하로 고정해 글자 크기를 일정하게 한다. 필기 영역은 컨테이너 전체 너비를 쓴다.
    *  좌표 정규화 기준(1)은 실제로 보이는 이미지 너비. 없으면 컨테이너 너비 = 이미지 너비. */
   imageMaxWidth?: number;
+  /** 읽기·검토 전용: 이 범위(이미지 너비 = 1 단위, 필기 오른쪽·아래 끝)까지 필기가 잘리지 않게 이미지를 필요한 만큼 줄이고
+   *  아래 여백을 늘린다. 풀이(쓰기) 화면은 넘기지 않는다. ink/inkFit.ts의 inkExtent로 만든다. */
+  fitToInk?: { maxX: number; maxY: number } | null;
 }
 export interface ExamInkCanvasHandle { undo(): void; redo(): void; clear(): void; canUndo(): boolean; canRedo(): boolean }
