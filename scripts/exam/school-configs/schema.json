@@ -282,6 +282,14 @@
                 ]
               }
             }
+          },
+          "originalPoints": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "pointsCorrectionNote": {
+            "type": "string",
+            "description": "원본 배점 보정 근거. 대동세무고 2025 선택형 마지막 19번 4.7→4.9점만 허용."
           }
         },
         "allOf": [

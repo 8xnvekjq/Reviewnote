@@ -63,7 +63,7 @@ class CoverTests(unittest.TestCase):
             yield path, config, resolve_pdf(config, path)
 
     def test_three_real_covers(self):
-        expected = {'dunchon': dict(questionCount=22, points=100), 'yeongpa': dict(questionCount=20, points=25), 'dongbuk': None, 'sangil': dict(questionCount=23, points=None)}
+        expected = {'dunchon': dict(questionCount=22, points=100), 'yeongpa': dict(questionCount=20, points=25), 'dongbuk': None, 'sangil': dict(questionCount=23, points=None), 'daedong': dict(questionCount=22, points=100)}
         for _, config, pdf in self.configs():
             with self.subTest(school=config['slug']), fitz.open(pdf) as doc:
                 self.assertEqual(read_cover(doc), expected[config['slug']])
@@ -81,7 +81,7 @@ class CoverTests(unittest.TestCase):
                 for explicit in (True, False):
                     candidate = copy.deepcopy(config)
                     if explicit:
-                        candidate['paper']['questionCount'] = {'dunchon': 22, 'yeongpa': 21, 'sangil': 23}[config['slug']]
+                        candidate['paper']['questionCount'] = {'dunchon': 22, 'yeongpa': 21, 'sangil': 23, 'daedong': 22}[config['slug']]
                     path.write_text(json.dumps(candidate), encoding='utf-8')
                     out = folder / str(explicit)
                     run(path, out, True)
@@ -481,6 +481,58 @@ class RealPdfTests(unittest.TestCase):
         help_result = subprocess.run([sys.executable, str(ROOT / 'scripts/exam/import_school.py'), '--help'], capture_output=True)
         self.assertEqual(help_result.returncode, 0)
         self.assertIn(b'--force', help_result.stdout)
+
+
+class DaedongPdfTests(unittest.TestCase):
+    def test_real_pdf_parsing_and_inconsistent_printed_total(self):
+        path = ROOT / 'scripts/exam/school-configs/2025-daedong-g1-s2-mid-common2.json'
+        config = json.loads(path.read_text(encoding='utf-8'))
+        with fitz.open(resolve_pdf(config, path)) as doc:
+            prepared, starts = prepare_config(doc, config)
+            keys, points = read_keys(doc, prepared, starts)
+            self.assertEqual(read_cover(doc), dict(questionCount=22, points=100))
+            self.assertEqual(prepared['layout']['questionPages'], [1,2,3,4,5,6])
+            self.assertEqual(prepared['layout']['answerPages'], [7,8,9])
+            self.assertEqual(prepared['layout']['columns'], [[52,359],[371,680]])
+            self.assertEqual([keys[n] for n in range(1,20)], list('②①①⑤③①④④③③②④①④⑤⑤②②③'))
+            self.assertEqual([q['answer'] for q in prepared['questions'][-3:]], ['16','4','9'])
+            self.assertEqual([points[n] for n in range(1,23)], [3.8,3.8,3.8,3.8,4.3,4.3,4.3,4.2,4.3,4.5,3.8,3.8,4.2,4.3,4.3,4.6,4.6,4.4,4.7,6,6,8])
+            self.assertAlmostEqual(sum(points.values()), 99.8)
+            self.assertAlmostEqual(sum(points[n] for n in range(1,20)), 79.8)
+            data, warnings = make_data(doc, prepared, starts)
+            self.assertEqual(len(data['questions']), 22)
+            self.assertAlmostEqual(sum(q['points'] for q in data['questions']), 100)
+            self.assertEqual(data['questions'][18]['points'], 4.9)
+            self.assertEqual(data['questions'][18]['originalPoints'], 4.7)
+            self.assertEqual(data['questions'][-1]['points'], 8)
+            self.assertNotIn('originalPoints', data['questions'][-1])
+            self.assertAlmostEqual(sum(q['points'] for q in data['questions'][:19]), 80)
+            self.assertAlmostEqual(sum(q['points'] for q in data['questions'][19:]), 20)
+            self.assertTrue(any('사용자 결정' in w for w in warnings))
+            # Correction never disables other PDF/config checks.
+            for mutation, error in [
+                (lambda c: c['questions'][18].update(originalPoints=4.5), 'original points mismatch'),
+                (lambda c: c['questions'][18].update(points=5.1), 'points mismatch'),
+                (lambda c: c['questions'][18].pop('pointsCorrectionNote'), 'points mismatch'),
+                (lambda c: c['paper'].update(id='other-school'), 'points mismatch'),
+                (lambda c: c['questions'][0].update(points=4), 'points mismatch'),
+                (lambda c: c['questions'][-1].update(points=8.2, originalPoints=8,
+                    pointsCorrectionNote='사용자 결정: 원본 합계 99.8 → 마지막 문항 +0.2'), 'points mismatch'),
+            ]:
+                candidate = copy.deepcopy(prepared)
+                mutation(candidate)
+                with self.assertRaisesRegex(ValueError, error):
+                    make_data(doc, candidate, starts)
+        # Without the explicit correction, the inconsistent total still fails.
+        config['questions'][0].pop('points')
+        config['questions'][0].pop('originalPoints')
+        config['questions'][0].pop('pointsCorrectionNote')
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / 'out'
+            with self.assertRaisesRegex(ValueError, 'Points total disagrees with maxScore'):
+                with patch('import_school.json.loads', return_value=config):
+                    run(path, out, True)
+            self.assertFalse(out.exists())
 
 
 class SangilPdfTests(unittest.TestCase):

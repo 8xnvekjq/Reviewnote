@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
 # 번호 앞에 "[서답형1]" 같은 꼬리표 줄이 붙는 학교가 있다(둔촌고).
 START = re.compile(r'^(?:\s*\[[^\]\n]{1,12}\]\s*)?(?:(\d+)\s+)?(\d+)\.')
 PUA_DIGITS = str.maketrans({chr(0xe034 + i): str(i + 1) for i in range(9)} | {chr(0xe03d): '0'})
+PUA_NUMBERS = PUA_DIGITS | {0xe053: '.'}
 
 
 def normalize(text):
@@ -67,7 +68,8 @@ def detect_layout(doc, overrides=None):
         choice_keys = re.findall(r'(?m)^\s*\d+[.)]\s*[①②③④⑤]', text)
         short_keys = re.findall(r'(?m)^\s*\d+[.)]\s*\d+\s*$', text)
         labels = [b for b in page_blocks if START.match(b[4])]
-        is_key = len(choice_keys) >= 2 or re.search(r'(?m)^\s*(정답|문항별\s*배점)\s*$', text) or (len(short_keys) >= 2 and len(short_keys) >= len(labels) * .6)
+        labelled_keys = re.findall(r'(?m)^\s*\d+[.)]\s*정답\s*[:：]', text)
+        is_key = len(labelled_keys) >= 2 or len(choice_keys) >= 2 or re.search(r'(?m)^\s*(정답|문항별\s*배점)\s*$', text) or (len(short_keys) >= 2 and len(short_keys) >= len(labels) * .6)
         if is_key:
             answer_pages.append(pn)
         elif labels:
@@ -291,7 +293,7 @@ def read_keys(doc, config, starts):
         for index, block in enumerate(blocks):
             labelled = re.match(r'^\s*(\d+)[.)]\s*정답\s*(.*)$', block[4], re.S)
             if labelled:
-                value = labelled[2].strip()
+                value = re.sub(r'^\s*[:：]\s*', '', labelled[2]).split('[해설]', 1)[0].strip()
                 # A raised fraction numerator may occupy the following block.
                 for continuation in blocks[index + 1:]:
                     if not value or re.search(r'[가-힣]|^\s*\d+[.)]', continuation[4]):
@@ -318,7 +320,7 @@ def read_keys(doc, config, starts):
         page = doc[pn - 1]
         end = min([sy for n, (p, c, sy) in starts.items() if p == pn and c == col and sy > y] or [config['layout'].get('pageBodyBottom', {}).get(str(pn), config['layout']['bodyBottom'])])
         left, right = config['layout']['columns'][col]
-        region = page.get_text(clip=fitz.Rect(left, y - 10, right, end))
+        region = page.get_text(clip=fitz.Rect(left, y - 10, right, end)).translate(PUA_NUMBERS)
         inline = re.findall(r'[\[(]\s*(\d+(?:\.\d+)?)\s*점\s*[\])]', region)
         if inline:
             total = sum(float(v) for v in inline)
@@ -455,19 +457,34 @@ def make_data(doc, config, starts):
             if long:
                 warnings.append(f'Question {number}: choices {long} list several points without \\allowbreak after "),"; they may be clipped')
         auto_points = points.get((original, spec['sourcePart']) if spec.get('sourcePart') else original)
-        if auto_points is not None and spec.get('points') is not None and abs(auto_points - spec['points']) > 1e-6:
+        # 사용자 결정: 원본 합계 99.8 → 선택형 마지막 19번 +0.2. 이 시험지/문항만 허용.
+        corrected = (
+            metadata['id'] == '2025-daedong-g1-s2-mid-common2'
+            and number == original == 19
+            and not spec.get('sourcePart')
+            and auto_points == spec.get('originalPoints') == 4.7
+            and spec.get('points') == 4.9
+            and spec.get('pointsCorrectionNote') == '사용자 결정: 원본 합계 99.8 → 선택형 마지막 19번 +0.2'
+        )
+        if 'originalPoints' in spec and auto_points != spec['originalPoints']:
+            raise ValueError(f'Question {number}: PDF/config original points mismatch')
+        if auto_points is not None and spec.get('points') is not None and abs(auto_points - spec['points']) > 1e-6 and not corrected:
             raise ValueError(f'Question {number}: PDF/config points mismatch')
-        value = auto_points if auto_points is not None else spec.get('points')
+        value = spec['points'] if corrected else auto_points if auto_points is not None else spec.get('points')
+        if corrected:
+            warnings.append(f"Question {number}: {spec['pointsCorrectionNote']} ({auto_points} → {value}점)")
         if value is None or value <= 0:
             raise ValueError(f'Question {number}: no positive parsed/manual points')
         if auto_points is None:
             warnings.append(f'Question {number}: using configured points; PDF points require manual review')
-        original_totals[original] = original_totals.get(original, 0) + value
+        original_totals[original] = original_totals.get(original, 0) + (auto_points if corrected else value)
         q = dict(number=number, section='common', imageUrl=f'/exams/{metadata["id"]}/q-{number:02}.png', points=round(value * config.get('pointScale', 1), 1), answer=answer, answerType=answer_type, curriculumGrade=config['curriculumGrade'], sourcePage=starts[original][0])
         if config.get('includeOriginalNumber'):
             q['originalNumber'] = spec.get('originalNumber', str(original))
         if config.get('includeOriginalPoints'):
             q['originalPoints'] = value
+        if corrected:
+            q['originalPoints'] = spec['originalPoints']
         if spec.get('chapter'):
             q['curriculumChapter'] = spec['chapter']
         for field in ('choices', 'originalAnswer', 'distractorReasons'):
