@@ -15,8 +15,11 @@ test('anonymous labels omit missing fields and show teacher fallback', () => {
   assert.equal(peerSolutionLabel(solution.label), '👩 도전자(고2)');
   assert.equal(peerSolutionLabel({ ...solution.label, title: null, grade: null }), '👩 익명 학생');
   assert.equal(peerSolutionLabel({ ...solution.label, title: null }), '👩 익명 학생(고2)');
-  assert.equal(peerSolutionLabel({ ...solution.label, isTeacher: true }), '🧑‍🏫 선생님 풀이');
+  assert.equal(peerSolutionLabel({ ...solution.label, isTeacher: true }), '🎓 선생님 풀이');
   assert.match(peerSolutionLabel({ ...solution.label, character: '모르는캐릭터' }), /^\p{Extended_Pictographic}/u, 'unknown characters still get a face');
+  // 결합(ZWJ) 이모지는 쓰지 않는다 — 기기·글꼴에 따라 갈라지거나 글씨와 겹친다.
+  for (const character of ['치이카와','하치와레','우사기','모몽가','쿠리만쥬','랏코','시사','후루혼','모르는캐릭터'])
+    for (const isTeacher of [false, true]) assert.ok(!peerSolutionLabel({ ...solution.label, character, isTeacher }).includes('‍'), `${character} ${isTeacher}`);
 });
 
 test('result session loads only on demand, deduplicates, caches null/replay and retries failures', async () => {
