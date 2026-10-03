@@ -258,7 +258,10 @@
 .exam-body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 12px 10px calc(env(safe-area-inset-bottom) + 20px); }
 .exam-paper { width: min(100%, 980px); margin-inline: auto; }
 .exam-paper-meta { margin: 0 2px 6px; }
-.exam-category-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.exam-reference-link { color: var(--rn-accent, #2563eb); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+.exam-category-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.exam-category-grid .exam-option { padding-inline: 4px; }
+.exam-category-grid .exam-option strong { white-space: nowrap; }
 .exam-page-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
 .exam-page-nav [aria-pressed="true"] { outline: 2px solid var(--rn-accent); }
 .exam-original-scroll { max-width: 100%; overflow-x: auto; }

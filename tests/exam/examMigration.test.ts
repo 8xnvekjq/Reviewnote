@@ -903,6 +903,26 @@ assert.equal(daedongResult.score, 100); assert.equal(daedongResult.correctCount,
 assert.equal(daedongResult.estimatedGrade, null);
 assert.equal((await as(AD, 'select published from exam_papers where id=$1', [daedongId]))[0].published, false);
 
+// 중3 삼각비 창의융합 학습지: 시드 2회 멱등, 비공개(학생 목록·시작 거부), 데이터 JSON과 SQL 일치.
+const trigId = '2026-g3m-trig-creative';
+const trigData = JSON.parse(fs.readFileSync(path.join(root, `src/features/exam/data/${trigId}.json`), 'utf8'));
+const trigMig = fs.readFileSync(path.join(root, 'supabase/migrations/20261004190000_exam_trig_creative_worksheet_seed.sql'), 'utf8');
+await db.exec(trigMig); await db.exec(trigMig);
+assert.equal((await as(S1, 'select id from exam_papers where id=$1', [trigId])).length, 0);
+assert.ok(!(await as(S1, 'select list_exam_papers_for_me() r'))[0].r.some(p => p.id === trigId));
+await fails(S1, `select start_exam_attempt($1,'free',null)`, [trigId], /EXAM_PAPER_NOT_FOUND/);
+const trigPaper = (await db.query('select * from exam_papers where id=$1', [trigId])).rows[0];
+assert.deepEqual([trigPaper.kind, trigPaper.grade, trigPaper.school_grade, trigPaper.published, trigPaper.time_limit_minutes, trigPaper.question_count, Number(trigPaper.max_score), trigPaper.unit_name, trigPaper.school_name],
+  ['worksheet', 9, '중3', false, null, 18, 90, trigData.unitName, trigData.schoolName]);
+const trigRows = (await db.query('select q.*, k.answer from exam_questions q join exam_answer_keys k on k.question_id=q.id where paper_id=$1 order by number', [trigId])).rows;
+assert.equal(trigRows.length, 18);
+for (const [i, row] of trigRows.entries()) {
+  const q = trigData.questions[i];
+  assert.deepEqual([row.number, Number(row.points), row.answer, row.answer_type, row.image_url, row.curriculum_grade, row.curriculum_chapter, row.source_label, row.is_choice],
+    [q.number, q.points, q.answer, q.answerType, q.imageUrl, q.curriculumGrade, q.curriculumChapter, q.sourceLabel, false]);
+}
+await fails(S1, `select start_exam_attempt($1,'free',null)`, [trigId], /EXAM_PAPER_NOT_FOUND/);
+await fails(AD, `select start_exam_attempt($1,'real',null)`, [trigId], /EXAM_INVALID_MODE/);
 
 for (const name of ['limits','derivatives']) {
   await db.exec(fs.readFileSync(path.join(root,`supabase/migrations/2026100313000${name==='limits'?1:2}_exam_youngpa_worksheet_${name}_seed.sql`),'utf8'));
@@ -1006,5 +1026,22 @@ const wsMistake=(await as(S1,`select add_exam_questions_to_mistakes($1,$2::uuid[
 assert.equal(wsMistake.length,1);
 const mistake=(await as(S1,'select grade,chapter from mistakes where id=$1',[wsMistake[0].mistakeId]))[0];
 assert.deepEqual(mistake,{grade:'미적분Ⅰ',chapter:'미분계수와 도함수'});
+// 공개 뒤(코디네이터의 publish SQL): 학생이 중3 학습지를 자유 모드로 풀고 원본 배점 만점·등급 없음.
+const trigWsId='2026-g3m-trig-creative';
+const trigWsData=JSON.parse(fs.readFileSync(path.join(root,`src/features/exam/data/${trigWsId}.json`),'utf8'));
+await db.exec(fs.readFileSync(path.join(root,'scripts/exam/publish_trig_creative_worksheet.sql'),'utf8'));
+const trigCard=(await as(S1,'select list_exam_papers_for_me() r'))[0].r.find(p=>p.id===trigWsId);
+assert.deepEqual([trigCard.grade,trigCard.kind,trigCard.timeLimitMinutes,trigCard.maxScore],[9,'worksheet',null,90]);
+await fails(S1,`select start_exam_attempt($1,'real',null)`,[trigWsId],/EXAM_INVALID_MODE/);
+const trigAttempt=(await as(S1,`select start_exam_attempt($1,'free',null) r`,[trigWsId]))[0].r;
+assert.equal(trigAttempt.questions.length,18);
+assert.ok(trigAttempt.questions.every(q=>!('answer' in q) && q.sourceLabel.startsWith('리뷰노트 변형 문항 · 유형 ')));
+assert.equal((await as(S1,'select * from exam_answer_keys where question_id=$1',[trigAttempt.questions[0].id])).length,0);
+const trigCheck=(await as(S1,`select check_exam_answer($1,$2,$3) r`,[trigAttempt.id,trigAttempt.questions[0].id,trigWsData.questions[0].answer]))[0].r;
+assert.equal(trigCheck.isCorrect,true);
+const trigResult=(await as(S1,'select submit_exam_attempt($1,$2::jsonb,null) r',[trigAttempt.id,JSON.stringify(trigAttempt.questions.map(q=>({questionId:q.id,answer:trigWsData.questions[q.number-1].answer,timeSpentMs:1000,visits:1})))]))[0].r;
+assert.deepEqual([trigResult.score,trigResult.correctCount,trigResult.maxScore,trigResult.estimatedGrade,trigResult.gradeCut],[90,18,90,null,null]);
+const trigMistake=(await as(S1,`select add_exam_questions_to_mistakes($1,$2::uuid[],'https://reviewnotes.test') r`,[trigAttempt.id,[trigAttempt.questions[12].id]]))[0].r;
+assert.deepEqual((await as(S1,'select grade,chapter from mistakes where id=$1',[trigMistake[0].mistakeId]))[0],{grade:'중3-2',chapter:'삼각비'});
 
 });

@@ -14,6 +14,7 @@ import { OmrCard } from './OmrCard';
 import { QuestionOverview } from './QuestionOverview';
 import { useExamInk } from './useExamInk';
 import { useInkBroadcast } from './useInkBroadcast';
+import { worksheetReferences } from './worksheetReferences';
 import {
   countAnswered, createStopwatch, crossedAlerts, elapsedFor, formatClock, normalizeShortAnswer, pauseStopwatch, remainingMs,
   switchStopwatch, toggleChoice, questionAnswerType, usesWholePages, type StopwatchState,
@@ -436,6 +437,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
             {question.sourceRound && <span data-testid="exam-question-source">제{question.sourceRound}회 {question.sourceNumber}번 · </span>}
             {question.number}번 · {question.points}점 · {question.isChoice ? '객관식' : '단답형'}
             {question.sourceLabel && <span data-testid="worksheet-source"> · {question.sourceLabel}</span>}
+            {worksheetReferences(attempt.paperId).map(link => <span key={link.href}> · <a className="exam-reference-link" href={link.href} target="_blank" rel="noopener noreferrer" data-testid="worksheet-reference">{link.label} ↗</a></span>)}
             {saveState === 'failed' && <span className="exam-save-failed"> · 저장이 잠깐 안 됐어요(다시 시도할게요)</span>}
           </div>
           {/* 시험 중 방해가 되지 않도록 저장 중·완료는 말하지 않고, 사용자가 해야 할 일이 있을 때만 보인다. */}
