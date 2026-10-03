@@ -9,6 +9,7 @@ import { buildData, buildPublishSql, buildSeedSql, verifyQuestion } from '../../
 
 const root = path.resolve(import.meta.dirname, '../..');
 const id = '2026-g3m-trig-creative';
+const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8').replace(/\r\n/g, '\n'); // autocrlf 체크아웃에서도 비교
 const data = JSON.parse(fs.readFileSync(path.join(root, `src/features/exam/data/${id}.json`), 'utf8'));
 
 // 문항 원본과 따로, 풀이를 손으로 옮겨 적은 식으로 정답을 다시 계산한다(표 값 / 정확한 값 / √3=1.732 / 정확한 √3).
@@ -91,11 +92,11 @@ test('trig worksheet: answers recomputed independently match with table values a
 test('trig worksheet: generated JSON/seed/publish SQL are up to date and seed stays private', () => {
   const generated = buildData();
   assert.deepEqual(generated, data);
-  const seed = fs.readFileSync(path.join(root, `supabase/migrations/${PAPER.migrationTimestamp}_exam_trig_creative_worksheet_seed.sql`), 'utf8');
+  const seed = read(`supabase/migrations/${PAPER.migrationTimestamp}_exam_trig_creative_worksheet_seed.sql`);
   assert.equal(seed, buildSeedSql(generated));
   assert.match(seed, /,false,'worksheet','리뷰노트',9,18,90\.0,'삼각비의 활용'\)/);
   assert.equal((seed.match(/insert into public\.exam_answer_keys/g) ?? []).length, 18);
-  assert.equal(fs.readFileSync(path.join(root, 'scripts/exam/publish_trig_creative_worksheet.sql'), 'utf8'), buildPublishSql(generated));
+  assert.equal(read('scripts/exam/publish_trig_creative_worksheet.sql'), buildPublishSql(generated));
   assert.ok(!fs.readdirSync(path.join(root, 'supabase/migrations')).some(f => f.startsWith(PAPER.migrationTimestamp) && !f.endsWith('_exam_trig_creative_worksheet_seed.sql')));
 });
 
