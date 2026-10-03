@@ -1148,5 +1148,58 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   await context.close();
 }
 
+// Live: author-only in this worktree. The coordinator executes these cases.
+for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
+  const { context, page, errors } = await open(viewport, '?live=1');
+  const badge = page.getByTestId('exam-live-badge');
+  await badge.waitFor();
+  assert.equal(await badge.count(), 1);
+  assert.equal(await badge.evaluate(node => node.parentElement.querySelector('[data-paper-id]').dataset.paperId), PAPER_A);
+  const heights = await Promise.all([paperCard(page, PAPER_A).boundingBox(), paperCard(page, PAPER_B).boundingBox()]);
+  assert.equal(heights[0].height, heights[1].height, 'absolute Live badge preserves card height');
+  assert.ok(await badge.evaluate(node => node.getBoundingClientRect().bottom <= node.parentElement.querySelector('.exam-paper-sheet-head').getBoundingClientRect().top), 'corner badge does not cover card text');
+  await noHorizontalOverflow(page, `Live badge/${viewport.width}`);
+  await page.screenshot({ path: `${out}/live-badge-${viewport.width}.png`, fullPage: true });
+  await badge.click();
+  const live = page.getByTestId('exam-live-view');
+  await live.waitFor();
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="exam-live-cell"]').length === 2);
+  const cell = () => live.locator('[data-attempt-id="live-attempt-0"]');
+  await page.waitForFunction(() => document.querySelector('[data-attempt-id="live-attempt-0"] .exam-ink')?.dataset.strokeCount === '1');
+  await page.evaluate(() => { window.__live.setCount(3); window.__live.draw(0); });
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="exam-live-cell"]').length === 3
+    && document.querySelector('[data-attempt-id="live-attempt-0"] .exam-ink')?.dataset.strokeCount === '2', null, { timeout: 12000 });
+  await page.evaluate(() => window.__live.erase(0));
+  await page.waitForFunction(() => document.querySelector('[data-attempt-id="live-attempt-0"] .exam-ink')?.dataset.strokeCount === '1', null, { timeout: 12000 });
+  await noHorizontalOverflow(page, `Live split/${viewport.width}`);
+  await page.screenshot({ path: `${out}/live-split-${viewport.width}.png`, fullPage: true });
+  for (const back of ['button', 'escape', 'history']) {
+    await cell().getByRole('button').click();
+    assert.equal(await live.getByTestId('exam-live-cell').count(), 1);
+    if (back === 'button') await live.getByRole('button', { name: '← 전체 보기', exact: true }).click();
+    else if (back === 'escape') await page.keyboard.press('Escape');
+    else await page.evaluate(() => history.back());
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid="exam-live-cell"]').length === 3);
+  }
+  await cell().getByRole('button').click();
+  await page.evaluate(() => window.__live.draw(0));
+  await page.waitForFunction(() => document.querySelector('[data-attempt-id="live-attempt-0"] .exam-ink')?.dataset.strokeCount === '2', null, { timeout: 12000 });
+  await noHorizontalOverflow(page, `Live focus/${viewport.width}`);
+  await page.screenshot({ path: `${out}/live-focus-${viewport.width}.png`, fullPage: true });
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="exam-live-cell"]').length === 3);
+  await page.evaluate(() => window.__live.setCount(0));
+  await live.getByText('지금 풀고 있는 학생이 없어요').waitFor({ timeout: 12000 });
+  await page.keyboard.press('Escape');
+  await live.waitFor({ state: 'detached' });
+  assert.deepEqual(errors, []);
+  await context.close();
+}
+{
+  const { context, page } = await open(LANDSCAPE);
+  assert.equal(await page.getByTestId('exam-live-badge').count(), 0, 'ordinary students never see Live badges');
+  await context.close();
+}
+
 await browser.close();
 console.log('exam practice browser tests passed');

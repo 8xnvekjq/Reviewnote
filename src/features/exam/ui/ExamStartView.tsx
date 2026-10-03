@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { AdminExamApi, AdminPaperStudentActivity, ExamAttempt, ExamClient, ExamElective, ExamMode, ExamPaperSummary, ExamResult, ExamPaperMetadata } from '../contract';
 import { AdminAttemptReview } from './AdminAttemptReview';
+import { AdminLiveView } from './AdminLiveView';
+import { browserPollEnvironment, startLivePolling } from './livePolling';
 import { ELECTIVE_SHORT, ELECTIVES, formatClock, formatElapsed, progressRatio, remainingMs, roundLabel } from './examLogic';
 import { HANNEUNG_ERAS } from './hanneungEra';
 import { resultGradeLabel } from './hanneungLogic';
@@ -158,6 +160,8 @@ export function ExamStartView({ client, currentUserId, admin, busy, error, onSta
   });
   const [activity, setActivity] = useState<Map<string, AdminPaperStudentActivity[]> | null>(null);
   const [reviewing, setReviewing] = useState<AdminPaperStudentActivity | null>(null);
+  const [liveCounts, setLiveCounts] = useState<Map<string, number>>(new Map());
+  const [livePaper, setLivePaper] = useState<ExamPaperSummary | null>(null);
   const setupRef = useRef<HTMLElement>(null);
   const [now] = useState(() => Date.now());
 
@@ -184,6 +188,16 @@ export function ExamStartView({ client, currentUserId, admin, busy, error, onSta
       .catch(() => {});
     return () => { alive = false; };
   }, [admin]);
+
+  useEffect(() => {
+    if (!admin || !activity) return;
+    let alive = true;
+    const stop = startLivePolling(async () => {
+      const rows = await admin.listLivePapers();
+      if (alive) setLiveCounts(new Map(rows.map(row => [row.paperId, row.liveCount])));
+    }, browserPollEnvironment, 30000);
+    return () => { alive = false; stop(); };
+  }, [admin, activity]);
 
   const visiblePapers = papers?.filter(candidate => paperGrade(candidate) === grade) ?? [];
   const paper = visiblePapers.find(p => p.id === paperId) ?? null;
@@ -258,6 +272,7 @@ export function ExamStartView({ client, currentUserId, admin, busy, error, onSta
             <div className={kind === 'era' ? 'exam-era-card-list' : 'exam-paper-list'} aria-label={kind === 'era' ? '시대 묶음' : '시험지'}>
             {group.map(p => (
               <div key={p.id} className="exam-paper-entry">
+                {activity && (liveCounts.get(p.id) ?? 0) > 0 && <button type="button" className="exam-live-badge" data-testid="exam-live-badge" aria-label={`${p.title} Live 보기`} onClick={() => setLivePaper(p)}><i aria-hidden="true" />Live</button>}
                 <PaperCard paper={p} selected={p.id === paperId} busy={busy || resuming != null} now={now} onClick={() => onCard(p)} />
                 <button type="button" className="rn-button rn-button-ghost rn-button-compact exam-history-open"
                   disabled={busy || resuming != null} onClick={() => onOpenHistory(p)}
@@ -312,6 +327,7 @@ export function ExamStartView({ client, currentUserId, admin, busy, error, onSta
 
       {reviewing && admin && <AdminAttemptReview key={reviewing.attemptId} target={reviewing} studentName={reviewing.studentName}
         api={admin} onClose={() => setReviewing(null)} />}
+      {livePaper && admin && <AdminLiveView api={admin} paperId={livePaper.id} title={livePaper.title} onClose={() => setLivePaper(null)} />}
 
       {past.length > 0 && (
         <section className="exam-past" aria-label="지난 OMR 결과">

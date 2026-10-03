@@ -1,5 +1,5 @@
 import { supabase } from '../../services/supabase';
-import type { AdminExamApi, AdminExamAttemptSummary, AdminPaperActivity, ExamClient, ExamInkDocument, InkReplayData } from './contract';
+import type { AdminExamApi, AdminExamAttemptSummary, AdminLiveStudent, LiveInkResponse, AdminPaperActivity, ExamClient, ExamInkDocument, InkReplayData } from './contract';
 import {
   ExamClientError,
   mapAddedMistakes,
@@ -153,6 +153,15 @@ export const examClient: ExamClient = {
 };
 
 export const adminExamClient = {
+  async listLivePapers() {
+    return await callRpc('admin_list_live_exam_papers', {}) as Array<{ paperId: string; liveCount: number }>;
+  },
+  async getLiveExam(paperId: string) {
+    return await callRpc('admin_get_live_exam', { p_paper_id: paperId }) as AdminLiveStudent[];
+  },
+  async getLiveInk(attemptId: string, questionId: string, sinceRevision: number | null) {
+    return await callRpc('admin_get_live_ink', { p_attempt_id: attemptId, p_question_id: questionId, p_since_revision: sinceRevision }) as LiveInkResponse;
+  },
   async listAttempts(studentId: string, offset = 0): Promise<AdminExamAttemptSummary[]> {
     return await callRpc('admin_list_student_exam_attempts', { p_student_id: studentId, p_offset: offset }) as AdminExamAttemptSummary[];
   },

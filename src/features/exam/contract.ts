@@ -286,6 +286,9 @@ export interface AdminPaperActivity {
 
 /** 관리자 읽기 전용 검토에 필요한 서버 호출 묶음. */
 export interface AdminExamApi {
+  listLivePapers(): Promise<Array<{ paperId: string; liveCount: number }>>;
+  getLiveExam(paperId: string): Promise<AdminLiveStudent[]>;
+  getLiveInk(attemptId: string, questionId: string, sinceRevision: number | null): Promise<LiveInkResponse>;
   listAttempts(studentId: string, offset?: number): Promise<AdminExamAttemptSummary[]>;
   getAttempt(attemptId: string): Promise<ExamAttempt>;
   getInk(attemptId: string): Promise<ExamInkDocument[]>;
@@ -294,6 +297,21 @@ export interface AdminExamApi {
   /** 관리자가 아니면 null. */
   listPaperActivity(): Promise<AdminPaperActivity[] | null>;
 }
+
+export interface AdminLiveStudent {
+  attemptId: string;
+  studentId: string;
+  studentName: string;
+  questionId: string;
+  number: number;
+  imageUrl: string;
+  revision: number;
+  updatedAt: string;
+  answeredCount: number;
+}
+export type LiveInkResponse =
+  | { mode: 'full'; revision: number; strokes: InkStroke[] }
+  | { mode: 'delta'; revision: number; batches: Array<{ revision: number; events: InkReplayEvent[] }> };
 
 export interface ExamInkCanvasProps {
   /** 문항 이미지 위에 겹쳐 그린다. 컨테이너 크기에 맞춰 이미지와 같은 영역을 덮는다. */
