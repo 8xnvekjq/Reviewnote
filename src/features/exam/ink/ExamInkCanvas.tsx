@@ -2,9 +2,10 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffec
 import type { CSSProperties, SyntheticEvent } from 'react';
 import type { ExamInkCanvasHandle, ExamInkCanvasProps, InkPoint, InkStroke } from '../contract.ts';
 import {
-  HIGHLIGHTER_OPACITY, INK_REFERENCE_WIDTH, inkExtraBelow, SIMULATED_PRESSURE, emptyHistory, newStrokeId, recordChange, redoHistory, strokesHitAlong, undoHistory,
+  HIGHLIGHTER_OPACITY, INK_REFERENCE_WIDTH, SIMULATED_PRESSURE, emptyHistory, newStrokeId, recordChange, redoHistory, strokesHitAlong, undoHistory,
 } from './inkModel.ts';
 import type { InkHistory } from './inkModel.ts';
+import { fitExtraBelow, fitImageWidth } from './inkFit.ts';
 import { drawShape, drawStroke, freehandPath, paint, prepareCanvas, resetTransform, safeDpr } from './inkRender.ts';
 import { holdStillStart, recognizeShape, resizeShape, shapeCenter, shapeToPoints } from './shapeSnap.ts';
 import { drawLaser, LASER_MAX_POINTS } from './inkLaser.ts';
@@ -96,7 +97,7 @@ const prefersReducedMotion = () => typeof window !== 'undefined' && !!window.mat
 const CANVAS_STYLE: CSSProperties = { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', display: 'block' };
 
 export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>(function ExamInkCanvas(props, ref) {
-  const { imageUrl, strokes, readOnly = false, imageMaxWidth } = props;
+  const { imageUrl, strokes, readOnly = false, imageMaxWidth, fitToInk } = props;
   const wrapRef = useRef<HTMLDivElement>(null);
   const highlightRef = useRef<HTMLCanvasElement>(null);
   const penRef = useRef<HTMLCanvasElement>(null);
@@ -109,9 +110,10 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
   const [liveHighlighter, setLiveHighlighter] = useState(false);
 
   // 정규화 기준(1) = 실제로 보이는 이미지 너비. 필기 영역(캔버스)은 컨테이너 전체 너비.
-  const imgW = imageMaxWidth ? Math.min(imageMaxWidth, cssWidth) : cssWidth;
+  // fitToInk(읽기 전용)가 있으면 필기 오른쪽 끝까지 보이도록 이미지를 줄이고, 아래로 쓴 필기만큼 여백을 늘린다.
+  const imgW = fitImageWidth(cssWidth, imageMaxWidth, fitToInk);
   const imageHeight = imgW * aspect;
-  const extraHeight = imgW * inkExtraBelow(aspect);
+  const extraHeight = imgW * fitExtraBelow(aspect, fitToInk);
   const cssHeight = imageHeight + extraHeight;
   const dpr = safeDpr(cssWidth, cssHeight, dprWanted);
   const geomRef = useRef({ cssWidth, imgW });

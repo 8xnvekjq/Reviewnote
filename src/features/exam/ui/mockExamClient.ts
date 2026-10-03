@@ -169,6 +169,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
   const wait = async () => {
     if (options.latencyMs) await new Promise(resolve => setTimeout(resolve, options.latencyMs));
   };
+  const originalSolutions = new Map<string, string>(); // mistakeId → '원래풀이' 이미지
   const record = (method: string, args: unknown[]) => { options.log?.push({ method, args: structuredClone(args) }); };
   const must = (attemptId: string) => {
     const entry = store.get(attemptId);
@@ -454,6 +455,17 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
         added.push({ questionId, mistakeId });
       }
       persist();
+      return added;
+    },
+    async addOriginalSolutions(rows) {
+      record('addOriginalSolutions', [rows.map(row => ({ mistakeId: row.mistakeId, png: row.imageDataUrl.startsWith('data:image/png;base64,'), bytes: row.imageDataUrl.length }))]);
+      await wait();
+      let added = 0;
+      for (const row of rows) {
+        if (originalSolutions.has(row.mistakeId)) continue;
+        originalSolutions.set(row.mistakeId, row.imageDataUrl);
+        added++;
+      }
       return added;
     },
   };

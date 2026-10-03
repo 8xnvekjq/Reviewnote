@@ -191,6 +191,9 @@ export interface ExamClient {
   listMyResults(paperId?: string): Promise<Array<Pick<ExamResult, 'attemptId' | 'paperTitle' | 'mode' | 'elective' | 'score' | 'estimatedGrade' | 'submittedAt' | keyof ExamPaperMetadata>>>;
   /** 학생이 OMR 결과에서 고른 문항(틀린 문제·🤔 문제 후보)을 오답노트(mistakes)에 추가. 이미 추가된 건 건너뜀. */
   addToMistakes(attemptId: string, questionIds: string[]): Promise<Array<{ questionId: string; mistakeId: string }>>;
+  /** 오답노트에 담은 문항마다 '원래풀이'(문항 이미지 + 서버에 저장된 필기를 합성한 PNG data URL)를 스캐폴딩으로 붙인다.
+   *  이미 '원래풀이'가 있는 오답은 건너뛴다. 새로 붙인 개수를 돌려준다. */
+  addOriginalSolutions?(rows: Array<{ mistakeId: string; imageDataUrl: string }>): Promise<number>;
 }
 
 // ── 필기 엔진(W2): src/features/exam/ink/ExamInkCanvas.tsx ──
@@ -308,5 +311,8 @@ export interface ExamInkCanvasProps {
   /** 문항 이미지를 이 너비(CSS px) 이하로 고정해 글자 크기를 일정하게 한다. 필기 영역은 컨테이너 전체 너비를 쓴다.
    *  좌표 정규화 기준(1)은 실제로 보이는 이미지 너비. 없으면 컨테이너 너비 = 이미지 너비. */
   imageMaxWidth?: number;
+  /** 읽기·검토 전용: 이 범위(이미지 너비 = 1 단위, 필기 오른쪽·아래 끝)까지 필기가 잘리지 않게 이미지를 필요한 만큼 줄이고
+   *  아래 여백을 늘린다. 풀이(쓰기) 화면은 넘기지 않는다. ink/inkFit.ts의 inkExtent로 만든다. */
+  fitToInk?: { maxX: number; maxY: number } | null;
 }
 export interface ExamInkCanvasHandle { undo(): void; redo(): void; clear(): void; canUndo(): boolean; canRedo(): boolean }
