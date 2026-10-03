@@ -2,19 +2,37 @@ import type { ExamClient, InkReplayData, PeerSolution } from '../contract.ts';
 
 export type PeerSolutionApi = Pick<ExamClient, 'getPeerSolution' | 'getPeerSolutionReplay'>;
 
-/** 서버가 정한 캐릭터(요청자+문항 기준이라 작성자와 연결되지 않음)를 사람 얼굴 이모지로 바꿔 쓴다.
+import { getTitleBadgeStyle } from '../../../utils/gachaCatalog.ts';
+
+/** 구버전 서버 응답(character만 있음)용 대체 — 새 서버는 작성자 기준 얼굴(label.face)을 직접 준다.
  *  선생님·머리색 같은 결합(ZWJ) 이모지는 글꼴·터미널에 따라 두 글자로 갈라지거나 옆 글씨와 겹쳐 보여 한 글자짜리만 쓴다. */
 const FACES: Record<string, string> = {
   치이카와: '🧑', 하치와레: '👩', 우사기: '👨', 모몽가: '🧒', 쿠리만쥬: '👧', 랏코: '👦', 시사: '👱', 후루혼: '🧔',
 };
 const FALLBACK_FACES = ['🧑', '👩', '👨', '🧒', '👧', '👦', '👱', '🧔'];
 
-/** "😀 칭호(학년)" — 칭호가 없으면 "익명 학생(학년)", 선생님 풀이는 "🎓 선생님 풀이". */
+export interface PeerLabelParts {
+  face: string;
+  /** 장착 칭호 — 다른 화면(헤더·랭킹·활동 피드)과 같은 getTitleBadgeStyle 이펙트. 칭호가 없으면 null. */
+  title: { text: string; style: string; icon: string } | null;
+  /** "(고2)" 또는 "" */
+  grade: string;
+  isTeacher: boolean;
+}
+
+export function peerSolutionLabelParts(label: PeerSolution['label']): PeerLabelParts {
+  if (label.isTeacher) return { face: '🎓', title: null, grade: '', isTeacher: true };
+  const character = label.character ?? '';
+  const face = label.face || FACES[character] || FALLBACK_FACES[[...character].reduce((sum, ch) => sum + ch.codePointAt(0)!, 0) % FALLBACK_FACES.length];
+  const text = label.title?.trim();
+  return { face, title: text ? { text, ...getTitleBadgeStyle(text) } : null, grade: label.grade ? `(${label.grade})` : '', isTeacher: false };
+}
+
+/** "😀 칭호(학년)" — 칭호가 없으면 "익명 학생(학년)", 선생님 풀이는 "🎓 선생님 풀이". 화면 읽기·제목용 문자열. */
 export function peerSolutionLabel(label: PeerSolution['label']): string {
-  if (label.isTeacher) return '🎓 선생님 풀이';
-  const face = FACES[label.character] ?? FALLBACK_FACES[[...label.character].reduce((sum, ch) => sum + ch.codePointAt(0)!, 0) % FALLBACK_FACES.length];
-  const grade = label.grade ? `(${label.grade})` : '';
-  return `${face} ${label.title || '익명 학생'}${grade}`;
+  const parts = peerSolutionLabelParts(label);
+  if (parts.isTeacher) return '🎓 선생님 풀이';
+  return `${parts.face} ${parts.title?.text || '익명 학생'}${parts.grade}`;
 }
 
 /** One result screen owns this cache. Nothing is stored in browser storage or module state.
