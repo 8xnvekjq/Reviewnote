@@ -7,6 +7,8 @@ import {
 import type { InkHistory } from './inkModel.ts';
 import { drawShape, drawStroke, freehandPath, paint, prepareCanvas, resetTransform, safeDpr } from './inkRender.ts';
 import { holdStillStart, recognizeShape, resizeShape, shapeCenter, shapeToPoints } from './shapeSnap.ts';
+import { drawLaser, LASER_MAX_POINTS } from './inkLaser.ts';
+import type { LaserTrail } from './inkLaser.ts';
 import type { Pt, SnapShape } from './shapeSnap.ts';
 
 const round = (value: number, scale: number) => Math.round(value * scale) / scale;
@@ -67,6 +69,11 @@ interface DrawGesture {
   holdTried: number;
   snap: { base: SnapShape; anchor: Pt; current: SnapShape; startedAt: number } | null;
 }
+interface LaserGesture {
+  kind: 'laser';
+  pointerId: number;
+  trail: LaserTrail;
+}
 interface PanGesture {
   kind: 'pan';
   pointerId: number;
@@ -82,7 +89,9 @@ interface EraseGesture {
   last: Pt;
   recorded: boolean;
 }
-type Gesture = DrawGesture | EraseGesture | PanGesture;
+type Gesture = DrawGesture | EraseGesture | PanGesture | LaserGesture;
+
+const prefersReducedMotion = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 const CANVAS_STYLE: CSSProperties = { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', display: 'block' };
 
@@ -92,6 +101,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
   const highlightRef = useRef<HTMLCanvasElement>(null);
   const penRef = useRef<HTMLCanvasElement>(null);
   const liveRef = useRef<HTMLCanvasElement>(null);
+  const laserRef = useRef<HTMLCanvasElement>(null);
   const [cssWidth, setCssWidth] = useState(0);
   const [aspect, setAspect] = useState(() => aspectCache.get(imageUrl) ?? 0); // naturalHeight / naturalWidth
   const [dprWanted, setDprWanted] = useState(() => (typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1));
@@ -117,6 +127,9 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
   const historyRef = useRef<InkHistory>(emptyHistory());
   const gestureRef = useRef<Gesture | null>(null);
   const rafRef = useRef(0);
+  const laserRafRef = useRef(0);
+  /** 아직 보이는 레이저 획(저장하지 않는다). */
+  const laserTrailsRef = useRef<LaserTrail[]>([]);
   const drawnRef = useRef<{ strokes: InkStroke[]; width: number; height: number } | null>(null);
   useLayoutEffect(() => { propsRef.current = props; });
 
@@ -176,7 +189,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     if (!ctx) return;
     resetTransform(ctx, canvas, unitDevicePx(canvas));
     const g = gestureRef.current;
-    if (!g || g.kind === 'pan') return;
+    if (!g || g.kind === 'pan' || g.kind === 'laser') return;
     const REF = INK_REFERENCE_WIDTH;
     if (g.kind === 'erase') {
       const w = geomRef.current.imgW || wrap.clientWidth || 1;
@@ -218,12 +231,31 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     if (!rafRef.current) rafRef.current = requestAnimationFrame(renderLive);
   }, [renderLive]);
 
+  // ── 레이저(별도 레이어, rAF). 모든 빛이 사라지면 rAF를 멈춘다. ──
+  const renderLaser = useCallback(() => {
+    laserRafRef.current = 0;
+    const canvas = laserRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    resetTransform(ctx, canvas, unitDevicePx(canvas));
+    const glowPx = 9 * (canvas.width / Math.max(1, geomRef.current.cssWidth));
+    laserTrailsRef.current = drawLaser(ctx, laserTrailsRef.current, performance.now(), prefersReducedMotion(), glowPx);
+    if (laserTrailsRef.current.length) laserRafRef.current = requestAnimationFrame(renderLaser);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const scheduleLaser = useCallback(() => {
+    if (!laserRafRef.current) laserRafRef.current = requestAnimationFrame(renderLaser);
+  }, [renderLaser]);
+
   useLayoutEffect(() => {
-    const live = liveRef.current;
-    if (!live || !cssWidth || !cssHeight) return;
+    const live = liveRef.current, laser = laserRef.current;
+    if (!live || !laser || !cssWidth || !cssHeight) return;
     prepareCanvas(live, cssWidth, cssHeight, dpr);
+    prepareCanvas(laser, cssWidth, cssHeight, dpr);
     renderLive();
-  }, [cssWidth, cssHeight, dpr, imgW, renderLive]);
+    renderLaser();
+  }, [cssWidth, cssHeight, dpr, imgW, renderLive, renderLaser]);
 
   // ── 변경 + 실행 취소 기록 ──
   const commit = useCallback((next: InkStroke[], before: InkStroke[]) => {
@@ -355,6 +387,14 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
         return;
       }
       const first = toPoint(e, start);
+      if (p.tool === 'laser') {
+        // 레이저는 저장·실행 취소·재생 기록 없이 빛만 그리고 사라진다(도형 판정도 하지 않는다).
+        const trail: LaserTrail = { points: [{ x: first.x, y: first.y }], endedAt: null };
+        laserTrailsRef.current = [...laserTrailsRef.current, trail];
+        gestureRef.current = { kind: 'laser', pointerId: e.pointerId, trail };
+        scheduleLaser();
+        return;
+      }
       const g: DrawGesture = {
         kind: 'draw', pointerId: e.pointerId, tool: p.tool, color: p.color, size: p.size,
         points: [first], predicted: [], startTime: start,
@@ -392,6 +432,18 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
         return;
       }
       const w = unit();
+      if (g.kind === 'laser') {
+        const pts = g.trail.points;
+        for (const ev of eventsOf(e)) {
+          const pt = toPoint(ev, 0);
+          const prev = pts[pts.length - 1];
+          if (Math.hypot(pt.x - prev.x, pt.y - prev.y) * w < 0.35) continue;
+          pts.push({ x: pt.x, y: pt.y });
+        }
+        if (pts.length > LASER_MAX_POINTS) pts.splice(0, pts.length - LASER_MAX_POINTS);
+        scheduleLaser();
+        return;
+      }
       if (g.snap) {
         const last = toPoint(e, g.startTime);
         g.points.push(last);
@@ -423,6 +475,9 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       if (g.kind === 'draw') {
         g.predicted = [];
         finishDraw(g);
+      } else if (g.kind === 'laser') {
+        g.trail.endedAt = performance.now();
+        scheduleLaser();
       }
       setLiveHighlighter(false);
       scheduleLive();
@@ -439,6 +494,9 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
         g.predicted = [];
         if (g.snap || g.points.length > 1) finishDraw(g);
         else clearHold(g);
+      } else if (g.kind === 'laser') {
+        g.trail.endedAt = performance.now();
+        scheduleLaser();
       }
       setLiveHighlighter(false);
       scheduleLive();
@@ -474,9 +532,12 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       if (g?.kind === 'draw') clearHold(g);
       gestureRef.current = null;
     };
-  }, [readOnly, commit, scheduleLive]);
+  }, [readOnly, commit, scheduleLive, scheduleLaser]);
 
-  useEffect(() => () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); }, []);
+  useEffect(() => () => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    if (laserRafRef.current) cancelAnimationFrame(laserRafRef.current);
+  }, []);
 
   // 손가락 스크롤은 pan 제스처가 직접 처리한다(touch-action pan은 iPad에서 펜 획을 끊었다).
   const touchAction = readOnly ? 'auto' : 'none';
@@ -503,6 +564,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       <div aria-hidden style={{ height: extraHeight }} />
       <canvas ref={highlightRef} aria-hidden style={highlighterLayer} />
       <canvas ref={penRef} aria-hidden style={{ ...CANVAS_STYLE, pointerEvents: 'none' }} />
+      <canvas ref={laserRef} className="exam-ink-laser" aria-hidden style={{ ...CANVAS_STYLE, pointerEvents: 'none' }} />
       <canvas
         ref={liveRef}
         className="exam-ink-input"

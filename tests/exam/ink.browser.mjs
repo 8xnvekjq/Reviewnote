@@ -274,7 +274,30 @@ try {
   assert.ok(await inkAt(0.49, 1.55), 'curve is painted through its top');
   const shapeCount = list.length;
 
+  // ── 레이저: 빛만 잠깐 남고 획·실행 취소 기록이 생기지 않는다 ──
+  const laserLit = () => page.evaluate(() => {
+    const canvas = document.querySelector('.exam-ink-laser');
+    const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+    let red = 0;
+    for (let i = 0; i < data.length; i += 4) if (data[i + 3] > 40 && data[i] > 200) red++;
+    return red;
+  });
+  const undoBefore = await page.evaluate(() => window.__ink.handle().canUndo());
+  const redoBefore = await page.evaluate(() => window.__ink.handle().canRedo());
+  await page.getByRole('button', { name: '레이저' }).click();
+  await draw(lineSteps([0.1, 1.7], [0.8, 1.75], 20), { holdMs: 900 }); // 꾹 눌러도 도형 판정 없음
+  assert.equal((await strokes()).length, shapeCount, 'laser never adds a stroke');
+  assert.ok(await laserLit() > 100, 'laser glow is visible right after drawing');
+  assert.ok(!(await inkAt(0.45, 1.725)), 'laser is not on the ink layer');
+  await draw(lineSteps([0.1, 1.85], [0.8, 1.9], 20)); // 연달아 한 번 더
+  await page.waitForTimeout(1500);
+  assert.equal(await laserLit(), 0, 'laser fades out completely after about a second');
+  assert.equal((await strokes()).length, shapeCount);
+  assert.equal(await page.evaluate(() => window.__ink.handle().canUndo()), undoBefore, 'laser leaves no undo history');
+  assert.equal(await page.evaluate(() => window.__ink.handle().canRedo()), redoBefore);
+  await page.getByRole('button', { name: '펜', exact: true }).click();
+
   assert.deepEqual(errors, []);
-  console.log('PASS exam ink: pen, hold→line/circle with resize, stroke eraser, undo/redo/clear, resize keeps position, readOnly, palm rejection, jittery Pencil hold, triangle/rectangle/curve');
+  console.log('PASS exam ink: pen, hold→line/circle with resize, stroke eraser, undo/redo/clear, resize keeps position, readOnly, palm rejection, jittery Pencil hold, triangle/rectangle/curve, laser');
   await page.close();
 } finally { await browser.close(); }
