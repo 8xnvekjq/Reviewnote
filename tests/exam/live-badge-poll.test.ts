@@ -25,7 +25,7 @@ function fakeEnv() {
   };
 }
 
-test('badge poll starts right after admin check, repeats every 12s, pauses hidden, refreshes once on return', async () => {
+test('badge poll starts right after admin check, repeats every 5s, pauses hidden, refreshes once on return', async () => {
   const fake = fakeEnv();
   let liveCalls = 0, liveCount = 0;
   const counts: Array<Map<string, number>> = [];
@@ -37,8 +37,8 @@ test('badge poll starts right after admin check, repeats every 12s, pauses hidde
   await flush();
   assert.equal(activity.length, 1);
   assert.equal(liveCalls, 1, 'first Live request right away');
-  assert.deepEqual(fake.delays(), [LIVE_BADGE_POLL_MS], 'only the Live timer remains, at 12s');
-  assert.equal(LIVE_BADGE_POLL_MS, 12000);
+  assert.deepEqual(fake.delays(), [LIVE_BADGE_POLL_MS], 'only the Live timer remains, at 5s');
+  assert.equal(LIVE_BADGE_POLL_MS, 5000);
 
   liveCount = 2; fake.fire(); await flush();
   assert.equal(liveCalls, 2);
@@ -85,16 +85,18 @@ test('a failed admin check is retried with backoff instead of hiding the badge u
   }, fake.env, { activity: () => {}, counts: () => {} });
   await flush();
   assert.equal(checks, 1); assert.equal(liveCalls, 0);
-  assert.deepEqual(fake.delays(), [24000], 'check retry backs off');
+  assert.deepEqual(fake.delays(), [10000], 'check retry backs off');
   fake.fire(); await flush();
   assert.equal(checks, 2); assert.equal(liveCalls, 1);
-  assert.deepEqual(fake.delays(), [24000], 'check stopped; Live failure backs off to 24s');
+  assert.deepEqual(fake.delays(), [10000], 'check stopped; Live failure backs off to 10s');
   fake.fire(); await flush();
-  assert.deepEqual(fake.delays(), [48000]);
+  assert.deepEqual(fake.delays(), [20000]);
+  fake.fire(); await flush();
+  assert.deepEqual(fake.delays(), [40000]);
   fake.fire(); await flush();
   assert.deepEqual(fake.delays(), [60000], 'capped at 60s');
   liveFails = false; fake.fire(); await flush();
-  assert.deepEqual(fake.delays(), [12000], 'success resets to 12s');
+  assert.deepEqual(fake.delays(), [5000], 'success resets to 5s');
   assert.equal(checks, 2, 'admin check runs only until it succeeds');
   stop();
 });
@@ -127,4 +129,31 @@ test('hidden at mount: nothing is requested until the tab becomes visible', asyn
   fake.setHidden(false); await flush();
   assert.equal(checks, 1);
   stop();
+});
+
+test('cleanup during an admin check prevents late results from starting Live polling', async () => {
+  const fake = fakeEnv();
+  let resolve: (rows: AdminPaperActivity[]) => void = () => {};
+  const stop = startLiveBadgePolling({
+    listPaperActivity: () => new Promise(res => { resolve = res; }),
+    listLivePapers: async () => { assert.fail('stopped check must not start Live'); },
+  }, fake.env, { activity: () => assert.fail('late activity'), counts: () => assert.fail('late counts') });
+  stop();
+  resolve([]); await flush();
+  assert.equal(fake.listeners.size, 0);
+  assert.deepEqual(fake.delays(), []);
+});
+
+test('cleanup during a Live request ignores late counts and leaves no timers or listeners', async () => {
+  const fake = fakeEnv();
+  let resolve: () => void = () => {};
+  const stop = startLiveBadgePolling({
+    listPaperActivity: async () => [],
+    listLivePapers: () => new Promise(res => { resolve = () => res([{ paperId: 'p1', liveCount: 1 }]); }),
+  }, fake.env, { activity: () => {}, counts: () => assert.fail('late counts') });
+  await flush();
+  stop();
+  resolve(); await flush();
+  assert.equal(fake.listeners.size, 0);
+  assert.deepEqual(fake.delays(), []);
 });

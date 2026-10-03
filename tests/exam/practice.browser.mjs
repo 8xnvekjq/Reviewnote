@@ -1295,9 +1295,9 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   await context.close();
 }
 
-// Author-only: the picker refreshes Live badges on its own (12s poll, mock clock) — no reload needed.
+// Author-only: the picker refreshes Live badges on its own (5s poll, mock clock) — no reload needed.
 {
-  const POLL = 12000;
+  const POLL = 5000;
   const context = await browser.newContext({ viewport: LANDSCAPE, deviceScaleFactor: 1 });
   const page = await context.newPage();
   const errors = [];
@@ -1318,6 +1318,16 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   assert.equal(await calls(), firstCalls + 1, 'exactly one request per interval');
   const after = await paperCard(page, PAPER_A).boundingBox();
   assert.deepEqual(after, before, 'badge appearing does not move the card');
+  // Fullscreen Live hides the picker: its badge requests stop until it is closed.
+  await badge.click();
+  const liveView = page.getByTestId('exam-live-view');
+  await liveView.waitFor();
+  const coveredCalls = await calls();
+  await page.clock.runFor(POLL * 3);
+  assert.equal(await calls(), coveredCalls, 'covered picker does not poll');
+  await liveView.getByRole('button', { name: '← 닫기', exact: true }).click();
+  await liveView.waitFor({ state: 'detached' });
+  await page.waitForFunction(n => window.__live.listCalls() === n + 1, coveredCalls, { timeout: 3000 });
   // Hidden tab: no requests; back to visible: one immediate refresh.
   await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange')); });
   const hiddenCalls = await calls();

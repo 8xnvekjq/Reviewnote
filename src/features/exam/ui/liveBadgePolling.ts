@@ -1,8 +1,8 @@
 import type { AdminExamApi, AdminPaperActivity } from '../contract.ts';
 import { startLivePolling, type PollEnvironment } from './livePolling.ts';
 
-/** 응답이 시험지 id·인원 수뿐이라 화면이 보이는 동안 12초마다 받아도 가볍다. */
-export const LIVE_BADGE_POLL_MS = 12000;
+/** 응답이 시험지 id·인원 수뿐이라 화면이 보이는 동안 5초마다 받아도 가볍다. */
+export const LIVE_BADGE_POLL_MS = 5000;
 
 /**
  * 시험지 고르기 화면의 Live 배지.

@@ -182,9 +182,9 @@ export function ExamStartView({ client, currentUserId, admin, busy, error, onSta
 
   // 관리자만 시험지별 학생 응시 현황과 Live 배지를 받는다(학생이면 서버가 null). 화면이 보이는 동안 자동 갱신.
   useEffect(() => {
-    if (!admin) return;
+    if (!admin || livePaper || reviewing) return;
     return startLiveBadgePolling(admin, browserPollEnvironment, { activity: rows => setActivity(new Map(rows.map(row => [row.paperId, row.students]))), counts: setLiveCounts });
-  }, [admin]);
+  }, [admin, livePaper, reviewing]);
 
   const visiblePapers = papers?.filter(candidate => paperGrade(candidate) === grade) ?? [];
   const paper = visiblePapers.find(p => p.id === paperId) ?? null;
