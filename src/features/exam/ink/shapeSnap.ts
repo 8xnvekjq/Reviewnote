@@ -482,6 +482,26 @@ export function shapeToPoints(shape: SnapShape, segments = 48): Pt[] {
   return out;
 }
 
+/**
+ * 꾹 누름 판정: 최근 holdMs 동안의 점(+ 그 직전 점 = 창이 시작될 때 펜 위치)이 중심에서 slop 안에 모여 있으면
+ * 멈춘 것으로 본다. 멈춘 덩어리가 시작된 위치(stillStart)를 돌려준다. 아직 아니면 -1.
+ * points/arrivals는 같은 길이, slop은 points와 같은 단위.
+ */
+export function holdStillStart(points: Pt[], arrivals: number[], now: number, holdMs: number, slop: number): number {
+  const n = points.length;
+  if (!n || now - arrivals[0] < holdMs) return -1;
+  // 창 안 첫 점 s → 그 직전 점부터(창이 시작될 때 펜은 거기 있었다). 창 안에 점이 없으면 마지막 점에 줄곧 멈춰 있던 것.
+  let s = n;
+  while (s > 0 && arrivals[s - 1] >= now - holdMs) s--;
+  s = s === n ? n - 1 : Math.max(0, s - 1);
+  let cx = 0, cy = 0;
+  for (let i = s; i < n; i++) { cx += points[i].x; cy += points[i].y; }
+  cx /= n - s; cy /= n - s;
+  for (let i = s; i < n; i++) if (Math.hypot(points[i].x - cx, points[i].y - cy) > slop) return -1;
+  while (s > 0 && Math.hypot(points[s - 1].x - cx, points[s - 1].y - cy) <= slop) s--;
+  return s;
+}
+
 /** 점(지우개 중심)이 폴리라인에서 radius 이내인지. */
 export function polylineHits(points: Pt[], p: Pt, radius: number): boolean {
   if (points.length === 1) return dist(points[0], p) <= radius;

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fitEllipse, polylineHits, recognizeCurve, recognizeEllipse, recognizeLine, recognizePolygon, recognizeShape, resizeShape, shapeCenter, shapeToPoints } from '../../src/features/exam/ink/shapeSnap.ts';
+import { fitEllipse, holdStillStart, polylineHits, recognizeCurve, recognizeEllipse, recognizeLine, recognizePolygon, recognizeShape, resizeShape, shapeCenter, shapeToPoints } from '../../src/features/exam/ink/shapeSnap.ts';
 import type { Pt, SnapShape } from '../../src/features/exam/ink/shapeSnap.ts';
 
 // 결정적인 흔들림(손떨림 흉내)
@@ -235,4 +235,53 @@ test('polygons and curves resize around their center and keep eraser hit testing
   assert.deepEqual(path[0], { x: 0, y: 0 });
   assert.deepEqual(path.at(-1), { x: 100, y: 0 });
   assert.ok(polylineHits(path, { x: 50, y: 40 }, 1), 'passes through its control points');
+});
+
+// ── 꾹 누름 판정(시간 창) ──
+/** 240Hz로 들어오는 점: 직선을 그리다(drawMs) 끝에서 ±amp px로 떨며 holdMs 동안 누른다. */
+const pencil = (drawMs: number, holdMs: number, amp: number) => {
+  const points: Pt[] = [], arrivals: number[] = [];
+  for (let t = 0; t <= drawMs + holdMs; t += 1000 / 240) {
+    const k = Math.min(1, t / drawMs);
+    const shake = t > drawMs ? amp : 0;
+    points.push({ x: 40 + 200 * k + rand() * 2 * shake, y: 80 + 60 * k + rand() * 2 * shake });
+    arrivals.push(t);
+  }
+  return { points, arrivals, now: drawMs + holdMs };
+};
+
+test('a hold is detected through Apple Pencil jitter (±4px at 240Hz) and excludes the jitter points', () => {
+  const { points, arrivals, now } = pencil(500, 700, 4);
+  const still = holdStillStart(points, arrivals, now, 650, 6);
+  assert.ok(still > 0, 'hold detected despite jitter');
+  const end = points[still];
+  assert.ok(Math.hypot(end.x - 240, end.y - 140) < 6, `stroke ends at the hold point: ${JSON.stringify(end)}`);
+  assert.ok(arrivals[still] >= 480, 'the stroke before the hold is kept whole');
+  // 예전 방식(마지막 기준점에서 3px을 넘으면 타이머 재시작)은 이 떨림에서 650ms를 채우지 못했다
+  let anchor = points[0], since = 0, fired = false;
+  for (let i = 1; i < points.length; i++) {
+    if (Math.hypot(points[i].x - anchor.x, points[i].y - anchor.y) > 3) { anchor = points[i]; since = arrivals[i]; }
+    if (arrivals[i] - since >= 650) fired = true;
+  }
+  assert.equal(fired, false, 'the old anchor/timer rule keeps resetting under this jitter');
+});
+
+test('no hold while the pen is still moving, before the hold time, or when it shakes a lot', () => {
+  const moving = pencil(1500, 0, 0);
+  assert.equal(holdStillStart(moving.points, moving.arrivals, 1500, 650, 6), -1, 'moving');
+  const early = pencil(500, 400, 3);
+  assert.equal(holdStillStart(early.points, early.arrivals, early.now, 650, 6), -1, 'only 400ms');
+  const wobbly = pencil(500, 900, 14);
+  assert.equal(holdStillStart(wobbly.points, wobbly.arrivals, wobbly.now, 650, 6), -1, 'large wobble is movement');
+  // 아주 천천히 그리는 중(650ms에 20px)도 멈춤이 아니다
+  const slow = Array.from({ length: 200 }, (_, i) => ({ x: i * 0.13, y: 0 }));
+  assert.equal(holdStillStart(slow, slow.map((_, i) => i * 5), 1000, 650, 6), -1, 'slow drawing');
+});
+
+test('a perfectly still pen (no more pointermove events) still counts as a hold', () => {
+  const points = lineOf({ x: 0, y: 0 }, { x: 200, y: 0 }, 10); // 빠르게 그어 점 간격이 20px
+  const arrivals = points.map((_, i) => i * 30); // 마지막 점 이후로는 이벤트 없음
+  assert.equal(holdStillStart(points, arrivals, 300 + 300, 650, 6), -1, 'not long enough yet');
+  const still = holdStillStart(points, arrivals, 300 + 700, 650, 6);
+  assert.equal(still, points.length - 1, 'the whole stroke is used, even with a large last step');
 });
