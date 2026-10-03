@@ -142,6 +142,7 @@ function BroadcastAdminFixture() {
 
 if (params.get('live') === '1') {
   const live = createMockLiveExamApi();
+  if (params.has('livecount')) live.setCount(Number(params.get('livecount')));
   Object.assign(adminApi, live.api, { listPaperActivity: async () => [] });
   (window as unknown as { __live: typeof live }).__live = live;
 }

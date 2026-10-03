@@ -1295,6 +1295,54 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   await context.close();
 }
 
+// Author-only: the picker refreshes Live badges on its own (5s poll, mock clock) — no reload needed.
+{
+  const POLL = 5000;
+  const context = await browser.newContext({ viewport: LANDSCAPE, deviceScaleFactor: 1 });
+  const page = await context.newPage();
+  const errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.clock.install({ time: new Date('2026-10-04T09:00:00+09:00') });
+  await page.goto(`${BASE}?live=1&livecount=0`);
+  await page.getByTestId('exam-start').waitFor();
+  await page.clock.runFor(1000);
+  const badge = page.getByTestId('exam-live-badge');
+  assert.equal(await badge.count(), 0, 'nobody drawing yet');
+  const before = await paperCard(page, PAPER_A).boundingBox();
+  const calls = () => page.evaluate(() => window.__live.listCalls());
+  const firstCalls = await calls();
+  // A student starts writing: the badge shows up within one interval, without reloading.
+  await page.evaluate(() => { window.__live.setCount(1); window.__live.draw(0); });
+  await page.clock.runFor(POLL + 500);
+  await badge.waitFor({ timeout: 3000 });
+  assert.equal(await calls(), firstCalls + 1, 'exactly one request per interval');
+  const after = await paperCard(page, PAPER_A).boundingBox();
+  assert.deepEqual(after, before, 'badge appearing does not move the card');
+  // Fullscreen Live hides the picker: its badge requests stop until it is closed.
+  await badge.click();
+  const liveView = page.getByTestId('exam-live-view');
+  await liveView.waitFor();
+  const coveredCalls = await calls();
+  await page.clock.runFor(POLL * 3);
+  assert.equal(await calls(), coveredCalls, 'covered picker does not poll');
+  await liveView.getByRole('button', { name: '← 닫기', exact: true }).click();
+  await liveView.waitFor({ state: 'detached' });
+  await page.waitForFunction(n => window.__live.listCalls() === n + 1, coveredCalls, { timeout: 3000 });
+  // Hidden tab: no requests; back to visible: one immediate refresh.
+  await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange')); });
+  const hiddenCalls = await calls();
+  await page.clock.runFor(POLL * 5);
+  assert.equal(await calls(), hiddenCalls, 'hidden tab does not poll');
+  await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => false }); document.dispatchEvent(new Event('visibilitychange')); });
+  await page.waitForFunction(n => window.__live.listCalls() === n + 1, hiddenCalls, { timeout: 3000 });
+  // 10 minutes without new ink: the badge goes away on the next tick, card stays put.
+  await page.clock.runFor(10 * 60_000 + POLL);
+  await badge.waitFor({ state: 'detached', timeout: 3000 });
+  assert.deepEqual(await paperCard(page, PAPER_A).boundingBox(), before, 'badge leaving does not move the card');
+  assert.deepEqual(errors, []);
+  await context.close();
+}
+
 // Author-only: private broadcast lifecycle with a real solving tab and a separate admin tab.
 {
   const context = await browser.newContext({ viewport: LANDSCAPE });

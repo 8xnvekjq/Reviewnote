@@ -4,7 +4,8 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { AdminExamApi, AdminPaperStudentActivity, ExamAttempt, ExamClient, ExamElective, ExamMode, ExamPaperSummary, ExamResult, ExamPaperMetadata } from '../contract';
 import { AdminAttemptReview } from './AdminAttemptReview';
 import { AdminLiveView } from './AdminLiveView';
-import { browserPollEnvironment, startLivePolling } from './livePolling';
+import { browserPollEnvironment } from './livePolling';
+import { startLiveBadgePolling } from './liveBadgePolling';
 import { ELECTIVE_SHORT, ELECTIVES, formatClock, formatElapsed, progressRatio, remainingMs, roundLabel } from './examLogic';
 import { HANNEUNG_ERAS } from './hanneungEra';
 import { resultGradeLabel } from './hanneungLogic';
@@ -179,25 +180,11 @@ export function ExamStartView({ client, currentUserId, admin, busy, error, onSta
     return () => { alive = false; };
   }, [client, initialPaperId]);
 
-  // 관리자만 시험지별 학생 응시 현황을 받는다(학생이면 서버가 null).
+  // 관리자만 시험지별 학생 응시 현황과 Live 배지를 받는다(학생이면 서버가 null). 화면이 보이는 동안 자동 갱신.
   useEffect(() => {
-    if (!admin) return;
-    let alive = true;
-    admin.listPaperActivity()
-      .then(rows => { if (alive && rows) setActivity(new Map(rows.map(row => [row.paperId, row.students]))); })
-      .catch(() => {});
-    return () => { alive = false; };
-  }, [admin]);
-
-  useEffect(() => {
-    if (!admin || !activity) return;
-    let alive = true;
-    const stop = startLivePolling(async () => {
-      const rows = await admin.listLivePapers();
-      if (alive) setLiveCounts(new Map(rows.map(row => [row.paperId, row.liveCount])));
-    }, browserPollEnvironment, 30000);
-    return () => { alive = false; stop(); };
-  }, [admin, activity]);
+    if (!admin || livePaper || reviewing) return;
+    return startLiveBadgePolling(admin, browserPollEnvironment, { activity: rows => setActivity(new Map(rows.map(row => [row.paperId, row.students]))), counts: setLiveCounts });
+  }, [admin, livePaper, reviewing]);
 
   const visiblePapers = papers?.filter(candidate => paperGrade(candidate) === grade) ?? [];
   const paper = visiblePapers.find(p => p.id === paperId) ?? null;
