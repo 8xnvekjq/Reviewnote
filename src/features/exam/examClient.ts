@@ -30,6 +30,9 @@ async function callRpc(name: string, args: Record<string, unknown>): Promise<unk
   return response.data;
 }
 
+/** 오답노트에 담을 때 자동으로 붙이는 스캐폴딩 이름(중복 확인에도 쓴다). */
+export const ORIGINAL_SOLUTION_CAPTION = '원래풀이';
+
 export const examClient: ExamClient = {
   async getInk(attemptId) {
     return await callRpc('get_exam_ink', { p_attempt_id: attemptId }) as ExamInkDocument[];
@@ -122,6 +125,30 @@ export const examClient: ExamClient = {
       p_origin: toMistakeOrigin(window.location.origin),
     });
     return mapAddedMistakes(data);
+  },
+
+  // HandwritingOverlay와 같은 방식: 학생 본인이 student_id·teacher_id 둘 다(스캐폴딩 insert 정책이 teacher_id = 본인을 요구).
+  async addOriginalSolutions(rows) {
+    if (rows.length === 0) return 0;
+    const { data: auth } = await supabase.auth.getUser();
+    const userId = auth.user?.id;
+    if (!userId) throw new ExamClientError('로그인이 필요해요.');
+    const { data: existing, error } = await supabase.from('mistake_scaffoldings').select('mistake_id')
+      .in('mistake_id', rows.map(row => row.mistakeId)).eq('caption', ORIGINAL_SOLUTION_CAPTION);
+    if (error) throw new ExamClientError(error);
+    const skip = new Set((existing ?? []).map(row => row.mistake_id as string));
+    let added = 0;
+    // 한 장이 수백 KB라 한 번에 하나씩 보낸다.
+    for (const row of rows) {
+      if (skip.has(row.mistakeId)) continue;
+      const { error: insertError } = await supabase.from('mistake_scaffoldings').insert([{
+        mistake_id: row.mistakeId, student_id: userId, teacher_id: userId, image_url: row.imageDataUrl, caption: ORIGINAL_SOLUTION_CAPTION,
+      }]);
+      if (insertError) throw new ExamClientError(insertError);
+      skip.add(row.mistakeId);
+      added++;
+    }
+    return added;
   },
 };
 

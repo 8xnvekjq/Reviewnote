@@ -191,6 +191,9 @@ export interface ExamClient {
   listMyResults(paperId?: string): Promise<Array<Pick<ExamResult, 'attemptId' | 'paperTitle' | 'mode' | 'elective' | 'score' | 'estimatedGrade' | 'submittedAt' | keyof ExamPaperMetadata>>>;
   /** 학생이 OMR 결과에서 고른 문항(틀린 문제·🤔 문제 후보)을 오답노트(mistakes)에 추가. 이미 추가된 건 건너뜀. */
   addToMistakes(attemptId: string, questionIds: string[]): Promise<Array<{ questionId: string; mistakeId: string }>>;
+  /** 오답노트에 담은 문항마다 '원래풀이'(문항 이미지 + 서버에 저장된 필기를 합성한 PNG data URL)를 스캐폴딩으로 붙인다.
+   *  이미 '원래풀이'가 있는 오답은 건너뛴다. 새로 붙인 개수를 돌려준다. */
+  addOriginalSolutions?(rows: Array<{ mistakeId: string; imageDataUrl: string }>): Promise<number>;
 }
 
 // ── 필기 엔진(W2): src/features/exam/ink/ExamInkCanvas.tsx ──

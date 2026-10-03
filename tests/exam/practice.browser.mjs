@@ -252,6 +252,12 @@ async function spinWheel(page, place, steps) {
   assert.equal(await page.locator('.exam-candidate.is-added').count(), 2);
   const addCall = await page.evaluate(() => window.__examLog.find(e => e.method === 'addToMistakes'));
   assert.deepEqual(addCall.args[1].sort(), ['q-c-01', 'q-c-02']);
+  // 담은 문항 중 필기가 있는 1번만 '원래풀이'(문항 이미지 + 서버 필기 PNG)가 스캐폴딩으로 붙는다.
+  await page.getByText('원래 풀이 1장도 함께 붙였어요.').waitFor();
+  const originalCall = await page.evaluate(() => window.__examLog.find(e => e.method === 'addOriginalSolutions'));
+  assert.equal(originalCall.args[0].length, 1);
+  assert.equal(originalCall.args[0][0].mistakeId, `mistake-${addCall.args[0]}-q-c-01`);
+  assert.equal(originalCall.args[0][0].png, true);
 
   // 문항 크게 보기 + 내 필기(IndexedDB·서버에서 복원) — 그 위에 덧쓰기는 이 기기에만 남고 서버로 가지 않는다.
   const viewerInk = '[data-testid="exam-viewer"] .exam-ink';
