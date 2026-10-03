@@ -4,6 +4,7 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
+import { assertCompactTopbar } from './compact-topbar.assertions.mjs';
 
 const BASE = `${process.env.EXAM_TEST_BASE_URL || 'http://127.0.0.1:5174'}/tests/exam/practice.html`;
 const out = 'node_modules/.cache/exam-practice';
@@ -112,6 +113,7 @@ async function spinWheel(page, place, steps) {
   assert.match(await page.getByTestId('exam-remaining').innerText(), /남은 (99|100):\d\d/);
   assert.equal(await question(page), '1');
   await noHorizontalOverflow(page, 'solve/landscape');
+  await assertCompactTopbar(page);
 
   // 객관식: 체크 → 다시 누르면 해제 → 다른 번호(하나만)
   const choice = n => page.locator(`.exam-choice[data-choice="${n}"]`);
@@ -165,6 +167,7 @@ async function spinWheel(page, place, steps) {
 
   // 단답(22번): 휠로 231
   await goToByOverview(page, 22);
+  await assertCompactTopbar(page, { digits: true });
   assert.equal(await page.getByTestId('exam-short-value').innerText(), '미입력');
   await spinWheel(page, '백의 자리', 2);
   await spinWheel(page, '십의 자리', 3);
@@ -323,6 +326,7 @@ async function spinWheel(page, place, steps) {
   await startExam(page, '자유 모드', '확통');
   assert.equal(await page.getByTestId('exam-remaining').count(), 0);
   await noHorizontalOverflow(page, 'solve/portrait');
+  await assertCompactTopbar(page);
   await page.screenshot({ path: `${out}/solve-portrait.png` });
 
   const check = page.getByRole('button', { name: '채점해 보기' });
@@ -355,6 +359,7 @@ async function spinWheel(page, place, steps) {
 
   // 단답 채점(22번 231)
   await goToByOverview(page, 22);
+  await assertCompactTopbar(page, { digits: true });
   await spinWheel(page, '백의 자리', 2);
   await spinWheel(page, '십의 자리', 3);
   await spinWheel(page, '일의 자리', 1);
@@ -436,6 +441,7 @@ async function spinWheel(page, place, steps) {
   await page.screenshot({ path: `${out}/start-phone.png`, fullPage: true });
   await startExam(page, '실전 모드', '미적분');
   await noHorizontalOverflow(page, 'solve/phone');
+  await assertCompactTopbar(page);
   await page.getByTestId('exam-overview-open').click();
   await page.getByTestId('exam-overview').waitFor();
   await noHorizontalOverflow(page, 'overview/phone');
@@ -443,6 +449,7 @@ async function spinWheel(page, place, steps) {
   await page.getByRole('button', { name: '닫기' }).click();
   await goToByOverview(page, 22);
   await noHorizontalOverflow(page, 'short/phone');
+  await assertCompactTopbar(page, { digits: true });
   await page.screenshot({ path: `${out}/solve-phone.png` });
   await context.close();
   console.log('ok — phone layout');
@@ -711,7 +718,7 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   }));
   for (const bounds of mathBounds) {
     assert.ok(bounds.top >= 0 && bounds.bottom >= 0, '루트·분수가 수식 영역 안에 표시됨');
-    assert.equal(Math.round(bounds.height), 76, '선지 버튼 높이 유지');
+    assert.ok(bounds.height >= 60 && bounds.height <= 76, '선지 버튼은 60px 이상, 수식 높이에 따라 확장');
   }
   const positions = await page.locator('.exam-choices-ten .exam-choice').evaluateAll(nodes => nodes.map(el => ({ x: el.getBoundingClientRect().x, y: el.getBoundingClientRect().y })));
   assert.equal(new Set(positions.map(p => Math.round(p.y))).size, 2, '2줄');
