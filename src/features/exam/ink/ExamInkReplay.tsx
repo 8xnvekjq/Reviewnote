@@ -29,6 +29,8 @@ interface Props {
   imageMaxWidth?: number;
   /** 열자마자 필기 순서를 불러와 재생한다(관리자 검토). */
   autoOpen?: boolean;
+  /** Anonymous peer viewers never read or write browser storage, including dock position. */
+  persistDock?: boolean;
   notes?: ReplayNotes;
 }
 /** 재생 상자 아이콘(이모지 ⏮⏭⏸는 윈도우·안드로이드에서 파란 네모 이모지로 나와 SVG로 그린다). */
@@ -69,9 +71,9 @@ const clampDock = (pos: DockPos, el: HTMLElement | null): DockPos => {
 };
 
 /** 재생 상자 위쪽 줄(손잡이)을 잡고 끌어 옮긴다. 버튼을 누른 건 끌기로 보지 않는다. */
-function useDockDrag() {
+function useDockDrag(persist: boolean) {
   const dockRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<DockPos | null>(() => readDockPos());
+  const [pos, setPos] = useState<DockPos | null>(() => persist ? readDockPos() : null);
   const drag = useRef<{ id: number; dx: number; dy: number } | null>(null);
   // 화면 크기가 바뀌어(가로·세로 전환 등) 상자가 화면 밖으로 나가지 않게
   useEffect(() => {
@@ -99,7 +101,7 @@ function useDockDrag() {
     if (!drag.current || drag.current.id !== event.pointerId) return;
     drag.current = null;
     setPos(prev => {
-      if (prev) try { window.localStorage.setItem(DOCK_POS_KEY, JSON.stringify(prev)); } catch { /* 저장 불가 */ }
+      if (persist && prev) try { window.localStorage.setItem(DOCK_POS_KEY, JSON.stringify(prev)); } catch { /* 저장 불가 */ }
       return prev;
     });
   };
@@ -108,7 +110,7 @@ function useDockDrag() {
   return { dockRef, handle, style };
 }
 
-export function ExamInkReplay({ client, attemptId, questionId, imageUrl, strokes, imageMaxWidth, autoOpen = false, notes }: Props) {
+export function ExamInkReplay({ client, attemptId, questionId, imageUrl, strokes, imageMaxWidth, autoOpen = false, persistDock = true, notes }: Props) {
   const [open, setOpen] = useState(autoOpen);
   const [data, setData] = useState<InkReplayData | null>(null);
   const [error, setError] = useState(false);
@@ -118,7 +120,7 @@ export function ExamInkReplay({ client, attemptId, questionId, imageUrl, strokes
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [folded, setFolded] = useState(false);
-  const dock = useDockDrag();
+  const dock = useDockDrag(persistDock);
   const timeline = useMemo(() => data ? buildInkTimeline(data) : null, [data]);
   const clock = useMemo(() => timeline ? buildInkClock(timeline) : null, [timeline]);
   const total = clock?.total ?? 0;

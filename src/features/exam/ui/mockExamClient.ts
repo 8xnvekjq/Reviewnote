@@ -84,6 +84,13 @@ const ERA_META: ExamPaperSummary[] = eraSets.map(set => ({
 }));
 /** 목 전용 최고점(원점수 100점) 표준점수·백분위 — 실제 값이 아니다. */
 const MOCK_TOP = { standard: 152, percentile: 100 };
+/** Anonymous peer fixture is never inserted into the persisted attempts/ink maps. */
+function mockPeerStrokes(): InkStroke[] {
+  return Array.from({ length: 3 }, (_, i) => ({
+    id: `peer-stroke-${i}`, tool: 'pen', color: '#16a34a', size: 4,
+    points: Array.from({ length: 24 }, (_, n) => ({ x: .12 + n * .018, y: .2 + i * .08 + n * .003, pressure: .5, t: n * 20 })),
+  }));
+}
 const SECTION_KEY: Record<'common' | ExamElective, string> = { common: 'c', '확률과 통계': 'prob', '미적분': 'calc', '기하': 'geom' };
 
 export function mockQuestionId(section: 'common' | ExamElective, number: number): string {
@@ -249,6 +256,27 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
     async getInk(attemptId) {
       must(attemptId);
       return clone(ink.get(attemptId) ?? []);
+    },
+    async getPeerSolution(attemptId, questionId) {
+      record('getPeerSolution', [attemptId, questionId]);
+      await wait();
+      const result = must(attemptId).result;
+      const item = result?.items.find(row => row.questionId === questionId);
+      if (!result || result.kind === 'hanneung' || item?.isCorrect !== false) throw new Error('EXAM_PEER_NOT_ALLOWED');
+      if (item.number === 3) return null;
+      const strokes = mockPeerStrokes();
+      return { label: { character: '하치와레', title: '꾸준한 도전자', grade: '고2', isTeacher: false },
+        strokes, solutionKey: 'mock-peer-fingerprint' };
+    },
+    async getPeerSolutionReplay(attemptId, questionId, solutionKey) {
+      record('getPeerSolutionReplay', [attemptId, questionId, solutionKey]);
+      if (solutionKey !== 'mock-peer-fingerprint') throw new Error('EXAM_PEER_CHANGED');
+      const result = must(attemptId).result;
+      if (!result || result.kind === 'hanneung' || result.items.find(row => row.questionId === questionId)?.isCorrect !== false) throw new Error('EXAM_PEER_NOT_ALLOWED');
+      // Reuse the anonymous fixture without adding another getPeerSolution request to the log.
+      const strokes = mockPeerStrokes();
+      const events = strokes.map((_, i) => ({ ...inkDelta(strokes.slice(0,i), strokes.slice(0,i+1), 'draw', (i+1)*600), id: `peer-event-${i}` }));
+      return { strokes, revision: 1, batches: [{ id: 'peer-batch-1', revision: 1, baseRevision: 0, baseline: [], events }] };
     },
     async getInkReplay(attemptId, questionId) {
       must(attemptId);
