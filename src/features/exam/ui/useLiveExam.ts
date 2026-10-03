@@ -10,7 +10,9 @@ export function useLiveExam(api: AdminExamApi, paperId: string) {
   const [students, setStudents] = useState<LiveStudentView[]>([]);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [broadcastConnected, setBroadcastConnected] = useState(false);
   useEffect(() => {
+    setBroadcastConnected(false);
     let alive = true;
     let previous = new Map<string, LiveStudentView>();
     // Only RPC results enter this map: optimistic strokes must never become a delta baseline.
@@ -33,9 +35,14 @@ export function useLiveExam(api: AdminExamApi, paperId: string) {
             ink: { revision: same ? row.ink?.revision ?? 0 : 0,
               strokes: applyBroadcast(same ? row.ink?.strokes ?? [] : [], message) } };
         }));
-      }, ready => { broadcastReady = ready; queueMicrotask(() => { if (alive) visible(); }); });
+      }, ready => {
+        broadcastReady = ready;
+        if (alive) setBroadcastConnected(watchReady && broadcastReady);
+        queueMicrotask(() => { if (alive) visible(); });
+      });
       watch = api.liveTransport?.open(`exam-live-watch:${paperId}`, 'watch', () => {}, ready => {
         watchReady = ready;
+        if (alive) setBroadcastConnected(watchReady && broadcastReady);
         // Defer to allow even synchronous test transports to return their channel handle.
         if (ready) queueMicrotask(() => { if (alive) visible(); });
       });
@@ -83,5 +90,5 @@ export function useLiveExam(api: AdminExamApi, paperId: string) {
       watch?.close(); broadcast?.close();
     };
   }, [api, paperId]);
-  return { students, error, loading };
+  return { students, error, loading, broadcastConnected };
 }

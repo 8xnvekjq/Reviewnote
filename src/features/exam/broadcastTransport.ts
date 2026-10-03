@@ -8,8 +8,14 @@ export interface LiveTransport {
 /** One underlying subscription per topic, including React StrictMode effect replay. */
 export function createBroadcastTransport(client: Pick<SupabaseClient, 'channel' | 'removeChannel' | 'realtime'>): LiveTransport {
   type Listener = { event: string; receive: (payload: unknown) => void; status: (ready: boolean) => void };
-  type Entry = { channel?: RealtimeChannel; ready: boolean; closing: boolean; listeners: Set<Listener> };
+  type Entry = { channel?: RealtimeChannel; starting?: boolean; ready: boolean; closing: boolean; listeners: Set<Listener> };
   const entries = new Map<string, Entry>();
+  const warned = new Set<string>();
+  const warn = (topic: string, reason: string) => {
+    if (warned.has(topic)) return;
+    warned.add(topic);
+    console.warn(`[exam-live] ${topic}: ${reason}`);
+  };
   return {
     open(topic, event, receive, status) {
       let entry = entries.get(topic);
@@ -17,19 +23,32 @@ export function createBroadcastTransport(client: Pick<SupabaseClient, 'channel' 
       const current = entry;
       const listener = { event, receive, status };
       current.listeners.add(listener);
-      const start = () => {
+      const start = async () => {
+        current.starting = true;
         try {
-          current.channel = client.channel(topic, { config: { private: true, broadcast: { self: false, ack: false } } });
+          // Resolve the current session before joining a private channel, even on
+          // an already-connected singleton socket. Keep callback-based token refresh.
+          await client.realtime.setAuth();
+          if (entries.get(topic) !== current || !current.listeners.size || current.closing) return;
+          current.channel = client.channel(topic, { config: { private: true, broadcast: { self: false, ack: false },
+            // Realtime requires a read permission to join. Ink publishers have
+            // presence read only; no client tracks presence or receives other ink.
+            presence: { enabled: topic.startsWith('exam-live:') } } });
           current.channel.on('broadcast', { event }, ({ payload }) => {
             if (!current.closing) for (const item of current.listeners) if (item.event === event) item.receive(payload);
           });
-          current.channel.subscribe(state => {
+          current.channel.subscribe((state, error) => {
             current.ready = state === 'SUBSCRIBED' && !current.closing;
+            if (!current.closing && (state === 'CHANNEL_ERROR' || state === 'TIMED_OUT')) warn(topic, error?.message ?? state);
             for (const item of current.listeners) item.status(current.ready);
           });
-        } catch { current.ready = false; for (const item of current.listeners) item.status(false); }
+        } catch (error) {
+          current.ready = false;
+          warn(topic, error instanceof Error ? error.message : 'Channel setup failed');
+          for (const item of current.listeners) item.status(false);
+        } finally { current.starting = false; }
       };
-      if (!current.channel && !current.closing) start();
+      if (!current.channel && !current.closing && !current.starting) void start();
       else queueMicrotask(() => { if (current.listeners.has(listener)) status(current.ready); });
       return {
         send(name, payload) {
@@ -47,7 +66,7 @@ export function createBroadcastTransport(client: Pick<SupabaseClient, 'channel' 
             if (!channel) { entries.delete(topic); return; }
             void client.removeChannel(channel).then(() => {
               current.channel = undefined; current.closing = false;
-              if (current.listeners.size) start(); else entries.delete(topic);
+              if (current.listeners.size) void start(); else entries.delete(topic);
             }).catch(() => { /* no extra retry load: polling remains available */ });
           });
         },

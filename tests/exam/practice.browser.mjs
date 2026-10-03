@@ -1315,6 +1315,8 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   await student.waitForFunction(() => window.__broadcast.log.length === 0);
   // An admin watch heartbeat opens the student's send-only ink channel.
   await admin.waitForFunction(() => window.__broadcast.log.some(m => m.payload.state === 'watching'));
+  await admin.waitForFunction(() => document.querySelector('[data-testid="exam-live-broadcast-status"]')?.textContent === '실시간 연결됨');
+  assert.equal(await student.getByTestId('exam-live-broadcast-status').count(), 0, 'diagnostics are admin-only');
   await student.waitForFunction(() => window.__broadcast.topics.has('exam-live:2025-06-math'));
   await drawStroke(student);
   await admin.waitForFunction(() => document.querySelector('[data-testid="exam-live-cell"] .exam-ink')?.dataset.strokeCount === '1', null, { timeout: 1500 });
@@ -1347,6 +1349,7 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   await admin.getByTestId('broadcast-open').click();
   await admin.getByTestId('exam-live-cell').waitFor();
   await admin.evaluate(() => window.__broadcast.setConnected(false));
+  await admin.waitForFunction(() => document.querySelector('[data-testid="exam-live-broadcast-status"]')?.textContent === '폴링만 · 5초마다 갱신');
   await drawStroke(student);
   // Dropped broadcasts still reconcile through the original save + polling paths.
   await admin.waitForFunction(() => document.querySelector('[data-testid="exam-live-cell"] .exam-ink')?.dataset.strokeCount === '2', null, { timeout: 13000 });

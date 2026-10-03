@@ -46,12 +46,27 @@ test('private broadcast RLS: own active paper only; ink receive/admin signal sen
     await send(admin,'exam-live:paper'); await send(admin,'exam-live-watch:paper');
     await assert.rejects(send(student,'exam-live:paper','presence'),/row-level security/);
     await assert.rejects(send('','exam-live:paper'),/row-level security/);
+    await db.exec(fs.readFileSync(new URL('../../supabase/migrations/20261004180000_exam_live_broadcast_fix.sql', import.meta.url), 'utf8'));
+    // Model the server's actual join gate: broadcast.read OR presence.read.
+    const extensions = async (uid: string, topic: string) =>
+      (await as(uid,topic,'select distinct extension from realtime.messages')).rows.map((row: any) => row.extension).sort();
+    assert.deepEqual(await extensions(student,'exam-live:paper'), ['presence'], 'publisher can join without reading ink');
+    assert.deepEqual(await extensions(admin,'exam-live:paper'), ['broadcast','presence']);
+    assert.deepEqual(await extensions(student,'exam-live-watch:paper'), ['broadcast']);
+    await send(student,'exam-live:paper');
+    for (const uid of [student,admin]) {
+      await assert.rejects(send(uid,'exam-live:paper','presence'),/row-level security/);
+      await assert.rejects(send(uid,'exam-live-watch:paper','presence'),/row-level security/);
+    }
+    for (const topic of ['exam-live:other','exam-live:finished','exam-live:paper:extra','exam-live:']) {
+      assert.deepEqual(await extensions(student,topic), []);
+    }
     // Emulate a deployment with existing broad public presence/broadcast grants.
     await db.exec(`create policy existing_read on realtime.messages for select to authenticated using(true);
       create policy existing_write on realtime.messages for insert to authenticated with check(true);
       create policy existing_anon_read on realtime.messages for select to anon using(true);
       create policy existing_anon_write on realtime.messages for insert to anon with check(true);`);
-    assert.equal(await receive(student,'exam-live:paper'),0);
+    assert.deepEqual(await extensions(student,'exam-live:paper'), ['presence']);
     assert.equal(await receive(student,'exam-live-watch:other'),0);
     await assert.rejects(send(student,'exam-live-watch:paper'),/row-level security/);
     await assert.rejects(send(student,'exam-live:other'),/row-level security/);
@@ -59,8 +74,8 @@ test('private broadcast RLS: own active paper only; ink receive/admin signal sen
     assert.equal(await receive('','exam-live-watch:paper'),0);
     await assert.rejects(send('','exam-live:paper'),/row-level security/);
     await assert.rejects(send('','exam-live-watch:paper'),/row-level security/);
-    assert.equal(await receive(student,'public-online'),5);
-    assert.equal(await receive('','public-online'),5);
+    assert.equal(await receive(student,'public-online'),6);
+    assert.equal(await receive('','public-online'),6);
     await send(student,'public-online','presence');
   } finally { await db.close(); }
 });

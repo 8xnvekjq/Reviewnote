@@ -7,7 +7,7 @@ import { useLiveExam } from './useLiveExam';
 
 const noop = () => {};
 export function AdminLiveView({ api, paperId, title, onClose }: { api: AdminExamApi; paperId: string; title: string; onClose: () => void }) {
-  const { students, error, loading } = useLiveExam(api, paperId);
+  const { students, error, loading, broadcastConnected } = useLiveExam(api, paperId);
   const [focused, setFocused] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now);
   const closeRef = useRef(onClose);
@@ -60,7 +60,7 @@ export function AdminLiveView({ api, paperId, title, onClose }: { api: AdminExam
   return createPortal(<div className="rn-app exam-practice exam-admin-review exam-live-view" role="dialog" aria-modal="true" aria-label={`${title} Live 보기`} data-testid="exam-live-view">
     <header className="exam-admin-review-bar">
       <button ref={backRef} type="button" className="rn-button rn-button-compact" onClick={() => history.back()}>← {focused ? '전체 보기' : '닫기'}</button>
-      <div className="exam-admin-review-title"><strong>{title}</strong><span>Live · {students.length}명 · 5초마다 갱신</span></div>
+      <div className="exam-admin-review-title"><strong>{title}</strong><span>Live · {students.length}명 · <span role="status" data-testid="exam-live-broadcast-status">{broadcastConnected ? '실시간 연결됨' : '폴링만 · 5초마다 갱신'}</span></span></div>
       <span className="exam-admin-review-badge">읽기 전용</span>
     </header>
     <div className="exam-admin-review-body">
