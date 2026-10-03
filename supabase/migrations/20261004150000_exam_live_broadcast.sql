@@ -1,5 +1,5 @@
 -- Authorization is evaluated on channel join/token refresh, not for every stroke.
--- Uses exam_attempts_in_progress_unique (student_id, paper_id), no new storage/write path.
+-- Uses exam_attempts_one_in_progress (student_id, paper_id), no new storage/write path.
 create or replace function private.can_use_exam_live_topic(p_watch boolean)
 returns boolean language sql stable security invoker set search_path = '' as $$
   select (select auth.uid()) is not null and (
