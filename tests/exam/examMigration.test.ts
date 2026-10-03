@@ -723,6 +723,35 @@ assert.match(migDelta, /revoke all on function public\.save_exam_ink_delta\(uuid
 assert.match(migDelta, /grant execute on function public\.save_exam_ink_delta\(uuid, uuid, integer, boolean, jsonb, uuid, text\) to authenticated/);
 assert.doesNotMatch(migDelta, /function public\.save_exam_ink(_replay)?\s*\(/, 'old save functions are left untouched');
 assert.doesNotMatch(migDelta, /\b(alter|drop|create or replace)\b/i);
+// 꾹 눌러 삼각형·사각형·곡선(20261004010000_exam_ink_shapes.sql): 새 도형 종류를 받고, 모양이 틀리면 거절한다.
+const shapeAttempt = (await as(S1, `select start_exam_attempt('2026-hanneung-79-basic','free',null) r`))[0].r;
+const sq = shapeAttempt.questions[0].id;
+const shapeDelta = (revision: number, stroke: unknown, ids: string[], batch: string) =>
+  as(S1, deltaSql, [shapeAttempt.id, sq, revision, false, JSON.stringify([ev(`s-${batch}`, 'draw', [{ index: ids.length - 1, stroke }])]), batch, idsHash(ids)]);
+const shapeOf = (id: string, shape: unknown) => ({ ...st(id), shape });
+const tri = shapeOf('tri', { kind: 'polygon', points: [[0.1, 0.1], [0.3, 0.1], [0.2, 0.3]] });
+const crv = shapeOf('crv', { kind: 'curve', points: [[0.1, 0.4], [0.2, 0.5], [0.3, 0.4]] });
+await assert.rejects(shapeDelta(0, tri, ['tri'], bid(12)), /EXAM_INK_INVALID/, 'before the migration only line/ellipse are accepted');
+await db.exec(fs.readFileSync(path.join(root, 'supabase/migrations/20261004010000_exam_ink_shapes.sql'), 'utf8'));
+assert.equal((await shapeDelta(0, tri, ['tri'], bid(12)))[0].r, 1, 'polygon shapes are stored');
+assert.equal((await shapeDelta(1, crv, ['tri', 'crv'], bid(13)))[0].r, 2, 'curve shapes are stored');
+const ln = shapeOf('ln', { kind: 'line', from: [0.1, 0.1], to: [0.2, 0.2] });
+const el = shapeOf('el', { kind: 'ellipse', cx: 0.5, cy: 0.5, rx: 0.1, ry: 0.1, rotation: 0 });
+assert.equal((await shapeDelta(2, ln, ['tri', 'crv', 'ln'], bid(14)))[0].r, 3, 'old shapes still work');
+assert.equal((await shapeDelta(3, el, ['tri', 'crv', 'ln', 'el'], bid(15)))[0].r, 4);
+assert.deepEqual((await db.query(`select strokes from exam_attempt_ink where attempt_id=$1 and question_id=$2`, [shapeAttempt.id, sq])).rows[0].strokes, [tri, crv, ln, el]);
+for (const bad of [
+  { kind: 'polygon', points: [[0.1, 0.1], [0.2, 0.2]] },
+  { kind: 'curve', points: [[0.1, 0.1]] },
+  { kind: 'curve', points: [[0.1, 0.1], [0.2]] },
+  { kind: 'polygon', points: [[0.1, 0.1], [0.2, 0.2], ['x', 0.3]] },
+  { kind: 'curve', points: [[0.1, 0.1], [500, 0.2]] },
+  { kind: 'curve', points: 'nope' },
+  { kind: 'star', points: [[0.1, 0.1], [0.2, 0.2], [0.3, 0.3]] },
+  { kind: 'line', from: [0.1], to: [0.2, 0.2] },
+]) {
+  await assert.rejects(shapeDelta(4, shapeOf('bad', bad), ['tri', 'crv', 'ln', 'el', 'bad'], bid(16)), /EXAM_INK_INVALID/, JSON.stringify(bad));
+}
 const deltaFn = (await db.query(`select p.prosecdef, p.proconfig, has_function_privilege('anon', p.oid, 'execute') anon,
   has_function_privilege('authenticated', p.oid, 'execute') auth from pg_proc p where p.proname = 'save_exam_ink_delta'`)).rows[0];
 assert.equal(deltaFn.prosecdef, true);

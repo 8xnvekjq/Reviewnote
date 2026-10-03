@@ -29,6 +29,7 @@ function Harness() {
         {toolButton('pen', '펜')}
         {toolButton('highlighter', '형광펜')}
         {toolButton('eraser', '지우개')}
+        {toolButton('laser', '레이저')}
         {COLORS.map(c => (
           <button key={c} type="button" className="rn-icon-button" aria-label={`색 ${c}`} aria-pressed={color === c} onClick={() => setColor(c)}>
             <span style={{ width: 18, height: 18, borderRadius: 9, background: c, display: 'block' }} />

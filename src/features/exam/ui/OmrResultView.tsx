@@ -2,7 +2,9 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { AdminExamApi, ExamClient, ExamResult, ExamResultItem, InkStroke } from '../contract';
 import { ExamInkReplay } from '../ink/ExamInkReplay';
+import { composeInkImage } from '../ink/inkComposite';
 import { useExamInk } from './useExamInk';
+import { ResultInkNotes } from './ResultInkNotes';
 import { ExamAnswer } from './ExamAnswer';
 import { resultGradeLabel } from './hanneungLogic';
 import { eraLabel, eraStats, resultPaperId, weakEras, type EraStat, type HanneungEra } from './hanneungEra';
@@ -21,13 +23,17 @@ type Props = {
 );
 
 interface BodyProps {
-  client: Pick<ExamClient, 'getInkReplay'> & Partial<Pick<ExamClient, 'addToMistakes'>>;
+  client: Pick<ExamClient, 'getInkReplay'> & Partial<Pick<ExamClient, 'addToMistakes' | 'addOriginalSolutions'>>;
   result: ExamResult;
   onBack: () => void;
   backLabel?: string;
   ink: Map<string, InkStroke[]>;
   inkBar: ReactNode;
   studentName?: string;
+  /** 학생 본인: 원래 필기를 다 불러와 덧쓰기를 시작해도 되는지. */
+  inkReady?: boolean;
+  /** 학생 본인: 서버에 저장된 원래 필기(이 기기에만 있던 필기는 먼저 서버로 옮긴 뒤). 오답노트 '원래풀이' 합성용. */
+  loadOriginalInk?: () => Promise<Map<string, InkStroke[]>>;
 }
 
 export function OmrResultView(props: Props) {
@@ -50,7 +56,13 @@ function StudentResult({ client, result, onBack, backLabel }: { client: ExamClie
       }}>{inkSync.status === 'conflict' ? '서버 필기 사용' : '다시 시도'}</button>}
     </p>
   );
-  return <OmrResultBody client={client} result={result} onBack={onBack} backLabel={backLabel} ink={inkSync.strokes} inkBar={inkBar} />;
+  const loadOriginalInk = async () => {
+    if (inkSync.pending) await inkSync.flush();
+    const docs = await client.getInk(result.attemptId);
+    return new Map(docs.map(doc => [doc.questionId, doc.strokes]));
+  };
+  return <OmrResultBody client={client} result={result} onBack={onBack} backLabel={backLabel} ink={inkSync.strokes} inkBar={inkBar}
+    inkReady={inkSync.ready} loadOriginalInk={loadOriginalInk} />;
 }
 
 function ReviewResult({ client, result, onBack, backLabel, studentName }: {
@@ -71,7 +83,7 @@ function ReviewResult({ client, result, onBack, backLabel, studentName }: {
   return <OmrResultBody client={client} result={result} onBack={onBack} backLabel={backLabel} ink={ink ?? new Map()} inkBar={inkBar} studentName={studentName} />;
 }
 
-function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar, studentName }: BodyProps) {
+function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar, studentName, inkReady = false, loadOriginalInk }: BodyProps) {
   const [result, setResult] = useState(initial);
   const reviewing = studentName != null;
   const wholePages = usesWholePages(initial.items);
@@ -103,6 +115,23 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar
     });
   };
 
+  // 필기 키: 한 페이지에 여러 문항(한능검 원본)이면 페이지 첫 문항, 아니면 문항 자신.
+  const inkKeyOf = (item: ExamResultItem) => wholePages ? result.items.find(other => other.imageUrl === item.imageUrl)!.questionId : item.questionId;
+
+  /** 담은 문항마다 문항 이미지 + 서버의 원래 필기를 한 장으로 합성해 '원래풀이' 스캐폴딩으로 붙인다. 필기가 없는 문항은 건너뛴다. */
+  const saveOriginalSolutions = async (added: Array<{ questionId: string; mistakeId: string }>) => {
+    if (!client.addOriginalSolutions || !loadOriginalInk || added.length === 0) return 0;
+    const original = await loadOriginalInk();
+    const rows: Array<{ mistakeId: string; imageDataUrl: string }> = [];
+    for (const row of added) {
+      const item = result.items.find(candidate => candidate.questionId === row.questionId);
+      if (!item) continue;
+      const imageDataUrl = await composeInkImage(item.imageUrl, original.get(inkKeyOf(item)) ?? []);
+      if (imageDataUrl) rows.push({ mistakeId: row.mistakeId, imageDataUrl });
+    }
+    return rows.length ? await client.addOriginalSolutions(rows) : 0;
+  };
+
   const addSelected = async () => {
     const ids = [...picked];
     if (ids.length === 0 || !client.addToMistakes) return;
@@ -116,7 +145,15 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar
         items: prev.items.map(item => (byId.has(item.questionId) ? { ...item, addedMistakeId: byId.get(item.questionId)! } : item)),
       }));
       setPicked(new Set());
-      setAddMessage(added.length > 0 ? `${added.length}문제를 오답노트에 담았어요.` : '이미 오답노트에 있는 문제였어요.');
+      const message = added.length > 0 ? `${added.length}문제를 오답노트에 담았어요.` : '이미 오답노트에 있는 문제였어요.';
+      setAddMessage(message);
+      // 스캐폴딩이 실패해도 오답노트 담기는 이미 성공 — 안내만 덧붙인다.
+      try {
+        const attached = await saveOriginalSolutions(added);
+        if (attached > 0) setAddMessage(`${message} 원래 풀이 ${attached}장도 함께 붙였어요.`);
+      } catch {
+        setAddMessage(`${message} 원래 풀이 이미지는 붙이지 못했어요.`);
+      }
     } catch (error) {
       setAddMessage(error instanceof Error ? error.message : '오답노트에 추가하지 못했어요. 잠시 뒤 다시 해 볼까요?');
     } finally {
@@ -284,15 +321,25 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar
               {wholePages && <button type="button" className="rn-button rn-button-compact" aria-pressed={pageZoom} onClick={() => setPageZoom(prev => !prev)}>{pageZoom ? '화면에 맞추기' : '원본 확대'}</button>}
               <div className={wholePages ? 'exam-original-scroll' : undefined}>
               <div style={wholePages && pageZoom ? { minWidth: 1100 } : undefined}>
-              <ExamInkReplay
+              {reviewing ? <ExamInkReplay
                 key={viewing.questionId}
                 client={client}
                 attemptId={result.attemptId}
-                questionId={wholePages ? result.items.find(item => item.imageUrl === viewing.imageUrl)!.questionId : viewing.questionId}
+                questionId={inkKeyOf(viewing)}
                 imageUrl={viewing.imageUrl}
-                strokes={ink.get(wholePages ? result.items.find(item => item.imageUrl === viewing.imageUrl)!.questionId : viewing.questionId) ?? []}
+                strokes={ink.get(inkKeyOf(viewing)) ?? []}
                 imageMaxWidth={wholePages ? (pageZoom ? 1100 : 980) : 480}
-              />
+                autoOpen
+              /> : <ResultInkNotes
+                key={viewing.questionId}
+                client={client}
+                attemptId={result.attemptId}
+                questionId={inkKeyOf(viewing)}
+                imageUrl={viewing.imageUrl}
+                strokes={ink.get(inkKeyOf(viewing)) ?? []}
+                imageMaxWidth={wholePages ? (pageZoom ? 1100 : 980) : 480}
+                ready={inkReady}
+              />}
               </div>
               </div>
             </div>

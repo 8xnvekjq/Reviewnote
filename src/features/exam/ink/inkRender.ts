@@ -4,6 +4,7 @@ import { getStroke } from 'perfect-freehand';
 import type { StrokeOptions } from 'perfect-freehand';
 import type { InkPoint, InkStroke } from '../contract.ts';
 import { INK_REFERENCE_WIDTH, strokeWidth, usesSimulatedPressure } from './inkModel.ts';
+import { curveSegments } from './shapeSnap.ts';
 
 const REF = INK_REFERENCE_WIDTH;
 
@@ -54,6 +55,13 @@ export function shapePath(shape: Shape): Path2D {
   if (shape.kind === 'line') {
     path.moveTo(shape.from[0] * REF, shape.from[1] * REF);
     path.lineTo(shape.to[0] * REF, shape.to[1] * REF);
+  } else if (shape.kind === 'polygon') {
+    shape.points.forEach(([x, y], i) => (i ? path.lineTo(x * REF, y * REF) : path.moveTo(x * REF, y * REF)));
+    path.closePath();
+  } else if (shape.kind === 'curve') {
+    const parts = curveSegments(shape.points);
+    if (parts.length) path.moveTo(parts[0][0].x * REF, parts[0][0].y * REF);
+    for (const [, c1, c2, b] of parts) path.bezierCurveTo(c1.x * REF, c1.y * REF, c2.x * REF, c2.y * REF, b.x * REF, b.y * REF);
   } else {
     path.ellipse(shape.cx * REF, shape.cy * REF, Math.max(shape.rx * REF, 0.01), Math.max(shape.ry * REF, 0.01), shape.rotation, 0, Math.PI * 2);
   }

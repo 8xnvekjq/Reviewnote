@@ -352,7 +352,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
           </button>
           <div className="exam-tools" role="toolbar" aria-label="필기 도구">
             <div className="exam-tool-group">
-              {([['pen', '펜', '✏️'], ['highlighter', '형광펜', '🖍️'], ['eraser', '지우개', '🧽']] as const).map(([value, label, icon]) => (
+              {([['pen', '펜', '✏️'], ['highlighter', '형광펜', '🖍️'], ['eraser', '지우개', '🧽'], ['laser', '레이저(남지 않음)', '🔴']] as const).map(([value, label, icon]) => (
                 <button key={value} type="button" className={`exam-tool${tool === value && !pagePan ? ' is-on' : ''}`} aria-pressed={tool === value && !pagePan} aria-label={label} title={label} onClick={() => { setTool(value); setPagePan(false); }}>
                   <span aria-hidden="true">{icon}</span>
                 </button>
@@ -360,7 +360,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
             </div>
             <div className="exam-tool-group">
               {PEN_COLORS.map(c => (
-                <button key={c.value} type="button" className={`exam-color${color === c.value ? ' is-on' : ''}`} style={{ '--swatch': c.value } as CSSProperties} aria-pressed={color === c.value} aria-label={`${c.label}색`} onClick={() => { setColor(c.value); if (tool === 'eraser') setTool('pen'); }} />
+                <button key={c.value} type="button" className={`exam-color${color === c.value ? ' is-on' : ''}`} style={{ '--swatch': c.value } as CSSProperties} aria-pressed={color === c.value} aria-label={`${c.label}색`} onClick={() => { setColor(c.value); if (tool === 'eraser' || tool === 'laser') setTool('pen'); }} />
               ))}
             </div>
             <div className="exam-tool-group">
