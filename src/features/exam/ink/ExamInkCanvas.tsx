@@ -6,7 +6,7 @@ import {
 } from './inkModel.ts';
 import type { InkHistory } from './inkModel.ts';
 import { drawShape, drawStroke, freehandPath, paint, prepareCanvas, resetTransform, safeDpr } from './inkRender.ts';
-import { recognizeShape, resizeShape, shapeToPoints } from './shapeSnap.ts';
+import { recognizeShape, resizeShape, shapeCenter, shapeToPoints } from './shapeSnap.ts';
 import type { Pt, SnapShape } from './shapeSnap.ts';
 
 const round = (value: number, scale: number) => Math.round(value * scale) / scale;
@@ -192,8 +192,8 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
         ctx.globalAlpha = eased;
         // 살짝 커지며 자리 잡는 느낌
         const s = g.snap.current;
-        const cx = (s.kind === 'line' ? (s.from[0] + s.to[0]) / 2 : s.cx) * REF;
-        const cy = (s.kind === 'line' ? (s.from[1] + s.to[1]) / 2 : s.cy) * REF;
+        const center = shapeCenter(s);
+        const cx = center.x * REF, cy = center.y * REF;
         const k = 0.94 + 0.06 * eased;
         ctx.translate(cx, cy); ctx.scale(k, k); ctx.translate(-cx, -cy);
         drawShape(ctx, s, g.tool, g.size, g.color);
