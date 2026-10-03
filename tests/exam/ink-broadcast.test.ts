@@ -5,7 +5,7 @@ import {
   liveSequenceGap, parseLiveInk, parseLiveSaved, payloadFits, receiveLiveInk, receiveLiveSaved, settleLiveHints, trustedLiveImage,
   vanishedStrokes, watching, type LiveHints, type LiveInkMessage, type LiveSavedMessage, type LiveSequenceState,
 } from '../../src/features/exam/ink/inkBroadcast.ts';
-import { nextLiveFrame } from '../../src/features/exam/ui/liveFrame.ts';
+import { nextImageRecovery, nextLiveFrame } from '../../src/features/exam/ui/liveFrame.ts';
 import { applyLiveInk } from '../../src/features/exam/ink/inkLive.ts';
 import type { InkStroke } from '../../src/features/exam/contract.ts';
 
@@ -180,8 +180,10 @@ test('missing strokes: a slower save of the previous question does not pull the 
   const agreed = settleLiveHints(confirmed!, () => 4, 300, 'q2');
   assert.equal(agreed?.focus, undefined);
   assert.equal(composeLiveView(row('q2', 4, [a, c]), agreed, () => undefined, () => undefined).questionId, 'q2');
-  // Without any further message the focus and the hints expire after the TTL.
-  assert.equal(settleLiveHints(state!, () => undefined, 100 + LIVE_HINT_TTL_MS, 'q1'), undefined);
+  // Without any further message the focus and the hints expire after the TTL; only the per-session newest sequence stays.
+  const expired = settleLiveHints(state!, () => undefined, 100 + LIVE_HINT_TTL_MS, 'q1');
+  assert.deepEqual([expired?.log, expired?.saved, expired?.focus, [...expired!.newest]], [[], [], undefined, [['session', 2]]]);
+  assert.equal(composeLiveView(row('q1', 5, [b]), expired, () => undefined, () => undefined).questionId, 'q1');
 });
 
 test("only the paper's own static question images are taken from a broadcast", () => {
@@ -273,4 +275,52 @@ test('Live cell switches image and ink together only once the new image is ready
   assert.equal(nextLiveFrame(f1, f2, isReady), f2);
   const more = { ...f1, strokes: [a, b] };
   assert.equal(nextLiveFrame(f1, more, () => false), more, 'same image updates ink immediately');
+});
+
+test('late earlier broadcast of the previous question does not take the focus back after newer hints were saved', () => {
+  const make = (sequence: number, questionId: string, number: number): LiveInkMessage => ({ ...message, sequence, questionId, number,
+    imageUrl: `/exams/p/${questionId}.png` });
+  const sequences = new Map<string, LiveSequenceState>();
+  const newest = make(2, 'q2', 2);
+  assert.equal(acceptLiveSequence(sequences, newest), true);
+  let hints = receiveLiveInk(undefined, newest, 1000);
+  const signal: LiveSavedMessage = { version: 1, kind: 'saved', attemptId: 'attempt', sessionId: 'session', sequence: 3,
+    saved: { questionKey: 'q2', revision: 2, upToSeq: 2 } };
+  acceptLiveSequence(sequences, signal);
+  hints = settleLiveHints(receiveLiveSaved(hints, signal, 1500), () => 2, 2000, 'q2')!;
+  assert.equal(hints.log.length, 0);
+  assert.equal(hints.focus, undefined);
+  const older = make(1, 'q1', 1);
+  assert.equal(acceptLiveSequence(sequences, older), true);
+  hints = receiveLiveInk(hints, older, 2500);
+  assert.equal(hints.log.length, 1, 'the late message is still recorded');
+  const server = { questionId: 'q2', number: 2, imageUrl: '/exams/p/q2.png', updatedAt: new Date(2000).toISOString(),
+    ink: { revision: 2, strokes: [a] } };
+  const view = composeLiveView(server, hints, () => undefined, () => undefined);
+  assert.equal(view.questionId, 'q2');
+  assert.deepEqual(view.ink?.strokes, [a]);
+  // Even after the focus TTL the newest-sequence record stays: a much later duplicate-era message cannot move the view.
+  hints = settleLiveHints(hints, () => 2, 2500 + LIVE_HINT_TTL_MS, 'q2')!;
+  hints = receiveLiveInk(hints, make(1, 'q1', 1), 2600 + LIVE_HINT_TTL_MS);
+  assert.equal(composeLiveView(server, hints, () => undefined, () => undefined).questionId, 'q2');
+  // A newer broadcast of another question still moves the focus.
+  hints = receiveLiveInk(hints, make(4, 'q3', 3), 2700 + LIVE_HINT_TTL_MS);
+  assert.equal(composeLiveView(server, hints, () => undefined, () => '/exams/p/q3.png').questionId, 'q3');
+});
+
+test('Live cell image recovery: a retry that loads after a failure bumps the generation (the cell reloads its <img>)', () => {
+  let state = nextImageRecovery({ url: '', failed: false, generation: 0 }, '/1.png', false);
+  assert.equal(state.generation, 0, 'first image: no remount');
+  assert.equal(nextImageRecovery(state, '/1.png', false), state, 'unchanged: same object, no re-render');
+  state = nextImageRecovery(state, '/1.png', true);
+  assert.equal(state.generation, 0, 'failure alone keeps the element (notice shown)');
+  assert.equal(nextImageRecovery(state, '/1.png', true), state);
+  state = nextImageRecovery(state, '/1.png', false);
+  assert.equal(state.generation, 1, 'retry succeeded: replace the broken <img>');
+  assert.equal(nextImageRecovery(state, '/1.png', false), state, 'only once per recovery');
+  // Question switches keep the element (same element, new src), including away from a failed image.
+  state = nextImageRecovery(nextImageRecovery(state, '/2.png', true), '/3.png', false);
+  assert.equal(state.generation, 1);
+  state = nextImageRecovery(nextImageRecovery(state, '/3.png', true), '/3.png', false);
+  assert.equal(state.generation, 2);
 });

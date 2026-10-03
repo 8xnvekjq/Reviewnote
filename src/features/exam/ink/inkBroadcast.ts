@@ -40,28 +40,37 @@ export interface LiveHintEntry { at: number; message: LiveInkMessage }
 interface LiveSavedEntry { at: number; sessionId: string; questionId: string; revision: number; upToSeq: number }
 /** Broadcast state of one attempt on the admin side. Server polls stay authoritative; hints are only replayed on top.
  *  `focus`: question of the newest stroke broadcast (a slower save of the previous question must not pull the view back).
- *  `confirmed`: per session+question, the highest sequence a save signal proved to be in the server canon. */
+ *  `confirmed`: per session+question, the highest sequence a save signal proved to be in the server canon.
+ *  `newest`: per session, the highest stroke-broadcast sequence received. Kept after the log is settled, so a late
+ *  earlier broadcast (e.g. of the previous question) only fills in the log and never moves the focus back. */
 export interface LiveHints {
   log: LiveHintEntry[];
   saved: LiveSavedEntry[];
   confirmed: Map<string, number>;
+  newest: Map<string, number>;
   focus?: { questionId: string; number: number; imageUrl?: string; at: number };
 }
-const emptyHints = (): LiveHints => ({ log: [], saved: [], confirmed: new Map() });
+const emptyHints = (): LiveHints => ({ log: [], saved: [], confirmed: new Map(), newest: new Map() });
 const confirmedKey = (sessionId: string, questionId: string) => `${sessionId}\n${questionId}`;
 
 /** Record a stroke broadcast. Within one student session the log stays in sequence order, so a late
  *  earlier message is replayed before the later ones. Messages already proved saved are ignored. */
 export function receiveLiveInk(state: LiveHints | undefined, message: LiveInkMessage, now: number): LiveHints {
   const hints = state ?? emptyHints();
+  // Decided before the confirmed check: a late earlier message must not take the focus even when it is dropped.
+  const newest = message.sequence > (hints.newest.get(message.sessionId) ?? 0);
   if (message.sequence <= (hints.confirmed.get(confirmedKey(message.sessionId, message.questionId)) ?? 0)) return hints;
   const log = [...hints.log];
   let at = log.length;
   while (at > 0 && log[at - 1].message.sessionId === message.sessionId && log[at - 1].message.sequence > message.sequence) at--;
   log.splice(at, 0, { at: now, message });
-  const newest = at === log.length - 1;
-  return { ...hints, log: log.length > LIVE_HINT_MAX ? log.slice(log.length - LIVE_HINT_MAX) : log,
-    focus: newest ? { questionId: message.questionId, number: message.number, imageUrl: message.imageUrl, at: now } : hints.focus };
+  if (!newest) return { ...hints, log: log.length > LIVE_HINT_MAX ? log.slice(log.length - LIVE_HINT_MAX) : log };
+  const sessions = new Map(hints.newest);
+  sessions.delete(message.sessionId); // re-insert: the oldest session is evicted first
+  sessions.set(message.sessionId, message.sequence);
+  while (sessions.size > LIVE_SAVED_MAX) sessions.delete(sessions.keys().next().value!);
+  return { ...hints, log: log.length > LIVE_HINT_MAX ? log.slice(log.length - LIVE_HINT_MAX) : log, newest: sessions,
+    focus: { questionId: message.questionId, number: message.number, imageUrl: message.imageUrl, at: now } };
 }
 
 /** Record a save signal. It is applied by settleLiveHints once the polled canon reaches its revision. */
@@ -92,8 +101,8 @@ export function settleLiveHints(hints: LiveHints, canonRevision: (questionId: st
   const focus = hints.focus && now - hints.focus.at < LIVE_HINT_TTL_MS && hints.focus.questionId !== serverQuestionId ? hints.focus : undefined;
   // Watermarks stay (bounded) so a delayed duplicate of a saved message is not replayed again.
   while (confirmed.size > LIVE_SAVED_MAX) confirmed.delete(confirmed.keys().next().value!);
-  if (!log.length && !saved.length && !focus && !confirmed.size) return undefined;
-  return { log, saved, confirmed, focus };
+  if (!log.length && !saved.length && !focus && !confirmed.size && !hints.newest.size) return undefined;
+  return { log, saved, confirmed, newest: hints.newest, focus };
 }
 
 interface LiveViewRow { questionId: string; number: number; imageUrl: string; updatedAt: string; ink: LiveInkState | null }

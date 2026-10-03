@@ -1433,6 +1433,29 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
     assert.deepEqual(errors, []);
     await context.close();
   }
+
+  {
+    const { context, page, errors, questions } = await openHintLive();
+    // Question 2's image fails (loader and the cell's <img>), then the server recovers: the loader retry must
+    // also reload the visible <img>, not just clear the notice over a broken image.
+    let failing = true;
+    await page.route(url => url.href.includes(questions[1].imageUrl), route => (failing ? route.abort() : route.continue()));
+    await startLive(page);
+    await send(page, 1, questions[1], [{ index: 0, stroke: liveStroke('q2-1') }]);
+    const cell = '[data-attempt-id="live-attempt-0"]';
+    await page.waitForSelector(`${cell} [data-testid="exam-live-image-failed"]`, { timeout: 15000 });
+    assert.equal(await page.evaluate(sel => document.querySelector(`${sel} .exam-live-canvas`)?.dataset.questionId, cell), questions[1].id);
+    failing = false;
+    await page.waitForSelector(`${cell} [data-testid="exam-live-image-failed"]`, { state: 'detached', timeout: 15000 });
+    await page.waitForFunction(sel => {
+      const img = document.querySelector(`${sel} .exam-ink img`);
+      return img?.complete && img.naturalWidth > 0;
+    }, cell, { timeout: 5000 });
+    assert.equal(await page.evaluate(sel => document.querySelector(`${sel} .exam-ink`)?.dataset.imagePainted, cell), 'true');
+    assert.equal(await page.evaluate(sel => document.querySelector(`${sel} .exam-ink`)?.dataset.strokeCount, cell), '1');
+    assert.deepEqual(errors, []);
+    await context.close();
+  }
 }
 
 await browser.close();

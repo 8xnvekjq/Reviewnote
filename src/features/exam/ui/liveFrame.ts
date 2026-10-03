@@ -7,3 +7,12 @@ export function nextLiveFrame(shown: LiveFrame | null, incoming: LiveFrame, read
   if (incoming.imageUrl && (ready(incoming.imageUrl) || shown?.imageUrl === incoming.imageUrl)) return incoming;
   return shown;
 }
+
+export interface LiveImageRecovery { url: string; failed: boolean; generation: number }
+/** A Live cell's image that failed and later loaded on a loader retry: the generation goes up, so the cell
+ *  replaces its broken <img> (a successful preload does not reload an element that already failed). */
+export function nextImageRecovery(previous: LiveImageRecovery, url: string, failed: boolean): LiveImageRecovery {
+  if (previous.url === url && previous.failed === failed) return previous;
+  const recovered = previous.url === url && previous.failed && !failed;
+  return { url, failed, generation: previous.generation + (recovered ? 1 : 0) };
+}

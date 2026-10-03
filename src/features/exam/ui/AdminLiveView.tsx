@@ -4,11 +4,12 @@ import type { AdminExamApi } from '../contract';
 import { ExamInkCanvas } from '../ink/ExamInkCanvas';
 import { inkExtent } from '../ink/inkFit';
 import { INK_IMAGE_RETRY_MS, inkImageFailed, inkImageReady, inkImageSettled, loadInkImage } from '../ink/inkImages';
-import { nextLiveFrame, type LiveFrame } from './liveFrame';
+import { nextImageRecovery, nextLiveFrame, type LiveFrame, type LiveImageRecovery } from './liveFrame';
 import { useLiveExam, type LiveStudentView } from './useLiveExam';
 
 const noop = () => {};
 const NO_STROKES: LiveFrame['strokes'] = [];
+const NO_RECOVERY: LiveImageRecovery = { url: '', failed: false, generation: 0 };
 
 /** Image and ink switch together once the new question image is decoded (the previous frame stays meanwhile).
  *  A failed or timed-out image (loader deadline) switches anyway with a notice; later updates retry it. */
@@ -36,15 +37,20 @@ function useLiveFrame(row: LiveStudentView) {
 
 function LiveCell({ row, now, focused, wide, onOpen }: { row: LiveStudentView; now: number; focused: boolean; wide: boolean; onOpen: () => void }) {
   const frame = useLiveFrame(row);
+  const imageFailed = !!frame && inkImageFailed(frame.imageUrl);
+  // A retry that succeeds after a failure remounts the canvas so its broken <img> loads again.
+  const [recovery, setRecovery] = useState(NO_RECOVERY);
+  const nextRecovery = nextImageRecovery(recovery, frame?.imageUrl ?? '', imageFailed);
+  if (nextRecovery !== recovery) setRecovery(nextRecovery);
   return <section className="exam-live-cell" data-testid="exam-live-cell" data-attempt-id={row.attemptId}>
     <button type="button" className="exam-live-cell-open" aria-label={`${row.studentName} 풀이 확대`} onClick={() => { if (!focused) onOpen(); }}>
       <strong>{row.studentName} · {frame?.number ?? row.number}번</strong><span>{Math.max(0, Math.floor((now - Date.parse(row.updatedAt)) / 1000))}초 전 갱신</span>
       <div className="exam-live-canvas" data-question-id={frame?.questionId ?? ''}>
         {frame
-          ? <ExamInkCanvas imageUrl={frame.imageUrl} strokes={frame.strokes} onChange={noop} tool="pen" color="#2563eb" size={3} readOnly fitToInk={inkExtent(frame.strokes)} imageMaxWidth={wide ? 760 : 480} />
+          ? <ExamInkCanvas key={nextRecovery.generation} imageUrl={frame.imageUrl} strokes={frame.strokes} onChange={noop} tool="pen" color="#2563eb" size={3} readOnly fitToInk={inkExtent(frame.strokes)} imageMaxWidth={wide ? 760 : 480} />
           : <div className="exam-live-image-pending" data-testid="exam-live-image-pending" role="status" aria-label="문항 이미지를 불러오는 중" />}
       </div>
-      {frame && inkImageFailed(frame.imageUrl) && <small className="exam-live-image-failed" data-testid="exam-live-image-failed" role="status">문항 이미지를 불러오지 못했어요 · 다시 시도 중</small>}
+      {imageFailed && <small className="exam-live-image-failed" data-testid="exam-live-image-failed" role="status">문항 이미지를 불러오지 못했어요 · 다시 시도 중</small>}
     </button>
   </section>;
 }
