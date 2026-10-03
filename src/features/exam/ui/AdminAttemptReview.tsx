@@ -58,7 +58,7 @@ function InProgressReview({ target, api }: { target: ReviewTarget; api: AdminExa
       <div className="exam-admin-paper">
         <ExamInkReplay key={`${question.id}:${reload}`} imageUrl={question.imageUrl}
           client={api} attemptId={target.attemptId} questionId={inkKey!}
-          strokes={data.ink.get(inkKey!) ?? []} imageMaxWidth={hanneung ? 980 : 720} />
+          strokes={data.ink.get(inkKey!) ?? []} imageMaxWidth={hanneung ? 980 : 480} autoOpen />
       </div>
     </>}
   </div>;

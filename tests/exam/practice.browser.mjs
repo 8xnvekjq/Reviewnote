@@ -253,11 +253,47 @@ async function spinWheel(page, place, steps) {
   const addCall = await page.evaluate(() => window.__examLog.find(e => e.method === 'addToMistakes'));
   assert.deepEqual(addCall.args[1].sort(), ['q-c-01', 'q-c-02']);
 
-  // 문항 크게 보기 + 내 필기(읽기 전용, IndexedDB 에서 복원)
+  // 문항 크게 보기 + 내 필기(IndexedDB·서버에서 복원) — 그 위에 덧쓰기는 이 기기에만 남고 서버로 가지 않는다.
+  const viewerInk = '[data-testid="exam-viewer"] .exam-ink';
+  const viewerStrokes = () => page.locator(viewerInk).getAttribute('data-stroke-count');
   await page.locator('.exam-item-row[data-number="1"]').click();
   await page.getByTestId('exam-viewer').waitFor();
-  await page.waitForFunction(() => document.querySelector('[data-testid="exam-viewer"] .exam-ink')?.getAttribute('data-stroke-count') === '1');
-  await page.getByRole('button', { name: '닫기' }).click();
+  await page.waitForFunction(sel => document.querySelector(sel)?.getAttribute('data-stroke-count') === '1', viewerInk);
+  const notesTools = page.getByTestId('exam-notes-tools');
+  await notesTools.waitFor();
+  assert.equal(await page.getByTestId('exam-viewer').getByRole('button', { name: '실행 취소', exact: true }).isDisabled(), true);
+  await page.getByText('서버에 저장된 필기도 문항별로 볼 수 있어요.').waitFor(); // 원래 필기 동기화가 끝난 뒤부터 센다
+  const inkRequestsBefore = await page.evaluate(() => window.__inkStats.requests);
+  const viewerBox = await page.locator(viewerInk).boundingBox();
+  await page.mouse.move(viewerBox.x + viewerBox.width * 0.3, viewerBox.y + 60); await page.mouse.down();
+  for (let i = 1; i <= 6; i += 1) await page.mouse.move(viewerBox.x + viewerBox.width * (0.3 + i * 0.03), viewerBox.y + 60 + i * 8);
+  await page.mouse.up();
+  assert.equal(await viewerStrokes(), '2');
+  await page.getByTestId('exam-viewer').getByRole('button', { name: '실행 취소', exact: true }).click();
+  assert.equal(await viewerStrokes(), '1');
+  await page.getByTestId('exam-viewer').getByRole('button', { name: '다시 실행', exact: true }).click();
+  assert.equal(await viewerStrokes(), '2');
+  // 필기 순서 보기(재생) 중에는 덧쓰기 도구가 숨고, 재생은 서버의 원래 필기만 보여 준다.
+  await page.getByRole('button', { name: '필기 순서 보기', exact: true }).click();
+  assert.equal(await notesTools.count(), 0);
+  await page.getByTestId('exam-replay-dock').waitFor();
+  const notesSlider = page.getByRole('slider', { name: '필기 재생 위치' });
+  await notesSlider.focus(); await notesSlider.press('End');
+  await page.waitForFunction(sel => document.querySelector(sel)?.getAttribute('data-stroke-count') === '1', viewerInk);
+  await page.getByRole('button', { name: '최종 풀이 보기', exact: true }).click();
+  assert.equal(await viewerStrokes(), '2');
+  await page.getByTestId('exam-viewer').getByRole('button', { name: '닫기', exact: true }).click();
+  // 다시 열어도 덧쓴 필기가 남아 있고, '원래 풀이로'를 누르면 원래 필기만 남는다.
+  await page.locator('.exam-item-row[data-number="1"]').click();
+  await page.waitForFunction(sel => document.querySelector(sel)?.getAttribute('data-stroke-count') === '2', viewerInk);
+  const notesKeys = () => page.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith('rn-exam-result-notes:')).length);
+  assert.equal(await notesKeys(), 1);
+  await page.getByRole('button', { name: '원래 풀이로', exact: true }).click();
+  assert.equal(await viewerStrokes(), '1');
+  assert.equal(await notesKeys(), 0);
+  await page.waitForTimeout(300);
+  assert.equal(await page.evaluate(() => window.__inkStats.requests), inkRequestsBefore, 'result-screen notes never hit the ink server');
+  await page.getByTestId('exam-viewer').getByRole('button', { name: '닫기', exact: true }).click();
 
   // 시험지 목록 → 지난 결과
   await page.getByRole('button', { name: '← 시험지 목록' }).click();
@@ -922,10 +958,23 @@ for (const viewport of [LANDSCAPE, { width: 390, height: 844 }]) {
   await review.locator('.exam-item-row[data-number="1"]').click();
   const inkSel = '[data-testid="exam-viewer"] .exam-ink';
   await page.locator(inkSel).waitFor();
-  await page.waitForFunction(sel => document.querySelector(sel)?.getAttribute('data-stroke-count') === '1', inkSel);
-  await page.getByRole('button', { name: '필기 순서 보기', exact: true }).click();
+  // 관리자가 문항을 열면 필기 순서를 바로 불러와 자동 재생한다(왼쪽에 떠 있는 작은 재생 상자).
+  const dock = page.getByTestId('exam-replay-dock');
+  await dock.waitFor();
+  assert.equal(await page.getByRole('button', { name: '최종 풀이 보기', exact: true }).count(), 1);
+  assert.equal(await dock.evaluate(el => getComputedStyle(el).position), 'fixed');
   const slider = page.getByRole('slider', { name: '필기 재생 위치' });
   await slider.waitFor();
+  await page.waitForFunction(() => Number(document.querySelector('[data-testid="exam-replay-position"]')?.getAttribute('data-step')) >= 1
+    || document.querySelector('[data-testid="exam-replay-dock"] button[aria-label="일시정지"]'), null, { timeout: 3000 });
+  // 아래로 스크롤해도 재생 상자는 화면 안에 그대로 있다.
+  const dockBefore = await dock.boundingBox();
+  await page.getByTestId('exam-viewer').evaluate(el => { el.scrollTop = el.scrollHeight; });
+  const dockAfter = await dock.boundingBox();
+  assert.equal(Math.round(dockAfter.y), Math.round(dockBefore.y), 'replay dock stays put while scrolling');
+  assert.ok(dockAfter.y >= 0 && dockAfter.y + dockAfter.height <= viewport.height, 'replay dock is on screen');
+  // 관리자 검토에는 덧쓰기 도구가 없다.
+  assert.equal(await page.getByTestId('exam-notes-tools').count(), 0);
   // React가 다시 그린 뒤의 상태를 기다린다(버튼 클릭 직후에는 아직 반영 전일 수 있음).
   const expectReplay = (ink, step) => page.waitForFunction(([ink, step]) =>
     document.querySelector('[data-testid="exam-viewer"] .exam-ink')?.getAttribute('data-stroke-count') === ink
@@ -967,6 +1016,10 @@ for (const viewport of [LANDSCAPE, { width: 390, height: 844 }]) {
   await page.locator('.exam-admin-attempt').nth(1).click();
   await review.waitFor();
   await page.locator('.exam-admin-paper .exam-ink').waitFor();
+  // 풀이 중 검토도 완료된 응시 화면처럼(이미지 480px 이하, 필기가 오른쪽 여백까지 있으면 그만큼 줄임) + 자동 재생.
+  await page.locator('.exam-admin-paper [data-testid="exam-replay-dock"]').waitFor();
+  const progressImg = await page.locator('.exam-admin-paper .exam-ink img').boundingBox();
+  assert.ok(progressImg.width <= 481, `in-progress review image ${progressImg.width}px is not zoomed in`);
   assert.doesNotMatch(await page.locator('.exam-admin-answer').innerText(), /정답/);
   assert.equal(await page.getByRole('button', { name: '제출하기', exact: true }).count(), 0);
   await page.getByRole('button', { name: '다음 문항', exact: true }).click();

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { AdminExamApi, ExamClient, ExamResult, ExamResultItem, InkStroke } from '../contract';
 import { ExamInkReplay } from '../ink/ExamInkReplay';
 import { useExamInk } from './useExamInk';
+import { ResultInkNotes } from './ResultInkNotes';
 import { ExamAnswer } from './ExamAnswer';
 import { resultGradeLabel } from './hanneungLogic';
 import { eraLabel, eraStats, resultPaperId, weakEras, type EraStat, type HanneungEra } from './hanneungEra';
@@ -28,6 +29,8 @@ interface BodyProps {
   ink: Map<string, InkStroke[]>;
   inkBar: ReactNode;
   studentName?: string;
+  /** 학생 본인: 원래 필기를 다 불러와 덧쓰기를 시작해도 되는지. */
+  inkReady?: boolean;
 }
 
 export function OmrResultView(props: Props) {
@@ -50,7 +53,8 @@ function StudentResult({ client, result, onBack, backLabel }: { client: ExamClie
       }}>{inkSync.status === 'conflict' ? '서버 필기 사용' : '다시 시도'}</button>}
     </p>
   );
-  return <OmrResultBody client={client} result={result} onBack={onBack} backLabel={backLabel} ink={inkSync.strokes} inkBar={inkBar} />;
+  return <OmrResultBody client={client} result={result} onBack={onBack} backLabel={backLabel} ink={inkSync.strokes} inkBar={inkBar}
+    inkReady={inkSync.ready} />;
 }
 
 function ReviewResult({ client, result, onBack, backLabel, studentName }: {
@@ -71,7 +75,7 @@ function ReviewResult({ client, result, onBack, backLabel, studentName }: {
   return <OmrResultBody client={client} result={result} onBack={onBack} backLabel={backLabel} ink={ink ?? new Map()} inkBar={inkBar} studentName={studentName} />;
 }
 
-function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar, studentName }: BodyProps) {
+function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar, studentName, inkReady = false }: BodyProps) {
   const [result, setResult] = useState(initial);
   const reviewing = studentName != null;
   const wholePages = usesWholePages(initial.items);
@@ -102,6 +106,9 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar
       return next;
     });
   };
+
+  // 필기 키: 한 페이지에 여러 문항(한능검 원본)이면 페이지 첫 문항, 아니면 문항 자신.
+  const inkKeyOf = (item: ExamResultItem) => wholePages ? result.items.find(other => other.imageUrl === item.imageUrl)!.questionId : item.questionId;
 
   const addSelected = async () => {
     const ids = [...picked];
@@ -284,15 +291,25 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar
               {wholePages && <button type="button" className="rn-button rn-button-compact" aria-pressed={pageZoom} onClick={() => setPageZoom(prev => !prev)}>{pageZoom ? '화면에 맞추기' : '원본 확대'}</button>}
               <div className={wholePages ? 'exam-original-scroll' : undefined}>
               <div style={wholePages && pageZoom ? { minWidth: 1100 } : undefined}>
-              <ExamInkReplay
+              {reviewing ? <ExamInkReplay
                 key={viewing.questionId}
                 client={client}
                 attemptId={result.attemptId}
-                questionId={wholePages ? result.items.find(item => item.imageUrl === viewing.imageUrl)!.questionId : viewing.questionId}
+                questionId={inkKeyOf(viewing)}
                 imageUrl={viewing.imageUrl}
-                strokes={ink.get(wholePages ? result.items.find(item => item.imageUrl === viewing.imageUrl)!.questionId : viewing.questionId) ?? []}
+                strokes={ink.get(inkKeyOf(viewing)) ?? []}
                 imageMaxWidth={wholePages ? (pageZoom ? 1100 : 980) : 480}
-              />
+                autoOpen
+              /> : <ResultInkNotes
+                key={viewing.questionId}
+                client={client}
+                attemptId={result.attemptId}
+                questionId={inkKeyOf(viewing)}
+                imageUrl={viewing.imageUrl}
+                strokes={ink.get(inkKeyOf(viewing)) ?? []}
+                imageMaxWidth={wholePages ? (pageZoom ? 1100 : 980) : 480}
+                ready={inkReady}
+              />}
               </div>
               </div>
             </div>
