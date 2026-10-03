@@ -4,7 +4,7 @@ import type { AdminExamApi, ExamClient, ExamResult, ExamResultItem, InkStroke } 
 import { composeInkImage } from '../ink/inkComposite';
 import { useExamInk } from './useExamInk';
 import { ResultInkNotes } from './ResultInkNotes';
-import { PeerSolutionView } from './PeerSolutionView';
+import { PeerSolutionSwitch } from './PeerSolutionView';
 import { PeerSolutionSession, type PeerSolutionApi } from './peerSolution';
 import { ExamAnswer } from './ExamAnswer';
 import { resultGradeLabel } from './hanneungLogic';
@@ -93,10 +93,9 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar
   const [addMessage, setAddMessage] = useState<string | null>(null);
   const [viewing, setViewing] = useState<ExamResultItem | null>(null);
   const [pageZoom, setPageZoom] = useState(false);
-  const [peerShowing, setPeerShowing] = useState(false);
   const peerSession = useMemo(() => !reviewing && client.getPeerSolution && client.getPeerSolutionReplay
     ? new PeerSolutionSession(client as PeerSolutionApi, initial.attemptId) : null, [client, initial.attemptId, reviewing]);
-  const openQuestion = (item: ExamResultItem | null) => { setPeerShowing(false); setViewing(item); };
+  const openQuestion = (item: ExamResultItem | null) => { setViewing(item); };
 
   const candidates = useMemo(() => mistakeCandidates(result.items), [result.items]);
   // 한능검 시대 태그가 있는 시험지만 시대별 결과를 보여 준다.
@@ -323,10 +322,9 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar
               <p className="rn-caption">전국 선택 비율: {viewing.nationalChoiceRates.map((rate, i) => `${displayAnswer(String(i + 1), true)} ${rate}%`).join(' · ')}</p>
             )}
             <div className="exam-viewer-paper">
-              {peerSession && result.kind !== 'hanneung' && viewing.isCorrect === false &&
-                <PeerSolutionView key={viewing.questionId} session={peerSession} attemptId={result.attemptId}
-                  questionId={viewing.questionId} imageUrl={viewing.imageUrl} onShowing={setPeerShowing} />}
-              <div hidden={peerShowing}>
+              <PeerSolutionSwitch key={viewing.questionId} session={peerSession} attemptId={result.attemptId}
+                eligible={result.kind !== 'hanneung' && viewing.isCorrect === false}
+                questionId={viewing.questionId} imageUrl={viewing.imageUrl}>{peerButton => <>
               {wholePages && <button type="button" className="rn-button rn-button-compact" aria-pressed={pageZoom} onClick={() => setPageZoom(prev => !prev)}>{pageZoom ? '화면에 맞추기' : '원본 확대'}</button>}
               <div className={wholePages ? 'exam-original-scroll' : undefined}>
               <div style={wholePages && pageZoom ? { minWidth: 1100 } : undefined}>
@@ -341,10 +339,11 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar
                 strokes={ink.get(inkKeyOf(viewing)) ?? []}
                 imageMaxWidth={wholePages ? (pageZoom ? 1100 : 980) : 480}
                 ready={inkReady}
+                extraTool={peerButton}
               />
               </div>
               </div>
-              </div>
+              </>}</PeerSolutionSwitch>
             </div>
           </div>
         </div>

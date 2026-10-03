@@ -12,9 +12,11 @@ const drawing = (count = 3): InkStroke[] => Array.from({ length: count }, (_, i)
 const solution: PeerSolution = { label: { character: '하치와레', title: '도전자', grade: '고2', isTeacher: false }, strokes: drawing(), solutionKey: 'opaque' };
 
 test('anonymous labels omit missing fields and show teacher fallback', () => {
-  assert.equal(peerSolutionLabel(solution.label), '하치와레 · [도전자] · 고2');
-  assert.equal(peerSolutionLabel({ ...solution.label, title: null, grade: null }), '하치와레');
-  assert.equal(peerSolutionLabel({ ...solution.label, isTeacher: true }), '선생님 풀이 · [도전자] · 고2');
+  assert.equal(peerSolutionLabel(solution.label), '👩 도전자(고2)');
+  assert.equal(peerSolutionLabel({ ...solution.label, title: null, grade: null }), '👩 익명 학생');
+  assert.equal(peerSolutionLabel({ ...solution.label, title: null }), '👩 익명 학생(고2)');
+  assert.equal(peerSolutionLabel({ ...solution.label, isTeacher: true }), '🧑‍🏫 선생님 풀이');
+  assert.match(peerSolutionLabel({ ...solution.label, character: '모르는캐릭터' }), /^\p{Extended_Pictographic}/u, 'unknown characters still get a face');
 });
 
 test('result session loads only on demand, deduplicates, caches null/replay and retries failures', async () => {

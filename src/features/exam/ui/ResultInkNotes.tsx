@@ -1,7 +1,7 @@
 // 시험이 끝난 뒤 결과 화면에서 문항을 열었을 때: 원래 필기 위에 덧칠해 이어 쓰기.
 // 새 '다시 풀기'가 아니다 — 답·점수는 바뀌지 않고, 여기서 쓴 필기는 서버(필기 저장·재생 기록)에 절대 보내지 않는다.
 // 이 기기에만(메모리 + localStorage, 원래 필기 캐시와 다른 키) 남긴다. 원래 필기를 지워도 그 지움 역시 이 기기에서만이다.
-import { useRef, useState, type CSSProperties } from 'react';
+import { useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { ExamClient, ExamInkCanvasHandle, InkStroke, InkTool } from '../contract';
 import { ExamInkReplay } from '../ink/ExamInkReplay';
 import { LaserIcon } from './LaserIcon';
@@ -50,9 +50,11 @@ interface Props {
   review?: boolean;
   /** false면 덧쓴 필기를 어디에도 남기지 않는다(풀이 중 응시 검토 — 학생 필기가 계속 바뀌므로 예전 복사본이 새 필기를 가리지 않게). */
   persist?: boolean;
+  /** '원래 풀이로' 바로 오른쪽에 붙는 버튼(다른 학생 풀이 보기). */
+  extraTool?: ReactNode;
 }
 
-export function ResultInkNotes({ client, attemptId, questionId, imageUrl, strokes, imageMaxWidth, ready, review = false, persist = true }: Props) {
+export function ResultInkNotes({ client, attemptId, questionId, imageUrl, strokes, imageMaxWidth, ready, review = false, persist = true, extraTool }: Props) {
   // 관리자가 덧쓴 필기는 학생 본인 키와 섞이지 않게 따로 둔다(같은 기기에서 둘 다 열 일은 드물지만).
   const key = `${resultNotesKey(attemptId, questionId)}${review ? ':admin' : ''}`;
   // null = 아직 덧쓰지 않음 → 원래 필기를 그대로 보여 준다. 처음 쓰는 순간 원래 필기 + 새 획을 복사해 따로 둔다.
@@ -95,6 +97,7 @@ export function ResultInkNotes({ client, attemptId, questionId, imageUrl, stroke
         <button type="button" className="exam-tool" aria-label="실행 취소" title="실행 취소" disabled={!canUndo} onClick={() => { inkRef.current?.undo(); setHistoryTick(t => t + 1); }}>↶</button>
         <button type="button" className="exam-tool" aria-label="다시 실행" title="다시 실행" disabled={!canRedo} onClick={() => { inkRef.current?.redo(); setHistoryTick(t => t + 1); }}>↷</button>
         <button type="button" className="exam-tool exam-tool-text" disabled={!notes} onClick={reset}>원래 풀이로</button>
+        {extraTool}
       </div>
       <p className="exam-notes-note">{!ready ? (review ? '학생 필기를 불러온 뒤에 쓸 수 있어요.' : '원래 필기를 불러온 뒤에 이어 쓸 수 있어요.')
         : review ? '여기서 쓴 필기는 이 기기에서만 보여요. 학생 풀이에는 저장되지 않아요.'

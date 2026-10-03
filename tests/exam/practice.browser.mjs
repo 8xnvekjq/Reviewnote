@@ -342,15 +342,19 @@ async function spinWheel(page, place, steps) {
   await page.getByTestId('exam-peer-toggle').click();
   const peerView = page.getByTestId('exam-peer-solution');
   await peerView.waitFor();
-  assert.equal(await page.getByTestId('exam-peer-label').innerText(), '하치와레 · [꾸준한 도전자] · 고2');
+  assert.equal(await page.getByTestId('exam-peer-label').innerText(), '👩 꾸준한 도전자(고2)');
   assert.match(await peerView.innerText(), /다른 풀이 · 읽기 전용/);
-  assert.equal(await peerView.locator('.exam-ink').getAttribute('data-stroke-count'), '3');
+  // 자동 재생이 처음(획 0개)부터 시작한다 — 끝까지 가면 3획(아래 End 확인).
+  assert.equal(await peerView.getByTestId('exam-ink-replay').getAttribute('data-replaying'), 'true');
   assert.equal(await peerView.getByTestId('exam-notes-tools').count(), 0);
   await page.getByTestId('exam-viewer').screenshot({ path: `${out}/peer-solution.png` });
-  assert.equal(await peerCalls('getPeerSolution'), 1); assert.equal(await peerCalls('getPeerSolutionReplay'), 0);
-  await peerView.getByRole('button', { name:'필기 순서 보기', exact:true }).click();
+  assert.equal(await peerCalls('getPeerSolution'), 1);
+  // 내 풀이처럼 열자마자 필기 순서를 재생한다.
   await peerView.getByTestId('exam-replay-dock').waitFor();
   assert.equal(await peerCalls('getPeerSolutionReplay'), 1);
+  // 버튼은 툴바 크기(큰 버튼이 상단을 차지하지 않음)
+  const backBox = await page.getByTestId('exam-peer-toggle').boundingBox();
+  assert.ok(backBox.height <= 40, `small peer button: ${backBox.height}px`);
   await peerView.getByRole('slider', { name:'필기 재생 위치' }).press('End');
   await page.waitForFunction(() => document.querySelector('[data-testid="exam-peer-solution"] .exam-ink')?.dataset.strokeCount === '3');
   await peerView.getByRole('button', { name:'최종 풀이 보기', exact:true }).click();
