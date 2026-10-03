@@ -170,6 +170,7 @@ export interface ExamPaperHistoryAttempt extends ExamPaperMetadata {
 
 /** src/features/exam/examClient.ts의 서버 경계. */
 export interface ExamClient {
+  liveTransport?: import('./liveTransport').LiveTransport;
   getInk(attemptId: string): Promise<ExamInkDocument[]>;
   /** 바뀐 내용(events)만 보낸다. 결과 필기 전체 대신 결과 획 id 목록의 해시로 서버 결과와 맞춘다. */
   saveInk(attemptId: string, questionId: string, request: InkSaveRequest): Promise<number>;
@@ -286,6 +287,7 @@ export interface AdminPaperActivity {
 
 /** 관리자 읽기 전용 검토에 필요한 서버 호출 묶음. */
 export interface AdminExamApi {
+  liveTransport?: import('./liveTransport').LiveTransport;
   listLivePapers(): Promise<Array<{ paperId: string; liveCount: number }>>;
   getLiveExam(paperId: string): Promise<AdminLiveStudent[]>;
   getLiveInk(attemptId: string, questionId: string, sinceRevision: number | null): Promise<LiveInkResponse>;

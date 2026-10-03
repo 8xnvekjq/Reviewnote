@@ -2,6 +2,7 @@
 // 실제 앱처럼 상단바/하단 탭을 흉내 낸 껍데기 안에 마운트해, 풀이 화면이 그걸 덮는지도 본다.
 // URL 파라미터: user, limit(실전 제한시간 분, 소수 가능), persist(1이면 localStorage 이어 풀기), failSave(1), latency(ms)
 import { createRoot } from 'react-dom/client';
+import { useState } from 'react';
 import '../../src/index.css';
 import '../../src/styles/design-system.css';
 import { ExamPracticeScreen } from '../../src/features/exam/ExamPracticeScreen';
@@ -9,6 +10,8 @@ import { createMockExamClient, createMockLiveExamApi } from '../../src/features/
 import AdminStudentExamSummary from '../../src/components/admin/AdminStudentExamSummary';
 import type { AdminExamApi, AdminExamAttemptSummary, AdminPaperStudentActivity, ExamAttempt } from '../../src/features/exam/contract';
 import { inkDelta, inkIdsHash } from '../../src/features/exam/ink/inkReplay';
+import { AdminLiveView } from '../../src/features/exam/ui/AdminLiveView';
+import type { LiveTransport } from '../../src/features/exam/liveTransport';
 
 const params = new URLSearchParams(location.search);
 const log: Array<{ method: string; args: unknown[] }> = [];
@@ -65,13 +68,85 @@ const adminApi: AdminExamApi = {
   listPaperActivity: async () => params.get('activity') === '1' ? [{ paperId: '2025-06-math', students: activityRows }] : null,
 };
 
+// Two actual browser tabs share a mock WebSocket bus and saved RPC state.
+// Only this opt-in fixture uses BroadcastChannel/localStorage; production uses Supabase.
+if (params.has('broadcast')) {
+  const wireLog: Array<{ topic: string; event: string; payload: unknown }> = [];
+  let connected = true;
+  const statuses = new Set<(ready: boolean) => void>();
+  const topics = new Set<string>();
+  const role = params.get('broadcast');
+  const transport: LiveTransport = {
+    open(topic, event, receive, status) {
+      const channel = new BroadcastChannel(`exam-test:${topic}`);
+      topics.add(topic);
+      statuses.add(status);
+      channel.onmessage = e => { if (connected && e.data.event === event) receive(e.data.payload); };
+      queueMicrotask(() => status(connected));
+      return {
+        send(name, payload) {
+          if (!connected) return;
+          wireLog.push({ topic, event: name, payload });
+          channel.postMessage({ event: name, payload });
+        },
+        close() { topics.delete(topic); statuses.delete(status); channel.close(); },
+      };
+    },
+  };
+  (window as unknown as { __broadcast: unknown }).__broadcast = {
+    log: wireLog,
+    topics,
+    setConnected(value: boolean) { connected = value; for (const status of statuses) status(value); },
+  };
+  client.liveTransport = transport;
+  adminApi.liveTransport = transport;
+  const metaKey = 'exam-broadcast-attempt';
+  const docsKey = 'exam-broadcast-docs';
+  const originalStart = client.startAttempt;
+  client.startAttempt = async (...args) => {
+    const attempt = await originalStart(...args);
+    localStorage.setItem(metaKey, JSON.stringify(attempt));
+    localStorage.setItem(docsKey, '[]');
+    return attempt;
+  };
+  const originalSave = client.saveInk;
+  client.saveInk = async (...args) => {
+    const revision = await originalSave(...args);
+    localStorage.setItem(docsKey, JSON.stringify(await client.getInk(args[0])));
+    return revision;
+  };
+  if (role === 'admin') {
+    adminApi.getLiveExam = async () => {
+      const attempt: ExamAttempt | null = JSON.parse(localStorage.getItem(metaKey) ?? 'null');
+      if (!attempt) return [];
+      const docs: Awaited<ReturnType<typeof client.getInk>> = JSON.parse(localStorage.getItem(docsKey) ?? '[]');
+      const doc = [...docs].sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))[0];
+      const question = attempt.questions.find(q => q.id === doc?.questionId) ?? attempt.questions[0];
+      return [{ attemptId: attempt.id, studentId: 'student-1', studentName: '방송 학생', questionId: question.id,
+        number: question.number, imageUrl: question.imageUrl, revision: doc?.revision ?? 0,
+        updatedAt: doc?.updatedAt ?? attempt.startedAt, answeredCount: 0 }];
+    };
+    adminApi.getLiveInk = async (_attemptId, questionId) => {
+      const docs: Awaited<ReturnType<typeof client.getInk>> = JSON.parse(localStorage.getItem(docsKey) ?? '[]');
+      const doc = docs.find(d => d.questionId === questionId);
+      return { mode: 'full', revision: doc?.revision ?? 0, strokes: doc?.strokes ?? [] };
+    };
+  }
+}
+
+function BroadcastAdminFixture() {
+  const [open, setOpen] = useState(false);
+  return <div><button data-testid="broadcast-open" onClick={() => setOpen(true)}>Live 열기</button>
+    {open && <AdminLiveView api={adminApi} paperId="2025-06-math" title="방송 검증" onClose={() => setOpen(false)} />}</div>;
+}
+
 if (params.get('live') === '1') {
   const live = createMockLiveExamApi();
   Object.assign(adminApi, live.api, { listPaperActivity: async () => [] });
   (window as unknown as { __live: typeof live }).__live = live;
 }
 
-createRoot(document.getElementById('root')!).render(params.get('records') === '1' ?
+createRoot(document.getElementById('root')!).render(params.get('broadcast') === 'admin' ? <BroadcastAdminFixture /> : params.get('records') === '1' ?
   <div className="rn-app" style={{ padding: 16, maxWidth: 680, margin: 'auto' }}>
     <AdminStudentExamSummary studentId="student-1" studentName="테스트 학생" api={adminApi} onPractice={() => { location.search = ''; }} />
   </div> :

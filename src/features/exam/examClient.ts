@@ -1,4 +1,5 @@
 import { supabase } from '../../services/supabase';
+import { examLiveTransport } from './liveTransport';
 import type { AdminExamApi, AdminExamAttemptSummary, AdminLiveStudent, LiveInkResponse, AdminPaperActivity, ExamClient, ExamInkDocument, InkReplayData } from './contract';
 import {
   ExamClientError,
@@ -34,6 +35,7 @@ async function callRpc(name: string, args: Record<string, unknown>): Promise<unk
 export const ORIGINAL_SOLUTION_CAPTION = '원래풀이';
 
 export const examClient: ExamClient = {
+  liveTransport: examLiveTransport,
   async getInk(attemptId) {
     return await callRpc('get_exam_ink', { p_attempt_id: attemptId }) as ExamInkDocument[];
   },
@@ -175,6 +177,7 @@ export const adminExamClient = {
 
 /** 관리자 읽기 전용 검토(학생 결과·필기·필기 재생). 서버 함수가 관리자만 허용한다. */
 export const adminExamApi: AdminExamApi = {
+  liveTransport: examLiveTransport,
   ...adminExamClient,
   getInk: (attemptId: string) => examClient.getInk(attemptId),
   getInkReplay: (attemptId: string, questionId: string) => examClient.getInkReplay(attemptId, questionId),
