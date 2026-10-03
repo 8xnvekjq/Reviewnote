@@ -15,3 +15,7 @@ The importer handles two-column PDFs with text layers. It preserves math glyphs 
 `python -m unittest discover -s scripts/exam -p test_import_worksheet.py` checks real PDF counts, explanation stitching, local-only review assets and question-only public output. `node --test tests/exam/*.test.ts` verifies era bundles and worksheets on the same PGlite database, including provenance, grading, history and permissions. Keep the existing Python importer tests too.
 
 `tests/exam/worksheet.browser.mjs` covers the list, free-mode start, provenance, checking an answer, submission and results without grades at 1180/820/390px. Browser execution belongs to the coordinator.
+
+## Self-authored worksheets (no PDF)
+
+`2026-g3m-trig-creative` (중3-2 삼각비 창의융합, 18문항) is written directly in `scripts/exam/trig-creative/questions.mjs` (background → "예를 들어," example → problem, plus a solution and a `compute` formula per question). `node scripts/exam/build_trig_creative_worksheet.mjs` verifies every answer with both trig-table values and exact values (same integer, ≥0.05 away from rounding edges), renders question PNGs and `trig-table.png` with Edge, and writes `src/features/exam/data/2026-g3m-trig-creative.json`, the unpublished seed `20261004190000_exam_trig_creative_worksheet_seed.sql` and `publish_trig_creative_worksheet.sql`. Solutions go only to the local `worksheet-generated/<id>/review.html`. Middle-school papers use `grade=9` (중3 tab); per-paper reference links (the trig table) live in `src/features/exam/ui/worksheetReferences.ts`.
