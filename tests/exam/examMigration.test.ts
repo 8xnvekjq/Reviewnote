@@ -844,6 +844,31 @@ const eraSeed = fs.readFileSync(path.join(root, 'supabase/migrations/20261003100
 await db.exec(eraSeed);
 // Apply worksheet definitions before either feature is exercised on this same database.
 await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261003130000_exam_worksheets.sql'),'utf8'));
+await db.exec(fs.readFileSync(path.join(root,'supabase/migrations/20261004115900_exam_school_question_validation.sql'),'utf8'));
+// Sangil remains private; verify the new seed is idempotent and matches all keys.
+const sangilId = '2026-sangil-g1-s2-mid-common2';
+const sangilData = JSON.parse(fs.readFileSync(path.join(root, `src/features/exam/data/${sangilId}.json`), 'utf8'));
+const sangilMig = fs.readFileSync(path.join(root, 'supabase/migrations/20261004120000_exam_sangil_school_seed.sql'), 'utf8');
+await db.exec(sangilMig); await db.exec(sangilMig);
+assert.equal((await as(S1, 'select id from exam_papers where id=$1', [sangilId])).length, 0);
+assert.equal((await as(S1, 'select id from exam_questions where paper_id=$1', [sangilId])).length, 0);
+await fails(S1, `select start_exam_attempt($1,'free',null)`, [sangilId], /EXAM_PAPER_NOT_FOUND/);
+const sangilRows = (await db.query('select q.*, k.answer from exam_questions q join exam_answer_keys k on k.question_id=q.id where paper_id=$1 order by number', [sangilId])).rows;
+assert.equal(sangilRows.length, 23);
+for (const [i, row] of sangilRows.entries()) {
+  const q = sangilData.questions[i];
+  assert.equal(row.number, q.number); assert.equal(Number(row.points), q.points);
+  assert.equal(row.answer, q.answer); assert.equal(row.answer_type, q.answerType);
+  assert.equal(row.image_url, q.imageUrl); assert.equal(row.curriculum_chapter, q.curriculumChapter);
+  if (q.choices) assert.deepEqual(row.choices, q.choices);
+}
+assert.equal(sangilRows.reduce((sum, row) => sum + Number(row.points), 0), 100);
+await assert.rejects(db.query('update exam_questions set number=24 where paper_id=$1 and number=1', [sangilId]), /EXAM_INVALID_QUESTION/);
+await assert.rejects(db.query("update exam_questions set section='미적분' where paper_id=$1 and number=1", [sangilId]), /EXAM_INVALID_QUESTION/);
+await assert.rejects(db.query("update exam_questions set answer_type='choice4' where paper_id=$1 and number=1", [sangilId]), /EXAM_INVALID_QUESTION/);
+assert.equal((await as(AD, 'select published from exam_papers where id=$1', [sangilId]))[0].published, false);
+
+
 for (const name of ['limits','derivatives']) {
   await db.exec(fs.readFileSync(path.join(root,`supabase/migrations/2026100313000${name==='limits'?1:2}_exam_youngpa_worksheet_${name}_seed.sql`),'utf8'));
 }

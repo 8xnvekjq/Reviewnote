@@ -9,6 +9,42 @@ import { buildHistoryRows, toggleChoice } from '../../src/features/exam/ui/examL
 const root = path.resolve(import.meta.dirname, '../..');
 const data = JSON.parse(fs.readFileSync(path.join(root, 'src/features/exam/data/2026-dongbuk-g1-s2-mid-common2.json'), 'utf8'));
 
+test('상일여고 서답형은 직접 계산한 정답이 유일하고 원본 오류를 교정한다', () => {
+  const paper = JSON.parse(fs.readFileSync(path.join(root, 'src/features/exam/data/2026-sangil-g1-s2-mid-common2.json'), 'utf8'));
+  assert.equal(paper.questions.length, 23); assert.equal(paper.published, false);
+  assert.ok(Math.abs(paper.questions.reduce((sum, q) => sum + q.originalPoints, 0) - 30) < 1e-10);
+  assert.equal(paper.questions.reduce((sum, q) => sum + q.points, 0), 100);
+  const intercept = -1 - ((5 - 2) / (2 - (-1))) * 3;
+  const tangentSum = -16 / 5; // a²+(2a+4)²=4, so 5a²+16a+12=0.
+  const area = Math.PI * ((3 / 2) ** 2 + (1 / 2) ** 2);
+  const numeric = new Map([
+    [19, [4,-1,-4,2,-2,0,3,-3,-7,-10]],
+    [20, [-16,16/5,-8/5,12/5,-2,-6/5,-16/5,-32/5,-16/3,-4/5]],
+    [22, [Math.sqrt(10)/2,5/2,5/4,5,10,9/4,1/4,25/4,13/4,29/2].map(x => x * Math.PI)],
+  ]);
+  for (const [n, correct] of [[19,intercept],[20,tangentSum],[22,area]]) {
+    const q = paper.questions[n - 1], values = numeric.get(n)!;
+    assert.equal(values.filter(x => Math.abs(x - correct) < 1e-10).length, 1);
+    assert.ok(Math.abs(values[Number(q.answer) - 1] - correct) < 1e-10);
+  }
+  assert.equal(paper.questions[20].answer, String(63 + 47 - 100));
+  // C satisfies p+q=11 and 2p-q=1, hence C=(4,7); AC has slope 7/6.
+  const slope = 7 / (4 - (-2)), constant = slope * 2;
+  const lines = [[7/6,-7/3],[6/7,12/7],[7/6,0],[7/2,7],[7/6,7],[1/8,1/4],[2,-1],[-7/6,-7/3],[7/6,7/3],[7/3,14/3]];
+  const matches = lines.map(([m,b], i) => Math.abs(m-slope)<1e-10 && Math.abs(b-constant)<1e-10 ? i+1 : 0).filter(Boolean);
+  assert.deepEqual(matches, [Number(paper.questions[22].answer)]);
+  for (const q of paper.questions) {
+    assert.ok(MATH_CURRICULUM[q.curriculumGrade].includes(q.curriculumChapter));
+    assert.equal(sanitizeExamAnswer(q.answer, q.answerType), q.answer);
+    assert.ok(fs.existsSync(path.join(root, 'public', q.imageUrl)));
+    if (q.choices) {
+      assert.equal(new Set(q.choices).size, 10);
+      assert.equal(q.choices[Number(q.answer)-1], q.originalAnswer);
+      assert.equal(q.distractorReasons.length, 10);
+    }
+  }
+});
+
 test('내신 원본 구조·배점·커리큘럼과 21개 PNG를 검증한다', () => {
   assert.equal(data.published, false); assert.equal(data.year, 2026);
   assert.equal(data.examDate, null); assert.equal(data.timeLimitMinutes, 50);
