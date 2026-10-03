@@ -1,4 +1,6 @@
-import { WORKSHEET_FIXTURE, WORKSHEET_FIXTURE_QUESTIONS } from './worksheetFixture';
+import { WORKSHEET_FIXTURES } from './worksheetFixture';
+
+const worksheetFixture = (paperId: string) => WORKSHEET_FIXTURES.find(fixture => fixture.paper.id === paperId) ?? null;
 // 테스트·브라우저 하네스용 메모리 ExamClient. 실제 서버(W1 examClient.ts)를 흉내만 낸다:
 // 정답은 data json 에서 읽어 채점하고, 실전 모드 채점 요청은 거부한다.
 // persistKey 를 주면 localStorage 에 상태를 남겨 새로고침 후 "이어 풀기"도 흉내낼 수 있다.
@@ -148,7 +150,7 @@ export interface MockExamClientOptions {
 }
 
 export function createMockExamClient(options: MockExamClientOptions = {}): ExamClient {
-  const papers = [...(options.worksheet ? [WORKSHEET_FIXTURE] : []), ...MOCK_PAPERS, ...HANNEUNG_META, ...ERA_META, ...(options.admin ? [SCHOOL_META] : [])];
+  const papers = [...(options.worksheet ? WORKSHEET_FIXTURES.map(fixture => fixture.paper) : []), ...MOCK_PAPERS, ...HANNEUNG_META, ...ERA_META, ...(options.admin ? [SCHOOL_META] : [])];
   const store = new Map<string, StoredAttempt>();
   const ink = new Map<string, ExamInkDocument[]>();
   const replay = new Map<string, InkReplayBatch[]>();
@@ -195,8 +197,8 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
   const grade = (entry: StoredAttempt, items: ExamItemState[]): ExamResult => {
     const { attempt } = entry;
     const byId = new Map(items.map(item => [item.questionId, item]));
-    const worksheet = attempt.paperId === WORKSHEET_FIXTURE.id;
-    const school = attempt.paperId === MOCK_SCHOOL_ID || worksheet;
+    const worksheet = worksheetFixture(attempt.paperId)?.paper;
+    const school = attempt.paperId === MOCK_SCHOOL_ID || worksheet != null;
     const historyMeta = [...HANNEUNG_META, ...ERA_META].find(paper => paper.id === attempt.paperId);
     const rates = school || historyMeta ? [] : PAPER.wrongRates.byElective[attempt.elective ?? '미적분'] ?? [];
     const resultItems: ExamResultItem[] = attempt.questions.map(question => {
@@ -226,7 +228,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
     const score = resultItems.reduce((sum, item) => sum + (item.isCorrect ? item.points : 0), 0);
     const rawByGrade = PAPER.gradeCuts.rawByElective[attempt.elective ?? '미적분'] ?? [];
     return {
-      ...(worksheet ? WORKSHEET_FIXTURE : school ? SCHOOL_META : {}),
+      ...(worksheet ?? (school ? SCHOOL_META : {})),
       ...historyMeta,
       attemptId: attempt.id,
       paperId: attempt.paperId,
@@ -346,8 +348,8 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
         return {
           ...meta,
           ...(meta.id === MOCK_SCHOOL_ID ? SCHOOL_META : {}),
-          timeLimitMinutes: meta.id === WORKSHEET_FIXTURE.id ? null : HANNEUNG_META.find(paper => paper.id === meta.id)?.timeLimitMinutes ?? (meta.id === MOCK_SCHOOL_ID ? 50 : PAPER.timeLimitMinutes),
-          electives: meta.id === WORKSHEET_FIXTURE.id || meta.id === MOCK_SCHOOL_ID || [...HANNEUNG_META, ...ERA_META].some(paper => paper.id === meta.id) ? [] : [...ELECTIVES],
+          timeLimitMinutes: worksheetFixture(meta.id) ? null : HANNEUNG_META.find(paper => paper.id === meta.id)?.timeLimitMinutes ?? (meta.id === MOCK_SCHOOL_ID ? 50 : PAPER.timeLimitMinutes),
+          electives: worksheetFixture(meta.id) || meta.id === MOCK_SCHOOL_ID || [...HANNEUNG_META, ...ERA_META].some(paper => paper.id === meta.id) ? [] : [...ELECTIVES],
           inProgress: active ? {
             attemptId: active.attempt.id,
             round: roundFor(active.attempt),
@@ -376,7 +378,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       const existing = [...store.values()].find(entry => entry.attempt.paperId === paperId && entry.attempt.status === 'in_progress');
       if (existing) throw new Error('이 시험지는 풀던 시험이 있어요. 이어 풀기로 열어 주세요.');
       if (!papers.some(p => p.id === paperId)) throw new Error('이 시험지를 찾지 못했어요.');
-      const worksheet = paperId === WORKSHEET_FIXTURE.id;
+      const worksheet = worksheetFixture(paperId);
       if (worksheet && mode !== 'free') throw new Error('EXAM_INVALID_MODE');
       const school = paperId === MOCK_SCHOOL_ID;
       const historyMeta = [...HANNEUNG_META, ...ERA_META].find(paper => paper.id === paperId);
@@ -385,7 +387,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       const historyPaper = HANNEUNG.find(paper => paper.id === paperId);
       seq += 1;
       const attempt: ExamAttempt = {
-        ...(worksheet ? { ...WORKSHEET_FIXTURE, paperTitle: WORKSHEET_FIXTURE.title } : school ? { ...SCHOOL_META, paperTitle: SCHOOL_META.title } : {}),
+        ...(worksheet ? { ...worksheet.paper, paperTitle: worksheet.paper.title } : school ? { ...SCHOOL_META, paperTitle: SCHOOL_META.title } : {}),
         ...historyMeta,
         id: `attempt-${seq}`,
         paperId,
@@ -394,7 +396,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
         startedAt: new Date().toISOString(),
         timeLimitMinutes: mode === 'real' ? options.timeLimitMinutes ?? historyMeta?.timeLimitMinutes ?? (school ? 50 : PAPER.timeLimitMinutes) : null,
         status: 'in_progress',
-        questions: worksheet ? clone(WORKSHEET_FIXTURE_QUESTIONS) : eraSet ? eraSet.members.map((member, i) => ({
+        questions: worksheet ? clone(worksheet.questions) : eraSet ? eraSet.members.map((member, i) => ({
           ...member, id: `${paperId}-${i + 1}`, number: i + 1, section: 'common',
           points: 1, isChoice: true, answerType: 'choice5',
         })) : historyPaper ? historyPaper.questions.map(question => ({
@@ -467,7 +469,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
         .filter(entry => entry.result && (!paperId || entry.attempt.paperId === paperId))
         .map(entry => {
           const r = entry.result!;
-          return { ...(r.kind === 'worksheet' ? WORKSHEET_FIXTURE : r.kind === 'school' ? SCHOOL_META : {}), kind: r.kind, practiceEra: r.practiceEra, questionCount: r.questionCount, hanneungLevel: r.hanneungLevel, attemptId: r.attemptId, paperTitle: r.paperTitle, mode: r.mode, elective: r.elective, score: r.score, estimatedGrade: r.estimatedGrade, submittedAt: r.submittedAt };
+          return { ...(r.kind === 'worksheet' ? worksheetFixture(r.paperId ?? '')?.paper : r.kind === 'school' ? SCHOOL_META : {}), kind: r.kind, practiceEra: r.practiceEra, questionCount: r.questionCount, hanneungLevel: r.hanneungLevel, attemptId: r.attemptId, paperTitle: r.paperTitle, mode: r.mode, elective: r.elective, score: r.score, estimatedGrade: r.estimatedGrade, submittedAt: r.submittedAt };
         })
         .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
     },

@@ -34,6 +34,12 @@ const MODES: Array<{ value: ExamMode; title: string; desc: string }> = [
 
 function electiveKey(userId: string) { return `rn-exam-elective:${userId}`; }
 
+/** 학년 탭: 1~3은 고1~고3, 9는 중3(학교 학년 1~12 기준), 한능검. */
+const GRADE_TABS = [9, 1, 2, 3, 'hanneung'] as const;
+function gradeLabel(value: number | 'hanneung') {
+  return value === 'hanneung' ? '한능검' : value <= 6 ? `고${value}` : `중${value - 6}`;
+}
+
 function paperGrade(paper: ExamPaperMetadata) {
   if (paper.kind === 'hanneung') return 'hanneung';
   return (paper.kind ?? 'csat') === 'csat' ? 3 : paper.grade;
@@ -229,7 +235,7 @@ export function ExamStartView({ client, currentUserId, admin, busy, error, onSta
       <h1 className="rn-title">시험지 고르기</h1>
 
       <div className="exam-option-grid exam-category-grid" role="group" aria-label="시험 분류">
-        {([1, 2, 3, 'hanneung'] as const).map(value => (
+        {GRADE_TABS.map(value => (
           <button key={value} type="button" aria-pressed={grade === value}
             className={`exam-option exam-option-small${grade === value ? ' is-on' : ''}`}
             disabled={!papers || busy || resuming != null}
@@ -239,7 +245,7 @@ export function ExamStartView({ client, currentUserId, admin, busy, error, onSta
               setPaperId(null);
               setResumeError(null);
             }}>
-            <strong>{value === 'hanneung' ? '한능검' : `고${value}`}</strong>
+            <strong>{gradeLabel(value)}</strong>
           </button>
         ))}
       </div>
@@ -247,7 +253,7 @@ export function ExamStartView({ client, currentUserId, admin, busy, error, onSta
       {loadError && <p className="exam-error" role="alert">{loadError}</p>}
       {!papers && !loadError && <div className="rn-loading"><div className="rn-skeleton rn-loading-card" /></div>}
 
-      {papers && visiblePapers.length === 0 && <div className="rn-empty">아직 {grade === 'hanneung' ? '한능검' : `고${grade}`} 시험지가 없어요.</div>}
+      {papers && visiblePapers.length === 0 && <div className="rn-empty">아직 {gradeLabel(grade)} 시험지가 없어요.</div>}
 
       {visiblePapers.length > 0 && (
         <>
