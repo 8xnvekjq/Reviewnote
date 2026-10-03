@@ -4,6 +4,8 @@ import { useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEve
 import { clampDigit, snapWheel, wheelSteps } from './examLogic';
 
 const ITEM_H = 34;
+// 82px 휠의 테두리 안쪽(78px) 중앙에 34px 숫자 행을 맞춘다. 드래그·스냅 간격은 유지.
+const CENTER_OFFSET = 22;
 const DIGITS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 interface DragState { pointerId: number; startY: number; startValue: number; lastY: number; lastT: number; velocity: number; moved: boolean }
@@ -88,7 +90,7 @@ export function DigitWheel({ value, label, dim, disabled, onChange }: { value: n
         else if (e.key === 'ArrowDown') { e.preventDefault(); e.stopPropagation(); set(value + 1); }
       }}
     >
-      <div className="exam-wheel-track" style={{ transform: `translateY(${offset + ITEM_H}px)` }} aria-hidden="true">
+      <div className="exam-wheel-track" style={{ transform: `translateY(${offset + CENTER_OFFSET}px)` }} aria-hidden="true">
         {DIGITS.map(d => <span key={d} className={d === value ? 'is-current' : undefined} style={{ height: ITEM_H }}>{d}</span>)}
       </div>
       <span className="exam-wheel-label">{label}</span>
