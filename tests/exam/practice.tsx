@@ -5,7 +5,7 @@ import { createRoot } from 'react-dom/client';
 import '../../src/index.css';
 import '../../src/styles/design-system.css';
 import { ExamPracticeScreen } from '../../src/features/exam/ExamPracticeScreen';
-import { createMockExamClient } from '../../src/features/exam/ui/mockExamClient';
+import { createMockExamClient, createMockLiveExamApi } from '../../src/features/exam/ui/mockExamClient';
 import AdminStudentExamSummary from '../../src/components/admin/AdminStudentExamSummary';
 import type { AdminExamApi, AdminExamAttemptSummary, AdminPaperStudentActivity, ExamAttempt } from '../../src/features/exam/contract';
 import { inkDelta, inkIdsHash } from '../../src/features/exam/ink/inkReplay';
@@ -56,11 +56,20 @@ const activityRows: AdminPaperStudentActivity[] = adminRows.map((row, index) => 
   ...row, studentId: `s${index + 1}`, studentName: index === 0 ? '김학생' : '이학생', attemptCount: index === 0 ? 2 : 1, inProgress: index === 0,
 }));
 const adminApi: AdminExamApi = {
+  listLivePapers: async () => [],
+  getLiveExam: async () => [],
+  getLiveInk: async () => ({ mode: 'full', revision: 0, strokes: [] }),
   listAttempts: async () => adminRows,
   getAttempt: async (id: string) => adminAttempts.get(id)!,
   getInk: client.getInk, getInkReplay: client.getInkReplay, getResult: client.getResult,
   listPaperActivity: async () => params.get('activity') === '1' ? [{ paperId: '2025-06-math', students: activityRows }] : null,
 };
+
+if (params.get('live') === '1') {
+  const live = createMockLiveExamApi();
+  Object.assign(adminApi, live.api, { listPaperActivity: async () => [] });
+  (window as unknown as { __live: typeof live }).__live = live;
+}
 
 createRoot(document.getElementById('root')!).render(params.get('records') === '1' ?
   <div className="rn-app" style={{ padding: 16, maxWidth: 680, margin: 'auto' }}>

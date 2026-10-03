@@ -17,10 +17,11 @@ import { hanneungGrade } from './hanneungLogic.ts';
 import paperJson from '../data/2025-06-math.json';
 import imagesJson from '../data/2025-06-math.images.json';
 import type {
+  AdminExamApi, AdminLiveStudent, InkStroke, LiveInkResponse,
   ExamAttempt, ExamClient, ExamElective, ExamInkDocument, ExamItemState, ExamMode, ExamPaperSummary, ExamQuestion, ExamResult, ExamResultItem, InkReplayBatch,
 } from '../contract.ts';
 import { sanitizeExamAnswer } from '../examMappers';
-import { applyInkEvent, inkIdsHash } from '../ink/inkReplay';
+import { applyInkEvent, inkDelta, inkIdsHash } from '../ink/inkReplay';
 import { countAnswered, ELECTIVES, estimateGrade, isAnswerCorrect, keepCheckedAnswers } from './examLogic.ts';
 
 interface WrongRateRow { number: number; wrongRate: number; choiceRates: number[] | null }
@@ -469,4 +470,37 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       return added;
     },
   };
+}
+
+/** Explicit controls let browser tests change membership and draw/erase between real polling ticks. */
+export function createMockLiveExamApi() {
+  let count = 2;
+  const questions = buildMockQuestions('미적분');
+  const docs = new Map<string, { revision: number; strokes: InkStroke[]; batches: Extract<LiveInkResponse, { mode: 'delta' }>['batches']; updatedAt: string }>();
+  const id = (index: number) => `live-attempt-${index}`;
+  const update = (index: number, erase = false) => {
+    const key = id(index);
+    const old = docs.get(key) ?? { revision: 0, strokes: [], batches: [], updatedAt: new Date().toISOString() };
+    const stroke: InkStroke = { id: `live-${index}-${old.revision}`, tool: 'pen', color: '#2563eb', size: 3,
+      points: [{ x: .1, y: .3 + old.revision * .04, pressure: .5, t: 0 }, { x: 1.4, y: .4 + old.revision * .04, pressure: .5, t: 150 }] };
+    const strokes = erase ? old.strokes.slice(1) : [...old.strokes, stroke];
+    const revision = old.revision + 1;
+    docs.set(key, { revision, strokes, updatedAt: new Date().toISOString(), batches: [...old.batches,
+      { revision, events: [inkDelta(old.strokes, strokes, erase ? 'erase' : 'draw')] }] });
+  };
+  for (let i = 0; i < 3; i++) update(i);
+  const api: Pick<AdminExamApi, 'listLivePapers' | 'getLiveExam' | 'getLiveInk'> = {
+    listLivePapers: async () => count ? [{ paperId: MOCK_PAPER_ID, liveCount: count }] : [],
+    getLiveExam: async paperId => paperId !== MOCK_PAPER_ID ? [] : Array.from({ length: count }, (_, index): AdminLiveStudent => {
+      const doc = docs.get(id(index))!;
+      return { attemptId: id(index), studentId: `live-student-${index}`, studentName: ['김학생', '이학생', '박학생'][index],
+        questionId: questions[0].id, number: 1, imageUrl: questions[0].imageUrl, revision: doc.revision, updatedAt: doc.updatedAt, answeredCount: 0 };
+    }),
+    getLiveInk: async (attemptId, _questionId, since): Promise<LiveInkResponse> => {
+      const doc = docs.get(attemptId)!;
+      if (since === null || doc.revision - since > 24 || since > doc.revision) return { mode: 'full', revision: doc.revision, strokes: doc.strokes };
+      return { mode: 'delta', revision: doc.revision, batches: doc.batches.filter(batch => batch.revision > since) };
+    },
+  };
+  return { api, setCount: (n: number) => { count = Math.max(0, Math.min(3, n)); }, draw: (index: number) => update(index), erase: (index: number) => update(index, true) };
 }

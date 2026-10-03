@@ -66,7 +66,17 @@
 /* ── 시작 ── */
 .exam-start { display: grid; gap: 14px; max-width: 760px; margin-inline: auto; min-width: 0; }
 .exam-start-head { margin-bottom: -4px; }
-.exam-paper-entry { display: grid; min-width: 0; align-content: start; gap: 8px; }
+.exam-paper-entry { position: relative; display: grid; min-width: 0; align-content: start; gap: 8px; }
+.exam-live-badge { position: absolute; z-index: 1; right: 8px; top: -8px; display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--rn-line); border-radius: 999px; padding: 2px 8px; line-height: 14px; background: var(--rn-surface); color: var(--rn-text); font-size: 11px; cursor: pointer; }
+.exam-live-badge i { width: 6px; height: 6px; border-radius: 50%; background: #ef4444; }
+.exam-live-grid { display: grid; grid-template-columns: repeat(var(--live-columns), minmax(0, 1fr)); gap: 12px; }
+.exam-live-cell { min-width: 0; overflow: hidden; border: 1px solid var(--rn-line); border-radius: 12px; background: var(--rn-surface); }
+.exam-live-cell-open { display: block; width: 100%; border: 0; padding: 12px; text-align: left; color: var(--rn-text); background: transparent; cursor: zoom-in; }
+.exam-live-cell-open > span { display: block; margin: 4px 0 12px; color: var(--rn-text-muted); font-size: 12px; }
+.exam-live-canvas { pointer-events: none; }
+.exam-live-grid[data-focused="true"] { max-width: 1000px; margin-inline: auto; }
+.exam-live-grid[data-focused="true"] .exam-live-cell-open { cursor: default; }
+@media (max-width: 600px) { .exam-live-grid { grid-template-columns: minmax(0, 1fr); } .exam-live-view .exam-admin-review-bar { gap: 6px; padding-inline: 8px; } }
 .exam-history-open { width: 100%; white-space: normal; }
 .exam-paper-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 @media (min-width: 640px) { .exam-paper-list { grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: 14px; } }
