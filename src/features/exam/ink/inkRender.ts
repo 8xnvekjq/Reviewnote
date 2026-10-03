@@ -17,11 +17,13 @@ export function freehandOptions(tool: InkStroke['tool'], width: number, simulate
   if (tool === 'highlighter') {
     return { size: width, thinning: 0, smoothing: 0.6, streamline: 0.45, simulatePressure: false, last, start: { cap: true }, end: { cap: true } };
   }
+  // 실제 펜: 필압에 따른 굵기 변화(thinning)를 줄이고 떨림을 조금 더 걸러 낸다 — 애플펜슬은 필압·위치가
+  // 많이 흔들려 0.6이면 획이 울퉁불퉁했다(2026-10-04 아이패드 필기감 피드백).
   return {
     size: width,
-    thinning: simulated ? 0.5 : 0.6,
-    smoothing: 0.55,
-    streamline: 0.32, // 낮을수록 펜 끝을 바짝 따라온다(애플펜슬 지연 체감 ↓)
+    thinning: simulated ? 0.5 : 0.38,
+    smoothing: simulated ? 0.55 : 0.65,
+    streamline: simulated ? 0.32 : 0.4, // 높을수록 떨림이 줄고, 낮을수록 펜 끝을 바짝 따라온다
     easing: simulated ? undefined : easeOutSine, // 약한 필압도 너무 가늘어지지 않게
     simulatePressure: simulated,
     start: { cap: true, taper: 0 },
@@ -72,6 +74,16 @@ export function freehandPath(tool: InkStroke['tool'], size: number, points: InkP
   const width = strokeWidth({ tool, size }) * REF;
   const simulated = usesSimulatedPressure(points);
   const input = points.map(p => [p.x * REF, p.y * REF, p.pressure]);
+  // 펜 필압은 점마다 들쭉날쭉해 굵기가 떨려 보인다 — 앞뒤 2점 평균으로 고르게.
+  if (!simulated && input.length > 2) {
+    const raw = input.map(p => p[2]);
+    for (let i = 0; i < input.length; i++) {
+      const lo = Math.max(0, i - 2), hi = Math.min(raw.length - 1, i + 2);
+      let sum = 0;
+      for (let k = lo; k <= hi; k++) sum += raw[k];
+      input[i][2] = sum / (hi - lo + 1);
+    }
+  }
   return outlineToPath(getStroke(input, freehandOptions(tool, width, simulated, last)));
 }
 

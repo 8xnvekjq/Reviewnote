@@ -12,8 +12,6 @@ export interface RecognizeOptions {
   minSize?: number;
   /** 가로/세로에서 이 각도(도) 이내면 수평·수직으로 스냅. 0이면 스냅 안 함. */
   axisSnapDegrees?: number;
-  /** 직선 판정을 느슨하게(다른 도형이 다 아닐 때 곡선보다 먼저 — 살짝 흔들린 직선이 곡선이 되지 않게). */
-  looseLine?: boolean;
 }
 
 const DEFAULT_MIN_SIZE = 20;
@@ -34,6 +32,23 @@ function bbox(points: Pt[]) {
     if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
   }
   return { minX, minY, maxX, maxY };
+}
+
+/**
+ * 떨림을 걸러 낸 획 길이. 애플펜슬은 240Hz로 점이 촘촘히 들어오고 ±2~4px씩 떨려, 점을 그대로 이으면
+ * 지그재그 때문에 실제보다 훨씬 길게 잰다(그래서 반듯이 그은 직선도 "구불구불하다"고 판정됐다).
+ * 이동 평균으로 떨림을 걷어 낸 뒤 잰다.
+ */
+export function steadyLength(points: Pt[], window = 4): number {
+  if (points.length < 3) return pathLength(points);
+  const smooth = points.map((_, i) => {
+    const lo = Math.max(0, i - window), hi = Math.min(points.length - 1, i + window);
+    let x = 0, y = 0;
+    for (let k = lo; k <= hi; k++) { x += points[k].x; y += points[k].y; }
+    return { x: x / (hi - lo + 1), y: y / (hi - lo + 1) };
+  });
+  smooth[0] = points[0]; smooth[smooth.length - 1] = points[points.length - 1];
+  return pathLength(smooth);
 }
 
 function bboxDiagonal(points: Pt[]): number {
@@ -76,10 +91,10 @@ export function recognizeLine(raw: Pt[], options: RecognizeOptions = {}): SnapSh
   const to = points[points.length - 1];
   const chord = dist(from, to);
   if (chord < minSize) return null;
-  if (pathLength(points) / chord > (options.looseLine ? 1.18 : 1.12)) return null;
+  if (steadyLength(points) / chord > 1.12) return null;
   let maxDeviation = 0;
   for (const p of points) maxDeviation = Math.max(maxDeviation, distanceToSegment(p, from, to));
-  if (maxDeviation / chord > (options.looseLine ? 0.1 : 0.07)) return null;
+  if (maxDeviation / chord > 0.07) return null;
   const end = snapLineToAxis(from, to, options.axisSnapDegrees ?? DEFAULT_AXIS_SNAP);
   return { kind: 'line', from: [from.x, from.y], to: [end.x, end.y] };
 }
@@ -354,65 +369,6 @@ export function recognizePolygon(raw: Pt[], options: RecognizeOptions = {}): Sna
   return { kind: 'polygon', points: vertices.map(tuple) };
 }
 
-/** 같은 간격으로 다시 찍는다(속도에 따라 들쭉날쭉한 점 간격을 고르게). */
-function resample(points: Pt[], step: number): Pt[] {
-  const out: Pt[] = [points[0]];
-  let need = step;
-  for (let i = 1; i < points.length; i++) {
-    const a = points[i - 1], b = points[i];
-    const len = dist(a, b);
-    let at = need;
-    while (at <= len) {
-      out.push({ x: a.x + ((b.x - a.x) * at) / len, y: a.y + ((b.y - a.y) * at) / len });
-      at += step;
-    }
-    need = at - len;
-  }
-  const last = points[points.length - 1];
-  if (dist(out[out.length - 1], last) > step * 0.3) out.push(last);
-  else out[out.length - 1] = last;
-  return out;
-}
-
-function minDistance(p: Pt, polyline: Pt[]): number {
-  let best = Infinity;
-  for (let i = 1; i < polyline.length; i++) best = Math.min(best, distanceToSegment(p, polyline[i - 1], polyline[i]));
-  return best;
-}
-
-/** 열린 획의 손떨림을 걷어 낸 매끈한 곡선. 꺾인 글씨(2·3·ㄱ)나 여러 번 휘는 획(S·낙서), 글자 크기 획은 그대로 둔다. */
-export function recognizeCurve(raw: Pt[], options: RecognizeOptions = {}): SnapShape | null {
-  const minSize = options.minSize ?? DEFAULT_MIN_SIZE;
-  const points = dedupe(raw, minSize * 0.02);
-  if (points.length < 4) return null;
-  const diagonal = bboxDiagonal(points);
-  if (diagonal < minSize * 2) return null;
-  if (dist(points[0], points[points.length - 1]) < diagonal * 0.25) return null; // 닫힌 획(원·다각형 실패)은 곡선이 아님
-  // 고르게 다시 찍고 이동 평균으로 손떨림을 걷어 낸 뒤 단순화
-  const even = resample(points, diagonal / 80);
-  const smooth = even.map((p, i) => {
-    if (i === 0 || i === even.length - 1) return p;
-    const r = Math.min(3, i, even.length - 1 - i);
-    let x = 0, y = 0;
-    for (let k = i - r; k <= i + r; k++) { x += even[k].x; y += even[k].y; }
-    return { x: x / (2 * r + 1), y: y / (2 * r + 1) };
-  });
-  const simple = simplify(smooth, Math.max(diagonal * 0.02, minSize * 0.03));
-  if (simple.length < 3 || simple.length > 16) return null;
-  let total = 0;
-  for (let i = 1; i < simple.length - 1; i++) {
-    const turn = turnAngle(simple[i - 1], simple[i], simple[i + 1]);
-    if (turn > (75 * Math.PI) / 180) return null; // 뾰족하게 꺾임 → 글씨
-    total += turn;
-  }
-  if (total > Math.PI * 1.5) return null;
-  const shape: SnapShape = { kind: 'curve', points: simple.map(tuple) };
-  // 다듬은 곡선이 원래 획에서 멀어지면 안 된다
-  const sampled = shapeToPoints(shape);
-  for (const p of points) if (minDistance(p, sampled) > diagonal * 0.06) return null;
-  return shape;
-}
-
 /** Catmull-Rom 곡선을 3차 베지어 조각([시작, 제어1, 제어2, 끝])으로. 접선 길이를 변 길이에 맞춰 넘침을 막는다. */
 export function curveSegments(points: Array<[number, number]>): Array<[Pt, Pt, Pt, Pt]> {
   const p = points.map(([x, y]) => ({ x, y }));
@@ -433,13 +389,50 @@ export function curveSegments(points: Array<[number, number]>): Array<[Pt, Pt, P
 }
 
 /**
- * 직선 → 다각형 → 원/타원 → 곡선 순서로 판정. 모두 아니면 null(원래 획 유지).
- * 다각형을 원보다 먼저 본다: 둥근 사각형은 사각형으로 잡히고, 원은 꼭짓점이 많이 남아 다각형에서 걸러진다.
+ * 꾹 눌러 바꿀 도형. 깔끔하게 그린 직선·삼각형·사각형·원/타원은 그 모양 그대로 맞추고,
+ * 그 밖에는 "닫힌 획이면 원, 열린 획이면 직선"으로 바꾼다 — 애플펜슬처럼 떨림이 큰 펜으로
+ * 대충 그어도 꾹 누르면 직선이 되게(곡선 다듬기는 없앴다). 글씨처럼 꺾이고 꼬인 획은 그대로 둔다.
  */
 export function recognizeShape(points: Pt[], options: RecognizeOptions = {}): SnapShape | null {
   return recognizeLine(points, options) ?? recognizePolygon(points, options) ?? recognizeEllipse(points, options)
-    // 손으로 그은 직선은 조금 흔들려도 직선(끝점을 움직여 각도·길이 조절)이어야 한다 — 곡선보다 먼저 느슨하게 본다.
-    ?? recognizeLine(points, { ...options, looseLine: true }) ?? recognizeCurve(points, options);
+    ?? roughCircle(points, options) ?? roughLine(points, options);
+}
+
+/** 닫힌 획(시작·끝이 가깝고 한 바퀴쯤 돈 획)을 외접 사각형에 맞춘 원/타원으로. */
+export function roughCircle(raw: Pt[], options: RecognizeOptions = {}): SnapShape | null {
+  const minSize = options.minSize ?? DEFAULT_MIN_SIZE;
+  const points = dedupe(raw, minSize * 0.02);
+  if (points.length < 8) return null;
+  const b = bbox(points);
+  const w = b.maxX - b.minX, h = b.maxY - b.minY;
+  const diagonal = Math.hypot(w, h);
+  if (diagonal < minSize || Math.min(w, h) < Math.max(w, h) * 0.35) return null; // 납작하면 원이 아님
+  if (dist(points[0], points[points.length - 1]) > diagonal * 0.3) return null; // 열린 획
+  const length = steadyLength(points);
+  const perimeter = Math.PI * (w + h) / 2;
+  if (length < perimeter * 0.75 || length > perimeter * 1.8) return null; // 덜 돌았거나 여러 바퀴 낙서
+  const cx = (b.minX + b.maxX) / 2, cy = (b.minY + b.maxY) / 2;
+  if (Math.abs(w - h) / Math.max(w, h) <= 0.15) {
+    const r = (w + h) / 4;
+    return { kind: 'ellipse', cx, cy, rx: r, ry: r, rotation: 0 };
+  }
+  return { kind: 'ellipse', cx, cy, rx: w / 2, ry: h / 2, rotation: 0 };
+}
+
+/** 열린 획을 시작점→끝점 직선으로. 크게 휘거나(반원 등) 꺾인 글씨(ㄹ·2·3)는 그대로 둔다. */
+export function roughLine(raw: Pt[], options: RecognizeOptions = {}): SnapShape | null {
+  const minSize = options.minSize ?? DEFAULT_MIN_SIZE;
+  const points = dedupe(raw, minSize * 0.02);
+  if (points.length < 2) return null;
+  const from = points[0], to = points[points.length - 1];
+  const chord = dist(from, to);
+  if (chord < minSize) return null;
+  if (chord / steadyLength(points) < 0.8) return null;
+  let maxDeviation = 0;
+  for (const p of points) maxDeviation = Math.max(maxDeviation, distanceToSegment(p, from, to));
+  if (maxDeviation / chord > 0.2) return null;
+  const end = snapLineToAxis(from, to, options.axisSnapDegrees ?? DEFAULT_AXIS_SNAP);
+  return { kind: 'line', from: [from.x, from.y], to: [end.x, end.y] };
 }
 
 /** 도형 중심(외접 사각형 가운데, 타원은 중심). 크기 조절·변환 애니메이션 기준. */
@@ -455,15 +448,6 @@ export function resizeShape(base: SnapShape, anchor: Pt, pointer: Pt, axisSnapDe
     const from = { x: base.from[0], y: base.from[1] };
     const end = snapLineToAxis(from, pointer, axisSnapDegrees);
     return { kind: 'line', from: base.from, to: [end.x, end.y] };
-  }
-  if (base.kind === 'curve') {
-    // 곡선도 직선처럼 시작점은 고정하고 펜 쪽 끝이 따라온다(돌리기 + 늘이기).
-    const [ox, oy] = base.points[0];
-    const ax = anchor.x - ox, ay = anchor.y - oy, px = pointer.x - ox, py = pointer.y - oy;
-    const d = ax * ax + ay * ay;
-    if (d < 1e-12) return base;
-    const re = (px * ax + py * ay) / d, im = (py * ax - px * ay) / d;
-    return { kind: 'curve', points: base.points.map(([x, y]) => [ox + (x - ox) * re - (y - oy) * im, oy + (x - ox) * im + (y - oy) * re]) };
   }
   const center = shapeCenter(base);
   const start = dist(anchor, center);

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fitEllipse, holdStillStart, polylineHits, recognizeCurve, recognizeEllipse, recognizeLine, recognizePolygon, recognizeShape, resizeShape, shapeCenter, shapeToPoints } from '../../src/features/exam/ink/shapeSnap.ts';
+import { fitEllipse, holdStillStart, polylineHits, recognizeEllipse, recognizeLine, recognizePolygon, recognizeShape, resizeShape, roughCircle, roughLine, shapeCenter, shapeToPoints } from '../../src/features/exam/ink/shapeSnap.ts';
 import type { Pt, SnapShape } from '../../src/features/exam/ink/shapeSnap.ts';
 
 // 결정적인 흔들림(손떨림 흉내)
@@ -76,12 +76,13 @@ test('least-squares fit recovers an exact ellipse', () => {
   near(Math.max(fit.rx, fit.ry), 90, 1e-6, 'major'); near(Math.min(fit.rx, fit.ry), 40, 1e-6, 'minor');
 });
 
-test('zigzags are neither lines nor circles', () => {
+test('big zigzags are neither lines nor circles', () => {
   const zigzag = Array.from({ length: 9 }, (_, i) => ({ x: i * 30, y: i % 2 ? 40 : 0 }));
   const dense = zigzag.slice(1).flatMap((p, i) => lineOf(zigzag[i], p, 10));
   assert.equal(recognizeShape(hold(dense)), null);
+  // 높이 8px짜리 잔 지그재그는 펜 떨림과 구분되지 않는다 — 꾹 누르면 직선(떨림 큰 애플펜슬 직선과 같은 취급)
   const tight = Array.from({ length: 40 }, (_, i) => ({ x: i * 6, y: i % 2 ? 8 : 0 }));
-  assert.equal(recognizeShape(tight), null);
+  assert.equal(recognizeShape(tight)?.kind, 'line');
 });
 
 test('ordinary handwriting (2, S, 3, a C-shaped arc) is left alone', () => {
@@ -91,7 +92,7 @@ test('ordinary handwriting (2, S, 3, a C-shaped arc) is left alone', () => {
   assert.equal(recognizeShape(hold(s)), null, 'S');
   const three = [...ellipseOf(40, 30, 30, 25, 0, 0.7, -0.75 * Math.PI, 40), ...ellipseOf(40, 80, 32, 25, 0, 0.7, -0.45 * Math.PI, 40)];
   assert.equal(recognizeShape(hold(three)), null, '3');
-  // 글자 크기의 C는 그대로(큰 호는 아래 곡선 테스트에서 매끈한 곡선이 된다)
+  // 글자 크기의 C는 그대로
   const arc = ellipseOf(30, 30, 12, 12, 0, 0.6, 0.7 * Math.PI);
   assert.equal(recognizeShape(hold(arc)), null, 'C');
   const ell = [...lineOf({ x: 0, y: 0 }, { x: 120, y: 0 }), ...lineOf({ x: 120, y: 0 }, { x: 120, y: 120 })];
@@ -199,24 +200,31 @@ test('a rounded square is a rectangle, not a circle; a circle is never a polygon
   asEllipse(recognizeShape(hold(jitter(ellipseOf(200, 180, 80, 80, 0, 1.03, 0.4), 4))));
 });
 
-test('an open curve is smoothed into a gentle curve through the stroke', () => {
-  // 손떨림 섞인 포물선(함수 그래프처럼)
+test('no curve smoothing: a shaky Pencil line or circle held still becomes a line or a circle, big arcs stay as drawn', () => {
+  // 애플펜슬처럼 크게 떨린 직선(±7px) — 엄격한 직선 판정은 못 넘어도 꾹 누르면 직선
+  const shakyLine = jitter(lineOf({ x: 0, y: 0 }, { x: 240, y: 100 }), 14);
+  const line = recognizeShape(hold(shakyLine), { minSize: 40 });
+  assert.equal(line?.kind, 'line', JSON.stringify(line));
+  // 살짝 휜 직선(중간 높이 12%)도 직선 — 끝점을 움직여 돌릴 수 있다
+  const bowed = Array.from({ length: 61 }, (_, i) => { const t = i / 60; return { x: 200 * t, y: 24 * Math.sin(Math.PI * t) }; });
+  const bowedLine = recognizeShape(bowed, { minSize: 40 });
+  assert.equal(bowedLine?.kind, 'line');
+  assert.deepEqual(resizeShape(bowedLine!, { x: 200, y: 0 }, { x: 0, y: 150 }), { kind: 'line', from: [0, 0], to: [0, 150] });
+  // 찌그러진 원(울퉁불퉁 ±12%)도 원
+  const lumpy = Array.from({ length: 90 }, (_, i) => { const a = (i / 89) * Math.PI * 2.05; const r = 80 * (1 + 0.12 * Math.sin(5 * a)); return { x: 200 + r * Math.cos(a), y: 200 + r * Math.sin(a) }; });
+  const circle = recognizeShape(lumpy, { minSize: 40 });
+  assert.equal(circle?.kind, 'ellipse', JSON.stringify(circle));
+  assert.ok(circle!.kind === 'ellipse' && Math.abs(circle!.rx - circle!.ry) < 1e-9, 'round enough → a perfect circle');
+  // 반원·포물선처럼 크게 휜 열린 획은 곡선으로 다듬지도, 직선으로 펴지도 않는다
   const parabola = Array.from({ length: 120 }, (_, i) => { const x = i * 2.5; return { x, y: 250 - ((x - 150) ** 2) / 100 }; });
-  const shaky = jitter(parabola, 5);
-  const shape = recognizeShape(hold(shaky));
-  assert.ok(shape && shape.kind === 'curve', `expected curve, got ${JSON.stringify(shape)}`);
-  assert.ok(shape.points.length >= 3 && shape.points.length <= 16, `control points: ${shape.points.length}`);
-  near(shape.points[0][0], shaky[0].x, 1e-9, 'starts where the stroke starts');
-  const sampled = shapeToPoints(shape);
-  for (const p of parabola) assert.ok(polylineHits(sampled, p, 6), `close to the true curve at ${p.x}`);
-  // 큰 C자 호도 곡선으로(원을 덜 그린 것은 원이 아님)
-  const arc = recognizeCurve(jitter(ellipseOf(100, 100, 80, 80, 0, 0.55, 0.8 * Math.PI), 3));
-  assert.ok(arc && arc.kind === 'curve');
-  // 직선은 직선으로(곡선보다 먼저)
-  assert.equal(recognizeShape(jitter(lineOf({ x: 0, y: 0 }, { x: 200, y: 90 }), 2))?.kind, 'line');
+  assert.equal(recognizeShape(hold(jitter(parabola, 5)), { minSize: 40 }), null, 'parabola stays');
+  assert.equal(recognizeShape(ellipseOf(100, 100, 80, 80, 0, 0.5), { minSize: 40 }), null, 'half circle stays');
+  // 보조 판정 단독
+  assert.equal(roughLine(lineOf({ x: 0, y: 0 }, { x: 10, y: 0 }), { minSize: 40 }), null, 'too short');
+  assert.equal(roughCircle(ellipseOf(100, 100, 80, 10, 0, 1), { minSize: 40 }), null, 'a flat loop is not a circle');
 });
 
-test('polygons resize around their center, curves rotate/stretch from their start, and keep eraser hit testing', () => {
+test('polygons resize around their center, old curve strokes still draw, and keep eraser hit testing', () => {
   const tri: SnapShape = { kind: 'polygon', points: [[0, 0], [100, 0], [50, 80]] };
   const center = shapeCenter(tri);
   assert.deepEqual(center, { x: 50, y: 40 });
@@ -228,12 +236,6 @@ test('polygons resize around their center, curves rotate/stretch from their star
   assert.ok(polylineHits(outline, { x: 25, y: 41 }, 2), 'on the left side');
   assert.ok(!polylineHits(outline, { x: 50, y: 30 }, 2), 'the middle is empty');
   const curve: SnapShape = { kind: 'curve', points: [[0, 0], [50, 40], [100, 0]] };
-  // 곡선은 직선처럼 시작점 고정, 펜 쪽 끝이 따라온다(돌리기 + 늘이기)
-  const turned = resizeShape(curve, { x: 100, y: 0 }, { x: 0, y: 50 });
-  assert.ok(turned.kind === 'curve');
-  assert.deepEqual(turned.points[0], [0, 0], 'start stays');
-  near(turned.points[2][0], 0, 1e-9); near(turned.points[2][1], 50, 1e-9, 'end follows the pen (rotated 90° and halved)');
-  near(turned.points[1][0], -20, 1e-9); near(turned.points[1][1], 25, 1e-9, 'the bulge rotates with it');
   const path = shapeToPoints(curve);
   assert.deepEqual(path[0], { x: 0, y: 0 });
   assert.deepEqual(path.at(-1), { x: 100, y: 0 });
@@ -297,16 +299,4 @@ test('a rectangle whose end overshoots past the start corner is still a 4-vertex
   const shape = recognizePolygon(stroke, { minSize: 40 });
   assert.equal(shape?.kind, 'polygon');
   assert.equal(shape.kind === 'polygon' && shape.points.length, 4);
-});
-
-test('a slightly wobbly hand-drawn line is still a line (endpoint can rotate), not a curve', () => {
-  // 가운데가 8% 정도 휜 직선(곡선 판정 전에 느슨한 직선으로 잡혀야 한다)
-  const wobbly = Array.from({ length: 61 }, (_, i) => { const t = i / 60; return { x: 200 * t, y: 16 * Math.sin(Math.PI * t) }; });
-  const shape = recognizeShape(wobbly, { minSize: 40 });
-  assert.equal(shape?.kind, 'line', JSON.stringify(shape));
-  const rotated = resizeShape(shape!, { x: 200, y: 0 }, { x: 0, y: 150 });
-  assert.deepEqual(rotated, { kind: 'line', from: [0, 0], to: [0, 150] });
-  // 확실히 휜 호(중간 높이 20%)는 곡선
-  const arc = Array.from({ length: 61 }, (_, i) => { const t = i / 60; return { x: 200 * t, y: 40 * Math.sin(Math.PI * t) }; });
-  assert.equal(recognizeShape(arc, { minSize: 40 })?.kind, 'curve');
 });

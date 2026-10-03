@@ -247,7 +247,7 @@ try {
   assert.equal(list.length, 5, 'a cancelled hold keeps the stroke');
   assert.equal(list.at(-1).shape?.kind, 'line', 'and the snapped shape');
 
-  // ── 삼각형·사각형·곡선(마우스로 꾹) ──
+  // ── 삼각형·사각형, 휜 획은 직선(마우스로 꾹) ──
   const loopOf = corners => [...corners, corners[0], corners[1]].flatMap((p, i, a) => (i ? lineSteps(a[i - 1], p, 10).slice(1) : [p])).slice(0, -8);
   await draw(loopOf([[0.2, 0.95], [0.35, 1.2], [0.05, 1.2]]), { holdMs: 800 });
   list = await strokes();
@@ -270,8 +270,9 @@ try {
   const arch = Array.from({ length: 40 }, (_, i) => { const x = 0.1 + i * 0.02; return [x, 1.55 - 0.6 * (x - 0.49) * (x - 0.49) + (i % 2 ? 0.003 : -0.003)]; });
   await draw(arch, { holdMs: 800 });
   list = await strokes();
-  assert.equal(list.at(-1).shape?.kind, 'curve', `held open arc becomes a smooth curve: ${JSON.stringify(list.at(-1).shape)}`);
-  assert.ok(await inkAt(0.49, 1.55), 'curve is painted through its top');
+  // 곡선 다듬기는 없앴다 — 살짝 휜 열린 획을 꾹 누르면 직선(시작점→끝점)
+  assert.equal(list.at(-1).shape?.kind, 'line', `held gentle arc becomes a line: ${JSON.stringify(list.at(-1).shape)}`);
+  assert.ok(await inkAt(0.49, 1.459), 'the line is painted between the ends');
   const shapeCount = list.length;
 
   // ── 레이저: 빛만 잠깐 남고 획·실행 취소 기록이 생기지 않는다 ──
@@ -301,6 +302,6 @@ try {
   await page.getByRole('button', { name: '펜', exact: true }).click();
 
   assert.deepEqual(errors, []);
-  console.log('PASS exam ink: pen, hold→line/circle with resize, stroke eraser, undo/redo/clear, resize keeps position, readOnly, palm rejection, jittery Pencil hold, triangle/rectangle/curve, laser');
+  console.log('PASS exam ink: pen, hold→line/circle with resize, stroke eraser, undo/redo/clear, resize keeps position, readOnly, palm rejection, jittery Pencil hold, triangle/rectangle, arc→line, laser');
   await page.close();
 } finally { await browser.close(); }

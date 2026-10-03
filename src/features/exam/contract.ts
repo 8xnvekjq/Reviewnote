@@ -211,7 +211,7 @@ export interface InkStroke {
   /** 꾹 눌러 도형으로 바뀐 획이면 도형 정보(렌더는 이걸 우선). */
   shape?: InkShape;
 }
-/** 꾹 눌러 바뀐 도형. polygon은 닫힌 꼭짓점 목록(삼각형·사각형), curve는 이 점들을 지나는 매끈한 곡선(Catmull-Rom). */
+/** 꾹 눌러 바뀐 도형. polygon은 닫힌 꼭짓점 목록(삼각형·사각형), curve는 예전에 저장된 매끈한 곡선(Catmull-Rom) — 새로 만들지는 않고 그리기만 한다. */
 export type InkShape =
   | { kind: 'line'; from: [number, number]; to: [number, number] }
   | { kind: 'ellipse'; cx: number; cy: number; rx: number; ry: number; rotation: number }
@@ -305,7 +305,7 @@ export interface ExamInkCanvasProps {
   size: number;
   /** 애플펜슬 등 펜 입력이 감지되면 손가락 터치는 그리지 않고 스크롤/확대에 양보(손바닥 무시). */
   penOnlyWhenPenDetected?: boolean;
-  /** 꾹 눌러 직선/다각형/원/곡선 변환(기본 true). 펜을 떼지 않고 ~650ms 멈추면 판정. */
+  /** 꾹 눌러 직선/삼각형·사각형/원 변환(기본 true). 펜을 떼지 않고 ~650ms 멈추면 판정. */
   shapeSnap?: boolean;
   readOnly?: boolean;
   /** 문항 이미지를 이 너비(CSS px) 이하로 고정해 글자 크기를 일정하게 한다. 필기 영역은 컨테이너 전체 너비를 쓴다.
