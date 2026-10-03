@@ -11,7 +11,7 @@ from pathlib import Path
 
 from PIL import Image, ImageChops
 
-from import_school import START, ROOT, NeedsExceptions, blank_boundary, crop_questions, detect_layout, find_starts, ink_rows, make_data, parse_cover, prepare_config, read_cover, resolve_pdf, run, seed_sql
+from import_school import START, ROOT, NeedsExceptions, blank_boundary, crop_questions, detect_layout, find_starts, ink_rows, make_data, parse_cover, prepare_config, read_cover, read_keys, resolve_pdf, run, seed_sql
 import fitz
 
 # 기준 시험지 두 개(1차 출력과 비교). 새로 추가되는 학교 설정은 각자 확인 화면으로 검증한다.
@@ -63,7 +63,7 @@ class CoverTests(unittest.TestCase):
             yield path, config, resolve_pdf(config, path)
 
     def test_three_real_covers(self):
-        expected = {'dunchon': dict(questionCount=22, points=100), 'yeongpa': dict(questionCount=20, points=25), 'dongbuk': None}
+        expected = {'dunchon': dict(questionCount=22, points=100), 'yeongpa': dict(questionCount=20, points=25), 'dongbuk': None, 'sangil': dict(questionCount=23, points=None)}
         for _, config, pdf in self.configs():
             with self.subTest(school=config['slug']), fitz.open(pdf) as doc:
                 self.assertEqual(read_cover(doc), expected[config['slug']])
@@ -81,7 +81,7 @@ class CoverTests(unittest.TestCase):
                 for explicit in (True, False):
                     candidate = copy.deepcopy(config)
                     if explicit:
-                        candidate['paper']['questionCount'] = 22 if config['slug'] == 'dunchon' else 21
+                        candidate['paper']['questionCount'] = {'dunchon': 22, 'yeongpa': 21, 'sangil': 23}[config['slug']]
                     path.write_text(json.dumps(candidate), encoding='utf-8')
                     out = folder / str(explicit)
                     run(path, out, True)
@@ -124,7 +124,7 @@ class CoverTests(unittest.TestCase):
                 path = Path(tmp) / 'bad.json'
                 path.write_text(json.dumps(config), encoding='utf-8')
                 out = Path(tmp) / 'out'
-                with self.assertRaisesRegex(ValueError, 'cover original points.*pointScale.*maxScore'):
+                with self.assertRaisesRegex(ValueError, 'Points total'):
                     run(path, out)
                 self.assertFalse(out.exists())
 
@@ -482,6 +482,42 @@ class RealPdfTests(unittest.TestCase):
         self.assertEqual(help_result.returncode, 0)
         self.assertIn(b'--force', help_result.stdout)
 
+
+class SangilPdfTests(unittest.TestCase):
+    def test_real_pdf_answers_points_layout_and_outputs(self):
+        path = ROOT / 'scripts/exam/school-configs/2026-sangil-g1-s2-mid-common2.json'
+        config = json.loads(path.read_text(encoding='utf-8'))
+        with fitz.open(resolve_pdf(config, path)) as doc:
+            prepared, starts = prepare_config(doc, config)
+            keys, points = read_keys(doc, prepared, starts)
+            self.assertEqual(read_cover(doc), dict(questionCount=23, points=None))
+            self.assertEqual(prepared['layout']['questionPages'], [1, 2, 3, 4])
+            self.assertEqual(prepared['layout']['answerPages'], [5])
+            self.assertEqual(prepared['layout']['columns'], [[42, 294], [302, 554]])
+            self.assertEqual([points[n] for n in range(1, 24)], [.8,.8,.9,1,1,1.1,1.1,1.2,1.2,1.3,1.3,1.3,1.4,1.4,1.4,1.5,1.6,1.7,1,1,1,2,3])
+            self.assertAlmostEqual(sum(points.values()) * config['pointScale'], 100)
+            self.assertEqual(keys[23], '정답')  # Empty printed header; use checked solution.
+            for spec in config['questions']:
+                self.assertEqual(spec['sourceAnswerText'], keys[spec['number']])
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            data, warnings = run(path, out, True)
+            self.assertEqual(data['questionCount'], 23)
+            self.assertFalse(data['published'])
+            self.assertEqual([q['answer'] for q in data['questions']], ['5','3','2','5','4','4','4','1','2','2','3','1','2','3','5','1','4','2','3','7','10','2','9'])
+            self.assertEqual([q['points'] for q in data['questions']], [2.7,2.7,3,3.3,3.3,3.7,3.7,4,4,4.3,4.3,4.3,4.7,4.7,4.7,5,5.3,5.7,3.3,3.3,3.3,6.7,10])
+            self.assertEqual(sum(q['points'] for q in data['questions']), 100)
+            current = json.loads((ROOT / 'src/features/exam/data' / (data['id'] + '.json')).read_text(encoding='utf-8'))
+            self.assertEqual(data, current)
+            self.assertFalse(any('source edge' in w or 'segment boundary' in w for w in warnings))
+            for relative in [Path('supabase/migrations/20261004120000_exam_sangil_school_seed.sql'), Path('scripts/exam/publish_sangil.sql')]:
+                self.assertEqual((out / relative).read_bytes(), (ROOT / relative).read_bytes())
+            for q in data['questions']:
+                relative = Path('public') / q['imageUrl'].lstrip('/')
+                self.assertEqual((out / relative).read_bytes(), (ROOT / relative).read_bytes())
+                if q['answerType'] == 'choice10':
+                    self.assertEqual(len(set(q['choices'])), 10)
+                    self.assertEqual(q['choices'][int(q['answer']) - 1], q['originalAnswer'])
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

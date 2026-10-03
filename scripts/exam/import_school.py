@@ -284,6 +284,20 @@ def read_keys(doc, config, starts):
     for i, match in enumerate(matches):
         raw = text[match.end():matches[i + 1].start() if i + 1 < len(matches) else len(text)]
         answers[int(match[1])] = raw.strip()
+    # Some publishers put a labelled answer in its own block, followed by a
+    # worked solution. Keep that header (even if empty) separate from the proof.
+    for pn in config['layout']['answerPages']:
+        blocks = doc[pn - 1].get_text('blocks')
+        for index, block in enumerate(blocks):
+            labelled = re.match(r'^\s*(\d+)[.)]\s*정답\s*(.*)$', block[4], re.S)
+            if labelled:
+                value = labelled[2].strip()
+                # A raised fraction numerator may occupy the following block.
+                for continuation in blocks[index + 1:]:
+                    if not value or re.search(r'[가-힣]|^\s*\d+[.)]', continuation[4]):
+                        break
+                    value += '\n' + continuation[4].strip()
+                answers[int(labelled[1])] = value or '정답'
     points = {}
     # Yeongpa: ten number labels followed by ten values, twice.
     lines = [line.strip() for line in text.splitlines() if line.strip()]
@@ -305,7 +319,7 @@ def read_keys(doc, config, starts):
         end = min([sy for n, (p, c, sy) in starts.items() if p == pn and c == col and sy > y] or [config['layout'].get('pageBodyBottom', {}).get(str(pn), config['layout']['bodyBottom'])])
         left, right = config['layout']['columns'][col]
         region = page.get_text(clip=fitz.Rect(left, y - 10, right, end))
-        inline = re.findall(r'\[\s*(\d+(?:\.\d+)?)\s*점\s*\]', region)
+        inline = re.findall(r'[\[(]\s*(\d+(?:\.\d+)?)\s*점\s*[\])]', region)
         if inline:
             total = sum(float(v) for v in inline)
             if original in points and abs(total - points[original]) > 1e-6:
