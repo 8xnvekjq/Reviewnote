@@ -43,8 +43,10 @@ export function PeerSolutionView({ session, attemptId, questionId, imageUrl, onS
     {solution === null && <p className="rn-caption" role="status">아직 이 문제를 맞힌 다른 풀이가 없어요</p>}
     {failed && <p className="rn-caption" role="status">풀이를 불러오지 못했어요. 다시 눌러 주세요.</p>}
     {showing && solution && <div data-testid="exam-peer-solution">
-      <p className="exam-peer-label" data-testid="exam-peer-label">{peerSolutionLabel(solution.label)}</p>
-      <p className="rn-caption">다른 풀이 · 읽기 전용</p>
+      <div className="exam-peer-head">
+        <p className="exam-peer-label" data-testid="exam-peer-label">{peerSolutionLabel(solution.label)}</p>
+        <p className="rn-caption">다른 풀이 · 읽기 전용</p>
+      </div>
       <ExamInkReplay client={replayClient} attemptId={attemptId} questionId={questionId}
         imageUrl={imageUrl} strokes={solution.strokes} imageMaxWidth={480} persistDock={false} />
     </div>}

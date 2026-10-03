@@ -346,6 +346,7 @@ async function spinWheel(page, place, steps) {
   assert.match(await peerView.innerText(), /다른 풀이 · 읽기 전용/);
   assert.equal(await peerView.locator('.exam-ink').getAttribute('data-stroke-count'), '3');
   assert.equal(await peerView.getByTestId('exam-notes-tools').count(), 0);
+  await page.getByTestId('exam-viewer').screenshot({ path: `${out}/peer-solution.png` });
   assert.equal(await peerCalls('getPeerSolution'), 1); assert.equal(await peerCalls('getPeerSolutionReplay'), 0);
   await peerView.getByRole('button', { name:'필기 순서 보기', exact:true }).click();
   await peerView.getByTestId('exam-replay-dock').waitFor();
