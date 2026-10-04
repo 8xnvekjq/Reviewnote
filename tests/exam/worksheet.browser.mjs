@@ -23,6 +23,7 @@ try {
     await page.getByTestId('exam-start-button').click();
     await page.getByTestId('worksheet-source').waitFor();
     assert.match(await page.getByTestId('worksheet-source').innerText(), /2017년 9월 고2/);
+    assert.equal(await page.getByTestId('worksheet-reference').count(), 0, '삼각비 표 버튼은 해당 학습지에만');
     assert.equal(await page.getByTestId('exam-remaining').count(), 0);
     await assertCompactTopbar(page, { freeCheck: true });
     await page.locator('.exam-choice[data-choice="4"]').click();
@@ -40,7 +41,7 @@ try {
     await context.close();
   }
 
-  // 중3 탭: 삼각비 창의융합 학습지 — 삼각비 표 링크는 새 탭에서 이미지로 열린다. 자유 모드로 채점·제출.
+  // 중3 탭: 삼각비 창의융합 학습지 — 삼각비 표 버튼은 앱 안 이미지 보기 창으로 열린다. 자유 모드로 채점·제출.
   for (const width of [1180, 390]) {
     const context = await browser.newContext({ viewport: { width, height: 820 } });
     const page = await context.newPage();
@@ -58,16 +59,61 @@ try {
     await page.getByTestId('exam-start-button').click();
     await page.getByTestId('worksheet-source').waitFor();
     assert.match(await page.getByTestId('worksheet-source').innerText(), /리뷰노트 변형 문항 · 유형 A-①/);
-    const link = page.getByTestId('worksheet-reference');
-    assert.equal(await link.getAttribute('target'), '_blank');
-    assert.equal(await link.getAttribute('href'), '/exams/2026-g3m-trig-creative/trig-table.png');
-    const [tab] = await Promise.all([context.waitForEvent('page'), link.click()]);
-    const response = await tab.waitForEvent('response', r => r.url().endsWith('/trig-table.png')).catch(() => null);
-    await tab.waitForLoadState();
-    assert.match(tab.url(), /\/exams\/2026-g3m-trig-creative\/trig-table\.png$/);
-    if (response) assert.match(response.headers()['content-type'] ?? '', /image\/png/);
-    assert.equal(await tab.evaluate(() => document.images[0]?.naturalWidth > 0), true, '삼각비 표 이미지가 열린다');
-    await tab.close();
+    // 삼각비 표: 새 탭이 아니라 앱 안 이미지 보기 창. 드래그·확대 뒤 click은 닫지 않고, 탭 한 번 · Esc · 뒤로가기로 닫힌다.
+    const opened = [];
+    context.on('page', p => opened.push(p));
+    const button = page.getByRole('button', { name: '삼각비 표', exact: true });
+    assert.equal(await button.getAttribute('data-testid'), 'worksheet-reference');
+    assert.equal(await page.locator('a[data-testid="worksheet-reference"]').count(), 0, '새 탭 링크는 없다');
+    await button.click();
+    const viewer = page.getByTestId('exam-image-viewer');
+    await viewer.waitFor();
+    const image = viewer.locator('img');
+    assert.equal(await image.getAttribute('src'), '/exams/2026-g3m-trig-creative/trig-table.png');
+    await page.waitForFunction(() => {
+      const img = document.querySelector('[data-testid="exam-image-viewer"] img');
+      return img?.complete && img.naturalWidth > 0 && img.getBoundingClientRect().width > 0;
+    });
+    const fit = await page.evaluate(() => {
+      const img = document.querySelector('[data-testid="exam-image-viewer"] img');
+      const r = img.getBoundingClientRect();
+      return { w: r.width, h: r.height, ratio: img.naturalWidth / img.naturalHeight, vw: innerWidth, vh: innerHeight };
+    });
+    assert.ok(Math.abs(fit.w / fit.h - fit.ratio) < 0.02, '이미지 비율 유지');
+    assert.ok(fit.w <= fit.vw && fit.h <= fit.vh, '처음엔 화면 안에 들어온다');
+    assert.ok(fit.w >= fit.vw - 40 || fit.h >= fit.vh - 40, '가로·세로 중 맞는 쪽으로 꽉 맞춘다');
+    const stage = viewer.locator('.exam-image-viewer-stage');
+    const sbox = await stage.boundingBox();
+    const cx = sbox.x + sbox.width / 2, cy = sbox.y + sbox.height / 2;
+    await page.mouse.move(cx, cy);
+    await page.mouse.wheel(0, -600);
+    await page.waitForFunction(() => Number(document.querySelector('.exam-image-viewer-stage')?.dataset.scale) > 1.2);
+    for (let i = 0; i < 20; i++) await page.mouse.wheel(0, -2000);
+    await page.waitForTimeout(100);
+    assert.ok(Number(await stage.getAttribute('data-scale')) <= 5, '최대 5배');
+    // 확대 상태에서 끌기 — 놓아도 닫히지 않는다.
+    await page.mouse.down();
+    await page.mouse.move(cx + 80, cy + 60, { steps: 6 });
+    await page.mouse.up();
+    await page.waitForTimeout(100);
+    assert.equal(await viewer.count(), 1, '드래그로는 닫히지 않는다');
+    // 탭 한 번이면 닫힌다(필기 캔버스로 click이 새지 않는다).
+    await page.mouse.click(cx, cy);
+    await viewer.waitFor({ state: 'detached' });
+    // Esc · 뒤로가기로도 닫힌다.
+    await button.click();
+    await viewer.waitFor();
+    await page.keyboard.press('Escape');
+    await viewer.waitFor({ state: 'detached' });
+    await button.click();
+    await viewer.waitFor();
+    await page.goBack();
+    await viewer.waitFor({ state: 'detached' });
+    // × 버튼
+    await button.click();
+    await page.getByRole('button', { name: '삼각비 표 닫기', exact: true }).click();
+    await viewer.waitFor({ state: 'detached' });
+    assert.equal(opened.length, 0, '새 탭이 열리지 않는다');
     assert.equal(await page.getByTestId('worksheet-source').count(), 1, '풀이 화면은 그대로');
     const ones = page.getByRole('spinbutton', { name: '일의 자리' });
     const box = await ones.boundingBox();

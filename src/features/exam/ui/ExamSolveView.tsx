@@ -14,7 +14,8 @@ import { OmrCard } from './OmrCard';
 import { QuestionOverview } from './QuestionOverview';
 import { useExamInk } from './useExamInk';
 import { useInkBroadcast } from './useInkBroadcast';
-import { worksheetReferences } from './worksheetReferences';
+import { worksheetReferences, type WorksheetReference } from './worksheetReferences';
+import { ExamImageViewer } from './ExamImageViewer';
 import {
   countAnswered, createStopwatch, crossedAlerts, elapsedFor, formatClock, normalizeShortAnswer, pauseStopwatch, remainingMs,
   switchStopwatch, toggleChoice, questionAnswerType, usesWholePages, type StopwatchState,
@@ -80,6 +81,8 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
   const [color, setColor] = useState(PEN_COLORS[0].value);
   const [size, setSize] = useState(SIZES[1].value);
   const [overlay, setOverlay] = useState<Overlay>(null);
+  // 학습지 참고 이미지(삼각비 표) 보기 창. 열려 있는 동안 필기 캔버스는 입력을 받지 않는다.
+  const [reference, setReference] = useState<WorksheetReference | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [toast, setToast] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -334,6 +337,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
   };
 
   const closeOverlay = useCallback(() => setOverlay(null), []);
+  const closeReference = useCallback(() => setReference(null), []);
 
   const confirmExit = async () => {
     swRef.current = pauseStopwatch(swRef.current, Date.now());
@@ -437,7 +441,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
             {question.sourceRound && <span data-testid="exam-question-source">제{question.sourceRound}회 {question.sourceNumber}번 · </span>}
             {question.number}번 · {question.points}점 · {question.isChoice ? '객관식' : '단답형'}
             {question.sourceLabel && <span data-testid="worksheet-source"> · {question.sourceLabel}</span>}
-            {worksheetReferences(attempt.paperId).map(link => <span key={link.href}> · <a className="exam-reference-link" href={link.href} target="_blank" rel="noopener noreferrer" data-testid="worksheet-reference">{link.label} ↗</a></span>)}
+            {worksheetReferences(attempt.paperId).map(link => <span key={link.href}> · <button type="button" className="exam-reference-button" aria-haspopup="dialog" onClick={() => setReference(link)} data-testid="worksheet-reference">{link.label}</button></span>)}
             {saveState === 'failed' && <span className="exam-save-failed"> · 저장이 잠깐 안 됐어요(다시 시도할게요)</span>}
           </div>
           {/* 시험 중 방해가 되지 않도록 저장 중·완료는 말하지 않고, 사용자가 해야 할 일이 있을 때만 보인다. */}
@@ -471,7 +475,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
             size={size}
             penOnlyWhenPenDetected
             shapeSnap
-            readOnly={!inkSync.ready || submitting || (hanneung && pagePan)}
+            readOnly={!inkSync.ready || submitting || (hanneung && pagePan) || reference != null}
             imageMaxWidth={hanneung ? (pageZoom ? 1100 : 980) : QUESTION_IMAGE_WIDTH}
           />
           </div>
@@ -485,6 +489,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
         </div>
       </main>
 
+      {reference && <ExamImageViewer src={reference.href} label={reference.label} onClose={closeReference} />}
       {toast && <div className="exam-toast" role="status" aria-live="assertive">{toast}</div>}
 
       {overlay === 'overview' && (
