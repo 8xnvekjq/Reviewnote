@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties, SyntheticEvent } from 'react';
 import type { ExamInkCanvasHandle, ExamInkCanvasProps, InkPoint, InkStroke } from '../contract.ts';
 import {
@@ -96,6 +96,7 @@ interface EraseGesture {
   working: InkStroke[];
   last: Pt;
   recorded: boolean;
+  historyBefore: InkHistory;
 }
 /** 올가미를 그리는 중. */
 interface LassoGesture {
@@ -112,7 +113,7 @@ interface SelectGesture {
   transform: Similarity;
 }
 type Gesture = (DrawGesture | EraseGesture | PanGesture | LaserGesture | LassoGesture | SelectGesture) & { touch?: boolean };
-/** 올가미로 고른 획(원본 객체)과 감싸는 테두리. 확정 레이어에서는 숨기고 선택 레이어에 그린다. */
+/** 올가미로 고른 획(원본 객체)과 감싸는 테두리. */
 interface Selection { ids: string[]; strokes: InkStroke[]; frame: LassoFrame }
 
 
@@ -141,7 +142,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
   const [dprWanted, setDprWanted] = useState(() => (typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1));
   const [penSeen, setPenSeen] = useState(penEverDetected);
   const [liveHighlighter, setLiveHighlighter] = useState(false);
-  /** 올가미로 고른 획 id(확정 레이어에서 숨긴다). */
+  /** 올가미로 고른 획 id(렌더 갱신과 선택 개수 표시). */
   const [hidden, setHidden] = useState<ReadonlySet<string> | null>(null);
   /** 두·세 손가락 두 번 탭 알림(잠깐 보였다 사라진다). */
   const [tapNotice, setTapNotice] = useState<{ action: MultiTapAction; at: number } | null>(null);
@@ -209,8 +210,8 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
   const imagePainted = paintedUrl === imageUrl;
 
   // ── 확정 획 렌더(형광펜 레이어 + 펜 레이어). 끝에 덧붙인 획만 있으면 그 획만 더 그린다. ──
-  // 올가미로 고른 획은 여기서 빼고 선택 레이어(변환 미리보기 포함)에 그린다.
-  const visibleStrokes = useMemo(() => (hidden ? props.strokes.filter(s => !hidden.has(s.id)) : props.strokes), [props.strokes, hidden]);
+  // 선택 중에도 원래 레이어와 획 순서를 유지한다. 미리보기는 아래에서 이 레이어를 다시 그린다.
+  const visibleStrokes = props.strokes;
   useLayoutEffect(() => {
     const strokes = visibleStrokes;
     const hl = highlightRef.current, pen = penRef.current;
@@ -220,7 +221,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     const hctx = hl.getContext('2d'), pctx = pen.getContext('2d');
     if (!hctx || !pctx) return;
     const drawn = drawnRef.current;
-    const appendOnly = !resizedA && !resizedB && drawn && drawn.width === hl.width && drawn.height === hl.height
+    const appendOnly = !hidden && !resizedA && !resizedB && drawn && drawn.width === hl.width && drawn.height === hl.height
       && drawn.strokes.length <= strokes.length && drawn.strokes.every((s, i) => strokes[i] === s);
     const from = appendOnly ? drawn.strokes.length : 0;
     if (!appendOnly) {
@@ -230,7 +231,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     for (let i = from; i < strokes.length; i++) drawStroke(strokes[i].tool === 'highlighter' ? hctx : pctx, strokes[i]);
     drawnRef.current = { strokes, width: hl.width, height: hl.height };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visibleStrokes, cssWidth, cssHeight, dpr, imgW]);
+  }, [visibleStrokes, hidden, cssWidth, cssHeight, dpr, imgW]);
 
   // ── 진행 중 획 렌더(별도 레이어, rAF) ──
   const renderLive = useCallback(() => {
@@ -328,12 +329,21 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     const g = gestureRef.current;
     const m = g?.kind === 'select' ? g.transform : IDENTITY;
     const REF = INK_REFERENCE_WIDTH;
-    // 미리보기는 캔버스 변환으로(획 모양 캐시를 그대로 써서 끌 때도 가볍다). 손을 떼면 좌표를 바꾼 새 획으로 확정한다.
+    // 같은 레이어에서 원래 순서대로 그린다. 선택 획을 별도 레이어 위에 얹으면
+    // 형광펜 겹침의 투명도와 펜 색의 앞뒤 순서가 선택만으로 바뀐다.
+    const baseHl = highlightRef.current, basePen = penRef.current;
+    const baseHctx = baseHl?.getContext('2d'), basePctx = basePen?.getContext('2d');
+    if (!baseHl || !basePen || !baseHctx || !basePctx) return;
+    resetTransform(baseHctx, baseHl, unitDevicePx(baseHl));
+    resetTransform(basePctx, basePen, unitDevicePx(basePen));
+    drawnRef.current = null; // 다음 확정 렌더는 미리보기를 지우고 전체를 다시 그린다.
+    const selected = new Set(sel.ids);
     const cos = Math.cos(m.angle) * m.k, sin = Math.sin(m.angle) * m.k;
-    for (const [ctx, layer] of [[hctx, 'highlighter'], [pctx, 'pen']] as const) {
+    for (const s of propsRef.current.strokes) {
+      const ctx = s.tool === 'highlighter' ? baseHctx : basePctx;
       ctx.save();
-      ctx.transform(cos, sin, -sin, cos, m.tx * REF, m.ty * REF);
-      for (const s of sel.strokes) if (s.tool === layer) drawStroke(ctx, s);
+      if (selected.has(s.id)) ctx.transform(cos, sin, -sin, cos, m.tx * REF, m.ty * REF);
+      drawStroke(ctx, s);
       ctx.restore();
     }
     const px = REF / (geomRef.current.imgW || 1);
@@ -407,12 +417,14 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     renderSelection();
   }, [cssWidth, cssHeight, dpr, imgW, renderLive, renderLaser, renderSelection]);
 
-  /** 선택을 바꾼다(null이면 해제). 확정 레이어에서 숨길 획도 함께. */
+  /** 선택을 바꾼다(null이면 해제). 렌더 갱신에 쓸 id도 함께. */
   const setSelection = useCallback((sel: Selection | null) => {
     selectionRef.current = sel;
     setHidden(sel ? new Set(sel.ids) : null);
     scheduleSelection();
   }, [scheduleSelection]);
+
+  useLayoutEffect(() => { renderSelection(); }, [strokes, hidden, renderSelection]);
 
   // 다른 도구로 바꾸거나 보기 전용이 되면 선택 해제.
   useEffect(() => {
@@ -541,8 +553,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       else if (g.kind === 'select') scheduleSelection();
       else if (g.kind === 'erase' && g.recorded) {
         // 그 사이 지운 획을 되살리고 기록도 되돌린다.
-        const past = historyRef.current.past;
-        historyRef.current = { past: past.slice(0, -1), future: historyRef.current.future };
+        historyRef.current = g.historyBefore;
         propsRef.current.onChange(g.before, 'undo');
       }
       setLiveHighlighter(false);
@@ -612,7 +623,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       }
       if (p.tool === 'eraser') {
         const pt = toPoint(e, start);
-        const g: EraseGesture = { kind: 'erase', pointerId: e.pointerId, before: p.strokes, working: p.strokes, last: pt, recorded: false };
+        const g: EraseGesture = { kind: 'erase', pointerId: e.pointerId, before: p.strokes, working: p.strokes, last: pt, recorded: false, historyBefore: historyRef.current };
         gestureRef.current = Object.assign(g, { touch });
         eraseAlong(g, pt);
         scheduleLive();
@@ -886,7 +897,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       <div aria-hidden style={{ height: extraHeight }} />
       <canvas ref={highlightRef} aria-hidden style={highlighterLayer} />
       <canvas ref={penRef} aria-hidden style={{ ...CANVAS_STYLE, pointerEvents: 'none', visibility: strokeVisibility }} />
-      {/* 올가미로 고른 획(옮기는 중 미리보기 포함)과 선택 테두리 */}
+      {/* 올가미 선택 테두리·손잡이(획 미리보기는 원래 레이어에 렌더) */}
       <canvas ref={selHighlightRef} aria-hidden style={highlighterLayer} />
       <canvas ref={selPenRef} className="exam-ink-selection" aria-hidden style={{ ...CANVAS_STYLE, pointerEvents: 'none', visibility: strokeVisibility }} />
       <canvas ref={laserRef} className="exam-ink-laser" aria-hidden style={{ ...CANVAS_STYLE, pointerEvents: 'none' }} />

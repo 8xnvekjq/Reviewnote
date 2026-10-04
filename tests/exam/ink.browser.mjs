@@ -157,6 +157,24 @@ try {
   await fire('pointermove', 'touch', 31, [[0.35, 1.22], [0.4, 1.25]]);
   await fire('pointerup', 'touch', 31, [[0.4, 1.25]]);
   assert.equal((await strokes()).length, touchBefore + 1, 'without a pen, fingers draw');
+  // 펜 감지 전 지우개 첫 터치를 다지 탭으로 취소해도 기존 redo는 보존한다.
+  await page.getByRole('button', { name: '되돌리기' }).click();
+  const beforeEraseTap = await strokes();
+  assert.ok(await page.evaluate(() => window.__ink.handle().canRedo()));
+  await page.getByRole('button', { name: '지우개' }).click();
+  await page.evaluate(() => {
+    const el = document.querySelector('.exam-ink-input');
+    const r = el.getBoundingClientRect();
+    const p = window.__ink.strokes()[0].points[0];
+    for (const type of ['pointerdown', 'pointerup']) for (const i of [0, 1]) {
+      el.dispatchEvent(new PointerEvent(type, { pointerId: 500 + i, pointerType: 'touch', bubbles: true, cancelable: true,
+        clientX: r.left + p.x * r.width + i * 60, clientY: r.top + p.y * r.width }));
+    }
+  });
+  assert.deepEqual(await strokes(), beforeEraseTap, 'cancelled erase restores the strokes');
+  assert.ok(await page.evaluate(() => window.__ink.handle().canRedo()), 'cancelled erase preserves redo');
+  await page.getByRole('button', { name: '다시 하기' }).click();
+  await page.getByRole('button', { name: '펜', exact: true }).click();
   await fire('pointerdown', 'pen', 32, [[0.3, 1.3]]);
   await fire('pointermove', 'pen', 32, [[0.35, 1.32], [0.4, 1.35]]);
   await fire('pointerup', 'pen', 32, [[0.4, 1.35]]);
@@ -307,12 +325,14 @@ try {
   const firstLine = (await strokes()).find(s => s.shape?.kind === 'line' && Math.abs(s.shape.from[1] - 0.3) < 0.02);
   assert.ok(firstLine, 'the jittery-hold line from (0.15,0.3) is there');
   const countBefore = (await strokes()).length;
+  const inkLayers = () => page.evaluate(() => Array.from(document.querySelectorAll('.exam-ink canvas')).slice(0, 2).map(c => c.toDataURL()));
+  const layersBeforeSelection = await inkLayers();
   await page.getByRole('button', { name: '올가미' }).click();
   await draw([[0.1, 0.24], [0.4, 0.22], [0.64, 0.25], [0.64, 0.46], [0.3, 0.47], [0.1, 0.45], [0.1, 0.26]]);
   assert.equal(await selected(), 1, 'the lasso picks the line only');
   assert.equal((await strokes()).length, countBefore, 'selecting changes nothing');
-  assert.ok(!(await inkAt(0.375, 0.35)), 'the selected line is lifted off the committed layer');
-  assert.ok(await inkAt(0.375, 0.35, 3), 'and drawn on the selection layer');
+  assert.ok(await inkAt(0.375, 0.35), 'the selected line stays on its original ink layer');
+  assert.deepEqual(await inkLayers(), layersBeforeSelection, 'selection preserves ink pixels, layer opacity and stroke order');
   // 선택 테두리(획 굵기 절반 + 여백 8px)
   const w0 = await unitPx();
   const [fx, fy] = [firstLine.shape.from, firstLine.shape.to];
