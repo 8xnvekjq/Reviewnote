@@ -7,6 +7,7 @@ import { assertCompactTopbar } from './compact-topbar.assertions.mjs';
 
 const base = process.env.EXAM_TEST_BASE_URL || 'http://127.0.0.1:5174';
 const output = 'scratch/worksheet-browser';
+const TRIG_IDS = ['2026-g3m-trig-creative-1', '2026-g3m-trig-creative-2'];
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
@@ -41,7 +42,7 @@ try {
     await context.close();
   }
 
-  // 중3 탭: 삼각비 창의융합 학습지 — 삼각비 표 버튼은 앱 안 이미지 보기 창으로 열린다. 자유 모드로 채점·제출.
+  // 중3 탭: 삼각비 창의융합 학습지 개편판 1차·2차(기존 18문항판은 비공개로 내려가 목록에 없다) — 삼각비 표 버튼은 앱 안 이미지 보기 창으로 열린다. 자유 모드로 채점·제출.
   for (const width of [1180, 390]) {
     const context = await browser.newContext({ viewport: { width, height: 820 } });
     const page = await context.newPage();
@@ -50,11 +51,15 @@ try {
     await page.goto(`${base}/tests/exam/practice.html?worksheet=1`);
     for (const label of ['중3', '고1', '고2', '고3', '한능검']) await page.getByRole('button', { name: label, exact: true }).waitFor();
     assert.equal(await page.getByRole('button', { name: '고3', exact: true }).getAttribute('aria-pressed'), 'true');
-    assert.equal(await page.locator('[data-paper-id="2026-g3m-trig-creative"]').count(), 0, '중3 학습지는 고3 탭에 없다');
+    for (const id of TRIG_IDS) assert.equal(await page.locator(`[data-paper-id="${id}"]`).count(), 0, '중3 학습지는 고3 탭에 없다');
     await page.getByRole('button', { name: '중3', exact: true }).click();
     await page.getByRole('heading', { name: '학교 프린트', exact: true }).waitFor();
     assert.equal(await page.locator('[data-paper-id="mock-worksheet"][data-testid="exam-paper-card"]').count(), 0, '고2 학습지는 중3 탭에 없다');
-    await page.locator('[data-paper-id="2026-g3m-trig-creative"][data-testid="exam-paper-card"]').click();
+    const trigCards = page.locator('[data-testid="exam-paper-card"][data-paper-id^="2026-g3m-trig-creative"]');
+    assert.deepEqual(await trigCards.evaluateAll(cards => cards.map(card => card.dataset.paperId).sort()), TRIG_IDS, '중3 탭에 1차·2차가 보이고 기존 18문항판은 없다');
+    assert.match(await page.locator(`[data-paper-id="${TRIG_IDS[0]}"][data-testid="exam-paper-card"]`).innerText(), /\(1차\)/);
+    assert.match(await page.locator(`[data-paper-id="${TRIG_IDS[1]}"][data-testid="exam-paper-card"]`).innerText(), /\(2차\)/);
+    await page.locator(`[data-paper-id="${TRIG_IDS[0]}"][data-testid="exam-paper-card"]`).click();
     assert.equal(await page.getByRole('radio', { name: /실전 모드/ }).count(), 0);
     await page.getByTestId('exam-start-button').click();
     await page.getByTestId('worksheet-source').waitFor();
@@ -69,7 +74,7 @@ try {
     const viewer = page.getByTestId('exam-image-viewer');
     await viewer.waitFor();
     const image = viewer.locator('img');
-    assert.equal(await image.getAttribute('src'), '/exams/2026-g3m-trig-creative/trig-table.png');
+    assert.equal(await image.getAttribute('src'), `/exams/${TRIG_IDS[0]}/trig-table.png`);
     await page.waitForFunction(() => {
       const img = document.querySelector('[data-testid="exam-image-viewer"] img');
       return img?.complete && img.naturalWidth > 0 && img.getBoundingClientRect().width > 0;
@@ -130,6 +135,32 @@ try {
     assert.equal(overflow, false, `${width}px horizontal overflow`);
     assert.deepEqual(errors, []);
     await page.screenshot({ path: `${output}/trig-result-${width}.png` });
+    await context.close();
+  }
+
+  // 2차 학습지: 같은 중3 탭에서 열리고, 출처 라벨은 '2차 유형 A', 삼각비 표 버튼은 2차 경로의 이미지를 띄운다.
+  {
+    const context = await browser.newContext({ viewport: { width: 390, height: 820 } });
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', e => errors.push(e.message));
+    await page.goto(`${base}/tests/exam/practice.html?worksheet=1`);
+    await page.getByRole('button', { name: '중3', exact: true }).click();
+    await page.locator(`[data-paper-id="${TRIG_IDS[1]}"][data-testid="exam-paper-card"]`).click();
+    assert.equal(await page.getByRole('radio', { name: /실전 모드/ }).count(), 0);
+    await page.getByTestId('exam-start-button').click();
+    await page.getByTestId('worksheet-source').waitFor();
+    assert.match(await page.getByTestId('worksheet-source').innerText(), /리뷰노트 변형 문항 · 2차 유형 A/);
+    await page.getByRole('button', { name: '삼각비 표', exact: true }).click();
+    const viewer = page.getByTestId('exam-image-viewer');
+    await viewer.waitFor();
+    assert.equal(await viewer.locator('img').getAttribute('src'), `/exams/${TRIG_IDS[1]}/trig-table.png`);
+    await page.keyboard.press('Escape');
+    await viewer.waitFor({ state: 'detached' });
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+    assert.equal(overflow, false, '390px horizontal overflow (2차)');
+    assert.deepEqual(errors, []);
+    await page.screenshot({ path: `${output}/trig2-solve-390.png` });
     await context.close();
   }
 } finally {

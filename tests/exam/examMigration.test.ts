@@ -924,6 +924,40 @@ for (const [i, row] of trigRows.entries()) {
 await fails(S1, `select start_exam_attempt($1,'free',null)`, [trigId], /EXAM_PAPER_NOT_FOUND/);
 await fails(AD, `select start_exam_attempt($1,'real',null)`, [trigId], /EXAM_INVALID_MODE/);
 
+// 개편판 1차(12)·2차(6): 시드 2회 멱등, 비공개, JSON과 SQL 일치. 공개 SQL은 두 paper 공개 + 기존 18문항판 비공개(응시 기록은 그대로).
+const trigV2Ids = ['2026-g3m-trig-creative-1', '2026-g3m-trig-creative-2'];
+const trigV2Mig = fs.readFileSync(path.join(root, 'supabase/migrations/20261004210000_exam_trig_creative_v2_seed.sql'), 'utf8');
+await db.exec(trigV2Mig); await db.exec(trigV2Mig);
+for (const [p, id] of trigV2Ids.entries()) {
+  const v2Data = JSON.parse(fs.readFileSync(path.join(root, `src/features/exam/data/${id}.json`), 'utf8'));
+  assert.equal((await as(S1, 'select id from exam_papers where id=$1', [id])).length, 0);
+  assert.ok(!(await as(S1, 'select list_exam_papers_for_me() r'))[0].r.some(paper => paper.id === id));
+  await fails(S1, `select start_exam_attempt($1,'free',null)`, [id], /EXAM_PAPER_NOT_FOUND/);
+  const v2Paper = (await db.query('select * from exam_papers where id=$1', [id])).rows[0];
+  assert.deepEqual([v2Paper.title, v2Paper.kind, v2Paper.grade, v2Paper.school_grade, v2Paper.published, v2Paper.time_limit_minutes, v2Paper.question_count, Number(v2Paper.max_score), v2Paper.unit_name, v2Paper.school_name],
+    [v2Data.title, 'worksheet', 9, '중3', false, null, [12, 6][p], [60, 30][p], v2Data.unitName, v2Data.schoolName]);
+  const v2Rows = (await db.query('select q.*, k.answer from exam_questions q join exam_answer_keys k on k.question_id=q.id where paper_id=$1 order by number', [id])).rows;
+  assert.equal(v2Rows.length, [12, 6][p]);
+  for (const [i, row] of v2Rows.entries()) {
+    const q = v2Data.questions[i];
+    assert.deepEqual([row.number, Number(row.points), row.answer, row.answer_type, row.image_url, row.curriculum_grade, row.curriculum_chapter, row.source_label, row.is_choice],
+      [q.number, q.points, q.answer, q.answerType, q.imageUrl, q.curriculumGrade, q.curriculumChapter, q.sourceLabel, false]);
+  }
+  await fails(AD, `select start_exam_attempt($1,'real',null)`, [id], /EXAM_INVALID_MODE/);
+}
+assert.equal((await db.query('select count(*)::int n from exam_questions where paper_id=$1', [trigId])).rows[0].n, 18, '기존 18문항판은 그대로');
+await db.exec(`update exam_papers set published=true where id='${trigId}'`);
+const trigOldAttempt = (await as(S1, `select start_exam_attempt($1,'free',null) r`, [trigId]))[0].r;
+await db.exec(fs.readFileSync(path.join(root, 'scripts/exam/publish_trig_creative_v2.sql'), 'utf8'));
+const trigListed = (await as(S1, 'select list_exam_papers_for_me() r'))[0].r.map(paper => paper.id);
+assert.ok(trigV2Ids.every(id => trigListed.includes(id)), '1차·2차 공개');
+assert.ok(!trigListed.includes(trigId), '기존 18문항판 비공개');
+assert.equal((await db.query('select status from exam_attempts where id=$1', [trigOldAttempt.id])).rows[0].status, 'in_progress', '진행 중 응시 행은 그대로');
+const trigV2Attempt = (await as(S1, `select start_exam_attempt($1,'free',null) r`, [trigV2Ids[1]]))[0].r;
+assert.equal(trigV2Attempt.questions.length, 6);
+assert.ok(trigV2Attempt.questions.every(q => !('answer' in q)));
+await db.exec(`update exam_papers set published=false where id in ('${trigId}','${trigV2Ids[0]}','${trigV2Ids[1]}')`);
+
 for (const name of ['limits','derivatives']) {
   await db.exec(fs.readFileSync(path.join(root,`supabase/migrations/2026100313000${name==='limits'?1:2}_exam_youngpa_worksheet_${name}_seed.sql`),'utf8'));
 }
