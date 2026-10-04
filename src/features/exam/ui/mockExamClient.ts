@@ -264,7 +264,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       await wait();
       const result = must(attemptId).result;
       const item = result?.items.find(row => row.questionId === questionId);
-      if (!result || result.kind === 'hanneung' || item?.isCorrect !== false) throw new Error('EXAM_PEER_NOT_ALLOWED');
+      if (!result || result.kind === 'hanneung' || !item || (item.isCorrect !== false && !item.unsure)) throw new Error('EXAM_PEER_NOT_ALLOWED');
       if (item.number === 3) return null;
       const strokes = mockPeerStrokes();
       return { label: { face: '🐱', character: '하치와레', title: '수학의 신', grade: '고2', isTeacher: false },
@@ -274,7 +274,8 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       record('getPeerSolutionReplay', [attemptId, questionId, solutionKey]);
       if (solutionKey !== 'mock-peer-fingerprint') throw new Error('EXAM_PEER_CHANGED');
       const result = must(attemptId).result;
-      if (!result || result.kind === 'hanneung' || result.items.find(row => row.questionId === questionId)?.isCorrect !== false) throw new Error('EXAM_PEER_NOT_ALLOWED');
+      const item = result?.items.find(row => row.questionId === questionId);
+      if (!result || result.kind === 'hanneung' || !item || (item.isCorrect !== false && !item.unsure)) throw new Error('EXAM_PEER_NOT_ALLOWED');
       // Reuse the anonymous fixture without adding another getPeerSolution request to the log.
       const strokes = mockPeerStrokes();
       const events = strokes.map((_, i) => ({ ...inkDelta(strokes.slice(0,i), strokes.slice(0,i+1), 'draw', (i+1)*600), id: `peer-event-${i}` }));

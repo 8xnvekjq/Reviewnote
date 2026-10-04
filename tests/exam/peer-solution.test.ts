@@ -262,3 +262,71 @@ test('peer face is fixed per author across requesters and questions, varied acro
     assert.equal(teacher.label.isTeacher, true); assert.equal(teacher.label.face, '🎓');
   } finally { await db.close(); }
 });
+
+test('peer RPC also opens for unsure-marked questions, including correct ones (PGlite)', { skip: !PGlite }, async () => {
+  const db = new PGlite();
+  const id = (n: number) => `00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
+  const me = id(1), other = id(2), mine = id(10), peer = id(11), q = id(20);
+  try {
+    await db.exec(`
+      create role anon; create role authenticated; create schema auth; create schema private;
+      create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
+      create table private.app_admins(user_id uuid primary key);
+      create table public.profiles(id uuid primary key, equipped_title text, school_grade text, display_name text, nickname text, email text);
+      create table public.exam_papers(id text primary key, kind text);
+      create table public.exam_questions(id uuid primary key, paper_id text);
+      create table public.exam_attempts(id uuid primary key, student_id uuid, paper_id text, status text, submitted_at timestamptz default now());
+      create table public.exam_attempt_items(attempt_id uuid, question_id uuid, is_correct boolean, unsure boolean not null default false, time_spent_ms bigint, primary key(attempt_id,question_id));
+      create table public.exam_attempt_ink(attempt_id uuid, question_id uuid, revision integer, strokes jsonb, primary key(attempt_id,question_id));
+      create table public.exam_ink_replay_batches(id uuid, attempt_id uuid, question_id uuid, revision integer, base_revision integer, baseline jsonb, events jsonb);
+      grant usage on schema public to anon, authenticated;
+      insert into exam_papers values ('paper','suneung'),('history','hanneung');
+      insert into exam_questions values ('${q}','paper');
+      insert into profiles values ('${other}','도전자','고2',null,null,null);
+      insert into exam_attempts values ('${mine}','${me}','paper','submitted'), ('${peer}','${other}','paper','submitted');
+      insert into exam_attempt_items values ('${mine}','${q}',true,false,30000), ('${peer}','${q}',true,false,30000);
+    `);
+    for (const file of ['20261004140000_exam_peer_solution.sql','20261004200000_exam_peer_solution_stable_face.sql','20261004220000_exam_peer_solution_unsure.sql'])
+      await db.exec(fs.readFileSync(new URL(`../../supabase/migrations/${file}`,import.meta.url),'utf8'));
+    await db.query('insert into exam_attempt_ink values ($1,$2,1,$3::jsonb)',[peer,q,JSON.stringify(drawing())]);
+    const helper = (await db.query(`select has_function_privilege('authenticated','private.pick_exam_peer_solution(uuid,uuid)','execute') as h`)).rows[0].h;
+    assert.equal(helper, false, 'helper stays private after replace');
+    const rpc = async (replayKey?: string) => {
+      await db.exec(`reset role; select set_config('request.jwt.claim.sub','${me}',false); set role authenticated;`);
+      try {
+        return (await db.query(replayKey === undefined ? 'select get_peer_solution($1,$2) r' : 'select get_peer_solution_replay($1,$2,$3) r',
+          replayKey === undefined ? [mine,q] : [mine,q,replayKey])).rows[0].r;
+      } finally { await db.exec('reset role'); }
+    };
+    const setMine = (correct: boolean, unsure: boolean) =>
+      db.query('update exam_attempt_items set is_correct=$1, unsure=$2 where attempt_id=$3',[correct,unsure,mine]);
+
+    await setMine(true, false);
+    await assert.rejects(rpc(), /EXAM_PEER_NOT_ALLOWED/, 'correct and not unsure stays closed');
+    await assert.rejects(rpc('x'), /EXAM_PEER_NOT_ALLOWED/);
+
+    await setMine(true, true);
+    const unsureCorrect = await rpc();
+    assert.equal(unsureCorrect.label.title, '도전자', 'correct but unsure opens');
+    assert.equal((await rpc(unsureCorrect.solutionKey)).strokes.length, 3, 'replay also allowed');
+
+    await setMine(false, true);
+    assert.equal((await rpc()).label.title, '도전자', 'wrong and unsure opens');
+    await setMine(false, false);
+    assert.equal((await rpc()).label.title, '도전자', 'wrong (existing rule) still opens');
+
+    // 나머지 규칙은 그대로 — 애매 표시여도 제출 전·한능검·남의 응시는 거부.
+    await setMine(true, true);
+    for (const [sql, restore] of [
+      [`update exam_attempts set status='in_progress' where id='${mine}'`, `update exam_attempts set status='submitted' where id='${mine}'`],
+      [`update exam_papers set kind='hanneung' where id='paper'`, `update exam_papers set kind='suneung' where id='paper'`],
+      [`update exam_questions set paper_id='history'`, `update exam_questions set paper_id='paper'`],
+      [`update exam_attempts set student_id='${other}' where id='${mine}'`, `update exam_attempts set student_id='${me}' where id='${mine}'`],
+    ]) {
+      await db.exec(sql); await assert.rejects(rpc(), /EXAM_PEER_NOT_ALLOWED/, sql); await db.exec(restore);
+    }
+    // 후보는 여전히 '맞힌' 응시만 — 애매 표시는 후보 조건을 바꾸지 않는다.
+    await db.exec(`update exam_attempt_items set is_correct=false, unsure=true where attempt_id='${peer}'`);
+    assert.equal(await rpc(), null, 'unsure-but-wrong peers are not candidates');
+  } finally { await db.close(); }
+});

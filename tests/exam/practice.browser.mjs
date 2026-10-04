@@ -267,7 +267,8 @@ async function spinWheel(page, place, steps) {
   const viewerStrokes = () => page.locator(viewerInk).getAttribute('data-stroke-count');
   await page.locator('.exam-item-row[data-number="1"]').click();
   await page.getByTestId('exam-viewer').waitFor();
-  assert.equal(await page.getByTestId('exam-peer-toggle').count(), 0, 'correct questions do not offer peer solutions');
+  // 1번은 맞혔지만 🤔 애매 표시 — 틀린 문항처럼 다른 학생 풀이 버튼이 보인다(누르지는 않는다: 아래 요청 수 검사 유지).
+  assert.equal(await page.getByTestId('exam-peer-toggle').count(), 1, 'correct but unsure questions offer peer solutions');
   await page.waitForFunction(sel => document.querySelector(sel)?.getAttribute('data-stroke-count') === '1', viewerInk);
   const notesTools = page.getByTestId('exam-notes-tools');
   await notesTools.waitFor();
@@ -310,6 +311,13 @@ async function spinWheel(page, place, steps) {
   assert.equal(await notesKeys(), 0);
   await page.waitForTimeout(300);
   assert.equal(await page.evaluate(() => window.__inkStats.requests), inkRequestsBefore, 'result-screen notes never hit the ink server');
+  await page.getByTestId('exam-viewer').getByRole('button', { name: '닫기', exact: true }).click();
+
+  // 맞혔고 애매 표시도 없는 문항(22번)은 버튼이 없다.
+  assert.equal(await page.locator('.exam-item-row[data-number="22"] .exam-item-unsure').innerText(), '');
+  await page.locator('.exam-item-row[data-number="22"]').click();
+  await page.getByTestId('exam-viewer').waitFor();
+  assert.equal(await page.getByTestId('exam-peer-toggle').count(), 0, 'correct, not-unsure questions do not offer peer solutions');
   await page.getByTestId('exam-viewer').getByRole('button', { name: '닫기', exact: true }).click();
 
   // 익명 동료 풀이: 요청은 클릭 때만, 재생은 재생 클릭 때만, 메모리 재사용과 내 덧쓰기 보존.
