@@ -157,6 +157,24 @@ try {
   await fire('pointermove', 'touch', 31, [[0.35, 1.22], [0.4, 1.25]]);
   await fire('pointerup', 'touch', 31, [[0.4, 1.25]]);
   assert.equal((await strokes()).length, touchBefore + 1, 'without a pen, fingers draw');
+  // 펜 감지 전 지우개 첫 터치를 다지 탭으로 취소해도 기존 redo는 보존한다.
+  await page.getByRole('button', { name: '되돌리기' }).click();
+  const beforeEraseTap = await strokes();
+  assert.ok(await page.evaluate(() => window.__ink.handle().canRedo()));
+  await page.getByRole('button', { name: '지우개' }).click();
+  await page.evaluate(() => {
+    const el = document.querySelector('.exam-ink-input');
+    const r = el.getBoundingClientRect();
+    const p = window.__ink.strokes()[0].points[0];
+    for (const type of ['pointerdown', 'pointerup']) for (const i of [0, 1]) {
+      el.dispatchEvent(new PointerEvent(type, { pointerId: 500 + i, pointerType: 'touch', bubbles: true, cancelable: true,
+        clientX: r.left + p.x * r.width + i * 60, clientY: r.top + p.y * r.width }));
+    }
+  });
+  assert.deepEqual(await strokes(), beforeEraseTap, 'cancelled erase restores the strokes');
+  assert.ok(await page.evaluate(() => window.__ink.handle().canRedo()), 'cancelled erase preserves redo');
+  await page.getByRole('button', { name: '다시 하기' }).click();
+  await page.getByRole('button', { name: '펜', exact: true }).click();
   await fire('pointerdown', 'pen', 32, [[0.3, 1.3]]);
   await fire('pointermove', 'pen', 32, [[0.35, 1.32], [0.4, 1.35]]);
   await fire('pointerup', 'pen', 32, [[0.4, 1.35]]);
@@ -301,7 +319,113 @@ try {
   assert.equal(await page.evaluate(() => window.__ink.handle().canRedo()), redoBefore);
   await page.getByRole('button', { name: '펜', exact: true }).click();
 
+  // ── 올가미: 둘러서 고르기 → 옮기기 → 회전 → 확대 → 실행 취소(조작마다 1단계) ──
+  const unitPx = async () => (await input.boundingBox()).width; // 정규화 1 = 이미지 너비(px)
+  const selected = async () => Number(await page.locator('.exam-ink').getAttribute('data-selected'));
+  const firstLine = (await strokes()).find(s => s.shape?.kind === 'line' && Math.abs(s.shape.from[1] - 0.3) < 0.02);
+  assert.ok(firstLine, 'the jittery-hold line from (0.15,0.3) is there');
+  const countBefore = (await strokes()).length;
+  const inkLayers = () => page.evaluate(() => Array.from(document.querySelectorAll('.exam-ink canvas')).slice(0, 2).map(c => c.toDataURL()));
+  const layersBeforeSelection = await inkLayers();
+  await page.getByRole('button', { name: '올가미' }).click();
+  await draw([[0.1, 0.24], [0.4, 0.22], [0.64, 0.25], [0.64, 0.46], [0.3, 0.47], [0.1, 0.45], [0.1, 0.26]]);
+  assert.equal(await selected(), 1, 'the lasso picks the line only');
+  assert.equal((await strokes()).length, countBefore, 'selecting changes nothing');
+  assert.ok(await inkAt(0.375, 0.35), 'the selected line stays on its original ink layer');
+  assert.deepEqual(await inkLayers(), layersBeforeSelection, 'selection preserves ink pixels, layer opacity and stroke order');
+  // 선택 테두리(획 굵기 절반 + 여백 8px)
+  const w0 = await unitPx();
+  const [fx, fy] = [firstLine.shape.from, firstLine.shape.to];
+  const half = 3 / 700 / 2, pad = 8 / w0, rot = 12 / w0;
+  let frame = {
+    cx: (fx[0] + fy[0]) / 2, cy: (fx[1] + fy[1]) / 2,
+    hw: Math.abs(fy[0] - fx[0]) / 2 + half + pad, hh: Math.abs(fy[1] - fx[1]) / 2 + half + pad, angle: 0,
+  };
+  // 1) 안쪽을 끌어 옮기기
+  await draw([[frame.cx, frame.cy], [frame.cx + 0.03, frame.cy + 0.2], [frame.cx + 0.05, frame.cy + 0.4]]);
+  list = await strokes();
+  assert.equal(list.length, countBefore, 'moving replaces, never duplicates');
+  assert.ok(!list.some(s => s.id === firstLine.id), 'the moved stroke got a new id (remove old + add new)');
+  const moved = list.find(s => s.shape?.kind === 'line' && Math.abs(s.shape.from[0] - (fx[0] + 0.05)) < 0.003);
+  assert.ok(moved && Math.abs(moved.shape.from[1] - (fx[1] + 0.4)) < 0.003, `moved line: ${JSON.stringify(moved?.shape)}`);
+  assert.ok(moved.points.every(p => Math.abs(p.x) <= 100 && Math.abs(p.y) <= 100));
+  assert.equal(await selected(), 1, 'the selection follows the moved stroke');
+  frame = { ...frame, cx: frame.cx + 0.05, cy: frame.cy + 0.4 };
+  // 2) 오른쪽 가운데 회전 아이콘을 끌어 45° 회전(무게중심 기준)
+  const R = frame.hw + rot;
+  await draw([[frame.cx + R, frame.cy], [frame.cx + R * Math.cos(Math.PI / 8), frame.cy + R * Math.sin(Math.PI / 8)], [frame.cx + R * Math.cos(Math.PI / 4), frame.cy + R * Math.sin(Math.PI / 4)]]);
+  list = await strokes();
+  const turned = list.find(s => s.shape?.kind === 'line' && s.id !== moved.id && Math.abs((s.shape.from[0] + s.shape.to[0]) / 2 - frame.cx) < 0.003 && Math.abs((s.shape.from[1] + s.shape.to[1]) / 2 - frame.cy) < 0.003);
+  assert.ok(turned, 'rotation keeps the centre');
+  const angleOf = s => Math.atan2(s.shape.to[1] - s.shape.from[1], s.shape.to[0] - s.shape.from[0]);
+  assert.ok(Math.abs(angleOf(turned) - angleOf(moved) - Math.PI / 4) < 0.02, `rotated by 45°: ${angleOf(turned) - angleOf(moved)}`);
+  assert.equal(list.length, countBefore);
+  frame = { ...frame, angle: Math.PI / 4 };
+  // 3) 오른아래 모서리 손잡이를 대각선 바깥으로 1.5배(맞은편 모서리 고정, 비율 유지)
+  const cornerOf = (f, sx, sy) => {
+    const c = Math.cos(f.angle), s = Math.sin(f.angle), u = sx * f.hw, v = sy * f.hh;
+    return [f.cx + u * c - v * s, f.cy + u * s + v * c];
+  };
+  const br = cornerOf(frame, 1, 1), tl = cornerOf(frame, -1, -1);
+  const to = [tl[0] + (br[0] - tl[0]) * 1.5, tl[1] + (br[1] - tl[1]) * 1.5];
+  await draw([br, [(br[0] + to[0]) / 2, (br[1] + to[1]) / 2], to]);
+  list = await strokes();
+  const lenOf = s => Math.hypot(s.shape.to[0] - s.shape.from[0], s.shape.to[1] - s.shape.from[1]);
+  const grown = list.find(s => s.shape?.kind === 'line' && s.id !== turned.id && Math.abs(lenOf(s) - lenOf(turned) * 1.5) < 0.01);
+  assert.ok(grown, `scaled 1.5×: ${JSON.stringify(list.filter(s => s.shape?.kind === 'line').map(s => [s.id.slice(0, 4), lenOf(s)]))}`);
+  assert.ok(Math.abs(grown.size - 4.5) < 0.01, 'the width scales with it');
+  assert.ok(Math.abs(angleOf(grown) - angleOf(turned)) < 0.01, 'scaling keeps the angle');
+  // 4) 빈 곳 탭 → 선택 해제
+  await draw([[0.05, 1.95]]);
+  assert.equal(await selected(), 0, 'tapping outside clears the selection');
+
+  // ── 두 손가락 두 번 탭 → 실행 취소, 세 손가락 두 번 탭 → 다시 실행 ──
+  const multiTap = (n, base) => page.evaluate(async ({ n, base }) => {
+    const el = document.querySelector('.exam-ink-input');
+    const r = el.getBoundingClientRect();
+    const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const send = (type, id, i) => el.dispatchEvent(new PointerEvent(type, {
+      pointerId: id, pointerType: 'touch', isPrimary: i === 0, bubbles: true, cancelable: true, buttons: type === 'pointerup' ? 0 : 1,
+      pressure: type === 'pointerup' ? 0 : 0.5, clientX: r.left + 40 + i * 70, clientY: r.top + r.width * 1.95,
+    }));
+    for (let k = 0; k < 2; k++) {
+      for (let i = 0; i < n; i++) send('pointerdown', base + k * 10 + i, i);
+      await sleep(60);
+      for (let i = 0; i < n; i++) send('pointerup', base + k * 10 + i, i);
+      await sleep(120);
+    }
+  }, { n, base });
+  const scrollY = await page.evaluate(() => window.scrollY);
+  await multiTap(2, 100);
+  list = await strokes();
+  assert.ok(list.some(s => s.id === turned.id) && !list.some(s => s.id === grown.id), 'two-finger double tap undid the scale (one step)');
+  assert.equal(list.length, countBefore, 'and drew nothing');
+  assert.equal(await page.evaluate(() => window.scrollY), scrollY, 'and did not scroll');
+  await multiTap(2, 200);
+  assert.ok((await strokes()).some(s => s.id === moved.id), 'again: the rotation is undone');
+  await multiTap(3, 300);
+  assert.ok((await strokes()).some(s => s.id === turned.id), 'three-finger double tap redoes');
+  // 한 번만 탭하면 아무 일도 없다
+  const single = JSON.stringify(await strokes());
+  await page.evaluate(() => {
+    const el = document.querySelector('.exam-ink-input');
+    const r = el.getBoundingClientRect();
+    for (const type of ['pointerdown', 'pointerup']) for (const i of [0, 1]) {
+      el.dispatchEvent(new PointerEvent(type, { pointerId: 400 + i, pointerType: 'touch', isPrimary: i === 0, bubbles: true, cancelable: true, clientX: r.left + 40 + i * 70, clientY: r.top + r.width * 1.95 }));
+    }
+  });
+  await page.waitForTimeout(450);
+  assert.equal(JSON.stringify(await strokes()), single, 'a single two-finger tap does nothing');
+  // 버튼 실행 취소로 원래 자리까지
+  await page.getByRole('button', { name: '되돌리기' }).click();
+  await page.getByRole('button', { name: '되돌리기' }).click();
+  list = await strokes();
+  assert.ok(list.some(s => s.id === firstLine.id), 'undo brings the original stroke back');
+  assert.equal(list.length, countBefore);
+  await page.screenshot({ path: 'node_modules/.cache/exam-ink/lasso.png' });
+  await page.getByRole('button', { name: '펜', exact: true }).click();
+
   assert.deepEqual(errors, []);
-  console.log('PASS exam ink: pen, hold→line/circle with resize, stroke eraser, undo/redo/clear, resize keeps position, readOnly, palm rejection, jittery Pencil hold, triangle/rectangle, arc→line, laser');
+  console.log('PASS exam ink: pen, hold→line/circle with resize, stroke eraser, undo/redo/clear, resize keeps position, readOnly, palm rejection, jittery Pencil hold, triangle/rectangle, arc→line, laser, lasso move/rotate/scale/undo, multi-finger tap undo/redo');
   await page.close();
 } finally { await browser.close(); }
