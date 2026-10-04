@@ -4,12 +4,17 @@ export type PeerSolutionApi = Pick<ExamClient, 'getPeerSolution' | 'getPeerSolut
 
 import { getTitleBadgeStyle } from '../../../utils/gachaCatalog.ts';
 
-/** 구버전 서버 응답(character만 있음)용 대체 — 새 서버는 작성자 기준 얼굴(label.face)을 직접 준다.
- *  선생님·머리색 같은 결합(ZWJ) 이모지는 글꼴·터미널에 따라 두 글자로 갈라지거나 옆 글씨와 겹쳐 보여 한 글자짜리만 쓴다. */
+/** 서버 v_faces(20261005000000)와 같은 귀여운 동물 목록 — 앱은 성별·나이를 모르니 사람 얼굴은 쓰지 않는다.
+ *  결합(ZWJ)·변형 선택자(FE0F) 이모지는 글꼴·터미널에 따라 두 글자로 갈라지거나 옆 글씨와 겹쳐 보여 단일 코드포인트만 쓴다. */
+export const PEER_ANIMAL_FACES = [
+  '🐶', '🐱', '🐰', '🦊', '🐼', '🐨', '🐯', '🦁', '🐻', '🐹', '🐧', '🐥', '🐸', '🐵', '🐷', '🐮', '🐙', '🦄',
+  '🐭', '🦔', '🦦', '🦥', '🐳', '🐬', '🦭', '🐢', '🦋', '🐝', '🐞', '🦉', '🦆', '🐤', '🐣',
+] as const;
+
+/** 구버전 서버 응답(character만 있음)용 대체 — 새 서버는 작성자 기준 얼굴(label.face)을 직접 준다. */
 const FACES: Record<string, string> = {
-  치이카와: '🧑', 하치와레: '👩', 우사기: '👨', 모몽가: '🧒', 쿠리만쥬: '👧', 랏코: '👦', 시사: '👱', 후루혼: '🧔',
+  치이카와: '🐹', 하치와레: '🐱', 우사기: '🐰', 모몽가: '🐭', 쿠리만쥬: '🐻', 랏코: '🦦', 시사: '🦁', 후루혼: '🦉',
 };
-const FALLBACK_FACES = ['🧑', '👩', '👨', '🧒', '👧', '👦', '👱', '🧔'];
 
 export interface PeerLabelParts {
   face: string;
@@ -23,7 +28,7 @@ export interface PeerLabelParts {
 export function peerSolutionLabelParts(label: PeerSolution['label']): PeerLabelParts {
   if (label.isTeacher) return { face: '🎓', title: null, grade: '', isTeacher: true };
   const character = label.character ?? '';
-  const face = label.face || FACES[character] || FALLBACK_FACES[[...character].reduce((sum, ch) => sum + ch.codePointAt(0)!, 0) % FALLBACK_FACES.length];
+  const face = label.face || FACES[character] || PEER_ANIMAL_FACES[[...character].reduce((sum, ch) => sum + ch.codePointAt(0)!, 0) % PEER_ANIMAL_FACES.length];
   const text = label.title?.trim();
   return { face, title: text ? { text, ...getTitleBadgeStyle(text) } : null, grade: label.grade ? `(${label.grade})` : '', isTeacher: false };
 }

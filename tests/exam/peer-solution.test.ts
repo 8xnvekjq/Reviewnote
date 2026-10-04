@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { PeerSolutionSession, peerSolutionLabel, peerSolutionLabelParts } from '../../src/features/exam/ui/peerSolution.ts';
+import { PEER_ANIMAL_FACES, PeerSolutionSession, peerSolutionLabel, peerSolutionLabelParts } from '../../src/features/exam/ui/peerSolution.ts';
 import { getTitleBadgeStyle } from '../../src/utils/gachaCatalog.ts';
 import { buildInkTimeline, inkDelta } from '../../src/features/exam/ink/inkReplay.ts';
 import type { InkStroke, PeerSolution } from '../../src/features/exam/contract.ts';
@@ -10,17 +10,38 @@ const drawing = (count = 3): InkStroke[] => Array.from({ length: count }, (_, i)
   id: `source-stroke-${i}`, tool: 'pen', color: '#123456', size: 4,
   points: Array.from({ length: 40 }, (_, n) => ({ x: n / 100, y: i / 10, pressure: .5, t: n * 20 })),
 }));
+// 사람 얼굴(성별·나이가 드러남) — 앱은 학생 성별·나이를 모르니 하나도 나오면 안 된다.
+const HUMAN_FACE = /[\u{1F466}-\u{1F469}\u{1F471}-\u{1F478}\u{1F9D1}-\u{1F9D4}\u{1F645}-\u{1F647}\u{1F64B}-\u{1F64F}\u{1F481}\u{1F482}\u{1F486}\u{1F487}]/u;
+const assertAnimalFace = (face: string) => {
+  assert.ok((PEER_ANIMAL_FACES as readonly string[]).includes(face), `${face} is a listed animal`);
+  assert.ok(!HUMAN_FACE.test(face), `${face} is not a human face`);
+  assert.equal([...face].length, 1, `${face} is one code point`);
+  assert.ok(!face.includes('\u200d') && !face.includes('\ufe0f'), `${face} has no ZWJ/FE0F`);
+};
 const solution: PeerSolution = { label: { character: '하치와레', title: '도전자', grade: '고2', isTeacher: false }, strokes: drawing(), solutionKey: 'opaque' };
 
 test('anonymous labels omit missing fields and show teacher fallback', () => {
-  assert.equal(peerSolutionLabel(solution.label), '👩 도전자(고2)');
-  assert.equal(peerSolutionLabel({ ...solution.label, title: null, grade: null }), '👩 익명 학생');
-  assert.equal(peerSolutionLabel({ ...solution.label, title: null }), '👩 익명 학생(고2)');
+  assert.equal(peerSolutionLabel(solution.label), '🐱 도전자(고2)');
+  assert.equal(peerSolutionLabel({ ...solution.label, title: null, grade: null }), '🐱 익명 학생');
+  assert.equal(peerSolutionLabel({ ...solution.label, title: null }), '🐱 익명 학생(고2)');
   assert.equal(peerSolutionLabel({ ...solution.label, isTeacher: true }), '🎓 선생님 풀이');
   assert.match(peerSolutionLabel({ ...solution.label, character: '모르는캐릭터' }), /^\p{Extended_Pictographic}/u, 'unknown characters still get a face');
   // 결합(ZWJ) 이모지는 쓰지 않는다 — 기기·글꼴에 따라 갈라지거나 글씨와 겹친다.
   for (const character of ['치이카와','하치와레','우사기','모몽가','쿠리만쥬','랏코','시사','후루혼','모르는캐릭터'])
     for (const isTeacher of [false, true]) assert.ok(!peerSolutionLabel({ ...solution.label, character, isTeacher }).includes('\u200d'), `${character} ${isTeacher}`);
+});
+
+test('peer faces are cute animals only — no human faces, single code point, same list as the server', () => {
+  assert.ok(PEER_ANIMAL_FACES.length >= 30);
+  assert.equal(new Set(PEER_ANIMAL_FACES).size, PEER_ANIMAL_FACES.length, 'no duplicates');
+  for (const face of PEER_ANIMAL_FACES) { assertAnimalFace(face); assert.match(face, /^\p{Emoji_Presentation}$/u, `${face} renders as emoji without FE0F`); }
+  // 구버전 서버 응답(character만)·아무 정보 없는 라벨도 동물만.
+  for (const character of ['치이카와','하치와레','우사기','모몽가','쿠리만쥬','랏코','시사','후루혼','모르는캐릭터','','x','안은채'])
+    assertAnimalFace(peerSolutionLabelParts({ character, title: null, grade: null, isTeacher: false }).face);
+  assertAnimalFace(peerSolutionLabelParts({ title: null, grade: null, isTeacher: false }).face);
+  const sql = fs.readFileSync(new URL('../../supabase/migrations/20261005000000_exam_peer_solution_animal_faces.sql', import.meta.url), 'utf8');
+  const serverFaces = [...sql.match(/v_faces constant text\[\] := array\[([^\]]*)\]/)![1].matchAll(/'([^']*)'/g)].map((m) => m[1]);
+  assert.deepEqual(serverFaces, [...PEER_ANIMAL_FACES], 'client fallback list mirrors server v_faces');
 });
 
 test('server face wins over legacy character; titles reuse the app-wide title badge effect', () => {
@@ -88,6 +109,7 @@ test('peer RPC validates ownership, wrong/submitted/non-hanneung, quality, stude
     `);
     await db.exec(fs.readFileSync(new URL('../../supabase/migrations/20261004140000_exam_peer_solution.sql',import.meta.url),'utf8'));
     await db.exec(fs.readFileSync(new URL('../../supabase/migrations/20261004200000_exam_peer_solution_stable_face.sql',import.meta.url),'utf8'));
+    await db.exec(fs.readFileSync(new URL('../../supabase/migrations/20261005000000_exam_peer_solution_animal_faces.sql',import.meta.url),'utf8'));
     const permissions = (await db.query(`select
       has_function_privilege('anon','public.get_peer_solution(uuid,uuid)','execute') as anon_read,
       has_function_privilege('anon','public.get_peer_solution_replay(uuid,uuid,text)','execute') as anon_replay,
@@ -114,6 +136,7 @@ test('peer RPC validates ownership, wrong/submitted/non-hanneung, quality, stude
     assert.ok(['치이카와','하치와레','우사기','모몽가','쿠리만쥬','랏코','시사','후루혼'].includes(selected.label.character));
     assert.match(selected.label.face, /^\p{Extended_Pictographic}$/u, 'one single-codepoint face');
     assert.ok(!selected.label.face.includes('‍') && selected.label.face !== '🎓');
+    assertAnimalFace(selected.label.face);
     assert.deepEqual(await rpc(), selected, 'stable across matching read/replay');
     const assertAnonymous = (value: unknown) => {
       const text = JSON.stringify(value);
@@ -209,7 +232,7 @@ test('peer face is fixed per author across requesters and questions, varied acro
       insert into exam_papers values ('paper','suneung');
       insert into profiles values ('${author}','수학의 신','고2','실제이름','닉네임','private@example.com');
     `);
-    for (const file of ['20261004140000_exam_peer_solution.sql','20261004200000_exam_peer_solution_stable_face.sql'])
+    for (const file of ['20261004140000_exam_peer_solution.sql','20261004200000_exam_peer_solution_stable_face.sql','20261005000000_exam_peer_solution_animal_faces.sql'])
       await db.exec(fs.readFileSync(new URL(`../../supabase/migrations/${file}`,import.meta.url),'utf8'));
     const rpc = async (uid: string, attempt: string, q: string) => {
       await db.exec(`reset role; select set_config('request.jwt.claim.sub','${uid}',false); set role authenticated;`);
@@ -238,6 +261,7 @@ test('peer face is fixed per author across requesters and questions, varied acro
     assert.equal(faces.size, 1, 'same author → same face for every requester and question');
     const face = [...faces][0];
     assert.match(face, /^\p{Extended_Pictographic}$/u); assert.ok(!face.includes('‍'));
+    assertAnimalFace(face);
 
     // 한 문항에 작성자를 바꿔 가며 — 대부분 다른 얼굴, 선생님은 항상 🎓.
     const q = questions[0], requester = id(100), attempt = id(200);
@@ -250,6 +274,7 @@ test('peer face is fixed per author across requesters and questions, varied acro
       await db.query('insert into exam_attempt_ink values ($1,$2,1,$3::jsonb)',[a,q,JSON.stringify(drawing())]);
       const got = await rpc(requester, attempt, q);
       assert.match(got.label.face, /^\p{Extended_Pictographic}$/u); assert.notEqual(got.label.face, '🎓');
+      assertAnimalFace(got.label.face);
       authorFaces.push(got.label.face);
       await db.query('delete from exam_attempt_ink where attempt_id=$1',[a]);
     }
@@ -260,6 +285,22 @@ test('peer face is fixed per author across requesters and questions, varied acro
     await db.query('insert into exam_attempt_ink values ($1,$2,1,$3::jsonb)',[id(501),q,JSON.stringify(drawing())]);
     const teacher = await rpc(requester, attempt, q);
     assert.equal(teacher.label.isTeacher, true); assert.equal(teacher.label.face, '🎓');
+
+    // 작성자 40명 — 모두 동물(사람 얼굴 0), 같은 작성자는 다른 요청자가 불러도 같은 동물.
+    await db.query('delete from exam_attempt_ink where attempt_id=$1',[id(501)]);
+    const many: string[] = [];
+    for (let n=0;n<40;n++) {
+      const a = id(600+n);
+      await db.query(`insert into exam_attempts values ($1,$2,'paper','submitted')`,[a,id(700+n)]);
+      await db.query('insert into exam_attempt_items values ($1,$2,true,30000)',[a,q]);
+      await db.query('insert into exam_attempt_ink values ($1,$2,1,$3::jsonb)',[a,q,JSON.stringify(drawing())]);
+      const got = await rpc(requester, attempt, q);
+      assertAnimalFace(got.label.face);
+      assert.equal((await rpc(id(101), id(201), q)).label.face, got.label.face, 'same author, another requester → same animal');
+      many.push(got.label.face);
+      await db.query('delete from exam_attempt_ink where attempt_id=$1',[a]);
+    }
+    assert.ok(new Set(many).size >= 15, `animals vary across authors: ${many.join('')}`);
   } finally { await db.close(); }
 });
 
