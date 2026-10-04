@@ -70,6 +70,23 @@ const MOCK_PAPERS = [
   { id: MOCK_PAPER_ID, title: PAPER.title, examDate: PAPER.examDate, source: PAPER.source },
   { id: MOCK_PAPER_B_ID, title: '연습용 시험지 B (목)', examDate: '2024-09-04', source: '테스트용 목 데이터' },
 ];
+/** ?filters=1: 시험지 고르기 필터(연도·월 / 연도·학기·중간기말·학교) 검증용 목록 전용 목 시험지. 문항은 첫 시험지 것을 빌려 쓴다. */
+const filterPaper = (meta: Pick<ExamPaperSummary, 'id' | 'title' | 'examDate' | 'source'> & Partial<ExamPaperSummary>): ExamPaperSummary => ({
+  timeLimitMinutes: PAPER.timeLimitMinutes, electives: [...ELECTIVES], inProgress: null, lastResult: null, resultCount: 0, ...meta,
+});
+const schoolFilterPaper = (id: string, schoolName: string, year: number, semester: number, examTerm: 'mid' | 'final') => filterPaper({
+  id, title: `${year} ${schoolName} 1학년 ${semester}학기 ${examTerm === 'mid' ? '중간' : '기말'} (목)`, examDate: '', source: schoolName,
+  kind: 'school', schoolName, year, grade: 1, semester, examTerm, questionCount: 30, maxScore: 100, published: true, timeLimitMinutes: 50, electives: [],
+});
+export const FILTER_FIXTURE_PAPERS: ExamPaperSummary[] = [
+  filterPaper({ id: 'mock-csat-2026-11', title: '2026학년도 대학수학능력시험 수학 (목)', examDate: '2025-11-13', source: '한국교육과정평가원' }),
+  filterPaper({ id: 'mock-csat-2026-06', title: '2026학년도 6월 모의평가 수학 (목)', examDate: '2025-06-04', source: '한국교육과정평가원' }),
+  schoolFilterPaper('mock-school-2026-s1-final', '둔촌고', 2026, 1, 'final'),
+  schoolFilterPaper('mock-school-2025-s2-final', '상일여고', 2025, 2, 'final'),
+  filterPaper({ id: 'mock-worksheet-g3-quadratic', title: '중3 이차함수 학습지 (목)', examDate: '', source: '브라우저 검증용', kind: 'worksheet',
+    schoolName: '리뷰노트', unitName: '이차함수', grade: 9, questionCount: 2, maxScore: 10, published: true, timeLimitMinutes: null, electives: [] }),
+];
+const filterFixture = (paperId: string) => FILTER_FIXTURE_PAPERS.find(paper => paper.id === paperId) ?? null;
 const HANNEUNG = [advancedJson, basicJson];
 const ERA_SOURCES = [round74, round75, round76, round77, round78, advancedJson];
 const HANNEUNG_META: ExamPaperSummary[] = HANNEUNG.map(paper => ({
@@ -145,12 +162,14 @@ export interface MockExamClientOptions {
   failSave?: boolean;
   /** 필기 저장 요청 수·요청 본문 바이트(서버로 가는 양 측정). */
   inkStats?: { requests: number; bytes: number };
+  /** 시험지 고르기 필터 검증용 목 시험지(수능·모평 2장, 학생 공개 내신 2장)를 더한다. */
+  filters?: boolean;
   /** 호출 기록(테스트에서 검사). */
   log?: Array<{ method: string; args: unknown[] }>;
 }
 
 export function createMockExamClient(options: MockExamClientOptions = {}): ExamClient {
-  const papers = [...(options.worksheet ? WORKSHEET_FIXTURES.map(fixture => fixture.paper) : []), ...MOCK_PAPERS, ...HANNEUNG_META, ...ERA_META, ...(options.admin ? [SCHOOL_META] : [])];
+  const papers = [...(options.worksheet ? WORKSHEET_FIXTURES.map(fixture => fixture.paper) : []), ...MOCK_PAPERS, ...HANNEUNG_META, ...ERA_META, ...(options.admin ? [SCHOOL_META] : []), ...(options.filters ? FILTER_FIXTURE_PAPERS : [])];
   const store = new Map<string, StoredAttempt>();
   const ink = new Map<string, ExamInkDocument[]>();
   const replay = new Map<string, InkReplayBatch[]>();
@@ -349,8 +368,10 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
         return {
           ...meta,
           ...(meta.id === MOCK_SCHOOL_ID ? SCHOOL_META : {}),
+          ...(filterFixture(meta.id) ? { timeLimitMinutes: filterFixture(meta.id)!.timeLimitMinutes, electives: filterFixture(meta.id)!.electives } : {
           timeLimitMinutes: worksheetFixture(meta.id) ? null : HANNEUNG_META.find(paper => paper.id === meta.id)?.timeLimitMinutes ?? (meta.id === MOCK_SCHOOL_ID ? 50 : PAPER.timeLimitMinutes),
           electives: worksheetFixture(meta.id) || meta.id === MOCK_SCHOOL_ID || [...HANNEUNG_META, ...ERA_META].some(paper => paper.id === meta.id) ? [] : [...ELECTIVES],
+          }),
           inProgress: active ? {
             attemptId: active.attempt.id,
             round: roundFor(active.attempt),

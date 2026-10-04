@@ -9,6 +9,7 @@ import { startLiveBadgePolling } from './liveBadgePolling';
 import { ELECTIVE_SHORT, ELECTIVES, formatClock, formatElapsed, progressRatio, remainingMs, roundLabel } from './examLogic';
 import { HANNEUNG_ERAS } from './hanneungEra';
 import { resultGradeLabel } from './hanneungLogic';
+import { applyPaperFilters, browserFilterStorage, buildPaperFilters, filterScope, isFilterSection, loadSavedFilters, normalizeSelection, sortPapersNewest, storeSavedFilters, type FilterKey, type FilterSection, type FilterSelection, type PaperFilter, type SavedFilters } from './paperFilters';
 
 type PastResult = Pick<ExamResult, 'attemptId' | 'paperTitle' | 'mode' | 'elective' | 'score' | 'estimatedGrade' | 'submittedAt' | keyof ExamPaperMetadata>;
 
@@ -86,6 +87,29 @@ function PaperActivity({ students, onOpen }: { students: AdminPaperStudentActivi
           ))}
         </ul>
       </details>
+    </div>
+  );
+}
+
+const SECTION_LABEL: Record<'era' | 'csat' | 'school' | 'worksheet' | 'hanneung', string> = { era: '시대별 모아 풀기', csat: '수능·모평', school: '내신', worksheet: '학교 프린트', hanneung: '한능검' };
+
+/** 구역 제목 아래 필터 칩 줄(필터마다 한 줄, 넘치면 가로 스크롤). */
+function PaperFilterBar({ section, filters, selection, onPick }: { section: FilterSection; filters: PaperFilter[]; selection: FilterSelection; onPick: (key: FilterKey, value: string | null) => void }) {
+  if (filters.length === 0) return null;
+  return (
+    <div className="exam-filter-bar" data-testid="exam-filter-bar" data-section={section}>
+      {filters.map(filter => (
+        <div key={filter.key} className="exam-filter-row" role="group" aria-label={`${SECTION_LABEL[section]} ${filter.label}`} data-testid="exam-filter-row" data-filter={filter.key}>
+          <span className="exam-filter-label" aria-hidden="true">{filter.label}</span>
+          {[{ value: null as string | null, label: '전체' }, ...filter.options].map(option => {
+            const on = (selection[filter.key] ?? null) === option.value;
+            return (
+              <button key={option.value ?? 'all'} type="button" className={`exam-filter-chip${on ? ' is-on' : ''}`} aria-pressed={on}
+                data-testid="exam-filter-chip" data-value={option.value ?? 'all'} onClick={() => onPick(filter.key, option.value)}>{option.label}</button>
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 }
@@ -169,6 +193,7 @@ export function ExamStartView({ client, currentUserId, admin, busy, error, onSta
   const [reviewing, setReviewing] = useState<AdminPaperStudentActivity | null>(null);
   const [liveCounts, setLiveCounts] = useState<Map<string, number>>(new Map());
   const [livePaper, setLivePaper] = useState<ExamPaperSummary | null>(null);
+  const [savedFilters, setSavedFilters] = useState<SavedFilters>(() => loadSavedFilters(browserFilterStorage(), currentUserId));
   const setupRef = useRef<HTMLElement>(null);
   const [now] = useState(() => Date.now());
 
@@ -221,6 +246,18 @@ export function ExamStartView({ client, currentUserId, admin, busy, error, onSta
     }
   };
 
+  const pickFilter = (section: FilterSection, filters: PaperFilter[], key: FilterKey | null, value: string | null) => {
+    const scope = filterScope(grade, section);
+    const current = normalizeSelection(filters, savedFilters[scope]);
+    const nextSelection: FilterSelection = key ? { ...current } : {};
+    if (key) { if (value == null) delete nextSelection[key]; else nextSelection[key] = value; }
+    const next = { ...savedFilters, [scope]: nextSelection };
+    setSavedFilters(next);
+    storeSavedFilters(browserFilterStorage(), currentUserId, next);
+    // 고른 시험지가 필터로 가려지면 아래 풀이 설정도 닫는다.
+    if (paper && (paper.kind ?? 'csat') === section && !paper.practiceEra && applyPaperFilters([paper], nextSelection).length === 0) setPaperId(null);
+  };
+
   const onCard = (target: ExamPaperSummary) => {
     if (target.inProgress) { void resume(target); return; }
     setPaperId(target.id);
@@ -259,10 +296,19 @@ export function ExamStartView({ client, currentUserId, admin, busy, error, onSta
         <>
           <p className="rn-caption">시험지를 눌러 시작해요. 풀던 시험지는 이어서 풀 수 있어요.</p>
           {(['era', 'csat', 'school', 'worksheet', 'hanneung'] as const).map(kind => {
-            const group = kind === 'era' ? HANNEUNG_ERAS.flatMap(era => visiblePapers.filter(p => p.practiceEra === era.id)) : visiblePapers.filter(p => !p.practiceEra && (p.kind ?? 'csat') === kind);
-            return group.length > 0 ? <section key={kind} aria-label={kind === 'era' ? '시대별 모아 풀기' : kind === 'worksheet' ? '학교 프린트' : kind === 'school' ? '내신' : kind === 'csat' ? '수능·모평' : '한능검'}>
-            <h2 className="exam-setup-title">{kind === 'era' ? '시대별 모아 풀기' : kind === 'worksheet' ? '학교 프린트' : kind === 'school' ? '내신' : kind === 'csat' ? '수능·모평' : '한능검'}</h2>
-            <div className={kind === 'era' ? 'exam-era-card-list' : 'exam-paper-list'} aria-label={kind === 'era' ? '시대 묶음' : '시험지'}>
+            const all = kind === 'era' ? HANNEUNG_ERAS.flatMap(era => visiblePapers.filter(p => p.practiceEra === era.id)) : visiblePapers.filter(p => !p.practiceEra && (p.kind ?? 'csat') === kind);
+            if (all.length === 0) return null;
+            const filters = isFilterSection(kind) ? buildPaperFilters(kind, all) : [];
+            const selection = isFilterSection(kind) ? normalizeSelection(filters, savedFilters[filterScope(grade, kind)]) : {};
+            const group = sortPapersNewest(kind, applyPaperFilters(all, selection));
+            return <section key={kind} aria-label={SECTION_LABEL[kind]} data-testid="exam-paper-section" data-section={kind}>
+            <h2 className="exam-setup-title">{SECTION_LABEL[kind]}</h2>
+            {isFilterSection(kind) && <PaperFilterBar section={kind} filters={filters} selection={selection} onPick={(key, value) => pickFilter(kind, filters, key, value)} />}
+            {group.length === 0 && <div className="rn-empty exam-filter-empty" data-testid="exam-filter-empty">
+              <span>조건에 맞는 시험지가 없어요</span>
+              {isFilterSection(kind) && <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={() => pickFilter(kind, filters, null, null)} data-testid="exam-filter-reset">필터 초기화</button>}
+            </div>}
+            {group.length > 0 && <div className={kind === 'era' ? 'exam-era-card-list' : 'exam-paper-list'} aria-label={kind === 'era' ? '시대 묶음' : '시험지'}>
             {group.map(p => (
               <div key={p.id} className="exam-paper-entry">
                 {activity && (liveCounts.get(p.id) ?? 0) > 0 && <button type="button" className="exam-live-badge" data-testid="exam-live-badge" aria-label={`${p.title} Live 보기`} onClick={() => setLivePaper(p)}><i aria-hidden="true" />Live</button>}
@@ -273,7 +319,7 @@ export function ExamStartView({ client, currentUserId, admin, busy, error, onSta
                 {activity && <PaperActivity students={activity.get(p.id) ?? []} onOpen={setReviewing} />}
               </div>
             ))}
-          </div></section> : null;
+          </div>}</section>;
           })}
         </>
       )}
