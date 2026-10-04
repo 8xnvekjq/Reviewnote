@@ -425,7 +425,76 @@ try {
   await page.screenshot({ path: 'node_modules/.cache/exam-ink/lasso.png' });
   await page.getByRole('button', { name: '펜', exact: true }).click();
 
+  // ── 두 손가락 드래그 → 스크롤(다지 탭 도입 후 막혔던 회귀). 탭 허용치 안의 두 번 탭은 계속 실행 취소 ──
+  /** 두 손가락을 함께 (dx, dy)만큼 민다. 손가락 위치는 화면 좌표 그대로(스크롤돼도 손가락은 화면에 있다). */
+  const twoFingerDrag = (dx, dy, base) => page.evaluate(async ({ dx, dy, base }) => {
+    const el = document.querySelector('.exam-ink-input');
+    const r = el.getBoundingClientRect();
+    const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const x0 = r.left + r.width * 0.3, y0 = Math.min(window.innerHeight - 40, r.top + r.width * 0.9);
+    const send = (type, i, k) => el.dispatchEvent(new PointerEvent(type, {
+      pointerId: base + i, pointerType: 'touch', isPrimary: i === 0, bubbles: true, cancelable: true, buttons: type === 'pointerup' ? 0 : 1,
+      pressure: type === 'pointerup' ? 0 : 0.5, clientX: x0 + i * 80 + (dx * k) / 10, clientY: y0 + (dy * k) / 10,
+    }));
+    send('pointerdown', 0, 0); send('pointerdown', 1, 0);
+    for (let k = 1; k <= 10; k++) { send('pointermove', 0, k); send('pointermove', 1, k); await sleep(16); }
+    send('pointerup', 0, 10); send('pointerup', 1, 10);
+    await sleep(50);
+  }, { dx, dy, base });
+  // index.css가 html·body·#root를 position: fixed + overflow: hidden으로 묶어 문서 자체는 스크롤되지 않는다(PWA).
+  // 앱처럼 안쪽 overflow: auto 영역이 스크롤되게 — #root를 세로 스크롤 영역으로 두고 아래 여백을 준다.
+  await page.evaluate(() => {
+    const root = document.getElementById('root');
+    root.style.overflowY = 'auto'; root.scrollTop = 0;
+    document.querySelector('main').style.paddingBottom = '2400px';
+  });
+  const rootScrollTop = () => page.evaluate(() => document.getElementById('root').scrollTop);
+  assert.ok(await page.evaluate(() => { const r = document.getElementById('root'); return r.scrollHeight - r.clientHeight; }) > 300, 'the harness scroller has room to scroll');
+  const beforeDrag = JSON.stringify(await strokes());
+  await twoFingerDrag(0, -150, 700);
+  assert.ok(Math.abs(await rootScrollTop() - 150) <= 2, 'two-finger drag up scrolls the page down by the finger movement');
+  assert.equal(JSON.stringify(await strokes()), beforeDrag, 'and neither draws nor undoes');
+  await twoFingerDrag(0, 100, 710);
+  assert.ok(Math.abs(await rootScrollTop() - 50) <= 2, 'and back up');
+  // 한능검 원본 페이지처럼 가로 스크롤 영역 안: 두 손가락 가로 드래그는 그 영역을 옆으로 민다.
+  await page.evaluate(() => {
+    const main = document.querySelector('main');
+    main.style.width = '480px'; main.style.overflowX = 'auto';
+    document.querySelector('[data-testid="paper"]').style.maxWidth = 'none';
+  });
+  await twoFingerDrag(-120, 0, 720);
+  assert.ok(Math.abs(await page.evaluate(() => document.querySelector('main').scrollLeft) - 120) <= 2, 'two-finger drag sideways scrolls the horizontal scroller');
+  await page.evaluate(() => {
+    const main = document.querySelector('main');
+    main.scrollLeft = 0; main.style.width = ''; main.style.overflowX = '';
+    document.querySelector('[data-testid="paper"]').style.maxWidth = '100%';
+  });
+  // 한 손가락(펜 감지 후)은 예전처럼 스크롤
+  const oneY = await rootScrollTop();
+  await page.evaluate(async () => {
+    const el = document.querySelector('.exam-ink-input');
+    const r = el.getBoundingClientRect();
+    const y0 = Math.min(window.innerHeight - 40, r.top + r.width * 0.9);
+    for (let k = 0; k <= 10; k++) {
+      el.dispatchEvent(new PointerEvent(k ? 'pointermove' : 'pointerdown', { pointerId: 730, pointerType: 'touch', isPrimary: true, bubbles: true, cancelable: true, buttons: 1, clientX: r.left + 100, clientY: y0 - k * 6 }));
+    }
+    el.dispatchEvent(new PointerEvent('pointerup', { pointerId: 730, pointerType: 'touch', isPrimary: true, bubbles: true, cancelable: true, clientX: r.left + 100, clientY: y0 - 60 }));
+  });
+  assert.ok(Math.abs(await rootScrollTop() - oneY - 60) <= 2, 'a single finger still scrolls once a pen was seen');
+  assert.equal(JSON.stringify(await strokes()), beforeDrag, 'and does not draw');
+  await page.waitForTimeout(400);
+  const scrolledY = await rootScrollTop();
+  await multiTap(2, 800);
+  assert.notEqual(JSON.stringify(await strokes()), beforeDrag, 'a still two-finger double tap still undoes after scrolling');
+  assert.equal(await rootScrollTop(), scrolledY, 'and the tap does not scroll');
+  await page.getByRole('button', { name: '다시 하기' }).click();
+  await page.evaluate(() => {
+    const root = document.getElementById('root');
+    root.scrollTop = 0; root.style.overflowY = '';
+    document.querySelector('main').style.paddingBottom = '';
+  });
+
   assert.deepEqual(errors, []);
-  console.log('PASS exam ink: pen, hold→line/circle with resize, stroke eraser, undo/redo/clear, resize keeps position, readOnly, palm rejection, jittery Pencil hold, triangle/rectangle, arc→line, laser, lasso move/rotate/scale/undo, multi-finger tap undo/redo');
+  console.log('PASS exam ink: pen, hold→line/circle with resize, stroke eraser, undo/redo/clear, resize keeps position, readOnly, palm rejection, jittery Pencil hold, triangle/rectangle, arc→line, laser, lasso move/rotate/scale/undo, multi-finger tap undo/redo, two-finger scroll');
   await page.close();
 } finally { await browser.close(); }

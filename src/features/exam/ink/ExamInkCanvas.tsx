@@ -14,6 +14,7 @@ import type { LaserTrail } from './inkLaser.ts';
 import type { Pt, SnapShape } from './shapeSnap.ts';
 import { MULTI_TAP_SPREAD_MS, MultiFingerTap } from './multiTap.ts';
 import type { MultiTapAction } from './multiTap.ts';
+import { MultiFingerPan } from './multiPan.ts';
 import {
   IDENTITY, frameCorners, frameOf, hitFrame, isIdentity, lassoSelect, moveTransform, rotateHandle, rotateTransform, scaleTransform,
   transformFrame, transformSelection,
@@ -52,13 +53,35 @@ const LASSO_MIN_PX = 12;
 /** 펜이 한 번이라도 감지되면 이후(문항을 옮겨 다시 마운트돼도) 손가락은 그리지 않는다. */
 let penEverDetected = false;
 
-/** 가장 가까운 세로 스크롤 조상(손가락 스크롤을 직접 처리할 때 쓴다). */
-function scrollParentOf(el: HTMLElement): HTMLElement | null {
+/** 가장 가까운 세로(y)·가로(x) 스크롤 조상(손가락 스크롤을 직접 처리할 때 쓴다). */
+function scrollParentOf(el: HTMLElement, axis: 'x' | 'y' = 'y'): HTMLElement | null {
   for (let node = el.parentElement; node; node = node.parentElement) {
-    const oy = getComputedStyle(node).overflowY;
-    if ((oy === 'auto' || oy === 'scroll') && node.scrollHeight > node.clientHeight) return node;
+    const style = getComputedStyle(node);
+    const o = axis === 'y' ? style.overflowY : style.overflowX;
+    const room = axis === 'y' ? node.scrollHeight > node.clientHeight : node.scrollWidth > node.clientWidth;
+    if ((o === 'auto' || o === 'scroll') && room) return node;
   }
   return (document.scrollingElement as HTMLElement | null) ?? null;
+}
+
+/** rx·ry: 아직 스크롤하지 못한 1px 미만 나머지. */
+interface Scrollers { x: HTMLElement | null; y: HTMLElement | null; rx: number; ry: number }
+const scrollersOf = (el: HTMLElement): Scrollers => ({ x: scrollParentOf(el, 'x'), y: scrollParentOf(el, 'y'), rx: 0, ry: 0 });
+/** 손가락이 (dx, dy)만큼 움직였을 때 내용이 손가락을 따라오게 스크롤(한능검 원본 페이지는 가로 스크롤 영역).
+ *  브라우저는 scrollBy를 (기기) 픽셀로 반올림한다 — 두 손가락 평균은 0.5px 단위라 그대로 넘기면 매번 올려져
+ *  손가락보다 더 많이 밀렸다. 실제로 움직인 만큼만 빼고 나머지는 다음 이동에 넘긴다(끝에 닿아 못 간 만큼은 버린다). */
+function scrollWith(s: Scrollers, dx: number, dy: number) {
+  const step = (el: HTMLElement | null, axis: 'x' | 'y', d: number) => {
+    if (!el || !d) return;
+    const want = (axis === 'x' ? s.rx : s.ry) - d;
+    const before = axis === 'x' ? el.scrollLeft : el.scrollTop;
+    if (axis === 'x') el.scrollBy(want, 0); else el.scrollBy(0, want);
+    const rest = want - ((axis === 'x' ? el.scrollLeft : el.scrollTop) - before);
+    const keep = Math.abs(rest) < 1 ? rest : 0;
+    if (axis === 'x') s.rx = keep; else s.ry = keep;
+  };
+  step(s.x, 'x', dx);
+  step(s.y, 'y', dy);
 }
 
 interface DrawGesture {
@@ -87,7 +110,7 @@ interface PanGesture {
   pointerId: number;
   lastX: number;
   lastY: number;
-  scroller: HTMLElement | null;
+  scrollers: Scrollers;
 }
 interface EraseGesture {
   kind: 'erase';
@@ -474,6 +497,9 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     let rect = canvas.getBoundingClientRect();
     /** 두·세 손가락 탭 판정(손가락만 넣는다). */
     const taps = new MultiFingerTap();
+    /** 두 손가락(이상) 드래그 → 스크롤(다지 탭과 같은 손가락 묶음). */
+    const multiPan = new MultiFingerPan();
+    let multiScrollers: Scrollers | null = null;
     /** 지금 제스처가 시작된 시각(e.timeStamp). */
     let gestureStartedAt = 0;
 
@@ -579,11 +605,14 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       const touch = e.pointerType === 'touch';
       if (touch) {
         const fingers = taps.down(e.pointerId, e.clientX, e.clientY, e.timeStamp);
+        multiPan.down(e.pointerId, e.clientX, e.clientY);
         const g = gestureRef.current;
-        if (g && !g.touch) taps.invalidate(); // 펜·마우스로 쓰는 중에 닿은 손(손바닥)은 탭이 아니다
+        if (g && !g.touch) { taps.invalidate(); multiPan.block(); } // 펜·마우스로 쓰는 중에 닿은 손(손바닥)은 탭·스크롤이 아니다
         if (fingers >= 2 || taps.multi) {
-          // 두·세 손가락: 첫 손가락으로 시작한 획·스크롤·조작은 취소하고, 다 뗄 때까지 아무것도 하지 않는다.
+          // 두·세 손가락: 첫 손가락으로 시작한 획·스크롤·조작은 취소하고, 다 뗄 때까지 탭(실행 취소·다시 실행)이나
+          // 두 손가락 스크롤(움직이면, onPointerMove)만 한다.
           if (e.cancelable) e.preventDefault();
+          if (fingers === 2) multiScrollers = scrollersOf(canvas);
           // 막 시작한 것(탭일 수 있는 시간 안)은 없던 일로, 이미 한참 쓰던 획 등은 지금까지의 결과로 확정한다.
           if (g?.touch) {
             if (e.timeStamp - gestureStartedAt <= MULTI_TAP_SPREAD_MS) abortGesture(g);
@@ -593,6 +622,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
         }
       } else if (e.pointerType === 'pen') {
         taps.invalidate();
+        multiPan.block();
       }
       if (gestureRef.current) return; // 두 번째 입력·손바닥은 무시
       gestureStartedAt = e.timeStamp;
@@ -605,7 +635,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
         // 애플펜슬 획까지 스크롤로 가로채 획이 0.5초 만에 끊겼다 — 그래서 touch-action은 항상 none.
         e.preventDefault();
         try { canvas.setPointerCapture(e.pointerId); } catch { /* 합성 이벤트 등 */ }
-        gestureRef.current = { kind: 'pan', pointerId: e.pointerId, lastX: e.clientX, lastY: e.clientY, scroller: scrollParentOf(canvas), touch };
+        gestureRef.current = { kind: 'pan', pointerId: e.pointerId, lastX: e.clientX, lastY: e.clientY, scrollers: scrollersOf(canvas), touch };
         return;
       }
       if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -663,13 +693,19 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     const onPointerMove = (e: PointerEvent) => {
       if (e.pointerType === 'touch') {
         taps.move(e.pointerId, e.clientX, e.clientY);
-        if (taps.multi) { if (e.cancelable) e.preventDefault(); return; }
+        const delta = multiPan.move(e.pointerId, e.clientX, e.clientY);
+        if (taps.multi) {
+          if (e.cancelable) e.preventDefault();
+          // 두 손가락이 탭 허용치를 넘게 움직였으면 평균 이동만큼 직접 스크롤(touch-action: none이라 브라우저는 하지 않는다).
+          if (delta) scrollWith(multiScrollers ?? (multiScrollers = scrollersOf(canvas)), delta.dx, delta.dy);
+          return;
+        }
       }
       const g = gestureRef.current;
       if (!g || e.pointerId !== g.pointerId) return;
       e.preventDefault();
       if (g.kind === 'pan') {
-        g.scroller?.scrollBy(g.lastX - e.clientX, g.lastY - e.clientY);
+        scrollWith(g.scrollers, e.clientX - g.lastX, e.clientY - g.lastY);
         g.lastX = e.clientX; g.lastY = e.clientY;
         return;
       }
@@ -767,6 +803,8 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
 
     const onPointerUp = (e: PointerEvent) => {
       if (e.pointerType === 'touch' && e.type === 'pointerup') {
+        // lostpointercapture는 손가락이 아직 닿아 있어도 온다(다지가 되며 첫 손가락 캡처를 풀 때) — 실제로 뗄 때만.
+        multiPan.up(e.pointerId);
         const action = taps.up(e.pointerId, e.timeStamp);
         if (action) { runTapAction(action); return; }
       }
@@ -813,7 +851,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     };
 
     const onPointerCancel = (e: PointerEvent) => {
-      if (e.pointerType === 'touch') taps.cancel(e.pointerId);
+      if (e.pointerType === 'touch') { taps.cancel(e.pointerId); multiPan.up(e.pointerId); }
       const g = gestureRef.current;
       if (g && e.pointerId === g.pointerId) settleGesture(g);
     };
