@@ -1,14 +1,14 @@
 // 올가미 선택·변환(순수 함수). 좌표는 필기와 같은 정규화 단위(이미지 너비 = 1).
 //
-// 선택 기준: 획을 이루는 점(도형은 둘레를 고르게 나눈 점) 가운데 절반 이상(LASSO_MIN_INSIDE)이 올가미 안에 있으면 선택.
-//   - 글씨를 대충 둘러도 획 끝이 조금 삐져나온 것은 잡히고, 옆 글자를 살짝 스친 것은 잡히지 않는다.
+// 선택 기준: 획의 일부라도 올가미에 걸치면 그 획 전체를 선택한다.
+//   - 획의 점(도형은 shapeToPoints 윤곽 점)이 하나라도 올가미 안에 있거나,
+//   - 획의 선분이 올가미 경계와 교차하면(점 간격이 넓은 직선·다각형 변이 올가미를 가로지르는 경우) 선택.
 //   - 점 하나짜리 획(콕 찍은 점)은 그 점이 안에 있으면 선택.
 // 변환은 닮음 변환(균일 확대·축소 + 회전 + 평행이동)만 쓴다 — 타원은 타원 그대로, 굵기도 같은 비율로 바뀐다.
 import type { InkShape, InkStroke } from '../contract.ts';
-import { strokePolyline, strokeWidth } from './inkModel.ts';
+import { strokeBounds, strokePolyline, strokeWidth } from './inkModel.ts';
 import type { Pt } from './shapeSnap.ts';
 
-export const LASSO_MIN_INSIDE = 0.5;
 /** 서버 검증(private.validate_exam_replay_strokes)이 받는 좌표 범위 |x|,|y| ≤ 100. */
 export const INK_COORD_LIMIT = 100;
 /** 회전 스냅: 전체 기울기가 0°·90°·180°·270°에서 이 각도(도) 안이면 딱 맞춘다. */
@@ -51,30 +51,16 @@ export function pointInPolygon(p: Pt, poly: Pt[]): boolean {
   return inside;
 }
 
-/** 폴리라인을 길이 기준으로 고르게 n+1개 점으로(직선 도형은 끝점 2개뿐이라 그대로 세면 판정이 거칠다). */
-function resample(points: Pt[], n: number): Pt[] {
-  if (points.length < 2) return points;
-  const lengths = [0];
-  for (let i = 1; i < points.length; i++) lengths.push(lengths[i - 1] + Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y));
-  const total = lengths[lengths.length - 1];
-  if (!total) return [points[0]];
-  const out: Pt[] = [];
-  let seg = 1;
-  for (let s = 0; s <= n; s++) {
-    const d = (s / n) * total;
-    while (seg < points.length - 1 && lengths[seg] < d) seg++;
-    const span = lengths[seg] - lengths[seg - 1] || 1;
-    const t = Math.min(1, Math.max(0, (d - lengths[seg - 1]) / span));
-    out.push({ x: points[seg - 1].x + (points[seg].x - points[seg - 1].x) * t, y: points[seg - 1].y + (points[seg].y - points[seg - 1].y) * t });
-  }
-  return out;
+/** 선분 ab와 cd가 만나는지(끝점이 닿거나 겹치는 경우 포함). */
+export function segmentsIntersect(a: Pt, b: Pt, c: Pt, d: Pt): boolean {
+  const cross = (o: Pt, p: Pt, q: Pt) => (p.x - o.x) * (q.y - o.y) - (p.y - o.y) * (q.x - o.x);
+  const onSeg = (o: Pt, p: Pt, q: Pt) => Math.min(o.x, p.x) <= q.x && q.x <= Math.max(o.x, p.x) && Math.min(o.y, p.y) <= q.y && q.y <= Math.max(o.y, p.y);
+  const d1 = cross(c, d, a), d2 = cross(c, d, b), d3 = cross(a, b, c), d4 = cross(a, b, d);
+  if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return true;
+  return (d1 === 0 && onSeg(c, d, a)) || (d2 === 0 && onSeg(c, d, b)) || (d3 === 0 && onSeg(a, b, c)) || (d4 === 0 && onSeg(a, b, d));
 }
 
-function samplePoints(stroke: InkStroke): Pt[] {
-  return stroke.shape ? resample(strokePolyline(stroke), 32) : stroke.points;
-}
-
-/** 올가미 경로(path, 자동으로 닫힌다)에 절반 이상 들어간 획 id들(획 순서 그대로). */
+/** 올가미 경로(path, 자동으로 닫힌다)에 일부라도 걸친 획 id들(획 순서 그대로). */
 export function lassoSelect(strokes: InkStroke[], path: Pt[]): string[] {
   if (path.length < 3) return [];
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -82,13 +68,21 @@ export function lassoSelect(strokes: InkStroke[], path: Pt[]): string[] {
     if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
     if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
   }
+  const inBox = (p: Pt) => p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY;
+  const crossesBoundary = (a: Pt, b: Pt) => {
+    if (Math.max(a.x, b.x) < minX || Math.min(a.x, b.x) > maxX || Math.max(a.y, b.y) < minY || Math.min(a.y, b.y) > maxY) return false;
+    for (let i = 0, j = path.length - 1; i < path.length; j = i++) if (segmentsIntersect(a, b, path[j], path[i])) return true;
+    return false;
+  };
   const ids: string[] = [];
   for (const stroke of strokes) {
-    const pts = samplePoints(stroke);
+    const pts = strokePolyline(stroke);
     if (!pts.length) continue;
-    let inside = 0;
-    for (const p of pts) if (p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY && pointInPolygon(p, path)) inside++;
-    if (inside > 0 && inside / pts.length >= LASSO_MIN_INSIDE) ids.push(stroke.id);
+    const b = strokeBounds(stroke);
+    if (b.maxX < minX || b.minX > maxX || b.maxY < minY || b.minY > maxY) continue;
+    let hit = pts.some(p => inBox(p) && pointInPolygon(p, path));
+    for (let i = 1; !hit && i < pts.length; i++) hit = crossesBoundary(pts[i - 1], pts[i]);
+    if (hit) ids.push(stroke.id);
   }
   return ids;
 }

@@ -423,6 +423,20 @@ try {
   assert.ok(list.some(s => s.id === firstLine.id), 'undo brings the original stroke back');
   assert.equal(list.length, countBefore);
   await page.screenshot({ path: 'node_modules/.cache/exam-ink/lasso.png' });
+  // 일부만 걸쳐도 획 전체 선택: 직선 가운데만 작게 두르면(끝점은 둘 다 밖) 선 전체가 잡히고, 올가미 밖 끝부분을 끌어도 옮겨진다
+  const mid = [(fx[0] + fy[0]) / 2, (fx[1] + fy[1]) / 2], r = 0.025;
+  await draw(Array.from({ length: 13 }, (_, i) => [mid[0] + r * Math.cos((i / 12) * Math.PI * 2), mid[1] + r * Math.sin((i / 12) * Math.PI * 2)]));
+  assert.equal(await selected(), 1, 'a lasso around just the middle of the line still picks it');
+  const nearFrom = [fx[0] + (fy[0] - fx[0]) * 0.08, fx[1] + (fy[1] - fx[1]) * 0.08]; // 올가미 밖, 선택 테두리 안
+  await draw([nearFrom, [nearFrom[0], nearFrom[1] + 0.05], [nearFrom[0], nearFrom[1] + 0.1]]);
+  list = await strokes();
+  const shifted = list.find(s => s.shape?.kind === 'line' && Math.abs(s.shape.from[0] - fx[0]) < 0.003 && Math.abs(s.shape.from[1] - (fx[1] + 0.1)) < 0.003);
+  assert.ok(shifted && Math.abs(shifted.shape.to[0] - fy[0]) < 0.003 && Math.abs(shifted.shape.to[1] - (fy[1] + 0.1)) < 0.003, `the whole line moved: ${JSON.stringify(shifted?.shape)}`);
+  assert.equal(list.length, countBefore);
+  await draw([[0.05, 1.95]]);
+  assert.equal(await selected(), 0);
+  await page.getByRole('button', { name: '되돌리기' }).click();
+  assert.ok((await strokes()).some(s => s.id === firstLine.id), 'undo puts the line back');
   await page.getByRole('button', { name: '펜', exact: true }).click();
 
   // ── 두 손가락 드래그 → 스크롤(다지 탭 도입 후 막혔던 회귀). 탭 허용치 안의 두 번 탭은 계속 실행 취소 ──
@@ -495,6 +509,6 @@ try {
   });
 
   assert.deepEqual(errors, []);
-  console.log('PASS exam ink: pen, hold→line/circle with resize, stroke eraser, undo/redo/clear, resize keeps position, readOnly, palm rejection, jittery Pencil hold, triangle/rectangle, arc→line, laser, lasso move/rotate/scale/undo, multi-finger tap undo/redo, two-finger scroll');
+  console.log('PASS exam ink: pen, hold→line/circle with resize, stroke eraser, undo/redo/clear, resize keeps position, readOnly, palm rejection, jittery Pencil hold, triangle/rectangle, arc→line, laser, lasso move/rotate/scale/undo, lasso partial pick, multi-finger tap undo/redo, two-finger scroll');
   await page.close();
 } finally { await browser.close(); }
