@@ -64,13 +64,24 @@ function scrollParentOf(el: HTMLElement, axis: 'x' | 'y' = 'y'): HTMLElement | n
   return (document.scrollingElement as HTMLElement | null) ?? null;
 }
 
-interface Scrollers { x: HTMLElement | null; y: HTMLElement | null }
-const scrollersOf = (el: HTMLElement): Scrollers => ({ x: scrollParentOf(el, 'x'), y: scrollParentOf(el, 'y') });
-/** 손가락이 (dx, dy)만큼 움직였을 때 내용이 손가락을 따라오게 스크롤(한능검 원본 페이지는 가로 스크롤 영역). */
+/** rx·ry: 아직 스크롤하지 못한 1px 미만 나머지. */
+interface Scrollers { x: HTMLElement | null; y: HTMLElement | null; rx: number; ry: number }
+const scrollersOf = (el: HTMLElement): Scrollers => ({ x: scrollParentOf(el, 'x'), y: scrollParentOf(el, 'y'), rx: 0, ry: 0 });
+/** 손가락이 (dx, dy)만큼 움직였을 때 내용이 손가락을 따라오게 스크롤(한능검 원본 페이지는 가로 스크롤 영역).
+ *  브라우저는 scrollBy를 (기기) 픽셀로 반올림한다 — 두 손가락 평균은 0.5px 단위라 그대로 넘기면 매번 올려져
+ *  손가락보다 더 많이 밀렸다. 실제로 움직인 만큼만 빼고 나머지는 다음 이동에 넘긴다(끝에 닿아 못 간 만큼은 버린다). */
 function scrollWith(s: Scrollers, dx: number, dy: number) {
-  if (s.x === s.y) { s.y?.scrollBy(-dx, -dy); return; }
-  if (dx) s.x?.scrollBy(-dx, 0);
-  if (dy) s.y?.scrollBy(0, -dy);
+  const step = (el: HTMLElement | null, axis: 'x' | 'y', d: number) => {
+    if (!el || !d) return;
+    const want = (axis === 'x' ? s.rx : s.ry) - d;
+    const before = axis === 'x' ? el.scrollLeft : el.scrollTop;
+    if (axis === 'x') el.scrollBy(want, 0); else el.scrollBy(0, want);
+    const rest = want - ((axis === 'x' ? el.scrollLeft : el.scrollTop) - before);
+    const keep = Math.abs(rest) < 1 ? rest : 0;
+    if (axis === 'x') s.rx = keep; else s.ry = keep;
+  };
+  step(s.x, 'x', dx);
+  step(s.y, 'y', dy);
 }
 
 interface DrawGesture {
