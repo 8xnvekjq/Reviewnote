@@ -258,7 +258,8 @@
 .exam-body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 12px 10px calc(env(safe-area-inset-bottom) + 20px); }
 .exam-paper { width: min(100%, 980px); margin-inline: auto; }
 .exam-paper-meta { margin: 0 2px 6px; }
-.exam-reference-link { color: var(--rn-accent, #2563eb); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+.exam-reference-button { display: inline-flex; align-items: center; min-height: 28px; padding: 2px 10px; border-radius: 99px; border: 1px solid var(--rn-accent, #2563eb); background: transparent; color: var(--rn-accent, #2563eb); font: inherit; font-weight: 700; cursor: pointer; touch-action: manipulation; vertical-align: middle; }
+.exam-reference-button:active { transform: scale(.97); }
 .exam-category-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .exam-category-grid .exam-option { padding-inline: 4px; }
 .exam-category-grid .exam-option strong { white-space: nowrap; }
@@ -275,6 +276,12 @@
 .exam-overlay { position: fixed; inset: 0; z-index: 2050; display: flex; align-items: flex-end; justify-content: center; background: rgb(3 7 18 / .72); }
 .exam-overlay-full { align-items: stretch; background: var(--rn-bg); }
 .exam-viewer-overlay { background: rgb(3 7 18 / .9); align-items: center; padding: 12px; }
+/* 학습지 참고 이미지 보기 창(ExamImageViewer): 검은 반투명 배경, 화면에 맞춘 이미지, 브라우저 확대 대신 직접 핀치 처리 */
+.exam-image-viewer { padding: 0; align-items: stretch; background: rgb(0 0 0 / .88); touch-action: none; overscroll-behavior: contain; }
+.exam-image-viewer-stage { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: none; cursor: zoom-out; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; margin: calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 8px) calc(env(safe-area-inset-bottom) + 8px) calc(env(safe-area-inset-left) + 8px); }
+.exam-image-viewer-stage img { display: block; flex: none; max-width: none; transform-origin: center center; will-change: transform; pointer-events: none; background: #fff; }
+.exam-image-viewer-close { position: absolute; top: calc(env(safe-area-inset-top) + 10px); right: calc(env(safe-area-inset-right) + 10px); width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 99px; background: rgb(255 255 255 / .18); color: #fff; font-size: 16px; cursor: pointer; }
+.exam-image-viewer-tip { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 12px); transform: translateX(-50%); padding: 4px 12px; border-radius: 99px; background: rgb(0 0 0 / .55); color: rgb(255 255 255 / .85); font-size: 12px; white-space: nowrap; pointer-events: none; }
 .exam-sheet-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
 .exam-sheet-head h2 { font-size: 19px; font-weight: 800; margin-right: auto; }
 .exam-sheet-wide { width: 100%; margin-top: 12px; }
