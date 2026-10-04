@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { ExamPaperSummary } from '../../src/features/exam/contract.ts';
 import {
-  applyPaperFilters, buildPaperFilters, csatAcademicYear, filterScope, filterStorageKey, loadSavedFilters,
+  applyPaperFilters, browserFilterStorage, buildPaperFilters, csatAcademicYear, filterScope, filterStorageKey, loadSavedFilters,
   normalizeSelection, paperFilterValue, parseSavedFilters, sortPapersNewest, storeSavedFilters,
 } from '../../src/features/exam/ui/paperFilters.ts';
 
@@ -80,4 +80,16 @@ test('선택 저장·복원: 학년·구역별 키, 깨진 값·사라진 값은
   const filters = buildPaperFilters('csat', CSAT);
   assert.deepEqual(normalizeSelection(filters, { year: '2019', month: '9' }), { month: '9' });
   assert.deepEqual(normalizeSelection(buildPaperFilters('csat', [CSAT[0]]), { year: '2025' }), {});
+});
+
+test('localStorage 객체 접근 자체가 거부되어도 복원·저장이 실패하지 않는다', () => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, get() { throw new Error('SecurityError'); } });
+  try {
+    assert.deepEqual(loadSavedFilters(browserFilterStorage(), 'u1'), {});
+    assert.doesNotThrow(() => storeSavedFilters(browserFilterStorage(), 'u1', { '3:csat': { month: '6' } }));
+  } finally {
+    if (original) Object.defineProperty(globalThis, 'localStorage', original);
+    else Reflect.deleteProperty(globalThis, 'localStorage');
+  }
 });

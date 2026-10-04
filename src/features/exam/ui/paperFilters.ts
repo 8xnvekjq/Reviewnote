@@ -106,6 +106,11 @@ export type SavedFilters = Record<string, FilterSelection>;
 export function filterStorageKey(userId: string) { return `rn-exam-paper-filters:${userId}`; }
 export function filterScope(grade: number | string, section: FilterSection) { return `${grade}:${section}`; }
 
+/** 저장소 메서드뿐 아니라 브라우저의 localStorage 접근 자체도 거부될 수 있다. */
+export function browserFilterStorage(): Storage | undefined {
+  try { return typeof localStorage === 'undefined' ? undefined : localStorage; } catch { return undefined; }
+}
+
 const FILTER_KEYS = new Set<string>(['year', 'month', 'semester', 'term', 'school', 'unit']);
 export function parseSavedFilters(raw: string | null): SavedFilters {
   if (!raw) return {};

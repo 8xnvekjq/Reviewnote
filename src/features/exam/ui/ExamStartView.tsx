@@ -9,7 +9,7 @@ import { startLiveBadgePolling } from './liveBadgePolling';
 import { ELECTIVE_SHORT, ELECTIVES, formatClock, formatElapsed, progressRatio, remainingMs, roundLabel } from './examLogic';
 import { HANNEUNG_ERAS } from './hanneungEra';
 import { resultGradeLabel } from './hanneungLogic';
-import { applyPaperFilters, buildPaperFilters, filterScope, isFilterSection, loadSavedFilters, normalizeSelection, sortPapersNewest, storeSavedFilters, type FilterKey, type FilterSection, type FilterSelection, type PaperFilter, type SavedFilters } from './paperFilters';
+import { applyPaperFilters, browserFilterStorage, buildPaperFilters, filterScope, isFilterSection, loadSavedFilters, normalizeSelection, sortPapersNewest, storeSavedFilters, type FilterKey, type FilterSection, type FilterSelection, type PaperFilter, type SavedFilters } from './paperFilters';
 
 type PastResult = Pick<ExamResult, 'attemptId' | 'paperTitle' | 'mode' | 'elective' | 'score' | 'estimatedGrade' | 'submittedAt' | keyof ExamPaperMetadata>;
 
@@ -193,7 +193,7 @@ export function ExamStartView({ client, currentUserId, admin, busy, error, onSta
   const [reviewing, setReviewing] = useState<AdminPaperStudentActivity | null>(null);
   const [liveCounts, setLiveCounts] = useState<Map<string, number>>(new Map());
   const [livePaper, setLivePaper] = useState<ExamPaperSummary | null>(null);
-  const [savedFilters, setSavedFilters] = useState<SavedFilters>(() => loadSavedFilters(typeof localStorage === 'undefined' ? undefined : localStorage, currentUserId));
+  const [savedFilters, setSavedFilters] = useState<SavedFilters>(() => loadSavedFilters(browserFilterStorage(), currentUserId));
   const setupRef = useRef<HTMLElement>(null);
   const [now] = useState(() => Date.now());
 
@@ -253,7 +253,7 @@ export function ExamStartView({ client, currentUserId, admin, busy, error, onSta
     if (key) { if (value == null) delete nextSelection[key]; else nextSelection[key] = value; }
     const next = { ...savedFilters, [scope]: nextSelection };
     setSavedFilters(next);
-    storeSavedFilters(typeof localStorage === 'undefined' ? undefined : localStorage, currentUserId, next);
+    storeSavedFilters(browserFilterStorage(), currentUserId, next);
     // 고른 시험지가 필터로 가려지면 아래 풀이 설정도 닫는다.
     if (paper && (paper.kind ?? 'csat') === section && !paper.practiceEra && applyPaperFilters([paper], nextSelection).length === 0) setPaperId(null);
   };
