@@ -201,8 +201,9 @@ export interface ExamClient {
 
 // ── 필기 엔진(W2): src/features/exam/ink/ExamInkCanvas.tsx ──
 
-/** laser: 잠깐 가리키는 빛 — 획을 남기지 않는다(저장·실행 취소·재생 기록 없음). */
-export type InkTool = 'pen' | 'highlighter' | 'eraser' | 'laser';
+/** laser: 잠깐 가리키는 빛 — 획을 남기지 않는다(저장·실행 취소·재생 기록 없음).
+ *  lasso: 둘러서 고른 획을 옮기기·확대·축소·회전(ink/lasso.ts). 변환 결과는 "옛 id 제거 + 새 id 획 추가"로 저장된다. */
+export type InkTool = 'pen' | 'highlighter' | 'eraser' | 'laser' | 'lasso';
 export interface InkPoint { x: number; y: number; pressure: number; t: number }
 /** 좌표는 문항 이미지 기준 정규화(0~1 가로, 세로는 이미지 높이/너비 비율 단위)로 저장해 화면 크기가 바뀌어도 같은 자리에 남는다. */
 export interface InkStroke {

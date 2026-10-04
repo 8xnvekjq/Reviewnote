@@ -3,6 +3,7 @@
 // v2: 자유 모드에서 채점해 본 문항(checked)은 답을 잠근다 — 이어 풀기로 다시 열어도 서버 payload 의 items[].checked 로 유지.
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { LaserIcon } from './LaserIcon';
+import { LassoIcon } from './LassoIcon';
 import type { ExamAttempt, ExamClient, ExamInkCanvasHandle, ExamItemState, ExamResult, InkChangeKind, InkStroke, InkTool } from '../contract';
 import { ExamInkCanvas } from '../ink/ExamInkCanvas';
 import { preloadInkImages } from '../ink/inkImages';
@@ -369,15 +370,15 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
           </button>
           <div className="exam-tools" role="toolbar" aria-label="필기 도구">
             <div className="exam-tool-group">
-              {([['pen', '펜', '✏️'], ['highlighter', '형광펜', '🖍️'], ['eraser', '지우개', '🧽'], ['laser', '레이저(남지 않음)', null]] as const).map(([value, label, icon]) => (
+              {([['pen', '펜', '✏️'], ['highlighter', '형광펜', '🖍️'], ['eraser', '지우개', '🧽'], ['laser', '레이저(남지 않음)', null], ['lasso', '올가미(옮기기·크기·회전)', null]] as const).map(([value, label, icon]) => (
                 <button key={value} type="button" className={`exam-tool${tool === value && !pagePan ? ' is-on' : ''}`} aria-pressed={tool === value && !pagePan} aria-label={label} title={label} onClick={() => { setTool(value); setPagePan(false); }}>
-                  {icon ? <span aria-hidden="true">{icon}</span> : <LaserIcon />}
+                  {icon ? <span aria-hidden="true">{icon}</span> : value === 'lasso' ? <LassoIcon /> : <LaserIcon />}
                 </button>
               ))}
             </div>
             <div className="exam-tool-group">
               {PEN_COLORS.map(c => (
-                <button key={c.value} type="button" className={`exam-color${color === c.value ? ' is-on' : ''}`} style={{ '--swatch': c.value } as CSSProperties} aria-pressed={color === c.value} aria-label={`${c.label}색`} onClick={() => { setColor(c.value); if (tool === 'eraser' || tool === 'laser') setTool('pen'); }} />
+                <button key={c.value} type="button" className={`exam-color${color === c.value ? ' is-on' : ''}`} style={{ '--swatch': c.value } as CSSProperties} aria-pressed={color === c.value} aria-label={`${c.label}색`} onClick={() => { setColor(c.value); if (tool === 'eraser' || tool === 'laser' || tool === 'lasso') setTool('pen'); }} />
               ))}
             </div>
             <div className="exam-tool-group">
