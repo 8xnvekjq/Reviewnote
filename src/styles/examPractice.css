@@ -448,3 +448,16 @@
 .exam-era-card .exam-paper-body { min-height: 40px; }
 .exam-era-card .exam-paper-title { font-size: 1.1rem; }
 .exam-replay-notes { display: contents; }
+/* 시험지 고르기: 구역별 필터 칩 줄 — 필터마다 한 줄, 넘치면 줄바꿈 대신 가로 스크롤. */
+.exam-filter-bar { display: grid; gap: 6px; margin: 4px 0 12px; min-width: 0; }
+.exam-filter-row { display: flex; align-items: center; gap: 6px; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-block: 2px; }
+.exam-filter-row::-webkit-scrollbar { display: none; }
+.exam-filter-label { flex: 0 0 auto; min-width: 52px; font-size: var(--rn-caption); font-weight: 750; color: var(--rn-muted); white-space: nowrap; }
+.exam-filter-chip { flex: 0 0 auto; min-height: 32px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--rn-line); background: var(--rn-surface); color: var(--rn-text); font: inherit; font-size: 13px; font-weight: 650; white-space: nowrap; cursor: pointer; touch-action: manipulation; transition: background var(--rn-fast), border-color var(--rn-fast); }
+.exam-filter-chip.is-on { border-color: var(--rn-accent); background: color-mix(in srgb, var(--rn-accent) 22%, var(--rn-surface)); color: var(--rn-text); }
+.exam-filter-chip:focus-visible { outline: 2px solid var(--rn-accent); outline-offset: 2px; }
+.exam-filter-chip:active { transform: scale(.97); }
+.exam-filter-empty { padding: 24px 16px; margin-bottom: 16px; }
+.theme-light .exam-filter-bar { --rn-text: #0f172a; --rn-muted: #475569; --rn-accent: #4f46e5; --rn-line: #cbd5e1; }
+.theme-light .exam-filter-chip { background: #ffffff; }
+.theme-light .exam-filter-chip.is-on { background: #eef2ff; }

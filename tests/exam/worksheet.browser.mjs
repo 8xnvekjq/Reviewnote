@@ -9,6 +9,7 @@ const base = process.env.EXAM_TEST_BASE_URL || 'http://127.0.0.1:5174';
 const output = 'scratch/worksheet-browser';
 const TRIG_IDS = ['2026-g3m-trig-creative-1', '2026-g3m-trig-creative-2'];
 await mkdir(output, { recursive: true });
+await mkdir('node_modules/.cache/exam-practice', { recursive: true });
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
   for (const width of [1180, 820, 390]) {
@@ -161,6 +162,39 @@ try {
     assert.equal(overflow, false, '390px horizontal overflow (2차)');
     assert.deepEqual(errors, []);
     await page.screenshot({ path: `${output}/trig2-solve-390.png` });
+    await context.close();
+  }
+
+  // 학교 프린트 단원 필터: 단원이 하나뿐이면 칩 줄이 없고(기본 목록), 둘 이상이면 단원 칩으로 좁힌다. 1180/820/390.
+  for (const width of [1180, 820, 390]) {
+    const context = await browser.newContext({ viewport: { width, height: width === 820 ? 1180 : 820 } });
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', e => errors.push(e.message));
+    await page.goto(`${base}/tests/exam/practice.html?worksheet=1`);
+    await page.getByRole('button', { name: '중3', exact: true }).click();
+    await page.getByRole('heading', { name: '학교 프린트', exact: true }).waitFor();
+    assert.equal(await page.getByTestId('exam-filter-bar').count(), 0, '단원이 하나면 필터 없음');
+    await page.goto(`${base}/tests/exam/practice.html?worksheet=1&filters=1`);
+    await page.getByRole('button', { name: '중3', exact: true }).click();
+    const section = page.locator('[data-testid="exam-paper-section"][data-section="worksheet"]');
+    const unitRow = section.locator('[data-testid="exam-filter-row"][data-filter="unit"]');
+    await unitRow.waitFor();
+    assert.deepEqual(await unitRow.getByTestId('exam-filter-chip').allInnerTexts(), ['전체', '삼각비의 활용', '이차함수']);
+    const cardIds = () => section.getByTestId('exam-paper-card').evaluateAll(nodes => nodes.map(node => node.dataset.paperId));
+    assert.equal((await cardIds()).length, 3);
+    await unitRow.locator('[data-value="삼각비의 활용"]').click();
+    assert.deepEqual((await cardIds()).sort(), TRIG_IDS);
+    await page.reload();
+    await page.getByRole('button', { name: '중3', exact: true }).click();
+    await unitRow.waitFor();
+    assert.equal(await unitRow.locator('[data-value="삼각비의 활용"]').getAttribute('aria-pressed'), 'true', '새로고침해도 단원 선택 유지');
+    assert.deepEqual((await cardIds()).sort(), TRIG_IDS);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+    assert.equal(overflow, false, `${width}px horizontal overflow (단원 필터)`);
+    assert.deepEqual(errors, []);
+    await page.waitForTimeout(400); // 화면 등장·탭 전환 애니메이션이 끝난 뒤 찍는다.
+    await page.screenshot({ path: `node_modules/.cache/exam-practice/filters-worksheet-${width}.png`, fullPage: true });
     await context.close();
   }
 } finally {

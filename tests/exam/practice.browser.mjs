@@ -566,6 +566,110 @@ async function spinWheel(page, place, steps) {
   console.log('ok — phone layout');
 }
 
+// ── 5b. 시험지 고르기 구역별 필터: 수능·모평 연도·월 / 내신 연도·학기·중간기말·학교, 한능검은 없음 ─────
+{
+  const section = (page, kind) => page.locator(`[data-testid="exam-paper-section"][data-section="${kind}"]`);
+  const row = (page, kind, key) => section(page, kind).locator(`[data-testid="exam-filter-row"][data-filter="${key}"]`);
+  const chip = (page, kind, key, value) => row(page, kind, key).locator(`[data-testid="exam-filter-chip"][data-value="${value}"]`);
+  const ids = (page, kind) => section(page, kind).getByTestId('exam-paper-card').evaluateAll(nodes => nodes.map(node => node.dataset.paperId));
+  const filterQuery = '?filters=1&admin=1';
+
+  const { context, page, errors } = await open(LANDSCAPE, filterQuery);
+  await section(page, 'csat').waitFor();
+  // 고3 수능·모평: 최신 순, 연도(학년도)·월 칩 줄.
+  assert.deepEqual(await ids(page, 'csat'), ['mock-csat-2026-11', 'mock-csat-2026-06', PAPER_B, PAPER_A]);
+  assert.deepEqual(await row(page, 'csat', 'year').getByTestId('exam-filter-chip').allInnerTexts(), ['전체', '2026학년도', '2025학년도']);
+  assert.deepEqual(await row(page, 'csat', 'month').getByTestId('exam-filter-chip').allInnerTexts(), ['전체', '수능', '9월 모평', '6월 모평']);
+  assert.equal(await chip(page, 'csat', 'year', 'all').getAttribute('aria-pressed'), 'true');
+  await chip(page, 'csat', 'year', '2025').click();
+  assert.deepEqual(await ids(page, 'csat'), [PAPER_B, PAPER_A]);
+  // AND: 2025학년도 + 수능 → 없음 → 필터 초기화.
+  await chip(page, 'csat', 'month', '11').click();
+  await section(page, 'csat').getByTestId('exam-filter-empty').waitFor();
+  assert.match(await section(page, 'csat').getByTestId('exam-filter-empty').innerText(), /조건에 맞는 시험지가 없어요/);
+  await section(page, 'csat').getByTestId('exam-filter-reset').click();
+  assert.deepEqual((await ids(page, 'csat')).length, 4);
+  assert.equal(await chip(page, 'csat', 'month', 'all').getAttribute('aria-pressed'), 'true');
+  await chip(page, 'csat', 'year', '2026').click();
+  await chip(page, 'csat', 'month', '6').click();
+  assert.deepEqual(await ids(page, 'csat'), ['mock-csat-2026-06']);
+  // 필터에 가려진 시험지는 풀이 설정도 닫힌다.
+  await paperCard(page, 'mock-csat-2026-06').click();
+  await page.getByTestId('exam-setup').waitFor();
+  await chip(page, 'csat', 'month', '11').click();
+  assert.deepEqual(await ids(page, 'csat'), ['mock-csat-2026-11']);
+  assert.equal(await page.getByTestId('exam-setup').count(), 0);
+  await chip(page, 'csat', 'month', '6').click();
+  await page.screenshot({ path: `${out}/filters-1180.png`, fullPage: true });
+
+  // 고1 내신: 학교 3곳·학기 2개·중간/기말 → 칩 줄 4개. AND로 좁힌다.
+  await page.getByRole('button', { name: '고1', exact: true }).click();
+  await section(page, 'school').waitFor();
+  assert.deepEqual(await section(page, 'school').getByTestId('exam-filter-row').evaluateAll(nodes => nodes.map(node => node.dataset.filter)), ['year', 'semester', 'term', 'school']);
+  assert.deepEqual(await ids(page, 'school'), ['2026-dongbuk-g1-s2-mid-common2', 'mock-school-2026-s1-final', 'mock-school-2025-s2-final']);
+  await chip(page, 'school', 'term', 'final').click();
+  assert.deepEqual(await ids(page, 'school'), ['mock-school-2026-s1-final', 'mock-school-2025-s2-final']);
+  await chip(page, 'school', 'school', '상일여고').click();
+  assert.deepEqual(await ids(page, 'school'), ['mock-school-2025-s2-final']);
+  await page.screenshot({ path: `${out}/filters-school-1180.png`, fullPage: true });
+  // 한능검은 필터 없음.
+  await page.getByRole('button', { name: '한능검', exact: true }).click();
+  await page.getByTestId('exam-paper-card').first().waitFor();
+  assert.equal(await page.getByTestId('exam-filter-bar').count(), 0);
+
+  // 기기에 기억: 새로고침해도 학년·구역별 선택 그대로(고3 2026학년도·6월, 고1 기말·상일여고).
+  await page.reload();
+  await section(page, 'csat').waitFor();
+  assert.equal(await chip(page, 'csat', 'year', '2026').getAttribute('aria-pressed'), 'true');
+  assert.equal(await chip(page, 'csat', 'month', '6').getAttribute('aria-pressed'), 'true');
+  assert.deepEqual(await ids(page, 'csat'), ['mock-csat-2026-06']);
+  await page.getByRole('button', { name: '고1', exact: true }).click();
+  assert.deepEqual(await ids(page, 'school'), ['mock-school-2025-s2-final']);
+  const stored = await page.evaluate(() => Object.entries(localStorage).filter(([key]) => key.startsWith('rn-exam-paper-filters:')));
+  assert.equal(stored.length, 1);
+  assert.deepEqual(errors, []);
+  await context.close();
+
+  const student = await open(LANDSCAPE, '?filters=1');
+  await student.page.getByRole('button', { name: '고1', exact: true }).click();
+  await section(student.page, 'school').waitFor();
+  assert.deepEqual(await section(student.page, 'school').getByTestId('exam-filter-row').evaluateAll(nodes => nodes.map(node => node.dataset.filter)), ['year', 'semester', 'school'], '값이 하나뿐인 중간·기말 줄은 숨김');
+  await student.context.close();
+
+  // 820·390: 칩 줄이 넘치면 줄바꿈 대신 가로 스크롤, 페이지 가로 넘침 없음. 라이트 테마도.
+  for (const viewport of [PORTRAIT, { width: 390, height: 844 }]) {
+    const { context: ctx, page: p, errors: errs } = await open(viewport, filterQuery);
+    await section(p, 'csat').waitFor();
+    for (const grade of ['고3', '고1']) {
+      await p.getByRole('button', { name: grade, exact: true }).click();
+      const kind = grade === '고3' ? 'csat' : 'school';
+      await section(p, kind).getByTestId('exam-filter-bar').waitFor();
+      await noHorizontalOverflow(p, `filters/${grade}/${viewport.width}`);
+      const rows = await section(p, kind).getByTestId('exam-filter-row').evaluateAll(nodes => nodes.map(node => ({
+        overflowX: getComputedStyle(node).overflowX, spread: (centers => Math.max(...centers) - Math.min(...centers))([...node.children].map(child => { const box = child.getBoundingClientRect(); return (box.top + box.bottom) / 2; })),
+      })));
+      for (const r of rows) { assert.equal(r.overflowX, 'auto'); assert.ok(r.spread < 4, `칩 줄은 한 줄 (${r.spread})`); }
+      await noPaperCardOverlap(p);
+      await p.waitForTimeout(250); // 탭 테두리 전환(140ms)이 끝난 뒤 찍는다.
+      await p.screenshot({ path: `${out}/filters-${grade === '고3' ? '' : 'school-'}${viewport.width}.png`, fullPage: true });
+    }
+    // 앱의 흰색 테마(applyThemeColor('#FFFFFF'))와 같은 변수·클래스.
+    await p.evaluate(() => {
+      const root = document.documentElement;
+      for (const [name, value] of [['--theme-bg-main', '255 255 255'], ['--theme-bg-surface', '248 250 252'], ['--theme-bg-elevated', '241 245 249'], ['--theme-header', '255 255 255']]) root.style.setProperty(name, value);
+      root.classList.add('theme-light');
+    });
+    const lightChip = await section(p, 'school').locator('[data-testid="exam-filter-chip"][data-value="all"]').first().evaluate(node => ({ color: getComputedStyle(node).color, background: getComputedStyle(node).backgroundColor }));
+    assert.equal(lightChip.color, 'rgb(15, 23, 42)', '라이트 테마 칩 글자는 진한 남색');
+    await p.waitForFunction(() => getComputedStyle(document.querySelector('[data-testid="exam-filter-chip"].is-on')).backgroundColor === 'rgb(238, 242, 255)');
+    await p.waitForTimeout(300); // 칩 배경 전환이 끝난 뒤
+    await p.screenshot({ path: `${out}/filters-school-${viewport.width}-light.png`, fullPage: true });
+    assert.deepEqual(errs, []);
+    await ctx.close();
+  }
+  console.log('ok — paper filters');
+}
+
 // ── 6. v2: 채점해 본 문항은 새로고침·이어 풀기 뒤에도 잠김 ───────────────────────────
 {
   const { context, page, errors } = await open(LANDSCAPE, '?persist=1');
