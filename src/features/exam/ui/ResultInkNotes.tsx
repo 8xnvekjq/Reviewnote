@@ -5,6 +5,7 @@ import { useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { ExamClient, ExamInkCanvasHandle, InkStroke, InkTool } from '../contract';
 import { ExamInkReplay } from '../ink/ExamInkReplay';
 import { LaserIcon } from './LaserIcon';
+import { LassoIcon } from './LassoIcon';
 
 const PEN_COLORS = [
   { value: '#1f2937', label: '검정' },
@@ -82,15 +83,15 @@ export function ResultInkNotes({ client, attemptId, questionId, imageUrl, stroke
   const toolbar = (
     <div className="exam-notes-tools" role="toolbar" aria-label="덧쓰기 도구" data-testid="exam-notes-tools">
       <div className="exam-tool-group">
-        {([['pen', '펜', '✏️'], ['highlighter', '형광펜', '🖍️'], ['eraser', '지우개', '🧽'], ['laser', '레이저(남지 않음)', null]] as const).map(([value, label, icon]) => (
+        {([['pen', '펜', '✏️'], ['highlighter', '형광펜', '🖍️'], ['eraser', '지우개', '🧽'], ['laser', '레이저(남지 않음)', null], ['lasso', '올가미(옮기기·크기·회전)', null]] as const).map(([value, label, icon]) => (
           <button key={value} type="button" className={`exam-tool${tool === value ? ' is-on' : ''}`} aria-pressed={tool === value} aria-label={label} title={label} disabled={!ready} onClick={() => setTool(value)}>
-            {icon ? <span aria-hidden="true">{icon}</span> : <LaserIcon />}
+            {icon ? <span aria-hidden="true">{icon}</span> : value === 'lasso' ? <LassoIcon /> : <LaserIcon />}
           </button>
         ))}
       </div>
       <div className="exam-tool-group">
         {PEN_COLORS.map(c => (
-          <button key={c.value} type="button" className={`exam-color${color === c.value ? ' is-on' : ''}`} style={{ '--swatch': c.value } as CSSProperties} aria-pressed={color === c.value} aria-label={`${c.label}색`} disabled={!ready} onClick={() => { setColor(c.value); if (tool === 'eraser' || tool === 'laser') setTool('pen'); }} />
+          <button key={c.value} type="button" className={`exam-color${color === c.value ? ' is-on' : ''}`} style={{ '--swatch': c.value } as CSSProperties} aria-pressed={color === c.value} aria-label={`${c.label}색`} disabled={!ready} onClick={() => { setColor(c.value); if (tool === 'eraser' || tool === 'laser' || tool === 'lasso') setTool('pen'); }} />
         ))}
       </div>
       <div className="exam-tool-group">
