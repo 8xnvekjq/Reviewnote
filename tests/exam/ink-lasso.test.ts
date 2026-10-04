@@ -23,24 +23,44 @@ test('point in polygon (even-odd)', () => {
   assert.ok(!pointInPolygon({ x: 0.5, y: 0.8 }, concave), 'the notch of a concave lasso is outside');
 });
 
-test('lasso selects strokes with at least half of their points inside', () => {
+test('lasso selects a whole stroke when any part of it is inside', () => {
   const strokes = [
     pen('all', [[0.2, 0.2], [0.3, 0.25], [0.4, 0.2]]),
     pen('most', [[0.3, 0.3], [0.4, 0.3], [0.45, 0.3], [0.6, 0.3]]), // 3/4 inside
     pen('few', [[0.45, 0.4], [0.6, 0.4], [0.7, 0.4], [0.8, 0.4]]), // 1/4 inside
     pen('out', [[0.8, 0.8], [0.9, 0.9]]),
+    pen('near', [[0.55, 0.1], [0.55, 0.5], [0.7, 0.5]]), // 바로 옆을 지나가지만 닿지 않음
     pen('dot', [[0.25, 0.4]]),
+    pen('dotOut', [[0.6, 0.6]]),
   ];
-  assert.deepEqual(lassoSelect(strokes, square(0.1, 0.1, 0.5, 0.5)), ['all', 'most', 'dot']);
+  assert.deepEqual(lassoSelect(strokes, square(0.1, 0.1, 0.5, 0.5)), ['all', 'most', 'few', 'dot']);
   assert.deepEqual(lassoSelect(strokes, [{ x: 0, y: 0 }, { x: 1, y: 1 }]), [], 'needs a closed area (3+ points)');
 });
 
-test('lasso judges shapes by their outline, not just the two line endpoints', () => {
+test('lasso catches sparse strokes whose segments cross it with no point inside', () => {
+  const sparse = pen('sparse', [[0.0, 0.5], [1.0, 0.5]]); // 두 점 모두 올가미 밖
+  assert.deepEqual(lassoSelect([sparse], square(0.4, 0.4, 0.6, 0.6)), ['sparse'], 'a straight stroke through the lasso');
+  const crossesClosing = pen('closing', [[0.5, 0.3], [0.5, 0.7]]);
+  // 열린 ㄷ자 올가미: 그리지 않은 마지막 변(자동으로 닫힘)만 가로지른다
+  const open = [{ x: 0.4, y: 0.4 }, { x: 0.4, y: 0.6 }, { x: 0.6, y: 0.6 }, { x: 0.6, y: 0.4 }];
+  assert.deepEqual(lassoSelect([crossesClosing], open), ['closing']);
+  const outside = pen('outside', [[0.0, 0.9], [1.0, 0.9]]);
+  assert.deepEqual(lassoSelect([outside], square(0.4, 0.4, 0.6, 0.6)), [], 'a long stroke that passes by is not picked');
+});
+
+test('lasso judges shapes by their outline: partially covered shapes are selected', () => {
   const line = pen('line', [[0.1, 0.5], [0.9, 0.5]], { shape: { kind: 'line', from: [0.1, 0.5], to: [0.9, 0.5] } });
-  assert.deepEqual(lassoSelect([line], square(0, 0.4, 0.45, 0.6)), [], 'less than half of the line inside');
-  assert.deepEqual(lassoSelect([line], square(0, 0.4, 0.6, 0.6)), ['line'], 'more than half inside');
+  assert.deepEqual(lassoSelect([line], square(0, 0.4, 0.2, 0.6)), ['line'], 'only one end inside');
+  assert.deepEqual(lassoSelect([line], square(0.4, 0.4, 0.6, 0.6)), ['line'], 'lasso in the middle of the line, both ends outside');
+  assert.deepEqual(lassoSelect([line], square(0.4, 0.6, 0.6, 0.8)), [], 'below the line');
   const ring = pen('ring', [[0.5, 0.5]], { shape: { kind: 'ellipse', cx: 0.5, cy: 0.5, rx: 0.1, ry: 0.1, rotation: 0 } });
   assert.deepEqual(lassoSelect([ring], square(0.35, 0.35, 0.65, 0.65)), ['ring']);
+  assert.deepEqual(lassoSelect([ring], square(0.55, 0.45, 0.7, 0.55)), ['ring'], 'only the right edge of the circle');
+  assert.deepEqual(lassoSelect([ring], square(0.45, 0.45, 0.55, 0.55)), [], 'inside the empty middle of the ring touches nothing');
+  const tri = pen('tri', [[0.2, 0.2]], { shape: { kind: 'polygon', points: [[0.2, 0.2], [0.8, 0.2], [0.5, 0.8]] } });
+  assert.deepEqual(lassoSelect([tri], square(0.45, 0.1, 0.55, 0.3)), ['tri'], 'crosses one side of the triangle (no vertex inside)');
+  assert.deepEqual(lassoSelect([tri], square(0.75, 0.15, 0.9, 0.25)), ['tri'], 'one vertex inside');
+  assert.deepEqual(lassoSelect([tri], square(0.85, 0.7, 0.95, 0.9)), []);
 });
 
 test('similarity helpers: compose, about keeps the pivot fixed', () => {

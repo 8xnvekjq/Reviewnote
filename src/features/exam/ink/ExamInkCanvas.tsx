@@ -770,7 +770,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       scheduleLive();
     };
 
-    /** 올가미를 다 그렸다: 절반 이상 들어간 획을 고른다. 거의 움직이지 않았으면(탭) 선택 없음. */
+    /** 올가미를 다 그렸다: 일부라도 걸친 획을 통째로 고른다. 거의 움직이지 않았으면(탭) 선택 없음. */
     const finishLasso = (g: LassoGesture) => {
       let len = 0;
       for (let i = 1; i < g.path.length; i++) len += Math.hypot(g.path[i].x - g.path[i - 1].x, g.path[i].y - g.path[i - 1].y);
