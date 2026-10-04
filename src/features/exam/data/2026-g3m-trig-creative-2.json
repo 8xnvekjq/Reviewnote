@@ -1,0 +1,97 @@
+{
+  "id": "2026-g3m-trig-creative-2",
+  "title": "중3-2 삼각비 창의융합 형성평가 대비 (2차)",
+  "kind": "worksheet",
+  "schoolName": "리뷰노트",
+  "grade": 9,
+  "schoolGrade": "중3",
+  "subject": "중3 수학",
+  "source": "리뷰노트 변형 문항",
+  "unitName": "삼각비의 활용",
+  "timeLimitMinutes": null,
+  "electives": [],
+  "published": false,
+  "examDate": null,
+  "questionCount": 6,
+  "maxScore": 30,
+  "referenceLinks": [
+    {
+      "label": "삼각비 표",
+      "url": "/exams/2026-g3m-trig-creative-2/trig-table.png"
+    }
+  ],
+  "questions": [
+    {
+      "number": 1,
+      "section": "common",
+      "imageUrl": "/exams/2026-g3m-trig-creative-2/q-01.png",
+      "points": 5,
+      "answer": "160",
+      "answerType": "digits",
+      "curriculumGrade": "중3-2",
+      "curriculumChapter": "삼각비",
+      "sourceLabel": "리뷰노트 변형 문항 · 2차 유형 A",
+      "typeName": "경사도(%)와 tan"
+    },
+    {
+      "number": 2,
+      "section": "common",
+      "imageUrl": "/exams/2026-g3m-trig-creative-2/q-02.png",
+      "points": 5,
+      "answer": "633",
+      "answerType": "digits",
+      "curriculumGrade": "중3-2",
+      "curriculumChapter": "삼각비",
+      "sourceLabel": "리뷰노트 변형 문항 · 2차 유형 B",
+      "typeName": "올려본각·내려본각과 눈높이"
+    },
+    {
+      "number": 3,
+      "section": "common",
+      "imageUrl": "/exams/2026-g3m-trig-creative-2/q-03.png",
+      "points": 5,
+      "answer": "32",
+      "answerType": "digits",
+      "curriculumGrade": "중3-2",
+      "curriculumChapter": "삼각비",
+      "sourceLabel": "리뷰노트 변형 문항 · 2차 유형 C",
+      "typeName": "두 번 관측해서 높이 구하기"
+    },
+    {
+      "number": 4,
+      "section": "common",
+      "imageUrl": "/exams/2026-g3m-trig-creative-2/q-04.png",
+      "points": 5,
+      "answer": "62",
+      "answerType": "digits",
+      "curriculumGrade": "중3-2",
+      "curriculumChapter": "삼각비",
+      "sourceLabel": "리뷰노트 변형 문항 · 2차 유형 D",
+      "typeName": "범위·조건(부등식)"
+    },
+    {
+      "number": 5,
+      "section": "common",
+      "imageUrl": "/exams/2026-g3m-trig-creative-2/q-05.png",
+      "points": 5,
+      "answer": "151",
+      "answerType": "digits",
+      "curriculumGrade": "중3-2",
+      "curriculumChapter": "삼각비",
+      "sourceLabel": "리뷰노트 변형 문항 · 2차 유형 E",
+      "typeName": "거꾸로 각 구하기"
+    },
+    {
+      "number": 6,
+      "section": "common",
+      "imageUrl": "/exams/2026-g3m-trig-creative-2/q-06.png",
+      "points": 5,
+      "answer": "451",
+      "answerType": "digits",
+      "curriculumGrade": "중3-2",
+      "curriculumChapter": "삼각비",
+      "sourceLabel": "리뷰노트 변형 문항 · 2차 유형 F",
+      "typeName": "비율 추론·어림"
+    }
+  ]
+}
