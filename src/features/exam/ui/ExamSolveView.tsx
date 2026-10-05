@@ -2,6 +2,7 @@
 // 전체 문제 보기·OMR 검토·나가기/제출 확인은 이 화면 위에 겹쳐 띄운다(전체화면을 유지한 채).
 // v2: 자유 모드에서 채점해 본 문항(checked)은 답을 잠근다 — 이어 풀기로 다시 열어도 서버 payload 의 items[].checked 로 유지.
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { ExamAssistOverlay } from './ExamAssistOverlay';
 import { LaserIcon } from './LaserIcon';
 import { LassoIcon } from './LassoIcon';
 import type { ExamAttempt, ExamClient, ExamInkCanvasHandle, ExamItemState, ExamResult, InkChangeKind, InkStroke, InkTool } from '../contract';
@@ -480,6 +481,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
           <ExamInkCanvas
             key={`${inkKey}:${inkSync.generation}`}
             ref={inkRef}
+            overlay={imageWidth => <ExamAssistOverlay key={question.id} transport={client.liveTransport} attemptId={attempt.id} questionId={question.id} imageWidth={imageWidth} active={attempt.status === 'in_progress' && !submitting} />}
             imageUrl={question.imageUrl}
             strokes={strokes.get(inkKey) ?? []}
             onChange={onInkChange}

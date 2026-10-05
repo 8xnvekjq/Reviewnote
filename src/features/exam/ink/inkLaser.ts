@@ -44,10 +44,10 @@ function trailPath(points: LaserPoint[], size: number, last: boolean): Path2D {
  * 레이저 획들을 그린다(캔버스는 미리 비우고 기준 공간 변환을 건 상태). 아직 보이는 획만 돌려준다.
  * glowPx: 글로우 번짐(백버퍼 px — shadowBlur는 캔버스 변환을 따르지 않는다).
  */
-export function drawLaser(ctx: CanvasRenderingContext2D, trails: LaserTrail[], now: number, glowPx: number): LaserTrail[] {
+export function drawLaser(ctx: CanvasRenderingContext2D, trails: LaserTrail[], now: number, glowPx: number, style?: { glowWidth: number; coreWidth: number; alpha: number }): LaserTrail[] {
   const alive: LaserTrail[] = [];
   for (const trail of trails) {
-    const alpha = laserAlpha(trail, now);
+    const alpha = style ? style.alpha : laserAlpha(trail, now);
     if (alpha === null) continue;
     alive.push(trail);
     const points = trail.points;
@@ -58,13 +58,13 @@ export function drawLaser(ctx: CanvasRenderingContext2D, trails: LaserTrail[], n
     ctx.shadowColor = 'rgba(255, 30, 60, 0.95)';
     ctx.shadowBlur = glowPx;
     ctx.fillStyle = 'rgba(255, 45, 70, 0.92)';
-    const glow = trailPath(points, GLOW_WIDTH, last);
+    const glow = trailPath(points, style?.glowWidth ?? GLOW_WIDTH, last);
     ctx.fill(glow);
     ctx.fill(glow); // 한 번 더 겹쳐 빛을 진하게
     ctx.shadowColor = 'rgba(255, 150, 170, 0.9)';
     ctx.shadowBlur = glowPx * 0.35;
     ctx.fillStyle = '#fff4f6';
-    ctx.fill(trailPath(points, CORE_WIDTH, last));
+    ctx.fill(trailPath(points, style?.coreWidth ?? CORE_WIDTH, last));
     ctx.restore();
   }
   return alive;
