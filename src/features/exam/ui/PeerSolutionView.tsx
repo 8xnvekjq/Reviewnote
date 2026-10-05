@@ -1,23 +1,22 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { PeerSolution } from '../contract';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import type { InkReplayData, PeerSolution, PeerSolutionCandidate } from '../contract';
 import { ExamInkReplay } from '../ink/ExamInkReplay';
-import { peerSolutionLabel, peerSolutionLabelParts, type PeerSolutionSession } from './peerSolution';
+import { formatPeerTime, isPeerChanged, peerSolutionLabel, peerSolutionLabelParts, type PeerSolutionSession } from './peerSolution';
 
 interface Props {
   session: PeerSolutionSession | null;
-  /** 내가 틀린 문항(제출 완료, 한능검 아님)일 때만 다른 학생 풀이를 쓸 수 있다. */
   eligible: boolean;
   attemptId: string;
   questionId: string;
   imageUrl: string;
-  /** 내 풀이(덧쓰기). peerButton은 그 툴바의 '원래 풀이로' 바로 오른쪽에 넣는 작은 버튼. */
   children: (peerButton: ReactNode) => ReactNode;
+  /** 자유 모드 보기 창은 열자마자 목록을 펼친다. */
+  autoPick?: boolean;
 }
 
-/** 머리 줄 라벨: 얼굴 + 장착 칭호(헤더·랭킹·활동 피드와 같은 getTitleBadgeStyle 배지 이펙트) + 학년. */
 export function PeerSolutionLabel({ label }: { label: PeerSolution['label'] }) {
   const parts = peerSolutionLabelParts(label);
-  return <p className="exam-peer-label" data-testid="exam-peer-label" aria-label={peerSolutionLabel(label)}>
+  return <span className="exam-peer-label" data-testid="exam-peer-label" aria-label={peerSolutionLabel(label)}>
     <span className="exam-peer-face" aria-hidden="true">{parts.face}</span>
     {parts.isTeacher ? <span>선생님 풀이</span>
       : parts.title ? <span className={`exam-peer-title px-2 py-0.5 rounded-full border text-[11px] ${parts.title.style}`} data-testid="exam-peer-title">
@@ -25,62 +24,138 @@ export function PeerSolutionLabel({ label }: { label: PeerSolution['label'] }) {
       </span>
       : <span>익명 학생</span>}
     {parts.grade && <span className="exam-peer-grade">{parts.grade}</span>}
-  </p>;
+  </span>;
 }
-
-/**
- * 크게 보기 안에서 "내 풀이 ↔ 다른 학생 풀이"를 바꾼다. 큰 버튼 대신 툴바의 작은 버튼으로 —
- * 내 풀이 툴바에는 '다른 학생 풀이', 다른 풀이 머리 줄에는 '내 풀이로'가 같은 자리에 온다.
- * 내 풀이는 숨겨만 두어(언마운트하지 않음) 덧쓰기·실행 취소 상태를 그대로 지킨다.
- */
-export function PeerSolutionSwitch({ session, eligible, attemptId, questionId, imageUrl, children }: Props) {
-  const [solution, setSolution] = useState<PeerSolution | null | undefined>();
-  const [showing, setShowing] = useState(false);
+export function PeerSolutionSwitch({ session, eligible, attemptId, questionId, imageUrl, children, autoPick = false }: Props) {
+  const [rows, setRows] = useState<PeerSolutionCandidate[] | undefined>();
+  const [solution, setSolution] = useState<(PeerSolutionCandidate & { strokes: InkReplayData['strokes'] }) | null>(null);
+  const [replay, setReplay] = useState<InkReplayData | null>(null);
+  const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [message, setMessage] = useState('');
+  const [menuStyle, setMenuStyle] = useState<CSSProperties>();
+  const pickerRef = useRef<HTMLSpanElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const alive = useRef(true);
+  const pending = useRef(false);
+  const hadSolution = useRef(false);
+  const menuId = useId();
+  const replayClient = useMemo(() => ({ getInkReplay: async () => replay! }), [replay]);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
-  const replayClient = useMemo(() => ({
-    getInkReplay: () => session!.replay(questionId, solution!.solutionKey),
-  }), [session, questionId, solution]);
-  if (!session || !eligible) return <>{children(null)}</>;
 
-  const toggle = async () => {
-    if (loading) return;
-    if (showing) { setShowing(false); return; }
-    setFailed(false);
-    setLoading(true);
+  const close = (focus = true) => {
+    setOpen(false);
+    if (focus) triggerRef.current?.focus();
+  };
+  const showList = async () => {
+    if (!session || pending.current) return;
+    pending.current = true;
+    setLoading(true); setMessage('');
     try {
-      const value = solution ?? await session.get(questionId);
+      const value = await session.list(questionId, true);
+      if (alive.current) { setRows(value); setOpen(value.length > 0); }
+    } catch { if (alive.current) setMessage('풀이를 불러오지 못했어요. 다시 눌러 주세요.'); }
+    finally { pending.current = false; if (alive.current) setLoading(false); }
+  };
+  useEffect(() => { if (autoPick && eligible) void showList(); }, [autoPick, eligible]); // eslint-disable-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const trigger = triggerRef.current?.getBoundingClientRect();
+      const menu = menuRef.current;
+      if (!trigger || !menu) return;
+      setMenuStyle({ left: Math.max(8, Math.min(trigger.right - menu.offsetWidth, window.innerWidth - menu.offsetWidth - 8)),
+        top: Math.max(8, Math.min(trigger.bottom + 4, window.innerHeight - menu.offsetHeight - 8)) });
+    };
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => { window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true); };
+  }, [open, rows]);
+  useEffect(() => {
+    if (solution || hadSolution.current) triggerRef.current?.focus();
+    hadSolution.current = !!solution;
+  }, [solution]);
+  useEffect(() => {
+    if (!open || loading) return;
+    const selected = menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitemradio"][aria-checked="true"]');
+    (selected ?? menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitemradio"]'))?.focus();
+    const outside = (event: PointerEvent) => { if (!pickerRef.current?.contains(event.target as Node)) close(false); };
+    document.addEventListener('pointerdown', outside);
+    return () => document.removeEventListener('pointerdown', outside);
+  }, [open, loading, rows]);
+
+  const choose = async (row: PeerSolutionCandidate) => {
+    if (!session || pending.current) return;
+    pending.current = true; setLoading(true); setMessage('');
+    try {
+      // 선택할 때마다 서버 자격을 확인한다. 재생 도구를 다시 열 때만 응답을 재사용한다.
+      const value = await session.replay(questionId, row.solutionKey, true);
+      if (alive.current) { setSolution({ ...row, strokes: value.strokes }); setReplay(value); close(); }
+    } catch (error) {
       if (!alive.current) return;
-      setSolution(value);
-      if (value) setShowing(true);
-    } catch { if (alive.current) setFailed(true); }
-    finally { if (alive.current) setLoading(false); }
+      if (isPeerChanged(error)) {
+        setSolution(null); setReplay(null);
+        try { const value = await session.list(questionId, true); if (alive.current) { setRows(value); setOpen(value.length > 0); } }
+        catch { if (alive.current) setMessage('목록을 불러오지 못했어요. 다시 눌러 주세요.'); }
+        if (alive.current) setMessage('풀이가 바뀌었어요. 새 목록에서 다시 골라 주세요.');
+      } else setMessage('풀이를 불러오지 못했어요. 다시 골라 주세요.');
+    } finally { pending.current = false; if (alive.current) setLoading(false); }
   };
 
-  const none = solution === null;
-  const peerButton = <button type="button" className="exam-tool exam-tool-text exam-peer-toggle" data-testid="exam-peer-toggle"
-    disabled={loading || none} aria-pressed={false} title={none ? '아직 이 문제를 맞힌 다른 풀이가 없어요' : '같은 문제를 맞힌 다른 학생의 풀이(익명)'}
-    onClick={() => { void toggle(); }}>
-    {loading ? '불러오는 중…' : none ? '다른 풀이 없음' : failed ? '다시 시도' : '다른 학생 풀이'}
-  </button>;
-
+  if (!session || !eligible) return <>{children(null)}</>;
+  const none = rows?.length === 0;
+  const picker = <span className="exam-peer-picker" ref={pickerRef}>
+    <button ref={triggerRef} type="button" className="exam-tool exam-tool-text exam-peer-toggle" data-testid="exam-peer-toggle"
+      disabled={loading} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? menuId : undefined}
+      onClick={() => { if (open) close(); else void showList(); }}>
+      {loading ? '불러오는 중…' : none ? '다른 풀이 없음' : '다른 학생 풀이'}
+    </button>
+    {open && <div id={menuId} ref={menuRef} style={menuStyle} className="exam-peer-menu" role="menu" aria-label="풀이 고르기" data-testid="exam-peer-list"
+      onKeyDown={event => {
+        if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); return; }
+        if (event.key === 'Tab') {
+          event.preventDefault(); event.stopPropagation();
+          const root = triggerRef.current?.closest('[role="dialog"]') ?? document;
+          const focusable = [...root.querySelectorAll<HTMLElement>('button:not(:disabled), input, select, [tabindex="0"]')]
+            .filter(el => el.getClientRects().length > 0 && !menuRef.current?.contains(el));
+          const i = focusable.indexOf(triggerRef.current!);
+          close(false);
+          focusable[(i + (event.shiftKey ? -1 : 1) + focusable.length) % focusable.length]?.focus();
+          return;
+        }
+        if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+        event.preventDefault(); event.stopPropagation();
+        const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]')];
+        const i = buttons.indexOf(document.activeElement as HTMLButtonElement);
+        const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1
+          : (i + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length;
+        buttons[next]?.focus();
+      }}>
+      {rows?.map(row => <button type="button" key={row.solutionKey} role="menuitemradio" disabled={loading}
+        aria-checked={solution?.solutionKey === row.solutionKey} className="exam-peer-row" data-testid="exam-peer-row"
+        onClick={() => { void choose(row); }}>
+        <PeerSolutionLabel label={row.label} /><span className="exam-peer-time">{formatPeerTime(row.timeSpentMs)}</span>
+      </button>)}
+    </div>}
+  </span>;
   return <>
     {none && <p className="exam-peer-note" role="status">아직 이 문제를 맞힌 다른 풀이가 없어요</p>}
-    {failed && <p className="exam-peer-note" role="status">풀이를 불러오지 못했어요. 다시 눌러 주세요.</p>}
-    {showing && solution && <section className="exam-peer" aria-label="다른 학생의 풀이" data-testid="exam-peer-solution">
+    {message && <p className="exam-peer-note" role="status">{message}</p>}
+    {solution && replay && <section className="exam-peer" aria-label="다른 학생의 풀이" data-testid="exam-peer-solution">
       <div className="exam-peer-head">
         <PeerSolutionLabel label={solution.label} />
+        <span className="exam-peer-time">{formatPeerTime(solution.timeSpentMs)}</span>
         <span className="exam-peer-caption">다른 풀이 · 읽기 전용</span>
-        <button type="button" className="exam-tool exam-tool-text exam-peer-toggle" data-testid="exam-peer-toggle"
-          aria-pressed onClick={() => { void toggle(); }}>내 풀이로</button>
+        <button type="button" className="exam-tool exam-tool-text" data-testid="exam-peer-back"
+          onClick={() => { setSolution(null); setReplay(null); }}>내 풀이로</button>
+        {picker}
       </div>
-      {/* 내 풀이처럼 열자마자 필기 순서를 재생한다. */}
-      <ExamInkReplay client={replayClient} attemptId={attemptId} questionId={questionId}
+      <ExamInkReplay key={solution.solutionKey} client={replayClient} attemptId={attemptId} questionId={questionId}
         imageUrl={imageUrl} strokes={solution.strokes} imageMaxWidth={480} persistDock={false} autoOpen />
     </section>}
-    {/* 다른 풀이를 보는 동안 내 풀이 툴바의 버튼은 빼 둔다(같은 자리의 '내 풀이로'와 겹치지 않게). */}
-    <div hidden={showing}>{children(showing ? null : peerButton)}</div>
+    {/* 내 덧쓰기 캔버스는 숨겨서 상태를 보존한다. */}
+    <div hidden={!!solution}>{children(solution ? null : picker)}</div>
   </>;
 }

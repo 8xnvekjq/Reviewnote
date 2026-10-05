@@ -301,6 +301,34 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       const events = strokes.map((_, i) => ({ ...inkDelta(strokes.slice(0,i), strokes.slice(0,i+1), 'draw', (i+1)*600), id: `peer-event-${i}` }));
       return { strokes, revision: 1, batches: [{ id: 'peer-batch-1', revision: 1, baseRevision: 0, baseline: [], events }] };
     },
+    async listPeerSolutions(attemptId, questionId) {
+      record('listPeerSolutions', [attemptId, questionId]);
+      await wait();
+      const { attempt, result } = must(attemptId);
+      const item = result?.items.find(row => row.questionId === questionId) ?? attempt.items.find(row => row.questionId === questionId);
+      const correct = item && ('isCorrect' in item ? item.isCorrect : item.checked?.isCorrect);
+      const allowed = result ? !!item && (correct === false || item.unsure)
+        : attempt.mode === 'free' && !!item && 'checked' in item && !!item.checked && (correct === false || item.unsure);
+      if (attempt.kind === 'hanneung' || !allowed) throw new Error('EXAM_PEER_NOT_ALLOWED');
+      if (attempt.questions.find(q => q.id === questionId)?.number === 3) return [];
+      return [
+        { solutionKey: 'mock-peer-fingerprint', label: { face: '🐱', title: '수학의 신', grade: '고2', isTeacher: false }, timeSpentMs: 252000 },
+        { solutionKey: 'mock-peer-second', label: { face: '🦊', title: '도전자', grade: '고1', isTeacher: false }, timeSpentMs: 15000 },
+        { solutionKey: 'mock-peer-teacher', label: { face: '🎓', title: null, grade: null, isTeacher: true }, timeSpentMs: 61000 },
+      ];
+    },
+    async getPeerSolutionByKey(attemptId, questionId, solutionKey) {
+      record('getPeerSolutionByKey', [attemptId, questionId, solutionKey]);
+      const { attempt, result } = must(attemptId);
+      const item = result?.items.find(row => row.questionId === questionId) ?? attempt.items.find(row => row.questionId === questionId);
+      const correct = item && ('isCorrect' in item ? item.isCorrect : item.checked?.isCorrect);
+      if (attempt.kind === 'hanneung' || !item || !(result ? correct === false || item.unsure
+        : attempt.mode === 'free' && 'checked' in item && item.checked && (correct === false || item.unsure))) throw new Error('EXAM_PEER_NOT_ALLOWED');
+      if (!['mock-peer-fingerprint', 'mock-peer-second', 'mock-peer-teacher'].includes(solutionKey)) throw new Error('EXAM_PEER_CHANGED');
+      const strokes = mockPeerStrokes().map(s => ({ ...s, color: solutionKey === 'mock-peer-second' ? '#dc2626' : '#2563eb' }));
+      const events = strokes.map((_, i) => ({ ...inkDelta(strokes.slice(0, i), strokes.slice(0, i + 1), 'draw', (i + 1) * 600), id: `peer-event-${i}` }));
+      return { strokes, revision: 1, batches: [{ id: 'peer-batch-1', revision: 1, baseRevision: 0, baseline: [], events }] };
+    },
     async getInkReplay(attemptId, questionId) {
       must(attemptId);
       const doc = ink.get(attemptId)?.find(row => row.questionId === questionId);

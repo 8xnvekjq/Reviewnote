@@ -18,6 +18,9 @@ import { useExamInk } from './useExamInk';
 import { useInkBroadcast } from './useInkBroadcast';
 import { worksheetReferences, type WorksheetReference } from './worksheetReferences';
 import { ExamImageViewer } from './ExamImageViewer';
+import { PeerSolutionSwitch } from './PeerSolutionView';
+import { PeerSolutionSession } from './peerSolution';
+import { ResultInkNotes } from './ResultInkNotes';
 import {
   countAnswered, createStopwatch, crossedAlerts, elapsedFor, formatClock, normalizeShortAnswer, pauseStopwatch, remainingMs,
   switchStopwatch, toggleChoice, questionAnswerType, usesWholePages, type StopwatchState,
@@ -39,7 +42,7 @@ const SIZES = [
 ];
 
 interface LocalItem { answer: string | null; unsure: boolean; visits: number; checked: FreeCheck | null }
-type Overlay = null | 'overview' | 'review' | 'exit' | 'submit';
+type Overlay = null | 'overview' | 'review' | 'exit' | 'submit' | 'peer';
 
 interface Props {
   client: ExamClient;
@@ -81,6 +84,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
   const [pageZoom, setPageZoom] = useState(false);
   const [pagePan, setPagePan] = useState(hanneung);
   const isReal = attempt.mode === 'real';
+  const peerSession = useMemo(() => new PeerSolutionSession(client, attempt.id), [client, attempt.id]);
   const [items, setItems] = useState(() => initialItems(attempt));
   const [index, setIndex] = useState(() => initialIndex(attempt));
   const inkSync = useExamInk(client, attempt.id, questions.map(q => q.id));
@@ -89,6 +93,13 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
   const [color, setColor] = useState(PEN_COLORS[0].value);
   const [size, setSize] = useState(SIZES[1].value);
   const [overlay, setOverlay] = useState<Overlay>(null);
+  const peerDialogRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (overlay !== 'peer') return;
+    const previous = document.activeElement as HTMLElement | null;
+    peerDialogRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    return () => previous?.focus();
+  }, [overlay]);
   // 학습지 참고 이미지(삼각비 표) 보기 창. 열려 있는 동안 필기 캔버스는 입력을 받지 않는다.
   const [reference, setReference] = useState<WorksheetReference | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -182,7 +193,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
   // 검토 화면에선 문항 스톱워치를 멈춘다
   useEffect(() => {
     const t = Date.now();
-    if (overlay === 'review' || overlay === 'submit') swRef.current = pauseStopwatch(swRef.current, t);
+    if (overlay === 'review' || overlay === 'submit' || overlay === 'peer') swRef.current = pauseStopwatch(swRef.current, t);
     else if (!document.hidden && swRef.current.runningSince == null) swRef.current = switchStopwatch(swRef.current, openedRef.current, t);
   }, [overlay]);
 
@@ -194,7 +205,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
         swRef.current = pauseStopwatch(swRef.current, t);
         void flushInk();
         void saveNow();
-      } else if (overlay !== 'review' && overlay !== 'submit') {
+      } else if (overlay !== 'review' && overlay !== 'submit' && overlay !== 'peer') {
         swRef.current = switchStopwatch(swRef.current, openedRef.current, t);
       }
     };
@@ -378,7 +389,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
 
   return (
     <div className="exam-solve" data-testid="exam-solve" data-mode={attempt.mode} data-question={question.number}>
-      <header className="exam-topbar">
+      <header className="exam-topbar" inert={overlay === 'peer' || undefined}>
         <div className="exam-topbar-main">
           <button type="button" className="rn-button rn-button-ghost rn-button-compact exam-exit" onClick={() => setOverlay('exit')}>
             나가기
@@ -436,6 +447,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
       </header>
 
       <AnswerBar
+        inert={overlay === 'peer' || undefined}
         key={question.id}
         question={question}
         answer={current.answer}
@@ -448,10 +460,35 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
           revealed: revealed[question.id] ?? false,
           onCheck: () => { void runFreeCheck(); },
           onReveal: () => setRevealed(prev => ({ ...prev, [question.id]: true })),
+          onPeer: attempt.kind !== 'hanneung' && current.checked && (!current.checked.isCorrect || current.unsure)
+            ? () => { void saveNow().then(ok => { if (ok) setOverlay('peer'); else setToast('진행 상황을 저장하지 못했어요. 다시 눌러 주세요.'); }); } : undefined,
         }}
       />
 
-      <main className="exam-body" data-testid="exam-body">
+      {overlay === 'peer' && <div className="exam-overlay exam-overlay-full exam-viewer-overlay" role="dialog" aria-modal="true" aria-label={`${question.number}번 풀이 보기`} onClick={closeOverlay}>
+        <div ref={peerDialogRef} className="exam-viewer" data-testid="exam-viewer" onClick={event => event.stopPropagation()} onKeyDown={event => {
+          if (event.key === 'Escape') { event.stopPropagation(); closeOverlay(); }
+          if (event.key === 'Tab') {
+            const buttons = [...event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), input, select, [tabindex="0"]')]
+              .filter(el => el.getClientRects().length > 0);
+            const first = buttons[0], last = buttons[buttons.length - 1];
+            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+            else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+          }
+        }}>
+          <div className="exam-sheet-head"><h2>{question.number}번 풀이 보기</h2>
+            <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={closeOverlay}>닫기</button>
+          </div>
+          <div className="exam-viewer-paper">
+            <PeerSolutionSwitch key={question.id} session={peerSession} eligible attemptId={attempt.id} questionId={question.id} imageUrl={question.imageUrl} autoPick>
+              {peerButton => <ResultInkNotes client={client} attemptId={attempt.id} questionId={question.id}
+                imageUrl={question.imageUrl} strokes={strokes.get(question.id) ?? []} ready={inkSync.ready} persist={false} extraTool={peerButton} />}
+            </PeerSolutionSwitch>
+          </div>
+        </div>
+      </div>}
+
+      <main className="exam-body" data-testid="exam-body" inert={overlay === 'peer' || undefined}>
         <div className="exam-paper">
           <div className="exam-paper-meta rn-caption">
             {question.sourceRound && <span data-testid="exam-question-source">제{question.sourceRound}회 {question.sourceNumber}번 · </span>}
@@ -494,7 +531,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
             size={size}
             penOnlyWhenPenDetected
             shapeSnap
-            readOnly={!inkSync.ready || submitting || (hanneung && pagePan) || reference != null}
+            readOnly={!inkSync.ready || submitting || (hanneung && pagePan) || reference != null || overlay === 'peer'}
             imageMaxWidth={hanneung ? (pageZoom ? 1100 : 980) : QUESTION_IMAGE_WIDTH}
           />
           </div>

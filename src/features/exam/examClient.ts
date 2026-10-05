@@ -2,7 +2,7 @@ import { supabase } from '../../services/supabase';
 import { examLiveTransport } from './liveTransport';
 import { readInkAtBoundary, saveInkAtBoundary } from './inkApi';
 import { loadExamInk } from './inkLoader';
-import type { AdminExamApi, AdminExamAttemptSummary, AdminLiveStudent, LiveStudentOrderCount, LiveInkResponse, AdminPaperActivity, ExamClient, InkReplayData, PeerSolution } from './contract';
+import type { AdminExamApi, AdminExamAttemptSummary, AdminLiveStudent, LiveStudentOrderCount, LiveInkResponse, AdminPaperActivity, ExamClient, InkReplayData, PeerSolution, PeerSolutionCandidate } from './contract';
 import {
   ExamClientError,
   mapAddedMistakes,
@@ -50,6 +50,12 @@ export const examClient: ExamClient = {
   },
   async getPeerSolutionReplay(attemptId, questionId, solutionKey) {
     return await readInkAtBoundary(callRpc, 'get_peer_solution_replay', { p_attempt_id: attemptId, p_question_id: questionId, p_solution_key: solutionKey }) as InkReplayData;
+  },
+  async listPeerSolutions(attemptId, questionId) {
+    return await callRpc('list_peer_solutions_v2', { p_attempt_id: attemptId, p_question_id: questionId }) as PeerSolutionCandidate[];
+  },
+  async getPeerSolutionByKey(attemptId, questionId, solutionKey) {
+    return await readInkAtBoundary(callRpc, 'get_peer_solution_by_key', { p_attempt_id: attemptId, p_question_id: questionId, p_solution_key: solutionKey }) as InkReplayData;
   },
   async saveInk(attemptId, questionId, { revision, legacyImport, events, batchId, idsHash }) {
     // 바뀐 내용만 보낸다(supabase/migrations/20261003050000_exam_ink_delta.sql). 필기 전체는 보내지 않는다.

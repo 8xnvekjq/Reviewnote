@@ -177,6 +177,8 @@ export interface ExamClient {
   getInkReplay(attemptId: string, questionId: string): Promise<InkReplayData>;
   getPeerSolution(attemptId: string, questionId: string): Promise<PeerSolution | null>;
   getPeerSolutionReplay(attemptId: string, questionId: string, solutionKey: string): Promise<InkReplayData>;
+  listPeerSolutions(attemptId: string, questionId: string): Promise<PeerSolutionCandidate[]>;
+  getPeerSolutionByKey(attemptId: string, questionId: string, solutionKey: string): Promise<InkReplayData>;
   /** 학생은 자기 기록만. studentId 지정은 관리자에게만 허용한다. */
   listPaperHistory(paperId: string, studentId?: string): Promise<ExamPaperHistoryAttempt[]>;
   listPapers(): Promise<ExamPaperSummary[]>;
@@ -266,6 +268,13 @@ export interface PeerSolution {
   strokes: InkStroke[];
   /** Opaque comparison fingerprint: replay reselects and verifies the same drawing. */
   solutionKey: string;
+}
+
+/** 목록에는 익명 표시 정보와 응시자 범위의 불투명 키만 담는다. */
+export interface PeerSolutionCandidate {
+  solutionKey: string;
+  label: PeerSolution['label'];
+  timeSpentMs: number;
 }
 
 export interface AdminExamAttemptSummary {

@@ -94,7 +94,7 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar
   const [addMessage, setAddMessage] = useState<string | null>(null);
   const [viewing, setViewing] = useState<ExamResultItem | null>(null);
   const [pageZoom, setPageZoom] = useState(false);
-  const peerSession = useMemo(() => !reviewing && client.getPeerSolution && client.getPeerSolutionReplay
+  const peerSession = useMemo(() => !reviewing && client.listPeerSolutions && client.getPeerSolutionByKey
     ? new PeerSolutionSession(client as PeerSolutionApi, initial.attemptId) : null, [client, initial.attemptId, reviewing]);
   const openQuestion = (item: ExamResultItem | null) => { setViewing(item); };
 

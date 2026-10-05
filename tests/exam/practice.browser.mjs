@@ -322,7 +322,7 @@ async function spinWheel(page, place, steps) {
 
   // 익명 동료 풀이: 요청은 클릭 때만, 재생은 재생 클릭 때만, 메모리 재사용과 내 덧쓰기 보존.
   const peerCalls = method => page.evaluate(name => window.__examLog.filter(row => row.method === name).length, method);
-  assert.equal(await peerCalls('getPeerSolution'), 0);
+  assert.equal(await peerCalls('listPeerSolutions'), 0);
   await page.locator('.exam-item-row[data-number="2"]').click();
   await page.getByTestId('exam-notes-tools').waitFor();
   const myInk = page.getByTestId('exam-viewer').locator('.exam-ink');
@@ -346,8 +346,9 @@ async function spinWheel(page, place, steps) {
     return { local, values };
   });
   const beforePeerStorage = await storedInk();
-  assert.equal(await peerCalls('getPeerSolution'), 0);
+  assert.equal(await peerCalls('listPeerSolutions'), 0);
   await page.getByTestId('exam-peer-toggle').click();
+  await page.getByTestId('exam-peer-row').first().click();
   const peerView = page.getByTestId('exam-peer-solution');
   await peerView.waitFor();
   const peerLabel = page.getByTestId('exam-peer-label');
@@ -381,10 +382,10 @@ async function spinWheel(page, place, steps) {
   assert.equal(await peerView.getByTestId('exam-ink-replay').getAttribute('data-replaying'), 'true');
   assert.equal(await peerView.getByTestId('exam-notes-tools').count(), 0);
   await page.getByTestId('exam-viewer').screenshot({ path: `${out}/peer-solution.png` });
-  assert.equal(await peerCalls('getPeerSolution'), 1);
+  assert.equal(await peerCalls('listPeerSolutions'), 1);
   // 내 풀이처럼 열자마자 필기 순서를 재생한다.
   await peerView.getByTestId('exam-replay-dock').waitFor();
-  assert.equal(await peerCalls('getPeerSolutionReplay'), 1);
+  assert.equal(await peerCalls('getPeerSolutionByKey'), 1);
   // 버튼은 툴바 크기(큰 버튼이 상단을 차지하지 않음)
   const backBox = await page.getByTestId('exam-peer-toggle').boundingBox();
   assert.ok(backBox.height <= 40, `small peer button: ${backBox.height}px`);
@@ -393,28 +394,28 @@ async function spinWheel(page, place, steps) {
   await peerView.getByRole('button', { name:'최종 풀이 보기', exact:true }).click();
   await peerView.getByRole('button', { name:'필기 순서 보기', exact:true }).click();
   await peerView.getByTestId('exam-replay-dock').waitFor();
-  assert.equal(await peerCalls('getPeerSolutionReplay'), 1, 'replay reused in memory');
+  assert.equal(await peerCalls('getPeerSolutionByKey'), 1, 'replay reused in memory');
   // Drag the anonymous dock: even its position must not write localStorage.
   const peerGrip = peerView.getByTestId('exam-replay-dock').locator('.exam-replay-dock-head');
   const gripBox = await peerGrip.boundingBox();
   await page.mouse.move(gripBox.x + 8, gripBox.y + gripBox.height / 2); await page.mouse.down();
   await page.mouse.move(gripBox.x + 30, gripBox.y - 20); await page.mouse.up();
   assert.deepEqual(await storedInk(), beforePeerStorage, 'peer drawings, replay and position never persist');
-  await page.getByTestId('exam-peer-toggle').click();
+  await page.getByTestId('exam-peer-back').click();
   assert.equal(await peerView.count(), 0);
   assert.equal(Number(await myInk.getAttribute('data-stroke-count')), myCount + 1);
   assert.equal(await page.getByTestId('exam-notes-tools').getByRole('button', { name:'실행 취소', exact:true }).isEnabled(),true);
-  await page.getByTestId('exam-peer-toggle').click(); await peerView.waitFor();
+  await page.getByTestId('exam-peer-toggle').click(); await page.getByTestId('exam-peer-row').first().click(); await peerView.waitFor();
   await page.getByTestId('exam-viewer').getByRole('button', { name:'닫기', exact:true }).click();
   await page.locator('.exam-item-row[data-number="2"]').click();
   assert.equal(Number(await page.getByTestId('exam-viewer').locator('.exam-ink').getAttribute('data-stroke-count')), myCount + 1);
-  await page.getByTestId('exam-peer-toggle').click(); await peerView.waitFor();
-  assert.equal(await peerCalls('getPeerSolution'), 1, 'same result screen reuses question ink');
+  await page.getByTestId('exam-peer-toggle').click(); await page.getByTestId('exam-peer-row').first().click(); await peerView.waitFor();
+  assert.equal(await peerCalls('listPeerSolutions'), 3, 'reopening refreshes current candidates');
   await page.getByTestId('exam-viewer').getByRole('button', { name:'닫기', exact:true }).click();
   await page.locator('.exam-item-row[data-number="3"]').click();
   await page.getByTestId('exam-peer-toggle').click();
   await page.getByText('아직 이 문제를 맞힌 다른 풀이가 없어요', { exact:true }).waitFor();
-  assert.equal(await page.getByTestId('exam-peer-toggle').isDisabled(),true);
+  assert.equal(await page.getByTestId('exam-peer-toggle').isEnabled(),true, 'empty lists remain refreshable');
   await page.getByTestId('exam-viewer').getByRole('button', { name:'닫기', exact:true }).click();
 
   // 시험지 목록 → 지난 결과
@@ -423,8 +424,8 @@ async function spinWheel(page, place, steps) {
   await page.locator('.exam-past-row').first().click();
   await page.getByTestId('exam-result').waitFor();
   await page.locator('.exam-item-row[data-number="2"]').click();
-  await page.getByTestId('exam-peer-toggle').click(); await peerView.waitFor();
-  assert.equal(await peerCalls('getPeerSolution'), 3, 'leaving the result screen releases its memory cache');
+  await page.getByTestId('exam-peer-toggle').click(); await page.getByTestId('exam-peer-row').first().click(); await peerView.waitFor();
+  assert.equal(await peerCalls('listPeerSolutions'), 5, 'leaving the result screen releases its memory cache');
   assert.deepEqual(errors, []);
   await context.close();
   console.log('ok — real mode flow (1180×820)');
@@ -1432,6 +1433,8 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="exam-live-cell"]').length === 3);
   await page.evaluate(() => window.__live.setCount(0));
+  // 모의 시계를 쓰는 화면에서는 목록 폴링 시각도 명시적으로 진행시킨다.
+  await page.clock.runFor(5000);
   await live.getByText('지금 풀고 있는 학생이 없어요').waitFor({ timeout: 12000 });
   await page.keyboard.press('Escape');
   await live.waitFor({ state: 'detached' });
