@@ -163,6 +163,8 @@ try {
     const el = document.querySelector('.exam-ink-input');
     const r = el.getBoundingClientRect();
     for (const [nx, ny] of points) {
+      // 실제 펜 샘플처럼 timeStamp가 앞으로 가게 한다(같은 시각의 샘플은 중복으로 걸러진다 — inkInput.ts).
+      const t0 = performance.now(); while (performance.now() - t0 < 0.3) { /* 짧게 대기 */ }
       el.dispatchEvent(new PointerEvent(type, { pointerId, pointerType, isPrimary: true, bubbles: true, cancelable: true, buttons: type === 'pointerup' ? 0 : 1, pressure: type === 'pointerup' ? 0 : 0.6, clientX: r.left + nx * r.width, clientY: r.top + ny * r.width }));
     }
   }, { type, pointerType, pointerId, points });

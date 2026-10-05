@@ -21,7 +21,7 @@ const draw = async (page, target) => {
 };
 try {
   await student.goto(`${base}?broadcast=student`);
-  await student.locator('[data-paper-id="2025-06-math"]').click();
+  await student.locator('[data-testid="exam-paper-card"][data-paper-id="2025-06-math"]').click();
   await student.getByRole('radio', { name: /자유 모드/ }).click();
   await student.getByRole('radio', { name: /미적분/ }).click();
   await student.getByTestId('exam-start-button').click();
@@ -53,14 +53,18 @@ try {
   await admin.getByRole('button', { name: '지우기 (Clear)' }).click();
   await student.waitForFunction(() => document.querySelector('[data-testid="exam-assist-overlay"]')?.dataset.strokeCount === '0');
   assert.equal(await count(admin), '0');
-  // 두 탭의 performance 시계를 함께 전진시켜 10초 유지와 전체 페이드를 검증한다.
-  await student.clock.install(); await admin.clock.install();
+  // 공유 시계를 전진시켜 10초 유지와 전체 페이드를 검증한다.
+  // 두 탭은 같은 context라 가짜 시계를 하나로 공유한다 — 한 번만 설치·전진한다.
+  await context.clock.install();
+  // 실제 시간이 흐르지 않게 멈춰 두고 runFor로만 전진한다(그리는 동안의 실제 경과가 10초 계산에 섞이지 않게).
+  const pauseAt = Date.now() + 1000;
+  await context.clock.pauseAt(pauseAt);
   await draw(admin, overlay(admin));
-  await student.clock.runFor(200); await admin.clock.runFor(200);
+  await context.clock.runFor(200);
   assert.equal(await count(student), '1');
-  await student.clock.runFor(9000); await admin.clock.runFor(9000);
+  await context.clock.runFor(9000);
   assert.equal(await count(student), '1');
-  await student.clock.runFor(1800); await admin.clock.runFor(1800);
+  await context.clock.runFor(1800);
   assert.equal(await count(student), '0'); assert.equal(await count(admin), '0');
   await draw(admin, overlay(admin));
   await student.clock.runFor(200);
@@ -69,9 +73,15 @@ try {
   await student.clock.runFor(50);
   assert.equal(await count(student), '0', '문항 이동 즉시 제거');
   await draw(student, student.locator('.exam-ink'));
-  await admin.clock.runFor(300);
-  await admin.waitForFunction(previous => document.querySelector('.exam-live-canvas')?.dataset.questionId !== previous &&
-    document.querySelector('[data-testid="exam-assist-overlay"]')?.dataset.strokeCount === '0', assistMessages[0].payload.questionId);
+  // 시계가 멈춰 있어 waitForFunction(raf 폴링)이 돌지 않는다 — 공유 시계를 조금씩 전진하며 확인한다
+  // (학생 방송 배치 750ms·저장 5초·관리자 폴링 5초).
+  let switched = false;
+  for (let i = 0; i < 12 && !switched; i++) {
+    await context.clock.runFor(1000);
+    switched = await admin.evaluate(previous => document.querySelector('.exam-live-canvas')?.dataset.questionId !== previous &&
+      document.querySelector('[data-testid="exam-assist-overlay"]')?.dataset.strokeCount === '0', assistMessages[0].payload.questionId);
+  }
+  assert.ok(switched, '관리자 확대 화면이 학생의 다음 문항으로 바뀜');
   assert.equal(await count(admin), '0', '관리자가 보는 문항도 이동하면 제거');
   await draw(admin, overlay(admin));
   await student.clock.runFor(200);

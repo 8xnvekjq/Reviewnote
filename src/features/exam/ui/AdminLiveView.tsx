@@ -48,6 +48,11 @@ function LiveCell({ row, now, focused, wide, onOpen, transport }: { row: LiveStu
   // 전체 보기의 기본 버튼 접근성을 유지하고, 확대 화면에서는 입력 캔버스를 버튼 밖에 둔다.
   const CellContent = focused ? 'div' : 'button';
   return <section className="exam-live-cell" data-testid="exam-live-cell" data-attempt-id={row.attemptId}>
+    {/* 확대 화면은 문항이 길어 아래 버튼을 누르면 문항 위쪽이 화면 밖으로 밀린다 — 위에 붙여 둔다. */}
+    {focused && <div className="exam-live-assist-bar" style={{ display: 'flex', gap: 8, padding: 8, position: 'sticky', top: 0, zIndex: 10, background: 'var(--rn-surface, #fff)' }}>
+      <button type="button" className="rn-button rn-button-compact" aria-pressed={pen} onClick={() => setPen(value => !value)}>도와주기 펜</button>
+      <button type="button" className="rn-button rn-button-compact" onClick={() => setClearToken(value => value + 1)}>지우기 (Clear)</button>
+    </div>}
     <CellContent type={focused ? undefined : 'button'} className="exam-live-cell-open" aria-label={`${row.studentName} 풀이 확대`} onClick={() => { if (!focused) onOpen(); }}>
       <strong>{row.studentName} · {frame?.number ?? row.number}번</strong><span>{Math.max(0, Math.floor((now - Date.parse(row.updatedAt)) / 1000))}초 전 갱신</span>
       <div className="exam-live-canvas" data-question-id={frame?.questionId ?? ''}>
@@ -57,10 +62,6 @@ function LiveCell({ row, now, focused, wide, onOpen, transport }: { row: LiveStu
       </div>
       {imageFailed && <small className="exam-live-image-failed" data-testid="exam-live-image-failed" role="status">문항 이미지를 불러오지 못했어요 · 다시 시도 중</small>}
     </CellContent>
-    {focused && <div style={{ display: 'flex', gap: 8, padding: 8 }}>
-      <button type="button" className="rn-button rn-button-compact" aria-pressed={pen} onClick={() => setPen(value => !value)}>도와주기 펜</button>
-      <button type="button" className="rn-button rn-button-compact" onClick={() => setClearToken(value => value + 1)}>지우기 (Clear)</button>
-    </div>}
   </section>;
 }
 export function AdminLiveView({ api, paperId, title, onClose }: { api: AdminExamApi; paperId: string; title: string; onClose: () => void }) {
