@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref } from 'react';
 import type { ExamClient, ExamInkCanvasHandle, InkChangeKind, InkReplayData, InkStroke, InkTool } from '../contract';
+import { ReplayAudio } from '../audio/ReplayAudio';
+import { audioTimelineBounds } from '../audio/audioMath';
 import { ExamInkCanvas } from './ExamInkCanvas';
 import { inkExtent, replayStrokeLists } from './inkFit';
 import { REPLAY_MAX_PAUSE_MS, buildInkClock, buildInkTimeline, formatReplayTime } from './inkReplay';
@@ -122,7 +124,16 @@ export function ExamInkReplay({ client, attemptId, questionId, imageUrl, strokes
   const [folded, setFolded] = useState(false);
   const dock = useDockDrag(persistDock);
   const timeline = useMemo(() => data ? buildInkTimeline(data) : null, [data]);
-  const clock = useMemo(() => timeline ? buildInkClock(timeline) : null, [timeline]);
+  const audioBounds = useMemo(() => {
+    const first = timeline?.steps.find(step => step.event);
+    const points = first?.event?.added[0]?.stroke.points ?? [];
+    const start = first ? first.at - (data?.audioOriginMs ?? 0) - Math.max(0, ...points.map(point => point.t)) : 0;
+    return audioTimelineBounds(data?.audioClips ?? [], start);
+  }, [timeline, data]);
+  const hasAudio = !!data?.audioClips?.length;
+  const clock = useMemo(() => timeline ? buildInkClock(timeline, hasAudio
+    ? { origin: data?.audioOriginMs ?? 0, shift: audioBounds.shift, total: audioBounds.end } : undefined) : null,
+    [timeline, hasAudio, data?.audioOriginMs, audioBounds]);
   const total = clock?.total ?? 0;
   const stepCount = timeline?.steps.length ?? 0;
   const speedRef = useRef(speed);
@@ -194,6 +205,7 @@ export function ExamInkReplay({ client, attemptId, questionId, imageUrl, strokes
   const playLabel = playing ? '일시정지' : '재생';
   return <div className="exam-ink-replay" data-testid="exam-ink-replay" data-replaying={open ? 'true' : 'false'}>
     <div className="exam-replay-bar">
+      {hasAudio && <ReplayAudio clips={data!.audioClips!} time={time} playing={open && playing} speed={speed} shift={audioBounds.shift} />}
       <button type="button" className="rn-button rn-button-compact" aria-expanded={open} onClick={toggleOpen}>{open ? '최종 풀이 보기' : '필기 순서 보기'}</button>
       {/* 덧쓰기 도구는 재생 중에도 보인다 — 도구를 누르면 재생을 닫고 최종 풀이 위에 바로 쓴다. */}
       {notes && <div className="exam-replay-notes" onClickCapture={() => { if (open) toggleOpen(); }}>{notes.toolbar}</div>}
@@ -202,7 +214,7 @@ export function ExamInkReplay({ client, attemptId, questionId, imageUrl, strokes
     {open && <div ref={dock.dockRef} style={dock.style} className={`exam-replay-dock${folded ? ' is-folded' : ''}`} role="group" aria-label="필기 재생" data-testid="exam-replay-dock">
       {folded ? <>
         <span className="exam-replay-grip" aria-hidden="true" title="끌어서 옮기기" {...dock.handle}><ReplayIcon name="grip" /></span>
-        <button type="button" className="exam-replay-icon" aria-label={playLabel} disabled={stepCount === 0} onClick={togglePlay}><ReplayIcon name={playing ? 'pause' : 'play'} /></button>
+        <button type="button" className="exam-replay-icon" aria-label={playLabel} disabled={stepCount === 0 && !hasAudio} onClick={togglePlay}><ReplayIcon name={playing ? 'pause' : 'play'} /></button>
         <button type="button" className="exam-replay-icon" aria-label="재생 상자 펼치기" aria-expanded={false} onClick={() => setFolded(false)}><ReplayIcon name="unfold" /></button>
       </> : <>
         <div className="exam-replay-dock-head" title="끌어서 옮기기" {...dock.handle}>
@@ -215,7 +227,7 @@ export function ExamInkReplay({ client, attemptId, questionId, imageUrl, strokes
         {error && <p role="alert">기록을 불러오지 못했어요. <button type="button" className="exam-replay-link" onClick={() => { setError(false); setRetry(n => n + 1); }}>다시 시도</button></p>}
         {timeline && clock && <>
           <input className="exam-replay-slider" type="range" aria-label="필기 재생 위치" min={0} max={sliderMax} step={SLIDER_STEP}
-            value={time >= total ? sliderMax : Math.round(time)} disabled={stepCount === 0}
+            value={time >= total ? sliderMax : Math.round(time)} disabled={stepCount === 0 && !hasAudio}
             aria-valuetext={`${formatReplayTime(time)} / ${formatReplayTime(total)}`} onChange={event => seek(Number(event.target.value))} />
           <output data-testid="exam-replay-position" data-step={done} data-steps={stepCount}>
             {formatReplayTime(time)} / {formatReplayTime(total)}{currentLabel ? ` · ${currentLabel}` : ''}
@@ -223,14 +235,14 @@ export function ExamInkReplay({ client, attemptId, questionId, imageUrl, strokes
           <div className="exam-replay-buttons">
             <button type="button" className="exam-replay-icon" aria-label="처음" title="처음" disabled={time <= 0} onClick={() => seek(0)}><ReplayIcon name="first" /></button>
             <button type="button" className="exam-replay-icon" aria-label="이전 필기 단계" title="이전 단계" disabled={time <= 0} onClick={() => seek(previousBoundary())}><ReplayIcon name="prev" /></button>
-            <button type="button" className="exam-replay-icon is-play" aria-label={playLabel} title={playLabel} disabled={stepCount === 0} onClick={togglePlay}><ReplayIcon name={playing ? 'pause' : 'play'} /></button>
+            <button type="button" className="exam-replay-icon is-play" aria-label={playLabel} title={playLabel} disabled={stepCount === 0 && !hasAudio} onClick={togglePlay}><ReplayIcon name={playing ? 'pause' : 'play'} /></button>
             <button type="button" className="exam-replay-icon" aria-label="다음 필기 단계" title="다음 단계" disabled={time >= total} onClick={() => seek(nextBoundary())}><ReplayIcon name="next" /></button>
             <button type="button" className="exam-replay-icon" aria-label="마지막" title="마지막" disabled={time >= total} onClick={() => seek(total)}><ReplayIcon name="last" /></button>
           </div>
           <div className="exam-replay-speed" role="group" aria-label="배속">
             {[0.5, 1, 2, 4].map(value => <button key={value} type="button" aria-pressed={speed === value} onClick={() => setSpeed(value)}>{value}×</button>)}
           </div>
-          <p className="exam-replay-note">{stepCount === 0 ? '아직 저장된 필기 기록이 없어요.' : timeline.approximate
+          <p className="exam-replay-note">{hasAudio ? '음성에 맞춰 멈춘 시간도 그대로 재생해요.' : stepCount === 0 ? '아직 저장된 필기 기록이 없어요.' : timeline.approximate
             ? '예전 필기는 남은 획·저장 상태만 보여요.'
             : `실제 쓴 속도로 재생해요(${REPLAY_MAX_PAUSE_MS / 1000}초보다 긴 멈춤은 줄임).`}</p>
         </>}
