@@ -37,12 +37,18 @@ export interface InkUpload {
   events: InkReplayEvent[];
   revision: number;
   legacyImport?: boolean;
+  /** 압축 batch(compact)가 대신한 원래 edit id들(Live 저장 확인용). */
+  covers?: string[];
 }
 export interface InkDraft {
   strokes: InkStroke[]; revision: number; pending: boolean; legacyImport?: boolean;
   events?: InkReplayEvent[];
   upload?: InkUpload;
   baseStrokes?: InkStroke[];
+  /** 서버가 영구 거절한 문항: 다음 batch는 쌓인 events 대신 baseStrokes → strokes 한 건으로 보낸다(지운 결과가 서버에 닿도록). */
+  compact?: boolean;
+  /** 압축으로 사라진 원래 edit id(저장되면 Live에 확인으로 보낸다). */
+  covers?: string[];
 }
 
 export async function loadInkDrafts(attemptId: string): Promise<Map<string, InkDraft>> {

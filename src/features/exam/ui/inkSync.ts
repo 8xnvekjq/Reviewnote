@@ -1,4 +1,4 @@
-import type { ExamClient, InkChangeKind, InkStroke } from '../contract.ts';
+import type { ExamClient, InkChangeKind, InkReplayEvent, InkStroke } from '../contract.ts';
 import { applyInkEvent, inkDelta, inkIdsHash } from '../ink/inkReplay.ts';
 import { loadInk, loadInkDrafts, saveInkDraft, type InkDraft } from './inkStore.ts';
 
@@ -19,7 +19,7 @@ const BACKOFF_MAX_MS = 120000;
 /**
  * 같은 요청을 다시 보내도 결과가 바뀌지 않는 거절(서버 트랜잭션은 롤백돼 batch가 남지 않는다).
  * 2026-10-05 장애: 문항 필기가 2MiB를 넘자 EXAM_INK_TOO_LARGE인 같은 batch를 끝없이 다시 보냈다.
- * 이런 문항은 그 문항이 다시 바뀌거나 학생이 '다시 시도'를 누를 때까지 보내지 않는다.
+ * 이런 문항은 그 문항이 다시 바뀌거나 학생이 '다시 시도'를 누를 때까지 보내지 않고, 다음 batch는 압축해서 보낸다(compactEdits).
  */
 const PERMANENT_REJECTION = /EXAM_INK_TOO_LARGE|EXAM_REPLAY_TOO_LARGE|EXAM_INK_INVALID|EXAM_REPLAY_INVALID|EXAM_QUESTION_NOT_FOUND/;
 /**
@@ -38,6 +38,18 @@ export function estimateInkBytes(strokes: InkStroke[]): number {
     sizeCache.set(strokes, bytes);
   }
   return bytes;
+}
+/**
+ * 거절된 문항의 쌓인 edit들을 '서버 필기(base) → 지금 필기' 한 건으로 바꾼다. 서버는 edit마다 중간 결과의 크기·획 수를
+ * 검사하므로, 큰 필기 뒤에 지운 edit가 있어도 앞부분에서 계속 거절된다(64개·4MiB 분할 경계, 2000획 중간 초과).
+ * 서버에 닿지 못한 중간 과정은 재생에서 한 단계로 합쳐진다. 남는 것이 없으면(base와 같음) undefined.
+ */
+export function compactEdits(base: InkStroke[], strokes: InkStroke[], edits: InkReplayEvent[]): InkReplayEvent | undefined {
+  const last = edits.at(-1);
+  const delta = inkDelta(base, strokes, 'draw', last?.at);
+  if (!delta.added.length && !delta.removed.length) return undefined;
+  delta.kind = !delta.added.length ? 'erase' : !delta.removed.length ? 'draw' : last?.kind ?? 'draw';
+  return delta;
 }
 export function autoSaveSpacingMs(strokes: InkStroke[]): number {
   const mb = estimateInkBytes(strokes) / (1024 * 1024);
@@ -176,7 +188,9 @@ export class InkSync {
 
   /** background: 자동 저장(디바운스·주기 재시도). 최근에 실패했으면 백오프 동안 서버에 보내지 않는다. */
   flush(options: { background?: boolean } = {}): Promise<boolean> {
-    if (this.saving) return this.saving;
+    // 진행 중인 저장에 합류. 자동 저장은 그 결과로 충분하지만, 명시 저장(제출·나가기·화면 숨김)은 그 저장이 간격 때문에
+    // 남긴 변경까지 끝난 뒤 이어서 보낸다(writer는 계속 하나: 끝난 뒤 다시 flush를 거친다).
+    if (this.saving) return options.background ? this.saving : this.saving.then(() => this.flush(options));
     if (!this.ready || this.status === 'conflict') return Promise.resolve(false);
     if (options.background && Date.now() < this.nextTryAt) return Promise.resolve(false);
     if (this.serverSyncOff) return Promise.resolve(true); // 이 기기(IndexedDB)에는 획마다 이미 저장돼 있다.
@@ -212,17 +226,34 @@ export class InkSync {
     try {
       for (let next = this.nextToSend(background); next; next = this.nextToSend(background)) {
         const [id, draft] = next;
-        const eventsToSend = [];
-        let bytes = 0;
-        for (const event of draft.events ?? []) {
-          const size = new TextEncoder().encode(JSON.stringify(event)).length;
-          if (eventsToSend.length && (eventsToSend.length >= 64 || bytes + size > 4 * 1024 * 1024)) break;
-          eventsToSend.push(event); bytes += size;
-        }
-        const upload = draft.upload ?? { id: crypto.randomUUID(), strokes: eventsToSend.reduce(applyInkEvent, draft.baseStrokes ?? []),
-          events: eventsToSend, revision: draft.revision, legacyImport: draft.legacyImport };
-        if (!draft.upload) {
-          const uploading = { ...draft, upload };
+        const sentStrokes = draft.strokes; // 거절 응답이 올 때 이 뒤로 바뀌었는지 본다.
+        let upload = draft.upload;
+        if (!upload) {
+          let events = draft.events ?? [];
+          let covers: string[] | undefined;
+          if (draft.compact) {
+            const compacted = compactEdits(draft.baseStrokes ?? [], draft.strokes, events);
+            if (!compacted) { // 지워서 서버 필기와 같아졌다: 보낼 것이 없다.
+              const clean = { ...draft, events: [], pending: false, compact: undefined, covers: undefined };
+              this.documents.set(id, clean);
+              this.persist(id, clean);
+              this.rejected.delete(id);
+              continue;
+            }
+            covers = [...draft.covers ?? [], ...events.map(event => event.id)]; // 다시 압축해도 원래 edit id를 잃지 않는다
+            events = [compacted];
+          }
+          const eventsToSend = [];
+          let bytes = 0;
+          for (const event of events) {
+            const size = new TextEncoder().encode(JSON.stringify(event)).length;
+            if (eventsToSend.length && (eventsToSend.length >= 64 || bytes + size > 4 * 1024 * 1024)) break;
+            eventsToSend.push(event); bytes += size;
+          }
+          upload = { id: crypto.randomUUID(), strokes: eventsToSend.reduce(applyInkEvent, draft.baseStrokes ?? []),
+            events: eventsToSend, revision: draft.revision, legacyImport: draft.legacyImport, ...(covers ? { covers } : {}) };
+          // 압축한 경우 events도 바꿔 둔다: 이 batch가 저장되면 그 뒤에 생긴 edit만 남는다.
+          const uploading = { ...draft, events, upload, ...(covers ? { covers } : {}) };
           this.documents.set(id, uploading);
           this.persist(id, uploading);
         }
@@ -237,9 +268,13 @@ export class InkSync {
         } catch (error) {
           const code = (error instanceof Error ? error.message : '').match(PERMANENT_REJECTION)?.[0];
           if (!code) throw error;
-          // 서버에 남은 것이 없으니 이 batch는 버리고, 사건 기록(events)은 그대로 두어 다음 변경과 함께 새 batch로 보낸다.
-          this.rejected.set(id, code);
-          const dropped = { ...this.documents.get(id)!, upload: undefined };
+          // 서버에 남은 것이 없으니 이 batch는 버리고, 다음 batch는 지금 필기 기준으로 압축해 보낸다.
+          // 멈추는(rejected) 것은 '지금 필기 한 건'이 거절됐을 때뿐이다. 중간 과정만 컸거나(압축하면 통과할 수 있다)
+          // 요청 중에 학생이 고쳤다면(예: 지움) 바로 다시 해 본다(자동 저장이면 큰 문항 간격은 지킨다).
+          const latest = this.documents.get(id)!;
+          const wholeState = upload.covers != null || (upload.events.length === 1 && (draft.events?.length ?? 0) === 1);
+          if (wholeState && latest.strokes === sentStrokes) this.rejected.set(id, code);
+          const dropped = { ...latest, upload: undefined, compact: true };
           this.documents.set(id, dropped);
           this.persist(id, dropped);
           continue;
@@ -247,10 +282,10 @@ export class InkSync {
         const latest = this.documents.get(id)!;
         const sent = new Set(upload.events.map(event => event.id));
         const events = (latest.events ?? []).filter(event => !sent.has(event.id));
-        const saved = { ...latest, revision, baseStrokes: upload.strokes, pending: events.length > 0, events, upload: undefined, legacyImport: false };
+        const saved = { ...latest, revision, baseStrokes: upload.strokes, pending: events.length > 0, events, upload: undefined, legacyImport: false, compact: undefined, covers: undefined };
         this.documents.set(id, saved);
         this.persist(id, saved);
-        try { this.onSaved?.(id, revision, upload.events.map(event => event.id)); } catch { /* Live only */ }
+        try { this.onSaved?.(id, revision, [...upload.events.map(event => event.id), ...upload.covers ?? []]); } catch { /* Live only */ }
       }
       await this.cacheWrites;
       this.failures = 0;
