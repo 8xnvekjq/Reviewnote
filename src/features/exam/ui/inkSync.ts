@@ -1,4 +1,5 @@
 import type { ExamClient, InkChangeKind, InkReplayEvent, InkStroke } from '../contract.ts';
+import { encodeInkEvents, needsInkCompaction, markInkCompacted } from '../ink/inkCodec.ts';
 import { applyInkEvent, inkDelta, inkIdsHash } from '../ink/inkReplay.ts';
 import { loadInk, loadInkDrafts, saveInkDraft, type InkDraft } from './inkStore.ts';
 
@@ -243,15 +244,23 @@ export class InkSync {
             covers = [...draft.covers ?? [], ...events.map(event => event.id)]; // 다시 압축해도 원래 edit id를 잃지 않는다
             events = [compacted];
           }
+          // 구형 본문은 8MiB까지 남아 있을 수 있다. 먼저 같은 id/순서로 재인코딩해야
+          // 이어지는 작은 delta도 새 4MiB 상한 아래에서 저장된다. 기존 edit·재생 순서는 보존한다.
+          const base = draft.baseStrokes ?? [];
+          const reencoded = needsInkCompaction(base);
+          if (reencoded) {
+            events = [{ id: crypto.randomUUID(), kind: 'draw', at: events[0]?.at ?? Date.now(),
+              removed: base.map(stroke => stroke.id), added: base.map((stroke, index) => ({ index, stroke })) }, ...events];
+          }
           const eventsToSend = [];
           let bytes = 0;
           for (const event of events) {
-            const size = new TextEncoder().encode(JSON.stringify(event)).length;
+            const size = new TextEncoder().encode(JSON.stringify(encodeInkEvents([event])[0])).length;
             if (eventsToSend.length && (eventsToSend.length >= 64 || bytes + size > 4 * 1024 * 1024)) break;
             eventsToSend.push(event); bytes += size;
           }
           upload = { id: crypto.randomUUID(), strokes: eventsToSend.reduce(applyInkEvent, draft.baseStrokes ?? []),
-            events: eventsToSend, revision: draft.revision, legacyImport: draft.legacyImport, ...(covers ? { covers } : {}) };
+            events: eventsToSend, revision: draft.revision, legacyImport: draft.legacyImport, ...(covers ? { covers } : {}), ...(reencoded ? { reencoded: true } : {}) };
           // 압축한 경우 events도 바꿔 둔다: 이 batch가 저장되면 그 뒤에 생긴 edit만 남는다.
           const uploading = { ...draft, events, upload, ...(covers ? { covers } : {}) };
           this.documents.set(id, uploading);
@@ -283,6 +292,7 @@ export class InkSync {
           continue;
         }
         const latest = this.documents.get(id)!;
+        if (upload.reencoded) markInkCompacted(upload.strokes);
         const sent = new Set(upload.events.map(event => event.id));
         const events = (latest.events ?? []).filter(event => !sent.has(event.id));
         const saved = { ...latest, revision, baseStrokes: upload.strokes, pending: events.length > 0, events, upload: undefined, legacyImport: false, compact: undefined, covers: undefined };

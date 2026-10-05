@@ -2,10 +2,31 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { InkSync, autoSaveSpacingMs, type InkCache } from '../../src/features/exam/ui/inkSync.ts';
 import { applyInkEvent, inkDelta, inkIdsHash } from '../../src/features/exam/ink/inkReplay.ts';
+import { decodeInkPayload } from '../../src/features/exam/ink/inkCodec.ts';
 import type { ExamClient, ExamInkDocument, InkReplayEvent, InkSaveRequest, InkStroke } from '../../src/features/exam/contract.ts';
 import type { InkDraft } from '../../src/features/exam/ui/inkStore.ts';
 
 const stroke = (id: string): InkStroke => ({ id, tool: 'pen', color: '#1f2937', size: 4, points: [{ x: .1, y: .2, pressure: .5, t: 0 }] });
+
+test('the next edit rewrites a large legacy baseline once and keeps every actual replay edit', async () => {
+  const s = server();
+  const legacy = { ...stroke('legacy'), points: Array.from({length:16000},(_,i)=>({x:.123456,y:.654321,pressure:.5,t:i})) };
+  const raw = { questionId:'q1', strokes:[legacy], revision:1 };
+  s.rows.set('q1', decodeInkPayload(raw));
+  const sync = new InkSync({ ...s.client, getInk: async () => [decodeInkPayload(raw)] }, 'attempt', undefined, cache().storage);
+  await sync.load();
+  const edit = sync.change('q1',[legacy,stroke('new')]);
+  assert.equal(await sync.flush(),true);
+  const events = s.requests[0].request.events;
+  assert.equal(events.length,2);
+  assert.deepEqual(events[0].removed,['legacy']);
+  assert.equal(events[0].added[0].stroke.id,'legacy');
+  assert.equal(events[1].id,edit);
+  sync.change('q1',[legacy,stroke('new'),stroke('next')]);
+  assert.equal(await sync.flush(),true);
+  assert.equal(s.requests[1].request.events.length,1,'the compacted baseline is not rewritten on each edit');
+  assert.deepEqual(s.rows.get('q1')?.strokes.map(s=>s.id),['legacy','new','next']);
+});
 function cache(legacy = new Map<string, InkStroke[]>()) {
   const drafts = new Map<string, InkDraft>();
   const storage: InkCache = {
@@ -504,8 +525,11 @@ test('a rejected queue split by bytes recovers after erasing; Live gets the orig
   const acknowledged: string[] = [];
   a.onSaved = (_id, _revision, ids) => acknowledged.push(...ids);
   await a.load();
-  const heavy = (id: string) => ({ ...stroke(id), points: Array.from({ length: 40000 }, (_, i) => ({ x: .1, y: .2, pressure: .5, t: i })) });
-  const [h1, h2, h3] = [heavy('h1'), heavy('h2'), heavy('h3')]; // 각 ≈1.7MB: 4MiB 분할 경계가 h2 뒤
+  // 컴팩트 전송에서도 분할되는 최악의 차분: 각 획 ≈1.87MB, 세 번째 획 앞에서 4MiB를 넘는다.
+  const heavy = (id: string) => ({ ...stroke(id), points: Array.from({ length: 100000 }, (_, i) => ({
+    x: i % 2 ? -100 : 100, y: i % 2 ? 100 : -100, pressure: i % 2, t: i % 2 ? 86400000 : 0,
+  })) });
+  const [h1, h2, h3] = [heavy('h1'), heavy('h2'), heavy('h3')];
   const ids = [a.change('q1', [h1]), a.change('q1', [h1, h2]), a.change('q1', [h1, h2, h3])];
   assert.equal(await a.flush(), false);
   assert.equal(s.requests[0].request.events.length, 2, 'the first batch stopped at the byte boundary');

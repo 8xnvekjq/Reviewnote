@@ -58,6 +58,20 @@ try {
   assert.ok(Math.abs(list[0].points[0].x - 0.1) < 0.01 && Math.abs(list[0].points[0].y - 0.2) < 0.01);
   assert.ok(await inkAt(0.1 + 10 * 0.01, 0.2 + Math.sin(10 / 2.5) * 0.03), 'stroke is painted where it was drawn');
 
+  // 서버 경계의 컴팩트 왕복 후에도 모의 압력과 화면 위치를 유지한다.
+  const beforeCompact = list;
+  await page.evaluate(() => window.__ink.roundTrip());
+  await page.waitForTimeout(50);
+  list = await strokes();
+  assert.equal(list[0].points.length, beforeCompact[0].points.length);
+  for (let i = 0; i < list[0].points.length; i++) {
+    const a = beforeCompact[0].points[i], b = list[0].points[i];
+    assert.ok(Math.abs(a.x - b.x) <= .000025 + 1e-12 && Math.abs(a.y - b.y) <= .000025 + 1e-12);
+    assert.equal(b.pressure, .5);
+    assert.ok(Math.abs(a.t - b.t) <= .5);
+  }
+  assert.ok(await inkAt(0.2, 0.2 + Math.sin(10 / 2.5) * 0.03), 'decoded stroke is rendered at its original location');
+
   // 2) 꾹 눌러 직선 → 펜을 떼기 전 끝점을 더 끌면 길이가 따라간다
   const shaky = Array.from({ length: 21 }, (_, i) => [0.15 + i * 0.02, 0.45 + (i % 2 ? 0.002 : -0.002) + i * 0.005]);
   await draw(shaky, { holdMs: 800, after: [[0.7, 0.62]] });
@@ -188,6 +202,49 @@ try {
   assert.equal((await strokes()).length, touchBefore + 2, 'palm/finger touches are ignored once a pen was seen');
   // 손가락은 캔버스가 직접 스크롤로 처리한다(touch-action pan은 iPad에서 펜 획까지 끊었다) — 펜 입력은 늘 캔버스가 받는다.
   assert.equal(await input.evaluate(el => getComputedStyle(el).touchAction), 'none', 'the pen is never handed to native scrolling');
+
+  // 겹치는 coalesced 목록 + 뒤로 가는 fallback 이벤트: 원시 시각으로만 중복 제거한다.
+  for (const [tool, layer] of [['펜', 1], ['형광펜', 0]]) {
+    await page.getByRole('button', { name: tool, exact: true }).click();
+    const beforeOverlap = (await strokes()).length;
+    await page.evaluate(() => {
+      const el = document.querySelector('.exam-ink-input');
+      const r = el.getBoundingClientRect();
+      const start = performance.now();
+      const make = (type, t, bad = false) => {
+        const ev = new PointerEvent(type, { pointerId: 9032, pointerType: 'pen', isPrimary: true,
+          bubbles: true, cancelable: true, buttons: type === 'pointerup' ? 0 : 1,
+          pressure: .2 + t / 100, clientX: r.left + (bad ? .8 : .2 + t * .002) * r.width,
+          clientY: r.top + (1 + Math.sin(t / 4) * .015) * r.width });
+        Object.defineProperty(ev, 'timeStamp', { value: start + t });
+        return ev;
+      };
+      el.dispatchEvent(make('pointerdown', 0));
+      for (const times of [[0,4,8,12], [4,8,12,16,20], [16,20,24]]) {
+        const ev = make('pointermove', times.at(-1));
+        Object.defineProperty(ev, 'getCoalescedEvents', { value: () => times.map(t => make('pointermove', t)) });
+        Object.defineProperty(ev, 'getPredictedEvents', { value: () => [make('pointermove', 80)] });
+        el.dispatchEvent(ev);
+      }
+      const stale = make('pointermove', 20, true);
+      Object.defineProperty(stale, 'getCoalescedEvents', { value: undefined });
+      el.dispatchEvent(stale);
+      const empty = make('pointermove', 28);
+      Object.defineProperty(empty, 'getCoalescedEvents', { value: () => [] });
+      el.dispatchEvent(empty);
+      el.dispatchEvent(make('pointermove', 28, true));
+      el.dispatchEvent(make('pointerup', 32));
+    });
+    list = await strokes();
+    assert.equal(list.length, beforeOverlap + 1);
+    const points = list.at(-1).points;
+    assert.deepEqual(points.map(p => p.t), [0,4,8,12,16,20,24,28], 'overlapping, stale and predicted samples are not committed');
+    assert.deepEqual(points.map(p => p.pressure), [.2,.24,.28,.32,.36,.4,.44,.48], 'fresh pen pressure is retained');
+    assert.ok(points.every(p => Math.abs(p.x - (.2 + p.t * .002)) <= .00005 + 1e-10));
+    assert.ok(!list.at(-1).shape, 'quick overlapping input remains freehand');
+    assert.equal(await inkAt(.2, 1, layer), true, 'filtered pressure stroke is visible');
+  }
+  await page.getByRole('button', { name: '펜', exact: true }).click();
 
   // 실기기 버그 회귀: 펜으로 쓰다 잠깐 멈춰도(짧은 획 + 0.7초 정지) 획이 도형으로 바뀌거나 끊기지 않고 이어진다.
   const beforePause = (await strokes()).length;

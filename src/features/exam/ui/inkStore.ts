@@ -1,5 +1,6 @@
 // IndexedDB is a recovery cache. Server revisions protect edits made on other devices.
 // IndexedDB 가 없거나(사생활 보호 모드 등) 실패해도 풀이는 계속돼야 하므로 모든 함수가 조용히 실패한다.
+import { decodeInkPayload } from '../ink/inkCodec.ts';
 import type { InkReplayEvent, InkStroke } from '../contract.ts';
 
 const DB_NAME = 'reviewnote-exam-ink';
@@ -39,6 +40,8 @@ export interface InkUpload {
   legacyImport?: boolean;
   /** 압축 batch(compact)가 대신한 원래 edit id들(Live 저장 확인용). */
   covers?: string[];
+  /** 이 batch가 큰 구형 baseline을 신형으로 다시 썼는지. 재시도에도 유지한다. */
+  reencoded?: boolean;
 }
 export interface InkDraft {
   strokes: InkStroke[]; revision: number; pending: boolean; legacyImport?: boolean;
@@ -55,7 +58,7 @@ export async function loadInkDrafts(attemptId: string): Promise<Map<string, InkD
   const db = await openDb();
   const result = new Map<string, InkDraft>();
   if (!db) return result;
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
     try {
       const tx = db.transaction('drafts', 'readonly');
       const prefix = `${attemptId}::`;
@@ -63,7 +66,9 @@ export async function loadInkDrafts(attemptId: string): Promise<Map<string, InkD
       req.onsuccess = () => {
         const cursor = req.result;
         if (!cursor) return;
-        result.set(String(cursor.key).slice(prefix.length), cursor.value as InkDraft);
+        // 손상된 압축 필기를 빈 초안으로 간주해 덮어쓰지 않는다. InkSync가 불러오기 실패로 처리한다.
+        try { result.set(String(cursor.key).slice(prefix.length), decodeInkPayload<InkDraft>(cursor.value, 'cache')); }
+        catch (error) { reject(error); return; }
         cursor.continue();
       };
       tx.oncomplete = () => resolve(result);
@@ -109,7 +114,7 @@ export async function loadInk(attemptId: string): Promise<Map<string, InkStroke[
   const db = await openDb();
   if (!db) return result;
   const prefix = `${attemptId}::`;
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
     try {
       const tx = db.transaction(STORE, 'readonly');
       const req = tx.objectStore(STORE).openCursor(IDBKeyRange.bound(prefix, `${prefix}￿`));
@@ -117,7 +122,8 @@ export async function loadInk(attemptId: string): Promise<Map<string, InkStroke[
         const cursor = req.result;
         if (!cursor) { resolve(result); return; }
         const questionId = String(cursor.key).slice(prefix.length);
-        if (Array.isArray(cursor.value)) result.set(questionId, cursor.value as InkStroke[]);
+        try { if (Array.isArray(cursor.value)) result.set(questionId, decodeInkPayload<InkStroke[]>(cursor.value, 'cache')); }
+        catch (error) { reject(error); return; }
         cursor.continue();
       };
       req.onerror = () => resolve(result);

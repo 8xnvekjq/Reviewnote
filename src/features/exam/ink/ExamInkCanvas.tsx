@@ -9,6 +9,7 @@ import { fitExtraBelow, fitImageWidth } from './inkFit.ts';
 import { drawShape, drawStroke, freehandPath, paint, prepareCanvas, resetTransform, safeDpr } from './inkRender.ts';
 import { holdStillStart, recognizeShape, resizeShape, shapeCenter, shapeToPoints } from './shapeSnap.ts';
 import { drawLaser } from './inkLaser.ts';
+import { freshPointerSamples } from './inkInput.ts';
 import { aspectCache } from './inkImages.ts';
 import type { LaserTrail } from './inkLaser.ts';
 import type { Pt, SnapShape } from './shapeSnap.ts';
@@ -93,6 +94,7 @@ interface DrawGesture {
   points: InkPoint[];
   predicted: InkPoint[];
   startTime: number;
+  lastTimeStamp: number;
   /** 점마다 받은 시각(performance.now()) — 꾹 누름 시간 창 계산용. */
   arrivals: number[];
   holdTimer: number | null;
@@ -104,6 +106,7 @@ interface LaserGesture {
   kind: 'laser';
   pointerId: number;
   trail: LaserTrail;
+  lastTimeStamp: number;
 }
 interface PanGesture {
   kind: 'pan';
@@ -118,6 +121,7 @@ interface EraseGesture {
   before: InkStroke[];
   working: InkStroke[];
   last: Pt;
+  lastTimeStamp: number;
   recorded: boolean;
   historyBefore: InkHistory;
 }
@@ -126,6 +130,7 @@ interface LassoGesture {
   kind: 'lasso';
   pointerId: number;
   path: Pt[];
+  lastTimeStamp: number;
 }
 /** 선택 영역을 옮기기·확대·회전하는 중(떼면 확정). */
 interface SelectGesture {
@@ -512,11 +517,6 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       // 좌표는 이미지 너비의 1/10000 단위로 반올림(눈에 보이지 않는 차이) — 서버로 가는 필기 크기를 줄인다.
       return { x: round((e.clientX - rect.left) / w, 1e4), y: round((e.clientY - rect.top) / w, 1e4), pressure: p, t: Math.max(0, Math.round(e.timeStamp - start)) };
     };
-    const eventsOf = (e: PointerEvent) => {
-      const list = typeof e.getCoalescedEvents === 'function' ? e.getCoalescedEvents() : [];
-      return list.length ? list : [e];
-    };
-
     const clearHold = (g: DrawGesture) => {
       if (g.holdTimer !== null) { window.clearInterval(g.holdTimer); g.holdTimer = null; }
     };
@@ -647,13 +647,13 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       if (p.tool === 'lasso') {
         // 선택 밖을 누르면 지금 선택은 풀고 새 올가미를 그린다(그냥 탭이면 해제만).
         if (selectionRef.current) setSelection(null);
-        gestureRef.current = { kind: 'lasso', pointerId: e.pointerId, path: [toPoint(e, start)], touch };
+        gestureRef.current = { kind: 'lasso', pointerId: e.pointerId, path: [toPoint(e, start)], lastTimeStamp: start, touch };
         scheduleLive();
         return;
       }
       if (p.tool === 'eraser') {
         const pt = toPoint(e, start);
-        const g: EraseGesture = { kind: 'erase', pointerId: e.pointerId, before: p.strokes, working: p.strokes, last: pt, recorded: false, historyBefore: historyRef.current };
+        const g: EraseGesture = { kind: 'erase', pointerId: e.pointerId, before: p.strokes, working: p.strokes, last: pt, lastTimeStamp: start, recorded: false, historyBefore: historyRef.current };
         gestureRef.current = Object.assign(g, { touch });
         eraseAlong(g, pt);
         scheduleLive();
@@ -664,13 +664,13 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
         // 레이저는 저장·실행 취소·재생 기록 없이 빛만 그리고 사라진다(도형 판정도 하지 않는다).
         const trail: LaserTrail = { points: [{ x: first.x, y: first.y }], endedAt: null };
         laserTrailsRef.current = [...laserTrailsRef.current, trail];
-        gestureRef.current = { kind: 'laser', pointerId: e.pointerId, trail, touch };
+        gestureRef.current = { kind: 'laser', pointerId: e.pointerId, trail, lastTimeStamp: start, touch };
         scheduleLaser();
         return;
       }
       const g: DrawGesture = {
         kind: 'draw', pointerId: e.pointerId, tool: p.tool, color: p.color, size: p.size,
-        points: [first], predicted: [], startTime: start,
+        points: [first], predicted: [], startTime: start, lastTimeStamp: start,
         arrivals: [performance.now()], holdTimer: null, holdTried: -1, snap: null,
       };
       gestureRef.current = Object.assign(g, { touch });
@@ -710,13 +710,17 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
         return;
       }
       if (g.kind === 'erase') {
-        for (const ev of eventsOf(e)) eraseAlong(g, toPoint(ev, 0));
+        const fresh = freshPointerSamples(e, g.lastTimeStamp);
+        g.lastTimeStamp = fresh.lastTimeStamp;
+        for (const ev of fresh.samples) eraseAlong(g, toPoint(ev, 0));
         scheduleLive();
         return;
       }
       const w = unit();
       if (g.kind === 'lasso') {
-        for (const ev of eventsOf(e)) {
+        const fresh = freshPointerSamples(e, g.lastTimeStamp);
+        g.lastTimeStamp = fresh.lastTimeStamp;
+        for (const ev of fresh.samples) {
           const pt = toPoint(ev, 0);
           const prev = g.path[g.path.length - 1];
           if (Math.hypot(pt.x - prev.x, pt.y - prev.y) * w < 2) continue;
@@ -738,7 +742,9 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       }
       if (g.kind === 'laser') {
         const pts = g.trail.points;
-        for (const ev of eventsOf(e)) {
+        const fresh = freshPointerSamples(e, g.lastTimeStamp);
+        g.lastTimeStamp = fresh.lastTimeStamp;
+        for (const ev of fresh.samples) {
           const pt = toPoint(ev, 0);
           const prev = pts[pts.length - 1];
           if (Math.hypot(pt.x - prev.x, pt.y - prev.y) * w < 0.35) continue;
@@ -747,15 +753,20 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
         scheduleLaser();
         return;
       }
+      const fresh = freshPointerSamples(e, g.lastTimeStamp);
+      g.lastTimeStamp = fresh.lastTimeStamp;
+      const arrived = performance.now();
       if (g.snap) {
-        const last = toPoint(e, g.startTime);
+        const ev = fresh.samples.at(-1);
+        if (!ev) return;
+        const last = toPoint(ev, g.startTime);
         g.points.push(last);
+        g.arrivals.push(arrived);
         g.snap.current = resizeShape(g.snap.base, g.snap.anchor, last);
         scheduleLive();
         return;
       }
-      const arrived = performance.now();
-      for (const ev of eventsOf(e)) {
+      for (const ev of fresh.samples) {
         const pt = toPoint(ev, g.startTime);
         const prev = g.points[g.points.length - 1];
         if (Math.hypot(pt.x - prev.x, pt.y - prev.y) * w < 0.35) continue; // 같은 자리 중복점

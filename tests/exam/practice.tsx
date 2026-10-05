@@ -62,6 +62,7 @@ const activityRows: AdminPaperStudentActivity[] = adminRows.map((row, index) => 
 const adminApi: AdminExamApi = {
   listLivePapers: async () => [],
   getLiveExam: async () => [],
+  getLiveStudentOrder: async () => [],
   getLiveInk: async () => ({ mode: 'full', revision: 0, strokes: [] }),
   listAttempts: async () => adminRows,
   getAttempt: async (id: string) => adminAttempts.get(id)!,
