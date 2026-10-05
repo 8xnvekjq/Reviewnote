@@ -1,7 +1,7 @@
 import { supabase } from '../../services/supabase';
 import { examLiveTransport } from './liveTransport';
 import { loadExamInk } from './inkLoader';
-import type { AdminExamApi, AdminExamAttemptSummary, AdminLiveStudent, LiveInkResponse, AdminPaperActivity, ExamClient, InkReplayData, PeerSolution } from './contract';
+import type { AdminExamApi, AdminExamAttemptSummary, AdminLiveStudent, LiveStudentOrderCount, LiveInkResponse, AdminPaperActivity, ExamClient, InkReplayData, PeerSolution } from './contract';
 import {
   ExamClientError,
   mapAddedMistakes,
@@ -168,6 +168,9 @@ export const adminExamClient = {
   },
   async getLiveExam(paperId: string) {
     return await callRpc('admin_get_live_exam', { p_paper_id: paperId }) as AdminLiveStudent[];
+  },
+  async getLiveStudentOrder(studentIds: string[]) {
+    return await callRpc('admin_get_live_student_order', { p_student_ids: studentIds }) as LiveStudentOrderCount[];
   },
   async getLiveInk(attemptId: string, questionId: string, sinceRevision: number | null) {
     return await callRpc('admin_get_live_ink', { p_attempt_id: attemptId, p_question_id: questionId, p_since_revision: sinceRevision }) as LiveInkResponse;

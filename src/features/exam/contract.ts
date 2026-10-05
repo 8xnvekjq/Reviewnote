@@ -302,6 +302,7 @@ export interface AdminExamApi {
   liveTransport?: import('./liveTransport').LiveTransport;
   listLivePapers(): Promise<Array<{ paperId: string; liveCount: number }>>;
   getLiveExam(paperId: string): Promise<AdminLiveStudent[]>;
+  getLiveStudentOrder(studentIds: string[]): Promise<LiveStudentOrderCount[]>;
   getLiveInk(attemptId: string, questionId: string, sinceRevision: number | null): Promise<LiveInkResponse>;
   listAttempts(studentId: string, offset?: number): Promise<AdminExamAttemptSummary[]>;
   getAttempt(attemptId: string): Promise<ExamAttempt>;
@@ -310,6 +311,11 @@ export interface AdminExamApi {
   getResult(attemptId: string): Promise<ExamResult>;
   /** 관리자가 아니면 null. */
   listPaperActivity(): Promise<AdminPaperActivity[] | null>;
+}
+
+export interface LiveStudentOrderCount {
+  studentId: string;
+  completedCount: number;
 }
 
 export interface AdminLiveStudent {
