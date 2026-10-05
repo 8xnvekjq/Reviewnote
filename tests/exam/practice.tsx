@@ -30,6 +30,8 @@ const client = createMockExamClient({
   inkStats,
   log,
 });
+// 목록 갱신 오류를 실제 화면에서 재현하는 테스트 전용 연결점.
+(window as unknown as { __examClient: typeof client }).__examClient = client;
 
 const adminRows: AdminExamAttemptSummary[] = [];
 const adminAttempts = new Map<string, ExamAttempt>();

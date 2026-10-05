@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { PEER_ANIMAL_FACES, PeerSolutionSession, peerSolutionLabel, peerSolutionLabelParts } from '../../src/features/exam/ui/peerSolution.ts';
+import { PEER_ANIMAL_FACES, PeerSolutionSession, peerSolutionLabel, peerSolutionLabelParts, formatPeerTime } from '../../src/features/exam/ui/peerSolution.ts';
 import { getTitleBadgeStyle } from '../../src/utils/gachaCatalog.ts';
 import { buildInkTimeline, inkDelta } from '../../src/features/exam/ink/inkReplay.ts';
 import type { InkStroke, PeerSolution } from '../../src/features/exam/contract.ts';
@@ -60,25 +60,36 @@ test('server face wins over legacy character; titles reuse the app-wide title ba
   assert.match(view, /\{parts\.title\.icon\}/);
 });
 
-test('result session loads only on demand, deduplicates, caches null/replay and retries failures', async () => {
+test('picker session deduplicates lists, separates selections and refreshes changed keys', async () => {
   let reads = 0, plays = 0;
+  const rows = [{ label: solution.label, solutionKey: 'opaque', timeSpentMs: 252000 }];
   const api = {
-    getPeerSolution: async (_a: string, q: string) => { reads++; if (q === 'failure' && reads === 3) throw new Error('offline'); return q === 'none' ? null : solution; },
-    getPeerSolutionReplay: async (a: string, q: string, key: string) => {
-      assert.equal(a, 'my-attempt'); assert.equal(q, 'q'); assert.equal(key, 'opaque'); plays++;
+    listPeerSolutions: async (_a: string, q: string) => { reads++; if (q === 'failure' && reads === 3) throw new Error('offline'); return q === 'none' ? [] : rows; },
+    getPeerSolutionByKey: async (a: string, q: string, key: string) => {
+      assert.equal(a, 'my-attempt'); assert.equal(q, 'q'); plays++;
+      if (key === 'changed') throw Object.assign(new Error('localized'), { code: 'EXAM_PEER_CHANGED' });
       return { strokes: drawing(), batches: [], revision: 0 };
     },
   };
   const session = new PeerSolutionSession(api, 'my-attempt');
   assert.equal(reads, 0); assert.equal(plays, 0);
-  assert.deepEqual(await Promise.all([session.get('q'), session.get('q')]), [solution, solution]);
+  assert.deepEqual(await Promise.all([session.list('q'), session.list('q')]), [rows, rows]);
   assert.equal(reads, 1); assert.equal(plays, 0);
-  assert.equal(await session.get('none'), null); assert.equal(await session.get('none'), null); assert.equal(reads, 2);
-  await assert.rejects(session.get('failure'), /offline/); await session.get('failure'); assert.equal(reads, 4);
-  await Promise.all([session.replay('q','opaque'),session.replay('q','opaque')]); assert.equal(plays, 1);
-  await new PeerSolutionSession(api, 'my-attempt').get('q'); assert.equal(reads, 5, 'new result screen has no cached peer ink');
+  assert.deepEqual(await session.list('none'), []); await session.list('none'); assert.equal(reads, 2);
+  await assert.rejects(session.list('failure'), /offline/); await session.list('failure'); assert.equal(reads, 4);
+  await Promise.all([session.replay('q', 'opaque'), session.replay('q', 'opaque')]); assert.equal(plays, 1);
+  await session.replay('q', 'other'); assert.equal(plays, 2);
+  await session.replay('q', 'opaque', true); assert.equal(plays, 3);
+  await assert.rejects(session.replay('q', 'changed')); await session.list('q'); assert.equal(reads, 5);
+  await session.list('q', true); assert.equal(reads, 6);
 });
 
+test('question time formatting has Korean minutes and seconds', () => {
+  assert.equal(formatPeerTime(252999), '4분 12초');
+  assert.equal(formatPeerTime(60000), '1분 0초');
+  assert.equal(formatPeerTime(15000), '15초');
+  for (const value of [0, -1, NaN, Infinity]) assert.equal(formatPeerTime(value), '0초');
+});
 let PGlite: any;
 try { const pkg = '@electric-sql/pglite'; PGlite = (await import(pkg)).PGlite; } catch { /* matches existing migration tests */ }
 

@@ -9,6 +9,7 @@ import { answerFromDigits, CHOICE_MARKS, digitsFromAnswer, CHOICE10_MARKS, quest
 export interface FreeCheck { isCorrect: boolean; correctAnswer: string }
 
 interface Props {
+  inert?: boolean;
   question: ExamQuestion;
   answer: string | null;
   unsure: boolean;
@@ -22,12 +23,13 @@ interface Props {
     revealed: boolean;
     onCheck: () => void;
     onReveal: () => void;
+    onPeer?: () => void;
   };
 }
 
 const PLACES = ['백의 자리', '십의 자리', '일의 자리'];
 
-export function AnswerBar({ question, answer, unsure, onAnswer, onUnsure, free }: Props) {
+export function AnswerBar({ question, answer, unsure, onAnswer, onUnsure, free, inert }: Props) {
   const digits = digitsFromAnswer(answer);
   const check = free?.check ?? null;
   const locked = check != null;
@@ -37,7 +39,7 @@ export function AnswerBar({ question, answer, unsure, onAnswer, onUnsure, free }
   const wide = ten && (question.choices ?? []).some(choice => choice.includes('\\begin{cases}') || choice.length > 24);
 
   return (
-    <div className={`exam-answerbar${locked ? ' is-locked' : ''}`} data-testid="exam-answerbar" data-locked={locked || undefined}>
+    <div inert={inert} className={`exam-answerbar${locked ? ' is-locked' : ''}`} data-testid="exam-answerbar" data-locked={locked || undefined}>
       <div className="exam-answerbar-inner">
         {answerType !== 'digits' ? (
           <div className={`exam-choices${ten ? ' exam-choices-ten' : ''}${wide ? ' is-wide' : ''}`} role="group" aria-label={`${question.number}번 답 고르기`}>
@@ -124,6 +126,7 @@ export function AnswerBar({ question, answer, unsure, onAnswer, onUnsure, free }
               </span>
             )}
             {locked && <span className="exam-freecheck-lock rn-caption" data-testid="exam-lock-note">🔒 채점한 문항은 답을 바꿀 수 없어요</span>}
+            {check && free.onPeer && <button type="button" className="exam-link" data-testid="exam-free-peer" aria-haspopup="dialog" onClick={free.onPeer}>풀이 보기</button>}
           </div>
         )}
       </div>

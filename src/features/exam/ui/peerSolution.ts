@@ -1,6 +1,6 @@
-import type { ExamClient, InkReplayData, PeerSolution } from '../contract.ts';
+import type { ExamClient, InkReplayData, PeerSolution, PeerSolutionCandidate } from '../contract.ts';
 
-export type PeerSolutionApi = Pick<ExamClient, 'getPeerSolution' | 'getPeerSolutionReplay'>;
+export type PeerSolutionApi = Pick<ExamClient, 'listPeerSolutions' | 'getPeerSolutionByKey'>;
 
 import { getTitleBadgeStyle } from '../../../utils/gachaCatalog.ts';
 
@@ -40,32 +40,45 @@ export function peerSolutionLabel(label: PeerSolution['label']): string {
   return `${parts.face} ${parts.title?.text || '익명 학생'}${parts.grade}`;
 }
 
-/** One result screen owns this cache. Nothing is stored in browser storage or module state.
- * Cache promises to deduplicate rapid clicks, including null; failures remain retryable. */
+export function formatPeerTime(ms: number): string {
+  const seconds = Math.floor(Math.max(0, Number.isFinite(ms) ? ms : 0) / 1000);
+  return seconds >= 60 ? `${Math.floor(seconds / 60)}분 ${seconds % 60}초` : `${seconds}초`;
+}
+
+export function isPeerChanged(error: unknown): boolean {
+  return !!error && typeof error === 'object' && (
+    ('code' in error && error.code === 'EXAM_PEER_CHANGED') ||
+    ('message' in error && String(error.message).includes('EXAM_PEER_CHANGED')));
+}
+
+/** 화면별 메모리 캐시. 목록은 다시 열 때 갱신하고 실패한 요청은 재시도한다. */
 export class PeerSolutionSession {
-  private solutions = new Map<string, Promise<PeerSolution | null>>();
+  private solutions = new Map<string, Promise<PeerSolutionCandidate[]>>();
   private replays = new Map<string, Promise<InkReplayData>>();
   private api: PeerSolutionApi;
   private attemptId: string;
   constructor(api: PeerSolutionApi, attemptId: string) { this.api = api; this.attemptId = attemptId; }
 
-  get(questionId: string): Promise<PeerSolution | null> {
+  list(questionId: string, refresh = false): Promise<PeerSolutionCandidate[]> {
+    if (refresh) this.solutions.delete(questionId);
     const cached = this.solutions.get(questionId);
     if (cached) return cached;
-    const pending = this.api.getPeerSolution(this.attemptId, questionId).catch(error => {
-      this.solutions.delete(questionId);
+    const pending = this.api.listPeerSolutions(this.attemptId, questionId).catch(error => {
+      if (this.solutions.get(questionId) === pending) this.solutions.delete(questionId);
       throw error;
     });
     this.solutions.set(questionId, pending);
     return pending;
   }
 
-  replay(questionId: string, solutionKey: string): Promise<InkReplayData> {
+  replay(questionId: string, solutionKey: string, refresh = false): Promise<InkReplayData> {
     const key = `${questionId}:${solutionKey}`;
+    if (refresh) this.replays.delete(key);
     const cached = this.replays.get(key);
     if (cached) return cached;
-    const pending = this.api.getPeerSolutionReplay(this.attemptId, questionId, solutionKey).catch(error => {
-      this.replays.delete(key);
+    const pending = this.api.getPeerSolutionByKey(this.attemptId, questionId, solutionKey).catch(error => {
+      if (this.replays.get(key) === pending) this.replays.delete(key);
+      if (isPeerChanged(error)) this.solutions.delete(questionId);
       throw error;
     });
     this.replays.set(key, pending);
