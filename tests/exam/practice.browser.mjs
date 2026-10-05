@@ -1391,17 +1391,29 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   assert.ok(await badge.evaluate(node => node.getBoundingClientRect().bottom <= node.parentElement.querySelector('.exam-paper-sheet-head').getBoundingClientRect().top), 'corner badge does not cover card text');
   await noHorizontalOverflow(page, `Live badge/${viewport.width}`);
   await page.screenshot({ path: `${out}/live-badge-${viewport.width}.png`, fullPage: true });
+  await page.clock.install();
   await badge.click();
   const live = page.getByTestId('exam-live-view');
   await live.waitFor();
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="exam-live-cell"]').length === 2);
   const cell = () => live.locator('[data-attempt-id="live-attempt-0"]');
   await page.waitForFunction(() => document.querySelector('[data-attempt-id="live-attempt-0"] .exam-ink')?.dataset.strokeCount === '1');
+  const order = () => live.getByTestId('exam-live-cell').evaluateAll(nodes => nodes.map(node => node.dataset.attemptId));
+  await page.waitForFunction(() => document.querySelector('[data-testid="exam-live-cell"]')?.dataset.attemptId === 'live-attempt-1');
+  assert.deepEqual(await order(), ['live-attempt-1', 'live-attempt-0'], '누적 복습 완료 수 30 → 10 내림차순');
+  assert.equal(await page.evaluate(() => window.__live.orderCalls()), 1);
   await page.evaluate(() => { window.__live.setCount(3); window.__live.draw(0); });
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="exam-live-cell"]').length === 3
     && document.querySelector('[data-attempt-id="live-attempt-0"] .exam-ink')?.dataset.strokeCount === '2', null, { timeout: 12000 });
+  assert.deepEqual((await order()).filter(id => id !== 'live-attempt-2'), ['live-attempt-1', 'live-attempt-0'], '미조회 신규 학생이 있어도 기존 상대 순서 유지');
+  await page.clock.runFor(61_000);
+  await page.waitForFunction(() => window.__live.orderCalls() === 2);
+  assert.deepEqual(await order(), ['live-attempt-1', 'live-attempt-2', 'live-attempt-0'], '신규 학생 완료 수 20은 30과 10 사이에 삽입');
+  await page.evaluate(() => window.__live.setCompletedCount(0, 100));
   await page.evaluate(() => window.__live.erase(0));
   await page.waitForFunction(() => document.querySelector('[data-attempt-id="live-attempt-0"] .exam-ink')?.dataset.strokeCount === '1', null, { timeout: 12000 });
+  assert.deepEqual(await order(), ['live-attempt-1', 'live-attempt-2', 'live-attempt-0'], '활동·완료 수가 바뀌어도 이미 확정된 순서 유지');
+  assert.equal(await page.evaluate(() => window.__live.orderCalls()), 2, '폴링마다 카운트를 조회하지 않는다');
   await noHorizontalOverflow(page, `Live split/${viewport.width}`);
   await page.screenshot({ path: `${out}/live-split-${viewport.width}.png`, fullPage: true });
   for (const back of ['button', 'escape', 'history']) {
@@ -1476,6 +1488,75 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   await page.clock.runFor(10 * 60_000 + POLL);
   await badge.waitFor({ state: 'detached', timeout: 3000 });
   assert.deepEqual(await paperCard(page, PAPER_A).boundingBox(), before, 'badge leaving does not move the card');
+  assert.deepEqual(errors, []);
+  await context.close();
+}
+
+// 작성만: Live의 revision별 필기 조회, 최근 활동 정렬, 탭 숨김과 복귀, 10분 만료를 함께 검증한다.
+{
+  const context = await browser.newContext({ viewport: LANDSCAPE });
+  const page = await context.newPage();
+  const errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.clock.install({ time: new Date('2026-10-05T09:00:00+09:00') });
+  await page.goto(`${BASE}?live=1&livecount=3`);
+  await page.getByTestId('exam-live-badge').click();
+  const live = page.getByTestId('exam-live-view');
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="exam-live-cell"] .exam-ink').length === 3);
+  const order = () => live.getByTestId('exam-live-cell').evaluateAll(nodes => nodes.map(node => node.dataset.attemptId));
+  const calls = () => page.evaluate(() => ({ exam: window.__live.examCalls(), ink: window.__live.inkCalls(), order: window.__live.orderCalls() }));
+  const expected = ['live-attempt-1', 'live-attempt-2', 'live-attempt-0'];
+  await page.waitForFunction(() => document.querySelector('[data-testid="exam-live-cell"]')?.dataset.attemptId === 'live-attempt-1');
+  assert.deepEqual(await order(), expected);
+  const initial = await calls();
+  await page.clock.runFor(15_500);
+  assert.ok((await calls()).exam > initial.exam, '목록은 5초 주기로 갱신한다');
+  assert.equal((await calls()).ink, initial.ink, 'revision이 같으면 필기 RPC를 보내지 않는다');
+  assert.equal((await calls()).order, initial.order, '목록 구성원이 같으면 카운트 RPC를 보내지 않는다');
+  await page.evaluate(() => window.__live.draw(1));
+  await page.clock.runFor(5500);
+  assert.equal((await calls()).ink, initial.ink + 1, '바뀐 학생의 필기만 1회 조회한다');
+  assert.deepEqual(await order(), expected, '서버 활동순이 바뀌어도 완료 수 기준 확정 위치를 유지한다');
+  await live.locator('[data-attempt-id="live-attempt-1"] button').click();
+  await page.evaluate(() => window.__live.draw(0));
+  await page.clock.runFor(5500);
+  assert.deepEqual(await order(), ['live-attempt-1'], '다른 학생이 갱신돼도 확대 대상 유지');
+  await live.getByRole('button', { name: '← 전체 보기', exact: true }).click();
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="exam-live-cell"]').length === 3);
+  assert.deepEqual(await order(), expected, '뒤로가기 후 전체 순서 유지');
+  await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange')); });
+  const hidden = await calls();
+  await page.clock.runFor(20_000);
+  assert.deepEqual(await calls(), hidden, '숨긴 탭에서는 목록/필기 RPC 모두 정지');
+  await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => false }); document.dispatchEvent(new Event('visibilitychange')); });
+  await page.waitForFunction(n => window.__live.examCalls() === n + 1, hidden.exam);
+  assert.equal((await calls()).ink, hidden.ink, '복귀 즉시 목록을 가져오되 기존 revision은 재사용');
+  await page.clock.runFor(10 * 60_000 + 5500);
+  await live.getByText('지금 풀고 있는 학생이 없어요').waitFor();
+  assert.deepEqual(errors, []);
+  await context.close();
+}
+
+// 작성만: 초기 늦은 카운트 응답은 한 번 적용, 실패는 오류 UI 없이 이름순 대체.
+for (const failure of [false, true]) {
+  const { context, page, errors } = await open(LANDSCAPE, '?live=1');
+  await page.clock.install();
+  await page.evaluate(fail => { window.__live.setOrderDelay(10_000); window.__live.setOrderFailure(fail); }, failure);
+  await page.getByTestId('exam-live-badge').click();
+  const live = page.getByTestId('exam-live-view');
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="exam-live-cell"]').length === 2);
+  const order = () => live.getByTestId('exam-live-cell').evaluateAll(nodes => nodes.map(node => node.dataset.attemptId));
+  assert.deepEqual(await order(), ['live-attempt-0', 'live-attempt-1'], '초기에는 이름순 임시 표시');
+  await page.clock.runFor(5500);
+  assert.equal(await page.evaluate(() => window.__live.orderCalls()), 1, '진행 중 요청 중복 없음');
+  await page.clock.runFor(5500);
+  const expected = failure ? ['live-attempt-0', 'live-attempt-1'] : ['live-attempt-1', 'live-attempt-0'];
+  assert.deepEqual(await order(), expected, failure ? '실패 이름순 대체' : '첫 응답만 정렬 적용');
+  await page.evaluate(() => { window.__live.setCompletedCount(0, 100); window.__live.draw(0); });
+  await page.clock.runFor(65_000);
+  assert.deepEqual(await order(), expected, '완료 수·활동 갱신 뒤 재정렬 없음');
+  assert.equal(await page.evaluate(() => window.__live.orderCalls()), 1, '새 학생 없으면 실패 후에도 재요청 없음');
+  assert.equal(await live.getByRole('alert').count(), 0, '카운트 조회 실패는 오류 UI를 만들지 않는다');
   assert.deepEqual(errors, []);
   await context.close();
 }

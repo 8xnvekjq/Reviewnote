@@ -3,6 +3,7 @@ import type { AdminExamApi, AdminLiveStudent } from '../contract';
 import { applyLiveInk, type LiveInkState } from '../ink/inkLive';
 import { preloadInkImages } from '../ink/inkImages';
 import { browserPollEnvironment, startLivePolling } from './livePolling';
+import { createLiveStudentOrderSession } from './liveStudentOrderSession';
 import {
   acceptLiveSequence, composeLiveView, liveSequenceGap, parseLiveInk, parseLiveSaved, receiveLiveInk, receiveLiveSaved,
   settleLiveHints, trustedLiveImage, vanishedStrokes, WATCH_INTERVAL_MS, type LiveHints, type LiveSequenceState,
@@ -54,9 +55,10 @@ export function useLiveExam(api: AdminExamApi, paperId: string) {
       // Attempts the poll no longer lists keep only what can still be shown once they reappear.
       if (next && (row || next.log.length || next.saved.length)) hints.set(attemptId, next); else hints.delete(attemptId);
     };
+    const studentOrder = createLiveStudentOrderSession(ids => api.getLiveStudentOrder(ids), () => { if (alive) publish(false); });
     const publish = (fromPoll: boolean) => {
-      const views = server.map(row => composeLiveView(row, hints.get(row.attemptId),
-        questionId => inkCache.get(inkKey(row.attemptId, questionId)), questionId => images.get(questionId)));
+      const views = studentOrder.apply(server.map(row => composeLiveView(row, hints.get(row.attemptId),
+        questionId => inkCache.get(inkKey(row.attemptId, questionId)), questionId => images.get(questionId))));
       if (fromPoll) {
         let vanished = 0;
         for (const view of views) {
@@ -150,7 +152,7 @@ export function useLiveExam(api: AdminExamApi, paperId: string) {
       } catch (err) { if (alive) { setError(true); setLoading(false); } throw err; }
     }, browserPollEnvironment);
     return () => {
-      alive = false; stop(); signal('stopped');
+      alive = false; studentOrder.dispose(); stop(); signal('stopped');
       window.clearInterval(heartbeat); document.removeEventListener('visibilitychange', visible);
       watch?.close(); broadcast?.close();
     };

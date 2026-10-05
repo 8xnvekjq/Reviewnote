@@ -92,9 +92,12 @@ test('admin Live RPC permissions, activity window, lightweight rows and contiguo
       const id = `00000000-0000-0000-0000-${String(i).padStart(12, '0')}`;
       await db.query(`insert into exam_attempts values ($1,$1,'many','in_progress');`, [id]);
       await db.query(`insert into exam_attempt_items values ($1,$2,null)`, [id,question]);
-      await db.query(`insert into exam_attempt_ink values ($1,$2,0,'[]',now())`, [id,question]);
+      await db.query(`insert into exam_attempt_ink values ($1,$2,0,'[]',now()-($3 * interval '1 second'))`, [id,question,i]);
     }
     assert.deepEqual(await as(admin, 'select admin_list_live_exam_papers() r'), [{ paperId: 'many', liveCount: 14 }]);
-    assert.equal((await as(admin, "select admin_get_live_exam('many') r")).length, 12, 'view limits membership to twelve cells');
+    const many = await as(admin, "select admin_get_live_exam('many') r");
+    assert.equal(many.length, 12, 'view limits membership to twelve cells');
+    assert.deepEqual(many.map(row => row.attemptId), Array.from({ length: 12 }, (_, i) =>
+      `00000000-0000-0000-0000-${String(i + 10).padStart(12, '0')}`), '12명 초과 시 이름과 무관하게 최근 활동 12명을 선택한다');
   } finally { await db.close(); }
 });
