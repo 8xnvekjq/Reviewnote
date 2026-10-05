@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ExamInkCanvas } from '../../src/features/exam/ink/ExamInkCanvas';
+import { encodeInkStroke, decodeInkStroke } from '../../src/features/exam/ink/inkCodec';
 import type { ExamInkCanvasHandle, InkStroke, InkTool } from '../../src/features/exam/contract';
 import '../../src/index.css';
 import '../../src/styles/design-system.css';
 
-declare global { interface Window { __ink: { strokes: () => InkStroke[]; handle: () => ExamInkCanvasHandle | null } } }
+declare global { interface Window { __ink: { strokes: () => InkStroke[]; handle: () => ExamInkCanvasHandle | null; roundTrip: () => void } } }
 
 const COLORS = ['#111827', '#2563eb', '#dc2626'];
 
@@ -19,7 +20,8 @@ function Harness() {
   const [readOnly, setReadOnly] = useState(false);
   const strokesRef = useRef(strokes);
   strokesRef.current = strokes;
-  window.__ink = { strokes: () => strokesRef.current, handle: () => handle.current };
+  window.__ink = { strokes: () => strokesRef.current, handle: () => handle.current,
+    roundTrip: () => setStrokes(strokesRef.current.map(stroke => decodeInkStroke(encodeInkStroke(stroke)))) };
   const toolButton = (value: InkTool, label: string) => (
     <button type="button" className={`rn-button rn-button-compact ${tool === value ? 'rn-button-primary' : 'rn-button-secondary'}`} aria-pressed={tool === value} onClick={() => setTool(value)}>{label}</button>
   );

@@ -1,5 +1,6 @@
 import { supabase } from '../../services/supabase';
 import { examLiveTransport } from './liveTransport';
+import { readInkAtBoundary, saveInkAtBoundary } from './inkApi';
 import { loadExamInk } from './inkLoader';
 import type { AdminExamApi, AdminExamAttemptSummary, AdminLiveStudent, LiveInkResponse, AdminPaperActivity, ExamClient, InkReplayData, PeerSolution } from './contract';
 import {
@@ -39,27 +40,28 @@ export const examClient: ExamClient = {
   liveTransport: examLiveTransport,
   async getInk(attemptId) {
     // 바뀐 문항만 나눠 받는다(큰 응시를 한 응답에 담던 get_exam_ink는 statement timeout에 걸렸다).
-    return await loadExamInk(callRpc, attemptId);
+    return await loadExamInk((name, args) => readInkAtBoundary(callRpc, name, args), attemptId);
   },
   async getInkReplay(attemptId, questionId) {
-    return await callRpc('get_exam_ink_replay', { p_attempt_id: attemptId, p_question_id: questionId }) as InkReplayData;
+    return await readInkAtBoundary(callRpc, 'get_exam_ink_replay', { p_attempt_id: attemptId, p_question_id: questionId }) as InkReplayData;
   },
   async getPeerSolution(attemptId, questionId) {
-    return await callRpc('get_peer_solution', { p_attempt_id: attemptId, p_question_id: questionId }) as PeerSolution | null;
+    return await readInkAtBoundary(callRpc, 'get_peer_solution', { p_attempt_id: attemptId, p_question_id: questionId }) as PeerSolution | null;
   },
   async getPeerSolutionReplay(attemptId, questionId, solutionKey) {
-    return await callRpc('get_peer_solution_replay', { p_attempt_id: attemptId, p_question_id: questionId, p_solution_key: solutionKey }) as InkReplayData;
+    return await readInkAtBoundary(callRpc, 'get_peer_solution_replay', { p_attempt_id: attemptId, p_question_id: questionId, p_solution_key: solutionKey }) as InkReplayData;
   },
   async saveInk(attemptId, questionId, { revision, legacyImport, events, batchId, idsHash }) {
     // 바뀐 내용만 보낸다(supabase/migrations/20261003050000_exam_ink_delta.sql). 필기 전체는 보내지 않는다.
     // Preserve conflict codes; the generic error mapper hides unknown server codes.
-    const { data, error } = await supabase.rpc('save_exam_ink_delta', {
+    const args = {
       p_attempt_id: attemptId, p_question_id: questionId, p_revision: revision, p_legacy_import: legacyImport,
       p_events: events, p_batch_id: batchId, p_ids_hash: idsHash,
-    });
+    };
+    const { data, error } = await saveInkAtBoundary(async (name, params) => await supabase.rpc(name, params), args);
     if (error) throw new Error(error.message);
-    if (!Number.isInteger(data) || data < 1) throw new Error('필기 저장을 확인하지 못했어요.');
-    return data as number;
+    if (typeof data !== 'number' || !Number.isInteger(data) || data < 1) throw new Error('필기 저장을 확인하지 못했어요.');
+    return data;
   },
   async listPaperHistory(paperId, studentId) {
     return mapExamPaperHistory(await callRpc('list_my_paper_history', {
@@ -170,7 +172,7 @@ export const adminExamClient = {
     return await callRpc('admin_get_live_exam', { p_paper_id: paperId }) as AdminLiveStudent[];
   },
   async getLiveInk(attemptId: string, questionId: string, sinceRevision: number | null) {
-    return await callRpc('admin_get_live_ink', { p_attempt_id: attemptId, p_question_id: questionId, p_since_revision: sinceRevision }) as LiveInkResponse;
+    return await readInkAtBoundary(callRpc, 'admin_get_live_ink', { p_attempt_id: attemptId, p_question_id: questionId, p_since_revision: sinceRevision }) as LiveInkResponse;
   },
   async listAttempts(studentId: string, offset = 0): Promise<AdminExamAttemptSummary[]> {
     return await callRpc('admin_list_student_exam_attempts', { p_student_id: studentId, p_offset: offset }) as AdminExamAttemptSummary[];

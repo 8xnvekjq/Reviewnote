@@ -1,3 +1,4 @@
+import { decodeInkPayload } from './ink/inkCodec.ts';
 import type { ExamInkDocument, InkStroke } from './contract.ts';
 
 // 응시 필기 불러오기. 2026-10-05 장애: get_exam_ink(응시 전체를 한 응답에, 큰 응시 11~12MB)가 8초 statement timeout에
@@ -59,7 +60,7 @@ export async function loadExamInk(rpc: Rpc, attemptId: string): Promise<ExamInkD
     index = await rpc('get_exam_ink_index', { p_attempt_id: attemptId }) as InkIndexRow[];
   } catch (error) {
     if (!isMissingFunction(error)) throw error;
-    return await rpc('get_exam_ink', { p_attempt_id: attemptId }) as ExamInkDocument[];
+    return decodeInkPayload<ExamInkDocument[]>(await rpc('get_exam_ink', { p_attempt_id: attemptId }));
   }
   const known = remember(attemptId);
   const fresh = (row: InkIndexRow) => {
@@ -68,7 +69,7 @@ export async function loadExamInk(rpc: Rpc, attemptId: string): Promise<ExamInkD
   };
   const missing = index.filter(row => !fresh(row));
   for (const ids of chunkIndex(missing)) {
-    const docs = await rpc('get_exam_ink_questions', { p_attempt_id: attemptId, p_question_ids: ids }) as ExamInkDocument[];
+    const docs = decodeInkPayload<ExamInkDocument[]>(await rpc('get_exam_ink_questions', { p_attempt_id: attemptId, p_question_ids: ids }));
     for (const doc of docs) known.set(doc.questionId, { revision: doc.revision, updatedAt: doc.updatedAt, lastBatchId: doc.lastBatchId ?? null, strokes: doc.strokes });
   }
   const present = new Set(index.map(row => row.questionId));

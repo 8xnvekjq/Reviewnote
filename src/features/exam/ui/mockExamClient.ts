@@ -24,6 +24,7 @@ import type {
 } from '../contract.ts';
 import { sanitizeExamAnswer } from '../examMappers';
 import { applyInkEvent, inkDelta, inkIdsHash } from '../ink/inkReplay';
+import { decodeInkPayload, encodeInkEvents } from '../ink/inkCodec';
 import { countAnswered, ELECTIVES, estimateGrade, isAnswerCorrect, keepCheckedAnswers } from './examLogic.ts';
 
 interface WrongRateRow { number: number; wrongRate: number; choiceRates: number[] | null }
@@ -183,8 +184,8 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       const parsed = JSON.parse(raw) as { seq: number; attempts: StoredAttempt[]; ink?: [string, ExamInkDocument[]][]; replay?: [string, InkReplayBatch[]][] };
       seq = parsed.seq;
       for (const entry of parsed.attempts) store.set(entry.attempt.id, entry);
-      for (const [id, docs] of parsed.ink ?? []) ink.set(id, docs);
-      for (const [id, batches] of parsed.replay ?? []) replay.set(id, batches);
+      for (const [id, docs] of parsed.ink ?? []) ink.set(id, decodeInkPayload(docs, 'cache'));
+      for (const [id, batches] of parsed.replay ?? []) replay.set(id, decodeInkPayload(batches, 'cache'));
     } catch { /* 깨진 저장분은 무시 */ }
   };
   const persist = () => {
@@ -276,7 +277,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
   return {
     async getInk(attemptId) {
       must(attemptId);
-      return clone(ink.get(attemptId) ?? []);
+      return decodeInkPayload(clone(ink.get(attemptId) ?? []));
     },
     async getPeerSolution(attemptId, questionId) {
       record('getPeerSolution', [attemptId, questionId]);
@@ -309,7 +310,8 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
     async saveInk(attemptId, questionId, request) {
       const { revision, legacyImport, events, batchId, idsHash } = request;
       const entry = must(attemptId);
-      if (options.inkStats) { options.inkStats.requests++; options.inkStats.bytes += new TextEncoder().encode(JSON.stringify(request)).length; }
+      const packedEvents = encodeInkEvents(events);
+      if (options.inkStats) { options.inkStats.requests++; options.inkStats.bytes += new TextEncoder().encode(JSON.stringify({ ...request, events: packedEvents })).length; }
       if (options.failSave) throw new Error('offline');
       const docs = ink.get(attemptId) ?? [];
       const old = docs.find(row => row.questionId === questionId);
@@ -317,16 +319,17 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       const batches = replay.get(key) ?? [];
       const duplicate = batches.find(batch => batch.id === batchId);
       if (duplicate) {
-        if (duplicate.baseRevision !== revision || JSON.stringify(duplicate.events) !== JSON.stringify(events)) throw new Error('EXAM_REPLAY_BATCH_MISMATCH');
+        if (duplicate.baseRevision !== revision || JSON.stringify(encodeInkEvents(duplicate.events)) !== JSON.stringify(packedEvents)) throw new Error('EXAM_REPLAY_BATCH_MISMATCH');
         return duplicate.revision;
       }
       if ((old?.revision ?? 0) !== revision) throw new Error('EXAM_INK_CONFLICT');
       if (entry.attempt.status === 'submitted' && !(legacyImport && !old)) throw new Error('EXAM_INK_SUBMITTED');
       if (!events.length) throw new Error('EXAM_REPLAY_TOO_LARGE');
-      const strokes = events.reduce(applyInkEvent, old?.strokes ?? []);
+      const decodedEvents = decodeInkPayload<typeof events>(packedEvents);
+      const strokes = decodedEvents.reduce(applyInkEvent, old?.strokes ?? []);
       if (await inkIdsHash(strokes) !== idsHash) throw new Error('EXAM_REPLAY_FINAL_MISMATCH');
       replay.set(key, [...batches, { id: batchId, revision: revision + 1, baseRevision: revision,
-        baseline: batches.at(-1)?.revision === revision ? null : clone(old?.strokes ?? []), events: clone(events) }]);
+        baseline: batches.at(-1)?.revision === revision ? null : clone(old?.strokes ?? []), events: clone(decodedEvents) }]);
       const next = { questionId, strokes: clone(strokes), revision: revision + 1, lastBatchId: batchId };
       ink.set(attemptId, [...docs.filter(row => row.questionId !== questionId), next]);
       persist();
