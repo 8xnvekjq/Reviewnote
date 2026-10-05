@@ -1078,4 +1078,48 @@ assert.deepEqual([trigResult.score,trigResult.correctCount,trigResult.maxScore,t
 const trigMistake=(await as(S1,`select add_exam_questions_to_mistakes($1,$2::uuid[],'https://reviewnotes.test') r`,[trigAttempt.id,[trigAttempt.questions[12].id]]))[0].r;
 assert.deepEqual((await as(S1,'select grade,chapter from mistakes where id=$1',[trigMistake[0].mistakeId]))[0],{grade:'중3-2',chapter:'삼각비'});
 
+// 2026-10-05 장애(20261005100000_exam_ink_capacity.sql): 2MiB를 넘는 문항은 영구 거절 → 8MiB. 응시 필기를 목록·문항 묶음으로 나눠 읽는다.
+const capAttempt = (await as(S1, `select start_exam_attempt('2026-hanneung-79-basic','free',null) r`))[0].r;
+const cq = capAttempt.questions[5].id; // 앞 문항들은 위(도형)에서 이미 쓴 같은 진행 중 응시
+const cq2 = capAttempt.questions[6].id;
+const heavyStroke = (id: string) => ({ ...st(id), points: Array.from({ length: 1000 }, (_, i) => ({ x: 0.1234, y: 0.5678, pressure: 0.512, t: i * 8 })) });
+const heavyAdds = Array.from({ length: 45 }, (_, i) => ({ index: i, stroke: heavyStroke(`h${i}`) }));
+const heavyIds = heavyAdds.map(a => a.stroke.id);
+const heavySave = (batch: string) => as(S1, deltaSql, [capAttempt.id, cq, 0, false, JSON.stringify([ev('heavy', 'draw', heavyAdds)]), batch, idsHash(heavyIds)]);
+await assert.rejects(heavySave(bid(30)), /EXAM_INK_TOO_LARGE/, 'before: a question over 2MiB is refused on every retry');
+const capMig = fs.readFileSync(path.join(root, 'supabase/migrations/20261005100000_exam_ink_capacity.sql'), 'utf8');
+await db.exec(capMig);
+assert.equal((await heavySave(bid(30)))[0].r, 1, 'the same batch now saves');
+assert.ok((await db.query(`select octet_length(strokes::text) n from exam_attempt_ink where attempt_id=$1 and question_id=$2`, [capAttempt.id, cq])).rows[0].n > 2097152);
+assert.equal((await as(S1, deltaSql, [capAttempt.id, cq, 1, false, JSON.stringify([ev('more', 'draw', [{ index: 45, stroke: st('m') }])]), bid(31), idsHash([...heavyIds, 'm'])]))[0].r, 2, 'and keeps saving');
+const huge = 'x'.repeat(8388608);
+await fails(S1, deltaSql, [capAttempt.id, cq, 2, false, JSON.stringify([{ ...ev('huge', 'erase', [], ['m']), pad: huge }]), bid(32), idsHash(heavyIds)], /EXAM_REPLAY_TOO_LARGE/);
+assert.equal((capMig.match(/8388608/g) ?? []).length, 3, 'validate, events and final document share the 8MiB cap');
+assert.doesNotMatch(capMig, /2097152/);
+await as(S1, deltaSql, [capAttempt.id, cq2, 0, false, JSON.stringify([ev('q2', 'draw', [{ index: 0, stroke: st('q2') }])]), bid(33), idsHash(['q2'])]);
+const allIndex = (await as(S1, `select get_exam_ink_index($1) r`, [capAttempt.id]))[0].r;
+const capIndex = allIndex.filter((row: { questionId: string }) => row.questionId === cq || row.questionId === cq2);
+assert.equal(capIndex.length, 2);
+assert.ok(capIndex.every((row: Record<string, unknown>) => !('strokes' in row) && Number(row.size) > 0));
+assert.deepEqual(capIndex.find((row: { questionId: string }) => row.questionId === cq).lastBatchId, bid(31));
+assert.ok(capIndex.find((row: { questionId: string }) => row.questionId === cq).size < 2097152, 'size is the stored (compressed) size');
+const whole = (await as(S1, `select get_exam_ink($1) r`, [capAttempt.id]))[0].r;
+const parts = (await as(S1, `select get_exam_ink_questions($1,$2::uuid[]) r`, [capAttempt.id, allIndex.map((row: { questionId: string }) => row.questionId)]))[0].r;
+assert.deepEqual(parts, whole, 'same rows and order as get_exam_ink');
+assert.deepEqual((await as(S1, `select get_exam_ink_questions($1,$2::uuid[]) r`, [capAttempt.id, [cq2]]))[0].r.map((row: { questionId: string }) => row.questionId), [cq2]);
+assert.deepEqual((await as(AD, `select get_exam_ink_questions($1,$2::uuid[]) r`, [capAttempt.id, [cq]]))[0].r.map((row: { revision: number }) => row.revision), [2]);
+assert.equal((await as(AD, `select get_exam_ink_index($1) r`, [capAttempt.id]))[0].r.length, allIndex.length);
+await fails(S2, `select get_exam_ink_index($1)`, [capAttempt.id], /EXAM_ATTEMPT_NOT_FOUND/);
+await fails(S2, `select get_exam_ink_questions($1,$2::uuid[])`, [capAttempt.id, [cq]], /EXAM_ATTEMPT_NOT_FOUND/);
+await fails(null, `select get_exam_ink_index($1)`, [capAttempt.id], /permission denied/);
+await fails(null, `select get_exam_ink_questions($1,$2::uuid[])`, [capAttempt.id, [cq]], /permission denied/);
+await fails(S1, `select get_exam_ink_questions($1,$2::uuid[])`, [capAttempt.id, Array.from({ length: 51 }, () => cq)], /EXAM_INK_INVALID/);
+assert.deepEqual((await as(S1, `select get_exam_ink_questions($1,$2::uuid[]) r`, [capAttempt.id, []]))[0].r, []);
+const capFn = (await db.query(`select p.proconfig from pg_proc p where p.proname = 'save_exam_ink_delta'`)).rows[0];
+assert.deepEqual([...capFn.proconfig].sort(), ['lock_timeout=2s', 'search_path=""'], 'replaced function keeps its settings');
+// 기존 규칙은 그대로: 잘못된 획·충돌·남의 응시
+await fails(S1, deltaSql, [capAttempt.id, cq, 2, false, JSON.stringify([ev('bad', 'draw', [{ index: 0, stroke: { ...st('n'), color: 'red' } }])]), bid(36), idsHash(['n', ...heavyIds, 'm'])], /EXAM_INK_INVALID/);
+await fails(S1, deltaSql, [capAttempt.id, cq, 1, false, JSON.stringify([ev('stale', 'erase', [], ['m'])]), bid(34), idsHash(heavyIds)], /EXAM_INK_CONFLICT/);
+await fails(S2, deltaSql, [capAttempt.id, cq, 2, false, JSON.stringify([ev('other', 'erase', [], ['m'])]), bid(35), idsHash(heavyIds)], /EXAM_ATTEMPT_NOT_FOUND/);
+
 });

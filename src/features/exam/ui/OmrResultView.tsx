@@ -50,10 +50,11 @@ function StudentResult({ client, result, onBack, backLabel }: { client: ExamClie
       {inkSync.status === 'loading' ? '필기를 불러오는 중…' : inkSync.status === 'saved' ? '서버에 저장된 필기도 문항별로 볼 수 있어요.'
         : inkSync.status === 'pending' || inkSync.status === 'saving' ? '이 기기의 필기를 서버에 옮기는 중…'
         : '필기 동기화를 완료하지 못했어요.'}
-      {(inkSync.status === 'failed' || inkSync.status === 'conflict') && <button type="button" className="rn-button rn-button-compact" onClick={() => {
+      {(inkSync.status === 'failed' || inkSync.status === 'conflict' || inkSync.status === 'rejected') && <button type="button" className="rn-button rn-button-compact" onClick={() => {
         if (inkSync.status === 'conflict') {
           if (window.confirm('이 기기의 미저장 필기 대신 서버에 저장된 필기를 사용할까요?')) void inkSync.load(true);
-        } else void inkSync.load().then(() => inkSync.flush());
+        } else if (inkSync.status === 'rejected') void inkSync.retryRejected();
+        else void inkSync.load().then(() => inkSync.flush());
       }}>{inkSync.status === 'conflict' ? '서버 필기 사용' : '다시 시도'}</button>}
     </p>
   );

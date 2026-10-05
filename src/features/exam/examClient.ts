@@ -1,6 +1,7 @@
 import { supabase } from '../../services/supabase';
 import { examLiveTransport } from './liveTransport';
-import type { AdminExamApi, AdminExamAttemptSummary, AdminLiveStudent, LiveInkResponse, AdminPaperActivity, ExamClient, ExamInkDocument, InkReplayData, PeerSolution } from './contract';
+import { loadExamInk } from './inkLoader';
+import type { AdminExamApi, AdminExamAttemptSummary, AdminLiveStudent, LiveInkResponse, AdminPaperActivity, ExamClient, InkReplayData, PeerSolution } from './contract';
 import {
   ExamClientError,
   mapAddedMistakes,
@@ -37,7 +38,8 @@ export const ORIGINAL_SOLUTION_CAPTION = '원래풀이';
 export const examClient: ExamClient = {
   liveTransport: examLiveTransport,
   async getInk(attemptId) {
-    return await callRpc('get_exam_ink', { p_attempt_id: attemptId }) as ExamInkDocument[];
+    // 바뀐 문항만 나눠 받는다(큰 응시를 한 응답에 담던 get_exam_ink는 statement timeout에 걸렸다).
+    return await loadExamInk(callRpc, attemptId);
   },
   async getInkReplay(attemptId, questionId) {
     return await callRpc('get_exam_ink_replay', { p_attempt_id: attemptId, p_question_id: questionId }) as InkReplayData;
