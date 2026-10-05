@@ -33,6 +33,7 @@ interface Props {
   autoOpen?: boolean;
   /** Anonymous peer viewers never read or write browser storage, including dock position. */
   persistDock?: boolean;
+  inline?: boolean;
   notes?: ReplayNotes;
 }
 /** 재생 상자 아이콘(이모지 ⏮⏭⏸는 윈도우·안드로이드에서 파란 네모 이모지로 나와 SVG로 그린다). */
@@ -112,7 +113,7 @@ function useDockDrag(persist: boolean) {
   return { dockRef, handle, style };
 }
 
-export function ExamInkReplay({ client, attemptId, questionId, imageUrl, strokes, imageMaxWidth, autoOpen = false, persistDock = true, notes }: Props) {
+export function ExamInkReplay({ client, attemptId, questionId, imageUrl, strokes, imageMaxWidth, autoOpen = false, persistDock = true, inline = false, notes }: Props) {
   const [open, setOpen] = useState(autoOpen);
   const [data, setData] = useState<InkReplayData | null>(null);
   const [error, setError] = useState(false);
@@ -122,7 +123,7 @@ export function ExamInkReplay({ client, attemptId, questionId, imageUrl, strokes
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [folded, setFolded] = useState(false);
-  const dock = useDockDrag(persistDock);
+  const dock = useDockDrag(persistDock && !inline);
   const timeline = useMemo(() => data ? buildInkTimeline(data) : null, [data]);
   const audioBounds = useMemo(() => {
     const first = timeline?.steps.find(step => step.event);
@@ -211,7 +212,7 @@ export function ExamInkReplay({ client, attemptId, questionId, imageUrl, strokes
       {notes && <div className="exam-replay-notes" onClickCapture={() => { if (open) toggleOpen(); }}>{notes.toolbar}</div>}
     </div>
     {/* 재생 컨트롤은 화면 왼쪽에 떠 있는 작은 상자 — 풀이를 아래로 스크롤해도 늘 보이고 바로 멈출 수 있다. */}
-    {open && <div ref={dock.dockRef} style={dock.style} className={`exam-replay-dock${folded ? ' is-folded' : ''}`} role="group" aria-label="필기 재생" data-testid="exam-replay-dock">
+    {open && <div ref={dock.dockRef} style={inline ? undefined : dock.style} className={`exam-replay-dock${inline ? ' exam-replay-inline' : ''}${folded ? ' is-folded' : ''}`} role="group" aria-label="필기 재생" data-testid="exam-replay-dock">
       {folded ? <>
         <span className="exam-replay-grip" aria-hidden="true" title="끌어서 옮기기" {...dock.handle}><ReplayIcon name="grip" /></span>
         <button type="button" className="exam-replay-icon" aria-label={playLabel} disabled={stepCount === 0 && !hasAudio} onClick={togglePlay}><ReplayIcon name={playing ? 'pause' : 'play'} /></button>

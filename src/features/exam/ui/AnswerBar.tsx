@@ -24,6 +24,7 @@ interface Props {
     onCheck: () => void;
     onReveal: () => void;
     onPeer?: () => void;
+    peerActive?: boolean;
   };
 }
 
@@ -126,7 +127,7 @@ export function AnswerBar({ question, answer, unsure, onAnswer, onUnsure, free, 
               </span>
             )}
             {locked && <span className="exam-freecheck-lock rn-caption" data-testid="exam-lock-note">🔒 채점한 문항은 답을 바꿀 수 없어요</span>}
-            {check && free.onPeer && <button type="button" className="exam-link" data-testid="exam-free-peer" aria-haspopup="dialog" onClick={free.onPeer}>풀이 보기</button>}
+            {check && free.onPeer && <button type="button" className="exam-link" data-testid="exam-free-peer" aria-pressed={free.peerActive ?? false} onClick={free.onPeer}>풀이 보기</button>}
           </div>
         )}
       </div>

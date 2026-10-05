@@ -12,6 +12,8 @@ interface Props {
   children: (peerButton: ReactNode) => ReactNode;
   /** 자유 모드 보기 창은 열자마자 목록을 펼친다. */
   autoPick?: boolean;
+  active?: boolean;
+  onBack?: () => void;
 }
 
 export function PeerSolutionLabel({ label }: { label: PeerSolution['label'] }) {
@@ -26,7 +28,7 @@ export function PeerSolutionLabel({ label }: { label: PeerSolution['label'] }) {
     {parts.grade && <span className="exam-peer-grade">{parts.grade}</span>}
   </span>;
 }
-export function PeerSolutionSwitch({ session, eligible, attemptId, questionId, imageUrl, children, autoPick = false }: Props) {
+export function PeerSolutionSwitch({ session, eligible, attemptId, questionId, imageUrl, children, autoPick = false, active, onBack }: Props) {
   const [rows, setRows] = useState<PeerSolutionCandidate[] | undefined>();
   const [solution, setSolution] = useState<(PeerSolutionCandidate & { strokes: InkReplayData['strokes'] }) | null>(null);
   const [replay, setReplay] = useState<InkReplayData | null>(null);
@@ -39,6 +41,7 @@ export function PeerSolutionSwitch({ session, eligible, attemptId, questionId, i
   const triggerRef = useRef<HTMLButtonElement>(null);
   const alive = useRef(true);
   const pending = useRef(false);
+  const epoch = useRef(0);
   const hadSolution = useRef(false);
   const menuId = useId();
   const replayClient = useMemo(() => ({ getInkReplay: async () => replay! }), [replay]);
@@ -50,15 +53,17 @@ export function PeerSolutionSwitch({ session, eligible, attemptId, questionId, i
   };
   const showList = async () => {
     if (!session || pending.current) return;
+    const requestEpoch = epoch.current;
+    const current = () => alive.current && requestEpoch === epoch.current;
     pending.current = true;
     setLoading(true); setMessage('');
     try {
       const value = await session.list(questionId, true);
-      if (alive.current) { setRows(value); setOpen(value.length > 0); }
-    } catch { if (alive.current) setMessage('풀이를 불러오지 못했어요. 다시 눌러 주세요.'); }
-    finally { pending.current = false; if (alive.current) setLoading(false); }
+      if (current()) { setRows(value); setOpen(value.length > 0); }
+    } catch { if (current()) setMessage('풀이를 불러오지 못했어요. 다시 눌러 주세요.'); }
+    finally { if (current()) { pending.current = false; setLoading(false); } }
   };
-  useEffect(() => { if (autoPick && eligible) void showList(); }, [autoPick, eligible]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if ((autoPick || active) && eligible) void showList(); }, [autoPick, active, eligible]); // eslint-disable-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
     if (!open) return;
     const place = () => {
@@ -88,22 +93,35 @@ export function PeerSolutionSwitch({ session, eligible, attemptId, questionId, i
 
   const choose = async (row: PeerSolutionCandidate) => {
     if (!session || pending.current) return;
+    const requestEpoch = epoch.current;
+    const current = () => alive.current && requestEpoch === epoch.current;
     pending.current = true; setLoading(true); setMessage('');
     try {
       // 선택할 때마다 서버 자격을 확인한다. 재생 도구를 다시 열 때만 응답을 재사용한다.
       const value = await session.replay(questionId, row.solutionKey, true);
-      if (alive.current) { setSolution({ ...row, strokes: value.strokes }); setReplay(value); close(); }
+      if (current()) { setSolution({ ...row, strokes: value.strokes }); setReplay(value); close(); }
     } catch (error) {
-      if (!alive.current) return;
+      if (!current()) return;
       if (isPeerChanged(error)) {
         setSolution(null); setReplay(null);
-        try { const value = await session.list(questionId, true); if (alive.current) { setRows(value); setOpen(value.length > 0); } }
-        catch { if (alive.current) setMessage('목록을 불러오지 못했어요. 다시 눌러 주세요.'); }
-        if (alive.current) setMessage('풀이가 바뀌었어요. 새 목록에서 다시 골라 주세요.');
+        try { const value = await session.list(questionId, true); if (current()) { setRows(value); setOpen(value.length > 0); } }
+        catch { if (current()) setMessage('목록을 불러오지 못했어요. 다시 눌러 주세요.'); }
+        if (current()) setMessage('풀이가 바뀌었어요. 새 목록에서 다시 골라 주세요.');
       } else setMessage('풀이를 불러오지 못했어요. 다시 골라 주세요.');
-    } finally { pending.current = false; if (alive.current) setLoading(false); }
+    } finally { if (current()) { pending.current = false; setLoading(false); } }
   };
 
+  const back = () => { ++epoch.current; pending.current = false; setLoading(false); setSolution(null); setReplay(null); close(false); onBack?.(); };
+  useEffect(() => { if (active === false) { ++epoch.current; pending.current = false; setLoading(false); setSolution(null); setReplay(null); setOpen(false); } }, [active]);
+  useEffect(() => {
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      if (open) { event.preventDefault(); close(); }
+      else if (active || solution) { event.preventDefault(); back(); }
+    };
+    window.addEventListener('keydown', escape);
+    return () => window.removeEventListener('keydown', escape);
+  });
   if (!session || !eligible) return <>{children(null)}</>;
   const none = rows?.length === 0;
   const picker = <span className="exam-peer-picker" ref={pickerRef}>
@@ -119,7 +137,7 @@ export function PeerSolutionSwitch({ session, eligible, attemptId, questionId, i
           event.preventDefault(); event.stopPropagation();
           const root = triggerRef.current?.closest('[role="dialog"]') ?? document;
           const focusable = [...root.querySelectorAll<HTMLElement>('button:not(:disabled), input, select, [tabindex="0"]')]
-            .filter(el => el.getClientRects().length > 0 && !menuRef.current?.contains(el));
+            .filter(el => el.getClientRects().length > 0 && !el.closest('[inert]') && !menuRef.current?.contains(el));
           const i = focusable.indexOf(triggerRef.current!);
           close(false);
           focusable[(i + (event.shiftKey ? -1 : 1) + focusable.length) % focusable.length]?.focus();
@@ -140,22 +158,25 @@ export function PeerSolutionSwitch({ session, eligible, attemptId, questionId, i
       </button>)}
     </div>}
   </span>;
-  return <>
-    {none && <p className="exam-peer-note" role="status">아직 이 문제를 맞힌 다른 풀이가 없어요</p>}
-    {message && <p className="exam-peer-note" role="status">{message}</p>}
+  return <div className="exam-peer-inline" onKeyDown={event => {
+    if (event.key === 'Escape' && (active || solution)) { event.preventDefault(); event.stopPropagation(); back(); }
+  }}>
+    {active && !solution && <div className="exam-peer-head">{picker}<button type="button" className="exam-tool exam-tool-text" data-testid="exam-peer-back" onClick={back}>내 풀이로 돌아가기</button></div>}
+    {active !== false && none && <p className="exam-peer-note" role="status">아직 이 문제를 맞힌 다른 풀이가 없어요</p>}
+    {active !== false && message && <p className="exam-peer-note" role="status">{message}</p>}
     {solution && replay && <section className="exam-peer" aria-label="다른 학생의 풀이" data-testid="exam-peer-solution">
       <div className="exam-peer-head">
         <PeerSolutionLabel label={solution.label} />
         <span className="exam-peer-time">{formatPeerTime(solution.timeSpentMs)}</span>
         <span className="exam-peer-caption">다른 풀이 · 읽기 전용</span>
         <button type="button" className="exam-tool exam-tool-text" data-testid="exam-peer-back"
-          onClick={() => { setSolution(null); setReplay(null); }}>내 풀이로</button>
+          onClick={back}>내 풀이로 돌아가기</button>
         {picker}
       </div>
       <ExamInkReplay key={solution.solutionKey} client={replayClient} attemptId={attemptId} questionId={questionId}
-        imageUrl={imageUrl} strokes={solution.strokes} imageMaxWidth={480} persistDock={false} autoOpen />
+        imageUrl={imageUrl} strokes={solution.strokes} imageMaxWidth={480} persistDock={false} inline autoOpen />
     </section>}
-    {/* 내 덧쓰기 캔버스는 숨겨서 상태를 보존한다. */}
-    <div hidden={!!solution}>{children(solution ? null : picker)}</div>
-  </>;
+    {/* 내 캔버스는 숨겨서 필기와 실행 취소 상태를 보존한다. */}
+    <div hidden={!!solution || !!active}>{children(solution || active !== undefined ? null : picker)}</div>
+  </div>;
 }

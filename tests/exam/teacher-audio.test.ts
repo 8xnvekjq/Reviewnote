@@ -59,6 +59,31 @@ const until = async (predicate: () => boolean) => {
   assert.fail('state did not settle');
 };
 
+test('flush waits for recovered in-flight clips, reports durable failures and retries them', async () => {
+  const { store, drafts, chunks } = memoryStore();
+  const draft: AudioDraft = { id: 'flush', ownerId: 'teacher', attemptId: 'attempt', questionId: 'question',
+    startedAt: 1, endedAt: 10, durationMs: 9, mime: 'audio/webm', sizeBytes: 4, chunks: 1, state: 'pending' };
+  drafts.set(draft.id, draft); chunks.set(draft.id, [new Blob(['test'])]);
+  let release!: () => void;
+  let fail = true;
+  const blocked = new Promise<void>(resolve => { release = resolve; });
+  const capture = new TeacherAudioCapture({ async uploadSolutionAudio() {
+    await blocked;
+    if (fail) throw new Error('offline');
+  } } as unknown as ExamClient, 'teacher', () => {}, store);
+  void capture.recover();
+  let finished = false;
+  const flush = capture.flushUploads().then(value => { finished = true; return value; });
+  await until(() => capture.state.uploads.some(row => row.state === 'uploading'));
+  assert.equal(finished, false);
+  release();
+  assert.deepEqual(await flush, { ok: false, failed: 1 });
+  assert.equal(drafts.size, 1);
+  fail = false;
+  assert.deepEqual(await capture.flushUploads(), { ok: true, failed: 0 });
+  assert.equal(drafts.size, 0);
+});
+
 test('chunks persist immediately; split creates independently decodable parts; retry/recovery retain question and owner', async () => {
   const oldRecorder = Object.getOwnPropertyDescriptor(globalThis, 'MediaRecorder');
   const oldNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');

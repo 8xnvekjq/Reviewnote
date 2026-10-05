@@ -474,3 +474,9 @@
 .exam-audio-settings { font-size:11px; max-width:260px; overflow-wrap:anywhere; }
 .exam-audio-settings summary { cursor:pointer; }
 .exam-audio-toggle { font-size:12px; padding:5px; }
+
+.exam-replay-dock.exam-replay-inline { position: static; transform: none; width: 100%; display: flex; flex-wrap: wrap; align-items: center; box-shadow: none; margin-bottom: 8px; }
+.exam-replay-inline .exam-replay-dock-head { display: none; }
+.exam-replay-inline .exam-replay-slider { flex: 1 1 140px; }
+.exam-replay-inline .exam-replay-note { flex-basis: 100%; }
+.exam-peer-inline { min-width: 0; }

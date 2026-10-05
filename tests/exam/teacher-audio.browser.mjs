@@ -6,11 +6,11 @@ const base = `${process.env.EXAM_TEST_BASE_URL || 'http://127.0.0.1:5174'}/tests
 const out = `${process.env.EXAM_TEST_ARTIFACT_DIR || '.test-artifacts'}/teacher-audio`;
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
-async function start(page, query = '') {
+async function start(page, query = '', mode = '자유 모드') {
   await page.goto(`${base}${query}`);
   await page.getByTestId('exam-start').waitFor();
   await page.locator('.exam-paper-card[data-paper-id="2025-06-math"]').click();
-  await page.getByRole('radio', { name: /자유 모드/ }).click();
+  await page.getByRole('radio', { name: new RegExp(mode) }).click();
   await page.getByRole('radio', { name: /확통/ }).click();
   await page.getByTestId('exam-start-button').click();
   await page.getByTestId('exam-solve').waitFor();
@@ -90,6 +90,64 @@ try {
   await page.waitForFunction(() => document.querySelector('[data-testid="exam-audio-record"]')?.getAttribute('aria-pressed') === 'false');
   await page.close();
 
+  for (const outcome of ['success', 'retry', 'continue']) {
+    const failure = outcome !== 'success';
+    const submitPage = await browser.newPage();
+    await start(submitPage, '?admin=1&fakeAudio=1');
+    await submitPage.evaluate(fail => {
+      const original = window.__examClient.uploadSolutionAudio;
+      window.__audioUploadOriginal = original;
+      window.__examClient.uploadSolutionAudio = async (...args) => {
+        await new Promise(resolve => setTimeout(resolve, 700));
+        if (fail) throw new Error('offline');
+        return original(...args);
+      };
+    }, failure);
+    await submitPage.getByTestId('exam-audio-record').click();
+    await submitPage.waitForTimeout(400);
+    await submitPage.getByRole('button', { name: '제출', exact: true }).click();
+    await submitPage.getByRole('button', { name: '제출하기', exact: true }).click();
+    await submitPage.getByTestId('exam-submit-confirm').click();
+    const status = submitPage.getByTestId('exam-audio-submit');
+    await status.getByText('음성 업로드 중…', { exact: true }).waitFor();
+    assert.equal(await submitPage.getByTestId('exam-result').count(), 0);
+    if (failure) {
+      await status.getByRole('button', { name: '다시 시도', exact: true }).waitFor();
+      assert.ok((await drafts(submitPage)).length > 0);
+      if (outcome === 'continue') {
+        await status.getByRole('button', { name: '그래도 계속', exact: true }).click();
+        await submitPage.getByTestId('exam-result').waitFor();
+        assert.ok((await drafts(submitPage)).length > 0);
+        await submitPage.close();
+        continue;
+      }
+      await submitPage.evaluate(() => { window.__examClient.uploadSolutionAudio = window.__audioUploadOriginal; });
+      await status.getByRole('button', { name: '다시 시도', exact: true }).click();
+    }
+    await status.getByText('음성 업로드 완료!', { exact: true }).waitFor();
+    await submitPage.getByTestId('exam-result').waitFor();
+    assert.equal((await drafts(submitPage)).length, 0);
+    await submitPage.close();
+  }
+
+  for (const auto of [false, true]) {
+    const stalled = await browser.newPage();
+    await start(stalled, `?admin=1&fakeAudio=1${auto ? '&limit=0.06' : ''}`, auto ? '실전 모드' : '자유 모드');
+    await stalled.evaluate(() => { window.__examClient.uploadSolutionAudio = () => new Promise(() => {}); });
+    await stalled.getByTestId('exam-audio-record').click();
+    await stalled.waitForTimeout(300);
+    if (!auto) {
+      await stalled.getByRole('button', { name: '제출', exact: true }).click();
+      await stalled.getByRole('button', { name: '제출하기', exact: true }).click();
+      await stalled.getByTestId('exam-submit-confirm').click();
+    }
+    await stalled.getByTestId('exam-audio-submit').waitFor();
+    if (!auto) await stalled.getByRole('button', { name: '그래도 계속', exact: true }).click();
+    await stalled.getByTestId('exam-result').waitFor({ timeout: 40000 });
+    assert.ok((await drafts(stalled)).length > 0);
+    await stalled.close();
+  }
+
   const denied = await browser.newPage();
   await start(denied, '?admin=1&fakeAudio=1&denyAudio=1');
   await denied.getByTestId('exam-audio-record').click();
@@ -134,10 +192,16 @@ try {
   await student.screenshot({ path: `${out}/student-muted-playback.png` });
   await student.getByTestId('exam-peer-back').click();
   await student.evaluate(() => { HTMLMediaElement.prototype.canPlayType = () => ''; });
-  await student.getByTestId('exam-peer-toggle').click();
+  await student.getByTestId('exam-free-peer').click();
   await student.getByTestId('exam-peer-row').last().click();
   await student.getByText(/이 기기에서는 .*음성 형식을 재생할 수 없어요/).waitFor();
+  await student.getByTestId('exam-peer-back').click();
+  await student.getByRole('button', { name: '제출', exact: true }).click();
+  await student.getByRole('button', { name: '제출하기', exact: true }).click();
+  await student.getByTestId('exam-submit-confirm').click();
+  await student.getByTestId('exam-result').waitFor();
+  assert.equal(await student.getByTestId('exam-audio-submit').count(), 0);
   assert.deepEqual(errors, []);
   await student.close();
-  console.log('Teacher audio browser: recording, navigation, durable chunks/recovery, upload states/retry, hidden/denied, student muted autoplay, sound gesture, pause/seek/speed and consecutive clips passed.');
+  console.log('Teacher audio browser: recording, durable recovery, admin submit progress/success/failure/retry/continue, stalled auto-submit timeout, unchanged student submit, muted autoplay and playback controls passed.');
 } finally { await browser.close(); }
