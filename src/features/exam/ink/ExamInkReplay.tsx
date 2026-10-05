@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref } from 'react';
 import type { ExamClient, ExamInkCanvasHandle, InkChangeKind, InkReplayData, InkStroke, InkTool } from '../contract';
 import { ReplayAudio } from '../audio/ReplayAudio';
-import { audioTimelineBounds } from '../audio/audioMath';
 import { ExamInkCanvas } from './ExamInkCanvas';
 import { inkExtent, replayStrokeLists } from './inkFit';
 import { REPLAY_MAX_PAUSE_MS, buildInkClock, buildInkTimeline, formatReplayTime } from './inkReplay';
@@ -34,6 +33,8 @@ interface Props {
   /** Anonymous peer viewers never read or write browser storage, including dock position. */
   persistDock?: boolean;
   inline?: boolean;
+  /** 다른 풀이에서는 짧게 탭해 재생을 멈추거나 이어 간다. */
+  peerPlayback?: boolean;
   notes?: ReplayNotes;
 }
 /** 재생 상자 아이콘(이모지 ⏮⏭⏸는 윈도우·안드로이드에서 파란 네모 이모지로 나와 SVG로 그린다). */
@@ -113,7 +114,7 @@ function useDockDrag(persist: boolean) {
   return { dockRef, handle, style };
 }
 
-export function ExamInkReplay({ client, attemptId, questionId, imageUrl, strokes, imageMaxWidth, autoOpen = false, persistDock = true, inline = false, notes }: Props) {
+export function ExamInkReplay({ client, attemptId, questionId, imageUrl, strokes, imageMaxWidth, autoOpen = false, persistDock = true, inline = false, peerPlayback = false, notes }: Props) {
   const [open, setOpen] = useState(autoOpen);
   const [data, setData] = useState<InkReplayData | null>(null);
   const [error, setError] = useState(false);
@@ -123,18 +124,30 @@ export function ExamInkReplay({ client, attemptId, questionId, imageUrl, strokes
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [folded, setFolded] = useState(false);
+  const pointers = useRef(new Set<number>());
+  const tap = useRef<{ id: number; x: number; y: number; at: number } | null>(null);
+  const [feedback, setFeedback] = useState<{ id: number; x: number; y: number; playing: boolean } | null>(null);
+  const feedbackTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => {
+    if (!peerPlayback) return;
+    const cancel = () => { tap.current = null; };
+    const otherPointer = (event: PointerEvent) => {
+      if (tap.current && event.pointerId !== tap.current.id) cancel();
+    };
+    window.addEventListener('scroll', cancel, true);
+    document.addEventListener('pointerdown', otherPointer, true);
+    return () => {
+      window.removeEventListener('scroll', cancel, true);
+      document.removeEventListener('pointerdown', otherPointer, true);
+      clearTimeout(feedbackTimer.current);
+    };
+  }, [peerPlayback]);
   const dock = useDockDrag(persistDock && !inline);
   const timeline = useMemo(() => data ? buildInkTimeline(data) : null, [data]);
-  const audioBounds = useMemo(() => {
-    const first = timeline?.steps.find(step => step.event);
-    const points = first?.event?.added[0]?.stroke.points ?? [];
-    const start = first ? first.at - (data?.audioOriginMs ?? 0) - Math.max(0, ...points.map(point => point.t)) : 0;
-    return audioTimelineBounds(data?.audioClips ?? [], start);
-  }, [timeline, data]);
   const hasAudio = !!data?.audioClips?.length;
   const clock = useMemo(() => timeline ? buildInkClock(timeline, hasAudio
-    ? { origin: data?.audioOriginMs ?? 0, shift: audioBounds.shift, total: audioBounds.end } : undefined) : null,
-    [timeline, hasAudio, data?.audioOriginMs, audioBounds]);
+    ? { origin: data?.audioOriginMs ?? 0, clips: data?.audioClips ?? [] } : undefined) : null,
+    [timeline, hasAudio, data?.audioOriginMs, data?.audioClips]);
   const total = clock?.total ?? 0;
   const stepCount = timeline?.steps.length ?? 0;
   const speedRef = useRef(speed);
@@ -183,11 +196,41 @@ export function ExamInkReplay({ client, attemptId, questionId, imageUrl, strokes
     if (!open) setData(null);
     setOpen(value => !value);
   };
-  const seek = (next: number) => { setPlaying(false); setTime(Math.max(0, Math.min(total, next))); };
+  const seek = (next: number) => { setPlaying(false); timeRef.current = Math.max(0, Math.min(total, next)); setTime(timeRef.current); };
   const togglePlay = () => {
     if (time >= total) { timeRef.current = 0; setTime(0); }
     setPlaying(value => !value);
   };
+  const controls = (event: ReactPointerEvent<HTMLDivElement>) =>
+    (event.target as Element).closest('button, input, select, a, [role="button"]');
+  const canvasGesture = peerPlayback ? {
+    onPointerDownCapture: (event: ReactPointerEvent<HTMLDivElement>) => {
+      pointers.current.add(event.pointerId);
+      tap.current = pointers.current.size === 1 && event.isPrimary && event.button === 0 && !controls(event)
+        ? { id: event.pointerId, x: event.clientX, y: event.clientY, at: performance.now() } : null;
+    },
+    onPointerMoveCapture: (event: ReactPointerEvent<HTMLDivElement>) => {
+      const start = tap.current;
+      if (start?.id === event.pointerId && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 8) tap.current = null;
+    },
+    onPointerUpCapture: (event: ReactPointerEvent<HTMLDivElement>) => {
+      const start = tap.current;
+      pointers.current.delete(event.pointerId);
+      tap.current = null;
+      if (!start || start.id !== event.pointerId || performance.now() - start.at > 300 ||
+        Math.hypot(event.clientX - start.x, event.clientY - start.y) > 8 || controls(event) ||
+        !open || !clock || (stepCount === 0 && !hasAudio)) return;
+      const rect = event.currentTarget.getBoundingClientRect();
+      setFeedback({ id: performance.now(), x: event.clientX - rect.left, y: event.clientY - rect.top, playing: !playing });
+      clearTimeout(feedbackTimer.current);
+      feedbackTimer.current = setTimeout(() => setFeedback(null), 650);
+      togglePlay();
+    },
+    onPointerCancelCapture: (event: ReactPointerEvent<HTMLDivElement>) => {
+      pointers.current.delete(event.pointerId); tap.current = null;
+    },
+    onPointerLeave: () => { pointers.current.clear(); tap.current = null; },
+  } : {};
   const done = clock ? clock.completedAt(time) : 0;
   // 이전/다음: 획(단계) 경계로 이동한다.
   const previousBoundary = () => {
@@ -206,13 +249,13 @@ export function ExamInkReplay({ client, attemptId, questionId, imageUrl, strokes
   const playLabel = playing ? '일시정지' : '재생';
   return <div className="exam-ink-replay" data-testid="exam-ink-replay" data-replaying={open ? 'true' : 'false'}>
     <div className="exam-replay-bar">
-      {hasAudio && <ReplayAudio clips={data!.audioClips!} time={time} playing={open && playing} speed={speed} shift={audioBounds.shift} />}
       <button type="button" className="rn-button rn-button-compact" aria-expanded={open} onClick={toggleOpen}>{open ? '최종 풀이 보기' : '필기 순서 보기'}</button>
       {/* 덧쓰기 도구는 재생 중에도 보인다 — 도구를 누르면 재생을 닫고 최종 풀이 위에 바로 쓴다. */}
       {notes && <div className="exam-replay-notes" onClickCapture={() => { if (open) toggleOpen(); }}>{notes.toolbar}</div>}
     </div>
     {/* 재생 컨트롤은 화면 왼쪽에 떠 있는 작은 상자 — 풀이를 아래로 스크롤해도 늘 보이고 바로 멈출 수 있다. */}
     {open && <div ref={dock.dockRef} style={inline ? undefined : dock.style} className={`exam-replay-dock${inline ? ' exam-replay-inline' : ''}${folded ? ' is-folded' : ''}`} role="group" aria-label="필기 재생" data-testid="exam-replay-dock">
+      {hasAudio && <ReplayAudio clips={clock?.audioClips ?? []} time={time} playing={playing} speed={speed} shift={0} />}
       {folded ? <>
         <span className="exam-replay-grip" aria-hidden="true" title="끌어서 옮기기" {...dock.handle}><ReplayIcon name="grip" /></span>
         <button type="button" className="exam-replay-icon" aria-label={playLabel} disabled={stepCount === 0 && !hasAudio} onClick={togglePlay}><ReplayIcon name={playing ? 'pause' : 'play'} /></button>
@@ -227,9 +270,17 @@ export function ExamInkReplay({ client, attemptId, questionId, imageUrl, strokes
         {!data && !error && <p role="status">필기 기록을 불러오는 중…</p>}
         {error && <p role="alert">기록을 불러오지 못했어요. <button type="button" className="exam-replay-link" onClick={() => { setError(false); setRetry(n => n + 1); }}>다시 시도</button></p>}
         {timeline && clock && <>
-          <input className="exam-replay-slider" type="range" aria-label="필기 재생 위치" min={0} max={sliderMax} step={SLIDER_STEP}
-            value={time >= total ? sliderMax : Math.round(time)} disabled={stepCount === 0 && !hasAudio}
-            aria-valuetext={`${formatReplayTime(time)} / ${formatReplayTime(total)}`} onChange={event => seek(Number(event.target.value))} />
+          <div className="exam-replay-progress">
+            <input className="exam-replay-slider" type="range" aria-label="필기 재생 위치" min={0} max={sliderMax} step={SLIDER_STEP}
+              value={time >= total ? sliderMax : Math.round(time)} disabled={stepCount === 0 && !hasAudio}
+              aria-valuetext={`${formatReplayTime(time)} / ${formatReplayTime(total)}`} onChange={event => seek(Number(event.target.value))} />
+            <div className="exam-replay-markers">
+              {clock.pauses.map((pause, index) => <button key={index} type="button" className="exam-replay-pause"
+                data-testid="exam-replay-pause" title={pause.label} aria-label={pause.label}
+                style={{ left: `${(pause.start + pause.end) / 2 / sliderMax * 100}%` }}
+                onClick={() => seek(pause.start)}><span>{pause.label}</span></button>)}
+            </div>
+          </div>
           <output data-testid="exam-replay-position" data-step={done} data-steps={stepCount}>
             {formatReplayTime(time)} / {formatReplayTime(total)}{currentLabel ? ` · ${currentLabel}` : ''}
           </output>
@@ -243,15 +294,19 @@ export function ExamInkReplay({ client, attemptId, questionId, imageUrl, strokes
           <div className="exam-replay-speed" role="group" aria-label="배속">
             {[0.5, 1, 2, 4].map(value => <button key={value} type="button" aria-pressed={speed === value} onClick={() => setSpeed(value)}>{value}×</button>)}
           </div>
-          <p className="exam-replay-note">{hasAudio ? '음성에 맞춰 멈춘 시간도 그대로 재생해요.' : stepCount === 0 ? '아직 저장된 필기 기록이 없어요.' : timeline.approximate
+          <p className="exam-replay-note">{hasAudio ? '녹음 중에는 그대로 재생하고, 녹음 밖의 긴 멈춤은 줄여요.' : stepCount === 0 ? '아직 저장된 필기 기록이 없어요.' : timeline.approximate
             ? '예전 필기는 남은 획·저장 상태만 보여요.'
             : `실제 쓴 속도로 재생해요(${REPLAY_MAX_PAUSE_MS / 1000}초보다 긴 멈춤은 줄임).`}</p>
         </>}
       </>}
     </div>}
+    <div className="exam-replay-canvas" data-testid={peerPlayback ? 'exam-peer-canvas' : undefined} {...canvasGesture}>
     <ExamInkCanvas key={notes?.canvasKey} ref={notes?.inkRef} imageUrl={imageUrl} strokes={displayed}
       onChange={writable ? notes!.onChange : () => {}}
       tool={notes?.tool ?? 'pen'} color={notes?.color ?? '#1f2937'} size={notes?.size ?? 4}
       penOnlyWhenPenDetected shapeSnap readOnly={!writable} imageMaxWidth={imageMaxWidth} fitToInk={fit} />
+    {feedback && <span key={feedback.id} className="exam-replay-feedback" data-testid="exam-replay-feedback" aria-hidden="true"
+      style={{ left: feedback.x, top: feedback.y }}><ReplayIcon name={feedback.playing ? 'play' : 'pause'} /></span>}
+    </div>
   </div>;
 }

@@ -20,7 +20,7 @@ test('format preference, fallback, constraints and split threshold', () => {
   assert.deepEqual(AUDIO_CONSTRAINTS, { channelCount: 1, sampleRate: 48000, noiseSuppression: true, autoGainControl: true, echoCancellation: false });
 });
 
-test('negative clip offsets, consecutive clips and uncompressed ink use the same clock', () => {
+test('negative clip offsets and ink share a clock that compresses only uncovered silence', () => {
   const second = { ...clip, id: 'second', offsetMs: 12000, durationMs: 3000 };
   const bounds = audioTimelineBounds([clip, second], -380);
   assert.deepEqual(bounds, { shift: 5000, end: 20000 });
@@ -32,15 +32,15 @@ test('negative clip offsets, consecutive clips and uncompressed ink use the same
   ] };
   const events = [inkDelta([], [stroke], 'draw', 0), inkDelta([stroke], [], 'erase', 12000)];
   const timeline = buildInkTimeline({ batches: [{ id: 'b', revision: 1, baseRevision: 0, baseline: [], events }], strokes: [], revision: 1 });
-  const clock = buildInkClock(timeline, { origin: 0, shift: bounds.shift, total: bounds.end });
-  assert.deepEqual(clock.starts, [4620, 16999]);
-  assert.deepEqual(clock.ends, [5000, 17000]);
-  assert.equal(clock.total, 20000);
+  const clock = buildInkClock(timeline, { origin: 0, clips: [clip, second] });
+  assert.deepEqual(clock.starts, [4620, 16500]);
+  assert.deepEqual(clock.ends, [5000, 16501]);
+  assert.equal(clock.total, 19501);
   assert.equal(clock.frame(4800)[0].points.length, 1);
   assert.equal(clock.frame(13000).length, 1, 'long pause remains present while teacher explains');
   assert.equal(clock.frame(18000).length, 0);
   const own = buildInkTimeline({ batches: [{ id: 'b', revision: 1, baseRevision: 0, baseline: [], events: events.map(e => ({ ...e, at: e.at + 100000 })) }], strokes: [], revision: 1 });
-  assert.deepEqual(buildInkClock(own, { origin: 100000, shift: bounds.shift, total: bounds.end }).ends, clock.ends);
+  assert.deepEqual(buildInkClock(own, { origin: 100000, clips: [clip, second] }).ends, clock.ends);
 });
 
 function memoryStore() {
