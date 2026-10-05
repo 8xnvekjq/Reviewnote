@@ -470,6 +470,7 @@ function limitedServer(limit: number) {
   const client = { ...s.client, saveInk: async (...args: Parameters<typeof s.client.saveInk>) => {
     const [, id, request] = args;
     if (hold) await hold;
+    if (s.state.offline || s.batches.has(request.batchId)) return s.client.saveInk(...args); // 오프라인·이미 받은 batch(멱등 경로)는 한도 검사 전
     let strokes = s.rows.get(id)?.strokes ?? [];
     for (const event of request.events) {
       strokes = applyInkEvent(strokes, event);
@@ -477,7 +478,7 @@ function limitedServer(limit: number) {
     }
     return s.client.saveInk(...args);
   } };
-  return { ...s, client, holdNext() { let release!: () => void; hold = new Promise(resolve => { release = () => { hold = undefined; resolve(); }; }); return () => release(); } };
+  return { ...s, client, setLimit(next: number) { limit = next; }, holdNext() { let release!: () => void; hold = new Promise(resolve => { release = () => { hold = undefined; resolve(); }; }); return () => release(); } };
 }
 
 test('a rejected queue longer than one batch (64 edits) recovers once the student clears the question', async () => {
@@ -562,4 +563,103 @@ test('an explicit save joining a held-back background save also sends what that 
   assert.equal(s.requests.length, 2);
   assert.deepEqual(s.rows.get('q1')?.strokes.map(x => x.id), ['big', 'small']);
   assert.equal(a.status, 'saved');
+});
+
+/** round-2 Codex 재현: 압축 batch가 네트워크 실패로 보관된 뒤 지웠다면, 그 batch의 거절은 지운 지금 필기를 막지 않는다. */
+async function storedCompactBatchThenErase(reopen: boolean) {
+  const s = limitedServer(3); const c = cache();
+  let a = new InkSync(s.client, 'attempt', undefined, c.storage);
+  await a.load();
+  a.change('q1', ['a', 'b', 'c', 'd'].map(stroke));
+  assert.equal(await a.flush(), false);
+  assert.equal(a.status, 'rejected');
+  s.state.offline = true;
+  assert.equal(await a.retryRejected(), false);
+  const stored = a.documents.get('q1')?.upload;
+  assert.ok(stored?.covers, 'a compacted batch is kept for an uncertain failure');
+  a.change('q1', ['a', 'b'].map(stroke), 'erase');
+  if (reopen) { await a.flush(); a = new InkSync(s.client, 'attempt', undefined, c.storage); }
+  s.state.offline = false;
+  if (reopen) await a.load();
+  const before = s.requests.length;
+  assert.equal(await a.flush(), true, 'one explicit save recovers');
+  assert.equal(s.requests[before].request.batchId, stored.id, 'the stored batch is resent unchanged first');
+  assert.equal(s.requests.length, before + 2);
+  assert.deepEqual(s.rows.get('q1')?.strokes.map(x => x.id), ['a', 'b']);
+  assert.equal(a.status, 'saved');
+  assert.equal(a.rejected.size, 0);
+}
+test('a stored compacted batch refused after a later erase does not stop the erased drawing (same tab)', () => storedCompactBatchThenErase(false));
+test('a stored compacted batch refused after a later erase does not stop the erased drawing (reopened from IndexedDB)', () => storedCompactBatchThenErase(true));
+
+test('a stored compacted batch refused after an erase: automatic saves keep the large-question spacing, but do not stop', async () => {
+  const s = limitedServer(3);
+  const a = new InkSync(s.client, 'attempt', undefined, cache().storage);
+  await a.load();
+  const heavy = (id: string) => ({ ...stroke(id), points: Array.from({ length: 9000 }, (_, i) => ({ x: .1, y: .2, pressure: .5, t: i })) });
+  const four = ['h1', 'h2', 'h3', 'h4'].map(heavy);
+  a.change('q1', four);
+  assert.equal(await a.flush(), false);
+  s.state.offline = true;
+  assert.equal(await a.retryRejected(), false);
+  a.change('q1', four.slice(0, 3), 'erase'); // 아직 ≈1.6MB
+  s.state.offline = false;
+  const before = s.requests.length;
+  const realNow = Date.now;
+  Date.now = () => realNow() + 10 * 60_000; // 오프라인 실패의 백오프가 지난 뒤의 자동 저장
+  try {
+    assert.equal(await a.flush({ background: true }), false);
+  } finally { Date.now = realNow; }
+  assert.equal(s.requests.length, before + 1, 'only the stored batch was resent; the new compacted one waits for the spacing');
+  assert.equal(a.status, 'pending');
+  assert.equal(a.rejected.size, 0);
+  assert.equal(await a.flush(), true);
+  assert.deepEqual(s.rows.get('q1')?.strokes.map(x => x.id), ['h1', 'h2', 'h3']);
+});
+
+test('the whole current drawing refused again (compacted, nothing after it) still stops', async () => {
+  const s = limitedServer(3);
+  const a = new InkSync(s.client, 'attempt', undefined, cache().storage);
+  await a.load();
+  a.change('q1', ['a', 'b', 'c', 'd'].map(stroke));
+  a.change('q1', ['a', 'b', 'c', 'd', 'e'].map(stroke));
+  assert.equal(await a.flush(), false);
+  assert.equal(s.requests.length, 2, 'the two-edit queue is compacted and tried once more');
+  assert.equal(a.status, 'rejected');
+  assert.equal(await a.flush(), false);
+  assert.equal(s.requests.length, 2, 'then nothing is resent until the drawing changes');
+  s.state.offline = true;
+  assert.equal(await a.retryRejected(), false);
+  s.state.offline = false;
+  const before = s.requests.length;
+  assert.equal(await a.flush(), false, 'the stored compacted batch covers the whole queue: refused again, stopped');
+  assert.equal(s.requests.length, before + 1);
+  assert.equal(a.status, 'rejected');
+});
+
+test('a compacted batch saved but its acknowledgement lost: the later erase is saved as the next revision', async () => {
+  for (const reopen of [false, true]) {
+    const s = limitedServer(3); const c = cache();
+    let ackLost = false;
+    const client = { ...s.client, saveInk: async (...args: Parameters<typeof s.client.saveInk>) => {
+      const revision = await s.client.saveInk(...args);
+      if (ackLost) { ackLost = false; throw Error('acknowledgement lost'); }
+      return revision;
+    } };
+    let a = new InkSync(client, 'attempt', undefined, c.storage);
+    await a.load();
+    a.change('q1', ['a', 'b', 'c', 'd'].map(stroke));
+    assert.equal(await a.flush(), false);
+    s.setLimit(Infinity); // 한도 상향 마이그레이션 적용
+    ackLost = true;
+    assert.equal(await a.retryRejected(), false);
+    assert.equal(s.rows.get('q1')?.revision, 1, 'the server did store the compacted batch');
+    a.change('q1', ['a', 'b'].map(stroke), 'erase');
+    if (reopen) { await a.flush(); a = new InkSync(client, 'attempt', undefined, c.storage); await a.load(); }
+    assert.equal(await a.flush(), true);
+    assert.equal(s.rows.get('q1')?.revision, 2);
+    assert.deepEqual(s.rows.get('q1')?.strokes.map(x => x.id), ['a', 'b']);
+    assert.equal(a.documents.get('q1')?.compact, undefined);
+    assert.equal(a.documents.get('q1')?.covers, undefined);
+  }
 });

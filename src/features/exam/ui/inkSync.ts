@@ -133,7 +133,7 @@ export class InkSync {
             const sent = new Set(local.upload!.events.map(event => event.id));
             const events = (local.events ?? []).filter(event => !sent.has(event.id));
             if (!events.length) continue;
-            local = { ...local, revision: server!.revision, baseStrokes: server!.strokes, upload: undefined, events, legacyImport: false };
+            local = { ...local, revision: server!.revision, baseStrokes: server!.strokes, upload: undefined, events, legacyImport: false, compact: undefined, covers: undefined };
           }
           // Old drafts had no operation log. Import them as a clearly labelled restored state.
           if (!local.events?.length && !local.upload) {
@@ -269,10 +269,13 @@ export class InkSync {
           const code = (error instanceof Error ? error.message : '').match(PERMANENT_REJECTION)?.[0];
           if (!code) throw error;
           // 서버에 남은 것이 없으니 이 batch는 버리고, 다음 batch는 지금 필기 기준으로 압축해 보낸다.
-          // 멈추는(rejected) 것은 '지금 필기 한 건'이 거절됐을 때뿐이다. 중간 과정만 컸거나(압축하면 통과할 수 있다)
-          // 요청 중에 학생이 고쳤다면(예: 지움) 바로 다시 해 본다(자동 저장이면 큰 문항 간격은 지킨다).
+          // 멈추는(rejected) 것은 '지금 필기 한 건'이 거절됐을 때뿐이다: 중간 과정이 없는 batch(압축했거나 edit 1개)이고,
+          // 지금 큐의 edit가 전부 그 batch 안에 있을 때. 중간 과정만 컸거나(압축하면 통과할 수 있다), 그 batch 뒤에
+          // 학생이 고쳤다면(요청 중이든, 보관된 batch를 다시 보내기 전이든. 예: 지움) 바로 다시 해 본다(자동 저장이면 큰 문항 간격은 지킨다).
           const latest = this.documents.get(id)!;
-          const wholeState = upload.covers != null || (upload.events.length === 1 && (draft.events?.length ?? 0) === 1);
+          const sent = new Set(upload.events.map(event => event.id));
+          const wholeState = (upload.covers != null || upload.events.length === 1)
+            && (latest.events ?? []).every(event => sent.has(event.id));
           if (wholeState && latest.strokes === sentStrokes) this.rejected.set(id, code);
           const dropped = { ...latest, upload: undefined, compact: true };
           this.documents.set(id, dropped);
