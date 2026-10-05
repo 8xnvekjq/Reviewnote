@@ -63,7 +63,7 @@ class CoverTests(unittest.TestCase):
             yield path, config, resolve_pdf(config, path)
 
     def test_three_real_covers(self):
-        expected = {'dunchon': dict(questionCount=22, points=100), 'yeongpa': dict(questionCount=20, points=25), 'dongbuk': None, 'sangil': dict(questionCount=23, points=None), 'daedong': dict(questionCount=22, points=100)}
+        expected = {'dunchon': dict(questionCount=22, points=100), 'yeongpa': dict(questionCount=20, points=25), 'dongbuk': None, 'sangil': dict(questionCount=23, points=None), 'daedong': dict(questionCount=22, points=100), 'godeok': dict(questionCount=26, points=100)}
         for _, config, pdf in self.configs():
             with self.subTest(school=config['slug']), fitz.open(pdf) as doc:
                 self.assertEqual(read_cover(doc), expected[config['slug']])
@@ -81,7 +81,7 @@ class CoverTests(unittest.TestCase):
                 for explicit in (True, False):
                     candidate = copy.deepcopy(config)
                     if explicit:
-                        candidate['paper']['questionCount'] = {'dunchon': 22, 'yeongpa': 21, 'sangil': 23, 'daedong': 22}[config['slug']]
+                        candidate['paper']['questionCount'] = {'dunchon': 22, 'yeongpa': 21, 'sangil': 23, 'daedong': 22, 'godeok': 26}[config['slug']]
                     path.write_text(json.dumps(candidate), encoding='utf-8')
                     out = folder / str(explicit)
                     run(path, out, True)
@@ -570,6 +570,32 @@ class SangilPdfTests(unittest.TestCase):
                 if q['answerType'] == 'choice10':
                     self.assertEqual(len(set(q['choices'])), 10)
                     self.assertEqual(q['choices'][int(q['answer']) - 1], q['originalAnswer'])
+
+class GodeokPdfTests(unittest.TestCase):
+    def test_middle_school_final_answers_points_and_exceptions(self):
+        path = ROOT / 'scripts/exam/school-configs/2025-godeok-m3-s2-final-m3-2.json'
+        config = json.loads(path.read_text(encoding='utf-8'))
+        with fitz.open(resolve_pdf(config, path)) as doc:
+            prepared, starts = prepare_config(doc, config)
+            data, warnings = make_data(doc, prepared, starts)
+            self.assertEqual(read_cover(doc), dict(questionCount=26, points=100))
+            self.assertEqual(prepared['layout']['questionPages'], list(range(1, 8)))
+            self.assertEqual(prepared['layout']['answerPages'], [8, 9, 10])
+            self.assertEqual((data['grade'], data['schoolGrade'], data['examTerm']), (9, '중3', 'final'))
+            self.assertEqual(data['questionCount'], 26)
+            self.assertFalse(data['published'])
+            self.assertEqual([q['answer'] for q in data['questions']], list('52411341544143335323114252'))
+            self.assertEqual([q['points'] for q in data['questions']], [3,3,3,4,4,4,4,4,4,4,3,5,5,3,4,4,4,3,4,4,3,3,4,4,5,5])
+            self.assertEqual(sum(q['points'] for q in data['questions']), 100)
+            self.assertTrue(all(q['answerType'] == 'choice5' and q['curriculumGrade'] == '중3-2' for q in data['questions']))
+            self.assertEqual(warnings, [f'Question {n}: using configured answer; PDF source text verified' for n in (2, 7)])
+            # 정답 예외도 원본 추출 텍스트가 바뀌면 반드시 중단한다.
+            for number in (2, 7):
+                candidate = copy.deepcopy(prepared)
+                candidate['questions'][number - 1]['sourceAnswerText'] = '⑤'
+                with self.assertRaisesRegex(ValueError, 'source answer mismatch'):
+                    make_data(doc, candidate, starts)
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

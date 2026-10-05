@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "pdf": "reference/school-exams/2025-고덕중-3학년-2학기-기말-중3-2/고덕중학교_3학년_2025_2학기기말_중3-2_문제_해설.pdf",
+  "referenceRoot": "C:/Users/8xnve/Documents/ReviewNotes/reference/school-exams",
+  "slug": "godeok",
+  "migrationTimestamp": "20261006150000",
+  "curriculumGrade": "중3-2",
+  "pointScale": 1,
+  "paper": {
+    "id": "2025-godeok-m3-s2-final",
+    "title": "2025 고덕중 3학년 2학기 기말 중3-2",
+    "kind": "school",
+    "schoolName": "고덕중",
+    "year": 2025,
+    "grade": 9,
+    "semester": 2,
+    "examTerm": "final",
+    "subject": "중3-2",
+    "source": "고덕중",
+    "schoolGrade": "중3",
+    "examDate": null,
+    "examDateNote": "원본에 정확한 시행일과 시험 시간이 없어 시행일은 미상, 시험 시간은 기존 가져오기 기본값 50분 적용",
+    "timeLimitMinutes": 45,
+    "maxScore": 100,
+    "electives": [],
+    "published": false
+  },
+  "chapters": {
+    "1": "삼각비",
+    "2": "삼각비",
+    "3": "삼각비",
+    "4": "삼각비",
+    "5": "삼각비",
+    "6": "삼각비",
+    "7": "삼각비",
+    "8": "삼각비",
+    "9": "삼각비",
+    "10": "삼각비",
+    "11": "삼각비",
+    "12": "삼각비",
+    "13": "삼각비",
+    "14": "원과 직선",
+    "15": "원과 직선",
+    "16": "원주각",
+    "17": "원과 직선",
+    "18": "원과 직선",
+    "19": "원주각",
+    "20": "원과 직선",
+    "21": "원주각",
+    "22": "원주각",
+    "23": "원주각",
+    "24": "원주각",
+    "25": "원주각",
+    "26": "원주각"
+  },
+  "questions": [
+    {
+      "number": 2,
+      "answerType": "choice5",
+      "answer": "2",
+      "sourceAnswerText": "②\nsinA"
+    },
+    {
+      "number": 7,
+      "answerType": "choice5",
+      "answer": "4",
+      "sourceAnswerText": "④\n\nAM"
+    }
+  ]
+}
