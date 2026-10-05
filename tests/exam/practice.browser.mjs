@@ -7,7 +7,7 @@ import { mkdir } from 'node:fs/promises';
 import { assertCompactTopbar } from './compact-topbar.assertions.mjs';
 
 const BASE = `${process.env.EXAM_TEST_BASE_URL || 'http://127.0.0.1:5174'}/tests/exam/practice.html`;
-const out = 'node_modules/.cache/exam-practice';
+const out = `${process.env.EXAM_TEST_ARTIFACT_DIR || 'node_modules/.cache'}/exam-practice`;
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 
@@ -954,7 +954,7 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   await choice(7).click();
   await page.getByRole('button', { name: '애매해요 표시' }).click();
   await noHorizontalOverflow(page, `school-ten/${viewport.width}`);
-  await page.screenshot({ path: `node_modules/.cache/exam-practice/school-ten-${viewport.width}.png` });
+  await page.screenshot({ path: `${out}/school-ten-${viewport.width}.png` });
   await page.getByRole('button', { name: '제출', exact: true }).click();
   await page.getByTestId('exam-review').waitFor();
   const omrAnswer = page.locator('.exam-omr-row[data-number="18"]');

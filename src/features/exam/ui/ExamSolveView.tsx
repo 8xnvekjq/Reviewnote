@@ -109,6 +109,10 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
   const question = questions[index];
   const pageQuestions = questions.filter(candidate => candidate.imageUrl === question.imageUrl);
   const inkKey = hanneung ? pageQuestions[0].id : question.id;
+  useEffect(() => {
+    const inkQuestion = questions.find(q => q.id === inkKey)!;
+    broadcastInk.focus(inkKey, inkQuestion.number, inkQuestion.imageUrl);
+  }, [broadcastInk, questions, inkKey]);
   const pageUrls = [...new Set(questions.map(candidate => candidate.imageUrl))];
   const itemsRef = useRef(items);
   const visitOrderRef = useRef<number[]>([...attempt.visitOrder]);
@@ -481,7 +485,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
           <ExamInkCanvas
             key={`${inkKey}:${inkSync.generation}`}
             ref={inkRef}
-            overlay={imageWidth => <ExamAssistOverlay key={question.id} transport={client.liveTransport} attemptId={attempt.id} questionId={question.id} imageWidth={imageWidth} active={attempt.status === 'in_progress' && !submitting} />}
+            overlay={imageWidth => <ExamAssistOverlay key={question.id} transport={client.liveTransport} attemptId={attempt.id} questionId={inkKey} imageWidth={imageWidth} active={attempt.status === 'in_progress' && !submitting} />}
             imageUrl={question.imageUrl}
             strokes={strokes.get(inkKey) ?? []}
             onChange={onInkChange}

@@ -225,6 +225,7 @@ export function createInkBatcher(send: (message: LiveInkMessage | LiveSavedMessa
   const records = new Map<string, Array<{ sequence: number; last: number }>>();
   const announced = new Map<string, number>();
   const marks = new Map<string, number>();
+  let focus: { attemptId: string; questionId: string; number: number; imageUrl?: string } | undefined;
   let timer: unknown, sequence = 0, lastMark = 0;
   const flush = () => {
     timer = undefined;
@@ -242,6 +243,12 @@ export function createInkBatcher(send: (message: LiveInkMessage | LiveSavedMessa
       send(message);
     }
     pending.clear();
+    // Navigation carries no saved strokes. Send it last so pending edits to the
+    // previous question cannot pull the admin back to that question.
+    if (focus) {
+      send({ version: 1, sessionId, sequence: ++sequence, ...focus, added: [], removed: [] });
+      focus = undefined;
+    }
     // After the stroke messages, so a save that already contains them confirms them in the same window.
     for (const [key, item] of savedPending) {
       let upToSeq = announced.get(key) ?? 0;
@@ -258,6 +265,10 @@ export function createInkBatcher(send: (message: LiveInkMessage | LiveSavedMessa
   };
   const schedule = () => { if (timer === undefined) timer = clock.schedule(flush, LIVE_BATCH_MS); };
   return {
+    focus(attemptId: string, questionId: string, number: number, imageUrl?: string) {
+      focus = { attemptId, questionId, number, ...(imageUrl ? { imageUrl } : {}) };
+      schedule();
+    },
     /** `eventId`: the InkSync edit this change was recorded as (undefined = not saved to the server). */
     change(attemptId: string, questionId: string, number: number, before: InkStroke[], after: InkStroke[], eventId?: string, imageUrl?: string) {
       let mark: number | undefined;
@@ -290,6 +301,6 @@ export function createInkBatcher(send: (message: LiveInkMessage | LiveSavedMessa
       savedPending.set(key, { attemptId, questionId, revision: Math.max(revision, old?.revision ?? 0), mark: Math.max(mark, old?.mark ?? 0) });
       schedule();
     },
-    clear() { if (timer !== undefined) clock.cancel(timer); timer = undefined; pending.clear(); savedPending.clear(); },
+    clear() { if (timer !== undefined) clock.cancel(timer); timer = undefined; focus = undefined; pending.clear(); savedPending.clear(); },
   };
 }

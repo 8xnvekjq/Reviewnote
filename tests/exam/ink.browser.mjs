@@ -5,7 +5,8 @@ import { mkdir } from 'node:fs/promises';
 
 const URL = 'http://127.0.0.1:5174/tests/exam/ink.html';
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
-await mkdir('node_modules/.cache/exam-ink', { recursive: true });
+const out = `${process.env.EXAM_TEST_ARTIFACT_DIR || 'node_modules/.cache'}/exam-ink`;
+await mkdir(out, { recursive: true });
 try {
   const page = await browser.newPage({ viewport: { width: 1024, height: 1600 } });
   const errors = [];
@@ -127,7 +128,7 @@ try {
   assert.ok(!(await inkAt(0.5, 0.78)));
   await page.getByRole('button', { name: '되돌리기' }).click();
   assert.equal((await strokes()).length, 5);
-  await page.screenshot({ path: 'node_modules/.cache/exam-ink/wide.png' });
+  await page.screenshot({ path: `${out}/wide.png` });
 
   // 8) 리사이즈(폭 변경·화면 회전) 후에도 같은 자리
   const before = JSON.stringify(await strokes());
@@ -145,7 +146,7 @@ try {
   await page.setViewportSize({ width: 390, height: 844 }); // 세로 폰
   await page.waitForTimeout(150);
   assert.ok(await inkAt(sample.x, sample.y), 'still in place on a narrow phone');
-  await page.screenshot({ path: 'node_modules/.cache/exam-ink/phone.png' });
+  await page.screenshot({ path: `${out}/phone.png` });
   await page.setViewportSize({ width: 1024, height: 1600 });
   await page.getByRole('button', { name: '넓게' }).click();
   await page.waitForTimeout(150);
@@ -481,7 +482,7 @@ try {
   list = await strokes();
   assert.ok(list.some(s => s.id === firstLine.id), 'undo brings the original stroke back');
   assert.equal(list.length, countBefore);
-  await page.screenshot({ path: 'node_modules/.cache/exam-ink/lasso.png' });
+  await page.screenshot({ path: `${out}/lasso.png` });
   // 일부만 걸쳐도 획 전체 선택: 직선 가운데만 작게 두르면(끝점은 둘 다 밖) 선 전체가 잡히고, 올가미 밖 끝부분을 끌어도 옮겨진다
   const mid = [(fx[0] + fy[0]) / 2, (fx[1] + fy[1]) / 2], r = 0.025;
   await draw(Array.from({ length: 13 }, (_, i) => [mid[0] + r * Math.cos((i / 12) * Math.PI * 2), mid[1] + r * Math.sin((i / 12) * Math.PI * 2)]));
