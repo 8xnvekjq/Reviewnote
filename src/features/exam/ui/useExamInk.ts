@@ -11,7 +11,7 @@ export function useExamInk(client: ExamClient, attemptId: string, questionIds: s
     void sync.load().then(() => { if (active && sync.pending) void sync.flush({ background: true }); });
     const retry = () => {
       if (sync.status === 'conflict') return;
-      if (!sync.ready) void sync.load().then(() => { if (active && sync.pending) void sync.flush({ background: true }); });
+      if (!sync.ready) void sync.load(false, { background: true }).then(() => { if (active && sync.ready && sync.pending) void sync.flush({ background: true }); });
       else if (sync.pending) void sync.flush({ background: true });
     };
     const refresh = () => {

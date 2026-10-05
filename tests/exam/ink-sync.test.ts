@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { InkSync, type InkCache } from '../../src/features/exam/ui/inkSync.ts';
+import { InkSync, autoSaveSpacingMs, type InkCache } from '../../src/features/exam/ui/inkSync.ts';
 import { applyInkEvent, inkDelta, inkIdsHash } from '../../src/features/exam/ink/inkReplay.ts';
 import type { ExamClient, ExamInkDocument, InkReplayEvent, InkSaveRequest, InkStroke } from '../../src/features/exam/contract.ts';
 import type { InkDraft } from '../../src/features/exam/ui/inkStore.ts';
@@ -349,4 +349,115 @@ test('Live end to end: student edits, broadcasts and saves; the admin drops hint
   hints = settleLiveHints(hints!, () => s.rows.get('q1')!.revision, 2, 'q1');
   assert.deepEqual(hints?.log ?? [], []);
   assert.deepEqual(view(), ['a', 'b'], 'the stale erase no longer reverts the saved undo');
+});
+
+// 2026-10-05 장애: 문항 필기가 서버 한도를 넘자 같은 batch를 끝없이 다시 보냈다("다시 시도" 무한 반복).
+test('a permanent rejection (too large) stops resending that question, keeps the ink, saves the rest, and recovers after erasing', async () => {
+  const s = server(); const c = cache();
+  const limit = 3; // 서버 한도 흉내: 문항당 획 3개까지
+  const client = { ...s.client, saveInk: async (...args: Parameters<typeof s.client.saveInk>) => {
+    const [, id, request] = args;
+    const strokes = request.events.reduce(applyInkEvent, s.rows.get(id)?.strokes ?? []);
+    if (strokes.length > limit) { s.requests.push({ questionId: id, request, bytes: 0 }); throw Error('EXAM_INK_TOO_LARGE'); }
+    return s.client.saveInk(...args);
+  } };
+  const a = new InkSync(client, 'attempt', undefined, c.storage);
+  await a.load();
+  const big = ['a', 'b', 'c', 'd'].map(stroke);
+  a.change('q1', big);
+  a.change('q2', [stroke('other')]);
+  assert.equal(await a.flush(), false);
+  assert.equal(a.status, 'rejected');
+  assert.equal(a.rejected.get('q1'), 'EXAM_INK_TOO_LARGE');
+  assert.equal(s.rows.get('q2')?.strokes[0].id, 'other', 'other questions still save');
+  assert.deepEqual(a.strokes.get('q1')?.map(x => x.id), ['a', 'b', 'c', 'd'], 'ink stays on the device');
+  assert.equal(a.documents.get('q1')?.upload, undefined, 'the refused batch is dropped (the server kept nothing)');
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(c.drafts.get('q1')?.pending, true);
+  const sent = s.requests.length;
+  // 자동 저장·화면 숨김(명시 저장)·10초 재시도 어느 것도 같은 문항을 다시 보내지 않는다.
+  assert.equal(await a.flush({ background: true }), false);
+  assert.equal(await a.flush(), false);
+  assert.equal(s.requests.length, sent);
+  assert.equal(a.onlyRejectedPending, true);
+  // 일부를 지우면 그 변경과 함께 새 batch로 다시 보내 저장된다(기록은 잃지 않는다).
+  a.change('q1', big.slice(0, 2), 'erase');
+  assert.equal(await a.flush(), true);
+  assert.equal(a.status, 'saved');
+  assert.deepEqual(s.rows.get('q1')?.strokes.map(x => x.id), ['a', 'b']);
+  assert.equal(a.rejected.size, 0);
+});
+
+test('a refused batch left in IndexedDB is resent once, then dropped; "다시 시도" retries it explicitly', async () => {
+  const s = server(); const c = cache(); let tooLarge = true; let calls = 0;
+  const client = { ...s.client, saveInk: async (...args: Parameters<typeof s.client.saveInk>) => {
+    calls++;
+    if (tooLarge) throw Error('EXAM_INK_TOO_LARGE');
+    return s.client.saveInk(...args);
+  } };
+  const a = new InkSync(client, 'attempt', undefined, c.storage);
+  await a.load();
+  a.change('q1', [stroke('a')]);
+  assert.equal(await a.flush(), false);
+  assert.equal(calls, 1);
+  tooLarge = false; // 서버 한도를 올리는 마이그레이션이 적용됐다
+  assert.equal(await a.flush(), false, 'not resent automatically');
+  assert.equal(calls, 1);
+  assert.equal(await a.retryRejected(), true);
+  assert.equal(calls, 2);
+  assert.equal(s.rows.get('q1')?.strokes[0].id, 'a');
+});
+
+test('a transient failure on a stored batch still retries the same batch (not treated as a rejection)', async () => {
+  const s = server(); const c = cache();
+  const a = new InkSync(s.client, 'attempt', undefined, c.storage);
+  await a.load();
+  s.state.offline = true;
+  a.change('q1', [stroke('a')]);
+  assert.equal(await a.flush(), false);
+  const batch = a.documents.get('q1')?.upload?.id;
+  assert.ok(batch);
+  assert.equal(a.status, 'failed');
+  s.state.offline = false;
+  assert.equal(await a.flush(), true);
+  assert.equal(s.requests.at(-1)?.request.batchId, batch);
+});
+
+test('failed loads back off: automatic retries do not reload the whole attempt every 10 seconds', async () => {
+  const s = server(); let loads = 0;
+  const client = { ...s.client, getInk: async (...args: Parameters<typeof s.client.getInk>) => { loads++; return s.client.getInk(...args); } };
+  const a = new InkSync(client, 'attempt', undefined, cache().storage);
+  s.state.offline = true;
+  await a.load();
+  assert.equal(a.status, 'failed');
+  assert.equal(loads, 1);
+  await a.load(false, { background: true });
+  assert.equal(loads, 1, 'within the backoff window');
+  s.state.offline = false;
+  await a.load(); // 학생이 누른 '다시 시도'는 바로
+  assert.equal(loads, 2);
+  assert.equal(a.status, 'saved');
+  await a.load(false, { background: true });
+  assert.equal(loads, 3, 'success resets the backoff');
+});
+
+test('large questions are auto-saved less often; explicit saves (submit, exit, hidden tab) are immediate', async () => {
+  const s = server();
+  const a = new InkSync(s.client, 'attempt', undefined, cache().storage);
+  await a.load();
+  const heavy = (id: string) => ({ ...stroke(id), points: Array.from({ length: 9000 }, (_, i) => ({ x: .1, y: .2, pressure: .5, t: i })) });
+  const strokes = [heavy('h1'), heavy('h2'), heavy('h3'), heavy('h4')]; // ≈ 2.1MB
+  assert.ok(autoSaveSpacingMs(strokes) >= 20000 && autoSaveSpacingMs(strokes) <= 30000);
+  assert.equal(autoSaveSpacingMs([stroke('small')]), 0);
+  a.change('q1', strokes);
+  assert.equal(await a.flush({ background: true }), true, 'first save goes right away');
+  a.change('q1', [...strokes, stroke('more')]);
+  assert.equal(await a.flush({ background: true }), false, 'next automatic save waits for the spacing');
+  assert.equal(a.status, 'pending');
+  assert.equal(s.rows.get('q1')?.strokes.length, 4);
+  a.change('q2', [stroke('small')]);
+  assert.equal(await a.flush({ background: true }), false);
+  assert.equal(s.rows.get('q2')?.strokes.length, 1, 'small questions are not held back by a large one');
+  assert.equal(await a.flush(), true);
+  assert.equal(s.rows.get('q1')?.strokes.length, 5);
 });

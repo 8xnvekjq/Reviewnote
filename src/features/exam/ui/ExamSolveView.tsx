@@ -61,6 +61,12 @@ function initialItems(attempt: ExamAttempt): Record<string, LocalItem> {
   return map;
 }
 
+/** 서버가 거절한 필기 문항 번호(예: "3·7번"). */
+function rejectedInkLabel(questions: ExamAttempt['questions'], rejected: ReadonlyMap<string, string>): string {
+  const numbers = questions.filter(q => rejected.has(q.id)).map(q => q.number);
+  return numbers.length ? `${numbers.join('·')}번` : '일부 문항';
+}
+
 function initialIndex(attempt: ExamAttempt): number {
   const last = attempt.visitOrder[attempt.visitOrder.length - 1];
   const index = attempt.questions.findIndex(q => q.number === last);
@@ -241,7 +247,11 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
     swRef.current = pauseStopwatch(swRef.current, Date.now());
     if (saveTimer.current != null) { window.clearTimeout(saveTimer.current); saveTimer.current = null; }
     try {
-      if (!await flushInk()) throw new Error('필기를 서버에 저장하지 못했어요. 저장 상태를 확인하고 다시 제출해 주세요.');
+      // 서버가 받을 수 없는 문항(너무 큰 필기)만 남았으면 제출을 막지 않는다 — 그 필기는 이 기기에 남는다.
+      if (!await flushInk() && !(inkSync.onlyRejectedPending && (auto || window.confirm(
+        `${rejectedInkLabel(questions, inkSync.rejected)} 필기가 너무 많아 서버에 저장되지 않았어요(이 기기에는 남아 있어요). 그래도 제출할까요?`)))) {
+        throw new Error('필기를 서버에 저장하지 못했어요. 저장 상태를 확인하고 다시 제출해 주세요.');
+      }
       const result = await client.submitAttempt(attempt.id, snapshot(), [...visitOrderRef.current]);
       onSubmitted(result);
     } catch (error) {
@@ -250,7 +260,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
       setSubmitError(error instanceof Error ? error.message : '제출하지 못했어요.');
       setOverlay(auto ? 'review' : 'submit');
     }
-  }, [client, attempt.id, snapshot, flushInk, onSubmitted]);
+  }, [client, attempt.id, snapshot, flushInk, onSubmitted, inkSync, questions]);
 
   const remaining = remainingMs(attempt.startedAt, attempt.timeLimitMinutes, now);
   useEffect(() => {
@@ -449,7 +459,9 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
           <div className="exam-ink-sync" role="status" data-testid="exam-ink-sync" data-status={inkSync.status}>
             {inkSync.status === 'conflict' ? '다른 기기에서 풀이가 변경됐어요. 이 기기 필기를 덮어쓰지 않았어요.'
               : inkSync.status === 'failed' ? '필기를 서버와 동기화하지 못했어요. 화면을 닫지 말고 다시 시도해 주세요.'
+              : inkSync.status === 'rejected' ? `${rejectedInkLabel(questions, inkSync.rejected)} 필기가 너무 많아 서버에 저장하지 못했어요. 이 기기에는 남아 있어요. 필기를 조금 지우면 다시 저장돼요.`
               : null}
+            {inkSync.status === 'rejected' && <button type="button" className="rn-button rn-button-compact" onClick={() => { void inkSync.retryRejected(); }}>다시 시도</button>}
             {inkSync.status === 'failed' && <button type="button" className="rn-button rn-button-compact" onClick={() => {
               if (inkSync.ready) void inkSync.flush(); else void inkSync.load().then(() => inkSync.flush());
             }}>다시 시도</button>}
