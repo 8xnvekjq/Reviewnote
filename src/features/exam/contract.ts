@@ -334,6 +334,8 @@ export type LiveInkResponse =
   | { mode: 'delta'; revision: number; batches: Array<{ revision: number; events: InkReplayEvent[] }> };
 
 export interface ExamInkCanvasProps {
+  /** 저장 필기와 분리된 일시 표시 레이어. 좌표 기준은 실제 이미지 너비. */
+  overlay?: (imageWidth: number) => import('react').ReactNode;
   /** 문항 이미지 위에 겹쳐 그린다. 컨테이너 크기에 맞춰 이미지와 같은 영역을 덮는다. */
   imageUrl: string;
   strokes: InkStroke[];                       // 제어 컴포넌트: 문항별 획은 부모(W3)가 들고 있다

@@ -962,6 +962,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
           ...(liveHighlighter ? { opacity: HIGHLIGHTER_OPACITY, mixBlendMode: 'multiply' as const } : null),
         }}
       />
+      {props.overlay?.(imgW)}
       {tapNotice && (
         <div key={tapNotice.at} className="exam-ink-tap-notice" role="status" style={TAP_NOTICE_STYLE}>
           {tapNotice.action === 'undo' ? '↶ 실행 취소' : '↷ 다시 실행'}
