@@ -36,10 +36,11 @@ function leaveFullscreen() {
   } catch { /* 무시 */ }
 }
 
-export function ExamPracticeScreen({ client, currentUserId, onExit, admin }: {
+export function ExamPracticeScreen({ client, currentUserId, onExit, admin, isAdmin = false }: {
   client: ExamClient; currentUserId: string; onExit: () => void;
   /** 관리자 기능(시험지별 학생 응시 현황·학생 풀이 검토). 서버가 관리자가 아니면 빈 결과를 준다. */
   admin?: AdminExamApi;
+  isAdmin?: boolean;
 }) {
   const [phase, setPhase] = useState<Phase>({ kind: 'start' });
   const [busy, setBusy] = useState(false);
@@ -130,6 +131,8 @@ export function ExamPracticeScreen({ client, currentUserId, onExit, admin }: {
       )}
       {phase.kind === 'solve' && (
         <ExamSolveView
+          isAdmin={isAdmin}
+          currentUserId={currentUserId}
           key={phase.attempt.id}
           client={client}
           attempt={phase.attempt}

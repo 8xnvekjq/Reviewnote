@@ -467,3 +467,10 @@
 .theme-light .exam-filter-bar { --rn-text: #0f172a; --rn-muted: #475569; --rn-accent: #4f46e5; --rn-line: #cbd5e1; }
 .theme-light .exam-filter-chip { background: #ffffff; }
 .theme-light .exam-filter-chip.is-on { background: #eef2ff; }
+
+/* 선생님 녹음 상태는 작은 화면에서도 잘리지 않게 줄바꿈한다. */
+.exam-audio-recorder { display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:12px; max-width:320px; }
+.exam-audio-notice { flex-basis:100%; }
+.exam-audio-settings { font-size:11px; max-width:260px; overflow-wrap:anywhere; }
+.exam-audio-settings summary { cursor:pointer; }
+.exam-audio-toggle { font-size:12px; padding:5px; }

@@ -136,7 +136,7 @@ export function PeerSolutionSwitch({ session, eligible, attemptId, questionId, i
       {rows?.map(row => <button type="button" key={row.solutionKey} role="menuitemradio" disabled={loading}
         aria-checked={solution?.solutionKey === row.solutionKey} className="exam-peer-row" data-testid="exam-peer-row"
         onClick={() => { void choose(row); }}>
-        <PeerSolutionLabel label={row.label} /><span className="exam-peer-time">{formatPeerTime(row.timeSpentMs)}</span>
+        <PeerSolutionLabel label={row.label} />{row.hasAudio && <span aria-label="음성 해설 있음">🎙️</span>}<span className="exam-peer-time">{formatPeerTime(row.timeSpentMs)}</span>
       </button>)}
     </div>}
   </span>;

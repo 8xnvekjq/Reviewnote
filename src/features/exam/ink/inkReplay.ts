@@ -99,7 +99,7 @@ function drawnStroke(step: ReplayStep) {
  * 단계 목록을 시간 축으로 펼친다. 획은 실제로 그린 속도대로, 획 사이의 긴 대기는 줄여서 놓는다.
  * frame(ms)는 그 시각의 필기(그리는 중인 획은 그때까지 그린 부분만)를 돌려준다.
  */
-export function buildInkClock(timeline: InkTimeline) {
+export function buildInkClock(timeline: InkTimeline, audio?: { origin: number; shift: number; total: number }) {
   const { steps } = timeline;
   const starts: number[] = [];
   const ends: number[] = [];
@@ -110,6 +110,15 @@ export function buildInkClock(timeline: InkTimeline) {
     const lastT = added ? Math.max(0, ...added.stroke.points.map(point => point.t)) : 0;
     // 지우기·실행 취소처럼 순간인 단계도 1ms를 줘서, 시작 시각에는 아직 일어나지 않은 상태로 보이게 한다.
     const duration = Math.max(1, Math.min(REPLAY_MAX_STROKE_MS, Number.isFinite(lastT) ? lastT : 0));
+    if (audio) {
+      // 해설 중에는 생각하는 시간도 그대로 재생하여 음성과 획이 어긋나지 않는다.
+      const realEnd = step.event ? step.at - audio.origin + audio.shift : clock;
+      const start = Math.max(clock, realEnd - duration);
+      starts.push(start);
+      clock = Math.max(start + 1, realEnd);
+      ends.push(clock);
+      return;
+    }
     const realStart = step.at > 0 ? step.at - (added ? duration : 0) : 0;
     const gap = index === 0 ? REPLAY_LEAD_IN_MS
       : realStart > 0 && previousEnd > 0 ? Math.min(REPLAY_MAX_PAUSE_MS, Math.max(0, realStart - previousEnd))
@@ -120,7 +129,7 @@ export function buildInkClock(timeline: InkTimeline) {
     ends.push(clock);
     previousEnd = step.at > 0 ? step.at : 0;
   });
-  const total = clock;
+  const total = Math.max(clock, audio?.total ?? 0);
   /** time 시각까지 끝난 단계 수. */
   const completedAt = (time: number) => {
     let low = 0, high = steps.length;

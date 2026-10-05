@@ -1,3 +1,4 @@
+import { audioExtension, isAudioObjectDuplicate } from './audio/audioMath';
 import { supabase } from '../../services/supabase';
 import { examLiveTransport } from './liveTransport';
 import { readInkAtBoundary, saveInkAtBoundary } from './inkApi';
@@ -36,14 +37,40 @@ async function callRpc(name: string, args: Record<string, unknown>): Promise<unk
 /** 오답노트에 담을 때 자동으로 붙이는 스캐폴딩 이름(중복 확인에도 쓴다). */
 export const ORIGINAL_SOLUTION_CAPTION = '원래풀이';
 
+const signedAudio = new Map<string, { url: string; expiresAt: number }>();
+async function playableReplay(data: InkReplayData): Promise<InkReplayData> {
+  const clips = data.audioClips ?? [];
+  const missing = clips.filter(clip => !clip.url && (signedAudio.get(clip.storagePath)?.expiresAt ?? 0) < Date.now());
+  if (missing.length) {
+    const { data: urls, error } = await supabase.storage.from('exam-solution-audio').createSignedUrls(missing.map(clip => clip.storagePath), 86400);
+    if (error) throw new ExamClientError(error);
+    for (const row of urls ?? []) if (row.path && row.signedUrl) signedAudio.set(row.path, { url: row.signedUrl, expiresAt: Date.now() + 23 * 3600000 });
+  }
+  return { ...data, audioClips: clips.map(clip => ({ ...clip, url: clip.url ?? signedAudio.get(clip.storagePath)?.url })) };
+}
+
 export const examClient: ExamClient = {
+  async uploadSolutionAudio(clip, blob) {
+    const storagePath = `${clip.attemptId}/${clip.questionId}/${clip.id}.${audioExtension(clip.mime)}`;
+    const { error: uploadError } = await supabase.storage.from('exam-solution-audio').upload(storagePath, blob, {
+      contentType: clip.mime.split(';')[0], cacheControl: '86400', upsert: false,
+    });
+    // 응답 유실 후 재시도: UUID 경로의 객체는 덮어쓰지 않고 메타데이터 저장을 이어간다.
+    if (uploadError && !isAudioObjectDuplicate(uploadError)) throw new ExamClientError(uploadError);
+    const { error } = await supabase.from('exam_solution_audio').upsert({
+      id: clip.id, attempt_id: clip.attemptId, question_id: clip.questionId, started_at_ms: clip.startedAt,
+      duration_ms: clip.durationMs, mime: clip.mime.split(';')[0] === 'audio/mp4' ? 'audio/mp4' : clip.mime,
+      size_bytes: blob.size, storage_path: storagePath,
+    }, { onConflict: 'id', ignoreDuplicates: true });
+    if (error) throw new ExamClientError(error);
+  },
   liveTransport: examLiveTransport,
   async getInk(attemptId) {
     // 바뀐 문항만 나눠 받는다(큰 응시를 한 응답에 담던 get_exam_ink는 statement timeout에 걸렸다).
     return await loadExamInk((name, args) => readInkAtBoundary(callRpc, name, args), attemptId);
   },
   async getInkReplay(attemptId, questionId) {
-    return await readInkAtBoundary(callRpc, 'get_exam_ink_replay', { p_attempt_id: attemptId, p_question_id: questionId }) as InkReplayData;
+    return await playableReplay(await readInkAtBoundary(callRpc, 'get_exam_ink_replay', { p_attempt_id: attemptId, p_question_id: questionId }) as InkReplayData);
   },
   async getPeerSolution(attemptId, questionId) {
     return await readInkAtBoundary(callRpc, 'get_peer_solution', { p_attempt_id: attemptId, p_question_id: questionId }) as PeerSolution | null;
@@ -55,7 +82,7 @@ export const examClient: ExamClient = {
     return await callRpc('list_peer_solutions_v2', { p_attempt_id: attemptId, p_question_id: questionId }) as PeerSolutionCandidate[];
   },
   async getPeerSolutionByKey(attemptId, questionId, solutionKey) {
-    return await readInkAtBoundary(callRpc, 'get_peer_solution_by_key', { p_attempt_id: attemptId, p_question_id: questionId, p_solution_key: solutionKey }) as InkReplayData;
+    return await playableReplay(await readInkAtBoundary(callRpc, 'get_peer_solution_by_key', { p_attempt_id: attemptId, p_question_id: questionId, p_solution_key: solutionKey }) as InkReplayData);
   },
   async saveInk(attemptId, questionId, { revision, legacyImport, events, batchId, idsHash }) {
     // 바뀐 내용만 보낸다(supabase/migrations/20261003050000_exam_ink_delta.sql). 필기 전체는 보내지 않는다.

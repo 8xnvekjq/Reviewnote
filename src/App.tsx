@@ -1910,7 +1910,7 @@ function App() {
         <Screen when={activeTab === 'examPractice' && !!session?.user?.id}>
           <LazyScreenBoundary>
             {/* 나갈 때 오답노트를 다시 읽는다 — OMR 결과에서 고른 문항이 오답노트에 바로 보이게. */}
-            <ExamPracticeEntry currentUserId={session?.user?.id || ''} onExit={() => { refreshMistakesLight(); setActiveTab('notes'); }} />
+            <ExamPracticeEntry isAdmin={isAdmin} currentUserId={session?.user?.id || ''} onExit={() => { refreshMistakesLight(); setActiveTab('notes'); }} />
           </LazyScreenBoundary>
         </Screen>
 

@@ -174,6 +174,16 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
   const store = new Map<string, StoredAttempt>();
   const ink = new Map<string, ExamInkDocument[]>();
   const replay = new Map<string, InkReplayBatch[]>();
+  const audio = new Map<string, Array<import('../contract').SolutionAudioClip & { startedAt: number }>>();
+  const sampleRate = 8000, seconds = 12;
+  const wav = new Uint8Array(44 + sampleRate * seconds * 2);
+  const view = new DataView(wav.buffer);
+  const text = (offset: number, value: string) => [...value].forEach((char, i) => { wav[offset + i] = char.charCodeAt(0); });
+  text(0, 'RIFF'); view.setUint32(4, wav.length - 8, true); text(8, 'WAVE'); text(12, 'fmt ');
+  view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+  text(36, 'data'); view.setUint32(40, wav.length - 44, true);
+  const mockAudioUrl = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }));
   let seq = 0;
 
   const load = () => {
@@ -314,7 +324,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       return [
         { solutionKey: 'mock-peer-fingerprint', label: { face: '🐱', title: '수학의 신', grade: '고2', isTeacher: false }, timeSpentMs: 252000 },
         { solutionKey: 'mock-peer-second', label: { face: '🦊', title: '도전자', grade: '고1', isTeacher: false }, timeSpentMs: 15000 },
-        { solutionKey: 'mock-peer-teacher', label: { face: '🎓', title: null, grade: null, isTeacher: true }, timeSpentMs: 61000 },
+        { solutionKey: 'mock-peer-teacher', label: { face: '🎓', title: null, grade: null, isTeacher: true }, timeSpentMs: 61000, hasAudio: true },
       ];
     },
     async getPeerSolutionByKey(attemptId, questionId, solutionKey) {
@@ -327,12 +337,30 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       if (!['mock-peer-fingerprint', 'mock-peer-second', 'mock-peer-teacher'].includes(solutionKey)) throw new Error('EXAM_PEER_CHANGED');
       const strokes = mockPeerStrokes().map(s => ({ ...s, color: solutionKey === 'mock-peer-second' ? '#dc2626' : '#2563eb' }));
       const events = strokes.map((_, i) => ({ ...inkDelta(strokes.slice(0, i), strokes.slice(0, i + 1), 'draw', (i + 1) * 600), id: `peer-event-${i}` }));
-      return { strokes, revision: 1, batches: [{ id: 'peer-batch-1', revision: 1, baseRevision: 0, baseline: [], events }] };
+      return { strokes, revision: 1, batches: [{ id: 'peer-batch-1', revision: 1, baseRevision: 0, baseline: [], events }],
+        ...(solutionKey === 'mock-peer-teacher' ? { audioClips: [
+          { id: 'teacher-audio-1', offsetMs: -500, durationMs: 5500, mime: 'audio/wav', sizeBytes: wav.length, storagePath: 'mock/teacher1.wav', url: mockAudioUrl },
+          { id: 'teacher-audio-2', offsetMs: 6000, durationMs: 4000, mime: 'audio/wav', sizeBytes: wav.length, storagePath: 'mock/teacher2.wav', url: mockAudioUrl },
+        ] } : {}) };
+    },
+    async uploadSolutionAudio(clip, blob) {
+      record('uploadSolutionAudio', [clip, blob.size]);
+      if (!options.admin) throw new Error('EXAM_ADMIN_REQUIRED');
+      await wait();
+      const key = `${clip.attemptId}:${clip.questionId}`;
+      const rows = audio.get(key) ?? [];
+      if (!rows.some(row => row.id === clip.id)) rows.push({ id: clip.id, offsetMs: 0, startedAt: clip.startedAt,
+        durationMs: clip.durationMs, mime: 'audio/wav', sizeBytes: blob.size, storagePath: `mock/${clip.id}.wav`, url: mockAudioUrl });
+      audio.set(key, rows);
     },
     async getInkReplay(attemptId, questionId) {
       must(attemptId);
       const doc = ink.get(attemptId)?.find(row => row.questionId === questionId);
-      return clone({ batches: replay.get(`${attemptId}:${questionId}`) ?? [], strokes: doc?.strokes ?? [], revision: doc?.revision ?? 0 });
+      const batches = replay.get(`${attemptId}:${questionId}`) ?? [];
+      const origin = Math.min(...batches.flatMap(batch => batch.events.map(event => event.at)));
+      return clone({ batches, strokes: doc?.strokes ?? [], revision: doc?.revision ?? 0,
+        audioOriginMs: Number.isFinite(origin) ? origin : 0,
+        audioClips: (audio.get(`${attemptId}:${questionId}`) ?? []).map(row => ({ ...row, offsetMs: row.startedAt - (Number.isFinite(origin) ? origin : row.startedAt) })) });
     },
     // save_exam_ink_delta 흉내: 이벤트를 서버 쪽 필기에 적용하고 결과 획 id 해시를 대조한다.
     async saveInk(attemptId, questionId, request) {

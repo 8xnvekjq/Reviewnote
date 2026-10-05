@@ -2,6 +2,7 @@
 // 전체 문제 보기·OMR 검토·나가기/제출 확인은 이 화면 위에 겹쳐 띄운다(전체화면을 유지한 채).
 // v2: 자유 모드에서 채점해 본 문항(checked)은 답을 잠근다 — 이어 풀기로 다시 열어도 서버 payload 의 items[].checked 로 유지.
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { TeacherAudioRecorder } from '../audio/TeacherAudioRecorder';
 import { ExamAssistOverlay } from './ExamAssistOverlay';
 import { LaserIcon } from './LaserIcon';
 import { LassoIcon } from './LassoIcon';
@@ -46,6 +47,8 @@ type Overlay = null | 'overview' | 'review' | 'exit' | 'submit' | 'peer';
 
 interface Props {
   client: ExamClient;
+  isAdmin?: boolean;
+  currentUserId?: string;
   attempt: ExamAttempt;
   /** 나가기(진행 상황은 저장된 뒤). */
   onExit: () => void;
@@ -77,7 +80,7 @@ function initialIndex(attempt: ExamAttempt): number {
   return index >= 0 ? index : 0;
 }
 
-export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
+export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = false, currentUserId = '' }: Props) {
   const questions = attempt.questions;
   // 원본 페이지를 통째로 쓰는 시험지(한능검 기본)만 페이지 이동·확대·페이지 단위 필기를 쓴다.
   const hanneung = usesWholePages(questions);
@@ -128,6 +131,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
   const itemsRef = useRef(items);
   const visitOrderRef = useRef<number[]>([...attempt.visitOrder]);
   const swRef = useRef<StopwatchState>(createStopwatch(Object.fromEntries(attempt.items.map(item => [item.questionId, item.timeSpentMs]))));
+  const audioStopRef = useRef<(() => Promise<void>) | null>(null);
   const inkRef = useRef<ExamInkCanvasHandle>(null);
   // 문항을 넘길 때 깜박이지 않게 이 시험의 문항 이미지를 미리 받아 둔다.
   useEffect(() => { if (!hanneung) preloadInkImages(questions.map(q => q.imageUrl)); }, [questions, hanneung]);
@@ -263,6 +267,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
     swRef.current = pauseStopwatch(swRef.current, Date.now());
     if (saveTimer.current != null) { window.clearTimeout(saveTimer.current); saveTimer.current = null; }
     try {
+      await audioStopRef.current?.();
       // 서버가 받을 수 없는 문항(너무 큰 필기)만 남았으면 제출을 막지 않는다 — 그 필기는 이 기기에 남는다.
       if (!await flushInk() && !(inkSync.onlyRejectedPending && (auto || window.confirm(
         `${rejectedInkLabel(questions, inkSync.rejected)} 필기가 너무 많아 서버에 저장되지 않았어요(이 기기에는 남아 있어요). 그래도 제출할까요?`)))) {
@@ -368,6 +373,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
 
   const confirmExit = async () => {
     swRef.current = pauseStopwatch(swRef.current, Date.now());
+    await audioStopRef.current?.();
     const results = await Promise.all([flushInk(), saveNow()]);
     if (results.some(ok => !ok)) {
       setOverlay(null);
@@ -394,6 +400,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted }: Props) {
           <button type="button" className="rn-button rn-button-ghost rn-button-compact exam-exit" onClick={() => setOverlay('exit')}>
             나가기
           </button>
+          {isAdmin && <TeacherAudioRecorder client={client} ownerId={currentUserId} attemptId={attempt.id} questionId={inkKey} navigationKey={question.id} stopRef={audioStopRef} />}
           <div className="exam-tools" role="toolbar" aria-label="필기 도구">
             <div className="exam-tool-group">
               {([['pen', '펜', '✏️'], ['highlighter', '형광펜', '🖍️'], ['eraser', '지우개', '🧽'], ['laser', '레이저(남지 않음)', null], ['lasso', '올가미(옮기기·크기·회전)', null]] as const).map(([value, label, icon]) => (

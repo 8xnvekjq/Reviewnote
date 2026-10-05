@@ -2,6 +2,6 @@
 import { ExamPracticeScreen } from './ExamPracticeScreen';
 import { adminExamApi, examClient } from './examClient';
 
-export default function ExamPracticeEntry({ currentUserId, onExit }: { currentUserId: string; onExit: () => void }) {
-  return <ExamPracticeScreen client={examClient} admin={adminExamApi} currentUserId={currentUserId} onExit={onExit} />;
+export default function ExamPracticeEntry({ currentUserId, onExit, isAdmin = false }: { currentUserId: string; isAdmin?: boolean; onExit: () => void }) {
+  return <ExamPracticeScreen isAdmin={isAdmin} client={examClient} admin={adminExamApi} currentUserId={currentUserId} onExit={onExit} />;
 }

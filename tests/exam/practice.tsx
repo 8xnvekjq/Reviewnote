@@ -15,6 +15,34 @@ import { createBroadcastTransport } from '../../src/features/exam/broadcastTrans
 import type { LiveTransport } from '../../src/features/exam/liveTransport';
 
 const params = new URLSearchParams(location.search);
+if (params.get('fakeAudio') === '1') {
+  const stats = { starts: 0, stops: 0, timeslices: [] as number[], constraints: [] as unknown[], options: [] as unknown[] };
+  (window as unknown as { __audioStats: typeof stats }).__audioStats = stats;
+  const track = { stop() {}, getSettings: () => ({ channelCount: 1, sampleRate: 48000, noiseSuppression: true, autoGainControl: true, echoCancellation: false }) };
+  Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { async getUserMedia(constraints: unknown) {
+    stats.constraints.push(constraints);
+    if (params.get('denyAudio') === '1') throw new DOMException('거부됨', 'NotAllowedError');
+    return { getTracks: () => [track], getAudioTracks: () => [track] };
+  } } });
+  class FakeMediaRecorder {
+    static isTypeSupported(mime: string) { return mime === 'audio/webm;codecs=opus'; }
+    state = 'inactive'; mimeType: string; audioBitsPerSecond: number;
+    ondataavailable: ((event: { data: Blob }) => void) | null = null;
+    onstop: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    timer: number | undefined;
+    constructor(_stream: unknown, options: MediaRecorderOptions) {
+      this.mimeType = options.mimeType!; this.audioBitsPerSecond = options.audioBitsPerSecond!; stats.options.push(options);
+    }
+    emit() { this.ondataavailable?.({ data: new Blob(['test-audio-chunk'], { type: this.mimeType }) }); }
+    start(timeslice: number) {
+      stats.starts++; stats.timeslices.push(timeslice); this.state = 'recording';
+      this.timer = window.setInterval(() => this.emit(), 200);
+    }
+    stop() { if (this.state === 'inactive') return; stats.stops++; this.state = 'inactive'; clearInterval(this.timer); queueMicrotask(() => { this.emit(); this.onstop?.(); }); }
+  }
+  Object.defineProperty(window, 'MediaRecorder', { configurable: true, value: FakeMediaRecorder });
+}
 const log: Array<{ method: string; args: unknown[] }> = [];
 (window as unknown as { __examLog: typeof log }).__examLog = log;
 const inkStats = { requests: 0, bytes: 0 }; // 필기 저장 요청 수·본문 바이트
@@ -203,6 +231,7 @@ createRoot(document.getElementById('root')!).render(params.get('broadcast') === 
     <main className="rn-main">
       <div className="screen-enter">
         <ExamPracticeScreen
+          isAdmin={params.get('admin') === '1'}
           client={client}
           currentUserId={params.get('user') || 'student-1'}
           admin={adminApi}

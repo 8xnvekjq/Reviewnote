@@ -170,6 +170,7 @@ export interface ExamPaperHistoryAttempt extends ExamPaperMetadata {
 
 /** src/features/exam/examClient.ts의 서버 경계. */
 export interface ExamClient {
+  uploadSolutionAudio?(clip: SolutionAudioUpload, blob: Blob): Promise<void>;
   liveTransport?: import('./liveTransport').LiveTransport;
   getInk(attemptId: string): Promise<ExamInkDocument[]>;
   /** 바뀐 내용(events)만 보낸다. 결과 필기 전체 대신 결과 획 id 목록의 해시로 서버 결과와 맞춘다. */
@@ -255,7 +256,27 @@ export interface InkReplayBatch {
   baseline: InkStroke[] | null;
   events: InkReplayEvent[];
 }
+export interface SolutionAudioClip {
+  id: string;
+  offsetMs: number;
+  durationMs: number;
+  mime: string;
+  sizeBytes: number;
+  storagePath: string;
+  url?: string;
+}
+export interface SolutionAudioUpload {
+  id: string;
+  attemptId: string;
+  questionId: string;
+  startedAt: number;
+  durationMs: number;
+  mime: string;
+  sizeBytes: number;
+}
 export interface InkReplayData {
+  audioClips?: SolutionAudioClip[];
+  audioOriginMs?: number;
   batches: InkReplayBatch[];
   strokes: InkStroke[];
   revision: number;
@@ -272,6 +293,7 @@ export interface PeerSolution {
 
 /** 목록에는 익명 표시 정보와 응시자 범위의 불투명 키만 담는다. */
 export interface PeerSolutionCandidate {
+  hasAudio?: boolean;
   solutionKey: string;
   label: PeerSolution['label'];
   timeSpentMs: number;
