@@ -395,11 +395,7 @@ async function spinWheel(page, place, steps) {
   await peerView.getByRole('button', { name:'필기 순서 보기', exact:true }).click();
   await peerView.getByTestId('exam-replay-dock').waitFor();
   assert.equal(await peerCalls('getPeerSolutionByKey'), 1, 'replay reused in memory');
-  // Drag the anonymous dock: even its position must not write localStorage.
-  const peerGrip = peerView.getByTestId('exam-replay-dock').locator('.exam-replay-dock-head');
-  const gripBox = await peerGrip.boundingBox();
-  await page.mouse.move(gripBox.x + 8, gripBox.y + gripBox.height / 2); await page.mouse.down();
-  await page.mouse.move(gripBox.x + 30, gripBox.y - 20); await page.mouse.up();
+  assert.equal(await peerView.getByTestId('exam-replay-dock').evaluate(el => getComputedStyle(el).position), 'static', 'peer controls stay inline');
   assert.deepEqual(await storedInk(), beforePeerStorage, 'peer drawings, replay and position never persist');
   await page.getByTestId('exam-peer-back').click();
   assert.equal(await peerView.count(), 0);

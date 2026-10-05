@@ -3,6 +3,7 @@
 // v2: 자유 모드에서 채점해 본 문항(checked)은 답을 잠근다 — 이어 풀기로 다시 열어도 서버 payload 의 items[].checked 로 유지.
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { TeacherAudioRecorder } from '../audio/TeacherAudioRecorder';
+import { waitForAudioUploads } from '../audio/audioFlush';
 import { ExamAssistOverlay } from './ExamAssistOverlay';
 import { LaserIcon } from './LaserIcon';
 import { LassoIcon } from './LassoIcon';
@@ -21,7 +22,7 @@ import { worksheetReferences, type WorksheetReference } from './worksheetReferen
 import { ExamImageViewer } from './ExamImageViewer';
 import { PeerSolutionSwitch } from './PeerSolutionView';
 import { PeerSolutionSession } from './peerSolution';
-import { ResultInkNotes } from './ResultInkNotes';
+import type { TeacherAudioCapture } from '../audio/audioRecorder';
 import {
   countAnswered, createStopwatch, crossedAlerts, elapsedFor, formatClock, normalizeShortAnswer, pauseStopwatch, remainingMs,
   switchStopwatch, toggleChoice, questionAnswerType, usesWholePages, type StopwatchState,
@@ -43,7 +44,7 @@ const SIZES = [
 ];
 
 interface LocalItem { answer: string | null; unsure: boolean; visits: number; checked: FreeCheck | null }
-type Overlay = null | 'overview' | 'review' | 'exit' | 'submit' | 'peer';
+type Overlay = null | 'overview' | 'review' | 'exit' | 'submit';
 
 interface Props {
   client: ExamClient;
@@ -96,17 +97,18 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
   const [color, setColor] = useState(PEN_COLORS[0].value);
   const [size, setSize] = useState(SIZES[1].value);
   const [overlay, setOverlay] = useState<Overlay>(null);
-  const peerDialogRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (overlay !== 'peer') return;
-    const previous = document.activeElement as HTMLElement | null;
-    peerDialogRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
-    return () => previous?.focus();
-  }, [overlay]);
+  const [peerMode, setPeerMode] = useState(false);
+  const peerTrigger = useRef<HTMLElement | null>(null);
+  const exitPeer = useCallback(() => { setPeerMode(false); peerTrigger.current?.focus(); }, []);
   // 학습지 참고 이미지(삼각비 표) 보기 창. 열려 있는 동안 필기 캔버스는 입력을 받지 않는다.
   const [reference, setReference] = useState<WorksheetReference | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [toast, setToast] = useState<string | null>(null);
+  const [audioSubmit, setAudioSubmit] = useState<'uploading' | 'done' | 'failed' | null>(null);
+  const audioDecision = useRef<((retry: boolean) => void) | null>(null);
+  const audioStarted = useRef(0);
+  const audioDialogRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (audioSubmit) audioDialogRef.current?.focus(); }, [audioSubmit]);
   const [submitting, setSubmitting] = useState(false);
   const broadcastInk = useInkBroadcast(client.liveTransport, attempt.paperId, attempt.id, attempt.status === 'in_progress' && !submitting);
   // Live: after each server save, tell a watching admin which broadcasts that save contains.
@@ -131,6 +133,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
   const itemsRef = useRef(items);
   const visitOrderRef = useRef<number[]>([...attempt.visitOrder]);
   const swRef = useRef<StopwatchState>(createStopwatch(Object.fromEntries(attempt.items.map(item => [item.questionId, item.timeSpentMs]))));
+  const audioCaptureRef = useRef<TeacherAudioCapture | null>(null);
   const audioStopRef = useRef<(() => Promise<void>) | null>(null);
   const inkRef = useRef<ExamInkCanvasHandle>(null);
   // 문항을 넘길 때 깜박이지 않게 이 시험의 문항 이미지를 미리 받아 둔다.
@@ -197,9 +200,9 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
   // 검토 화면에선 문항 스톱워치를 멈춘다
   useEffect(() => {
     const t = Date.now();
-    if (overlay === 'review' || overlay === 'submit' || overlay === 'peer') swRef.current = pauseStopwatch(swRef.current, t);
+    if (overlay === 'review' || overlay === 'submit' || peerMode || submitting) swRef.current = pauseStopwatch(swRef.current, t);
     else if (!document.hidden && swRef.current.runningSince == null) swRef.current = switchStopwatch(swRef.current, openedRef.current, t);
-  }, [overlay]);
+  }, [overlay, peerMode, submitting]);
 
   // 탭이 숨겨지면 멈추고 저장, 돌아오면 다시
   useEffect(() => {
@@ -209,7 +212,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
         swRef.current = pauseStopwatch(swRef.current, t);
         void flushInk();
         void saveNow();
-      } else if (overlay !== 'review' && overlay !== 'submit' && overlay !== 'peer') {
+      } else if (overlay !== 'review' && overlay !== 'submit' && !peerMode && !submitting) {
         swRef.current = switchStopwatch(swRef.current, openedRef.current, t);
       }
     };
@@ -220,7 +223,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('pagehide', onPageHide);
     };
-  }, [overlay, flushInk, saveNow]);
+  }, [overlay, peerMode, submitting, flushInk, saveNow]);
 
   // 화면에서 나갈 때 남은 저장분 정리
   useEffect(() => () => {
@@ -267,7 +270,35 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
     swRef.current = pauseStopwatch(swRef.current, Date.now());
     if (saveTimer.current != null) { window.clearTimeout(saveTimer.current); saveTimer.current = null; }
     try {
-      await audioStopRef.current?.();
+      if (isAdmin && audioCaptureRef.current) {
+        const capture = audioCaptureRef.current;
+        audioStarted.current = Date.now();
+        setOverlay(null);
+        for (;;) {
+          setAudioSubmit('uploading');
+          const decision = new Promise<'continue'>(resolve => {
+            audioDecision.current = () => resolve('continue');
+          });
+          const outcome = await waitForAudioUploads(() => capture.flushUploads(), decision);
+          audioDecision.current = null;
+          if (outcome === 'continue') break;
+          if (outcome.ok) {
+            setAudioSubmit('done');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            break;
+          }
+          setAudioSubmit('failed');
+          let failureTimeout: ReturnType<typeof setTimeout> | undefined;
+          const retry = await new Promise<boolean>(resolve => {
+            audioDecision.current = resolve;
+            if (auto) failureTimeout = setTimeout(() => resolve(false), 5000);
+          });
+          clearTimeout(failureTimeout);
+          audioDecision.current = null;
+          if (!retry) break;
+        }
+        setAudioSubmit(null);
+      } else await audioStopRef.current?.();
       // 서버가 받을 수 없는 문항(너무 큰 필기)만 남았으면 제출을 막지 않는다 — 그 필기는 이 기기에 남는다.
       if (!await flushInk() && !(inkSync.onlyRejectedPending && (auto || window.confirm(
         `${rejectedInkLabel(questions, inkSync.rejected)} 필기가 너무 많아 서버에 저장되지 않았어요(이 기기에는 남아 있어요). 그래도 제출할까요?`)))) {
@@ -281,7 +312,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
       setSubmitError(error instanceof Error ? error.message : '제출하지 못했어요.');
       setOverlay(auto ? 'review' : 'submit');
     }
-  }, [client, attempt.id, snapshot, flushInk, onSubmitted, inkSync, questions]);
+  }, [client, attempt.id, snapshot, flushInk, onSubmitted, inkSync, questions, isAdmin]);
 
   const remaining = remainingMs(attempt.startedAt, attempt.timeLimitMinutes, now);
   useEffect(() => {
@@ -305,6 +336,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
   // ── 조작 ──
   const goTo = useCallback((next: number) => {
     if (next < 0 || next >= questions.length) return;
+    setPeerMode(false);
     setIndex(next);
   }, [questions.length]);
 
@@ -337,7 +369,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
   // 키보드(데스크톱 편의): ←/→ 이전·다음, 1~5 객관식
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (overlay || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (overlay || submitting || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
       const target = e.target as HTMLElement | null;
       if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
       if (e.key === 'ArrowLeft') { e.preventDefault(); goTo(index - 1); }
@@ -349,7 +381,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [overlay, goTo, index, question, setAnswer]);
+  }, [overlay, submitting, goTo, index, question, setAnswer]);
 
   const runFreeCheck = async () => {
     const answer = items[question.id]?.answer;
@@ -395,13 +427,13 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
 
   return (
     <div className="exam-solve" data-testid="exam-solve" data-mode={attempt.mode} data-question={question.number}>
-      <header className="exam-topbar" inert={overlay === 'peer' || undefined}>
+      <header className="exam-topbar" inert={submitting || undefined}>
         <div className="exam-topbar-main">
           <button type="button" className="rn-button rn-button-ghost rn-button-compact exam-exit" onClick={() => setOverlay('exit')}>
             나가기
           </button>
-          {isAdmin && <TeacherAudioRecorder client={client} ownerId={currentUserId} attemptId={attempt.id} questionId={inkKey} navigationKey={question.id} stopRef={audioStopRef} />}
-          <div className="exam-tools" role="toolbar" aria-label="필기 도구">
+          {isAdmin && <TeacherAudioRecorder client={client} ownerId={currentUserId} attemptId={attempt.id} questionId={inkKey} navigationKey={question.id} stopRef={audioStopRef} captureRef={audioCaptureRef} />}
+          <div className="exam-tools" role="toolbar" aria-label="필기 도구" inert={peerMode || undefined}>
             <div className="exam-tool-group">
               {([['pen', '펜', '✏️'], ['highlighter', '형광펜', '🖍️'], ['eraser', '지우개', '🧽'], ['laser', '레이저(남지 않음)', null], ['lasso', '올가미(옮기기·크기·회전)', null]] as const).map(([value, label, icon]) => (
                 <button key={value} type="button" className={`exam-tool${tool === value && !pagePan ? ' is-on' : ''}`} aria-pressed={tool === value && !pagePan} aria-label={label} title={label} onClick={() => { setTool(value); setPagePan(false); }}>
@@ -454,7 +486,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
       </header>
 
       <AnswerBar
-        inert={overlay === 'peer' || undefined}
+        inert={submitting || undefined}
         key={question.id}
         question={question}
         answer={current.answer}
@@ -467,35 +499,21 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
           revealed: revealed[question.id] ?? false,
           onCheck: () => { void runFreeCheck(); },
           onReveal: () => setRevealed(prev => ({ ...prev, [question.id]: true })),
+          peerActive: peerMode,
           onPeer: attempt.kind !== 'hanneung' && current.checked && (!current.checked.isCorrect || current.unsure)
-            ? () => { void saveNow().then(ok => { if (ok) setOverlay('peer'); else setToast('진행 상황을 저장하지 못했어요. 다시 눌러 주세요.'); }); } : undefined,
+            ? () => {
+              if (peerMode) { exitPeer(); return; }
+              peerTrigger.current = document.activeElement as HTMLElement;
+              void saveNow().then(ok => {
+                if (openedRef.current !== question.id || submittedRef.current) return;
+                if (ok) setPeerMode(true);
+                else setToast('진행 상황을 저장하지 못했어요. 다시 눌러 주세요.');
+              });
+            } : undefined,
         }}
       />
 
-      {overlay === 'peer' && <div className="exam-overlay exam-overlay-full exam-viewer-overlay" role="dialog" aria-modal="true" aria-label={`${question.number}번 풀이 보기`} onClick={closeOverlay}>
-        <div ref={peerDialogRef} className="exam-viewer" data-testid="exam-viewer" onClick={event => event.stopPropagation()} onKeyDown={event => {
-          if (event.key === 'Escape') { event.stopPropagation(); closeOverlay(); }
-          if (event.key === 'Tab') {
-            const buttons = [...event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), input, select, [tabindex="0"]')]
-              .filter(el => el.getClientRects().length > 0);
-            const first = buttons[0], last = buttons[buttons.length - 1];
-            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
-            else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
-          }
-        }}>
-          <div className="exam-sheet-head"><h2>{question.number}번 풀이 보기</h2>
-            <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={closeOverlay}>닫기</button>
-          </div>
-          <div className="exam-viewer-paper">
-            <PeerSolutionSwitch key={question.id} session={peerSession} eligible attemptId={attempt.id} questionId={question.id} imageUrl={question.imageUrl} autoPick>
-              {peerButton => <ResultInkNotes client={client} attemptId={attempt.id} questionId={question.id}
-                imageUrl={question.imageUrl} strokes={strokes.get(question.id) ?? []} ready={inkSync.ready} persist={false} extraTool={peerButton} />}
-            </PeerSolutionSwitch>
-          </div>
-        </div>
-      </div>}
-
-      <main className="exam-body" data-testid="exam-body" inert={overlay === 'peer' || undefined}>
+      <main className="exam-body" data-testid="exam-body" inert={submitting || undefined}>
         <div className="exam-paper">
           <div className="exam-paper-meta rn-caption">
             {question.sourceRound && <span data-testid="exam-question-source">제{question.sourceRound}회 {question.sourceNumber}번 · </span>}
@@ -526,6 +544,10 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
           </nav>}
           <div className={hanneung ? 'exam-original-scroll' : undefined}>
           <div style={hanneung && pageZoom ? { minWidth: 1100 } : undefined}>
+          <PeerSolutionSwitch key={question.id} session={peerSession} eligible={!isReal && attempt.kind !== 'hanneung'}
+            attemptId={attempt.id} questionId={question.id} imageUrl={question.imageUrl}
+            active={peerMode} onBack={exitPeer}>
+            {() => <>
           <ExamInkCanvas
             key={`${inkKey}:${inkSync.generation}`}
             ref={inkRef}
@@ -538,9 +560,11 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
             size={size}
             penOnlyWhenPenDetected
             shapeSnap
-            readOnly={!inkSync.ready || submitting || (hanneung && pagePan) || reference != null || overlay === 'peer'}
+            readOnly={!inkSync.ready || submitting || (hanneung && pagePan) || reference != null || peerMode}
             imageMaxWidth={hanneung ? (pageZoom ? 1100 : 980) : QUESTION_IMAGE_WIDTH}
           />
+            </>}
+          </PeerSolutionSwitch>
           </div>
           </div>
           {/* 이전·다음은 상단 화살표로 충분하다. 마지막 문항에서만 OMR 확인으로 이어 준다. */}
@@ -552,6 +576,22 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
         </div>
       </main>
 
+      {audioSubmit && <div ref={audioDialogRef} tabIndex={-1} className="exam-confirm" role="alertdialog" aria-modal="true" aria-label="음성 업로드" data-testid="exam-audio-submit" onKeyDown={event => {
+        if (event.key !== 'Tab') return;
+        const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('button')];
+        event.preventDefault();
+        if (!buttons.length) return;
+        const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+        buttons[(index + (event.shiftKey ? -1 : 1) + buttons.length) % buttons.length]?.focus();
+      }}>
+        <div className="exam-confirm-box">
+          <p role="status">{audioSubmit === 'done' ? '음성 업로드 완료!' : audioSubmit === 'failed'
+            ? '음성 업로드 실패 — 이 기기에 저장돼 있어 다음에 자동으로 다시 올라가요.' : '음성 업로드 중…'}</p>
+          <p>{audioCaptureRef.current?.state.uploads.filter(row => row.state === 'done').length ?? 0} / {audioCaptureRef.current?.state.uploads.length ?? 0}개 · {Math.floor(Math.max(0, now - audioStarted.current) / 1000)}초</p>
+          {audioSubmit === 'failed' && <button type="button" className="rn-button" onClick={() => audioDecision.current?.(true)}>다시 시도</button>}
+          {audioSubmit !== 'done' && <button type="button" className="rn-button" onClick={() => audioDecision.current?.(false)}>그래도 계속</button>}
+        </div>
+      </div>}
       {reference && <ExamImageViewer src={reference.href} label={reference.label} onClose={closeReference} />}
       {toast && <div className="exam-toast" role="status" aria-live="assertive">{toast}</div>}
 

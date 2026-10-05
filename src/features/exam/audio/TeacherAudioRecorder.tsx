@@ -3,9 +3,10 @@ import type { ExamClient } from '../contract';
 import { formatClock } from '../ui/examLogic';
 import { TeacherAudioCapture } from './audioRecorder';
 
-export function TeacherAudioRecorder({ client, ownerId, attemptId, questionId, navigationKey, stopRef }: {
+export function TeacherAudioRecorder({ client, ownerId, attemptId, questionId, navigationKey, stopRef, captureRef }: {
   client: ExamClient; ownerId: string; attemptId: string; questionId: string;
   navigationKey: string;
+  captureRef: RefObject<TeacherAudioCapture | null>;
   stopRef: RefObject<(() => Promise<void>) | null>;
 }) {
   const [, redraw] = useReducer(n => n + 1, 0);
@@ -28,9 +29,10 @@ export function TeacherAudioRecorder({ client, ownerId, attemptId, questionId, n
     };
   }, [capture]);
   useEffect(() => {
+    captureRef.current = capture;
     stopRef.current = () => capture.stop();
-    return () => { stopRef.current = null; };
-  }, [capture, stopRef]);
+    return () => { stopRef.current = null; captureRef.current = null; };
+  }, [capture, stopRef, captureRef]);
   useEffect(() => () => { void capture.stop(); }, [capture, navigationKey]);
   useEffect(() => {
     if (!state.recording) return;

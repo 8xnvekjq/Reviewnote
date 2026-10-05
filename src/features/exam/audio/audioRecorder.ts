@@ -33,7 +33,9 @@ export class TeacherAudioCapture {
   private status(draft: AudioDraft, state: AudioStatus['state']) {
     this.publish({ uploads: [...this.state.uploads.filter(row => row.id !== draft.id), { id: draft.id, questionId: draft.questionId, state }] });
   }
-  async recover() {
+  private recovery: Promise<void> | null = null;
+  recover() { return this.recovery ??= this.recoverDrafts(); }
+  private async recoverDrafts() {
     try {
       for (const draft of await this.store.list(this.ownerId)) {
         if (draft.sizeBytes === 0) { await this.store.remove(draft); continue; }
@@ -138,6 +140,14 @@ export class TeacherAudioCapture {
     await this.currentDone;
     this.stream?.getTracks().forEach(track => track.stop()); this.stream = null;
     this.publish({ recording: false });
+  }
+  async flushUploads(): Promise<{ ok: boolean; failed: number }> {
+    await this.stop();
+    await this.recovery;
+    this.retry();
+    while (this.uploading.size) await Promise.all([...this.uploading.values()]);
+    const failed = this.failures.size;
+    return { ok: failed === 0, failed };
   }
   retry() { for (const draft of this.failures.values()) void this.upload(draft); }
   private upload(draft: AudioDraft): Promise<void> {

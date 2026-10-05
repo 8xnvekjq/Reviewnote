@@ -7,7 +7,7 @@ const out = `${process.env.EXAM_TEST_ARTIFACT_DIR || '.test-artifacts'}/peer-pic
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
-  for (const viewport of [{ width:390,height:844 }, { width:820,height:1180 }]) {
+  for (const viewport of [{ width:390,height:844 }, { width:820,height:1180 }, { width:1024,height:768 }]) {
     const page = await browser.newPage({ viewport });
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
@@ -18,12 +18,26 @@ try {
     await page.getByRole('radio', { name:/확통/ }).click();
     await page.getByTestId('exam-start-button').click();
     await page.getByTestId('exam-solve').waitFor();
+    const ownInk = page.locator('[data-testid="exam-body"] .exam-ink');
+    await ownInk.waitFor();
+    const inkBox = await ownInk.boundingBox();
+    await page.mouse.move(inkBox.x + 30, inkBox.y + 40);
+    await page.mouse.down();
+    await page.mouse.move(inkBox.x + 100, inkBox.y + 80, { steps: 8 });
+    await page.mouse.up();
+    await page.waitForFunction(() => document.querySelector('[data-testid="exam-body"] .exam-ink')?.dataset.strokeCount === '1');
+    const ownCanvas = await ownInk.elementHandle();
     assert.equal(await page.getByTestId('exam-free-peer').count(),0);
     await page.locator('.exam-choice[data-choice="3"]').click();
     await page.getByRole('button',{name:'채점해 보기',exact:true}).click();
     await page.getByTestId('exam-free-peer').click();
     const list = page.getByTestId('exam-peer-list');
     await list.waitFor();
+    assert.equal(await page.locator('[role="dialog"], .exam-overlay').count(), 0);
+    await page.waitForTimeout(600);
+    const pausedAt = await page.getByTestId('exam-stopwatch').getAttribute('data-ms');
+    await page.waitForTimeout(600);
+    assert.equal(await page.getByTestId('exam-stopwatch').getAttribute('data-ms'), pausedAt);
     const rows = list.getByTestId('exam-peer-row');
     assert.equal(await rows.count(),3);
     assert.match(await rows.nth(0).innerText(),/🐱.*수학의 신.*고2.*4분 12초/s);
@@ -55,6 +69,7 @@ try {
     await rows.first().click();
     const peer = page.getByTestId('exam-peer-solution');
     await peer.getByTestId('exam-replay-dock').waitFor();
+    assert.equal(await peer.getByTestId('exam-replay-dock').evaluate(el => getComputedStyle(el).position), 'static');
     assert.equal(await list.count(),0);
     assert.match(await peer.getByTestId('exam-peer-label').innerText(),/수학의 신/);
     await peer.getByRole('slider',{name:'필기 재생 위치'}).press('End');
@@ -67,10 +82,31 @@ try {
     assert.deepEqual(calls,['mock-peer-fingerprint','mock-peer-second']);
     await peer.getByTestId('exam-peer-toggle').click();
     await page.keyboard.press('Escape');
-    assert.equal(await list.count(),0); assert.equal(await page.getByTestId('exam-viewer').count(),1);
-    await page.getByTestId('exam-viewer').getByRole('button',{name:'닫기',exact:true}).click();
+    assert.equal(await list.count(),0); assert.equal(await page.locator('[role="dialog"], .exam-overlay').count(),0);
+    await page.keyboard.press('Escape');
     assert.equal(await page.getByTestId('exam-free-peer').evaluate(el=>el===document.activeElement),true);
+    assert.equal(await ownInk.getAttribute('data-stroke-count'), '1');
+    assert.equal(await ownCanvas.evaluate(el => el === document.querySelector('[data-testid="exam-body"] .exam-ink')), true);
     assert.equal(await page.getByTestId('exam-freecheck').getAttribute('data-correct'),'false');
+    await page.getByTestId('exam-free-peer').click();
+    await list.waitFor();
+    await page.getByRole('button',{name:'다음 문항',exact:true}).click();
+    assert.equal(await list.count(),0);
+    await page.getByRole('button',{name:'이전 문항',exact:true}).click();
+    await page.evaluate(() => {
+      const original = window.__examClient.listPeerSolutions;
+      window.__examClient.listPeerSolutions = async (...args) => {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        return original(...args);
+      };
+    });
+    await page.getByTestId('exam-free-peer').click();
+    await page.getByTestId('exam-peer-back').waitFor();
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(700);
+    assert.equal(await list.count(), 0, 'late responses cannot reopen an exited peer session');
+    assert.equal(await page.getByTestId('exam-peer-back').count(), 0);
+    await ownInk.waitFor();
     await page.getByRole('button',{name:'제출',exact:true}).click();
     await page.getByRole('button',{name:'제출하기',exact:true}).click();
     await page.getByTestId('exam-submit-confirm').click();
@@ -79,6 +115,7 @@ try {
     await page.getByTestId('exam-peer-toggle').click();
     await rows.last().click();
     await peer.getByTestId('exam-replay-dock').waitFor();
+    assert.equal(await page.locator('[role="dialog"]').count(), 1);
     assert.match(await peer.getByTestId('exam-peer-label').innerText(),/선생님/);
     assert.equal(await peer.getByTestId('exam-notes-tools').count(),0);
     assert.deepEqual(errors,[]);
