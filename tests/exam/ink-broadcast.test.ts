@@ -14,6 +14,23 @@ const b = { ...a, id: 'b' };
 const message = { version: 1 as const, attemptId: 'attempt', questionId: 'question', number: 1, sessionId: 'session', sequence: 1,
   added: [{ index: 0, stroke: a }], removed: [] };
 
+test('navigation without ink broadcasts focus after pending old-question edits, without saving strokes', () => {
+  let flush = () => {};
+  const sent: Array<LiveInkMessage | LiveSavedMessage> = [];
+  const batch = createInkBatcher(m => sent.push(m), { schedule(fn) { flush = fn; return 1; }, cancel() {} }, 'session');
+  batch.change('attempt', 'question', 1, [], [a]);
+  batch.focus('attempt', 'next', 2, '/next.webp');
+  flush();
+  assert.equal(sent.length, 2);
+  const focus = parseLiveInk(sent[1])!;
+  assert.equal(focus.questionId, 'next');
+  assert.deepEqual(focus.added, []); assert.deepEqual(focus.removed, []);
+  const hints = receiveLiveInk(receiveLiveInk(undefined, sent[0] as LiveInkMessage, 0), focus, 1);
+  assert.equal(hints.focus?.questionId, 'next');
+  batch.focus('attempt', 'discarded', 3); batch.clear(); flush();
+  assert.equal(sent.length, 2);
+});
+
 test('fixed 750ms window coalesces additions/removals, bounds latency while drawing, cancels stopped watchers', () => {
   let now = 0;
   const tasks = new Map<number, { at: number; fn: () => void }>();

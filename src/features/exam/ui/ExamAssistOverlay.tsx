@@ -6,12 +6,17 @@ import { ASSIST_BATCH_MS, ASSIST_HOLD_MS, ASSIST_MAX_POINTS, assistAlpha, emptyA
 import type { AssistMessage, AssistPoint } from '../ink/inkAssist';
 
 /** 캔버스의 실제 이미지 너비를 공유하므로 확대·여백·화면 크기에 관계없이 같은 자리에 보인다. */
-export function ExamAssistOverlay({ transport, attemptId, questionId, imageWidth, active = true, enabled = false, admin = false, clearToken = 0 }:
-  { transport?: LiveTransport; attemptId: string; questionId: string; imageWidth: number; active?: boolean; enabled?: boolean; admin?: boolean; clearToken?: number }) {
+export type AssistConnection = 'connecting' | 'ready' | 'failed';
+export function ExamAssistOverlay({ transport, attemptId, questionId, imageWidth, active = true, enabled = false, admin = false, clearToken = 0, onConnectionChange }:
+  { transport?: LiveTransport; attemptId: string; questionId: string; imageWidth: number; active?: boolean; enabled?: boolean; admin?: boolean; clearToken?: number; onConnectionChange?: (state: AssistConnection) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const state = useRef(emptyAssist());
   const channel = useRef<LiveChannel | undefined>(undefined);
   const ready = useRef(false);
+  const delivery = useRef({ generation: 0, failed: false });
+  const notify = useRef(onConnectionChange);
+  notify.current = onConnectionChange;
+  const sendAssist = useRef<(message: AssistMessage) => void>(() => {});
   const [writing, setWriting] = useState(false);
   const requestPaint = useRef<() => void>(() => {});
   const gesture = useRef<{ pointerId: number; strokeId: string; points: AssistPoint[]; pending: AssistPoint[]; seq: number } | null>(null);
@@ -23,13 +28,37 @@ export function ExamAssistOverlay({ transport, attemptId, questionId, imageWidth
     do {
       const message: AssistMessage = { version: 1, kind: 'stroke', questionId, strokeId: g.strokeId,
         points: g.pending.splice(0, ASSIST_MAX_POINTS), done: done && g.pending.length === 0, seq: g.seq++ };
-      try { if (ready.current) channel.current?.send('assist', message); } catch { /* 연결 해제는 조용히 무시 */ }
+      sendAssist.current(message);
     } while (g.pending.length);
   };
   useEffect(() => {
     state.current = emptyAssist(); setWriting(false);
+    ready.current = false;
+    delivery.current = { generation: delivery.current.generation + 1, failed: false };
+    notify.current?.('connecting');
+    sendAssist.current = () => { notify.current?.('failed'); };
     if (!transport || !active) return;
     let disposed = false;
+    const send = (message: AssistMessage) => {
+      if (!ready.current || !channel.current) { notify.current?.('failed'); return; }
+      const generation = delivery.current.generation;
+      const failed = () => {
+        if (!disposed && generation === delivery.current.generation) {
+          delivery.current.failed = true; notify.current?.('failed');
+        }
+      };
+      try {
+        const result = channel.current.send('assist', message);
+        void Promise.resolve(result).then(ok => {
+          if (ok === false) { failed(); return; }
+          // A later successful batch must not hide missing points earlier in this gesture.
+          if (!disposed && generation === delivery.current.generation && !delivery.current.failed) {
+            notify.current?.(ready.current ? 'ready' : 'connecting');
+          }
+        }, failed);
+      } catch { failed(); }
+    };
+    sendAssist.current = send;
     try {
       channel.current = transport.open(`exam-assist:${attemptId}`, 'assist', value => {
         if (disposed || admin) return;
@@ -38,16 +67,26 @@ export function ExamAssistOverlay({ transport, attemptId, questionId, imageWidth
           state.current = receiveAssist(state.current, message, questionId, performance.now());
           requestPaint.current();
         }
-      }, connected => { if (!disposed) ready.current = connected; });
-    } catch { /* 선택 기능: 풀이 화면을 방해하지 않는다 */ }
-    return () => { disposed = true; ready.current = false; channel.current?.close(); channel.current = undefined; };
+      }, connected => {
+        if (!disposed) {
+          if (ready.current !== connected) delivery.current = { generation: delivery.current.generation + 1, failed: false };
+          ready.current = connected; notify.current?.(connected ? 'ready' : 'connecting');
+        }
+      });
+    } catch { notify.current?.('failed'); }
+    return () => {
+      disposed = true; ready.current = false; channel.current?.close(); channel.current = undefined;
+      sendAssist.current = () => {};
+      notify.current?.('connecting');
+    };
   }, [transport, active, attemptId, questionId, admin]);
   useEffect(() => {
     if (!admin || !clearToken) return;
     gesture.current = null;
     state.current = emptyAssist();
     requestPaint.current();
-    try { if (ready.current) channel.current?.send('assist', { version: 1, kind: 'clear', questionId }); } catch { /* 선택 기능 */ }
+    delivery.current = { generation: delivery.current.generation + 1, failed: false };
+    sendAssist.current({ version: 1, kind: 'clear', questionId });
   }, [clearToken, admin, questionId]);
   useEffect(() => {
     if (enabled && active) return;
@@ -120,12 +159,16 @@ export function ExamAssistOverlay({ transport, attemptId, questionId, imageWidth
   return <>
     <canvas ref={canvasRef} data-testid="exam-assist-overlay" aria-label={admin ? '도와주기 펜 그리기' : undefined} aria-hidden={!admin}
       style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: 5,
+        outline: admin && enabled && active ? '2px solid #be123c' : undefined, outlineOffset: -2,
+        cursor: admin && enabled && active ? ready.current ? 'crosshair' : 'wait' : undefined,
         pointerEvents: admin && enabled && active ? 'auto' : 'none', touchAction: enabled ? 'none' : undefined }}
       onPointerDown={event => {
         if (!admin || !enabled || !active || !ready.current || gesture.current || event.button !== 0) return;
         if (assistAlpha(state.current, performance.now()) > 0 && (state.current.strokes.size >= 128 ||
           [...state.current.strokes.values()].reduce((n, s) => n + s.points.length, 0) >= 16_000)) return;
         event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId);
+        delivery.current = { generation: delivery.current.generation + 1, failed: false };
+        notify.current?.('ready');
         const p = point(event);
         gesture.current = { pointerId: event.pointerId, strokeId: crypto.randomUUID(), points: [p], pending: [p], seq: 0 };
         preview(false); flush.current(false);

@@ -11,6 +11,7 @@ import AdminStudentExamSummary from '../../src/components/admin/AdminStudentExam
 import type { AdminExamApi, AdminExamAttemptSummary, AdminPaperStudentActivity, ExamAttempt } from '../../src/features/exam/contract';
 import { inkDelta, inkIdsHash } from '../../src/features/exam/ink/inkReplay';
 import { AdminLiveView } from '../../src/features/exam/ui/AdminLiveView';
+import { createBroadcastTransport } from '../../src/features/exam/broadcastTransport';
 import type { LiveTransport } from '../../src/features/exam/liveTransport';
 
 const params = new URLSearchParams(location.search);
@@ -75,10 +76,11 @@ const adminApi: AdminExamApi = {
 if (params.has('broadcast')) {
   const wireLog: Array<{ topic: string; event: string; payload: unknown }> = [];
   let connected = true;
+  let sendFailure = false;
   const statuses = new Set<(ready: boolean) => void>();
   const topics = new Set<string>();
   const role = params.get('broadcast');
-  const transport: LiveTransport = {
+  const mockTransport: LiveTransport = {
     open(topic, event, receive, status) {
       const channel = new BroadcastChannel(`exam-test:${topic}`);
       topics.add(topic);
@@ -95,10 +97,41 @@ if (params.has('broadcast')) {
       };
     },
   };
+  // Same private-channel API and broadcast envelope as Supabase, with a local wire only.
+  const transport = params.get('transport') === 'supabase' ? createBroadcastTransport({
+    realtime: { async setAuth() {}, isConnected: () => connected },
+    channel(topic: string, options: { config: { private: boolean; broadcast: { ack: boolean } } }) {
+      if (!options.config.private) throw new Error('Expected private channel');
+      const bus = new BroadcastChannel(`exam-test:${topic}`);
+      const bindings: Array<{ event: string; receive: (message: unknown) => void }> = [];
+      let notify: (state: string) => void = () => {};
+      const channel = {
+        state: 'joining',
+        on(_type: string, filter: { event: string }, receive: (message: unknown) => void) { bindings.push({ event: filter.event, receive }); return this; },
+        subscribe(callback: (state: string) => void) {
+          notify = callback; topics.add(topic);
+          statuses.add(update);
+          queueMicrotask(() => update(connected));
+          return this;
+        },
+        async send(message: { event: string; payload: unknown }) {
+          if (!connected) return 'error';
+          if (sendFailure) return 'error';
+          wireLog.push({ topic, ...message }); bus.postMessage(message); return 'ok';
+        },
+        close() { topics.delete(topic); statuses.delete(update); bus.close(); channel.state = 'closed'; notify('CLOSED'); },
+      };
+      const update = (value: boolean) => { channel.state = value ? 'joined' : 'errored'; notify(value ? 'SUBSCRIBED' : 'CHANNEL_ERROR'); };
+      bus.onmessage = e => { if (connected) for (const item of bindings) if (item.event === '*' || item.event === e.data.event) item.receive(e.data); };
+      return channel;
+    },
+    async removeChannel(channel: { close(): void }) { channel.close(); return 'ok'; },
+  } as unknown as Parameters<typeof createBroadcastTransport>[0]) : mockTransport;
   (window as unknown as { __broadcast: unknown }).__broadcast = {
     log: wireLog,
     topics,
     setConnected(value: boolean) { connected = value; for (const status of statuses) status(value); },
+    setSendFailure(value: boolean) { sendFailure = value; },
   };
   client.liveTransport = transport;
   adminApi.liveTransport = transport;
@@ -139,7 +172,7 @@ if (params.has('broadcast')) {
 function BroadcastAdminFixture() {
   const [open, setOpen] = useState(false);
   return <div><button data-testid="broadcast-open" onClick={() => setOpen(true)}>Live 열기</button>
-    {open && <AdminLiveView api={adminApi} paperId="2025-06-math" title="방송 검증" onClose={() => setOpen(false)} />}</div>;
+    {open && <AdminLiveView api={adminApi} paperId={params.get('broadcastPaper') || '2025-06-math'} title="방송 검증" onClose={() => setOpen(false)} />}</div>;
 }
 
 if (params.get('live') === '1') {

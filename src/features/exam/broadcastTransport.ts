@@ -1,6 +1,6 @@
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
 
-export interface LiveChannel { send(event: string, payload: unknown): void; close(): void }
+export interface LiveChannel { send(event: string, payload: unknown): void | Promise<boolean>; close(): void }
 export interface LiveTransport {
   open(topic: string, event: string, receive: (payload: unknown) => void, status: (ready: boolean) => void): LiveChannel;
 }
@@ -30,12 +30,12 @@ export function createBroadcastTransport(client: Pick<SupabaseClient, 'channel' 
           // an already-connected singleton socket. Keep callback-based token refresh.
           await client.realtime.setAuth();
           if (entries.get(topic) !== current || !current.listeners.size || current.closing) return;
-          current.channel = client.channel(topic, { config: { private: true, broadcast: { self: false, ack: false },
+          current.channel = client.channel(topic, { config: { private: true, broadcast: { self: false, ack: topic.startsWith('exam-assist:') },
             // Realtime requires a read permission to join. Ink publishers have
             // presence read only; no client tracks presence or receives other ink.
             presence: { enabled: topic.startsWith('exam-live:') } } });
-          current.channel.on('broadcast', { event }, ({ payload }) => {
-            if (!current.closing) for (const item of current.listeners) if (item.event === event) item.receive(payload);
+          current.channel.on('broadcast', { event: '*' }, ({ event: name, payload }) => {
+            if (!current.closing) for (const item of current.listeners) if (item.event === name) item.receive(payload);
           });
           current.channel.subscribe((state, error) => {
             current.ready = state === 'SUBSCRIBED' && !current.closing;
@@ -51,11 +51,15 @@ export function createBroadcastTransport(client: Pick<SupabaseClient, 'channel' 
       if (!current.channel && !current.closing && !current.starting) void start();
       else queueMicrotask(() => { if (current.listeners.has(listener)) status(current.ready); });
       return {
-        send(name, payload) {
+        async send(name, payload) {
           const channel = current.channel;
           // send() otherwise falls back to HTTP in supabase-js. Drop instead.
-          if (!current.listeners.has(listener) || !current.ready || current.closing || channel?.state !== 'joined' || !client.realtime.isConnected()) return;
-          try { void channel.send({ type: 'broadcast', event: name, payload }).catch(() => {}); } catch { /* polling fallback */ }
+          if (!current.listeners.has(listener) || !current.ready || current.closing || channel?.state !== 'joined' || !client.realtime.isConnected()) return false;
+          try {
+            const result = await channel.send({ type: 'broadcast', event: name, payload });
+            if (result !== 'ok') { warn(topic, `Send failed: ${result}`); return false; }
+            return true;
+          } catch (error) { warn(topic, error instanceof Error ? error.message : 'Send failed'); return false; }
         },
         close() {
           current.listeners.delete(listener);

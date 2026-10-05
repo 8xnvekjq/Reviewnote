@@ -40,6 +40,9 @@
 .rn-button-secondary, .rn-icon-button { background: var(--rn-elevated); border-color: var(--rn-line); }
 .rn-button-ghost { background: transparent; color: var(--rn-muted); }
 .rn-button-destructive { background: #532b39; color: #ffced6; }
+.rn-button-assist-active { background: #be123c; color: #fff; border-color: #fb7185; }
+.rn-button-assist-active:hover { background: #9f1239; }
+.theme-light .exam-live-assist-bar { --rn-text: #334155; color: var(--rn-text); }
 .rn-icon-button { width: 44px; padding: 10px; }
 /* 문제 추가처럼 "hero CTA로 보이면 안 되는" primary 버튼 — touch target(40px)은 유지하되
    패딩/글자를 줄여 문제 목록보다 시각적 우선순위가 높아지지 않게 한다. */

@@ -1,6 +1,52 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createBroadcastTransport } from '../../src/features/exam/broadcastTransport.ts';
+import { parseAssist, receiveAssist, emptyAssist } from '../../src/features/exam/ink/inkAssist.ts';
+
+test('assist uses private acknowledged broadcast, unwraps envelopes, reports drops and failed sends, shares event bindings', async () => {
+  let connected = true;
+  let deliver: (message: any) => void = () => {};
+  let notify: (state: string) => void = () => {};
+  let response = 'ok', sends = 0;
+  let student = emptyAssist();
+  const ready: boolean[] = [];
+  const other: unknown[] = [];
+  const channel = {
+    state: 'joining',
+    on(type: string, filter: unknown, receive: typeof deliver) {
+      assert.equal(type, 'broadcast'); assert.deepEqual(filter, { event: '*' }); deliver = receive; return this;
+    },
+    subscribe(status: typeof notify) { notify = status; return this; },
+    async send(message: any) { sends++; if (response === 'reject') throw new Error('offline'); if (response === 'ok') deliver(message); return response; },
+  };
+  let joins = 0;
+  const transport = createBroadcastTransport({
+    realtime: { async setAuth() {}, isConnected: () => connected },
+    channel(topic: string, config: unknown) {
+      joins++; assert.equal(topic, 'exam-assist:attempt');
+      assert.deepEqual(config, { config: { private: true, broadcast: { self: false, ack: true }, presence: { enabled: false } } });
+      return channel;
+    },
+    async removeChannel() { return 'ok'; },
+  } as unknown as Parameters<typeof createBroadcastTransport>[0]);
+  const handle = transport.open('exam-assist:attempt', 'assist', value => {
+    const parsed = parseAssist(value); assert.ok(parsed); student = receiveAssist(student, parsed, 'question', 100);
+  }, value => ready.push(value));
+  const message = { version: 1, kind: 'stroke', questionId: 'question', strokeId: 'stroke', points: [{ x: .2, y: .3 }], seq: 0, done: true };
+  assert.equal(await handle.send('assist', message), false); assert.equal(sends, 0);
+  await Promise.resolve(); channel.state = 'joined'; notify('SUBSCRIBED');
+  assert.equal(await handle.send('assist', message), true); assert.equal(student.strokes.size, 1);
+  const second = transport.open('exam-assist:attempt', 'another-event', value => other.push(value), () => {});
+  deliver({ event: 'another-event', payload: 42 }); assert.deepEqual(other, [42]); assert.equal(joins, 1);
+  response = 'error'; assert.equal(await handle.send('assist', message), false);
+  response = 'timed out'; assert.equal(await handle.send('assist', message), false);
+  response = 'reject'; assert.equal(await handle.send('assist', message), false);
+  connected = false; assert.equal(await handle.send('assist', message), false); assert.equal(sends, 4);
+  connected = true; notify('TIMED_OUT'); assert.equal(await handle.send('assist', message), false);
+  response = 'ok'; notify('SUBSCRIBED'); assert.equal(await handle.send('assist', { version: 1, kind: 'clear', questionId: 'question' }), true);
+  assert.equal(student.strokes.size, 0); assert.deepEqual(ready, [true, false, true]);
+  handle.close(); second.close(); await Promise.resolve(); await Promise.resolve();
+});
 
 test('private transport shares topics across StrictMode replay, drops offline sends, and serializes a pending leave/rejoin', async () => {
   let connected = true, created = 0, removed = 0;
@@ -16,7 +62,7 @@ test('private transport shares topics across StrictMode replay, drops offline se
         state: 'joined', sent: [] as unknown[], callback: (_: unknown) => {}, status: (_: string) => {},
         on(_type: string, _filter: unknown, fn: (message: unknown) => void) { this.callback = fn; return this; },
         subscribe(fn: (state: string) => void) { this.status = fn; fn('SUBSCRIBED'); return this; },
-        async send(message: unknown) { this.sent.push(message); },
+        async send(message: unknown) { this.sent.push(message); return 'ok'; },
       };
       channels.push(channel); return channel;
     },
@@ -37,7 +83,7 @@ test('private transport shares topics across StrictMode replay, drops offline se
   const second = transport.open('exam-live:paper','ink', value => heard.push(value), () => {});
   await Promise.resolve();
   assert.equal(created,1); assert.equal(removed,0, 'effect replay retains the existing subscription');
-  channels[0].callback({ payload: 'hello' }); assert.deepEqual(heard,['hello']);
+  channels[0].callback({ event: 'ink', payload: 'hello' }); assert.deepEqual(heard,['hello']);
   first.send('ink', {}); assert.equal(channels[0].sent.length, 1, 'disposed handle cannot send');
   second.close(); await Promise.resolve(); assert.equal(removed,1);
   const third = transport.open('exam-live:paper','ink', () => {}, () => {});
@@ -60,7 +106,7 @@ test('private join waits for fresh auth, reports failures once, recovers, and ne
     state: 'joining',
     on() { return this; },
     subscribe(fn: typeof status) { status = fn; return this; },
-    async send(message: unknown) { sent.push(message); },
+    async send(message: unknown) { sent.push(message); return 'ok'; },
   };
   const client = {
     realtime: {
@@ -159,5 +205,15 @@ test('installed supabase-js sends the session JWT and presence-enabled private j
   assert.equal(joins[1].access_token, 'session-refreshed');
   assert.equal(joins[1].config.presence.enabled, false);
   assert.equal(client.realtime.channels[0].joinPush.payload().access_token, 'session-refreshed');
-  ink.close(); watch.close(); await Promise.resolve(); await Promise.resolve();
+  const heard: unknown[] = [];
+  const assist = transport.open('exam-assist:attempt', 'assist', value => heard.push(value), () => {});
+  await waitForJoin(3);
+  assert.deepEqual(joins[2].config.broadcast, { self: false, ack: true });
+  assert.equal(joins[2].config.private, true);
+  assert.equal(joins[2].config.presence.enabled, false);
+  const payload = { version: 1, kind: 'clear', questionId: 'question' };
+  // Real installed SDK binding/filter/transform path, at the Phoenix wire boundary.
+  (client.realtime.channels[2].channelAdapter as any).channel.trigger('broadcast', { event: 'assist', payload });
+  assert.deepEqual(heard, [payload]);
+  ink.close(); watch.close(); assist.close(); await Promise.resolve(); await Promise.resolve();
 });

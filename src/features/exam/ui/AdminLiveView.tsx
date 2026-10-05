@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
-import { ExamAssistOverlay } from './ExamAssistOverlay';
+import { ExamAssistOverlay, type AssistConnection } from './ExamAssistOverlay';
 import type { AdminExamApi } from '../contract';
 import { ExamInkCanvas } from '../ink/ExamInkCanvas';
 import { inkExtent } from '../ink/inkFit';
@@ -40,6 +40,7 @@ function LiveCell({ row, now, focused, wide, onOpen, transport }: { row: LiveStu
   const frame = useLiveFrame(row);
   const [pen, setPen] = useState(false);
   const [clearToken, setClearToken] = useState(0);
+  const [assistConnection, setAssistConnection] = useState<AssistConnection>('connecting');
   const imageFailed = !!frame && inkImageFailed(frame.imageUrl);
   // A retry that succeeds after a failure remounts the canvas so its broken <img> loads again.
   const [recovery, setRecovery] = useState(NO_RECOVERY);
@@ -50,14 +51,15 @@ function LiveCell({ row, now, focused, wide, onOpen, transport }: { row: LiveStu
   return <section className="exam-live-cell" data-testid="exam-live-cell" data-attempt-id={row.attemptId}>
     {/* 확대 화면은 문항이 길어 아래 버튼을 누르면 문항 위쪽이 화면 밖으로 밀린다 — 위에 붙여 둔다. */}
     {focused && <div className="exam-live-assist-bar" style={{ display: 'flex', gap: 8, padding: 8, position: 'sticky', top: 0, zIndex: 10, background: 'var(--rn-surface, #fff)' }}>
-      <button type="button" className="rn-button rn-button-compact" aria-pressed={pen} onClick={() => setPen(value => !value)}>도와주기 펜</button>
-      <button type="button" className="rn-button rn-button-compact" onClick={() => setClearToken(value => value + 1)}>지우기 (Clear)</button>
+      <button type="button" className={`rn-button rn-button-compact ${pen ? 'rn-button-assist-active' : 'rn-button-secondary'}`} aria-pressed={pen} onClick={() => setPen(value => !value)}>{pen ? '도와주기 펜 켜짐' : '도와주기 펜'}</button>
+      <button type="button" className="rn-button rn-button-compact" disabled={assistConnection === 'connecting'} onClick={() => setClearToken(value => value + 1)}>지우기 (Clear)</button>
+      <small role="status" data-testid="exam-assist-connection">{assistConnection === 'ready' ? '도와주기 연결됨' : assistConnection === 'failed' ? '전송 실패 · 다시 그려 주세요' : '도와주기 연결 대기 중'}</small>
     </div>}
     <CellContent type={focused ? undefined : 'button'} className="exam-live-cell-open" aria-label={`${row.studentName} 풀이 확대`} onClick={() => { if (!focused) onOpen(); }}>
       <strong>{row.studentName} · {frame?.number ?? row.number}번</strong><span>{Math.max(0, Math.floor((now - Date.parse(row.updatedAt)) / 1000))}초 전 갱신</span>
       <div className="exam-live-canvas" data-question-id={frame?.questionId ?? ''}>
         {frame
-          ? <ExamInkCanvas key={nextRecovery.generation} imageUrl={frame.imageUrl} strokes={frame.strokes} onChange={noop} tool="pen" color="#2563eb" size={3} readOnly overlay={focused ? imageWidth => <ExamAssistOverlay key={row.questionId} transport={transport} attemptId={row.attemptId} questionId={row.questionId} imageWidth={imageWidth} admin enabled={pen && frame.questionId === row.questionId} active={frame.questionId === row.questionId} clearToken={clearToken} /> : undefined} fitToInk={inkExtent(frame.strokes)} imageMaxWidth={wide ? 760 : 480} />
+          ? <ExamInkCanvas key={nextRecovery.generation} imageUrl={frame.imageUrl} strokes={frame.strokes} onChange={noop} tool="pen" color="#2563eb" size={3} readOnly overlay={focused ? imageWidth => <ExamAssistOverlay key={row.questionId} transport={transport} attemptId={row.attemptId} questionId={row.questionId} imageWidth={imageWidth} admin enabled={pen && frame.questionId === row.questionId} active={frame.questionId === row.questionId} clearToken={clearToken} onConnectionChange={setAssistConnection} /> : undefined} fitToInk={inkExtent(frame.strokes)} imageMaxWidth={wide ? 760 : 480} />
           : <div className="exam-live-image-pending" data-testid="exam-live-image-pending" role="status" aria-label="문항 이미지를 불러오는 중" />}
       </div>
       {imageFailed && <small className="exam-live-image-failed" data-testid="exam-live-image-failed" role="status">문항 이미지를 불러오지 못했어요 · 다시 시도 중</small>}
