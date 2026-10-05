@@ -165,9 +165,33 @@ try {
   assert.match(await teacher.innerText(), /🎙️/); await teacher.click();
   await student.getByTestId('exam-replay-audio').waitFor();
   assert.equal(await student.getByTestId('exam-replay-audio').getAttribute('data-muted'), 'true');
+  const sound = student.getByTestId('exam-audio-sound');
+  assert.equal(await sound.textContent(), '🔇소리 켜기');
+  assert.equal(await sound.getAttribute('aria-label'), '소리 켜기');
+  assert.equal(await sound.getAttribute('aria-pressed'), 'false');
+  assert.equal(await sound.evaluate(el => !!el.closest('[data-testid="exam-replay-dock"]')), true);
+  const soundBox = await sound.boundingBox();
+  assert.ok(soundBox.width >= 40 && soundBox.height >= 40);
+  for (const theme of ['light', 'dark']) {
+    await student.evaluate(async value => {
+      const { applyThemeColor } = await import('/src/utils/theme.ts');
+      applyThemeColor(value === 'light' ? '#FFFFFF' : undefined);
+    }, theme);
+    assert.equal(await sound.evaluate(el => getComputedStyle(el).color), theme === 'light' ? 'rgb(15, 23, 42)' : 'rgb(243, 245, 251)');
+    await student.getByTestId('exam-replay-dock').screenshot({ path: `${out}/speaker-${theme}.png` });
+  }
   await student.waitForFunction(() => { const audio = document.querySelector('audio'); return audio && audio.muted && !audio.paused; });
   await student.getByTestId('exam-audio-sound').click();
   assert.equal(await student.getByTestId('exam-replay-audio').getAttribute('data-muted'), 'false');
+  assert.equal(await sound.textContent(), '🔊소리 끄기');
+  assert.equal(await sound.getAttribute('aria-label'), '소리 끄기');
+  assert.equal(await sound.getAttribute('aria-pressed'), 'true');
+  assert.equal(await student.getByTestId('exam-audio-player').evaluate(audio => audio.muted), false);
+  await sound.click();
+  assert.equal(await sound.textContent(), '🔇소리 켜기');
+  assert.equal(await sound.getAttribute('aria-pressed'), 'false');
+  assert.equal(await student.getByTestId('exam-audio-player').evaluate(audio => audio.muted), true);
+  await sound.click();
   await student.getByRole('button', { name: '일시정지', exact: true }).click();
   assert.equal(await student.getByTestId('exam-audio-player').evaluate(audio => audio.paused), true);
   const slider = student.getByRole('slider', { name: '필기 재생 위치' });

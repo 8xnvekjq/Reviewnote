@@ -174,9 +174,9 @@ export function PeerSolutionSwitch({ session, eligible, attemptId, questionId, i
         {picker}
       </div>
       <ExamInkReplay key={solution.solutionKey} client={replayClient} attemptId={attemptId} questionId={questionId}
-        imageUrl={imageUrl} strokes={solution.strokes} imageMaxWidth={480} persistDock={false} inline autoOpen />
+        imageUrl={imageUrl} strokes={solution.strokes} imageMaxWidth={480} persistDock={false} inline autoOpen peerPlayback />
     </section>}
-    {/* 내 캔버스는 숨겨서 필기와 실행 취소 상태를 보존한다. */}
-    <div hidden={!!solution || !!active}>{children(solution || active !== undefined ? null : picker)}</div>
+    {/* 목록을 고를 때는 내 문항을 보여 주고, 풀이가 열려도 필기와 실행 취소 상태를 보존한다. */}
+    <div hidden={!!solution}>{children(solution || active !== undefined ? null : picker)}</div>
   </div>;
 }

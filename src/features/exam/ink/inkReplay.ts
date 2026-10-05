@@ -1,4 +1,4 @@
-import type { InkChangeKind, InkReplayData, InkReplayEvent, InkStroke } from '../contract.ts';
+import type { InkChangeKind, InkReplayData, InkReplayEvent, InkStroke, SolutionAudioClip } from '../contract.ts';
 
 export function inkDelta(before: InkStroke[], after: InkStroke[], kind: InkChangeKind, at = Date.now()): InkReplayEvent {
   const old = new Map(before.map(stroke => [stroke.id, stroke]));
@@ -95,41 +95,111 @@ function drawnStroke(step: ReplayStep) {
   return event.added[0];
 }
 
+export const REPLAY_THINKING_PAUSE_MS = 10000;
+type TimeSegment = { realStart: number; realEnd: number; start: number; end: number };
+export type ReplayPause = { start: number; end: number; durationMs: number; label: string };
+
+export function formatThinkingPause(ms: number) {
+  const seconds = Math.max(1, Math.round(ms / 1000));
+  const hours = Math.floor(seconds / 3600), minutes = Math.floor(seconds % 3600 / 60);
+  const parts = [hours ? `${hours}시간` : '', minutes ? `${minutes}분` : '', seconds % 60 ? `${seconds % 60}초` : ''];
+  return `${parts.filter(Boolean).join(' ')} 고민`;
+}
+
+function timeMapping(segments: TimeSegment[], total: number) {
+  const map = (value: number, inverse: boolean) => {
+    if (!segments.length) return 0;
+    const fromStart = inverse ? 'start' : 'realStart', fromEnd = inverse ? 'end' : 'realEnd';
+    const toStart = inverse ? 'realStart' : 'start', toEnd = inverse ? 'realEnd' : 'end';
+    const t = Math.max(segments[0][fromStart], Math.min(segments.at(-1)![fromEnd], value));
+    let low = 0, high = segments.length - 1;
+    while (low < high) { const mid = (low + high) >> 1; if (segments[mid][fromEnd] < t) low = mid + 1; else high = mid; }
+    const s = segments[low], length = s[fromEnd] - s[fromStart];
+    return s[toStart] + (length ? (t - s[fromStart]) / length : 0) * (s[toEnd] - s[toStart]);
+  };
+  return { total, toReplay: (real: number) => map(real, false), toReal: (replay: number) => map(replay, true) };
+}
+
+/** 녹음과 획의 활동 구간을 합치고, 그 밖의 빈 구간만 줄인다. 시계는 양방향으로 변환한다. */
+export function buildReplayTimeMap(activity: readonly { start: number; end: number }[], origin = 0) {
+  const intervals = activity.filter(s => Number.isFinite(s.start) && Number.isFinite(s.end) && s.end >= s.start)
+    .map(s => ({ ...s })).sort((a, b) => a.start - b.start);
+  const merged: typeof intervals = [];
+  for (const interval of intervals) {
+    const last = merged.at(-1);
+    if (last && interval.start <= last.end) last.end = Math.max(last.end, interval.end);
+    else merged.push(interval);
+  }
+  const segments: TimeSegment[] = [], pauses: ReplayPause[] = [];
+  let real = Math.min(origin, merged[0]?.start ?? origin), clock = 0;
+  for (const interval of merged) {
+    const gap = interval.start - real;
+    if (gap > 0) {
+      const end = clock + Math.min(gap, REPLAY_MAX_PAUSE_MS);
+      segments.push({ realStart: real, realEnd: interval.start, start: clock, end });
+      if (gap >= REPLAY_THINKING_PAUSE_MS) pauses.push({ start: clock, end, durationMs: gap, label: formatThinkingPause(gap) });
+      clock = end;
+    }
+    const end = clock + interval.end - interval.start;
+    segments.push({ realStart: interval.start, realEnd: interval.end, start: clock, end });
+    clock = end; real = interval.end;
+  }
+  return { ...timeMapping(segments, clock), pauses };
+}
+
 /**
  * 단계 목록을 시간 축으로 펼친다. 획은 실제로 그린 속도대로, 획 사이의 긴 대기는 줄여서 놓는다.
  * frame(ms)는 그 시각의 필기(그리는 중인 획은 그때까지 그린 부분만)를 돌려준다.
  */
-export function buildInkClock(timeline: InkTimeline, audio?: { origin: number; shift: number; total: number }) {
+export function buildInkClock(timeline: InkTimeline, audio?: { origin: number; clips: readonly SolutionAudioClip[] }) {
   const { steps } = timeline;
   const starts: number[] = [];
   const ends: number[] = [];
   let clock = 0;
-  let previousEnd = 0; // 직전 단계가 끝난 실제 시각(ms, 0이면 모름)
-  steps.forEach((step, index) => {
+  let previousEnd: number | null = null; // 직전 단계의 실제 시각(익명 풀이의 0도 유효함)
+  const pauses: ReplayPause[] = [];
+  const segments: TimeSegment[] = [];
+  const durationOf = (step: ReplayStep) => {
     const added = drawnStroke(step);
     const lastT = added ? Math.max(0, ...added.stroke.points.map(point => point.t)) : 0;
+    return Math.max(1, Math.min(audio ? Infinity : REPLAY_MAX_STROKE_MS, Number.isFinite(lastT) ? lastT : 0));
+  };
+  const audioMap = audio ? buildReplayTimeMap([
+    ...audio.clips.map(clip => ({ start: clip.offsetMs, end: clip.offsetMs + clip.durationMs })),
+    ...steps.filter(step => step.event).map(step => ({ start: step.at - audio.origin - durationOf(step), end: step.at - audio.origin })),
+  ]) : null;
+  steps.forEach((step, index) => {
+    const added = drawnStroke(step);
     // 지우기·실행 취소처럼 순간인 단계도 1ms를 줘서, 시작 시각에는 아직 일어나지 않은 상태로 보이게 한다.
-    const duration = Math.max(1, Math.min(REPLAY_MAX_STROKE_MS, Number.isFinite(lastT) ? lastT : 0));
-    if (audio) {
-      // 해설 중에는 생각하는 시간도 그대로 재생하여 음성과 획이 어긋나지 않는다.
-      const realEnd = step.event ? step.at - audio.origin + audio.shift : clock;
-      const start = Math.max(clock, realEnd - duration);
+    const duration = durationOf(step);
+    if (audio && audioMap) {
+      const realEnd = step.at - audio.origin;
+      const start = step.event ? audioMap.toReplay(realEnd - duration) : clock;
       starts.push(start);
-      clock = Math.max(start + 1, realEnd);
+      clock = Math.max(clock, start + 1, step.event ? audioMap.toReplay(realEnd) : start + duration);
       ends.push(clock);
       return;
     }
-    const realStart = step.at > 0 ? step.at - (added ? duration : 0) : 0;
+    const knownTime = !!step.event && (step.at > 0 || !timeline.approximate);
+    const realStart = knownTime ? step.at - (added ? duration : 0) : 0;
     const gap = index === 0 ? REPLAY_LEAD_IN_MS
-      : realStart > 0 && previousEnd > 0 ? Math.min(REPLAY_MAX_PAUSE_MS, Math.max(0, realStart - previousEnd))
+      : knownTime && previousEnd !== null ? Math.min(REPLAY_MAX_PAUSE_MS, Math.max(0, realStart - previousEnd))
       : REPLAY_UNKNOWN_GAP_MS;
+    if (index > 0 && knownTime && previousEnd !== null) {
+      const realGap = Math.max(0, realStart - previousEnd);
+      if (realGap >= REPLAY_THINKING_PAUSE_MS) pauses.push({ start: clock, end: clock + gap, durationMs: realGap, label: formatThinkingPause(realGap) });
+      if (realGap > 0) segments.push({ realStart: previousEnd, realEnd: realStart, start: clock, end: clock + gap });
+    }
     clock += gap;
     starts.push(clock);
+    if (knownTime) segments.push({ realStart, realEnd: realStart + duration, start: clock, end: clock + duration });
     clock += duration;
     ends.push(clock);
-    previousEnd = step.at > 0 ? step.at : 0;
+    previousEnd = knownTime ? step.at : null;
   });
-  const total = Math.max(clock, audio?.total ?? 0);
+  const total = Math.max(clock, audioMap?.total ?? 0);
+  const mapping = audioMap ?? timeMapping(segments, total);
+  const audioClips = audio?.clips.map(clip => ({ ...clip, offsetMs: mapping.toReplay(clip.offsetMs) })) ?? [];
   /** time 시각까지 끝난 단계 수. */
   const completedAt = (time: number) => {
     let low = 0, high = steps.length;
@@ -137,7 +207,8 @@ export function buildInkClock(timeline: InkTimeline, audio?: { origin: number; s
     return low;
   };
   return {
-    total, starts, ends, completedAt,
+    total, starts, ends, completedAt, audioClips, pauses: audioMap?.pauses ?? pauses,
+    toReplay: mapping.toReplay, toReal: mapping.toReal,
     frame(time: number): InkStroke[] {
       const t = Math.max(0, Math.min(total, time));
       const done = completedAt(t);

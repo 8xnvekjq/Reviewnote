@@ -6,9 +6,54 @@ const base = `${process.env.EXAM_TEST_BASE_URL || 'http://127.0.0.1:5174'}/tests
 const out = `${process.env.EXAM_TEST_ARTIFACT_DIR || '.test-artifacts'}/peer-picker`;
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
+async function checkCanvasPlayback(page, peer) {
+  const canvas = peer.getByTestId('exam-peer-canvas');
+  await peer.getByRole('slider').press('End');
+  await peer.getByRole('slider').press('Home');
+  await canvas.scrollIntoViewIfNeeded();
+  const box = await canvas.boundingBox();
+  const x = Math.round(box.x + box.width / 2), y = Math.round(box.y + 45);
+  const paused = () => peer.getByRole('button', { name: '재생', exact: true });
+  const playing = () => peer.getByRole('button', { name: '일시정지', exact: true });
+  assert.equal(await paused().count(), 1);
+  await page.touchscreen.tap(x, y);
+  assert.equal(await playing().count(), 1, 'one-finger tap starts playback');
+  await page.touchscreen.tap(x, y);
+  assert.equal(await paused().count(), 1, 'one-finger tap pauses playback');
+  assert.equal(await peer.getByTestId('exam-replay-feedback').isVisible(), true);
+  await page.waitForTimeout(750);
+  assert.equal(await peer.getByTestId('exam-replay-feedback').count(), 0);
+  await page.mouse.move(x, y); await page.mouse.down();
+  await page.mouse.move(x + 40, y + 30, { steps: 5 }); await page.mouse.up();
+  assert.equal(await paused().count(), 1, 'drag does not toggle');
+  await page.mouse.move(x, y); await page.mouse.down();
+  await page.waitForTimeout(350); await page.mouse.up();
+  assert.equal(await paused().count(), 1, 'long press does not toggle');
+  await page.mouse.click(x, y);
+  assert.equal(await playing().count(), 1, 'mouse click starts playback');
+  await page.mouse.click(x, y);
+  assert.equal(await paused().count(), 1);
+  const cdp = await page.context().newCDPSession(page);
+  const touch = (type, touchPoints) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints });
+  await touch('touchStart', [{ x, y, id: 1 }]);
+  await touch('touchMove', [{ x, y: y + 50, id: 1 }]);
+  await touch('touchEnd', []);
+  assert.equal(await paused().count(), 1, 'native touch scroll does not toggle');
+  await canvas.scrollIntoViewIfNeeded();
+  const next = await canvas.boundingBox();
+  const px = Math.round(next.x + next.width / 2), py = Math.round(next.y + 45);
+  await touch('touchStart', [{ x: px - 20, y: py, id: 1 }, { x: px + 20, y: py, id: 2 }]);
+  await touch('touchMove', [{ x: px - 35, y: py + 10, id: 1 }, { x: px + 35, y: py + 10, id: 2 }]);
+  await touch('touchEnd', []);
+  assert.equal(await paused().count(), 1, 'pinch does not toggle');
+  await touch('touchStart', [{ x: px - 20, y: py, id: 1 }, { x: px + 20, y: py, id: 2 }]);
+  await touch('touchEnd', []);
+  assert.equal(await paused().count(), 1, 'two-finger tap does not toggle');
+  await cdp.detach();
+}
 try {
   for (const viewport of [{ width:390,height:844 }, { width:820,height:1180 }, { width:1024,height:768 }]) {
-    const page = await browser.newPage({ viewport });
+    const page = await browser.newPage({ viewport, hasTouch: true });
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(base);
@@ -18,6 +63,13 @@ try {
     await page.getByRole('radio', { name:/확통/ }).click();
     await page.getByTestId('exam-start-button').click();
     await page.getByTestId('exam-solve').waitFor();
+    await page.evaluate(() => {
+      const original = window.__examClient.listPeerSolutions;
+      window.__examClient.listPeerSolutions = async (...args) => {
+        const rows = await original(...args);
+        return [...rows.slice(0, 2), ...[3, 4].map(i => ({ ...rows[1], solutionKey: `extra-${i}` })), ...rows.slice(2)];
+      };
+    });
     const ownInk = page.locator('[data-testid="exam-body"] .exam-ink');
     await ownInk.waitFor();
     const inkBox = await ownInk.boundingBox();
@@ -33,13 +85,20 @@ try {
     await page.getByTestId('exam-free-peer').click();
     const list = page.getByTestId('exam-peer-list');
     await list.waitFor();
+    assert.equal(await ownInk.isVisible(), true, 'question canvas stays visible under chooser');
+    const openBox = await ownInk.boundingBox();
+    assert.ok(openBox.width > 0 && openBox.height > 0);
+    assert.equal(openBox.width, inkBox.width);
+    assert.equal(openBox.height, inkBox.height);
+    assert.equal(await list.evaluate(el => getComputedStyle(el).position), 'fixed');
+    assert.equal(await list.evaluate(el => getComputedStyle(el).overflowY), 'auto');
     assert.equal(await page.locator('[role="dialog"], .exam-overlay').count(), 0);
     await page.waitForTimeout(600);
     const pausedAt = await page.getByTestId('exam-stopwatch').getAttribute('data-ms');
     await page.waitForTimeout(600);
     assert.equal(await page.getByTestId('exam-stopwatch').getAttribute('data-ms'), pausedAt);
     const rows = list.getByTestId('exam-peer-row');
-    assert.equal(await rows.count(),3);
+    assert.equal(await rows.count(),5);
     assert.match(await rows.nth(0).innerText(),/🐱.*수학의 신.*고2.*4분 12초/s);
     assert.match(await rows.nth(1).innerText(),/🦊.*도전자.*고1.*15초/s);
     assert.match(await rows.last().innerText(),/🎓.*선생님.*1분 1초/s);
@@ -49,6 +108,7 @@ try {
       const rect = await list.boundingBox();
       assert.ok(rect.x >= 0 && rect.x + rect.width <= viewport.width && rect.y + rect.height <= viewport.height);
       await list.screenshot({path:`${out}/list-${viewport.width}-${theme}.png`});
+      if (viewport.width === 390) await page.screenshot({path:`${out}/question-popover-${theme}.png`});
     }
     const listReadsBefore = await page.evaluate(() => window.__examLog.filter(row=>row.method==='listPeerSolutions').length);
     await page.evaluate(() => {
@@ -72,8 +132,16 @@ try {
     assert.equal(await peer.getByTestId('exam-replay-dock').evaluate(el => getComputedStyle(el).position), 'static');
     assert.equal(await list.count(),0);
     assert.match(await peer.getByTestId('exam-peer-label').innerText(),/수학의 신/);
+    assert.equal(await peer.getByTestId('exam-audio-sound').count(), 0);
+    await checkCanvasPlayback(page, peer);
     await peer.getByRole('slider',{name:'필기 재생 위치'}).press('End');
     await page.waitForFunction(() => document.querySelector('[data-testid="exam-peer-solution"] .exam-ink')?.dataset.strokeCount === '3');
+    await peer.getByTestId('exam-peer-toggle').click();
+    assert.equal(await peer.locator('.exam-ink').isVisible(), true);
+    const peerBox = await peer.locator('.exam-ink').boundingBox();
+    assert.ok(peerBox.width > 0 && peerBox.height > 0);
+    await peer.getByTestId('exam-peer-label').first().click();
+    assert.equal(await list.count(), 0, 'outside tap closes chooser');
     await peer.getByTestId('exam-peer-toggle').click();
     await rows.nth(1).click();
     await peer.getByTestId('exam-replay-dock').waitFor();
@@ -113,11 +181,16 @@ try {
     await page.getByTestId('exam-result').waitFor();
     await page.locator('.exam-item-row[data-number="1"]').click();
     await page.getByTestId('exam-peer-toggle').click();
+    const resultInk = page.locator('[role="dialog"] .exam-ink').first();
+    assert.equal(await resultInk.isVisible(), true);
+    const resultBox = await resultInk.boundingBox();
+    assert.ok(resultBox.width > 0 && resultBox.height > 0);
     await rows.last().click();
     await peer.getByTestId('exam-replay-dock').waitFor();
     assert.equal(await page.locator('[role="dialog"]').count(), 1);
     assert.match(await peer.getByTestId('exam-peer-label').innerText(),/선생님/);
     assert.equal(await peer.getByTestId('exam-notes-tools').count(),0);
+    await checkCanvasPlayback(page, peer);
     assert.deepEqual(errors,[]);
     await page.close();
     console.log(`ok — peer picker free/result selection, switching, keyboard and themes (${viewport.width}px)`);

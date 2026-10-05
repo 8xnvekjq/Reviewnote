@@ -473,10 +473,27 @@
 .exam-audio-notice { flex-basis:100%; }
 .exam-audio-settings { font-size:11px; max-width:260px; overflow-wrap:anywhere; }
 .exam-audio-settings summary { cursor:pointer; }
-.exam-audio-toggle { font-size:12px; padding:5px; }
+.exam-replay-audio { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+.exam-audio-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; min-width: 44px; padding: 6px 10px; border: 1px solid var(--rn-line); border-radius: 10px; background: var(--rn-elevated); color: inherit; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.exam-audio-toggle > span:first-child { font-size: 20px; }
+.exam-audio-toggle[aria-pressed="true"] { background: rgb(96 165 250 / .22); }
+.exam-audio-toggle:focus-visible { outline: 2px solid var(--rn-accent); outline-offset: 2px; }
+.exam-replay-canvas { position: relative; }
+.exam-replay-feedback { position: absolute; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: rgb(15 23 42 / .6); color: #fff; pointer-events: none; transform: translate(-50%, -50%); animation: exam-replay-feedback .65s ease-out forwards; }
+@keyframes exam-replay-feedback { 0%, 25% { opacity: .8; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .exam-replay-feedback { animation: none; } }
 
 .exam-replay-dock.exam-replay-inline { position: static; transform: none; width: 100%; display: flex; flex-wrap: wrap; align-items: center; box-shadow: none; margin-bottom: 8px; }
 .exam-replay-inline .exam-replay-dock-head { display: none; }
-.exam-replay-inline .exam-replay-slider { flex: 1 1 140px; }
+.exam-replay-inline .exam-replay-progress { flex: 1 1 140px; }
 .exam-replay-inline .exam-replay-note { flex-basis: 100%; }
 .exam-peer-inline { min-width: 0; }
+.theme-light .exam-peer-inline, .theme-light .exam-replay-dock { --rn-text: #0f172a; --rn-muted: #475569; --rn-line: #cbd5e1; color: var(--rn-text); }
+
+/* 긴 고민은 작은 점으로 표시하고, 탭하거나 초점을 맞추면 실제 시간을 보여 준다. */
+.exam-replay-progress { position: relative; min-width: 0; padding-bottom: 12px; }
+.exam-replay-markers { position: absolute; left: 8px; right: 8px; bottom: 0; height: 14px; }
+.exam-replay-pause { position: absolute; top: 0; transform: translateX(-50%); width: 14px; height: 14px; padding: 0; border: 0; background: transparent; color: #fbbf24; cursor: pointer; }
+.exam-replay-pause::before { content: ''; display: block; width: 5px; height: 5px; margin: auto; border-radius: 50%; background: currentColor; }
+.exam-replay-pause span { display: none; position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); width: max-content; max-width: 140px; padding: 4px 6px; border-radius: 6px; background: #0f172a; color: #fbbf24; font-size: 11px; pointer-events: none; }
+.exam-replay-pause:hover span, .exam-replay-pause:focus span { display: block; }
