@@ -2,10 +2,13 @@ import { useEffect, useMemo, useReducer, useState, type RefObject } from 'react'
 import type { ExamClient } from '../contract';
 import { formatClock } from '../ui/examLogic';
 import { TeacherAudioCapture } from './audioRecorder';
+import { TeacherAudioManager } from './TeacherAudioManager';
 
-export function TeacherAudioRecorder({ client, ownerId, attemptId, questionId, navigationKey, stopRef, captureRef }: {
+export function TeacherAudioRecorder({ client, ownerId, attemptId, questionId, navigationKey, stopRef, captureRef, onReset }: {
   client: ExamClient; ownerId: string; attemptId: string; questionId: string;
   navigationKey: string;
+  /** "처음부터 다시": 이 문항의 필기를 지운다(녹음 정리는 여기서 먼저 한다). */
+  onReset?: () => Promise<void>;
   captureRef: RefObject<TeacherAudioCapture | null>;
   stopRef: RefObject<(() => Promise<void>) | null>;
 }) {
@@ -50,6 +53,12 @@ export function TeacherAudioRecorder({ client, ownerId, attemptId, questionId, n
         ? <button type="button" className="exam-replay-link" onClick={() => capture.retry()}>실패 · 다시 시도</button>
         : state.uploads.length ? '완료' : ''}
     </span>
+    <TeacherAudioManager client={client} capture={capture} attemptId={attemptId} questionId={questionId}
+      onReset={onReset && (async () => {
+        // 이 기기의 녹음(진행 중 녹음·대기 중 업로드)을 먼저 버려야 서버에서 지운 뒤 다시 올라가지 않는다.
+        await capture.discardQuestion(attemptId, questionId);
+        await onReset();
+      })} />
     {state.notice && <span role="status" className="exam-audio-notice">{state.notice}</span>}
     {state.settings && <details className="exam-audio-settings"><summary>마이크 설정</summary>{state.settings}</details>}
   </div>;

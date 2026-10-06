@@ -353,6 +353,41 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
         durationMs: clip.durationMs, mime: 'audio/wav', sizeBytes: blob.size, storagePath: `mock/${clip.id}.wav`, url: mockAudioUrl });
       audio.set(key, rows);
     },
+    async listSolutionAudio(attemptId, questionId) {
+      record('listSolutionAudio', [attemptId, questionId]);
+      if (!options.admin) throw new Error('EXAM_ADMIN_REQUIRED');
+      await wait();
+      return (audio.get(`${attemptId}:${questionId}`) ?? []).map(row => ({ id: row.id, startedAt: row.startedAt,
+        durationMs: row.durationMs, mime: row.mime, sizeBytes: row.sizeBytes, storagePath: row.storagePath }))
+        .sort((a, b) => a.startedAt - b.startedAt || a.id.localeCompare(b.id));
+    },
+    async deleteSolutionAudio(clipId) {
+      record('deleteSolutionAudio', [clipId]);
+      if (!options.admin) throw new Error('EXAM_ADMIN_REQUIRED');
+      await wait();
+      for (const [key, rows] of audio) audio.set(key, rows.filter(row => row.id !== clipId));
+    },
+    // reset_exam_question_solution 흉내: 녹음·재생 기록을 지우고 필기는 빈 채로 revision만 올린다.
+    async resetQuestionSolution(attemptId, questionId) {
+      record('resetQuestionSolution', [attemptId, questionId]);
+      if (!options.admin) throw new Error('EXAM_ATTEMPT_NOT_FOUND');
+      must(attemptId);
+      await wait();
+      const key = `${attemptId}:${questionId}`;
+      audio.delete(key);
+      replay.delete(key);
+      const docs = ink.get(attemptId) ?? [];
+      const old = docs.find(row => row.questionId === questionId);
+      if (old) ink.set(attemptId, [...docs.filter(row => row.questionId !== questionId), { questionId, strokes: [], revision: old.revision + 1, lastBatchId: null }]);
+      persist();
+      return { revision: old ? old.revision + 1 : 0 };
+    },
+    async getAttemptForRevision(attemptId) {
+      record('getAttemptForRevision', [attemptId]);
+      if (!options.admin) throw new Error('EXAM_ADMIN_REQUIRED');
+      await wait();
+      return clone(must(attemptId).attempt);
+    },
     async getInkReplay(attemptId, questionId) {
       must(attemptId);
       const doc = ink.get(attemptId)?.find(row => row.questionId === questionId);
@@ -379,7 +414,8 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
         return duplicate.revision;
       }
       if ((old?.revision ?? 0) !== revision) throw new Error('EXAM_INK_CONFLICT');
-      if (entry.attempt.status === 'submitted' && !(legacyImport && !old)) throw new Error('EXAM_INK_SUBMITTED');
+      // 관리자 본인 응시는 제출한 뒤에도 풀이(필기)를 고칠 수 있다.
+      if (entry.attempt.status === 'submitted' && !options.admin && !(legacyImport && !old)) throw new Error('EXAM_INK_SUBMITTED');
       if (!events.length) throw new Error('EXAM_REPLAY_TOO_LARGE');
       const decodedEvents = decodeInkPayload<typeof events>(packedEvents);
       const strokes = decodedEvents.reduce(applyInkEvent, old?.strokes ?? []);

@@ -17,6 +17,8 @@ type Props = {
   result: ExamResult;
   onBack: () => void;
   backLabel?: string;
+  /** 관리자 본인 결과: 문항 풀이(필기·녹음)를 고치러 다시 연다. */
+  onRevise?: () => void;
 } & (
   | { client: ExamClient; review?: undefined }
   /** 관리자 읽기 전용 검토: 서버 필기만 읽고, 오답노트 담기·필기 저장은 하지 않는다. */
@@ -28,6 +30,7 @@ interface BodyProps {
   result: ExamResult;
   onBack: () => void;
   backLabel?: string;
+  onRevise?: () => void;
   ink: Map<string, InkStroke[]>;
   inkBar: ReactNode;
   studentName?: string;
@@ -40,10 +43,10 @@ interface BodyProps {
 export function OmrResultView(props: Props) {
   return props.review
     ? <ReviewResult client={props.client} result={props.result} onBack={props.onBack} backLabel={props.backLabel} studentName={props.review.studentName} />
-    : <StudentResult client={props.client} result={props.result} onBack={props.onBack} backLabel={props.backLabel} />;
+    : <StudentResult client={props.client} result={props.result} onBack={props.onBack} backLabel={props.backLabel} onRevise={props.onRevise} />;
 }
 
-function StudentResult({ client, result, onBack, backLabel }: { client: ExamClient; result: ExamResult; onBack: () => void; backLabel?: string }) {
+function StudentResult({ client, result, onBack, backLabel, onRevise }: { client: ExamClient; result: ExamResult; onBack: () => void; backLabel?: string; onRevise?: () => void }) {
   const inkSync = useExamInk(client, result.attemptId, result.items.map(item => item.questionId));
   const inkBar = (
     <p className="rn-caption" role="status">
@@ -63,7 +66,7 @@ function StudentResult({ client, result, onBack, backLabel }: { client: ExamClie
     const docs = await client.getInk(result.attemptId);
     return new Map(docs.map(doc => [doc.questionId, doc.strokes]));
   };
-  return <OmrResultBody client={client} result={result} onBack={onBack} backLabel={backLabel} ink={inkSync.strokes} inkBar={inkBar}
+  return <OmrResultBody client={client} result={result} onBack={onBack} backLabel={backLabel} onRevise={onRevise} ink={inkSync.strokes} inkBar={inkBar}
     inkReady={inkSync.ready} loadOriginalInk={loadOriginalInk} />;
 }
 
@@ -85,7 +88,7 @@ function ReviewResult({ client, result, onBack, backLabel, studentName }: {
   return <OmrResultBody client={client} result={result} onBack={onBack} backLabel={backLabel} ink={ink ?? new Map()} inkBar={inkBar} studentName={studentName} inkReady={ink !== null} />;
 }
 
-function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar, studentName, inkReady = false, loadOriginalInk }: BodyProps) {
+function OmrResultBody({ client, result: initial, onBack, backLabel, onRevise, ink, inkBar, studentName, inkReady = false, loadOriginalInk }: BodyProps) {
   const [result, setResult] = useState(initial);
   const reviewing = studentName != null;
   const wholePages = usesWholePages(initial.items);
@@ -170,6 +173,9 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, ink, inkBar
     <div className="exam-result" data-testid="exam-result">
       {!reviewing && <div className="exam-result-head">
         <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={onBack}>{backLabel ?? '← 시험지 목록'}</button>
+        {onRevise && <button type="button" className="rn-button rn-button-secondary rn-button-compact" data-testid="exam-result-revise" onClick={onRevise}>
+          풀이 고치기(필기·녹음)
+        </button>}
       </div>}
       {inkBar}
 

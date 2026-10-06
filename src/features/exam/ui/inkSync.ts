@@ -195,8 +195,35 @@ export class InkSync {
     if (!this.ready || this.status === 'conflict') return Promise.resolve(false);
     if (options.background && Date.now() < this.nextTryAt) return Promise.resolve(false);
     if (this.serverSyncOff) return Promise.resolve(true); // 이 기기(IndexedDB)에는 획마다 이미 저장돼 있다.
-    this.saving = this.flushNow(options.background ?? false).finally(() => { this.saving = null; });
-    return this.saving;
+    const saving: Promise<boolean> = this.flushNow(options.background ?? false).finally(() => { if (this.saving === saving) this.saving = null; });
+    this.saving = saving;
+    return saving;
+  }
+
+  /**
+   * "처음부터 다시": 진행 중인 저장이 끝난 뒤 서버에서 이 문항을 지우고(serverReset), 이 기기의 초안도 빈 필기로 바꾼다.
+   * 저장과 같은 writer 자리를 잡으므로 그 사이에 옛 batch가 올라가지 않는다. 지우기 전의 미저장 필기도 함께 버린다.
+   * 서버가 실패하면 이 기기의 필기는 그대로 두고 오류를 그대로 던진다.
+   */
+  resetQuestion<T extends { revision: number }>(questionId: string, serverReset: () => Promise<T>): Promise<T> {
+    const previous = this.saving;
+    const run = (async () => {
+      if (previous) await previous.catch(() => false);
+      const result = await serverReset();
+      const clean: InkDraft = { strokes: [], baseStrokes: [], revision: result.revision, pending: false, events: [] };
+      this.documents.set(questionId, clean);
+      this.persist(questionId, clean);
+      this.rejected.delete(questionId);
+      this.lastSentAt.delete(questionId);
+      this.generation++; // 캔버스를 새로 띄워 실행 취소 기록도 비운다.
+      if (this.status !== 'conflict' && this.status !== 'loading') this.status = this.restingStatus();
+      await this.cacheWrites;
+      return result;
+    })();
+    const saving: Promise<boolean> = run.then(() => !this.pending, () => false)
+      .finally(() => { if (this.saving === saving) this.saving = null; this.notify(); });
+    this.saving = saving;
+    return run;
   }
 
   /** '다시 시도': 거절된 문항도 한 번 더 보낸다. */
