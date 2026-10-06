@@ -382,6 +382,10 @@ export type LiveInkResponse =
   | { mode: 'delta'; revision: number; batches: Array<{ revision: number; events: InkReplayEvent[] }> };
 
 export interface ExamInkCanvasProps {
+  /** 이미지 없는 고정 필기 월드. 좌표 1은 월드 너비이며 CSS 카메라 배율을 보정한다. */
+  surface?: { height: number; transparent?: boolean; scale?: number };
+  /** 필기창 카메라가 손가락 팬을 담당할 때 사용한다. */
+  onPan?: (dx: number, dy: number) => void;
   /** 저장 필기와 분리된 일시 표시 레이어. 좌표 기준은 실제 이미지 너비. */
   overlay?: (imageWidth: number) => import('react').ReactNode;
   /** 문항 이미지 위에 겹쳐 그린다. 컨테이너 크기에 맞춰 이미지와 같은 영역을 덮는다. */
@@ -403,4 +407,4 @@ export interface ExamInkCanvasProps {
    *  아래 여백을 늘린다. 풀이(쓰기) 화면은 넘기지 않는다. ink/inkFit.ts의 inkExtent로 만든다. */
   fitToInk?: { maxX: number; maxY: number } | null;
 }
-export interface ExamInkCanvasHandle { undo(): void; redo(): void; clear(): void; canUndo(): boolean; canRedo(): boolean }
+export interface ExamInkCanvasHandle { undo(): void; redo(): void; clear(): void; canUndo(): boolean; canRedo(): boolean; finish(): void }

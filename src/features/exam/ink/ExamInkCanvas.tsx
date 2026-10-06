@@ -180,8 +180,10 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
   const imgW = fitImageWidth(cssWidth, imageMaxWidth, fitToInk);
   const imageHeight = imgW * aspect;
   const extraHeight = imgW * fitExtraBelow(aspect, fitToInk);
-  const cssHeight = imageHeight + extraHeight;
-  const dpr = safeDpr(cssWidth, cssHeight, dprWanted);
+  const cssHeight = props.surface?.height ?? (imageHeight + extraHeight);
+  const dpr = props.surface
+    ? Math.min(dprWanted * (props.surface.scale ?? 1), Math.sqrt(4_000_000 / Math.max(1, cssWidth * cssHeight)))
+    : safeDpr(cssWidth, cssHeight, dprWanted);
   const geomRef = useRef({ cssWidth, cssHeight, imgW });
   geomRef.current = { cssWidth, cssHeight, imgW };
   /** 정규화 1이 차지하는 백버퍼 픽셀 수(캔버스 변환용). */
@@ -189,6 +191,8 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     const g = geomRef.current;
     return g.cssWidth > 0 ? (canvas.width / g.cssWidth) * g.imgW : 0;
   };
+  /** 고정 월드에 적용된 카메라의 화면 배율까지 포함한다. */
+  const screenUnit = () => propsRef.current.surface ? (liveRef.current?.getBoundingClientRect().width || 1) : (geomRef.current.imgW || 1);
 
   // 최신 props를 네이티브 이벤트 핸들러에서 읽기 위한 ref.
   const propsRef = useRef(props);
@@ -235,7 +239,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     const img = imgElRef.current;
     if (img?.complete && img.naturalWidth && img.getAttribute('src') === imageUrl) setPaintedUrl(imageUrl);
   }, [imageUrl]);
-  const imagePainted = paintedUrl === imageUrl;
+  const imagePainted = !!props.surface || paintedUrl === imageUrl;
 
   // ── 확정 획 렌더(형광펜 레이어 + 펜 레이어). 끝에 덧붙인 획만 있으면 그 획만 더 그린다. ──
   // 선택 중에도 원래 레이어와 획 순서를 유지한다. 미리보기는 아래에서 이 레이어를 다시 그린다.
@@ -274,7 +278,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     if (!g || g.kind === 'pan' || g.kind === 'laser' || g.kind === 'select') return;
     const REF = INK_REFERENCE_WIDTH;
     if (g.kind === 'lasso') {
-      const px = REF / (geomRef.current.imgW || wrap.clientWidth || 1);
+      const px = REF / (propsRef.current.surface ? screenUnit() : (geomRef.current.imgW || wrap.clientWidth || 1));
       ctx.beginPath();
       g.path.forEach((p, i) => (i ? ctx.lineTo(p.x * REF, p.y * REF) : ctx.moveTo(p.x * REF, p.y * REF)));
       ctx.fillStyle = 'rgba(242, 178, 48, .08)';
@@ -374,7 +378,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       drawStroke(ctx, s);
       ctx.restore();
     }
-    const px = REF / (geomRef.current.imgW || 1);
+    const px = REF / screenUnit();
     const frame = transformFrame(sel.frame, m);
     const corners = frameCorners(frame);
     pctx.save();
@@ -398,7 +402,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       pctx.restore();
     }
     // 회전 아이콘: 오른쪽 변 가운데에 붙은 동그라미 + 도는 화살표 두 개
-    const r = rotateHandle(frame, ROTATE_OFFSET_PX / (geomRef.current.imgW || 1));
+    const r = rotateHandle(frame, ROTATE_OFFSET_PX / screenUnit());
     pctx.translate(r.x * REF, r.y * REF);
     pctx.rotate(frame.angle);
     pctx.beginPath();
@@ -483,6 +487,10 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
   }, []);
 
   useImperativeHandle(ref, () => ({
+    finish() {
+      const g = gestureRef.current;
+      if (g) liveRef.current?.dispatchEvent(new PointerEvent('pointercancel', { pointerId: g.pointerId, bubbles: true }));
+    },
     undo() { stepHistory('undo'); },
     redo() { stepHistory('redo'); },
     clear() {
@@ -508,8 +516,9 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     /** 지금 제스처가 시작된 시각(e.timeStamp). */
     let gestureStartedAt = 0;
 
-    const unit = () => geomRef.current.imgW || rect.width || 1;
+    const unit = () => propsRef.current.surface ? (canvas.getBoundingClientRect().width || 1) : (geomRef.current.imgW || rect.width || 1);
     const toPoint = (e: PointerEvent, start: number): InkPoint => {
+      if (propsRef.current.surface) rect = canvas.getBoundingClientRect();
       const w = unit();
       const pressure = e.pointerType === 'pen' ? round(e.pressure > 0 ? e.pressure : 0.5, 1e3) : SIMULATED_PRESSURE;
       // 펜 압력이 정확히 0.5로 들어와 '흉내 모드'로 오인되는 일을 막는다.
@@ -697,7 +706,10 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
         if (taps.multi) {
           if (e.cancelable) e.preventDefault();
           // 두 손가락이 탭 허용치를 넘게 움직였으면 평균 이동만큼 직접 스크롤(touch-action: none이라 브라우저는 하지 않는다).
-          if (delta) scrollWith(multiScrollers ?? (multiScrollers = scrollersOf(canvas)), delta.dx, delta.dy);
+          if (delta) {
+            if (propsRef.current.onPan) propsRef.current.onPan(delta.dx, delta.dy);
+            else scrollWith(multiScrollers ?? (multiScrollers = scrollersOf(canvas)), delta.dx, delta.dy);
+          }
           return;
         }
       }
@@ -705,7 +717,8 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       if (!g || e.pointerId !== g.pointerId) return;
       e.preventDefault();
       if (g.kind === 'pan') {
-        scrollWith(g.scrollers, e.clientX - g.lastX, e.clientY - g.lastY);
+        if (propsRef.current.onPan) propsRef.current.onPan(e.clientX - g.lastX, e.clientY - g.lastY);
+        else scrollWith(g.scrollers, e.clientX - g.lastX, e.clientY - g.lastY);
         g.lastX = e.clientX; g.lastY = e.clientY;
         return;
       }
@@ -734,7 +747,8 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
         if (!sel) return;
         const pt = toPoint(e, 0);
         const geom = geomRef.current;
-        if (g.hit.kind === 'move') g.transform = moveTransform(sel.frame, pt.x - g.start.x, pt.y - g.start.y, geom.cssWidth / w, geom.cssHeight / w);
+        const boundUnit = propsRef.current.surface ? geom.imgW : w;
+        if (g.hit.kind === 'move') g.transform = moveTransform(sel.frame, pt.x - g.start.x, pt.y - g.start.y, geom.cssWidth / boundUnit, geom.cssHeight / boundUnit);
         else if (g.hit.kind === 'corner') g.transform = scaleTransform(sel.frame, g.hit.index, pt, SELECT_MIN_HALF_PX / w);
         else g.transform = rotateTransform(sel.frame, g.start, pt);
         scheduleSelection();
@@ -926,14 +940,15 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     <div
       ref={wrapRef}
       className="exam-ink"
-      data-ready={cssWidth > 0 && aspect > 0 ? 'true' : 'false'}
+      data-ready={cssWidth > 0 && (props.surface ? cssHeight > 0 : aspect > 0) ? 'true' : 'false'}
       data-pen-detected={penSeen ? 'true' : 'false'}
       data-stroke-count={strokes.length}
+      data-shape-count={props.surface ? strokes.filter(s => s.shape).length : undefined}
       data-image-painted={imagePainted ? 'true' : 'false'}
       data-selected={hidden?.size ?? 0}
-      style={{ position: 'relative', width: '100%', background: '#fff', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' } as CSSProperties}
+      style={{ position: 'relative', width: '100%', height: props.surface?.height, background: props.surface?.transparent ? 'transparent' : '#fff', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' } as CSSProperties}
     >
-      <img
+      {!props.surface && <img
         ref={imgRef}
         src={imageUrl}
         alt="문항"
@@ -941,9 +956,9 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
         onLoad={onImageLoad}
         onError={onImageError}
         style={{ display: 'block', width: imgW || '100%', maxWidth: '100%', height: imgW && aspect ? imgW * aspect : 'auto', pointerEvents: 'none', background: '#fff' }}
-      />
+      />}
       {/* 문항 아래 빈 공간에도 쓸 수 있게 여백(이미지 높이의 60%, 최소 너비의 절반) */}
-      <div aria-hidden style={{ height: extraHeight }} />
+      {!props.surface && <div aria-hidden style={{ height: extraHeight }} />}
       <canvas ref={highlightRef} aria-hidden style={highlighterLayer} />
       <canvas ref={penRef} aria-hidden style={{ ...CANVAS_STYLE, pointerEvents: 'none', visibility: strokeVisibility }} />
       {/* 올가미 선택 테두리·손잡이(획 미리보기는 원래 레이어에 렌더) */}

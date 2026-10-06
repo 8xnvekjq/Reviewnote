@@ -89,6 +89,12 @@
 .rn-writing-toolbar .rn-pen-color { width: 44px; height: 44px; min-height: 44px; border-radius: 50%; background-clip: content-box; padding: 9px; box-shadow: none; transform: none; }
 .rn-writing-toolbar .rn-pen-color[aria-pressed="true"] { outline: 2px solid var(--rn-accent); outline-offset: -3px; border-color: transparent; }
 .rn-writing-toolbar > button[aria-label="직전 필기 실행 취소"] { margin-left: auto; }
+/* 시험 필기 도구는 한 줄로 유지하고 창 안에서만 가로 스크롤한다. */
+.rn-writing-toolbar.rn-writing-ink-toolbar { display: flex; flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; overflow-y: hidden; min-height: 44px; padding: 4px 36px; gap: 4px; }
+.rn-writing-ink-toolbar button { min-width: 32px; min-height: 32px; height: 32px; border-radius: 8px; white-space: nowrap; }
+.rn-writing-ink-toolbar button[aria-pressed="true"] { outline: 2px solid var(--rn-accent); outline-offset: -2px; }
+.rn-writing-ink-toolbar .rn-pen-color { width: 32px; height: 32px; min-height: 32px; padding: 5px; }
+.rn-writing-toolbar.rn-writing-ink-toolbar > button[aria-label="직전 필기 실행 취소"] { margin-left: 0; }
 .rn-detail-sheet button:focus-visible, .rn-writing-window button:focus-visible, .rn-section-toggle:focus-visible { outline: 2px solid var(--rn-accent); outline-offset: 3px; }
 @media (min-width: 640px) {
   .rn-detail-backdrop { align-items: center; }
@@ -112,3 +118,9 @@
 .rn-writing-toolbar > div { gap: 0; }
 .rn-writing-toolbar > div > span[aria-hidden] { margin-inline: 2px; }
 .rn-writing-window > div:first-child { padding-inline: 40px; }
+
+/* 풀이노트 헤더 오른쪽: 실행 취소·다시 실행·새 필기장·저장 */
+.rn-writing-head-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; flex: none; }
+.rn-writing-head-actions button { min-width: 32px; height: 32px; padding: 0 6px; border-radius: 8px; background: rgb(30 41 59); color: #e2e8f0; font-size: 15px; font-weight: 700; touch-action: manipulation; }
+.rn-writing-head-actions button:disabled { opacity: .35; }
+.rn-writing-head-actions .rn-writing-save { font-size: 12px; background: var(--rn-accent, #6366f1); color: #fff; white-space: nowrap; }
