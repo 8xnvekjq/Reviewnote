@@ -181,18 +181,30 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
   const imageHeight = imgW * aspect;
   const extraHeight = imgW * fitExtraBelow(aspect, fitToInk);
   const cssHeight = props.surface?.height ?? (imageHeight + extraHeight);
+  const view = props.surface?.view;
+  const viewX = view?.x ?? 0, viewY = view?.y ?? 0;
+  const layerWidth = view?.width ?? cssWidth, layerHeight = view?.height ?? cssHeight;
+  const canvasStyle: CSSProperties = view
+    ? { ...CANVAS_STYLE, left: viewX, top: viewY, width: layerWidth, height: layerHeight }
+    : CANVAS_STYLE;
   const dpr = props.surface
-    ? Math.min(dprWanted * (props.surface.scale ?? 1), Math.sqrt(4_000_000 / Math.max(1, cssWidth * cssHeight)))
+    ? Math.min(dprWanted * (props.surface.scale ?? 1), Math.sqrt((view ? 15_000_000 : 4_000_000) / Math.max(1, layerWidth * layerHeight)))
     : safeDpr(cssWidth, cssHeight, dprWanted);
-  const geomRef = useRef({ cssWidth, cssHeight, imgW });
-  geomRef.current = { cssWidth, cssHeight, imgW };
+  const geomRef = useRef({ cssWidth, cssHeight, imgW, layerWidth, viewX, viewY, viewport: !!view });
+  geomRef.current = { cssWidth, cssHeight, imgW, layerWidth, viewX, viewY, viewport: !!view };
   /** 정규화 1이 차지하는 백버퍼 픽셀 수(캔버스 변환용). */
   const unitDevicePx = (canvas: HTMLCanvasElement) => {
     const g = geomRef.current;
-    return g.cssWidth > 0 ? (canvas.width / g.cssWidth) * g.imgW : 0;
+    return g.layerWidth > 0 ? (canvas.width / g.layerWidth) * g.imgW : 0;
+  };
+  /** 보이는 조각을 비운 뒤 월드 기준 경로를 해당 백버퍼로 옮긴다. 시험 모드는 기존 변환 그대로. */
+  const resetInkTransform = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => {
+    resetTransform(ctx, canvas, unitDevicePx(canvas));
+    const g = geomRef.current;
+    if (g.viewport && g.imgW > 0) ctx.translate(-g.viewX * INK_REFERENCE_WIDTH / g.imgW, -g.viewY * INK_REFERENCE_WIDTH / g.imgW);
   };
   /** 고정 월드에 적용된 카메라의 화면 배율까지 포함한다. */
-  const screenUnit = () => propsRef.current.surface ? (liveRef.current?.getBoundingClientRect().width || 1) : (geomRef.current.imgW || 1);
+  const screenUnit = () => propsRef.current.surface ? (wrapRef.current?.getBoundingClientRect().width || 1) : (geomRef.current.imgW || 1);
 
   // 최신 props를 네이티브 이벤트 핸들러에서 읽기 위한 ref.
   const propsRef = useRef(props);
@@ -202,7 +214,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
   const laserRafRef = useRef(0);
   /** 아직 보이는 레이저 획(저장하지 않는다). */
   const laserTrailsRef = useRef<LaserTrail[]>([]);
-  const drawnRef = useRef<{ strokes: InkStroke[]; width: number; height: number } | null>(null);
+  const drawnRef = useRef<{ strokes: InkStroke[]; width: number; height: number; viewX: number; viewY: number; unit: number } | null>(null);
   const selectionRef = useRef<Selection | null>(null);
   const selRafRef = useRef(0);
   useLayoutEffect(() => { propsRef.current = props; });
@@ -248,22 +260,23 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     const strokes = visibleStrokes;
     const hl = highlightRef.current, pen = penRef.current;
     if (!hl || !pen || !cssWidth || !cssHeight) return;
-    const resizedA = prepareCanvas(hl, cssWidth, cssHeight, dpr);
-    const resizedB = prepareCanvas(pen, cssWidth, cssHeight, dpr);
+    const resizedA = prepareCanvas(hl, layerWidth, layerHeight, dpr);
+    const resizedB = prepareCanvas(pen, layerWidth, layerHeight, dpr);
     const hctx = hl.getContext('2d'), pctx = pen.getContext('2d');
     if (!hctx || !pctx) return;
     const drawn = drawnRef.current;
     const appendOnly = !hidden && !resizedA && !resizedB && drawn && drawn.width === hl.width && drawn.height === hl.height
+      && (!props.surface || (drawn.viewX === viewX && drawn.viewY === viewY && drawn.unit === unitDevicePx(hl)))
       && drawn.strokes.length <= strokes.length && drawn.strokes.every((s, i) => strokes[i] === s);
     const from = appendOnly ? drawn.strokes.length : 0;
     if (!appendOnly) {
-      resetTransform(hctx, hl, unitDevicePx(hl));
-      resetTransform(pctx, pen, unitDevicePx(pen));
+      resetInkTransform(hctx, hl);
+      resetInkTransform(pctx, pen);
     }
     for (let i = from; i < strokes.length; i++) drawStroke(strokes[i].tool === 'highlighter' ? hctx : pctx, strokes[i]);
-    drawnRef.current = { strokes, width: hl.width, height: hl.height };
+    drawnRef.current = { strokes, width: hl.width, height: hl.height, viewX, viewY, unit: unitDevicePx(hl) };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visibleStrokes, hidden, cssWidth, cssHeight, dpr, imgW]);
+  }, [visibleStrokes, hidden, cssWidth, cssHeight, dpr, imgW, layerWidth, layerHeight, viewX, viewY]);
 
   // ── 진행 중 획 렌더(별도 레이어, rAF) ──
   const renderLive = useCallback(() => {
@@ -273,7 +286,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     if (!canvas || !wrap) return;
     const ctx = canvas.getContext('2d', { desynchronized: true } as CanvasRenderingContext2DSettings);
     if (!ctx) return;
-    resetTransform(ctx, canvas, unitDevicePx(canvas));
+    resetInkTransform(ctx, canvas);
     const g = gestureRef.current;
     if (!g || g.kind === 'pan' || g.kind === 'laser' || g.kind === 'select') return;
     const REF = INK_REFERENCE_WIDTH;
@@ -291,7 +304,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       return;
     }
     if (g.kind === 'erase') {
-      const w = geomRef.current.imgW || wrap.clientWidth || 1;
+      const w = propsRef.current.surface ? screenUnit() : (geomRef.current.imgW || wrap.clientWidth || 1);
       const r = (ERASER_RADIUS_PX / w) * REF;
       ctx.beginPath();
       ctx.arc(g.last.x * REF, g.last.y * REF, r, 0, Math.PI * 2);
@@ -337,8 +350,10 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    resetTransform(ctx, canvas, unitDevicePx(canvas));
-    const glowPx = 9 * (canvas.width / Math.max(1, geomRef.current.cssWidth));
+    resetInkTransform(ctx, canvas);
+    const glowPx = propsRef.current.surface
+      ? 9 * unitDevicePx(canvas) / screenUnit()
+      : 9 * (canvas.width / Math.max(1, geomRef.current.cssWidth));
     laserTrailsRef.current = drawLaser(ctx, laserTrailsRef.current, performance.now(), glowPx);
     if (laserTrailsRef.current.length) laserRafRef.current = requestAnimationFrame(renderLaser);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -354,8 +369,8 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     if (!hl || !pen) return;
     const hctx = hl.getContext('2d'), pctx = pen.getContext('2d');
     if (!hctx || !pctx) return;
-    resetTransform(hctx, hl, unitDevicePx(hl));
-    resetTransform(pctx, pen, unitDevicePx(pen));
+    resetInkTransform(hctx, hl);
+    resetInkTransform(pctx, pen);
     const sel = selectionRef.current;
     if (!sel) return;
     const g = gestureRef.current;
@@ -366,8 +381,8 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     const baseHl = highlightRef.current, basePen = penRef.current;
     const baseHctx = baseHl?.getContext('2d'), basePctx = basePen?.getContext('2d');
     if (!baseHl || !basePen || !baseHctx || !basePctx) return;
-    resetTransform(baseHctx, baseHl, unitDevicePx(baseHl));
-    resetTransform(basePctx, basePen, unitDevicePx(basePen));
+    resetInkTransform(baseHctx, baseHl);
+    resetInkTransform(basePctx, basePen);
     drawnRef.current = null; // 다음 확정 렌더는 미리보기를 지우고 전체를 다시 그린다.
     const selected = new Set(sel.ids);
     const cos = Math.cos(m.angle) * m.k, sin = Math.sin(m.angle) * m.k;
@@ -440,14 +455,20 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
   useLayoutEffect(() => {
     const live = liveRef.current, laser = laserRef.current, selHl = selHighlightRef.current, selPen = selPenRef.current;
     if (!live || !laser || !selHl || !selPen || !cssWidth || !cssHeight) return;
-    prepareCanvas(live, cssWidth, cssHeight, dpr);
-    prepareCanvas(laser, cssWidth, cssHeight, dpr);
-    prepareCanvas(selHl, cssWidth, cssHeight, dpr);
-    prepareCanvas(selPen, cssWidth, cssHeight, dpr);
+    prepareCanvas(live, layerWidth, layerHeight, dpr);
+    prepareCanvas(laser, layerWidth, layerHeight, dpr);
+    prepareCanvas(selHl, layerWidth, layerHeight, dpr);
+    prepareCanvas(selPen, layerWidth, layerHeight, dpr);
+    // 카메라 재렌더와 예약된 애니메이션이 겹쳐 rAF 루프가 중복되지 않게 한다.
+    if (geomRef.current.viewport) {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (laserRafRef.current) cancelAnimationFrame(laserRafRef.current);
+      if (selRafRef.current) cancelAnimationFrame(selRafRef.current);
+    }
     renderLive();
     renderLaser();
     renderSelection();
-  }, [cssWidth, cssHeight, dpr, imgW, renderLive, renderLaser, renderSelection]);
+  }, [cssWidth, cssHeight, dpr, imgW, layerWidth, layerHeight, viewX, viewY, renderLive, renderLaser, renderSelection]);
 
   /** 선택을 바꾼다(null이면 해제). 렌더 갱신에 쓸 id도 함께. */
   const setSelection = useCallback((sel: Selection | null) => {
@@ -516,9 +537,9 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     /** 지금 제스처가 시작된 시각(e.timeStamp). */
     let gestureStartedAt = 0;
 
-    const unit = () => propsRef.current.surface ? (canvas.getBoundingClientRect().width || 1) : (geomRef.current.imgW || rect.width || 1);
+    const unit = () => propsRef.current.surface ? (wrapRef.current?.getBoundingClientRect().width || 1) : (geomRef.current.imgW || rect.width || 1);
     const toPoint = (e: PointerEvent, start: number): InkPoint => {
-      if (propsRef.current.surface) rect = canvas.getBoundingClientRect();
+      if (propsRef.current.surface) rect = wrapRef.current!.getBoundingClientRect();
       const w = unit();
       const pressure = e.pointerType === 'pen' ? round(e.pressure > 0 ? e.pressure : 0.5, 1e3) : SIMULATED_PRESSURE;
       // 펜 압력이 정확히 0.5로 들어와 '흉내 모드'로 오인되는 일을 막는다.
@@ -934,7 +955,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
   // 손가락 스크롤은 pan 제스처가 직접 처리한다(touch-action pan은 iPad에서 펜 획을 끊었다).
   const touchAction = readOnly ? 'auto' : 'none';
   const strokeVisibility = imagePainted ? 'visible' : 'hidden';
-  const highlighterLayer: CSSProperties = { ...CANVAS_STYLE, opacity: HIGHLIGHTER_OPACITY, mixBlendMode: 'multiply', pointerEvents: 'none', visibility: strokeVisibility };
+  const highlighterLayer: CSSProperties = { ...canvasStyle, opacity: HIGHLIGHTER_OPACITY, mixBlendMode: 'multiply', pointerEvents: 'none', visibility: strokeVisibility };
 
   return (
     <div
@@ -960,17 +981,17 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       {/* 문항 아래 빈 공간에도 쓸 수 있게 여백(이미지 높이의 60%, 최소 너비의 절반) */}
       {!props.surface && <div aria-hidden style={{ height: extraHeight }} />}
       <canvas ref={highlightRef} aria-hidden style={highlighterLayer} />
-      <canvas ref={penRef} aria-hidden style={{ ...CANVAS_STYLE, pointerEvents: 'none', visibility: strokeVisibility }} />
+      <canvas ref={penRef} aria-hidden style={{ ...canvasStyle, pointerEvents: 'none', visibility: strokeVisibility }} />
       {/* 올가미 선택 테두리·손잡이(획 미리보기는 원래 레이어에 렌더) */}
       <canvas ref={selHighlightRef} aria-hidden style={highlighterLayer} />
-      <canvas ref={selPenRef} className="exam-ink-selection" aria-hidden style={{ ...CANVAS_STYLE, pointerEvents: 'none', visibility: strokeVisibility }} />
-      <canvas ref={laserRef} className="exam-ink-laser" aria-hidden style={{ ...CANVAS_STYLE, pointerEvents: 'none' }} />
+      <canvas ref={selPenRef} className="exam-ink-selection" aria-hidden style={{ ...canvasStyle, pointerEvents: 'none', visibility: strokeVisibility }} />
+      <canvas ref={laserRef} className="exam-ink-laser" aria-hidden style={{ ...canvasStyle, pointerEvents: 'none' }} />
       <canvas
         ref={liveRef}
         className="exam-ink-input"
         aria-label={readOnly ? '필기 보기' : '필기 영역'}
         style={{
-          ...CANVAS_STYLE,
+          ...canvasStyle,
           touchAction,
           pointerEvents: readOnly ? 'none' : 'auto',
           cursor: readOnly ? 'default' : 'crosshair',

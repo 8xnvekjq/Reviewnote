@@ -383,7 +383,13 @@ export type LiveInkResponse =
 
 export interface ExamInkCanvasProps {
   /** 이미지 없는 고정 필기 월드. 좌표 1은 월드 너비이며 CSS 카메라 배율을 보정한다. */
-  surface?: { height: number; transparent?: boolean; scale?: number };
+  surface?: {
+    height: number;
+    transparent?: boolean;
+    scale?: number;
+    /** 월드 원점 기준으로 지금 보이는 영역(CSS 좌표). */
+    view?: { x: number; y: number; width: number; height: number };
+  };
   /** 필기창 카메라가 손가락 팬을 담당할 때 사용한다. */
   onPan?: (dx: number, dy: number) => void;
   /** 저장 필기와 분리된 일시 표시 레이어. 좌표 기준은 실제 이미지 너비. */

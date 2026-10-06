@@ -10,6 +10,7 @@ import { supabase } from '../services/supabase';
 import { type DocumentSize } from '../features/handwriting/useHandwritingInput';
 import { flattenHandwriting, blobToDataUrl } from '../features/handwriting/flattenHandwriting';
 import { getDrawingWorld, type DocRect } from '../features/handwriting/drawingWorld';
+import { visibleInkViewport } from '../features/handwriting/inkViewport';
 
 const DOC_REFERENCE_LONG_SIDE = 1600;
 
@@ -229,7 +230,10 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
   // 실제 필기 가능 영역 — 문서 바깥 흰 여백까지. documentSize는 useMemo/state 값이라 참조가 안정적이다.
   const drawingWorld = useMemo<DocRect | null>(() => (documentSize ? getDrawingWorld(documentSize) : null), [documentSize]);
 
-  const { camera, captureHandlers, onPan } = useInkCamera(viewportRef, documentSize, drawingWorld, !isSaving && !showClearConfirm);
+  const { camera, viewportSize, captureHandlers, onPan } = useInkCamera(viewportRef, documentSize, drawingWorld, !isSaving && !showClearConfirm);
+  // 캔버스는 보이는 월드 조각만 할당하고, 입력 좌표는 전체 월드를 기준으로 유지한다.
+  const inkView = useMemo(() => drawingWorld ? visibleInkViewport(drawingWorld, camera, viewportSize) : undefined,
+    [drawingWorld, camera, viewportSize]);
 
   // 창 이동(드래그) — pointer event 하나로 마우스/터치/펜슬 전부 처리
   const dragStateRef = useRef<{ dragging: boolean; startX: number; startY: number; originLeft: number; originTop: number }>({
@@ -547,7 +551,7 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
                 <ExamInkCanvas
                   ref={canvasRef}
                   imageUrl=""
-                  surface={{ height: drawingWorld.height, transparent: true, scale: camera.scale }}
+                  surface={{ height: drawingWorld.height, transparent: true, scale: camera.scale, view: inkView }}
                   strokes={strokes}
                   onChange={next => { strokesRef.current = next; setStrokes(next); }}
                   tool={tool}
