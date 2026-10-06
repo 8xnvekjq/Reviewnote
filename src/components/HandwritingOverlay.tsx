@@ -468,12 +468,19 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
           onPointerMove={handleDragMove}
           onPointerUp={handleDragEnd}
           onPointerCancel={handleDragEnd}
-          className="flex-none flex items-center justify-between px-10 py-2 bg-slate-950 border-b border-slate-800 cursor-move select-none touch-none"
+          className="flex-none flex items-center justify-between gap-2 px-10 py-1 bg-slate-950 border-b border-slate-800 cursor-move select-none touch-none"
         >
-          <span className="text-[11px] font-black text-slate-300 flex items-center space-x-1.5">
+          <span className="text-[11px] font-black text-slate-300 flex items-center space-x-1.5 min-w-0 overflow-hidden">
             <span>✏️</span>
-            <span>풀이노트{!backgroundImageUrl ? ' · 추가 필기장' : ''}</span>
+            <span className="truncate">풀이노트{!backgroundImageUrl ? ' · 추가 필기장' : ''}</span>
           </span>
+          {/* 자주 쓰는 실행 취소·다시 실행·새 필기장·저장은 헤더에 둔다(아래 도구 줄은 좁은 창에서 옆으로 밀려 안 보였다). */}
+          <div className="rn-writing-head-actions" onPointerDown={(e) => e.stopPropagation()}>
+            <button type="button" aria-label="직전 필기 실행 취소" title="실행 취소" disabled={isSaving || !canvasRef.current?.canUndo()} onClick={handleUndo}>↶</button>
+            <button type="button" aria-label="필기 다시 실행" title="다시 실행" disabled={isSaving || !canvasRef.current?.canRedo()} onClick={() => canvasRef.current?.redo()}>↷</button>
+            {onRequestExtraNotebook && <button type="button" aria-label="＋ 새 필기장" title="새 필기장" disabled={isSaving} onClick={onRequestExtraNotebook}>＋</button>}
+            {runExclusiveSave && <button type="button" className="rn-writing-save" aria-label="저장하기" disabled={isSaving || !documentSize} onClick={handleSave}>{isSaving ? '저장 중…' : '💾 저장'}</button>}
+          </div>
           <button
             type="button"
             onClick={onClose}
@@ -576,11 +583,7 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
               aria-label={`${color.label} 펜 선택`} aria-pressed={strokeColor === color.value}
               style={{ backgroundColor: color.value }} disabled={isSaving} onClick={() => handleSelectColor(color.value)} />
           ))}
-          <button type="button" aria-label="직전 필기 실행 취소" title="실행 취소" disabled={isSaving || !canvasRef.current?.canUndo()} onClick={handleUndo}>↶</button>
-          <button type="button" aria-label="필기 다시 실행" title="다시 실행" disabled={isSaving || !canvasRef.current?.canRedo()} onClick={() => canvasRef.current?.redo()}>↷</button>
           <button type="button" aria-label="필기 전체 지우기" title="전체 지우기" disabled={isSaving || !hasStrokes} onClick={requestClear}>🗑️</button>
-          {onRequestExtraNotebook && <button type="button" disabled={isSaving} onClick={onRequestExtraNotebook}>＋ 새 필기장</button>}
-          {runExclusiveSave && <button type="button" className="rn-button rn-button-primary" disabled={isSaving || !documentSize} onClick={handleSave}>{isSaving ? '저장 중...' : '💾 저장하기'}</button>}
         </div>
 
         {/* 전체 지우기 확인창 — 실수 터치로 필기가 통째로 날아가지 않도록 창 전체를 덮는다 */}

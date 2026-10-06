@@ -134,7 +134,7 @@ try {
       await draw(line(cx - 20, cy, 40));
       assert.equal(await count(), laserBefore + 1, 'outside document still accepts pen');
       assert(await layerAt(cx, cy, 1), 'outside ink aligns with pen');
-      await win().getByRole('button', { name: '💾 저장하기', exact: true }).click();
+      await win().getByRole('button', { name: '저장하기', exact: true }).click();
       await page.waitForFunction(n => window.__savedInk.length >= n, extra ? 2 : 1);
       const png = await page.evaluate(async () => {
         const url = window.__savedInk.at(-1)[0].image_url;
@@ -155,7 +155,7 @@ try {
     await page.goto(`${base}/tests/handwriting/practice.html`);
     await page.getByRole('button', { name: '풀이노트 열기' }).click();
     await win().locator('.exam-ink[data-ready="true"]').waitFor();
-    assert.equal(await win().getByRole('button', { name: '💾 저장하기', exact: true }).count(), 0, 'practice has no save');
+    assert.equal(await win().getByRole('button', { name: '저장하기', exact: true }).count(), 0, 'practice has no save');
     for (const name of ['펜', '형광펜', '지우개', '레이저', '올가미']) assert.equal(await win().getByRole('button', { name: `${name} 도구 선택`, exact: true }).count(), 1);
     const practiceViewport = await viewport();
     await draw(line(practiceViewport.x + 60, practiceViewport.y + practiceViewport.height / 2));

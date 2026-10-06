@@ -118,3 +118,9 @@
 .rn-writing-toolbar > div { gap: 0; }
 .rn-writing-toolbar > div > span[aria-hidden] { margin-inline: 2px; }
 .rn-writing-window > div:first-child { padding-inline: 40px; }
+
+/* 풀이노트 헤더 오른쪽: 실행 취소·다시 실행·새 필기장·저장 */
+.rn-writing-head-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; flex: none; }
+.rn-writing-head-actions button { min-width: 32px; height: 32px; padding: 0 6px; border-radius: 8px; background: rgb(30 41 59); color: #e2e8f0; font-size: 15px; font-weight: 700; touch-action: manipulation; }
+.rn-writing-head-actions button:disabled { opacity: .35; }
+.rn-writing-head-actions .rn-writing-save { font-size: 12px; background: var(--rn-accent, #6366f1); color: #fff; white-space: nowrap; }
