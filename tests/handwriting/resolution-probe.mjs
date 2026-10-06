@@ -1,4 +1,4 @@
-﻿// 코디네이터가 실행한다: HANDWRITING_TEST_URL=http://127.0.0.1:5174 node tests/handwriting/resolution-probe.mjs
+// 코디네이터가 실행한다: HANDWRITING_TEST_URL=http://127.0.0.1:5174 node tests/handwriting/resolution-probe.mjs
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 
@@ -97,6 +97,18 @@ try {
   assert(await pixelAt(cx + 64, cy), 'committed ink follows pan');
   assert(!(await pixelAt(cx - 35, cy)), 'pan clears the former ink position');
   await assertResolution('max zoom after pan');
+
+  // 최대 확대에서도 획 끝까지 모양이 살아 있어야 한다. perfect-freehand의 '끝 3단위 건너뛰기'가 확대된 월드에서
+  // 화면 수십 px이 되어 마지막 물결이 직선으로 잘리던 회귀(2026-10-06).
+  await win.getByRole('button', { name: '필기 전체 지우기' }).click();
+  await win.getByRole('button', { name: '모두 지우기', exact: true }).click();
+  const wave = Array.from({ length: 161 }, (_, i) => [cx - 64 + i * .8, cy + Math.sin(i / 160 * Math.PI * 4) * 14]);
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: wave[0][0], y: wave[0][1], button: 'left', buttons: 1, clickCount: 1, pointerType: 'pen', force: .5 });
+  for (const [x, y] of wave.slice(1)) await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y, button: 'left', buttons: 1, pointerType: 'pen', force: .5 });
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: wave.at(-1)[0], y: wave.at(-1)[1], button: 'left', buttons: 0, clickCount: 1, pointerType: 'pen' });
+  await page.waitForTimeout(120);
+  // 마지막 마루(i=140, 위로 14px)가 그려져 있어야 한다 — 끝이 직선으로 잘리면 이 자리가 비었다.
+  assert(await pixelAt(wave[140][0], wave[140][1]), 'last wave crest is drawn at max zoom');
   assert.deepEqual(errors, []);
 } finally {
   await browser.close();

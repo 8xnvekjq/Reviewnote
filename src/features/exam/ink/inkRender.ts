@@ -70,10 +70,18 @@ export function shapePath(shape: Shape): Path2D {
   return path;
 }
 
+/** perfect-freehand는 '끝 3단위는 건너뛰기' 같은 절대 길이 상수를 쓴다(화면 px 기준으로 만든 라이브러리).
+ *  시험 펜(굵기 2 이상)은 기준 공간 1단위가 화면 약 1px이라 문제없지만, 풀이노트처럼 넓은 월드를 크게 확대해 쓰면
+ *  1단위가 화면 수십 px이 되어 획 끝이 직선으로 잘리고 모양이 뭉개졌다. 이보다 가는 획은 이 굵기가 되도록 키워
+ *  계산하고 결과만 다시 줄인다 — 시험 획(굵기 ≥ 2)은 배율 1로 지금과 똑같다. */
+const MIN_FREEHAND_WIDTH = 2;
+
 export function freehandPath(tool: InkStroke['tool'], size: number, points: InkPoint[], last: boolean): Path2D {
-  const width = strokeWidth({ tool, size }) * REF;
+  const realWidth = strokeWidth({ tool, size }) * REF;
+  const k = realWidth > 0 && realWidth < MIN_FREEHAND_WIDTH ? MIN_FREEHAND_WIDTH / realWidth : 1;
+  const width = realWidth * k;
   const simulated = usesSimulatedPressure(points);
-  const input = points.map(p => [p.x * REF, p.y * REF, p.pressure]);
+  const input = points.map(p => [p.x * REF * k, p.y * REF * k, p.pressure]);
   // 펜 필압은 점마다 들쭉날쭉해 굵기가 떨려 보인다 — 앞뒤 2점 평균으로 고르게.
   if (!simulated && input.length > 2) {
     const raw = input.map(p => p[2]);
@@ -84,7 +92,8 @@ export function freehandPath(tool: InkStroke['tool'], size: number, points: InkP
       input[i][2] = sum / (hi - lo + 1);
     }
   }
-  return outlineToPath(getStroke(input, freehandOptions(tool, width, simulated, last)));
+  const outline = getStroke(input, freehandOptions(tool, width, simulated, last));
+  return outlineToPath(k === 1 ? outline : outline.map(([x, y]) => [x / k, y / k]));
 }
 
 const cache = new WeakMap<InkStroke, Drawable>();

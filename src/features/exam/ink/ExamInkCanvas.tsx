@@ -545,7 +545,10 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       // 펜 압력이 정확히 0.5로 들어와 '흉내 모드'로 오인되는 일을 막는다.
       const p = e.pointerType === 'pen' && pressure === SIMULATED_PRESSURE ? 0.501 : pressure;
       // 좌표는 이미지 너비의 1/10000 단위로 반올림(눈에 보이지 않는 차이) — 서버로 가는 필기 크기를 줄인다.
-      return { x: round((e.clientX - rect.left) / w, 1e4), y: round((e.clientY - rect.top) / w, 1e4), pressure: p, t: Math.max(0, Math.round(e.timeStamp - start)) };
+      // 풀이노트(surface)는 너비 1이 문서 3배 넓이의 월드라 크게 키우고 확대하면 1/10000이 펜 굵기의 몇 분의 1까지
+      // 커져 획이 울퉁불퉁·뭉툭해졌다. 서버로 보내지 않으니(PNG로 저장) 더 촘촘히 둔다.
+      const q = propsRef.current.surface ? 1e7 : 1e4;
+      return { x: round((e.clientX - rect.left) / w, q), y: round((e.clientY - rect.top) / w, q), pressure: p, t: Math.max(0, Math.round(e.timeStamp - start)) };
     };
     const clearHold = (g: DrawGesture) => {
       if (g.holdTimer !== null) { window.clearInterval(g.holdTimer); g.holdTimer = null; }
