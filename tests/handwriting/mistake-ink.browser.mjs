@@ -6,7 +6,7 @@ const base = process.env.HANDWRITING_TEST_URL || 'http://127.0.0.1:5173';
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
   for (const width of [390, 820]) {
-    const context = await browser.newContext({ viewport: { width, height: 1000 }, hasTouch: true, serviceWorkers: 'block', reducedMotion: 'reduce' });
+    const context = await browser.newContext({ viewport: { width, height: 1000 }, deviceScaleFactor: 2, hasTouch: true, serviceWorkers: 'block', reducedMotion: 'reduce' });
     await context.route('**/*', route => new URL(route.request().url()).origin === base ? route.continue() : route.abort());
     await context.routeWebSocket(/supabase/, ws => ws.close());
     const page = await context.newPage();
@@ -39,6 +39,16 @@ try {
     const tool = name => win().getByRole('button', { name: `${name} 도구 선택`, exact: true }).click();
     const viewport = async () => win().locator('.bg-white.relative.overflow-hidden').boundingBox();
     const camera = () => win().locator('.bg-white.relative.overflow-hidden > div').first().evaluate(el => el.style.transform);
+    const assertResolution = async () => {
+      const layers = await win().locator('.exam-ink canvas').evaluateAll(canvases => canvases.map(c => {
+        const r = c.getBoundingClientRect();
+        return { x: c.width / r.width, y: c.height / r.height, pixels: c.width * c.height, dpr: window.devicePixelRatio };
+      }));
+      for (const layer of layers) {
+        assert(layer.x >= .95 * layer.dpr && layer.y >= .95 * layer.dpr, 'all ink layers render at device resolution');
+        assert(layer.pixels <= 16_000_000, 'each ink layer stays below 16M pixels');
+      }
+    };
     const layerAt = async (x, y, index) => win().locator('.exam-ink canvas').nth(index).evaluate((canvas, { x, y }) => {
       const rect = canvas.getBoundingClientRect();
       const px = Math.round((x - rect.left) / rect.width * canvas.width), py = Math.round((y - rect.top) / rect.height * canvas.height);
@@ -52,6 +62,8 @@ try {
       if (extra) await page.getByRole('button', { name: '풀이노트 열기' }).click();
       if (extra) await win().getByRole('button', { name: '＋ 새 필기장', exact: true }).click();
       await win().locator('.exam-ink[data-ready="true"]').waitFor();
+      await page.waitForTimeout(80);
+      await assertResolution();
       const toolbar = win().getByRole('toolbar');
       const geometry = await toolbar.evaluate(el => ({ height: el.getBoundingClientRect().height, buttons: [...el.querySelectorAll('button')].map(b => ({ y: b.getBoundingClientRect().y, width: b.getBoundingClientRect().width, height: b.getBoundingClientRect().height })) }));
       assert(geometry.height <= 48, 'compact toolbar');
@@ -104,6 +116,7 @@ try {
       await touch('touchEnd', []);
       await page.waitForTimeout(80);
       assert.notEqual(await camera(), camBefore, 'two fingers zoom');
+      await assertResolution();
       assert.equal(await count(), before, 'pinch does not add ink');
       await draw(line(x, y + 130));
       assert(await layerAt(x + 45, y + 130, 1), 'pen coordinates still align after pinch');
@@ -132,6 +145,7 @@ try {
       }
       await tool('펜');
       await draw(line(cx - 20, cy, 40));
+      await assertResolution();
       assert.equal(await count(), laserBefore + 1, 'outside document still accepts pen');
       assert(await layerAt(cx, cy, 1), 'outside ink aligns with pen');
       await win().getByRole('button', { name: '저장하기', exact: true }).click();

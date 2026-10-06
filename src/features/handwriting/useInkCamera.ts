@@ -5,31 +5,39 @@ import type { DocRect } from './drawingWorld';
 /** 획 입력은 시험 캔버스에 맡기고 두 손가락 카메라만 관찰한다. 탭 이벤트는 막지 않는다. */
 export function useInkCamera(viewportRef: React.RefObject<HTMLDivElement | null>, doc: DocumentSize | null, world: DocRect | null, enabled: boolean) {
   const [camera, setCamera] = useState<Camera>({ x: 0, y: 0, scale: 1 });
+  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
+  const frame = useRef(0);
   const current = useRef(camera);
   const fit = useRef(1);
   const fingers = useRef(new Map<number, { x: number; y: number }>());
   const pinch = useRef<{ distance: number; x: number; y: number; camera: Camera } | null>(null);
   const pen = useRef<number | null>(null);
-  current.current = camera;
   useEffect(() => {
     const el = viewportRef.current;
     if (!el || !doc) return;
     const measure = () => {
       const scale = Math.min(el.clientWidth / doc.width, el.clientHeight / doc.height);
       fit.current = scale;
-      setCamera({ scale, x: (el.clientWidth - doc.width * scale) / 2, y: (el.clientHeight - doc.height * scale) / 2 });
+      setViewportSize({ width: el.clientWidth, height: el.clientHeight });
+      current.current = { scale, x: (el.clientWidth - doc.width * scale) / 2, y: (el.clientHeight - doc.height * scale) / 2 };
+      setCamera(current.current);
     };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(el);
     return () => observer.disconnect();
   }, [viewportRef, doc]);
+  useEffect(() => () => { if (frame.current) cancelAnimationFrame(frame.current); }, []);
   const update = (next: Camera) => {
     const el = viewportRef.current;
     if (!world || !el) return;
     const clamp = (p: number, origin: number, length: number, view: number) => Math.max(view - (origin + length) * next.scale - 80, Math.min(80 - origin * next.scale, p));
     current.current = { ...next, x: clamp(next.x, world.x, world.width, el.clientWidth), y: clamp(next.y, world.y, world.height, el.clientHeight) };
-    setCamera(current.current);
+    // 고주파 포인터 이벤트는 한 프레임에 한 번만 화면과 잉크에 반영한다.
+    if (!frame.current) frame.current = requestAnimationFrame(() => {
+      frame.current = 0;
+      setCamera(current.current);
+    });
   };
   const pair = () => {
     const [a, b] = [...fingers.current.values()];
@@ -60,6 +68,7 @@ export function useInkCamera(viewportRef: React.RefObject<HTMLDivElement | null>
   };
   return {
     camera,
+    viewportSize,
     captureHandlers: { onPointerDownCapture: down, onPointerMoveCapture: move, onPointerUpCapture: up, onPointerCancelCapture: up },
     onPan: (dx: number, dy: number) => {
       if (enabled && fingers.current.size < 2 && pen.current === null) update({ ...current.current, x: current.current.x + dx, y: current.current.y + dy });
