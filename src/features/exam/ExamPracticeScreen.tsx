@@ -86,6 +86,20 @@ export function ExamPracticeScreen({ client, currentUserId, onExit, admin, isAdm
     }
   };
 
+  // 관리자: 제출한 자기 응시의 문항 풀이(필기·녹음)를 고치러 다시 연다. 답·점수는 바뀌지 않는다.
+  const revise = async (attemptId: string) => {
+    if (!client.getAttemptForRevision) return;
+    enterFullscreen();
+    setBusy(true);
+    setError(null);
+    try {
+      setPhase({ kind: 'solve', attempt: await client.getAttemptForRevision(attemptId) });
+    } catch (e) {
+      leaveFullscreen();
+      setError(e instanceof Error ? e.message : '풀이를 다시 열지 못했어요.');
+    } finally { setBusy(false); }
+  };
+
   const continueHistory = async (paper: ExamPaperSummary, inProgress: boolean) => {
     if (!inProgress) {
       setError(null);
@@ -136,12 +150,14 @@ export function ExamPracticeScreen({ client, currentUserId, onExit, admin, isAdm
           key={phase.attempt.id}
           client={client}
           attempt={phase.attempt}
-          onExit={backToStart}
+          onExit={phase.attempt.status === 'submitted' ? () => { leaveFullscreen(); void openResult(phase.attempt.id); } : backToStart}
           onSubmitted={result => { leaveFullscreen(); setPhase({ kind: 'result', result }); }}
         />
       )}
+      {phase.kind === 'result' && error && <p className="exam-error" role="alert">{error}</p>}
       {phase.kind === 'result' && (
         <OmrResultView key={phase.result.attemptId} client={client} result={phase.result}
+          onRevise={isAdmin && client.getAttemptForRevision && !busy ? () => { void revise(phase.result.attemptId); } : undefined}
           backLabel={phase.historyPaper ? '← 풀이 기록' : undefined}
           onBack={() => { if (phase.historyPaper) { setError(null); setPhase({ kind: 'history', paper: phase.historyPaper }); } else backToStart(); }} />
       )}

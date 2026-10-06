@@ -49,6 +49,14 @@ async function playableReplay(data: InkReplayData): Promise<InkReplayData> {
   return { ...data, audioClips: clips.map(clip => ({ ...clip, url: clip.url ?? signedAudio.get(clip.storagePath)?.url })) };
 }
 
+/** 지운 녹음의 저장 파일. 실패해도 행은 이미 없어 학생에게 보이지 않으므로 경고만 남긴다. */
+async function removeAudioObjects(paths: string[]) {
+  if (!paths.length) return;
+  for (const path of paths) signedAudio.delete(path);
+  const { error } = await supabase.storage.from('exam-solution-audio').remove(paths);
+  if (error) console.warn('[exam] 녹음 파일 삭제 실패:', error.message);
+}
+
 export const examClient: ExamClient = {
   async uploadSolutionAudio(clip, blob) {
     const storagePath = `${clip.attemptId}/${clip.questionId}/${clip.id}.${audioExtension(clip.mime)}`;
@@ -63,6 +71,29 @@ export const examClient: ExamClient = {
       size_bytes: blob.size, storage_path: storagePath,
     }, { onConflict: 'id', ignoreDuplicates: true });
     if (error) throw new ExamClientError(error);
+  },
+  async listSolutionAudio(attemptId, questionId) {
+    const { data, error } = await supabase.from('exam_solution_audio')
+      .select('id,started_at_ms,duration_ms,mime,size_bytes,storage_path')
+      .eq('attempt_id', attemptId).eq('question_id', questionId).order('started_at_ms').order('id');
+    if (error) throw new ExamClientError(error);
+    return (data ?? []).map(row => ({ id: row.id as string, startedAt: Number(row.started_at_ms), durationMs: Number(row.duration_ms),
+      mime: row.mime as string, sizeBytes: Number(row.size_bytes), storagePath: row.storage_path as string }));
+  },
+  async deleteSolutionAudio(clipId) {
+    // 행을 먼저 지워 학생 화면에서 바로 사라지게 한다. 파일 삭제가 실패해도 행이 없으면 아무도 읽을 수 없다.
+    const { data, error } = await supabase.from('exam_solution_audio').delete().eq('id', clipId).select('storage_path');
+    if (error) throw new ExamClientError(error);
+    await removeAudioObjects((data ?? []).map(row => row.storage_path as string));
+  },
+  async resetQuestionSolution(attemptId, questionId) {
+    const data = await callRpc('reset_exam_question_solution', { p_attempt_id: attemptId, p_question_id: questionId }) as
+      { revision?: number; storagePaths?: string[] } | null;
+    await removeAudioObjects(data?.storagePaths ?? []);
+    return { revision: Number(data?.revision ?? 0) };
+  },
+  async getAttemptForRevision(attemptId) {
+    return mapExamAttempt(await callRpc('admin_get_exam_attempt', { p_attempt_id: attemptId }));
   },
   liveTransport: examLiveTransport,
   async getInk(attemptId) {

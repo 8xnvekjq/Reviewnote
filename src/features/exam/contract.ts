@@ -171,6 +171,14 @@ export interface ExamPaperHistoryAttempt extends ExamPaperMetadata {
 /** src/features/exam/examClient.ts의 서버 경계. */
 export interface ExamClient {
   uploadSolutionAudio?(clip: SolutionAudioUpload, blob: Blob): Promise<void>;
+  /** 관리자 본인 응시: 이 문항에 올라간 녹음(시작 시각 순). */
+  listSolutionAudio?(attemptId: string, questionId: string): Promise<TeacherAudioClip[]>;
+  /** 관리자 본인 응시: 녹음 하나를 지운다(행 → 저장 파일). 이미 없으면 아무것도 하지 않는다. */
+  deleteSolutionAudio?(clipId: string): Promise<void>;
+  /** 관리자 본인 응시: 이 문항의 필기·재생 기록·녹음을 모두 지운다. 서버가 올린 새 필기 revision을 돌려준다. */
+  resetQuestionSolution?(attemptId: string, questionId: string): Promise<{ revision: number }>;
+  /** 관리자 본인의 제출한 응시를 풀이 고치기(필기·녹음)로 다시 연다. */
+  getAttemptForRevision?(attemptId: string): Promise<ExamAttempt>;
   liveTransport?: import('./liveTransport').LiveTransport;
   getInk(attemptId: string): Promise<ExamInkDocument[]>;
   /** 바뀐 내용(events)만 보낸다. 결과 필기 전체 대신 결과 획 id 목록의 해시로 서버 결과와 맞춘다. */
@@ -264,6 +272,15 @@ export interface SolutionAudioClip {
   sizeBytes: number;
   storagePath: string;
   url?: string;
+}
+/** 선생님 녹음 관리 목록의 한 줄. startedAt은 녹음을 시작한 기기 시각(ms). */
+export interface TeacherAudioClip {
+  id: string;
+  startedAt: number;
+  durationMs: number;
+  mime: string;
+  sizeBytes: number;
+  storagePath: string;
 }
 export interface SolutionAudioUpload {
   id: string;

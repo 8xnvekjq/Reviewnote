@@ -88,6 +88,8 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
   const [pageZoom, setPageZoom] = useState(false);
   const [pagePan, setPagePan] = useState(hanneung);
   const isReal = attempt.mode === 'real';
+  // 관리자가 제출한 자기 응시를 다시 연 "풀이 고치기": 필기·녹음만 바꾼다(답·시간·점수는 그대로, 제출 없음).
+  const revising = attempt.status === 'submitted';
   const peerSession = useMemo(() => new PeerSolutionSession(client, attempt.id), [client, attempt.id]);
   const [items, setItems] = useState(() => initialItems(attempt));
   const [index, setIndex] = useState(() => initialIndex(attempt));
@@ -165,13 +167,13 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
 
   const saveNow = useCallback(async () => {
     if (saveTimer.current != null) { window.clearTimeout(saveTimer.current); saveTimer.current = null; }
-    if (submittedRef.current) return true;
+    if (submittedRef.current || revising) return true;
     setSaveState('saving');
     let ok = false;
     try { ok = await client.saveProgress(attempt.id, snapshot(), [...visitOrderRef.current]); } catch { ok = false; }
     setSaveState(ok ? 'saved' : 'failed');
     return ok;
-  }, [client, attempt.id, snapshot]);
+  }, [client, attempt.id, snapshot, revising]);
 
   const scheduleSave = useCallback(() => {
     if (saveTimer.current != null) window.clearTimeout(saveTimer.current);
@@ -314,7 +316,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
     }
   }, [client, attempt.id, snapshot, flushInk, onSubmitted, inkSync, questions, isAdmin]);
 
-  const remaining = remainingMs(attempt.startedAt, attempt.timeLimitMinutes, now);
+  const remaining = revising ? null : remainingMs(attempt.startedAt, attempt.timeLimitMinutes, now);
   useEffect(() => {
     if (remaining == null) return;
     const crossed = crossedAlerts(prevRemaining.current, remaining);
@@ -372,6 +374,8 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
       if (overlay || submitting || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
       const target = e.target as HTMLElement | null;
       if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
+      if (target?.closest?.('[role="dialog"], [role="alertdialog"]')) return; // 녹음 관리 창 등이 열려 있으면 문항을 넘기지 않는다
+      if (revising && /^[0-9]$/.test(e.key)) return;
       if (e.key === 'ArrowLeft') { e.preventDefault(); goTo(index - 1); }
       else if (e.key === 'ArrowRight') { e.preventDefault(); goTo(index + 1); }
       else if (questionAnswerType(question) !== 'digits' && (question.answerType === 'choice10' ? /^[0-9]$/ : question.answerType === 'choice4' ? /^[1-4]$/ : /^[1-5]$/).test(e.key)) {
@@ -381,7 +385,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [overlay, submitting, goTo, index, question, setAnswer]);
+  }, [overlay, submitting, goTo, index, question, setAnswer, revising]);
 
   const runFreeCheck = async () => {
     const answer = items[question.id]?.answer;
@@ -406,6 +410,14 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
   const confirmExit = async () => {
     swRef.current = pauseStopwatch(swRef.current, Date.now());
     await audioStopRef.current?.();
+    const capture = audioCaptureRef.current;
+    if (revising && capture) {
+      // 고치기는 제출 단계가 없으니 나갈 때 녹음을 올린다. 못 올린 녹음은 이 기기에 남아 다음에 다시 올라간다.
+      setOverlay(null);
+      setToast('음성을 올리는 중이에요…');
+      const uploaded = await waitForAudioUploads(() => capture.flushUploads(), new Promise<'continue'>(() => {}));
+      if (uploaded !== 'continue' && !uploaded.ok) setToast('음성 일부를 올리지 못했어요. 이 기기에 남아 있어 다음에 다시 올라가요.');
+    }
     const results = await Promise.all([flushInk(), saveNow()]);
     if (results.some(ok => !ok)) {
       setOverlay(null);
@@ -414,6 +426,16 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
     }
     onExit();
   };
+
+  // "처음부터 다시": 녹음 정리(TeacherAudioRecorder) 뒤에 이 문항 필기를 서버와 이 기기에서 함께 지운다.
+  const resetQuestion = useCallback(async () => {
+    const qid = inkKey;
+    if (!client.resetQuestionSolution) throw new Error('unsupported');
+    const timer = inkTimers.current.get(qid);
+    if (timer != null) { window.clearTimeout(timer); inkTimers.current.delete(qid); }
+    await inkSync.resetQuestion(qid, () => client.resetQuestionSolution!(attempt.id, qid));
+    setHistoryTick(t => t + 1);
+  }, [client, attempt.id, inkKey, inkSync]);
 
   const answeredCount = useMemo(() => countAnswered(Object.values(items)), [items]);
   const emptyCount = questions.length - answeredCount;
@@ -432,7 +454,8 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
           <button type="button" className="rn-button rn-button-ghost rn-button-compact exam-exit" onClick={() => setOverlay('exit')}>
             나가기
           </button>
-          {isAdmin && <TeacherAudioRecorder client={client} ownerId={currentUserId} attemptId={attempt.id} questionId={inkKey} navigationKey={question.id} stopRef={audioStopRef} captureRef={audioCaptureRef} />}
+          {isAdmin && <TeacherAudioRecorder client={client} ownerId={currentUserId} attemptId={attempt.id} questionId={inkKey} navigationKey={question.id} stopRef={audioStopRef} captureRef={audioCaptureRef}
+            onReset={client.resetQuestionSolution ? resetQuestion : undefined} />}
           <div className="exam-tools" role="toolbar" aria-label="필기 도구" inert={peerMode || undefined}>
             <div className="exam-tool-group">
               {([['pen', '펜', '✏️'], ['highlighter', '형광펜', '🖍️'], ['eraser', '지우개', '🧽'], ['laser', '레이저(남지 않음)', null], ['lasso', '올가미(옮기기·크기·회전)', null]] as const).map(([value, label, icon]) => (
@@ -479,21 +502,22 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
               남은 {formatClock(remaining)}
             </span>
           )}
-          <button type="button" className="rn-button rn-button-primary rn-button-compact exam-submit-open" onClick={() => setOverlay('review')}>
-            제출
-          </button>
+          {revising ? <span className="rn-caption" data-testid="exam-revising">풀이 고치기 · 답과 점수는 그대로예요</span>
+            : <button type="button" className="rn-button rn-button-primary rn-button-compact exam-submit-open" onClick={() => setOverlay('review')}>
+              제출
+            </button>}
         </div>
       </header>
 
       <AnswerBar
-        inert={submitting || undefined}
+        inert={submitting || revising || undefined}
         key={question.id}
         question={question}
         answer={current.answer}
         unsure={current.unsure}
         onAnswer={setAnswer}
         onUnsure={next => updateItem(question.id, { unsure: next })}
-        free={isReal ? undefined : {
+        free={isReal || revising ? undefined : {
           check: current.checked,
           checking,
           revealed: revealed[question.id] ?? false,
@@ -568,7 +592,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
           </div>
           </div>
           {/* 이전·다음은 상단 화살표로 충분하다. 마지막 문항에서만 OMR 확인으로 이어 준다. */}
-          {index === questions.length - 1 && (
+          {index === questions.length - 1 && !revising && (
             <div className="exam-paper-foot">
               <button type="button" className="rn-button rn-button-primary" onClick={() => setOverlay('review')}>OMR 확인하기</button>
             </div>
@@ -651,10 +675,10 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
       {overlay === 'exit' && (
         <div className="exam-confirm" role="alertdialog" aria-modal="true" aria-label="나가기 확인">
           <div className="exam-confirm-box">
-            <h3>잠깐 나갈까요?</h3>
+            <h3>{revising ? '풀이 고치기를 마칠까요?' : '잠깐 나갈까요?'}</h3>
             <p className="rn-caption">
-              답과 필기는 저장돼서 나중에 이어 풀 수 있어요.
-              {isReal && ' 실전 모드는 나가 있어도 시간이 계속 흘러요.'}
+              {revising ? '고친 필기와 녹음을 저장하고 결과 화면으로 돌아가요.' : '답과 필기는 저장돼서 나중에 이어 풀 수 있어요.'}
+              {isReal && !revising && ' 실전 모드는 나가 있어도 시간이 계속 흘러요.'}
             </p>
             <div className="exam-confirm-actions">
               <button type="button" className="rn-button rn-button-secondary" onClick={() => setOverlay(null)}>계속 풀기</button>

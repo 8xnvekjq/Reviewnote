@@ -2,6 +2,8 @@ import type { ExamClient } from '../contract.ts';
 import { AUDIO_CONSTRAINTS, AUDIO_MAX_BYTES, AUDIO_TIMESLICE_MS, chooseAudioFormat, shouldSplitAudio } from './audioMath.ts';
 import { audioStore, type AudioDraft, type AudioStore } from './audioStore.ts';
 
+const questionKey = (attemptId: string, questionId: string) => `${attemptId}/${questionId}`;
+
 export interface AudioStatus { id: string; questionId: string; state: 'uploading' | 'done' | 'failed' }
 export interface RecordingState {
   recording: boolean;
@@ -26,12 +28,20 @@ export class TeacherAudioCapture {
   private ownerId: string;
   private store: AudioStore;
   private splitBytes?: number;
+  /** 지운 녹음 id. 진행 중이던 업로드·복구가 끝난 뒤에도 다시 올리지 않는다. */
+  private deleted = new Set<string>();
+  /** "처음부터 다시" 중인 문항(attemptId/questionId). 그 문항 녹음은 저장하지 않고 버린다. */
+  private discarding = new Set<string>();
+  private recordingKey: string | null = null;
   constructor(client: ExamClient, ownerId: string, change: () => void, store = audioStore, splitBytes?: number) {
     this.client = client; this.ownerId = ownerId; this.change = change; this.store = store; this.splitBytes = splitBytes;
   }
   private publish(patch: Partial<RecordingState>) { this.state = { ...this.state, ...patch }; this.change(); }
   private status(draft: AudioDraft, state: AudioStatus['state']) {
     this.publish({ uploads: [...this.state.uploads.filter(row => row.id !== draft.id), { id: draft.id, questionId: draft.questionId, state }] });
+  }
+  private isDiscarded(draft: Pick<AudioDraft, 'id' | 'attemptId' | 'questionId'>) {
+    return this.deleted.has(draft.id) || this.discarding.has(questionKey(draft.attemptId, draft.questionId));
   }
   private recovery: Promise<void> | null = null;
   recover() { return this.recovery ??= this.recoverDrafts(); }
@@ -89,6 +99,7 @@ export class TeacherAudioCapture {
     let resolveDone: () => void = () => {};
     this.currentDone = new Promise(resolve => { resolveDone = resolve; });
     this.recorder = recorder;
+    this.recordingKey = questionKey(attemptId, questionId);
     recorder.ondataavailable = event => {
       if (!event.data.size) return;
       draft = { ...draft, chunks: draft.chunks + 1, sizeBytes: draft.sizeBytes + event.data.size, endedAt: Date.now() };
@@ -113,23 +124,23 @@ export class TeacherAudioCapture {
           if (failed) draft = (await this.store.list(this.ownerId)).find(row => row.id === draft.id) ?? draft;
           const stoppedAt = failed ? draft.endedAt : captureStoppedAt;
           draft = { ...draft, state: 'pending', endedAt: stoppedAt, durationMs: Math.max(0, stoppedAt - startedAt) };
-          if (draft.sizeBytes) { await this.store.put(draft); void this.upload(draft); }
+          if (draft.sizeBytes && !this.isDiscarded(draft)) { await this.store.put(draft); void this.upload(draft); }
           else await this.store.remove(draft);
           if (split && generation === this.generation && !document.hidden && !failed) {
             await this.part(attemptId, questionId, format, generation);
           } else {
             this.stream?.getTracks().forEach(track => track.stop()); this.stream = null;
-            this.recorder = null; this.publish({ recording: false });
+            this.recorder = null; this.recordingKey = null; this.publish({ recording: false });
           }
         } catch {
-          this.stream?.getTracks().forEach(track => track.stop()); this.stream = null; this.recorder = null;
+          this.stream?.getTracks().forEach(track => track.stop()); this.stream = null; this.recorder = null; this.recordingKey = null;
           this.publish({ recording: false, notice: '음성을 저장하지 못했어요. 기기 저장 공간을 확인해 주세요.' });
         }
         finally { resolveDone(); }
       })();
     };
     try { recorder.start(AUDIO_TIMESLICE_MS); }
-    catch (error) { resolveDone(); this.recorder = null; throw error; }
+    catch (error) { resolveDone(); this.recorder = null; this.recordingKey = null; throw error; }
     if (!this.state.recording) this.publish({ recording: true, startedAt });
   }
   async stop(notice = '') {
@@ -150,9 +161,37 @@ export class TeacherAudioCapture {
     return { ok: failed === 0, failed };
   }
   retry() { for (const draft of this.failures.values()) void this.upload(draft); }
+  /** 녹음 하나 지우기 전: 진행 중인 업로드를 기다리고 이 기기에 남은 초안을 지워, 나중에 다시 올라가지 않게 한다.
+   *  이미 서버에 올라간 녹음은 호출한 쪽이 이어서 서버에서 지운다. */
+  async discardClip(id: string) {
+    this.deleted.add(id);
+    await this.recovery;
+    await this.uploading.get(id);
+    this.failures.delete(id);
+    for (const draft of await this.store.list(this.ownerId)) if (draft.id === id) await this.store.remove(draft);
+    this.publish({ uploads: this.state.uploads.filter(row => row.id !== id) });
+  }
+  /** "처음부터 다시" 전: 이 문항을 녹음 중이면 멈추고 버린 뒤, 진행 중인 업로드를 기다리고 이 문항의 초안을 모두 지운다.
+   *  끝나면 이 문항의 녹음이 이 기기에 남지 않으므로, 이어서 서버에서 지우면 다시 살아나지 않는다. */
+  async discardQuestion(attemptId: string, questionId: string) {
+    const key = questionKey(attemptId, questionId);
+    this.discarding.add(key);
+    try {
+      if (this.recordingKey === key || this.state.busy) await this.stop();
+      await this.recovery;
+      while (this.uploading.size) await Promise.all([...this.uploading.values()]);
+      const mine = (draft: Pick<AudioDraft, 'attemptId' | 'questionId'>) => questionKey(draft.attemptId, draft.questionId) === key;
+      for (const [id, draft] of this.failures) if (mine(draft)) { this.failures.delete(id); this.deleted.add(id); }
+      for (const draft of await this.store.list(this.ownerId)) {
+        if (mine(draft)) { this.deleted.add(draft.id); await this.store.remove(draft); }
+      }
+      this.publish({ uploads: this.state.uploads.filter(row => row.questionId !== questionId) });
+    } finally { this.discarding.delete(key); }
+  }
   private upload(draft: AudioDraft): Promise<void> {
     const existing = this.uploading.get(draft.id);
     if (existing) return existing;
+    if (this.isDiscarded(draft)) return this.store.remove(draft).catch(() => {});
     const pending = (async () => {
       this.status(draft, 'uploading');
       try {
