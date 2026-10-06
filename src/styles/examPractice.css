@@ -487,6 +487,9 @@
 .exam-replay-inline .exam-replay-dock-head { display: none; }
 .exam-replay-inline .exam-replay-progress { flex: 1 1 140px; }
 .exam-replay-inline .exam-replay-note { flex-basis: 100%; }
+/* 소리·진행 막대·시간은 첫 줄, 재생 버튼·배속·안내는 늘 둘째 줄: 화면 폭이나 안내 문구와 상관없이 같은 모양. */
+.exam-replay-inline::after { content: ''; flex-basis: 100%; order: 1; }
+.exam-replay-inline .exam-replay-buttons, .exam-replay-inline .exam-replay-speed, .exam-replay-inline .exam-replay-note { order: 2; }
 .exam-peer-inline { min-width: 0; }
 .theme-light .exam-peer-inline, .theme-light .exam-replay-dock { --rn-text: #0f172a; --rn-muted: #475569; --rn-line: #cbd5e1; color: var(--rn-text); }
 
