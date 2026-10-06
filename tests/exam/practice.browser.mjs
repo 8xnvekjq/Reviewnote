@@ -1203,29 +1203,22 @@ for (const viewport of [LANDSCAPE, { width: 390, height: 844 }]) {
   assert.equal(await page.getByTestId('exam-peer-toggle').count(),0, 'admin review excludes peer solutions');
   const inkSel = '[data-testid="exam-viewer"] .exam-ink';
   await page.locator(inkSel).waitFor();
-  // 관리자가 문항을 열면 필기 순서를 바로 불러와 자동 재생한다(왼쪽에 떠 있는 작은 재생 상자).
+  // 관리자가 문항을 열면 필기 순서를 바로 불러와 자동 재생한다('다른 풀이 보기'와 같은 문항 위 두 줄 막대).
   const dock = page.getByTestId('exam-replay-dock');
   await dock.waitFor();
   assert.equal(await page.getByRole('button', { name: '최종 풀이 보기', exact: true }).count(), 1);
-  assert.equal(await dock.evaluate(el => getComputedStyle(el).position), 'fixed');
+  assert.equal(await dock.evaluate(el => getComputedStyle(el).position), 'static');
+  assert.equal(await dock.evaluate(el => el.classList.contains('exam-replay-inline')), true);
+  assert.equal(await dock.locator('.exam-replay-dock-head').isVisible(), false, 'no floating 필기 과정 header');
   const slider = page.getByRole('slider', { name: '필기 재생 위치' });
   await slider.waitFor();
   await page.waitForFunction(() => Number(document.querySelector('[data-testid="exam-replay-position"]')?.getAttribute('data-step')) >= 1
     || document.querySelector('[data-testid="exam-replay-dock"] button[aria-label="일시정지"]'), null, { timeout: 3000 });
-  // 아래로 스크롤해도 재생 상자는 화면 안에 그대로 있다.
-  const dockBefore = await dock.boundingBox();
-  await page.getByTestId('exam-viewer').evaluate(el => { el.scrollTop = el.scrollHeight; });
-  const dockAfter = await dock.boundingBox();
-  assert.equal(Math.round(dockAfter.y), Math.round(dockBefore.y), 'replay dock stays put while scrolling');
-  assert.ok(dockAfter.y >= 0 && dockAfter.y + dockAfter.height <= viewport.height, 'replay dock is on screen');
-  // 재생 상자는 위쪽 줄을 잡고 끌어 옮길 수 있다(왼쪽 고정이면 풀이를 가렸다).
-  const head = dock.locator('.exam-replay-dock-head');
-  const headBox = await head.boundingBox();
-  await page.mouse.move(headBox.x + 40, headBox.y + headBox.height / 2); await page.mouse.down();
-  await page.mouse.move(headBox.x + 40 + Math.min(200, viewport.width - 200), headBox.y + headBox.height / 2 - 40, { steps: 5 }); await page.mouse.up();
-  const moved = await dock.boundingBox();
-  assert.ok(moved.x > dockAfter.x + 50, `dock moved right: ${dockAfter.x} → ${moved.x}`);
-  assert.ok(moved.x >= 0 && moved.x + moved.width <= viewport.width && moved.y >= 0, 'dragged dock stays on screen');
+  // 소리·막대·시간 아래 줄에 재생 버튼이 온다(다른 풀이 보기와 같은 모양).
+  const sliderBox = await slider.boundingBox();
+  const playBox = await dock.locator('.exam-replay-buttons').boundingBox();
+  assert.ok(playBox.y >= sliderBox.y + sliderBox.height - 1, 'play buttons sit on the second row');
+  await dock.screenshot({ path: `${out}/admin-review-replay-${viewport.width}.png` });
   // 관리자도 덧쓰기 도구가 있다(이 기기에서만 보이고 학생 풀이에는 저장되지 않는다).
   assert.equal(await page.getByTestId('exam-notes-tools').count(), 1);
   assert.match(await page.getByTestId('exam-notes-tools').innerText(), /학생 풀이에는 저장되지 않아요/);
