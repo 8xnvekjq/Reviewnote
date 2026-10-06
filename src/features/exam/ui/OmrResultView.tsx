@@ -4,6 +4,7 @@ import type { AdminExamApi, ExamClient, ExamResult, ExamResultItem, InkStroke } 
 import { composeInkImage } from '../ink/inkComposite';
 import { useExamInk } from './useExamInk';
 import { ResultInkNotes } from './ResultInkNotes';
+import { useHistoryClose } from './useHistoryClose';
 import { PeerSolutionSwitch } from './PeerSolutionView';
 import { PeerSolutionSession, type PeerSolutionApi } from './peerSolution';
 import { ExamAnswer } from './ExamAnswer';
@@ -320,6 +321,7 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, onRevise, i
       {viewing && (
         <div className="exam-overlay exam-overlay-full exam-viewer-overlay" role="dialog" aria-modal="true" aria-label={`${viewing.number}번 크게 보기`} onClick={() => openQuestion(null)}>
           <div className="exam-viewer" onClick={e => e.stopPropagation()} data-testid="exam-viewer">
+            <HistoryClose onClose={() => openQuestion(null)} />
             <div className="exam-sheet-head">
               <h2>{viewing.number}번 {viewing.sourceRound && <small>제{viewing.sourceRound}회 {viewing.sourceNumber}번</small>} <span className={viewing.isCorrect ? 'is-correct' : 'is-wrong'}>{viewing.isCorrect ? 'O' : 'X'}</span></h2>
               <span className="rn-caption">{reviewing ? '학생 답' : '내 답'} <ExamAnswer question={viewing} answer={viewing.answer} /> · 정답 <ExamAnswer question={viewing} answer={viewing.correctAnswer} /> · {formatClock(viewing.timeSpentMs)}</span>
@@ -407,4 +409,10 @@ function EraSection({ stats }: { stats: EraStat[] }) {
       </ul>
     </section>
   );
+}
+
+/** 문항 크게 보기가 열려 있는 동안 휴대폰 뒤로가기로 닫는다(앱 밖으로 나가지 않게). */
+function HistoryClose({ onClose }: { onClose: () => void }) {
+  useHistoryClose('examResultViewer', onClose);
+  return null;
 }

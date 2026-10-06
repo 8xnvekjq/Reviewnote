@@ -284,23 +284,27 @@ async function spinWheel(page, place, steps) {
   assert.equal(await viewerStrokes(), '1');
   await page.getByTestId('exam-viewer').getByRole('button', { name: '다시 실행', exact: true }).click();
   assert.equal(await viewerStrokes(), '2');
-  // 필기 순서 보기(재생)는 서버의 원래 필기만 보여 준다. 덧쓰기 도구는 재생 중에도 보인다(누르면 재생을 닫고 바로 쓴다).
+  // 필기 순서 보기(재생)는 서버의 원래 필기만 보여 준다. 재생 중에는 쓸 수 없으니 덧쓰기 도구를 숨긴다.
   await page.getByRole('button', { name: '필기 순서 보기', exact: true }).click();
-  assert.equal(await notesTools.count(), 1);
+  assert.equal(await notesTools.count(), 0);
   await page.getByTestId('exam-replay-dock').waitFor();
   const notesSlider = page.getByRole('slider', { name: '필기 재생 위치' });
   await notesSlider.focus(); await notesSlider.press('End');
   await page.waitForFunction(sel => document.querySelector(sel)?.getAttribute('data-stroke-count') === '1', viewerInk);
   await page.getByRole('button', { name: '최종 풀이 보기', exact: true }).click();
   assert.equal(await viewerStrokes(), '2');
-  // 재생 중 도구를 누르면 재생이 닫히고 덧쓴 최종 필기로 돌아온다
+  // 최종 풀이 보기로 닫으면 도구가 다시 나오고 덧쓴 최종 필기로 돌아온다
   await page.getByRole('button', { name: '필기 순서 보기', exact: true }).click();
   await page.getByTestId('exam-replay-dock').waitFor();
+  await page.getByRole('button', { name: '최종 풀이 보기', exact: true }).click();
   await notesTools.getByRole('button', { name: '형광펜', exact: true }).click();
   assert.equal(await page.getByTestId('exam-replay-dock').count(), 0);
   assert.equal(await viewerStrokes(), '2');
   await notesTools.getByRole('button', { name: '펜', exact: true }).click();
-  await page.getByTestId('exam-viewer').getByRole('button', { name: '닫기', exact: true }).click();
+  // 휴대폰 뒤로가기는 문항 크게 보기만 닫고 결과 화면에 남는다.
+  await page.goBack();
+  await page.getByTestId('exam-viewer').waitFor({ state: 'detached' });
+  assert.equal(await page.getByTestId('exam-result').isVisible(), true);
   // 다시 열어도 덧쓴 필기가 남아 있고, '원래 풀이로'를 누르면 원래 필기만 남는다.
   await page.locator('.exam-item-row[data-number="1"]').click();
   await page.waitForFunction(sel => document.querySelector(sel)?.getAttribute('data-stroke-count') === '2', viewerInk);
@@ -1214,14 +1218,15 @@ for (const viewport of [LANDSCAPE, { width: 390, height: 844 }]) {
   await slider.waitFor();
   await page.waitForFunction(() => Number(document.querySelector('[data-testid="exam-replay-position"]')?.getAttribute('data-step')) >= 1
     || document.querySelector('[data-testid="exam-replay-dock"] button[aria-label="일시정지"]'), null, { timeout: 3000 });
-  // 소리·막대·시간 아래 줄에 재생 버튼이 온다(다른 풀이 보기와 같은 모양).
+  // 휴대폰은 [막대·시간] / [재생 버튼·배속] 두 줄, 넓은 화면은 한 줄(다른 풀이 보기와 같은 얇은 막대).
   const sliderBox = await slider.boundingBox();
   const playBox = await dock.locator('.exam-replay-buttons').boundingBox();
-  assert.ok(playBox.y >= sliderBox.y + sliderBox.height - 1, 'play buttons sit on the second row');
+  if (viewport.width <= 640) assert.ok(playBox.y >= sliderBox.y + sliderBox.height - 1, 'play buttons sit on the second row');
+  else assert.ok(playBox.y < sliderBox.y + sliderBox.height && playBox.y + playBox.height > sliderBox.y, 'one row on wide screens');
+  assert.ok((await dock.boundingBox()).height <= (viewport.width <= 640 ? 100 : 56), 'thin replay bar');
   await dock.screenshot({ path: `${out}/admin-review-replay-${viewport.width}.png` });
-  // 관리자도 덧쓰기 도구가 있다(이 기기에서만 보이고 학생 풀이에는 저장되지 않는다).
-  assert.equal(await page.getByTestId('exam-notes-tools').count(), 1);
-  assert.match(await page.getByTestId('exam-notes-tools').innerText(), /학생 풀이에는 저장되지 않아요/);
+  // 재생 중에는 쓸 수 없으니 덧쓰기 도구를 숨긴다(최종 풀이 보기로 닫으면 나온다).
+  assert.equal(await page.getByTestId('exam-notes-tools').count(), 0);
   // React가 다시 그린 뒤의 상태를 기다린다(버튼 클릭 직후에는 아직 반영 전일 수 있음).
   const expectReplay = (ink, step) => page.waitForFunction(([ink, step]) =>
     document.querySelector('[data-testid="exam-viewer"] .exam-ink')?.getAttribute('data-stroke-count') === ink
@@ -1253,9 +1258,11 @@ for (const viewport of [LANDSCAPE, { width: 390, height: 844 }]) {
   await page.mouse.move(box.x + 30, box.y + 30); await page.mouse.down();
   await page.mouse.move(box.x + 80, box.y + 90); await page.mouse.up();
   assert.equal(await page.locator(inkSel).getAttribute('data-stroke-count'), '1', 'no writing while replaying');
-  // 도구를 누르면 재생이 닫히고 학생 필기 위에 쓸 수 있다
-  await page.getByTestId('exam-notes-tools').getByRole('button', { name: '펜', exact: true }).click();
+  // 최종 풀이 보기로 재생을 닫으면 덧쓰기 도구가 나오고 학생 필기 위에 쓸 수 있다(이 기기에서만, 학생 풀이에는 저장 안 됨)
+  await page.getByRole('button', { name: '최종 풀이 보기', exact: true }).click();
   assert.equal(await dock.count(), 0);
+  assert.match(await page.getByTestId('exam-notes-tools').innerText(), /학생 풀이에는 저장되지 않아요/);
+  await page.getByTestId('exam-notes-tools').getByRole('button', { name: '펜', exact: true }).click();
   const paper = await page.locator(inkSel).boundingBox();
   await page.mouse.move(paper.x + 40, paper.y + 40); await page.mouse.down();
   for (let i = 1; i <= 5; i++) await page.mouse.move(paper.x + 40 + i * 15, paper.y + 40 + i * 12);

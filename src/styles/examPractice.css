@@ -16,7 +16,7 @@
 .exam-admin-answer { font-size: 13px; }
 .exam-admin-paper { min-width: 0; background: white; border-radius: 10px; overflow: hidden; }
 /* 필기 순서 보기: 위에는 얇은 줄(버튼·덧쓰기 도구)만, 재생 컨트롤은 화면 왼쪽에 떠 있는 반투명 작은 상자(스크롤해도 그대로). */
-.exam-replay-bar { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; min-width: 0; padding: 8px 10px; background: var(--rn-surface, #0f172a); color: var(--rn-text, #e2e8f0); font-size: 13px; }
+.exam-replay-bar { display: flex; flex-wrap: nowrap; gap: 6px; align-items: center; min-width: 0; padding: 4px 8px; background: var(--rn-surface, #0f172a); color: var(--rn-text, #e2e8f0); font-size: 13px; }
 .exam-replay-dock { position: fixed; z-index: 30; left: calc(env(safe-area-inset-left) + 10px); top: 50%; transform: translateY(-50%); display: grid; gap: 6px; width: 156px; max-width: calc(100vw - 20px); padding: 6px 8px 8px; border-radius: 14px; border: 1px solid rgb(148 163 184 / .28); background: rgb(15 23 42 / .5); background: color-mix(in srgb, var(--rn-surface, #0f172a) 52%, transparent); color: var(--rn-text, #e2e8f0); font-size: 12px; box-shadow: 0 10px 28px rgb(0 0 0 / .28); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
 .exam-replay-dock p { margin: 0; }
 .exam-replay-dock, .exam-replay-dock * { box-sizing: border-box; }
@@ -47,9 +47,11 @@
   .exam-replay-dock { top: auto; bottom: calc(env(safe-area-inset-bottom) + 10px); transform: none; }
 }
 /* 결과 화면 덧쓰기 도구(이 기기에만 남는 필기) */
-.exam-notes-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
-.exam-notes-tools .exam-tool { min-width: 36px; min-height: 36px; font-size: 16px; }
-.exam-notes-tools .exam-color { width: 26px; height: 26px; margin: 3px 1px; }
+.exam-notes-tools { display: flex; flex-wrap: nowrap; align-items: center; gap: 4px; min-width: 0; }
+.exam-replay-bar > *, .exam-notes-tools > * { flex: none; }
+.exam-notes-tools .exam-tool-group { flex-wrap: nowrap; }
+.exam-notes-tools .exam-tool { min-width: 32px; min-height: 32px; font-size: 15px; }
+.exam-notes-tools .exam-color { width: 22px; height: 22px; margin: 2px 1px; }
 .exam-notes-note { flex-basis: 100%; margin: 0; font-size: 11.5px; color: var(--rn-muted, #94a3b8); }
 .exam-ink-replay { min-width: 0; width: 100%; }
 .exam-review-badge { font-size: 11px; line-height: 1.4; color: #784a00; background: #fff1cc; padding: 4px 6px; border-radius: 6px; }
@@ -160,7 +162,9 @@
 .theme-light .exam-past-row { --rn-text: #0f172a; --rn-accent: #4f46e5; --rn-line: #cbd5e1; }
 .exam-peer { display: grid; background: var(--rn-surface); color: var(--rn-text); }
 /* 크게 보기 종이(.exam-viewer-paper)는 흰 바탕 — 익명 이름 줄·안내는 표면색 띠로 붙이고 아래 여백을 두지 않는다(흰 빈칸이 생겼다). */
-.exam-peer-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 6px 10px; }
+.exam-peer-head { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; padding: 2px 8px; }
+.exam-peer-head .exam-tool-text { min-height: 32px; }
+@media (max-width: 640px) { .exam-peer-caption { display: none; } }
 .exam-peer-label { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; max-width: 100%; margin: 0; font-weight: 800; color: var(--rn-text); overflow-wrap: anywhere; }
 .exam-peer-face { flex: none; font-size: 1.15em; line-height: 1; }
 /* 칭호 배지 색·애니메이션은 getTitleBadgeStyle 클래스 그대로 — 여기서는 머리 줄 안에 들어가게 크기만 맞춘다. */
@@ -453,7 +457,8 @@
 .exam-era-card { aspect-ratio: auto; min-height: 180px; width: 100%; background: #f0f7ff; border-color: #c9ddf4; }
 .exam-era-card .exam-paper-body { min-height: 40px; }
 .exam-era-card .exam-paper-title { font-size: 1.1rem; }
-.exam-replay-notes { display: contents; }
+/* 도구가 많아도 한 줄: 도구 묶음만 옆으로 밀어 보고, 재생 토글·다른 학생 풀이 버튼은 늘 보인다. */
+.exam-replay-bar > .exam-replay-notes { flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 /* 시험지 고르기: 구역별 필터 칩 줄 — 필터마다 한 줄, 넘치면 줄바꿈 대신 가로 스크롤. */
 .exam-filter-bar { display: grid; gap: 6px; margin: 4px 0 12px; min-width: 0; }
 .exam-filter-row { display: flex; align-items: center; gap: 6px; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-block: 2px; }
@@ -483,23 +488,33 @@
 @keyframes exam-replay-feedback { 0%, 25% { opacity: .8; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .exam-replay-feedback { animation: none; } }
 
-.exam-replay-dock.exam-replay-inline { position: static; transform: none; width: 100%; display: flex; flex-wrap: wrap; align-items: center; box-shadow: none; margin-bottom: 8px; background: var(--rn-surface, #0f172a); }
-.exam-replay-inline .exam-replay-dock-head { display: none; }
-.exam-replay-inline .exam-replay-progress { flex: 1 1 140px; }
-.exam-replay-inline .exam-replay-note { flex-basis: 100%; }
-/* 소리·진행 막대·시간은 첫 줄, 재생 버튼·배속·안내는 늘 둘째 줄: 화면 폭이나 안내 문구와 상관없이 같은 모양. */
-.exam-replay-inline::after { content: ''; flex-basis: 100%; order: 1; }
-.exam-replay-inline .exam-replay-buttons, .exam-replay-inline .exam-replay-speed, .exam-replay-inline .exam-replay-note { order: 2; }
+/* 문항 위 얇은 재생 막대. 휴대폰: [소리·진행 막대·시간] / [재생 버튼·배속] 두 줄, 넓은 화면: 한 줄. */
+.exam-replay-dock.exam-replay-inline { position: static; transform: none; width: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 4px 8px; border-radius: 10px; box-shadow: none; margin-bottom: 4px; background: var(--rn-surface, #0f172a); }
+.exam-replay-inline .exam-replay-dock-head, .exam-replay-inline .exam-replay-note { display: none; }
+.exam-replay-inline .exam-replay-progress { flex: 1 1 120px; padding-bottom: 0; }
+.exam-replay-inline .exam-replay-speed { width: 128px; }
+.exam-replay-inline .exam-audio-toggle { min-width: 40px; min-height: 40px; padding: 2px; }
+.exam-replay-inline .exam-audio-toggle > span:first-child { font-size: 16px; }
+.exam-replay-inline .exam-audio-toggle > span:last-child { display: none; }
+.exam-replay-inline .exam-replay-audio { display: contents; }
+.exam-replay-inline .exam-replay-audio .exam-peer-note { order: 9; flex-basis: 100%; }
+.exam-replay-inline .exam-audio-toggle { order: 0; }
+.exam-replay-inline .exam-replay-buttons { order: 1; }
+.exam-replay-inline .exam-replay-progress { order: 2; }
+.exam-replay-inline output { order: 3; font-size: 12px; white-space: nowrap; }
+.exam-replay-inline .exam-replay-speed { order: 4; }
+.exam-replay-inline .exam-replay-final { order: 8; }
+@media (max-width: 640px) {
+  .exam-replay-inline .exam-replay-buttons { order: 5; }
+  .exam-replay-inline .exam-replay-speed { order: 6; margin-left: auto; }
+  .exam-replay-inline .exam-replay-final { order: 7; }
+  .exam-replay-inline::after { content: ''; flex-basis: 100%; order: 4; }
+}
+.rn-visually-hidden { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .exam-peer-inline { min-width: 0; }
 .theme-light .exam-peer-inline, .theme-light .exam-replay-dock { --rn-text: #0f172a; --rn-muted: #475569; --rn-line: #cbd5e1; color: var(--rn-text); }
 
-/* 긴 고민은 작은 점으로 표시하고, 탭하거나 초점을 맞추면 실제 시간을 보여 준다. */
 .exam-replay-progress { position: relative; min-width: 0; padding-bottom: 12px; }
-.exam-replay-markers { position: absolute; left: 8px; right: 8px; bottom: 0; height: 14px; }
-.exam-replay-pause { position: absolute; top: 0; transform: translateX(-50%); width: 14px; height: 14px; padding: 0; border: 0; background: transparent; color: #fbbf24; cursor: pointer; }
-.exam-replay-pause::before { content: ''; display: block; width: 5px; height: 5px; margin: auto; border-radius: 50%; background: currentColor; }
-.exam-replay-pause span { display: none; position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); width: max-content; max-width: 140px; padding: 4px 6px; border-radius: 6px; background: #0f172a; color: #fbbf24; font-size: 11px; pointer-events: none; }
-.exam-replay-pause:hover span, .exam-replay-pause:focus span { display: block; }
 
 /* 선생님 녹음 관리(녹음 지우기·처음부터 다시) */
 .exam-result-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
@@ -507,3 +522,12 @@
 .exam-audio-clips { display: grid; gap: 6px; max-height: 50vh; overflow-y: auto; padding: 0; list-style: none; }
 .exam-audio-clips li { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 4px 8px; border: 1px solid var(--rn-line); border-radius: 10px; background: var(--rn-elevated); font-size: 14px; font-variant-numeric: tabular-nums; }
 .exam-audio-clips li .rn-button { min-height: 40px; }
+
+/* 휴대폰에서 문항 크게 보기는 화면 끝까지 쓴다(바깥 여백·둥근 테두리로 문제가 작아졌다). */
+@media (max-width: 640px) {
+  .exam-viewer-overlay { padding: 0; }
+  .exam-viewer { border-radius: 0; border: 0; padding: 8px 6px; height: 100%; }
+  .exam-viewer .exam-sheet-head { margin-bottom: 4px; gap: 4px 8px; }
+  .exam-viewer .exam-sheet-head h2 { font-size: 17px; }
+  .exam-viewer-paper { margin-top: 4px; }
+}
