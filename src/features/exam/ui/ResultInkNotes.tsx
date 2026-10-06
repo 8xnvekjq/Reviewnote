@@ -98,9 +98,9 @@ export function ResultInkNotes({ client, attemptId, questionId, imageUrl, stroke
         <button type="button" className="exam-tool" aria-label="실행 취소" title="실행 취소" disabled={!canUndo} onClick={() => { inkRef.current?.undo(); setHistoryTick(t => t + 1); }}>↶</button>
         <button type="button" className="exam-tool" aria-label="다시 실행" title="다시 실행" disabled={!canRedo} onClick={() => { inkRef.current?.redo(); setHistoryTick(t => t + 1); }}>↷</button>
         <button type="button" className="exam-tool exam-tool-text" disabled={!notes} onClick={reset}>원래 풀이로</button>
-        {extraTool}
       </div>
-      <p className="exam-notes-note">{!ready ? (review ? '학생 필기를 불러온 뒤에 쓸 수 있어요.' : '원래 필기를 불러온 뒤에 이어 쓸 수 있어요.')
+      {/* 안내는 화면을 차지하지 않게 읽기 프로그램에만 들려준다. */}
+      <p className="exam-notes-note rn-visually-hidden">{!ready ? (review ? '학생 필기를 불러온 뒤에 쓸 수 있어요.' : '원래 필기를 불러온 뒤에 이어 쓸 수 있어요.')
         : review ? '여기서 쓴 필기는 이 기기에서만 보여요. 학생 풀이에는 저장되지 않아요.'
         : '여기서 쓴 필기는 이 기기에만 남아요. 답·점수와 서버의 원래 풀이는 바뀌지 않아요.'}</p>
     </div>
@@ -108,7 +108,7 @@ export function ResultInkNotes({ client, attemptId, questionId, imageUrl, stroke
 
   return <ExamInkReplay client={client} attemptId={attemptId} questionId={questionId} imageUrl={imageUrl}
     strokes={strokes} imageMaxWidth={imageMaxWidth} autoOpen={review}
-    // 관리자가 학생 풀이를 볼 때는 '다른 풀이 보기'와 같은 막대(문항 위 두 줄)로 보여 준다.
-    inline={review} persistDock={!review} peerPlayback={review}
+    // 결과·관리자 검토 모두 '다른 풀이 보기'와 같은 문항 위 얇은 막대로 보여 준다.
+    inline persistDock={false} peerPlayback barExtra={extraTool}
     notes={{ strokes: shown, onChange, tool, color, size: 4, inkRef, toolbar, ready, canvasKey: generation }} />;
 }

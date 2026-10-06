@@ -48,9 +48,8 @@ try {
     }, value);
   };
   await open(true);
-  const marker = page.getByTestId('exam-replay-pause');
-  assert.equal(await marker.count(), 1);
-  assert.equal(await marker.getAttribute('aria-label'), '7시간 고민');
+  // 긴 멈춤은 줄여서 재생하지만 막대에 고민 시간 점은 그리지 않는다(무의미한 점이라는 의견).
+  assert.equal(await page.getByTestId('exam-replay-pause').count(), 0);
   assert.equal(await page.getByRole('slider').getAttribute('max'), '9500');
   await page.waitForFunction(() => !document.querySelector('audio').paused);
   await page.getByTestId('exam-audio-sound').click();
@@ -70,10 +69,7 @@ try {
   assert.ok(Math.abs(elapsed - (timelineTime - 5500) / 1000) < .4);
   await page.getByRole('button', { name: '일시정지', exact: true }).click();
   assert.equal(await page.getByTestId('exam-audio-player').evaluate(audio => audio.paused), true);
-  await marker.click();
-  await page.waitForFunction(() => document.querySelector('audio').paused);
-  assert.equal(await marker.locator('span').isVisible(), true);
-  await page.screenshot({ path: `${out}/mobile-thinking-pause.png` });
+  await page.screenshot({ path: `${out}/mobile-replay-bar.png` });
   await page.getByRole('button', { name: '마지막', exact: true }).click();
   assert.equal(await page.getByTestId('exam-replay-position').getAttribute('data-step'), '2');
   await page.getByRole('button', { name: '처음', exact: true }).click();
@@ -82,9 +78,7 @@ try {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await page.getByTestId('exam-peer-back').click();
   await open(false);
-  assert.equal(await page.getByTestId('exam-replay-pause').getAttribute('aria-label'), '50초 고민');
-  await page.getByTestId('exam-replay-pause').click();
-  assert.equal(await page.getByTestId('exam-replay-pause').locator('span').isVisible(), true);
+  assert.equal(await page.getByTestId('exam-replay-pause').count(), 0);
   await page.getByTestId('exam-peer-back').click();
 
   // 겹치는 녹음은 둘 다 재생되며, 탐색과 배속도 같은 시계를 따른다.
@@ -108,5 +102,5 @@ try {
   await page.getByRole('button', { name: '재생', exact: true }).click();
   await page.waitForFunction(() => [...document.querySelectorAll('audio')].every(audio => !audio.paused && !audio.muted && audio.playbackRate === 4));
   assert.deepEqual(errors, []);
-  console.log('Replay gaps browser: seven-hour compression, clip/ink timing, seek, speed, pause/resume, endpoints, mobile markers, ink-only labels and overlapping audio passed.');
+  console.log('Replay gaps browser: seven-hour compression, clip/ink timing, seek, speed, pause/resume, endpoints, no pause markers, ink-only labels and overlapping audio passed.');
 } finally { await browser.close(); }
