@@ -22,6 +22,8 @@ export class TeacherAudioCapture {
   private generation = 0;
   private currentDone: Promise<void> = Promise.resolve();
   private uploading = new Map<string, Promise<void>>();
+  /** 올리는 중인 녹음 id → 문항(attemptId/questionId). 문항 하나의 업로드만 기다릴 때 쓴다. */
+  private uploadingKeys = new Map<string, string>();
   private failures = new Map<string, AudioDraft>();
   private change: () => void;
   private client: ExamClient;
@@ -161,6 +163,29 @@ export class TeacherAudioCapture {
     return { ok: failed === 0, failed };
   }
   retry() { for (const draft of this.failures.values()) void this.upload(draft); }
+  /** 이 문항에 아직 다 올리지 못한(올리는 중·실패) 녹음이 있는지. 녹음 중인 문항은 먼저 멈춘 뒤 물어본다. */
+  async hasPendingQuestionUploads(attemptId: string, questionId: string) {
+    const key = questionKey(attemptId, questionId);
+    await this.recovery;
+    return [...this.uploadingKeys.values()].includes(key)
+      || [...this.failures.values()].some(draft => questionKey(draft.attemptId, draft.questionId) === key);
+  }
+  /** 선생님 "채점해 보기" 전: 이 문항을 녹음 중이면 멈추고, 이 문항 녹음(실패분은 다시 시도)이 다 올라갈 때까지 기다린다.
+   *  다른 문항 업로드는 기다리지 않는다(백그라운드에서 계속). */
+  async flushQuestionUploads(attemptId: string, questionId: string): Promise<{ ok: boolean; failed: number }> {
+    const key = questionKey(attemptId, questionId);
+    const mine = (draft: Pick<AudioDraft, 'attemptId' | 'questionId'>) => questionKey(draft.attemptId, draft.questionId) === key;
+    if (this.recordingKey === key || this.state.busy) await this.stop();
+    await this.recovery;
+    for (const draft of [...this.failures.values()]) if (mine(draft)) void this.upload(draft);
+    for (;;) {
+      const pending = [...this.uploading].filter(([id]) => this.uploadingKeys.get(id) === key).map(([, upload]) => upload);
+      if (!pending.length) break;
+      await Promise.all(pending);
+    }
+    const failed = [...this.failures.values()].filter(mine).length;
+    return { ok: failed === 0, failed };
+  }
   /** 녹음 하나 지우기 전: 진행 중인 업로드를 기다리고 이 기기에 남은 초안을 지워, 나중에 다시 올라가지 않게 한다.
    *  이미 서버에 올라간 녹음은 호출한 쪽이 이어서 서버에서 지운다. */
   async discardClip(id: string) {
@@ -204,8 +229,9 @@ export class TeacherAudioCapture {
         }
         await this.store.remove(draft); this.failures.delete(draft.id); this.status(draft, 'done');
       } catch { this.failures.set(draft.id, draft); this.status(draft, 'failed'); }
-    })().finally(() => { this.uploading.delete(draft.id); });
+    })().finally(() => { this.uploading.delete(draft.id); this.uploadingKeys.delete(draft.id); });
     this.uploading.set(draft.id, pending);
+    this.uploadingKeys.set(draft.id, questionKey(draft.attemptId, draft.questionId));
     return pending;
   }
 }
