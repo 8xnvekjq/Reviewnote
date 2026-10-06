@@ -1,6 +1,6 @@
 // 기출문제 풀이 화면(ExamPracticeScreen)을 메모리 mock client 로 띄우는 standalone fixture.
 // 실제 앱처럼 상단바/하단 탭을 흉내 낸 껍데기 안에 마운트해, 풀이 화면이 그걸 덮는지도 본다.
-// URL 파라미터: user, limit(실전 제한시간 분, 소수 가능), persist(1이면 localStorage 이어 풀기), failSave(1), latency(ms)
+// URL 파라미터: user, limit(실전 제한시간 분, 소수 가능), persist(1이면 localStorage 이어 풀기), failSave(1), latency(ms), sharedTeacher(1이면 관리자 탭↔학생 탭 선생님 풀이 공유)
 import { createRoot } from 'react-dom/client';
 import { useState } from 'react';
 import '../../src/index.css';
@@ -53,6 +53,7 @@ const client = createMockExamClient({
   filters: params.get('filters') === '1',
   timeLimitMinutes: params.has('limit') ? Number(params.get('limit')) : undefined,
   persistKey: params.get('persist') === '1' ? 'exam-practice-harness' : undefined,
+  sharedTeacherKey: params.get('sharedTeacher') === '1' ? 'exam-practice-teacher-share' : undefined,
   failSave: params.get('failSave') === '1',
   latencyMs: params.has('latency') ? Number(params.get('latency')) : 0,
   inkStats,

@@ -3,7 +3,7 @@
 // v2: 자유 모드에서 채점해 본 문항(checked)은 답을 잠근다 — 이어 풀기로 다시 열어도 서버 payload 의 items[].checked 로 유지.
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { TeacherAudioRecorder } from '../audio/TeacherAudioRecorder';
-import { waitForAudioUploads } from '../audio/audioFlush';
+import { prepareTeacherCheck, runAudioUploadGate, waitForAudioUploads, type AudioGateUi } from '../audio/audioFlush';
 import { ExamAssistOverlay } from './ExamAssistOverlay';
 import { LaserIcon } from './LaserIcon';
 import { LassoIcon } from './LassoIcon';
@@ -109,8 +109,24 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
   const [audioSubmit, setAudioSubmit] = useState<'uploading' | 'done' | 'failed' | null>(null);
   const audioDecision = useRef<((retry: boolean) => void) | null>(null);
   const audioStarted = useRef(0);
+  // 진행 창이 한 문항(채점해 보기)의 녹음만 기다리면 그 문항 id, 제출처럼 전체면 null.
+  const audioGateQuestion = useRef<string | null>(null);
   const audioDialogRef = useRef<HTMLDivElement>(null);
   useEffect(() => { if (audioSubmit) audioDialogRef.current?.focus(); }, [audioSubmit]);
+  /** 음성 업로드 진행 창(audioSubmit)을 움직이는 콜백들. auto(시간 종료 자동 제출)면 실패 창은 5초 뒤 그냥 계속한다. */
+  const audioGateUi = useCallback((auto: boolean, questionId: string | null): AudioGateUi => {
+    audioStarted.current = Date.now();
+    audioGateQuestion.current = questionId;
+    return {
+      show: state => { setAudioSubmit(state); if (state === null) audioDecision.current = null; },
+      continueRequested: () => new Promise<'continue'>(resolve => { audioDecision.current = () => resolve('continue'); }),
+      retryRequested: () => new Promise<boolean>(resolve => {
+        audioDecision.current = resolve;
+        if (auto) setTimeout(() => resolve(false), 5000);
+      }),
+      pause: () => new Promise<void>(resolve => setTimeout(resolve, 1000)),
+    };
+  }, []);
   const [submitting, setSubmitting] = useState(false);
   const broadcastInk = useInkBroadcast(client.liveTransport, attempt.paperId, attempt.id, attempt.status === 'in_progress' && !submitting);
   // Live: after each server save, tell a watching admin which broadcasts that save contains.
@@ -274,32 +290,8 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
     try {
       if (isAdmin && audioCaptureRef.current) {
         const capture = audioCaptureRef.current;
-        audioStarted.current = Date.now();
         setOverlay(null);
-        for (;;) {
-          setAudioSubmit('uploading');
-          const decision = new Promise<'continue'>(resolve => {
-            audioDecision.current = () => resolve('continue');
-          });
-          const outcome = await waitForAudioUploads(() => capture.flushUploads(), decision);
-          audioDecision.current = null;
-          if (outcome === 'continue') break;
-          if (outcome.ok) {
-            setAudioSubmit('done');
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            break;
-          }
-          setAudioSubmit('failed');
-          let failureTimeout: ReturnType<typeof setTimeout> | undefined;
-          const retry = await new Promise<boolean>(resolve => {
-            audioDecision.current = resolve;
-            if (auto) failureTimeout = setTimeout(() => resolve(false), 5000);
-          });
-          clearTimeout(failureTimeout);
-          audioDecision.current = null;
-          if (!retry) break;
-        }
-        setAudioSubmit(null);
+        await runAudioUploadGate(() => capture.flushUploads(), audioGateUi(auto, null));
       } else await audioStopRef.current?.();
       // 서버가 받을 수 없는 문항(너무 큰 필기)만 남았으면 제출을 막지 않는다 — 그 필기는 이 기기에 남는다.
       if (!await flushInk() && !(inkSync.onlyRejectedPending && (auto || window.confirm(
@@ -314,7 +306,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
       setSubmitError(error instanceof Error ? error.message : '제출하지 못했어요.');
       setOverlay(auto ? 'review' : 'submit');
     }
-  }, [client, attempt.id, snapshot, flushInk, onSubmitted, inkSync, questions, isAdmin]);
+  }, [client, attempt.id, snapshot, flushInk, onSubmitted, inkSync, questions, isAdmin, audioGateUi]);
 
   const remaining = revising ? null : remainingMs(attempt.startedAt, attempt.timeLimitMinutes, now);
   useEffect(() => {
@@ -393,6 +385,18 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
     const qid = question.id;
     setChecking(true);
     try {
+      if (isAdmin) {
+        // 선생님 채점해 보기는 이 문항 풀이를 학생에게 공개한다: 녹음 멈춤 → 필기 저장 → 이 문항 녹음 업로드를 먼저 끝낸다.
+        const capture = audioCaptureRef.current;
+        const prepared = await prepareTeacherCheck({
+          stopRecording: async () => { await audioStopRef.current?.(); },
+          flushInk: () => flushInk(),
+          uploadAudio: async () => capture && await capture.hasPendingQuestionUploads(attempt.id, inkKey)
+            ? runAudioUploadGate(() => capture.flushQuestionUploads(attempt.id, inkKey), audioGateUi(false, inkKey))
+            : 'skipped',
+        });
+        if (!prepared.inkSaved) setToast('필기를 아직 서버에 저장하지 못했어요. 저장되는 대로 학생에게 보여요.');
+      }
       const res = await client.checkAnswer(attempt.id, qid, answer);
       // 서버가 이 답을 저장하고 문항을 잠갔다 — 화면도 같은 답으로 잠근다.
       updateItem(qid, { answer, checked: { isCorrect: res.isCorrect, correctAnswer: res.correctAnswer } });
@@ -610,8 +614,13 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
       }}>
         <div className="exam-confirm-box">
           <p role="status">{audioSubmit === 'done' ? '음성 업로드 완료!' : audioSubmit === 'failed'
-            ? '음성 업로드 실패 — 이 기기에 저장돼 있어 다음에 자동으로 다시 올라가요.' : '음성 업로드 중…'}</p>
-          <p>{audioCaptureRef.current?.state.uploads.filter(row => row.state === 'done').length ?? 0} / {audioCaptureRef.current?.state.uploads.length ?? 0}개 · {Math.floor(Math.max(0, now - audioStarted.current) / 1000)}초</p>
+            ? '음성 업로드 실패 — 이 기기에 저장돼 있어 다음에 자동으로 다시 올라가요.'
+            : audioGateQuestion.current ? '채점 전에 이 문항 음성을 올리는 중…' : '음성 업로드 중…'}</p>
+          {(() => {
+            // 채점해 보기는 그 문항 녹음만 센다.
+            const rows = (audioCaptureRef.current?.state.uploads ?? []).filter(row => !audioGateQuestion.current || row.questionId === audioGateQuestion.current);
+            return <p>{rows.filter(row => row.state === 'done').length} / {rows.length}개 · {Math.floor(Math.max(0, now - audioStarted.current) / 1000)}초</p>;
+          })()}
           {audioSubmit === 'failed' && <button type="button" className="rn-button" onClick={() => audioDecision.current?.(true)}>다시 시도</button>}
           {audioSubmit !== 'done' && <button type="button" className="rn-button" onClick={() => audioDecision.current?.(false)}>그래도 계속</button>}
         </div>
