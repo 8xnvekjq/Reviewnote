@@ -26,6 +26,7 @@ import { sanitizeExamAnswer } from '../examMappers';
 import { applyInkEvent, inkDelta, inkIdsHash } from '../ink/inkReplay';
 import { decodeInkPayload, encodeInkEvents } from '../ink/inkCodec';
 import { countAnswered, ELECTIVES, estimateGrade, isAnswerCorrect, keepCheckedAnswers } from './examLogic.ts';
+import { canReadSharedTeacherAudio, pickSharedTeacher, readSharedTeacher, writeSharedTeacher, type SharedTeacherAttempt } from './mockTeacherShare.ts';
 
 interface WrongRateRow { number: number; wrongRate: number; choiceRates: number[] | null }
 interface PaperData {
@@ -167,6 +168,9 @@ export interface MockExamClientOptions {
   filters?: boolean;
   /** 호출 기록(테스트에서 검사). */
   log?: Array<{ method: string; args: unknown[] }>;
+  /** 주면 관리자 탭이 선생님 풀이(필기·녹음·채점·제출)를 이 localStorage 키에 올리고, 학생 탭은 고정 🎓 대신
+   *  서버와 같은 공개 규칙(mockTeacherShare)으로 거기서 선생님 풀이를 고른다. */
+  sharedTeacherKey?: string;
 }
 
 export function createMockExamClient(options: MockExamClientOptions = {}): ExamClient {
@@ -185,6 +189,8 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
   text(36, 'data'); view.setUint32(40, wav.length - 44, true);
   const mockAudioUrl = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }));
   let seq = 0;
+  // 문항별 채점해 본 시각(attemptId:questionId → ISO). 선생님 풀이 공개 순서를 흉내 내는 데만 쓴다.
+  const checkedAt = new Map<string, string>();
 
   const load = () => {
     if (!options.persistKey) return;
@@ -217,6 +223,24 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
     return entry;
   };
   const clone = <T,>(value: T): T => structuredClone(value);
+  // 관리자 탭: 이 응시의 선생님 풀이를 공유 저장소에 올린다(공개 여부는 학생 쪽 pickSharedTeacher가 판단).
+  const shareTeacher = (attemptId: string) => {
+    const entry = store.get(attemptId);
+    if (!options.admin || !options.sharedTeacherKey || !entry) return;
+    const prefix = `${attemptId}:`;
+    const byQuestion = <T,>(rows: Iterable<[string, T]>) => Object.fromEntries([...rows]
+      .filter(([key]) => key.startsWith(prefix)).map(([key, value]) => [key.slice(prefix.length), value]));
+    const row: SharedTeacherAttempt = {
+      attemptId, paperId: entry.attempt.paperId, mode: entry.attempt.mode, status: entry.attempt.status,
+      submittedAt: entry.result?.submittedAt ?? null,
+      checkedAt: byQuestion(checkedAt),
+      ink: Object.fromEntries((ink.get(attemptId) ?? []).map(doc => [doc.questionId,
+        { strokes: doc.strokes, revision: doc.revision, batches: replay.get(`${attemptId}:${doc.questionId}`) ?? [] }])),
+      audio: byQuestion([...audio].map(([key, rows]) => [key, rows.map(clip => ({ id: clip.id, startedAt: clip.startedAt,
+        durationMs: clip.durationMs, sizeBytes: clip.sizeBytes }))] as [string, SharedTeacherAttempt['audio'][string]])),
+    };
+    writeSharedTeacher(options.sharedTeacherKey, row);
+  };
 
   const paperTitle = (paperId: string) => papers.find(p => p.id === paperId)?.title ?? PAPER.title;
   const roundFor = (attempt: ExamAttempt) => [...store.values()]
@@ -321,9 +345,17 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
         : attempt.mode === 'free' && !!item && 'checked' in item && !!item.checked && (correct === false || item.unsure);
       if (attempt.kind === 'hanneung' || !allowed) throw new Error('EXAM_PEER_NOT_ALLOWED');
       if (attempt.questions.find(q => q.id === questionId)?.number === 3) return [];
-      return [
+      const students = [
         { solutionKey: 'mock-peer-fingerprint', label: { face: '🐱', title: '수학의 신', grade: '고2', isTeacher: false }, timeSpentMs: 252000 },
         { solutionKey: 'mock-peer-second', label: { face: '🦊', title: '도전자', grade: '고1', isTeacher: false }, timeSpentMs: 15000 },
+      ];
+      if (options.sharedTeacherKey) {
+        const teacher = pickSharedTeacher(readSharedTeacher(options.sharedTeacherKey), attempt.paperId, questionId);
+        return teacher ? [...students, { solutionKey: `mock-teacher:${teacher.attemptId}:${teacher.ink[questionId].revision}`,
+          label: { face: '🎓', title: null, grade: null, isTeacher: true }, timeSpentMs: 61000,
+          hasAudio: (teacher.audio[questionId]?.length ?? 0) > 0 }] : students;
+      }
+      return [...students,
         { solutionKey: 'mock-peer-teacher', label: { face: '🎓', title: null, grade: null, isTeacher: true }, timeSpentMs: 61000, hasAudio: true },
       ];
     },
@@ -334,6 +366,20 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       const correct = item && ('isCorrect' in item ? item.isCorrect : item.checked?.isCorrect);
       if (attempt.kind === 'hanneung' || !item || !(result ? correct === false || item.unsure
         : attempt.mode === 'free' && 'checked' in item && item.checked && (correct === false || item.unsure))) throw new Error('EXAM_PEER_NOT_ALLOWED');
+      if (options.sharedTeacherKey && solutionKey.startsWith('mock-teacher:')) {
+        const teacher = pickSharedTeacher(readSharedTeacher(options.sharedTeacherKey), attempt.paperId, questionId);
+        const doc = teacher?.ink[questionId];
+        if (!teacher || !doc || solutionKey !== `mock-teacher:${teacher.attemptId}:${doc.revision}`) throw new Error('EXAM_PEER_CHANGED');
+        const batches = decodeInkPayload<InkReplayBatch[]>(doc.batches, 'cache');
+        const first = Math.min(...batches.flatMap(batch => batch.events.map(event => event.at)));
+        const origin = Number.isFinite(first) ? first : 0;
+        return { strokes: decodeInkPayload<InkStroke[]>(doc.strokes, 'cache'), revision: doc.revision,
+          batches: batches.map(batch => ({ ...batch, events: batch.events.map(event => ({ ...event, at: event.at - origin })) })),
+          audioClips: canReadSharedTeacherAudio(teacher, questionId) ? [...(teacher.audio[questionId] ?? [])]
+            .sort((a, b) => a.startedAt - b.startedAt || a.id.localeCompare(b.id))
+            .map(clip => ({ id: clip.id, offsetMs: clip.startedAt - origin, durationMs: clip.durationMs, mime: 'audio/wav',
+              sizeBytes: clip.sizeBytes, storagePath: `mock/${clip.id}.wav`, url: mockAudioUrl })) : [] };
+      }
       if (!['mock-peer-fingerprint', 'mock-peer-second', 'mock-peer-teacher'].includes(solutionKey)) throw new Error('EXAM_PEER_CHANGED');
       const strokes = mockPeerStrokes().map(s => ({ ...s, color: solutionKey === 'mock-peer-second' ? '#dc2626' : '#2563eb' }));
       const events = strokes.map((_, i) => ({ ...inkDelta(strokes.slice(0, i), strokes.slice(0, i + 1), 'draw', (i + 1) * 600), id: `peer-event-${i}` }));
@@ -352,6 +398,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       if (!rows.some(row => row.id === clip.id)) rows.push({ id: clip.id, offsetMs: 0, startedAt: clip.startedAt,
         durationMs: clip.durationMs, mime: 'audio/wav', sizeBytes: blob.size, storagePath: `mock/${clip.id}.wav`, url: mockAudioUrl });
       audio.set(key, rows);
+      shareTeacher(clip.attemptId);
     },
     async listSolutionAudio(attemptId, questionId) {
       record('listSolutionAudio', [attemptId, questionId]);
@@ -365,7 +412,11 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       record('deleteSolutionAudio', [clipId]);
       if (!options.admin) throw new Error('EXAM_ADMIN_REQUIRED');
       await wait();
-      for (const [key, rows] of audio) audio.set(key, rows.filter(row => row.id !== clipId));
+      for (const [key, rows] of audio) {
+        if (!rows.some(row => row.id === clipId)) continue;
+        audio.set(key, rows.filter(row => row.id !== clipId));
+        shareTeacher(key.slice(0, key.lastIndexOf(':')));
+      }
     },
     // reset_exam_question_solution 흉내: 녹음·재생 기록을 지우고 필기는 빈 채로 revision만 올린다.
     async resetQuestionSolution(attemptId, questionId) {
@@ -380,6 +431,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       const old = docs.find(row => row.questionId === questionId);
       if (old) ink.set(attemptId, [...docs.filter(row => row.questionId !== questionId), { questionId, strokes: [], revision: old.revision + 1, lastBatchId: null }]);
       persist();
+      shareTeacher(attemptId);
       return { revision: old ? old.revision + 1 : 0 };
     },
     async getAttemptForRevision(attemptId) {
@@ -425,6 +477,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       const next = { questionId, strokes: clone(strokes), revision: revision + 1, lastBatchId: batchId };
       ink.set(attemptId, [...docs.filter(row => row.questionId !== questionId), next]);
       persist();
+      shareTeacher(attemptId);
       return next.revision;
     },
     async listPaperHistory(paperId, studentId) {
@@ -557,7 +610,9 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       const checked = { isCorrect: isAnswerCorrect(answer, correctAnswer, question.isChoice), correctAnswer };
       if (existing) Object.assign(existing, { answer, checked });
       else attempt.items.push({ questionId, answer, unsure: false, timeSpentMs: 0, visits: 1, checked });
+      checkedAt.set(`${attemptId}:${questionId}`, new Date().toISOString());
       persist();
+      shareTeacher(attemptId);
       return { ...checked };
     },
     async submitAttempt(attemptId, items, visitOrder) {
@@ -570,6 +625,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       entry.attempt.status = 'submitted';
       entry.result = grade(entry, entry.attempt.items);
       persist();
+      shareTeacher(attemptId);
       return clone(entry.result);
     },
     async getResult(attemptId) {
