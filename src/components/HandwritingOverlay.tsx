@@ -1,16 +1,16 @@
 import React, { useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import '../styles/detail.css';
-import { ReactSketchCanvas, type ReactSketchCanvasRef, type CanvasPath } from 'react-sketch-canvas';
+import { ExamInkCanvas } from '../features/exam/ink/ExamInkCanvas';
+import type { ExamInkCanvasHandle, InkStroke, InkTool } from '../features/exam/contract';
+import { INK_REFERENCE_WIDTH } from '../features/exam/ink/inkModel';
+import { examInkExportRect, paintExamInk } from '../features/handwriting/examInkExport';
+import { useInkCamera } from '../features/handwriting/useInkCamera';
 import { supabase } from '../services/supabase';
-import { useHandwritingInput, type DocumentSize } from '../features/handwriting/useHandwritingInput';
+import { type DocumentSize } from '../features/handwriting/useHandwritingInput';
 import { flattenHandwriting, blobToDataUrl } from '../features/handwriting/flattenHandwriting';
-import { computeExportRect, getDrawingWorld, type DocRect } from '../features/handwriting/drawingWorld';
+import { getDrawingWorld, type DocRect } from '../features/handwriting/drawingWorld';
 
-// 문서(캔버스) 좌표계의 "기준 해상도" — 문제 사진의 실제 카메라 해상도(수천 px일 수 있음)를 그대로
-// 쓰지 않고 화면비만 유지한 채 이 값으로 정규화한다. PR1은 "라이브 편집 중 좌표계"만 다루고,
-// 저장용 실제 출력 해상도/용량 상한은 PR2(저장 합성) 범위 — 여기서는 그 둘을 분리해서, 큰 사진이
-// react-sketch-canvas의 SVG 박스 자체를 불필요하게 거대하게 만들지 않도록 한다.
 const DOC_REFERENCE_LONG_SIDE = 1600;
 
 // 헤더(닫기 버튼 포함)가 화면 밖으로 완전히 나가면 창을 되찾을 방법이 없어지므로, 최소한 헤더
@@ -87,11 +87,18 @@ const RESIZE_HANDLES: Array<{
   },
 ];
 
-// 펜 색상 1차 버전: 검정/빨강/초록 3개만. 컬러피커나 팔레트는 이번 범위 밖.
-const PEN_COLORS: Array<{ value: string; label: string }> = [
-  { value: '#000000', label: '검정' },
+const PEN_COLORS = [
+  { value: '#1f2937', label: '검정' },
+  { value: '#2563eb', label: '파랑' },
   { value: '#dc2626', label: '빨강' },
   { value: '#16a34a', label: '초록' },
+];
+const INK_TOOLS: Array<{ tool: InkTool; label: string; icon: string }> = [
+  { tool: 'pen', label: '펜', icon: '✏️' },
+  { tool: 'highlighter', label: '형광펜', icon: '🖍️' },
+  { tool: 'eraser', label: '지우개', icon: '🧽' },
+  { tool: 'laser', label: '레이저', icon: '🔴' },
+  { tool: 'lasso', label: '올가미', icon: '➰' },
 ];
 
 // 전체 지우기(파괴적 동작)에 대한 확인 대기 상태. 예전엔 "필기장 전환" 확인도 같은 상태로
@@ -137,10 +144,13 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
   initialPositionHint,
   runExclusiveSave,
 }, ref) => {
-  const canvasRef = useRef<ReactSketchCanvasRef>(null);
-  const [isErasing, setIsErasing] = useState(false);
-  const [strokeColor, setStrokeColor] = useState(PEN_COLORS[1].value); // 기존 사용자 학습된 기본값(빨강) 유지
-  const [hasStrokes, setHasStrokes] = useState(false); // undo/전체지우기 disabled 판단용 — 라이브러리 자체 history 상태를 새로 베끼지 않고 onChange로만 추적
+  const canvasRef = useRef<ExamInkCanvasHandle>(null);
+  const [tool, setTool] = useState<InkTool>('pen');
+  const [strokes, setStrokes] = useState<InkStroke[]>([]);
+  const strokesRef = useRef(strokes);
+  strokesRef.current = strokes;
+  const [strokeColor, setStrokeColor] = useState(PEN_COLORS[2].value); // 기본 빨강 유지
+  const hasStrokes = strokes.length > 0;
   const [isSaving, setIsSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -163,19 +173,11 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
     getBounds: () => ({ left: pos.left, top: pos.top, width: size.width, height: size.height }),
   }), [pos, size]);
 
-  // ── 문서 좌표계: 창 크기(=화면에 보이는 뷰포트)와 완전히 분리된 "고정 문서" 크기 ──────────
-  // 문제 위 필기 = 사진의 실제 가로세로 비율 기준, 새 필기장(빈 캔버스) = 마운트 시점의 캔버스
-  // 영역 크기로 잠금. backgroundImageUrl은 이 창의 평생 고정값이라(PR3부터 내부에서 바뀌지
-  // 않음) 아래 로직도 전부 마운트 시 한 번만 판단하면 된다. 창을 리사이즈하거나 핀치를 해도 이
-  // 값 자체는 바뀌지 않는다 — useHandwritingInput의 카메라(scale/x/y)만 바뀐다.
   const viewportRef = useRef<HTMLDivElement>(null);
   const [imageIntrinsicSize, setImageIntrinsicSize] = useState<{ width: number; height: number } | null>(null);
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
   const [blankDocSize, setBlankDocSize] = useState<DocumentSize | null>(null);
 
-  // 문제 이미지의 실제 원본 비율은 canvas 배경 prop만으로는 알 수 없어(react-sketch-canvas가
-  // 크기를 다시 알려주지 않음) 가볍게 한 번 더 미리 불러와 naturalWidth/Height만 확인한다 —
-  // 이 로드는 좌표계 기준 확보용이고 export/CORS 처리는 PR2(저장 합성)의 몫이라 여기서는 하지 않는다.
   useEffect(() => {
     if (!backgroundImageUrl) return;
     let cancelled = false;
@@ -227,25 +229,7 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
   // 실제 필기 가능 영역 — 문서 바깥 흰 여백까지. documentSize는 useMemo/state 값이라 참조가 안정적이다.
   const drawingWorld = useMemo<DocRect | null>(() => (documentSize ? getDrawingWorld(documentSize) : null), [documentSize]);
 
-  const { camera, captureHandlers, finalizeActiveStroke } = useHandwritingInput({
-    viewportRef,
-    documentSize,
-    drawingWorld,
-    enabled: !isSaving && !showClearConfirm,
-    // 두 창이 동시에 열릴 수 있으므로 DEV 로그에서 어느 창인지 구분한다 — mistakeId는 두 창이
-    // 공유하므로 배경 유무로 구분하는 편이 실제 원인 추적에 더 유용하다.
-    debugLabel: backgroundImageUrl ? 'problem' : 'extra',
-    onStrayStroke: () => canvasRef.current?.undo(),
-  });
-
-  // documentSize가 null → 값으로 바뀔 때(마운트 후 문서 크기가 처음 확정될 때) 아래 JSX가
-  // <ReactSketchCanvas>를 처음 마운트한다 — 그러면 canvasRef가 인스턴스를 가리키고, 라이브러리
-  // 내부 eraseMode는 항상 기본값(펜)으로 초기화된다. 이때 우리 쪽 isErasing 상태만 "지우개
-  // 선택됨"으로 남아있으면 툴바 표시와 실제 동작이 어긋난다 — 마운트/재마운트될 때마다 다시 동기화한다.
-  useEffect(() => {
-    if (!documentSize) return;
-    canvasRef.current?.eraseMode(isErasing);
-  }, [documentSize, isErasing]);
+  const { camera, captureHandlers, onPan } = useInkCamera(viewportRef, documentSize, drawingWorld, !isSaving && !showClearConfirm);
 
   // 창 이동(드래그) — pointer event 하나로 마우스/터치/펜슬 전부 처리
   const dragStateRef = useRef<{ dragging: boolean; startX: number; startY: number; originLeft: number; originTop: number }>({
@@ -364,35 +348,12 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
     resizeStateRef.current.resizing = false;
   };
 
-  // 펜 ↔ 지우개는 하나의 아이콘을 재사용해 토글하던 방식(모드가 뭔지 알아보기 어려움)을 버리고,
-  // 각 버튼이 자기 모드로 "명시적으로" 설정만 한다 — 두 버튼 다 라이브러리의 eraseMode(boolean)를 그대로 씀.
-  const handleSelectPen = () => {
-    if (isSaving) return;
-    setIsErasing(false);
-    canvasRef.current?.eraseMode(false);
-  };
-
-  const handleSelectEraser = () => {
-    if (isSaving) return;
-    setIsErasing(true);
-    canvasRef.current?.eraseMode(true);
-  };
-
   const handleSelectColor = (color: string) => {
     if (isSaving) return;
     setStrokeColor(color);
-    // 지우개 상태에서 색을 고르면 자연스럽게 펜으로 돌아온다 — 지우개용 색상 선택은 의미가 없으므로.
-    if (isErasing) {
-      setIsErasing(false);
-      canvasRef.current?.eraseMode(false);
-    }
+    if (tool !== 'pen' && tool !== 'highlighter') setTool('pen');
   };
-
-  // 라이브러리 자체 undo/redo 히스토리를 그대로 사용 — 별도 undo 스택을 만들지 않는다.
-  const handleUndo = () => {
-    if (isSaving || !hasStrokes) return;
-    canvasRef.current?.undo();
-  };
+  const handleUndo = () => canvasRef.current?.undo();
 
   // 전체 지우기는 바로 실행하지 않고 확인 대기 상태로만 전환한다. 지울 필기가 없으면 버튼 자체가 비활성.
   const requestClear = () => {
@@ -403,20 +364,13 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
   const handleConfirmCancel = () => setShowClearConfirm(false);
 
   const handleConfirmAccept = () => {
-    canvasRef.current?.clearCanvas();
+    canvasRef.current?.clear();
     setShowClearConfirm(false);
   };
 
-  // 저장하기: 문제 이미지 전체(자르지 않음) + 흰 배경 + 필기를 직접 합성해 PNG로 만든 뒤
-  // 스캐폴딩(본인 풀이)으로 등록한다. react-sketch-canvas의 내장 exportImage()는 더 이상 쓰지
-  // 않는다 — exportSvg()(undo/지우개 mask가 반영된 최종 상태)만 재사용하고, 배경 합성은
-  // flattenHandwriting이 직접 offscreen canvas에서 한다(PR2, 검은 배경/crop 버그의 근본 수정).
   const handleSave = async () => {
     if (!runExclusiveSave || isSaving || !canvasRef.current || !documentSize || !drawingWorld) return;
-    // readOnly prop은 이후의 pointerdown/move/up/cancel을 전부 끊어버릴 뿐, 이 순간 이미 눌려 있던
-    // pointer의 stroke를 라이브러리 스스로 정상 종료시켜주지는 않는다(리뷰에서 실제 설치본 실행으로
-    // 확인) — readOnly를 켜기(=isSaving을 true로 만들기) 전에 먼저 진행 중이던 stroke를 확정한다.
-    finalizeActiveStroke();
+    canvasRef.current.finish();
     setIsSaving(true);
     try {
       // 입력 동결: setIsSaving(true) 자체는 다음 렌더에서야 readOnly prop을 캔버스에 반영한다.
@@ -427,9 +381,9 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
       });
       if (!canvasRef.current) throw new Error('캔버스를 찾을 수 없습니다.');
 
-      const svgMarkup = await canvasRef.current.exportSvg();
+      const snapshotStrokes = strokesRef.current;
       // 문서 밖에 쓴 필기가 저장 이미지에서 잘리지 않도록 저장 범위를 필기까지 넓힌다(없으면 문서 그대로).
-      const exportRect = computeExportRect(documentSize, drawingWorld, await canvasRef.current.exportPaths());
+      const exportRect = examInkExportRect(documentSize, drawingWorld, snapshotStrokes);
 
       // snapshot — "저장 시작 시점"(=이 시점)의 값만 이후 계속 쓴다. 두 창이 동시에 열려 있을 때
       // 아래 runExclusiveSave가 이 창의 실제 합성/업로드를 뒤로 미루더라도(다른 창이 먼저 저장
@@ -451,7 +405,7 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
         const blob = await flattenHandwriting({
           documentSize: snapshotDocumentSize,
           backgroundImageUrl: snapshotBackgroundUrl,
-          svgMarkup,
+          paintInk: ctx => paintExamInk(ctx, snapshotStrokes, snapshotDrawingWorld),
           svgRect: snapshotDrawingWorld,
           outputRect: exportRect,
         });
@@ -546,7 +500,6 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
           onPointerMoveCapture={captureHandlers.onPointerMoveCapture}
           onPointerUpCapture={captureHandlers.onPointerUpCapture}
           onPointerCancelCapture={captureHandlers.onPointerCancelCapture}
-          onLostPointerCaptureCapture={captureHandlers.onLostPointerCaptureCapture}
         >
           {documentSize && drawingWorld ? (
             <div
@@ -564,9 +517,7 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
                 transition: 'none',
               }}
             >
-              {/* 문제 이미지는 문서 사각형에만 깐다. 예전엔 react-sketch-canvas의 backgroundImage로
-                  SVG 박스 전체에 깔았는데, 이제 SVG 박스는 문서보다 큰 월드라서 그대로 두면 이미지가
-                  월드 전체로 늘어난다. 문서가 이미 사진 비율이라 contain = 예전 meet와 같은 모습. */}
+              {/* 배경은 문서에만 깔고 필기는 확장 월드 전체에 그린다. */}
               {backgroundImageUrl && !imageLoadFailed && (
                 <img
                   src={backgroundImageUrl}
@@ -575,7 +526,7 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
                   className="absolute inset-0 w-full h-full object-contain select-none pointer-events-none"
                 />
               )}
-              {/* 필기 SVG 박스 = 월드. 문서 좌표 (world.x, world.y)에서 시작해 문서 밖 여백까지 덮는다
+              {/* 필기 캔버스 = 월드. 문서 좌표 (world.x, world.y)에서 시작해 문서 밖 여백까지 덮는다
                   — 확대/팬으로 이동한 흰 공간에서도 실제로 필기가 된다(drawingWorld.ts). */}
               <div
                 style={{
@@ -586,32 +537,17 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
                   height: drawingWorld.height,
                 }}
               >
-                <ReactSketchCanvas
+                <ExamInkCanvas
                   ref={canvasRef}
-                  // 획 굵기는 문서(=react-sketch-canvas 내부) 좌표 단위라, 카메라 배율을 그대로 두면
-                  // 기본 축소 상태(예: 1600 단위 문서를 360px 창에 맞춤, scale≈0.22)에서 화면에는
-                  // 3px가 아니라 1px도 안 되게 그려진다(리뷰에서 확인된 회귀). 배율의 역수를 곱해
-                  // "지금 화면에 보이는 굵기"가 항상 기존과 같은 3px/16px가 되도록 보정한다.
-                  strokeWidth={3 / camera.scale}
-                  eraserWidth={16 / camera.scale}
-                  strokeColor={strokeColor}
-                  // 화면 배경(bg-white)이 이미 흰색이라 캔버스 자체는 투명해도 빈 필기장은 그대로
-                  // 흰 종이처럼 보인다 — 대신 exportSvg()가 내보내는 배경 rect도 투명해진다(canvasColor
-                  // 값 그대로 채워지던 걸 없앰). exportWithBackgroundImage=false와 맞물려 exportSvg()
-                  // 결과가 "필기 획만 있는, 원격 이미지 참조도 없는" 순수 벡터가 되어(설치본 K() 함수
-                  // 기준 확인) flattenHandwriting이 그 위에 흰 배경 + 원본 사진을 안전하게 겹칠 수 있다.
-                  canvasColor="transparent"
-                  // 배경 이미지는 위의 <img>가 문서 사각형에만 그린다 — 캔버스는 필기 획만 가진다.
-                  // 저장도 flattenHandwriting(PR2)이 문제 이미지 전체를 직접 그려 넣는다.
-                  exportWithBackgroundImage={false}
-                  onChange={(paths: CanvasPath[]) => setHasStrokes(paths.length > 0)}
-                  // 저장 중에는 새 입력을 받지 않는다(기존 획/undo/export API는 계속 정상 동작) —
-                  // useHandwritingInput의 enabled=false는 우리 augmentation만 멈추지, 라이브러리 자체
-                  // pointer 리스너는 막지 못하므로 이 prop이 실제 "입력 동결"을 담당한다.
-                  readOnly={isSaving}
-                  width="100%"
-                  height="100%"
-                  style={{ border: 'none' }}
+                  imageUrl=""
+                  surface={{ height: drawingWorld.height, transparent: true, scale: camera.scale }}
+                  strokes={strokes}
+                  onChange={next => { strokesRef.current = next; setStrokes(next); }}
+                  tool={tool}
+                  color={strokeColor}
+                  size={(tool === 'highlighter' ? 6 : 3) * INK_REFERENCE_WIDTH / (drawingWorld.width * camera.scale)}
+                  onPan={onPan}
+                  readOnly={isSaving || showClearConfirm}
                 />
               </div>
             </div>
@@ -627,108 +563,24 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
           )}
         </div>
 
-        {/* 하단 툴바 — 1줄: 펜/지우개/색상/undo, 2줄: 전체지우기/새 필기장/저장 */}
-        <div className="rn-writing-toolbar flex-none flex items-center justify-between gap-1.5 px-2.5 py-1.5 bg-slate-950 border-t border-slate-800">
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={handleSelectPen}
-              disabled={isSaving}
-              title="펜"
-              aria-label="펜 도구 선택"
-              aria-pressed={!isErasing}
-              className={`w-7 h-7 rounded-lg flex items-center justify-center text-[13px] border transition-all active:scale-90 disabled:opacity-40 ${
-                !isErasing
-                  ? 'bg-indigo-600 border-indigo-500 text-white'
-                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              ✏️
+        {/* 한 줄 툴바: 좁은 창에서는 가로로 스크롤한다. */}
+        <div className="rn-writing-toolbar rn-writing-ink-toolbar" role="toolbar" aria-label="필기 도구">
+          {INK_TOOLS.map(item => (
+            <button key={item.tool} type="button" title={item.label} aria-label={`${item.label} 도구 선택`}
+              aria-pressed={tool === item.tool} disabled={isSaving} onClick={() => setTool(item.tool)}>
+              {item.icon}
             </button>
-            <button
-              type="button"
-              onClick={handleSelectEraser}
-              disabled={isSaving}
-              title="지우개"
-              aria-label="지우개 도구 선택"
-              aria-pressed={isErasing}
-              className={`w-7 h-7 rounded-lg flex items-center justify-center text-[13px] border transition-all active:scale-90 disabled:opacity-40 ${
-                isErasing
-                  ? 'bg-indigo-600 border-indigo-500 text-white'
-                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              🧽
-            </button>
-            <span className="w-px h-5 bg-slate-800 mx-0.5" aria-hidden="true" />
-            {PEN_COLORS.map((color) => (
-              <button
-                key={color.value}
-                type="button"
-                onClick={() => handleSelectColor(color.value)}
-                disabled={isSaving}
-                title={`${color.label} 펜`}
-                aria-label={`${color.label} 펜 선택`}
-                aria-pressed={!isErasing && strokeColor === color.value}
-                className={`rn-pen-color w-6 h-6 rounded-full border-2 transition-all active:scale-90 disabled:opacity-40 ${
-                  !isErasing && strokeColor === color.value
-                    ? 'border-amber-400 ring-2 ring-amber-400/50 scale-110'
-                    : 'border-slate-700'
-                }`}
-                style={{ backgroundColor: color.value }}
-              />
-            ))}
-          </div>
-
-          <button
-            type="button"
-            onClick={handleUndo}
-            disabled={isSaving || !hasStrokes}
-            title="실행 취소"
-            aria-label="직전 필기 실행 취소"
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-sm font-black bg-slate-900 border border-slate-800 text-slate-300 hover:text-slate-100 transition-all active:scale-90 disabled:opacity-30 disabled:active:scale-100"
-          >
-            ↶
-          </button>
-        </div>
-
-        <div className="rn-writing-toolbar flex-none flex items-center justify-between gap-1.5 px-2.5 py-1.5 bg-slate-950 border-t border-slate-800">
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={requestClear}
-              disabled={isSaving || !hasStrokes}
-              title="전체 지우기"
-              aria-label="필기 전체 지우기"
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-xs bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 transition-all active:scale-90 disabled:opacity-30"
-            >
-              🗑️
-            </button>
-            {onRequestExtraNotebook && (
-              <button
-                type="button"
-                onClick={onRequestExtraNotebook}
-                disabled={isSaving}
-                title="추가 흰색 필기장 열기"
-                className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-slate-900 border border-slate-800 text-slate-300 hover:text-slate-100 transition-all active:scale-95 disabled:opacity-40 whitespace-nowrap"
-              >
-                ＋ 새 필기장
-              </button>
-            )}
-          </div>
-
-          {runExclusiveSave && (
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={isSaving || !documentSize}
-                className="rn-button rn-button-primary"
-              >
-                {isSaving ? '저장 중...' : '💾 저장하기'}
-              </button>
-            </div>
-          )}
+          ))}
+          {PEN_COLORS.map(color => (
+            <button key={color.value} type="button" className="rn-pen-color" title={`${color.label} 펜`}
+              aria-label={`${color.label} 펜 선택`} aria-pressed={strokeColor === color.value}
+              style={{ backgroundColor: color.value }} disabled={isSaving} onClick={() => handleSelectColor(color.value)} />
+          ))}
+          <button type="button" aria-label="직전 필기 실행 취소" title="실행 취소" disabled={isSaving || !canvasRef.current?.canUndo()} onClick={handleUndo}>↶</button>
+          <button type="button" aria-label="필기 다시 실행" title="다시 실행" disabled={isSaving || !canvasRef.current?.canRedo()} onClick={() => canvasRef.current?.redo()}>↷</button>
+          <button type="button" aria-label="필기 전체 지우기" title="전체 지우기" disabled={isSaving || !hasStrokes} onClick={requestClear}>🗑️</button>
+          {onRequestExtraNotebook && <button type="button" disabled={isSaving} onClick={onRequestExtraNotebook}>＋ 새 필기장</button>}
+          {runExclusiveSave && <button type="button" className="rn-button rn-button-primary" disabled={isSaving || !documentSize} onClick={handleSave}>{isSaving ? '저장 중...' : '💾 저장하기'}</button>}
         </div>
 
         {/* 전체 지우기 확인창 — 실수 터치로 필기가 통째로 날아가지 않도록 창 전체를 덮는다 */}
@@ -739,7 +591,7 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
                 작성한 필기를 모두 지울까요?
               </p>
               <p className="text-[10.5px] text-slate-400 leading-relaxed">
-                되돌릴 수 없어요.
+                실행 취소로 되돌릴 수 있어요.
               </p>
               <div className="flex items-center gap-2 pt-1">
                 <button

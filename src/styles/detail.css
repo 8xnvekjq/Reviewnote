@@ -89,6 +89,12 @@
 .rn-writing-toolbar .rn-pen-color { width: 44px; height: 44px; min-height: 44px; border-radius: 50%; background-clip: content-box; padding: 9px; box-shadow: none; transform: none; }
 .rn-writing-toolbar .rn-pen-color[aria-pressed="true"] { outline: 2px solid var(--rn-accent); outline-offset: -3px; border-color: transparent; }
 .rn-writing-toolbar > button[aria-label="직전 필기 실행 취소"] { margin-left: auto; }
+/* 시험 필기 도구는 한 줄로 유지하고 창 안에서만 가로 스크롤한다. */
+.rn-writing-toolbar.rn-writing-ink-toolbar { display: flex; flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; overflow-y: hidden; min-height: 44px; padding: 4px 36px; gap: 4px; }
+.rn-writing-ink-toolbar button { min-width: 32px; min-height: 32px; height: 32px; border-radius: 8px; white-space: nowrap; }
+.rn-writing-ink-toolbar button[aria-pressed="true"] { outline: 2px solid var(--rn-accent); outline-offset: -2px; }
+.rn-writing-ink-toolbar .rn-pen-color { width: 32px; height: 32px; min-height: 32px; padding: 5px; }
+.rn-writing-toolbar.rn-writing-ink-toolbar > button[aria-label="직전 필기 실행 취소"] { margin-left: 0; }
 .rn-detail-sheet button:focus-visible, .rn-writing-window button:focus-visible, .rn-section-toggle:focus-visible { outline: 2px solid var(--rn-accent); outline-offset: 3px; }
 @media (min-width: 640px) {
   .rn-detail-backdrop { align-items: center; }

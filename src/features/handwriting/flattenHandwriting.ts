@@ -1,18 +1,9 @@
 import type { DocumentSize } from './useHandwritingInput';
 import type { DocRect } from './drawingWorld';
 
-// PR2(저장 합성) 전용 유틸 — HandwritingOverlay의 저장 버튼에서만 쓰인다.
-//
-// 배경: react-sketch-canvas의 내장 exportImage()에 맡기면, PNG+배경이미지 조합에서 canvasColor
-// fill이 생략되는 라이브러리 자체 동작 때문에 "meet"(letterbox)의 여백이 완전 투명으로 남는다 —
-// 이게 검은 배경 버그의 근본 원인이었다(직전 PR들의 감사로 확인). 반대로 "slice"(cover)로 바꾸면
-// 여백은 없어지지만 원본 사진이 실제로 잘려나간다. 둘 다 받아들일 수 없어서, 최종 저장은
-// react-sketch-canvas의 SVG 결과(exportSvg — undo/지우개 mask가 이미 반영된 상태)만 재사용하고,
-// 배경 이미지 합성은 우리가 직접 offscreen canvas에서 한다:
-//   불투명 흰 배경 → 원본 이미지 전체(contain, 자르지 않음) → 필기 SVG 오버레이 → PNG.
-//
-// PR1의 문서 좌표계(고정 documentSize)를 그대로 source of truth로 쓴다 — 카메라(창 크기/핀치)는
-// 저장 결과에 전혀 관여하지 않는다.
+// 저장 합성: 불투명 흰 배경 → 원본 이미지 전체(contain) → 필기 → PNG.
+// 기존 SVG 입력과 시험 획 렌더 콜백을 모두 지원한다. 고정 문서 좌표만 사용하며
+// 창 크기나 카메라 배율은 저장 결과에 관여하지 않는다.
 
 export type FlattenStage = 'decode-background' | 'decode-svg' | 'compose' | 'encode';
 
@@ -33,8 +24,10 @@ export interface FlattenHandwritingInput {
   documentSize: DocumentSize;
   /** 문제 위 필기일 때만 존재. 없으면(새 필기장) 흰 배경 위에 필기만 저장된다. */
   backgroundImageUrl?: string;
-  /** canvasRef.current.exportSvg()의 결과 — undo/지우개 mask가 이미 반영된 최종 상태. */
-  svgMarkup: string;
+  /** 기존 SVG 필기 입력(지우개가 반영된 최종 상태). */
+  svgMarkup?: string;
+  /** 시험 획 렌더러로 문서 좌표에 직접 합성한다. */
+  paintInk?: (ctx: CanvasRenderingContext2D) => void;
   /** SVG 박스가 차지하는 문서 좌표 사각형(필기 월드). 생략하면 문서 사각형과 같다고 본다. */
   svgRect?: DocRect;
   /** 저장할 영역(문서 좌표, computeExportRect). 생략하면 문서 전체 — 기존 저장 결과와 동일. */
@@ -129,13 +122,13 @@ export function blobToDataUrl(blob: Blob): Promise<string> {
 
 /**
  * 문제 이미지(있다면) + 필기를 "불투명 흰 배경 → 원본 전체(contain) → 필기 SVG" 순서로 하나의
- * PNG로 합성한다. 카메라(창 크기/핀치)는 전혀 관여하지 않는다 — documentSize와 svgMarkup(둘 다
- * PR1의 고정 문서 좌표계 기준)만 입력으로 받는다.
+ * PNG로 합성한다. 카메라(창 크기/핀치)는 관여하지 않으며 모든 필기는 고정 문서 좌표를 사용한다.
  */
 export async function flattenHandwriting({
   documentSize,
   backgroundImageUrl,
   svgMarkup,
+  paintInk,
   svgRect,
   outputRect,
   maxOutputLongSide = DEFAULT_MAX_OUTPUT_LONG_SIDE,
@@ -158,9 +151,9 @@ export async function flattenHandwriting({
     backgroundDecodedAt = performance.now();
   }
 
-  let svgImg: HTMLImageElement;
+  let svgImg: HTMLImageElement | null = null;
   try {
-    svgImg = await loadSvgOverlay(svgMarkup);
+    if (svgMarkup) svgImg = await loadSvgOverlay(svgMarkup);
   } catch (err) {
     throw new FlattenError('decode-svg', '필기 내용을 불러오지 못했습니다.', err);
   }
@@ -206,7 +199,13 @@ export async function flattenHandwriting({
     // DOM 노드의 offsetWidth/offsetHeight로 viewBox를 잡음), 그 사각형을 출력 좌표로 옮겨 그리면
     // 배경과 정확히 같은 배율로 맞는다. 저장 영역 밖으로 나간 부분은 canvas가 알아서 잘라낸다.
     const strokes = toOut(strokeRect);
-    ctx.drawImage(svgImg, strokes.x, strokes.y, strokes.width, strokes.height);
+    if (svgImg) ctx.drawImage(svgImg, strokes.x, strokes.y, strokes.width, strokes.height);
+    if (paintInk) {
+      ctx.save();
+      ctx.setTransform(output.scale, 0, 0, output.scale, -outRect.x * output.scale, -outRect.y * output.scale);
+      paintInk(ctx);
+      ctx.restore();
+    }
   } catch (err) {
     if (err instanceof FlattenError) throw err;
     throw new FlattenError('compose', '이미지 합성 중 오류가 발생했습니다.', err);
