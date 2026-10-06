@@ -483,7 +483,7 @@
 @keyframes exam-replay-feedback { 0%, 25% { opacity: .8; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .exam-replay-feedback { animation: none; } }
 
-.exam-replay-dock.exam-replay-inline { position: static; transform: none; width: 100%; display: flex; flex-wrap: wrap; align-items: center; box-shadow: none; margin-bottom: 8px; }
+.exam-replay-dock.exam-replay-inline { position: static; transform: none; width: 100%; display: flex; flex-wrap: wrap; align-items: center; box-shadow: none; margin-bottom: 8px; background: var(--rn-surface, #0f172a); }
 .exam-replay-inline .exam-replay-dock-head { display: none; }
 .exam-replay-inline .exam-replay-progress { flex: 1 1 140px; }
 .exam-replay-inline .exam-replay-note { flex-basis: 100%; }

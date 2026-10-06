@@ -108,5 +108,7 @@ export function ResultInkNotes({ client, attemptId, questionId, imageUrl, stroke
 
   return <ExamInkReplay client={client} attemptId={attemptId} questionId={questionId} imageUrl={imageUrl}
     strokes={strokes} imageMaxWidth={imageMaxWidth} autoOpen={review}
+    // 관리자가 학생 풀이를 볼 때는 '다른 풀이 보기'와 같은 막대(문항 위 두 줄)로 보여 준다.
+    inline={review} persistDock={!review} peerPlayback={review}
     notes={{ strokes: shown, onChange, tool, color, size: 4, inkRef, toolbar, ready, canvasKey: generation }} />;
 }
