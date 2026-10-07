@@ -351,6 +351,46 @@ try {
   // 곡선 다듬기는 없앴다 — 살짝 휜 열린 획을 꾹 누르면 직선(시작점→끝점)
   assert.equal(list.at(-1).shape?.kind, 'line', `held gentle arc becomes a line: ${JSON.stringify(list.at(-1).shape)}`);
   assert.ok(await inkAt(0.49, 1.459), 'the line is painted between the ends');
+
+  // 도형으로 바뀌는 애니메이션(180ms) 중에 펜을 떼도 다음 획이 그리는 동안 흐려지지 않는다
+  // (진행 중 레이어 globalAlpha가 반투명으로 남아 다음 획부터 그리는 동안만 투명하게 보였다).
+  const liveAfterSnapLift = await page.evaluate(async () => {
+    const el = document.querySelector('.exam-ink-input');
+    const r = el.getBoundingClientRect();
+    const send = (type, pointerId, [nx, ny]) => el.dispatchEvent(new PointerEvent(type, {
+      pointerId, pointerType: 'pen', isPrimary: true, bubbles: true, cancelable: true, buttons: type === 'pointerup' ? 0 : 1, pressure: 0.6,
+      clientX: r.left + nx * r.width, clientY: r.top + ny * r.width,
+    }));
+    const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const frame = () => new Promise(resolve => requestAnimationFrame(() => resolve()));
+    let snapped = false;
+    const vibrate = navigator.vibrate;
+    navigator.vibrate = () => { snapped = true; return true; };
+    try {
+      send('pointerdown', 46, [0.15, 1.62]);
+      for (let i = 1; i <= 30; i++) { send('pointermove', 46, [0.15 + i * 0.015, 1.62]); await sleep(4); }
+      for (const until = performance.now() + 2000; !snapped && performance.now() < until;) await sleep(10);
+      await frame(); // 애니메이션 첫 프레임(반투명)이 그려진 직후 뗀다
+      send('pointerup', 46, [0.6, 1.62]);
+      await frame(); await frame();
+      send('pointerdown', 47, [0.15, 1.66]);
+      for (let i = 1; i <= 20; i++) { send('pointermove', 47, [0.15 + i * 0.02, 1.66]); await sleep(4); }
+      await frame(); await frame();
+      const ctx = el.getContext('2d');
+      const y = Math.round(1.66 * el.width), data = ctx.getImageData(Math.round(0.3 * el.width), y - 6, Math.round(0.2 * el.width), 13).data;
+      let maxAlpha = 0;
+      for (let i = 3; i < data.length; i += 4) maxAlpha = Math.max(maxAlpha, data[i]);
+      const result = { snapped, globalAlpha: ctx.globalAlpha, maxAlpha };
+      send('pointerup', 47, [0.55, 1.66]);
+      return result;
+    } finally { navigator.vibrate = vibrate; }
+  });
+  assert.ok(liveAfterSnapLift.snapped, 'the held stroke snapped to a shape');
+  assert.equal(liveAfterSnapLift.globalAlpha, 1, 'live layer alpha is reset after a snap animation is cut short');
+  assert.equal(liveAfterSnapLift.maxAlpha, 255, `the next in-progress stroke is fully opaque: ${liveAfterSnapLift.maxAlpha}`);
+  await page.evaluate(() => { window.__ink.handle().undo(); window.__ink.handle().undo(); });
+  await page.waitForTimeout(50);
+  list = await strokes();
   const shapeCount = list.length;
 
   // ── 레이저: 빛만 잠깐 남고 획·실행 취소 기록이 생기지 않는다 ──

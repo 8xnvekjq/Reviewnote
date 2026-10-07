@@ -319,6 +319,9 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       const t = Math.min(1, (performance.now() - g.snap.startedAt) / SNAP_ANIM_MS);
       const eased = 1 - (1 - t) * (1 - t);
       if (t < 1) {
+        // globalAlpha·확대는 이 프레임에만. 애니메이션 중에 펜을 떼면 다음 프레임이 없어 반투명이 남고,
+        // 진행 중 레이어는 크기가 바뀌기 전까지 같은 컨텍스트를 쓰므로 다음 획부터 그리는 동안만 흐리게(투명하게) 보였다.
+        ctx.save();
         ctx.globalAlpha = 1 - eased;
         paint(ctx, { path: freehandPath(g.tool, g.size, g.points, true), mode: 'fill', width: 0 }, g.color);
         ctx.globalAlpha = eased;
@@ -329,6 +332,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
         const k = 0.94 + 0.06 * eased;
         ctx.translate(cx, cy); ctx.scale(k, k); ctx.translate(-cx, -cy);
         drawShape(ctx, s, g.tool, g.size, g.color);
+        ctx.restore();
         rafRef.current = requestAnimationFrame(renderLive);
       } else {
         drawShape(ctx, g.snap.current, g.tool, g.size, g.color);
@@ -939,6 +943,8 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       const g = gestureRef.current;
       if (g?.kind === 'draw') clearHold(g);
       gestureRef.current = null;
+      // 형광펜으로 쓰는 중에 보기 전용이 되면 pointerup이 오지 않아, 다시 쓸 때 펜 획까지 형광펜 투명도로 보였다.
+      setLiveHighlighter(false);
     };
   }, [readOnly, commit, scheduleLive, scheduleLaser, scheduleSelection, setSelection, stepHistory]);
 
