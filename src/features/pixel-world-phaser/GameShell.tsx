@@ -17,20 +17,24 @@ import { dialogueFor } from './logic/dialogues';
 import type { SceneId } from './logic/scenes';
 import type { Placement } from '../pixel-room/model';
 import { composeAvatar } from './game/avatarTexture';
-import { loadBed, loadFloors, loadFurnitureSheets, loadInterior, loadPetSheet, loadScarecrow, loadTown } from './game/sceneAssets';
+import { loadBed, loadFloors, loadFurnitureSheets, loadInterior, loadPetSheet, loadScarecrow, loadTown, loadPlazaStall } from './game/sceneAssets';
 import type { BedLook } from './game/sceneAssets';
 import type { Prompt, WorldGameHandle } from './game/boot';
 import './gameShell.css';
 import { GamePanels } from './ui/GamePanels';
 import type { PanelAdapter } from './ui/GamePanels';
 import type { PanelKind } from './logic/panels';
+import { panelFrozen } from './logic/panels';
+import { PlazaBridge } from './ui/PlazaBridge';
+import type { PlazaPanel } from './ui/PlazaBridge';
+
 import { FarmPanels } from './ui/FarmPanels';
 import type { ActivityPanel, FarmAdapter } from './ui/FarmPanels';
-type ShellPanel = PanelKind | ActivityPanel;
-const panelFrozen = (panel: ShellPanel | null, dialogue: boolean) => !!panel || dialogue;
+type ShellPanel = PanelKind | PlazaPanel | ActivityPanel;
 
 export interface GameShellProps {
   panels?: PanelAdapter;
+  userId?: string;
   farmAdapter?: FarmAdapter;
   appearance: PublicAvatarAppearance;
   pet: PetId | null;
@@ -79,7 +83,7 @@ async function leaveFullscreen() {
 }
 
 // 상위가 1초마다(밭 시계) 다시 그려져도, 넘겨받는 값이 같으면 셸은 다시 그리지 않는다.
-export const GameShell = memo(function GameShell({ appearance, pet, balance, beds, furniture, scarecrowLine, onExit, panels, farmAdapter }: GameShellProps) {
+export const GameShell = memo(function GameShell({ appearance, pet, balance, beds, furniture, scarecrowLine, onExit, panels, farmAdapter, userId = 'guest' }: GameShellProps) {
   const root = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const probe = useRef<HTMLDivElement>(null);
@@ -154,7 +158,10 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
   // 게임 안 창(상점/옷장 등) 열기 자리. 장면 정의에서 action {kind:'panel', panel}인 대상을 A로 누르면
   // 여기로 온다. 창이 생기면 이 ref를 그 창을 여는 함수로 채우면 된다(지금은 그런 대상이 없다).
   const scenePanelRef = useRef<(panel: string) => void>(() => {});
-  scenePanelRef.current = kind => { if (kind === 'shop' || kind === 'wardrobe' || kind === 'pet' || kind.startsWith('farm:')) { farmAdapter?.farm.clearMessage(); openPanel(kind as ShellPanel); } };
+  scenePanelRef.current = kind => {
+    if (kind === 'shop' || kind === 'wardrobe' || kind === 'contest' || kind === 'well' || kind === 'bench') openPanel(kind);
+    else if (kind === 'pet' || /^farm:\d+$/.test(kind)) { farmAdapter?.farm.clearMessage(); openPanel(kind as ActivityPanel); }
+  };
   const bedsRef = useRef(beds); bedsRef.current = beds;
   const furnitureRef = useRef(furniture); furnitureRef.current = furniture;
   useEffect(() => {
@@ -162,13 +169,13 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     (async () => {
       try {
         const avatar = composeAvatar(appearance);
-        const [town, interior, floors, furnitureSheets, avatarCanvas, petSource, scarecrow, bedImages, { startWorldGame }] = await Promise.all([
+        const [town, interior, floors, furnitureSheets, avatarCanvas, petSource, scarecrow, bedImages, { startWorldGame }, plazaStall] = await Promise.all([
           loadTown(), loadInterior(), loadFloors(), loadFurnitureSheets(), avatar.canvas, pet ? loadPetSheet(pet) : Promise.resolve(null),
-          Promise.resolve().then(loadScarecrow), Promise.resolve().then(() => Promise.all(bedsRef.current.map(loadBed))), import('./game/boot'),
+          Promise.resolve().then(loadScarecrow), Promise.resolve().then(() => Promise.all(bedsRef.current.map(loadBed))), import('./game/boot'), Promise.resolve().then(loadPlazaStall),
         ]);
         if (cancelled || !stage.current) return;
         const game = await startWorldGame(stage.current, {
-          assets: { town, interior, floors, furniture: furnitureSheets, avatar: { key: avatar.key, canvas: avatarCanvas }, pet: pet && petSource ? { id: pet, source: petSource } : null, scarecrow },
+          assets: { town, interior, floors, furniture: furnitureSheets, avatar: { key: avatar.key, canvas: avatarCanvas }, pet: pet && petSource ? { id: pet, source: petSource } : null, scarecrow, plazaStall },
           beds: bedImages, furniture: furnitureRef.current,
         }, controls, {
           onPrompt: next => setPrompt(next),
@@ -464,7 +471,6 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
       {fullscreenSupported() && <button type="button" className="pwp-chip pwp-icon" aria-pressed={fullscreen} aria-label={fullscreen ? '전체화면 끄기' : '전체화면'} onClick={toggleFullscreen}>⛶</button>}
     </div>
     {panels && <div className="pwp-panel-access" style={{ left: hud.x + 10, top: hud.y + hud.height + 8 }}>
-      <button type="button" className="pwp-chip" disabled={status !== 'ready'} onClick={() => openPanel('shop')}>상점</button>
       <button type="button" className="pwp-chip" disabled={status !== 'ready'} onClick={() => openPanel('wardrobe')}>옷장</button>
     </div>}
     <button type="button" className="pwp-btn pwp-btn-a" data-pressed={pressed.a} data-prompt={!!prompt || !!dialogue}
@@ -489,7 +495,8 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
       {typed >= currentLine.length && <span className="pwp-dialogue-next" aria-hidden="true">{dialogue.index + 1 < dialogue.lines.length ? '▼' : '■'}</span>}
     </div>}
     {(panel === 'shop' || panel === 'wardrobe') && panels && <GamePanels kind={panel} adapter={panels} onClose={closePanel} />}
-    {panel && panel !== 'shop' && panel !== 'wardrobe' && <FarmPanels key={panel} kind={panel} adapter={farmAdapter} onClose={closePanel}
+    {scene?.id === 'plaza' && status === 'ready' && <PlazaBridge key={'plaza:' + scene.visit} handle={handle} appearance={appearance} pet={pet} userId={userId} panel={panel} onClose={closePanel} />}
+    {panel && panel !== 'shop' && panel !== 'wardrobe' && panel !== 'contest' && panel !== 'well' && panel !== 'bench' && <FarmPanels key={panel} kind={panel} adapter={farmAdapter} onClose={closePanel}
       onCollection={() => openPanel('collection')} onTalk={() => { closePanel(); openDialogue('scarecrow'); }}
       onPet={kind => { closePanel(); handle.current?.reactPet(kind); }} onFx={(index, action) => handle.current?.farmFx(index, action)} />}
     {petMessage && <div className="pwp-pet-message" role="status" aria-live="polite">{petMessage}</div>}

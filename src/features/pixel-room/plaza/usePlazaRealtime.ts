@@ -4,9 +4,10 @@ import { supabase } from '../../../services/supabase';
 import type { PublicAvatarAppearance } from '../shop/types';
 import { createPlazaStoreState, getOtherPlayers, plazaStoreReducer } from './presenceStore';
 import type { PathWaypoint } from './presenceStore';
-import type { PlazaDirection, PlazaPlayerState } from './types';
+import type { PlazaPlayerState } from './types';
 import { PLAZA_CHANNEL_NAME } from './types';
 import { plazaDebugLog } from './plazaDebug';
+import { protocolExtras } from './presenceProtocol';
 
 import { usePlazaReactions } from './usePlazaReactions';
 import { REACTION_COOLDOWN_MS, nearWell } from './plazaInteractions';
@@ -27,6 +28,8 @@ function reconnectDelayFor(attempt: number): number {
   return Math.min(RECONNECT_BASE_DELAY_MS * 2 ** attempt, RECONNECT_MAX_DELAY_MS);
 }
 
+export type PlazaSelfState = Pick<PlazaPlayerState, 'x' | 'y' | 'direction' | 'moving' | 'version' | 'position' | 'pet'>;
+
 export interface UsePlazaRealtimeResult {
   players: PlazaPlayerState[]; // everyone else currently in the plaza (not me)
   // sessionId -> every waypoint that session has actually passed through, in order (append-only —
@@ -37,7 +40,7 @@ export interface UsePlazaRealtimeResult {
   reactions: ReturnType<typeof usePlazaReactions>['reactions'];
   sendReaction: (kind: ReactionKind) => Promise<boolean>;
   ready: boolean;              // channel subscribed + initial presence sync received (false while reconnecting)
-  updateMyState: (partial: { x: number; y: number; direction: PlazaDirection; moving: boolean }) => void;
+  updateMyState: (partial: PlazaSelfState) => void;
 }
 
 // Supabase Presence는 우리가 track()에 넘긴 값 위에 presence_ref 같은 자체 필드를 얹어서 돌려준다
@@ -143,7 +146,7 @@ function beginPlazaVisitTeardown(channel: RealtimeChannel): void {
 /** Pixel World Phase 2A — 광장(Plaza) 실시간 배선. presenceStore.ts의 순수 reducer 위에
  * Supabase Presence(현재 위치의 진실, 느림/무거움)와 Broadcast(이동 중 보간용, 빠름/가벼움)를
  * 얹는다. 정확한 라우팅 정책은 updateMyState 안의 주석 참고. */
-export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppearance): UsePlazaRealtimeResult {
+export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppearance, initial?: PlazaSelfState): UsePlazaRealtimeResult {
   const [storeState, dispatch] = useReducer(plazaStoreReducer, undefined, createPlazaStoreState);
   const [ready, setReady] = useState(false);
   const { reactions, receive } = usePlazaReactions(sessionId, storeState.players);
@@ -166,11 +169,12 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
   const seqRef = useRef(0);
   // 최근에 실제로 전송한 내 위치/방향/이동여부 — appearance만 바뀌어서 재track할 때도, 그리고
   // 재연결로 새 채널을 만들 때도 최신 위치를 그대로 실어 보내기 위해 필요하다.
-  const selfRef = useRef<{ x: number; y: number; direction: PlazaDirection; moving: boolean }>({
+  const selfRef = useRef<PlazaSelfState>({
     x: 0,
     y: 0,
     direction: 'Front',
     moving: false,
+    ...initial,
   });
   const movingRef = useRef(false);
   const appearanceRef = useRef(appearance);
@@ -180,6 +184,7 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
     const self = selfRef.current;
     return {
       sessionId,
+      ...protocolExtras(self),
       x: self.x,
       y: self.y,
       direction: self.direction,
@@ -348,7 +353,8 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
   }, [appearance, ready]);
 
   const updateMyState = useMemo(() => {
-    return (partial: { x: number; y: number; direction: PlazaDirection; moving: boolean }) => {
+    return (partial: PlazaSelfState) => {
+      const petChanged = partial.pet !== selfRef.current.pet;
       selfRef.current = partial;
       const channel = channelRef.current;
       if (!channel) return;
@@ -373,6 +379,7 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
       // 못 느낀다. 반면 정지 시의 track은 그대로 유지한다 — 정지하면 broadcast가 더 이상 안
       // 나가므로(정책 그대로), "내가 최종적으로 멈춘 그 칸"을 presence로 알려주는 게 유일한
       // 신호이기 때문이다. 이 변경만으로 이동당 track() 호출이 2번에서 1번으로 절반이 된다.
+      if (petChanged && (partial.moving || !movingRef.current)) void channel.track(state);
       if (!partial.moving && movingRef.current) {
         movingRef.current = false;
         void channel.track(state);

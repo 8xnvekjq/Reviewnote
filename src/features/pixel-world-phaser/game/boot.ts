@@ -12,6 +12,8 @@ import type { Placement } from '../../pixel-room/model';
 import type { ControlState } from '../controls';
 import { RoomScene } from './RoomScene';
 import { YardScene } from './YardScene';
+import { PlazaScene } from './PlazaScene';
+import type { PlazaPlayerState } from '../../pixel-room/plaza/types';
 import type { WorldAssets, WorldContext, WorldDebug, WorldEvents, WorldScene } from './WorldScene';
 
 export type { Prompt, WorldAssets, WorldDebug, WorldEvents } from './WorldScene';
@@ -33,6 +35,8 @@ export interface WorldGameHandle {
   setFurniture(furniture: readonly Placement[]): void;
   /** 지금 장면. 전환 중 잠깐은 직전 장면. */
   scene(): SceneId;
+  setExhibit(show: boolean): void;
+  setClassmates(players: PlazaPlayerState[], reactions: Record<string, string>, selfId: string): void;
   debug(): WorldDebug;
 }
 export interface WorldStart {
@@ -66,7 +70,8 @@ export function startWorldGame(parent: HTMLElement, start: WorldStart, controls:
     };
     const yard = new YardScene(ctx);
     const room = new RoomScene(ctx);
-    const ordered = FIRST_SCENE === 'room' ? [room, yard] : [yard, room];
+    const plaza = new PlazaScene(ctx);
+    const ordered = FIRST_SCENE === 'room' ? [room, yard, plaza] : [yard, room, plaza];
     const game = new Phaser.Game({
       type: Phaser.AUTO,
       parent,
@@ -126,6 +131,8 @@ export function startWorldGame(parent: HTMLElement, start: WorldStart, controls:
         if (active?.scene.key === 'room') active.refreshData();
       },
       scene: () => lastScene,
+      setExhibit: show => { if (active instanceof PlazaScene) active.setExhibit(show); },
+      setClassmates: (players, reactions, selfId) => { if (active instanceof PlazaScene) active.setClassmates(players, reactions, selfId); },
       debug: () => (active ? active.snapshot() : { ...(last as WorldDebug), transitioning: true }),
     };
   });

@@ -42,8 +42,8 @@ export const INTERACTABLES: readonly (Interactable & { id: InteractableId })[] =
   }),
   { id: 'scarecrow', cell: SCARECROW, label: '허수아비', verb: '말 걸기', action: { kind: 'talk' }, bang: { x: SCARECROW.x * TILE + TILE / 2, y: (SCARECROW.y + 1) * TILE - 32 } },
   { id: 'door', cell: DOOR, label: '우리 집 문', verb: '들어가기', action: { kind: 'exit', exit: 'door' }, bang: { x: DOOR.x * TILE + TILE / 2, y: DOOR.y * TILE - 2 } },
-  // 광장 길목: 아직 막혀 있어서 A를 누르면 안내만 한다. 광장 장면이 생기면 action을 exit로 바꾸면 된다.
-  { id: 'gate', cell: GATE, label: '광장 가는 길', verb: '살펴보기', action: { kind: 'talk' }, bang: { x: GATE.x * TILE + TILE / 2, y: GATE.y * TILE + 2 } },
+  // 광장 길목을 밟거나 A를 누르면 광장으로 넘어간다.
+  { id: 'gate', cell: GATE, label: '광장 가는 길', verb: '광장 가기', action: { kind: 'exit', exit: 'gate' }, bang: { x: GATE.x * TILE + TILE / 2, y: GATE.y * TILE + 2 } },
 ];
 export const BED_CELLS: readonly Point[] = FARM_BEDS.map(toWorldCell);
 /** 처음 서 있는 곳 — 기존 마당의 "방에서 나왔을 때" 자리(문 바로 앞). */
@@ -54,7 +54,8 @@ export function yardScene(): SceneSpec {
   return {
     id: 'yard', title: '앞마당', cols: WORLD_COLS, rows: WORLD_ROWS, solid: worldSolid,
     interactables: INTERACTABLES,
-    exits: [{ id: 'door', cells: [DOOR], to: { scene: 'room', entry: 'door' } }],
+    exits: [{ id: 'door', cells: [DOOR], to: { scene: 'room', entry: 'door' } },
+      { id: 'gate', cells: [GATE], to: { scene: 'plaza', entry: 'yard' } }],
     entries: {
       door: { cell: toWorldCell(YARD_SPAWNS.room), facing: 'Front' as Facing },
       // 광장에서 돌아올 때 설 자리(광장 장면이 생기면 그쪽 출구가 이 이름을 가리킨다).

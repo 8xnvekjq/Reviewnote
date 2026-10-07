@@ -12,6 +12,7 @@ import dogSheet from '../../pixel-room/pet/assets/dog.png';
 import bearSheet from '../../pixel-room/pet/assets/bear.png';
 import pigeonSheet from '../../pixel-room/pet/assets/pigeon.png';
 import duckSheet from '../../pixel-room/pet/assets/duck.png';
+import { ShopStallArt } from '../../pixel-room/plaza/ShopStallArt';
 import { ScarecrowSprite } from '../../pixel-room/farm/Scarecrow';
 import { TomatoSprite } from '../../pixel-room/farm/TomatoSprite';
 import type { FarmMoisture, FarmStage } from '../../pixel-room/farm/farmModel';
@@ -62,3 +63,5 @@ function renderSvg(element: ReactElement, width: number, height: number): Promis
 export const loadScarecrow = () => renderSvg(createElement(ScarecrowSprite), 24, 30);
 export type BedLook = { stage: FarmStage; moisture: FarmMoisture };
 export const loadBed = (look: BedLook) => renderSvg(createElement(TomatoSprite, look), 32, 32);
+
+export const loadPlazaStall = () => renderSvg(createElement(ShopStallArt), 48, 48);

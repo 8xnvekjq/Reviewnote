@@ -39,6 +39,7 @@ export interface WorldAssets {
   avatar: { key: string; canvas: HTMLCanvasElement };
   pet: { id: PetId; source: HTMLImageElement | HTMLCanvasElement } | null;
   scarecrow: HTMLImageElement;
+  plazaStall?: HTMLImageElement;
 }
 export interface Prompt { id: string; verb: string }
 export interface WorldEvents {
@@ -254,7 +255,8 @@ export abstract class WorldScene extends Phaser.Scene {
     this.facing = facingToward(this.feet, nearestCellCenter(item, this.feet));
     this.playAvatar(false, 1);
     this.updatePrompt();
-    this.act(item);
+    // The shopkeeper waits for A after the player arrives facing the stall.
+    if (item.action.kind !== 'panel' || item.action.panel !== 'shop') this.act(item);
   }
   /** A 버튼: 지금 바라보는 대상과 상호작용. */
   interact() {

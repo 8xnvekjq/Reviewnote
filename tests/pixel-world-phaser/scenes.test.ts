@@ -75,5 +75,5 @@ test('fractional DPR keeps camera zoom in integer rendering pixels; invalid DPR 
     assert.ok(Number.isInteger(zoom));
     assert.equal(size.width, Math.round(393 * (dpr > 0 && Number.isFinite(dpr) ? Math.min(3, dpr) : 1)));
   }
-  assert.equal(dialogueFor('gate', { scarecrowLine: () => '' })?.lines.some(line => line.includes('다음 베타에서 열려요')), true);
+  assert.equal(buildScene('yard', data).interactables.find(item => item.id === 'gate')?.action.kind, 'exit');
 });
