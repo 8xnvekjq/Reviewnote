@@ -128,7 +128,7 @@ export class PlazaScene extends WorldScene {
     for (const [id, emoji] of Object.entries(this.reactions)) {
       const spot = spots.get(id); if (!spot) continue;
       let bubble = this.bubbles.get(id);
-      if (!bubble) { bubble = this.add.text(0, 0, emoji, { fontSize: '16px', backgroundColor: '#fff5de', padding: { x: 3, y: 2 } }).setOrigin(.5, 1).setDepth(100001); this.bubbles.set(id, bubble); }
+      if (!bubble) { bubble = this.add.text(0, 0, emoji, { fontSize: '9px', fontFamily: 'Pretendard, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif', fontStyle: 'bold', color: '#4f3a28', backgroundColor: '#fff9ec', padding: { x: 4, y: 2 }, resolution: 4 }).setOrigin(.5, 1).setDepth(100001); this.bubbles.set(id, bubble); }
       bubble.setText(emoji).setPosition(spot.x, spot.y - 34);
     }
   }
