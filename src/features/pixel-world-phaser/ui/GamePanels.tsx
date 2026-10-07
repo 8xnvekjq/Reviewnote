@@ -19,17 +19,27 @@ export function PriceTag({ value }: { value: number }) {
 function Tabs({ options, value, onChange }: { options: readonly (readonly [string, string])[]; value: string; onChange: (value: string) => void }) {
   return <nav className="pwp-tabs" aria-label="분류">{options.map(([key, label]) => <button type="button" key={key} aria-pressed={key === value} onClick={() => onChange(key)}>{label}</button>)}</nav>;
 }
-export function Window({ title, onClose, children, compact = false, small = false }: { title: string; onClose: () => void; children: ReactNode; compact?: boolean; small?: boolean }) {
+export function Window({ title, onClose, onCancel = onClose, children, compact = false, small = false }: { title: string; onClose: () => void; onCancel?: () => void; children: ReactNode; compact?: boolean; small?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
+  const cancel = useRef(onCancel); cancel.current = onCancel;
+  useEffect(() => {
+    const element = box.current;
+    const back = () => cancel.current();
+    element?.addEventListener('pwp-cancel', back);
+    return () => element?.removeEventListener('pwp-cancel', back);
+  }, []);
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     box.current?.querySelector<HTMLButtonElement>('button')?.focus();
     return () => previous?.focus();
   }, []);
-  return <div className="pwp-panel-shade" onPointerDown={event => event.stopPropagation()}>
+  return <div className="pwp-panel-shade" onPointerDown={event => {
+    event.stopPropagation();
+    if (event.target === event.currentTarget && event.button === 0) { event.preventDefault(); onCancel(); }
+  }}>
     <div ref={box} className={(compact ? "pwp-window pwp-window-compact" : "pwp-window") + (small ? " pwp-window-small" : "")} role="dialog" aria-modal="true" aria-label={title} onKeyDown={event => {
       event.stopPropagation();
-      if (event.key === 'Escape') { event.preventDefault(); onClose(); }
+      if (event.key === 'Escape' || event.key.toLowerCase() === 'x') { event.preventDefault(); if (!event.repeat) onCancel(); }
       if (event.key === 'Tab') {
         const buttons = [...box.current!.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
         const first = buttons[0], last = buttons.at(-1);
@@ -65,7 +75,7 @@ export function GamePanels({ kind, adapter: { shop, pet }, onClose }: { kind: Pa
     ? <PanelArt appearance={{ ...shop.equipped, [item.slot]: item.assetKey }} />
     : item.category === 'pet' ? <PanelArt pet={item.itemId} /> : <PanelArt furniture={item.assetKey as FurnitureType} />;
   const entries = panelItems(shop.catalog, kind === 'shop' ? category : slot, kind === 'wardrobe' ? shop.ownedIds : undefined);
-  return <Window title={kind === 'shop' ? '상점' : '옷장'} onClose={onClose}>
+  return <Window title={kind === 'shop' ? '상점' : '옷장'} onClose={onClose} onCancel={() => { if (confirming) { if (!busy) setConfirming(null); } else onClose(); }}>
     <div className="pwp-panel-summary">{kind === 'shop' ? <><span>마음에 드는 스타일을 골라요.</span><PriceTag value={shop.balance} /></> : <><div className="pwp-preview"><PanelArt appearance={shop.equipped} /></div><span>오늘의 나 · 바꾸면 바로 보여요.</span></>}</div>
     <Tabs options={kind === 'shop' ? [['all', '전체'], ...AVATAR_SLOTS.map(key => [key, SLOT_LABELS[key]] as const), ['furniture', '가구'], ['pet', '펫']] : [...AVATAR_SLOTS.map(key => [key, SLOT_LABELS[key]] as const), ['base', '기본 외형'], ['pet', '펫']]} value={kind === 'shop' ? category : slot} onChange={value => { if (kind === 'shop') setCategory(value); else setSlot(value); setConfirming(null); }} />
     <div className="pwp-panel-content">
