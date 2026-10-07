@@ -19,8 +19,13 @@ import { loadBed, loadInterior, loadPetSheet, loadScarecrow, loadTown } from './
 import type { BedLook } from './game/sceneAssets';
 import type { YardGameHandle } from './game/boot';
 import './gameShell.css';
+import { GamePanels } from './ui/GamePanels';
+import type { PanelAdapter } from './ui/GamePanels';
+import type { PanelKind } from './logic/panels';
+import { panelFrozen } from './logic/panels';
 
 export interface GameShellProps {
+  panels?: PanelAdapter;
   appearance: PublicAvatarAppearance;
   pet: PetId | null;
   balance: number;
@@ -63,7 +68,7 @@ async function leaveFullscreen() {
 }
 
 // 상위가 1초마다(밭 시계) 다시 그려져도, 넘겨받는 값이 같으면 셸은 다시 그리지 않는다.
-export const GameShell = memo(function GameShell({ appearance, pet, balance, beds, scarecrowLine, onExit }: GameShellProps) {
+export const GameShell = memo(function GameShell({ appearance, pet, balance, beds, scarecrowLine, onExit, panels }: GameShellProps) {
   const root = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const probe = useRef<HTMLDivElement>(null);
@@ -82,6 +87,21 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
   const promptRef = useRef(prompt); promptRef.current = prompt;
   const [dialogue, setDialogue] = useState<Dialogue | null>(null);
   const dialogueRef = useRef(dialogue); dialogueRef.current = dialogue;
+  const [panel, setPanel] = useState<PanelKind | null>(null);
+  const panelRef = useRef(panel); panelRef.current = panel;
+  const closePanel = useCallback(() => {
+    panelRef.current = null; setPanel(null);
+    controls.frozen = panelFrozen(null, !!dialogueRef.current);
+    controls.stick = ZERO_STICK; controls.run = false;
+    keys.current = { up: false, down: false, left: false, right: false };
+  }, [controls]);
+  const openPanel = (kind: PanelKind) => {
+    panelRef.current = kind; setPanel(kind);
+    controls.frozen = panelFrozen(kind, !!dialogueRef.current); controls.stick = ZERO_STICK; controls.run = false;
+    pointers.current.clear(); stickOrigin.current = null;
+    if (ring.current) ring.current.style.opacity = '0';
+    handle.current?.cancelWalk();
+  };
   const [typed, setTyped] = useState(0);
   const [pressed, setPressed] = useState<{ a: boolean; b: boolean }>({ a: false, b: false });
   const [fullscreen, setFullscreen] = useState(false);
@@ -148,8 +168,25 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
       handle.current = null;
       if (import.meta.env.DEV) delete (window as unknown as { __pixelWorldPhaser?: YardGameHandle }).__pixelWorldPhaser;
     };
-    // 외형/펫이 바뀌면 장면을 새로 만든다(이 베타 화면 안에서는 바뀌지 않음).
-  }, [appearance, pet, controls]);
+    // 외형과 펫 변경은 아래 효과에서 처리하고 장면은 한 번만 만든다.
+  }, [controls]);
+
+  // 장착 변경은 장면을 재부팅하지 않고 최신 요청만 반영한다.
+  useEffect(() => {
+    if (status !== 'ready') return;
+    let cancelled = false;
+    const next = composeAvatar(appearance);
+    void next.canvas.then(canvas => { if (!cancelled) handle.current?.setAppearance({ key: next.key, canvas }); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [appearance, status]);
+  useEffect(() => {
+    if (status !== 'ready') return;
+    let cancelled = false;
+    void (pet ? loadPetSheet(pet) : Promise.resolve(null)).then(source => {
+      if (!cancelled) handle.current?.setPet(pet && source ? { id: pet, source } : null);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [pet, status]);
 
   // 밭 모습이 바뀌면(서버 새로고침) 밭 그림만 갈아 끼운다.
   const bedKey = beds.map(bed => `${bed.stage}/${bed.moisture}`).join(',');
@@ -162,7 +199,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
 
   // ── 대화 ──
   const openDialogue = useCallback((id: InteractableId) => {
-    if (dialogueRef.current) return;
+    if (dialogueRef.current || panelRef.current) return;
     let lines: string[];
     let speaker: string;
     if (id === 'scarecrow') {
@@ -182,7 +219,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     setDialogue(next);
   }, [controls]);
   arriveRef.current = openDialogue;
-  const closeDialogue = useCallback(() => { controls.frozen = false; dialogueRef.current = null; setDialogue(null); }, [controls]);
+  const closeDialogue = useCallback(() => { controls.frozen = panelFrozen(panelRef.current, false); dialogueRef.current = null; setDialogue(null); }, [controls]);
   const currentLine = dialogue ? dialogue.lines[dialogue.index] : '';
   // 한 글자씩 찍히는 대사(약 40자/초). 끝나면 타이머 정지.
   useEffect(() => {
@@ -205,13 +242,15 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     closeDialogue();
   }, [closeDialogue]);
   const pressA = useCallback(() => {
+    if (panelRef.current) return;
     if (dialogueRef.current) advance();
     else if (promptRef.current) openDialogue(promptRef.current);
   }, [advance, openDialogue]);
   const pressB = useCallback((down: boolean) => {
+    if (panelRef.current) { if (down) closePanel(); return; }
     if (down && dialogueRef.current) { closeDialogue(); return; }
     controls.run = down;
-  }, [closeDialogue, controls]);
+  }, [closeDialogue, closePanel, controls]);
 
   // ── 조이스틱/탭 (게임 표면 전체에서 받는다; 버튼은 자기 이벤트를 먼저 먹는다) ──
   const framePoint = (event: { clientX: number; clientY: number }): Point => {
@@ -235,6 +274,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     if (fullscreenSupported() && !fullscreenElement() && root.current) void enterFullscreen(root.current, layoutRef.current.device === 'phone');
   };
   const onSurfaceDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (panelRef.current) return;
     if (dialogueRef.current) { if (event.pointerType !== 'mouse' || event.button === 0) advance(); return; }
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     const point = framePoint(event);
@@ -306,6 +346,8 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     const map: Record<string, keyof typeof keys.current> = { ArrowUp: 'up', w: 'up', ArrowDown: 'down', s: 'down', ArrowLeft: 'left', a: 'left', ArrowRight: 'right', d: 'right' };
     const sync = () => { if (!stickOrigin.current) controls.stick = keyboardVector(keys.current); };
     const down = (event: KeyboardEvent) => {
+      if (panelRef.current) { if (event.key === 'Escape') closePanel(); return; }
+      if (event.target instanceof HTMLElement && event.target.closest('button') && (event.key === 'Enter' || event.key === ' ')) return;
       if (event.altKey || event.ctrlKey || event.metaKey) return;
       const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
       const dir = map[key];
@@ -339,7 +381,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
       window.removeEventListener('blur', reset);
       document.removeEventListener('visibilitychange', visibility);
     };
-  }, [controls, pressA, closeDialogue]);
+  }, [controls, pressA, closeDialogue, closePanel]);
 
   // ── 전체화면 상태 추적 + iOS 핀치/더블탭 확대 막기 ──
   useEffect(() => {
@@ -347,7 +389,10 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     document.addEventListener('fullscreenchange', sync);
     document.addEventListener('webkitfullscreenchange', sync);
     const element = root.current;
-    const block = (event: Event) => event.preventDefault();
+    const block = (event: Event) => {
+      if (event.type === 'touchmove' && event.target instanceof Element && event.target.closest('.pwp-panel-content')) return;
+      event.preventDefault();
+    };
     element?.addEventListener('gesturestart', block);
     element?.addEventListener('gesturechange', block);
     element?.addEventListener('dblclick', block);
@@ -385,6 +430,10 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
       <button type="button" className="pwp-chip pwp-icon" aria-pressed={bgm.enabled} aria-label="배경음악" title={bgm.enabled ? '배경음악 끄기' : '배경음악 켜기'} onClick={bgm.toggle}><span aria-hidden="true">♪</span></button>
       {fullscreenSupported() && <button type="button" className="pwp-chip pwp-icon" aria-pressed={fullscreen} aria-label={fullscreen ? '전체화면 끄기' : '전체화면'} onClick={toggleFullscreen}>⛶</button>}
     </div>
+    {panels && <div className="pwp-panel-access" style={{ left: hud.x + 10, top: hud.y + hud.height + 8 }}>
+      <button type="button" className="pwp-chip" disabled={status !== 'ready'} onClick={() => openPanel('shop')}>상점</button>
+      <button type="button" className="pwp-chip" disabled={status !== 'ready'} onClick={() => openPanel('wardrobe')}>옷장</button>
+    </div>}
     <button type="button" className="pwp-btn pwp-btn-a" data-pressed={pressed.a} data-prompt={!!prompt || !!dialogue}
       style={{ left: a.x - a.size / 2, top: a.y - a.size / 2, width: a.size, height: a.size }}
       aria-label={dialogue ? 'A · 다음' : prompt ? `A · ${promptLabel}` : 'A'}
@@ -406,6 +455,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
       <p data-full={currentLine}>{currentLine.slice(0, typed)}</p>
       {typed >= currentLine.length && <span className="pwp-dialogue-next" aria-hidden="true">{dialogue.index + 1 < dialogue.lines.length ? '▼' : '■'}</span>}
     </div>}
+    {panel && panels && <GamePanels kind={panel} adapter={panels} onClose={closePanel} />}
     {status !== 'ready' && <div className="pwp-loading" role="status">
       {status === 'loading' ? '앞마당으로 가는 중…' : <>게임을 시작하지 못했어요.<button type="button" className="pwp-chip" onClick={exit}>돌아가기</button></>}
     </div>}
