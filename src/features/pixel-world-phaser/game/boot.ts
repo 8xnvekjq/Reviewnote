@@ -14,6 +14,7 @@ import { RoomScene } from './RoomScene';
 import { YardScene } from './YardScene';
 import { PlazaScene } from './PlazaScene';
 import type { PlazaPlayerState } from '../../pixel-room/plaza/types';
+import type { PlazaBubble } from './plazaBubbles';
 import type { WorldAssets, WorldContext, WorldDebug, WorldEvents, WorldScene } from './WorldScene';
 
 export type { Prompt, WorldAssets, WorldDebug, WorldEvents } from './WorldScene';
@@ -36,7 +37,7 @@ export interface WorldGameHandle {
   /** 지금 장면. 전환 중 잠깐은 직전 장면. */
   scene(): SceneId;
   setExhibit(show: boolean): void;
-  setClassmates(players: PlazaPlayerState[], reactions: Record<string, string>, selfId: string): void;
+  setClassmates(players: PlazaPlayerState[], bubbles: Record<string, PlazaBubble>, selfId: string): void;
   debug(): WorldDebug;
 }
 export interface WorldStart {
@@ -132,7 +133,7 @@ export function startWorldGame(parent: HTMLElement, start: WorldStart, controls:
       },
       scene: () => lastScene,
       setExhibit: show => { if (active instanceof PlazaScene) active.setExhibit(show); },
-      setClassmates: (players, reactions, selfId) => { if (active instanceof PlazaScene) active.setClassmates(players, reactions, selfId); },
+      setClassmates: (players, bubbles, selfId) => { if (active instanceof PlazaScene) active.setClassmates(players, bubbles, selfId); },
       debug: () => (active ? active.snapshot() : { ...(last as WorldDebug), transitioning: true }),
     };
   });

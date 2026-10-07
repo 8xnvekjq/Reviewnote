@@ -8,6 +8,8 @@ import { plazaGroundTile, PLAZA_MARGIN } from '../logic/plazaWorld';
 import { PET_SHEETS, petFollowSpot } from '../logic/petSheets';
 import { composeAvatar } from './avatarTexture';
 import { loadPetSheet, loadBed } from './sceneAssets';
+import { PlazaBubbles } from './plazaBubbles';
+import type { PlazaBubble } from './plazaBubbles';
 import { WorldScene } from './WorldScene';
 import type { WorldContext } from './WorldScene';
 
@@ -15,15 +17,15 @@ type Friend = { sprite?: Phaser.GameObjects.Sprite; pet?: Phaser.GameObjects.Spr
 export class PlazaScene extends WorldScene {
   protected readonly background = '#5d8a4a';
   private friends = new Map<string, Friend>();
-  private bubbles = new Map<string, Phaser.GameObjects.Text>();
-  private reactions: Record<string, string> = {};
+  private bubbles: PlazaBubbles | null = null;
+  private wantedBubbles: Record<string, PlazaBubble> = {};
   private selfId = '';
   private exhibit: Phaser.GameObjects.Image | null = null;
   private exhibitWanted = false;
   constructor(ctx: WorldContext) { super('plaza', ctx); }
   protected drawWorld() {
     this.exhibit = null; this.exhibitWanted = false;
-    this.friends = new Map(); this.bubbles = new Map(); this.reactions = {};
+    this.friends = new Map(); this.bubbles = new PlazaBubbles(this); this.wantedBubbles = {};
     const canvas = document.createElement('canvas'); canvas.width = 416; canvas.height = 352;
     const g = canvas.getContext('2d')!; g.imageSmoothingEnabled = false;
     const tile = (id: number, x: number, y: number, w = 16, h = 16) => g.drawImage(this.ctx.assets.town, id % 12 * 16, Math.floor(id / 12) * 16, 16, 16, x, y, w, h);
@@ -52,7 +54,7 @@ export class PlazaScene extends WorldScene {
       this.add.image((s.x + 5) * 16, (s.y + 5) * 16, key).setOrigin(0).setDepth((s.footprint.y + 5 + s.footprint.h) * 16 - 2);
     });
     this.add.text((8 + 5) * 16 + 8, (11 + 5) * 16 + 8, '↓', { fontSize: '12px', color: '#fff4ce' }).setOrigin(.5);
-    const clear = () => { this.friends.clear(); this.bubbles.clear(); };
+    const clear = () => { this.friends.clear(); this.bubbles?.clear(); this.bubbles = null; };
     this.events.once('shutdown', clear);
   }
   setExhibit(show: boolean) {
@@ -65,8 +67,9 @@ export class PlazaScene extends WorldScene {
       this.exhibit = this.add.image(160, 136, 'plaza-tomato').setDisplaySize(24, 24).setOrigin(.5, 1).setDepth(143);
     }).catch(() => {});
   }
-  setClassmates(players: PlazaPlayerState[], reactions: Record<string, string>, selfId: string) {
-    this.reactions = reactions; this.selfId = selfId;
+  /** bubbles: 머리 위 말풍선(인사·한마디). 목록에서 빠지면 장면이 천천히 흐리게 지운다. */
+  setClassmates(players: PlazaPlayerState[], bubbles: Record<string, PlazaBubble>, selfId: string) {
+    this.wantedBubbles = bubbles; this.selfId = selfId;
     const ids = new Set(players.map(p => p.sessionId));
     for (const [id, f] of this.friends) if (!ids.has(id)) { f.sprite?.destroy(); f.pet?.destroy(); this.friends.delete(id); }
     for (const p of players) {
@@ -124,13 +127,10 @@ export class PlazaScene extends WorldScene {
         f.pet.setPosition(spot.x, spot.y).setDepth(spot.y).setFrame(a.row * sheet.columns + a.frames[Math.floor(time / a.frameMs) % a.frames.length]);
       }
     }
-    for (const [id, bubble] of this.bubbles) if (!this.reactions[id] || !spots.has(id)) { bubble.destroy(); this.bubbles.delete(id); }
-    for (const [id, emoji] of Object.entries(this.reactions)) {
-      const spot = spots.get(id); if (!spot) continue;
-      let bubble = this.bubbles.get(id);
-      if (!bubble) { bubble = this.add.text(0, 0, emoji, { fontSize: '9px', fontFamily: 'Pretendard, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif', fontStyle: 'bold', color: '#4f3a28', backgroundColor: '#fff9ec', padding: { x: 4, y: 2 }, resolution: 4 }).setOrigin(.5, 1).setDepth(100001); this.bubbles.set(id, bubble); }
-      bubble.setText(emoji).setPosition(spot.x, spot.y - 34);
-    }
+    this.bubbles?.update(this.wantedBubbles, spots);
   }
-  snapshot() { return { ...super.snapshot(), classmates: [...this.friends].map(([id, f]) => ({ id, x: f.state.x, y: f.state.y, rendered: !!f.sprite, pet: !!f.pet })), reactions: Object.keys(this.reactions) }; }
+  snapshot() {
+    return { ...super.snapshot(), classmates: [...this.friends].map(([id, f]) => ({ id, x: f.state.x, y: f.state.y, rendered: !!f.sprite, pet: !!f.pet })),
+      reactions: Object.keys(this.wantedBubbles), bubbles: this.bubbles?.snapshot() ?? [] };
+  }
 }
