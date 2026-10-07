@@ -14,6 +14,8 @@ import { PET_SHEETS, petFollowSpot } from '../logic/petSheets';
 import type { PetSheet } from '../logic/petSheets';
 import { createPetFollowState, stepPetFollow } from '../logic/petFollow';
 import type { PetFollowState } from '../logic/petFollow';
+import { createPetFlightState, startPetFlight, stepPetFlight, petFlightFrame, PIGEON_FLIGHT_DISTANCE } from '../logic/petFlight';
+import type { PetFlightState, FlightWorld } from '../logic/petFlight';
 import type { PetId } from '../../pixel-room/pet/petKinds';
 import { TILE, cellCenter, cellOf, coversCell, facedInteractable, facingToward, feetBlocked, moveFeet, nearestCellCenter, nearestOpenCell, planPath } from '../logic/world';
 import type { Interactable } from '../logic/world';
@@ -96,6 +98,9 @@ export abstract class WorldScene extends Phaser.Scene {
   private pet: Phaser.GameObjects.Sprite | null = null;
   private petSheet: PetSheet | null = null;
   private petFollow: PetFollowState | null = null;
+  private petFlight: PetFlightState | null = null;
+  private petShadow: Phaser.GameObjects.Ellipse | null = null;
+  private petNextFlightAt = 0;
   private reaction: { start: number; until: number; kind: 'feed' | 'pet'; quiet?: boolean } | null = null;
   private wander: { target: { x: number; y: number } | null; nextAt: number } = { target: null, nextAt: 0 };
   private bang!: Phaser.GameObjects.Image;
@@ -128,6 +133,7 @@ export abstract class WorldScene extends Phaser.Scene {
   init(data: { entry?: string } | undefined) {
     this.entry = data?.entry;
     this.pet = null; this.petSheet = null; this.petFollow = null; this.reaction = null;
+    this.petFlight = null; this.petShadow = null;
     this.moving = false; this.running = false; this.path = []; this.pathTarget = null;
     this.prompt = null; this.animKey = ''; this.transitioning = false; this.exitArmed = false;
     this.dust = new Set(); this.dustDistance = 0;
@@ -197,6 +203,10 @@ export abstract class WorldScene extends Phaser.Scene {
 
   refreshPet() {
     this.pet?.destroy();
+    if (this.petFlight || this.ctx.assets.pet?.id === 'pet_pigeon') {
+      this.reaction = null; this.wander = { target: null, nextAt: 0 };
+    }
+    this.petShadow?.destroy(); this.petShadow = null; this.petFlight = null;
     this.pet = null; this.petSheet = null; this.petFollow = null;
     if (this.ctx.assets.pet) this.addPet(this.ctx.assets.pet.id);
   }
@@ -220,6 +230,12 @@ export abstract class WorldScene extends Phaser.Scene {
     this.petFollow = createPetFollowState(start);
     this.pet = this.add.sprite(start.x, start.y, key, sheet.idle.row * sheet.columns).setOrigin(0.5, sheet.footY / sheet.cell);
     this.pet.play(`${key}:idle`);
+    if (id === 'pet_pigeon') {
+      this.wander = { target: null, nextAt: 0 };
+      this.petFlight = createPetFlightState(start);
+      this.petNextFlightAt = this.time.now + 10000 + Math.random() * 5000;
+      this.petShadow = this.add.ellipse(start.x, start.y, 10, 3, 0x453d29, 0.2).setVisible(false);
+    }
   }
 
   private applyZoom() {
@@ -380,7 +396,7 @@ export abstract class WorldScene extends Phaser.Scene {
   // 펫이 고개를 돌려 기존 시트의 먹기/앉기/짖기 동작을 보여 준다.
   reactPet(kind: 'feed' | 'pet') {
     const pet = this.pet, id = this.ctx.assets.pet?.id;
-    if (!pet || !id || this.reaction || Math.hypot(pet.x - this.feet.x, pet.y - this.feet.y) > 34) return;
+    if (!pet || !id || this.reaction || (this.petFlight && this.petFlight.phase !== 'ground') || Math.hypot(pet.x - this.feet.x, pet.y - this.feet.y) > 34) return;
     this.cancelWalk();
     this.reaction = { kind, start: this.time.now, until: this.time.now + PET_INTERACTIONS[id].ms };
     pet.anims.stop(); pet.setFlipX(this.feet.x > pet.x);
@@ -432,7 +448,7 @@ export abstract class WorldScene extends Phaser.Scene {
   }
   private petTarget(): Interactable | null {
     const pet = this.pet;
-    if (!pet || this.reaction || !facesPet(this.feet, this.facing, pet)) return null;
+    if (!pet || this.reaction || (this.petFlight && this.petFlight.phase !== 'ground') || !facesPet(this.feet, this.facing, pet)) return null;
     return { id: 'pet', cell: cellOf(pet), label: '친구', verb: '놀아주기', action: { kind: 'panel', panel: 'pet' }, bang: { x: pet.x, y: pet.y - 30 } };
   }
   private wanderPet(pet: Phaser.GameObjects.Sprite, sheet: PetSheet, deltaMs: number) {
@@ -468,6 +484,22 @@ export abstract class WorldScene extends Phaser.Scene {
     const pet = this.pet, sheet = this.petSheet;
     if (!pet || !sheet) return;
     if (!this.petFollow) return;
+    const follows = this.spec.id === 'plaza' || PET_ALWAYS_FOLLOWS;
+    if (this.petFlight) {
+      const wasAirborne = this.petFlight.phase !== 'ground';
+      this.petFlight = stepPetFlight(this.petFlight, deltaMs, this.petFlightWorld(), follows ? petFollowSpot(this.feet, this.facing) : undefined);
+      if (wasAirborne) {
+        this.renderPetFlight();
+        if (this.petFlight.phase === 'ground') {
+          this.petFollow = createPetFollowState(this.petFlight.position, this.petFlight.flipX);
+          this.wander = { target: null, nextAt: this.time.now + 1500 };
+          this.petNextFlightAt = this.time.now + 10000 + Math.random() * 5000;
+        }
+        return;
+      }
+      this.petFlight.position = { x: pet.x, y: pet.y };
+      this.petFlight.flipX = pet.flipX;
+    }
     if (this.reaction && this.ctx.assets.pet) {
       if (this.time.now < this.reaction.until) {
         pet.setFrame(reactionFrame(this.ctx.assets.pet.id, this.time.now - this.reaction.start, this.reaction.kind));
@@ -478,6 +510,26 @@ export abstract class WorldScene extends Phaser.Scene {
     }
     // 가만히 서서 바라보는 친구는 뒤로 돌아가지 않는다. A를 누를 시간을 준다.
     if (this.ctx.controls.frozen || (!this.moving && facesPet(this.feet, this.facing, pet))) { pet.play(pet.texture.key + ':idle', true); return; }
+    if (this.petFlight) {
+      let target: Point | null = null;
+      if (follows) {
+        const spot = petFollowSpot(this.feet, this.facing);
+        if (Math.hypot(spot.x - pet.x, spot.y - pet.y) > PIGEON_FLIGHT_DISTANCE || this.petFollow.stuckMs >= 300) target = spot;
+      } else if (this.petFlight.cooldownMs === 0 && this.time.now >= this.petNextFlightAt) {
+        const world = this.petFlightWorld();
+        for (let i = 0; i < 12; i++) {
+          const candidate = { x: pet.x + (Math.random() - 0.5) * TILE * 8, y: pet.y + (Math.random() - 0.5) * TILE * 6 };
+          if (!world.blocked(candidate) && Math.hypot(candidate.x - pet.x, candidate.y - pet.y) >= TILE * 2) { target = candidate; break; }
+        }
+        this.petNextFlightAt = this.time.now + 10000 + Math.random() * 5000;
+      }
+      if (target) {
+        // 따라잡기는 대기 시간보다 우선하며 지상 순간이동 대신 날아서 회복한다.
+        if (follows) this.petFlight.cooldownMs = 0;
+        this.petFlight = startPetFlight(this.petFlight, target, this.petFlightWorld());
+        if (this.petFlight.phase !== 'ground') { this.wander.target = null; this.renderPetFlight(); return; }
+      }
+    }
     // 광장에서만 따라온다. 집과 마당에서는 혼자 돌아다니며 가끔 짖거나 쪼거나 손을 흔든다.
     if (this.spec.id !== 'plaza' && !PET_ALWAYS_FOLLOWS) { this.wanderPet(pet, sheet, deltaMs); return; }
     const solid = this.spec.solid;
@@ -491,6 +543,30 @@ export abstract class WorldScene extends Phaser.Scene {
     const animation = `${pet.texture.key}:${result.walking ? 'walk' : 'idle'}`;
     if (pet.anims.currentAnim?.key !== animation) pet.play(animation);
     pet.setDepth(pet.y);
+  }
+
+  /** 착륙 후보는 장면 범위와 발밑 충돌을 모두 확인한다. */
+  private petFlightWorld(): FlightWorld {
+    const blocked = (point: Point) => point.x < TILE || point.y < TILE || point.x > this.spec.cols * TILE - TILE || point.y > this.spec.rows * TILE - TILE || feetBlocked(point, this.spec.solid);
+    return { blocked, landing: point => {
+      if (!blocked(point)) return point;
+      let best: Point | null = null, distance = Infinity;
+      for (let y = 1; y < this.spec.rows - 1; y++) for (let x = 1; x < this.spec.cols - 1; x++) {
+        const candidate = cellCenter({ x, y });
+        const gap = Math.hypot(candidate.x - point.x, candidate.y - point.y);
+        if (gap < distance && !blocked(candidate)) { best = candidate; distance = gap; }
+      }
+      return best;
+    } };
+  }
+
+  /** 그림은 높이에 맞춰 그리고 그림자는 지상 좌표에 남긴다. */
+  private renderPetFlight() {
+    const flight = this.petFlight, pet = this.pet;
+    if (!flight || !pet) return;
+    pet.anims.stop();
+    pet.setFrame(petFlightFrame(flight)).setPosition(flight.position.x, flight.position.y - flight.altitude).setFlipX(flight.flipX).setDepth(flight.position.y + flight.altitude);
+    this.petShadow?.setPosition(flight.position.x, flight.position.y).setDepth(flight.position.y - 1).setScale(1 - flight.altitude / 40).setVisible(flight.phase !== 'ground');
   }
 
   private updatePrompt(force = false) {
