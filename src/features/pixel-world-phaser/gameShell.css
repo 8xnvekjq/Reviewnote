@@ -69,3 +69,11 @@ html.pwp-open, html.pwp-open body { overflow:hidden; overscroll-behavior:none; h
 /* 광장에서만 나타나는 게임 프레임 안 반응 버튼. */
 .pwp-plaza-reactions { position: absolute; z-index: 12; top: calc(env(safe-area-inset-top, 0px) + 110px); right: max(12px, env(safe-area-inset-right, 0px)); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; max-width: 240px; }
 .pwp-plaza-reactions [role="status"] { flex-basis: 100%; text-align: right; color: #fff4ce; font-size: 12px; text-shadow: 1px 1px #453429; }
+
+/* 배치 안내는 HUD 아래에 두고, 버튼 밖의 터치는 방 바닥으로 보낸다. */
+.pwp-room-placing { position:absolute; left:12px; right:12px; display:flex; gap:8px; align-items:center; pointer-events:none; }
+.pwp-room-placing p, .pwp-room-result { margin:0; padding:8px; background:#fff4d9; color:#4f3a28; border:2px solid #5b3926; font-size:13px; pointer-events:none; }
+.pwp-room-placing button { pointer-events:auto; flex-shrink:0; }
+.pwp-room-result { position:absolute; bottom:max(110px,env(safe-area-inset-bottom)); left:12px; }
+.pwp-btn:disabled { opacity:.35; pointer-events:none; }
+.pwp-hud > .pwp-hud-spacer { pointer-events:none; }

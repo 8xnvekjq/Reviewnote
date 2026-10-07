@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { FURNITURE, defaultState, canPlace, removeFurniture } from '../../src/features/pixel-room/model.ts';
 import type { FurnitureType, Placement } from '../../src/features/pixel-room/model.ts';
 import { PIXEL_CATALOG } from '../../src/features/pixel-room/shop/catalog.ts';
-import { furnitureRows, moveFurniture, ownedFurniture, roomPoint, snapRoomPoint, furnitureAt } from '../../src/features/pixel-world-phaser/logic/roomEditing.ts';
+import { furnitureRows, moveFurniture, ownedFurniture, roomPoint, snapRoomPoint } from '../../src/features/pixel-world-phaser/logic/roomEditing.ts';
 import { savedFurniture } from '../../src/features/pixel-world-phaser/logic/savedFurniture.ts';
-import { furnitureSprite, roomSolid, roomToWorld } from '../../src/features/pixel-world-phaser/logic/roomWorld.ts';
+import { roomSolid, roomToWorld } from '../../src/features/pixel-world-phaser/logic/roomWorld.ts';
 
 const types = Object.keys(FURNITURE) as FurnitureType[];
 const owned = new Set(types);
@@ -45,14 +45,12 @@ test('보관함으로 돌려놓아도 구매 목록은 보존되고 다시 배�
   assert.equal(ownedFurniture(PIXEL_CATALOG, ownedIds).length, types.length);
   assert.ok(moveFurniture(layout, 'chair', { x: 2, y: 2 }, owned, actor));
 });
-test('월드 좌표는 기존 바닥 칸으로 스냅하고 키가 큰 그림도 선택한다', () => {
+test('월드 좌표는 기존 바닥 칸으로 스냅한다', () => {
   assert.deepEqual(snapRoomPoint(roomPoint({ x: 16 + 3.9 * 16, y: 32 + 2.1 * 16 })), { x: 3, y: 2 });
   assert.deepEqual(snapRoomPoint(roomPoint({ x: 15, y: 31 })), { x: -1, y: -1 });
-  const item: Placement = { type: 'tallplant', x: 3, y: 4 };
-  const sprite = furnitureSprite(item);
-  assert.equal(furnitureAt([item], { x: sprite.x + 8, y: sprite.bottom - sprite.height + 2 }), item);
+
 });
-test('완료된 배치는 이동 충돌에 즉시 반영할 수 있다', () => {
+test('저장된 배치는 이동 충돌에 즉시 반영할 수 있다', () => {
   const old: Placement[] = [{ type: 'desk', x: 3, y: 4 }];
   const next = moveFurniture(old, 'desk', { x: 3, y: 2 }, owned, actor)!;
   assert.ok(roomSolid(old)(roomToWorld({ x: 4, y: 4 })));

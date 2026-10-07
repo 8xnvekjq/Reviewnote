@@ -15,14 +15,16 @@ import { gameLayout, insideRect, NO_INSETS } from './logic/layout';
 import type { GameLayout, Insets } from './logic/layout';
 import { dialogueFor } from './logic/dialogues';
 import type { SceneId } from './logic/scenes';
-import type { Placement } from '../pixel-room/model';
+import type { FurnitureType, Placement } from '../pixel-room/model';
 import { composeAvatar } from './game/avatarTexture';
 import { loadBed, loadFloors, loadFurnitureSheets, loadInterior, loadPetSheet, loadScarecrow, loadTown, loadPlazaStall } from './game/sceneAssets';
 import type { BedLook } from './game/sceneAssets';
 import type { Prompt, WorldGameHandle } from './game/boot';
 import './gameShell.css';
 import { GamePanels } from './ui/GamePanels';
-import { RoomEditor } from './ui/RoomEditor';
+import { FurniturePanel } from './ui/FurniturePanel';
+import { moveFurniture, ownedFurniture, snapRoomPoint } from './logic/roomEditing';
+import { FURNITURE_NAMES } from './logic/roomLines';
 import type { PanelAdapter } from './ui/GamePanels';
 import type { PanelKind } from './logic/panels';
 import { panelFrozen } from './logic/panels';
@@ -31,7 +33,7 @@ import type { PlazaPanel } from './ui/PlazaBridge';
 
 import { FarmPanels } from './ui/FarmPanels';
 import type { ActivityPanel, FarmAdapter } from './ui/FarmPanels';
-type ShellPanel = PanelKind | PlazaPanel | ActivityPanel;
+type ShellPanel = PanelKind | PlazaPanel | ActivityPanel | 'furniture';
 
 export interface GameShellProps {
   panels?: PanelAdapter;
@@ -109,11 +111,19 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
   const [dialogue, setDialogue] = useState<Dialogue | null>(null);
   const dialogueRef = useRef(dialogue); dialogueRef.current = dialogue;
   const [panel, setPanel] = useState<ShellPanel | null>(null);
-  const [editingRoom, setEditingRoom] = useState(false);
+  const [placing, setPlacing] = useState<FurnitureType | null>(null);
+  const [roomMessage, setRoomMessage] = useState('');
+  const [roomPending, setRoomPending] = useState(false);
+  const roomSaving = useRef(false);
+  const placingRef = useRef<FurnitureType | null>(null);
   const editingRef = useRef(false);
-  const beginRoomEdit = () => {
-    if (!handle.current || handle.current.debug().transitioning || panel || dialogue) return;
-    editingRef.current = true; setEditingRoom(true);
+  const beginRoomEdit = (type: FurnitureType) => {
+    if (!handle.current || handle.current.debug().transitioning || dialogue || roomSaving.current) return;
+    panelRef.current = null; setPanel(null);
+    placingRef.current = type; setPlacing(type);
+    setRoomMessage(`${FURNITURE_NAMES[type]}: 원하는 빈 칸을 눌러 주세요.`);
+    editingRef.current = true;
+    handle.current.setRoomPlacing(true);
     controls.frozen = true; controls.stick = ZERO_STICK; controls.run = false;
     keys.current = { up: false, down: false, left: false, right: false };
     pointers.current.clear(); stickOrigin.current = null;
@@ -121,15 +131,38 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     handle.current.cancelWalk();
   };
   const endRoomEdit = () => {
-    editingRef.current = false; setEditingRoom(false);
+    editingRef.current = false; placingRef.current = null; setPlacing(null);
+    handle.current?.setRoomPlacing(false);
     controls.stick = ZERO_STICK; controls.run = false;
     keys.current = { up: false, down: false, left: false, right: false };
-    controls.frozen = false;
+    controls.frozen = panelFrozen(panelRef.current, !!dialogueRef.current);
+  };
+  const saveRoomLayout = async (next: Placement[]) => {
+    if (roomSaving.current || !onSaveFurniture) return;
+    roomSaving.current = true; setRoomPending(true);
+    try {
+      await onSaveFurniture(next);
+      handle.current?.setFurniture(next);
+      endRoomEdit();
+      setRoomMessage('가구 배치를 저장했어요.');
+    } catch {
+      setRoomMessage('방 배치를 저장하지 못했어요. 다시 시도해 주세요.');
+    } finally { roomSaving.current = false; setRoomPending(false); }
+  };
+  const placeAt = (point: Point) => {
+    if (roomSaving.current || !placingRef.current || !panels) return;
+    const at = handle.current?.roomEditPoint(point.x, point.y);
+    if (!at) return;
+    const owned = new Set(ownedFurniture(panels.shop.catalog, panels.shop.ownedIds).map(item => item.assetKey as FurnitureType));
+    const next = moveFurniture(handle.current!.getFurniture(), placingRef.current, snapRoomPoint(at.point), owned, at.actor);
+    if (!next) { setRoomMessage('빈 칸에 놓아 주세요. 캐릭터와 출입구는 비워 주세요.'); return; }
+    void saveRoomLayout(next);
   };
   const panelRef = useRef(panel); panelRef.current = panel;
   const closePanel = useCallback(() => {
+    if (panelRef.current === 'furniture' && roomSaving.current) return;
     panelRef.current = null; setPanel(null);
-    controls.frozen = panelFrozen(null, !!dialogueRef.current);
+    controls.frozen = editingRef.current || panelFrozen(null, !!dialogueRef.current);
     controls.stick = ZERO_STICK; controls.run = false;
     keys.current = { up: false, down: false, left: false, right: false };
   }, [controls]);
@@ -301,11 +334,12 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
   }, [closeDialogue]);
   // 대화 중이면 다음 줄, 아니면 장면에 맡긴다(말 걸기 → onTalk, 문 → 장면 전환).
   const pressA = useCallback(() => {
-    if (panelRef.current) return;
+    if (panelRef.current || editingRef.current) return;
     if (dialogueRef.current) advance();
     else if (promptRef.current) handle.current?.interact();
   }, [advance]);
   const pressB = useCallback((down: boolean) => {
+    if (editingRef.current) return;
     if (panelRef.current) { if (down) closePanel(); return; }
     if (down && dialogueRef.current) { closeDialogue(); return; }
     controls.run = down;
@@ -333,6 +367,10 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     if (fullscreenSupported() && !fullscreenElement() && root.current) void enterFullscreen(root.current, layoutRef.current.device === 'phone');
   };
   const onSurfaceDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (editingRef.current) {
+      if (event.pointerType !== 'mouse' || event.button === 0) { event.preventDefault(); placeAt(framePoint(event)); }
+      return;
+    }
     if (panelRef.current) return;
     if (dialogueRef.current) { if (event.pointerType !== 'mouse' || event.button === 0) advance(); return; }
     if (event.pointerType === 'mouse' && event.button !== 0) return;
@@ -405,7 +443,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     const map: Record<string, keyof typeof keys.current> = { ArrowUp: 'up', w: 'up', ArrowDown: 'down', s: 'down', ArrowLeft: 'left', a: 'left', ArrowRight: 'right', d: 'right' };
     const sync = () => { if (!stickOrigin.current) controls.stick = keyboardVector(keys.current); };
     const down = (event: KeyboardEvent) => {
-      if (editingRef.current) return;
+      if (editingRef.current) { if (map[event.key] || ['Shift', 'z', 'x'].includes(event.key)) event.preventDefault(); return; }
       if (panelRef.current) { if (event.key === 'Escape') closePanel(); return; }
       if (event.target instanceof HTMLElement && event.target.closest('button') && (event.key === 'Enter' || event.key === ' ')) return;
       if (event.altKey || event.ctrlKey || event.metaKey) return;
@@ -492,10 +530,10 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
       {fullscreenSupported() && <button type="button" className="pwp-chip pwp-icon" aria-pressed={fullscreen} aria-label={fullscreen ? '전체화면 끄기' : '전체화면'} onClick={toggleFullscreen}>⛶</button>}
     </div>
     {panels && <div className="pwp-panel-access" style={{ left: hud.x + 10, top: hud.y + hud.height + 8 }}>
-      <button type="button" className="pwp-chip" disabled={status !== 'ready'} onClick={() => openPanel('wardrobe')}>옷장</button>
-      {scene?.id === 'room' && <button type="button" className="pwp-chip" disabled={status !== 'ready' || !onSaveFurniture || !panels.shop.ready || panels.shop.loadError || !!panel || !!dialogue} onClick={beginRoomEdit}>꾸미기</button>}
+      <button type="button" className="pwp-chip" disabled={status !== 'ready' || !!placing || roomPending} onClick={() => openPanel('wardrobe')}>옷장</button>
+      {scene?.id === 'room' && <button type="button" className="pwp-chip" disabled={status !== 'ready' || !onSaveFurniture || !panels.shop.ready || panels.shop.loadError || !!panel || !!dialogue || !!placing || roomPending} onClick={() => { setRoomMessage(''); openPanel('furniture'); }}>꾸미기</button>}
     </div>}
-    <button type="button" className="pwp-btn pwp-btn-a" data-pressed={pressed.a} data-prompt={!!prompt || !!dialogue}
+    <button type="button" disabled={!!placing} className="pwp-btn pwp-btn-a" data-pressed={pressed.a} data-prompt={!!prompt || !!dialogue}
       style={{ left: a.x - a.size / 2, top: a.y - a.size / 2, width: a.size, height: a.size }}
       aria-label={dialogue ? 'A · 다음' : prompt ? `A · ${promptLabel}` : 'A'}
       onPointerDown={buttonDown('a')} onPointerUp={buttonUp('a')} onPointerCancel={buttonUp('a')} onLostPointerCapture={buttonUp('a')}
@@ -503,7 +541,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
       onClick={event => { if (event.detail === 0) pressA(); }}>
       <b>A</b>{(prompt || dialogue) && <small>{dialogue ? '다음' : promptLabel}</small>}
     </button>
-    <button type="button" className="pwp-btn pwp-btn-b" data-pressed={pressed.b}
+    <button type="button" disabled={!!placing} className="pwp-btn pwp-btn-b" data-pressed={pressed.b}
       style={{ left: b.x - b.size / 2, top: b.y - b.size / 2, width: b.size, height: b.size }}
       aria-label={dialogue ? 'B · 닫기' : 'B · 누르는 동안 달리기'}
       onPointerDown={buttonDown('b')} onPointerUp={buttonUp('b')} onPointerCancel={buttonUp('b')} onLostPointerCapture={buttonUp('b')}>
@@ -518,12 +556,19 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     </div>}
     {(panel === 'shop' || panel === 'wardrobe') && panels && <GamePanels kind={panel} adapter={panels} onClose={closePanel} />}
     {scene?.id === 'plaza' && status === 'ready' && <PlazaBridge key={'plaza:' + scene.visit} handle={handle} appearance={appearance} pet={pet} userId={userId} panel={panel} onClose={closePanel} />}
-    {panel && panel !== 'shop' && panel !== 'wardrobe' && panel !== 'contest' && panel !== 'well' && panel !== 'bench' && <FarmPanels key={panel} kind={panel} adapter={farmAdapter} onClose={closePanel}
+    {panel && panel !== 'furniture' && panel !== 'shop' && panel !== 'wardrobe' && panel !== 'contest' && panel !== 'well' && panel !== 'bench' && <FarmPanels key={panel} kind={panel} adapter={farmAdapter} onClose={closePanel}
       onCollection={() => openPanel('collection')} onTalk={() => { closePanel(); openDialogue('scarecrow'); }}
       onPet={kind => { closePanel(); handle.current?.reactPet(kind); }} onFx={(index, action) => handle.current?.farmFx(index, action)} />}
-    {editingRoom && handle.current && panels && onSaveFurniture && <RoomEditor game={handle.current} furniture={handle.current.getFurniture()} shop={panels.shop} save={onSaveFurniture} onClose={endRoomEdit} />}
-    {petMessage && <div className="pwp-pet-message" role="status" aria-live="polite">{petMessage}</div>}
-    {toast && <div key={toast.visit} className="pwp-toast" role="status" style={{ top: hud.y + hud.height + 6 }}>{toast.title}</div>}
+    {panel === 'furniture' && panels && <FurniturePanel furniture={handle.current?.getFurniture() ?? furniture} shop={panels.shop}
+      pending={roomPending} message={roomMessage} onClose={() => { if (!roomSaving.current) closePanel(); }} onPick={beginRoomEdit}
+      onStore={type => void saveRoomLayout(handle.current!.getFurniture().filter(item => item.type !== type))} />}
+    {placing && <div className="pwp-room-placing" style={{ top: hud.y + hud.height + 62 }}>
+      <p role="status" aria-live="polite">{roomPending ? '저장 중…' : roomMessage}</p>
+      <button type="button" className="pwp-chip" autoFocus disabled={roomPending} onClick={() => { endRoomEdit(); setRoomMessage(''); }}>그만두기</button>
+    </div>}
+    {!placing && panel !== 'furniture' && roomMessage && <div className="pwp-room-result" role="status">{roomMessage}</div>}
+    {!placing && petMessage && <div className="pwp-pet-message" role="status" aria-live="polite">{petMessage}</div>}
+    {!placing && panel !== 'furniture' && toast && <div key={toast.visit} className="pwp-toast" role="status" style={{ top: hud.y + hud.height + 6 }}>{toast.title}</div>}
     {status !== 'ready' && <div className="pwp-loading" role="status">
       {status === 'loading' ? '앞마당으로 가는 중…' : <>게임을 시작하지 못했어요.<button type="button" className="pwp-chip" onClick={exit}>돌아가기</button></>}
     </div>}
