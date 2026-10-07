@@ -38,6 +38,7 @@ export interface YardEvents {
   onArrive(target: InteractableId): void;
 }
 export interface YardDebug {
+  avatarKey: string; petId: PetId | null;
   x: number; y: number; facing: Facing; moving: boolean; running: boolean; prompt: InteractableId | null;
   pet: { x: number; y: number } | null; zoom: number; camera: { x: number; y: number }; fps: number; renderer: string; pathLength: number;
   /** 테스트용: 상호작용 대상의 화면(CSS px) 위치. */
@@ -50,6 +51,8 @@ export interface YardGameHandle {
   walkToScreen(x: number, y: number): void;
   cancelWalk(): void;
   setBeds(images: HTMLImageElement[]): void;
+  setAppearance(avatar: YardAssets['avatar']): void;
+  setPet(pet: YardAssets['pet']): void;
   debug(): YardDebug;
 }
 
@@ -160,6 +163,7 @@ class YardScene extends Phaser.Scene {
 
   private addAvatarTexture() {
     const { key, canvas } = this.assets.avatar;
+    if (this.textures.exists(key)) return;
     const texture = this.textures.addCanvas(key, canvas);
     if (!texture) return;
     for (let i = 0; i < AVATAR_POSES.length * AVATAR_FRAMES_PER_POSE; i++) {
@@ -178,17 +182,35 @@ class YardScene extends Phaser.Scene {
   private addPet(id: PetId, source: HTMLImageElement | HTMLCanvasElement) {
     const sheet = PET_SHEETS[id];
     const key = `pet:${id}`;
-    const texture = source instanceof HTMLCanvasElement ? this.textures.addCanvas(key, source) : this.textures.addImage(key, source);
+    const texture = this.textures.exists(key) ? this.textures.get(key) : source instanceof HTMLCanvasElement ? this.textures.addCanvas(key, source) : this.textures.addImage(key, source);
     if (!texture) return;
-    for (let r = 0; r < sheet.rows; r++) for (let c = 0; c < sheet.columns; c++) texture.add(r * sheet.columns + c, 0, c * sheet.cell, r * sheet.cell, sheet.cell, sheet.cell);
+    for (let r = 0; r < sheet.rows; r++) for (let c = 0; c < sheet.columns; c++) {
+      const frame = r * sheet.columns + c;
+      if (!texture.has(String(frame))) texture.add(frame, 0, c * sheet.cell, r * sheet.cell, sheet.cell, sheet.cell);
+    }
     for (const [name, anim] of [['walk', sheet.walk], ['idle', sheet.idle]] as const) {
-      this.anims.create({ key: `${key}:${name}`, repeat: -1, frameRate: 1000 / anim.frameMs, frames: anim.frames.map(frame => ({ key, frame: anim.row * sheet.columns + frame })) });
+      if (!this.anims.exists(`${key}:${name}`)) this.anims.create({ key: `${key}:${name}`, repeat: -1, frameRate: 1000 / anim.frameMs, frames: anim.frames.map(frame => ({ key, frame: anim.row * sheet.columns + frame })) });
     }
     const spot = petFollowSpot(this.feet, this.facing);
     const start = feetBlocked(spot) ? { ...this.feet } : spot;
     this.petSheet = sheet;
     this.pet = this.add.sprite(start.x, start.y, key, sheet.idle.row * sheet.columns).setOrigin(0.5, sheet.footY / sheet.cell);
     this.pet.play(`${key}:idle`);
+  }
+
+  // 위치와 카메라를 유지한 채 외형과 친구만 바꾼다.
+  setAppearance(avatar: YardAssets['avatar']) {
+    this.assets.avatar = avatar;
+    this.addAvatarTexture();
+    this.player.stop().setTexture(avatar.key, 0);
+    this.animKey = '';
+    this.playAvatar(this.moving, this.running ? RUN_SPEED / WALK_SPEED : 1);
+  }
+
+  setPet(pet: YardAssets['pet']) {
+    this.pet?.destroy(); this.pet = null; this.petSheet = null; this.petStuckMs = 0;
+    this.assets.pet = pet;
+    if (pet) this.addPet(pet.id, pet.source);
   }
 
   setBeds(images: HTMLImageElement[]) {
@@ -310,6 +332,7 @@ class YardScene extends Phaser.Scene {
   snapshot(): YardDebug {
     const camera = this.cameras.main;
     return {
+      avatarKey: this.player.texture.key, petId: this.assets.pet?.id ?? null,
       x: Math.round(this.feet.x * 10) / 10, y: Math.round(this.feet.y * 10) / 10, facing: this.facing, moving: this.moving, running: this.running,
       prompt: this.prompt, pet: this.pet ? { x: Math.round(this.pet.x), y: Math.round(this.pet.y) } : null, zoom: camera.zoom,
       camera: { x: Math.round(camera.scrollX), y: Math.round(camera.scrollY) }, fps: Math.round(this.game.loop.actualFps),
@@ -342,6 +365,8 @@ export function startYardGame(parent: HTMLElement, assets: YardAssets, controls:
       walkToScreen: (x, y) => scene.walkToScreen(x, y),
       cancelWalk: () => scene.cancelWalk(),
       setBeds: images => scene.setBeds(images),
+      setAppearance: avatar => scene.setAppearance(avatar),
+      setPet: pet => scene.setPet(pet),
       debug: () => scene.snapshot(),
     }));
     const game = new Phaser.Game({
