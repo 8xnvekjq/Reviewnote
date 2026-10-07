@@ -19,7 +19,7 @@ export function PriceTag({ value }: { value: number }) {
 function Tabs({ options, value, onChange }: { options: readonly (readonly [string, string])[]; value: string; onChange: (value: string) => void }) {
   return <nav className="pwp-tabs" aria-label="분류">{options.map(([key, label]) => <button type="button" key={key} aria-pressed={key === value} onClick={() => onChange(key)}>{label}</button>)}</nav>;
 }
-export function Window({ title, onClose, children, compact = false }: { title: string; onClose: () => void; children: ReactNode; compact?: boolean }) {
+export function Window({ title, onClose, children, compact = false, small = false }: { title: string; onClose: () => void; children: ReactNode; compact?: boolean; small?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
@@ -27,7 +27,7 @@ export function Window({ title, onClose, children, compact = false }: { title: s
     return () => previous?.focus();
   }, []);
   return <div className="pwp-panel-shade" onPointerDown={event => event.stopPropagation()}>
-    <div ref={box} className={compact ? "pwp-window pwp-window-compact" : "pwp-window"} role="dialog" aria-modal="true" aria-label={title} onKeyDown={event => {
+    <div ref={box} className={(compact ? "pwp-window pwp-window-compact" : "pwp-window") + (small ? " pwp-window-small" : "")} role="dialog" aria-modal="true" aria-label={title} onKeyDown={event => {
       event.stopPropagation();
       if (event.key === 'Escape') { event.preventDefault(); onClose(); }
       if (event.key === 'Tab') {

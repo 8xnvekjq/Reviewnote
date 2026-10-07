@@ -53,7 +53,7 @@ export function PlazaBridge({ handle, appearance, pet, userId, panel, onClose }:
   }, [retry]);
   useEffect(() => { handle.current?.setExhibit(!!contest?.top.length); }, [handle, contest]);
   useEffect(() => {
-    const reactions = Object.fromEntries([...realtime.reactions].map(([id, r]) => [id, REACTIONS[r.kind].emoji]));
+    const reactions = Object.fromEntries([...realtime.reactions].map(([id, r]) => [id, REACTIONS[r.kind].label]));  // 머리 위에는 이모지 대신 말풍선 글(안녕!/응원해!)
     handle.current?.setClassmates(smoothed, reactions, sessionId);
   }, [handle, smoothed, realtime.reactions, sessionId]);
   useEffect(() => {
@@ -80,7 +80,7 @@ export function PlazaBridge({ handle, appearance, pet, userId, panel, onClose }:
         }}>{REACTIONS[kind].emoji}</button>)}
       <span role="status">{!realtime.ready ? '다시 연결하는 중…' : now < coolUntil ? '잠깐 쉬었다 보내요' : message}</span>
     </div>
-    {(panel === 'contest' || panel === 'well' || panel === 'bench') && <Window title={title} onClose={onClose}>
+    {(panel === 'contest' || panel === 'well' || panel === 'bench') && <Window title={title} onClose={onClose} compact small>
       <div className="pwp-panel-content">
         {panel === 'well' ? <p role="status">{dailyWellMessage(plazaDay(now))}</p> : panel === 'bench' ? <p>잠깐 앉아 쉬어 가요. 천천히 가도 괜찮아요.</p>
           : failed ? <div role="alert"><p>대회를 불러오지 못했어요.</p><button type="button" onClick={() => setRetry(n => n + 1)}>다시 시도</button></div>
