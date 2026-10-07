@@ -1,11 +1,13 @@
 // 새 Pixel World(베타) 진입 — 지금 Pixel World와 똑같은 방식으로 학생의 실제 외형(usePixelShop)과
-// 데리고 다니는 펫(usePet), 밭 상태(useFarm)를 불러와 Phaser 셸에 넘긴다. 서버 쓰기는 하지 않는다.
+// 데리고 다니는 펫(usePet), 밭 상태(useFarm)를 불러와 Phaser 셸에 넘긴다. 돌봄과 출품은 기존 훅/RPC만 사용한다.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchPixelFurniturePlacement } from '../../utils/pixelShop';
 import type { FurniturePlacementRow } from '../../utils/pixelShop';
 import { savedFurniture } from './logic/savedFurniture';
 import { usePixelShop } from '../pixel-room/usePixelShop';
 import { usePet } from '../pixel-room/pet/usePet';
+import { useFarmInventory } from '../pixel-room/farm/useFarmInventory';
+import { submitFarmCrop, fetchWeeklyCropContest } from '../../utils/pixelFarm';
 import { useFarm } from '../pixel-room/farm/useFarm';
 import { FARM_BEDS, farmMoisture, farmStage } from '../pixel-room/farm/farmModel';
 import { pickScarecrowLine } from '../pixel-room/farm/scarecrowLines';
@@ -19,6 +21,9 @@ export default function PixelWorldPhaser({ userId, pointsBalance, onExit }: Prop
   const shop = usePixelShop(userId, pointsBalance);
   const pet = usePet(userId);
   const farm = useFarm();
+  const inventory = useFarmInventory(userId);
+  const harvestCount = farm.snapshot?.harvestCount;
+  useEffect(() => { if (harvestCount !== undefined) void inventory.refresh(); }, [harvestCount, inventory.refresh]);
   const [placement, setPlacement] = useState<{ userId: string; rows: FurniturePlacementRow[] } | null>(null);
   const [roomError, setRoomError] = useState(false);
   const [retry, setRetry] = useState(0);
@@ -48,7 +53,7 @@ export default function PixelWorldPhaser({ userId, pointsBalance, onExit }: Prop
     <button type="button" onClick={onExit}>나가기</button></div>;
   if (!appearance || !pet.ready || placement?.userId !== userId) return <div className="pwp-root pwp-loading" role="status">앞마당으로 가는 중…</div>;
   return <GameShell appearance={appearance} pet={!pet.error && pet.active && shop.ownedIds.has(pet.active) ? pet.active : null} balance={shop.balance} beds={beds} furniture={furniture}
-    scarecrowLine={scarecrowLine} onExit={onExit} panels={{ shop, pet }} />;
+    scarecrowLine={scarecrowLine} onExit={onExit} panels={{ shop, pet }} farmAdapter={{ farm, inventory, contest: fetchWeeklyCropContest, submit: async id => { const result = await submitFarmCrop(id); if (result.ok) shop.reload(); return result; } }} />;
 }
 
 function bedsKey(snapshot: ReturnType<typeof useFarm>['snapshot'], now: number): string {

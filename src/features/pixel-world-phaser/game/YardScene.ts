@@ -45,6 +45,8 @@ export class YardScene extends WorldScene {
 
   refreshData() { this.setBeds(this.ctx.data.beds); }
 
+  snapshot() { return { ...super.snapshot(), bedTextures: this.beds.map(bed => bed.texture.key) }; }
+
   private setBeds(images: HTMLImageElement[]) {
     this.beds.forEach(bed => bed.destroy());
     this.beds = [];

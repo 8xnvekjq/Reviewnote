@@ -24,10 +24,14 @@ import './gameShell.css';
 import { GamePanels } from './ui/GamePanels';
 import type { PanelAdapter } from './ui/GamePanels';
 import type { PanelKind } from './logic/panels';
-import { panelFrozen } from './logic/panels';
+import { FarmPanels } from './ui/FarmPanels';
+import type { ActivityPanel, FarmAdapter } from './ui/FarmPanels';
+type ShellPanel = PanelKind | ActivityPanel;
+const panelFrozen = (panel: ShellPanel | null, dialogue: boolean) => !!panel || dialogue;
 
 export interface GameShellProps {
   panels?: PanelAdapter;
+  farmAdapter?: FarmAdapter;
   appearance: PublicAvatarAppearance;
   pet: PetId | null;
   balance: number;
@@ -75,7 +79,7 @@ async function leaveFullscreen() {
 }
 
 // 상위가 1초마다(밭 시계) 다시 그려져도, 넘겨받는 값이 같으면 셸은 다시 그리지 않는다.
-export const GameShell = memo(function GameShell({ appearance, pet, balance, beds, furniture, scarecrowLine, onExit, panels }: GameShellProps) {
+export const GameShell = memo(function GameShell({ appearance, pet, balance, beds, furniture, scarecrowLine, onExit, panels, farmAdapter }: GameShellProps) {
   const root = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const probe = useRef<HTMLDivElement>(null);
@@ -90,13 +94,15 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
   const [layout, setLayout] = useState<GameLayout>(() => gameLayout(window.innerWidth, window.innerHeight));
   const layoutRef = useRef(layout); layoutRef.current = layout;
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [petMessage, setPetMessage] = useState('');
+  useEffect(() => { if (!petMessage) return; const timer = window.setTimeout(() => setPetMessage(''), 4500); return () => clearTimeout(timer); }, [petMessage]);
   const [prompt, setPrompt] = useState<Prompt | null>(null);
   const [scene, setScene] = useState<SceneInfo | null>(null);
   const [toast, setToast] = useState<SceneInfo | null>(null);
   const promptRef = useRef(prompt); promptRef.current = prompt;
   const [dialogue, setDialogue] = useState<Dialogue | null>(null);
   const dialogueRef = useRef(dialogue); dialogueRef.current = dialogue;
-  const [panel, setPanel] = useState<PanelKind | null>(null);
+  const [panel, setPanel] = useState<ShellPanel | null>(null);
   const panelRef = useRef(panel); panelRef.current = panel;
   const closePanel = useCallback(() => {
     panelRef.current = null; setPanel(null);
@@ -104,7 +110,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     controls.stick = ZERO_STICK; controls.run = false;
     keys.current = { up: false, down: false, left: false, right: false };
   }, [controls]);
-  const openPanel = (kind: PanelKind) => {
+  const openPanel = (kind: ShellPanel) => {
     panelRef.current = kind; setPanel(kind);
     controls.frozen = panelFrozen(kind, !!dialogueRef.current); controls.stick = ZERO_STICK; controls.run = false;
     pointers.current.clear(); stickOrigin.current = null;
@@ -148,7 +154,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
   // 게임 안 창(상점/옷장 등) 열기 자리. 장면 정의에서 action {kind:'panel', panel}인 대상을 A로 누르면
   // 여기로 온다. 창이 생기면 이 ref를 그 창을 여는 함수로 채우면 된다(지금은 그런 대상이 없다).
   const scenePanelRef = useRef<(panel: string) => void>(() => {});
-  scenePanelRef.current = kind => { if (kind === 'shop' || kind === 'wardrobe') openPanel(kind); };
+  scenePanelRef.current = kind => { if (kind === 'shop' || kind === 'wardrobe' || kind === 'pet' || kind.startsWith('farm:')) { farmAdapter?.farm.clearMessage(); openPanel(kind as ShellPanel); } };
   const bedsRef = useRef(beds); bedsRef.current = beds;
   const furnitureRef = useRef(furniture); furnitureRef.current = furniture;
   useEffect(() => {
@@ -166,6 +172,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
           beds: bedImages, furniture: furnitureRef.current,
         }, controls, {
           onPrompt: next => setPrompt(next),
+          onPetMessage: setPetMessage,
           onTalk: id => talkRef.current(id),
           onPanel: panel => scenePanelRef.current(panel),
           onScene: (id, title) => {
@@ -243,7 +250,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     setTyped(0);
     setDialogue(next);
   }, [controls]);
-  talkRef.current = openDialogue;
+  talkRef.current = id => { if (id === 'scarecrow') openPanel('scarecrow'); else openDialogue(id); };
   const closeDialogue = useCallback(() => { controls.frozen = panelFrozen(panelRef.current, false); dialogueRef.current = null; setDialogue(null); }, [controls]);
   const currentLine = dialogue ? dialogue.lines[dialogue.index] : '';
   // 한 글자씩 찍히는 대사(약 40자/초). 끝나면 타이머 정지.
@@ -481,7 +488,11 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
       <p data-full={currentLine}>{currentLine.slice(0, typed)}</p>
       {typed >= currentLine.length && <span className="pwp-dialogue-next" aria-hidden="true">{dialogue.index + 1 < dialogue.lines.length ? '▼' : '■'}</span>}
     </div>}
-    {panel && panels && <GamePanels kind={panel} adapter={panels} onClose={closePanel} />}
+    {(panel === 'shop' || panel === 'wardrobe') && panels && <GamePanels kind={panel} adapter={panels} onClose={closePanel} />}
+    {panel && panel !== 'shop' && panel !== 'wardrobe' && <FarmPanels key={panel} kind={panel} adapter={farmAdapter} onClose={closePanel}
+      onCollection={() => openPanel('collection')} onTalk={() => { closePanel(); openDialogue('scarecrow'); }}
+      onPet={kind => { closePanel(); handle.current?.reactPet(kind); }} onFx={(index, action) => handle.current?.farmFx(index, action)} />}
+    {petMessage && <div className="pwp-pet-message" role="status" aria-live="polite">{petMessage}</div>}
     {toast && <div key={toast.visit} className="pwp-toast" role="status" style={{ top: hud.y + hud.height + 6 }}>{toast.title}</div>}
     {status !== 'ready' && <div className="pwp-loading" role="status">
       {status === 'loading' ? '앞마당으로 가는 중…' : <>게임을 시작하지 못했어요.<button type="button" className="pwp-chip" onClick={exit}>돌아가기</button></>}

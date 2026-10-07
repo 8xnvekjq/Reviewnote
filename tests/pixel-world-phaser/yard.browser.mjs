@@ -109,7 +109,7 @@ try {
       if (!visible((await debug(page)).targets.scarecrow)) {
         await page.evaluate(() => {
           const h = window.__pixelWorldPhaser, d = h.debug();
-          h.walkToScreen(d.targets.scarecrow.x, d.targets.scarecrow.y + 16 * d.zoom / d.ratio);
+          h.walkToScreen(d.targets.scarecrow.x - 16 * d.zoom / d.ratio, d.targets.scarecrow.y);
         });
         await until(page, () => window.__pixelWorldPhaser.debug().pathLength === 0 && !window.__pixelWorldPhaser.debug().moving, null, 10000);
         await page.waitForTimeout(500); // 따라오는 카메라도 목적지에서 안정된 뒤 탭한다.
@@ -118,6 +118,7 @@ try {
       assert.ok(visible(target), `scarecrow reachable on screen: ${JSON.stringify(await debug(page))}`);
       await touchEvent('touchStart', [{ x: target.x, y: target.y, id: 4 }]);
       await touchEvent('touchEnd', []);
+      await page.getByRole('button', { name: '이야기하기', exact: true }).click();
       await page.locator('.pwp-dialogue').waitFor({ timeout: 10000 });
       assert.equal((await debug(page)).prompt, 'scarecrow');
       // A: 찍히는 중이면 전부 보이기 → 다음 줄/닫기.
@@ -133,6 +134,7 @@ try {
       // ── "!" 표시 + A로 다시 말 걸기 (조이스틱과 A 동시 입력도 허용) ──
       assert.match(await page.locator('.pwp-btn-a').getAttribute('aria-label'), /말 걸기/);
       await tapA();
+      await page.getByRole('button', { name: '이야기하기', exact: true }).click();
       await page.locator('.pwp-dialogue').waitFor();
       const line = await page.locator('.pwp-dialogue p').getAttribute('data-full');
       await page.screenshot({ path: `${SHOTS}/${name}-dialogue.png` });
@@ -158,10 +160,12 @@ try {
       // 마우스 클릭으로 허수아비까지 걸어가기 → 도착하면 대화.
       const target = (await debug(page)).targets.scarecrow;
       await page.mouse.click(target.x, target.y);
+      await page.getByRole('button', { name: '이야기하기', exact: true }).click();
       await page.locator('.pwp-dialogue').waitFor({ timeout: 10000 });
       for (let i = 0; i < 6 && await page.locator('.pwp-dialogue').count(); i++) { await page.keyboard.press('Space'); await page.waitForTimeout(80); }
       assert.equal(await page.locator('.pwp-dialogue').count(), 0);
       await page.keyboard.press('Space');
+      await page.getByRole('button', { name: '이야기하기', exact: true }).click();
       await page.locator('.pwp-dialogue').waitFor();
       await page.keyboard.press('Escape');
       assert.equal(await page.locator('.pwp-dialogue').count(), 0);
