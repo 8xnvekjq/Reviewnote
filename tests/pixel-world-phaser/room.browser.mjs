@@ -26,7 +26,7 @@ try {
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
-    await page.goto(`${BASE}/tests/pixel-world-phaser/harness.html?pet=pet_dog`);
+    await page.goto(`${BASE}/tests/pixel-world-phaser/harness.html?petWander=0&pet=pet_dog`);
     await page.waitForFunction(() => document.querySelector('.pwp-root')?.dataset.status === 'ready');
     await readyScene(page, 'yard');
     await page.keyboard.down('ArrowUp');
@@ -144,7 +144,7 @@ try {
     else if (table === 'get_pixel_farm') body = { serverNow: new Date().toISOString(), plots: [{ index: 0, crop: null }, { index: 1, crop: null }] };
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
   });
-  await page.goto(`${BASE}/tests/pixel-world-phaser/harness.html?saved=1`);
+  await page.goto(`${BASE}/tests/pixel-world-phaser/harness.html?petWander=0&saved=1`);
   await page.getByRole('alert').waitFor();
   assert.equal(await page.locator('canvas').count(), 0, 'failed query is not shown as an empty saved room');
   await page.getByRole('button', { name: '다시 불러오기' }).click();

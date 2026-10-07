@@ -35,7 +35,7 @@ try {
   for (const [name, viewport] of [['phone', { width: 390, height: 844 }], ['tablet', { width: 1180, height: 820 }]]) {
     const context = await browser.newContext({ viewport, hasTouch: true });
     const page = await context.newPage(); const errors = []; page.on('pageerror', e => errors.push(e.message));
-    await page.goto(BASE + '/tests/pixel-world-phaser/harness.html?farm=1&pet=pet_dog'); await ready(page);
+    await page.goto(BASE + '/tests/pixel-world-phaser/harness.html?petWander=0&farm=1&pet=pet_dog'); await ready(page);
     await react(page, 'feed');
     await target(page, 'farm:1');
     const bed = page.getByRole('dialog', { name: '2번 토마토 밭', exact: true }); await bed.waitFor();
@@ -74,7 +74,7 @@ try {
   }
   for (const pet of ['pet_bear', 'pet_duck', 'pet_pigeon']) {
     const page = await browser.newPage({ viewport: { width: 1180, height: 820 } });
-    await page.goto(BASE + '/tests/pixel-world-phaser/harness.html?pet=' + pet); await ready(page);
+    await page.goto(BASE + '/tests/pixel-world-phaser/harness.html?petWander=0&pet=' + pet); await ready(page);
     await react(page, 'feed');
     await page.evaluate(() => { const h = window.__pixelWorldPhaser, p = h.debug().exits.door; h.walkToScreen(p.x, p.y); });
     await page.waitForFunction(() => window.__pixelWorldPhaser.debug().scene === 'room' && !window.__pixelWorldPhaser.debug().transitioning);
@@ -82,7 +82,7 @@ try {
   }
   for (const flag of ['farmError', 'farmChanged']) {
     const page = await browser.newPage({ viewport: { width: 1180, height: 820 } });
-    await page.goto(BASE + '/tests/pixel-world-phaser/harness.html?farm=1&pet=none&' + flag + '=1'); await ready(page);
+    await page.goto(BASE + '/tests/pixel-world-phaser/harness.html?petWander=0&farm=1&pet=none&' + flag + '=1'); await ready(page);
     await target(page, 'farm:1'); const bed = page.getByRole('dialog', { name: '2번 토마토 밭', exact: true }); await bed.waitFor();
     await bed.getByRole('button', { name: '토마토 심기', exact: true }).click();
     await bed.getByRole('status').filter({ hasText: flag === 'farmError' ? '저장 결과' : '다른 곳' }).waitFor();

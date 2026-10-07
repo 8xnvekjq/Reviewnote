@@ -26,7 +26,7 @@ try {
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
-    await page.goto(`${BASE}/tests/pixel-world-phaser/harness.html?${query}`);
+    await page.goto(`${BASE}/tests/pixel-world-phaser/harness.html?petWander=0&${query}`);
     await until(page, () => window.__pixelWorldPhaser && document.querySelector('.pwp-root')?.dataset.status === 'ready', null, 20000);
     await page.waitForTimeout(300);
 
