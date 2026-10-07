@@ -8,6 +8,8 @@ import type { Facing, Point } from '../logic/joystick';
 import { AVATAR_FRAMES_PER_POSE, AVATAR_POSES } from '../logic/avatarPlan';
 import { PET_SHEETS, petFollowSpot } from '../logic/petSheets';
 import type { PetSheet } from '../logic/petSheets';
+import { createPetFollowState, stepPetFollow } from '../logic/petFollow';
+import type { PetFollowState } from '../logic/petFollow';
 import type { PetId } from '../../pixel-room/pet/petKinds';
 import {
   BED_CELLS, BIG_TREES, FENCE_ROWS, INTERACTABLES, SPAWN, TILE, WORLD_COLS, WORLD_HEIGHT, WORLD_ROWS, WORLD_WIDTH,
@@ -56,7 +58,7 @@ class YardScene extends Phaser.Scene {
   private shadow!: Phaser.GameObjects.Ellipse;
   private pet: Phaser.GameObjects.Sprite | null = null;
   private petSheet: PetSheet | null = null;
-  private petStuckMs = 0;
+  private petFollowState: PetFollowState | null = null;
   private bang!: Phaser.GameObjects.Image;
   private beds: Phaser.GameObjects.Image[] = [];
   private feet: Point = { ...SPAWN };
@@ -272,25 +274,17 @@ class YardScene extends Phaser.Scene {
   private updatePet(deltaMs: number) {
     const pet = this.pet, sheet = this.petSheet;
     if (!pet || !sheet) return;
-    const spot = petFollowSpot(this.feet, this.facing);
     const here = { x: pet.x, y: pet.y };
-    const dx = spot.x - here.x, dy = spot.y - here.y;
-    const distance = Math.hypot(dx, dy);
+    const result = stepPetFollow(
+      this.petFollowState ?? createPetFollowState(here, pet.flipX),
+      here, this.feet, this.facing, sheet, deltaMs, RUN_SPEED,
+      { move: moveFeet, blocked: feetBlocked },
+    );
+    this.petFollowState = result.state;
+    pet.setPosition(result.position.x, result.position.y).setFlipX(result.state.flipX);
     const key = pet.texture.key;
-    if (distance > 7) {
-      const far = distance > 40;
-      const speed = (far ? RUN_SPEED * 1.05 : WALK_SPEED) * sheet.pace;
-      const step = Math.min(distance, speed * Math.min(deltaMs, 50) / 1000);
-      const next = moveFeet(here, dx / distance * step, dy / distance * step);
-      const moved = Math.hypot(next.x - here.x, next.y - here.y);
-      // 집/울타리에 걸려 오래 못 따라오면 플레이어 뒤로 살짝 순간이동(펫 길찾기는 다음 단계).
-      this.petStuckMs = moved < step * 0.3 ? this.petStuckMs + deltaMs : 0;
-      const target = this.petStuckMs > 900 && !feetBlocked(spot) ? spot : next;
-      if (target === spot) this.petStuckMs = 0;
-      pet.setPosition(target.x, target.y);
-      if (Math.abs(dx) > 1) pet.setFlipX(sheet.facesLeft ? dx > 0 : dx < 0);
-      if (pet.anims.currentAnim?.key !== `${key}:walk`) pet.play(`${key}:walk`);
-    } else if (pet.anims.currentAnim?.key !== `${key}:idle`) pet.play(`${key}:idle`);
+    const animation = `${key}:${result.walking ? 'walk' : 'idle'}`;
+    if (pet.anims.currentAnim?.key !== animation) pet.play(animation);
     pet.setDepth(pet.y);
   }
 
