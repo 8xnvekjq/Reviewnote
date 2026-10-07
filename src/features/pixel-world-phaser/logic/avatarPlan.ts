@@ -25,20 +25,31 @@ export type LayerPlan =
   | { layer: AvatarLayerKey; kind: 'sheet'; row: number }
   | { layer: AvatarLayerKey; kind: 'fashion'; fashion: 'blouse' | 'bootcut'; colors: readonly string[] };
 
-export function avatarLayerPlan(appearance: PublicAvatarAppearance): LayerPlan[] {
+export type AvatarStyle = 'cute' | 'legacy';
+
+// 비교용 주소 플래그를 모든 합성 경로(광장·패널 포함)에서 함께 사용한다.
+export function avatarStyle(): AvatarStyle {
+  return typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('avatarStyle') === 'legacy' ? 'legacy' : 'cute';
+}
+
+// 판매하지 않는 행만 사용하고 합성할 때 전용 무료 팔레트로 바꾼다.
+export const FREE_DEFAULT_ROWS = { tops: 0, bottoms: 3 } as const;
+
+export function avatarLayerPlan(appearance: PublicAvatarAppearance, style: AvatarStyle = avatarStyle()): LayerPlan[] {
   return AVATAR_LAYERS.map(({ key, slot }) => {
     const assetKey = appearance[slot];
     const fashion = fashionFor(slot, assetKey);
     if (fashion) return { layer: key, kind: 'fashion', fashion: fashion.kind, colors: fashion.colors };
-    const row = assetKey ? AVATAR_ROW_BY_SLOT[slot][assetKey] ?? 0 : 0;
+    const defaultRow = style === 'cute' && (key === 'tops' || key === 'bottoms') ? FREE_DEFAULT_ROWS[key] : 0;
+    const row = assetKey ? AVATAR_ROW_BY_SLOT[slot][assetKey] ?? defaultRow : defaultRow;
     return { layer: key, kind: 'sheet', row };
   });
 }
 
 const KEY_ORDER: readonly AppearanceLayerKey[] = ['skin', 'eyes', 'top', 'bottom', 'shoes', 'hair'];
 /** 같은 모습이면 같은 키 → 텍스처를 한 번만 합성해 재사용한다. 모르는 값은 기본(행 0)과 같은 키로 접는다. */
-export function avatarTextureKey(appearance: PublicAvatarAppearance): string {
-  return 'avatar:' + KEY_ORDER.map(slot => {
+export function avatarTextureKey(appearance: PublicAvatarAppearance, style: AvatarStyle = avatarStyle()): string {
+  return `avatar:${style}:` + KEY_ORDER.map(slot => {
     const value = appearance[slot];
     if (!value) return '-';
     if (fashionFor(slot, value)) return value;
