@@ -45,6 +45,9 @@ html.pwp-open, html.pwp-open body { overflow:hidden; overscroll-behavior:none; h
 .pwp-btn-a { background:rgba(214,70,58,.82); }
 .pwp-btn-a[data-prompt="true"] { background:rgba(226,78,62,.96); box-shadow:0 4px 0 rgba(30,20,12,.45), 0 0 0 4px rgba(255,215,106,.55); }
 .pwp-btn-b { background:rgba(60,94,160,.78); }
+/* 창의 그늘 위에서도 B로 닫을 수 있다. A는 기존 순서를 유지한다. */
+.pwp-btn-b[data-closing="true"] { z-index:21; }
+.pwp-root:has(.pwp-dialogue-shade) .pwp-btn-a { z-index:21; }
 .pwp-btn[data-pressed="true"] { transform:translateY(3px) scale(.96); box-shadow:0 1px 0 rgba(30,20,12,.45); }
 
 /* 대화창 — 게임 프레임 안, 하단 버튼 위 */
