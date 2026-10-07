@@ -30,6 +30,9 @@ const PET_ALWAYS_FOLLOWS = typeof window !== 'undefined' && new URLSearchParams(
 /** 장면 전환 때 어두워졌다/밝아지는 시간(ms). 기존 Pixel World의 문 페이드(260ms)와 비슷하게. */
 export const FADE_MS = 240;
 const FADE_RGB = [24, 16, 12] as const;
+/** 달릴 때만 발뒤꿈치에서 흙먼지가 이만큼(월드 px) 갈 때마다 피어오른다. 걸을 때는 없다. */
+const DUST_STEP = 11;
+const REDUCED_MOTION = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 export interface WorldAssets {
   town: HTMLImageElement;
@@ -76,6 +79,8 @@ export interface WorldDebug {
   petReaction: string | null;
   petFrame: number | null;
   petFlipX: boolean;
+  /** 지금 떠 있는 달리기 흙먼지 조각 수(테스트용 — 걷기 0, 다 사라지면 0). */
+  dust: number;
   /** 카메라 배율(기기 픽셀/월드 px)과 CSS px 기준 배율, 캔버스 기기 픽셀 비율. */
   zoom: number; cssZoom: number; ratio: number;
   camera: { x: number; y: number }; fps: number; renderer: string; pathLength: number;
@@ -98,6 +103,8 @@ export abstract class WorldScene extends Phaser.Scene {
   protected facing: Facing = 'Front';
   private moving = false;
   private running = false;
+  private dust = new Set<Phaser.GameObjects.Image>();
+  private dustDistance = 0;
   private path: Point[] = [];
   private pathTarget: string | null = null;
   private prompt: Interactable | null = null;
@@ -123,6 +130,7 @@ export abstract class WorldScene extends Phaser.Scene {
     this.pet = null; this.petSheet = null; this.petFollow = null; this.reaction = null;
     this.moving = false; this.running = false; this.path = []; this.pathTarget = null;
     this.prompt = null; this.animKey = ''; this.transitioning = false; this.exitArmed = false;
+    this.dust = new Set(); this.dustDistance = 0;
   }
 
   /** 맵 그림(바닥·벽·소품). spec은 이미 준비돼 있다. */
@@ -150,7 +158,8 @@ export abstract class WorldScene extends Phaser.Scene {
     camera.setRoundPixels(true);
     this.applyZoom();
     this.scale.on('resize', this.applyZoom, this);
-    const gone = () => { this.scale.off('resize', this.applyZoom, this); this.ctx.onSceneGone(this); };
+    // 흙먼지 조각과 tween은 장면이 내려갈 때 함께 지워진다 — 목록만 비운다.
+    const gone = () => { this.scale.off('resize', this.applyZoom, this); this.dust.clear(); this.ctx.onSceneGone(this); };
     this.events.once('shutdown', gone);
     this.events.once('destroy', gone);
     camera.fadeIn(FADE_MS, ...FADE_RGB);
@@ -163,6 +172,7 @@ export abstract class WorldScene extends Phaser.Scene {
   private ensureSharedTextures() {
     const { textures, anims } = this;
     if (!textures.exists('bang')) textures.addCanvas('bang', drawBang());
+    if (!textures.exists('run-dust')) textures.addCanvas('run-dust', drawDust());
     const { key, canvas } = this.ctx.assets.avatar;
     if (!textures.exists(key)) {
       const texture = textures.addCanvas(key, canvas);
@@ -317,9 +327,11 @@ export abstract class WorldScene extends Phaser.Scene {
       speedScale = run ? RUN_SPEED / WALK_SPEED : 1;
     }
     const wasMoving = this.moving;
+    let moved = 0;
     if (vx || vy) {
       const before = this.feet;
       this.feet = moveFeet(before, vx * dt, vy * dt, solid);
+      moved = Math.hypot(this.feet.x - before.x, this.feet.y - before.y);
       this.facing = facingFor(vx, vy, this.facing);
       // 벽에 정면으로 막혀 제자리면 걷는 시늉도 멈춘다(제자리 걸음 방지).
       this.moving = Math.hypot(this.feet.x - before.x, this.feet.y - before.y) > 0.05 * speedScale;
@@ -327,6 +339,11 @@ export abstract class WorldScene extends Phaser.Scene {
     } else this.moving = false;
     this.running = this.moving && run;
     if (this.transitioning) return; // 도착하자마자 문으로 들어간 경우
+    // 달리기 흙먼지: 막 달리기 시작하면 곧바로 한 번, 그 뒤 DUST_STEP마다. 걷거나 멈추면 다시 센다.
+    if (this.running) {
+      this.dustDistance += moved;
+      if (this.dustDistance >= DUST_STEP) { this.dustDistance = 0; this.kickDust(vx, vy); }
+    } else this.dustDistance = DUST_STEP * 0.7;
     if (this.moving || wasMoving || this.animKey === '') this.playAvatar(this.moving, Math.max(0.6, speedScale));
     this.player.setPosition(Math.round(this.feet.x), Math.round(this.feet.y)).setDepth(this.feet.y);
     this.shadow.setPosition(Math.round(this.feet.x), Math.round(this.feet.y)).setDepth(this.feet.y - 0.5);
@@ -337,6 +354,21 @@ export abstract class WorldScene extends Phaser.Scene {
     else if (this.exitArmed) { this.leave(exit); return; }
     this.updatePrompt();
     this.positionCamera(dt);
+  }
+
+  /** 발뒤꿈치(가는 방향 반대쪽)에 흙먼지 세 조각. 캐릭터보다 뒤에 그리고, 다 흐려지면 스스로 지운다. */
+  private kickDust(vx: number, vy: number) {
+    if (REDUCED_MOTION) return;
+    const length = Math.hypot(vx, vy) || 1, bx = -vx / length, by = -vy / length;
+    const x = this.feet.x + bx * 4, y = this.feet.y + by * 2 - 1;
+    ([[-3, 0, -4, 0], [3, 0, 4, 30], [0, -2, 0, 60]] as const).forEach(([ox, oy, dx, delay]) => {
+      const puff = this.add.image(Math.round(x + ox), Math.round(y + oy), 'run-dust').setDepth(this.feet.y - 1);
+      this.dust.add(puff);
+      this.tweens.add({
+        targets: puff, x: puff.x + dx + bx * 3, y: puff.y - 4, alpha: 0, scale: 0.5, duration: 420, delay, ease: 'Quad.easeOut',
+        onComplete: () => { this.dust.delete(puff); puff.destroy(); },
+      });
+    });
   }
 
   private playAvatar(walking: boolean, timeScale: number) {
@@ -487,6 +519,7 @@ export abstract class WorldScene extends Phaser.Scene {
     const screen = (p: Point): Point => ({ x: Math.round((p.x - camera.worldView.x) * camera.zoom / ratio), y: Math.round((p.y - camera.worldView.y) * camera.zoom / ratio) });
     return {
       avatarKey: this.player.texture.key, petId: this.pet ? this.ctx.assets.pet?.id ?? null : null,
+      dust: this.dust.size,
       petReaction: this.reaction?.kind ?? null, petFrame: this.pet ? Number(this.pet.frame.name) : null, petFlipX: this.pet?.flipX ?? false,
       scene: this.spec.id, transitioning: this.transitioning,
       x: Math.round(this.feet.x * 10) / 10, y: Math.round(this.feet.y * 10) / 10, facing: this.facing, moving: this.moving, running: this.running,
@@ -498,6 +531,16 @@ export abstract class WorldScene extends Phaser.Scene {
       exits: Object.fromEntries(this.spec.exits.map(exit => [exit.id, screen(cellCenter(exit.cells[0]))])),
     };
   }
+}
+
+/** 달리기 흙먼지 한 조각(3×3 도트, 예전 Pixel World 발자국 먼지 색). */
+function drawDust(): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.width = 3; canvas.height = 3;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#fbf3df'; ctx.fillRect(0, 0, 3, 2);
+  ctx.fillStyle = '#d9c39a'; ctx.fillRect(0, 2, 3, 1);
+  return canvas;
 }
 
 /** 말풍선 "!" (9×12 도트) — 상호작용 가능 표시. */
