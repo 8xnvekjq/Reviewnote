@@ -9,6 +9,7 @@ import { canvasSize } from '../logic/layout';
 import { FIRST_SCENE } from '../logic/scenes';
 import type { SceneId } from '../logic/scenes';
 import type { Placement } from '../../pixel-room/model';
+import type { FurnitureType } from '../../pixel-room/model';
 import type { ControlState } from '../controls';
 import { RoomScene } from './RoomScene';
 import { YardScene } from './YardScene';
@@ -34,6 +35,9 @@ export interface WorldGameHandle {
   setBeds(images: HTMLImageElement[]): void;
   /** 방 가구 배치(서버 값). 방에 있으면 바로 다시 그린다. */
   setFurniture(furniture: readonly Placement[]): void;
+  getFurniture(): Placement[];
+  previewFurniture(layout: readonly Placement[] | null, selected?: FurnitureType | null): void;
+  roomEditPoint(x: number, y: number): ReturnType<RoomScene['editPoint']> | null;
   /** 지금 장면. 전환 중 잠깐은 직전 장면. */
   scene(): SceneId;
   setExhibit(show: boolean): void;
@@ -103,6 +107,9 @@ export function startWorldGame(parent: HTMLElement, start: WorldStart, controls:
     window.addEventListener('resize', fit);
 
     const handle: WorldGameHandle = {
+      getFurniture: () => ctx.data.furniture.map(item => ({ ...item })),
+      previewFurniture: (layout, selected) => { if (active === room) room.previewFurniture(layout, selected); },
+      roomEditPoint: (x, y) => active === room ? room.editPoint(x, y) : null,
       destroy: () => {
         observer.disconnect();
         window.removeEventListener('resize', fit);

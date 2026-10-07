@@ -1,4 +1,22 @@
 /* 게임 안의 도트 창과 또렷한 한글 버튼. */
+.pwp-room-editor { position:absolute; inset:0; z-index:25; color:#4f3a28; }
+.pwp-room-edit-surface { position:absolute; inset:0; touch-action:none; }
+.pwp-room-edit-toolbar, .pwp-room-edit-inventory { position:absolute; background:#fff4d9; border:3px solid #5b3926; padding:8px; }
+.pwp-room-edit-toolbar { top:max(8px,env(safe-area-inset-top)); left:8px; right:8px; display:flex; gap:8px; align-items:center; }
+.pwp-room-edit-toolbar strong { flex:1; }
+.pwp-room-editor button { min-width:44px; min-height:44px; border:2px solid #7d5737; padding:6px 8px; background:#fff9e9; color:inherit; font:inherit; cursor:pointer; touch-action:manipulation; }
+.pwp-room-editor button:focus-visible { outline:3px solid #207684; outline-offset:2px; }
+.pwp-room-editor button[aria-pressed=true] { background:#fce19c; }
+.pwp-room-editor button:disabled { opacity:.5; cursor:default; }
+.pwp-room-edit-inventory { bottom:max(8px,env(safe-area-inset-bottom)); left:8px; right:8px; }
+.pwp-room-edit-inventory > p { margin:0 0 6px; font-size:13px; min-height:20px; }
+.pwp-room-edit-actions { display:flex; gap:4px; margin-bottom:6px; }
+.pwp-room-edit-strip { display:flex; gap:6px; overflow-x:auto; padding:4px; touch-action:pan-x; }
+.pwp-room-edit-strip * { touch-action:pan-x; }
+.pwp-room-edit-strip > button { flex:0 0 105px; display:flex; flex-direction:column; align-items:center; gap:3px; font-size:12px; }
+.pwp-room-edit-strip > button > span { width:44px; height:40px; display:grid; place-items:center; }
+.pwp-room-edit-strip small { font-size:11px; }
+@media(min-width:700px) { .pwp-room-edit-toolbar { left:calc(50% - 300px); right:calc(50% - 300px); } .pwp-room-edit-inventory { left:calc(50% - 350px); right:calc(50% - 350px); } }
 .pwp-panel-shade { position:absolute; inset:0; z-index:20; background:#17241888; display:grid; grid-template-rows:minmax(0,1fr); grid-template-columns:minmax(0,1fr); place-items:center; padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left)); touch-action:auto; }
 .pwp-window { width:min(760px,100%); height:100%; max-height:100%; min-height:0; overflow:hidden; display:flex; flex-direction:column; border:4px solid #5b3926; background:#fff4d9; color:#4f3a28; box-shadow:4px 4px 0 #241b16,inset 0 0 0 3px #dfbf82; padding:10px; position:relative; }
 .pwp-window > header, .pwp-panel-summary, .pwp-tabs, .pwp-toast { flex-shrink:0; }

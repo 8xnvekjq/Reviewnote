@@ -16,6 +16,17 @@ const walk = async (page, point) => {
   await page.evaluate(p => window.__pixelWorldPhaser.walkToScreen(p.x, p.y), point);
   await page.waitForFunction(() => window.__pixelWorldPhaser.debug().pathLength === 0);
 };
+// 편집 표면은 CSS 좌표로 터치와 펜을 같은 칸에 맞춘다.
+const roomCellScreen = (d, x, y) => ({ x: ((x + 1.5) * 16 - d.camera.x) * d.cssZoom,
+  y: ((y + 2.5) * 16 - d.camera.y) * d.cssZoom });
+const layout = page => page.evaluate(() => window.__pixelWorldPhaser.getFurniture());
+const penDrag = async (page, from, to) => {
+  const session = await page.context().newCDPSession(page);
+  await session.send('Input.dispatchMouseEvent', { type: 'mousePressed', ...from, button: 'left', buttons: 1, clickCount: 1, pointerType: 'pen' });
+  await session.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...to, button: 'left', buttons: 1, pointerType: 'pen' });
+  await session.send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...to, button: 'left', buttons: 0, clickCount: 1, pointerType: 'pen' });
+  await session.detach();
+};
 
 try {
   for (const [name, viewport, dpr] of [
@@ -26,7 +37,7 @@ try {
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
-    await page.goto(`${BASE}/tests/pixel-world-phaser/harness.html?petWander=0&pet=pet_dog`);
+    await page.goto(`${BASE}/tests/pixel-world-phaser/harness.html?petWander=0&pet=pet_dog&roomEdit=1`);
     await page.waitForFunction(() => document.querySelector('.pwp-root')?.dataset.status === 'ready');
     await readyScene(page, 'yard');
     await page.keyboard.down('ArrowUp');
@@ -56,6 +67,46 @@ try {
     await page.locator('.pwp-dialogue').waitFor();
     assert.match(await page.locator('.pwp-dialogue p').getAttribute('data-full'), /책상/);
     await page.keyboard.press('Escape');
+
+    // 취소는 저장된 배치를 유지하고, 완료는 터치·펜으로 바꾼 배치를 반영한다.
+    await page.waitForTimeout(300);
+    const originalLayout = await layout(page);
+    await page.getByRole('button', { name: '꾸미기', exact: true }).click();
+    let editor = page.getByRole('dialog', { name: '내 방 꾸미기', exact: true });
+    const frozen = await debug(page);
+    await page.keyboard.down('ArrowRight'); await page.waitForTimeout(300); await page.keyboard.up('ArrowRight');
+    assert.equal((await debug(page)).x, frozen.x, 'character frozen while editing');
+    assert.equal((await debug(page)).y, frozen.y);
+    await editor.locator('[data-room-item="desk"]').click();
+    await editor.getByRole('button', { name: '위로 한 칸', exact: true }).click();
+    await editor.getByRole('button', { name: '취소', exact: true }).click();
+    assert.deepEqual(await layout(page), originalLayout, 'cancel restores the previous layout');
+
+    await page.getByRole('button', { name: '꾸미기', exact: true }).click();
+    editor = page.getByRole('dialog', { name: '내 방 꾸미기', exact: true });
+    const editDebug = await debug(page);
+    await penDrag(page, roomCellScreen(editDebug, 4, 4), roomCellScreen(editDebug, 4, 2));
+    await editor.locator('[data-room-item="chair"]').click();
+    const chairPoint = roomCellScreen(await debug(page), 7, 1);
+    await page.touchscreen.tap(chairPoint.x, chairPoint.y);
+    await page.screenshot({ path: `${SHOTS}/${name}-room-edit.png` });
+    await editor.getByRole('button', { name: '완료', exact: true }).click();
+    await editor.waitFor({ state: 'detached' });
+    const editedLayout = await layout(page);
+    assert.deepEqual(editedLayout.find(item => item.type === 'desk'), { type: 'desk', x: 3, y: 2 });
+    assert.deepEqual(editedLayout.find(item => item.type === 'chair'), { type: 'chair', x: 7, y: 1 });
+    const newDesk = (await debug(page)).targets['furniture:desk'];
+    assert.ok(newDesk.y < editDebug.targets['furniture:desk'].y, 'saved interactions follow the new layout');
+    await walk(page, roomCellScreen(await debug(page), 4, 4));
+    assert.ok((await debug(page)).y > 96, 'old desk footprint is walkable after save');
+    await page.getByRole('button', { name: '꾸미기', exact: true }).click();
+    editor = page.getByRole('dialog', { name: '내 방 꾸미기', exact: true });
+    await editor.locator('[data-room-item="chair"]').click();
+    await editor.getByRole('button', { name: '보관함에 넣기', exact: true }).click();
+    assert.match(await editor.locator('[data-room-item="chair"]').textContent(), /보관 중/);
+    await editor.getByRole('button', { name: '완료', exact: true }).click();
+    await editor.waitFor({ state: 'detached' });
+    assert.equal((await layout(page)).find(item => item.type === 'chair'), undefined);
 
     // 멈추고 방향을 바꾼 뒤 펫이 안정적으로 정지한다.
     await page.waitForTimeout(2500);
@@ -120,6 +171,8 @@ try {
   const context = await browser.newContext({ viewport: { width: 1180, height: 820 } });
   const page = await context.newPage();
   let placementReads = 0;
+  let layoutWrites = 0;
+  const payloads = [];
   const writes = [];
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
@@ -128,7 +181,12 @@ try {
     const table = url.pathname.split('/').at(-1);
     if (request.method() !== 'GET' && table !== 'get_pixel_farm') writes.push(request.url());
     let body = [];
-    if (table === 'pixel_furniture_placement') {
+    if (table === 'save_pixel_room_layout') {
+      assert.equal(request.method(), 'POST');
+      payloads.push(request.postDataJSON());
+      layoutWrites++;
+      body = layoutWrites === 1 ? { ok: false, reason: 'unknown', message: 'test save failure' } : { ok: true, count: 0 };
+    } else if (table === 'pixel_furniture_placement') {
       assert.equal(request.method(), 'GET');
       assert.equal(url.searchParams.get('user_id'), 'eq.scene-test-user');
       assert.equal(url.searchParams.get('select'), 'item_id,x,y');
@@ -158,8 +216,24 @@ try {
   assert.equal(saved.targets['furniture:plant'], undefined, 'unowned placement is hidden');
   assert.equal(placementReads, 2);
   assert.deepEqual(writes, []);
+  await page.getByRole('button', { name: '꾸미기', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: '내 방 꾸미기', exact: true });
+  assert.equal(await editor.locator('[data-room-item]').count(), 1, 'only owned furniture can be placed');
+  await editor.locator('[data-room-item="desk"]').click();
+  await editor.getByRole('button', { name: '보관함에 넣기', exact: true }).click();
+  await editor.getByRole('button', { name: '완료', exact: true }).click();
+  await editor.getByRole('status').filter({ hasText: '저장하지 못했어요' }).waitFor();
+  assert.ok((await debug(page)).targets['furniture:desk'], 'failed save retains committed collisions');
+  assert.deepEqual(payloads, [{ p_placements: [] }], 'same full-layout RPC payload as legacy');
+  await editor.getByRole('button', { name: '완료', exact: true }).click();
+  await editor.waitFor({ state: 'detached' });
+  assert.equal((await debug(page)).targets['furniture:desk'], undefined);
+  assert.equal(layoutWrites, 2, 'retry succeeds without duplicate concurrent writes');
+  await page.getByRole('button', { name: '꾸미기', exact: true }).click();
+  assert.match(await page.locator('[data-room-item="desk"]').textContent(), /보관 중/, 'removing placement preserves ownership');
+  await page.getByRole('button', { name: '취소', exact: true }).click();
   assert.deepEqual(errors, []);
   await page.locator('.pwp-exit').click();
   await context.close();
-  console.log('PASS saved furniture: scoped read, error/retry, ownership filter, rendering, no layout writes');
+  console.log('PASS saved furniture: scoped read, ownership filter, legacy save payload, failure/retry, inventory preservation');
 } finally { await browser.close(); }

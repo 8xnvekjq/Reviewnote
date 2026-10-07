@@ -12,6 +12,7 @@ import type { FarmAdapter } from '../../src/features/pixel-world-phaser/ui/FarmP
 import type { FarmSnapshot, HarvestedCrop } from '../../src/features/pixel-room/farm/farmModel';
 import { farmStage, farmMoisture, computeSubmitReward } from '../../src/features/pixel-room/farm/farmModel';
 import type { PanelAdapter } from '../../src/features/pixel-world-phaser/ui/GamePanels';
+import type { Placement } from '../../src/features/pixel-room/model';
 
 const params = new URLSearchParams(location.search);
 const appearance: PublicAvatarAppearance = {
@@ -26,6 +27,7 @@ const furniture = [{ type: 'desk', x: 3, y: 4 }, { type: 'bed', x: 0, y: 0 }, { 
 const farmNow = Date.parse('2026-10-08T03:00:00Z');
 const fakeContest: FarmAdapter['contest'] = async () => ({ weekStart: '2026-10-05', top: [{ rank: 1, sizeScore: 82, submitterLabel: '토마토 친구' }], mine: { rank: null, sizeScore: null, participantCount: 1 } });
 function Harness() {
+  const [roomLayout, setRoomLayout] = useState<readonly Placement[]>(furniture);
   const [snapshot, setSnapshot] = useState<FarmSnapshot>({ serverNow: new Date(farmNow).toISOString(), today: '2026-10-08', harvestCount: 0, bestSize: null, lastHarvestSize: null,
     plots: [{ index: 0, revision: 1, crop: { id: 'ripe', plantedAt: '2026-10-01T00:00:00Z', readyAt: '2026-10-05T00:00:00Z', lastWateredOn: '2026-10-03', careCount: 3, reviewGained: 0 } }, { index: 1, revision: 1, crop: null }] });
   const [crops, setCrops] = useState<HarvestedCrop[]>([]);
@@ -51,7 +53,7 @@ function Harness() {
   const [look, setLook] = useState(appearance);
   const [active, setActive] = useState(pet);
   const [balance, setBalance] = useState(1234);
-  const [ownedIds, setOwnedIds] = useState(new Set(PIXEL_CATALOG.filter(item => item.category === 'avatar' || item.category === 'pet').map(item => item.itemId)));
+  const [ownedIds, setOwnedIds] = useState(new Set(PIXEL_CATALOG.filter(item => item.category === 'avatar' || item.category === 'pet' || params.has('roomEdit') && item.category === 'furniture' && ['desk', 'bed', 'plant', 'chair'].includes(item.assetKey)).map(item => item.itemId)));
   // 서버 없이 모든 패션과 친구를 장착하고 가구 구매를 시험한다.
   const adapter: PanelAdapter = {
     shop: { ready: true, loadError: false, mutating: false, catalog: [...PIXEL_CATALOG], equipped: look, ownedIds, balance, reload: () => {},
@@ -71,7 +73,7 @@ function Harness() {
   return open
     ? params.has('saved')
       ? <PixelWorldPhaser userId="scene-test-user" pointsBalance={1234} onExit={() => setOpen(false)} />
-      : <GameShell appearance={look} pet={active} balance={balance} panels={adapter} farmAdapter={params.has('farm') ? farmAdapter : undefined} beds={params.has('farm') ? farmBeds : [...beds]} furniture={furniture} scarecrowLine={() => pickScarecrowLine(null, Date.now())} onExit={() => setOpen(false)} />
+      : <GameShell appearance={look} pet={active} balance={balance} panels={adapter} farmAdapter={params.has('farm') ? farmAdapter : undefined} beds={params.has('farm') ? farmBeds : [...beds]} furniture={roomLayout} onSaveFurniture={async layout => { await new Promise(resolve => setTimeout(resolve, 100)); if (params.has('roomSaveError')) throw new Error('저장하지 못했어요. 다시 시도해 주세요.'); setRoomLayout(layout); }} scarecrowLine={() => pickScarecrowLine(null, Date.now())} onExit={() => setOpen(false)} />
     : <main style={{ padding: 24 }}><p data-testid="exited">게임에서 나왔어요.</p><button type="button" onClick={() => setOpen(true)}>다시 들어가기</button></main>;
 }
 createRoot(document.getElementById('root')!).render(<Harness />);
