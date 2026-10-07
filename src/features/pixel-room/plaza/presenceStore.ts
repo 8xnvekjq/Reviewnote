@@ -3,6 +3,7 @@
 // 얹는다. 그래서 이 파일은 node --test로 라이브 연결 없이 그대로 단위 테스트할 수 있다.
 
 import type { PlazaPlayerState } from './types';
+import { protocolExtras } from './presenceProtocol';
 
 // 실시간 이동 버그(순간이동/경로 스킵) 조사 결과 — usePlazaRealtime.ts 상단 주석 참고. React는
 // 같은 태스크 안에서 여러 dispatch가 몰리면(예: presence의 leave+join 동시 diff, 브라우저가
@@ -15,6 +16,8 @@ import type { PlazaPlayerState } from './types';
 // 구간만 꺼내가면서 rAF로 재생한다 — 렌더 횟수와 완전히 무관하게 실제 이동 경로를 그대로
 // 따라갈 수 있다.
 export interface PathWaypoint {
+  version?: 2;
+  position?: { x: number; y: number };
   x: number;
   y: number;
   seq: number; // 소비자가 "마지막으로 읽은 지점"을 기억하는 커서 — sender가 채우는 단조증가 값을 그대로 재사용.
@@ -112,6 +115,7 @@ export type PlazaStoreAction =
 function sanitizePlayerState(raw: PlazaPlayerState): PlazaPlayerState {
   const appearance = raw.appearance ?? { top: null, bottom: null, shoes: null, hair: null, eyes: null, skin: null };
   return {
+    ...protocolExtras(raw),
     sessionId: raw.sessionId,
     x: raw.x,
     y: raw.y,
@@ -179,7 +183,7 @@ export function plazaStoreReducer(state: PlazaStoreState, action: PlazaStoreActi
         // sync는 "지금 이 순간의 완전한 명단"이다 — 그 이전 경로는 우리가 관측하지 못했던
         // 구간이므로 재생하지 않고, 이 좌표 하나를 새 출발점으로 삼는다(스푼 없이 그 자리에서
         // 시작). 기존에 알고 있던 이력은 sync로 대체되므로 함께 초기화한다.
-        paths.set(sanitized.sessionId, [{ x: sanitized.x, y: sanitized.y, seq: sanitized.seq }]);
+        paths.set(sanitized.sessionId, [{ ...protocolExtras(sanitized), x: sanitized.x, y: sanitized.y, seq: sanitized.seq }]);
       }
       return { players, paths, presenceRefs, recentlyLeftRefs: state.recentlyLeftRefs };
     }
@@ -196,7 +200,7 @@ export function plazaStoreReducer(state: PlazaStoreState, action: PlazaStoreActi
         // 항상 신뢰). moving:false 전이의 경우 "실제 최종 도착 칸"을 담고 있으므로, 혹시 그 사이
         // broadcast 일부가 유실되더라도 경로의 마지막 지점은 반드시 정확하게 재생되도록 이
         // 좌표도 경로에 추가한다.
-        paths = appendPath(paths, sanitized.sessionId, { x: sanitized.x, y: sanitized.y, seq: sanitized.seq });
+        paths = appendPath(paths, sanitized.sessionId, { ...protocolExtras(sanitized), x: sanitized.x, y: sanitized.y, seq: sanitized.seq });
       }
       return { players, paths, presenceRefs, recentlyLeftRefs: state.recentlyLeftRefs };
     }
@@ -230,7 +234,7 @@ export function plazaStoreReducer(state: PlazaStoreState, action: PlazaStoreActi
       }
       const players = new Map(state.players);
       players.set(incoming.sessionId, incoming);
-      const paths = appendPath(state.paths, incoming.sessionId, { x: incoming.x, y: incoming.y, seq: incoming.seq });
+      const paths = appendPath(state.paths, incoming.sessionId, { ...protocolExtras(incoming), x: incoming.x, y: incoming.y, seq: incoming.seq });
       return { players, paths, presenceRefs: state.presenceRefs, recentlyLeftRefs: state.recentlyLeftRefs };
     }
     default:

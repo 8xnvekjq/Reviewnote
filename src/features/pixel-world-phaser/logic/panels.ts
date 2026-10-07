@@ -10,4 +10,4 @@ export function itemState(item: PixelItem, owned: ReadonlySet<string>, appearanc
   return (item.category === 'avatar' && appearance[item.slot as keyof PublicAvatarAppearance] === item.assetKey)
     || (item.category === 'pet' && pet === item.itemId) ? 'equipped' : 'owned';
 }
-export function panelFrozen(panel: PanelKind | null, dialogue: boolean) { return panel !== null || dialogue; }
+export function panelFrozen(panel: string | null, dialogue: boolean) { return panel !== null || dialogue; }

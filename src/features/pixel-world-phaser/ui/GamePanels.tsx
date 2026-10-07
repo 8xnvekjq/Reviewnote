@@ -19,7 +19,7 @@ export function PriceTag({ value }: { value: number }) {
 function Tabs({ options, value, onChange }: { options: readonly (readonly [string, string])[]; value: string; onChange: (value: string) => void }) {
   return <nav className="pwp-tabs" aria-label="분류">{options.map(([key, label]) => <button type="button" key={key} aria-pressed={key === value} onClick={() => onChange(key)}>{label}</button>)}</nav>;
 }
-function Window({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+export function Window({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;

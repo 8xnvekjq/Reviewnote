@@ -65,3 +65,7 @@ html.pwp-open, html.pwp-open body { overflow:hidden; overscroll-behavior:none; h
   background:rgba(255,244,217,.94); color:#5b3926; font-size:15px; font-weight:900; letter-spacing:.5px; pointer-events:none;
   box-shadow:0 3px 0 rgba(58,36,22,.4); animation:pwp-toast 1.8s ease-out both; }
 @keyframes pwp-toast { 0% { opacity:0; transform:translate(-50%, -6px); } 12%, 75% { opacity:1; transform:translate(-50%, 0); } 100% { opacity:0; transform:translate(-50%, 0); } }
+
+/* 광장에서만 나타나는 게임 프레임 안 반응 버튼. */
+.pwp-plaza-reactions { position: absolute; z-index: 12; top: calc(env(safe-area-inset-top, 0px) + 110px); right: max(12px, env(safe-area-inset-right, 0px)); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; max-width: 240px; }
+.pwp-plaza-reactions [role="status"] { flex-basis: 100%; text-align: right; color: #fff4ce; font-size: 12px; text-shadow: 1px 1px #453429; }

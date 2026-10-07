@@ -17,7 +17,7 @@ import { dialogueFor } from './logic/dialogues';
 import type { SceneId } from './logic/scenes';
 import type { Placement } from '../pixel-room/model';
 import { composeAvatar } from './game/avatarTexture';
-import { loadBed, loadFloors, loadFurnitureSheets, loadInterior, loadPetSheet, loadScarecrow, loadTown } from './game/sceneAssets';
+import { loadBed, loadFloors, loadFurnitureSheets, loadInterior, loadPetSheet, loadScarecrow, loadTown, loadPlazaStall } from './game/sceneAssets';
 import type { BedLook } from './game/sceneAssets';
 import type { Prompt, WorldGameHandle } from './game/boot';
 import './gameShell.css';
@@ -25,9 +25,12 @@ import { GamePanels } from './ui/GamePanels';
 import type { PanelAdapter } from './ui/GamePanels';
 import type { PanelKind } from './logic/panels';
 import { panelFrozen } from './logic/panels';
+import { PlazaBridge } from './ui/PlazaBridge';
+import type { PlazaPanel } from './ui/PlazaBridge';
 
 export interface GameShellProps {
   panels?: PanelAdapter;
+  userId?: string;
   appearance: PublicAvatarAppearance;
   pet: PetId | null;
   balance: number;
@@ -75,7 +78,7 @@ async function leaveFullscreen() {
 }
 
 // 상위가 1초마다(밭 시계) 다시 그려져도, 넘겨받는 값이 같으면 셸은 다시 그리지 않는다.
-export const GameShell = memo(function GameShell({ appearance, pet, balance, beds, furniture, scarecrowLine, onExit, panels }: GameShellProps) {
+export const GameShell = memo(function GameShell({ appearance, pet, balance, beds, furniture, scarecrowLine, onExit, panels, userId = 'guest' }: GameShellProps) {
   const root = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const probe = useRef<HTMLDivElement>(null);
@@ -96,7 +99,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
   const promptRef = useRef(prompt); promptRef.current = prompt;
   const [dialogue, setDialogue] = useState<Dialogue | null>(null);
   const dialogueRef = useRef(dialogue); dialogueRef.current = dialogue;
-  const [panel, setPanel] = useState<PanelKind | null>(null);
+  const [panel, setPanel] = useState<PanelKind | PlazaPanel | null>(null);
   const panelRef = useRef(panel); panelRef.current = panel;
   const closePanel = useCallback(() => {
     panelRef.current = null; setPanel(null);
@@ -104,7 +107,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     controls.stick = ZERO_STICK; controls.run = false;
     keys.current = { up: false, down: false, left: false, right: false };
   }, [controls]);
-  const openPanel = (kind: PanelKind) => {
+  const openPanel = (kind: PanelKind | PlazaPanel) => {
     panelRef.current = kind; setPanel(kind);
     controls.frozen = panelFrozen(kind, !!dialogueRef.current); controls.stick = ZERO_STICK; controls.run = false;
     pointers.current.clear(); stickOrigin.current = null;
@@ -148,7 +151,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
   // 게임 안 창(상점/옷장 등) 열기 자리. 장면 정의에서 action {kind:'panel', panel}인 대상을 A로 누르면
   // 여기로 온다. 창이 생기면 이 ref를 그 창을 여는 함수로 채우면 된다(지금은 그런 대상이 없다).
   const scenePanelRef = useRef<(panel: string) => void>(() => {});
-  scenePanelRef.current = kind => { if (kind === 'shop' || kind === 'wardrobe') openPanel(kind); };
+  scenePanelRef.current = kind => { if (kind === 'shop' || kind === 'wardrobe' || kind === 'contest' || kind === 'well' || kind === 'bench') openPanel(kind); };
   const bedsRef = useRef(beds); bedsRef.current = beds;
   const furnitureRef = useRef(furniture); furnitureRef.current = furniture;
   useEffect(() => {
@@ -156,13 +159,13 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     (async () => {
       try {
         const avatar = composeAvatar(appearance);
-        const [town, interior, floors, furnitureSheets, avatarCanvas, petSource, scarecrow, bedImages, { startWorldGame }] = await Promise.all([
+        const [town, interior, floors, furnitureSheets, avatarCanvas, petSource, scarecrow, bedImages, { startWorldGame }, plazaStall] = await Promise.all([
           loadTown(), loadInterior(), loadFloors(), loadFurnitureSheets(), avatar.canvas, pet ? loadPetSheet(pet) : Promise.resolve(null),
-          Promise.resolve().then(loadScarecrow), Promise.resolve().then(() => Promise.all(bedsRef.current.map(loadBed))), import('./game/boot'),
+          Promise.resolve().then(loadScarecrow), Promise.resolve().then(() => Promise.all(bedsRef.current.map(loadBed))), import('./game/boot'), Promise.resolve().then(loadPlazaStall),
         ]);
         if (cancelled || !stage.current) return;
         const game = await startWorldGame(stage.current, {
-          assets: { town, interior, floors, furniture: furnitureSheets, avatar: { key: avatar.key, canvas: avatarCanvas }, pet: pet && petSource ? { id: pet, source: petSource } : null, scarecrow },
+          assets: { town, interior, floors, furniture: furnitureSheets, avatar: { key: avatar.key, canvas: avatarCanvas }, pet: pet && petSource ? { id: pet, source: petSource } : null, scarecrow, plazaStall },
           beds: bedImages, furniture: furnitureRef.current,
         }, controls, {
           onPrompt: next => setPrompt(next),
@@ -481,7 +484,8 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
       <p data-full={currentLine}>{currentLine.slice(0, typed)}</p>
       {typed >= currentLine.length && <span className="pwp-dialogue-next" aria-hidden="true">{dialogue.index + 1 < dialogue.lines.length ? '▼' : '■'}</span>}
     </div>}
-    {panel && panels && <GamePanels kind={panel} adapter={panels} onClose={closePanel} />}
+    {(panel === 'shop' || panel === 'wardrobe') && panels && <GamePanels kind={panel} adapter={panels} onClose={closePanel} />}
+    {scene?.id === 'plaza' && status === 'ready' && <PlazaBridge key={'plaza:' + scene.visit} handle={handle} appearance={appearance} pet={pet} userId={userId} panel={panel} onClose={closePanel} />}
     {toast && <div key={toast.visit} className="pwp-toast" role="status" style={{ top: hud.y + hud.height + 6 }}>{toast.title}</div>}
     {status !== 'ready' && <div className="pwp-loading" role="status">
       {status === 'loading' ? '앞마당으로 가는 중…' : <>게임을 시작하지 못했어요.<button type="button" className="pwp-chip" onClick={exit}>돌아가기</button></>}

@@ -12,6 +12,10 @@ export type PlazaDirection = 'Front' | 'Back' | 'Left' | 'Right';
 // 정보는 절대 포함하지 않는다 — 다른 사용자는 이 shape만 보고, sessionId로는 실제 계정을
 // 역추적할 수 없어야 한다(랜덤 값, user_id 아님).
 export interface PlazaPlayerState {
+  /** 베타 연속 좌표. 없는 경우 기존 칸 좌표(v1)로 해석한다. */
+  version?: 2;
+  position?: { x: number; y: number };
+  pet?: import('../pet/petKinds').PetId | null;
   sessionId: string;   // 이 탭 하나의 고유 id(crypto.randomUUID() 등) — 같은 계정 여러 탭 구분용
   x: number;
   y: number;

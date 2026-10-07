@@ -36,6 +36,7 @@ export interface WorldAssets {
   avatar: { key: string; canvas: HTMLCanvasElement };
   pet: { id: PetId; source: HTMLImageElement | HTMLCanvasElement } | null;
   scarecrow: HTMLImageElement;
+  plazaStall?: HTMLImageElement;
 }
 export interface Prompt { id: string; verb: string }
 export interface WorldEvents {
