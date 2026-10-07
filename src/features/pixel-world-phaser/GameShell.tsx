@@ -22,6 +22,7 @@ import type { BedLook } from './game/sceneAssets';
 import type { Prompt, WorldGameHandle } from './game/boot';
 import './gameShell.css';
 import { GamePanels } from './ui/GamePanels';
+import { RoomEditor } from './ui/RoomEditor';
 import type { PanelAdapter } from './ui/GamePanels';
 import type { PanelKind } from './logic/panels';
 import { panelFrozen } from './logic/panels';
@@ -40,8 +41,9 @@ export interface GameShellProps {
   pet: PetId | null;
   balance: number;
   beds: BedLook[];
-  /** 내 방 가구 배치(서버 값, 읽기 전용). 불러오기 전에는 빈 배열. */
+  /** 내 방 가구 배치(서버 값). 완료된 편집 결과도 같은 경로로 반영한다. */
   furniture: readonly Placement[];
+  onSaveFurniture?: (layout: Placement[]) => Promise<void>;
   /** 허수아비 대사 한 줄(기존 scarecrowLines.ts). 호출할 때마다 새로 뽑는다. */
   scarecrowLine: () => string;
   onExit: () => void;
@@ -83,7 +85,7 @@ async function leaveFullscreen() {
 }
 
 // 상위가 1초마다(밭 시계) 다시 그려져도, 넘겨받는 값이 같으면 셸은 다시 그리지 않는다.
-export const GameShell = memo(function GameShell({ appearance, pet, balance, beds, furniture, scarecrowLine, onExit, panels, farmAdapter, userId = 'guest' }: GameShellProps) {
+export const GameShell = memo(function GameShell({ appearance, pet, balance, beds, furniture, onSaveFurniture, scarecrowLine, onExit, panels, farmAdapter, userId = 'guest' }: GameShellProps) {
   const root = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const probe = useRef<HTMLDivElement>(null);
@@ -107,6 +109,23 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
   const [dialogue, setDialogue] = useState<Dialogue | null>(null);
   const dialogueRef = useRef(dialogue); dialogueRef.current = dialogue;
   const [panel, setPanel] = useState<ShellPanel | null>(null);
+  const [editingRoom, setEditingRoom] = useState(false);
+  const editingRef = useRef(false);
+  const beginRoomEdit = () => {
+    if (!handle.current || handle.current.debug().transitioning || panel || dialogue) return;
+    editingRef.current = true; setEditingRoom(true);
+    controls.frozen = true; controls.stick = ZERO_STICK; controls.run = false;
+    keys.current = { up: false, down: false, left: false, right: false };
+    pointers.current.clear(); stickOrigin.current = null;
+    if (ring.current) ring.current.style.opacity = '0';
+    handle.current.cancelWalk();
+  };
+  const endRoomEdit = () => {
+    editingRef.current = false; setEditingRoom(false);
+    controls.stick = ZERO_STICK; controls.run = false;
+    keys.current = { up: false, down: false, left: false, right: false };
+    controls.frozen = false;
+  };
   const panelRef = useRef(panel); panelRef.current = panel;
   const closePanel = useCallback(() => {
     panelRef.current = null; setPanel(null);
@@ -386,6 +405,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     const map: Record<string, keyof typeof keys.current> = { ArrowUp: 'up', w: 'up', ArrowDown: 'down', s: 'down', ArrowLeft: 'left', a: 'left', ArrowRight: 'right', d: 'right' };
     const sync = () => { if (!stickOrigin.current) controls.stick = keyboardVector(keys.current); };
     const down = (event: KeyboardEvent) => {
+      if (editingRef.current) return;
       if (panelRef.current) { if (event.key === 'Escape') closePanel(); return; }
       if (event.target instanceof HTMLElement && event.target.closest('button') && (event.key === 'Enter' || event.key === ' ')) return;
       if (event.altKey || event.ctrlKey || event.metaKey) return;
@@ -398,6 +418,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
       else if (key === 'Escape' || key === 'x') { event.preventDefault(); if (dialogueRef.current) closeDialogue(); }
     };
     const up = (event: KeyboardEvent) => {
+      if (editingRef.current) return;
       const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
       const dir = map[key];
       if (dir) { keys.current[dir] = false; sync(); }
@@ -472,6 +493,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     </div>
     {panels && <div className="pwp-panel-access" style={{ left: hud.x + 10, top: hud.y + hud.height + 8 }}>
       <button type="button" className="pwp-chip" disabled={status !== 'ready'} onClick={() => openPanel('wardrobe')}>옷장</button>
+      {scene?.id === 'room' && <button type="button" className="pwp-chip" disabled={status !== 'ready' || !onSaveFurniture || !panels.shop.ready || panels.shop.loadError || !!panel || !!dialogue} onClick={beginRoomEdit}>꾸미기</button>}
     </div>}
     <button type="button" className="pwp-btn pwp-btn-a" data-pressed={pressed.a} data-prompt={!!prompt || !!dialogue}
       style={{ left: a.x - a.size / 2, top: a.y - a.size / 2, width: a.size, height: a.size }}
@@ -499,6 +521,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     {panel && panel !== 'shop' && panel !== 'wardrobe' && panel !== 'contest' && panel !== 'well' && panel !== 'bench' && <FarmPanels key={panel} kind={panel} adapter={farmAdapter} onClose={closePanel}
       onCollection={() => openPanel('collection')} onTalk={() => { closePanel(); openDialogue('scarecrow'); }}
       onPet={kind => { closePanel(); handle.current?.reactPet(kind); }} onFx={(index, action) => handle.current?.farmFx(index, action)} />}
+    {editingRoom && handle.current && panels && onSaveFurniture && <RoomEditor game={handle.current} furniture={handle.current.getFurniture()} shop={panels.shop} save={onSaveFurniture} onClose={endRoomEdit} />}
     {petMessage && <div className="pwp-pet-message" role="status" aria-live="polite">{petMessage}</div>}
     {toast && <div key={toast.visit} className="pwp-toast" role="status" style={{ top: hud.y + hud.height + 6 }}>{toast.title}</div>}
     {status !== 'ready' && <div className="pwp-loading" role="status">
