@@ -10,7 +10,7 @@ import { AppShell } from './app/AppShell';
 import { Screen } from './app/ScreenRouter';
 import { OverlayHost } from './app/OverlayHost';
 import { LazyScreenBoundary } from './app/LazyScreenBoundary';
-import { canOpenPixelWorldBeta } from './features/pixel-world-phaser/access';
+import { adjustmentAfterServerReward, adjustmentForServerBalance } from './features/pixel-world-phaser/pointSync';
 import { useCheckpointGeneration } from './features/checkpoints/useCheckpointGeneration';
 import { useChecklistGeneration } from './features/checklist/useChecklistGeneration';
 import { useMistakeAnalysis } from './features/mistakes/useMistakeAnalysis';
@@ -245,9 +245,23 @@ function App() {
   // 여부 자체는 이 플래그가 아니라 호출부(BottomNavigation의 currentUserId, 아래 Screen의
   // session?.user?.id)가 각자 따로 확인하므로 여기서는 단순히 "누구나"로 둔다.
   const canAccessPixelWorld = true;
-  // 새 Pixel World(베타): 관리자 + 테스트 계정만. 학생은 진입 버튼이 아예 보이지 않는다.
-  const canAccessPixelWorldBeta = !!session?.user?.id && canOpenPixelWorldBeta(isAdmin, session?.user?.email);
-  const [pixelWorldBetaOpen, setPixelWorldBetaOpen] = useState(false);
+
+  // Pixel World의 서버 RPC(purchase_pixel_item, submit_farm_crop)는 이미 profiles.point_adjustment를
+  // 원자적으로 서버에서 직접 바꿨다 — handleDeductPoints를 또 부르면(자체적으로 별도 supabase.update를
+  // 한 번 더 쏨) 불필요할 뿐 아니라, 그 사이 다른 포인트 적립(예: 복습 콤보)이 있었다면 클라이언트가
+  // 들고 있던 오래된 값 기준으로 덮어써서 서버의 정확한 값을 되돌려버릴 위험이 있다. 여기서는 화면
+  // 표시 상태(+localStorage)만 서버 값에 맞춰 동기화한다(추가 서버 쓰기 없음). 이렇게 맞춰 두지 않으면
+  // 나중에 클라이언트가 포인트를 쓸 때 오래된 값으로 서버를 덮어써 차감된 포인트가 되살아난다.
+  const syncServerPointAdjustment = (nextFrom: (previous: number) => number | null) => {
+    setPointAdjustment(previous => {
+      const next = nextFrom(previous);
+      if (next === null) return previous;
+      try { localStorage.setItem('reviewnote_point_adj', String(next)); } catch (e) { console.error(e); }
+      return next;
+    });
+  };
+  const handlePixelPurchase = (newBalance: number) => syncServerPointAdjustment(() => adjustmentForServerBalance(newBalance, myBonusPoints));
+  const handlePixelReward = (rewardPoints: number) => syncServerPointAdjustment(previous => adjustmentAfterServerReward(previous, rewardPoints));
   
   const prevTabRef = useRef(activeTab);
 
@@ -1544,13 +1558,12 @@ function App() {
             onlineUsers={onlineUsers}
             onStartReviewSession={handleStartReviewSession}
             onOpenSlideList={() => setIsSlideListOpen(true)}
-            onOpenPixelWorldBeta={canAccessPixelWorldBeta ? () => setPixelWorldBetaOpen(true) : undefined}
             dailyReviewCount={dailyReviewCount}
           />
         )}
       >
-        {/* Pixel World — 로그인한 모든 계정에게 열려 있다(전체 학생 공개). */}
-        <Screen when={activeTab === 'pixelRoom' && !!session?.user?.id && canAccessPixelWorld} className="pr-screen-fill">
+        {/* 예전 Pixel World — 관리자 비교용. 학생은 'pixelRoom'(새 Pixel World, 아래 전체화면)으로만 들어간다. */}
+        <Screen when={activeTab === 'pixelRoomLegacy' && !!session?.user?.id && isAdmin} className="pr-screen-fill">
           <LazyScreenBoundary>
             {(() => {
               // Pixel Room은 gachaCatalog/aiVoiceCheers를 직접 import하지 않는 지연 로드 청크라
@@ -1572,17 +1585,7 @@ function App() {
                   themeAccent={pixelRoomTheme?.themeAccentValue || pixelRoomTheme?.effectValue}
                   onSpeak={() => getRandomCheer(equippedItems.aiVoice)}
                   pointsBalance={currentDisplayPoints}
-                  onPixelPurchase={newBalance => {
-                    // Pixel World의 purchase_pixel_item RPC가 이미 profiles.point_adjustment를
-                    // 원자적으로 서버에서 직접 차감했다 — handleDeductPoints를 또 부르면(자체적으로
-                    // 별도 supabase.update를 한 번 더 쏨) 불필요할 뿐 아니라, 그 사이 다른 포인트
-                    // 적립(예: 복습 콤보)이 있었다면 클라이언트가 들고 있던 오래된 값 기준으로
-                    // 덮어써서 서버의 정확한 값을 되돌려버릴 위험이 있다. 여기서는 화면 표시 상태만
-                    // 서버가 돌려준 진짜 값에 맞춰 동기화한다(추가 서버 쓰기 없음).
-                    const nextAdjustment = newBalance - myBonusPoints;
-                    setPointAdjustment(nextAdjustment);
-                    try { localStorage.setItem('reviewnote_point_adj', String(nextAdjustment)); } catch (e) { console.error(e); }
-                  }}
+                  onPixelPurchase={handlePixelPurchase}
                 />
               );
             })()}
@@ -2160,9 +2163,12 @@ function App() {
         </Screen>
       </AppShell>
 
-      {pixelWorldBetaOpen && canAccessPixelWorldBeta && (
+      {/* Pixel World — 로그인한 모든 계정에게 열려 있다(전체 학생 공개). 게임은 전체화면이라
+          AppShell 밖에 띄우고, Phaser 청크는 처음 열 때만 내려받는다. */}
+      {activeTab === 'pixelRoom' && !!session?.user?.id && canAccessPixelWorld && (
         <LazyScreenBoundary fallback={<div role="status" style={{ position: 'fixed', inset: 0, zIndex: 2147483000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#3f6b3a', color: '#fff4d9', fontWeight: 800 }}>앞마당으로 가는 중…</div>}>
-          <PixelWorldPhaser userId={session.user.id} pointsBalance={currentDisplayPoints} onExit={() => setPixelWorldBetaOpen(false)} />
+          <PixelWorldPhaser userId={session.user.id} pointsBalance={currentDisplayPoints} onExit={() => setActiveTab('notes')}
+            onPixelPurchase={handlePixelPurchase} onPointsReward={handlePixelReward} />
         </LazyScreenBoundary>
       )}
 

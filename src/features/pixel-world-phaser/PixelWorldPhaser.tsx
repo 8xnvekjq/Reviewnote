@@ -1,4 +1,4 @@
-// 새 Pixel World(베타) 진입 — 지금 Pixel World와 똑같은 방식으로 학생의 실제 외형(usePixelShop)과
+// 새 Pixel World 진입(모든 학생) — 예전 Pixel World와 똑같은 방식으로 학생의 실제 외형(usePixelShop)과
 // 데리고 다니는 펫(usePet), 밭 상태(useFarm)를 불러와 Phaser 셸에 넘긴다. 돌봄과 출품은 기존 훅/RPC만 사용한다.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchPixelFurniturePlacement, savePixelRoomLayout } from '../../utils/pixelShop';
@@ -17,10 +17,18 @@ import { GameShell } from './GameShell';
 import type { BedLook } from './game/sceneAssets';
 import './gameShell.css';
 
-interface Props { userId: string; pointsBalance: number; onExit: () => void }
+interface Props {
+  userId: string;
+  pointsBalance: number;
+  onExit: () => void;
+  /** 구매 RPC가 서버에서 차감한 뒤 돌려준 새 잔액 — App이 화면 포인트를 서버 값에 맞춘다. */
+  onPixelPurchase?: (newBalance: number) => void;
+  /** 출품 RPC가 서버에서 point_adjustment에 더한 보상 점수 — App이 같은 양을 반영한다. */
+  onPointsReward?: (rewardPoints: number) => void;
+}
 
-export default function PixelWorldPhaser({ userId, pointsBalance, onExit }: Props) {
-  const shop = usePixelShop(userId, pointsBalance);
+export default function PixelWorldPhaser({ userId, pointsBalance, onExit, onPixelPurchase, onPointsReward }: Props) {
+  const shop = usePixelShop(userId, pointsBalance, onPixelPurchase);
   const pet = usePet(userId);
   const farm = useFarm();
   const inventory = useFarmInventory(userId);
@@ -61,7 +69,11 @@ export default function PixelWorldPhaser({ userId, pointsBalance, onExit }: Prop
     <button type="button" onClick={onExit}>나가기</button></div>;
   if (!appearance || !pet.ready || placement?.userId !== userId) return <div className="pwp-root pwp-loading" role="status">앞마당으로 가는 중…</div>;
   return <GameShell userId={userId} appearance={appearance} pet={!pet.error && pet.active && shop.ownedIds.has(pet.active) ? pet.active : null} balance={shop.balance} beds={beds} furniture={furniture}
-    onSaveFurniture={saveFurniture} scarecrowLine={scarecrowLine} onExit={onExit} panels={{ shop, pet }} farmAdapter={{ farm, inventory, contest: fetchWeeklyCropContest, submit: async id => { const result = await submitFarmCrop(id); if (result.ok) shop.reload(); return result; } }} />;
+    onSaveFurniture={saveFurniture} scarecrowLine={scarecrowLine} onExit={onExit} panels={{ shop, pet }} farmAdapter={{ farm, inventory, contest: fetchWeeklyCropContest, submit: async id => {
+      const result = await submitFarmCrop(id);
+      if (result.ok) { onPointsReward?.(result.rewardPoints); shop.reload(); }
+      return result;
+    } }} />;
 }
 
 function bedsKey(snapshot: ReturnType<typeof useFarm>['snapshot'], now: number): string {
