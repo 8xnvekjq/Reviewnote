@@ -65,6 +65,19 @@ try {
     assert.ok(Math.hypot(pet2.x - pet1.x, pet2.y - pet1.y) <= 2, 'room pet settles');
     await page.screenshot({ path: `${SHOTS}/${name}-room.png` });
 
+    // Equip inside the room; the active sprite and the next yard visit must agree.
+    const roomLook = (await debug(page)).avatarKey;
+    await page.getByRole('button', { name: '옷장', exact: true }).click();
+    const wardrobe = page.getByRole('dialog', { name: '옷장', exact: true });
+    await wardrobe.getByRole('button', { name: '상의', exact: true }).click();
+    await wardrobe.locator('[data-item="top_blouse_rose"]').getByRole('button', { name: '장착하기' }).click();
+    await page.waitForFunction(key => window.__pixelWorldPhaser.debug().avatarKey !== key, roomLook);
+    const equippedKey = (await debug(page)).avatarKey;
+    await wardrobe.getByRole('button', { name: '펫', exact: true }).click();
+    await wardrobe.locator('[data-item="pet_duck"]').getByRole('button', { name: '함께 살기' }).click();
+    await page.waitForFunction(() => window.__pixelWorldPhaser.debug().petId === 'pet_duck');
+    await wardrobe.getByRole('button', { name: '옷장 닫기' }).click();
+
     // 서버 배치가 늦게 바뀌어도 그림/충돌/상호작용이 함께 새로고침된다.
     await page.evaluate(() => window.__pixelWorldPhaser.setFurniture([{ type: 'plant', x: 4, y: 5 }]));
     const refreshed = await debug(page);
@@ -82,6 +95,8 @@ try {
     });
     await readyScene(page, 'yard');
     assert.equal(await page.locator('.pwp-toast').textContent(), '앞마당');
+    assert.equal((await debug(page)).avatarKey, equippedKey, 'room outfit persists in yard');
+    assert.equal((await debug(page)).petId, 'pet_duck', 'room pet persists in yard');
     assert.ok((await debug(page)).pet);
     await page.waitForTimeout(400);
     assert.equal((await debug(page)).scene, 'yard');
@@ -93,6 +108,7 @@ try {
     });
     await readyScene(page, 'room');
     assert.ok(Number.isInteger((await debug(page)).zoom));
+    assert.equal((await debug(page)).avatarKey, equippedKey, 'outfit survives revisiting room');
     assert.deepEqual(errors, []);
     await page.locator('.pwp-exit').click();
     await page.getByTestId('exited').waitFor();

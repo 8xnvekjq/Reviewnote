@@ -7,6 +7,8 @@ import PixelWorldPhaser from '../../src/features/pixel-world-phaser/PixelWorldPh
 import { isPetId } from '../../src/features/pixel-room/pet/petKinds';
 import type { PublicAvatarAppearance } from '../../src/features/pixel-room/shop/types';
 import { pickScarecrowLine } from '../../src/features/pixel-room/farm/scarecrowLines';
+import { PIXEL_CATALOG } from '../../src/features/pixel-room/shop/catalog';
+import type { PanelAdapter } from '../../src/features/pixel-world-phaser/ui/GamePanels';
 
 const params = new URLSearchParams(location.search);
 const appearance: PublicAvatarAppearance = {
@@ -20,10 +22,29 @@ const furniture = [{ type: 'desk', x: 3, y: 4 }, { type: 'bed', x: 0, y: 0 }, { 
 
 function Harness() {
   const [open, setOpen] = useState(true);
+  const [look, setLook] = useState(appearance);
+  const [active, setActive] = useState(pet);
+  const [balance, setBalance] = useState(1234);
+  const [ownedIds, setOwnedIds] = useState(new Set(PIXEL_CATALOG.filter(item => item.category === 'avatar' || item.category === 'pet').map(item => item.itemId)));
+  // 서버 없이 모든 패션과 친구를 장착하고 가구 구매를 시험한다.
+  const adapter: PanelAdapter = {
+    shop: { ready: true, loadError: false, mutating: false, catalog: [...PIXEL_CATALOG], equipped: look, ownedIds, balance, reload: () => {},
+      equip: async (slot, id) => { const item = PIXEL_CATALOG.find(entry => entry.itemId === id); if (id && (!item || !ownedIds.has(id))) return false; setLook(value => ({ ...value, [slot]: item?.assetKey ?? null })); return true; },
+      setBaseAppearance: async (skin, eyes) => { setLook(value => ({ ...value, skin, eyes })); return true; },
+      purchase: async item => {
+        if (ownedIds.has(item.itemId)) return { ok: false, reason: 'already_owned', message: '이미 보유하고 있어요.' };
+        if (balance < item.price) return { ok: false, reason: 'insufficient_balance', message: '포인트가 부족해요.' };
+        setOwnedIds(value => new Set([...value, item.itemId])); setBalance(value => value - item.price);
+        if (item.category === 'avatar') setLook(value => ({ ...value, [item.slot]: item.assetKey }));
+        return { ok: true, itemId: item.itemId, newBalance: balance - item.price };
+      },
+    },
+    pet: { active, ready: true, busy: false, error: false, reload: () => {}, activate: async id => { setActive(id); return true; } },
+  };
   return open
     ? params.has('saved')
       ? <PixelWorldPhaser userId="scene-test-user" pointsBalance={1234} onExit={() => setOpen(false)} />
-      : <GameShell appearance={appearance} pet={pet} balance={1234} beds={[...beds]} furniture={furniture} scarecrowLine={() => pickScarecrowLine(null, Date.now())} onExit={() => setOpen(false)} />
+      : <GameShell appearance={look} pet={active} balance={balance} panels={adapter} beds={[...beds]} furniture={furniture} scarecrowLine={() => pickScarecrowLine(null, Date.now())} onExit={() => setOpen(false)} />
     : <main style={{ padding: 24 }}><p data-testid="exited">게임에서 나왔어요.</p><button type="button" onClick={() => setOpen(true)}>다시 들어가기</button></main>;
 }
 createRoot(document.getElementById('root')!).render(<Harness />);

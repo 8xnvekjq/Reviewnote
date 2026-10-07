@@ -61,6 +61,7 @@ export interface WorldContext {
   onSceneGone(scene: WorldScene): void;
 }
 export interface WorldDebug {
+  avatarKey: string; petId: PetId | null;
   scene: SceneId; transitioning: boolean;
   x: number; y: number; facing: Facing; moving: boolean; running: boolean; prompt: string | null;
   pet: { x: number; y: number } | null;
@@ -161,6 +162,20 @@ export abstract class WorldScene extends Phaser.Scene {
       const frames = pose.startsWith('Walk') ? [0, 1, 2, 3] : [0];
       anims.create({ key: `${key}:${pose}`, repeat: -1, frameRate: 8, frames: frames.map(frame => ({ key, frame: index * AVATAR_FRAMES_PER_POSE + frame })) });
     });
+  }
+
+  /** Shared assets persist across visits; replace only the active scene's sprite. */
+  refreshAppearance() {
+    this.ensureSharedTextures();
+    this.player.setTexture(this.ctx.assets.avatar.key, 0);
+    this.animKey = '';
+    this.playAvatar(this.moving, this.running ? RUN_SPEED / WALK_SPEED : 1);
+  }
+
+  refreshPet() {
+    this.pet?.destroy();
+    this.pet = null; this.petSheet = null; this.petFollow = null;
+    if (this.ctx.assets.pet) this.addPet(this.ctx.assets.pet.id);
   }
 
   private addPet(id: PetId) {
@@ -358,6 +373,7 @@ export abstract class WorldScene extends Phaser.Scene {
     const ratio = this.ctx.view.ratio;
     const screen = (p: Point): Point => ({ x: Math.round((p.x - camera.worldView.x) * camera.zoom / ratio), y: Math.round((p.y - camera.worldView.y) * camera.zoom / ratio) });
     return {
+      avatarKey: this.player.texture.key, petId: this.pet ? this.ctx.assets.pet?.id ?? null : null,
       scene: this.spec.id, transitioning: this.transitioning,
       x: Math.round(this.feet.x * 10) / 10, y: Math.round(this.feet.y * 10) / 10, facing: this.facing, moving: this.moving, running: this.running,
       prompt: this.prompt?.id ?? null, pet: this.pet ? { x: Math.round(this.pet.x), y: Math.round(this.pet.y) } : null,

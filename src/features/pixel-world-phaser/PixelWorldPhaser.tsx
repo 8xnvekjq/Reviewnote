@@ -48,7 +48,7 @@ export default function PixelWorldPhaser({ userId, pointsBalance, onExit }: Prop
     <button type="button" onClick={onExit}>나가기</button></div>;
   if (!appearance || !pet.ready || placement?.userId !== userId) return <div className="pwp-root pwp-loading" role="status">앞마당으로 가는 중…</div>;
   return <GameShell appearance={appearance} pet={!pet.error && pet.active && shop.ownedIds.has(pet.active) ? pet.active : null} balance={shop.balance} beds={beds} furniture={furniture}
-    scarecrowLine={scarecrowLine} onExit={onExit} />;
+    scarecrowLine={scarecrowLine} onExit={onExit} panels={{ shop, pet }} />;
 }
 
 function bedsKey(snapshot: ReturnType<typeof useFarm>['snapshot'], now: number): string {
