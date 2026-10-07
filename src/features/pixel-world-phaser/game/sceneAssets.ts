@@ -6,6 +6,8 @@ import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import town from '../../pixel-room/plaza/assets/tiny-town.png';
 import interior from '../../pixel-room/assets/interior/source-17655392.png';
+import floors from '../../pixel-room/assets/interior/source-17655391.png';
+import { furnitureArt } from '../../pixel-room/assets';
 import dogSheet from '../../pixel-room/pet/assets/dog.png';
 import bearSheet from '../../pixel-room/pet/assets/bear.png';
 import pigeonSheet from '../../pixel-room/pet/assets/pigeon.png';
@@ -19,6 +21,13 @@ import { loadImage, svgToImage } from './loadImage';
 
 export const loadTown = () => loadImage(town);
 export const loadInterior = () => loadImage(interior);
+/** 방 벽/바닥 아틀라스(floors-walls, 같은 CC0 팩). */
+export const loadFloors = () => loadImage(floors);
+/** 가구 그림이 들어 있는 아틀라스들(furnitureArt.src 기준, 보통 interior + small-items 두 장). */
+export async function loadFurnitureSheets(): Promise<Map<string, HTMLImageElement>> {
+  const sources = [...new Set(Object.values(furnitureArt).map(art => art.src))];
+  return new Map(await Promise.all(sources.map(async src => [src, await loadImage(src)] as const)));
+}
 
 const PET_SOURCES: Record<PetId, string> = { pet_dog: dogSheet, pet_bear: bearSheet, pet_pigeon: pigeonSheet, pet_duck: duckSheet };
 export async function loadPetSheet(pet: PetId): Promise<HTMLImageElement | HTMLCanvasElement> {

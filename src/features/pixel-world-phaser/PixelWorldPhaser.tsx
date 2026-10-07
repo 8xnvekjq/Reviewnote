@@ -1,6 +1,9 @@
 // 새 Pixel World(베타) 진입 — 지금 Pixel World와 똑같은 방식으로 학생의 실제 외형(usePixelShop)과
 // 데리고 다니는 펫(usePet), 밭 상태(useFarm)를 불러와 Phaser 셸에 넘긴다. 서버 쓰기는 하지 않는다.
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { fetchPixelFurniturePlacement } from '../../utils/pixelShop';
+import type { FurniturePlacementRow } from '../../utils/pixelShop';
+import { savedFurniture } from './logic/savedFurniture';
 import { usePixelShop } from '../pixel-room/usePixelShop';
 import { usePet } from '../pixel-room/pet/usePet';
 import { useFarm } from '../pixel-room/farm/useFarm';
@@ -16,6 +19,20 @@ export default function PixelWorldPhaser({ userId, pointsBalance, onExit }: Prop
   const shop = usePixelShop(userId, pointsBalance);
   const pet = usePet(userId);
   const farm = useFarm();
+  const [placement, setPlacement] = useState<{ userId: string; rows: FurniturePlacementRow[] } | null>(null);
+  const [roomError, setRoomError] = useState(false);
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    setRoomError(false);
+    // 기존 방과 같은 서버 조회만 사용한다. 로컬 배치 이관/저장은 기존 방에서 맡는다.
+    fetchPixelFurniturePlacement(userId).then(rows => {
+      if (!cancelled) setPlacement({ userId, rows });
+    }).catch(() => { if (!cancelled) setRoomError(true); });
+    return () => { cancelled = true; };
+  }, [userId, retry]);
+  const furniture = useMemo(() => savedFurniture(placement?.userId === userId ? placement.rows : [],
+    shop.catalog, shop.ownedIds), [placement, userId, shop.catalog, shop.ownedIds]);
   const farmRef = useRef(farm); farmRef.current = farm;
   // farm.now는 1초마다 바뀌지만, 밭 그림은 단계/촉촉함이 실제로 바뀔 때만 다시 만든다(문자열 키로 접기).
   const key = bedsKey(farm.snapshot, farm.now);
@@ -26,8 +43,11 @@ export default function PixelWorldPhaser({ userId, pointsBalance, onExit }: Prop
   const scarecrowLine = useCallback(() => pickScarecrowLine(farmRef.current.snapshot, farmRef.current.now), []);
   // 외형은 서버 확인이 끝난 뒤에 한 번만 장면을 만든다(기본 모습으로 먼저 떴다가 바뀌는 깜빡임 방지).
   const appearance = shop.ready ? shop.equipped : null;
-  if (!appearance || !pet.ready) return <div className="pwp-root pwp-loading" role="status">앞마당으로 가는 중…</div>;
-  return <GameShell appearance={appearance} pet={pet.active} balance={shop.balance} beds={beds}
+  if (roomError) return <div className="pwp-root pwp-loading" role="alert">방 배치를 불러오지 못했어요.
+    <button type="button" onClick={() => setRetry(value => value + 1)}>다시 불러오기</button>
+    <button type="button" onClick={onExit}>나가기</button></div>;
+  if (!appearance || !pet.ready || placement?.userId !== userId) return <div className="pwp-root pwp-loading" role="status">앞마당으로 가는 중…</div>;
+  return <GameShell appearance={appearance} pet={!pet.error && pet.active && shop.ownedIds.has(pet.active) ? pet.active : null} balance={shop.balance} beds={beds} furniture={furniture}
     scarecrowLine={scarecrowLine} onExit={onExit} panels={{ shop, pet }} />;
 }
 

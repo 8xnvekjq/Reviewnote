@@ -6,7 +6,7 @@ export interface GameLayout {
   width: number; height: number;
   orientation: 'portrait' | 'landscape';
   device: 'phone' | 'tablet';
-  /** 카메라 정수 배율(CSS px / 월드 px) — 도트가 고르게 보이도록 항상 정수. */
+  /** 카메라 정수 배율(CSS px / 월드 px, 기기 픽셀 비율 1 기준) — 실제 게임은 cameraZoom(…, ratio)로 기기 픽셀 기준 정수 배율을 쓴다. */
   zoom: number;
   /** 상단 HUD 띠(포인트·버튼) 영역. 조이스틱 영역은 이 아래부터. */
   hud: Rect;
@@ -24,9 +24,27 @@ const TARGET_WORLD_SHORT_SIDE = 150;
 const HUD_HEIGHT = 52;
 const EDGE = 14;
 
-export function cameraZoom(width: number, height: number): number {
-  const short = Math.max(1, Math.min(width, height));
-  return Math.max(2, Math.min(8, Math.round(short / TARGET_WORLD_SHORT_SIDE)));
+/** 캔버스를 그리는 기기 픽셀 비율 상한 — 3배 넘는 화면도 3배로 그려 GPU 부담을 묶는다. */
+export const MAX_PIXEL_RATIO = 3;
+
+/** 카메라 정수 배율 = 월드 1px을 "기기 픽셀" 몇 개로 그릴지. width/height는 CSS px, ratio는 캔버스의
+ *  기기 픽셀 비율. 안드로이드 폰(2.625배 등)에서도 정수라서 도트 한 칸 한 칸이 같은 크기로 보인다.
+ *  ratio=1이면 예전(CSS px 기준 2~8배)과 같다. */
+export function cameraZoom(width: number, height: number, ratio = 1): number {
+  const r = ratio > 0 && Number.isFinite(ratio) ? ratio : 1;
+  const short = Math.max(1, Math.min(width, height)) * r;
+  const low = Math.max(1, Math.round(2 * r)), high = Math.max(low, Math.round(8 * r));
+  return Math.max(low, Math.min(high, Math.round(short / TARGET_WORLD_SHORT_SIDE)));
+}
+
+/** 캔버스 실제 해상도(기기 픽셀). CSS 크기 × 기기 픽셀 비율을 반올림 — 캔버스는 CSS로 화면 크기에 맞춰
+ *  보여 주므로 캔버스 1픽셀 = 기기 1픽셀이 되어 브라우저가 한 번 더 늘리며 뭉개지 않는다.
+ *  ratio는 실제로 쓰인 비율(반올림 반영) — 화면 좌표(CSS px) → 캔버스 좌표 변환에 쓴다. */
+export function canvasSize(cssWidth: number, cssHeight: number, devicePixelRatio: number): { width: number; height: number; ratio: number } {
+  const dpr = devicePixelRatio > 0 && Number.isFinite(devicePixelRatio) ? Math.min(MAX_PIXEL_RATIO, devicePixelRatio) : 1;
+  const w = Math.max(1, cssWidth), h = Math.max(1, cssHeight);
+  const width = Math.max(1, Math.round(w * dpr)), height = Math.max(1, Math.round(h * dpr));
+  return { width, height, ratio: width / w };
 }
 
 export function gameLayout(width: number, height: number, insets: Insets = NO_INSETS): GameLayout {

@@ -13,11 +13,13 @@ import { followOrigin, keyboardVector, knobOffset, stickVector, STICK_RADIUS, ZE
 import type { Point } from './logic/joystick';
 import { gameLayout, insideRect, NO_INSETS } from './logic/layout';
 import type { GameLayout, Insets } from './logic/layout';
-import type { InteractableId } from './logic/yardWorld';
+import { dialogueFor } from './logic/dialogues';
+import type { SceneId } from './logic/scenes';
+import type { Placement } from '../pixel-room/model';
 import { composeAvatar } from './game/avatarTexture';
-import { loadBed, loadInterior, loadPetSheet, loadScarecrow, loadTown } from './game/sceneAssets';
+import { loadBed, loadFloors, loadFurnitureSheets, loadInterior, loadPetSheet, loadScarecrow, loadTown } from './game/sceneAssets';
 import type { BedLook } from './game/sceneAssets';
-import type { YardGameHandle } from './game/boot';
+import type { Prompt, WorldGameHandle } from './game/boot';
 import './gameShell.css';
 import { GamePanels } from './ui/GamePanels';
 import type { PanelAdapter } from './ui/GamePanels';
@@ -30,12 +32,17 @@ export interface GameShellProps {
   pet: PetId | null;
   balance: number;
   beds: BedLook[];
+  /** 내 방 가구 배치(서버 값, 읽기 전용). 불러오기 전에는 빈 배열. */
+  furniture: readonly Placement[];
   /** 허수아비 대사 한 줄(기존 scarecrowLines.ts). 호출할 때마다 새로 뽑는다. */
   scarecrowLine: () => string;
   onExit: () => void;
 }
 
 type Dialogue = { speaker: string; lines: string[]; index: number };
+type SceneInfo = { id: SceneId; title: string; visit: number };
+/** 장면 이름 알림이 떠 있는 시간(ms) — CSS 애니메이션(pwp-toast)과 같은 길이. */
+const TOAST_MS = 1800;
 type PointerRole = { kind: 'stick' | 'tap' | 'pen'; start: Point; at: number; moved: boolean };
 const TAP_SLOP = 10;
 const TAP_MS = 280;
@@ -68,13 +75,13 @@ async function leaveFullscreen() {
 }
 
 // 상위가 1초마다(밭 시계) 다시 그려져도, 넘겨받는 값이 같으면 셸은 다시 그리지 않는다.
-export const GameShell = memo(function GameShell({ appearance, pet, balance, beds, scarecrowLine, onExit, panels }: GameShellProps) {
+export const GameShell = memo(function GameShell({ appearance, pet, balance, beds, furniture, scarecrowLine, onExit, panels }: GameShellProps) {
   const root = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const probe = useRef<HTMLDivElement>(null);
   const ring = useRef<HTMLDivElement>(null);
   const knob = useRef<HTMLDivElement>(null);
-  const handle = useRef<YardGameHandle | null>(null);
+  const handle = useRef<WorldGameHandle | null>(null);
   const controls = useRef(createControls()).current;
   const pointers = useRef(new Map<number, PointerRole>());
   const stickOrigin = useRef<Point | null>(null);
@@ -83,7 +90,9 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
   const [layout, setLayout] = useState<GameLayout>(() => gameLayout(window.innerWidth, window.innerHeight));
   const layoutRef = useRef(layout); layoutRef.current = layout;
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
-  const [prompt, setPrompt] = useState<InteractableId | null>(null);
+  const [prompt, setPrompt] = useState<Prompt | null>(null);
+  const [scene, setScene] = useState<SceneInfo | null>(null);
+  const [toast, setToast] = useState<SceneInfo | null>(null);
   const promptRef = useRef(prompt); promptRef.current = prompt;
   const [dialogue, setDialogue] = useState<Dialogue | null>(null);
   const dialogueRef = useRef(dialogue); dialogueRef.current = dialogue;
@@ -134,28 +143,39 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
   }, []);
 
   // ── 게임 부팅(Phaser는 여기서 처음 동적 import) / 정리 ──
-  // 탭해서 걷기로 대상 앞에 도착 → 대화 열기(아래에서 openDialogue로 채운다; 부팅을 다시 하지 않도록 ref).
-  const arriveRef = useRef<(id: InteractableId) => void>(() => {});
+  // 장면이 부르는 대화 열기/창 열기(아래에서 채운다; 부팅을 다시 하지 않도록 ref).
+  const talkRef = useRef<(id: string) => void>(() => {});
+  // 게임 안 창(상점/옷장 등) 열기 자리. 장면 정의에서 action {kind:'panel', panel}인 대상을 A로 누르면
+  // 여기로 온다. 창이 생기면 이 ref를 그 창을 여는 함수로 채우면 된다(지금은 그런 대상이 없다).
+  const scenePanelRef = useRef<(panel: string) => void>(() => {});
+  scenePanelRef.current = kind => { if (kind === 'shop' || kind === 'wardrobe') openPanel(kind); };
   const bedsRef = useRef(beds); bedsRef.current = beds;
+  const furnitureRef = useRef(furniture); furnitureRef.current = furniture;
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const avatar = composeAvatar(appearance);
-        const [town, interior, avatarCanvas, petSource, scarecrow, bedImages, { startYardGame }] = await Promise.all([
-          loadTown(), loadInterior(), avatar.canvas, pet ? loadPetSheet(pet) : Promise.resolve(null),
+        const [town, interior, floors, furnitureSheets, avatarCanvas, petSource, scarecrow, bedImages, { startWorldGame }] = await Promise.all([
+          loadTown(), loadInterior(), loadFloors(), loadFurnitureSheets(), avatar.canvas, pet ? loadPetSheet(pet) : Promise.resolve(null),
           Promise.resolve().then(loadScarecrow), Promise.resolve().then(() => Promise.all(bedsRef.current.map(loadBed))), import('./game/boot'),
         ]);
         if (cancelled || !stage.current) return;
-        const game = await startYardGame(stage.current, {
-          town, interior, avatar: { key: avatar.key, canvas: avatarCanvas }, pet: pet && petSource ? { id: pet, source: petSource } : null, scarecrow, beds: bedImages,
+        const game = await startWorldGame(stage.current, {
+          assets: { town, interior, floors, furniture: furnitureSheets, avatar: { key: avatar.key, canvas: avatarCanvas }, pet: pet && petSource ? { id: pet, source: petSource } : null, scarecrow },
+          beds: bedImages, furniture: furnitureRef.current,
         }, controls, {
-          onPrompt: id => setPrompt(id),
-          onArrive: id => arriveRef.current(id),
+          onPrompt: next => setPrompt(next),
+          onTalk: id => talkRef.current(id),
+          onPanel: panel => scenePanelRef.current(panel),
+          onScene: (id, title) => {
+            const info = { id, title, visit: performance.now() };
+            setScene(info); setToast(info);
+          },
         });
         if (cancelled) { game.destroy(); return; }
         handle.current = game;
-        if (import.meta.env.DEV) (window as unknown as { __pixelWorldPhaser?: YardGameHandle }).__pixelWorldPhaser = game;
+        if (import.meta.env.DEV) (window as unknown as { __pixelWorldPhaser?: WorldGameHandle }).__pixelWorldPhaser = game;
         setStatus('ready');
       } catch (error) {
         console.error(error);
@@ -166,7 +186,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
       cancelled = true;
       handle.current?.destroy();
       handle.current = null;
-      if (import.meta.env.DEV) delete (window as unknown as { __pixelWorldPhaser?: YardGameHandle }).__pixelWorldPhaser;
+      if (import.meta.env.DEV) delete (window as unknown as { __pixelWorldPhaser?: WorldGameHandle }).__pixelWorldPhaser;
     };
     // 외형과 펫 변경은 아래 효과에서 처리하고 장면은 한 번만 만든다.
   }, [controls]);
@@ -197,19 +217,24 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     return () => { cancelled = true; };
   }, [bedKey, status]);
 
+  // 가구 배치가 (서버에서) 새로 오면 방에 반영한다. 방에 있지 않으면 다음에 들어갈 때 쓴다.
+  useEffect(() => {
+    if (status === 'ready') handle.current?.setFurniture(furniture);
+  }, [furniture, status]);
+
+  // 장면 이름 알림은 잠깐만.
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(current => (current === toast ? null : current)), TOAST_MS);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
   // ── 대화 ──
-  const openDialogue = useCallback((id: InteractableId) => {
+  const openDialogue = useCallback((id: string) => {
     if (dialogueRef.current || panelRef.current) return;
-    let lines: string[];
-    let speaker: string;
-    if (id === 'scarecrow') {
-      speaker = '허수아비';
-      const first = scarecrowLineRef.current();
-      let second = scarecrowLineRef.current();
-      for (let i = 0; i < 4 && second === first; i++) second = scarecrowLineRef.current();
-      lines = second === first ? [first] : [first, second];
-    } else if (id === 'door') { speaker = '우리 집'; lines = ['문이 닫혀 있어요.', '내 방은 다음 베타에서 들어갈 수 있어요!']; }
-    else { speaker = '안내판'; lines = ['↓ 광장 가는 길', '광장은 다음 베타에서 열려요. 조금만 기다려 주세요!']; }
+    const text = dialogueFor(id, { scarecrowLine: () => scarecrowLineRef.current() });
+    if (!text) return;
+    const { speaker, lines } = text;
     controls.frozen = true;
     controls.stick = ZERO_STICK;
     handle.current?.cancelWalk();
@@ -218,7 +243,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     setTyped(0);
     setDialogue(next);
   }, [controls]);
-  arriveRef.current = openDialogue;
+  talkRef.current = openDialogue;
   const closeDialogue = useCallback(() => { controls.frozen = panelFrozen(panelRef.current, false); dialogueRef.current = null; setDialogue(null); }, [controls]);
   const currentLine = dialogue ? dialogue.lines[dialogue.index] : '';
   // 한 글자씩 찍히는 대사(약 40자/초). 끝나면 타이머 정지.
@@ -241,11 +266,12 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     }
     closeDialogue();
   }, [closeDialogue]);
+  // 대화 중이면 다음 줄, 아니면 장면에 맡긴다(말 걸기 → onTalk, 문 → 장면 전환).
   const pressA = useCallback(() => {
     if (panelRef.current) return;
     if (dialogueRef.current) advance();
-    else if (promptRef.current) openDialogue(promptRef.current);
-  }, [advance, openDialogue]);
+    else if (promptRef.current) handle.current?.interact();
+  }, [advance]);
   const pressB = useCallback((down: boolean) => {
     if (panelRef.current) { if (down) closePanel(); return; }
     if (down && dialogueRef.current) { closeDialogue(); return; }
@@ -410,11 +436,11 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
 
   const exit = () => { void leaveFullscreen(); onExit(); };
   const toggleFullscreen = () => { if (fullscreenElement()) void leaveFullscreen(); else if (root.current) void enterFullscreen(root.current, layout.device === 'phone'); };
-  const promptLabel = prompt === 'scarecrow' ? '말 걸기' : prompt ? '살펴보기' : '';
+  const promptLabel = prompt?.verb ?? '';
   const { a, b, hud, dialogue: box } = layout;
 
   return createPortal(<div ref={root} className="pwp-root" data-device={layout.device} data-orientation={layout.orientation} data-status={status}
-    role="application" aria-label="새 Pixel World 베타 · 앞마당">
+    data-scene={scene?.id} role="application" aria-label={`새 Pixel World 베타 · ${scene?.title ?? '앞마당'}`}>
     <div ref={probe} className="pwp-safe-probe" aria-hidden="true" />
     <div ref={stage} className="pwp-stage" />
     <div className="pwp-surface" data-testid="pwp-surface"
@@ -456,6 +482,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
       {typed >= currentLine.length && <span className="pwp-dialogue-next" aria-hidden="true">{dialogue.index + 1 < dialogue.lines.length ? '▼' : '■'}</span>}
     </div>}
     {panel && panels && <GamePanels kind={panel} adapter={panels} onClose={closePanel} />}
+    {toast && <div key={toast.visit} className="pwp-toast" role="status" style={{ top: hud.y + hud.height + 6 }}>{toast.title}</div>}
     {status !== 'ready' && <div className="pwp-loading" role="status">
       {status === 'loading' ? '앞마당으로 가는 중…' : <>게임을 시작하지 못했어요.<button type="button" className="pwp-chip" onClick={exit}>돌아가기</button></>}
     </div>}
