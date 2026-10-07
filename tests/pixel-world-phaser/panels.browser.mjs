@@ -1,4 +1,4 @@
-// 실행 전 하네스 서버를 띄운다. 브라우저 테스트는 작업 지시대로 작성만 한다.
+// Start the harness server before running this panel regression suite.
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 const base = process.env.PWP_BASE ?? 'http://127.0.0.1:5174';
@@ -21,6 +21,35 @@ try {
     assert.deepEqual([(await debug()).x, (await debug()).y], [frozen.x, frozen.y]);
     const bounds = await shop.boundingBox();
     assert.ok(bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= viewport.width && bounds.y + bounds.height <= viewport.height);
+    await page.waitForFunction(() => [...document.querySelectorAll('.pwp-item-art canvas')].every(canvas => canvas.dataset.ready === 'true'));
+    // Every catalog preview is an isolated crop, including fashion, furniture and pets.
+    const crops = await shop.locator('.pwp-item-art').evaluateAll(nodes => nodes.map(node => ({
+      item: node.closest('[data-item]').dataset.item,
+      canvas: node.querySelector('canvas')?.dataset.ready,
+      svg: !!node.querySelector('svg'),
+    })));
+    assert.ok(crops.length > 0);
+    assert.ok(crops.every(crop => crop.canvas === 'true' && !crop.svg));
+    await page.screenshot({ path: `scratch/fix-shop-top-${viewport.width}.png` });
+    const content = shop.locator('.pwp-panel-content');
+    const tabs = await shop.locator('.pwp-tabs').boundingBox();
+    const header = await shop.locator('header').boundingBox();
+    const gridBounds = await content.boundingBox();
+    const cdp = await context.newCDPSession(page);
+    const x = gridBounds.x + gridBounds.width / 2;
+    const y = gridBounds.y + gridBounds.height - 40;
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y, id: 1 }] });
+    for (let step = 1; step <= 8; step++) {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y - step * 25, id: 1 }] });
+      await page.waitForTimeout(20);
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await page.waitForFunction(() => document.querySelector('.pwp-panel-content').scrollTop > 0);
+    assert.deepEqual(await shop.locator('.pwp-tabs').boundingBox(), tabs);
+    assert.deepEqual(await shop.locator('header').boundingBox(), header);
+    assert.deepEqual(await shop.boundingBox(), bounds);
+    assert.equal(await page.evaluate(() => window.scrollY), 0);
+    await page.screenshot({ path: `scratch/fix-shop-${viewport.width}.png` });
     await shop.getByRole('button', { name: '가구', exact: true }).click();
     const plant = shop.locator('[data-item="furniture_plant"]');
     await plant.getByRole('button', { name: '구매하기' }).click();
@@ -42,8 +71,29 @@ try {
     await page.keyboard.press('Escape');
     await page.getByRole('button', { name: '옷장', exact: true }).click();
     const wardrobe = page.getByRole('dialog', { name: '옷장', exact: true });
+    const wardrobeBounds = await wardrobe.boundingBox();
+    assert.ok(wardrobeBounds.x >= 0 && wardrobeBounds.y >= 0 && wardrobeBounds.x + wardrobeBounds.width <= viewport.width && wardrobeBounds.y + wardrobeBounds.height <= viewport.height);
     const before = await debug();
     await wardrobe.getByRole('button', { name: '상의', exact: true }).click();
+    await page.waitForFunction(() => [...document.querySelectorAll('.pwp-window canvas')].every(canvas => canvas.dataset.ready === 'true'));
+    const wardrobeHeader = await wardrobe.locator('header').boundingBox();
+    const wardrobeTabs = await wardrobe.locator('.pwp-tabs').boundingBox();
+    const wardrobeContent = wardrobe.locator('.pwp-panel-content');
+    if (await wardrobeContent.evaluate(node => node.scrollHeight > node.clientHeight)) {
+      const rect = await wardrobeContent.boundingBox();
+      const wx = rect.x + rect.width / 2, wy = rect.y + rect.height - 40;
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: wx, y: wy, id: 1 }] });
+      for (let step = 1; step <= 8; step++) {
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: wx, y: wy - step * 25, id: 1 }] });
+        await page.waitForTimeout(20);
+      }
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await page.waitForFunction(() => document.querySelector('.pwp-panel-content').scrollTop > 0);
+      assert.deepEqual(await wardrobe.locator('header').boundingBox(), wardrobeHeader);
+      assert.deepEqual(await wardrobe.locator('.pwp-tabs').boundingBox(), wardrobeTabs);
+      assert.deepEqual(await wardrobe.boundingBox(), wardrobeBounds);
+    }
+    await page.screenshot({ path: `scratch/fix-wardrobe-${viewport.width}.png` });
     const fashion = wardrobe.locator('[data-item="top_blouse_rose"]');
     await fashion.getByRole('button', { name: '장착하기' }).click();
     await page.waitForFunction(key => window.__pixelWorldPhaser.debug().avatarKey !== key, before.avatarKey);

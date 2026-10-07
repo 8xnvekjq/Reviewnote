@@ -3,8 +3,7 @@ import type { ReactNode } from 'react';
 import type { usePixelShop } from '../../pixel-room/usePixelShop';
 import type { usePet } from '../../pixel-room/pet/usePet';
 import { isPetId } from '../../pixel-room/pet/petKinds';
-import { PetPreview } from '../../pixel-room/pet/Companion';
-import { AvatarSprite, FurnitureSprite } from '../../pixel-room/sprites';
+import { PanelArt } from './PanelArt';
 import type { FurnitureType } from '../../pixel-room/model';
 import type { PixelAvatarSlot, PixelItem } from '../../pixel-room/shop/types';
 import { AVATAR_SLOTS, EYE_COLOR_OPTIONS, SKIN_TONE_OPTIONS, SLOT_LABELS } from '../../pixel-room/shop/appearanceRows';
@@ -63,11 +62,11 @@ export function GamePanels({ kind, adapter: { shop, pet }, onClose }: { kind: Pa
     return await pet.activate(id) ? '함께할 친구를 바꿨어요.' : '펫 설정을 저장하지 못했어요.';
   });
   const art = (item: PixelItem) => item.category === 'avatar'
-    ? <AvatarSprite direction="Front" frame={0} walking={false} appearance={{ ...shop.equipped, [item.slot]: item.assetKey }} />
-    : item.category === 'pet' ? <PetPreview pet={item.itemId} /> : <FurnitureSprite type={item.assetKey as FurnitureType} />;
+    ? <PanelArt appearance={{ ...shop.equipped, [item.slot]: item.assetKey }} />
+    : item.category === 'pet' ? <PanelArt pet={item.itemId} /> : <PanelArt furniture={item.assetKey as FurnitureType} />;
   const entries = panelItems(shop.catalog, kind === 'shop' ? category : slot, kind === 'wardrobe' ? shop.ownedIds : undefined);
   return <Window title={kind === 'shop' ? '상점' : '옷장'} onClose={onClose}>
-    <div className="pwp-panel-summary">{kind === 'shop' ? <><span>마음에 드는 스타일을 골라요.</span><PriceTag value={shop.balance} /></> : <><div className="pwp-preview"><AvatarSprite direction="Front" frame={0} walking={false} appearance={shop.equipped} /></div><span>오늘의 나 · 바꾸면 바로 보여요.</span></>}</div>
+    <div className="pwp-panel-summary">{kind === 'shop' ? <><span>마음에 드는 스타일을 골라요.</span><PriceTag value={shop.balance} /></> : <><div className="pwp-preview"><PanelArt appearance={shop.equipped} /></div><span>오늘의 나 · 바꾸면 바로 보여요.</span></>}</div>
     <Tabs options={kind === 'shop' ? [['all', '전체'], ...AVATAR_SLOTS.map(key => [key, SLOT_LABELS[key]] as const), ['furniture', '가구'], ['pet', '펫']] : [...AVATAR_SLOTS.map(key => [key, SLOT_LABELS[key]] as const), ['base', '기본 외형'], ['pet', '펫']]} value={kind === 'shop' ? category : slot} onChange={value => { if (kind === 'shop') setCategory(value); else setSlot(value); setConfirming(null); }} />
     <div className="pwp-panel-content">
       {!shop.ready ? <p role="status">보유 정보를 불러오는 중…</p> : shop.loadError ? <div role="alert"><p>보유 정보를 불러오지 못했어요.</p><button onClick={shop.reload}>다시 시도</button></div> : kind === 'wardrobe' && slot === 'base' ? <>

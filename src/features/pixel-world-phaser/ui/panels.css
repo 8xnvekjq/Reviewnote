@@ -1,6 +1,7 @@
 /* 게임 안의 도트 창과 또렷한 한글 버튼. */
-.pwp-panel-shade { position:absolute; inset:0; z-index:20; background:#17241888; display:grid; place-items:center; padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left)); touch-action:none; }
-.pwp-window { width:min(760px,100%); max-height:100%; display:flex; flex-direction:column; border:4px solid #5b3926; background:#fff4d9; color:#4f3a28; box-shadow:4px 4px 0 #241b16,inset 0 0 0 3px #dfbf82; padding:10px; position:relative; }
+.pwp-panel-shade { position:absolute; inset:0; z-index:20; background:#17241888; display:grid; grid-template-rows:minmax(0,1fr); grid-template-columns:minmax(0,1fr); place-items:center; padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left)); touch-action:auto; }
+.pwp-window { width:min(760px,100%); height:100%; max-height:100%; min-height:0; overflow:hidden; display:flex; flex-direction:column; border:4px solid #5b3926; background:#fff4d9; color:#4f3a28; box-shadow:4px 4px 0 #241b16,inset 0 0 0 3px #dfbf82; padding:10px; position:relative; }
+.pwp-window > header, .pwp-panel-summary, .pwp-tabs, .pwp-toast { flex-shrink:0; }
 .pwp-window header { display:flex; align-items:center; justify-content:space-between; gap:12px; }
 .pwp-window h2 { margin:0; font-size:22px; }
 .pwp-window button { min-width:44px; min-height:44px; padding:8px 10px; border:2px solid #7d5737; background:#fff9e9; color:#4f3a28; font:inherit; font-weight:700; cursor:pointer; touch-action:manipulation; box-shadow:0 2px 0 #c9a46c; }
@@ -10,7 +11,7 @@
 .pwp-panel-summary { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 0; font-size:14px; }
 .pwp-price { display:inline-flex; gap:5px; align-items:center; font-weight:800; white-space:nowrap; }
 .pwp-tabs { display:flex; flex-wrap:wrap; gap:5px; padding:4px 0 10px; }
-.pwp-panel-content { overflow:auto; overscroll-behavior:contain; touch-action:pan-y; min-height:0; padding:4px; }
+.pwp-panel-content { flex:1; overflow:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action:pan-y; min-height:0; padding:4px; }
 .pwp-panel-content * { touch-action:pan-y; }
 .pwp-item-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(145px,1fr)); gap:10px; }
 .pwp-item { border:2px solid #bb9560; padding:8px; display:flex; flex-direction:column; align-items:center; gap:8px; text-align:center; font-size:14px; background:#fffaf0; }
@@ -27,3 +28,6 @@
 .pwp-panel-access { position:absolute; display:flex; gap:8px; z-index:2; }
 .pwp-panel-access button, .pwp-hud .pwp-chip { min-height:44px; }
 @media(max-width:360px) { .pwp-item-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .pwp-window { padding:6px; } .pwp-hud { gap:4px; padding:4px; } .pwp-hud .pwp-chip { padding:0 6px; } }
+
+.pwp-art-canvas { display:block; max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain; image-rendering:pixelated; }
+.pwp-item-art .pwp-art-canvas, .pwp-preview .pwp-art-canvas { width:100%; height:100%; }
