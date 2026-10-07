@@ -30,11 +30,16 @@ export function worldSolid(cell: Point): boolean {
   return !yardWalkable({ x, y });
 }
 
-export type InteractableId = 'scarecrow' | 'door' | 'gate';
+export type InteractableId = 'scarecrow' | 'door' | 'gate' | `farm:${number}`;
 const DOOR = toWorldCell(YARD_DOOR);
 const GATE = toWorldCell(YARD_GATE);
 const SCARECROW = toWorldCell(SCARECROW_CELL);
 export const INTERACTABLES: readonly (Interactable & { id: InteractableId })[] = [
+  ...FARM_BEDS.map((bed, index): Interactable & { id: InteractableId } => {
+    const cell = toWorldCell(bed);
+    return { id: `farm:${index}`, cell, cells: [cell, { x: cell.x + 1, y: cell.y }, { x: cell.x, y: cell.y + 1 }, { x: cell.x + 1, y: cell.y + 1 }],
+      label: '토마토 밭', verb: '돌보기', action: { kind: 'panel', panel: `farm:${index}` }, bang: { x: (cell.x + 1) * TILE, y: cell.y * TILE } };
+  }),
   { id: 'scarecrow', cell: SCARECROW, label: '허수아비', verb: '말 걸기', action: { kind: 'talk' }, bang: { x: SCARECROW.x * TILE + TILE / 2, y: (SCARECROW.y + 1) * TILE - 32 } },
   { id: 'door', cell: DOOR, label: '우리 집 문', verb: '들어가기', action: { kind: 'exit', exit: 'door' }, bang: { x: DOOR.x * TILE + TILE / 2, y: DOOR.y * TILE - 2 } },
   // 광장 길목을 밟거나 A를 누르면 광장으로 넘어간다.

@@ -6,6 +6,7 @@ const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
   for (const viewport of [{ width: 390, height: 844 }, { width: 1180, height: 820 }]) {
     const context = await browser.newContext({ viewport, hasTouch: true });
+    await context.route('**/src/services/supabase.ts', route => route.fulfill({ contentType: 'application/javascript', body: "export { supabase } from '/tests/pixel-world-phaser/fakeRealtime.mjs';" }));
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
@@ -13,7 +14,14 @@ try {
     await page.waitForFunction(() => window.__pixelWorldPhaser && document.querySelector('.pwp-root')?.dataset.status === 'ready');
     await page.evaluate(() => { window.__panelsOriginal = window.__pixelWorldPhaser; });
     const debug = () => page.evaluate(() => window.__pixelWorldPhaser.debug());
-    await page.getByRole('button', { name: '상점', exact: true }).click();
+    assert.equal(await page.locator('.pwp-panel-access').getByRole('button', { name: '상점', exact: true }).count(), 0);
+    assert.equal(await page.locator('.pwp-panel-access').getByRole('button', { name: '옷장', exact: true }).count(), 1);
+    await page.evaluate(() => { const h = window.__pixelWorldPhaser, p = h.debug().exits.gate; h.walkToScreen(p.x, p.y); });
+    await page.waitForFunction(() => window.__pixelWorldPhaser.debug().scene === 'plaza' && !window.__pixelWorldPhaser.debug().transitioning);
+    await page.evaluate(() => { const h = window.__pixelWorldPhaser, p = h.debug().targets.shop; h.walkToScreen(p.x, p.y); });
+    await page.waitForFunction(() => window.__pixelWorldPhaser.debug().prompt === 'shop' && !window.__pixelWorldPhaser.debug().moving);
+    assert.equal(await page.getByRole('dialog', { name: '상점', exact: true }).count(), 0, 'arrival faces the stall and waits for A');
+    await page.locator('.pwp-btn-a').click();
     const shop = page.getByRole('dialog', { name: '상점', exact: true });
     await shop.waitFor();
     const frozen = await debug();

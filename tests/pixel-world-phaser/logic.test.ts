@@ -155,8 +155,8 @@ test('tap-to-walk path reaches open cells and stops beside solid targets (scarec
 test('A-button target: facing the scarecrow from the cell below finds it; facing away does not', () => {
   const scarecrow = INTERACTABLES.find(item => item.id === 'scarecrow')!;
   const below = cellCenter({ x: scarecrow.cell.x, y: scarecrow.cell.y + 1 });
-  assert.equal(facedInteractable(below, 'Back')?.id, 'scarecrow');
-  assert.equal(facedInteractable(below, 'Front'), null);
+  assert.equal(facedInteractable(below, 'Back', [scarecrow])?.id, 'scarecrow');
+  assert.equal(facedInteractable(below, 'Front')?.id, 'farm:0');
   assert.equal(facedInteractable(SPAWN, 'Back')?.id, 'door');
 });
 test('pet follow spot trails behind the player for each facing', () => {

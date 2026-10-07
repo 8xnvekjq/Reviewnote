@@ -25,8 +25,12 @@ try {
     await page.waitForFunction(() => document.querySelector('.pwp-plaza-reactions')?.dataset.ready === 'true');
   }
   for (const page of [a, b]) { await page.bringToFront(); await page.waitForFunction(() => window.__pixelWorldPhaser.debug().classmates?.length === 1 && window.__pixelWorldPhaser.debug().classmates[0].rendered && window.__pixelWorldPhaser.debug().classmates[0].pet); }
-  // 탭한 가판대 앞까지 걸어가면 기존 상점 창이 열린다.
+  // Tapping approaches the stall; only A opens the shop.
+  assert.equal(await a.locator('.pwp-panel-access').getByRole('button', { name: '상점', exact: true }).count(), 0);
   await target(a, 'shop');
+  await a.waitForFunction(() => window.__pixelWorldPhaser.debug().prompt === 'shop' && !window.__pixelWorldPhaser.debug().moving);
+  assert.equal(await a.getByRole('dialog', { name: '상점', exact: true }).count(), 0);
+  await a.locator('.pwp-btn-a').click();
   const shop = a.getByRole('dialog', { name: '상점', exact: true }); await shop.waitFor({ timeout: 20000 });
   assert.equal(await a.evaluate(() => window.__pixelWorldPhaser.debug().prompt), 'shop');
   await shop.getByRole('button', { name: '상점 닫기' }).click();
@@ -96,6 +100,9 @@ try {
   await phone.waitForFunction(() => document.querySelector('.pwp-root')?.dataset.status === 'ready');
   await exit(phone, 'gate'); await ready(phone, 'plaza');
   await target(phone, 'shop');
+  await phone.waitForFunction(() => window.__pixelWorldPhaser.debug().prompt === 'shop' && !window.__pixelWorldPhaser.debug().moving);
+  assert.equal(await phone.getByRole('dialog', { name: '상점', exact: true }).count(), 0);
+  await phone.locator('.pwp-btn-a').click();
   const phoneShop = phone.getByRole('dialog', { name: '상점', exact: true });
   await phoneShop.waitFor({ timeout: 20000 });
   const rect = await phoneShop.boundingBox(); assert.ok(rect.x >= 0 && rect.x + rect.width <= 390);
