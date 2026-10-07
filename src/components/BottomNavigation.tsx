@@ -14,8 +14,6 @@ interface BottomNavigationProps {
   onlineUsers: { id: string; display_name: string; nickname?: string; username: string }[];
   onStartReviewSession?: () => void;
   onOpenSlideList?: () => void;
-  /** 관리자/테스트 계정에게만 넘어온다 — 없으면 새 Pixel World(베타) 메뉴가 보이지 않는다. */
-  onOpenPixelWorldBeta?: () => void;
   dailyReviewCount?: number;
 }
 // "숨긴 카드" 행은 다른 메뉴 행과 같은 구조/스타일(AppIcon + 제목 + 설명)을 그대로 쓰고, 학생들이
@@ -28,6 +26,8 @@ const guideMenu: MenuEntry = { tab: 'guide', label: '이용안내', description:
 const hiddenMenu: MenuEntry = { tab: 'hidden', label: '숨긴 카드', description: '제외한 문제 확인과 다시 꺼내기', icon: 'eye', emoji: '🙈' };
 const examPracticeMenu: MenuEntry = { tab: 'examPractice', label: '📝 기출문제 풀이', description: '평가원 모의고사를 실전처럼 풀고 OMR 결과 보기', icon: 'book' };
 const pixelRoomMenu: MenuEntry = { tab: 'pixelRoom', label: '🎮 Pixel Room', description: '내 캐릭터와 작은 방 꾸미기', icon: 'user' };
+// 관리자 전용 — 새 Pixel World와 비교해 보려고 남겨 둔 예전 화면.
+const pixelRoomLegacyMenu: MenuEntry = { tab: 'pixelRoomLegacy', label: '예전 Pixel World (관리자)', description: '관리자 전용 · 새 Pixel World와 비교용', icon: 'user' };
 // 시트 안의 한 행. key는 "최근 사용" 기록용 고유 키(탭이 아닌 수업자료는 'slides').
 type SheetItem = { key: string; label: string; description: string; icon: AppIconName; current: boolean; onSelect: () => void };
 type SheetSection = { title: string; items: SheetItem[] };
@@ -46,7 +46,7 @@ const reviewCheckMenuAdmin: MenuEntry =
   { tab: 'reviewCheck', label: '복습체크 관리', description: '채점하기 · 학생별 시험 관리', icon: 'check' };
 const reviewCheckMenuStudent: MenuEntry =
   { tab: 'reviewCheck', label: '복습체크', description: '복습 완료 문제 다시 풀어보고 채점받기', icon: 'check' };
-export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, setActiveTab, isAdmin, canAccessPixelWorld, currentUserId, onOpenSlideList, onOpenPixelWorldBeta }) => {
+export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, setActiveTab, isAdmin, canAccessPixelWorld, currentUserId, onOpenSlideList }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [recent, setRecent] = useState<string[]>([]);
   const select = (tab: ActiveTab) => { setActiveTab(tab); setMenuOpen(false); };
@@ -57,12 +57,11 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, s
   const reviewCheckMenu = isAdmin ? reviewCheckMenuAdmin : currentUserId ? reviewCheckMenuStudent : null;
   const tabItem = (entry: MenuEntry): SheetItem => ({ key: entry.tab, label: entry.emoji ? `${entry.label} ${entry.emoji}` : entry.label, description: entry.description, icon: entry.icon, current: activeTab === entry.tab, onSelect: () => { remember(entry.tab); select(entry.tab); } });
   const slidesItem: SheetItem | null = onOpenSlideList ? { key: 'slides', label: '수업자료', description: '선생님이 준비한 교안 슬라이드', icon: 'book', current: false, onSelect: () => { remember('slides'); setMenuOpen(false); onOpenSlideList(); } } : null;
-  const pixelWorldBetaItem: SheetItem | null = onOpenPixelWorldBeta ? { key: 'pixelWorldBeta', label: '🎮 새 Pixel World (베타)', description: '관리자 전용 · 새 조작감 미리보기(앞마당)', icon: 'user', current: false, onSelect: () => { setMenuOpen(false); onOpenPixelWorldBeta(); } } : null;
   // 표시 조건은 기존 그대로: 기출문제 풀이는 로그인 시, Pixel Room은 로그인 + Pixel World 접근 시(전체 공개).
   const sections: SheetSection[] = [
     { title: '공부하기', items: [currentUserId ? tabItem(examPracticeMenu) : null, reviewCheckMenu && tabItem(reviewCheckMenu), tabItem(scaffoldingMenu)].filter((item): item is SheetItem => !!item) },
     { title: '내 기록', items: [tabItem(statsMenu), examPrepMenu && tabItem(examPrepMenu), tabItem(completedMenu), tabItem(hiddenMenu)].filter((item): item is SheetItem => !!item) },
-    { title: '기타', items: [slidesItem, currentUserId && canAccessPixelWorld ? tabItem(pixelRoomMenu) : null, pixelWorldBetaItem, tabItem(guideMenu)].filter((item): item is SheetItem => !!item) },
+    { title: '기타', items: [slidesItem, currentUserId && canAccessPixelWorld ? tabItem(pixelRoomMenu) : null, currentUserId && isAdmin ? tabItem(pixelRoomLegacyMenu) : null, tabItem(guideMenu)].filter((item): item is SheetItem => !!item) },
   ].filter(section => section.items.length > 0);
   const visibleItems = sections.flatMap(section => section.items);
   const recentItems = currentUserId ? pickVisibleMenuRecent(recent, visibleItems.map(item => item.key)).map(key => visibleItems.find(item => item.key === key)).filter((item): item is SheetItem => !!item) : [];
