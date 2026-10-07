@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { GameShell } from '../../src/features/pixel-world-phaser/GameShell';
+import PixelWorldPhaser from '../../src/features/pixel-world-phaser/PixelWorldPhaser';
 import { isPetId } from '../../src/features/pixel-room/pet/petKinds';
 import type { PublicAvatarAppearance } from '../../src/features/pixel-room/shop/types';
 import { pickScarecrowLine } from '../../src/features/pixel-room/farm/scarecrowLines';
@@ -15,11 +16,14 @@ const appearance: PublicAvatarAppearance = {
 const petParam = params.get('pet') ?? 'pet_dog';
 const pet = isPetId(petParam) ? petParam : null;
 const beds = [{ stage: 'leaf', moisture: 'moist' }, { stage: 'empty', moisture: 'normal' }] as const;
+const furniture = [{ type: 'desk', x: 3, y: 4 }, { type: 'bed', x: 0, y: 0 }, { type: 'plant', x: 8, y: 3 }] as const;
 
 function Harness() {
   const [open, setOpen] = useState(true);
   return open
-    ? <GameShell appearance={appearance} pet={pet} balance={1234} beds={[...beds]} scarecrowLine={() => pickScarecrowLine(null, Date.now())} onExit={() => setOpen(false)} />
+    ? params.has('saved')
+      ? <PixelWorldPhaser userId="scene-test-user" pointsBalance={1234} onExit={() => setOpen(false)} />
+      : <GameShell appearance={appearance} pet={pet} balance={1234} beds={[...beds]} furniture={furniture} scarecrowLine={() => pickScarecrowLine(null, Date.now())} onExit={() => setOpen(false)} />
     : <main style={{ padding: 24 }}><p data-testid="exited">게임에서 나왔어요.</p><button type="button" onClick={() => setOpen(true)}>다시 들어가기</button></main>;
 }
 createRoot(document.getElementById('root')!).render(<Harness />);

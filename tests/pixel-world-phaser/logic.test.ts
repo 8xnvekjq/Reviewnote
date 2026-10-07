@@ -111,19 +111,19 @@ test('avatar frame index covers 8 poses × 4 frames', () => {
 });
 
 // ── 마당 월드 / 충돌 / 길찾기 ──
-test('world solidity matches the original yard (plus forest margin and a closed door)', () => {
+test('world solidity matches the original yard (plus forest margin and an open door)', () => {
   for (let y = 0; y < 12; y++) for (let x = 0; x < 16; x++) {
     const w = toWorldCell({ x, y });
-    const expected = (x === YARD_DOOR.x && y === YARD_DOOR.y) ? true : !yardWalkable({ x, y });
+    const expected = !yardWalkable({ x, y });
     assert.equal(worldSolid(w), expected, `${x},${y}`);
   }
   assert.ok(worldSolid({ x: 0, y: 0 }) && worldSolid({ x: WORLD_COLS - 1, y: WORLD_ROWS - 1 }));
   assert.ok(!feetBlocked(SPAWN));
 });
 test('movement slides along walls and never enters a solid cell', () => {
-  const door = cellCenter(toWorldCell({ x: 6, y: 6 }));
+  const door = cellCenter(toWorldCell(YARD_DOOR));
   // 문 앞에서 위로 계속 밀면 집 벽에서 멈춘다.
-  let p = { ...SPAWN };
+  let p = cellCenter(toWorldCell({ x: 5, y: 7 }));
   for (let i = 0; i < 60; i++) p = moveFeet(p, 0, -2);
   assert.ok(p.y > door.y + TILE / 2, 'stopped below the house');
   assert.ok(!feetBlocked(p));

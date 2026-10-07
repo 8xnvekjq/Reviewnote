@@ -7,22 +7,22 @@ import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 
 const BASE = process.env.PWP_BASE ?? 'http://127.0.0.1:5174';
-const SHOTS = 'node_modules/.cache/pixel-world-phaser';
+const SHOTS = '.pixel-world-test.local';
 await mkdir(SHOTS, { recursive: true });
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 const debug = page => page.evaluate(() => window.__pixelWorldPhaser.debug());
 const until = (page, fn, arg, timeout = 6000) => page.waitForFunction(fn, arg, { timeout, polling: 50 });
 
 const VIEWPORTS = [
-  { name: 'phone-portrait', viewport: { width: 390, height: 844 }, touch: true, mobile: true, query: 'pet=pet_dog&top=blouse_rose&bottom=bootcut_blue&hair=long_black' },
+  { name: 'phone-portrait', viewport: { width: 390, height: 844 }, touch: true, mobile: true, dpr: 2.625, query: 'pet=pet_dog&top=blouse_rose&bottom=bootcut_blue&hair=long_black' },
   { name: 'tablet-landscape', viewport: { width: 1180, height: 820 }, touch: true, mobile: false, query: 'pet=pet_duck&skin=umber&eyes=sky&hair=buzz_blonde' },
   { name: 'tablet-portrait', viewport: { width: 800, height: 1280 }, touch: true, mobile: false, query: 'pet=pet_bear' },
   { name: 'desktop', viewport: { width: 1280, height: 800 }, touch: false, mobile: false, query: 'pet=pet_pigeon' },
 ];
 
 try {
-  for (const { name, viewport, touch, mobile, query } of VIEWPORTS) {
-    const context = await browser.newContext({ viewport, hasTouch: touch, isMobile: mobile });
+  for (const { name, viewport, touch, mobile, query, dpr = 1 } of VIEWPORTS) {
+    const context = await browser.newContext({ viewport, hasTouch: touch, isMobile: mobile, deviceScaleFactor: dpr });
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
@@ -49,6 +49,11 @@ try {
     }
     const start = await debug(page);
     assert.equal(start.moving, false);
+    assert.equal(start.scene, 'yard');
+    assert.ok(Math.abs(start.ratio - dpr) < 0.01);
+    assert.ok(Math.abs(start.cssZoom * start.ratio - start.zoom) < 0.01);
+    const pixels = await page.locator('canvas').evaluate(c => [c.width, c.height]);
+    assert.deepEqual(pixels, [Math.round(viewport.width * dpr), Math.round(viewport.height * dpr)]);
     assert.ok(Number.isInteger(start.zoom) && start.zoom >= 2);
     await page.screenshot({ path: `${SHOTS}/${name}-start.png` });
 
@@ -101,14 +106,16 @@ try {
       // ── 탭해서 걷기: 허수아비를 콕 → 옆까지 걸어가 바라보고 대화가 열린다 ──
       // 허수아비가 화면 밖이면 먼저 보이는 쪽(오른쪽 위)을 콕 찍어 다가간다 — 이것도 탭해서 걷기.
       const visible = p => p.x > 20 && p.x < viewport.width - 20 && p.y > 80 && p.y < viewport.height - 160;
-      for (let i = 0; i < 10 && !visible((await debug(page)).targets.scarecrow); i++) {
-        await touchEvent('touchStart', [{ x: viewport.width * 0.85, y: viewport.height * 0.45, id: 10 + i }]);
-        await touchEvent('touchEnd', []);
-        await until(page, () => window.__pixelWorldPhaser.debug().pathLength > 0 || window.__pixelWorldPhaser.debug().moving);
+      if (!visible((await debug(page)).targets.scarecrow)) {
+        await page.evaluate(() => {
+          const h = window.__pixelWorldPhaser, d = h.debug();
+          h.walkToScreen(d.targets.scarecrow.x, d.targets.scarecrow.y + 16 * d.zoom / d.ratio);
+        });
         await until(page, () => window.__pixelWorldPhaser.debug().pathLength === 0 && !window.__pixelWorldPhaser.debug().moving, null, 10000);
+        await page.waitForTimeout(500); // 따라오는 카메라도 목적지에서 안정된 뒤 탭한다.
       }
       const target = (await debug(page)).targets.scarecrow;
-      assert.ok(visible(target), 'scarecrow reachable on screen');
+      assert.ok(visible(target), `scarecrow reachable on screen: ${JSON.stringify(await debug(page))}`);
       await touchEvent('touchStart', [{ x: target.x, y: target.y, id: 4 }]);
       await touchEvent('touchEnd', []);
       await page.locator('.pwp-dialogue').waitFor({ timeout: 10000 });

@@ -9,6 +9,8 @@ import type { Facing, Point } from '../logic/joystick';
 import { AVATAR_FRAMES_PER_POSE, AVATAR_POSES } from '../logic/avatarPlan';
 import { PET_SHEETS, petFollowSpot } from '../logic/petSheets';
 import type { PetSheet } from '../logic/petSheets';
+import { createPetFollowState, stepPetFollow } from '../logic/petFollow';
+import type { PetFollowState } from '../logic/petFollow';
 import type { PetId } from '../../pixel-room/pet/petKinds';
 import { TILE, cellCenter, cellOf, coversCell, facedInteractable, facingToward, feetBlocked, moveFeet, nearestCellCenter, nearestOpenCell, planPath } from '../logic/world';
 import type { Interactable } from '../logic/world';
@@ -76,7 +78,7 @@ export abstract class WorldScene extends Phaser.Scene {
   private shadow!: Phaser.GameObjects.Ellipse;
   private pet: Phaser.GameObjects.Sprite | null = null;
   private petSheet: PetSheet | null = null;
-  private petStuckMs = 0;
+  private petFollow: PetFollowState | null = null;
   private bang!: Phaser.GameObjects.Image;
   protected feet: Point = { x: 0, y: 0 };
   protected facing: Facing = 'Front';
@@ -104,7 +106,7 @@ export abstract class WorldScene extends Phaser.Scene {
   /** 같은 장면 인스턴스가 다시 시작될 때마다 불린다 — 이전 방문의 상태를 모두 비운다. */
   init(data: { entry?: string } | undefined) {
     this.entry = data?.entry;
-    this.pet = null; this.petSheet = null; this.petStuckMs = 0;
+    this.pet = null; this.petSheet = null; this.petFollow = null;
     this.moving = false; this.running = false; this.path = []; this.pathTarget = null;
     this.prompt = null; this.animKey = ''; this.transitioning = false; this.exitArmed = false;
   }
@@ -177,6 +179,7 @@ export abstract class WorldScene extends Phaser.Scene {
     const spot = petFollowSpot(this.feet, this.facing);
     const start = feetBlocked(spot, this.spec.solid) ? { ...this.feet } : spot;
     this.petSheet = sheet;
+    this.petFollow = createPetFollowState(start);
     this.pet = this.add.sprite(start.x, start.y, key, sheet.idle.row * sheet.columns).setOrigin(0.5, sheet.footY / sheet.cell);
     this.pet.play(`${key}:idle`);
   }
@@ -252,7 +255,11 @@ export abstract class WorldScene extends Phaser.Scene {
     this.prompt = null;
     this.ctx.hooks.onPrompt(null);
     const camera = this.cameras.main;
-    camera.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => this.scene.start(exit.to.scene, { entry: exit.to.entry }));
+    camera.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+      // Phaser가 shutdown에서 카메라를 지우기 전에 마지막 상태를 보관한다.
+      this.ctx.onSceneGone(this);
+      this.scene.start(exit.to.scene, { entry: exit.to.entry });
+    });
     camera.fadeOut(FADE_MS, ...FADE_RGB);
   }
 
@@ -312,26 +319,17 @@ export abstract class WorldScene extends Phaser.Scene {
   private updatePet(deltaMs: number) {
     const pet = this.pet, sheet = this.petSheet;
     if (!pet || !sheet) return;
+    if (!this.petFollow) return;
     const solid = this.spec.solid;
-    const spot = petFollowSpot(this.feet, this.facing);
-    const here = { x: pet.x, y: pet.y };
-    const dx = spot.x - here.x, dy = spot.y - here.y;
-    const distance = Math.hypot(dx, dy);
-    const key = pet.texture.key;
-    if (distance > 7) {
-      const far = distance > 40;
-      const speed = (far ? RUN_SPEED * 1.05 : WALK_SPEED) * sheet.pace;
-      const step = Math.min(distance, speed * Math.min(deltaMs, 50) / 1000);
-      const next = moveFeet(here, dx / distance * step, dy / distance * step, solid);
-      const moved = Math.hypot(next.x - here.x, next.y - here.y);
-      // 집/울타리/가구에 걸려 오래 못 따라오면 플레이어 뒤로 살짝 순간이동(펫 길찾기는 다음 단계).
-      this.petStuckMs = moved < step * 0.3 ? this.petStuckMs + deltaMs : 0;
-      const target = this.petStuckMs > 900 && !feetBlocked(spot, solid) ? spot : next;
-      if (target === spot) this.petStuckMs = 0;
-      pet.setPosition(target.x, target.y);
-      if (Math.abs(dx) > 1) pet.setFlipX(sheet.facesLeft ? dx > 0 : dx < 0);
-      if (pet.anims.currentAnim?.key !== `${key}:walk`) pet.play(`${key}:walk`);
-    } else if (pet.anims.currentAnim?.key !== `${key}:idle`) pet.play(`${key}:idle`);
+    const result = stepPetFollow(this.petFollow, { x: pet.x, y: pet.y }, this.feet,
+      this.facing, sheet, deltaMs, RUN_SPEED, {
+        move: (from, dx, dy) => moveFeet(from, dx, dy, solid),
+        blocked: point => feetBlocked(point, solid),
+      });
+    this.petFollow = result.state;
+    pet.setPosition(result.position.x, result.position.y).setFlipX(result.state.flipX);
+    const animation = `${pet.texture.key}:${result.walking ? 'walk' : 'idle'}`;
+    if (pet.anims.currentAnim?.key !== animation) pet.play(animation);
     pet.setDepth(pet.y);
   }
 
