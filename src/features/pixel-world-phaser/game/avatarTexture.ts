@@ -79,7 +79,9 @@ async function draw(appearance: PublicAvatarAppearance): Promise<HTMLCanvasEleme
           continue;
         }
         // 원래 눈은 그리지 않고 그 위치에 점 눈·볼·입을 그린다(눈 시트 위치를 따라가므로 머리 흔들림도 그대로).
-        for (const p of facePixels(layer.data, direction)) {
+        // 몸은 첫 레이어라 지금 칸에는 몸만 그려져 있다 — 흰자를 피부색으로 덮는 데 쓴다.
+        const body = ctx.getImageData(ox, oy, AVATAR_FRAME, AVATAR_FRAME).data;
+        for (const p of facePixels(layer.data, direction, body)) {
           ctx.fillStyle = `rgb(${p.color[0]},${p.color[1]},${p.color[2]})`;
           ctx.fillRect(ox + p.x, oy + p.y, 1, 1);
         }
