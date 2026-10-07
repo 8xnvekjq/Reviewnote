@@ -24,6 +24,8 @@ export interface WorldGameHandle {
   cancelWalk(): void;
   /** A 버튼: 바라보는 대상과 상호작용(말 걸기/살펴보기/문으로 들어가기). */
   interact(): void;
+  reactPet(kind: 'feed' | 'pet'): void;
+  farmFx(index: number, action: string): void;
   setAppearance(avatar: WorldAssets['avatar']): void;
   setPet(pet: WorldAssets['pet']): void;
   setBeds(images: HTMLImageElement[]): void;
@@ -105,6 +107,8 @@ export function startWorldGame(parent: HTMLElement, start: WorldStart, controls:
       walkToScreen: (x, y) => active?.walkToScreen(x, y),
       cancelWalk: () => active?.cancelWalk(),
       interact: () => active?.interact(),
+      reactPet: kind => active?.reactPet(kind),
+      farmFx: (index, action) => active?.farmFx(index, action),
       setAppearance: avatar => {
         ctx.assets.avatar = avatar;
         active?.refreshAppearance();

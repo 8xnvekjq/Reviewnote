@@ -3,6 +3,9 @@
 // 여기서 한 번에 처리한다. 하위 장면은 drawWorld()로 그림만 그린다(어디가 막혔는지·출구·입구는
 // logic/scenes.ts의 장면 정의가 정한다). 입력은 공유 객체(ControlState)를 매 프레임 읽기만 한다.
 import Phaser from 'phaser';
+import { PET_INTERACTIONS } from '../../pixel-room/pet/petInteraction';
+import { facesPet, reactionFrame } from '../logic/petReaction';
+import { BED_CELLS } from '../logic/yardWorld';
 import { cameraCenterAxis, cameraZoom } from '../logic/layout';
 import { facingFor } from '../logic/joystick';
 import type { Facing, Point } from '../logic/joystick';
@@ -45,6 +48,7 @@ export interface WorldEvents {
   onTalk(id: string): void;
   /** A로 게임 안 창(상점/옷장 등)을 여는 대상. 셸이 처리한다. */
   onPanel(panel: string): void;
+  onPetMessage?(message: string): void;
   /** 장면에 들어왔을 때(첫 장면 포함) — 장면 이름 알림용. */
   onScene(id: SceneId, title: string): void;
 }
@@ -65,6 +69,10 @@ export interface WorldDebug {
   scene: SceneId; transitioning: boolean;
   x: number; y: number; facing: Facing; moving: boolean; running: boolean; prompt: string | null;
   pet: { x: number; y: number } | null;
+  bedTextures?: string[];
+  petReaction: string | null;
+  petFrame: number | null;
+  petFlipX: boolean;
   /** 카메라 배율(기기 픽셀/월드 px)과 CSS px 기준 배율, 캔버스 기기 픽셀 비율. */
   zoom: number; cssZoom: number; ratio: number;
   camera: { x: number; y: number }; fps: number; renderer: string; pathLength: number;
@@ -80,6 +88,7 @@ export abstract class WorldScene extends Phaser.Scene {
   private pet: Phaser.GameObjects.Sprite | null = null;
   private petSheet: PetSheet | null = null;
   private petFollow: PetFollowState | null = null;
+  private reaction: { start: number; until: number; kind: 'feed' | 'pet' } | null = null;
   private bang!: Phaser.GameObjects.Image;
   protected feet: Point = { x: 0, y: 0 };
   protected facing: Facing = 'Front';
@@ -107,7 +116,7 @@ export abstract class WorldScene extends Phaser.Scene {
   /** 같은 장면 인스턴스가 다시 시작될 때마다 불린다 — 이전 방문의 상태를 모두 비운다. */
   init(data: { entry?: string } | undefined) {
     this.entry = data?.entry;
-    this.pet = null; this.petSheet = null; this.petFollow = null;
+    this.pet = null; this.petSheet = null; this.petFollow = null; this.reaction = null;
     this.moving = false; this.running = false; this.path = []; this.pathTarget = null;
     this.prompt = null; this.animKey = ''; this.transitioning = false; this.exitArmed = false;
   }
@@ -331,10 +340,78 @@ export abstract class WorldScene extends Phaser.Scene {
     this.player.anims.timeScale = timeScale;
   }
 
+  // 펫이 고개를 돌려 기존 시트의 먹기/앉기/짖기 동작을 보여 준다.
+  reactPet(kind: 'feed' | 'pet') {
+    const pet = this.pet, id = this.ctx.assets.pet?.id;
+    if (!pet || !id || this.reaction || Math.hypot(pet.x - this.feet.x, pet.y - this.feet.y) > 34) return;
+    this.cancelWalk();
+    this.reaction = { kind, start: this.time.now, until: this.time.now + PET_INTERACTIONS[id].ms };
+    pet.anims.stop(); pet.setFlipX(this.feet.x > pet.x);
+    this.ctx.hooks.onPetMessage?.(kind === 'feed' ? PET_INTERACTIONS[id].start : '친구를 다정하게 쓰다듬었어요.');
+    this.facing = facingToward(this.feet, pet); this.playAvatar(false, 1);
+    if (kind === 'feed') this.treatFx(id, pet);
+    else this.sparkles(pet.x, pet.y - 20, 0xf477a6);
+    this.time.delayedCall(1400, () => { if (this.pet === pet && this.reaction) this.sparkles(pet.x, pet.y - 24, 0xf477a6); });
+  }
+  private treatFx(id: PetId, pet: Phaser.GameObjects.Sprite) {
+    const side = pet.flipX ? 1 : -1;
+    const prop = this.add.graphics().setPosition(pet.x + side * 12, pet.y - 8).setDepth(99999);
+    if (id === 'pet_dog') {
+      prop.fillStyle(0xfbf1dc).fillRect(-4, -1, 8, 2).fillRect(-5, -2, 2, 4).fillRect(3, -2, 2, 4);
+    } else if (id === 'pet_bear') {
+      prop.fillStyle(0xe59a2f).fillRect(-4, -2, 8, 6);
+      prop.fillStyle(0x7a4a22).fillRect(-3, -4, 6, 2);
+      prop.fillStyle(0xfff1c1).fillRect(-1, 0, 2, 2);
+    } else {
+      prop.fillStyle(id === 'pet_duck' ? 0xe2a75a : 0xb8893f);
+      for (let i = 0; i < 5; i++) prop.fillRect((i % 3) * 3 - 3, Math.floor(i / 3) * 3, id === 'pet_duck' ? 2 : 1, 2);
+    }
+    this.tweens.add({ targets: prop, x: pet.x + side * 4, alpha: 0, duration: id === 'pet_duck' || id === 'pet_pigeon' ? 1900 : 600, onComplete: () => prop.destroy() });
+  }
+  farmFx(index: number, action: string) {
+    if (this.spec.id !== 'yard') return;
+    const cell = BED_CELLS[index]; if (!cell) return;
+    this.sparkles((cell.x + 1) * TILE, (cell.y + 1) * TILE, action === 'water' ? 0x83d9fa : 0xffdf75);
+  }
+  private sparkles(x: number, y: number, color: number) {
+    if (color === 0xf477a6) {
+      const key = 'pet-heart';
+      if (!this.textures.exists(key)) {
+        const canvas = document.createElement('canvas'); canvas.width = 9; canvas.height = 8;
+        const ctx = canvas.getContext('2d')!; ctx.fillStyle = '#f477a6';
+        ['01100110', '11111111', '11111111', '01111110', '00111100', '00011000'].forEach((row, y) => [...row].forEach((pixel, x) => { if (pixel === '1') ctx.fillRect(x, y, 1, 1); }));
+        this.textures.addCanvas(key, canvas);
+      }
+      for (let i = 0; i < 3; i++) {
+        const heart = this.add.image(x + (i - 1) * 10, y - i * 4, key).setDepth(99999);
+        this.tweens.add({ targets: heart, y: heart.y - 18, alpha: 0, duration: 1000, onComplete: () => heart.destroy() });
+      }
+      return;
+    }
+    for (let i = 0; i < 6; i++) {
+      const dot = this.add.rectangle(x + (i - 3) * 3, y, 3, 3, color).setDepth(99999);
+      this.tweens.add({ targets: dot, y: y - 12 - i * 2, x: dot.x + (i - 3) * 3, alpha: 0, duration: 650, onComplete: () => dot.destroy() });
+    }
+  }
+  private petTarget(): Interactable | null {
+    const pet = this.pet;
+    if (!pet || this.reaction || !facesPet(this.feet, this.facing, pet)) return null;
+    return { id: 'pet', cell: cellOf(pet), label: '친구', verb: '놀아주기', action: { kind: 'panel', panel: 'pet' }, bang: { x: pet.x, y: pet.y - 30 } };
+  }
   private updatePet(deltaMs: number) {
     const pet = this.pet, sheet = this.petSheet;
     if (!pet || !sheet) return;
     if (!this.petFollow) return;
+    if (this.reaction && this.ctx.assets.pet) {
+      if (this.time.now < this.reaction.until) {
+        pet.setFrame(reactionFrame(this.ctx.assets.pet.id, this.time.now - this.reaction.start, this.reaction.kind));
+        pet.setDepth(pet.y); return;
+      }
+      this.ctx.hooks.onPetMessage?.(this.reaction.kind === 'feed' ? PET_INTERACTIONS[this.ctx.assets.pet.id].result : '친구가 기분 좋아 보여요!');
+      this.reaction = null; this.petFollow = createPetFollowState(pet);
+    }
+    // 가만히 서서 바라보는 친구는 뒤로 돌아가지 않는다. A를 누를 시간을 준다.
+    if (this.ctx.controls.frozen || (!this.moving && facesPet(this.feet, this.facing, pet))) { pet.play(pet.texture.key + ':idle', true); return; }
     const solid = this.spec.solid;
     const result = stepPetFollow(this.petFollow, { x: pet.x, y: pet.y }, this.feet,
       this.facing, sheet, deltaMs, RUN_SPEED, {
@@ -349,7 +426,7 @@ export abstract class WorldScene extends Phaser.Scene {
   }
 
   private updatePrompt(force = false) {
-    const item = this.moving && this.path.length ? null : facedInteractable(this.feet, this.facing, this.spec.interactables);
+    const item = this.moving && this.path.length ? null : (facedInteractable(this.feet, this.facing, this.spec.interactables) ?? this.petTarget());
     if (item) this.bang.setPosition(item.bang.x, item.bang.y).setVisible(true);
     else this.bang.setVisible(false);
     if (force || item?.id !== this.prompt?.id) {
@@ -374,6 +451,7 @@ export abstract class WorldScene extends Phaser.Scene {
     const screen = (p: Point): Point => ({ x: Math.round((p.x - camera.worldView.x) * camera.zoom / ratio), y: Math.round((p.y - camera.worldView.y) * camera.zoom / ratio) });
     return {
       avatarKey: this.player.texture.key, petId: this.pet ? this.ctx.assets.pet?.id ?? null : null,
+      petReaction: this.reaction?.kind ?? null, petFrame: this.pet ? Number(this.pet.frame.name) : null, petFlipX: this.pet?.flipX ?? false,
       scene: this.spec.id, transitioning: this.transitioning,
       x: Math.round(this.feet.x * 10) / 10, y: Math.round(this.feet.y * 10) / 10, facing: this.facing, moving: this.moving, running: this.running,
       prompt: this.prompt?.id ?? null, pet: this.pet ? { x: Math.round(this.pet.x), y: Math.round(this.pet.y) } : null,
