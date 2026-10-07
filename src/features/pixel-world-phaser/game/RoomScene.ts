@@ -1,9 +1,12 @@
 // 내 방 그림: 기존 방(CSS)과 같은 느낌 — 베이지 벽 + 창문, 밝은 나무 마루, 아래 가운데 문 매트 — 을
 // 원본 interior 아틀라스(floors-walls / furniture / small-items)에서 잘라 그린다. 가구는 학생이 서버에
-// 저장한 배치 그대로(읽기 전용). 움직임/충돌/출구/대화는 WorldScene이 맡는다.
+// 저장한 배치를 그린다. 움직임/충돌/출구/대화는 WorldScene이 맡는다.
 import type Phaser from 'phaser';
 import { furnitureArt } from '../../pixel-room/assets';
 import type { Placement } from '../../pixel-room/model';
+import { ROOM_HEIGHT, ROOM_WIDTH } from '../../pixel-room/model';
+import { roomPoint } from '../logic/roomEditing';
+import { cellOf } from '../logic/world';
 import { ROOM_COLS, ROOM_DOOR, ROOM_ROWS, ROOM_WALL, furnitureSprite, roomToWorld, sanitizeFurniture } from '../logic/roomWorld';
 import { TILE } from '../logic/world';
 import { WorldScene } from './WorldScene';
@@ -13,12 +16,15 @@ export class RoomScene extends WorldScene {
   protected readonly background = '#2b1d16';
   private furniture: Phaser.GameObjects.Image[] = [];
 
+  private grid: Phaser.GameObjects.Graphics | null = null;
+
   constructor(ctx: WorldContext) { super('room', ctx); }
 
   protected drawWorld() {
     if (!this.textures.exists('room-bg')) this.textures.addCanvas('room-bg', this.drawRoom());
     this.add.image(0, 0, 'room-bg').setOrigin(0, 0).setDepth(-1000);
     this.furniture = [];
+    this.grid = null;
     this.drawFurniture();
   }
 
@@ -26,6 +32,26 @@ export class RoomScene extends WorldScene {
   refreshData() {
     this.rebuildSpec();
     this.drawFurniture();
+  }
+
+  /** 바닥 안내선만 표시한다. 가구는 저장 성공 후에만 바꾼다. */
+  setRoomPlacing(active: boolean) {
+    this.setPlacingActors(active);
+    this.grid?.destroy(); this.grid = null;
+    if (!active) return;
+    const grid = this.add.graphics().setDepth(99998);
+    grid.lineStyle(0.5, 0xfff4d9, 0.45);
+    for (let x = 0; x <= ROOM_WIDTH; x++) grid.lineBetween((x + 1) * TILE, 2 * TILE, (x + 1) * TILE, (2 + ROOM_HEIGHT) * TILE);
+    for (let y = 0; y <= ROOM_HEIGHT; y++) grid.lineBetween(TILE, (y + 2) * TILE, (ROOM_WIDTH + 1) * TILE, (y + 2) * TILE);
+    this.grid = grid;
+  }
+
+  editPoint(x: number, y: number) {
+    // CSS 크기와 캔버스 크기를 축별로 변환한다. 소수 DPR의 반올림도 반영한다.
+    const rect = this.game.canvas.getBoundingClientRect();
+    const world = this.cameras.main.getWorldPoint(x * this.scale.width / rect.width, y * this.scale.height / rect.height);
+    const actor = cellOf(this.feet);
+    return { point: roomPoint(world), actor: { x: actor.x - 1, y: actor.y - 2 } };
   }
 
   private drawFurniture() {

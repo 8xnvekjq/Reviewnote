@@ -1,6 +1,6 @@
 // Phaser "내 방" 월드 데이터. 기존 Pixel Room(model.ts, PixelRoom.tsx)과 같은 10×8 칸 방, 같은 가구
 // 크기·배치 규칙, 같은 문(아래 줄 가운데 매트) 자리를 쓴다. 방 둘레에 벽(위 2줄, 옆·아래 1줄)을 둘러
-// 월드는 12×11칸. 가구 배치는 서버 값을 읽기만 한다(꾸미기는 다음 PR의 창에서). 순수 모듈.
+// 월드는 12×11칸. 저장된 배치와 편집 결과는 같은 좌표·충돌 규칙을 쓴다. 순수 모듈.
 import { FURNITURE, ROOM_HEIGHT, ROOM_WIDTH } from '../../pixel-room/model';
 import type { FurnitureType, Placement } from '../../pixel-room/model';
 import type { Point } from './joystick';

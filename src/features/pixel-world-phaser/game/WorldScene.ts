@@ -14,6 +14,8 @@ import { PET_SHEETS, petFollowSpot } from '../logic/petSheets';
 import type { PetSheet } from '../logic/petSheets';
 import { createPetFollowState, stepPetFollow } from '../logic/petFollow';
 import type { PetFollowState } from '../logic/petFollow';
+import { createPetFlightState, startPetFlight, stepPetFlight, petFlightFrame, PIGEON_FLIGHT_DISTANCE } from '../logic/petFlight';
+import type { PetFlightState, FlightWorld } from '../logic/petFlight';
 import type { PetId } from '../../pixel-room/pet/petKinds';
 import { TILE, cellCenter, cellOf, coversCell, facedInteractable, facingToward, feetBlocked, moveFeet, nearestCellCenter, nearestOpenCell, planPath } from '../logic/world';
 import type { Interactable } from '../logic/world';
@@ -30,6 +32,9 @@ const PET_ALWAYS_FOLLOWS = typeof window !== 'undefined' && new URLSearchParams(
 /** 장면 전환 때 어두워졌다/밝아지는 시간(ms). 기존 Pixel World의 문 페이드(260ms)와 비슷하게. */
 export const FADE_MS = 240;
 const FADE_RGB = [24, 16, 12] as const;
+/** 달릴 때만 발뒤꿈치에서 흙먼지가 이만큼(월드 px) 갈 때마다 피어오른다. 걸을 때는 없다. */
+const DUST_STEP = 11;
+const REDUCED_MOTION = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 export interface WorldAssets {
   town: HTMLImageElement;
@@ -68,6 +73,7 @@ export interface WorldContext {
   onSceneGone(scene: WorldScene): void;
 }
 export interface WorldDebug {
+  placing: boolean; playerAlpha: number; petAlpha: number | null; bangVisible: boolean;
   avatarKey: string; petId: PetId | null;
   scene: SceneId; transitioning: boolean;
   x: number; y: number; facing: Facing; moving: boolean; running: boolean; prompt: string | null;
@@ -76,6 +82,8 @@ export interface WorldDebug {
   petReaction: string | null;
   petFrame: number | null;
   petFlipX: boolean;
+  /** 지금 떠 있는 달리기 흙먼지 조각 수(테스트용 — 걷기 0, 다 사라지면 0). */
+  dust: number;
   /** 카메라 배율(기기 픽셀/월드 px)과 CSS px 기준 배율, 캔버스 기기 픽셀 비율. */
   zoom: number; cssZoom: number; ratio: number;
   camera: { x: number; y: number }; fps: number; renderer: string; pathLength: number;
@@ -88,9 +96,13 @@ export abstract class WorldScene extends Phaser.Scene {
   protected spec!: SceneSpec;
   protected player!: Phaser.GameObjects.Sprite;
   private shadow!: Phaser.GameObjects.Ellipse;
+  private placing = false;
   private pet: Phaser.GameObjects.Sprite | null = null;
   private petSheet: PetSheet | null = null;
   private petFollow: PetFollowState | null = null;
+  private petFlight: PetFlightState | null = null;
+  private petShadow: Phaser.GameObjects.Ellipse | null = null;
+  private petNextFlightAt = 0;
   private reaction: { start: number; until: number; kind: 'feed' | 'pet'; quiet?: boolean } | null = null;
   private wander: { target: { x: number; y: number } | null; nextAt: number } = { target: null, nextAt: 0 };
   private bang!: Phaser.GameObjects.Image;
@@ -98,6 +110,8 @@ export abstract class WorldScene extends Phaser.Scene {
   protected facing: Facing = 'Front';
   private moving = false;
   private running = false;
+  private dust = new Set<Phaser.GameObjects.Image>();
+  private dustDistance = 0;
   private path: Point[] = [];
   private pathTarget: string | null = null;
   private prompt: Interactable | null = null;
@@ -121,8 +135,10 @@ export abstract class WorldScene extends Phaser.Scene {
   init(data: { entry?: string } | undefined) {
     this.entry = data?.entry;
     this.pet = null; this.petSheet = null; this.petFollow = null; this.reaction = null;
+    this.petFlight = null; this.petShadow = null;
     this.moving = false; this.running = false; this.path = []; this.pathTarget = null;
     this.prompt = null; this.animKey = ''; this.transitioning = false; this.exitArmed = false;
+    this.dust = new Set(); this.dustDistance = 0;
   }
 
   /** 맵 그림(바닥·벽·소품). spec은 이미 준비돼 있다. */
@@ -150,7 +166,8 @@ export abstract class WorldScene extends Phaser.Scene {
     camera.setRoundPixels(true);
     this.applyZoom();
     this.scale.on('resize', this.applyZoom, this);
-    const gone = () => { this.scale.off('resize', this.applyZoom, this); this.ctx.onSceneGone(this); };
+    // 흙먼지 조각과 tween은 장면이 내려갈 때 함께 지워진다 — 목록만 비운다.
+    const gone = () => { this.scale.off('resize', this.applyZoom, this); this.dust.clear(); this.ctx.onSceneGone(this); };
     this.events.once('shutdown', gone);
     this.events.once('destroy', gone);
     camera.fadeIn(FADE_MS, ...FADE_RGB);
@@ -163,6 +180,7 @@ export abstract class WorldScene extends Phaser.Scene {
   private ensureSharedTextures() {
     const { textures, anims } = this;
     if (!textures.exists('bang')) textures.addCanvas('bang', drawBang());
+    if (!textures.exists('run-dust')) textures.addCanvas('run-dust', drawDust());
     const { key, canvas } = this.ctx.assets.avatar;
     if (!textures.exists(key)) {
       const texture = textures.addCanvas(key, canvas);
@@ -187,6 +205,10 @@ export abstract class WorldScene extends Phaser.Scene {
 
   refreshPet() {
     this.pet?.destroy();
+    if (this.petFlight || this.ctx.assets.pet?.id === 'pet_pigeon') {
+      this.reaction = null; this.wander = { target: null, nextAt: 0 };
+    }
+    this.petShadow?.destroy(); this.petShadow = null; this.petFlight = null;
     this.pet = null; this.petSheet = null; this.petFollow = null;
     if (this.ctx.assets.pet) this.addPet(this.ctx.assets.pet.id);
   }
@@ -209,7 +231,14 @@ export abstract class WorldScene extends Phaser.Scene {
     this.petSheet = sheet;
     this.petFollow = createPetFollowState(start);
     this.pet = this.add.sprite(start.x, start.y, key, sheet.idle.row * sheet.columns).setOrigin(0.5, sheet.footY / sheet.cell);
+    this.pet.setAlpha(this.placing ? 0.35 : 1);
     this.pet.play(`${key}:idle`);
+    if (id === 'pet_pigeon') {
+      this.wander = { target: null, nextAt: 0 };
+      this.petFlight = createPetFlightState(start);
+      this.petNextFlightAt = this.time.now + 10000 + Math.random() * 5000;
+      this.petShadow = this.add.ellipse(start.x, start.y, 10, 3, 0x453d29, 0.2).setVisible(false);
+    }
   }
 
   private applyZoom() {
@@ -317,9 +346,11 @@ export abstract class WorldScene extends Phaser.Scene {
       speedScale = run ? RUN_SPEED / WALK_SPEED : 1;
     }
     const wasMoving = this.moving;
+    let moved = 0;
     if (vx || vy) {
       const before = this.feet;
       this.feet = moveFeet(before, vx * dt, vy * dt, solid);
+      moved = Math.hypot(this.feet.x - before.x, this.feet.y - before.y);
       this.facing = facingFor(vx, vy, this.facing);
       // 벽에 정면으로 막혀 제자리면 걷는 시늉도 멈춘다(제자리 걸음 방지).
       this.moving = Math.hypot(this.feet.x - before.x, this.feet.y - before.y) > 0.05 * speedScale;
@@ -327,6 +358,11 @@ export abstract class WorldScene extends Phaser.Scene {
     } else this.moving = false;
     this.running = this.moving && run;
     if (this.transitioning) return; // 도착하자마자 문으로 들어간 경우
+    // 달리기 흙먼지: 막 달리기 시작하면 곧바로 한 번, 그 뒤 DUST_STEP마다. 걷거나 멈추면 다시 센다.
+    if (this.running) {
+      this.dustDistance += moved;
+      if (this.dustDistance >= DUST_STEP) { this.dustDistance = 0; this.kickDust(vx, vy); }
+    } else this.dustDistance = DUST_STEP * 0.7;
     if (this.moving || wasMoving || this.animKey === '') this.playAvatar(this.moving, Math.max(0.6, speedScale));
     this.player.setPosition(Math.round(this.feet.x), Math.round(this.feet.y)).setDepth(this.feet.y);
     this.shadow.setPosition(Math.round(this.feet.x), Math.round(this.feet.y)).setDepth(this.feet.y - 0.5);
@@ -339,6 +375,21 @@ export abstract class WorldScene extends Phaser.Scene {
     this.positionCamera(dt);
   }
 
+  /** 발뒤꿈치(가는 방향 반대쪽)에 흙먼지 세 조각. 캐릭터보다 뒤에 그리고, 다 흐려지면 스스로 지운다. */
+  private kickDust(vx: number, vy: number) {
+    if (REDUCED_MOTION) return;
+    const length = Math.hypot(vx, vy) || 1, bx = -vx / length, by = -vy / length;
+    const x = this.feet.x + bx * 4, y = this.feet.y + by * 2 - 1;
+    ([[-3, 0, -4, 0], [3, 0, 4, 30], [0, -2, 0, 60]] as const).forEach(([ox, oy, dx, delay]) => {
+      const puff = this.add.image(Math.round(x + ox), Math.round(y + oy), 'run-dust').setDepth(this.feet.y - 1);
+      this.dust.add(puff);
+      this.tweens.add({
+        targets: puff, x: puff.x + dx + bx * 3, y: puff.y - 4, alpha: 0, scale: 0.5, duration: 420, delay, ease: 'Quad.easeOut',
+        onComplete: () => { this.dust.delete(puff); puff.destroy(); },
+      });
+    });
+  }
+
   private playAvatar(walking: boolean, timeScale: number) {
     const key = `${this.ctx.assets.avatar.key}:${walking ? 'Walk' : 'Idle'}_${this.facing}`;
     if (key !== this.animKey) { this.player.play(key); this.animKey = key; }
@@ -348,7 +399,7 @@ export abstract class WorldScene extends Phaser.Scene {
   // 펫이 고개를 돌려 기존 시트의 먹기/앉기/짖기 동작을 보여 준다.
   reactPet(kind: 'feed' | 'pet') {
     const pet = this.pet, id = this.ctx.assets.pet?.id;
-    if (!pet || !id || this.reaction || Math.hypot(pet.x - this.feet.x, pet.y - this.feet.y) > 34) return;
+    if (!pet || !id || this.reaction || (this.petFlight && this.petFlight.phase !== 'ground') || Math.hypot(pet.x - this.feet.x, pet.y - this.feet.y) > 34) return;
     this.cancelWalk();
     this.reaction = { kind, start: this.time.now, until: this.time.now + PET_INTERACTIONS[id].ms };
     pet.anims.stop(); pet.setFlipX(this.feet.x > pet.x);
@@ -400,7 +451,7 @@ export abstract class WorldScene extends Phaser.Scene {
   }
   private petTarget(): Interactable | null {
     const pet = this.pet;
-    if (!pet || this.reaction || !facesPet(this.feet, this.facing, pet)) return null;
+    if (!pet || this.reaction || (this.petFlight && this.petFlight.phase !== 'ground') || !facesPet(this.feet, this.facing, pet)) return null;
     return { id: 'pet', cell: cellOf(pet), label: '친구', verb: '놀아주기', action: { kind: 'panel', panel: 'pet' }, bang: { x: pet.x, y: pet.y - 30 } };
   }
   private wanderPet(pet: Phaser.GameObjects.Sprite, sheet: PetSheet, deltaMs: number) {
@@ -436,6 +487,22 @@ export abstract class WorldScene extends Phaser.Scene {
     const pet = this.pet, sheet = this.petSheet;
     if (!pet || !sheet) return;
     if (!this.petFollow) return;
+    const follows = this.spec.id === 'plaza' || PET_ALWAYS_FOLLOWS;
+    if (this.petFlight) {
+      const wasAirborne = this.petFlight.phase !== 'ground';
+      this.petFlight = stepPetFlight(this.petFlight, deltaMs, this.petFlightWorld(), follows ? petFollowSpot(this.feet, this.facing) : undefined);
+      if (wasAirborne) {
+        this.renderPetFlight();
+        if (this.petFlight.phase === 'ground') {
+          this.petFollow = createPetFollowState(this.petFlight.position, this.petFlight.flipX);
+          this.wander = { target: null, nextAt: this.time.now + 1500 };
+          this.petNextFlightAt = this.time.now + 10000 + Math.random() * 5000;
+        }
+        return;
+      }
+      this.petFlight.position = { x: pet.x, y: pet.y };
+      this.petFlight.flipX = pet.flipX;
+    }
     if (this.reaction && this.ctx.assets.pet) {
       if (this.time.now < this.reaction.until) {
         pet.setFrame(reactionFrame(this.ctx.assets.pet.id, this.time.now - this.reaction.start, this.reaction.kind));
@@ -446,6 +513,26 @@ export abstract class WorldScene extends Phaser.Scene {
     }
     // 가만히 서서 바라보는 친구는 뒤로 돌아가지 않는다. A를 누를 시간을 준다.
     if (this.ctx.controls.frozen || (!this.moving && facesPet(this.feet, this.facing, pet))) { pet.play(pet.texture.key + ':idle', true); return; }
+    if (this.petFlight) {
+      let target: Point | null = null;
+      if (follows) {
+        const spot = petFollowSpot(this.feet, this.facing);
+        if (Math.hypot(spot.x - pet.x, spot.y - pet.y) > PIGEON_FLIGHT_DISTANCE || this.petFollow.stuckMs >= 300) target = spot;
+      } else if (this.petFlight.cooldownMs === 0 && this.time.now >= this.petNextFlightAt) {
+        const world = this.petFlightWorld();
+        for (let i = 0; i < 12; i++) {
+          const candidate = { x: pet.x + (Math.random() - 0.5) * TILE * 8, y: pet.y + (Math.random() - 0.5) * TILE * 6 };
+          if (!world.blocked(candidate) && Math.hypot(candidate.x - pet.x, candidate.y - pet.y) >= TILE * 2) { target = candidate; break; }
+        }
+        this.petNextFlightAt = this.time.now + 10000 + Math.random() * 5000;
+      }
+      if (target) {
+        // 따라잡기는 대기 시간보다 우선하며 지상 순간이동 대신 날아서 회복한다.
+        if (follows) this.petFlight.cooldownMs = 0;
+        this.petFlight = startPetFlight(this.petFlight, target, this.petFlightWorld());
+        if (this.petFlight.phase !== 'ground') { this.wander.target = null; this.renderPetFlight(); return; }
+      }
+    }
     // 광장에서만 따라온다. 집과 마당에서는 혼자 돌아다니며 가끔 짖거나 쪼거나 손을 흔든다.
     if (this.spec.id !== 'plaza' && !PET_ALWAYS_FOLLOWS) { this.wanderPet(pet, sheet, deltaMs); return; }
     const solid = this.spec.solid;
@@ -461,8 +548,42 @@ export abstract class WorldScene extends Phaser.Scene {
     pet.setDepth(pet.y);
   }
 
+  /** 착륙 후보는 장면 범위와 발밑 충돌을 모두 확인한다. */
+  private petFlightWorld(): FlightWorld {
+    const blocked = (point: Point) => point.x < TILE || point.y < TILE || point.x > this.spec.cols * TILE - TILE || point.y > this.spec.rows * TILE - TILE || feetBlocked(point, this.spec.solid);
+    return { blocked, landing: point => {
+      if (!blocked(point)) return point;
+      let best: Point | null = null, distance = Infinity;
+      for (let y = 1; y < this.spec.rows - 1; y++) for (let x = 1; x < this.spec.cols - 1; x++) {
+        const candidate = cellCenter({ x, y });
+        const gap = Math.hypot(candidate.x - point.x, candidate.y - point.y);
+        if (gap < distance && !blocked(candidate)) { best = candidate; distance = gap; }
+      }
+      return best;
+    } };
+  }
+
+  /** 그림은 높이에 맞춰 그리고 그림자는 지상 좌표에 남긴다. */
+  private renderPetFlight() {
+    const flight = this.petFlight, pet = this.pet;
+    if (!flight || !pet) return;
+    pet.anims.stop();
+    pet.setFrame(petFlightFrame(flight)).setPosition(flight.position.x, flight.position.y - flight.altitude).setFlipX(flight.flipX).setDepth(flight.position.y + flight.altitude);
+    this.petShadow?.setPosition(flight.position.x, flight.position.y).setDepth(flight.position.y - 1).setScale(1 - flight.altitude / 40).setVisible(flight.phase !== 'ground');
+  }
+
+  /** 배치 중에는 캐릭터·펫을 흐리게 하고 상호작용 표시를 숨긴다. */
+  protected setPlacingActors(active: boolean) {
+    this.placing = active;
+    this.player.setAlpha(active ? 0.35 : 1);
+    this.shadow.setAlpha(active ? 0.35 : 1);
+    this.pet?.setAlpha(active ? 0.35 : 1);
+    this.petShadow?.setAlpha(active ? 0.35 : 1);
+    this.updatePrompt(true);
+  }
+
   private updatePrompt(force = false) {
-    const item = this.moving && this.path.length ? null : (facedInteractable(this.feet, this.facing, this.spec.interactables) ?? this.petTarget());
+    const item = this.placing || (this.moving && this.path.length) ? null : (facedInteractable(this.feet, this.facing, this.spec.interactables) ?? this.petTarget());
     if (item) this.bang.setPosition(item.bang.x, item.bang.y).setVisible(true);
     else this.bang.setVisible(false);
     if (force || item?.id !== this.prompt?.id) {
@@ -487,17 +608,28 @@ export abstract class WorldScene extends Phaser.Scene {
     const screen = (p: Point): Point => ({ x: Math.round((p.x - camera.worldView.x) * camera.zoom / ratio), y: Math.round((p.y - camera.worldView.y) * camera.zoom / ratio) });
     return {
       avatarKey: this.player.texture.key, petId: this.pet ? this.ctx.assets.pet?.id ?? null : null,
+      dust: this.dust.size,
       petReaction: this.reaction?.kind ?? null, petFrame: this.pet ? Number(this.pet.frame.name) : null, petFlipX: this.pet?.flipX ?? false,
       scene: this.spec.id, transitioning: this.transitioning,
       x: Math.round(this.feet.x * 10) / 10, y: Math.round(this.feet.y * 10) / 10, facing: this.facing, moving: this.moving, running: this.running,
-      prompt: this.prompt?.id ?? null, pet: this.pet ? { x: Math.round(this.pet.x), y: Math.round(this.pet.y) } : null,
-      zoom: camera.zoom, cssZoom: Math.round(camera.zoom / ratio * 1000) / 1000, ratio: Math.round(ratio * 1000) / 1000,
-      camera: { x: Math.round(camera.scrollX), y: Math.round(camera.scrollY) }, fps: Math.round(this.game.loop.actualFps),
+      prompt: this.prompt?.id ?? null, placing: this.placing, playerAlpha: this.player.alpha, petAlpha: this.pet?.alpha ?? null, bangVisible: this.bang.visible, pet: this.pet ? { x: Math.round(this.pet.x), y: Math.round(this.pet.y) } : null,
+      zoom: camera.zoom, cssZoom: camera.zoom / ratio, ratio,
+      camera: { x: camera.worldView.x, y: camera.worldView.y }, fps: Math.round(this.game.loop.actualFps),
       renderer: this.game.renderer.type === Phaser.WEBGL ? 'webgl' : 'canvas', pathLength: this.path.length,
       targets: Object.fromEntries(this.spec.interactables.map(item => [item.id, screen(cellCenter(item.cell))])),
       exits: Object.fromEntries(this.spec.exits.map(exit => [exit.id, screen(cellCenter(exit.cells[0]))])),
     };
   }
+}
+
+/** 달리기 흙먼지 한 조각(3×3 도트, 예전 Pixel World 발자국 먼지 색). */
+function drawDust(): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.width = 3; canvas.height = 3;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#fbf3df'; ctx.fillRect(0, 0, 3, 2);
+  ctx.fillStyle = '#d9c39a'; ctx.fillRect(0, 2, 3, 1);
+  return canvas;
 }
 
 /** 말풍선 "!" (9×12 도트) — 상호작용 가능 표시. */

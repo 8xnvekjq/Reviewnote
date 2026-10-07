@@ -55,6 +55,37 @@ try {
   await b.waitForFunction(() => window.__pixelWorldPhaser.debug().reactions?.length === 1);
   await mkdir('.pixel-world-test.local', { recursive: true });
   await b.screenshot({ path: '.pixel-world-test.local/plaza-classmates.png' });
+  // 한마디: 구름 버튼 → 입력창(이동 키가 게임으로 새지 않음) → 두 화면 모두 머리 위 구름 말풍선 → 5초 뒤 천천히 사라짐.
+  await a.bringToFront();
+  const spot = () => a.evaluate(() => { const d = window.__pixelWorldPhaser.debug(); return { x: d.x, y: d.y, moving: d.moving }; });
+  const still = await spot();
+  await a.getByRole('button', { name: '한마디 하기' }).click();
+  const chatInput = a.getByRole('textbox', { name: '한마디' });
+  await chatInput.waitFor();
+  await chatInput.press('ArrowDown'); await chatInput.press('ArrowLeft'); await chatInput.pressSequentially('wasd');
+  await a.waitForTimeout(250);
+  assert.deepEqual(await spot(), still, 'typing does not move the character');
+  await chatInput.fill('  같이   토마토 키우자!  ');
+  await chatInput.press('Enter');
+  assert.equal(await chatInput.inputValue(), '', 'sent text clears');
+  await a.waitForFunction(() => window.__pixelWorldPhaser.debug().bubbles?.some(v => v.text === '같이 토마토 키우자!'));
+  await chatInput.fill('또 보내기'); await chatInput.press('Enter');
+  await a.getByText('조금만 천천히 보내요.').waitFor();
+  await b.bringToFront();
+  await b.waitForFunction(() => window.__pixelWorldPhaser.debug().bubbles?.some(v => v.text === '같이 토마토 키우자!' && v.alpha === 1));
+  assert.equal(await b.evaluate(() => window.__pixelWorldPhaser.debug().bubbles.some(v => v.text === '또 보내기')), false, 'cooldown message was not sent');
+  await b.screenshot({ path: '.pixel-world-test.local/plaza-chat.png' });
+  await b.waitForFunction(() => { const v = window.__pixelWorldPhaser.debug().bubbles.find(x => x.text === '같이 토마토 키우자!'); return v && v.alpha > 0 && v.alpha < 1; }, null, { timeout: 9000 });
+  await b.waitForFunction(() => window.__pixelWorldPhaser.debug().bubbles.length === 0, null, { timeout: 4000 });
+  await a.bringToFront();
+  await a.getByRole('button', { name: '한마디 닫기' }).click();
+  // 달리기 흙먼지: 걸을 때는 없고, 달릴 때만 생겼다가 스스로 사라진다.
+  await target(a, 'shop');
+  for (let i = 0; i < 8; i++) { const d = await a.evaluate(() => window.__pixelWorldPhaser.debug()); assert.equal(d.dust, 0, 'no dust while walking'); await a.waitForTimeout(60); }
+  await a.keyboard.down('Shift');
+  await a.waitForFunction(() => { const d = window.__pixelWorldPhaser.debug(); return d.running && d.dust > 0; }, null, { timeout: 5000 });
+  await a.keyboard.up('Shift');
+  await a.waitForFunction(() => window.__pixelWorldPhaser.debug().dust === 0, null, { timeout: 3000 });
   await exit(a, 'yard'); await ready(a, 'yard');
   await b.bringToFront();
   await b.waitForFunction(() => window.__pixelWorldPhaser.debug().classmates.length === 0);
@@ -87,10 +118,16 @@ try {
   await b.evaluate(() => { window.plazaSender({ x: 10, y: 8, direction: 'Left', moving: true }); window.plazaSender({ x: 10, y: 8, direction: 'Left', moving: false }); });
   await a.bringToFront();
   await a.waitForFunction(() => { const old = window.__pixelWorldPhaser.debug().classmates.find(p => p.id === 'sender'); return old && old.x === 10 && old.y === 8 && old.rendered && !old.pet; });
+  // 새 'chat' 이벤트는 예전 화면이 듣지 않으므로 오류 없이 지나간다.
+  await a.getByRole('button', { name: '한마디 하기' }).click();
+  await a.getByRole('textbox', { name: '한마디' }).fill('예전 화면도 괜찮아');
+  await a.getByRole('textbox', { name: '한마디' }).press('Enter');
+  await a.waitForFunction(() => window.__pixelWorldPhaser.debug().bubbles?.some(v => v.text === '예전 화면도 괜찮아'));
+  await b.bringToFront(); await b.waitForTimeout(300); await a.bringToFront();
   await a.locator('.pwp-exit').click(); await a.getByTestId('exited').waitFor();
   await a.waitForFunction(() => window.plazaTransport.audit().active.length === 0);
   console.log('PASS mixed clients: legacy receives nearest tile, beta renders legacy tile coordinates');
-  console.log('PASS plaza: fades, stall A/shop, contest RPC, well, two-page sprites/pets, fractional movement, reaction, leave/rejoin/exit cleanup');
+  console.log('PASS plaza: fades, stall A/shop, contest RPC, well, two-page sprites/pets, fractional movement, reaction, chat bubble + fade + cooldown, run-only dust, leave/rejoin/exit cleanup');
   await context.close();
   const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2.625 });
   await mobile.route('**/src/services/supabase.ts', route => route.fulfill({ contentType: 'application/javascript', body: "export { supabase } from '/tests/pixel-world-phaser/fakeRealtime.mjs';" }));
@@ -107,6 +144,19 @@ try {
   await phoneShop.waitFor({ timeout: 20000 });
   const rect = await phoneShop.boundingBox(); assert.ok(rect.x >= 0 && rect.x + rect.width <= 390);
   await phoneShop.getByRole('button', { name: '상점 닫기' }).click();
+  // 폰(390px): 구름 버튼과 입력창이 화면 안에 있고 A/B 버튼과 겹치지 않는다. 터치로 연다.
+  const chatButton = phone.getByRole('button', { name: '한마디 하기' });
+  await chatButton.tap();
+  const phoneForm = phone.getByRole('form', { name: '광장 한마디' }); await phoneForm.waitFor();
+  const boxes = { chat: await chatButton.boundingBox(), form: await phoneForm.boundingBox(), a: await phone.locator('.pwp-btn-a').boundingBox(), b: await phone.locator('.pwp-btn-b').boundingBox() };
+  const overlap = (p, q) => p.x < q.x + q.width && q.x < p.x + p.width && p.y < q.y + q.height && q.y < p.y + p.height;
+  for (const box of [boxes.chat, boxes.form]) { assert.ok(box.x >= 0 && box.x + box.width <= 390); assert.ok(!overlap(box, boxes.a) && !overlap(box, boxes.b)); }
+  assert.ok(boxes.form.y + boxes.form.height < 844 / 2, 'input stays in the upper half (soft keyboard / joystick)');
+  await phone.getByRole('textbox', { name: '한마디' }).fill('폰에서 안녕');
+  await phone.getByRole('button', { name: '보내기' }).tap();
+  await phone.waitForFunction(() => window.__pixelWorldPhaser.debug().bubbles?.some(v => v.text === '폰에서 안녕'));
+  await phone.screenshot({ path: '.pixel-world-test.local/plaza-phone-chat.png' });
+  await phone.getByRole('button', { name: '한마디 닫기' }).tap();
   await phone.screenshot({ path: '.pixel-world-test.local/plaza-phone.png' });
   await phone.locator('.pwp-exit').click(); await phone.getByTestId('exited').waitFor();
   await phone.waitForFunction(() => window.plazaTransport.audit().active.length === 0);

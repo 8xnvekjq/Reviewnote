@@ -14,6 +14,7 @@ import { RoomScene } from './RoomScene';
 import { YardScene } from './YardScene';
 import { PlazaScene } from './PlazaScene';
 import type { PlazaPlayerState } from '../../pixel-room/plaza/types';
+import type { PlazaBubble } from './plazaBubbles';
 import type { WorldAssets, WorldContext, WorldDebug, WorldEvents, WorldScene } from './WorldScene';
 
 export type { Prompt, WorldAssets, WorldDebug, WorldEvents } from './WorldScene';
@@ -33,10 +34,13 @@ export interface WorldGameHandle {
   setBeds(images: HTMLImageElement[]): void;
   /** 방 가구 배치(서버 값). 방에 있으면 바로 다시 그린다. */
   setFurniture(furniture: readonly Placement[]): void;
+  getFurniture(): Placement[];
+  setRoomPlacing(active: boolean): void;
+  roomEditPoint(x: number, y: number): ReturnType<RoomScene['editPoint']> | null;
   /** 지금 장면. 전환 중 잠깐은 직전 장면. */
   scene(): SceneId;
   setExhibit(show: boolean): void;
-  setClassmates(players: PlazaPlayerState[], reactions: Record<string, string>, selfId: string): void;
+  setClassmates(players: PlazaPlayerState[], bubbles: Record<string, PlazaBubble>, selfId: string): void;
   debug(): WorldDebug;
 }
 export interface WorldStart {
@@ -102,6 +106,9 @@ export function startWorldGame(parent: HTMLElement, start: WorldStart, controls:
     window.addEventListener('resize', fit);
 
     const handle: WorldGameHandle = {
+      getFurniture: () => ctx.data.furniture.map(item => ({ ...item })),
+      setRoomPlacing: on => { if (active === room) room.setRoomPlacing(on); },
+      roomEditPoint: (x, y) => active === room ? room.editPoint(x, y) : null,
       destroy: () => {
         observer.disconnect();
         window.removeEventListener('resize', fit);
@@ -132,7 +139,7 @@ export function startWorldGame(parent: HTMLElement, start: WorldStart, controls:
       },
       scene: () => lastScene,
       setExhibit: show => { if (active instanceof PlazaScene) active.setExhibit(show); },
-      setClassmates: (players, reactions, selfId) => { if (active instanceof PlazaScene) active.setClassmates(players, reactions, selfId); },
+      setClassmates: (players, bubbles, selfId) => { if (active instanceof PlazaScene) active.setClassmates(players, bubbles, selfId); },
       debug: () => (active ? active.snapshot() : { ...(last as WorldDebug), transitioning: true }),
     };
   });
