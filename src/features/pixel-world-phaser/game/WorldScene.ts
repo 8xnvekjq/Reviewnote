@@ -73,6 +73,7 @@ export interface WorldContext {
   onSceneGone(scene: WorldScene): void;
 }
 export interface WorldDebug {
+  placing: boolean; playerAlpha: number; petAlpha: number | null; bangVisible: boolean;
   avatarKey: string; petId: PetId | null;
   scene: SceneId; transitioning: boolean;
   x: number; y: number; facing: Facing; moving: boolean; running: boolean; prompt: string | null;
@@ -95,6 +96,7 @@ export abstract class WorldScene extends Phaser.Scene {
   protected spec!: SceneSpec;
   protected player!: Phaser.GameObjects.Sprite;
   private shadow!: Phaser.GameObjects.Ellipse;
+  private placing = false;
   private pet: Phaser.GameObjects.Sprite | null = null;
   private petSheet: PetSheet | null = null;
   private petFollow: PetFollowState | null = null;
@@ -229,6 +231,7 @@ export abstract class WorldScene extends Phaser.Scene {
     this.petSheet = sheet;
     this.petFollow = createPetFollowState(start);
     this.pet = this.add.sprite(start.x, start.y, key, sheet.idle.row * sheet.columns).setOrigin(0.5, sheet.footY / sheet.cell);
+    this.pet.setAlpha(this.placing ? 0.35 : 1);
     this.pet.play(`${key}:idle`);
     if (id === 'pet_pigeon') {
       this.wander = { target: null, nextAt: 0 };
@@ -569,8 +572,18 @@ export abstract class WorldScene extends Phaser.Scene {
     this.petShadow?.setPosition(flight.position.x, flight.position.y).setDepth(flight.position.y - 1).setScale(1 - flight.altitude / 40).setVisible(flight.phase !== 'ground');
   }
 
+  /** 배치 중에는 캐릭터·펫을 흐리게 하고 상호작용 표시를 숨긴다. */
+  protected setPlacingActors(active: boolean) {
+    this.placing = active;
+    this.player.setAlpha(active ? 0.35 : 1);
+    this.shadow.setAlpha(active ? 0.35 : 1);
+    this.pet?.setAlpha(active ? 0.35 : 1);
+    this.petShadow?.setAlpha(active ? 0.35 : 1);
+    this.updatePrompt(true);
+  }
+
   private updatePrompt(force = false) {
-    const item = this.moving && this.path.length ? null : (facedInteractable(this.feet, this.facing, this.spec.interactables) ?? this.petTarget());
+    const item = this.placing || (this.moving && this.path.length) ? null : (facedInteractable(this.feet, this.facing, this.spec.interactables) ?? this.petTarget());
     if (item) this.bang.setPosition(item.bang.x, item.bang.y).setVisible(true);
     else this.bang.setVisible(false);
     if (force || item?.id !== this.prompt?.id) {
@@ -599,9 +612,9 @@ export abstract class WorldScene extends Phaser.Scene {
       petReaction: this.reaction?.kind ?? null, petFrame: this.pet ? Number(this.pet.frame.name) : null, petFlipX: this.pet?.flipX ?? false,
       scene: this.spec.id, transitioning: this.transitioning,
       x: Math.round(this.feet.x * 10) / 10, y: Math.round(this.feet.y * 10) / 10, facing: this.facing, moving: this.moving, running: this.running,
-      prompt: this.prompt?.id ?? null, pet: this.pet ? { x: Math.round(this.pet.x), y: Math.round(this.pet.y) } : null,
-      zoom: camera.zoom, cssZoom: Math.round(camera.zoom / ratio * 1000) / 1000, ratio: Math.round(ratio * 1000) / 1000,
-      camera: { x: Math.round(camera.scrollX), y: Math.round(camera.scrollY) }, fps: Math.round(this.game.loop.actualFps),
+      prompt: this.prompt?.id ?? null, placing: this.placing, playerAlpha: this.player.alpha, petAlpha: this.pet?.alpha ?? null, bangVisible: this.bang.visible, pet: this.pet ? { x: Math.round(this.pet.x), y: Math.round(this.pet.y) } : null,
+      zoom: camera.zoom, cssZoom: camera.zoom / ratio, ratio,
+      camera: { x: camera.worldView.x, y: camera.worldView.y }, fps: Math.round(this.game.loop.actualFps),
       renderer: this.game.renderer.type === Phaser.WEBGL ? 'webgl' : 'canvas', pathLength: this.path.length,
       targets: Object.fromEntries(this.spec.interactables.map(item => [item.id, screen(cellCenter(item.cell))])),
       exits: Object.fromEntries(this.spec.exits.map(exit => [exit.id, screen(cellCenter(exit.cells[0]))])),
