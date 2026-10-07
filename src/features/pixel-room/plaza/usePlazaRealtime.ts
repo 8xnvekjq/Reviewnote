@@ -12,6 +12,8 @@ import { protocolExtras } from './presenceProtocol';
 import { usePlazaReactions } from './usePlazaReactions';
 import { REACTION_COOLDOWN_MS, nearWell } from './plazaInteractions';
 import type { ReactionKind } from './plazaInteractions';
+import { usePlazaChat } from './usePlazaChat';
+import { CHAT_COOLDOWN_MS, CHAT_EVENT, normalizeChat } from './plazaChat';
 
 const MOVE_BROADCAST_EVENT = 'move';
 
@@ -39,6 +41,9 @@ export interface UsePlazaRealtimeResult {
   paths: Map<string, PathWaypoint[]>;
   reactions: ReturnType<typeof usePlazaReactions>['reactions'];
   sendReaction: (kind: ReactionKind) => Promise<boolean>;
+  chats: ReturnType<typeof usePlazaChat>['chats'];
+  /** 광장 한마디. 저장하지 않는 broadcast — 'empty'(빈 말), 'cooldown'(1.5초 안), 'failed'(연결 문제). */
+  sendChat: (text: string) => Promise<'ok' | 'empty' | 'cooldown' | 'failed'>;
   ready: boolean;              // channel subscribed + initial presence sync received (false while reconnecting)
   updateMyState: (partial: PlazaSelfState) => void;
 }
@@ -153,6 +158,10 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
   const receiveRef = useRef(receive);
   receiveRef.current = receive;
   const reactionSentAt = useRef(0);
+  const { chats, receive: receiveChat } = usePlazaChat(sessionId, storeState.players);
+  const receiveChatRef = useRef(receiveChat);
+  receiveChatRef.current = receiveChat;
+  const chatSentAt = useRef(0);
 
   const channelRef = useRef<RealtimeChannel | null>(null);
   // 이 세션(=이 훅 인스턴스, 탭 하나) 안에서 단조증가하는 시퀀스 — PlazaPlayerState.seq를 우리가
@@ -283,6 +292,10 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
         if (!cancelled && channel === nextChannel) receiveRef.current(payload);
       });
 
+      nextChannel.on('broadcast', { event: CHAT_EVENT }, ({ payload }) => {
+        if (!cancelled && channel === nextChannel) receiveChatRef.current(payload);
+      });
+
       nextChannel.subscribe(status => {
         if (cancelled) return;
         // 이 채널이 이미 다른 connect()/teardown에 의해 교체된 뒤 뒤늦게 도착한 이벤트라면
@@ -406,5 +419,21 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
       return true;
     } catch { return false; }
   }
-  return { players, paths: storeState.paths, ready, updateMyState, reactions, sendReaction };
+  async function sendChat(raw: string): Promise<'ok' | 'empty' | 'cooldown' | 'failed'> {
+    const text = normalizeChat(raw);
+    if (!text) return 'empty';
+    const channel = channelRef.current;
+    const now = Date.now();
+    if (now - chatSentAt.current < CHAT_COOLDOWN_MS) return 'cooldown';
+    if (!channel || !ready) return 'failed';
+    chatSentAt.current = now;
+    const payload = { sessionId, text, sentAt: now };
+    try {
+      const result = await channel.send({ type: 'broadcast', event: CHAT_EVENT, payload });
+      if (result !== 'ok' || channelRef.current !== channel) return 'failed';
+      receiveChatRef.current(payload);
+      return 'ok';
+    } catch { return 'failed'; }
+  }
+  return { players, paths: storeState.paths, ready, updateMyState, reactions, sendReaction, chats, sendChat };
 }

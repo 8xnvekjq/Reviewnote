@@ -11,7 +11,9 @@ import type { WeeklyCropContest } from '../../pixel-room/farm/farmModel';
 import type { PublicAvatarAppearance } from '../../pixel-room/shop/types';
 import type { PetId } from '../../pixel-room/pet/petKinds';
 import type { WorldGameHandle } from '../game/boot';
+import type { PlazaBubble } from '../game/plazaBubbles';
 import { Window } from './GamePanels';
+import { PlazaChat } from './PlazaChat';
 export type PlazaPanel = 'contest' | 'well' | 'bench';
 export function PlazaBridge({ handle, appearance, pet, userId, panel, onClose }: {
   handle: RefObject<WorldGameHandle | null>; appearance: PublicAvatarAppearance; pet: PetId | null;
@@ -52,10 +54,22 @@ export function PlazaBridge({ handle, appearance, pet, userId, panel, onClose }:
     return () => { cancelled = true; };
   }, [retry]);
   useEffect(() => { handle.current?.setExhibit(!!contest?.top.length); }, [handle, contest]);
+  // 머리 위 말풍선: 인사(안녕!/응원해!)와 한마디를 같은 구름 모양으로. 한 사람에겐 가장 최근 것 하나만,
+  // 먼저 끝난 새 말 뒤에 오래된 말이 되살아나지 않게 사람마다 본 적 있는 가장 늦은 시각을 기억한다.
+  const latest = useRef(new Map<string, number>());
+  const bubbles = useMemo(() => {
+    const out: Record<string, PlazaBubble> = {};
+    const offer = (id: string, text: string, stamp: number) => {
+      if (stamp > (latest.current.get(id) ?? -Infinity)) latest.current.set(id, stamp);
+      if (stamp === latest.current.get(id)) out[id] = { text, stamp };
+    };
+    for (const [id, r] of realtime.reactions) offer(id, REACTIONS[r.kind].label, r.sentAt);
+    for (const [id, c] of realtime.chats) offer(id, c.text, c.sentAt);
+    return out;
+  }, [realtime.reactions, realtime.chats]);
   useEffect(() => {
-    const reactions = Object.fromEntries([...realtime.reactions].map(([id, r]) => [id, REACTIONS[r.kind].label]));  // 머리 위에는 이모지 대신 말풍선 글(안녕!/응원해!)
-    handle.current?.setClassmates(smoothed, reactions, sessionId);
-  }, [handle, smoothed, realtime.reactions, sessionId]);
+    handle.current?.setClassmates(smoothed, bubbles, sessionId);
+  }, [handle, smoothed, bubbles, sessionId]);
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 250);
     return () => window.clearInterval(timer);
@@ -78,6 +92,7 @@ export function PlazaBridge({ handle, appearance, pet, userId, panel, onClose }:
           setCoolUntil(Date.now() + 4000);
           void realtime.sendReaction(kind).then(sent => setMessage(sent ? REACTIONS[kind].label : '반응을 보내지 못했어요. 잠시 후 다시 해 주세요.'));
         }}>{REACTIONS[kind].emoji}</button>)}
+      <PlazaChat disabled={!realtime.ready || !!panel} onSend={realtime.sendChat} onStatus={setMessage} />
       <span role="status">{!realtime.ready ? '다시 연결하는 중…' : now < coolUntil ? '잠깐 쉬었다 보내요' : message}</span>
     </div>
     {(panel === 'contest' || panel === 'well' || panel === 'bench') && <Window title={title} onClose={onClose} compact small>
