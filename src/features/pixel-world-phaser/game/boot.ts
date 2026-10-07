@@ -94,14 +94,42 @@ export function startWorldGame(parent: HTMLElement, start: WorldStart, controls:
     });
 
     // 크기/회전/브라우저 확대(기기 픽셀 비율 변화) → 캔버스 해상도 다시 맞추기. 장면은 scale 'resize'로 카메라 배율을 다시 잡는다.
-    const fit = () => {
-      const next = measure();
+    let pendingSize: ReturnType<typeof measure> | null = null;
+    let resizeFrame: number | null = null;
+    let resizedThisFrame = false;
+    const flushSize = () => {
+      const next = pendingSize;
+      pendingSize = null;
+      if (!next) return;
       if (next.width === size.width && next.height === size.height && next.ratio === size.ratio) return;
       size = next;
       ctx.view.ratio = next.ratio;
       game.scale.resize(next.width, next.height);
+      // 버퍼를 비운 콜백 안에서 바로 그린다. 업데이트를 생략해 잠든 루프와 게임 시간은 유지한다.
+      const renderer = game.renderer;
+      renderer.preRender();
+      game.events.emit(Phaser.Core.Events.PRE_RENDER, renderer, game.loop.time, 0);
+      game.scene.render(renderer);
+      renderer.postRender();
+      game.events.emit(Phaser.Core.Events.POST_RENDER, renderer, game.loop.time, 0);
+      resizedThisFrame = true;
     };
-    const observer = new ResizeObserver(fit);
+    const scheduleSize = () => {
+      if (resizeFrame !== null) return;
+      resizeFrame = requestAnimationFrame(() => {
+        resizeFrame = null;
+        resizedThisFrame = false;
+        flushSize();
+        if (resizedThisFrame) scheduleSize();
+      });
+    };
+    const fit = () => { pendingSize = measure(); scheduleSize(); };
+    const observer = new ResizeObserver(() => {
+      pendingSize = measure();
+      // 관찰자는 rAF 뒤에 호출된다. 첫 변경은 페인트 전에 처리하고 같은 프레임의 나머지는 합친다.
+      if (!resizedThisFrame) flushSize();
+      scheduleSize();
+    });
     observer.observe(parent);
     window.addEventListener('resize', fit);
 
@@ -112,6 +140,7 @@ export function startWorldGame(parent: HTMLElement, start: WorldStart, controls:
       destroy: () => {
         observer.disconnect();
         window.removeEventListener('resize', fit);
+        if (resizeFrame !== null) cancelAnimationFrame(resizeFrame);
         active = null;
         game.destroy(true);
       },
