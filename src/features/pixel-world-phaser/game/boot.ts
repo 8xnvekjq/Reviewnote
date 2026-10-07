@@ -208,7 +208,7 @@ class YardScene extends Phaser.Scene {
   }
 
   setPet(pet: YardAssets['pet']) {
-    this.pet?.destroy(); this.pet = null; this.petSheet = null; this.petStuckMs = 0;
+    this.pet?.destroy(); this.pet = null; this.petSheet = null; this.petFollowState = null;
     this.assets.pet = pet;
     if (pet) this.addPet(pet.id, pet.source);
   }
