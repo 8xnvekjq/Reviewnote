@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CHAT_MAX_CHARS, CHAT_SHOW_MS, normalizeChat, parseChat } from '../../src/features/pixel-room/plaza/plazaChat.ts';
+import { CHAT_MAX_CHARS, CHAT_SHOW_MS, chatAccepted, normalizeChat, parseChat } from '../../src/features/pixel-room/plaza/plazaChat.ts';
 import { CLOUD_PAD_X, CLOUD_PAD_Y, cloudMask } from '../../src/features/pixel-world-phaser/logic/cloudBubble.ts';
 import { facePixels } from '../../src/features/pixel-world-phaser/logic/avatarPixels.ts';
 
@@ -13,15 +13,35 @@ test('chat: trims, collapses whitespace/newlines, strips hidden direction marks,
   assert.equal(Array.from(normalizeChat(long)).length, CHAT_MAX_CHARS);
   assert.equal(Array.from(normalizeChat('😀'.repeat(50))).length, CHAT_MAX_CHARS, 'emoji count as one');
 });
-test('chat: parse accepts only well-formed fresh messages and never keeps extra fields', () => {
-  const now = 1_000_000;
-  const ok = parseChat({ sessionId: 's1', text: ' 같이 가자 ', sentAt: now - 10, name: '실명', html: '<b>' }, now);
-  assert.deepEqual(ok, { sessionId: 's1', text: '같이 가자', sentAt: now - 10 });
-  for (const bad of [null, 'hi', { sessionId: '', text: 'a', sentAt: now }, { sessionId: 's', text: 3, sentAt: now },
-    { sessionId: 's', text: '   ', sentAt: now }, { sessionId: 's', text: 'a', sentAt: now - CHAT_SHOW_MS - 1 },
-    { sessionId: 's', text: 'a', sentAt: now + 6000 }, { sessionId: 's', text: 'a', sentAt: NaN }, { sessionId: 's', text: 'x'.repeat(500), sentAt: now }]) {
-    assert.equal(parseChat(bad, now), null);
+test('chat: parse keeps only well-formed messages and never keeps extra fields', () => {
+  const ok = parseChat({ sessionId: 's1', text: ' 같이 가자 ', sentAt: 123, name: '실명', html: '<b>' });
+  assert.deepEqual(ok, { sessionId: 's1', text: '같이 가자', sentAt: 123 });
+  for (const bad of [null, 'hi', { sessionId: '', text: 'a', sentAt: 1 }, { sessionId: 's', text: 3, sentAt: 1 },
+    { sessionId: 's', text: '   ', sentAt: 1 }, { sessionId: 's', text: 'a', sentAt: NaN }, { sessionId: 's', text: 'a', sentAt: Infinity },
+    { sessionId: 's', text: 'a', sentAt: '1' }, { sessionId: 's', text: 'x'.repeat(500), sentAt: 1 }]) {
+    assert.equal(parseChat(bad), null);
   }
+});
+test('chat: a sender clock skewed ±10 minutes is still accepted and paced by the receiver clock', () => {
+  const now = 1_700_000_000_000;
+  for (const skew of [-10 * 60_000, 10 * 60_000]) {
+    // 보낸 쪽 시계가 10분 빠르거나 느려도 첫 말은 받는다(parseChat은 내 시계와 비교하지 않는다).
+    const first = parseChat({ sessionId: 's', text: '안녕', sentAt: now + skew });
+    assert.ok(first);
+    assert.equal(chatAccepted(undefined, first.sentAt, now), true);
+    const prev = { sentAt: now + skew, receivedAt: now };
+    // 다음 말: 1.5초 뒤(보낸 쪽 시계도 1.5초 흐름) → 받는다. 같은 말 재전송/1초 안 → 버린다.
+    assert.equal(chatAccepted(prev, now + skew + 1500, now + 1500), true);
+    assert.equal(chatAccepted(prev, now + skew, now + 2000), false, 'duplicate');
+    assert.equal(chatAccepted(prev, now + skew + 800, now + 800), false, 'faster than the receive gap');
+  }
+});
+test('chat: a sender whose clock jumps backwards is only held back while the old bubble is showing', () => {
+  const now = 1_700_000_000_000, prev = { sentAt: now + 600_000, receivedAt: now };
+  // 보낸 기기 시계가 10분 뒤로 맞춰짐 → 5초 안에는 늦게 온 옛 말로 보고 버리지만, 그 뒤로는 다시 받는다.
+  assert.equal(chatAccepted(prev, now + 2000, now + 2000), false);
+  assert.equal(chatAccepted(prev, now + CHAT_SHOW_MS, now + CHAT_SHOW_MS), true);
+  assert.equal(chatAccepted(prev, now + 60_000, now + 60_000), true);
 });
 
 // ── 구름 말풍선 ──

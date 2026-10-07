@@ -4,7 +4,7 @@ import type { RefObject } from 'react';
 import { usePlazaRealtime } from '../../pixel-room/plaza/usePlazaRealtime';
 import { useSmoothedPlayerPositions } from '../../pixel-room/plaza/useSmoothedPlayerPositions';
 import { continuousPayload, continuousPosition } from '../../pixel-room/plaza/presenceProtocol';
-import { REACTIONS, dailyWellMessage, plazaDay, wellStorageKey } from '../../pixel-room/plaza/plazaInteractions';
+import { REACTIONS, REACTION_MS, dailyWellMessage, plazaDay, wellStorageKey } from '../../pixel-room/plaza/plazaInteractions';
 import { fetchWeeklyCropContest } from '../../../utils/pixelFarm';
 import { weeklyRankLabel } from '../../pixel-room/farm/farmModel';
 import type { WeeklyCropContest } from '../../pixel-room/farm/farmModel';
@@ -56,6 +56,7 @@ export function PlazaBridge({ handle, appearance, pet, userId, panel, onClose }:
   useEffect(() => { handle.current?.setExhibit(!!contest?.top.length); }, [handle, contest]);
   // 머리 위 말풍선: 인사(안녕!/응원해!)와 한마디를 같은 구름 모양으로. 한 사람에겐 가장 최근 것 하나만,
   // 먼저 끝난 새 말 뒤에 오래된 말이 되살아나지 않게 사람마다 본 적 있는 가장 늦은 시각을 기억한다.
+  // 시각은 모두 내 시계(받은 시각) — 보낸 기기 시계가 어긋나거나 뒤로 가도 새 말이 막히지 않는다.
   const latest = useRef(new Map<string, number>());
   const bubbles = useMemo(() => {
     const out: Record<string, PlazaBubble> = {};
@@ -63,8 +64,8 @@ export function PlazaBridge({ handle, appearance, pet, userId, panel, onClose }:
       if (stamp > (latest.current.get(id) ?? -Infinity)) latest.current.set(id, stamp);
       if (stamp === latest.current.get(id)) out[id] = { text, stamp };
     };
-    for (const [id, r] of realtime.reactions) offer(id, REACTIONS[r.kind].label, r.sentAt);
-    for (const [id, c] of realtime.chats) offer(id, c.text, c.sentAt);
+    for (const [id, r] of realtime.reactions) offer(id, REACTIONS[r.kind].label, r.expires - REACTION_MS);
+    for (const [id, c] of realtime.chats) offer(id, c.text, c.receivedAt);
     return out;
   }, [realtime.reactions, realtime.chats]);
   useEffect(() => {
