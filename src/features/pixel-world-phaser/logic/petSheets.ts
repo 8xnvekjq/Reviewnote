@@ -7,6 +7,7 @@ export interface PetSheet {
   /** 칸 크기(px). 오리는 큰 원본을 32px 칸으로 줄여 다시 만든 시트 기준. */
   cell: number; columns: number; rows: number;
   walk: PetAnim; idle: PetAnim;
+  takeoff?: PetAnim; fly?: PetAnim; land?: PetAnim;
   /** 원본 그림이 왼쪽을 보고 있어 오른쪽으로 갈 때 좌우 반전. */
   facesLeft: boolean;
   /** 발끝 기준점(칸 위쪽에서 px). */
@@ -21,7 +22,7 @@ export const PET_SHEETS: Record<PetId, PetSheet> = {
   // bear.png 192×192, 48칸: 1행 걷기(150ms), 0행 숨쉬기.
   pet_bear: { cell: 48, columns: 4, rows: 4, walk: { row: 1, frames: [0, 1, 2, 3], frameMs: 150 }, idle: { row: 0, frames: [0, 0, 0, 1, 1, 1, 3, 3, 2], frameMs: 450 }, facesLeft: true, footY: 46, pace: 1 },
   // pigeon.png 128×192, 32칸: 1행 종종걸음(75ms), 0행 고개 까딱.
-  pet_pigeon: { cell: 32, columns: 4, rows: 6, walk: { row: 1, frames: [0, 1, 2, 3], frameMs: 75 }, idle: { row: 0, frames: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3], frameMs: 320 }, facesLeft: true, footY: 31, pace: 1.1 },
+  pet_pigeon: { cell: 32, columns: 4, rows: 6, walk: { row: 1, frames: [0, 1, 2, 3], frameMs: 75 }, idle: { row: 0, frames: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3], frameMs: 320 }, takeoff: { row: 4, frames: [0, 1], frameMs: 120 }, fly: { row: 5, frames: [0, 1, 2, 3], frameMs: 90 }, land: { row: 4, frames: [2, 3], frameMs: 120 }, facesLeft: true, footY: 31, pace: 1.1 },
   // duck.png는 1254px 원본 — game/petTextures.ts가 Duck.tsx와 같은 알파 경계로 32px 칸 4×4 시트를 만든다.
   pet_duck: { cell: 32, columns: 4, rows: 4, walk: { row: 1, frames: [0, 1, 2, 3], frameMs: 110 }, idle: { row: 0, frames: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3], frameMs: 330 }, facesLeft: true, footY: 30, pace: 1.05 },
 };
