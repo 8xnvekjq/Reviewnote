@@ -88,6 +88,27 @@ async function leaveFullscreen() {
 
 // 상위가 1초마다(밭 시계) 다시 그려져도, 넘겨받는 값이 같으면 셸은 다시 그리지 않는다.
 export const GameShell = memo(function GameShell({ appearance, pet, balance, beds, furniture, onSaveFurniture, scarecrowLine, onExit, panels, farmAdapter, userId = 'guest' }: GameShellProps) {
+  useLayoutEffect(() => {
+    let viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
+    const created = !viewport;
+    if (!viewport) {
+      viewport = document.createElement('meta');
+      viewport.name = 'viewport';
+      document.head.appendChild(viewport);
+    }
+    const original = viewport.getAttribute('content');
+    // 키보드는 시각 뷰포트만 줄이게 하고, 기존 확대/안전 영역 설정은 그대로 보존한다.
+    const content = original ?? '';
+    const directive = /(^|,)(\s*)interactive-widget\s*=\s*[^,]*/gi;
+    viewport.setAttribute('content', /(^|,)\s*interactive-widget\s*=/i.test(content)
+      ? content.replace(directive, '$1$2interactive-widget=resizes-visual')
+      : `${content}${content ? ', ' : ''}interactive-widget=resizes-visual`);
+    return () => {
+      if (created) viewport.remove();
+      else if (original === null) viewport.removeAttribute('content');
+      else viewport.setAttribute('content', original);
+    };
+  }, []);
   const root = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const probe = useRef<HTMLDivElement>(null);
