@@ -59,6 +59,15 @@ type PointerRole = { kind: 'stick' | 'tap' | 'pen'; start: Point; at: number; mo
 const TAP_SLOP = 10;
 const TAP_MS = 280;
 
+// B와 키보드는 가장 위 창의 뒤로 동작을 공유한다.
+function cancelTopWindow(root: HTMLElement | null) {
+  const windows = root?.querySelectorAll('.pwp-window');
+  const top = windows?.[windows.length - 1];
+  if (!top) return false;
+  top.dispatchEvent(new Event('pwp-cancel'));
+  return true;
+}
+
 function readInsets(probe: HTMLElement | null): Insets {
   if (!probe) return NO_INSETS;
   const style = getComputedStyle(probe);
@@ -310,7 +319,11 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     setDialogue(next);
   }, [controls]);
   talkRef.current = id => { if (id === 'scarecrow') openPanel('scarecrow'); else openDialogue(id); };
-  const closeDialogue = useCallback(() => { controls.frozen = panelFrozen(panelRef.current, false); dialogueRef.current = null; setDialogue(null); }, [controls]);
+  const closeDialogue = useCallback(() => {
+    controls.frozen = panelFrozen(panelRef.current, false); dialogueRef.current = null; setDialogue(null);
+    controls.stick = ZERO_STICK; controls.run = false;
+    keys.current = { up: false, down: false, left: false, right: false };
+  }, [controls]);
   const currentLine = dialogue ? dialogue.lines[dialogue.index] : '';
   // 한 글자씩 찍히는 대사(약 40자/초). 끝나면 타이머 정지.
   useEffect(() => {
@@ -340,10 +353,15 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
   }, [advance]);
   const pressB = useCallback((down: boolean) => {
     if (editingRef.current) return;
-    if (panelRef.current) { if (down) closePanel(); return; }
+    if (down && cancelTopWindow(root.current)) { controls.run = false; return; }
+    if (panelRef.current) { controls.run = false; return; }
     if (down && dialogueRef.current) { closeDialogue(); return; }
+    if (down && root.current?.querySelector('.pwp-chat-form')) {
+      root.current.querySelector<HTMLButtonElement>('.pwp-chat-close')?.click();
+      controls.run = false; return;
+    }
     controls.run = down;
-  }, [closeDialogue, closePanel, controls]);
+  }, [closeDialogue, controls]);
 
   // ── 조이스틱/탭 (게임 표면 전체에서 받는다; 버튼은 자기 이벤트를 먼저 먹는다) ──
   const framePoint = (event: { clientX: number; clientY: number }): Point => {
@@ -443,17 +461,21 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     const map: Record<string, keyof typeof keys.current> = { ArrowUp: 'up', w: 'up', ArrowDown: 'down', s: 'down', ArrowLeft: 'left', a: 'left', ArrowRight: 'right', d: 'right' };
     const sync = () => { if (!stickOrigin.current) controls.stick = keyboardVector(keys.current); };
     const down = (event: KeyboardEvent) => {
+      const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
       if (editingRef.current) { if (map[event.key] || ['Shift', 'z', 'x'].includes(event.key)) event.preventDefault(); return; }
-      if (panelRef.current) { if (event.key === 'Escape') closePanel(); return; }
+      if (key === 'Escape' || key === 'x') {
+        event.preventDefault();
+        if (!event.repeat) { if (!cancelTopWindow(root.current) && dialogueRef.current) closeDialogue(); }
+        return;
+      }
+      if (panelRef.current) return;
       if (event.target instanceof HTMLElement && event.target.closest('button') && (event.key === 'Enter' || event.key === ' ')) return;
       if (event.altKey || event.ctrlKey || event.metaKey) return;
-      const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
       const dir = map[key];
       if (dir) { event.preventDefault(); keys.current[dir] = true; sync(); return; }
       if (key === 'Shift') { controls.run = true; return; }
       if (event.repeat) return;
       if (key === ' ' || key === 'Enter' || key === 'z') { event.preventDefault(); pressA(); }
-      else if (key === 'Escape' || key === 'x') { event.preventDefault(); if (dialogueRef.current) closeDialogue(); }
     };
     const up = (event: KeyboardEvent) => {
       if (editingRef.current) return;
@@ -541,19 +563,23 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
       onClick={event => { if (event.detail === 0) pressA(); }}>
       <b>A</b>{(prompt || dialogue) && <small>{dialogue ? '다음' : promptLabel}</small>}
     </button>
-    <button type="button" disabled={!!placing} className="pwp-btn pwp-btn-b" data-pressed={pressed.b}
+    <button type="button" disabled={!!placing} className="pwp-btn pwp-btn-b" data-pressed={pressed.b} data-closing={!!panel || !!dialogue}
       style={{ left: b.x - b.size / 2, top: b.y - b.size / 2, width: b.size, height: b.size }}
-      aria-label={dialogue ? 'B · 닫기' : 'B · 누르는 동안 달리기'}
-      onPointerDown={buttonDown('b')} onPointerUp={buttonUp('b')} onPointerCancel={buttonUp('b')} onLostPointerCapture={buttonUp('b')}>
-      <b>B</b><small>{dialogue ? '닫기' : '달리기'}</small>
+      aria-label={panel || dialogue ? 'B · 닫기' : 'B · 누르는 동안 달리기'}
+      onPointerDown={buttonDown('b')} onPointerUp={buttonUp('b')} onPointerCancel={buttonUp('b')} onLostPointerCapture={buttonUp('b')}
+      onClick={event => { if (event.detail === 0 && (panelRef.current || dialogueRef.current || root.current?.querySelector('.pwp-chat-form'))) pressB(true); }}>
+      <b>B</b><small>{panel || dialogue ? '닫기' : '달리기'}</small>
     </button>
-    {dialogue && <div className="pwp-dialogue" role="dialog" aria-live="polite" aria-label={`${dialogue.speaker}의 말`}
+    {dialogue && <div className="pwp-panel-shade pwp-dialogue-shade" onPointerDown={event => {
+      event.stopPropagation();
+      if (event.target === event.currentTarget && event.button === 0) { event.preventDefault(); closeDialogue(); }
+    }}><div className="pwp-dialogue" role="dialog" aria-live="polite" aria-label={`${dialogue.speaker}의 말`}
       style={{ left: box.x, top: box.y, width: box.width, minHeight: box.height }}
       onPointerDown={event => { event.stopPropagation(); advance(); }}>
       <strong>{dialogue.speaker}</strong>
       <p data-full={currentLine}>{currentLine.slice(0, typed)}</p>
       {typed >= currentLine.length && <span className="pwp-dialogue-next" aria-hidden="true">{dialogue.index + 1 < dialogue.lines.length ? '▼' : '■'}</span>}
-    </div>}
+    </div></div>}
     {(panel === 'shop' || panel === 'wardrobe') && panels && <GamePanels kind={panel} adapter={panels} onClose={closePanel} />}
     {scene?.id === 'plaza' && status === 'ready' && <PlazaBridge key={'plaza:' + scene.visit} handle={handle} appearance={appearance} pet={pet} userId={userId} panel={panel} onClose={closePanel} />}
     {panel && panel !== 'furniture' && panel !== 'shop' && panel !== 'wardrobe' && panel !== 'contest' && panel !== 'well' && panel !== 'bench' && <FarmPanels key={panel} kind={panel} adapter={farmAdapter} onClose={closePanel}
