@@ -78,8 +78,7 @@ async function draw(appearance: PublicAvatarAppearance): Promise<HTMLCanvasEleme
           ctx.drawImage(cell, ox, oy);
           continue;
         }
-        // 원래 눈 위에 큰 눈·볼·입을 덧그린다(눈 시트 위치를 따라가므로 머리 흔들림도 그대로).
-        ctx.drawImage(cell, ox, oy);
+        // 원래 눈은 그리지 않고 그 위치에 점 눈·볼·입을 그린다(눈 시트 위치를 따라가므로 머리 흔들림도 그대로).
         for (const p of facePixels(layer.data, direction)) {
           ctx.fillStyle = `rgb(${p.color[0]},${p.color[1]},${p.color[2]})`;
           ctx.fillRect(ox + p.x, oy + p.y, 1, 1);

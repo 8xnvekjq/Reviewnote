@@ -25,6 +25,8 @@ import type { Placement } from '../../pixel-room/model';
 /** 걷기/달리기 속도(월드 px/초). 16px 칸 기준 약 3.5칸/6칸. */
 export const WALK_SPEED = 56;
 export const RUN_SPEED = 96;
+/** 테스트용(?petWander=0): 마당·방에서도 예전처럼 따라오게 한다. */
+const PET_ALWAYS_FOLLOWS = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('petWander') === '0';
 /** 장면 전환 때 어두워졌다/밝아지는 시간(ms). 기존 Pixel World의 문 페이드(260ms)와 비슷하게. */
 export const FADE_MS = 240;
 const FADE_RGB = [24, 16, 12] as const;
@@ -89,7 +91,8 @@ export abstract class WorldScene extends Phaser.Scene {
   private pet: Phaser.GameObjects.Sprite | null = null;
   private petSheet: PetSheet | null = null;
   private petFollow: PetFollowState | null = null;
-  private reaction: { start: number; until: number; kind: 'feed' | 'pet' } | null = null;
+  private reaction: { start: number; until: number; kind: 'feed' | 'pet'; quiet?: boolean } | null = null;
+  private wander: { target: { x: number; y: number } | null; nextAt: number } = { target: null, nextAt: 0 };
   private bang!: Phaser.GameObjects.Image;
   protected feet: Point = { x: 0, y: 0 };
   protected facing: Facing = 'Front';
@@ -400,6 +403,35 @@ export abstract class WorldScene extends Phaser.Scene {
     if (!pet || this.reaction || !facesPet(this.feet, this.facing, pet)) return null;
     return { id: 'pet', cell: cellOf(pet), label: '친구', verb: '놀아주기', action: { kind: 'panel', panel: 'pet' }, bang: { x: pet.x, y: pet.y - 30 } };
   }
+  private wanderPet(pet: Phaser.GameObjects.Sprite, sheet: PetSheet, deltaMs: number) {
+    const now = this.time.now, solid = this.spec.solid, key = pet.texture.key;
+    if (!this.wander.target) {
+      pet.play(key + ':idle', true); pet.setDepth(pet.y);
+      if (now < this.wander.nextAt) return;
+      if (Math.random() < 0.35 && this.ctx.assets.pet) {
+        // 혼자 노는 동작(짖기·쪼기·손 흔들기 등) — 알림 문구는 띄우지 않는다.
+        this.reaction = { start: now, until: now + 1600, kind: Math.random() < 0.5 ? 'feed' : 'pet', quiet: true };
+        this.wander.nextAt = now + 1600 + 2000 + Math.random() * 3000;
+        return;
+      }
+      for (let i = 0; i < 12; i++) {
+        const t = { x: pet.x + (Math.random() - 0.5) * TILE * 8, y: pet.y + (Math.random() - 0.5) * TILE * 6 };
+        const size = this.worldSize();
+        if (t.x < TILE || t.y < TILE || t.x > size.width - TILE || t.y > size.height - TILE || feetBlocked(t, solid)) continue;
+        this.wander.target = t; break;
+      }
+      this.wander.nextAt = now + 2000 + Math.random() * 4000;
+      return;
+    }
+    const dx = this.wander.target.x - pet.x, dy = this.wander.target.y - pet.y, distance = Math.hypot(dx, dy);
+    const step = Math.min(distance, RUN_SPEED * 0.45 * sheet.pace * Math.min(deltaMs, 50) / 1000);
+    const next = distance > 1 ? moveFeet({ x: pet.x, y: pet.y }, dx / distance * step, dy / distance * step, solid) : { x: pet.x, y: pet.y };
+    const moved = Math.hypot(next.x - pet.x, next.y - pet.y);
+    if (distance <= 2 || moved < step * 0.3) { this.wander.target = null; this.wander.nextAt = now + 1500 + Math.random() * 3000; return; }
+    pet.setPosition(next.x, next.y);
+    if (Math.abs(dx) > 4) pet.setFlipX(sheet.facesLeft ? dx > 0 : dx < 0);
+    pet.play(key + ':walk', true); pet.setDepth(pet.y);
+  }
   private updatePet(deltaMs: number) {
     const pet = this.pet, sheet = this.petSheet;
     if (!pet || !sheet) return;
@@ -409,11 +441,13 @@ export abstract class WorldScene extends Phaser.Scene {
         pet.setFrame(reactionFrame(this.ctx.assets.pet.id, this.time.now - this.reaction.start, this.reaction.kind));
         pet.setDepth(pet.y); return;
       }
-      this.ctx.hooks.onPetMessage?.(this.reaction.kind === 'feed' ? PET_INTERACTIONS[this.ctx.assets.pet.id].result : '친구가 기분 좋아 보여요!');
+      if (!this.reaction.quiet) this.ctx.hooks.onPetMessage?.(this.reaction.kind === 'feed' ? PET_INTERACTIONS[this.ctx.assets.pet.id].result : '친구가 기분 좋아 보여요!');
       this.reaction = null; this.petFollow = createPetFollowState(pet);
     }
     // 가만히 서서 바라보는 친구는 뒤로 돌아가지 않는다. A를 누를 시간을 준다.
     if (this.ctx.controls.frozen || (!this.moving && facesPet(this.feet, this.facing, pet))) { pet.play(pet.texture.key + ':idle', true); return; }
+    // 광장에서만 따라온다. 집과 마당에서는 혼자 돌아다니며 가끔 짖거나 쪼거나 손을 흔든다.
+    if (this.spec.id !== 'plaza' && !PET_ALWAYS_FOLLOWS) { this.wanderPet(pet, sheet, deltaMs); return; }
     const solid = this.spec.solid;
     const result = stepPetFollow(this.petFollow, { x: pet.x, y: pet.y }, this.feet,
       this.facing, sheet, deltaMs, RUN_SPEED, {

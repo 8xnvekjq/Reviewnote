@@ -16,8 +16,9 @@ export function facePixels(eyes: Uint8ClampedArray, direction: 'Front' | 'Back' 
   for (const anchor of anchors) {
     const x = anchor.x + (direction === 'Left' ? 1 : direction === 'Right' ? -2 : anchor.x > 15 ? -1 : 0);
     const y = anchor.y;
-    pixels.push({ x, y, color: AVATAR_OUTLINE }, { x: x + 1, y, color: [255, 246, 225] },
-      { x, y: y + 1, color: AVATAR_OUTLINE }, { x: x + 1, y: y + 1, color: anchor.color });
+    // 강아지처럼 동글한 점 눈: 눈 색을 아주 어둡게 해서 색감만 남긴다(1×2).
+    const bead = anchor.color.map(v => Math.round(v * 0.35 + AVATAR_OUTLINE[0] * 0.15));
+    pixels.push({ x, y, color: bead }, { x, y: y + 1, color: bead });
   }
   if (anchors.length) {
     const y = anchors[0].y;
