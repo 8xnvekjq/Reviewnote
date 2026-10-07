@@ -1,0 +1,413 @@
+// 새 Pixel World(베타) 전체 화면 셸. 게임 캔버스가 화면 전체를 채우고, 모든 UI(포인트, 나가기, 전체화면,
+// 대화창, 조이스틱, A/B)는 그 프레임 "안"에 DOM으로 겹친다. 한글은 앱 웹폰트 그대로 선명하게 보이고
+// (Phaser Text는 도트 모드에서 최근접 보간이라 작은 한글이 뭉개진다), 버튼은 접근성/테스트도 쉽다.
+// 입력은 controls 객체에만 쓰고 Phaser가 매 프레임 읽는다 — 손가락 이동으로 React가 다시 그리지 않는다.
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
+import { createPortal } from 'react-dom';
+import type { PublicAvatarAppearance } from '../pixel-room/shop/types';
+import type { PetId } from '../pixel-room/pet/petKinds';
+import { useBgm } from '../pixel-room/bgm/useBgm';
+import { createControls } from './controls';
+import { followOrigin, keyboardVector, knobOffset, stickVector, STICK_RADIUS, ZERO_STICK } from './logic/joystick';
+import type { Point } from './logic/joystick';
+import { gameLayout, insideRect, NO_INSETS } from './logic/layout';
+import type { GameLayout, Insets } from './logic/layout';
+import type { InteractableId } from './logic/yardWorld';
+import { composeAvatar } from './game/avatarTexture';
+import { loadBed, loadInterior, loadPetSheet, loadScarecrow, loadTown } from './game/sceneAssets';
+import type { BedLook } from './game/sceneAssets';
+import type { YardGameHandle } from './game/boot';
+import './gameShell.css';
+
+export interface GameShellProps {
+  appearance: PublicAvatarAppearance;
+  pet: PetId | null;
+  balance: number;
+  beds: BedLook[];
+  /** 허수아비 대사 한 줄(기존 scarecrowLines.ts). 호출할 때마다 새로 뽑는다. */
+  scarecrowLine: () => string;
+  onExit: () => void;
+}
+
+type Dialogue = { speaker: string; lines: string[]; index: number };
+type PointerRole = { kind: 'stick' | 'tap' | 'pen'; start: Point; at: number; moved: boolean };
+const TAP_SLOP = 10;
+const TAP_MS = 280;
+
+function readInsets(probe: HTMLElement | null): Insets {
+  if (!probe) return NO_INSETS;
+  const style = getComputedStyle(probe);
+  const px = (value: string) => Number.parseFloat(value) || 0;
+  return { top: px(style.paddingTop), right: px(style.paddingRight), bottom: px(style.paddingBottom), left: px(style.paddingLeft) };
+}
+type FullscreenDoc = Document & { webkitFullscreenElement?: Element | null; webkitExitFullscreen?: () => Promise<void> | void; webkitFullscreenEnabled?: boolean };
+type FullscreenEl = HTMLElement & { webkitRequestFullscreen?: () => Promise<void> | void };
+const fullscreenElement = () => document.fullscreenElement ?? (document as FullscreenDoc).webkitFullscreenElement ?? null;
+const fullscreenSupported = () => !!(document.fullscreenEnabled || (document as FullscreenDoc).webkitFullscreenEnabled);
+async function enterFullscreen(element: HTMLElement, phone: boolean) {
+  try {
+    const el = element as FullscreenEl;
+    if (el.requestFullscreen) await el.requestFullscreen({ navigationUI: 'hide' });
+    else await el.webkitRequestFullscreen?.();
+    // 폰은 세로 고정을 시도(안드로이드 크롬은 전체화면에서만 허용). 안 되면 조용히 넘어간다.
+    if (phone) await (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> })?.lock?.('portrait').catch(() => {});
+  } catch { /* 지원 안 하거나 거절 — 화면 채우기(100dvh)로 충분 */ }
+}
+async function leaveFullscreen() {
+  try {
+    if (!fullscreenElement()) return;
+    if (document.exitFullscreen) await document.exitFullscreen();
+    else await (document as FullscreenDoc).webkitExitFullscreen?.();
+  } catch { /* 이미 나왔음 */ }
+}
+
+// 상위가 1초마다(밭 시계) 다시 그려져도, 넘겨받는 값이 같으면 셸은 다시 그리지 않는다.
+export const GameShell = memo(function GameShell({ appearance, pet, balance, beds, scarecrowLine, onExit }: GameShellProps) {
+  const root = useRef<HTMLDivElement>(null);
+  const stage = useRef<HTMLDivElement>(null);
+  const probe = useRef<HTMLDivElement>(null);
+  const ring = useRef<HTMLDivElement>(null);
+  const knob = useRef<HTMLDivElement>(null);
+  const handle = useRef<YardGameHandle | null>(null);
+  const controls = useRef(createControls()).current;
+  const pointers = useRef(new Map<number, PointerRole>());
+  const stickOrigin = useRef<Point | null>(null);
+  const keys = useRef({ up: false, down: false, left: false, right: false });
+  const triedFullscreen = useRef(false);
+  const [layout, setLayout] = useState<GameLayout>(() => gameLayout(window.innerWidth, window.innerHeight));
+  const layoutRef = useRef(layout); layoutRef.current = layout;
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [prompt, setPrompt] = useState<InteractableId | null>(null);
+  const promptRef = useRef(prompt); promptRef.current = prompt;
+  const [dialogue, setDialogue] = useState<Dialogue | null>(null);
+  const dialogueRef = useRef(dialogue); dialogueRef.current = dialogue;
+  const [typed, setTyped] = useState(0);
+  const [pressed, setPressed] = useState<{ a: boolean; b: boolean }>({ a: false, b: false });
+  const [fullscreen, setFullscreen] = useState(false);
+  const bgm = useBgm(root);
+  const scarecrowLineRef = useRef(scarecrowLine); scarecrowLineRef.current = scarecrowLine;
+
+  // ── 화면 채우기: 앱 내비/스크롤을 숨기고, 나가면 그대로 되돌린다 ──
+  useLayoutEffect(() => {
+    const html = document.documentElement;
+    html.classList.add('pwp-open');
+    const app = document.getElementById('root');
+    const wasInert = app?.inert ?? false;
+    if (app) app.inert = true;
+    return () => { html.classList.remove('pwp-open'); if (app) app.inert = wasInert; };
+  }, []);
+
+  // ── 크기/회전 → 레이아웃 ──
+  useLayoutEffect(() => {
+    const element = root.current;
+    if (!element) return;
+    const measure = () => {
+      const rect = element.getBoundingClientRect();
+      setLayout(gameLayout(Math.round(rect.width), Math.round(rect.height), readInsets(probe.current)));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    window.addEventListener('orientationchange', measure);
+    return () => { observer.disconnect(); window.removeEventListener('orientationchange', measure); };
+  }, []);
+
+  // ── 게임 부팅(Phaser는 여기서 처음 동적 import) / 정리 ──
+  // 탭해서 걷기로 대상 앞에 도착 → 대화 열기(아래에서 openDialogue로 채운다; 부팅을 다시 하지 않도록 ref).
+  const arriveRef = useRef<(id: InteractableId) => void>(() => {});
+  const bedsRef = useRef(beds); bedsRef.current = beds;
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const avatar = composeAvatar(appearance);
+        const [town, interior, avatarCanvas, petSource, scarecrow, bedImages, { startYardGame }] = await Promise.all([
+          loadTown(), loadInterior(), avatar.canvas, pet ? loadPetSheet(pet) : Promise.resolve(null),
+          Promise.resolve().then(loadScarecrow), Promise.resolve().then(() => Promise.all(bedsRef.current.map(loadBed))), import('./game/boot'),
+        ]);
+        if (cancelled || !stage.current) return;
+        const game = await startYardGame(stage.current, {
+          town, interior, avatar: { key: avatar.key, canvas: avatarCanvas }, pet: pet && petSource ? { id: pet, source: petSource } : null, scarecrow, beds: bedImages,
+        }, controls, {
+          onPrompt: id => setPrompt(id),
+          onArrive: id => arriveRef.current(id),
+        });
+        if (cancelled) { game.destroy(); return; }
+        handle.current = game;
+        if (import.meta.env.DEV) (window as unknown as { __pixelWorldPhaser?: YardGameHandle }).__pixelWorldPhaser = game;
+        setStatus('ready');
+      } catch (error) {
+        console.error(error);
+        if (!cancelled) setStatus('error');
+      }
+    })();
+    return () => {
+      cancelled = true;
+      handle.current?.destroy();
+      handle.current = null;
+      if (import.meta.env.DEV) delete (window as unknown as { __pixelWorldPhaser?: YardGameHandle }).__pixelWorldPhaser;
+    };
+    // 외형/펫이 바뀌면 장면을 새로 만든다(이 베타 화면 안에서는 바뀌지 않음).
+  }, [appearance, pet, controls]);
+
+  // 밭 모습이 바뀌면(서버 새로고침) 밭 그림만 갈아 끼운다.
+  const bedKey = beds.map(bed => `${bed.stage}/${bed.moisture}`).join(',');
+  useEffect(() => {
+    if (status !== 'ready') return;
+    let cancelled = false;
+    void Promise.resolve().then(() => Promise.all(bedsRef.current.map(loadBed))).then(images => { if (!cancelled) handle.current?.setBeds(images); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [bedKey, status]);
+
+  // ── 대화 ──
+  const openDialogue = useCallback((id: InteractableId) => {
+    if (dialogueRef.current) return;
+    let lines: string[];
+    let speaker: string;
+    if (id === 'scarecrow') {
+      speaker = '허수아비';
+      const first = scarecrowLineRef.current();
+      let second = scarecrowLineRef.current();
+      for (let i = 0; i < 4 && second === first; i++) second = scarecrowLineRef.current();
+      lines = second === first ? [first] : [first, second];
+    } else if (id === 'door') { speaker = '우리 집'; lines = ['문이 닫혀 있어요.', '내 방은 다음 베타에서 들어갈 수 있어요!']; }
+    else { speaker = '안내판'; lines = ['↓ 광장 가는 길', '광장은 다음 베타에서 열려요. 조금만 기다려 주세요!']; }
+    controls.frozen = true;
+    controls.stick = ZERO_STICK;
+    handle.current?.cancelWalk();
+    const next = { speaker, lines, index: 0 };
+    dialogueRef.current = next;
+    setTyped(0);
+    setDialogue(next);
+  }, [controls]);
+  arriveRef.current = openDialogue;
+  const closeDialogue = useCallback(() => { controls.frozen = false; dialogueRef.current = null; setDialogue(null); }, [controls]);
+  const currentLine = dialogue ? dialogue.lines[dialogue.index] : '';
+  // 한 글자씩 찍히는 대사(약 40자/초). 끝나면 타이머 정지.
+  useEffect(() => {
+    if (!dialogue || typed >= currentLine.length) return;
+    const timer = window.setTimeout(() => setTyped(count => count + 1), 25);
+    return () => window.clearTimeout(timer);
+  }, [dialogue, typed, currentLine]);
+  const typedRef = useRef(typed); typedRef.current = typed;
+  const advance = useCallback(() => {
+    const current = dialogueRef.current;
+    if (!current) return;
+    const line = current.lines[current.index];
+    if (typedRef.current < line.length) { typedRef.current = line.length; setTyped(line.length); return; } // 찍히는 중이면 먼저 다 보여 준다.
+    if (current.index + 1 < current.lines.length) {
+      const next = { ...current, index: current.index + 1 };
+      dialogueRef.current = next; typedRef.current = 0;
+      setDialogue(next); setTyped(0);
+      return;
+    }
+    closeDialogue();
+  }, [closeDialogue]);
+  const pressA = useCallback(() => {
+    if (dialogueRef.current) advance();
+    else if (promptRef.current) openDialogue(promptRef.current);
+  }, [advance, openDialogue]);
+  const pressB = useCallback((down: boolean) => {
+    if (down && dialogueRef.current) { closeDialogue(); return; }
+    controls.run = down;
+  }, [closeDialogue, controls]);
+
+  // ── 조이스틱/탭 (게임 표면 전체에서 받는다; 버튼은 자기 이벤트를 먼저 먹는다) ──
+  const framePoint = (event: { clientX: number; clientY: number }): Point => {
+    const rect = root.current!.getBoundingClientRect();
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  };
+  const showStick = (origin: Point | null, point?: Point) => {
+    const ringEl = ring.current, knobEl = knob.current;
+    if (!ringEl || !knobEl) return;
+    if (!origin) { ringEl.style.opacity = '0'; return; }
+    ringEl.style.opacity = '1';
+    ringEl.style.transform = `translate(${origin.x - STICK_RADIUS}px, ${origin.y - STICK_RADIUS}px)`;
+    const offset = point ? knobOffset(origin, point) : { x: 0, y: 0 };
+    knobEl.style.transform = `translate(${offset.x}px, ${offset.y}px)`;
+  };
+  // 첫 터치에서 한 번만 전체화면 시도. HTML 표준상 터치의 pointerdown은 사용자 활성화가 아니라서
+  // (iPad/안드로이드에서 거절됨) 손을 뗄 때(pointerup) 요청한다. 마우스(데스크톱)는 자동으로 하지 않는다.
+  const maybeFullscreen = (pointerType: string) => {
+    if (triedFullscreen.current || pointerType === 'mouse') return;
+    triedFullscreen.current = true;
+    if (fullscreenSupported() && !fullscreenElement() && root.current) void enterFullscreen(root.current, layoutRef.current.device === 'phone');
+  };
+  const onSurfaceDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (dialogueRef.current) { if (event.pointerType !== 'mouse' || event.button === 0) advance(); return; }
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    const point = framePoint(event);
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    if (event.pointerType === 'pen') {
+      pointers.current.set(event.pointerId, { kind: 'pen', start: point, at: performance.now(), moved: false });
+      handle.current?.walkToScreen(point.x, point.y);
+      return;
+    }
+    const hasStick = [...pointers.current.values()].some(role => role.kind === 'stick');
+    if (!hasStick && insideRect(point, layoutRef.current.stickZone)) {
+      pointers.current.set(event.pointerId, { kind: 'stick', start: point, at: performance.now(), moved: false });
+      stickOrigin.current = point;
+      showStick(point, point);
+      return;
+    }
+    pointers.current.set(event.pointerId, { kind: 'tap', start: point, at: performance.now(), moved: false });
+  };
+  const onSurfaceMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const role = pointers.current.get(event.pointerId);
+    if (!role) return;
+    const point = framePoint(event);
+    if (Math.hypot(point.x - role.start.x, point.y - role.start.y) > TAP_SLOP) role.moved = true;
+    if (role.kind === 'stick' && stickOrigin.current) {
+      const origin = followOrigin(stickOrigin.current, point);
+      stickOrigin.current = origin;
+      controls.stick = stickVector(origin, point);
+      showStick(origin, point);
+    } else if (role.kind === 'pen' && role.moved && performance.now() - role.at > 120) {
+      // 펜으로 끌면 펜 끝을 계속 따라간다.
+      role.at = performance.now();
+      handle.current?.walkToScreen(point.x, point.y);
+    }
+  };
+  const releasePointer = (event: ReactPointerEvent<HTMLDivElement>, cancelled: boolean) => {
+    if (!cancelled) maybeFullscreen(event.pointerType);
+    const role = pointers.current.get(event.pointerId);
+    if (!role) return;
+    pointers.current.delete(event.pointerId);
+    if (role.kind === 'stick') {
+      stickOrigin.current = null;
+      controls.stick = ZERO_STICK;
+      showStick(null);
+    }
+    // 조이스틱 영역이라도 짧게 콕 찍으면 그 자리로 걸어간다(탭해서 걷기).
+    if (!cancelled && role.kind !== 'pen' && !role.moved && performance.now() - role.at < TAP_MS) {
+      const point = framePoint(event);
+      handle.current?.walkToScreen(point.x, point.y);
+    }
+  };
+
+  // ── 버튼(A/B): 각자 포인터 캡처 → 조이스틱과 동시에 눌러도 서로 안 섞인다 ──
+  const buttonDown = (which: 'a' | 'b') => (event: ReactPointerEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    event.preventDefault();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    setPressed(state => ({ ...state, [which]: true }));
+    if (which === 'a') pressA(); else pressB(true);
+  };
+  const buttonUp = (which: 'a' | 'b') => (event: ReactPointerEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    if (event.type === 'pointerup') maybeFullscreen(event.pointerType);
+    setPressed(state => ({ ...state, [which]: false }));
+    if (which === 'b') pressB(false);
+  };
+
+  // ── 키보드(데스크톱 테스트용) ──
+  useEffect(() => {
+    const map: Record<string, keyof typeof keys.current> = { ArrowUp: 'up', w: 'up', ArrowDown: 'down', s: 'down', ArrowLeft: 'left', a: 'left', ArrowRight: 'right', d: 'right' };
+    const sync = () => { if (!stickOrigin.current) controls.stick = keyboardVector(keys.current); };
+    const down = (event: KeyboardEvent) => {
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+      const dir = map[key];
+      if (dir) { event.preventDefault(); keys.current[dir] = true; sync(); return; }
+      if (key === 'Shift') { controls.run = true; return; }
+      if (event.repeat) return;
+      if (key === ' ' || key === 'Enter' || key === 'z') { event.preventDefault(); pressA(); }
+      else if (key === 'Escape' || key === 'x') { event.preventDefault(); if (dialogueRef.current) closeDialogue(); }
+    };
+    const up = (event: KeyboardEvent) => {
+      const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+      const dir = map[key];
+      if (dir) { keys.current[dir] = false; sync(); }
+      if (key === 'Shift') controls.run = false;
+    };
+    // 창이 가려지거나 포커스를 잃으면 모든 입력을 놓는다(계속 걷는 버그 방지) + 게임 루프 정지.
+    const reset = () => {
+      keys.current = { up: false, down: false, left: false, right: false };
+      pointers.current.clear(); stickOrigin.current = null;
+      controls.stick = ZERO_STICK; controls.run = false; showStick(null);
+      setPressed({ a: false, b: false });
+    };
+    const visibility = () => { reset(); handle.current?.setActive(document.visibilityState === 'visible'); };
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    window.addEventListener('blur', reset);
+    document.addEventListener('visibilitychange', visibility);
+    return () => {
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+      window.removeEventListener('blur', reset);
+      document.removeEventListener('visibilitychange', visibility);
+    };
+  }, [controls, pressA, closeDialogue]);
+
+  // ── 전체화면 상태 추적 + iOS 핀치/더블탭 확대 막기 ──
+  useEffect(() => {
+    const sync = () => setFullscreen(!!fullscreenElement());
+    document.addEventListener('fullscreenchange', sync);
+    document.addEventListener('webkitfullscreenchange', sync);
+    const element = root.current;
+    const block = (event: Event) => event.preventDefault();
+    element?.addEventListener('gesturestart', block);
+    element?.addEventListener('gesturechange', block);
+    element?.addEventListener('dblclick', block);
+    // touchmove 기본 동작(스크롤/당겨서 새로고침) 차단 — passive:false라야 막힌다.
+    element?.addEventListener('touchmove', block, { passive: false });
+    return () => {
+      document.removeEventListener('fullscreenchange', sync);
+      document.removeEventListener('webkitfullscreenchange', sync);
+      element?.removeEventListener('gesturestart', block);
+      element?.removeEventListener('gesturechange', block);
+      element?.removeEventListener('dblclick', block);
+      element?.removeEventListener('touchmove', block);
+    };
+  }, []);
+
+  const exit = () => { void leaveFullscreen(); onExit(); };
+  const toggleFullscreen = () => { if (fullscreenElement()) void leaveFullscreen(); else if (root.current) void enterFullscreen(root.current, layout.device === 'phone'); };
+  const promptLabel = prompt === 'scarecrow' ? '말 걸기' : prompt ? '살펴보기' : '';
+  const { a, b, hud, dialogue: box } = layout;
+
+  return createPortal(<div ref={root} className="pwp-root" data-device={layout.device} data-orientation={layout.orientation} data-status={status}
+    role="application" aria-label="새 Pixel World 베타 · 앞마당">
+    <div ref={probe} className="pwp-safe-probe" aria-hidden="true" />
+    <div ref={stage} className="pwp-stage" />
+    <div className="pwp-surface" data-testid="pwp-surface"
+      onPointerDown={onSurfaceDown} onPointerMove={onSurfaceMove}
+      onPointerUp={event => releasePointer(event, false)} onPointerCancel={event => releasePointer(event, true)}
+      onLostPointerCapture={event => releasePointer(event, true)} onContextMenu={event => event.preventDefault()}>
+      <div ref={ring} className="pwp-stick" aria-hidden="true" style={{ width: STICK_RADIUS * 2, height: STICK_RADIUS * 2 }}><div ref={knob} className="pwp-knob" /></div>
+    </div>
+    <div className="pwp-hud" style={{ left: hud.x, top: hud.y, width: hud.width, height: hud.height }}>
+      <button type="button" className="pwp-chip pwp-exit" onClick={exit} aria-label="Pixel World 나가기">← 나가기</button>
+      <span className="pwp-chip pwp-points" aria-label={`포인트 ${balance}`}><span className="pwp-coin" aria-hidden="true">P</span>{balance.toLocaleString()}</span>
+      <span className="pwp-hud-spacer" />
+      <button type="button" className="pwp-chip pwp-icon" aria-pressed={bgm.enabled} aria-label="배경음악" title={bgm.enabled ? '배경음악 끄기' : '배경음악 켜기'} onClick={bgm.toggle}><span aria-hidden="true">♪</span></button>
+      {fullscreenSupported() && <button type="button" className="pwp-chip pwp-icon" aria-pressed={fullscreen} aria-label={fullscreen ? '전체화면 끄기' : '전체화면'} onClick={toggleFullscreen}>⛶</button>}
+    </div>
+    <button type="button" className="pwp-btn pwp-btn-a" data-pressed={pressed.a} data-prompt={!!prompt || !!dialogue}
+      style={{ left: a.x - a.size / 2, top: a.y - a.size / 2, width: a.size, height: a.size }}
+      aria-label={dialogue ? 'A · 다음' : prompt ? `A · ${promptLabel}` : 'A'}
+      onPointerDown={buttonDown('a')} onPointerUp={buttonUp('a')} onPointerCancel={buttonUp('a')} onLostPointerCapture={buttonUp('a')}
+      onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') event.stopPropagation(); }}
+      onClick={event => { if (event.detail === 0) pressA(); }}>
+      <b>A</b>{(prompt || dialogue) && <small>{dialogue ? '다음' : promptLabel}</small>}
+    </button>
+    <button type="button" className="pwp-btn pwp-btn-b" data-pressed={pressed.b}
+      style={{ left: b.x - b.size / 2, top: b.y - b.size / 2, width: b.size, height: b.size }}
+      aria-label={dialogue ? 'B · 닫기' : 'B · 누르는 동안 달리기'}
+      onPointerDown={buttonDown('b')} onPointerUp={buttonUp('b')} onPointerCancel={buttonUp('b')} onLostPointerCapture={buttonUp('b')}>
+      <b>B</b><small>{dialogue ? '닫기' : '달리기'}</small>
+    </button>
+    {dialogue && <div className="pwp-dialogue" role="dialog" aria-live="polite" aria-label={`${dialogue.speaker}의 말`}
+      style={{ left: box.x, top: box.y, width: box.width, minHeight: box.height }}
+      onPointerDown={event => { event.stopPropagation(); advance(); }}>
+      <strong>{dialogue.speaker}</strong>
+      <p data-full={currentLine}>{currentLine.slice(0, typed)}</p>
+      {typed >= currentLine.length && <span className="pwp-dialogue-next" aria-hidden="true">{dialogue.index + 1 < dialogue.lines.length ? '▼' : '■'}</span>}
+    </div>}
+    {status !== 'ready' && <div className="pwp-loading" role="status">
+      {status === 'loading' ? '앞마당으로 가는 중…' : <>게임을 시작하지 못했어요.<button type="button" className="pwp-chip" onClick={exit}>돌아가기</button></>}
+    </div>}
+  </div>, document.body);
+});
