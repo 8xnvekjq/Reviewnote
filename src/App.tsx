@@ -10,6 +10,7 @@ import { AppShell } from './app/AppShell';
 import { Screen } from './app/ScreenRouter';
 import { OverlayHost } from './app/OverlayHost';
 import { LazyScreenBoundary } from './app/LazyScreenBoundary';
+import { canOpenPixelWorldBeta } from './features/pixel-world-phaser/access';
 import { useCheckpointGeneration } from './features/checkpoints/useCheckpointGeneration';
 import { useChecklistGeneration } from './features/checklist/useChecklistGeneration';
 import { useMistakeAnalysis } from './features/mistakes/useMistakeAnalysis';
@@ -46,6 +47,8 @@ const ReviewCheckAdminScreen = lazy(() => import('./components/reviewCheck/Revie
 const ScaffoldingPanel = lazy(() => import('./components/ScaffoldingPanel').then(m => ({ default: m.ScaffoldingPanel })));
 const GachaStore = lazy(() => import('./components/GachaStore').then(m => ({ default: m.GachaStore })));
 const PixelRoom = lazy(() => import('./features/pixel-room/PixelRoom'));
+// 새 Pixel World(Phaser 베타) — Phaser 포함 청크라 열 때만 내려받는다(첫 번들 크기 그대로).
+const PixelWorldPhaser = lazy(() => import('./features/pixel-world-phaser/PixelWorldPhaser'));
 const ExamPracticeEntry = lazy(() => import('./features/exam/ExamPracticeEntry'));
 
 interface ProfileDirectoryRow {
@@ -242,6 +245,9 @@ function App() {
   // 여부 자체는 이 플래그가 아니라 호출부(BottomNavigation의 currentUserId, 아래 Screen의
   // session?.user?.id)가 각자 따로 확인하므로 여기서는 단순히 "누구나"로 둔다.
   const canAccessPixelWorld = true;
+  // 새 Pixel World(베타): 관리자 + 테스트 계정만. 학생은 진입 버튼이 아예 보이지 않는다.
+  const canAccessPixelWorldBeta = !!session?.user?.id && canOpenPixelWorldBeta(isAdmin, session?.user?.email);
+  const [pixelWorldBetaOpen, setPixelWorldBetaOpen] = useState(false);
   
   const prevTabRef = useRef(activeTab);
 
@@ -1538,6 +1544,7 @@ function App() {
             onlineUsers={onlineUsers}
             onStartReviewSession={handleStartReviewSession}
             onOpenSlideList={() => setIsSlideListOpen(true)}
+            onOpenPixelWorldBeta={canAccessPixelWorldBeta ? () => setPixelWorldBetaOpen(true) : undefined}
             dailyReviewCount={dailyReviewCount}
           />
         )}
@@ -2152,6 +2159,12 @@ function App() {
           )}
         </Screen>
       </AppShell>
+
+      {pixelWorldBetaOpen && canAccessPixelWorldBeta && (
+        <LazyScreenBoundary fallback={<div role="status" style={{ position: 'fixed', inset: 0, zIndex: 2147483000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#3f6b3a', color: '#fff4d9', fontWeight: 800 }}>앞마당으로 가는 중…</div>}>
+          <PixelWorldPhaser userId={session.user.id} pointsBalance={currentDisplayPoints} onExit={() => setPixelWorldBetaOpen(false)} />
+        </LazyScreenBoundary>
+      )}
 
       <OverlayHost
         selectedEntry={selectedEntry}

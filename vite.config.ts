@@ -18,6 +18,11 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
+            // Phaser(약 1.2MB)는 새 Pixel World 베타를 열 때만 동적 import된다 — 공용 vendor 청크에
+            // 섞이면 모든 학생이 첫 화면에서 내려받게 되므로 반드시 따로 뺀다.
+            if (id.includes('/node_modules/phaser/')) {
+              return 'vendor-phaser';
+            }
             if (id.includes('katex')) {
               return 'vendor-katex';
             }
