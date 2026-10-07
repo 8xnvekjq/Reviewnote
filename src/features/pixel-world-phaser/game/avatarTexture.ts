@@ -4,7 +4,8 @@
 import { avatarSheets } from '../../pixel-room/assets';
 import { FASHION_PATHS } from '../../pixel-room/shop/fashionPaths';
 import type { PublicAvatarAppearance } from '../../pixel-room/shop/types';
-import { AVATAR_FRAME, AVATAR_FRAMES_PER_POSE, AVATAR_LAYERS, AVATAR_POSES, avatarLayerPlan, avatarTextureKey } from '../logic/avatarPlan';
+import { AVATAR_FRAME, AVATAR_FRAMES_PER_POSE, AVATAR_LAYERS, AVATAR_POSES, avatarLayerPlan, avatarStyle, avatarTextureKey } from '../logic/avatarPlan';
+import { facePixels, outlineFrame, recolorDefault } from '../logic/avatarPixels';
 import { loadImage } from './loadImage';
 
 const cache = new Map<string, Promise<HTMLCanvasElement>>();
@@ -21,7 +22,14 @@ export function composeAvatar(appearance: PublicAvatarAppearance): { key: string
 }
 
 async function draw(appearance: PublicAvatarAppearance): Promise<HTMLCanvasElement> {
-  const plan = avatarLayerPlan(appearance);
+  const style = avatarStyle();
+  const plan = avatarLayerPlan(appearance, style);
+  const cute = style === 'cute';
+  // 한 칸(32px)씩 따로 만져야 하는 레이어(무료 기본 옷 색, 눈→얼굴)는 작은 캔버스에서 처리한다.
+  const cell = document.createElement('canvas');
+  cell.width = cell.height = AVATAR_FRAME;
+  const cellCtx = cell.getContext('2d', { willReadFrequently: true });
+  if (!cellCtx) throw new Error('캔버스를 만들 수 없어요.');
   const canvas = document.createElement('canvas');
   canvas.width = AVATAR_FRAME * AVATAR_FRAMES_PER_POSE;
   canvas.height = AVATAR_FRAME * AVATAR_POSES.length;
@@ -54,7 +62,34 @@ async function draw(appearance: PublicAvatarAppearance): Promise<HTMLCanvasEleme
         const height = AVATAR_LAYERS.find(layer => layer.key === step.layer)?.height ?? 0;
         if ((step.row + 1) * AVATAR_FRAME > height) continue; // 원본도 시트 밖 행은 빈 칸.
         const image = images.get(src);
-        if (image) ctx.drawImage(image, frame * AVATAR_FRAME, step.row * AVATAR_FRAME, AVATAR_FRAME, AVATAR_FRAME, ox, oy, AVATAR_FRAME, AVATAR_FRAME);
+        if (!image) continue;
+        const freeDefault = cute && (step.layer === 'tops' || step.layer === 'bottoms') && !appearance[step.layer === 'tops' ? 'top' : 'bottom'];
+        const face = cute && step.layer === 'eyes';
+        if (!freeDefault && !face) {
+          ctx.drawImage(image, frame * AVATAR_FRAME, step.row * AVATAR_FRAME, AVATAR_FRAME, AVATAR_FRAME, ox, oy, AVATAR_FRAME, AVATAR_FRAME);
+          continue;
+        }
+        cellCtx.clearRect(0, 0, AVATAR_FRAME, AVATAR_FRAME);
+        cellCtx.drawImage(image, frame * AVATAR_FRAME, step.row * AVATAR_FRAME, AVATAR_FRAME, AVATAR_FRAME, 0, 0, AVATAR_FRAME, AVATAR_FRAME);
+        const layer = cellCtx.getImageData(0, 0, AVATAR_FRAME, AVATAR_FRAME);
+        if (freeDefault) {
+          recolorDefault(layer.data, step.layer as 'tops' | 'bottoms');
+          cellCtx.putImageData(layer, 0, 0);
+          ctx.drawImage(cell, ox, oy);
+          continue;
+        }
+        // 원래 눈 위에 큰 눈·볼·입을 덧그린다(눈 시트 위치를 따라가므로 머리 흔들림도 그대로).
+        ctx.drawImage(cell, ox, oy);
+        for (const p of facePixels(layer.data, direction)) {
+          ctx.fillStyle = `rgb(${p.color[0]},${p.color[1]},${p.color[2]})`;
+          ctx.fillRect(ox + p.x, oy + p.y, 1, 1);
+        }
+      }
+      if (cute) {
+        // 모든 레이어를 다 그린 뒤 바깥 테두리 1px(강아지 외곽선 색). 칸 밖으로는 번지지 않는다.
+        const whole = ctx.getImageData(ox, oy, AVATAR_FRAME, AVATAR_FRAME);
+        outlineFrame(whole.data);
+        ctx.putImageData(whole, ox, oy);
       }
     }
   });
