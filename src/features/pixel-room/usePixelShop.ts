@@ -114,16 +114,14 @@ export function usePixelShop(userId: string, initialBalance: number, onBalanceCh
     finally { mutationLock.current = false; if (mounted.current) setMutating(false); }
   }
 
-
   async function equipRod(itemId: string | null): Promise<boolean> {
     if (mutationLock.current || !ready || loadError) return false;
     mutationLock.current = true; setMutating(true);
     try {
       const result = await equipPixelRod(itemId);
-      if (!result.ok) return false;
-      const rod = await fetchEquippedRod(userId);
-      if (!mounted.current) return false;
-      setEquippedRod(rod); return true;
+      if (!result.ok || !mounted.current) return false;
+      // 서버가 돌려준 장착 결과를 그대로 쓴다(다시 불러오면 pixel_rod_equipment와 같은 값).
+      setEquippedRod(result.rodId); return true;
     } catch { if (mounted.current) setLoadError(true); return false; }
     finally { mutationLock.current = false; if (mounted.current) setMutating(false); }
   }

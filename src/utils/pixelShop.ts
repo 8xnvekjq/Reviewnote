@@ -101,7 +101,7 @@ export async function purchasePixelItem(itemId: string): Promise<PurchasePixelIt
 }
 
 export type EquipPixelItemResult =
-  | { ok: true; slot: PixelAvatarSlot | 'rod'; itemId: string | null }
+  | { ok: true; slot: PixelAvatarSlot; itemId: string | null }
   | { ok: false; reason: 'invalid_slot' | 'not_found' | 'not_owned' | 'unknown'; message: string };
 
 /** Equip (or, with itemId null, unequip) an owned avatar item into one slot. Server verifies
@@ -147,16 +147,24 @@ export async function savePixelRoomLayout(placements: FurniturePlacementRow[]): 
   return data as SavePixelRoomLayoutResult;
 }
 
-/** 서버가 소유권을 검사한 뒤 낚싯대를 장착하거나 기본 낚싯대로 되돌린다. */
-export async function equipPixelRod(itemId: string | null): Promise<EquipPixelItemResult> {
-  // TODO: 서버 보고서에서 별도 RPC를 선택했다면 equip_pixel_rod(p_item_id)로 바꾼다.
-  const { data, error } = await supabase.rpc('equip_pixel_item', { p_slot: 'rod', p_item_id: itemId });
+export type EquipPixelRodResult = { ok: true; rodId: string | null } | { ok: false; reason: 'not_found' | 'not_owned' | 'unknown'; message: string };
+/** 서버(equip_pixel_rod)가 소유권을 검사한 뒤 낚싯대를 장착한다. null이면 기본 낚싯대로 되돌린다.
+ * 낚싯대는 pixel_avatar_equipment가 아니라 pixel_rod_equipment에 저장된다. */
+export async function equipPixelRod(itemId: string | null): Promise<EquipPixelRodResult> {
+  const { data, error } = await supabase.rpc('equip_pixel_rod', { p_item_id: itemId });
   if (error) return { ok: false, reason: 'unknown', message: error.message || '낚싯대를 장착하지 못했어요.' };
-  return data as EquipPixelItemResult;
+  const raw = (data ?? {}) as { ok?: unknown; reason?: unknown; rod?: { id?: unknown } | null };
+  if (raw.ok !== true) {
+    const reason = raw.reason === 'not_found' || raw.reason === 'not_owned' ? raw.reason : 'unknown';
+    return { ok: false, reason, message: reason === 'not_owned' ? '아직 가지고 있지 않은 낚싯대예요.' : '낚싯대를 장착하지 못했어요.' };
+  }
+  return { ok: true, rodId: typeof raw.rod?.id === 'string' ? raw.rod.id : null };
 }
-/** 기존 장비 조회 경로에서 낚싯대 아이템 키를 읽는다. */
+/** 장착한 낚싯대 item_id(pixel_rod_equipment, 내 줄만 RLS로 읽힘). 줄이 없거나 v4 이전(표 없음)이면 null —
+ * 낚싯대 조회 실패가 상점 전체를 막지 않도록 오류도 null(기본 낚싯대)로 본다. */
 export async function fetchEquippedRod(userId: string): Promise<string | null> {
-  const { data, error } = await supabase.from('pixel_avatar_equipment').select('*').eq('user_id', userId).maybeSingle();
-  if (error) throw error;
-  return typeof data?.rod === 'string' ? data.rod : null;
+  const { data, error } = await supabase.from('pixel_rod_equipment').select('rod_id').eq('user_id', userId).maybeSingle();
+  if (error) return null;
+  const rodId = (data as { rod_id?: unknown } | null)?.rod_id;
+  return typeof rodId === 'string' ? rodId : null;
 }

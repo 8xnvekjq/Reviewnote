@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createReelGame, stepReelGame, minReelMs, REEL_MARGIN_MS } from '../../src/features/pixel-world-phaser/logic/reelGame.ts';
-import { rodDisplay, rodEffectText, ROD_CATALOG } from '../../src/features/pixel-room/shop/rods.ts';
-import { parseCastStart, parseFishingState } from '../../src/features/pixel-world-phaser/ui/fishingAdapter.ts';
+import { RODS, rodDisplay, rodEffectText, ROD_CATALOG } from '../../src/features/pixel-room/shop/rods.ts';
+import { FISHING_RODS, parseCastStart, parseFishingState } from '../../src/features/pixel-world-phaser/ui/fishingAdapter.ts';
 import { itemState, panelItems } from '../../src/features/pixel-world-phaser/logic/panels.ts';
 
 test('낚싯대 속도는 겹침 구간의 진행량에만 적용된다', () => {
@@ -30,6 +30,10 @@ test('낚싯대 이름, 효과, 기본 선택과 보유 필터', () => {
   assert.equal(rodDisplay({ id: 'unknown', tier: 4 }).displayName, '기본 낚싯대');
   assert.deepEqual(ROD_CATALOG.map(r => rodDisplay({ id: r.itemId, tier: r.tier }).displayName), ['대나무 낚싯대', '강철 낚싯대', '행운의 낚싯대', '황금 낚싯대']);
   assert.equal(rodEffectText('rod_lucky'), '난이도 −0.5 · 희귀 물고기 +5% · 낚시 속도 +25%');
+  // 0인 효과는 숨긴다
+  assert.equal(rodEffectText('rod_bamboo'), '난이도 −0.3');
+  assert.equal(rodEffectText('rod_steel'), '난이도 −0.5 · 낚시 속도 +15%');
+  assert.equal(rodEffectText('rod_gold'), '난이도 −0.8 · 희귀 물고기 +8% · 낚시 속도 +35%');
   const owned = new Set(['rod_gold']);
   assert.deepEqual(panelItems(ROD_CATALOG, 'rod', owned).map(r => r.itemId), ['rod_gold']);
   const appearance = { top: null, bottom: null, hair: null, shoes: null, eyes: null, skin: null };
@@ -40,11 +44,20 @@ test('추가 서버 필드와 구형 응답의 기본값', () => {
   const old = parseCastStart(raw);
   assert.ok(old.ok);
   if (!old.ok) return;
-  assert.deepEqual(old.rod, { id: null, tier: 0 }); assert.equal(old.speed, 1); assert.equal(old.trophy, false);
+  // v3 서버 응답에는 rod·speed·trophy가 없다 — 소비하는 쪽(useFishing)이 기본 낚싯대·속도 1·대물 아님으로 본다.
+  assert.equal(old.rod, undefined); assert.equal(old.speed, undefined); assert.equal(old.trophy, undefined);
   const upgraded = parseCastStart({ ...raw, rod: { id: 'rod_gold', tier: 4 }, speed: 1.35, trophy: true, difficulty: 2.2 });
   assert.ok(upgraded.ok);
   if (!upgraded.ok) return;
   assert.equal(upgraded.speed, 1.35); assert.equal(upgraded.trophy, true); assert.equal(upgraded.difficulty, 2.2);
   assert.deepEqual(parseFishingState({ rod: upgraded.rod }).rod, upgraded.rod);
   assert.deepEqual(parseFishingState({ rod: { id: 'bad', tier: 9 } }).rod, { id: null, tier: 0 });
+});
+test('상점 설명용 낚싯대 숫자가 서버 계약(FISHING_RODS)과 같다', () => {
+  assert.deepEqual(RODS.map(r => [r.itemId, r.displayName, r.price, r.tier, r.difficultyDown, r.rareBonus, r.speed]),
+    FISHING_RODS.map(r => [r.id, r.name, r.price, r.tier, r.difficultyDown, r.rareBonus, r.speed]));
+});
+test('클라이언트 릴 최소 시간은 서버 종료 규칙(rodMinReelMs)과 같다', async () => {
+  const { rodMinReelMs } = await import('../../src/features/pixel-world-phaser/ui/fishingAdapter.ts');
+  for (const d of [1, 2.2, 3.5, 5]) for (const s of [1, 1.15, 1.25, 1.35]) assert.ok(Math.abs(minReelMs(d, s) - rodMinReelMs(d, s)) < 1e-9);
 });

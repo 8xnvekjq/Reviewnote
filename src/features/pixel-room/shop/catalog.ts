@@ -1,5 +1,6 @@
 import type { PixelItem } from './types';
-import { ROD_CATALOG } from './rods';
+// 확장자를 붙여 둔다: tests/pixelShop/*browser*.mjs가 이 파일을 node로 바로 읽는다.
+import { ROD_CATALOG } from './rods.ts';
 
 // Avatar/furniture use existing atlas art; pet artwork provenance lives in pet/assets.
 // Keep IDs stable for server ownership; prices come from the server.

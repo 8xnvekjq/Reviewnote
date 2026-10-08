@@ -13,5 +13,9 @@ export function rodDisplay(rod?: RodEquipment | null) {
 }
 export function rodEffectText(id: string) {
   const rod = RODS.find(entry => entry.itemId === id);
-  return rod ? `난이도 −${rod.difficultyDown.toFixed(1)} · 희귀 물고기 +${rod.rareBonus}% · 낚시 속도 +${Math.round((rod.speed - 1) * 100)}%` : '';
+  if (!rod) return '';
+  // 0인 효과는 숨긴다(대나무는 '난이도 −0.3'만).
+  const speed = Math.round((rod.speed - 1) * 100);
+  return [rod.difficultyDown > 0 ? `난이도 −${rod.difficultyDown.toFixed(1)}` : '', rod.rareBonus > 0 ? `희귀 물고기 +${rod.rareBonus}%` : '', speed > 0 ? `낚시 속도 +${speed}%` : '']
+    .filter(Boolean).join(' · ');
 }

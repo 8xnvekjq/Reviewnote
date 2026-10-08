@@ -35,7 +35,9 @@ function Harness() {
   const clockOverride = useMemo(() => parseClockOverride(location.search) ?? undefined, []);
   const fishingAdapter = useMemo((): FishingAdapter | undefined => {
     if (!params.has('fishing')) return undefined;
-    const adapter = createMockFishingAdapter({ seed: 7, override: clockOverride, classmates: [
+    // seed 11: v4 모의 서버에서 처음 두 번이 어려운 물고기(15%)가 아니다(시계·날씨 무관). seed 7은 첫 캐스트가 늘 난이도 4 이상이라
+    // 단순 탭 봇이 못 잡는다 — 어려운 물고기는 단위 테스트가 따로 검사한다.
+    const adapter = createMockFishingAdapter({ seed: 11, override: clockOverride, classmates: [
       { speciesId: 'carp', lengthCm: 41.2, animal: '🐻', caughtAt: new Date(Date.now() - 3 * 3600000).toISOString() },
       { speciesId: 'pirami', lengthCm: 13.4, animal: '🐰', caughtAt: new Date(Date.now() - 20 * 60000).toISOString() },
     ] });
