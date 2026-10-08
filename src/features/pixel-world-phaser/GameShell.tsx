@@ -3,7 +3,7 @@
 // (Phaser Text는 도트 모드에서 최근접 보간이라 작은 한글이 뭉개진다), 버튼은 접근성/테스트도 쉽다.
 // 입력은 controls 객체에만 쓰고 Phaser가 매 프레임 읽는다 — 손가락 이동으로 React가 다시 그리지 않는다.
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { PointerEvent as ReactPointerEvent } from 'react';
+import type { PointerEvent as ReactPointerEvent, RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import type { PublicAvatarAppearance } from '../pixel-room/shop/types';
 import type { PetId } from '../pixel-room/pet/petKinds';
@@ -19,7 +19,7 @@ import type { FurnitureType, Placement } from '../pixel-room/model';
 import { composeAvatar } from './game/avatarTexture';
 import { loadBed, loadFloors, loadFurnitureSheets, loadInterior, loadPetSheet, loadScarecrow, loadTown, loadPlazaStall } from './game/sceneAssets';
 import type { BedLook } from './game/sceneAssets';
-import type { Prompt, WorldGameHandle } from './game/boot';
+import type { Prompt, WorldGameHandle, WorldEvents } from './game/boot';
 import './gameShell.css';
 import { GamePanels } from './ui/GamePanels';
 import { FurniturePanel } from './ui/FurniturePanel';
@@ -31,6 +31,11 @@ import { panelFrozen } from './logic/panels';
 import { PlazaBridge } from './ui/PlazaBridge';
 import type { PlazaPanel } from './ui/PlazaBridge';
 
+import { useFishing } from './ui/useFishing';
+import type { FishingHandle } from './ui/useFishing';
+import type { FishingAdapter } from './ui/fishingAdapter';
+import { CatchCard } from './ui/CatchCard';
+
 import { FarmPanels } from './ui/FarmPanels';
 import type { ActivityPanel, FarmAdapter } from './ui/FarmPanels';
 type ShellPanel = PanelKind | PlazaPanel | ActivityPanel | 'furniture';
@@ -39,6 +44,7 @@ export interface GameShellProps {
   panels?: PanelAdapter;
   userId?: string;
   farmAdapter?: FarmAdapter;
+  fishingAdapter?: FishingAdapter;
   appearance: PublicAvatarAppearance;
   pet: PetId | null;
   balance: number;
@@ -96,7 +102,7 @@ async function leaveFullscreen() {
 }
 
 // 상위가 1초마다(밭 시계) 다시 그려져도, 넘겨받는 값이 같으면 셸은 다시 그리지 않는다.
-export const GameShell = memo(function GameShell({ appearance, pet, balance, beds, furniture, onSaveFurniture, scarecrowLine, onExit, panels, farmAdapter, userId = 'guest' }: GameShellProps) {
+export const GameShell = memo(function GameShell({ appearance, pet, balance, beds, furniture, onSaveFurniture, scarecrowLine, onExit, panels, farmAdapter, fishingAdapter, userId = 'guest' }: GameShellProps) {
   useLayoutEffect(() => {
     let viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
     const created = !viewport;
@@ -137,6 +143,17 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
   const [prompt, setPrompt] = useState<Prompt | null>(null);
   const [scene, setScene] = useState<SceneInfo | null>(null);
   const [toast, setToast] = useState<SceneInfo | null>(null);
+  const fishingFrozen = useRef(false);
+  const freezeFishing = useCallback((active: boolean) => {
+    fishingFrozen.current = active;
+    controls.frozen = active || editingRef.current || panelFrozen(panelRef.current, !!dialogueRef.current);
+    controls.stick = ZERO_STICK; controls.run = false;
+    keys.current = { up: false, down: false, left: false, right: false };
+    pointers.current.clear(); stickOrigin.current = null;
+    if (ring.current) ring.current.style.opacity = '0';
+  }, [controls]);
+  const fishing = useFishing({ adapter: fishingAdapter, handle: handle as RefObject<(WorldGameHandle & FishingHandle) | null>, scene: scene?.id ?? null, pet, freeze: freezeFishing });
+  const fishingRef = useRef(fishing); fishingRef.current = fishing;
   const promptRef = useRef(prompt); promptRef.current = prompt;
   const [dialogue, setDialogue] = useState<Dialogue | null>(null);
   const dialogueRef = useRef(dialogue); dialogueRef.current = dialogue;
@@ -165,7 +182,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     handle.current?.setRoomPlacing(false);
     controls.stick = ZERO_STICK; controls.run = false;
     keys.current = { up: false, down: false, left: false, right: false };
-    controls.frozen = panelFrozen(panelRef.current, !!dialogueRef.current);
+    controls.frozen = fishingFrozen.current || panelFrozen(panelRef.current, !!dialogueRef.current);
   };
   const saveRoomLayout = async (next: Placement[]) => {
     if (roomSaving.current || !onSaveFurniture) return;
@@ -192,13 +209,13 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
   const closePanel = useCallback(() => {
     if (panelRef.current === 'furniture' && roomSaving.current) return;
     panelRef.current = null; setPanel(null);
-    controls.frozen = editingRef.current || panelFrozen(null, !!dialogueRef.current);
+    controls.frozen = fishingFrozen.current || editingRef.current || panelFrozen(null, !!dialogueRef.current);
     controls.stick = ZERO_STICK; controls.run = false;
     keys.current = { up: false, down: false, left: false, right: false };
   }, [controls]);
   const openPanel = (kind: ShellPanel) => {
     panelRef.current = kind; setPanel(kind);
-    controls.frozen = panelFrozen(kind, !!dialogueRef.current); controls.stick = ZERO_STICK; controls.run = false;
+    controls.frozen = fishingFrozen.current || panelFrozen(kind, !!dialogueRef.current); controls.stick = ZERO_STICK; controls.run = false;
     pointers.current.clear(); stickOrigin.current = null;
     if (ring.current) ring.current.style.opacity = '0';
     handle.current?.cancelWalk();
@@ -260,6 +277,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
           assets: { town, interior, floors, furniture: furnitureSheets, avatar: { key: avatar.key, canvas: avatarCanvas }, pet: pet && petSource ? { id: pet, source: petSource } : null, scarecrow, plazaStall },
           beds: bedImages, furniture: furnitureRef.current,
         }, controls, {
+          onShadowTap: (index: number) => { void fishingRef.current.onShadowTap(index); },
           onPrompt: next => setPrompt(next),
           onPetMessage: setPetMessage,
           onTalk: id => talkRef.current(id),
@@ -268,7 +286,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
             const info = { id, title, visit: performance.now() };
             setScene(info); setToast(info);
           },
-        });
+        } as WorldEvents & { onShadowTap(index: number): void });
         if (cancelled) { game.destroy(); return; }
         handle.current = game;
         if (import.meta.env.DEV) (window as unknown as { __pixelWorldPhaser?: WorldGameHandle }).__pixelWorldPhaser = game;
@@ -341,7 +359,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
   }, [controls]);
   talkRef.current = id => { if (id === 'scarecrow') openPanel('scarecrow'); else openDialogue(id); };
   const closeDialogue = useCallback(() => {
-    controls.frozen = panelFrozen(panelRef.current, false); dialogueRef.current = null; setDialogue(null);
+    controls.frozen = fishingFrozen.current || panelFrozen(panelRef.current, false); dialogueRef.current = null; setDialogue(null);
     controls.stick = ZERO_STICK; controls.run = false;
     keys.current = { up: false, down: false, left: false, right: false };
   }, [controls]);
@@ -368,11 +386,13 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
   }, [closeDialogue]);
   // 대화 중이면 다음 줄, 아니면 장면에 맡긴다(말 걸기 → onTalk, 문 → 장면 전환).
   const pressA = useCallback(() => {
+    if (fishingRef.current.reel()) return;
     if (panelRef.current || editingRef.current) return;
     if (dialogueRef.current) advance();
     else if (promptRef.current) handle.current?.interact();
   }, [advance]);
   const pressB = useCallback((down: boolean) => {
+    if (fishingFrozen.current) { if (down) fishingRef.current.cancel(); return; }
     if (editingRef.current) return;
     if (down && cancelTopWindow(root.current)) { controls.run = false; return; }
     if (panelRef.current) { controls.run = false; return; }
@@ -406,6 +426,10 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     if (fullscreenSupported() && !fullscreenElement() && root.current) void enterFullscreen(root.current, layoutRef.current.device === 'phone');
   };
   const onSurfaceDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (fishingFrozen.current) {
+      if (event.pointerType !== 'mouse' || event.button === 0) { event.preventDefault(); fishingRef.current.reel(); }
+      return;
+    }
     if (editingRef.current) {
       if (event.pointerType !== 'mouse' || event.button === 0) { event.preventDefault(); placeAt(framePoint(event)); }
       return;
@@ -486,6 +510,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
       if (editingRef.current) { if (map[event.key] || ['Shift', 'z', 'x'].includes(event.key)) event.preventDefault(); return; }
       if (key === 'Escape' || key === 'x') {
         event.preventDefault();
+        if (!event.repeat && fishingFrozen.current) { fishingRef.current.cancel(); return; }
         if (!event.repeat) { if (!cancelTopWindow(root.current) && dialogueRef.current) closeDialogue(); }
         return;
       }
@@ -555,7 +580,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
   const promptLabel = prompt?.verb ?? '';
   const { a, b, hud, dialogue: box } = layout;
 
-  return createPortal(<div ref={root} className="pwp-root" data-device={layout.device} data-orientation={layout.orientation} data-status={status}
+  return createPortal(<div ref={root} className="pwp-root" data-device={layout.device} data-orientation={layout.orientation} data-status={status} data-fishing-phase={fishing.phase} data-fishing-busy={fishing.busy}
     data-scene={scene?.id} role="application" aria-label={`새 Pixel World 베타 · ${scene?.title ?? '앞마당'}`}>
     <div ref={probe} className="pwp-safe-probe" aria-hidden="true" />
     <div ref={stage} className="pwp-stage" />
@@ -588,7 +613,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
       style={{ left: b.x - b.size / 2, top: b.y - b.size / 2, width: b.size, height: b.size }}
       aria-label={panel || dialogue ? 'B · 닫기' : 'B · 누르는 동안 달리기'}
       onPointerDown={buttonDown('b')} onPointerUp={buttonUp('b')} onPointerCancel={buttonUp('b')} onLostPointerCapture={buttonUp('b')}
-      onClick={event => { if (event.detail === 0 && (panelRef.current || dialogueRef.current || root.current?.querySelector('.pwp-chat-form'))) pressB(true); }}>
+      onClick={event => { if (event.detail === 0 && (fishingFrozen.current || panelRef.current || dialogueRef.current || root.current?.querySelector('.pwp-chat-form'))) pressB(true); }}>
       <b>B</b><small>{panel || dialogue ? '닫기' : '달리기'}</small>
     </button>
     {dialogue && <div className="pwp-panel-shade pwp-dialogue-shade" onPointerDown={event => {
@@ -616,6 +641,8 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     {!placing && panel !== 'furniture' && roomMessage && <div className="pwp-room-result" role="status">{roomMessage}</div>}
     {!placing && petMessage && <div className="pwp-pet-message" role="status" aria-live="polite">{petMessage}</div>}
     {!placing && panel !== 'furniture' && toast && <div key={toast.visit} className="pwp-toast" role="status" style={{ top: hud.y + hud.height + 6 }}>{toast.title}</div>}
+    {fishing.caught && <CatchCard caught={fishing.caught} onHide={fishing.hideCatch} />}
+    {fishing.message && <div className="pwp-fishing-message" role="status">{fishing.message}</div>}
     {status !== 'ready' && <div className="pwp-loading" role="status">
       {status === 'loading' ? '앞마당으로 가는 중…' : <>게임을 시작하지 못했어요.<button type="button" className="pwp-chip" onClick={exit}>돌아가기</button></>}
     </div>}

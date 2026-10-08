@@ -13,13 +13,22 @@ import { submitFarmCrop, fetchWeeklyCropContest } from '../../utils/pixelFarm';
 import { useFarm } from '../pixel-room/farm/useFarm';
 import { FARM_BEDS, farmMoisture, farmStage } from '../pixel-room/farm/farmModel';
 import { pickScarecrowLine } from '../pixel-room/farm/scarecrowLines';
+import { supabase } from '../../services/supabase';
+import * as fishingModule from './ui/fishingAdapter';
+import type { FishingAdapter, FishingOverride } from './ui/fishingAdapter';
 import { GameShell } from './GameShell';
 import type { BedLook } from './game/sceneAssets';
 import './gameShell.css';
 
-interface Props { userId: string; pointsBalance: number; onExit: () => void }
+interface Props { isAdmin?: boolean; userId: string; pointsBalance: number; onExit: () => void }
 
-export default function PixelWorldPhaser({ userId, pointsBalance, onExit }: Props) {
+export default function PixelWorldPhaser({ userId, pointsBalance, onExit, isAdmin = false }: Props) {
+  const fishingAdapter = useMemo(() => {
+    const override = fishingOverride(location.search, isAdmin);
+    // 서버 작업자가 팩토리를 추가하면 이 연결점을 사용한다.
+    const { createFishingAdapter } = fishingModule as typeof fishingModule & { createFishingAdapter?: (client: typeof supabase, override?: FishingOverride) => FishingAdapter };
+    return createFishingAdapter?.(supabase, override);
+  }, [isAdmin, userId]);
   const shop = usePixelShop(userId, pointsBalance);
   const pet = usePet(userId);
   const farm = useFarm();
@@ -60,7 +69,7 @@ export default function PixelWorldPhaser({ userId, pointsBalance, onExit }: Prop
     <button type="button" onClick={() => setRetry(value => value + 1)}>다시 불러오기</button>
     <button type="button" onClick={onExit}>나가기</button></div>;
   if (!appearance || !pet.ready || placement?.userId !== userId) return <div className="pwp-root pwp-loading" role="status">앞마당으로 가는 중…</div>;
-  return <GameShell userId={userId} appearance={appearance} pet={!pet.error && pet.active && shop.ownedIds.has(pet.active) ? pet.active : null} balance={shop.balance} beds={beds} furniture={furniture}
+  return <GameShell fishingAdapter={fishingAdapter} userId={userId} appearance={appearance} pet={!pet.error && pet.active && shop.ownedIds.has(pet.active) ? pet.active : null} balance={shop.balance} beds={beds} furniture={furniture}
     onSaveFurniture={saveFurniture} scarecrowLine={scarecrowLine} onExit={onExit} panels={{ shop, pet }} farmAdapter={{ farm, inventory, contest: fetchWeeklyCropContest, submit: async id => { const result = await submitFarmCrop(id); if (result.ok) shop.reload(); return result; } }} />;
 }
 
@@ -69,4 +78,15 @@ function bedsKey(snapshot: ReturnType<typeof useFarm>['snapshot'], now: number):
     const crop = snapshot?.plots.find(plot => plot.index === index)?.crop ?? null;
     return `${farmStage(crop, now)}/${farmMoisture(crop, now)}`;
   }).join(',');
+}
+
+export function fishingOverride(search: string, isAdmin: boolean): FishingOverride | undefined {
+  if (!isAdmin) return undefined;
+  const params = new URLSearchParams(search);
+  const clock = params.get('pwClock');
+  const weather = params.get('pwWeather');
+  const override: FishingOverride = {};
+  if (clock && /^([01]\d|2[0-3]):[0-5]\d$/.test(clock)) override.clock = clock;
+  if (weather === 'clear' || weather === 'cloudy' || weather === 'rain') override.weather = weather;
+  return Object.keys(override).length ? override : undefined;
 }

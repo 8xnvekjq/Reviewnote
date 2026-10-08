@@ -1,0 +1,8 @@
+.pwp-catch-card { position: absolute; z-index: 20; left: 50%; top: 22%; transform: translateX(-50%); max-width: calc(100% - 32px); min-width: 210px; padding: 14px 18px; border: 3px solid #6f5842; border-radius: 9px; background: #fff5db; color: #493d32; box-shadow: 0 4px 0 #382e2866; pointer-events: none; display: grid; grid-template-columns: 32px 1fr; gap: 6px 10px; }
+.pwp-catch-card > strong { font-size: 15px; }
+.pwp-fish-icon { grid-row: span 3; width: 32px; height: 32px; background-size: 384px 32px; image-rendering: pixelated; font-size: 25px; }
+.pwp-fish-stars { color: #b88619; }
+.pwp-catch-badges, .pwp-catch-card > small { grid-column: 1 / -1; }
+.pwp-catch-badges { display: flex; gap: 6px; }
+.pwp-catch-badges b { padding: 2px 6px; border-radius: 4px; background: #edd58c; font-size: 12px; }
+.pwp-fishing-message { position: absolute; z-index: 20; top: 28%; left: 50%; transform: translateX(-50%); background: #fff5db; border: 2px solid #6f5842; border-radius: 8px; padding: 10px; color: #493d32; pointer-events: none; }
