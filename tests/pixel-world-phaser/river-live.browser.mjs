@@ -1,13 +1,19 @@
+import { trackReel } from './reel-player.browser-helper.mjs';
 // 강가 실시간: 두 페이지가 가짜 realtime(fakeRealtime.mjs)으로 같은 강가에 들어간다.
 // A는 B를 보고, B가 던지면 찌를, 입질이면 "!"를, 잡으면 "붕어 23.4cm!" 같은 구름을 본다. B가 떠나면 A에서 사라진다. 광장은 그대로 된다.
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
-const BASE = process.env.PWP_BASE ?? 'http://127.0.0.1:5174';
+const BASE = process.env.PWP_BASE ?? 'http://127.0.0.1:5198';
 const SHOTS = '.pixel-world-test.local';
-const browser = await chromium.launch({ headless: true });
+// 두 페이지의 관찰 화면을 찍는 동안에도 릴 입력과 애니메이션을 계속 실행한다.
+const browser = await chromium.launch({ headless: true, args: ['--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'] });
 const debug = page => page.evaluate(() => window.__pixelWorldPhaser.debug());
-const ready = (page, scene) => page.waitForFunction(scene => window.__pixelWorldPhaser?.debug().scene === scene && !window.__pixelWorldPhaser.debug().transitioning, scene, { timeout: 20000 });
+const ready = async (page, scene) => {
+  try {
+    await page.waitForFunction(scene => window.__pixelWorldPhaser?.debug().scene === scene && !window.__pixelWorldPhaser.debug().transitioning, scene, { timeout: 20000 });
+  } catch (error) { console.error('SCENE WAIT', scene, await debug(page)); throw error; }
+};
 const exit = async (page, pattern) => { await page.bringToFront(); return page.evaluate(pattern => { const h = window.__pixelWorldPhaser, exits = h.debug().exits, key = Object.keys(exits).find(k => new RegExp(pattern).test(k)); h.walkToScreen(exits[key].x, exits[key].y); }, pattern); };
 const walkTo = async (page, cell) => {
   await page.bringToFront();
@@ -68,6 +74,11 @@ try {
   await b.locator('.pwp-btn-a').tap();
   // 챔 → 릴 미니게임이 시작되는 순간 'reeling'을 보낸다(아직 잡은 게 아니다).
   await b.getByTestId('reel-bar').waitFor();
+  await b.bringToFront();
+  const tracking = trackReel(b, 'keyboard', async i => {
+    if (i === 3) await b.screenshot({ path: SHOTS + '/river-live-reelbar.png' });
+  });
+  tracking.catch(() => {});
   assert.deepEqual((await b.evaluate(() => window.plazaTransport.sent('fish'))).map(s => s.payload.phase), ['casting', 'waiting', 'bite', 'reeling'], 'reeling is sent when the reel starts, landed only after it');
   await a.waitForFunction(() => window.__pixelWorldPhaser.debug().classmates[0]?.fishing?.phase === 'reeling', null, { polling: 50, timeout: 3000 });
   await a.screenshot({ path: SHOTS + '/river-live-reeling.png' });
@@ -75,15 +86,7 @@ try {
   // 물고기와 칸의 위치·속도를 읽고 추적해서 탭한다(꾹 누르기는 처음 한 번만 올린다).
   await b.bringToFront();
   const card = b.getByTestId('catch-card');
-  let lastTap = -1000;
-  for (let i = 0; i < 1200 && !(await card.isVisible()); i++) {
-    const state = await b.getByTestId('reel-bar').evaluate(el => ({ zone: +el.dataset.zone, fish: +el.dataset.fish, velocity: +el.dataset.velocity, time: +el.dataset.elapsed * 1000 }));
-    if (state.time - lastTap >= 150 && state.zone < state.fish - .06 && state.velocity < .1) {
-      lastTap = state.time; await b.keyboard.press('Space');
-    }
-    if (i === 3) await b.screenshot({ path: SHOTS + '/river-live-reelbar.png' });
-    await b.waitForTimeout(40);
-  }
+  await tracking;
   await card.waitFor({ timeout: 5000 });
   const landed = (await b.evaluate(() => window.plazaTransport.sent('fish'))).find(s => s.payload.phase === 'landed');
   assert.ok(landed, 'landed event was sent');
