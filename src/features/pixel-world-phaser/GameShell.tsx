@@ -55,6 +55,8 @@ export interface GameShellProps {
   /** 내 방 가구 배치(서버 값). 완료된 편집 결과도 같은 경로로 반영한다. */
   furniture: readonly Placement[];
   onSaveFurniture?: (layout: Placement[]) => Promise<void>;
+  /** 장면이 바뀔 때(내 방 입장 시 서버 배치를 다시 읽는 데 쓴다). */
+  onSceneChange?: (id: SceneId) => void;
   /** 허수아비 대사 한 줄(기존 scarecrowLines.ts). 호출할 때마다 새로 뽑는다. */
   scarecrowLine: () => string;
   onExit: () => void;
@@ -105,7 +107,7 @@ async function leaveFullscreen() {
 }
 
 // 상위가 1초마다(밭 시계) 다시 그려져도, 넘겨받는 값이 같으면 셸은 다시 그리지 않는다.
-export const GameShell = memo(function GameShell({ appearance, pet, balance, beds, furniture, onSaveFurniture, scarecrowLine, onExit, panels, farmAdapter, fishingAdapter, newFishSpeciesId, clockOverride, userId = 'guest' }: GameShellProps) {
+export const GameShell = memo(function GameShell({ appearance, pet, balance, beds, furniture, onSaveFurniture, onSceneChange, scarecrowLine, onExit, panels, farmAdapter, fishingAdapter, newFishSpeciesId, clockOverride, userId = 'guest' }: GameShellProps) {
   useLayoutEffect(() => {
     let viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
     const created = !viewport;
@@ -200,8 +202,8 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
       handle.current?.setFurniture(next);
       endRoomEdit();
       setRoomMessage('가구 배치를 저장했어요.');
-    } catch {
-      setRoomMessage('방 배치를 저장하지 못했어요. 다시 시도해 주세요.');
+    } catch (error) {
+      setRoomMessage(error instanceof Error && error.message ? error.message : '방 배치를 저장하지 못했어요. 다시 시도해 주세요.');
     } finally { roomSaving.current = false; setRoomPending(false); }
   };
   const placeAt = (point: Point) => {
@@ -273,6 +275,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
   };
   const bedsRef = useRef(beds); bedsRef.current = beds;
   const furnitureRef = useRef(furniture); furnitureRef.current = furniture;
+  const onSceneChangeRef = useRef(onSceneChange); onSceneChangeRef.current = onSceneChange;
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -295,6 +298,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
           onScene: (id, title) => {
             const info = { id, title, visit: performance.now() };
             setScene(info); setToast(info);
+            onSceneChangeRef.current?.(id);
           },
         } satisfies WorldEvents);
         if (cancelled) { game.destroy(); return; }

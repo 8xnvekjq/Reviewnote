@@ -196,6 +196,8 @@ try {
   const payloads = [];
   const writes = [];
   const errors = [];
+  // 저장이 성공하면 서버 값이 바뀐다(저장 전 다른 기기 변경 확인이 실제 서버처럼 동작하게).
+  let serverRows = [{ item_id: 'furniture_desk', x: 3, y: 4 }, { item_id: 'furniture_plant', x: 8, y: 3 }];
   page.on('pageerror', e => errors.push(e.message));
   await page.route('**/rest/v1/**', async route => {
     const request = route.request(), url = new URL(request.url());
@@ -207,6 +209,7 @@ try {
       payloads.push(request.postDataJSON());
       layoutWrites++;
       body = layoutWrites === 1 ? { ok: false, reason: 'unknown', message: 'test save failure' } : { ok: true, count: 0 };
+      if (layoutWrites > 1) serverRows = request.postDataJSON().p_placements.map(p => ({ item_id: p.itemId, x: p.x, y: p.y }));
     } else if (table === 'pixel_furniture_placement') {
       assert.equal(request.method(), 'GET');
       assert.equal(url.searchParams.get('user_id'), 'eq.scene-test-user');
@@ -216,7 +219,7 @@ try {
         await route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ message: 'test query failure' }) });
         return;
       }
-      body = [{ item_id: 'furniture_desk', x: 3, y: 4 }, { item_id: 'furniture_plant', x: 8, y: 3 }];
+      body = serverRows;
     } else if (table === 'pixel_item_ownership') body = [{ item_id: 'furniture_desk' }, { item_id: 'furniture_chair' }];
     else if (table === 'pixel_avatar_equipment') body = null;
     else if (table === 'pixel_pet_equipment') body = { active_pet: null };
@@ -235,7 +238,7 @@ try {
   const saved = await debug(page);
   assert.ok(saved.targets['furniture:desk']);
   assert.equal(saved.targets['furniture:plant'], undefined, 'unowned placement is hidden');
-  assert.equal(placementReads, 2);
+  assert.equal(placementReads, 3, 'failed read, retry, and a fresh read on entering the room');
   assert.deepEqual(writes, []);
   await page.getByRole('button', { name: '꾸미기', exact: true }).click();
   const panel = furniturePanel(page);

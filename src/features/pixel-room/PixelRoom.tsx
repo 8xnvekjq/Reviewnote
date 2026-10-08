@@ -1,8 +1,8 @@
 import { PlazaShopDialog } from './shop/PlazaShopDialog';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { FURNITURE, ROOM_HEIGHT, ROOM_WIDTH, defaultState, findSpawn, isCellFree, loadRoom, placeFurniture, planWalk, removeFurniture, storageKey, validateRoom } from './model';
-import type { Cell, FurnitureType, Placement, RoomState, StorageLike } from './model';
+import { FURNITURE, ROOM_HEIGHT, ROOM_WIDTH, defaultState, findSpawn, isCellFree, placeFurniture, planWalk, removeFurniture, validateRoom } from './model';
+import type { Cell, FurnitureType, Placement, RoomState } from './model';
 import { AvatarSprite, DoormatSprite, FurnitureSprite } from './sprites';
 import type { PixelItem } from './shop/types';
 import { usePixelShop } from './usePixelShop';
@@ -67,7 +67,6 @@ function toSteps(from: Cell, path: Cell[]): WalkStep[] {
   for (const cell of path) { steps.push({ cell, direction: stepDirection(from, cell) }); from = cell; }
   return steps;
 }
-function browserStorage(): StorageLike | undefined { try { return window.localStorage; } catch { return undefined; } }
 // 장착 칭호/말투/테마는 새 프로필을 만들지 않고 기존 equipped state를 재사용한다. 단, 이 파일은
 // gachaCatalog/aiVoiceCheers를 직접 import하지 않는다 — 그 모듈은 App.tsx(항상 로드됨)에도 이미
 // 쓰이는데, 지연 로드되는 이 Pixel Room 청크에서 다시 import하면 번들러가 두 진입점 모두에 코드를
@@ -120,8 +119,8 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
   const [dpadOpen, setDpadOpen] = useState(false);
   const [selected, setSelected] = useState<FurnitureType | null>(null);
   const [message, setMessage] = useState('방의 바닥을 누르면 그 자리로 걸어가요.');
-  // 가구 배치는 이제 서버가 기준(pixel_furniture_placement) — roomReady는 그 최초 로드(+필요하면
-  // 레거시 localStorage 1회 이전)가 끝났는지를 나타낸다. storageError는 그 로드나 이후 저장이
+  // 가구 배치는 이제 서버가 기준(pixel_furniture_placement) — roomReady는 그 최초 로드가
+  // 끝났는지를 나타낸다. storageError는 그 로드나 이후 저장이
   // 실패했을 때만 채워진다(로컬 저장소 접근 불가 자체는 더 이상 에러가 아님 — 그냥 서버 기준으로
   // 시작할 뿐).
   const [roomReady, setRoomReady] = useState(false);
@@ -140,9 +139,7 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
 
   // 서버가 기준인 가구 배치 최초 로드. shop.ready가 되는 순간 딱 한 번만 실행(ref로 가드) — 그
   // 시점의 shop.catalog로 item_id<->assetKey를 매핑한다(usePixelShop이 즉시 정적 PIXEL_CATALOG로
-  // 초기화해 두므로 네트워크 전에도 이미 채워져 있다). 서버에 아직 아무 행도 없으면(신규 유저 또는
-  // 이 기능 출시 전 로컬에만 저장해 둔 유저) 레거시 localStorage를 한 번만 읽어 소유한 가구만
-  // 서버로 이전한다 — 이전 시도 여부는 기기별 마커로 기록해서 다시 비운 방을 매번 되살리지 않는다.
+  // 초기화해 두므로 네트워크 전에도 이미 채워져 있다). 로컬 저장소의 예전 배치는 쓰지 않는다(아래).
   const roomLoadStartedRef = useRef(false);
   useEffect(() => {
     if (!shop.ready || roomLoadStartedRef.current) return;
@@ -150,7 +147,6 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
     let cancelled = false;
     const furnitureCatalog = shop.catalog.filter(item => item.category === 'furniture');
     const typeByItemId = new Map(furnitureCatalog.map(item => [item.itemId, item.assetKey as FurnitureType]));
-    const itemIdByType = new Map(furnitureCatalog.map(item => [item.assetKey as FurnitureType, item.itemId]));
 
     function applyLoadedFurniture(furniture: Placement[]) {
       const loaded = validateRoom({ version: 1, avatar: defaultState().avatar, furniture });
@@ -163,51 +159,15 @@ function RoomForUser({ userId, onExit, themePrimary, themeAccent, onSpeak, point
       try {
         const rows = await fetchPixelFurniturePlacement(userId);
         if (cancelled) return;
-        if (rows.length > 0) {
-          const furniture = rows
-            .map(row => { const type = typeByItemId.get(row.itemId); return type ? { type, x: row.x, y: row.y } : null; })
-            .filter((item): item is Placement => item !== null);
-          applyLoadedFurniture(furniture);
-          return;
-        }
-
-        const storage = browserStorage();
-        // v2: 이전 배포의 마이그레이션 로직이 소유권을 확인하지 않고 통째로 실패해도 이 마커를
-        // 찍는 버그가 있었다(바로 위 고침) — 그 버그를 이미 겪은 계정은 v1 마커가 이미 찍혀 있어
-        // 재시도를 막고 있으므로, 키 자체를 올려서 이 고침이 배포되는 순간 자연스럽게 한 번 더
-        // 재시도하게 한다. v1 마커는 그냥 죽은 키로 남지만 지울 필요는 없다.
-        const migratedKey = `${storageKey(userId)}:migrated:v2`;
-        if (storage?.getItem(migratedKey)) return; // already attempted (or confirmed empty) before
-        const legacy = loadRoom(userId, storage);
-        // room state was never itself pruned when ownership changed (only the derived activeRoom
-        // was, for rendering) — so legacy.state.furniture can genuinely contain types the user no
-        // longer (or never actually) owns. itemIdByType.has(...) only checks "is this a real
-        // furniture type", not ownership — filtering on that alone let an unowned leftover sink
-        // the whole RPC call (all-or-nothing on ownership), which silently emptied the room and
-        // still marked migration done. Filter to shop.ownedIds here so only what's truly owned
-        // is ever sent.
-        const ownedLegacy = legacy.ok
-          ? legacy.state.furniture.filter(item => {
-              const itemId = itemIdByType.get(item.type);
-              return !!itemId && shop.ownedIds.has(itemId);
-            })
-          : [];
-        if (ownedLegacy.length > 0) {
-          const placements = ownedLegacy.map(item => ({ itemId: itemIdByType.get(item.type)!, x: item.x, y: item.y }));
-          const result = await savePixelRoomLayout(placements);
-          if (cancelled) return;
-          if (result.ok) {
-            applyLoadedFurniture(ownedLegacy);
-          } else {
-            // Don't lose the migration attempt silently: show the legacy layout for this session
-            // anyway (nothing was saved server-side, so a later real edit will persist it) and
-            // don't mark "migrated" — next load retries instead of losing it for good.
-            applyLoadedFurniture(ownedLegacy);
-            setStorageError(result.message || '이전 가구 배치를 서버로 옮기지 못했어요. 가구를 다시 놓으면 저장돼요.');
-            return;
-          }
-        }
-        storage?.setItem(migratedKey, '1');
+        // 서버 행이 없으면 빈 방이다. 예전에는 여기서 이 기기의 레거시 localStorage 배치를 서버로
+        // "이전"했는데, 학생이 방을 일부러 비운 뒤(서버 0행) 다른 기기에서 이 화면을 열면 그 기기의
+        // 오래된 로컬 배치가 되살아나 서버를 덮어썼다. 이전 실패 때는 서버에 없는 배치를 이 기기에서만
+        // 보여 주기도 했다(기기마다 다른 방). 서버 저장은 2026-09-15부터 기준이므로 이관은 끝났다 — 로컬
+        // 배치는 읽지도 쓰지도 않는다.
+        const furniture = rows
+          .map(row => { const type = typeByItemId.get(row.itemId); return type ? { type, x: row.x, y: row.y } : null; })
+          .filter((item): item is Placement => item !== null);
+        applyLoadedFurniture(furniture);
       } catch {
         if (!cancelled) setStorageError('가구 배치를 불러오지 못했어요. 새로고침 후 다시 시도해 주세요.');
       } finally {
