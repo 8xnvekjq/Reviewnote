@@ -84,3 +84,18 @@ html.pwp-open, html.pwp-open body { overflow:hidden; overscroll-behavior:none; h
 /* 채팅 입력은 선택과 화면 키보드를 그대로 사용한다. */
 .pwp-root :is(input, textarea, select, [contenteditable="true"]) { user-select:text; -webkit-user-select:text; -webkit-touch-callout:default; touch-action:auto; }
 .pwp-stage, .pwp-surface { -webkit-touch-callout:none; user-select:none; -webkit-user-select:none; touch-action:none; }
+
+/* 옷장과 반대편 두 번째 HUD 줄에 표시한다. */
+.pwp-level-badge { position:absolute; width:84px; min-height:40px; flex-direction:column; justify-content:center; gap:5px; padding:6px 8px; font-size:13px; }
+.pwp-xp-track { display:block; width:100%; height:5px; background:#d7c4a1; overflow:hidden; border-radius:2px; }
+.pwp-xp-track > span { display:block; height:100%; background:#6d9d48; }
+.pwp-catch-card .pwp-xp-gain { grid-column:1 / -1; }
+.pwp-level-panel { line-height:1.45; font-size:13px; }
+.pwp-level-panel p, .pwp-level-panel h3 { margin:4px 0; }
+.pwp-xp-gain { color:#528531; font-weight:900; animation:pwp-xp-pop .5s steps(4); }
+.pwp-level-toast { position:absolute; z-index:30; top:52%; left:50%; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; gap:6px; padding:12px 20px; border:3px solid #795326; background:#fff4d9; color:#5b3926; box-shadow:4px 4px #493c36; pointer-events:none; white-space:nowrap; }
+.pwp-level-sparkles { color:#b58114; letter-spacing:16px; animation:pwp-sparkle .35s steps(2) alternate 6; }
+.pwp-bait-icon { width:48px; height:48px; image-rendering:pixelated; }
+@keyframes pwp-sparkle { to { transform:scale(1.35); opacity:.35; } }
+@keyframes pwp-xp-pop { from { transform:translateY(8px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+@media (prefers-reduced-motion:reduce) { .pwp-xp-gain, .pwp-level-sparkles { animation:none; } }

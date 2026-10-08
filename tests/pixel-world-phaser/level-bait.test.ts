@@ -166,7 +166,7 @@ test('새 테이블은 본인 조회만, 새 RPC는 인증 사용자만, 포인�
 });
 
 test('운영 농장 본문과 v4 종료 본문은 경험치 추가 외에 그대로 유지한다', () => {
-  const prod = readFileSync(new URL('../../PROD_FUNCTIONS.sql', import.meta.url), 'utf8');
+  const prod = readFileSync(new URL('./fixtures/production-farm.sql', import.meta.url), 'utf8');
   const farmPattern = /CREATE OR REPLACE FUNCTION pixel_private.farm_action[^]*?end \$function\$;/;
   const migratedFarm = farmPattern.exec(sql)![0]
     .replace('  v_xp_gain jsonb;\n', '')

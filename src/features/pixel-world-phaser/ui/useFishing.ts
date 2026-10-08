@@ -219,5 +219,5 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
     };
   }, [reel, cancel, setReelX]);
   const hideCatch = useCallback(() => setCaught(null), []);
-  return { state, phase, reelState, busy, message, caught, onShadowTap, reel, cancel, refresh, hideCatch, setReelX };
+  return { state, phase, bait: game.current.cast?.bait, reelState, busy, message, caught, onShadowTap, reel, cancel, refresh, hideCatch, setReelX };
 }

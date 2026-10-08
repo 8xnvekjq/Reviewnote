@@ -32,7 +32,7 @@ function mapCatalogRow(row: PixelItemCatalogRow): PixelItem {
     assetKey: row.asset_key,
     displayName: row.display_name,
     tier: row.tier,
-    stackable: false,
+    stackable: row.stackable,
   };
 }
 
@@ -167,4 +167,18 @@ export async function fetchEquippedRod(userId: string): Promise<string | null> {
   if (error) return null;
   const rodId = (data as { rod_id?: unknown } | null)?.rod_id;
   return typeof rodId === 'string' ? rodId : null;
+}
+
+export type BuyPixelBaitResult = { ok: true; newBalance: number; charges: number } | { ok: false; reason: 'insufficient_balance' | 'unknown'; message: string };
+export async function buyPixelBait(): Promise<BuyPixelBaitResult> {
+  try {
+    const { data, error } = await supabase.rpc('buy_pixel_bait');
+    if (error) throw error;
+    if (data?.ok === true && Number.isFinite(data.newBalance) && Number.isInteger(data.charges) && data.charges >= 0) return { ok: true, newBalance: data.newBalance, charges: data.charges };
+    return { ok: false, reason: data?.reason === 'insufficient_balance' ? 'insufficient_balance' : 'unknown', message: data?.message ?? '구매 결과를 확인하지 못했어요.' };
+  } catch { return { ok: false, reason: 'unknown', message: '구매 결과를 확인하지 못했어요. 다시 확인해 주세요.' }; }
+}
+export async function fetchPixelBaitCharges(): Promise<number | null> {
+  try { const { data, error } = await supabase.rpc('get_pixel_fishing_state'); return !error && Number.isInteger(data?.bait?.charges) && data.bait.charges >= 0 ? data.bait.charges : null; }
+  catch { return null; }
 }

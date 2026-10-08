@@ -30,7 +30,7 @@ try {
   await context.route('**/src/features/pixel-world-phaser/ui/fishingAdapterMock.ts', async route => {
     const response = await route.fetch();
     const source = await response.text();
-    const body = source.replace(/const difficulty = rodDifficulty\([^;]+;/, 'const difficulty = 1;');
+    const body = source.replace(/const difficulty = levelBaitDifficulty\([^;]+;/, 'const difficulty = 1;');
     assert.notEqual(body, source, 'easy mock difficulty override applied');
     await route.fulfill({ response, body });
   });

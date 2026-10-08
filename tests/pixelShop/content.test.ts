@@ -17,11 +17,12 @@ test('every avatar product maps to a bounded atlas row or custom garment in its 
     if (item.slot === 'furniture') { assert.ok(Object.hasOwn(FURNITURE, item.assetKey)); continue; }
     if (item.slot === 'pet') { continue; } // pets render via their own sprite system, not AVATAR_ROW_BY_SLOT
     if (item.slot === 'rod') { assert.match(item.assetKey, /^rod_(bamboo|steel|lucky|gold)$/); continue; }
+    if (item.slot === 'bait') { assert.equal(item.assetKey, 'worm'); assert.equal(item.category, 'bait'); continue; }
     if (fashionFor(item.slot,item.assetKey)) continue;
     const row = AVATAR_ROW_BY_SLOT[item.slot][item.assetKey];
     assert.ok(Number.isInteger(row) && row > 0 && row < rowCounts[item.slot]);
   }
-  assert.equal(ids.size, 59);
+  assert.equal(ids.size, 60);
   assert.equal(PIXEL_CATALOG.filter(item => item.slot === 'hair').length, 18);
   assert.equal(PIXEL_CATALOG.filter(item => item.slot === 'top').length, 13);
   assert.equal(PIXEL_CATALOG.filter(item => item.slot === 'bottom').length, 7);

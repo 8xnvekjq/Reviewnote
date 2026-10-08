@@ -37,10 +37,11 @@ try {
       item: node.closest('[data-item]').dataset.item,
       canvas: node.querySelector('canvas')?.dataset.ready,
       rod: node.querySelector('img.pwp-rod-icon')?.complete && node.querySelector('img.pwp-rod-icon')?.naturalWidth === 16,
+      bait: node.querySelector('img.pwp-bait-icon')?.complete && node.querySelector('img.pwp-bait-icon')?.naturalWidth === 16,
       svg: !!node.querySelector('svg'),
     })));
     assert.ok(crops.length > 0);
-    assert.ok(crops.every(crop => (crop.canvas === 'true' || crop.rod) && !crop.svg));
+    assert.ok(crops.every(crop => (crop.canvas === 'true' || crop.rod || crop.bait) && !crop.svg));
     await page.screenshot({ path: `scratch/fix-shop-top-${viewport.width}.png` });
     await shop.getByRole('button', { name: '낚싯대', exact: true }).click();
     assert.equal(await shop.locator('[data-item]').count(), 4);

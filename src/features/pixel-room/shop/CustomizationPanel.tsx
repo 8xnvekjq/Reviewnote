@@ -75,7 +75,7 @@ export function ShopPanel({ shop, pet, room, setMessage, busy, onPurchase, onPla
   const featured = ['hair_buns', 'top_vest', 'furniture_aquarium', 'hair_long', 'bottom_denim', 'shoes_low'];
   const rank = (item: PixelItem) => { const index = featured.indexOf(item.itemId); return index < 0 ? featured.length : index; };
   // 낚싯대는 광장 상점·옷장에서만 다룬다(이 화면엔 낚싯대 그림·장착 경로가 없다).
-  const filtered = shop.catalog.filter(item => item.category !== 'rod' && (category === 'all' || item.slot === category)).sort((a, b) => rank(a) - rank(b));
+  const filtered = shop.catalog.filter(item => item.category !== 'rod' && item.category !== 'bait' && (category === 'all' || item.slot === category)).sort((a, b) => rank(a) - rank(b));
   return <div className="pr-shop">
     <div className="pr-shop-heading"><div><h2>작은 변화, 나다운 공간</h2><p>직접 입어 본 모습으로 골라요.</p></div><p className="pr-shop-balance"><strong>{shop.balance.toLocaleString()}P</strong></p></div>
     <div className="pr-category-tabs" aria-label="상품 분류">{[['all', '전체'], ...AVATAR_SLOTS.map(slot => [slot, SLOT_LABELS[slot]]), ['furniture', '가구'], ['pet', '펫']].map(([key, label]) => <button key={key} aria-pressed={category === key} onClick={() => { setCategory(key); setConfirming(null); }}>{label}</button>)}</div>

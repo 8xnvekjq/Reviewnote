@@ -6,6 +6,9 @@ import type { WeeklyCropContest } from '../../pixel-room/farm/farmModel';
 import type { SubmitFarmCropResult } from '../../../utils/pixelFarm';
 import { TomatoSprite } from '../../pixel-room/farm/TomatoSprite';
 import { farmAction } from '../logic/farmActions';
+import { gainFrom } from './useLevel';
+import type { XpGain } from './useLevel';
+import { harvestXpDisplay } from '../logic/levels';
 import { Window } from './GamePanels';
 
 // 실서버 훅과 브라우저 하네스가 같은 동작을 주입한다.
@@ -16,10 +19,13 @@ export interface FarmAdapter {
   contest: () => Promise<WeeklyCropContest>;
 }
 export type ActivityPanel = 'scarecrow' | 'collection' | 'pet' | `farm:${number}`;
-export function FarmPanels({ kind, adapter, onClose, onTalk, onPet, onFx, onCollection }: {
+export function FarmPanels({ kind, adapter, onClose, onTalk, onPet, onFx, onCollection, onXp }: {
+  onXp?: (gain?: XpGain) => void;
   kind: ActivityPanel; adapter?: FarmAdapter; onClose: () => void; onTalk: () => void; onCollection: () => void;
   onPet: (kind: 'feed' | 'pet') => void; onFx: (index: number, action: string) => void;
 }) {
+  const [xpDisplay, setXpDisplay] = useState<number | null>(null);
+  const harvestGain = useRef<XpGain | undefined>(undefined);
   const [message, setMessage] = useState('');
   const [effect, setEffect] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -52,10 +58,11 @@ export function FarmPanels({ kind, adapter, onClose, onTalk, onPet, onFx, onColl
   const lastRevision = useRef(revision);
   useEffect(() => {
     if (revision !== lastRevision.current && effect && farm?.message && !farm.error && /^(심었어요|물을 줬어요|수확 기록)/.test(farm.message)) {
+      if (effect === 'harvest') { const gain = harvestGain.current ?? gainFrom(farm); setXpDisplay(gain?.gained ?? harvestXpDisplay()); onXp?.(gain); harvestGain.current = undefined; }
       onFx(index, effect); setEffect(null);
     }
     lastRevision.current = revision;
-  }, [revision, effect, farm?.message, farm?.error, index, onFx]);
+  }, [revision, effect, farm?.message, farm?.error, index, onFx, onXp, farm]);
   return <Window title={title} onClose={onClose} compact={kind !== 'collection'}><div className="pwp-panel-content">
     {kind === 'scarecrow' ? <div className="pwp-options"><button onClick={onTalk}>이야기하기</button><button onClick={onCollection}>수확물 보기</button></div>
       : kind === 'pet' ? <div className="pwp-options"><button onClick={() => onPet('feed')}>먹이 주기</button><button onClick={() => onPet('pet')}>쓰다듬기</button></div>
@@ -81,11 +88,12 @@ export function FarmPanels({ kind, adapter, onClose, onTalk, onPet, onFx, onColl
       </> : <>
         <p>{plot?.crop ? growthLabel(plot.crop, farm!.now) : '씨앗은 무료 · 4일 후 수확'}</p>
         {farm?.error ? <p role="alert">밭을 불러오지 못했어요. <button disabled={pending || farm.busy} onClick={() => void farm.refresh()}>다시 확인</button></p> : <button disabled={pending || farm?.busy || option.disabled} onClick={() => void act(async () => {
-          setEffect(option.action); await farm!.act(index, option.action);
+          setXpDisplay(null); setEffect(option.action); const result: unknown = await farm!.act(index, option.action); harvestGain.current = gainFrom(result);
           if (option.action === 'harvest') await adapter.inventory.refresh();
         })}>{option.label}</button>}
         {farm?.message && <article className="pwp-item" role="status" aria-label="밭 작업 결과"><strong>{farm.message}</strong>{farm.message.startsWith('수확 기록') && farm.snapshot?.lastHarvestSize != null && <><div className="pwp-crop-art"><TomatoSprite stage="ripe" moisture="normal" /></div><span>{sizeLabel(farm.snapshot.lastHarvestSize)} · {farm.snapshot.lastHarvestSize}/100</span></>}</article>}
       </>}
+    {xpDisplay !== null && <p className="pwp-xp-gain" role="status">+{xpDisplay} XP</p>}
     {message && <p role="status" aria-live="polite">{message}</p>}
   </div></Window>;
 }

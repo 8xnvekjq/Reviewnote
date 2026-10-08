@@ -1,8 +1,9 @@
-﻿import type { ReelGame } from '../logic/reelGame';
+﻿import type { CastStart } from './fishingAdapter';
+import type { ReelGame } from '../logic/reelGame';
 import './fishing.css';
 import { RodIcon } from './RodIcon';
 import { rodDisplay } from '../../pixel-room/shop/rods';
-export function ReelBar({ game }: { game: ReelGame }) {
+export function ReelBar({ game, bait }: { game: ReelGame; bait?: Extract<CastStart, { ok: true }>['bait'] }) {
   return <div className="pwp-reel" data-testid="reel-bar" data-danger={game.progress < .15}
     data-zone={game.zone} data-zone-x={game.zoneX} data-fish={game.fish} data-fish-x={game.fishX}
     data-velocity={game.velocity} data-velocity-x={game.velocityX} data-fish-vx={game.fishVX} data-fish-vy={game.fishVY}
@@ -10,6 +11,7 @@ export function ReelBar({ game }: { game: ReelGame }) {
     role="group" aria-label="물고기 끌어올리기">
     <strong>물고기를 따라가요!</strong>
     <div className="pwp-reel-rod"><RodIcon rod={game.rod} /><span>{rodDisplay(game.rod).displayName}</span></div>
+    {bait?.used && <small className="pwp-reel-bait" data-testid="reel-bait">미끼 {bait.charges}회</small>}
     {game.trophy && <b className="pwp-reel-big">대물이에요!</b>}
     {game.big && <b className="pwp-reel-big">힘이 센 녀석이에요!</b>}
     <div className="pwp-reel-arena-wrap">

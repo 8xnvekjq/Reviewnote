@@ -1,3 +1,5 @@
+import { gainFrom } from './useLevel';
+import { fishXpDisplay } from '../logic/levels';
 import { useEffect } from 'react';
 import { FISH_CATALOG, RARITY_STARS } from '../logic/fishCatalog';
 import type { LandedCatch } from './useFishing';
@@ -13,6 +15,7 @@ export function CatchCard({ caught, onHide }: { caught: LandedCatch; onHide(): v
     <strong>{name} 낚았어요!</strong><span>{caught.lengthCm.toFixed(1)}cm</span>
     <span className="pwp-fish-stars" aria-label={`희귀도 ${RARITY_STARS[caught.rarity]}별`}>{'★'.repeat(RARITY_STARS[caught.rarity])}</span>
     <div className="pwp-catch-badges">{caught.isNew && <b>새 친구!</b>}{caught.isBig && <b>대물</b>}{caught.isPersonalBest && <b>새 기록!</b>}</div>
+    <span className="pwp-xp-gain">+{gainFrom(caught)?.gained ?? fishXpDisplay(caught.rarity, caught.isBig)} XP</span>
     <small aria-hidden="true">✦ ✧ ✦</small>
   </div>;
 }

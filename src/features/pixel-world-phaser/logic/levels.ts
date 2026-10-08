@@ -36,3 +36,8 @@ export function levelBaitDifficulty(afterRod: number, level: number, legendary: 
   return Math.round(Math.max(legendary ? 4 : 1, afterRod * (1 - reduction) - (bait ? 0.3 : 0)) * 100) / 100;
 }
 export const hardFishChance = (rareBonus: number, bait = false): number => bait ? Math.min(60, (15 + rareBonus) * 2) : 15 + rareBonus;
+
+export const fishingPerkText = (level: number) => `낚시 난이도 −${Math.min(Math.max(level - 1, 0), 50)}%`;
+export const fishXpDisplay = (rarity: 'common' | 'uncommon' | 'rare' | 'legendary', trophy = false) =>
+  FISH_XP[rarity] + (trophy ? TROPHY_XP : 0);
+export const harvestXpDisplay = () => HARVEST_XP;

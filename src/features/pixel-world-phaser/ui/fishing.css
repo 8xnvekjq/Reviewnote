@@ -40,3 +40,5 @@
 .pwp-rod-icon { object-fit: contain; image-rendering: pixelated; }
 .pwp-reel-rod { display:flex; align-items:center; justify-content:center; gap:6px; font-size:12px; }
 .pwp-reel-rod .pwp-rod-icon { width:32px; height:32px; }
+
+.pwp-reel .pwp-reel-bait { color: #386831; font-size: 11px; }
