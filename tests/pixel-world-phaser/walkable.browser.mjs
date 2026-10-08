@@ -78,6 +78,64 @@ try {
     await page.screenshot({ path: `${shots}/river-entry-toast.png` });
     console.log('PASS walkable flow: normal camera edge, sign A dialogue, east river exit and 강가 toast');
   }
+  // 중앙에서 직진해 출구와 귀환을 확인한다.
+  for (const width of [390, 1180]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 820 });
+    await page.goto(`${base}/tests/pixel-world-phaser/harness.html?pet=none&pwClock=12:00`);
+    await ready('yard');
+    const walkCell = async (x, y) => {
+      await page.evaluate(({ x, y }) => {
+        const h = window.__pixelWorldPhaser, d = h.debug();
+        h.walkToScreen(((x + .5) * 16 - d.camera.x) * d.cssZoom, ((y + .5) * 16 - d.camera.y) * d.cssZoom);
+      }, { x, y });
+      await page.waitForFunction(({ x, y }) => {
+        const d = window.__pixelWorldPhaser.debug();
+        return !d.moving && Math.abs(d.x - (x + .5) * 16) < 1 && Math.abs(d.y - (y + .5) * 16) < 1;
+      }, { x, y }, { timeout: 20000 });
+      await page.waitForTimeout(500);
+    };
+    const tapExit = async id => {
+      await page.evaluate(id => { const h = window.__pixelWorldPhaser, p = h.debug().exits[id]; h.walkToScreen(p.x, p.y); }, id);
+    };
+    const stableEntry = async (scene, facing) => {
+      await ready(scene);
+      await page.waitForTimeout(500);
+      const d = await page.evaluate(() => window.__pixelWorldPhaser.debug());
+      assert.equal(d.scene, scene);
+      assert.equal(d.facing, facing);
+    };
+    await walkCell(11, 14);
+    await page.keyboard.down('ArrowDown');
+    await page.waitForFunction(() => window.__pixelWorldPhaser.debug().y >= 19 * 16, null, { timeout: 10000 });
+    await page.keyboard.up('ArrowDown');
+    await page.waitForTimeout(500);
+    const bottom = await page.evaluate(() => window.__pixelWorldPhaser.debug());
+    assert.equal(bottom.scene, 'yard');
+    assert.ok(bottom.exits.gate.x >= 0 && bottom.exits.gate.x <= width && bottom.exits.gate.y >= 0 && bottom.exits.gate.y <= page.viewportSize().height);
+    await page.screenshot({ path: `${shots}/yard-bottom-${width}.png` });
+    await page.keyboard.down('ArrowDown');
+    await page.waitForFunction(() => window.__pixelWorldPhaser.debug().transitioning);
+    await page.keyboard.up('ArrowDown');
+    await stableEntry('plaza', 'Back');
+    await tapExit('yard'); await stableEntry('yard', 'Back');
+    await walkCell(11, 14);
+    await page.keyboard.down('ArrowRight');
+    await page.waitForFunction(() => window.__pixelWorldPhaser.debug().x >= 23 * 16, null, { timeout: 10000 });
+    await page.keyboard.up('ArrowRight');
+    await page.waitForTimeout(500);
+    const right = await page.evaluate(() => window.__pixelWorldPhaser.debug());
+    assert.equal(right.scene, 'yard');
+    const riverExit = Object.entries(right.exits).find(([id]) => id.includes('river'))[1];
+    assert.ok(riverExit.x >= 0 && riverExit.x <= width && riverExit.y >= 0 && riverExit.y <= page.viewportSize().height);
+    await page.screenshot({ path: `${shots}/yard-right-${width}.png` });
+    await page.keyboard.down('ArrowRight');
+    await page.waitForFunction(() => window.__pixelWorldPhaser.debug().transitioning);
+    await page.keyboard.up('ArrowRight');
+    await stableEntry('river', 'Right');
+    const back = await page.evaluate(() => Object.keys(window.__pixelWorldPhaser.debug().exits)[0]);
+    await tapExit(back); await stableEntry('yard', 'Left');
+    console.log(`PASS edge exits ${width}px: straight down/right, visible gaps/arrows, plaza/river tap returns without bounce`);
+  }
   assert.deepEqual(errors, []);
   console.log(`PASS walkable ${phase}: 1180px yard/plaza collision overlays and art`);
 } finally { await browser.close(); }

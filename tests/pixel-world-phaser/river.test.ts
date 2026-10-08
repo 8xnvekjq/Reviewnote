@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { yardScene, toWorldCell } from '../../src/features/pixel-world-phaser/logic/yardWorld.ts';
+import { yardScene, RIVER_EXIT_CELLS } from '../../src/features/pixel-world-phaser/logic/yardWorld.ts';
 import { riverScene, riverWater, DOCK, RIVER_DECORATIONS, decorationCells, BANK_SPOTS, canCastFrom, nearestBankSpot, bankEdge, RIVER_COLS, RIVER_ROWS } from '../../src/features/pixel-world-phaser/logic/riverWorld.ts';
 import { buildScene, entrySpawn, exitAt, exitCells } from '../../src/features/pixel-world-phaser/logic/scenes.ts';
 import { cellCenter, cellOf, feetBlocked, planPath, facedInteractable, facingToward } from '../../src/features/pixel-world-phaser/logic/world.ts';
@@ -9,7 +9,8 @@ import { worldTint, fallbackWorldTime } from '../../src/features/pixel-world-pha
 test('yard east exit and river west exit connect to open entries both ways', () => {
   const yard = yardScene(); const river = riverScene();
   const east = yard.exits.find(exit => exit.to.scene === 'river')!;
-  assert.deepEqual(east.cells[0], toWorldCell({ x: 15, y: 7 }));
+  assert.deepEqual(east.cells, RIVER_EXIT_CELLS);
+  assert.deepEqual(river.exits[0].cells, [{ x: 2, y: 11 }]);
   assert.equal(east.to.entry, 'fromYard'); assert.equal(river.exits[0].to.entry, 'fromRiver');
   for (const [scene, exit] of [[yard, east], [river, river.exits[0]]] as const) {
     const destination = buildScene(exit.to.scene, { furniture: [] });
