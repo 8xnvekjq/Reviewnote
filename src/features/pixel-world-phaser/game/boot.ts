@@ -13,6 +13,10 @@ import type { ControlState } from '../controls';
 import { RoomScene } from './RoomScene';
 import { YardScene } from './YardScene';
 import { PlazaScene } from './PlazaScene';
+import { RiverScene } from './RiverScene';
+import type { FishShadow } from './RiverScene';
+import type { FishPhase, FishWeather } from '../logic/worldTint';
+import type { Point } from '../logic/joystick';
 import type { PlazaPlayerState } from '../../pixel-room/plaza/types';
 import type { PlazaBubble } from './plazaBubbles';
 import type { WorldAssets, WorldContext, WorldDebug, WorldEvents, WorldScene } from './WorldScene';
@@ -20,6 +24,10 @@ import type { WorldAssets, WorldContext, WorldDebug, WorldEvents, WorldScene } f
 export type { Prompt, WorldAssets, WorldDebug, WorldEvents } from './WorldScene';
 
 export interface WorldGameHandle {
+  setShadows(shadows: FishShadow[]): void;
+  setWorldTime(phase: FishPhase, weather: FishWeather): void;
+  readonly castFrom: Point | null;
+  shadowPoint(index: number): Point | null;
   destroy(): void;
   setActive(active: boolean): void;
   /** 게임 프레임 기준 CSS 좌표를 탭 → 그 자리까지 걸어간다. */
@@ -75,7 +83,8 @@ export function startWorldGame(parent: HTMLElement, start: WorldStart, controls:
     const yard = new YardScene(ctx);
     const room = new RoomScene(ctx);
     const plaza = new PlazaScene(ctx);
-    const ordered = FIRST_SCENE === 'room' ? [room, yard, plaza] : [yard, room, plaza];
+    const river = new RiverScene(ctx);
+    const ordered = FIRST_SCENE === 'room' ? [room, yard, plaza, river] : [yard, room, plaza, river];
     const game = new Phaser.Game({
       type: Phaser.AUTO,
       parent,
@@ -134,6 +143,10 @@ export function startWorldGame(parent: HTMLElement, start: WorldStart, controls:
     window.addEventListener('resize', fit);
 
     const handle: WorldGameHandle = {
+      setShadows: shadows => river.setShadows(shadows),
+      setWorldTime: (phase, weather) => { ctx.worldTime = { phase, weather }; active?.setWorldTime(phase, weather); },
+      get castFrom() { return active === river ? river.castFrom : null; },
+      shadowPoint: index => active === river && index >= 0 && index <= 2 ? river.shadowPoint(index) : null,
       getFurniture: () => ctx.data.furniture.map(item => ({ ...item })),
       setRoomPlacing: on => { if (active === room) room.setRoomPlacing(on); },
       roomEditPoint: (x, y) => active === room ? room.editPoint(x, y) : null,
