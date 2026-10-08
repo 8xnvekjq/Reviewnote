@@ -7,6 +7,7 @@ import { preloadFishing, fishingFrames } from './sceneAssets';
 import { createFishingFx, preloadFishingFx } from './fishingFx';
 import type { FishingEffects } from './fishingFx';
 import type { FishingGame } from '../logic/fishingGame';
+import { RiverPeers } from './riverPeers';
 import { WorldScene } from './WorldScene';
 import type { WorldContext } from './WorldScene';
 
@@ -19,6 +20,8 @@ export class RiverScene extends WorldScene {
   private water: Phaser.GameObjects.Image[] = [];
   private ready = false;
   private fx: FishingEffects | null = null;
+  /** 강가 친구들(실시간). 그리기는 riverPeers.ts가 맡는다. */
+  readonly peers = { current: null as RiverPeers | null };
   constructor(ctx: WorldContext) { super('river', ctx); }
   preload() { preloadFishing(this); preloadFishingFx(this); }
   init(data: { entry?: string } | undefined) { super.init(data); this.ready = false; this.shadows = []; this.water = []; }
@@ -66,7 +69,8 @@ export class RiverScene extends WorldScene {
     // 찌·줄·물보라 효과. 닻(anchor)은 매번 지금 위치를 읽도록 getter로 넘긴다. 장면이 끝나면 fishingFx가 스스로 정리한다.
     const scene = this;
     this.fx = createFishingFx(this, { get castFrom() { return scene.castFrom; }, shadowPoint: index => scene.shadowPoint(index) });
-    this.events.once('shutdown', () => { this.ready = false; this.shadows = []; this.water = []; this.fx = null; });
+    this.peers.current = new RiverPeers(this, this.spec.solid);
+    this.events.once('shutdown', () => { this.ready = false; this.shadows = []; this.water = []; this.fx = null; this.peers.current?.clear(); this.peers.current = null; });
   }
   setShadows(shadows: FishShadow[]) {
     this.desired = shadows.slice(0, 3).map(s => ({ ...s }));
@@ -108,6 +112,7 @@ export class RiverScene extends WorldScene {
   }
   update(time: number, delta: number) {
     super.update(time, delta);
+    this.peers.current?.update(time, this.feet);
     const clock = this.worldClock(), tint = worldTint(clock.phase, clock.weather);
     for (const image of this.water) image.setFrame(`water${Math.floor(time / 650) % 3}`);
     for (const s of this.shadows) {
@@ -123,6 +128,6 @@ export class RiverScene extends WorldScene {
     const shadows = this.shadows.map(s => ({ ...s.data, point: screen(s.body) }));
     // 브라우저 테스트가 탭할 수 있도록 그림자 위치를 targets['shadow:0..2']로도 내보낸다(숨기면 사라짐).
     const targets = { ...debug.targets, ...Object.fromEntries(shadows.map(s => [`shadow:${s.index}`, s.point])) };
-    return { ...debug, targets, shadows, castFrom: this.castFrom };
+    return { ...debug, targets, shadows, castFrom: this.castFrom, ...(this.peers.current?.snapshot() ?? { classmates: [], bubbles: [], sparkles: [] }) };
   }
 }

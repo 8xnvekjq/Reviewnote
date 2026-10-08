@@ -3,6 +3,8 @@ import type { RefObject } from 'react';
 import type { CastFinish, FishingAdapter, FishingState, FishPhase, FishWeather } from './fishingAdapter';
 import { cancelFishingGame, fishingActive, idleFishingGame, reelFishingGame, startFishingGame, tickFishingGame } from '../logic/fishingGame';
 import type { FishingGame } from '../logic/fishingGame';
+import { fishReportForGamePhase } from '../logic/riverPresence';
+import type { RiverFishReporter } from '../logic/riverPresence';
 export type LandedCatch = Extract<CastFinish, { landed: true }>;
 export interface FishingShadow { index: 0 | 1 | 2; size: 'S' | 'M' | 'L'; sparkle: boolean }
 // 추가 연결점: RiverScene은 이 호출을 자신의 createFishingFx().update로 전달한다.
@@ -12,15 +14,17 @@ export interface FishingHandle {
   setWorldTime?(phase: FishPhase, weather: FishWeather): void;
   fishingFx?(game: FishingGame, index: number, now: number): void;
 }
-export function useFishing({ adapter, handle, scene, pet, freeze }: {
+export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
   adapter?: FishingAdapter; handle: RefObject<FishingHandle | null>; scene: string | null; pet: string | null; freeze(active: boolean): void;
+  /** 강가 친구들에게 내 낚시 단계를 알린다(logic/riverPresence.ts). 없으면 아무것도 안 한다. */
+  report?: RiverFishReporter;
 }) {
   const [state, setState] = useState<FishingState | null>(null);
   const [phase, setPhase] = useState<FishingGame['phase']>('idle');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [caught, setCaught] = useState<LandedCatch | null>(null);
-  const latest = useRef({ adapter, handle, scene, pet, freeze }); latest.current = { adapter, handle, scene, pet, freeze };
+  const latest = useRef({ adapter, handle, scene, pet, freeze, report }); latest.current = { adapter, handle, scene, pet, freeze, report };
   const stateRef = useRef(state); stateRef.current = state;
   const game = useRef(idleFishingGame());
   const lock = useRef(false);
@@ -52,10 +56,13 @@ export function useFishing({ adapter, handle, scene, pet, freeze }: {
     const epoch = generation.current;
     game.current = next; setPhase(next.phase);
     latest.current.handle.current?.fishingFx?.(next, shadow.current, performance.now());
+    const told = fishReportForGamePhase(next.phase);
+    if (told) latest.current.report?.(told);
     setMessage(next.phase === 'tooEarly' ? '너무 빨랐어요!' : next.phase === 'missed' ? '놓쳤어요!' : next.phase === 'cancelled' ? '낚시를 취소했어요.' : '물고기를 올리는 중…');
     try {
       const result = await current?.finish(next.cast.castId, next.phase === 'landed');
       if (mounted.current && epoch === generation.current) {
+        if (next.phase === 'landed') latest.current.report?.(result?.ok && result.landed ? { phase: 'landed', speciesId: result.speciesId, lengthCm: result.lengthCm } : result?.ok ? { phase: 'escaped' } : { phase: 'idle' });
         if (result?.ok && result.landed) { setCaught(result); setMessage(''); await refresh(); }
         else if (!result?.ok) setMessage('낚시 결과를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.');
         else if (stateRef.current) shadows(stateRef.current);
@@ -94,6 +101,7 @@ export function useFishing({ adapter, handle, scene, pet, freeze }: {
       const firstEver = !attempted.current && stateRef.current.album.length === 0;
       attempted.current = true;
       game.current = startFishingGame(cast, companion, performance.now(), firstEver); setPhase('casting');
+      latest.current.report?.({ phase: 'casting', shadow: index });
     } catch { lock.current = false; if (mounted.current) { setBusy(false); latest.current.freeze(false); setMessage('낚시를 시작하지 못했어요.'); } }
   }, [refresh]);
   useEffect(() => {
@@ -107,7 +115,11 @@ export function useFishing({ adapter, handle, scene, pet, freeze }: {
         else {
           game.current = next;
           latest.current.handle.current?.fishingFx?.(next, shadow.current, now);
-          if (previous.phase !== next.phase) { setPhase(next.phase); if (next.phase === 'bite') navigator.vibrate?.(35); }
+          if (previous.phase !== next.phase) {
+            setPhase(next.phase); if (next.phase === 'bite') navigator.vibrate?.(35);
+            const told = fishReportForGamePhase(next.phase);
+            if (told) latest.current.report?.(told);
+          }
         }
       }
       frame = requestAnimationFrame(tick);
