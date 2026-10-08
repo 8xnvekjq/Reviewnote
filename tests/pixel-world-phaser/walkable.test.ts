@@ -1,10 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { yardScene, toWorldCell, RIVER_SIGN, RIVER_EXIT, groundTile, borderTrees } from '../../src/features/pixel-world-phaser/logic/yardWorld.ts';
-import { plazaScene, plazaCell } from '../../src/features/pixel-world-phaser/logic/plazaWorld.ts';
+import { plazaScene, plazaCell, plazaBorderGap } from '../../src/features/pixel-world-phaser/logic/plazaWorld.ts';
 import { yardWalkable } from '../../src/features/pixel-room/yard/yardModel.ts';
 import { SCENERY, inRect } from '../../src/features/pixel-room/plaza/plazaLayout.ts';
-import { cellCenter, feetBlocked, facedInteractable } from '../../src/features/pixel-world-phaser/logic/world.ts';
+import { cellCenter, feetBlocked, facedInteractable, planPath } from '../../src/features/pixel-world-phaser/logic/world.ts';
+import { riverScene } from '../../src/features/pixel-world-phaser/logic/riverWorld.ts';
 import { dialogueFor } from '../../src/features/pixel-world-phaser/logic/dialogues.ts';
 import { cameraCenterAxis, cameraZoom } from '../../src/features/pixel-world-phaser/logic/layout.ts';
 
@@ -57,13 +58,38 @@ for (const scene of [yardScene(), plazaScene()]) {
 }
 test('river sign is solid, readable with A from the path, and uses the requested Korean dialogue', () => {
   const scene = yardScene();
-  const sign = facedInteractable(cellCenter(toWorldCell({ x: 14, y: 7 })), 'Back', scene.interactables);
+  const sign = facedInteractable(cellCenter({ x: RIVER_SIGN.x, y: RIVER_SIGN.y + 1 }), 'Back', scene.interactables);
   assert.equal(sign?.id, 'river-sign');
   assert.deepEqual(sign?.action, { kind: 'talk' });
   assert.equal(scene.solid(RIVER_SIGN), true);
   assert.deepEqual(dialogueFor('river-sign', { scarecrowLine: () => '' }), { speaker: '강가 안내판', lines: ['오른쪽으로 쭉 가면 강가가 나와요. 물고기 그림자를 눌러 낚시해 보세요!'] });
   const path = [...Array.from({ length: 8 }, (_, i) => toWorldCell({ x: 7 + i, y: 9 })), toWorldCell({ x: 14, y: 8 }), toWorldCell({ x: 14, y: 7 }), RIVER_EXIT];
   for (const p of path) { assert.equal(groundTile(p.x, p.y), 25); assert.equal(scene.solid(p), false); }
+  for (let x = 19; x <= 25; x++) for (let y = 12; y <= 15; y++) assert.equal(groundTile(x, y), 25);
   for (const tree of borderTrees()) assert.equal(scene.solid({ x: tree.x, y: tree.y - 1 }), true);
   assert.equal(plazaScene().solid(plazaCell({ x: -1, y: 6 })), false);
+});
+
+test('outdoor exits sit at walkable edges, entries face inward and each exit cell accepts taps', () => {
+  for (const scene of [yardScene(), plazaScene(), riverScene()]) {
+    for (const exit of scene.exits.filter(e => e.id !== 'door')) {
+      if (scene.id !== 'river') assert.equal(exit.cells.length, 3);
+      for (const cell of exit.cells) {
+        assert.ok(cell.x === 1 || cell.x === scene.cols - 2 || cell.y === scene.rows - 2 || (scene.id === 'river' && cell.x === 2));
+        for (const entry of Object.values(scene.entries)) {
+          const path = planPath(entry.cell, cell, scene, scene.exits.flatMap(e => e.cells));
+          assert.deepEqual(path.at(-1), cell);
+        }
+      }
+    }
+    for (const entry of Object.values(scene.entries)) {
+      assert.ok(!scene.exits.some(e => e.cells.some(c => key(c) === key(entry.cell))));
+      assert.equal(feetBlocked(cellCenter(entry.cell), scene.solid), false);
+    }
+  }
+  assert.equal(yardScene().entries.plaza.facing, 'Back');
+  assert.equal(yardScene().entries.fromRiver.facing, 'Left');
+  assert.equal(plazaScene().entries.yard.facing, 'Back');
+  for (const cell of yardScene().exits.find(e => e.id === 'gate')!.cells) assert.ok(!borderTrees().some(t => t.x === cell.x && t.y === 22));
+  for (const cell of plazaScene().exits[0].cells) assert.ok(plazaBorderGap(cell.x, 21));
 });

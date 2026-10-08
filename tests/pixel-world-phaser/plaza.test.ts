@@ -49,7 +49,7 @@ test('plaza preserves scenery footprints with open return entry and connected ex
   for (let y = 0; y < 12; y++) for (let x = 0; x < 16; x++) assert.equal(scene.solid(plazaCell({ x, y })), !isWalkablePlaza({ x, y }));
   for (const item of SCENERY) assert.ok(scene.solid(plazaCell(item.footprint)));
   assert.equal(plazaGroundTile(8, 10), 25); assert.equal(plazaGroundTile(4, 3), 12);
-  for (const id of ['yard', 'room', 'plaza'] as const) {
+  for (const id of ['yard', 'room', 'plaza', 'river'] as const) {
     const current = buildScene(id, { furniture: [] });
     for (const exit of current.exits) {
       const destination = buildScene(exit.to.scene, { furniture: [] });
@@ -60,4 +60,12 @@ test('plaza preserves scenery footprints with open return entry and connected ex
     }
   }
   assert.equal(facedInteractable(cellCenter(plazaCell({ x: 13, y: 7 })), 'Back', scene.interactables)?.action.kind, 'panel');
+});
+
+test('plaza return path extends to its bottom perimeter', () => {
+  const scene = plazaScene();
+  for (let y = 12; y <= 16; y++) for (let x = 7; x <= 9; x++) assert.equal(plazaGroundTile(x, y), 25);
+  assert.equal(exitAt(scene, cellCenter(plazaCell({ x: 8, y: 11 }))), null);
+  assert.equal(scene.entries.yard.cell.y, 19);
+  for (const cell of scene.exits[0].cells) assert.equal(cell.y, 20);
 });
