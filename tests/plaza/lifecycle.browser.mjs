@@ -15,7 +15,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ headless: true });
 const output = process.env.UI_OUTPUT || 'node_modules/.cache/plaza-lifecycle';
 await mkdir(output, { recursive: true });
 try {

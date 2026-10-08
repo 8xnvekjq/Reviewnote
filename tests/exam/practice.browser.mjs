@@ -9,7 +9,7 @@ import { assertCompactTopbar } from './compact-topbar.assertions.mjs';
 const BASE = `${process.env.EXAM_TEST_BASE_URL || 'http://127.0.0.1:5174'}/tests/exam/practice.html`;
 const out = `${process.env.EXAM_TEST_ARTIFACT_DIR || 'node_modules/.cache'}/exam-practice`;
 await mkdir(out, { recursive: true });
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ headless: true });
 
 const LANDSCAPE = { width: 1180, height: 820 };
 const PORTRAIT = { width: 820, height: 1180 };

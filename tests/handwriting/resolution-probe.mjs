@@ -3,7 +3,7 @@ import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 
 const base = process.env.HANDWRITING_TEST_URL || 'http://127.0.0.1:5174';
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ headless: true });
 try {
   const context = await browser.newContext({ viewport: { width: 820, height: 1180 }, hasTouch: true, deviceScaleFactor: 2, serviceWorkers: 'block' });
   await context.route('**/*', r => new URL(r.request().url()).origin === base ? r.continue() : r.abort());

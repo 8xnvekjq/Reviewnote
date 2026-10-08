@@ -2,7 +2,7 @@ import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { writeFile, unlink } from 'node:fs/promises';
 const BASE = process.env.PWP_BASE ?? 'http://127.0.0.1:5174';
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ headless: true });
 // 파일이 아직 병합되지 않았을 때만 이 테스트 안의 최소 mock으로 제어기를 검증한다.
 async function controllerChecks() {
   const page = await browser.newPage();

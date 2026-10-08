@@ -3,7 +3,7 @@ import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 const BASE = process.env.PWP_BASE ?? 'http://127.0.0.1:5174';
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ headless: true });
 const ready = (page, scene) => page.waitForFunction(scene => window.__pixelWorldPhaser?.debug().scene === scene && !window.__pixelWorldPhaser.debug().transitioning, scene, { timeout: 20000 });
 const target = async (page, name) => { await page.bringToFront(); return page.evaluate(name => { const h = window.__pixelWorldPhaser, p = h.debug().targets[name]; h.walkToScreen(p.x, p.y); }, name); };
 const exit = async (page, name) => { await page.bringToFront(); return page.evaluate(name => { const h = window.__pixelWorldPhaser, p = h.debug().exits[name]; h.walkToScreen(p.x, p.y); }, name); };

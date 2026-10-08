@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 const base = process.env.PWP_BASE ?? 'http://127.0.0.1:5174';
 await mkdir('.pixel-world-test.local/fish-album', { recursive: true });
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ headless: true });
 try {
   for (const viewport of [{ width: 390, height: 844 }, { width: 1180, height: 820 }]) {
     const context = await browser.newContext({ viewport });

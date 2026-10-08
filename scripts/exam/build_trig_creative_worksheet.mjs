@@ -208,7 +208,7 @@ function reviewHtml(data, sheet) {
 
 async function renderPngs(outDir, tmpDir, sheet) {
   const { chromium } = await import('playwright');
-  const browser = await chromium.launch({ channel: 'msedge', headless: true });
+  const browser = await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage({ viewport: { width: 960, height: 800 }, deviceScaleFactor: 1.4 });
     const shoot = async (html, name, file) => {

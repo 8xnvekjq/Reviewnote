@@ -21,7 +21,7 @@ const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const out = process.env.UI_OUTPUT || 'node_modules/.cache/pixel-furniture-race';
 await mkdir(out, { recursive: true });
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ headless: true });
 const catalog = PIXEL_CATALOG.map(i => ({ item_id: i.itemId, category: i.category, slot: i.slot, price: i.price, asset_key: i.assetKey, display_name: i.displayName, tier: i.tier, stackable: false }));
 const CATALOG_DELAY_MS = 180;   // arrives after shop.ready
 const FURNITURE_FETCH_DELAY_MS = 450; // still in flight when the (buggy) tear-down would hit

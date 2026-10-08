@@ -2,7 +2,7 @@ import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { emptyFarm } from './emptyFarm.mjs';
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ headless: true });
 await mkdir('node_modules/.cache/front-yard', { recursive: true });
 try {
   for (const viewport of [{ width: 390, height: 700 }, { width: 1440, height: 1000 }]) {
