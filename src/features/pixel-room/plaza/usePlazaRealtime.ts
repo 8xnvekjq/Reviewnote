@@ -2,12 +2,13 @@ import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { RealtimeChannel, RealtimePresenceState } from '@supabase/supabase-js';
 import { supabase } from '../../../services/supabase';
 import type { PublicAvatarAppearance } from '../shop/types';
-import { createPlazaStoreState, getOtherPlayers, plazaStoreReducer } from './presenceStore';
+import { createPlazaStoreReducer, createPlazaStoreState, getOtherPlayers, plazaStoreReducer } from './presenceStore';
 import type { PathWaypoint } from './presenceStore';
 import type { PlazaPlayerState } from './types';
 import { PLAZA_CHANNEL_NAME } from './types';
 import { plazaDebugLog } from './plazaDebug';
-import { protocolExtras } from './presenceProtocol';
+import { PLAZA_BOUNDS, protocolExtras } from './presenceProtocol';
+import type { PresenceBounds } from './presenceProtocol';
 
 import { usePlazaReactions } from './usePlazaReactions';
 import { REACTION_COOLDOWN_MS, nearWell } from './plazaInteractions';
@@ -46,6 +47,18 @@ export interface UsePlazaRealtimeResult {
   sendChat: (text: string) => Promise<'ok' | 'empty' | 'cooldown' | 'failed'>;
   ready: boolean;              // channel subscribed + initial presence sync received (false while reconnecting)
   updateMyState: (partial: PlazaSelfState) => void;
+  /** options.events에 등록한 추가 broadcast 이벤트를 보낸다(저장하지 않음). 연결 전이거나 실패하면 false. */
+  sendEvent: (event: string, payload: unknown) => Promise<boolean>;
+}
+
+/** 같은 presence/이동/인사/한마디 프로토콜을 다른 장소(예: 강가)에서 쓰기 위한 선택값. 기본값은 광장 그대로다. */
+export interface PlazaRealtimeOptions {
+  /** 채널(topic) 이름. 광장과 다른 이름을 쓰면 구형 광장 화면과 절대 섞이지 않는다. */
+  channel?: string;
+  /** 연속 좌표의 유효 범위(칸). */
+  bounds?: PresenceBounds;
+  /** 추가로 들을 broadcast 이벤트 → 받는 함수. 이벤트 이름은 채널을 만들 때 읽고, 함수는 매번 최신 것을 부른다. */
+  events?: Record<string, (payload: unknown) => void>;
 }
 
 // Supabase Presence는 우리가 track()에 넘긴 값 위에 presence_ref 같은 자체 필드를 얹어서 돌려준다
@@ -92,7 +105,7 @@ function flattenPresenceState(state: RealtimePresenceState<PlazaPlayerState>): A
  * removeChannel() 자체가 await한다(RealtimeClient.removeChannel: `await channel.unsubscribe()`
  * — 서버의 leave ack를 기다리는 진짜 네트워크 왕복, 곧바로 끝나지 않는다) — 이 함수가 반환하는
  * Promise는 그 왕복까지 전부 끝난 뒤에야 resolve된다. 호출자(connect())가 이 Promise를
- * plazaVisitTeardown에 등록해 두는 이유는 바로 아래 주석 참고. */
+ * visitTeardowns에 등록해 두는 이유는 바로 아래 주석 참고. */
 async function leaveChannelSafely(channel: RealtimeChannel): Promise<void> {
   try {
     await channel.untrack();
@@ -131,28 +144,35 @@ async function leaveChannelSafely(channel: RealtimeChannel): Promise<void> {
 // status 콜백을 받는 바로 그 시점에 이미) 스스로 topic 레지스트리에서 빠진다. untrack()/
 // removeChannel()의 서버 ack를 기다릴 필요가 원천적으로 없다 — 이미 죽어서 서버가 ack를 줄 수도
 // 없는 채널에 그 ack를 기다리게 하면 removeChannel 내부의 unsubscribe()가 자체 timeout(수 초)까지
-// 그냥 흘려보내고, connect()는 그동안 재연결을 시작조차 못 한다. plazaVisitTeardown이 원래 막으려던
+// 그냥 흘려보내고, connect()는 그동안 재연결을 시작조차 못 한다. visitTeardowns이 원래 막으려던
 // 건 "살아있는 채널을 능동적으로 untrack하는 도중에 생기는 재사용 경합"이었지, "이미 죽은 채널이
 // 재사용될까봐"가 아니었다 — CLOSED 채널은 애초에 재사용될 수 없다(레지스트리에 없으므로).
-let plazaVisitTeardown: Promise<void> | null = null;
+// 채널(topic)마다 따로 기억한다 — 광장과 강가는 서로의 퇴장을 기다릴 이유가 없다.
+const visitTeardowns = new Map<string, Promise<void>>();
 
-function beginPlazaVisitTeardown(channel: RealtimeChannel): void {
+function beginPlazaVisitTeardown(topic: string, channel: RealtimeChannel): void {
   // .catch(()=>{})로 감싼 버전을 추적한다 — connect()가 이 Promise를 곧바로 await하므로, 여기서
   // reject가 새어나가면 unhandled rejection이 되는 데다 connect() 자체가 채널을 만들어보지도
   // 못하고 중단된다. leaveChannelSafely는 best-effort 정리일 뿐이라 실패해도 다음 방문을
   // 막을 이유가 없다 — 실패했든 성공했든 "이전 방문 정리 시도가 끝났다"는 사실만 중요하다.
   const teardown = leaveChannelSafely(channel).catch(() => {});
-  plazaVisitTeardown = teardown;
+  visitTeardowns.set(topic, teardown);
   void teardown.finally(() => {
-    if (plazaVisitTeardown === teardown) plazaVisitTeardown = null;
+    if (visitTeardowns.get(topic) === teardown) visitTeardowns.delete(topic);
   });
 }
 
 /** Pixel World Phase 2A — 광장(Plaza) 실시간 배선. presenceStore.ts의 순수 reducer 위에
  * Supabase Presence(현재 위치의 진실, 느림/무거움)와 Broadcast(이동 중 보간용, 빠름/가벼움)를
  * 얹는다. 정확한 라우팅 정책은 updateMyState 안의 주석 참고. */
-export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppearance, initial?: PlazaSelfState): UsePlazaRealtimeResult {
-  const [storeState, dispatch] = useReducer(plazaStoreReducer, undefined, createPlazaStoreState);
+export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppearance, initial?: PlazaSelfState, options?: PlazaRealtimeOptions): UsePlazaRealtimeResult {
+  // 채널 이름·좌표 범위는 마운트 동안 고정이다(바꾸려면 key로 다시 마운트한다).
+  const [topic] = useState(() => options?.channel ?? PLAZA_CHANNEL_NAME);
+  const [bounds] = useState(() => options?.bounds ?? PLAZA_BOUNDS);
+  const [reducer] = useState(() => bounds === PLAZA_BOUNDS ? plazaStoreReducer : createPlazaStoreReducer(bounds));
+  const eventsRef = useRef(options?.events);
+  eventsRef.current = options?.events;
+  const [storeState, dispatch] = useReducer(reducer, undefined, createPlazaStoreState);
   const [ready, setReady] = useState(false);
   const { reactions, receive } = usePlazaReactions(sessionId, storeState.players);
   const receiveRef = useRef(receive);
@@ -193,7 +213,7 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
     const self = selfRef.current;
     return {
       sessionId,
-      ...protocolExtras(self),
+      ...protocolExtras(self, bounds),
       x: self.x,
       y: self.y,
       direction: self.direction,
@@ -236,11 +256,12 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
       if (cancelled) return;
       // 이전 방문(같은 topic의 이전 채널)의 퇴장이 아직 끝나지 않았으면 기다린다 — 그러지 않으면
       // supabase.channel()이 아직 unsubscribe 중인 옛 채널 객체를 그대로 돌려줄 수 있다(위
-      // plazaVisitTeardown 주석 참고). 광장을 빠르게 왕복하지 않는 보통의 경우엔 이 시점에 이미
+      // visitTeardowns 주석 참고). 광장을 빠르게 왕복하지 않는 보통의 경우엔 이 시점에 이미
       // null이라 사실상 대기 없이 지나간다.
-      if (plazaVisitTeardown) {
+      const previousVisit = visitTeardowns.get(topic);
+      if (previousVisit) {
         plazaDebugLog('channel:awaiting-previous-teardown', sessionId, {});
-        await plazaVisitTeardown;
+        await previousVisit;
         if (cancelled) return;
       }
       plazaDebugLog('channel:connect', sessionId, { previousSeq: seqRef.current, reconnectAttempt });
@@ -253,10 +274,10 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
       setReady(false);
 
       // presence: { key: sessionId } — 같은 계정으로 연 여러 탭도 sessionId가 서로 달라서 독립된
-      // presence 항목으로 잡힌다(서로 덮어쓰지 않음). 위에서 plazaVisitTeardown을 기다렸으므로
+      // presence 항목으로 잡힌다(서로 덮어쓰지 않음). 위에서 visitTeardowns을 기다렸으므로
       // 이 시점엔 같은 topic의 이전 채널이 레지스트리에서 확실히 빠져 있다 — supabase.channel()이
       // 그 옛 채널을 재사용하지 않고 진짜 새 채널을 만든다.
-      const nextChannel = supabase.channel(PLAZA_CHANNEL_NAME, {
+      const nextChannel = supabase.channel(topic, {
         config: { presence: { key: sessionId } },
       });
       channel = nextChannel;
@@ -296,6 +317,12 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
         if (!cancelled && channel === nextChannel) receiveChatRef.current(payload);
       });
 
+      for (const event of Object.keys(eventsRef.current ?? {})) {
+        nextChannel.on('broadcast', { event }, ({ payload }) => {
+          if (!cancelled && channel === nextChannel) eventsRef.current?.[event]?.(payload);
+        });
+      }
+
       nextChannel.subscribe(status => {
         if (cancelled) return;
         // 이 채널이 이미 다른 connect()/teardown에 의해 교체된 뒤 뒤늦게 도착한 이벤트라면
@@ -319,7 +346,7 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
         // 인스턴스에 재호출하는 것보다 깨끗하게 새 채널을 만들어 스스로 재연결을 책임지는 쪽이
         // 더 예측 가능하다. leaveChannelSafely는 fire-and-forget으로만 부른다(await 안 함, 다음
         // connect()도 이 결과를 기다리지 않는다) — CLOSED에 도달한 채널은 이미 스스로 topic
-        // 레지스트리에서 빠져 있으므로(위 plazaVisitTeardown 주석 참고) 기다릴 이유가 없고,
+        // 레지스트리에서 빠져 있으므로(위 visitTeardowns 주석 참고) 기다릴 이유가 없고,
         // 기다리면 죽은 채널의 untrack()/unsubscribe()가 서버 ack를 못 받아 자체 timeout까지
         // 재연결 자체가 미뤄진다 — 실제 Supabase에서 확인된 "5~12초 멈췄다가 순간이동" 패턴의
         // 핵심 원인이었다.
@@ -350,7 +377,7 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
       setReady(false);
       const dying = channel;
       channel = null;
-      if (dying) beginPlazaVisitTeardown(dying);
+      if (dying) beginPlazaVisitTeardown(topic, dying);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
@@ -435,5 +462,13 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
       return 'ok';
     } catch { return 'failed'; }
   }
-  return { players, paths: storeState.paths, ready, updateMyState, reactions, sendReaction, chats, sendChat };
+  async function sendEvent(event: string, payload: unknown): Promise<boolean> {
+    const channel = channelRef.current;
+    if (!channel || !ready) return false;
+    try {
+      const result = await channel.send({ type: 'broadcast', event, payload });
+      return result === 'ok' && channelRef.current === channel;
+    } catch { return false; }
+  }
+  return { players, paths: storeState.paths, ready, updateMyState, reactions, sendReaction, chats, sendChat, sendEvent };
 }

@@ -21,6 +21,7 @@ import type { FishingOverride } from '../ui/fishingAdapter';
 import type { FishingGame } from '../logic/fishingGame';
 import type { PlazaPlayerState } from '../../pixel-room/plaza/types';
 import type { PlazaBubble } from './plazaBubbles';
+import type { RiverPeerFishing } from '../logic/riverPresence';
 import type { WorldAssets, WorldContext, WorldDebug, WorldEvents, WorldScene } from './WorldScene';
 
 export type { Prompt, WorldAssets, WorldDebug, WorldEvents } from './WorldScene';
@@ -52,7 +53,10 @@ export interface WorldGameHandle {
   /** 지금 장면. 전환 중 잠깐은 직전 장면. */
   scene(): SceneId;
   setExhibit(show: boolean): void;
+  /** 광장·강가의 친구들. 다른 장면에서는 무시한다. */
   setClassmates(players: PlazaPlayerState[], bubbles: Record<string, PlazaBubble>, selfId: string): void;
+  /** 강가 친구(와 나)의 낚시 모습. 강가가 아니면 무시한다. */
+  setRiverFishing(fishing: Record<string, RiverPeerFishing>): void;
   debug(): WorldDebug;
 }
 export interface WorldStart {
@@ -188,7 +192,11 @@ export function startWorldGame(parent: HTMLElement, start: WorldStart, controls:
       },
       scene: () => lastScene,
       setExhibit: show => { if (active instanceof PlazaScene) active.setExhibit(show); },
-      setClassmates: (players, bubbles, selfId) => { if (active instanceof PlazaScene) active.setClassmates(players, bubbles, selfId); },
+      setClassmates: (players, bubbles, selfId) => {
+        if (active instanceof PlazaScene) active.setClassmates(players, bubbles, selfId);
+        else if (active === river) river.peers.current?.set(players, bubbles, selfId);
+      },
+      setRiverFishing: fishing => { if (active === river) river.peers.current?.setFishing(fishing); },
       debug: () => (active ? active.snapshot() : { ...(last as WorldDebug), transitioning: true }),
     };
   });

@@ -7,6 +7,7 @@ import { preloadFishing, fishingFrames } from './sceneAssets';
 import { createFishingFx, preloadFishingFx } from './fishingFx';
 import type { FishingEffects } from './fishingFx';
 import type { FishingGame } from '../logic/fishingGame';
+import { RiverPeers } from './riverPeers';
 import { WorldScene } from './WorldScene';
 import type { WorldContext } from './WorldScene';
 
@@ -24,6 +25,8 @@ export class RiverScene extends WorldScene {
   private waterStars: Phaser.GameObjects.Graphics | null = null;
   private lampGlow: Phaser.GameObjects.Graphics | null = null;
   private fx: FishingEffects | null = null;
+  /** 강가 친구들(실시간). 그리기는 riverPeers.ts가 맡는다. */
+  readonly peers = { current: null as RiverPeers | null };
   constructor(ctx: WorldContext) { super('river', ctx); }
   preload() { preloadFishing(this); preloadFishingFx(this); }
   init(data: { entry?: string } | undefined) { super.init(data); this.ready = false; this.shadows = []; this.water = []; this.pendingCast = null; this.waterFrame = -1; this.lampPhase = ''; }
@@ -70,7 +73,8 @@ export class RiverScene extends WorldScene {
     // 찌·줄·물보라 효과. 닻(anchor)은 매번 지금 위치를 읽도록 getter로 넘긴다. 장면이 끝나면 fishingFx가 스스로 정리한다.
     const scene = this;
     this.fx = createFishingFx(this, { get castFrom() { return scene.castFrom; }, shadowPoint: index => scene.shadowPoint(index) });
-    this.events.once('shutdown', () => { this.ready = false; this.shadows = []; this.water = []; this.fx = null; this.pendingCast = null; this.waterStars = null; this.lampGlow = null; });
+    this.peers.current = new RiverPeers(this, this.spec.solid);
+    this.events.once('shutdown', () => { this.ready = false; this.shadows = []; this.water = []; this.fx = null; this.pendingCast = null; this.waterStars = null; this.lampGlow = null; this.peers.current?.clear(); this.peers.current = null; });
   }
   private drawDecorations() {
     if (!this.textures.exists('town')) this.textures.addSpriteSheet('town', this.ctx.assets.town, { frameWidth: 16, frameHeight: 16 });
@@ -154,6 +158,7 @@ export class RiverScene extends WorldScene {
       const pending = this.pendingCast;
       if (Math.hypot(this.feet.x - pending.spot.x, this.feet.y - pending.spot.y) < 2) this.castShadow(pending.index);
     }
+    this.peers.current?.update(time, this.feet);
     const clock = this.worldClock(), tint = worldTint(clock.phase, clock.weather);
     const frame = Math.floor(time / 650) % 3;
     if (frame !== this.waterFrame) {
@@ -191,6 +196,7 @@ export class RiverScene extends WorldScene {
     const targets = { ...debug.targets, ...Object.fromEntries(shadows.map(s => [`shadow:${s.index}`, s.point])) };
     return { ...debug, targets, shadows, castFrom: this.castFrom, pendingCast: this.pendingCast,
       bankSpots: BANK_SPOTS.map(cellCenter), decorations: RIVER_DECORATIONS,
-      waterBounds: { left: bankEdge(9) * 16, right: RIVER_COLS * 16, top: 0, bottom: RIVER_ROWS * 16 } };
+      waterBounds: { left: bankEdge(9) * 16, right: RIVER_COLS * 16, top: 0, bottom: RIVER_ROWS * 16 },
+      ...(this.peers.current?.snapshot() ?? { classmates: [], bubbles: [], sparkles: [] }) };
   }
 }

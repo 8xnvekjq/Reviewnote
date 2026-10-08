@@ -31,6 +31,8 @@ import type { PanelKind } from './logic/panels';
 import { fishingPanelFor, panelFrozen } from './logic/panels';
 import { PlazaBridge } from './ui/PlazaBridge';
 import type { PlazaPanel } from './ui/PlazaBridge';
+import { RiverBridge } from './ui/RiverBridge';
+import type { RiverFishReporter } from './logic/riverPresence';
 
 import { useFishing } from './ui/useFishing';
 import type { FishingHandle } from './ui/useFishing';
@@ -159,7 +161,10 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     pointers.current.clear(); stickOrigin.current = null;
     if (ring.current) ring.current.style.opacity = '0';
   }, [controls]);
-  const fishing = useFishing({ adapter: fishingAdapter, handle: handle as RefObject<(WorldGameHandle & FishingHandle) | null>, scene: scene?.id ?? null, pet, freeze: freezeFishing });
+  // 강가 실시간(RiverBridge)이 마운트된 동안만 채워진다. 낚시 단계를 친구들에게 알린다.
+  const riverReporter = useRef<RiverFishReporter | null>(null);
+  const reportRiverFishing = useCallback<RiverFishReporter>(report => riverReporter.current?.(report), []);
+  const fishing = useFishing({ adapter: fishingAdapter, handle: handle as RefObject<(WorldGameHandle & FishingHandle) | null>, scene: scene?.id ?? null, pet, freeze: freezeFishing, report: reportRiverFishing });
   const fishingRef = useRef(fishing); fishingRef.current = fishing;
   // 방금 처음 잡은 물고기 — 거북이가 도감을 열 때 "새 친구" 인사를 한다. 도감을 한 번 닫으면 잊는다.
   const [freshSpecies, setFreshSpecies] = useState<string | null>(null);
@@ -644,6 +649,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     </div></div>}
     {(panel === 'shop' || panel === 'wardrobe') && panels && <GamePanels kind={panel} adapter={panels} onClose={closePanel} />}
     {(panel === 'turtle' || panel === 'fishboard') && <FishingPanels key={panel} kind={panel} adapter={fishingAdapter} newSpeciesId={newFishSpeciesId ?? freshSpecies} onClose={() => { if (panel === 'turtle') setFreshSpecies(null); closePanel(); }} />}
+    {scene?.id === 'river' && status === 'ready' && <RiverBridge key={'river:' + scene.visit} handle={handle} appearance={appearance} pet={pet} panel={panel} reporter={riverReporter} />}
     {scene?.id === 'plaza' && status === 'ready' && <PlazaBridge key={'plaza:' + scene.visit} handle={handle} appearance={appearance} pet={pet} userId={userId} panel={panel} onClose={closePanel} />}
     {panel && panel !== 'turtle' && panel !== 'fishboard' && panel !== 'furniture' && panel !== 'shop' && panel !== 'wardrobe' && panel !== 'contest' && panel !== 'well' && panel !== 'bench' && <FarmPanels key={panel} kind={panel} adapter={farmAdapter} onClose={closePanel}
       onCollection={() => openPanel('collection')} onTalk={() => { closePanel(); openDialogue('scarecrow'); }}
