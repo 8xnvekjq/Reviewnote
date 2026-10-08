@@ -9,7 +9,6 @@ const base = process.env.EXAM_TEST_BASE_URL || 'http://127.0.0.1:5174';
 const output = 'scratch/worksheet-browser';
 const TRIG_IDS = ['2026-g3m-trig-creative-1', '2026-g3m-trig-creative-2'];
 await mkdir(output, { recursive: true });
-await mkdir('node_modules/.cache/exam-practice', { recursive: true });
 const browser = await chromium.launch({ headless: true });
 try {
   for (const width of [1180, 820, 390]) {
@@ -35,11 +34,28 @@ try {
     await page.getByRole('button', { name: '제출하기', exact: true }).click();
     await page.getByRole('alertdialog', { name: '제출 확인' }).getByRole('button', { name: '제출하기', exact: true }).click();
     await page.getByTestId('exam-result').waitFor();
+    assert.equal(await page.getByTestId('exam-score').innerText(), '42.9점');
+    assert.equal(await page.locator('.exam-score-main .exam-score-raw').innerText(), '(원점수 3 / 7점)');
     assert.equal(await page.getByText(/추정.*등급|추정.*표준점수|추정.*백분위/).count(), 0);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
     assert.equal(overflow, false, `${width}px horizontal overflow`);
     assert.deepEqual(errors, []);
     await page.screenshot({ path: `${output}/result-${width}.png` });
+    await page.getByRole('button', { name: '← 시험지 목록', exact: true }).click();
+    await page.getByRole('button', { name: '고2', exact: true }).click();
+    const card = page.locator('[data-paper-id="mock-worksheet"][data-testid="exam-paper-card"]');
+    assert.match(await card.innerText(), /42\.9점/);
+    assert.match(await card.innerText(), /원점수 3 \/ 7점/);
+    assert.match(await page.locator('.exam-past .exam-past-row').first().innerText(), /42\.9점/);
+    await page.locator('[data-testid="exam-history-open"][data-paper-id="mock-worksheet"]').click();
+    await page.getByTestId('exam-history-table').waitFor();
+    assert.match(await page.getByTestId('exam-history-attempt').innerText(), /42\.9점/);
+    assert.match(await page.getByTestId('exam-history-attempt').innerText(), /원점수 3 \/ 7점/);
+    const trend = page.getByTestId('exam-history-trend');
+    assert.deepEqual(await trend.locator('svg > g text').allTextContents(), ['0', '50', '100']);
+    assert.match(await trend.locator('svg').getAttribute('aria-label'), /42\.9점/);
+    assert.match(await trend.locator('circle title').textContent(), /42\.9점/);
+    assert.ok(Math.abs(Number(await trend.locator('circle').getAttribute('cy')) - (96 - .429 * 72)) < .001);
     await context.close();
   }
 
@@ -194,7 +210,7 @@ try {
     assert.equal(overflow, false, `${width}px horizontal overflow (단원 필터)`);
     assert.deepEqual(errors, []);
     await page.waitForTimeout(400); // 화면 등장·탭 전환 애니메이션이 끝난 뒤 찍는다.
-    await page.screenshot({ path: `node_modules/.cache/exam-practice/filters-worksheet-${width}.png`, fullPage: true });
+    await page.screenshot({ path: `${output}/filters-worksheet-${width}.png`, fullPage: true });
     await context.close();
   }
 } finally {

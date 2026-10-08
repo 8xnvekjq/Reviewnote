@@ -357,6 +357,8 @@
 .exam-score-label { align-self: center; font-size: 12px; font-weight: 750; color: var(--rn-muted); margin-right: 2px; }
 .exam-score-main strong { font-size: 52px; font-weight: 850; line-height: 1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
 .exam-score-main span { color: var(--rn-muted); font-weight: 700; }
+.exam-score-main.is-converted { flex-wrap: wrap; }
+.exam-score-raw { font-size: 12px; font-weight: 500; color: var(--rn-muted); }
 .exam-score-stats { display: grid; grid-template-columns: repeat(2, auto); gap: 6px 18px; }
 /* 추정 등급·표준점수·백분위: 원점수 아래에 크게 */
 .exam-score-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
