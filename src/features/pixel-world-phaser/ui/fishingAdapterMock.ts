@@ -1,8 +1,9 @@
 // 메모리 안에서만 도는 낚시 어댑터 — 브라우저 하네스와 단위 테스트용. 서버(supabase_pixel_fishing.sql)와 같은 규칙:
-// 하루 6마리, 대기 중인 캐스트는 1개·90초, 놓치면 횟수 안 씀, 최근 5마리에 새 친구가 없으면 안 잡아 본 물고기 보장,
+// 무제한, 시작 간격 2초, 대기 캐스트 1개·90초, 최근 5마리에 새 친구가 없으면 안 잡아 본 물고기 보장,
 // 강아지 반짝임, 비둘기 힌트, 곰 +8%. 같은 seed·같은 시계면 언제나 같은 결과가 나온다.
-import { DAILY_CATCHES, FISH_CATALOG, RARITY_WEIGHT, fishById } from '../logic/fishCatalog';
+import { FISH_CATALOG, RARITY_WEIGHT, fishById } from '../logic/fishCatalog';
 import type { FishSpecies } from '../logic/fishCatalog';
+import { minReelMs } from '../logic/reelGame';
 import { fnv1a32, worldClockAt } from '../logic/worldClock';
 import type { BitePattern, CastFinish, CastStart, ClassFishBoard, FishAlbumEntry, FishingAdapter, FishingOverride, FishingState, FishPhase, FishWeather } from './fishingAdapter';
 
@@ -84,8 +85,9 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
   const now = opts.now ?? (() => Date.now());
   const catches: MockCatch[] = (opts.catches ?? []).map(c => ({ ...c }));
   const classmates = opts.classmates ?? DEFAULT_CLASSMATES;
-  let pending: { castId: string; fish: FishSpecies; lengthCm: number; kstDate: string; expiresAt: number } | null = null;
+  let pending: { castId: string; fish: FishSpecies; lengthCm: number; kstDate: string; expiresAt: number; startedAt: number; biteDelayMs: number; difficulty: number } | null = null;
   let castSeq = 0;
+  let lastStart = -Infinity;
   const delay = <T>(value: T): Promise<T> => opts.latencyMs ? new Promise(resolve => setTimeout(() => resolve(value), opts.latencyMs)) : Promise.resolve(value);
   const clock = () => worldClockAt(now(), opts.override ?? null);
   const usedOn = (kstDate: string) => catches.filter(c => c.kstDate === kstDate).length;
@@ -106,9 +108,9 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
     async state(): Promise<FishingState> {
       const c = clock();
       const used = usedOn(c.kstDate);
-      const remaining = Math.max(0, DAILY_CATCHES - used);
+      const remaining = -1;
       const active = opts.activePet ?? null;
-      const sparkleShadow = active === 'pet_dog' && remaining > 0 ? fnv1a32(`sparkle:${MOCK_USER}:${c.kstDate}:${used}`) % 3 : null;
+      const sparkleShadow = active === 'pet_dog' ? fnv1a32(`sparkle:${MOCK_USER}:${c.kstDate}:${used}`) % 3 : null;
       const known = caughtIds();
       const uncaught = FISH_CATALOG.filter(f => !known.has(f.id));
       const pigeonHint = active === 'pet_pigeon' && uncaught.length ? fishHintText(uncaught[fnv1a32(`pigeon:${MOCK_USER}:${c.kstDate}`) % uncaught.length]) : null;
@@ -118,7 +120,7 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
       const c = clock();
       if (pending && pending.expiresAt <= now()) pending = null;
       if (pending) return delay({ ok: false, reason: 'pending' });
-      if (usedOn(c.kstDate) >= DAILY_CATCHES) return delay({ ok: false, reason: 'budget' });
+      if (now() - lastStart < 2000) return delay({ ok: false, reason: 'pending' });
       const valid = FISH_CATALOG.filter(f => fishValidNow(f, c.phase, c.weather));
       const known = caughtIds();
       const fresh = valid.filter(f => !known.has(f.id));
@@ -132,23 +134,24 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
       const [lo, hi] = pattern === 'quick' ? [1200, 2500] : pattern === 'double' ? [2200, 3600] : [3200, 5000];
       const biteDelayMs = Math.round(lo + rand() * (hi - lo));
       const castId = `mock-cast-${++castSeq}`;
-      pending = { castId, fish, lengthCm, kstDate: c.kstDate, expiresAt: now() + CAST_TTL_MS };
+      const difficulty = Math.min(5, ({ common: 1, uncommon: 2, rare: 3.5, legendary: 5 }[fish.rarity]) + ((FISH_CATALOG.indexOf(fish) + 1) % 3) * .08);
+      lastStart = now();
+      pending = { castId, fish, lengthCm, kstDate: c.kstDate, expiresAt: now() + CAST_TTL_MS, startedAt: now(), biteDelayMs, difficulty };
       const hint = myPet === 'pet_dog' && (fish.rarity === 'rare' || fish.rarity === 'legendary') ? 'sparkle' : null;
-      return delay({ ok: true, castId, shadow: fish.shadow, biteDelayMs, pattern, hint });
+      return delay({ ok: true, castId, shadow: fish.shadow, biteDelayMs, difficulty, pattern, hint });
     },
     async finish(castId: string, landed: boolean): Promise<CastFinish> {
       const cast = pending;
       if (!cast || cast.castId !== castId || cast.expiresAt <= now()) return delay({ ok: false });
       pending = null;
-      if (!landed) return delay({ ok: true, landed: false });
-      if (usedOn(cast.kstDate) >= DAILY_CATCHES) return delay({ ok: false });
+      if (!landed || now() < cast.startedAt + cast.biteDelayMs + minReelMs(cast.difficulty)) return delay({ ok: true, landed: false });
       const before = catches.filter(c => c.speciesId === cast.fish.id);
       const isNew = before.length === 0;
       const isPersonalBest = !isNew && cast.lengthCm > Math.max(...before.map(c => c.lengthCm));
       catches.push({ id: `mock-catch-${catches.length + 1}`, speciesId: cast.fish.id, lengthCm: cast.lengthCm, caughtAt: new Date(now()).toISOString(), kstDate: cast.kstDate });
       return delay({
         ok: true, landed: true, speciesId: cast.fish.id, lengthCm: cast.lengthCm, rarity: cast.fish.rarity,
-        isNew, isBig: isBigCatch(cast.fish, cast.lengthCm), isPersonalBest, remaining: Math.max(0, DAILY_CATCHES - usedOn(cast.kstDate)),
+        isNew, isBig: isBigCatch(cast.fish, cast.lengthCm), isPersonalBest, remaining: -1,
       });
     },
     async board(): Promise<ClassFishBoard> {

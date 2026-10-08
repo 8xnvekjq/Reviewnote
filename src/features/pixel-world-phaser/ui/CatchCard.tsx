@@ -13,6 +13,6 @@ export function CatchCard({ caught, onHide }: { caught: LandedCatch; onHide(): v
     <strong>{name} 낚았어요!</strong><span>{caught.lengthCm.toFixed(1)}cm</span>
     <span className="pwp-fish-stars" aria-label={`희귀도 ${RARITY_STARS[caught.rarity]}별`}>{'★'.repeat(RARITY_STARS[caught.rarity])}</span>
     <div className="pwp-catch-badges">{caught.isNew && <b>새 친구!</b>}{caught.isBig && <b>대물</b>}{caught.isPersonalBest && <b>새 기록!</b>}</div>
-    <small>오늘 남은 낚시 {caught.remaining}번</small>
+    <small aria-hidden="true">✦ ✧ ✦</small>
   </div>;
 }
