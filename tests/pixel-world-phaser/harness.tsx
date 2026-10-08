@@ -15,7 +15,8 @@ import type { PanelAdapter } from '../../src/features/pixel-world-phaser/ui/Game
 import type { Placement } from '../../src/features/pixel-room/model';
 
 import type { FishingAdapter } from '../../src/features/pixel-world-phaser/ui/fishingAdapter';
-const mockModules = import.meta.glob('../../src/features/pixel-world-phaser/ui/fishingAdapterMock.ts', { eager: true });
+import { createMockFishingAdapter } from '../../src/features/pixel-world-phaser/ui/fishingAdapterMock';
+import { parseClockOverride } from '../../src/features/pixel-world-phaser/logic/worldClock';
 
 const params = new URLSearchParams(location.search);
 const appearance: PublicAvatarAppearance = {
@@ -30,11 +31,14 @@ const furniture = [{ type: 'desk', x: 3, y: 4 }, { type: 'bed', x: 0, y: 0 }, { 
 const farmNow = Date.parse('2026-10-08T03:00:00Z');
 const fakeContest: FarmAdapter['contest'] = async () => ({ weekStart: '2026-10-05', top: [{ rank: 1, sizeScore: 82, submitterLabel: '토마토 친구' }], mine: { rank: null, sizeScore: null, participantCount: 1 } });
 function Harness() {
-  const fishingAdapter = useMemo(() => {
+  // 낚시: ?fishing=1 이면 목(mock) 어댑터. 하네스는 관리자처럼 ?pwClock=21:30&pwWeather=rain 을 받는다.
+  const clockOverride = useMemo(() => parseClockOverride(location.search) ?? undefined, []);
+  const fishingAdapter = useMemo((): FishingAdapter | undefined => {
     if (!params.has('fishing')) return undefined;
-    const module = Object.values(mockModules)[0] as { createMockFishingAdapter?: () => FishingAdapter } | undefined;
-    const adapter = module?.createMockFishingAdapter?.();
-    if (!adapter) return undefined;
+    const adapter = createMockFishingAdapter({ seed: 7, override: clockOverride, classmates: [
+      { speciesId: 'carp', lengthCm: 41.2, animal: '🐻', caughtAt: new Date(Date.now() - 3 * 3600000).toISOString() },
+      { speciesId: 'pirami', lengthCm: 13.4, animal: '🐰', caughtAt: new Date(Date.now() - 20 * 60000).toISOString() },
+    ] });
     if (params.get('fishingBudget') === '0') return { ...adapter, state: async () => ({ ...await adapter.state(), remaining: 0, sparkleShadow: null }) };
     return adapter;
   }, []);
@@ -84,7 +88,7 @@ function Harness() {
   return open
     ? params.has('saved')
       ? <PixelWorldPhaser userId="scene-test-user" pointsBalance={1234} onExit={() => setOpen(false)} />
-      : <GameShell fishingAdapter={fishingAdapter} appearance={look} pet={active} balance={balance} panels={adapter} farmAdapter={params.has('farm') ? farmAdapter : undefined} beds={params.has('farm') ? farmBeds : [...beds]} furniture={roomLayout} onSaveFurniture={async layout => { await new Promise(resolve => setTimeout(resolve, 100)); if (params.has('roomSaveError')) throw new Error('저장하지 못했어요. 다시 시도해 주세요.'); setRoomLayout(layout); }} scarecrowLine={() => pickScarecrowLine(null, Date.now())} onExit={() => setOpen(false)} />
+      : <GameShell fishingAdapter={fishingAdapter} clockOverride={clockOverride} appearance={look} pet={active} balance={balance} panels={adapter} farmAdapter={params.has('farm') ? farmAdapter : undefined} beds={params.has('farm') ? farmBeds : [...beds]} furniture={roomLayout} onSaveFurniture={async layout => { await new Promise(resolve => setTimeout(resolve, 100)); if (params.has('roomSaveError')) throw new Error('저장하지 못했어요. 다시 시도해 주세요.'); setRoomLayout(layout); }} scarecrowLine={() => pickScarecrowLine(null, Date.now())} onExit={() => setOpen(false)} />
     : <main style={{ padding: 24 }}><p data-testid="exited">게임에서 나왔어요.</p><button type="button" onClick={() => setOpen(true)}>다시 들어가기</button></main>;
 }
 createRoot(document.getElementById('root')!).render(<Harness />);

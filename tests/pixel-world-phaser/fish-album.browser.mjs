@@ -1,8 +1,8 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
-const base = 'http://127.0.0.1:5177';
-await mkdir('scratch/fish-album', { recursive: true });
+const base = process.env.PWP_BASE ?? 'http://127.0.0.1:5174';
+await mkdir('.pixel-world-test.local/fish-album', { recursive: true });
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
   for (const viewport of [{ width: 390, height: 844 }, { width: 1180, height: 820 }]) {
@@ -25,7 +25,7 @@ try {
         assert.equal(await page.locator('.pwp-panel-content').evaluate(node => node.scrollWidth > node.clientWidth), false);
       };
       await checkBounds();
-      await page.screenshot({ path: `scratch/fish-album/album-${viewport.width}.png` });
+      await page.screenshot({ path: `.pixel-world-test.local/fish-album/album-${viewport.width}.png` });
       await page.keyboard.press('Escape');
       assert.equal(await page.getByRole('dialog').count(), 0);
       await page.getByRole('button', { name: '게시판', exact: true }).click();
@@ -43,7 +43,7 @@ try {
         }
       });
       await checkBounds();
-      await page.screenshot({ path: `scratch/fish-album/board-${viewport.width}.png` });
+      await page.screenshot({ path: `.pixel-world-test.local/fish-album/board-${viewport.width}.png` });
       await page.evaluate(() => document.querySelector('.pwp-window').dispatchEvent(new Event('pwp-cancel')));
       assert.equal(await page.getByRole('dialog').count(), 0);
       await page.getByRole('button', { name: '게시판', exact: true }).click();

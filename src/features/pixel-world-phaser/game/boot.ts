@@ -17,6 +17,8 @@ import { RiverScene } from './RiverScene';
 import type { FishShadow } from './RiverScene';
 import type { FishPhase, FishWeather } from '../logic/worldTint';
 import type { Point } from '../logic/joystick';
+import type { FishingOverride } from '../ui/fishingAdapter';
+import type { FishingGame } from '../logic/fishingGame';
 import type { PlazaPlayerState } from '../../pixel-room/plaza/types';
 import type { PlazaBubble } from './plazaBubbles';
 import type { WorldAssets, WorldContext, WorldDebug, WorldEvents, WorldScene } from './WorldScene';
@@ -28,6 +30,8 @@ export interface WorldGameHandle {
   setWorldTime(phase: FishPhase, weather: FishWeather): void;
   readonly castFrom: Point | null;
   shadowPoint(index: number): Point | null;
+  /** 낚시 상태(찌·줄·물보라)를 강가 장면에 전달. 다른 장면에서는 무시한다. */
+  fishingFx(game: FishingGame, index: number, now: number): void;
   destroy(): void;
   setActive(active: boolean): void;
   /** 게임 프레임 기준 CSS 좌표를 탭 → 그 자리까지 걸어간다. */
@@ -55,6 +59,8 @@ export interface WorldStart {
   assets: WorldAssets;
   beds: HTMLImageElement[];
   furniture: readonly Placement[];
+  /** 관리자 시험용 시각·날씨(?pwClock/?pwWeather). 학생에게는 넘기지 않는다. */
+  clockOverride?: FishingOverride;
 }
 
 export function startWorldGame(parent: HTMLElement, start: WorldStart, controls: ControlState, events: WorldEvents): Promise<WorldGameHandle> {
@@ -66,7 +72,7 @@ export function startWorldGame(parent: HTMLElement, start: WorldStart, controls:
     let lastScene: SceneId = FIRST_SCENE;
     let resolved = false;
     const ctx: WorldContext = {
-      assets: start.assets, controls, hooks: events,
+      assets: start.assets, controls, hooks: events, clockOverride: start.clockOverride,
       data: { furniture: start.furniture, beds: start.beds },
       view: { ratio: size.ratio },
       onSceneReady: scene => {
@@ -144,9 +150,10 @@ export function startWorldGame(parent: HTMLElement, start: WorldStart, controls:
 
     const handle: WorldGameHandle = {
       setShadows: shadows => river.setShadows(shadows),
-      setWorldTime: (phase, weather) => { ctx.worldTime = { phase, weather }; active?.setWorldTime(phase, weather); },
+      setWorldTime: (phase, weather) => { ctx.worldTime = { phase, weather, at: Date.now() }; active?.setWorldTime(phase, weather); },
       get castFrom() { return active === river ? river.castFrom : null; },
       shadowPoint: index => active === river && index >= 0 && index <= 2 ? river.shadowPoint(index) : null,
+      fishingFx: (game, index, now) => { if (active === river) river.fishingFx(game, index, now); },
       getFurniture: () => ctx.data.furniture.map(item => ({ ...item })),
       setRoomPlacing: on => { if (active === room) room.setRoomPlacing(on); },
       roomEditPoint: (x, y) => active === room ? room.editPoint(x, y) : null,

@@ -4,8 +4,9 @@
 // logic/scenes.ts의 장면 정의가 정한다). 입력은 공유 객체(ControlState)를 매 프레임 읽기만 한다.
 import Phaser from 'phaser';
 import { WorldTint } from './worldTint';
-import { fallbackWorldTime } from '../logic/worldTint';
+import { fallbackWorldTime, SERVER_TIME_TRUST_MS } from '../logic/worldTint';
 import type { FishPhase, FishWeather } from '../logic/worldTint';
+import type { FishingOverride } from '../ui/fishingAdapter';
 import { PET_INTERACTIONS } from '../../pixel-room/pet/petInteraction';
 import { facesPet, reactionFrame } from '../logic/petReaction';
 import { BED_CELLS } from '../logic/yardWorld';
@@ -66,7 +67,10 @@ export interface WorldEvents {
 }
 /** 장면들이 함께 쓰는 것(장면이 바뀌어도 그대로): 그림, 입력, 셸 연결, 서버 데이터, 화면 비율. */
 export interface WorldContext {
-  worldTime?: { phase: FishPhase; weather: FishWeather };
+  /** 서버가 마지막으로 알려 준 낚시 세계 시각(at = 받은 시각, Date.now 기준). */
+  worldTime?: { phase: FishPhase; weather: FishWeather; at: number };
+  /** 관리자 시험용 시각·날씨 덮어쓰기(관리자일 때만 셸이 넘긴다). */
+  clockOverride?: FishingOverride;
   assets: WorldAssets;
   controls: ControlState;
   hooks: WorldEvents;
@@ -101,7 +105,12 @@ export interface WorldDebug {
 export abstract class WorldScene extends Phaser.Scene {
   private outdoorTint?: WorldTint;
   private tintClockMinute = -1;
-  setWorldTime(phase: FishPhase, weather: FishWeather) { this.ctx.worldTime = { phase, weather }; this.outdoorTint?.set(phase, weather); }
+  setWorldTime(phase: FishPhase, weather: FishWeather) { this.ctx.worldTime = { phase, weather, at: Date.now() }; this.outdoorTint?.set(phase, weather); }
+  /** 지금 화면에 쓸 시각·날씨: 최근 서버 값, 없으면 같은 규칙의 클라이언트 시계. */
+  protected worldClock(): { phase: FishPhase; weather: FishWeather } {
+    const known = this.ctx.worldTime;
+    return known && Date.now() - known.at < SERVER_TIME_TRUST_MS ? known : fallbackWorldTime(Date.now(), this.ctx.clockOverride);
+  }
   protected spec!: SceneSpec;
   protected player!: Phaser.GameObjects.Sprite;
   private shadow!: Phaser.GameObjects.Ellipse;
@@ -184,7 +193,7 @@ export abstract class WorldScene extends Phaser.Scene {
     this.ctx.hooks.onScene(this.spec.id, this.spec.title);
     this.outdoorTint = undefined; this.tintClockMinute = -1;
     if (this.spec.id !== 'room') this.outdoorTint = new WorldTint(this, () => this.feet);
-    const clock = this.ctx.worldTime ?? fallbackWorldTime();
+    const clock = this.worldClock();
     this.outdoorTint?.set(clock.phase, clock.weather);
     this.ctx.onSceneReady(this);
   }
@@ -336,8 +345,8 @@ export abstract class WorldScene extends Phaser.Scene {
 
   update(_time: number, deltaMs: number) {
     const minute = Math.floor(Date.now() / 60000);
-    if (!this.ctx.worldTime && minute !== this.tintClockMinute) {
-      this.tintClockMinute = minute; const clock = fallbackWorldTime(); this.outdoorTint?.set(clock.phase, clock.weather);
+    if (minute !== this.tintClockMinute) {
+      this.tintClockMinute = minute; const clock = this.worldClock(); this.outdoorTint?.set(clock.phase, clock.weather);
     }
     this.outdoorTint?.update(deltaMs);
     if (this.transitioning) { this.updatePet(deltaMs); return; }
@@ -408,7 +417,7 @@ export abstract class WorldScene extends Phaser.Scene {
     });
   }
 
-  private playAvatar(walking: boolean, timeScale: number) {
+  protected playAvatar(walking: boolean, timeScale: number) {
     const key = `${this.ctx.assets.avatar.key}:${walking ? 'Walk' : 'Idle'}_${this.facing}`;
     if (key !== this.animKey) { this.player.play(key); this.animKey = key; }
     this.player.anims.timeScale = timeScale;

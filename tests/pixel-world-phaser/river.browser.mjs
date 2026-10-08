@@ -1,7 +1,7 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
-const BASE = 'http://127.0.0.1:5175';
+const BASE = process.env.PWP_BASE ?? 'http://127.0.0.1:5174';
 const SHOTS = '.pixel-world-test.local/river';
 await mkdir(SHOTS, { recursive: true });
 const browser = await chromium.launch({ channel: 'msedge', headless: true });

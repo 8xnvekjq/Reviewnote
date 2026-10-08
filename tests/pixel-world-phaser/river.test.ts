@@ -53,4 +53,9 @@ test('local fallback follows all KST phase boundaries and deterministic daily we
     const date = new Date(Date.UTC(2026, 9, 8, hour - 9)); assert.equal(fallbackWorldTime(date).phase, phase);
   }
   assert.equal(fallbackWorldTime(new Date('2026-10-08T00:00:00Z')).weather, fallbackWorldTime(new Date('2026-10-08T14:00:00Z')).weather);
+  // 서버(SQL fish_weather_for)와 같은 FNV 규칙: 2026-10-08은 비, 2026-01-01은 맑음.
+  assert.equal(fallbackWorldTime(new Date('2026-10-08T03:00:00Z')).weather, 'rain');
+  assert.equal(fallbackWorldTime(new Date('2026-01-01T03:00:00Z')).weather, 'clear');
+  // 관리자 덮어쓰기는 화면 시계에도 그대로 반영된다.
+  assert.deepEqual(fallbackWorldTime(new Date('2026-10-08T03:00:00Z'), { clock: '21:30', weather: 'clear' }), { phase: 'night', weather: 'clear' });
 });

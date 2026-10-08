@@ -22,7 +22,7 @@ import type { BedLook } from './game/sceneAssets';
 import type { Prompt, WorldGameHandle, WorldEvents } from './game/boot';
 import './gameShell.css';
 import { GamePanels, FishingPanels } from './ui/GamePanels';
-import type { FishingAdapter } from './ui/fishingAdapter';
+import type { FishingAdapter, FishingOverride } from './ui/fishingAdapter';
 import { FurniturePanel } from './ui/FurniturePanel';
 import { moveFurniture, ownedFurniture, snapRoomPoint } from './logic/roomEditing';
 import { FURNITURE_NAMES } from './logic/roomLines';
@@ -44,6 +44,8 @@ export interface GameShellProps {
   panels?: PanelAdapter;
   fishingAdapter?: FishingAdapter;
   newFishSpeciesId?: string | null;
+  /** 관리자 시험용 시각·날씨(?pwClock/?pwWeather) — 화면 색감용. 서버에는 어댑터가 따로 보낸다. */
+  clockOverride?: FishingOverride;
   userId?: string;
   farmAdapter?: FarmAdapter;
   appearance: PublicAvatarAppearance;
@@ -103,7 +105,7 @@ async function leaveFullscreen() {
 }
 
 // 상위가 1초마다(밭 시계) 다시 그려져도, 넘겨받는 값이 같으면 셸은 다시 그리지 않는다.
-export const GameShell = memo(function GameShell({ appearance, pet, balance, beds, furniture, onSaveFurniture, scarecrowLine, onExit, panels, farmAdapter, fishingAdapter, newFishSpeciesId, userId = 'guest' }: GameShellProps) {
+export const GameShell = memo(function GameShell({ appearance, pet, balance, beds, furniture, onSaveFurniture, scarecrowLine, onExit, panels, farmAdapter, fishingAdapter, newFishSpeciesId, clockOverride, userId = 'guest' }: GameShellProps) {
   useLayoutEffect(() => {
     let viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
     const created = !viewport;
@@ -143,6 +145,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
   useEffect(() => { if (!petMessage) return; const timer = window.setTimeout(() => setPetMessage(''), 4500); return () => clearTimeout(timer); }, [petMessage]);
   const [prompt, setPrompt] = useState<Prompt | null>(null);
   const [scene, setScene] = useState<SceneInfo | null>(null);
+  const sceneRef = useRef(scene); sceneRef.current = scene;
   const [toast, setToast] = useState<SceneInfo | null>(null);
   const fishingFrozen = useRef(false);
   const freezeFishing = useCallback((active: boolean) => {
@@ -155,6 +158,10 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
   }, [controls]);
   const fishing = useFishing({ adapter: fishingAdapter, handle: handle as RefObject<(WorldGameHandle & FishingHandle) | null>, scene: scene?.id ?? null, pet, freeze: freezeFishing });
   const fishingRef = useRef(fishing); fishingRef.current = fishing;
+  // 방금 처음 잡은 물고기 — 거북이가 도감을 열 때 "새 친구" 인사를 한다. 도감을 한 번 닫으면 잊는다.
+  const [freshSpecies, setFreshSpecies] = useState<string | null>(null);
+  const caughtNew = fishing.caught?.isNew ? fishing.caught.speciesId : null;
+  useEffect(() => { if (caughtNew) setFreshSpecies(caughtNew); }, [caughtNew]);
   const promptRef = useRef(prompt); promptRef.current = prompt;
   const [dialogue, setDialogue] = useState<Dialogue | null>(null);
   const dialogueRef = useRef(dialogue); dialogueRef.current = dialogue;
@@ -278,7 +285,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
         if (cancelled || !stage.current) return;
         const game = await startWorldGame(stage.current, {
           assets: { town, interior, floors, furniture: furnitureSheets, avatar: { key: avatar.key, canvas: avatarCanvas }, pet: pet && petSource ? { id: pet, source: petSource } : null, scarecrow, plazaStall },
-          beds: bedImages, furniture: furnitureRef.current,
+          beds: bedImages, furniture: furnitureRef.current, clockOverride,
         }, controls, {
           onShadowTap: (index: number) => { void fishingRef.current.onShadowTap(index); },
           onPrompt: next => setPrompt(next),
@@ -289,7 +296,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
             const info = { id, title, visit: performance.now() };
             setScene(info); setToast(info);
           },
-        } as WorldEvents & { onShadowTap(index: number): void });
+        } satisfies WorldEvents);
         if (cancelled) { game.destroy(); return; }
         handle.current = game;
         if (import.meta.env.DEV) (window as unknown as { __pixelWorldPhaser?: WorldGameHandle }).__pixelWorldPhaser = game;
@@ -392,7 +399,8 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     if (fishingRef.current.reel()) return;
     if (panelRef.current || editingRef.current) return;
     if (dialogueRef.current) advance();
-    else if (promptRef.current) handle.current?.interact();
+    // 강가에서는 안내가 없어도 장면에 맡긴다 — 물을 보고 그림자 가까이 서 있으면 A로 던진다.
+    else if (promptRef.current || sceneRef.current?.id === 'river') handle.current?.interact();
   }, [advance]);
   const pressB = useCallback((down: boolean) => {
     if (fishingFrozen.current) { if (down) fishingRef.current.cancel(); return; }
@@ -630,7 +638,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
       {typed >= currentLine.length && <span className="pwp-dialogue-next" aria-hidden="true">{dialogue.index + 1 < dialogue.lines.length ? '▼' : '■'}</span>}
     </div></div>}
     {(panel === 'shop' || panel === 'wardrobe') && panels && <GamePanels kind={panel} adapter={panels} onClose={closePanel} />}
-    {(panel === 'turtle' || panel === 'fishboard') && <FishingPanels key={panel} kind={panel} adapter={fishingAdapter} newSpeciesId={newFishSpeciesId} onClose={closePanel} />}
+    {(panel === 'turtle' || panel === 'fishboard') && <FishingPanels key={panel} kind={panel} adapter={fishingAdapter} newSpeciesId={newFishSpeciesId ?? freshSpecies} onClose={() => { if (panel === 'turtle') setFreshSpecies(null); closePanel(); }} />}
     {scene?.id === 'plaza' && status === 'ready' && <PlazaBridge key={'plaza:' + scene.visit} handle={handle} appearance={appearance} pet={pet} userId={userId} panel={panel} onClose={closePanel} />}
     {panel && panel !== 'turtle' && panel !== 'fishboard' && panel !== 'furniture' && panel !== 'shop' && panel !== 'wardrobe' && panel !== 'contest' && panel !== 'well' && panel !== 'bench' && <FarmPanels key={panel} kind={panel} adapter={farmAdapter} onClose={closePanel}
       onCollection={() => openPanel('collection')} onTalk={() => { closePanel(); openDialogue('scarecrow'); }}

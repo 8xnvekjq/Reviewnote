@@ -1,8 +1,7 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { writeFile, unlink } from 'node:fs/promises';
-const BASE = process.env.PWP_BASE ?? 'http://127.0.0.1:5176';
-if (new URL(BASE).port !== '5176') throw new Error('Fishing worker browser tests require port 5176');
+const BASE = process.env.PWP_BASE ?? 'http://127.0.0.1:5174';
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 // 파일이 아직 병합되지 않았을 때만 이 테스트 안의 최소 mock으로 제어기를 검증한다.
 async function controllerChecks() {
@@ -78,7 +77,7 @@ async function controllerChecks() {
   await page.close();
   console.log('PASS isolated controller: shadows, sparkle, tint, duplicate tap, early retry, landed refresh, catch toast, pending cancellation, finish lock, zero budget');
 }
-async function enterRiver(page, query = '') {
+async function enterRiver(page, query = '', walkToDock = true) {
   await page.goto(`${BASE}/tests/pixel-world-phaser/harness.html?fishing=1&pet=none${query}`);
   await page.waitForFunction(() => document.querySelector('.pwp-root')?.dataset.status === 'ready');
   const exists = await page.evaluate(() => Object.keys(window.__pixelWorldPhaser.debug().exits).some(key => /river|east/i.test(key)));
@@ -90,6 +89,11 @@ async function enterRiver(page, query = '') {
     h.walkToScreen(exits[key].x, exits[key].y);
   });
   await page.waitForFunction(() => window.__pixelWorldPhaser.debug().scene === 'river' && !window.__pixelWorldPhaser.debug().transitioning);
+  if (!walkToDock) return;
+  // 들어온 자리(서쪽 둑)에서는 물이 화면 밖이다 — 선착장 끝까지 걸어가 그림자가 보이게 한다.
+  await page.evaluate(() => { const h = window.__pixelWorldPhaser, d = h.debug(); h.walkToScreen((17 * 16 + 8 - d.camera.x) * d.cssZoom, (11 * 16 + 8 - d.camera.y) * d.cssZoom); });
+  await page.waitForFunction(() => { const d = window.__pixelWorldPhaser.debug(); return !d.moving && d.pathLength === 0 && d.x > 17 * 16; }, null, { timeout: 20000 });
+  await page.waitForTimeout(400);
 }
 async function tapShadow(page) {
   await page.waitForFunction(() => window.__pixelWorldPhaser.debug().targets['shadow:0']);
@@ -119,7 +123,7 @@ try {
     await page.getByText('너무 빨랐어요!', { exact: true }).waitFor();
     await page.waitForFunction(() => !!window.__pixelWorldPhaser.debug().targets['shadow:0']);
     assert.deepEqual(errors, []);
-    await enterRiver(page, '&fishingBudget=0');
+    await enterRiver(page, '&fishingBudget=0', false);
     await page.getByText('오늘은 물고기들이 쉬고 있어요. 내일 또 와요!', { exact: true }).waitFor();
     assert.equal(await page.evaluate(() => Object.keys(window.__pixelWorldPhaser.debug().targets).filter(key => key.startsWith('shadow:')).length), 0);
     await context.close(); console.log(`PASS fishing ${viewport.width}: landed, early retry, freeze, toast, zero budget`);

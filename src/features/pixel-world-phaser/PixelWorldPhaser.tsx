@@ -15,6 +15,7 @@ import { FARM_BEDS, farmMoisture, farmStage } from '../pixel-room/farm/farmModel
 import { pickScarecrowLine } from '../pixel-room/farm/scarecrowLines';
 import { supabase } from '../../services/supabase';
 import { createFishingAdapter } from './ui/fishingAdapter';
+import { parseClockOverride } from './logic/worldClock';
 import type { FishingOverride } from './ui/fishingAdapter';
 import { GameShell } from './GameShell';
 import type { BedLook } from './game/sceneAssets';
@@ -33,7 +34,8 @@ interface Props {
 
 export default function PixelWorldPhaser({ userId, pointsBalance, onExit, onPixelPurchase, onPointsReward, isAdmin = false }: Props) {
   // 관리자(선생님)만 ?pwClock=HH:MM / ?pwWeather= 로 시간·날씨를 바꿔 볼 수 있다. 서버도 한 번 더 확인한다.
-  const fishingAdapter = useMemo(() => createFishingAdapter(supabase, fishingOverride(location.search, isAdmin)), [isAdmin, userId]);
+  const clockOverride = useMemo(() => fishingOverride(location.search, isAdmin), [isAdmin]);
+  const fishingAdapter = useMemo(() => createFishingAdapter(supabase, clockOverride), [clockOverride, userId]);
   const shop = usePixelShop(userId, pointsBalance, onPixelPurchase);
   const pet = usePet(userId);
   const farm = useFarm();
@@ -74,7 +76,7 @@ export default function PixelWorldPhaser({ userId, pointsBalance, onExit, onPixe
     <button type="button" onClick={() => setRetry(value => value + 1)}>다시 불러오기</button>
     <button type="button" onClick={onExit}>나가기</button></div>;
   if (!appearance || !pet.ready || placement?.userId !== userId) return <div className="pwp-root pwp-loading" role="status">앞마당으로 가는 중…</div>;
-  return <GameShell fishingAdapter={fishingAdapter} userId={userId} appearance={appearance} pet={!pet.error && pet.active && shop.ownedIds.has(pet.active) ? pet.active : null} balance={shop.balance} beds={beds} furniture={furniture}
+  return <GameShell fishingAdapter={fishingAdapter} clockOverride={clockOverride} userId={userId} appearance={appearance} pet={!pet.error && pet.active && shop.ownedIds.has(pet.active) ? pet.active : null} balance={shop.balance} beds={beds} furniture={furniture}
     onSaveFurniture={saveFurniture} scarecrowLine={scarecrowLine} onExit={onExit} panels={{ shop, pet }} farmAdapter={{ farm, inventory, contest: fetchWeeklyCropContest, submit: async id => {
       const result = await submitFarmCrop(id);
       if (result.ok) { onPointsReward?.(result.rewardPoints); shop.reload(); }
@@ -89,13 +91,7 @@ function bedsKey(snapshot: ReturnType<typeof useFarm>['snapshot'], now: number):
   }).join(',');
 }
 
+/** 관리자만 주소의 ?pwClock=HH:MM / ?pwWeather=clear|cloudy|rain 을 쓴다. 규칙은 logic/worldClock.ts 하나. */
 export function fishingOverride(search: string, isAdmin: boolean): FishingOverride | undefined {
-  if (!isAdmin) return undefined;
-  const params = new URLSearchParams(search);
-  const clock = params.get('pwClock');
-  const weather = params.get('pwWeather');
-  const override: FishingOverride = {};
-  if (clock && /^([01]\d|2[0-3]):[0-5]\d$/.test(clock)) override.clock = clock;
-  if (weather === 'clear' || weather === 'cloudy' || weather === 'rain') override.weather = weather;
-  return Object.keys(override).length ? override : undefined;
+  return isAdmin ? parseClockOverride(search) ?? undefined : undefined;
 }
