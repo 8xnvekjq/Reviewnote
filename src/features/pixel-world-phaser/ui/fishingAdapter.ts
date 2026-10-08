@@ -1,3 +1,6 @@
+import { MAX_LEVEL, nonnegativeInteger, parseXpGain } from '../logic/levels';
+import type { PlayerLevel, XpGain } from '../logic/levels';
+export type { PlayerLevel, XpGain } from '../logic/levels';
 // 낚시(강가의 하루) 서버 연결의 고정 계약. 모양은 docs/pixel-world/FISHING_SPEC.md를 따른다.
 // 실제 Supabase 구현(createFishingAdapter)은 서버 작업에서 이 파일에 채운다.
 import { worldClockAt } from '../logic/worldClock';
@@ -33,13 +36,14 @@ export const rodMinReelMs = (difficulty: number, speed: number): number => minRe
 export const rodDifficulty = (base: number, difficultyDown: number, trophy = false): number =>
   Math.round(Math.max(1, Math.min(5, base + (trophy ? 1.5 : 0)) - difficultyDown) * 100) / 100;
 
-export interface FishingState { kstDate: string; phase: FishPhase; weather: FishWeather; remaining: number; sparkleShadow: number | null; pigeonHint: string | null; album: FishAlbumEntry[]; rod: FishingRod }
+export interface FishingState { kstDate: string; phase: FishPhase; weather: FishWeather; remaining: number; sparkleShadow: number | null; pigeonHint: string | null; album: FishAlbumEntry[]; rod: FishingRod; level?: PlayerLevel; bait?: { charges: number } }
 /** rod·speed·trophy는 v4 서버부터 온다. 없으면 기본 낚싯대·속도 1·대물 아님으로 본다. */
-export type CastStart = { ok: true; castId: string; shadow: FishShadow; biteDelayMs: number; difficulty?: number; big?: boolean; pattern: BitePattern; hint: 'sparkle' | null; rod?: FishingRod; speed?: number; trophy?: boolean } | { ok: false; reason: 'budget' | 'pending' | 'error' };
+export type CastStart = { ok: true; castId: string; shadow: FishShadow; biteDelayMs: number; difficulty?: number; big?: boolean; pattern: BitePattern; hint: 'sparkle' | null; rod?: FishingRod; speed?: number; trophy?: boolean; bait?: { used: boolean; charges: number } } | { ok: false; reason: 'budget' | 'pending' | 'error' };
 export type EquipRodResult = { ok: true; rod: FishingRod } | { ok: false; reason: 'not_found' | 'not_owned' | 'error' };
-export type CastFinish = { ok: true; landed: true; speciesId: string; lengthCm: number; rarity: FishRarity; isNew: boolean; isBig: boolean; isPersonalBest: boolean; remaining: number } | { ok: true; landed: false } | { ok: false };
+export type CastFinish = { ok: true; landed: true; speciesId: string; lengthCm: number; rarity: FishRarity; isNew: boolean; isBig: boolean; isPersonalBest: boolean; remaining: number; xpGain?: XpGain } | { ok: true; landed: false } | { ok: false };
 export interface ClassFishBoard { rows: { speciesId: string; lengthCm: number; animal: string; caughtAt: string }[]; classSpecies: number }
-export interface FishingAdapter { state(): Promise<FishingState>; start(pet: string | null): Promise<CastStart>; finish(castId: string, landed: boolean): Promise<CastFinish>; board(): Promise<ClassFishBoard>; /** 낚싯대 장착(null = 해제). 서버 RPC equip_pixel_rod. */ equipRod?(itemId: FishingRodId | null): Promise<EquipRodResult> }
+export type BuyBaitResult = { ok: true; newBalance: number; charges: number } | { ok: false; reason: 'insufficient_balance' | 'error'; message?: string };
+export interface FishingAdapter { buyBait?(): Promise<BuyBaitResult>; getLevel?(): Promise<PlayerLevel | null>; state(): Promise<FishingState>; start(pet: string | null): Promise<CastStart>; finish(castId: string, landed: boolean): Promise<CastFinish>; board(): Promise<ClassFishBoard>; /** 낚싯대 장착(null = 해제). 서버 RPC equip_pixel_rod. */ equipRod?(itemId: FishingRodId | null): Promise<EquipRodResult> }
 /** 관리자 시험용 시계·날씨 덮어쓰기(관리자만 서버가 받아 준다). */
 export interface FishingOverride { clock?: string; weather?: FishWeather }
 
@@ -76,10 +80,30 @@ export function parseFishingRod(raw: unknown): FishingRod {
   return spec ? { id: spec.id, tier: spec.tier } : NO_ROD;
 }
 
+export function parsePlayerLevel(raw: unknown): PlayerLevel | undefined {
+  if (!isObj(raw)) return undefined;
+  const xp = nonnegativeInteger(raw.xp), level = nonnegativeInteger(raw.level), xpIntoLevel = nonnegativeInteger(raw.xpIntoLevel);
+  const xpForNext = nonnegativeInteger(raw.xpForNext), maxLevel = nonnegativeInteger(raw.maxLevel);
+  return xp !== undefined && level !== undefined && level >= 1 && maxLevel === MAX_LEVEL && level <= maxLevel && xpIntoLevel !== undefined && xpForNext !== undefined
+    ? { xp, level, xpIntoLevel, xpForNext, maxLevel } : undefined;
+}
+export function parseBait(raw: unknown): { charges: number } | undefined {
+  if (!isObj(raw)) return undefined;
+  const charges = nonnegativeInteger(raw.charges);
+  return charges !== undefined ? { charges } : undefined;
+}
+export function parseBuyBait(raw: unknown): BuyBaitResult {
+  if (!isObj(raw)) return { ok: false, reason: 'error' };
+  if (raw.ok !== true) return { ok: false, reason: raw.reason === 'insufficient_balance' ? raw.reason : 'error', ...(str(raw.message) ? { message: str(raw.message)! } : {}) };
+  const newBalance = nonnegativeInteger(raw.newBalance), bait = parseBait(raw);
+  return newBalance !== undefined && bait ? { ok: true, newBalance, charges: bait.charges } : { ok: false, reason: 'error' };
+}
+
 export function parseFishingState(raw: unknown, fallback: FishingState = fallbackFishingState()): FishingState {
   if (!isObj(raw)) return fallback;
   const remaining = num(raw.remaining);
   const spark = num(raw.sparkleShadow);
+  const level = parsePlayerLevel(raw.level), bait = parseBait(raw.bait);
   const album = Array.isArray(raw.album) ? raw.album.flatMap((e): FishAlbumEntry[] => {
     if (!isObj(e)) return [];
     const speciesId = str(e.speciesId), count = num(e.count), bestCm = num(e.bestCm), firstAt = str(e.firstAt);
@@ -94,6 +118,8 @@ export function parseFishingState(raw: unknown, fallback: FishingState = fallbac
     pigeonHint: str(raw.pigeonHint),
     album,
     rod: parseFishingRod(raw.rod),
+    ...(level ? { level } : {}),
+    ...(bait ? { bait } : {}),
   };
 }
 
@@ -103,10 +129,12 @@ export function parseCastStart(raw: unknown): CastStart {
   const castId = str(raw.castId), biteDelayMs = num(raw.biteDelayMs);
   if (!castId || !oneOf(SHADOWS, raw.shadow) || biteDelayMs == null || biteDelayMs < 0) return { ok: false, reason: 'error' };
   const speed = num(raw.speed);
+  const bait = parseBait(raw.bait);
   return { ok: true, castId, shadow: raw.shadow, biteDelayMs, difficulty: Math.max(1, Math.min(5, num(raw.difficulty) ?? 1)), ...(typeof raw.big === 'boolean' ? { big: raw.big } : {}), pattern: oneOf(PATTERNS, raw.pattern) ? raw.pattern : 'quick', hint: raw.hint === 'sparkle' ? 'sparkle' : null,
     ...(raw.rod !== undefined ? { rod: parseFishingRod(raw.rod) } : {}),
     // 속도는 1~1.35(황금 낚싯대)지만, 이상한 값이 와도 미니게임이 깨지지 않게 1~2로 묶는다.
     ...(speed != null ? { speed: Math.max(1, Math.min(2, speed)) } : {}),
+    ...(isObj(raw.bait) && typeof raw.bait.used === 'boolean' && bait ? { bait: { used: raw.bait.used, charges: bait.charges } } : {}),
     ...(typeof raw.trophy === 'boolean' ? { trophy: raw.trophy } : {}) };
 }
 
@@ -121,8 +149,10 @@ export function parseCastFinish(raw: unknown): CastFinish {
   if (raw.landed !== true) return { ok: true, landed: false };
   const speciesId = str(raw.speciesId), lengthCm = num(raw.lengthCm), remaining = num(raw.remaining);
   if (!speciesId || lengthCm == null || !oneOf(RARITIES, raw.rarity)) return { ok: false };
+  const xpGain = parseXpGain(raw.xpGain);
   return {
     ok: true, landed: true, speciesId, lengthCm, rarity: raw.rarity,
+    ...(xpGain ? { xpGain } : {}),
     isNew: raw.isNew === true, isBig: raw.isBig === true, isPersonalBest: raw.isPersonalBest === true,
     remaining: remaining == null ? 0 : Math.max(-1, Math.floor(remaining)),
   };
@@ -171,6 +201,14 @@ export function createFishingAdapter(supabase: FishingRpcClient, override?: Fish
     async board() {
       try { return parseClassFishBoard(await callRpc(supabase, 'get_class_fish_board')); }
       catch { return { rows: [], classSpecies: 0 }; }
+    },
+    async buyBait() {
+      try { return parseBuyBait(await callRpc(supabase, 'buy_pixel_bait')); }
+      catch { return { ok: false, reason: 'error' }; }
+    },
+    async getLevel() {
+      try { return parsePlayerLevel(await callRpc(supabase, 'get_pixel_level')) ?? null; }
+      catch { return null; }
     },
     async equipRod(itemId) {
       try { return parseEquipRod(await callRpc(supabase, 'equip_pixel_rod', { p_item_id: itemId ?? null })); }

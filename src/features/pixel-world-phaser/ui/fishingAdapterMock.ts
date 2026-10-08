@@ -1,3 +1,5 @@
+import { BAIT_CHARGES, BAIT_PRICE, FISH_XP, TROPHY_XP, MAX_LEVEL, levelForXp, levelBaitDifficulty, hardFishChance, nonnegativeInteger } from '../logic/levels';
+import type { PlayerLevel } from '../logic/levels';
 // 메모리 안에서만 도는 낚시 어댑터 — 브라우저 하네스와 단위 테스트용. 서버(supabase_pixel_fishing.sql)와 같은 규칙:
 // 무제한, 시작 간격 2초, 대기 캐스트 1개·90초, 어려운 물고기 15%+낚싯대 보너스(없으면 대물),
 // 피티(최근 5마리에 새 친구가 없으면 35%로 안 잡아 본 물고기, 놓친 피티 바로 다음은 쉼),
@@ -6,12 +8,15 @@ import { FISH_CATALOG, RARITY_WEIGHT, fishById } from '../logic/fishCatalog';
 import type { FishSpecies } from '../logic/fishCatalog';
 import { fishDifficulty } from '../logic/reelGame';
 import { fnv1a32, worldClockAt } from '../logic/worldClock';
-import { BASIC_ROD, FISHING_RODS, HARD_FISH_PERCENT, NO_ROD, rodBiteDelayMs, rodDifficulty, rodMinReelMs, rodSpec } from './fishingAdapter';
+import { BASIC_ROD, FISHING_RODS, NO_ROD, rodBiteDelayMs, rodDifficulty, rodMinReelMs, rodSpec } from './fishingAdapter';
 import type { BitePattern, CastFinish, CastStart, ClassFishBoard, EquipRodResult, FishAlbumEntry, FishingAdapter, FishingOverride, FishingRod, FishingRodId, FishingState, FishPhase, FishWeather } from './fishingAdapter';
 
 export interface MockCatch { id: string; speciesId: string; lengthCm: number; caughtAt: string; kstDate: string }
 export interface MockFishingOptions {
   seed?: number;
+  xp?: number;
+  baitCharges?: number;
+  balance?: number;
   /** 시계(ms). 기본값은 Date.now. */
   now?: () => number;
   override?: FishingOverride | null;
@@ -32,6 +37,8 @@ export interface MockFishingAdapter extends FishingAdapter {
   /** 테스트용: 대기 중인 캐스트가 정해 둔 물고기. */
   peek(): { castId: string; speciesId: string; lengthCm: number; difficulty: number; speed: number; pity: boolean; trophy: boolean; hard: boolean } | null;
   equipRod(itemId: FishingRodId | null): Promise<EquipRodResult>;
+  buyBait(): Promise<import('./fishingAdapter').BuyBaitResult>;
+  getLevel(): Promise<PlayerLevel>;
   readonly catches: readonly MockCatch[];
 }
 
@@ -98,17 +105,18 @@ export interface CastRollInput {
   skipPity: boolean;
   /** 낚싯대 희귀 보너스(%p). */
   rareBonus: number;
+  bait?: boolean;
   rand: () => number;
 }
 export interface CastRoll { fish: FishSpecies; pity: boolean; hard: boolean; trophy: boolean }
 
 /** SQL start_pixel_cast와 같은 순서의 물고기 고르기: 피티(35%) → 어려운 물고기(15%+보너스) → 보통 굴림. */
-export function rollCastFish({ valid, caught, pityDue: due, skipPity, rareBonus, rand }: CastRollInput): CastRoll | null {
+export function rollCastFish({ valid, caught, pityDue: due, skipPity, rareBonus, bait = false, rand }: CastRollInput): CastRoll | null {
   if (due && !skipPity && rand() < PITY_CHANCE) {
     const fresh = valid.filter(f => !caught.has(f.id));
     if (fresh.length) return { fish: weightedPick(fresh, rand()), pity: true, hard: false, trophy: false };
   }
-  if (rand() * 100 < HARD_FISH_PERCENT + rareBonus) {
+  if (rand() * 100 < hardFishChance(rareBonus, bait)) {
     const hard = valid.filter(f => f.rarity === 'rare' || f.rarity === 'legendary');
     if (hard.length) {
       const total = hard.reduce((a, f) => a + (f.rarity === 'rare' ? 5 : 1), 0);
@@ -129,6 +137,10 @@ const DEFAULT_CLASSMATES: ClassFishBoard['rows'] = [
 ];
 
 export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFishingAdapter {
+  let xp = nonnegativeInteger(opts.xp) ?? 0;
+  let charges = nonnegativeInteger(opts.baitCharges) ?? 0;
+  let balance = nonnegativeInteger(opts.balance) ?? 1000;
+  const playerLevel = (): PlayerLevel => { const l = levelForXp(xp); return { xp, level: l.level, xpIntoLevel: l.xpIntoLevel, xpForNext: l.xpForNext, maxLevel: MAX_LEVEL }; };
   const rand = mulberry32(opts.seed ?? 20261008);
   const now = opts.now ?? (() => Date.now());
   const catches: MockCatch[] = (opts.catches ?? []).map(c => ({ ...c }));
@@ -158,6 +170,12 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
   }
 
   return {
+    async getLevel() { return delay(playerLevel()); },
+    async buyBait() {
+      if (balance < BAIT_PRICE) return delay({ ok: false, reason: 'insufficient_balance', message: '포인트가 부족해요.' });
+      balance -= BAIT_PRICE; charges += BAIT_CHARGES;
+      return delay({ ok: true, newBalance: balance, charges });
+    },
     get catches() { return catches; },
     peek: () => pending && pending.expiresAt > now() ? { castId: pending.castId, speciesId: pending.fish.id, lengthCm: pending.lengthCm, difficulty: pending.difficulty, speed: pending.speed, pity: pending.pity, trophy: pending.trophy, hard: pending.hard } : null,
     async equipRod(itemId: FishingRodId | null): Promise<EquipRodResult> {
@@ -175,7 +193,7 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
       const known = caughtIds();
       const uncaught = FISH_CATALOG.filter(f => !known.has(f.id));
       const pigeonHint = active === 'pet_pigeon' && uncaught.length ? fishHintText(uncaught[fnv1a32(`pigeon:${MOCK_USER}:${c.kstDate}`) % uncaught.length]) : null;
-      return delay({ kstDate: c.kstDate, phase: c.phase, weather: c.weather, remaining, sparkleShadow, pigeonHint, album: album(), rod: currentRod() });
+      return delay({ kstDate: c.kstDate, phase: c.phase, weather: c.weather, remaining, sparkleShadow, pigeonHint, album: album(), rod: currentRod(), level: playerLevel(), bait: { charges } });
     },
     async start(askedPet: string | null): Promise<CastStart> {
       const c = clock();
@@ -185,7 +203,8 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
       const rod = currentRod();
       const spec = rodSpec(rod.id) ?? BASIC_ROD;
       const valid = FISH_CATALOG.filter(f => fishValidNow(f, c.phase, c.weather));
-      const roll = rollCastFish({ valid, caught: caughtIds(), pityDue: pityDue(catches), skipPity, rareBonus: spec.rareBonus, rand });
+      const baitUsed = charges > 0;
+      const roll = rollCastFish({ valid, caught: caughtIds(), pityDue: pityDue(catches), skipPity, rareBonus: spec.rareBonus, bait: baitUsed, rand });
       skipPity = false;
       if (!roll) return delay({ ok: false, reason: 'error' });
       const { fish, trophy } = roll;
@@ -198,11 +217,12 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
       const [lo, hi] = pattern === 'quick' ? [1200, 2500] : pattern === 'double' ? [2200, 3600] : [3200, 5000];
       const biteDelayMs = rodBiteDelayMs(Math.round(lo + rand() * (hi - lo)), spec.speed);
       const castId = `mock-cast-${++castSeq}`;
-      const difficulty = rodDifficulty(fishDifficulty(fish, lengthCm), spec.difficultyDown, trophy);
+      const difficulty = levelBaitDifficulty(rodDifficulty(fishDifficulty(fish, lengthCm), spec.difficultyDown, trophy), levelForXp(xp).level, fish.rarity === 'legendary', baitUsed);
+      if (baitUsed) charges--;
       lastStart = now();
       pending = { castId, fish, lengthCm, kstDate: c.kstDate, expiresAt: now() + CAST_TTL_MS, startedAt: now(), biteDelayMs, difficulty, speed: spec.speed, pity: roll.pity, trophy, hard: roll.hard };
       const hint = myPet === 'pet_dog' && (fish.rarity === 'rare' || fish.rarity === 'legendary') ? 'sparkle' : null;
-      return delay({ ok: true, castId, shadow: fish.shadow, biteDelayMs, difficulty, big: isBigCatch(fish, lengthCm), pattern, hint, rod, speed: spec.speed, trophy });
+      return delay({ ok: true, castId, shadow: fish.shadow, biteDelayMs, difficulty, big: isBigCatch(fish, lengthCm), pattern, hint, rod, speed: spec.speed, trophy, bait: { used: baitUsed, charges } });
     },
     async finish(castId: string, landed: boolean): Promise<CastFinish> {
       const cast = pending;
@@ -215,9 +235,13 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
       const isNew = before.length === 0;
       const isPersonalBest = !isNew && cast.lengthCm > Math.max(...before.map(c => c.lengthCm));
       catches.push({ id: `mock-catch-${catches.length + 1}`, speciesId: cast.fish.id, lengthCm: cast.lengthCm, caughtAt: new Date(now()).toISOString(), kstDate: cast.kstDate });
+      const oldLevel = levelForXp(xp).level;
+      const gained = FISH_XP[cast.fish.rarity] + (cast.trophy ? TROPHY_XP : 0);
+      xp += gained;
+      const xpGain = { gained, xp, level: levelForXp(xp).level, leveledUp: levelForXp(xp).level > oldLevel };
       return delay({
         ok: true, landed: true, speciesId: cast.fish.id, lengthCm: cast.lengthCm, rarity: cast.fish.rarity,
-        isNew, isBig: isBigCatch(cast.fish, cast.lengthCm), isPersonalBest, remaining: -1,
+        isNew, isBig: isBigCatch(cast.fish, cast.lengthCm), isPersonalBest, remaining: -1, xpGain,
       });
     },
     async board(): Promise<ClassFishBoard> {
