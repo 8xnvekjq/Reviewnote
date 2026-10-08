@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 
 // DOM 상태를 읽고 실제 조이스틱과 탭을 함께 사용하는 추적 플레이어.
 export async function trackReel(page, pointerType = 'keyboard', onFrame = async () => {}) {
+  await assertDifficultyHidden(page);
   const stick = page.locator('.pwp-reel-stick');
   const box = await stick.boundingBox();
   assert.ok(box, 'reel joystick is visible');
@@ -51,6 +52,7 @@ export async function trackReel(page, pointerType = 'keyboard', onFrame = async 
 }
 
 export async function assertReelLayout(page) {
+  await assertDifficultyHidden(page);
   const circle = await page.locator('.pwp-reel-track').boundingBox();
   const stick = await page.locator('.pwp-reel-stick').boundingBox();
   assert.ok(circle && stick);
@@ -58,4 +60,12 @@ export async function assertReelLayout(page) {
   assert.ok(circle.y + circle.height < stick.y || circle.x > stick.x + stick.width, 'arena does not overlap joystick');
   const viewport = page.viewportSize();
   assert.ok(stick.x >= 0 && stick.y >= 0 && stick.x + stick.width <= viewport.width && stick.y + stick.height <= viewport.height, 'joystick remains on screen');
+}
+
+export async function assertDifficultyHidden(page) {
+  const reel = page.getByTestId('reel-bar');
+  assert.doesNotMatch(await reel.textContent(), /난이도|[●○]/);
+  assert.equal(await reel.locator('.pwp-reel-difficulty, [data-difficulty], [aria-label*="난이도"]').count(), 0);
+  assert.equal(await reel.getAttribute('data-difficulty'), null);
+  assert.doesNotMatch(await reel.getAttribute('aria-label'), /난이도/);
 }

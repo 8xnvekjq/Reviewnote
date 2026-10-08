@@ -6,13 +6,10 @@ export function ReelBar({ game }: { game: ReelGame }) {
   return <div className="pwp-reel" data-testid="reel-bar" data-danger={game.progress < .15}
     data-zone={game.zone} data-zone-x={game.zoneX} data-fish={game.fish} data-fish-x={game.fishX}
     data-velocity={game.velocity} data-velocity-x={game.velocityX} data-fish-vx={game.fishVX} data-fish-vy={game.fishVY}
-    data-zone-radius={game.zoneSize} data-elapsed={game.elapsed} data-difficulty={game.difficulty}
+    data-zone-radius={game.zoneSize} data-elapsed={game.elapsed}
     role="group" aria-label="물고기 끌어올리기">
     <strong>물고기를 따라가요!</strong>
     <div className="pwp-reel-rod"><RodIcon rod={game.rod} /><span>{rodDisplay(game.rod).displayName}</span></div>
-    <small className="pwp-reel-difficulty" aria-label={`난이도 ${game.difficulty.toFixed(1)} / 5`}>
-      난이도 <span aria-hidden="true">{'●'.repeat(Math.ceil(game.difficulty))}{'○'.repeat(5 - Math.ceil(game.difficulty))}</span>
-    </small>
     {game.trophy && <b className="pwp-reel-big">대물이에요!</b>}
     {game.big && <b className="pwp-reel-big">힘이 센 녀석이에요!</b>}
     <div className="pwp-reel-arena-wrap">
