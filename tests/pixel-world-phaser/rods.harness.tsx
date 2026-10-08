@@ -4,6 +4,7 @@ import { usePixelShop } from '../../src/features/pixel-room/usePixelShop';
 import { GamePanels } from '../../src/features/pixel-world-phaser/ui/GamePanels';
 import { useFishing } from '../../src/features/pixel-world-phaser/ui/useFishing';
 import { createFishingAdapter } from '../../src/features/pixel-world-phaser/ui/fishingAdapter';
+import { ReelJoystick } from '../../src/features/pixel-world-phaser/ui/ReelJoystick';
 import { ReelBar } from '../../src/features/pixel-world-phaser/ui/ReelBar';
 import { supabase } from '../../src/services/supabase';
 import '../../src/features/pixel-world-phaser/gameShell.css';
@@ -23,7 +24,7 @@ function Harness() {
       <output data-testid="phase">{fishing.phase}</output><output>{fishing.message}</output>
     </div>
     {panel && <GamePanels key={panel} kind={panel} adapter={{ shop, pet }} onClose={() => setPanel(null)} />}
-    {fishing.reelState && <ReelBar game={fishing.reelState} />}
+    {fishing.reelState && <><ReelBar game={fishing.reelState} /><ReelJoystick onAxis={fishing.setReelX} /></>}
   </div>;
 }
 createRoot(document.getElementById('root')!).render(<Harness />);

@@ -3,7 +3,7 @@ import type { RefObject } from 'react';
 import type { CastFinish, FishingAdapter, FishingState, FishPhase, FishWeather } from './fishingAdapter';
 import { cancelFishingGame, fishingActive, idleFishingGame, reelFishingGame, startFishingGame, tickFishingGame } from '../logic/fishingGame';
 import { createReelGame, stepReelGame } from '../logic/reelGame';
-import type { ReelGame } from '../logic/reelGame';
+import type { ReelAxisInput, ReelGame } from '../logic/reelGame';
 import type { FishingGame } from '../logic/fishingGame';
 import { fishReportForGamePhase } from '../logic/riverPresence';
 import type { RiverFishReporter } from '../logic/riverPresence';
@@ -26,6 +26,10 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
   const [reelState, setReelState] = useState<ReelGame | null>(null);
   const reelGame = useRef<ReelGame | null>(null);
   const taps = useRef<number[]>([]);
+  const axes = useRef<ReelAxisInput[]>([]);
+  const setReelX = useCallback((x: number) => {
+    if (reelGame.current) axes.current.push({ time: performance.now() - reelStarted.current, x });
+  }, []);
   const reelStarted = useRef(0);
   const lastFrame = useRef(0);
   const [busy, setBusy] = useState(false);
@@ -60,7 +64,7 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
     if (!next.cast || !lock.current || !fishingActive(game.current)) return;
     const current = castAdapter.current;
     const epoch = generation.current;
-    game.current = next; setPhase(next.phase); reelGame.current = null; setReelState(null); taps.current = [];
+    game.current = next; setPhase(next.phase); reelGame.current = null; setReelState(null); taps.current = []; axes.current = [];
     latest.current.handle.current?.fishingFx?.(next, shadow.current, performance.now());
     const told = fishReportForGamePhase(next.phase);
     if (told) latest.current.report?.(told);
@@ -96,8 +100,10 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
       const next = reelFishingGame(game.current, performance.now());
       if (next.phase === 'reeling') {
         game.current = next; setPhase('reeling');
-        reelGame.current = createReelGame(next.cast?.difficulty ?? 1, latest.current.pet === 'pet_duck', next.cast?.big ?? false, 0, next.cast?.speed ?? 1, next.cast?.rod, next.cast?.trophy ?? false);
-        setReelState(reelGame.current); reelStarted.current = performance.now(); lastFrame.current = reelStarted.current; taps.current = [];
+        // 캐스팅마다 다른 경로를 만들되 같은 캐스팅은 재현할 수 있게 한다.
+        const seed = Array.from(next.cast?.castId ?? '').reduce((value, char) => (Math.imul(value, 31) + char.charCodeAt(0)) >>> 0, 0);
+        reelGame.current = createReelGame(next.cast?.difficulty ?? 1, latest.current.pet === 'pet_duck', next.cast?.big ?? false, seed, next.cast?.speed ?? 1, next.cast?.rod, next.cast?.trophy ?? false);
+        setReelState(reelGame.current); reelStarted.current = performance.now(); lastFrame.current = reelStarted.current; taps.current = []; axes.current = [];
         latest.current.report?.({ phase: 'reeling' });
       } else finishRef.current(next);
     }
@@ -133,7 +139,7 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
         if (game.current.phase === 'reeling' && reelGame.current) {
           // rAF 시각은 릴 시작(performance.now())보다 앞설 수 있다. 시계를 되돌리지 않아 릴 시간이 실제보다 길게 쌓이지 않는다(서버 최소 시간 보장).
           const delta = now - lastFrame.current; if (delta > 0) lastFrame.current = now;
-          const result = stepReelGame(reelGame.current, delta, delta > 0 ? taps.current.splice(0) : []);
+          const result = stepReelGame(reelGame.current, delta, delta > 0 ? taps.current.splice(0) : [], delta > 0 ? axes.current.splice(0) : []);
           reelGame.current = result; setReelState(result);
           if (result.status !== 'playing') finishRef.current({ ...game.current, phase: result.status === 'landed' ? 'landed' : 'missed' });
         }
@@ -171,7 +177,7 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
     const boost = () => { if (game.current.phase === 'reeling') taps.current.push(performance.now() - reelStarted.current); };
     const down = (event: PointerEvent) => {
       const target = event.target;
-      if (editable(target) || !(target instanceof Element) || !target.closest('.pwp-root') || target.closest('.pwp-btn-b')) return;
+      if (editable(target) || !(target instanceof Element) || !target.closest('.pwp-root') || target.closest('.pwp-btn-b, .pwp-reel-stick')) return;
       if (!['bite', 'reeling'].includes(game.current.phase) || (event.pointerType === 'mouse' && event.button !== 0)) return;
       event.preventDefault();
       if (pointers.has(event.pointerId)) return;
@@ -183,26 +189,35 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
       reel(); boost();
     };
     const up = (event: PointerEvent) => { pointers.delete(event.pointerId); };
+    const horizontal = new Set<string>();
+    const keyUp = (event: KeyboardEvent) => {
+      if (horizontal.delete(event.code)) setReelX((horizontal.has('KeyD') || horizontal.has('ArrowRight') ? 1 : 0) - (horizontal.has('KeyA') || horizontal.has('ArrowLeft') ? 1 : 0));
+    };
     const keyDown = (event: KeyboardEvent) => {
       if (editable(event.target)) return;
+      if (game.current.phase === 'reeling' && ['KeyA', 'KeyD', 'ArrowLeft', 'ArrowRight'].includes(event.code)) {
+        event.preventDefault(); event.stopImmediatePropagation(); horizontal.add(event.code);
+        setReelX((horizontal.has('KeyD') || horizontal.has('ArrowRight') ? 1 : 0) - (horizontal.has('KeyA') || horizontal.has('ArrowLeft') ? 1 : 0)); return;
+      }
       if (fishingActive(game.current) && event.code === 'KeyB') { event.preventDefault(); cancel(); return; }
-      if (!fishingActive(game.current) || !['Space', 'KeyZ', 'KeyA'].includes(event.code)) return;
+      if (!fishingActive(game.current) || !['Space', 'KeyZ', 'KeyW', 'ArrowUp'].includes(event.code)) return;
       event.preventDefault(); event.stopImmediatePropagation();
       if (!event.repeat) { reel(); boost(); }
     };
-    const reset = () => { pointers.clear(); };
+    const reset = () => { pointers.clear(); horizontal.clear(); setReelX(0); };
     window.addEventListener('pointerdown', down, { capture: true, passive: false });
     window.addEventListener('pointerup', up, true);
     window.addEventListener('pointercancel', up, true);
     window.addEventListener('keydown', keyDown, true);
+    window.addEventListener('keyup', keyUp, true);
     window.addEventListener('blur', reset);
     return () => {
       reset(); window.removeEventListener('pointerdown', down, true);
       window.removeEventListener('pointerup', up, true); window.removeEventListener('pointercancel', up, true);
-      window.removeEventListener('keydown', keyDown, true);
+      window.removeEventListener('keydown', keyDown, true); window.removeEventListener('keyup', keyUp, true);
       window.removeEventListener('blur', reset);
     };
-  }, [reel, cancel]);
+  }, [reel, cancel, setReelX]);
   const hideCatch = useCallback(() => setCaught(null), []);
-  return { state, phase, reelState, busy, message, caught, onShadowTap, reel, cancel, refresh, hideCatch };
+  return { state, phase, reelState, busy, message, caught, onShadowTap, reel, cancel, refresh, hideCatch, setReelX };
 }

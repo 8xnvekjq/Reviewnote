@@ -1,7 +1,8 @@
+import { trackReel } from './reel-player.browser-helper.mjs';
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
-const base = process.env.PWP_BASE ?? 'http://127.0.0.1:5196';
+const base = process.env.PWP_BASE ?? 'http://127.0.0.1:5198';
 await mkdir('scratch/rods', { recursive: true });
 const browser = await chromium.launch({ headless: true });
 try {
@@ -58,7 +59,8 @@ try {
     assert.ok((await reel.textContent()).includes('행운의 낚싯대')); assert.ok((await reel.textContent()).includes('대물이에요!'));
     assert.ok((await reel.locator('img').getAttribute('src')).includes('rod_lucky.png'));
     await page.screenshot({ path: `scratch/rods/reel-${width}.png` });
-    await page.getByRole('button', { name: '낚시 취소' }).click();
+    await trackReel(page);
+    assert.ok(await page.evaluate(() => window.rodRpcCalls.some(c => c.fn === 'finish_pixel_cast' && c.args.p_landed === true)));
     await page.getByRole('button', { name: '옷장 열기' }).click(); await wardrobe.getByRole('button', { name: '낚싯대', exact: true }).click();
     await wardrobe.getByRole('button', { name: '기본 낚싯대', exact: true }).click();
     await wardrobe.getByRole('button', { name: '기본 낚싯대', exact: true }).filter({ has: page.locator('strong') }).waitFor();
