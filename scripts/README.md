@@ -7,6 +7,12 @@
 
 ## 🛠️ 보유 스크립트 목록
 
+### `draw-fishing-art.mjs`
+* **실행**: `node scripts/draw-fishing-art.mjs`
+* **용도**: 강가 타일, 어종, 소품과 기본·대나무·강철·행운·황금 낚싯대 아이콘을 읽기 쉬운 픽셀 맵으로 생성한다.
+* **출력**: `src/features/pixel-world-phaser/assets/fishing/*.png`, `docs/pixel-world/fishing-art-preview.png`
+* **검증**: 그림 경계, 이진 알파, PNG CRC 및 압축 해제 크기를 검사한다.
+
 ### 1. `extract_playlist.js`
 * **파일 경로**: `scripts/extract_playlist.js`
 * **주요 용도**: 유튜브 재생목록(Playlist) URL을 입력받아 모든 동영상 스크립트를 자동 추출 및 마크다운으로 변환하여 정돈 저장

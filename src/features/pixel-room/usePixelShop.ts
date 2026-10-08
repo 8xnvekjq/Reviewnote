@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { equipPixelItem, fetchEquippedAppearance, fetchOwnedPixelItemIds, fetchPixelCatalog, purchasePixelItem, setPixelBaseAppearance } from '../../utils/pixelShop';
+import { equipPixelRod, fetchEquippedRod, equipPixelItem, fetchEquippedAppearance, fetchOwnedPixelItemIds, fetchPixelCatalog, purchasePixelItem, setPixelBaseAppearance } from '../../utils/pixelShop';
 import { PIXEL_CATALOG } from './shop/catalog';
 import type { PixelAvatarSlot, PixelItem, PublicAvatarAppearance, PurchasePixelItemResult } from './shop/types';
 
@@ -14,6 +14,7 @@ export function usePixelShop(userId: string, initialBalance: number, onBalanceCh
   const mounted = useRef(true);
   const [mutating, setMutating] = useState(false);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const [equippedRod, setEquippedRod] = useState<string | null>(null);
   const [ownedIds, setOwnedIds] = useState<Set<string>>(new Set());
   const [equipped, setEquipped] = useState<PublicAvatarAppearance>(EMPTY_APPEARANCE);
   // 컴파일된 PIXEL_CATALOG를 초기값으로 즉시 보여주고(로딩 깜빡임 없음), 서버가 응답하면 그 값으로
@@ -38,11 +39,12 @@ export function usePixelShop(userId: string, initialBalance: number, onBalanceCh
     let cancelled = false;
     setReady(false);
     setLoadError(false);
-    Promise.all([fetchOwnedPixelItemIds(userId), fetchEquippedAppearance(userId)])
-      .then(([ids, appearance]) => {
+    Promise.all([fetchOwnedPixelItemIds(userId), fetchEquippedAppearance(userId), fetchEquippedRod(userId)])
+      .then(([ids, appearance, rod]) => {
         if (cancelled) return;
         setOwnedIds(new Set(ids));
         setEquipped(appearance);
+        setEquippedRod(rod);
         setReady(true);
       })
       .catch(() => {
@@ -52,7 +54,7 @@ export function usePixelShop(userId: string, initialBalance: number, onBalanceCh
       });
     // 카탈로그는 별도 요청 — 실패해도 위 보유/장착 조회와 무관하게 정적 폴백으로 계속 동작하면
     // 되므로 Promise.all에 묶어서 전체를 실패시키지 않는다.
-    fetchPixelCatalog().then(rows => { if (!cancelled && rows.length > 0) setCatalog(rows.filter(row => PIXEL_CATALOG.some(known => known.itemId === row.itemId && known.slot === row.slot && known.assetKey === row.assetKey))); }).catch(() => {});
+    fetchPixelCatalog().then(rows => { if (!cancelled && rows.length > 0) setCatalog(rows.filter(row => PIXEL_CATALOG.some(known => known.itemId === row.itemId && known.slot === row.slot && (row.category === 'rod' || known.assetKey === row.assetKey)))); }).catch(() => {});
     return () => { cancelled = true; };
   }, [userId, reloadToken]);
 
@@ -112,5 +114,19 @@ export function usePixelShop(userId: string, initialBalance: number, onBalanceCh
     finally { mutationLock.current = false; if (mounted.current) setMutating(false); }
   }
 
-  return { ownedIds, equipped, catalog, balance, ready, loadError, reload, equip, purchase, setBaseAppearance, mutating };
+
+  async function equipRod(itemId: string | null): Promise<boolean> {
+    if (mutationLock.current || !ready || loadError) return false;
+    mutationLock.current = true; setMutating(true);
+    try {
+      const result = await equipPixelRod(itemId);
+      if (!result.ok) return false;
+      const rod = await fetchEquippedRod(userId);
+      if (!mounted.current) return false;
+      setEquippedRod(rod); return true;
+    } catch { if (mounted.current) setLoadError(true); return false; }
+    finally { mutationLock.current = false; if (mounted.current) setMutating(false); }
+  }
+
+  return { equippedRod, equipRod, ownedIds, equipped, catalog, balance, ready, loadError, reload, equip, purchase, setBaseAppearance, mutating };
 }

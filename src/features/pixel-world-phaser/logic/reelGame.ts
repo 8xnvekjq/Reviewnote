@@ -1,7 +1,11 @@
+import type { RodEquipment } from '../../pixel-room/shop/rods';
 import type { FishSpecies } from './fishCatalog';
 
 export interface ReelGame {
   difficulty: number;
+  speed: number;
+  rod?: RodEquipment;
+  trophy?: boolean;
   big: boolean;
   seed: number;
   zoneSize: number;
@@ -17,12 +21,13 @@ export interface ReelGame {
   status: 'playing' | 'landed' | 'escaped';
 }
 const clamp = (value: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, value));
-export const minReelMs = (difficulty: number) => 1500 + (clamp(difficulty, 1, 5) - 1) * 375;
+export const reelSpeed = (speed: number = 1) => Number.isFinite(speed) && speed > 0 ? speed : 1;
+export const minReelMs = (difficulty: number, speed = 1) => (1500 + (clamp(difficulty, 1, 5) - 1) * 375) / reelSpeed(speed);
 /** 서버는 시작 후 biteDelay + minReelMs 전에 온 '잡음'을 거절한다. 시계 오차에 대비해 조금 더 기다린다. */
 export const REEL_MARGIN_MS = 150;
-export function createReelGame(difficulty = 1, duck = false, big = false, seed = 0): ReelGame {
+export function createReelGame(difficulty = 1, duck = false, big = false, seed = 0, speed = 1, rod?: RodEquipment, trophy = false): ReelGame {
   const d = Number.isFinite(difficulty) ? clamp(difficulty, 1, 5) : 1;
-  return { difficulty: d, big, seed, zoneSize: .30 - (d - 1) * .0225 + (duck ? .035 : 0), zone: .5,
+  return { difficulty: d, speed: reelSpeed(speed), rod, trophy, big, seed, zoneSize: .30 - (d - 1) * .0225 + (duck ? .035 : 0), zone: .5,
     velocity: 0, fish: .5, progress: .35, elapsed: 0, remainder: 0, taps: [], lastTap: -1, tapCount: 0, status: 'playing' };
 }
 // 고정 시간 간격으로 계산하여 화면 주사율과 무관하게 같은 입력을 같은 결과로 처리한다.
@@ -54,8 +59,8 @@ export function stepReelGame(game: ReelGame, deltaMs: number, taps: readonly num
     next.zone = clamp(next.zone + next.velocity * dt, next.zoneSize / 2, 1 - next.zoneSize / 2);
     if (next.zone === next.zoneSize / 2 || next.zone === 1 - next.zoneSize / 2) next.velocity = 0;
     const overlaps = Math.abs(next.zone - next.fish) <= next.zoneSize / 2;
-    next.progress = clamp(next.progress + (overlaps ? .12 - d * .01 : -(.16 + d * .01)) * dt, 0, 1);
-    if (next.progress >= 1 && t * 1000 >= minReelMs(next.difficulty) + REEL_MARGIN_MS) next.status = 'landed';
+    next.progress = clamp(next.progress + (overlaps ? (.12 - d * .01) * next.speed : -(.16 + d * .01)) * dt, 0, 1);
+    if (next.progress >= 1 && t * 1000 >= minReelMs(next.difficulty, next.speed) + REEL_MARGIN_MS) next.status = 'landed';
     else if (next.progress <= 0 || t >= 75) next.status = 'escaped';
   }
   return next;

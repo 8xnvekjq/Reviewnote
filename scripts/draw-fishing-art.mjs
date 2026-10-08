@@ -370,6 +370,32 @@ const props = [
 ];
 for (const [name, w, h, rows] of props) { const c = canvas(w, h); map(c, rows); save(name, c, [[0, 0, w, h]]); }
 
+// 낚싯대는 같은 실루엣에 대나무 마디, 네잎클로버, 금빛 반짝임을 더한다.
+const rodMap = `
+............OO..
+...........OKO..
+..........OKO.A.
+.........OKO..A.
+........OKO...A.
+.......OKO....A.
+......OKO.....A.
+.....OKO......A.
+....OKO.......A.
+...OKO........A.
+..OLO.........A.
+.OLLO..OO.....A.
+.OLLO.OWBO....A.
+..OO...OO.....R.
+..............W.
+................`;
+for (const [name, color] of [['basic', '#d3a46b'], ['bamboo', '#8cab62'], ['steel', '#9ca6ad'], ['lucky', '#557c4c'], ['gold', '#edcd75']]) {
+  const c = canvas(16, 16); map(c, rodMap, 0, 0, { K: rgba(color) });
+  if (name === 'bamboo') map(c, 'N', 8, 5);
+  if (name === 'lucky') map(c, '.GG.GG\n.GHGHG\n..GGG.\n.GHGHG\n.GG.GG\n...J..', 0, 0);
+  if (name === 'gold') map(c, '..W..\n..W..\nWWWWW\n..W..\n..W..', 0, 0);
+  save(`rod_${name}`, c, [[0, 0, 16, 16]]);
+}
+
 const font={
   A:'010/101/111/101/101', B:'110/101/110/101/110', C:'011/100/100/100/011', D:'110/101/101/101/110',
   E:'111/100/110/100/111', F:'111/100/110/100/100', G:'011/100/101/101/011', H:'101/101/111/101/101',
@@ -393,7 +419,7 @@ for(let y=0;y<preview.h;y++) for(let x=0;x<preview.w;x++) pixel(preview,x,y,rgba
 label(preview,'FISHING ART / 8X NEAREST',8,5);
 let y=17;
 for(const {name,c,frames} of sheets) {
-  label(preview,`${name} ${c.w}X${c.h}`,8,y); y+=8;
+  label(preview,`${name.replaceAll('_','-')} ${c.w}X${c.h}`,8,y); y+=8;
   blit(preview,c,8,y,1,true);
   // 셀 경계를 작은 빨간 눈금으로 표시한다. 원본 시트는 그대로 보존.
   for(const [x,fy] of frames) pixel(preview,8+x,y+fy,colors.R);
