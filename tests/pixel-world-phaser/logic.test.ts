@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { facingFor, followOrigin, keyboardVector, knobOffset, stickVector, STICK_DEAD_ZONE, STICK_RADIUS } from '../../src/features/pixel-world-phaser/logic/joystick.ts';
 import { cameraCenterAxis, cameraZoom, gameLayout, insideRect } from '../../src/features/pixel-world-phaser/logic/layout.ts';
 import { AVATAR_POSES, avatarFrameIndex, avatarLayerPlan, avatarTextureKey } from '../../src/features/pixel-world-phaser/logic/avatarPlan.ts';
-import { INTERACTABLES, SPAWN, TILE, WORLD_COLS, WORLD_ROWS, cellCenter, cellOf, facedInteractable, feetBlocked, moveFeet, planPath, worldSolid, toWorldCell } from '../../src/features/pixel-world-phaser/logic/yardWorld.ts';
+import { INTERACTABLES, SPAWN, TILE, WORLD_COLS, WORLD_ROWS, cellCenter, cellOf, facedInteractable, feetBlocked, moveFeet, planPath, worldSolid, toWorldCell, RIVER_SIGN, yardScene } from '../../src/features/pixel-world-phaser/logic/yardWorld.ts';
 import { PET_SHEETS, petFollowSpot } from '../../src/features/pixel-world-phaser/logic/petSheets.ts';
 import { PIXEL_CATALOG } from '../../src/features/pixel-room/shop/catalog.ts';
 import { SKIN_TONE_OPTIONS, EYE_COLOR_OPTIONS } from '../../src/features/pixel-room/shop/appearanceRows.ts';
@@ -114,7 +114,7 @@ test('avatar frame index covers 8 poses × 4 frames', () => {
 test('world solidity preserves yard obstacles and adds the river sign', () => {
   for (let y = 0; y < 12; y++) for (let x = 0; x < 16; x++) {
     const w = toWorldCell({ x, y });
-    const expected = !yardWalkable({ x, y }) || (x === 14 && y === 6);
+    const expected = !yardWalkable({ x, y }) || (w.x === RIVER_SIGN.x && w.y === RIVER_SIGN.y);
     assert.equal(worldSolid(w), expected, `${x},${y}`);
   }
   assert.ok(worldSolid({ x: 0, y: 0 }) && worldSolid({ x: WORLD_COLS - 1, y: WORLD_ROWS - 1 }));
@@ -167,5 +167,16 @@ test('pet follow spot trails behind the player for each facing', () => {
   assert.ok(petFollowSpot(feet, 'Back').y > feet.y);
   for (const sheet of Object.values(PET_SHEETS)) {
     for (const anim of [sheet.walk, sheet.idle]) assert.ok(anim.row < sheet.rows && anim.frames.every(frame => frame < sheet.columns));
+  }
+});
+
+test('yard taps reach every edge exit and old mid-field exits are ordinary ground', () => {
+  const scene = yardScene();
+  for (const exit of scene.exits.filter(e => e.id !== 'door')) for (const cell of exit.cells) {
+    assert.deepEqual(planPath(cellOf(SPAWN), cell).at(-1), cell);
+  }
+  for (const cell of [toWorldCell({ x: 6, y: 11 }), toWorldCell({ x: 15, y: 7 })]) {
+    assert.equal(worldSolid(cell), false);
+    assert.ok(!scene.exits.some(e => e.cells.some(c => c.x === cell.x && c.y === cell.y)));
   }
 });

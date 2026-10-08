@@ -25,7 +25,8 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
   const [phase, setPhase] = useState<FishingGame['phase']>('idle');
   const [reelState, setReelState] = useState<ReelGame | null>(null);
   const reelGame = useRef<ReelGame | null>(null);
-  const held = useRef(false);
+  const taps = useRef<number[]>([]);
+  const reelStarted = useRef(0);
   const lastFrame = useRef(0);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -59,7 +60,7 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
     if (!next.cast || !lock.current || !fishingActive(game.current)) return;
     const current = castAdapter.current;
     const epoch = generation.current;
-    game.current = next; setPhase(next.phase); reelGame.current = null; setReelState(null); held.current = false;
+    game.current = next; setPhase(next.phase); reelGame.current = null; setReelState(null); taps.current = [];
     latest.current.handle.current?.fishingFx?.(next, shadow.current, performance.now());
     const told = fishReportForGamePhase(next.phase);
     if (told) latest.current.report?.(told);
@@ -96,7 +97,7 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
       if (next.phase === 'reeling') {
         game.current = next; setPhase('reeling');
         reelGame.current = createReelGame(next.cast?.difficulty ?? 1, latest.current.pet === 'pet_duck');
-        setReelState(reelGame.current); lastFrame.current = performance.now();
+        setReelState(reelGame.current); reelStarted.current = performance.now(); lastFrame.current = reelStarted.current; taps.current = [];
         latest.current.report?.({ phase: 'reeling' });
       } else finishRef.current(next);
     }
@@ -132,7 +133,7 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
         if (game.current.phase === 'reeling' && reelGame.current) {
           // rAF 시각은 릴 시작(performance.now())보다 앞설 수 있다. 시계를 되돌리지 않아 릴 시간이 실제보다 길게 쌓이지 않는다(서버 최소 시간 보장).
           const delta = now - lastFrame.current; if (delta > 0) lastFrame.current = now;
-          const result = stepReelGame(reelGame.current, delta, held.current);
+          const result = stepReelGame(reelGame.current, delta, delta > 0 ? taps.current.splice(0) : []);
           reelGame.current = result; setReelState(result);
           if (result.status !== 'playing') finishRef.current({ ...game.current, phase: result.status === 'landed' ? 'landed' : 'missed' });
         }
@@ -165,33 +166,40 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
   useEffect(() => { if (!message || busy) return; const timer = setTimeout(() => setMessage(''), 3500); return () => clearTimeout(timer); }, [message, busy]);
   useEffect(() => {
     const pointers = new Set<number>();
-    const keys = new Set<string>();
-    const sync = () => { held.current = pointers.size > 0 || keys.size > 0; };
+    let lastDirectTap = -Infinity;
+    const editable = (target: EventTarget | null) => target instanceof Element && !!target.closest('input, textarea, select, [contenteditable="true"]');
+    const boost = () => { if (game.current.phase === 'reeling') taps.current.push(performance.now() - reelStarted.current); };
     const down = (event: PointerEvent) => {
+      const target = event.target;
+      if (editable(target) || !(target instanceof Element) || !target.closest('.pwp-root') || target.closest('.pwp-btn-b')) return;
       if (!['bite', 'reeling'].includes(game.current.phase) || (event.pointerType === 'mouse' && event.button !== 0)) return;
-      if ((event.target as Element)?.closest?.('.pwp-btn-b')) return;
-      event.preventDefault(); pointers.add(event.pointerId); sync();
+      event.preventDefault();
+      if (pointers.has(event.pointerId)) return;
+      pointers.add(event.pointerId);
+      const now = performance.now();
+      // 터치/펜 직후의 호환 마우스 입력은 같은 탭으로 간주한다.
+      if (event.pointerType === 'mouse' && now - lastDirectTap < 500) return;
+      if (event.pointerType !== 'mouse') lastDirectTap = now;
+      reel(); boost();
     };
-    const up = (event: PointerEvent) => { pointers.delete(event.pointerId); sync(); };
+    const up = (event: PointerEvent) => { pointers.delete(event.pointerId); };
     const keyDown = (event: KeyboardEvent) => {
+      if (editable(event.target)) return;
       if (fishingActive(game.current) && event.code === 'KeyB') { event.preventDefault(); cancel(); return; }
       if (!fishingActive(game.current) || !['Space', 'KeyZ', 'KeyA'].includes(event.code)) return;
       event.preventDefault(); event.stopImmediatePropagation();
-      if (!event.repeat) reel();
-      if (game.current.phase === 'reeling') { keys.add(event.code); sync(); }
+      if (!event.repeat) { reel(); boost(); }
     };
-    const keyUp = (event: KeyboardEvent) => { keys.delete(event.code); sync(); };
-    const reset = () => { pointers.clear(); keys.clear(); sync(); };
+    const reset = () => { pointers.clear(); };
     window.addEventListener('pointerdown', down, { capture: true, passive: false });
     window.addEventListener('pointerup', up, true);
     window.addEventListener('pointercancel', up, true);
     window.addEventListener('keydown', keyDown, true);
-    window.addEventListener('keyup', keyUp, true);
     window.addEventListener('blur', reset);
     return () => {
       reset(); window.removeEventListener('pointerdown', down, true);
       window.removeEventListener('pointerup', up, true); window.removeEventListener('pointercancel', up, true);
-      window.removeEventListener('keydown', keyDown, true); window.removeEventListener('keyup', keyUp, true);
+      window.removeEventListener('keydown', keyDown, true);
       window.removeEventListener('blur', reset);
     };
   }, [reel, cancel]);

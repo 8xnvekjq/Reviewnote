@@ -4,7 +4,7 @@ import { SCENERY } from '../../pixel-room/plaza/plazaLayout';
 import type { PlazaPlayerState } from '../../pixel-room/plaza/types';
 import { AVATAR_POSES, AVATAR_FRAMES_PER_POSE } from '../logic/avatarPlan';
 import { feetBlocked } from '../logic/world';
-import { plazaGroundTile, PLAZA_MARGIN } from '../logic/plazaWorld';
+import { plazaGroundTile, PLAZA_MARGIN, PLAZA_EXIT, plazaBorderGap } from '../logic/plazaWorld';
 import { PET_SHEETS, petFollowSpot } from '../logic/petSheets';
 import { composeAvatar } from './avatarTexture';
 import { loadPetSheet, loadBed } from './sceneAssets';
@@ -41,6 +41,7 @@ export class PlazaScene extends WorldScene {
     }
     for (let y = 0; y < 22; y++) for (let x = 0; x < 26; x++) {
       if (x !== 0 && y !== 0 && x !== 25 && y !== 21) continue;
+      if (plazaBorderGap(x, y)) continue;
       this.add.image(x * 16 + 8, (y + 1) * 16, 'plaza-border-tree').setOrigin(.5, 1).setDepth((y + 1) * 16 - 2);
     }
     SCENERY.forEach((s, index) => {
@@ -64,7 +65,8 @@ export class PlazaScene extends WorldScene {
       if (!this.textures.exists(key)) this.textures.addCanvas(key, c);
       this.add.image((s.x + 5) * 16, (s.y + 5) * 16, key).setOrigin(0).setDepth((s.footprint.y + 5 + s.footprint.h) * 16 - 2);
     });
-    this.add.text((8 + 5) * 16 + 8, (11 + 5) * 16 + 8, '↓', { fontSize: '12px', color: '#fff4ce' }).setOrigin(.5);
+    const hint = this.add.text((PLAZA_EXIT.x + .5) * 16, (PLAZA_EXIT.y + .5) * 16, '↓', { fontSize: '12px', color: '#fff4ce' }).setOrigin(.5).setDepth(-900);
+    this.tweens.add({ targets: hint, alpha: .35, y: hint.y + 3, duration: 850, yoyo: true, repeat: -1 });
     const clear = () => { this.friends.clear(); this.bubbles?.clear(); this.bubbles = null; };
     this.events.once('shutdown', clear);
   }

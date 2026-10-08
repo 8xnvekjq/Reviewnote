@@ -80,3 +80,7 @@ html.pwp-open, html.pwp-open body { overflow:hidden; overscroll-behavior:none; h
 .pwp-room-result { position:absolute; bottom:max(110px,env(safe-area-inset-bottom)); left:12px; }
 .pwp-btn:disabled { opacity:.35; pointer-events:none; }
 .pwp-hud > .pwp-hud-spacer { pointer-events:none; }
+
+/* 채팅 입력은 선택과 화면 키보드를 그대로 사용한다. */
+.pwp-root :is(input, textarea, select, [contenteditable="true"]) { user-select:text; -webkit-user-select:text; -webkit-touch-callout:default; touch-action:auto; }
+.pwp-stage, .pwp-surface { -webkit-touch-callout:none; user-select:none; -webkit-user-select:none; touch-action:none; }

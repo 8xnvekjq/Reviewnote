@@ -1,6 +1,6 @@
 // 앞마당 그림: 기존 마당과 같은 타일·집·나무·울타리·밭·허수아비. 움직임/출구/대화는 WorldScene이 맡는다.
 import type Phaser from 'phaser';
-import { BED_CELLS, BIG_TREES, FENCE_ROWS, RIVER_SIGN, RIVER_EXIT, WORLD_COLS, WORLD_HEIGHT, WORLD_ROWS, WORLD_WIDTH, borderTrees, groundTile, toWorldCell } from '../logic/yardWorld';
+import { BED_CELLS, BIG_TREES, FENCE_ROWS, RIVER_SIGN, RIVER_EXIT, GATE, WORLD_COLS, WORLD_HEIGHT, WORLD_ROWS, WORLD_WIDTH, borderTrees, groundTile, toWorldCell } from '../logic/yardWorld';
 import { TILE } from '../logic/world';
 import { SCARECROW_CELL } from '../../pixel-room/farm/farmModel';
 import { WorldScene } from './WorldScene';
@@ -46,6 +46,8 @@ export class YardScene extends WorldScene {
     this.add.rectangle(sx + 8, sy, 44, 9, 0xc99a61).setDepth(sy + 17);
     this.add.text(sx + 8, sy, '강가 (낚시터) →', { fontFamily: 'sans-serif', fontSize: '6px', color: '#382918', resolution: 4 }).setOrigin(.5).setDepth(sy + 18);
     const hint = this.add.text((RIVER_EXIT.x + .5) * TILE, (RIVER_EXIT.y + .5) * TILE, '→', { fontSize: '13px', color: '#fff2b9', stroke: '#946e38', strokeThickness: 1 }).setOrigin(.5).setDepth(-900);
+    const gateHint = this.add.text((GATE.x + .5) * TILE, (GATE.y + .5) * TILE, '↓', { fontSize: '13px', color: '#fff2b9', stroke: '#946e38', strokeThickness: 1 }).setOrigin(.5).setDepth(-900);
+    this.tweens.add({ targets: gateHint, alpha: .35, y: gateHint.y + 3, duration: 850, yoyo: true, repeat: -1 });
     this.tweens.add({ targets: hint, alpha: .35, x: hint.x + 3, duration: 850, yoyo: true, repeat: -1 });
   }
 
