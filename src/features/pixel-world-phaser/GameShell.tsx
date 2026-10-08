@@ -601,7 +601,9 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
   const promptLabel = prompt?.verb ?? '';
   const { a, b, hud, dialogue: box } = layout;
 
-  return createPortal(<div ref={root} className="pwp-root" data-device={layout.device} data-orientation={layout.orientation} data-status={status} data-fishing-phase={fishing.phase} data-fishing-busy={fishing.busy}
+  return createPortal(<div ref={root} onContextMenu={event => {
+    if (!(event.target instanceof Element) || !event.target.closest('input, textarea, select, [contenteditable="true"]')) event.preventDefault();
+  }} className="pwp-root" data-device={layout.device} data-orientation={layout.orientation} data-status={status} data-fishing-phase={fishing.phase} data-fishing-busy={fishing.busy}
     data-scene={scene?.id} role="application" aria-label={`새 Pixel World 베타 · ${scene?.title ?? '앞마당'}`}>
     <div ref={probe} className="pwp-safe-probe" aria-hidden="true" />
     <div ref={stage} className="pwp-stage" />
