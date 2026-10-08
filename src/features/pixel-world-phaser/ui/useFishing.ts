@@ -67,12 +67,18 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
     try {
       const result = await current?.finish(next.cast.castId, next.phase === 'landed');
       if (mounted.current && epoch === generation.current) {
+        // 릴을 다 감은 경우만 서버 결과를 알린다(놓침·너무 빠름·취소는 위에서 escaped/idle로 이미 보냈다).
         if (next.phase === 'landed') latest.current.report?.(result?.ok && result.landed ? { phase: 'landed', speciesId: result.speciesId, lengthCm: result.lengthCm } : result?.ok ? { phase: 'escaped' } : { phase: 'idle' });
         if (result?.ok && result.landed) { setCaught(result); setMessage(''); await refresh(); }
         else if (!result?.ok) setMessage('낚시 결과를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.');
         else if (stateRef.current) shadows(stateRef.current);
       }
-    } catch { if (mounted.current && epoch === generation.current) setMessage('낚시 결과를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.'); }
+    } catch {
+      if (mounted.current && epoch === generation.current) {
+        if (next.phase === 'landed') latest.current.report?.({ phase: 'idle' });
+        setMessage('낚시 결과를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.');
+      }
+    }
     finally {
       lock.current = false;
       if (mounted.current) { setBusy(false); latest.current.freeze(false); }
@@ -91,6 +97,7 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
         game.current = next; setPhase('reeling');
         reelGame.current = createReelGame(next.cast?.difficulty ?? 1, latest.current.pet === 'pet_duck');
         setReelState(reelGame.current); lastFrame.current = performance.now();
+        latest.current.report?.({ phase: 'reeling' });
       } else finishRef.current(next);
     }
     return lock.current;
@@ -123,7 +130,8 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
     const tick = (now: number) => {
       if (fishingActive(game.current)) {
         if (game.current.phase === 'reeling' && reelGame.current) {
-          const delta = now - lastFrame.current; lastFrame.current = now;
+          // rAF 시각은 릴 시작(performance.now())보다 앞설 수 있다. 시계를 되돌리지 않아 릴 시간이 실제보다 길게 쌓이지 않는다(서버 최소 시간 보장).
+          const delta = now - lastFrame.current; if (delta > 0) lastFrame.current = now;
           const result = stepReelGame(reelGame.current, delta, held.current);
           reelGame.current = result; setReelState(result);
           if (result.status !== 'playing') finishRef.current({ ...game.current, phase: result.status === 'landed' ? 'landed' : 'missed' });

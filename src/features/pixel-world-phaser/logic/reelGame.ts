@@ -11,6 +11,8 @@ export interface ReelGame {
 }
 const clamp = (value: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, value));
 export const minReelMs = (difficulty: number) => 1500 + (clamp(difficulty, 1, 5) - 1) * 375;
+/** 서버(v2)는 시작 후 biteDelay + minReelMs 전에 온 '잡음'을 거절한다. 릴은 입질 뒤에만 시작하므로 이미 지켜지지만, 시계 오차에 대비해 조금 더 기다린다. */
+export const REEL_MARGIN_MS = 150;
 export function createReelGame(difficulty = 1, duck = false): ReelGame {
   const d = Number.isFinite(difficulty) ? clamp(difficulty, 1, 5) : 1;
   return { difficulty: d, zoneSize: .48 - (d - 1) * .075 + (duck ? .045 : 0), zone: .5,
@@ -35,7 +37,7 @@ export function stepReelGame(game: ReelGame, deltaMs: number, held: boolean): Re
     if (next.zone === next.zoneSize / 2 || next.zone === 1 - next.zoneSize / 2) next.velocity = 0;
     const overlaps = Math.abs(next.zone - next.fish) <= next.zoneSize / 2;
     next.progress = clamp(next.progress + (overlaps ? .18 : -(.12 + d * .01)) * dt, 0, 1);
-    if (next.progress >= 1 && t * 1000 >= minReelMs(next.difficulty)) next.status = 'landed';
+    if (next.progress >= 1 && t * 1000 >= minReelMs(next.difficulty) + REEL_MARGIN_MS) next.status = 'landed';
     else if (next.progress <= 0 || t >= 75) next.status = 'escaped';
   }
   return next;

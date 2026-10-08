@@ -31,7 +31,9 @@ test('river presence: continuous cell coordinates survive the shared reducer wit
   // 같은 payload를 광장 reducer에 넣으면 광장 범위 밖이라 칸 좌표로 떨어진다(광장 동작 그대로).
   const plaza = plazaStoreReducer(createPlazaStoreState(), { type: 'broadcast', player });
   assert.deepEqual(continuousPosition(plaza.players.get('b')!), { x: 20, y: 17 });
-  assert.deepEqual(PLAZA_BOUNDS, { width: 16, height: 12 });
+  // 광장은 16×12 + 바깥 네 칸 여백(fx-walkable). 강가는 여백 없이 26×22.
+  assert.deepEqual(PLAZA_BOUNDS, { width: 16, height: 12, slack: 4 });
+  assert.equal(RIVER_BOUNDS.slack ?? 0, 0);
   // 강가 범위 밖·NaN은 연속 좌표로 믿지 않는다.
   assert.deepEqual(continuousPosition({ ...player, position: { x: 26, y: 3 } }, RIVER_BOUNDS), { x: 20, y: 17 });
   assert.deepEqual(continuousPosition({ ...player, position: { x: NaN, y: 3 } }, RIVER_BOUNDS), { x: 20, y: 17 });
@@ -68,10 +70,11 @@ test('buildFishEvent: casting needs a target in the scene; landed needs a catalo
   assert.deepEqual(buildFishEvent('a', 3, { phase: 'bite' }, null), { sessionId: 'a', seq: 3, phase: 'bite' });
 });
 
-test('fishReportForGamePhase maps the current minigame phases (landed = reeling until the server answers)', () => {
+test('fishReportForGamePhase maps the minigame phases (reeling when the reel starts; landed waits for the server)', () => {
   assert.deepEqual(fishReportForGamePhase('waiting'), { phase: 'waiting' });
   assert.deepEqual(fishReportForGamePhase('bite'), { phase: 'bite' });
-  assert.deepEqual(fishReportForGamePhase('landed'), { phase: 'reeling' });
+  assert.deepEqual(fishReportForGamePhase('reeling'), { phase: 'reeling' });
+  assert.equal(fishReportForGamePhase('landed'), null);
   assert.deepEqual(fishReportForGamePhase('tooEarly'), { phase: 'escaped' });
   assert.deepEqual(fishReportForGamePhase('missed'), { phase: 'escaped' });
   assert.deepEqual(fishReportForGamePhase('cancelled'), { phase: 'idle' });

@@ -49,7 +49,7 @@ try {
     assert.deepEqual(await page.evaluate(() => window.riverTest.taps), [1]);
     const cast = await page.evaluate(() => window.riverTest.handle.debug());
     assert.equal(cast.pendingCast, null); assert.equal(cast.facing, 'Right');
-    assert.ok(Math.hypot(cast.x - 184, cast.y - 184) < 2);
+    assert.ok(Math.hypot(cast.x - 184, cast.y - 184) < .5, JSON.stringify({ x: cast.x, y: cast.y }));
     await page.waitForTimeout(350);
     assert.deepEqual(await page.evaluate(() => window.riverTest.taps), [1]);
     const p = await page.evaluate(() => window.riverTest.handle.debug().targets['shadow:1']);

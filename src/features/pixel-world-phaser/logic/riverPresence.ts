@@ -32,15 +32,15 @@ export type RiverFishReport =
   | { phase: 'landed'; speciesId: string; lengthCm: number };
 export type RiverFishReporter = (report: RiverFishReport) => void;
 
-/** 지금 낚시 미니게임(logic/fishingGame.ts)의 단계 → 친구에게 보낼 단계. 결과가 서버에서 오기 전인 'landed'는 '끌어올리는 중'이다.
- *  TODO(릴 단계): 새 릴(감기) 미니게임이 들어오면 감기 시작 순간에 { phase: 'reeling' }을 보내고, 여기 'landed' 매핑은 그 단계로 옮긴다. */
+/** 지금 낚시 미니게임(logic/fishingGame.ts)의 단계 → 친구에게 보낼 단계.
+ *  'reeling'은 릴 미니게임(logic/reelGame.ts)이 실제로 시작되는 순간이다. 릴을 다 감은 'landed'는 서버 결과가 와야 알 수 있으므로
+ *  여기서는 보내지 않고, useFishing이 결과(landed/escaped/idle)를 직접 보낸다. */
 export function fishReportForGamePhase(phase: FishingPhase): RiverFishReport | null {
   switch (phase) {
-    case 'waiting': case 'bite': return { phase };
-    case 'landed': return { phase: 'reeling' };
+    case 'waiting': case 'bite': case 'reeling': return { phase };
     case 'tooEarly': case 'missed': return { phase: 'escaped' };
     case 'cancelled': return { phase: 'idle' };
-    default: return null; // casting은 그림자 번호가 필요해서 useFishing이 직접 보낸다. idle은 보낼 일이 없다.
+    default: return null; // casting은 그림자 번호가 필요해서 useFishing이 직접 보낸다. landed는 서버 결과로 보낸다. idle은 보낼 일이 없다.
   }
 }
 

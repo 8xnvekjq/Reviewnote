@@ -127,9 +127,9 @@ async function enterRiver(page, query = '', walkToDock = true) {
   });
   await page.waitForFunction(() => window.__pixelWorldPhaser.debug().scene === 'river' && !window.__pixelWorldPhaser.debug().transitioning);
   if (!walkToDock) return;
-  // 들어온 자리(서쪽 둑)에서는 물이 화면 밖이다 — 선착장 끝까지 걸어가 그림자가 보이게 한다.
-  await page.evaluate(() => { const h = window.__pixelWorldPhaser, d = h.debug(); h.walkToScreen((17 * 16 + 8 - d.camera.x) * d.cssZoom, (11 * 16 + 8 - d.camera.y) * d.cssZoom); });
-  await page.waitForFunction(() => { const d = window.__pixelWorldPhaser.debug(); return !d.moving && d.pathLength === 0 && d.x > 17 * 16; }, null, { timeout: 20000 });
+  // 선착장 끝(물가 자리 11,11)까지 걸어가 그 자리에서 바로 던진다(강가 꾸미기 이후 배치).
+  await page.evaluate(() => { const h = window.__pixelWorldPhaser, d = h.debug(); h.walkToScreen((11 * 16 + 8 - d.camera.x) * d.cssZoom, (11 * 16 + 8 - d.camera.y) * d.cssZoom); });
+  await page.waitForFunction(() => { const d = window.__pixelWorldPhaser.debug(); return !d.moving && d.pathLength === 0 && d.x > 11 * 16; }, null, { timeout: 20000 });
   await page.waitForTimeout(400);
 }
 async function tapShadow(page) {

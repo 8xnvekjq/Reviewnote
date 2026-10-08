@@ -14,7 +14,7 @@ export interface FishingGame {
 export const idleFishingGame = (): FishingGame => ({ phase: 'idle', cast: null, startedAt: 0, biteAt: 0, deadline: 0, castDurationMs: 0, nibbles: [], nibble: -1 });
 export const fishingActive = (game: FishingGame) => ['casting', 'waiting', 'bite', 'reeling'].includes(game.phase);
 
-// 실제 시각으로 판정하므로 렌더링 속도와 무관하다. 빌린 오리는 보너스가 없다.
+// 실제 시각으로 판정하므로 렌더링 속도와 무관하다. 입질 창에는 펫 보너스가 없다(오리는 릴 칸이 넓어진다 — reelGame.ts).
 export function startFishingGame(cast: CastStart, _pet: string | null, now: number, firstEver = false): FishingGame {
   if (!cast.ok) return idleFishingGame();
   const delay = Math.max(0, cast.biteDelayMs);

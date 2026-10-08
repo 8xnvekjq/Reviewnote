@@ -156,7 +156,11 @@ export class RiverScene extends WorldScene {
     super.update(time, delta);
     if (this.pendingCast && !this.ctx.controls.frozen) {
       const pending = this.pendingCast;
-      if (Math.hypot(this.feet.x - pending.spot.x, this.feet.y - pending.spot.y) < 2) this.castShadow(pending.index);
+      // 거의 도착하면 물가 자리에 딱 맞춰 세운 뒤 던진다(걷기를 멈추면 1~2px 앞에 서 있던 것). 친구 화면의 줄도 이 자리에서 시작한다.
+      if (Math.hypot(this.feet.x - pending.spot.x, this.feet.y - pending.spot.y) < 2) {
+        this.feet = { ...pending.spot };
+        this.castShadow(pending.index);
+      }
     }
     this.peers.current?.update(time, this.feet);
     const clock = this.worldClock(), tint = worldTint(clock.phase, clock.weather);
