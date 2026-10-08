@@ -2167,7 +2167,7 @@ function App() {
           AppShell 밖에 띄우고, Phaser 청크는 처음 열 때만 내려받는다. */}
       {activeTab === 'pixelRoom' && !!session?.user?.id && canAccessPixelWorld && (
         <LazyScreenBoundary fallback={<div role="status" style={{ position: 'fixed', inset: 0, zIndex: 2147483000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#3f6b3a', color: '#fff4d9', fontWeight: 800 }}>앞마당으로 가는 중…</div>}>
-          <PixelWorldPhaser userId={session.user.id} pointsBalance={currentDisplayPoints} onExit={() => setActiveTab('notes')}
+          <PixelWorldPhaser isAdmin={isAdmin} userId={session.user.id} pointsBalance={currentDisplayPoints} onExit={() => setActiveTab('notes')}
             onPixelPurchase={handlePixelPurchase} onPointsReward={handlePixelReward} />
         </LazyScreenBoundary>
       )}
