@@ -200,7 +200,7 @@ begin
   end if;
 
   -- 어려운 물고기 굴림: 15% + 희귀 보너스(%p). 희귀:전설 = 5:1.
-  if v_fish.id is null and random() * 100 < case when v_bait then least(60, (15 + v_bonus) * 2) else 15 + v_bonus end then
+  if v_fish.id is null and random() * 100 < (case when v_bait then least(60, (15 + v_bonus) * 2) else 15 + v_bonus end) then
     v_roll := random();
     with hard as (
       select s.*, case s.rarity when 'rare' then 5 else 1 end as w
