@@ -5,7 +5,7 @@ import { mkdir } from 'node:fs/promises';
 const base = `${process.env.EXAM_TEST_BASE_URL || 'http://127.0.0.1:5174'}/tests/exam/practice.html`;
 const out = `${process.env.EXAM_TEST_ARTIFACT_DIR || '.test-artifacts'}/peer-picker`;
 await mkdir(out, { recursive: true });
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ headless: true });
 async function checkCanvasPlayback(page, peer) {
   const canvas = peer.getByTestId('exam-peer-canvas');
   await peer.getByRole('slider').press('End');

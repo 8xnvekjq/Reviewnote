@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { PIXEL_CATALOG } from '../../src/features/pixel-room/shop/catalog.ts';
 import { emptyFarm } from './emptyFarm.mjs';
-const browser=await chromium.launch({channel:'msedge',headless:true});
+const browser=await chromium.launch({headless: true});
 const out='node_modules/.cache/pixel-pigeon';await mkdir(out,{recursive:true});
 const catalog=PIXEL_CATALOG.map(i=>({item_id:i.itemId,category:i.category,slot:i.slot,price:i.price,asset_key:i.assetKey,display_name:i.displayName,tier:i.tier,stackable:false}));
 const url='http://127.0.0.1:5174/tests/pixel-room/?tab=pixelRoom&user=pigeon-test&testBalance=10000';

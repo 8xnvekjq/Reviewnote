@@ -10,7 +10,7 @@ const output = 'scratch/worksheet-browser';
 const TRIG_IDS = ['2026-g3m-trig-creative-1', '2026-g3m-trig-creative-2'];
 await mkdir(output, { recursive: true });
 await mkdir('node_modules/.cache/exam-practice', { recursive: true });
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ headless: true });
 try {
   for (const width of [1180, 820, 390]) {
     const context = await browser.newContext({ viewport: { width, height: width === 820 ? 1180 : 820 } });

@@ -8,14 +8,14 @@
 //           2) `npm run test:plaza-reconnect` (기본: 고친 코드가 맞게 동작하는지 검증, PASS 기대)
 //              `EXPECT_REGRESSION=1 npm run test:plaza-reconnect` (버그가 실제 있었는지 재현 —
 //              고친 코드에서 돌리면 일부러 실패해야 정상: 회귀가 사라졌다는 증거).
-// 시스템에 설치된 Microsoft Edge(channel:'msedge')를 그대로 구동한다 — `npx playwright install`로
-// 별도 브라우저를 내려받을 필요가 없다(이 프로젝트가 개발되는 Windows 환경 기준).
+// 창을 만들지 않는 Playwright headless shell로 구동한다(처음 한 번 `npx playwright install chromium-headless-shell`).
+// 시스템 Edge(channel:'msedge')는 샌드박스에서 돌리면 Alt+Tab에 빈 창이 남아 쓰지 않는다.
 import { createRequire } from 'node:module';
 import { mkdir,writeFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 const require=createRequire(import.meta.url);
 const {chromium}=require(process.env.PLAYWRIGHT_PATH || 'playwright');
-const browser=await chromium.launch({channel:'msedge',headless:true});
+const browser=await chromium.launch({headless: true});
 const before=process.env.EXPECT_REGRESSION==='1';
 const output=process.env.UI_OUTPUT || 'node_modules/.cache/plaza-reconnect';
 await mkdir(output,{recursive:true});

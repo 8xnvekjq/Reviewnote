@@ -8,7 +8,7 @@ import { mkdir } from 'node:fs/promises';
 const base = `${process.env.EXAM_TEST_BASE_URL || 'http://127.0.0.1:5174'}/tests/exam/practice.html`;
 const out = `${process.env.EXAM_TEST_ARTIFACT_DIR || '.test-artifacts'}/teacher-check-publish`;
 await mkdir(out, { recursive: true });
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ headless: true });
 async function start(page, query) {
   await page.goto(`${base}${query}`);
   await page.getByTestId('exam-start').waitFor();

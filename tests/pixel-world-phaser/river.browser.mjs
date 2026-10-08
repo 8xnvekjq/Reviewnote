@@ -4,7 +4,7 @@ import { mkdir } from 'node:fs/promises';
 const BASE = process.env.PWP_BASE ?? 'http://127.0.0.1:5174';
 const SHOTS = '.pixel-world-test.local/river';
 await mkdir(SHOTS, { recursive: true });
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 1180, height: 820 } });
   const errors = []; page.on('pageerror', error => errors.push(error.message));

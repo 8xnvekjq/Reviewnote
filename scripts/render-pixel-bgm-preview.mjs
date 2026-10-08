@@ -13,7 +13,7 @@ const loud = process.argv.includes('--loud');
 const output = 'scratch/pixel-bgm-preview.wav';
 const server = await createServer({ server: { port: 0, host: '127.0.0.1' }, logLevel: 'error' });
 await server.listen();
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ headless: true });
 try {
   const page = await browser.newPage();
   // 아무 모듈 URL이나 열어 dev 서버와 같은 origin을 얻은 뒤, 그 안에서 엔진을 import한다.

@@ -6,7 +6,7 @@ import { mkdir } from 'node:fs/promises';
 const BASE = process.env.PWP_BASE ?? 'http://127.0.0.1:5174';
 const SHOTS = '.pixel-world-test.local';
 await mkdir(SHOTS, { recursive: true });
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ headless: true });
 const debug = page => page.evaluate(() => window.__pixelWorldPhaser.debug());
 const scene = (page, id) => page.waitForFunction(id => {
   const d = window.__pixelWorldPhaser?.debug(); return d?.scene === id && !d.transitioning;

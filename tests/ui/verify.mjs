@@ -8,7 +8,7 @@ const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const output = path.resolve(process.env.UI_OUTPUT || 'node_modules/.cache/ui-renewal');
 await mkdir(output, { recursive: true });
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ headless: true });
 const sizes = [[320,568], [375,667], [390,844], [430,932], [360,800], [800,1280], [844,390]];
 const results = [];
 const errors = [];

@@ -6,7 +6,7 @@ import { mkdir } from 'node:fs/promises';
 
 const out = 'node_modules/.cache/ui-menu';
 await mkdir(out, { recursive: true });
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ headless: true });
 
 async function open(page, query) {
   await page.goto(`http://127.0.0.1:5174/tests/ui/menu.html?${query}`);

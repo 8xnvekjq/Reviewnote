@@ -2,7 +2,7 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ headless: true });
 
 try {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });

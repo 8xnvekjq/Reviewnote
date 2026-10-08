@@ -2,7 +2,7 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 const base = process.env.PWP_BASE ?? 'http://127.0.0.1:5174';
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ headless: true });
 try {
   for (const viewport of [{ width: 390, height: 844 }, { width: 1180, height: 820 }]) {
     const context = await browser.newContext({ viewport, hasTouch: true });

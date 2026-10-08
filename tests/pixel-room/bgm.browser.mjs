@@ -20,7 +20,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const MASTER_LIMIT = 0.06;
 const PORT = process.env.PIXEL_TEST_PORT || '5174';
 const URL = `http://127.0.0.1:${PORT}/tests/pixel-room/?tab=pixelRoom&user=bgm-user`;
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ headless: true });
 
 async function openPage({ blockStorage = false, storedOn = false, touch = false, denyFirstStart = false } = {}) {
   const page = await browser.newPage(touch ? { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true } : { viewport: { width: 1280, height: 900 } });

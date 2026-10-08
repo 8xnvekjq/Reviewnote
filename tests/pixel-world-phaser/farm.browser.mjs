@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 const BASE = process.env.PWP_BASE ?? 'http://127.0.0.1:5174';
 await mkdir('.pixel-world-test.local', { recursive: true });
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ headless: true });
 const ready = page => page.waitForFunction(() => document.querySelector('.pwp-root')?.dataset.status === 'ready');
 const target = async (page, id) => {
   await page.evaluate(id => { const h = window.__pixelWorldPhaser, p = h.debug().targets[id]; h.walkToScreen(p.x, p.y); }, id);

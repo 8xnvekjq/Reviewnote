@@ -7,7 +7,7 @@ const base = `${process.env.EXAM_TEST_BASE_URL || 'http://127.0.0.1:5174'}/tests
 const paperId = process.env.EXAM_ASSIST_PAPER_ID || '2025-06-math';
 const worksheet = paperId !== '2025-06-math';
 const query = `transport=supabase&broadcastPaper=${paperId}${worksheet ? '&worksheet=1' : ''}`;
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({ viewport: { width: 1180, height: 820 } });
 const student = await context.newPage(), admin = await context.newPage();
 const errors = [];
