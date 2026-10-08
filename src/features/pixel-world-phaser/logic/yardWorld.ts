@@ -1,5 +1,5 @@
 // Phaser 앞마당의 월드 데이터. 기존 마당(yard/yardModel.ts, FrontYard.tsx)의 16×12 칸 배치를 그대로
-// 쓰고, 카메라가 맵 끝에서 검은 화면을 보이지 않도록 둘레에 숲(통과 불가) 여백을 두른다. 순수 모듈.
+// 쓰고, 둘레 잔디도 걸을 수 있게 한다. 지도 끝의 나무 줄만 경계로 막는다. 순수 모듈.
 // 충돌/길찾기 계산 자체는 world.ts(모든 장면 공통)에 있고, 여기 함수들은 마당 격자를 기본값으로 채운 얇은 포장이다.
 import { yardWalkable, YARD_DOOR, YARD_GATE, YARD_HEIGHT, YARD_SPAWNS, YARD_WIDTH } from '../../pixel-room/yard/yardModel';
 import { FARM_BEDS, SCARECROW_CELL } from '../../pixel-room/farm/farmModel';
@@ -12,7 +12,7 @@ export { TILE, FEET, cellCenter, cellOf, facingDelta, facingToward } from './wor
 export type { SolidFn } from './world';
 const { TILE, cellCenter } = world;
 
-/** 마당 둘레 숲 여백(칸). 폰 세로 화면(카메라 약 130×280 월드 px)에서도 맵 밖이 안 보일 만큼. */
+/** 마당 둘레 잔디 여백(칸). 폰 세로 화면에서도 맵 밖이 안 보일 만큼. */
 export const MARGIN = 5;
 export const WORLD_COLS = YARD_WIDTH + MARGIN * 2;
 export const WORLD_ROWS = YARD_HEIGHT + MARGIN * 2;
@@ -22,19 +22,26 @@ export const WORLD_HEIGHT = WORLD_ROWS * TILE;
 /** 마당 칸(0..15, 0..11) → 월드 칸. */
 export const toWorldCell = (cell: Point): Point => ({ x: cell.x + MARGIN, y: cell.y + MARGIN });
 
-/** 월드 칸이 막혀 있는가. 마당 밖(숲)은 전부 막힘. 집 문 칸은 기존 마당처럼 밟을 수 있고(밟으면 방으로),
- *  광장 길목은 아직 베타에서 갈 수 없으니 그 칸만 걸을 수 있게 남겨 두고 그 아래는 숲으로 막는다. */
+export const RIVER_SIGN = toWorldCell({ x: 14, y: 6 });
+export const RIVER_EXIT = toWorldCell({ x: 15, y: 7 });
+
+/** 빈 잔디 여백은 열고 실제 장애물과 맨 바깥 나무 줄만 막는다. */
 export function worldSolid(cell: Point): boolean {
+  if (!Number.isInteger(cell.x) || !Number.isInteger(cell.y)
+    || cell.x <= 0 || cell.y <= 0 || cell.x >= WORLD_COLS - 1 || cell.y >= WORLD_ROWS - 1) return true;
+  if (cell.x === RIVER_SIGN.x && cell.y === RIVER_SIGN.y) return true;
   const x = cell.x - MARGIN, y = cell.y - MARGIN;
-  if (x < 0 || y < 0 || x >= YARD_WIDTH || y >= YARD_HEIGHT) return true;
+  if (x < 0 || y < 0 || x >= YARD_WIDTH || y >= YARD_HEIGHT) return false;
   return !yardWalkable({ x, y });
 }
 
-export type InteractableId = 'scarecrow' | 'door' | 'gate' | `farm:${number}`;
+export type InteractableId = 'scarecrow' | 'door' | 'gate' | 'river-sign' | `farm:${number}`;
 const DOOR = toWorldCell(YARD_DOOR);
 const GATE = toWorldCell(YARD_GATE);
 const SCARECROW = toWorldCell(SCARECROW_CELL);
 export const INTERACTABLES: readonly (Interactable & { id: InteractableId })[] = [
+  { id: 'river-sign', cell: RIVER_SIGN, label: '강가 (낚시터)', verb: '읽기', action: { kind: 'talk' },
+    bang: { x: (RIVER_SIGN.x + .5) * TILE, y: RIVER_SIGN.y * TILE - 4 } },
   ...FARM_BEDS.map((bed, index): Interactable & { id: InteractableId } => {
     const cell = toWorldCell(bed);
     return { id: `farm:${index}`, cell, cells: [cell, { x: cell.x + 1, y: cell.y }, { x: cell.x, y: cell.y + 1 }, { x: cell.x + 1, y: cell.y + 1 }],
@@ -56,7 +63,7 @@ export function yardScene(): SceneSpec {
     interactables: INTERACTABLES,
     exits: [{ id: 'door', cells: [DOOR], to: { scene: 'room', entry: 'door' } },
       { id: 'gate', cells: [GATE], to: { scene: 'plaza', entry: 'yard' } },
-      { id: 'yard→river', cells: [toWorldCell({ x: 15, y: 7 })], to: { scene: 'river', entry: 'fromYard' } }],
+      { id: 'yard→river', cells: [RIVER_EXIT], to: { scene: 'river', entry: 'fromYard' } }],
     entries: {
       fromRiver: { cell: toWorldCell({ x: 14, y: 7 }), facing: 'Left' },
       door: { cell: toWorldCell(YARD_SPAWNS.room), facing: 'Front' as Facing },
@@ -78,23 +85,19 @@ export const facedInteractable = (feet: Point, facing: Facing, list: readonly In
 /** 기존 마당과 같은 바닥 타일 선택식(잔디 3종 + 가운데 흙길). id는 Kenney Tiny Town 아틀라스 번호. */
 export function groundTile(worldX: number, worldY: number): number {
   const x = worldX - MARGIN, y = worldY - MARGIN;
+  // 밭을 피해 아래로 돌아간 뒤 오른쪽 강가 출구로 이어지는 흙길.
+  if ((y === 9 && x >= 7 && x <= 14) || (x === 14 && y >= 7 && y <= 9) || (x === 15 && y === 7)) return 25;
   if (x >= 5 && x <= 7 && y >= 5 && y < YARD_HEIGHT) return x === 5 ? 24 : x === 7 ? 26 : 25;
-  // 광장 쪽으로 이어지는 길을 숲 여백 아래로도 조금 그린다(갈 수는 없음).
+  // 광장 쪽으로 이어지는 길도 바깥 나무 줄 전까지 걸을 수 있다.
   if (x >= 5 && x <= 7 && y >= YARD_HEIGHT) return x === 5 ? 24 : x === 7 ? 26 : 25;
   const gx = ((worldX % 16) + 16) % 16, gy = ((worldY % 12) + 12) % 12;
   return (gx + gy * 3) % 17 === 0 ? 2 : (gx * 7 + gy) % 5 === 0 ? 1 : 0;
 }
-/** 숲 여백의 나무(16×32, 발끝 칸 기준). 길 자리와 마당 안은 비운다. 결정적 배치. */
+/** 나무 밑동이 경계 칸 안에 놓이도록 발끝을 칸의 아래 끝에 맞춘다. */
 export function borderTrees(): Point[] {
   const trees: Point[] = [];
-  for (let y = 1; y < WORLD_ROWS + 1; y++) for (let x = 0; x < WORLD_COLS; x++) {
-    const yardX = x - MARGIN, yardY = y - MARGIN;
-    const inYard = yardX >= 0 && yardX < YARD_WIDTH && yardY >= 0 && yardY < YARD_HEIGHT;
-    if (inYard) continue;
-    if (yardX >= 4 && yardX <= 8 && yardY >= YARD_HEIGHT) continue;
-    // 바로 붙은 줄은 촘촘하게, 바깥은 엇갈리게 — 울타리처럼 보이지 않도록.
-    const ring = Math.min(Math.abs(yardX < 0 ? yardX : yardX - (YARD_WIDTH - 1)), Math.abs(yardY < 0 ? yardY : yardY - (YARD_HEIGHT - 1)));
-    if (ring <= 1 ? (x + y) % 2 === 0 : (x * 3 + y * 5) % 4 === 0) trees.push({ x, y });
+  for (let y = 0; y < WORLD_ROWS; y++) for (let x = 0; x < WORLD_COLS; x++) {
+    if (x === 0 || y === 0 || x === WORLD_COLS - 1 || y === WORLD_ROWS - 1) trees.push({ x, y: y + 1 });
   }
   return trees;
 }

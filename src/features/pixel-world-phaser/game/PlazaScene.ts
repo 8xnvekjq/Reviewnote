@@ -32,6 +32,17 @@ export class PlazaScene extends WorldScene {
     for (let y = 0; y < 22; y++) for (let x = 0; x < 26; x++) tile(plazaGroundTile(x - 5, y - 5), x * 16, y * 16);
     if (!this.textures.exists('plaza-ground')) this.textures.addCanvas('plaza-ground', canvas);
     this.add.image(0, 0, 'plaza-ground').setOrigin(0).setDepth(-1000);
+    // 열린 잔디와 막힌 지도 경계를 구별하는 나무 줄.
+    if (!this.textures.exists('plaza-border-tree')) {
+      const c = document.createElement('canvas'); c.width = 16; c.height = 32;
+      const p = c.getContext('2d')!; p.imageSmoothingEnabled = false;
+      p.drawImage(this.ctx.assets.town, 64, 0, 16, 32, 0, 0, 16, 32);
+      this.textures.addCanvas('plaza-border-tree', c);
+    }
+    for (let y = 0; y < 22; y++) for (let x = 0; x < 26; x++) {
+      if (x !== 0 && y !== 0 && x !== 25 && y !== 21) continue;
+      this.add.image(x * 16 + 8, (y + 1) * 16, 'plaza-border-tree').setOrigin(.5, 1).setDepth((y + 1) * 16 - 2);
+    }
     SCENERY.forEach((s, index) => {
       const c = document.createElement('canvas'); c.width = s.w * 16; c.height = s.h * 16;
       const p = c.getContext('2d')!; p.imageSmoothingEnabled = false;
