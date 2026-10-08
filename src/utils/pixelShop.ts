@@ -14,12 +14,12 @@ export { toPublicAvatarAppearance } from './pixelShopAppearance';
 
 interface PixelItemCatalogRow {
   item_id: string;
-  category: 'avatar' | 'furniture' | 'pet';
-  slot: PixelAvatarSlot | 'furniture' | 'pet';
+  category: PixelItem['category'];
+  slot: PixelItem['slot'];
   price: number;
   asset_key: string;
   display_name: string;
-  tier: 1 | 2 | 3;
+  tier: PixelItem['tier'];
   stackable: boolean;
 }
 
@@ -145,4 +145,26 @@ export async function savePixelRoomLayout(placements: FurniturePlacementRow[]): 
     return { ok: false, reason: 'unknown', message: error.message || '가구 배치를 저장하지 못했어요.' };
   }
   return data as SavePixelRoomLayoutResult;
+}
+
+export type EquipPixelRodResult = { ok: true; rodId: string | null } | { ok: false; reason: 'not_found' | 'not_owned' | 'unknown'; message: string };
+/** 서버(equip_pixel_rod)가 소유권을 검사한 뒤 낚싯대를 장착한다. null이면 기본 낚싯대로 되돌린다.
+ * 낚싯대는 pixel_avatar_equipment가 아니라 pixel_rod_equipment에 저장된다. */
+export async function equipPixelRod(itemId: string | null): Promise<EquipPixelRodResult> {
+  const { data, error } = await supabase.rpc('equip_pixel_rod', { p_item_id: itemId });
+  if (error) return { ok: false, reason: 'unknown', message: error.message || '낚싯대를 장착하지 못했어요.' };
+  const raw = (data ?? {}) as { ok?: unknown; reason?: unknown; rod?: { id?: unknown } | null };
+  if (raw.ok !== true) {
+    const reason = raw.reason === 'not_found' || raw.reason === 'not_owned' ? raw.reason : 'unknown';
+    return { ok: false, reason, message: reason === 'not_owned' ? '아직 가지고 있지 않은 낚싯대예요.' : '낚싯대를 장착하지 못했어요.' };
+  }
+  return { ok: true, rodId: typeof raw.rod?.id === 'string' ? raw.rod.id : null };
+}
+/** 장착한 낚싯대 item_id(pixel_rod_equipment, 내 줄만 RLS로 읽힘). 줄이 없거나 v4 이전(표 없음)이면 null —
+ * 낚싯대 조회 실패가 상점 전체를 막지 않도록 오류도 null(기본 낚싯대)로 본다. */
+export async function fetchEquippedRod(userId: string): Promise<string | null> {
+  const { data, error } = await supabase.from('pixel_rod_equipment').select('rod_id').eq('user_id', userId).maybeSingle();
+  if (error) return null;
+  const rodId = (data as { rod_id?: unknown } | null)?.rod_id;
+  return typeof rodId === 'string' ? rodId : null;
 }

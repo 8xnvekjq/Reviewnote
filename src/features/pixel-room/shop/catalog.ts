@@ -1,9 +1,12 @@
 import type { PixelItem } from './types';
+// 확장자를 붙여 둔다: tests/pixelShop/*browser*.mjs가 이 파일을 node로 바로 읽는다.
+import { ROD_CATALOG } from './rods.ts';
 
 // Avatar/furniture use existing atlas art; pet artwork provenance lives in pet/assets.
 // Keep IDs stable for server ownership; prices come from the server.
 // Asset selection and zero-based rows are documented in docs/pixel-world-content.md.
 export const PIXEL_CATALOG: readonly PixelItem[] = [
+  ...ROD_CATALOG,
   { itemId: 'top_sage', category: 'avatar', slot: 'top', price: 25, assetKey: 'sage', displayName: '세이지 티셔츠', tier: 1, stackable: false },
   { itemId: 'top_blue', category: 'avatar', slot: 'top', price: 25, assetKey: 'blue', displayName: '블루 티셔츠', tier: 1, stackable: false },
   { itemId: 'top_necktie', category: 'avatar', slot: 'top', price: 80, assetKey: 'necktie', displayName: '단정한 넥타이 셔츠', tier: 2, stackable: false },

@@ -1,11 +1,13 @@
 // 메모리 안에서만 도는 낚시 어댑터 — 브라우저 하네스와 단위 테스트용. 서버(supabase_pixel_fishing.sql)와 같은 규칙:
-// 무제한, 시작 간격 2초, 대기 캐스트 1개·90초, 최근 5마리에 새 친구가 없으면 안 잡아 본 물고기 보장,
-// 강아지 반짝임, 비둘기 힌트, 곰 +8%. 같은 seed·같은 시계면 언제나 같은 결과가 나온다.
+// 무제한, 시작 간격 2초, 대기 캐스트 1개·90초, 어려운 물고기 15%+낚싯대 보너스(없으면 대물),
+// 피티(최근 5마리에 새 친구가 없으면 35%로 안 잡아 본 물고기, 놓친 피티 바로 다음은 쉼),
+// 낚싯대(난이도↓·희귀↑·속도), 강아지 반짝임, 비둘기 힌트, 곰 +8%. 같은 seed·같은 시계면 언제나 같은 결과가 나온다.
 import { FISH_CATALOG, RARITY_WEIGHT, fishById } from '../logic/fishCatalog';
 import type { FishSpecies } from '../logic/fishCatalog';
-import { fishDifficulty, minReelMs } from '../logic/reelGame';
+import { fishDifficulty } from '../logic/reelGame';
 import { fnv1a32, worldClockAt } from '../logic/worldClock';
-import type { BitePattern, CastFinish, CastStart, ClassFishBoard, FishAlbumEntry, FishingAdapter, FishingOverride, FishingState, FishPhase, FishWeather } from './fishingAdapter';
+import { BASIC_ROD, FISHING_RODS, HARD_FISH_PERCENT, NO_ROD, rodBiteDelayMs, rodDifficulty, rodMinReelMs, rodSpec } from './fishingAdapter';
+import type { BitePattern, CastFinish, CastStart, ClassFishBoard, EquipRodResult, FishAlbumEntry, FishingAdapter, FishingOverride, FishingRod, FishingRodId, FishingState, FishPhase, FishWeather } from './fishingAdapter';
 
 export interface MockCatch { id: string; speciesId: string; lengthCm: number; caughtAt: string; kstDate: string }
 export interface MockFishingOptions {
@@ -21,10 +23,15 @@ export interface MockFishingOptions {
   classmates?: ClassFishBoard['rows'];
   /** 응답 지연(ms). 0이면 바로. */
   latencyMs?: number;
+  /** 처음 장착한 낚싯대(가지고 있다고 본다). 기본은 null = 기본 낚싯대. */
+  rod?: FishingRodId | null;
+  /** 가지고 있는 낚싯대. 기본은 4개 모두(하네스 편의). */
+  ownedRods?: readonly FishingRodId[];
 }
 export interface MockFishingAdapter extends FishingAdapter {
   /** 테스트용: 대기 중인 캐스트가 정해 둔 물고기. */
-  peek(): { castId: string; speciesId: string; lengthCm: number } | null;
+  peek(): { castId: string; speciesId: string; lengthCm: number; difficulty: number; speed: number; pity: boolean; trophy: boolean; hard: boolean } | null;
+  equipRod(itemId: FishingRodId | null): Promise<EquipRodResult>;
   readonly catches: readonly MockCatch[];
 }
 
@@ -75,6 +82,47 @@ function weightedPick(pool: readonly FishSpecies[], roll: number): FishSpecies {
   return pool[pool.length - 1];
 }
 
+/** 피티는 발동 대상이어도 캐스트마다 이 확률로만 쓴다. */
+export const PITY_CHANCE = 0.35;
+/** 대물: 길이 상위 15%, 난이도 +1.5. */
+export const TROPHY_TOP = 0.15;
+
+export interface CastRollInput {
+  /** 지금 시간대·날씨에 나올 수 있는 물고기. */
+  valid: readonly FishSpecies[];
+  /** 이미 잡아 본 종. */
+  caught: ReadonlySet<string>;
+  /** 최근 5마리에 새 친구가 없음(pityDue). */
+  pityDue: boolean;
+  /** 바로 전 피티 캐스트를 놓쳤으면 이번에는 피티를 쉰다. */
+  skipPity: boolean;
+  /** 낚싯대 희귀 보너스(%p). */
+  rareBonus: number;
+  rand: () => number;
+}
+export interface CastRoll { fish: FishSpecies; pity: boolean; hard: boolean; trophy: boolean }
+
+/** SQL start_pixel_cast와 같은 순서의 물고기 고르기: 피티(35%) → 어려운 물고기(15%+보너스) → 보통 굴림. */
+export function rollCastFish({ valid, caught, pityDue: due, skipPity, rareBonus, rand }: CastRollInput): CastRoll | null {
+  if (due && !skipPity && rand() < PITY_CHANCE) {
+    const fresh = valid.filter(f => !caught.has(f.id));
+    if (fresh.length) return { fish: weightedPick(fresh, rand()), pity: true, hard: false, trophy: false };
+  }
+  if (rand() * 100 < HARD_FISH_PERCENT + rareBonus) {
+    const hard = valid.filter(f => f.rarity === 'rare' || f.rarity === 'legendary');
+    if (hard.length) {
+      const total = hard.reduce((a, f) => a + (f.rarity === 'rare' ? 5 : 1), 0);
+      let left = rand() * total;
+      const fish = hard.find(f => (left -= f.rarity === 'rare' ? 5 : 1) < 0) ?? hard[hard.length - 1];
+      return { fish, pity: false, hard: true, trophy: false };
+    }
+    const uncommon = valid.filter(f => f.rarity === 'uncommon');
+    const pool = uncommon.length ? uncommon : valid.filter(f => f.rarity === 'common');
+    if (pool.length) return { fish: pool[Math.min(pool.length - 1, Math.floor(rand() * pool.length))], pity: false, hard: true, trophy: true };
+  }
+  return valid.length ? { fish: weightedPick(valid, rand()), pity: false, hard: false, trophy: false } : null;
+}
+
 const DEFAULT_CLASSMATES: ClassFishBoard['rows'] = [
   { speciesId: 'carp', lengthCm: 52.3, animal: '🐻', caughtAt: '2026-10-06T08:12:00.000Z' },
   { speciesId: 'buri', lengthCm: 21.7, animal: '🐰', caughtAt: '2026-10-07T03:40:00.000Z' },
@@ -85,7 +133,14 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
   const now = opts.now ?? (() => Date.now());
   const catches: MockCatch[] = (opts.catches ?? []).map(c => ({ ...c }));
   const classmates = opts.classmates ?? DEFAULT_CLASSMATES;
-  let pending: { castId: string; fish: FishSpecies; lengthCm: number; kstDate: string; expiresAt: number; startedAt: number; biteDelayMs: number; difficulty: number } | null = null;
+  let pending: { castId: string; fish: FishSpecies; lengthCm: number; kstDate: string; expiresAt: number; startedAt: number; biteDelayMs: number; difficulty: number; speed: number; pity: boolean; trophy: boolean; hard: boolean } | null = null;
+  const ownedRods = new Set<string>(opts.ownedRods ?? FISHING_RODS.map(r => r.id));
+  if (opts.rod) ownedRods.add(opts.rod);
+  let equippedRod: FishingRodId | null = opts.rod ?? null;
+  let skipPity = false;
+  const currentRod = (): FishingRod => { const spec = rodSpec(equippedRod); return spec && ownedRods.has(spec.id) ? { id: spec.id, tier: spec.tier } : NO_ROD; };
+  // 대기 캐스트를 지울 때: 피티 캐스트였으면 다음 피티를 쉰다(낚으면 finish에서 다시 지운다).
+  const dropPending = () => { if (pending?.pity) skipPity = true; pending = null; };
   let castSeq = 0;
   let lastStart = -Infinity;
   const delay = <T>(value: T): Promise<T> => opts.latencyMs ? new Promise(resolve => setTimeout(() => resolve(value), opts.latencyMs)) : Promise.resolve(value);
@@ -104,7 +159,13 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
 
   return {
     get catches() { return catches; },
-    peek: () => pending && pending.expiresAt > now() ? { castId: pending.castId, speciesId: pending.fish.id, lengthCm: pending.lengthCm } : null,
+    peek: () => pending && pending.expiresAt > now() ? { castId: pending.castId, speciesId: pending.fish.id, lengthCm: pending.lengthCm, difficulty: pending.difficulty, speed: pending.speed, pity: pending.pity, trophy: pending.trophy, hard: pending.hard } : null,
+    async equipRod(itemId: FishingRodId | null): Promise<EquipRodResult> {
+      if (itemId !== null && !rodSpec(itemId)) return delay({ ok: false, reason: 'not_found' });
+      if (itemId !== null && !ownedRods.has(itemId)) return delay({ ok: false, reason: 'not_owned' });
+      equippedRod = itemId;
+      return delay({ ok: true, rod: currentRod() });
+    },
     async state(): Promise<FishingState> {
       const c = clock();
       const used = usedOn(c.kstDate);
@@ -114,37 +175,42 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
       const known = caughtIds();
       const uncaught = FISH_CATALOG.filter(f => !known.has(f.id));
       const pigeonHint = active === 'pet_pigeon' && uncaught.length ? fishHintText(uncaught[fnv1a32(`pigeon:${MOCK_USER}:${c.kstDate}`) % uncaught.length]) : null;
-      return delay({ kstDate: c.kstDate, phase: c.phase, weather: c.weather, remaining, sparkleShadow, pigeonHint, album: album() });
+      return delay({ kstDate: c.kstDate, phase: c.phase, weather: c.weather, remaining, sparkleShadow, pigeonHint, album: album(), rod: currentRod() });
     },
     async start(askedPet: string | null): Promise<CastStart> {
       const c = clock();
-      if (pending && pending.expiresAt <= now()) pending = null;
+      if (pending && pending.expiresAt <= now()) dropPending();
       if (pending) return delay({ ok: false, reason: 'pending' });
       if (now() - lastStart < 2000) return delay({ ok: false, reason: 'pending' });
+      const rod = currentRod();
+      const spec = rodSpec(rod.id) ?? BASIC_ROD;
       const valid = FISH_CATALOG.filter(f => fishValidNow(f, c.phase, c.weather));
-      const known = caughtIds();
-      const fresh = valid.filter(f => !known.has(f.id));
-      const fish = weightedPick(pityDue(catches) && fresh.length ? fresh : valid, rand());
+      const roll = rollCastFish({ valid, caught: caughtIds(), pityDue: pityDue(catches), skipPity, rareBonus: spec.rareBonus, rand });
+      skipPity = false;
+      if (!roll) return delay({ ok: false, reason: 'error' });
+      const { fish, trophy } = roll;
       const myPet = pet(askedPet);
-      let lengthCm = fish.minCm + rand() * (fish.maxCm - fish.minCm);
+      let lengthCm = fish.minCm + (trophy ? 1 - TROPHY_TOP + rand() * TROPHY_TOP : rand()) * (fish.maxCm - fish.minCm);
       if (myPet === 'pet_bear') lengthCm = Math.min(lengthCm * 1.08, fish.maxCm * 1.08);
       lengthCm = Math.round(lengthCm * 10) / 10;
       const patternRoll = rand();
       const pattern: BitePattern = patternRoll < 0.4 ? 'quick' : patternRoll < 0.75 ? 'double' : 'long';
       const [lo, hi] = pattern === 'quick' ? [1200, 2500] : pattern === 'double' ? [2200, 3600] : [3200, 5000];
-      const biteDelayMs = Math.round(lo + rand() * (hi - lo));
+      const biteDelayMs = rodBiteDelayMs(Math.round(lo + rand() * (hi - lo)), spec.speed);
       const castId = `mock-cast-${++castSeq}`;
-      const difficulty = fishDifficulty(fish, lengthCm);
+      const difficulty = rodDifficulty(fishDifficulty(fish, lengthCm), spec.difficultyDown, trophy);
       lastStart = now();
-      pending = { castId, fish, lengthCm, kstDate: c.kstDate, expiresAt: now() + CAST_TTL_MS, startedAt: now(), biteDelayMs, difficulty };
+      pending = { castId, fish, lengthCm, kstDate: c.kstDate, expiresAt: now() + CAST_TTL_MS, startedAt: now(), biteDelayMs, difficulty, speed: spec.speed, pity: roll.pity, trophy, hard: roll.hard };
       const hint = myPet === 'pet_dog' && (fish.rarity === 'rare' || fish.rarity === 'legendary') ? 'sparkle' : null;
-      return delay({ ok: true, castId, shadow: fish.shadow, biteDelayMs, difficulty, big: isBigCatch(fish, lengthCm), pattern, hint });
+      return delay({ ok: true, castId, shadow: fish.shadow, biteDelayMs, difficulty, big: isBigCatch(fish, lengthCm), pattern, hint, rod, speed: spec.speed, trophy });
     },
     async finish(castId: string, landed: boolean): Promise<CastFinish> {
       const cast = pending;
-      if (!cast || cast.castId !== castId || cast.expiresAt <= now()) return delay({ ok: false });
-      pending = null;
-      if (!landed || now() < cast.startedAt + cast.biteDelayMs + minReelMs(cast.difficulty)) return delay({ ok: true, landed: false });
+      if (!cast || cast.castId !== castId) return delay({ ok: false });
+      dropPending();
+      if (cast.expiresAt <= now()) return delay({ ok: false });
+      if (!landed || now() < cast.startedAt + cast.biteDelayMs + rodMinReelMs(cast.difficulty, cast.speed)) return delay({ ok: true, landed: false });
+      skipPity = false;
       const before = catches.filter(c => c.speciesId === cast.fish.id);
       const isNew = before.length === 0;
       const isPersonalBest = !isNew && cast.lengthCm > Math.max(...before.map(c => c.lengthCm));

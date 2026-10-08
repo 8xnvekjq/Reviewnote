@@ -82,6 +82,8 @@ try{
   await page.locator('.pr-plaza-shop-target[data-near=false]').waitFor();
   const connection=await page.evaluate(()=>window.plazaTransport.audit());
   await open(page,touch);
+  // 낚싯대는 서버 카탈로그에 있어도 이 옛 상점(전체 탭)에는 보이지 않는다(광장 게임 상점에서만 판다).
+  await page.locator('[data-item="top_sage"]').waitFor();assert.equal(await page.locator('[data-item^="rod_"]').count(),0);
   const position=await page.locator('.pr-plaza-actor').evaluate(el=>({...el.dataset}));
   await buy(page,'top_blouse_black');await page.locator('.pr-plaza-actor [data-style="blouse_black"]').waitFor({state:'attached'});
   await buy(page,'hair_buns');await buy(page,'shoes_low');

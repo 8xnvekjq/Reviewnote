@@ -44,3 +44,5 @@
 /* 광장 우물·벤치·대회판: 화면을 덜 가리게 낮게(내용이 길면 안에서 스크롤). */
 .pwp-window-small { width: min(360px, 100%); max-height: min(300px, 42%); }
 .pwp-window-small > *:not(:first-child) { overflow-y: auto; min-height: 0; }
+
+.pwp-rod-effects { font-size:12px; line-height:1.5; overflow-wrap:anywhere; }

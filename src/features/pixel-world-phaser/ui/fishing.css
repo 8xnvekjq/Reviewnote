@@ -30,3 +30,7 @@
 .pwp-reel .pwp-reel-difficulty { color: #685a47; margin-top: 4px; }
 .pwp-reel-difficulty span { letter-spacing: 2px; color: #276778; }
 .pwp-reel-big { display: block; margin-top: 6px; font-size: 12px; color: #884a1c; }
+
+.pwp-rod-icon { object-fit: contain; image-rendering: pixelated; }
+.pwp-reel-rod { display:flex; align-items:center; justify-content:center; gap:6px; font-size:12px; }
+.pwp-reel-rod .pwp-rod-icon { width:32px; height:32px; }

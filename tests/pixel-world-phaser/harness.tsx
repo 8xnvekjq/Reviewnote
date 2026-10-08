@@ -35,7 +35,9 @@ function Harness() {
   const clockOverride = useMemo(() => parseClockOverride(location.search) ?? undefined, []);
   const fishingAdapter = useMemo((): FishingAdapter | undefined => {
     if (!params.has('fishing')) return undefined;
-    const adapter = createMockFishingAdapter({ seed: 7, override: clockOverride, classmates: [
+    // seed 11: v4 모의 서버에서 처음 두 번이 어려운 물고기(15%)가 아니다(시계·날씨 무관). seed 7은 첫 캐스트가 늘 난이도 4 이상이라
+    // 단순 탭 봇이 못 잡는다 — 어려운 물고기는 단위 테스트가 따로 검사한다.
+    const adapter = createMockFishingAdapter({ seed: 11, override: clockOverride, classmates: [
       { speciesId: 'carp', lengthCm: 41.2, animal: '🐻', caughtAt: new Date(Date.now() - 3 * 3600000).toISOString() },
       { speciesId: 'pirami', lengthCm: 13.4, animal: '🐰', caughtAt: new Date(Date.now() - 20 * 60000).toISOString() },
     ] });
@@ -65,13 +67,14 @@ function Harness() {
   };
   const farmBeds = snapshot.plots.map(p => ({ stage: farmStage(p.crop, farmNow), moisture: farmMoisture(p.crop, farmNow) }));
   const [open, setOpen] = useState(true);
+  const [equippedRod, setEquippedRod] = useState<string | null>(null);
   const [look, setLook] = useState(appearance);
   const [active, setActive] = useState(pet);
   const [balance, setBalance] = useState(1234);
   const [ownedIds, setOwnedIds] = useState(new Set(PIXEL_CATALOG.filter(item => item.category === 'avatar' || item.category === 'pet' || params.has('roomEdit') && item.category === 'furniture' && ['desk', 'bed', 'plant', 'chair'].includes(item.assetKey)).map(item => item.itemId)));
   // 서버 없이 모든 패션과 친구를 장착하고 가구 구매를 시험한다.
   const adapter: PanelAdapter = {
-    shop: { ready: true, loadError: false, mutating: false, catalog: [...PIXEL_CATALOG], equipped: look, ownedIds, balance, reload: () => {},
+    shop: { equippedRod, equipRod: async id => { if (id && !ownedIds.has(id)) return false; setEquippedRod(id); return true; }, ready: true, loadError: false, mutating: false, catalog: [...PIXEL_CATALOG], equipped: look, ownedIds, balance, reload: () => {},
       equip: async (slot, id) => { const item = PIXEL_CATALOG.find(entry => entry.itemId === id); if (id && (!item || !ownedIds.has(id))) return false; setLook(value => ({ ...value, [slot]: item?.assetKey ?? null })); return true; },
       setBaseAppearance: async (skin, eyes) => { setLook(value => ({ ...value, skin, eyes })); return true; },
       purchase: async item => {
