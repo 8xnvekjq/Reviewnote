@@ -34,6 +34,7 @@ import type { PlazaPanel } from './ui/PlazaBridge';
 
 import { useFishing } from './ui/useFishing';
 import type { FishingHandle } from './ui/useFishing';
+import { ReelBar } from './ui/ReelBar';
 import { CatchCard } from './ui/CatchCard';
 
 import { FarmPanels } from './ui/FarmPanels';
@@ -657,6 +658,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     {!placing && panel !== 'furniture' && roomMessage && <div className="pwp-room-result" role="status">{roomMessage}</div>}
     {!placing && petMessage && <div className="pwp-pet-message" role="status" aria-live="polite">{petMessage}</div>}
     {!placing && panel !== 'furniture' && toast && <div key={toast.visit} className="pwp-toast" role="status" style={{ top: hud.y + hud.height + 6 }}>{toast.title}</div>}
+    {fishing.reelState && <ReelBar game={fishing.reelState} />}
     {fishing.caught && <CatchCard caught={fishing.caught} onHide={fishing.hideCatch} />}
     {fishing.message && <div className="pwp-fishing-message" role="status">{fishing.message}</div>}
     {status !== 'ready' && <div className="pwp-loading" role="status">
