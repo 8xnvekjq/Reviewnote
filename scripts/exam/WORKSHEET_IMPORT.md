@@ -10,6 +10,12 @@ The importer handles two-column PDFs with text layers. It preserves math glyphs 
 4. The coordinator applies `20261003130000_exam_worksheets.sql` and the unpublished seed SQL. Seeds register questions, provenance and server answer keys only. Worksheets allow free mode only; maximum scores use original points. The importer never applies SQL to a live database.
 5. After question/answer review, the coordinator may run the separate `publish_youngpa_worksheet_*.sql`. Unpublished papers remain hidden from student lists.
 
+## Combining independently numbered textbook exams
+
+`worksheet-configs/gaeplus-m3-s2-midfinal-1.json` combines selected questions from two exams in one PDF. Its `referenceRoot` is relative to the config directory; absolute roots in existing configs still work. Each `sections` entry specifies its question/solution pages, number font, answer-table rectangle, original question count, ordered `include` list, per-original-number `chapters`, and reviewed `questions` exceptions. The importer retains excluded anchors as crop boundaries and renumbers included questions consecutively across sections. `pageColumns` handles alternating page offsets, and solution `columnWindows` isolate adjacent answer blocks. `imageSegments` removes unrelated headings where necessary. Multi-line answer-table fractions require review and cannot silently become integers.
+
+The importer also accepts `kind=school` with a positive `timeLimitMinutes` and at most 50 questions, using the existing school schema (including `20261004115900_exam_school_question_validation.sql`). The new combined paper uses 60 minutes and original points. No schema changes or database calls are made. Optional `slug` controls the seed/publish filenames. All imports now emit an answer-free `src/features/exam/data/<id>.json`; answer keys, source answer text, solution images and review assets remain local. The unpublished seed registers the production list entry through the existing RPC, so no frontend production registry is needed.
+
 ## Verification
 
 `python -m unittest discover -s scripts/exam -p test_import_worksheet.py` checks real PDF counts, explanation stitching, local-only review assets and question-only public output. `node --test tests/exam/*.test.ts` verifies era bundles and worksheets on the same PGlite database, including provenance, grading, history and permissions. Keep the existing Python importer tests too.

@@ -367,7 +367,7 @@ def crop_questions(doc, config, starts):
     for original, (pn, col, y) in starts.items():
         key = (pn, col)
         if key not in columns:
-            left, right = layout['columns'][col]
+            left, right = layout.get('pageColumns', {}).get(str(pn), layout['columns'])[col]
             bottom = layout.get('pageBodyBottom', {}).get(str(pn), layout['bodyBottom'])
             pix = doc[pn - 1].get_pixmap(matrix=fitz.Matrix(3, 3), clip=fitz.Rect(left, 0, right, bottom), alpha=False)
             image = Image.frombytes('RGB', (pix.width, pix.height), pix.samples)
