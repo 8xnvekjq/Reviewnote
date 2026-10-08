@@ -21,13 +21,14 @@ import { loadBed, loadFloors, loadFurnitureSheets, loadInterior, loadPetSheet, l
 import type { BedLook } from './game/sceneAssets';
 import type { Prompt, WorldGameHandle } from './game/boot';
 import './gameShell.css';
-import { GamePanels } from './ui/GamePanels';
+import { GamePanels, FishingPanels } from './ui/GamePanels';
+import type { FishingAdapter } from './ui/fishingAdapter';
 import { FurniturePanel } from './ui/FurniturePanel';
 import { moveFurniture, ownedFurniture, snapRoomPoint } from './logic/roomEditing';
 import { FURNITURE_NAMES } from './logic/roomLines';
 import type { PanelAdapter } from './ui/GamePanels';
 import type { PanelKind } from './logic/panels';
-import { panelFrozen } from './logic/panels';
+import { fishingPanelFor, panelFrozen } from './logic/panels';
 import { PlazaBridge } from './ui/PlazaBridge';
 import type { PlazaPanel } from './ui/PlazaBridge';
 
@@ -37,6 +38,8 @@ type ShellPanel = PanelKind | PlazaPanel | ActivityPanel | 'furniture';
 
 export interface GameShellProps {
   panels?: PanelAdapter;
+  fishingAdapter?: FishingAdapter;
+  newFishSpeciesId?: string | null;
   userId?: string;
   farmAdapter?: FarmAdapter;
   appearance: PublicAvatarAppearance;
@@ -96,7 +99,7 @@ async function leaveFullscreen() {
 }
 
 // 상위가 1초마다(밭 시계) 다시 그려져도, 넘겨받는 값이 같으면 셸은 다시 그리지 않는다.
-export const GameShell = memo(function GameShell({ appearance, pet, balance, beds, furniture, onSaveFurniture, scarecrowLine, onExit, panels, farmAdapter, userId = 'guest' }: GameShellProps) {
+export const GameShell = memo(function GameShell({ appearance, pet, balance, beds, furniture, onSaveFurniture, scarecrowLine, onExit, panels, farmAdapter, fishingAdapter, newFishSpeciesId, userId = 'guest' }: GameShellProps) {
   useLayoutEffect(() => {
     let viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
     const created = !viewport;
@@ -241,7 +244,9 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
   // 여기로 온다. 창이 생기면 이 ref를 그 창을 여는 함수로 채우면 된다(지금은 그런 대상이 없다).
   const scenePanelRef = useRef<(panel: string) => void>(() => {});
   scenePanelRef.current = kind => {
-    if (kind === 'shop' || kind === 'wardrobe' || kind === 'contest' || kind === 'well' || kind === 'bench') openPanel(kind);
+    const fishing = fishingPanelFor(kind);
+    if (fishing) openPanel(fishing);
+    else if (kind === 'shop' || kind === 'wardrobe' || kind === 'contest' || kind === 'well' || kind === 'bench') openPanel(kind);
     else if (kind === 'pet' || /^farm:\d+$/.test(kind)) { farmAdapter?.farm.clearMessage(); openPanel(kind as ActivityPanel); }
   };
   const bedsRef = useRef(beds); bedsRef.current = beds;
@@ -602,8 +607,9 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
       {typed >= currentLine.length && <span className="pwp-dialogue-next" aria-hidden="true">{dialogue.index + 1 < dialogue.lines.length ? '▼' : '■'}</span>}
     </div></div>}
     {(panel === 'shop' || panel === 'wardrobe') && panels && <GamePanels kind={panel} adapter={panels} onClose={closePanel} />}
+    {(panel === 'turtle' || panel === 'fishboard') && <FishingPanels key={panel} kind={panel} adapter={fishingAdapter} newSpeciesId={newFishSpeciesId} onClose={closePanel} />}
     {scene?.id === 'plaza' && status === 'ready' && <PlazaBridge key={'plaza:' + scene.visit} handle={handle} appearance={appearance} pet={pet} userId={userId} panel={panel} onClose={closePanel} />}
-    {panel && panel !== 'furniture' && panel !== 'shop' && panel !== 'wardrobe' && panel !== 'contest' && panel !== 'well' && panel !== 'bench' && <FarmPanels key={panel} kind={panel} adapter={farmAdapter} onClose={closePanel}
+    {panel && panel !== 'turtle' && panel !== 'fishboard' && panel !== 'furniture' && panel !== 'shop' && panel !== 'wardrobe' && panel !== 'contest' && panel !== 'well' && panel !== 'bench' && <FarmPanels key={panel} kind={panel} adapter={farmAdapter} onClose={closePanel}
       onCollection={() => openPanel('collection')} onTalk={() => { closePanel(); openDialogue('scarecrow'); }}
       onPet={kind => { closePanel(); handle.current?.reactPet(kind); }} onFx={(index, action) => handle.current?.farmFx(index, action)} />}
     {panel === 'furniture' && panels && <FurniturePanel furniture={handle.current?.getFurniture() ?? furniture} shop={panels.shop}
