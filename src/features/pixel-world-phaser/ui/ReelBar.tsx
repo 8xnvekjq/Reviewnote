@@ -1,8 +1,14 @@
 import type { ReelGame } from '../logic/reelGame';
 import './fishing.css';
 export function ReelBar({ game }: { game: ReelGame }) {
-  return <div className="pwp-reel" data-testid="reel-bar" data-danger={game.progress < .15} role="group" aria-label="물고기 끌어올리기">
-    <strong>물고기를 따라가요!</strong>
+  return <div className="pwp-reel" data-testid="reel-bar" data-danger={game.progress < .15}
+    data-zone={game.zone} data-fish={game.fish} data-velocity={game.velocity} data-elapsed={game.elapsed}
+    role="group" aria-label="물고기 끌어올리기">
+    <strong>물고기를 따라가요</strong>
+    <small className="pwp-reel-difficulty" aria-label={`난이도 ${game.difficulty.toFixed(1)} / 5`}>
+      난이도 <span aria-hidden="true">{'●'.repeat(Math.ceil(game.difficulty))}{'○'.repeat(5 - Math.ceil(game.difficulty))}</span>
+    </small>
+    {game.big && <b className="pwp-reel-big">힘이 센 녀석이에요!</b>}
     <div className="pwp-reel-track" aria-hidden="true">
       <div key={game.tapCount} className="pwp-reel-zone" data-pulse={game.elapsed - game.lastTap < .16} style={{ bottom: `${(game.zone - game.zoneSize / 2) * 100}%`, height: `${game.zoneSize * 100}%` }} />
       <span className="pwp-reel-fish" draggable={false} style={{ bottom: `${game.fish * 100}%` }}>🐟</span>

@@ -3,7 +3,7 @@
 // 강아지 반짝임, 비둘기 힌트, 곰 +8%. 같은 seed·같은 시계면 언제나 같은 결과가 나온다.
 import { FISH_CATALOG, RARITY_WEIGHT, fishById } from '../logic/fishCatalog';
 import type { FishSpecies } from '../logic/fishCatalog';
-import { minReelMs } from '../logic/reelGame';
+import { fishDifficulty, minReelMs } from '../logic/reelGame';
 import { fnv1a32, worldClockAt } from '../logic/worldClock';
 import type { BitePattern, CastFinish, CastStart, ClassFishBoard, FishAlbumEntry, FishingAdapter, FishingOverride, FishingState, FishPhase, FishWeather } from './fishingAdapter';
 
@@ -134,11 +134,11 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
       const [lo, hi] = pattern === 'quick' ? [1200, 2500] : pattern === 'double' ? [2200, 3600] : [3200, 5000];
       const biteDelayMs = Math.round(lo + rand() * (hi - lo));
       const castId = `mock-cast-${++castSeq}`;
-      const difficulty = Math.min(5, ({ common: 1, uncommon: 2, rare: 3.5, legendary: 5 }[fish.rarity]) + ((FISH_CATALOG.indexOf(fish) + 1) % 3) * .08);
+      const difficulty = fishDifficulty(fish, lengthCm);
       lastStart = now();
       pending = { castId, fish, lengthCm, kstDate: c.kstDate, expiresAt: now() + CAST_TTL_MS, startedAt: now(), biteDelayMs, difficulty };
       const hint = myPet === 'pet_dog' && (fish.rarity === 'rare' || fish.rarity === 'legendary') ? 'sparkle' : null;
-      return delay({ ok: true, castId, shadow: fish.shadow, biteDelayMs, difficulty, pattern, hint });
+      return delay({ ok: true, castId, shadow: fish.shadow, biteDelayMs, difficulty, big: isBigCatch(fish, lengthCm), pattern, hint });
     },
     async finish(castId: string, landed: boolean): Promise<CastFinish> {
       const cast = pending;

@@ -5,16 +5,22 @@ const BASE = process.env.PWP_BASE ?? 'http://127.0.0.1:5192';
 await mkdir('.pixel-world-test.local/fishing', { recursive: true });
 const browser = await chromium.launch({ headless: true });
 async function tapToLand(page, pointerType = 'touch') {
-  for (let tap = 0; tap < 30; tap++) {
+  let last = -1000;
+  for (let frame = 0; frame < 1200; frame++) {
     if (await page.getByTestId('catch-card').count()) return;
-    assert.ok(await page.getByTestId('reel-bar').count(), 'fish must remain in reel while tapping');
-    if (pointerType === 'keyboard') await page.keyboard.press('Space');
-    else if (pointerType === 'touch' && await page.locator('.pwp-surface').count()) await page.touchscreen.tap(20, 300);
-    else await page.locator('.pwp-root').dispatchEvent('pointerdown', { pointerId: 91, pointerType, button: 0, bubbles: true, cancelable: true });
-    if (pointerType !== 'keyboard') await page.locator('.pwp-root').dispatchEvent('pointerup', { pointerId: 91, pointerType, button: 0, bubbles: true });
-    await page.waitForTimeout(600);
+    const bar = page.getByTestId('reel-bar');
+    assert.ok(await bar.count(), 'fish must remain in reel while tracking');
+    const state = await bar.evaluate(el => ({ zone: +el.dataset.zone, fish: +el.dataset.fish, velocity: +el.dataset.velocity, time: +el.dataset.elapsed * 1000 }));
+    if (state.time - last >= 150 && state.zone < state.fish - .06 && state.velocity < .1) {
+      last = state.time;
+      if (pointerType === 'keyboard') await page.keyboard.press('Space');
+      else if (pointerType === 'touch' && await page.locator('.pwp-surface').count()) await page.touchscreen.tap(20, 300);
+      else await page.locator('.pwp-root').dispatchEvent('pointerdown', { pointerId: 91, pointerType, button: 0, bubbles: true, cancelable: true });
+      if (pointerType !== 'keyboard') await page.locator('.pwp-root').dispatchEvent('pointerup', { pointerId: 91, pointerType, button: 0, bubbles: true });
+    }
+    await page.waitForTimeout(40);
   }
-  throw new Error('regular taps did not land fish');
+  throw new Error('tracking taps did not land fish');
 }
 // 파일이 아직 병합되지 않았을 때만 이 테스트 안의 최소 mock으로 제어기를 검증한다.
 async function controllerChecks() {
@@ -35,7 +41,7 @@ async function controllerChecks() {
     let remaining = -1, pending = null, finished = [], starts = 0, startDelay = 0, finishDelay = 0, frozen = false, shadows = [], time = null;
     const adapter = {
       state: async () => ({ kstDate: '2026-10-08', phase: 'night', weather: 'rain', remaining, sparkleShadow: 1, pigeonHint: null, album: [] }),
-      start: async () => { starts++; await new Promise(r => setTimeout(r, startDelay)); pending = 'cast-' + starts; return { ok: true, castId: pending, shadow: 'L', biteDelayMs: 500, difficulty: 1, pattern: 'quick', hint: null }; },
+      start: async () => { starts++; await new Promise(r => setTimeout(r, startDelay)); pending = 'cast-' + starts; return { ok: true, castId: pending, shadow: 'L', biteDelayMs: 500, difficulty: 1, big: true, pattern: 'quick', hint: null }; },
       finish: async (id, landed) => { finished.push({ id, landed }); await new Promise(r => setTimeout(r, finishDelay)); if (id !== pending) return { ok: false }; pending = null; if (!landed) return { ok: true, landed: false };  return { ok: true, landed: true, speciesId: 'pirami', lengthCm: 10.5, rarity: 'rare', isNew: true, isBig: true, isPersonalBest: true, remaining }; },
       board: async () => ({ rows: [], classSpecies: 0 })
     };

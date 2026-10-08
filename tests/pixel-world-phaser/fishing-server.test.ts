@@ -1,3 +1,4 @@
+import { fishDifficulty } from '../../src/features/pixel-world-phaser/logic/reelGame.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -251,4 +252,47 @@ test('v2 migration retains security, unlimited compatibility and timing checks',
   assert.match(v2, /pg_advisory_xact_lock/);
   assert.equal((v2.match(/v_difficulty := least\(5/g) ?? []).length, 2);
   assert.match(v2, /select \* into s from public.pixel_fish_species where id = k.species_id/);
+});
+
+test('v3 희귀도와 길이 공식이 SQL, 타입스크립트와 모의 서버에서 일치한다', async () => {
+  const v3 = readFileSync(new URL('../../supabase/migrations/supabase_pixel_fishing_v3.sql', import.meta.url), 'utf8');
+  const helper = v3.slice(0, v3.indexOf('create or replace function pixel_private.start_pixel_cast'));
+  const cases = [...helper.matchAll(/case s\.rarity when 'common' then ([\d.]+) when 'uncommon' then ([\d.]+) when 'rare' then ([\d.]+) else ([\d.]+) end/g)].map(m => m.slice(1).map(Number));
+  assert.deepEqual(cases, [[1, 1.8, 2.8, 3.8], [1, 1.2, 1.4, 1.2]]);
+  assert.match(helper, /round\(least\(5,/);
+  assert.match(helper, /greatest\(0, least\(1, \(p_length - s.min_cm\) \/ nullif\(s.max_cm - s.min_cm, 0\)\)\)/);
+  assert.match(helper, /\), 2\) from public.pixel_fish_species s where s.id = p_species/);
+  assert.match(helper, /revoke execute on function pixel_private.fish_difficulty\(text, numeric\) from public, anon, authenticated/);
+  const sqlTwin = (fish: typeof FISH_CATALOG[number], length: number) => {
+    const index = ['common', 'uncommon', 'rare', 'legendary'].indexOf(fish.rarity);
+    const ratio = Math.max(0, Math.min(1, (length - fish.minCm) / (fish.maxCm - fish.minCm)));
+    return Math.round(Math.min(5, cases[0][index] + cases[1][index] * ratio) * 100) / 100;
+  };
+  for (const fish of FISH_CATALOG) for (const ratio of [-.1, 0, .125, .5, .8, 1, 1.08]) {
+    const length = fish.minCm + ratio * (fish.maxCm - fish.minCm);
+    assert.equal(fishDifficulty(fish, length), sqlTwin(fish, length), `${fish.id} ${ratio}`);
+  }
+  for (let seed = 0; seed < 100; seed++) {
+    const mock = createMockFishingAdapter({ seed, now: () => noonKst, activePet: 'pet_bear' });
+    const start = await mock.start('pet_bear'); assert.ok(start.ok);
+    const pending = mock.peek()!, fish = fishById(pending.speciesId)!;
+    assert.equal(start.difficulty, sqlTwin(fish, pending.lengthCm));
+    assert.equal(start.big, pending.lengthCm >= fish.minCm + .8 * (fish.maxCm - fish.minCm));
+  }
+  const old = parseCastStart({ ok: true, castId: 'c', shadow: 'S', biteDelayMs: 1200 }); assert.ok(old.ok && old.big === undefined);
+  const big = parseCastStart({ ok: true, castId: 'c', shadow: 'S', biteDelayMs: 1200, big: true }); assert.ok(big.ok && big.big === true);
+  const invalid = parseCastStart({ ok: true, castId: 'c', shadow: 'S', biteDelayMs: 1200, big: 'true' }); assert.ok(invalid.ok && invalid.big === undefined);
+});
+test('v3는 난이도와 큰 물고기 안내 외에 v2 함수 본문을 유지한다', () => {
+  const v2 = readFileSync(new URL('../../supabase/migrations/supabase_pixel_fishing_v2.sql', import.meta.url), 'utf8');
+  const v3 = readFileSync(new URL('../../supabase/migrations/supabase_pixel_fishing_v3.sql', import.meta.url), 'utf8');
+  for (const name of ['start_pixel_cast', 'finish_pixel_cast']) {
+    const body = (sql: string) => new RegExp(`create or replace function pixel_private.${name}[^]*?end \\$\\$;`).exec(sql)![0];
+    const normalize = (sql: string) => body(sql).replace(/v_difficulty := [^;]+;/, 'v_difficulty := FORMULA;').replace(", 'big', v_len >= v_fish.min_cm + 0.8 * (v_fish.max_cm - v_fish.min_cm)", '');
+    assert.equal(normalize(v3), normalize(v2), name);
+  }
+  assert.match(v3, /fish_difficulty\(v_fish.id, v_len\)/);
+  assert.match(v3, /fish_difficulty\(k.species_id, k.length_cm\)/);
+  assert.match(v3, /k.bite_delay_ms \+ 1500 \+ \(v_difficulty - 1\) \* 375/);
+  assert.match(v3, /to authenticated/);
 });
