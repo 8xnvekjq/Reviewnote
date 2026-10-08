@@ -3,6 +3,9 @@
 // 여기서 한 번에 처리한다. 하위 장면은 drawWorld()로 그림만 그린다(어디가 막혔는지·출구·입구는
 // logic/scenes.ts의 장면 정의가 정한다). 입력은 공유 객체(ControlState)를 매 프레임 읽기만 한다.
 import Phaser from 'phaser';
+import { WorldTint } from './worldTint';
+import { fallbackWorldTime } from '../logic/worldTint';
+import type { FishPhase, FishWeather } from '../logic/worldTint';
 import { PET_INTERACTIONS } from '../../pixel-room/pet/petInteraction';
 import { facesPet, reactionFrame } from '../logic/petReaction';
 import { BED_CELLS } from '../logic/yardWorld';
@@ -50,6 +53,7 @@ export interface WorldAssets {
 }
 export interface Prompt { id: string; verb: string }
 export interface WorldEvents {
+  onShadowTap?(index: 0 | 1 | 2): void;
   /** 바라보는 상호작용 대상이 바뀔 때만 호출(매 프레임 아님). */
   onPrompt(prompt: Prompt | null): void;
   /** A(또는 탭해서 걷기 도착)로 말 걸기/살펴보기 → 셸이 대화창을 연다. */
@@ -62,6 +66,7 @@ export interface WorldEvents {
 }
 /** 장면들이 함께 쓰는 것(장면이 바뀌어도 그대로): 그림, 입력, 셸 연결, 서버 데이터, 화면 비율. */
 export interface WorldContext {
+  worldTime?: { phase: FishPhase; weather: FishWeather };
   assets: WorldAssets;
   controls: ControlState;
   hooks: WorldEvents;
@@ -73,6 +78,7 @@ export interface WorldContext {
   onSceneGone(scene: WorldScene): void;
 }
 export interface WorldDebug {
+  worldTint?: ReturnType<WorldTint['debug']>;
   placing: boolean; playerAlpha: number; petAlpha: number | null; bangVisible: boolean;
   avatarKey: string; petId: PetId | null;
   scene: SceneId; transitioning: boolean;
@@ -93,6 +99,9 @@ export interface WorldDebug {
 }
 
 export abstract class WorldScene extends Phaser.Scene {
+  private outdoorTint?: WorldTint;
+  private tintClockMinute = -1;
+  setWorldTime(phase: FishPhase, weather: FishWeather) { this.ctx.worldTime = { phase, weather }; this.outdoorTint?.set(phase, weather); }
   protected spec!: SceneSpec;
   protected player!: Phaser.GameObjects.Sprite;
   private shadow!: Phaser.GameObjects.Ellipse;
@@ -173,6 +182,10 @@ export abstract class WorldScene extends Phaser.Scene {
     camera.fadeIn(FADE_MS, ...FADE_RGB);
     this.ctx.hooks.onPrompt(null);
     this.ctx.hooks.onScene(this.spec.id, this.spec.title);
+    this.outdoorTint = undefined; this.tintClockMinute = -1;
+    if (this.spec.id !== 'room') this.outdoorTint = new WorldTint(this, () => this.feet);
+    const clock = this.ctx.worldTime ?? fallbackWorldTime();
+    this.outdoorTint?.set(clock.phase, clock.weather);
     this.ctx.onSceneReady(this);
   }
 
@@ -322,6 +335,11 @@ export abstract class WorldScene extends Phaser.Scene {
   }
 
   update(_time: number, deltaMs: number) {
+    const minute = Math.floor(Date.now() / 60000);
+    if (!this.ctx.worldTime && minute !== this.tintClockMinute) {
+      this.tintClockMinute = minute; const clock = fallbackWorldTime(); this.outdoorTint?.set(clock.phase, clock.weather);
+    }
+    this.outdoorTint?.update(deltaMs);
     if (this.transitioning) { this.updatePet(deltaMs); return; }
     const dt = Math.min(deltaMs, 50) / 1000;
     const { stick, run, frozen } = this.ctx.controls;
@@ -607,6 +625,7 @@ export abstract class WorldScene extends Phaser.Scene {
     const ratio = this.ctx.view.ratio;
     const screen = (p: Point): Point => ({ x: Math.round((p.x - camera.worldView.x) * camera.zoom / ratio), y: Math.round((p.y - camera.worldView.y) * camera.zoom / ratio) });
     return {
+      worldTint: this.outdoorTint?.debug(),
       avatarKey: this.player.texture.key, petId: this.pet ? this.ctx.assets.pet?.id ?? null : null,
       dust: this.dust.size,
       petReaction: this.reaction?.kind ?? null, petFrame: this.pet ? Number(this.pet.frame.name) : null, petFlipX: this.pet?.flipX ?? false,

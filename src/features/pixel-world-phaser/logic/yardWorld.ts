@@ -55,8 +55,10 @@ export function yardScene(): SceneSpec {
     id: 'yard', title: '앞마당', cols: WORLD_COLS, rows: WORLD_ROWS, solid: worldSolid,
     interactables: INTERACTABLES,
     exits: [{ id: 'door', cells: [DOOR], to: { scene: 'room', entry: 'door' } },
-      { id: 'gate', cells: [GATE], to: { scene: 'plaza', entry: 'yard' } }],
+      { id: 'gate', cells: [GATE], to: { scene: 'plaza', entry: 'yard' } },
+      { id: 'yard→river', cells: [toWorldCell({ x: 15, y: 7 })], to: { scene: 'river', entry: 'fromYard' } }],
     entries: {
+      fromRiver: { cell: toWorldCell({ x: 14, y: 7 }), facing: 'Left' },
       door: { cell: toWorldCell(YARD_SPAWNS.room), facing: 'Front' as Facing },
       // 광장에서 돌아올 때 설 자리(광장 장면이 생기면 그쪽 출구가 이 이름을 가리킨다).
       plaza: { cell: toWorldCell(YARD_SPAWNS.plaza), facing: 'Back' as Facing },

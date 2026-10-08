@@ -65,3 +65,20 @@ export type BedLook = { stage: FarmStage; moisture: FarmMoisture };
 export const loadBed = (look: BedLook) => renderSvg(createElement(TomatoSprite, look), 32, 32);
 
 export const loadPlazaStall = () => renderSvg(createElement(ShopStallArt), 48, 48);
+
+const fishingSources = import.meta.glob('../assets/fishing/*.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
+export function preloadFishing(scene: import('phaser').Scene) {
+  for (const [path, url] of Object.entries(fishingSources)) {
+    const name = path.split('/').pop()!.replace('.png', '');
+    const key = `fishing:${name}`;
+    if (!scene.textures.exists(key)) scene.load.image(key, url);
+  }
+}
+export function fishingFrames(scene: import('phaser').Scene) {
+  const tiles = scene.textures.exists('fishing:river-tiles') ? scene.textures.get('fishing:river-tiles') : null;
+  if (tiles && !tiles.has('water0')) for (let i = 0; i < 9; i++) tiles.add(i < 3 ? `water${i}` : String(i), 0, i * 16, 0, 16, 16);
+  const turtle = scene.textures.exists('fishing:turtle') ? scene.textures.get('fishing:turtle') : null;
+  if (turtle && !turtle.has('idle0')) for (let i = 0; i < 4; i++) turtle.add(`idle${i}`, 0, i * 32, 0, 32, 32);
+  const shadows = scene.textures.exists('fishing:fish-shadow') ? scene.textures.get('fishing:fish-shadow') : null;
+  if (shadows && !shadows.has('S')) { shadows.add('S', 0, 0, 0, 16, 8); shadows.add('M', 0, 16, 0, 24, 12); shadows.add('L', 0, 40, 0, 32, 14); }
+}
