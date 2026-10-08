@@ -72,13 +72,17 @@ try {
   await a.waitForFunction(() => window.__pixelWorldPhaser.debug().classmates[0]?.fishing?.phase === 'reeling', null, { polling: 50, timeout: 3000 });
   await a.screenshot({ path: SHOTS + '/river-live-reeling.png' });
   // 릴을 끝까지 감아야 잡힌다. 잡으면 B 머리 위 구름 "이름 00.0cm!"가 A에도.
-  // 톡톡 방식: 일정한 박자로 스페이스를 눌러 초록 칸을 띄운다(꾹 누르기는 처음 한 번만 올린다).
+  // 물고기와 칸의 위치·속도를 읽고 추적해서 탭한다(꾹 누르기는 처음 한 번만 올린다).
   await b.bringToFront();
   const card = b.getByTestId('catch-card');
-  for (let i = 0; i < 80 && !(await card.isVisible()); i++) {
-    await b.keyboard.press('Space');
+  let lastTap = -1000;
+  for (let i = 0; i < 1200 && !(await card.isVisible()); i++) {
+    const state = await b.getByTestId('reel-bar').evaluate(el => ({ zone: +el.dataset.zone, fish: +el.dataset.fish, velocity: +el.dataset.velocity, time: +el.dataset.elapsed * 1000 }));
+    if (state.time - lastTap >= 150 && state.zone < state.fish - .06 && state.velocity < .1) {
+      lastTap = state.time; await b.keyboard.press('Space');
+    }
     if (i === 3) await b.screenshot({ path: SHOTS + '/river-live-reelbar.png' });
-    await b.waitForTimeout(450);
+    await b.waitForTimeout(40);
   }
   await card.waitFor({ timeout: 5000 });
   const landed = (await b.evaluate(() => window.plazaTransport.sent('fish'))).find(s => s.payload.phase === 'landed');

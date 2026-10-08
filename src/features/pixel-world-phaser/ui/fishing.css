@@ -27,3 +27,6 @@
 .pwp-reel img { pointer-events:none; -webkit-user-drag:none; }
 .pwp-reel-zone[data-pulse="true"] { animation:pwp-reel-tap .16s ease-out; }
 @keyframes pwp-reel-tap { from { background:#bbffae; box-shadow:0 0 8px #d2ffbb; } to { background:#75cf70bb; box-shadow:0 0 0 transparent; } }
+.pwp-reel .pwp-reel-difficulty { color: #685a47; margin-top: 4px; }
+.pwp-reel-difficulty span { letter-spacing: 2px; color: #276778; }
+.pwp-reel-big { display: block; margin-top: 6px; font-size: 12px; color: #884a1c; }

@@ -8,7 +8,7 @@ export type FishShadow = 'S' | 'M' | 'L';
 export type BitePattern = 'quick' | 'double' | 'long';
 export interface FishAlbumEntry { speciesId: string; count: number; bestCm: number; firstAt: string }
 export interface FishingState { kstDate: string; phase: FishPhase; weather: FishWeather; remaining: number; sparkleShadow: number | null; pigeonHint: string | null; album: FishAlbumEntry[] }
-export type CastStart = { ok: true; castId: string; shadow: FishShadow; biteDelayMs: number; difficulty?: number; pattern: BitePattern; hint: 'sparkle' | null } | { ok: false; reason: 'budget' | 'pending' | 'error' };
+export type CastStart = { ok: true; castId: string; shadow: FishShadow; biteDelayMs: number; difficulty?: number; big?: boolean; pattern: BitePattern; hint: 'sparkle' | null } | { ok: false; reason: 'budget' | 'pending' | 'error' };
 export type CastFinish = { ok: true; landed: true; speciesId: string; lengthCm: number; rarity: FishRarity; isNew: boolean; isBig: boolean; isPersonalBest: boolean; remaining: number } | { ok: true; landed: false } | { ok: false };
 export interface ClassFishBoard { rows: { speciesId: string; lengthCm: number; animal: string; caughtAt: string }[]; classSpecies: number }
 export interface FishingAdapter { state(): Promise<FishingState>; start(pet: string | null): Promise<CastStart>; finish(castId: string, landed: boolean): Promise<CastFinish>; board(): Promise<ClassFishBoard> }
@@ -66,7 +66,7 @@ export function parseCastStart(raw: unknown): CastStart {
   if (raw.ok !== true) return { ok: false, reason: raw.reason === 'budget' || raw.reason === 'pending' ? raw.reason : 'error' };
   const castId = str(raw.castId), biteDelayMs = num(raw.biteDelayMs);
   if (!castId || !oneOf(SHADOWS, raw.shadow) || biteDelayMs == null || biteDelayMs < 0) return { ok: false, reason: 'error' };
-  return { ok: true, castId, shadow: raw.shadow, biteDelayMs, difficulty: Math.max(1, Math.min(5, num(raw.difficulty) ?? 1)), pattern: oneOf(PATTERNS, raw.pattern) ? raw.pattern : 'quick', hint: raw.hint === 'sparkle' ? 'sparkle' : null };
+  return { ok: true, castId, shadow: raw.shadow, biteDelayMs, difficulty: Math.max(1, Math.min(5, num(raw.difficulty) ?? 1)), ...(typeof raw.big === 'boolean' ? { big: raw.big } : {}), pattern: oneOf(PATTERNS, raw.pattern) ? raw.pattern : 'quick', hint: raw.hint === 'sparkle' ? 'sparkle' : null };
 }
 
 export function parseCastFinish(raw: unknown): CastFinish {
