@@ -1,17 +1,45 @@
 // 낚시(강가의 하루) 서버 연결의 고정 계약. 모양은 docs/pixel-world/FISHING_SPEC.md를 따른다.
 // 실제 Supabase 구현(createFishingAdapter)은 서버 작업에서 이 파일에 채운다.
 import { worldClockAt } from '../logic/worldClock';
+import { minReelMs } from '../logic/reelGame';
 export type FishPhase = 'morning' | 'day' | 'evening' | 'night';
 export type FishWeather = 'clear' | 'cloudy' | 'rain';
 export type FishRarity = 'common' | 'uncommon' | 'rare' | 'legendary';
 export type FishShadow = 'S' | 'M' | 'L';
 export type BitePattern = 'quick' | 'double' | 'long';
 export interface FishAlbumEntry { speciesId: string; count: number; bestCm: number; firstAt: string }
-export interface FishingState { kstDate: string; phase: FishPhase; weather: FishWeather; remaining: number; sparkleShadow: number | null; pigeonHint: string | null; album: FishAlbumEntry[] }
-export type CastStart = { ok: true; castId: string; shadow: FishShadow; biteDelayMs: number; difficulty?: number; big?: boolean; pattern: BitePattern; hint: 'sparkle' | null } | { ok: false; reason: 'budget' | 'pending' | 'error' };
+export type FishingRodId = 'rod_bamboo' | 'rod_steel' | 'rod_lucky' | 'rod_gold';
+/** 장착한 낚싯대. id가 null이면 무료 기본 낚싯대(tier 0). */
+export interface FishingRod { id: FishingRodId | null; tier: number }
+export interface FishingRodSpec { id: FishingRodId; name: string; price: number; tier: number; difficultyDown: number; rareBonus: number; speed: number }
+/** 상점 낚싯대 — supabase_pixel_fishing_v4.sql의 fish_rods·카탈로그와 같은 숫자(단위 테스트가 대조). rareBonus는 %p. */
+export const FISHING_RODS: readonly FishingRodSpec[] = [
+  { id: 'rod_bamboo', name: '대나무 낚싯대', price: 80, tier: 1, difficultyDown: 0.3, rareBonus: 0, speed: 1.0 },
+  { id: 'rod_steel', name: '강철 낚싯대', price: 200, tier: 2, difficultyDown: 0.5, rareBonus: 0, speed: 1.15 },
+  { id: 'rod_lucky', name: '행운의 낚싯대', price: 400, tier: 3, difficultyDown: 0.5, rareBonus: 5, speed: 1.25 },
+  { id: 'rod_gold', name: '황금 낚싯대', price: 700, tier: 4, difficultyDown: 0.8, rareBonus: 8, speed: 1.35 },
+];
+/** 낚싯대를 장착하지 않았을 때(팔지 않음). */
+export const BASIC_ROD = { name: '기본 낚싯대', tier: 0, difficultyDown: 0, rareBonus: 0, speed: 1 } as const;
+export const NO_ROD: FishingRod = { id: null, tier: 0 };
+export const rodSpec = (id: string | null | undefined): FishingRodSpec | undefined => FISHING_RODS.find(r => r.id === id);
+/** 어려운 물고기 기본 확률(%). 낚싯대의 rareBonus(%p)를 더한다. */
+export const HARD_FISH_PERCENT = 15;
+/** 입질 대기 = round(기본 / speed). */
+export const rodBiteDelayMs = (baseMs: number, speed: number): number => Math.round(baseMs / Math.max(1, speed));
+/** 서버의 최소 끌어올리기 시간 = (1500 + (난이도-1)*375) / speed. */
+export const rodMinReelMs = (difficulty: number, speed: number): number => minReelMs(difficulty) / Math.max(1, speed);
+/** 최종 난이도 = max(1, min(5, 기본 + 대물 1.5) - 낚싯대 낮춤), 소수 둘째 자리. */
+export const rodDifficulty = (base: number, difficultyDown: number, trophy = false): number =>
+  Math.round(Math.max(1, Math.min(5, base + (trophy ? 1.5 : 0)) - difficultyDown) * 100) / 100;
+
+export interface FishingState { kstDate: string; phase: FishPhase; weather: FishWeather; remaining: number; sparkleShadow: number | null; pigeonHint: string | null; album: FishAlbumEntry[]; rod: FishingRod }
+/** rod·speed·trophy는 v4 서버부터 온다. 없으면 기본 낚싯대·속도 1·대물 아님으로 본다. */
+export type CastStart = { ok: true; castId: string; shadow: FishShadow; biteDelayMs: number; difficulty?: number; big?: boolean; pattern: BitePattern; hint: 'sparkle' | null; rod?: FishingRod; speed?: number; trophy?: boolean } | { ok: false; reason: 'budget' | 'pending' | 'error' };
+export type EquipRodResult = { ok: true; rod: FishingRod } | { ok: false; reason: 'not_found' | 'not_owned' | 'error' };
 export type CastFinish = { ok: true; landed: true; speciesId: string; lengthCm: number; rarity: FishRarity; isNew: boolean; isBig: boolean; isPersonalBest: boolean; remaining: number } | { ok: true; landed: false } | { ok: false };
 export interface ClassFishBoard { rows: { speciesId: string; lengthCm: number; animal: string; caughtAt: string }[]; classSpecies: number }
-export interface FishingAdapter { state(): Promise<FishingState>; start(pet: string | null): Promise<CastStart>; finish(castId: string, landed: boolean): Promise<CastFinish>; board(): Promise<ClassFishBoard> }
+export interface FishingAdapter { state(): Promise<FishingState>; start(pet: string | null): Promise<CastStart>; finish(castId: string, landed: boolean): Promise<CastFinish>; board(): Promise<ClassFishBoard>; /** 낚싯대 장착(null = 해제). 서버 RPC equip_pixel_rod. */ equipRod?(itemId: FishingRodId | null): Promise<EquipRodResult> }
 /** 관리자 시험용 시계·날씨 덮어쓰기(관리자만 서버가 받아 준다). */
 export interface FishingOverride { clock?: string; weather?: FishWeather }
 
@@ -38,7 +66,14 @@ const str = (v: unknown): string | null => typeof v === 'string' && v !== '' ? v
 
 export function fallbackFishingState(now: number = Date.now(), override?: FishingOverride | null): FishingState {
   const c = worldClockAt(now, override);
-  return { kstDate: c.kstDate, phase: c.phase, weather: c.weather, remaining: 0, sparkleShadow: null, pigeonHint: null, album: [] };
+  return { kstDate: c.kstDate, phase: c.phase, weather: c.weather, remaining: 0, sparkleShadow: null, pigeonHint: null, album: [], rod: NO_ROD };
+}
+
+/** 낚싯대 {id, tier}. 모르는 id는 기본 낚싯대로, tier는 카탈로그 값을 믿는다. */
+export function parseFishingRod(raw: unknown): FishingRod {
+  if (!isObj(raw)) return NO_ROD;
+  const spec = rodSpec(typeof raw.id === 'string' ? raw.id : null);
+  return spec ? { id: spec.id, tier: spec.tier } : NO_ROD;
 }
 
 export function parseFishingState(raw: unknown, fallback: FishingState = fallbackFishingState()): FishingState {
@@ -58,6 +93,7 @@ export function parseFishingState(raw: unknown, fallback: FishingState = fallbac
     sparkleShadow: spark != null && [0, 1, 2].includes(spark) ? spark : null,
     pigeonHint: str(raw.pigeonHint),
     album,
+    rod: parseFishingRod(raw.rod),
   };
 }
 
@@ -66,7 +102,18 @@ export function parseCastStart(raw: unknown): CastStart {
   if (raw.ok !== true) return { ok: false, reason: raw.reason === 'budget' || raw.reason === 'pending' ? raw.reason : 'error' };
   const castId = str(raw.castId), biteDelayMs = num(raw.biteDelayMs);
   if (!castId || !oneOf(SHADOWS, raw.shadow) || biteDelayMs == null || biteDelayMs < 0) return { ok: false, reason: 'error' };
-  return { ok: true, castId, shadow: raw.shadow, biteDelayMs, difficulty: Math.max(1, Math.min(5, num(raw.difficulty) ?? 1)), ...(typeof raw.big === 'boolean' ? { big: raw.big } : {}), pattern: oneOf(PATTERNS, raw.pattern) ? raw.pattern : 'quick', hint: raw.hint === 'sparkle' ? 'sparkle' : null };
+  const speed = num(raw.speed);
+  return { ok: true, castId, shadow: raw.shadow, biteDelayMs, difficulty: Math.max(1, Math.min(5, num(raw.difficulty) ?? 1)), ...(typeof raw.big === 'boolean' ? { big: raw.big } : {}), pattern: oneOf(PATTERNS, raw.pattern) ? raw.pattern : 'quick', hint: raw.hint === 'sparkle' ? 'sparkle' : null,
+    ...(raw.rod !== undefined ? { rod: parseFishingRod(raw.rod) } : {}),
+    // 속도는 1~1.35(황금 낚싯대)지만, 이상한 값이 와도 미니게임이 깨지지 않게 1~2로 묶는다.
+    ...(speed != null ? { speed: Math.max(1, Math.min(2, speed)) } : {}),
+    ...(typeof raw.trophy === 'boolean' ? { trophy: raw.trophy } : {}) };
+}
+
+export function parseEquipRod(raw: unknown): EquipRodResult {
+  if (!isObj(raw)) return { ok: false, reason: 'error' };
+  if (raw.ok !== true) return { ok: false, reason: raw.reason === 'not_found' || raw.reason === 'not_owned' ? raw.reason : 'error' };
+  return { ok: true, rod: parseFishingRod(raw.rod) };
 }
 
 export function parseCastFinish(raw: unknown): CastFinish {
@@ -124,6 +171,10 @@ export function createFishingAdapter(supabase: FishingRpcClient, override?: Fish
     async board() {
       try { return parseClassFishBoard(await callRpc(supabase, 'get_class_fish_board')); }
       catch { return { rows: [], classSpecies: 0 }; }
+    },
+    async equipRod(itemId) {
+      try { return parseEquipRod(await callRpc(supabase, 'equip_pixel_rod', { p_item_id: itemId ?? null })); }
+      catch { return { ok: false, reason: 'error' }; }
     },
   };
 }
