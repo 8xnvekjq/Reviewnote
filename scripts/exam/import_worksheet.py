@@ -16,6 +16,126 @@ KEY = re.compile(r'^(\d+)\)\s*([^\n]+)')
 CIRCLED = str.maketrans('➀➁➂➃➄❶❷❸❹❺', '①②③④⑤①②③④⑤')
 
 
+def page_columns(layout, pn):
+    return layout.get('pageColumns', {}).get(str(pn), layout['columns'])
+
+
+def numbered_anchors(doc, layout, font):
+    """Standalone textbook numbers: match the configured number font at the margin.
+
+    Font and position checks prevent formula numerators and figure labels from
+    becoming anchors. Column windows separate adjacent exam solution blocks.
+    """
+    found = {}
+    for pn in layout['pages']:
+        for block in doc[pn - 1].get_text('dict')['blocks']:
+            if not block.get('lines'):
+                continue
+            for line in block['lines']:
+                for span in line['spans']:
+                    if span['font'] != font or not re.fullmatch(r'\d+\s*', span['text']):
+                        continue
+                    n = int(span['text'])
+                    x, y = span['bbox'][:2]
+                    col = next((c for c, (left, right) in enumerate(page_columns(layout, pn))
+                                if left <= x < left + 8), None)
+                    if col is None:
+                        continue
+                    window = layout.get('columnWindows', {}).get(f'{pn}:{col}',
+                                [layout['bodyTop'], layout['bodyBottom']])
+                    if not window[0] <= y < window[1]:
+                        continue
+                    if n in found:
+                        raise ValueError(f'Duplicate numbered anchor {n} on page {pn}')
+                    found[n] = (pn, col, y, None)
+    return dict(sorted(found.items()))
+
+
+def collection_images(doc, config):
+    """Import independent numbered exams, filter explicitly, then renumber.
+
+    All source anchors remain crop boundaries even when a question is excluded.
+    The answer table is read from its configured region, never a supplied key.
+    """
+    resolved = copy.deepcopy(config)
+    questions, images, solutions, segments, warnings, layouts = [], {}, {}, {}, [], []
+    for section in config['sections']:
+        layout = copy.deepcopy(section['layout'])
+        layout['pages'] = layout['questionPages']
+        qs = numbered_anchors(doc, layout, section['numberFont'])
+        sl = copy.deepcopy(section['solutionLayout'])
+        sl['pages'] = sl['answerPages']
+        ks = numbered_anchors(doc, sl, section['numberFont'])
+        expected = list(range(1, section['questionCount'] + 1))
+        if list(qs) != expected or list(ks) != expected:
+            raise ValueError(f'{section["name"]}: question/solution anchors disagree')
+        for found in (qs, ks):
+            order = [a[:3] for a in found.values()]
+            if order != sorted(order):
+                raise ValueError('Anchors do not follow page/column reading order')
+        table = section['answerTable']
+        text = doc[table['page'] - 1].get_text(clip=fitz.Rect(table['rect']))
+        raw_keys = {}
+        entries = list(re.finditer(r'(?m)^(\d+)[ \u2004]+(\S[^\n]*)', text))
+        for i, match in enumerate(entries):
+            end = entries[i + 1].start() if i + 1 < len(entries) else len(text)
+            n, raw = int(match[1]), text[match.start(2):end].strip()
+            if n in raw_keys:
+                raise ValueError(f'Duplicate answer-table key {n}')
+            raw_keys[n] = raw
+        if sorted(raw_keys) != expected:
+            raise ValueError(f'{section["name"]}: incomplete answer table')
+        include = section.get('include', expected)
+        if include != sorted(set(include)) or not set(include) <= set(qs) or not include:
+            raise ValueError('Invalid included question list')
+        exceptions = {q['number']: q for q in section.get('questions', [])}
+        selected = []
+        for original in include:
+            pn, col, y, _ = qs[original]
+            left, right = page_columns(layout, pn)[col]
+            end = min([a[2] - 8 for a in qs.values() if a[:2] == (pn, col) and a[2] > y]
+                      or [layout['bodyBottom']])
+            body = doc[pn - 1].get_text(clip=fitz.Rect(left, y - 5, right, end))
+            points = re.findall(r'\[\s*(\d+(?:\.\d+)?)\s*점\s*\]', body)
+            if len(points) != 1:
+                raise ValueError(f'{section["name"]} {original}: expected one points label')
+            raw = raw_keys[original]
+            # A wrapped fraction must never turn into concatenated integer digits.
+            answer = parse_answer(raw) if '\n' not in raw else None
+            spec = exceptions.get(original, {})
+            if 'sourceAnswerText' in spec and spec['sourceAnswerText'] != raw:
+                raise ValueError(f'Question {original}: source answer text changed')
+            if answer and ('answer' in spec and str(spec['answer']) != answer[1]
+                           or 'answerType' in spec and spec['answerType'] != answer[0]):
+                raise ValueError(f'Question {original}: configured answer disagrees with PDF')
+            if not answer:
+                if spec.get('sourceAnswerText') != raw or not spec.get('answerType') or 'answer' not in spec:
+                    raise NeedsExceptions([original], questions)
+                answer = spec['answerType'], str(spec['answer'])
+                if answer[0] not in ('choice5', 'digits') or not re.fullmatch(r'\d{1,3}', answer[1]) or (answer[0] == 'choice5' and not 1 <= int(answer[1]) <= 5):
+                    raise ValueError('Invalid configured typed answer')
+            number = len(questions) + len(selected) + 1
+            selected.append(dict(number=number, original=original, originalNumber=original,
+                sourceSection=section['name'], sourcePage=pn, sourceAnswerText=raw,
+                answerPage=table['page'], answerType=answer[0], answer=answer[1],
+                points=float(points[0]), curriculumChapter=section['chapters'][str(original)],
+                sourceLabel=f'{config["paper"]["schoolName"]} · {section["name"]} · PDF {pn}쪽 · {original}번',
+                **({'imageSegments': spec['imageSegments']} if 'imageSegments' in spec else {})))
+        cropped, cw = crop_questions(doc, dict(layout=layout, questions=selected),
+                                     {n: a[:3] for n, a in qs.items()})
+        explained, refs, sw = solution_images(doc, sl, ks)
+        for q in selected:
+            n, original = q['number'], q['original']
+            images[n], solutions[n], segments[n] = cropped[n], explained[original], refs[original]
+        questions.extend(selected)
+        warnings.extend(cw + [f'{section["name"]}: {w}' for w in sw if any(f'Solution {n}:' in w for n in include)])
+        layouts.append(dict(name=section['name'], questions=layout, solutions=sl))
+    if config['paper'].get('questionCount', len(questions)) != len(questions):
+        raise ValueError('Configured question count disagrees with selection')
+    resolved.update(questions=questions, layout=layouts)
+    return resolved, images, solutions, segments, warnings
+
+
 def parse_answer(raw):
     value = normalize(raw.translate(CIRCLED))
     if value in '①②③④⑤' and len(value) == 1:
@@ -44,9 +164,10 @@ def solution_images(doc, layout, starts):
     """Reading order is page, left column, right column; join continuations vertically."""
     regions = [(pn, col) for pn in layout['answerPages'] for col in range(len(layout['columns']))]
     columns, boundaries = {}, {}
-    width = round(max(right - left for left, right in layout['columns']) * 3)
+    all_columns = layout['columns'] + [column for columns in layout.get('pageColumns', {}).values() for column in columns]
+    width = round(max(right - left for left, right in all_columns) * 3)
     for pn, col in regions:
-        left, right = layout['columns'][col]
+        left, right = page_columns(layout, pn)[col]
         bottom = layout['bodyBottom']
         pix = doc[pn - 1].get_pixmap(matrix=fitz.Matrix(3, 3), clip=fitz.Rect(left, 0, right, bottom), alpha=False)
         image = Image.frombytes('RGB', (pix.width, pix.height), pix.samples)
@@ -54,7 +175,7 @@ def solution_images(doc, layout, starts):
     for n, (pn, col, y, _) in starts.items():
         image, rows = columns[pn, col]
         # The first solution may follow a ruled key table. Do not include its rule.
-        floor = max(round(layout['bodyTop'] * 3), round(y * 3) - 24)
+        floor = max(round(layout['bodyTop'] * 3), round((y - layout.get('anchorSearchUpPt', 8)) * 3))
         boundaries[n] = blank_boundary(rows, round(y * 3) + 8, floor, 12)
     images, segments, warnings = {}, {}, []
     for n, (pn, col, _, _) in starts.items():
@@ -65,8 +186,9 @@ def solution_images(doc, layout, starts):
         for index in range(first, last + 1):
             p, c = regions[index]
             image, rows = columns[p, c]
-            top = boundaries[n] if index == first else round(layout['bodyTop'] * 3)
-            bottom = boundaries[n + 1] if next_start and index == last else image.height
+            window = layout.get('columnWindows', {}).get(f'{p}:{c}')
+            top = boundaries[n] if index == first else round((window[0] if window else layout['bodyTop']) * 3)
+            bottom = boundaries[n + 1] if next_start and index == last else (min(image.height, round(window[1] * 3)) if window else image.height)
             if bottom <= top:
                 continue
             piece = image.crop((0, top, image.width, bottom))
@@ -156,7 +278,7 @@ def seed_sql(data):
     p = data
     columns = 'id,title,exam_date,source,subject,school_grade,time_limit_minutes,electives,grade_cuts,published,kind,school_name,grade,question_count,max_score,unit_name'
     values = [quote(p['id']), quote(p['title']), 'null', quote(p['source']), quote(p['subject']), quote(p['schoolGrade']),
-              'null', "'{}'::text[]", 'null', 'false', "'worksheet'", quote(p['schoolName']), str(p['grade']),
+              str(p['timeLimitMinutes']) if p['timeLimitMinutes'] is not None else 'null', "'{}'::text[]", 'null', 'false', quote(p['kind']), quote(p['schoolName']), str(p['grade']),
               str(p['questionCount']), str(p['maxScore']), quote(p['unitName'])]
     sql = '-- Worksheet reviewed separately; remains unpublished. Review images remain local only.\nbegin;\n'
     sql += f'insert into public.exam_papers ({columns}) values ({",".join(values)}) on conflict do nothing;\n'
@@ -178,29 +300,49 @@ def review_html(data, warnings):
 def run(config_path, out_dir=None, sheet=False, force=False):
     config_path = Path(config_path).resolve()
     config = json.loads(config_path.read_text(encoding='utf-8-sig'))
-    if config.get('schemaVersion') != 1 or config['paper'].get('kind') != 'worksheet':
-        raise ValueError('Requires schemaVersion=1 and kind=worksheet')
+    kind = config['paper'].get('kind')
+    if config.get('schemaVersion') != 1 or kind not in ('worksheet', 'school'):
+        raise ValueError('Requires schemaVersion=1 and kind=worksheet or school')
+    if kind == 'school' and (not isinstance(config['paper'].get('timeLimitMinutes'), int)
+                            or config['paper']['timeLimitMinutes'] <= 0
+                            or config['paper'].get('questionCount', 0) > 50):
+        raise ValueError('School papers require a positive time limit and at most 50 questions')
     pid = config['paper']['id']
     if not re.fullmatch('[a-z0-9-]+', pid) or not re.fullmatch(r'\d{14}', config['migrationTimestamp']):
         raise ValueError('Unsafe id or migration timestamp')
+    slug = config.get('slug', pid.replace('-', '_'))
+    if not re.fullmatch('[a-z0-9_]+', slug):
+        raise ValueError('Unsafe slug')
     out = Path(out_dir).resolve() if out_dir else ROOT
     target = out / 'scripts/exam/worksheet-generated' / pid
+    frontend_path = out / 'src/features/exam/data' / f'{pid}.json'
     if target.exists() and not force:
         raise ValueError('Existing worksheet; use --force to overwrite')
+    if frontend_path.exists() and not force:
+        raise ValueError('Existing frontend paper; use --force to overwrite')
     pdf = Path(config['pdf'])
     if not pdf.is_absolute():
-        pdf = Path(config.get('referenceRoot', config_path.parent)) / pdf
+        reference = Path(config.get('referenceRoot', config_path.parent))
+        if not reference.is_absolute():
+            reference = config_path.parent / reference
+        pdf = reference / pdf
     with fitz.open(pdf) as doc:
-        resolved, starts, keys, auto = prepare(doc, config)
-        images, warnings = crop_questions(doc, resolved, starts)
-        solutions, segments, sw = solution_images(doc, resolved['layout'], keys)
-    warnings += sw
-    data = dict(config['paper'], published=False, timeLimitMinutes=None, electives=[], gradeCuts=None)
+        if config.get('sections'):
+            resolved, images, solutions, segments, warnings = collection_images(doc, config)
+            auto, keys = None, solutions
+        else:
+            resolved, starts, keys, auto = prepare(doc, config)
+            images, warnings = crop_questions(doc, resolved, starts)
+            solutions, segments, sw = solution_images(doc, resolved['layout'], keys)
+            warnings += sw
+    data = dict(config['paper'], published=False,
+                timeLimitMinutes=config['paper']['timeLimitMinutes'] if kind == 'school' else None,
+                electives=[], gradeCuts=None)
     data['questionCount'] = len(images)
     data['maxScore'] = sum(q['points'] for q in resolved['questions'])
     if config['paper'].get('maxScore', data['maxScore']) != data['maxScore']:
         raise ValueError('Configured maxScore disagrees with parsed points')
-    data['questions'] = [dict(q, section='common', curriculumGrade=data['subject'], curriculumChapter=config.get('chapters', {}).get(str(q['number']), data['unitName']),
+    data['questions'] = [dict(q, section='common', curriculumGrade=data['subject'], curriculumChapter=q.get('curriculumChapter', config.get('chapters', {}).get(str(q['number']), data['unitName'])),
                               imageUrl=f'/exams/{pid}/q-{q["number"]:02}.png',
                               solutionKey=f'{pid}/s-{q["number"]:02}.png', solutionSegments=segments[q['number']]) for q in resolved['questions']]
     target.mkdir(parents=True, exist_ok=True)
@@ -214,12 +356,18 @@ def run(config_path, out_dir=None, sheet=False, force=False):
     (target / 'data.json').write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
     (target / 'review.html').write_text(review_html(data, warnings).replace('src="public/exams/', 'src="../../../../public/exams/'), encoding='utf-8')
     (target / 'validation.json').write_text(json.dumps(dict(warnings=warnings, layout=resolved['layout'], autoLayout=auto), ensure_ascii=False, indent=2), encoding='utf-8')
-    migration = out / 'supabase/migrations' / f'{config["migrationTimestamp"]}_exam_{pid.replace("-", "_")}_seed.sql'
+    # Only metadata and question images enter the frontend; keys and solutions stay local.
+    frontend = dict(data, questions=[{k: v for k, v in q.items() if k not in
+        ('answer', 'sourceAnswerText', 'answerPage', 'solutionKey', 'solutionSegments', 'imageSegments')}
+        for q in data['questions']])
+    frontend_path.parent.mkdir(parents=True, exist_ok=True)
+    frontend_path.write_text(json.dumps(frontend, ensure_ascii=False, indent=2), encoding='utf-8')
+    migration = out / 'supabase/migrations' / f'{config["migrationTimestamp"]}_exam_{slug}_seed.sql'
     migration.parent.mkdir(parents=True, exist_ok=True)
     migration.write_text(seed_sql(data), encoding='utf-8')
-    publish = out / 'scripts/exam' / f'publish_{pid.replace("-", "_")}.sql'
+    publish = out / 'scripts/exam' / f'publish_{slug}.sql'
     publish.parent.mkdir(parents=True, exist_ok=True)
-    publish.write_text(f"-- Only after question/answer review.\nupdate public.exam_papers set published=true where id={quote(pid)} and kind='worksheet';\n", encoding='utf-8')
+    publish.write_text(f"-- Only after question/answer review.\nupdate public.exam_papers set published=true where id={quote(pid)} and kind={quote(kind)};\n", encoding='utf-8')
     if sheet:
         thumbs = []
         for n in sorted(images):
