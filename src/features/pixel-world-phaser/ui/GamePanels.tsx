@@ -3,6 +3,8 @@ import type { ReactNode } from 'react';
 import type { usePixelShop } from '../../pixel-room/usePixelShop';
 import type { usePet } from '../../pixel-room/pet/usePet';
 import { isPetId } from '../../pixel-room/pet/petKinds';
+import baitIcon from '../assets/fishing/bait.png';
+import { BAIT_ITEM } from '../../pixel-room/shop/catalog';
 import { RodIcon } from './RodIcon';
 import { rodEffectText } from '../../pixel-room/shop/rods';
 import { PanelArt } from './PanelArt';
@@ -22,7 +24,7 @@ export function FishingPanels({ kind, adapter, onClose, newSpeciesId }: { kind: 
 }
 
 // 실제 훅과 하네스가 같은 계약으로 데이터와 동작을 전달한다.
-export interface PanelAdapter { shop: ReturnType<typeof usePixelShop>; pet: ReturnType<typeof usePet> }
+export interface PanelAdapter { shop: Omit<ReturnType<typeof usePixelShop>, 'baitCharges' | 'buyBait' | 'refreshBait'> & Partial<Pick<ReturnType<typeof usePixelShop>, 'baitCharges' | 'buyBait' | 'refreshBait'>>; pet: ReturnType<typeof usePet> }
 export function PriceTag({ value }: { value: number }) {
   return <span className="pwp-price"><span className="pwp-coin" aria-hidden="true">P</span>{value.toLocaleString()}</span>;
 }
@@ -60,6 +62,8 @@ export function Window({ title, onClose, onCancel = onClose, children, compact =
   </div>;
 }
 export function GamePanels({ kind, adapter: { shop, pet }, onClose }: { kind: Exclude<PanelKind, FishingPanelKind>; adapter: PanelAdapter; onClose: () => void }) {
+  const refreshBait = useRef(shop.refreshBait); refreshBait.current = shop.refreshBait;
+  useEffect(() => { if (kind === 'shop') void refreshBait.current?.(); }, [kind]);
   const [category, setCategory] = useState('all');
   const [slot, setSlot] = useState('hair');
   const [confirming, setConfirming] = useState<string | null>(null);
@@ -84,10 +88,10 @@ export function GamePanels({ kind, adapter: { shop, pet }, onClose }: { kind: Ex
   const art = (item: PixelItem) => item.category === 'avatar'
     ? <PanelArt appearance={{ ...shop.equipped, [item.slot]: item.assetKey }} />
     : item.category === 'rod' ? <RodIcon rod={{ id: item.itemId, tier: item.tier }} /> : item.category === 'pet' ? <PanelArt pet={item.itemId} /> : <PanelArt furniture={item.assetKey as FurnitureType} />;
-  const entries = panelItems(shop.catalog, kind === 'shop' ? category : slot, kind === 'wardrobe' ? shop.ownedIds : undefined);
+  const entries = panelItems(shop.catalog.filter(item => item.category !== 'bait'), kind === 'shop' ? category : slot, kind === 'wardrobe' ? shop.ownedIds : undefined);
   return <Window title={kind === 'shop' ? '상점' : '옷장'} onClose={onClose} onCancel={() => { if (confirming) { if (!busy) setConfirming(null); } else onClose(); }}>
     <div className="pwp-panel-summary">{kind === 'shop' ? <><span>마음에 드는 스타일을 골라요.</span><PriceTag value={shop.balance} /></> : <><div className="pwp-preview"><PanelArt appearance={shop.equipped} /></div><span>오늘의 나 · 바꾸면 바로 보여요.</span></>}</div>
-    <Tabs options={kind === 'shop' ? [['all', '전체'], ...AVATAR_SLOTS.map(key => [key, SLOT_LABELS[key]] as const), ['furniture', '가구'], ['pet', '펫'], ['rod', '낚싯대']] : [...AVATAR_SLOTS.map(key => [key, SLOT_LABELS[key]] as const), ['base', '기본 외형'], ['pet', '펫'], ['rod', '낚싯대']]} value={kind === 'shop' ? category : slot} onChange={value => { if (kind === 'shop') setCategory(value); else setSlot(value); setConfirming(null); }} />
+    <Tabs options={kind === 'shop' ? [['all', '전체'], ...AVATAR_SLOTS.map(key => [key, SLOT_LABELS[key]] as const), ['furniture', '가구'], ['pet', '펫'], ['rod', '낚싯대'], ['bait', '미끼']] : [...AVATAR_SLOTS.map(key => [key, SLOT_LABELS[key]] as const), ['base', '기본 외형'], ['pet', '펫'], ['rod', '낚싯대']]} value={kind === 'shop' ? category : slot} onChange={value => { if (kind === 'shop') setCategory(value); else setSlot(value); setConfirming(null); }} />
     <div className="pwp-panel-content">
       {!shop.ready ? <p role="status">보유 정보를 불러오는 중…</p> : shop.loadError ? <div role="alert"><p>보유 정보를 불러오지 못했어요.</p><button onClick={shop.reload}>다시 시도</button></div> : kind === 'wardrobe' && slot === 'base' ? <>
         <p>피부색과 눈동자색은 무료예요.</p>
@@ -96,6 +100,14 @@ export function GamePanels({ kind, adapter: { shop, pet }, onClose }: { kind: Ex
           return await shop.setBaseAppearance(key === 'skin' ? value : shop.equipped.skin, key === 'eyes' ? value : shop.equipped.eyes) ? `${label}을 바꿨어요.` : '외형을 저장하지 못했어요.';
         })}>{option.label}</button>)}</div></section>)}
       </> : <div className="pwp-item-grid">
+        {kind === 'shop' && (category === 'all' || category === 'bait') && <article className="pwp-item" data-item="bait_worm">
+          <div className="pwp-item-art"><img className="pwp-bait-icon" src={baitIcon} alt="지렁이가 든 미끼 통" /></div>
+          <strong>{BAIT_ITEM.displayName}</strong><small>희귀 물고기 2배 · 난이도 −0.3 · 100번 낚시</small>
+          <span>남은 미끼 {shop.baitCharges == null ? '확인 중' : `${shop.baitCharges}회`}</span><PriceTag value={BAIT_ITEM.price} />
+          <button disabled={busy || !shop.buyBait || shop.balance < BAIT_ITEM.price} onClick={() => void act(async () => {
+            const result = await shop.buyBait!(); return result.ok ? `미끼 구매 완료! 남은 미끼 ${result.charges}회` : result.message;
+          })}>미끼 구매하기</button>
+        </article>}
         {kind === 'wardrobe' && <button className="pwp-item" disabled={busy || (slot === 'pet' && (!pet.ready || pet.error))} aria-pressed={slot === 'rod' ? shop.equippedRod === null : slot === 'pet' ? pet.active === null : shop.equipped[slot as PixelAvatarSlot] === null} onClick={() => slot === 'rod' ? void act(async () => await shop.equipRod(null) ? '기본 낚싯대로 바꿨어요.' : '장착하지 못했어요.') : slot === 'pet' ? void changePet(null) : void act(async () => await shop.equip(slot as PixelAvatarSlot, null) ? '기본 모습으로 바꿨어요.' : '장착하지 못했어요.')}>{slot === 'rod' && <RodIcon />}<strong>{slot === 'rod' ? '기본 낚싯대' : slot === 'pet' ? '친구 쉬게 하기' : `기본 ${SLOT_LABELS[slot as PixelAvatarSlot]}`}</strong></button>}
         {entries.map(item => {
           const state = itemState(item, shop.ownedIds, shop.equipped, pet.active, shop.equippedRod);
@@ -112,7 +124,7 @@ export function GamePanels({ kind, adapter: { shop, pet }, onClose }: { kind: Ex
               })}>구매 확정</button><button disabled={busy} onClick={() => setConfirming(null)}>취소</button></> : <button disabled={disabled} onClick={() => setConfirming(item.itemId)}>구매하기</button>}</>}
           </article>;
         })}
-        {entries.length === 0 && <p>아직 보유한 아이템이 없어요.</p>}
+        {entries.length === 0 && category !== 'bait' && <p>아직 보유한 아이템이 없어요.</p>}
       </div>}
       {pet.error && <p role="alert">펫 정보를 확인하지 못했어요. <button onClick={pet.reload}>다시 확인</button></p>}
     </div>

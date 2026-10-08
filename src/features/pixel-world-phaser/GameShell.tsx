@@ -42,7 +42,10 @@ import { CatchCard } from './ui/CatchCard';
 
 import { FarmPanels } from './ui/FarmPanels';
 import type { ActivityPanel, FarmAdapter } from './ui/FarmPanels';
-type ShellPanel = PanelKind | PlazaPanel | ActivityPanel | 'furniture';
+import { useLevel, gainFrom } from './ui/useLevel';
+import { LevelBadge, LevelToast } from './ui/LevelBadge';
+import { LevelPanel } from './ui/LevelPanel';
+type ShellPanel = 'level' | PanelKind | PlazaPanel | ActivityPanel | 'furniture';
 
 export interface GameShellProps {
   panels?: PanelAdapter;
@@ -166,6 +169,8 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
   const riverReporter = useRef<RiverFishReporter | null>(null);
   const reportRiverFishing = useCallback<RiverFishReporter>(report => riverReporter.current?.(report), []);
   const fishing = useFishing({ adapter: fishingAdapter, handle: handle as RefObject<(WorldGameHandle & FishingHandle) | null>, scene: scene?.id ?? null, pet, freeze: freezeFishing, report: reportRiverFishing });
+  const level = useLevel(fishingAdapter, fishing.state);
+  useEffect(() => { if (fishing.caught) level.onXp(gainFrom(fishing.caught)); }, [fishing.caught, level.onXp]);
   const fishingRef = useRef(fishing); fishingRef.current = fishing;
   // 방금 처음 잡은 물고기 — 거북이가 도감을 열 때 "새 친구" 인사를 한다. 도감을 한 번 닫으면 잊는다.
   const [freshSpecies, setFreshSpecies] = useState<string | null>(null);
@@ -621,6 +626,9 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
       <button type="button" className="pwp-chip pwp-icon" aria-pressed={bgm.enabled} aria-label="배경음악" title={bgm.enabled ? '배경음악 끄기' : '배경음악 켜기'} onClick={bgm.toggle}><span aria-hidden="true">♪</span></button>
       {fullscreenSupported() && <button type="button" className="pwp-chip pwp-icon" aria-pressed={fullscreen} aria-label={fullscreen ? '전체화면 끄기' : '전체화면'} onClick={toggleFullscreen}>⛶</button>}
     </div>
+    {!placing && !fishing.busy && !fishing.reelState && panel !== 'furniture' && <LevelBadge value={level} onClick={() => openPanel('level')} style={{ right: layout.width - hud.x - hud.width + 10, top: hud.y + hud.height + 8 }} />}
+    {panel === 'level' && <LevelPanel value={level} onClose={closePanel} />}
+    {level.celebration && <LevelToast level={level.celebration.level} />}
     {panels && <div className="pwp-panel-access" style={{ left: hud.x + 10, top: hud.y + hud.height + 8 }}>
       <button type="button" className="pwp-chip" disabled={status !== 'ready' || !!placing || roomPending} onClick={() => openPanel('wardrobe')}>옷장</button>
       {scene?.id === 'room' && <button type="button" className="pwp-chip" disabled={status !== 'ready' || !onSaveFurniture || !panels.shop.ready || panels.shop.loadError || !!panel || !!dialogue || !!placing || roomPending} onClick={() => { setRoomMessage(''); openPanel('furniture'); }}>꾸미기</button>}
@@ -654,8 +662,8 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     {(panel === 'turtle' || panel === 'fishboard') && <FishingPanels key={panel} kind={panel} adapter={fishingAdapter} newSpeciesId={newFishSpeciesId ?? freshSpecies} onClose={() => { if (panel === 'turtle') setFreshSpecies(null); closePanel(); }} />}
     {scene?.id === 'river' && status === 'ready' && <RiverBridge key={'river:' + scene.visit} handle={handle} appearance={appearance} pet={pet} panel={panel} reporter={riverReporter} />}
     {scene?.id === 'plaza' && status === 'ready' && <PlazaBridge key={'plaza:' + scene.visit} handle={handle} appearance={appearance} pet={pet} userId={userId} panel={panel} onClose={closePanel} />}
-    {panel && panel !== 'turtle' && panel !== 'fishboard' && panel !== 'furniture' && panel !== 'shop' && panel !== 'wardrobe' && panel !== 'contest' && panel !== 'well' && panel !== 'bench' && <FarmPanels key={panel} kind={panel} adapter={farmAdapter} onClose={closePanel}
-      onCollection={() => openPanel('collection')} onTalk={() => { closePanel(); openDialogue('scarecrow'); }}
+    {panel && panel !== 'level' && panel !== 'turtle' && panel !== 'fishboard' && panel !== 'furniture' && panel !== 'shop' && panel !== 'wardrobe' && panel !== 'contest' && panel !== 'well' && panel !== 'bench' && <FarmPanels key={panel} kind={panel} adapter={farmAdapter} onClose={closePanel}
+      onXp={level.onXp} onCollection={() => openPanel('collection')} onTalk={() => { closePanel(); openDialogue('scarecrow'); }}
       onPet={kind => { closePanel(); handle.current?.reactPet(kind); }} onFx={(index, action) => handle.current?.farmFx(index, action)} />}
     {panel === 'furniture' && panels && <FurniturePanel furniture={handle.current?.getFurniture() ?? furniture} shop={panels.shop}
       pending={roomPending} message={roomMessage} onClose={() => { if (!roomSaving.current) closePanel(); }} onPick={beginRoomEdit}

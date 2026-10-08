@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { equipPixelRod, fetchEquippedRod, equipPixelItem, fetchEquippedAppearance, fetchOwnedPixelItemIds, fetchPixelCatalog, purchasePixelItem, setPixelBaseAppearance } from '../../utils/pixelShop';
+import { buyPixelBait, fetchPixelBaitCharges, equipPixelRod, fetchEquippedRod, equipPixelItem, fetchEquippedAppearance, fetchOwnedPixelItemIds, fetchPixelCatalog, purchasePixelItem, setPixelBaseAppearance } from '../../utils/pixelShop';
 import { PIXEL_CATALOG } from './shop/catalog';
 import type { PixelAvatarSlot, PixelItem, PublicAvatarAppearance, PurchasePixelItemResult } from './shop/types';
 
@@ -14,6 +14,7 @@ export function usePixelShop(userId: string, initialBalance: number, onBalanceCh
   const mounted = useRef(true);
   const [mutating, setMutating] = useState(false);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const [baitCharges, setBaitCharges] = useState<number | null>(null);
   const [equippedRod, setEquippedRod] = useState<string | null>(null);
   const [ownedIds, setOwnedIds] = useState<Set<string>>(new Set());
   const [equipped, setEquipped] = useState<PublicAvatarAppearance>(EMPTY_APPEARANCE);
@@ -37,7 +38,8 @@ export function usePixelShop(userId: string, initialBalance: number, onBalanceCh
 
   useEffect(() => {
     let cancelled = false;
-    setReady(false);
+    setReady(false); setBaitCharges(null);
+    void fetchPixelBaitCharges().then(charges => { if (!cancelled) setBaitCharges(charges); });
     setLoadError(false);
     Promise.all([fetchOwnedPixelItemIds(userId), fetchEquippedAppearance(userId), fetchEquippedRod(userId)])
       .then(([ids, appearance, rod]) => {
@@ -126,5 +128,15 @@ export function usePixelShop(userId: string, initialBalance: number, onBalanceCh
     finally { mutationLock.current = false; if (mounted.current) setMutating(false); }
   }
 
-  return { equippedRod, equipRod, ownedIds, equipped, catalog, balance, ready, loadError, reload, equip, purchase, setBaseAppearance, mutating };
+  async function buyBait() {
+    if (mutationLock.current || !ready || loadError) return { ok: false as const, reason: 'unknown' as const, message: '이전 처리를 마친 뒤 다시 시도해 주세요.' };
+    mutationLock.current = true; setMutating(true);
+    try {
+      const result = await buyPixelBait();
+      if (result.ok && mounted.current) { setBaitCharges(result.charges); setBalance(result.newBalance); onBalanceChange?.(result.newBalance); }
+      return result;
+    } finally { mutationLock.current = false; if (mounted.current) setMutating(false); }
+  }
+  async function refreshBait() { const charges = await fetchPixelBaitCharges(); if (mounted.current) setBaitCharges(charges); }
+  return { refreshBait, baitCharges, buyBait, equippedRod, equipRod, ownedIds, equipped, catalog, balance, ready, loadError, reload, equip, purchase, setBaseAppearance, mutating };
 }
