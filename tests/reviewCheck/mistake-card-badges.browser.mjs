@@ -3,13 +3,14 @@ import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 
 const browser = await chromium.launch({ headless: true });
+const base = process.env.REVIEWCHECK_TEST_URL || 'http://127.0.0.1:5174';
 
 try {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  await page.goto('http://127.0.0.1:5174/tests/reviewCheck/mistake-card-badges.html');
+  await page.goto(`${base}/tests/reviewCheck/mistake-card-badges.html`);
   await page.locator('#card-mastered').waitFor();
 
   // 마스터된 문제 -> "완벽!"만, "약함"은 없음.

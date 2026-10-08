@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 
 const browser = await chromium.launch({ headless: true });
-const out = 'node_modules/.cache/reviewcheck-admin-view-mistake-card';
+const base = process.env.REVIEWCHECK_TEST_URL || 'http://127.0.0.1:5174';
+const out = process.env.REVIEWCHECK_TEST_OUT || 'node_modules/.cache/reviewcheck-admin-view-mistake-card';
 await mkdir(out, { recursive: true });
 
 function isoNow() { return new Date().toISOString(); }
@@ -53,7 +54,7 @@ async function withPage(context, route) {
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  await page.goto('http://127.0.0.1:5174/tests/reviewCheck/admin-view-mistake-card.html');
+  await page.goto(`${base}/tests/reviewCheck/admin-view-mistake-card.html`);
   return { page, errors };
 }
 

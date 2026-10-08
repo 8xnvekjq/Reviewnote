@@ -1112,10 +1112,8 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   };
 
   // 학습 흐름은 PR #46 이전 실제 순서로 복원됐다: 복습 확인 → 유튜브 딥링크 → 체크리스트 →
-  // 학습 기록 → 레거시 체크리스트 → 풀이 → 틀린 이유+대책(git show 62ec993 기준 확인). 이
-  // 상수들은 기존에 하나의 3분기 ternary 안에서만 쓰이던 조건을 한 번만 계산해서 "풀이"
-  // 영역과 "학습 기록" 영역 두 곳에서 그대로 재사용한다 — 조건식 자체를 중복 작성하지 않아
-  // 두 영역이 항상 같은 판단을 보도록 보장한다(로직 변경 없음, 위치만 분리).
+  // 학습 기록 → 레거시 체크리스트 → 풀이 → 틀린 이유+대책(git show 62ec993 기준 확인).
+  // 풀이와 진단 상태는 분석 결과로 판단하고, 학습 기록은 진단 여부와 관계없이 표시한다.
   const isAnalysisLoading = !showResult && (isAnalyzing || (progress > 0 && progress < 100)) && (!selectedEntry.analysis?.solvingProcess || selectedEntry.analysis.solvingProcess === SOLVING_PLACEHOLDER_TEXT);
   const isAnalysisReady = hasRealAnalysis(selectedEntry);
 
@@ -1518,14 +1516,10 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
             );
           })()}
 
-          {/* ── 학습 흐름 3.5: 학습 기록(스캐폴딩/재풀이) + 진단 재생성 배너. PR #46 이전엔
-              이 블록이 체크리스트 2.0과 레거시 체크리스트 "사이"에 있었다(git show 62ec993
-              기준 Card 0.5) — 그 원래 위치 그대로 복원. AI 모델 정보(관리자 전용)도 같은
-              자리. 각 조건/데이터/저장 경로는 전혀 바꾸지 않고 위치만 옮겼다. */}
-          {isAnalysisReady && (
+          {/* ── 학습 흐름 3.5: 학습 기록은 AI 진단 없이도 확인하고 추가할 수 있다. */}
             <div className="space-y-6">
               {/* AI 모델 명시 정보 */}
-              {isAdmin && <div className="flex items-center justify-end">
+              {isAnalysisReady && isAdmin && <div className="flex items-center justify-end">
                 <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-slate-800 text-indigo-400 border border-slate-700/60 flex items-center space-x-1 select-none">
                   <span>⚡ AI 엔진:</span>
                   <span className="font-extrabold">{selectedEntry.analysis!.modelUsed || 'gemini-2.5-flash (기본)'}</span>
@@ -1572,13 +1566,13 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
               {/* 🧭 정리하기(초기화) 이후 체크리스트 재생성 진행 상태 — 정석 풀이는 전혀 건드리지
                   않고 이 배너들만 추가/제거된다(기존 데이터가 사라지거나 깜빡이지 않음). */}
-              {checkpointRegenStatus === 'generating' && (
+              {isAnalysisReady && checkpointRegenStatus === 'generating' && (
                 <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
                   <span className="flex-none w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
                   <span>AI가 새로운 학습 진단을 만들고 있어요...</span>
                 </div>
               )}
-              {checkpointRegenStatus === 'failed' && (
+              {isAnalysisReady && checkpointRegenStatus === 'failed' && (
                 <div className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-red-500/10 text-red-300 border border-red-500/20">
                   <span>⚠️ AI 진단 생성에 실패했어요</span>
                   {onRetryCheckpointGeneration && (
@@ -1591,14 +1585,12 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                   )}
                 </div>
               )}
-              {checkpointRegenStatus === 'success' && (
+              {isAnalysisReady && checkpointRegenStatus === 'success' && (
                 <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
                   <span>✓ 새로운 진단이 준비됐어요</span>
                 </div>
               )}
             </div>
-          )}
-
           {/* ── 학습 흐름 4: 레거시 체크리스트. Card 0.8(레거시): 단계형 풀이 체크리스트 —
               체크리스트 2.0 이전에 생성된 레코드만 대상(신규 분석은 항상 solutionChecklist를
               갖게 되므로 자연히 배타적). PR #46 이전 순서(학습 기록 다음)로 복원. 원래
@@ -1720,7 +1712,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
           {/* ── 학습 흐름 5: 풀이 (기본 접힘). PR #46 이전엔 레거시 체크리스트 바로 다음이
               정석 풀이(Card 1)였다 — 그 순서로 복원. isAnalysisLoading/isAnalysisReady는
-              위에서 한 번만 계산해 이 영역과 학습 기록(§3.5) 영역이 항상 같은 판단을 보게
+              위에서 한 번만 계산해 풀이와 진단 재생성 배너가 항상 같은 판단을 보게
               한다 — 로직 변경 없음, 조건을 다시 쓰지 않고 이름 붙은 상수를 재사용할 뿐이다. */}
           {isAnalysisLoading ? (
             <div className="py-8 px-4 flex flex-col items-center space-y-8 animate-fade-in bg-slate-900/20 rounded-3xl border border-slate-800/40 backdrop-blur-md">
