@@ -179,6 +179,7 @@ try {
 
     // ── 회전/리사이즈: 레이아웃이 따라온다 ──
     if (name === 'phone-portrait') {
+      await page.evaluate(async () => { if (document.fullscreenElement) await document.exitFullscreen(); });
       await page.setViewportSize({ width: 844, height: 390 });
       await until(page, () => document.querySelector('.pwp-root').dataset.orientation === 'landscape');
       const rotated = await page.evaluate(() => { const c = document.querySelector('.pwp-stage canvas').getBoundingClientRect(); const a = document.querySelector('.pwp-btn-a').getBoundingClientRect(); return { w: c.width, h: c.height, ax: a.right, ay: a.bottom }; });

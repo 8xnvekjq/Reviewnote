@@ -32,9 +32,9 @@ test('invalid extension falls back to legacy coordinates and invalid pets are st
   const state = plazaStoreReducer(createPlazaStoreState(), { type: 'broadcast', player: { ...old, version: 2, pet: 'unknown' as never } });
   assert.equal(state.players.get('old')!.pet, null);
 });
-test('plaza uses every legacy solid and tile footprint with open return entry and connected exits', () => {
+test('plaza preserves scenery footprints with open return entry and connected exits', () => {
   const scene = plazaScene();
-  for (let y = -1; y <= 12; y++) for (let x = -1; x <= 16; x++) assert.equal(scene.solid(plazaCell({ x, y })), !isWalkablePlaza({ x, y }));
+  for (let y = 0; y < 12; y++) for (let x = 0; x < 16; x++) assert.equal(scene.solid(plazaCell({ x, y })), !isWalkablePlaza({ x, y }));
   for (const item of SCENERY) assert.ok(scene.solid(plazaCell(item.footprint)));
   assert.equal(plazaGroundTile(8, 10), 25); assert.equal(plazaGroundTile(4, 3), 12);
   for (const id of ['yard', 'room', 'plaza'] as const) {

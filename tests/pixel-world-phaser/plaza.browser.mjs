@@ -82,8 +82,11 @@ try {
   // 달리기 흙먼지: 걸을 때는 없고, 달릴 때만 생겼다가 스스로 사라진다.
   await target(a, 'shop');
   for (let i = 0; i < 8; i++) { const d = await a.evaluate(() => window.__pixelWorldPhaser.debug()); assert.equal(d.dust, 0, 'no dust while walking'); await a.waitForTimeout(60); }
+  await a.waitForFunction(() => window.__pixelWorldPhaser.debug().prompt === 'shop' && !window.__pixelWorldPhaser.debug().moving);
   await a.keyboard.down('Shift');
+  await a.keyboard.down('ArrowDown');
   await a.waitForFunction(() => { const d = window.__pixelWorldPhaser.debug(); return d.running && d.dust > 0; }, null, { timeout: 5000 });
+  await a.keyboard.up('ArrowDown');
   await a.keyboard.up('Shift');
   await a.waitForFunction(() => window.__pixelWorldPhaser.debug().dust === 0, null, { timeout: 3000 });
   await exit(a, 'yard'); await ready(a, 'yard');
