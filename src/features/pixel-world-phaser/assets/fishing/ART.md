@@ -1,6 +1,6 @@
 # Fishing art
 
-Regenerate all eight sheets and the preview from the worktree root:
+Regenerate all fourteen sheets and the preview from the worktree root:
 
 ```sh
 node scripts/draw-fishing-art.mjs
@@ -47,3 +47,9 @@ The spec requests both binary PNG alpha and semi-transparent dark shadows. To pr
 Bank-edge-top has grass above water; bank-edge-bottom reverses that arrangement vertically. Water highlights wrap horizontally through the three shimmer frames; top and bottom borders retain the base water color. Reeds, lily pad, and stone are transparent overlays; dock and bank tiles are opaque terrain.
 
 `docs/pixel-world/fishing-art-preview.png` is a 1664×2816 contact sheet. Every source pixel becomes an exact 8×8 block. Checkerboards show transparency; red registration ticks mark frame starts in the preview only. The original PNGs have no ticks or labels.
+
+## Riverside props
+
+Six additional single-frame sheets reuse the palette and binary alpha: `lamp.png` (16×32), `crate.png`, `bucket.png`, `lily-small.png`, `lily-flower.png`, and `flowers.png` (each 16×16). The lamp sits at the cell bottom and receives a small warm overlay during evening/night, above the existing world tint. Crate rods and the bucket handle distinguish the fishing equipment. Two lily silhouettes include a coral blossom variant.
+
+Trees, bushes, and fence sections reuse town/yard/plaza art; the bench uses the existing plaza geometry. Reeds and rocks reuse river tiles. Flowers allow walking; trees, bushes, reeds, equipment, furniture, fence, and the lamp block their base cells. Water props stay inaccessible. Decorations remain static; five water glints share the 650 ms water frame clock without tweens. The generated contact sheet is 1664×4512 pixels.
