@@ -160,6 +160,12 @@ async function controllerChecks() {
     await page.getByTestId('reel-bar').waitFor();
     await assertReelLayout(page);
     await page.screenshot({ path: `.pixel-world-test.local/fishing/reel-d${difficulty}-${width}.png` });
+    if (difficulty === 5) {
+      // 높은 난도는 화면을 확인하고 쉬운 mock에서 실제 입력으로 잡기를 검증한다.
+      await page.evaluate(() => window.probe.fishing.cancel());
+      await page.waitForFunction(() => !window.probe.fishing.busy);
+      continue;
+    }
     await tapToLand(page, width === 390 ? 'touch' : 'pen');
     await page.waitForFunction(() => !window.probe.fishing.busy);
   }

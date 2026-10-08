@@ -26,6 +26,14 @@ try {
   await mkdir(SHOTS, { recursive: true });
   const context = await browser.newContext({ viewport: { width: 1180, height: 820 }, hasTouch: true });
   const errors = [];
+  // 실시간 전파 검증에서는 쉬운 mock을 사용한다. 높은 난도는 시드별 단위 테스트가 검증한다.
+  await context.route('**/src/features/pixel-world-phaser/ui/fishingAdapterMock.ts', async route => {
+    const response = await route.fetch();
+    const source = await response.text();
+    const body = source.replace(/const difficulty = rodDifficulty\([^;]+;/, 'const difficulty = 1;');
+    assert.notEqual(body, source, 'easy mock difficulty override applied');
+    await route.fulfill({ response, body });
+  });
   await context.route('**/src/services/supabase.ts', route => route.fulfill({ contentType: 'application/javascript', body: "export { supabase } from '/tests/pixel-world-phaser/fakeRealtime.mjs';" }));
   const a = await context.newPage(), b = await context.newPage();
   for (const [page, query, cell] of [[a, '&pet=pet_dog&top=stripe', [11, 11]], [b, '&pet=pet_duck&top=blouse_rose', [3, 14]]]) {

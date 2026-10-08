@@ -9,6 +9,7 @@ export interface ReelGame {
   zoneX: number; zone: number; velocityX: number; velocity: number;
   fishX: number; fish: number; fishVX: number; fishVY: number;
   targetX: number; targetY: number; nextTarget: number; burstUntil: number; pauseUntil: number;
+  motion: 'wander' | 'dart' | 'sweep' | 'feint'; motionStart: number; motionAngle: number; motionTurn: number; wanderFrequency: number;
   progress: number; elapsed: number; remainder: number; taps: number[];
   axes: ReelAxisInput[]; axis: number; lastTap: number; tapCount: number;
   status: 'playing' | 'landed' | 'escaped';
@@ -24,6 +25,7 @@ export function createReelGame(difficulty = 1, duck = false, big = false, seed =
     arenaScale: 1 - (d - 1) * .0625, zoneSize: (d <= 2 ? .42 - (d - 1) * .09 : .33 - (d - 2) * .01) + (duck ? .035 : 0),
     zoneX: 0, zone: 0, velocityX: 0, velocity: 0, fishX: 0, fish: 0, fishVX: 0, fishVY: 0,
     targetX: 0, targetY: 0, nextTarget: 0, burstUntil: 0, pauseUntil: 0,
+    motion: 'wander', motionStart: 0, motionAngle: 0, motionTurn: 1, wanderFrequency: 3,
     progress: .35, elapsed: 0, remainder: 0, taps: [], axes: [], axis: 0, lastTap: -1, tapCount: 0, status: 'playing' };
 }
 function random(g: ReelGame) {
@@ -47,6 +49,7 @@ export function stepReelGame(game: ReelGame, deltaMs: number, taps: readonly num
   while (g.remainder + 1e-10 >= dt && g.status === 'playing') {
     g.remainder -= dt; g.elapsed += dt;
     const d = g.difficulty - 1, t = g.elapsed;
+    const erratic = clamp((g.difficulty - 3.5) / 1.5, 0, 1);
     while (g.axes.length && g.axes[0].time <= t * 1000 + 1e-7) g.axis = clamp(g.axes.shift()!.x, -1, 1);
     while (g.taps.length && g.taps[0] <= t * 1000 + 1e-7) {
       g.taps.shift(); g.velocity = .85; g.lastTap = t; g.tapCount++;
@@ -60,17 +63,46 @@ export function stepReelGame(game: ReelGame, deltaMs: number, taps: readonly num
       g.nextTarget = t + .9 + random(g) * 1.2 - d * .10;
       if (random(g) < .18 + d * .12 + (g.big || g.trophy ? .18 : 0)) g.burstUntil = t + .22 + random(g) * .25;
       if (random(g) < .18) g.pauseUntil = t + .15 + random(g) * .2;
+      if (erratic > 0) {
+        // 시드 난수로 머무는 시간과 행동을 바꿔 규칙적인 반복을 피한다.
+        const choice = random(g);
+        g.motion = choice < .3 ? 'dart' : choice < .5 ? 'sweep' : choice < .75 ? 'feint' : 'wander';
+        g.motionStart = t; g.motionAngle = Math.atan2(g.fish, g.fishX) + Math.PI + (random(g) - .5) * .8;
+        g.motionTurn = random(g) < .5 ? -1 : 1;
+        g.wanderFrequency = 1.5 + random(g) * 6;
+        g.nextTarget = t + .35 + random(g) * (1.5 - erratic * .55);
+        if (g.motion === 'sweep' && choice > .48) g.nextTarget = t + Math.PI * 2 / (1 + erratic);
+        if (g.motion === 'dart' || g.motion === 'feint') {
+          g.targetX = Math.cos(g.motionAngle) * .88; g.targetY = Math.sin(g.motionAngle) * .88;
+          g.burstUntil = t + .25 + random(g) * .35;
+          g.pauseUntil = t;
+        }
+      }
+    }
+    if (erratic > 0 && g.motion === 'sweep') {
+      // 가장자리를 따라 흐르는 호를 쫓되 좌표 자체는 순간 이동시키지 않는다.
+      const angle = g.motionAngle + (t - g.motionStart) * g.motionTurn * (1 + erratic);
+      g.targetX = Math.cos(angle) * .9; g.targetY = Math.sin(angle) * .9;
+    } else if (erratic > 0 && g.motion === 'feint' && t - g.motionStart >= .22) {
+      g.targetX = -Math.cos(g.motionAngle) * .88; g.targetY = -Math.sin(g.motionAngle) * .88;
     }
     const dx = g.targetX - g.fishX, dy = g.targetY - g.fish, distance = Math.hypot(dx, dy);
     // 대물은 정기적인 몸부림을 추가한다. 일시 정지보다 몸부림이 우선한다.
     const struggle = (g.big || g.trophy) && (t + g.seed * .17) % 5.4 < .3;
     const swimmingSpeed = d <= 1 ? .24 + d * .21 : d <= 2 ? .45 + (d - 1) * .005 : .455 + (d - 2) * .0925;
-    const speed = t < g.pauseUntil && !struggle ? .03 : swimmingSpeed * (t < g.burstUntil || struggle ? 1.9 : 1);
-    const curve = Math.sin(t * 3 + g.seed) * (.12 + d * .04);
+    // 중간 난도는 속도로, 최고 난도는 짧은 머무름과 날카로운 회전으로 추적을 어렵게 한다.
+    const cruiseSpeed = swimmingSpeed * (1 + erratic * (2.45 - 2.4 * erratic));
+    const speed = t < g.pauseUntil && !struggle ? .03 : cruiseSpeed * (t < g.burstUntil || struggle ? 1.9 : 1);
+    const curve = Math.sin(t * g.wanderFrequency + g.seed) * (.12 + d * .04);
     const edge = Math.max(0, Math.hypot(g.fishX, g.fish) - .72) * 3;
     const vx = dx / (distance || 1) * Math.min(speed, distance * 3) - g.fishVY * curve - g.fishX * edge;
     const vy = dy / (distance || 1) * Math.min(speed, distance * 3) + g.fishVX * curve - g.fish * edge;
-    g.fishVX += (vx - g.fishVX) * (3 + d) * dt; g.fishVY += (vy - g.fishVY) * (3 + d) * dt;
+    g.fishVX += (vx - g.fishVX) * (3 + d + erratic * 16) * dt; g.fishVY += (vy - g.fishVY) * (3 + d + erratic * 16) * dt;
+    if (erratic > 0) {
+      // 가속 후에도 속도를 제한하여 고정 스텝당 이동 거리가 항상 유한하다.
+      const magnitude = Math.hypot(g.fishVX, g.fishVY), cap = cruiseSpeed * 1.9;
+      if (magnitude > cap) { g.fishVX *= cap / magnitude; g.fishVY *= cap / magnitude; }
+    }
     [g.fishX, g.fish, g.fishVX, g.fishVY] = constrain(g.fishX + g.fishVX * dt, g.fish + g.fishVY * dt, g.fishVX, g.fishVY, .94);
     const inside = Math.hypot(g.zoneX - g.fishX, g.zone - g.fish) <= g.zoneSize;
     g.progress = clamp(g.progress + (inside ? (.105 - d * .006) * g.speed : -(d <= 1 ? .13 + d * .12 : d <= 2 ? .25 - (d - 1) * .06 : .19 - (d - 2) * .015)) * dt, 0, 1);
