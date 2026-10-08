@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { ConvertedScore } from './ConvertedScore';
+import { scoreDisplay } from './scoreDisplay';
 import type { ExamClient, ExamElective, ExamPaperHistoryAttempt, ExamPaperSummary } from '../contract';
 import { buildHistoryRows, formatDuration, historyCellLabel, roundLabel } from './examLogic';
 
@@ -20,22 +22,27 @@ function ScoreTrend({ history, paper }: { history: ExamPaperHistoryAttempt[]; pa
   const submitted = history.filter(a => a.status === 'submitted' && a.score != null);
   if (!submitted.length) return null;
   const maxRound = Math.max(...history.map(a => a.round));
+  const maxScore = scoreDisplay(0, paper).maxScore;
+  const scoreLabel = (score: number) => {
+    const display = scoreDisplay(score, paper);
+    return `${display.score}점${display.rawLabel ? ` ${display.rawLabel}` : ''}`;
+  };
   const points = submitted.map(a => ({
     x: maxRound === 1 ? 180 : 28 + (a.round - 1) / (maxRound - 1) * 304,
-    y: 96 - a.score! / (paper.maxScore ?? 100) * 72,
+    y: 96 - scoreDisplay(a.score!, paper).score / maxScore * 72,
     attempt: a,
   }));
   return (
     <figure className="rn-surface exam-history-trend" data-testid="exam-history-trend">
       <figcaption>점수 추이</figcaption>
-      <svg viewBox="0 0 360 122" role="img" aria-label={`회차별 점수: ${submitted.map(a => `${roundLabel(a.round)} ${a.score}점`).join(', ')}`}>
-        {[0, (paper.maxScore ?? 100) / 2, paper.maxScore ?? 100].map(score => <g key={score}>
-          <line x1="28" x2="332" y1={96 - score / (paper.maxScore ?? 100) * 72} y2={96 - score / (paper.maxScore ?? 100) * 72} className="exam-trend-guide" />
-          <text x="2" y={100 - score / (paper.maxScore ?? 100) * 72}>{score}</text>
+      <svg viewBox="0 0 360 122" role="img" aria-label={`회차별 점수: ${submitted.map(a => `${roundLabel(a.round)} ${scoreLabel(a.score!)}`).join(', ')}`}>
+        {[0, maxScore / 2, maxScore].map(score => <g key={score}>
+          <line x1="28" x2="332" y1={96 - score / maxScore * 72} y2={96 - score / maxScore * 72} className="exam-trend-guide" />
+          <text x="2" y={100 - score / maxScore * 72}>{score}</text>
         </g>)}
         <polyline points={points.map(p => `${p.x},${p.y}`).join(' ')} className="exam-trend-line" />
         {points.map(p => <g key={p.attempt.attemptId}>
-          <circle cx={p.x} cy={p.y} r="3"><title>{roundLabel(p.attempt.round)} · {p.attempt.score}점{p.attempt.elective && ` · ${p.attempt.elective}`}</title></circle>
+          <circle cx={p.x} cy={p.y} r="3"><title>{roundLabel(p.attempt.round)} · {scoreLabel(p.attempt.score!)}{p.attempt.elective && ` · ${p.attempt.elective}`}</title></circle>
         </g>)}
         <text x={points[0].x} y="116" textAnchor="middle">{roundLabel(submitted[0].round)}</text>
         {submitted.length > 1 && <text x={points.at(-1)!.x} y="116" textAnchor="middle">{roundLabel(submitted.at(-1)!.round)}</text>}
@@ -95,7 +102,7 @@ export function ExamHistoryView({ client, paper, busy, error, onBack, onContinue
                 <button type="button" className="exam-past-row exam-history-attempt" disabled={busy}
                   onClick={() => a.status === 'submitted' ? onOpenResult(a.attemptId) : onContinue(true)}
                   data-testid="exam-history-attempt" data-round={a.round}>
-                  <strong>{roundLabel(a.round)}{a.status === 'in_progress' ? ' 진행 중' : paper.practiceEra ? ` · ${a.score}/${paper.questionCount}문항` : ` · ${a.score}점${paper.kind === 'school' || paper.kind === 'worksheet' ? ` / ${paper.maxScore ?? 100}` : paper.kind === 'hanneung' ? a.estimatedGrade == null ? ' · 미합격' : ` · 예상 ${a.estimatedGrade}급` : ` · 추정 ${a.estimatedGrade ?? '—'}등급`}`}</strong>
+                  <strong>{roundLabel(a.round)}{a.status === 'in_progress' ? ' 진행 중' : <>{' · '}<ConvertedScore score={a.score ?? 0} paper={paper}>{paper.practiceEra ? `${a.score}/${paper.questionCount}문항` : `${a.score}점${paper.kind === 'school' || paper.kind === 'worksheet' ? ` / ${paper.maxScore ?? 100}` : paper.kind === 'hanneung' ? a.estimatedGrade == null ? ' · 미합격' : ` · 예상 ${a.estimatedGrade}급` : ` · 추정 ${a.estimatedGrade ?? '—'}등급`}`}</ConvertedScore></>}</strong>
                   <span className="rn-caption">{historyDate(a.startedAt)} · {a.mode === 'real' ? '실전' : '자유'}{a.elective && ` · ${a.elective}`} · 총 {formatDuration(a.totalTimeMs)}</span>
                 </button>
               </li>)}

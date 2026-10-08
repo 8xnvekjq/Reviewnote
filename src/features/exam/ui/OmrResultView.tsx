@@ -8,6 +8,7 @@ import { useHistoryClose } from './useHistoryClose';
 import { PeerSolutionSwitch } from './PeerSolutionView';
 import { PeerSolutionSession, type PeerSolutionApi } from './peerSolution';
 import { ExamAnswer } from './ExamAnswer';
+import { scoreDisplay } from './scoreDisplay';
 import { resultGradeLabel } from './hanneungLogic';
 import { eraLabel, eraStats, resultPaperId, weakEras, type EraStat, type HanneungEra } from './hanneungEra';
 import { hanneungTopicsFor } from '../data/hanneungTopics';
@@ -109,6 +110,7 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, onRevise, i
   const pendingCandidates = candidates.filter(item => !item.addedMistakeId);
   const cuts = result.gradeCut;
   const school = result.kind === 'school' || result.kind === 'worksheet' || result.kind === 'hanneung';
+  const display = scoreDisplay(result.score, result);
   // 서버가 v2 이전 결과를 주면 top 값이 없을 수 있다 — 그땐 1등급컷 값으로 본다.
   const estimate = useMemo(() => school ? { standard: null, percentile: null } : estimateStandardScore(result.score, {
     ...cuts,
@@ -185,9 +187,10 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, onRevise, i
         <h2 className="exam-result-title">{result.paperTitle}{roundLabel(result.round) && ` · ${roundLabel(result.round)}`}</h2>
         <p className="rn-caption">{result.mode === 'real' ? '실전 모드' : '자유 모드'}{result.elective && ` · ${result.elective}`}</p>
         <div className="exam-score-grid">
-          <div className="exam-score-main">
-            <span className="exam-score-label">{result.practiceEra ? '맞은 문항' : '원점수'}</span>
-            <strong data-testid="exam-score">{result.practiceEra ? result.correctCount : result.score}</strong><span>/ {result.practiceEra ? result.totalCount : result.maxScore ?? 100}</span>
+          <div className={`exam-score-main${display.converted ? ' is-converted' : ''}`}>
+            <span className="exam-score-label">{result.practiceEra ? '맞은 문항' : display.converted ? '100점 환산' : '원점수'}</span>
+            <strong data-testid="exam-score">{result.practiceEra ? result.correctCount : display.score}{display.converted && '점'}</strong>
+            {display.converted ? <small className="exam-score-raw">{display.rawLabel}</small> : <span>/ {result.practiceEra ? result.totalCount : result.maxScore ?? 100}</span>}
           </div>
           <dl className="exam-score-stats">
             <div><dt>맞은 개수</dt><dd data-testid="exam-correct-count">{result.correctCount} / {result.totalCount}</dd></div>

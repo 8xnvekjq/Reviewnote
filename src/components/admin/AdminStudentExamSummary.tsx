@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
-import type { AdminExamApi, AdminExamAttemptSummary } from '../../features/exam/contract';
+import type { AdminExamApi, AdminExamAttemptSummary, ExamPaperMetadata } from '../../features/exam/contract';
 import { adminExamApi } from '../../features/exam/examClient';
 import { AdminAttemptReview } from '../../features/exam/ui/AdminAttemptReview';
+import { ConvertedScore } from '../../features/exam/ui/ConvertedScore';
 import '../../styles/examPractice.css';
 
 const dateLabel = (value: string) => new Date(value).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 type Api = AdminExamApi;
+type AttemptRow = AdminExamAttemptSummary & Pick<ExamPaperMetadata, 'kind' | 'practiceEra'>;
 
 export default function AdminStudentExamSummary({ studentId, studentName, onPractice, api = adminExamApi }: {
   studentId: string; studentName: string; onPractice?: () => void; api?: Api;
 }) {
-  const [rows, setRows] = useState<AdminExamAttemptSummary[] | null>(null);
+  const [rows, setRows] = useState<AttemptRow[] | null>(null);
   const [selected, setSelected] = useState<AdminExamAttemptSummary | null>(null);
   const [page, setPage] = useState(0);
   const [reload, setReload] = useState(0);
@@ -19,7 +21,15 @@ export default function AdminStudentExamSummary({ studentId, studentName, onPrac
     let alive = true;
     setRows(null);
     setError(false);
-    void api.listAttempts(studentId, page * 30).then(value => { if (alive) setRows(value); })
+    void api.listAttempts(studentId, page * 30).then(async value => {
+      // The legacy summary RPC omits kind; only non-100-point submissions need it.
+      const enriched = await Promise.all(value.map(async row => {
+        if (row.status !== 'submitted' || (row.maxScore ?? 100) === 100) return row;
+        const result = await api.getResult(row.attemptId);
+        return { ...row, kind: result.kind, practiceEra: result.practiceEra };
+      }));
+      if (alive) setRows(enriched);
+    })
       .catch(() => { if (alive) setError(true); });
     return () => { alive = false; };
   }, [api, studentId, page, reload]);
@@ -39,7 +49,7 @@ export default function AdminStudentExamSummary({ studentId, studentName, onPrac
         : <ul className="exam-admin-attempts">{rows.map(row => <li key={row.attemptId}>
           <button type="button" className="exam-admin-attempt" onClick={() => setSelected(row)}>
             <span><strong>{row.paperTitle}</strong><small>{row.round}차 · {row.mode === 'real' ? '실전' : '자유'}{row.elective ? ` · ${row.elective}` : ''} · {dateLabel(row.submittedAt ?? row.startedAt)}</small></span>
-            <span className="exam-admin-score">{row.status === 'submitted' ? `${row.score} / ${row.maxScore}점` : `풀이 중 ${row.answeredCount}/${row.questionCount}`}<small>전체 화면으로 보기 →</small></span>
+            <span className="exam-admin-score">{row.status === 'submitted' ? <ConvertedScore score={row.score ?? 0} paper={row}>{`${row.score} / ${row.maxScore}점`}</ConvertedScore> : `풀이 중 ${row.answeredCount}/${row.questionCount}`}<small>전체 화면으로 보기 →</small></span>
           </button>
         </li>)}</ul>}
       {(page > 0 || rows?.length === 30) && <nav className="exam-admin-actions" aria-label="응시 기록 페이지">

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { AdminExamApi, AdminPaperStudentActivity, ExamAttempt, ExamClient, ExamElective, ExamMode, ExamPaperSummary, ExamResult, ExamPaperMetadata } from '../contract';
 import { AdminAttemptReview } from './AdminAttemptReview';
 import { AdminLiveView } from './AdminLiveView';
+import { ConvertedScore } from './ConvertedScore';
 import { browserPollEnvironment } from './livePolling';
 import { startLiveBadgePolling } from './liveBadgePolling';
 import { ELECTIVE_SHORT, ELECTIVES, formatClock, formatElapsed, progressRatio, remainingMs, roundLabel } from './examLogic';
@@ -58,12 +59,12 @@ function activityDate(iso: string) {
   return `${d.getMonth() + 1}.${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-function activityScore(row: AdminPaperStudentActivity) {
-  return row.status === 'submitted' ? `${row.score ?? 0}/${row.maxScore}점` : `풀이 중 ${row.answeredCount}/${row.questionCount}`;
+function activityScore(row: AdminPaperStudentActivity, paper: ExamPaperMetadata) {
+  return row.status === 'submitted' ? <ConvertedScore score={row.score ?? 0} paper={{ ...paper, maxScore: row.maxScore }}>{`${row.score ?? 0}/${row.maxScore}점`}</ConvertedScore> : `풀이 중 ${row.answeredCount}/${row.questionCount}`;
 }
 
 /** 관리자: 시험지 카드 아래 — 가장 최근 응시자 한 줄 + 학생별 최근 점수 목록(누르면 전체 화면 검토). */
-function PaperActivity({ students, onOpen }: { students: AdminPaperStudentActivity[]; onOpen: (row: AdminPaperStudentActivity) => void }) {
+function PaperActivity({ students, paper, onOpen }: { students: AdminPaperStudentActivity[]; paper: ExamPaperMetadata; onOpen: (row: AdminPaperStudentActivity) => void }) {
   const latest = students[0];
   if (!latest) return <p className="exam-admin-activity is-empty" data-testid="exam-admin-activity">아직 응시한 학생이 없어요</p>;
   return (
@@ -71,7 +72,7 @@ function PaperActivity({ students, onOpen }: { students: AdminPaperStudentActivi
       <button type="button" className="exam-admin-activity-latest" onClick={() => onOpen(latest)} data-testid="exam-admin-latest">
         <span className="exam-admin-activity-label">최근 응시</span>
         <strong>{latest.studentName}</strong>
-        <span><b>{activityScore(latest)}</b> · {activityDate(latest.submittedAt ?? latest.startedAt)}</span>
+        <span><b>{activityScore(latest, paper)}</b> · {activityDate(latest.submittedAt ?? latest.startedAt)}</span>
       </button>
       <details className="exam-admin-activity-more">
         <summary>학생별 최근 점수 ({students.length}명)</summary>
@@ -80,7 +81,7 @@ function PaperActivity({ students, onOpen }: { students: AdminPaperStudentActivi
             <li key={row.studentId}>
               <button type="button" className="exam-admin-activity-row" onClick={() => onOpen(row)} data-testid="exam-admin-student">
                 <span className="exam-admin-activity-name">{row.studentName}</span>
-                <span className="exam-admin-activity-score">{activityScore(row)}</span>
+                <span className="exam-admin-activity-score">{activityScore(row, paper)}</span>
                 <span className="exam-admin-activity-meta">{row.round}차{row.attemptCount > 1 ? ` (총 ${row.attemptCount}회)` : ''}{row.status === 'submitted' && row.inProgress ? ' · 다시 푸는 중' : ''} · {activityDate(row.submittedAt ?? row.startedAt)}</span>
               </button>
             </li>
@@ -163,7 +164,7 @@ function PaperCard({ paper, selected, busy, now, onClick }: { paper: ExamPaperSu
         )}
         {last && (
           <span className="exam-paper-last" data-testid="exam-paper-last">
-            <span className="exam-paper-line">최근 {roundLabel(last.round) && `${roundLabel(last.round)} · `}<b>{era ? `${last.score}/${total}문항` : `${last.score}점`}{school && ` / ${paper.maxScore ?? 100}`}</b>{resultGradeLabel(paper, last.estimatedGrade) && <> · <b>{resultGradeLabel(paper, last.estimatedGrade)}</b></>}</span>
+            <span className="exam-paper-line">최근 {roundLabel(last.round) && `${roundLabel(last.round)} · `}<b><ConvertedScore score={last.score} paper={paper}>{era ? `${last.score}/${total}문항` : `${last.score}점`}{school && ` / ${paper.maxScore ?? 100}`}</ConvertedScore></b>{resultGradeLabel(paper, last.estimatedGrade) && <> · <b>{resultGradeLabel(paper, last.estimatedGrade)}</b></>}</span>
           </span>
         )}
         {!progress && !last && <span className="exam-paper-line is-muted">아직 풀지 않았어요</span>}
@@ -316,7 +317,7 @@ export function ExamStartView({ client, currentUserId, admin, busy, error, onSta
                 <button type="button" className="rn-button rn-button-ghost rn-button-compact exam-history-open"
                   disabled={busy || resuming != null} onClick={() => onOpenHistory(p)}
                   aria-label={`${p.title} 풀이 기록 보기`} data-testid="exam-history-open" data-paper-id={p.id}>풀이 기록 보기</button>
-                {activity && <PaperActivity students={activity.get(p.id) ?? []} onOpen={setReviewing} />}
+                {activity && <PaperActivity students={activity.get(p.id) ?? []} paper={p} onOpen={setReviewing} />}
               </div>
             ))}
           </div>}</section>;
@@ -375,7 +376,7 @@ export function ExamStartView({ client, currentUserId, admin, busy, error, onSta
             {past.map(r => (
               <li key={r.attemptId}>
                 <button type="button" className="exam-past-row" onClick={() => onOpenResult(r.attemptId)}>
-                  <span><strong>{r.practiceEra ? `${r.score}/${r.questionCount}문항` : `${r.score}점`}{(r.kind === 'school' || r.kind === 'worksheet') && ` / ${r.maxScore ?? 100}`}</strong>{resultGradeLabel(r, r.estimatedGrade) && ` · ${resultGradeLabel(r, r.estimatedGrade)}`}</span>
+                  <span><strong><ConvertedScore score={r.score} paper={r}>{r.practiceEra ? `${r.score}/${r.questionCount}문항` : `${r.score}점`}{(r.kind === 'school' || r.kind === 'worksheet') && ` / ${r.maxScore ?? 100}`}</ConvertedScore></strong>{resultGradeLabel(r, r.estimatedGrade) && ` · ${resultGradeLabel(r, r.estimatedGrade)}`}</span>
                   <span className="rn-caption">{r.paperTitle} · {r.mode === 'real' ? '실전' : '자유'}{r.elective && ` · ${ELECTIVE_SHORT[r.elective]}`} · {formatDate(r.submittedAt)}</span>
                   <span className="exam-past-arrow" aria-hidden="true">›</span>
                 </button>

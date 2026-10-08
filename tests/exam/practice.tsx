@@ -84,7 +84,7 @@ if (adminMode) {
     attemptId: attempt.id, paperId: attempt.paperId, paperTitle: result.paperTitle, round: index + 1,
     status: index === 0 ? 'submitted' : 'in_progress', mode: attempt.mode, elective: attempt.elective,
     startedAt: attempt.startedAt, submittedAt: index === 0 ? result.submittedAt : null,
-    score: index === 0 ? result.score : null, maxScore: 100, answeredCount: index === 0 ? items.length : 0, questionCount: completed.questions.length,
+    score: index === 0 ? result.score : null, maxScore: result.maxScore ?? 100, answeredCount: index === 0 ? items.length : 0, questionCount: completed.questions.length,
   });
 }
 // 시험지별 응시 현황(관리자): 같은 mock 응시 두 건을 두 학생의 최근 응시로 보여 준다.
@@ -99,7 +99,7 @@ const adminApi: AdminExamApi = {
   listAttempts: async () => adminRows,
   getAttempt: async (id: string) => adminAttempts.get(id)!,
   getInk: client.getInk, getInkReplay: client.getInkReplay, getResult: client.getResult,
-  listPaperActivity: async () => params.get('activity') === '1' ? [{ paperId: '2025-06-math', students: activityRows }] : null,
+  listPaperActivity: async () => params.get('activity') === '1' ? [{ paperId: recordsPaper, students: activityRows }] : null,
 };
 
 // Two actual browser tabs share a mock WebSocket bus and saved RPC state.
