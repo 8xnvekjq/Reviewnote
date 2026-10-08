@@ -1,3 +1,4 @@
+import { levelBaitDifficulty } from '../../src/features/pixel-world-phaser/logic/levels.ts';
 import { fishDifficulty } from '../../src/features/pixel-world-phaser/logic/reelGame.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -282,7 +283,7 @@ test('v3 희귀도와 길이 공식이 SQL, 타입스크립트와 모의 서버�
     const start = await mock.start('pet_bear'); assert.ok(start.ok);
     const pending = mock.peek()!, fish = fishById(pending.speciesId)!;
     // v4: 대물은 +1.5(최대 5). 낚싯대 없음 = 낮춤 0.
-    assert.equal(start.difficulty, rodDifficulty(sqlTwin(fish, pending.lengthCm), 0, pending.trophy));
+    assert.equal(start.difficulty, levelBaitDifficulty(rodDifficulty(sqlTwin(fish, pending.lengthCm), 0, pending.trophy), 1, fish.rarity === 'legendary'));
     assert.equal(start.big, pending.lengthCm >= fish.minCm + .8 * (fish.maxCm - fish.minCm));
   }
   const old = parseCastStart({ ok: true, castId: 'c', shadow: 'S', biteDelayMs: 1200 }); assert.ok(old.ok && old.big === undefined);
@@ -501,7 +502,7 @@ test('v4 속도: 입질 대기·최소 끌어올리기 시간을 speed로 나누
       const p = mock.peek()!, fish = fishById(p.speciesId)!;
       assert.equal(s.speed, rod.speed); assert.deepEqual(s.rod, { id: rod.id, tier: rod.tier });
       assert.ok(s.biteDelayMs >= Math.round(1200 / rod.speed) && s.biteDelayMs <= Math.round(5000 / rod.speed), `${rod.id} ${s.biteDelayMs}`);
-      assert.equal(s.difficulty, rodDifficulty(fishDifficulty(fish, p.lengthCm), rod.difficultyDown, p.trophy));
+      assert.equal(s.difficulty, levelBaitDifficulty(rodDifficulty(fishDifficulty(fish, p.lengthCm), rod.difficultyDown, p.trophy), (await mock.getLevel()).level, fish.rarity === 'legendary'));
       // 중간에 낚싯대를 바꿔도 이 캐스트는 그대로.
       assert.ok((await mock.equipRod(null)).ok);
       const ready = s.biteDelayMs + rodMinReelMs(s.difficulty!, rod.speed);

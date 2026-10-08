@@ -5,7 +5,10 @@ import { ROD_CATALOG } from './rods.ts';
 // Avatar/furniture use existing atlas art; pet artwork provenance lives in pet/assets.
 // Keep IDs stable for server ownership; prices come from the server.
 // Asset selection and zero-based rows are documented in docs/pixel-world-content.md.
+export const BAIT_ITEM: PixelItem = { itemId: 'bait_worm', category: 'bait', slot: 'bait', price: 50, assetKey: 'worm', displayName: '지렁이 미끼 (100회)', tier: 1, stackable: true };
+
 export const PIXEL_CATALOG: readonly PixelItem[] = [
+  BAIT_ITEM,
   ...ROD_CATALOG,
   { itemId: 'top_sage', category: 'avatar', slot: 'top', price: 25, assetKey: 'sage', displayName: '세이지 티셔츠', tier: 1, stackable: false },
   { itemId: 'top_blue', category: 'avatar', slot: 'top', price: 25, assetKey: 'blue', displayName: '블루 티셔츠', tier: 1, stackable: false },

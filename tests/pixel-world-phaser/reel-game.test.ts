@@ -31,12 +31,13 @@ test('지연된 추적 플레이어의 난이도별 성공률', () => {
     const mean = wins.reduce((sum,g) => sum + g.elapsed,0) / (wins.length || 1);
     console.log(`SIM difficulty=${d} player=${player} wins=${wins.length}/40 meanSeconds=${mean.toFixed(2)}`);
     if (player === 'lazy' && d === 1) assert.ok(wins.length <= 8);
-    if (player === 'novice' && d === 1) assert.ok(wins.length >= 28);
-    if (player === 'novice' && (d === 2 || d === 3)) assert.ok(wins.length >= 16 && wins.length <= 24);
-    if (player === 'novice' && d === 4) assert.ok(wins.length <= 8);
-    if (player === 'novice' && d === 5) assert.ok(wins.length <= 2);
-    if (player === 'good' && d === 4) assert.ok(wins.length >= 32);
-    if (player === 'good' && d === 5) { assert.ok(wins.length >= 24); assert.ok(mean >= 20 && mean <= 35); }
+    if (player === 'novice' && d === 1) assert.ok(wins.length >= 38);
+    if (player === 'novice' && (d === 2 || d === 3)) assert.ok(Math.abs(wins.length - (d === 2 ? 22 : 23)) <= 2);
+    if (player === 'novice' && d === 4) assert.ok(wins.length <= 2);
+    if (player === 'novice' && d === 5) assert.equal(wins.length, 0);
+    if (player === 'good' && d === 4) assert.ok(wins.length >= 30 && wins.length <= 36);
+    if (player === 'good' && d === 5) assert.ok(wins.length >= 22 && wins.length <= 28);
+    if (player === 'good' && d <= 3) assert.equal(wins.length, 40);
     if (player === 'good') assert.ok(wins.every(g => g.elapsed < 75));
   }
 });
@@ -56,7 +57,7 @@ test('원 내부 물리, 좌우 조작, 위로 부스트와 오리 보너스', (
   assert.notEqual(stepReelGame({...createReelGame(3,true,true),progress:.5},10000).fish,stepReelGame({...createReelGame(3),progress:.5},10000).fish);
 });
 test('시간표 입력 재생은 프레임 속도와 무관하다', () => {
-  for (const d of [1,3,5]) {
+  for (const d of [1,3,3.75,4,5]) {
     const {game,taps,axes} = simulate(d,'good',5);
     for (const frames of [[1000/30],[1000/60],[17,93,250,41,99]]) {
       let other=createReelGame(d,false,false,5), wall=0, ti=0, ai=0, frame=0;
@@ -66,9 +67,58 @@ test('시간표 입력 재생은 프레임 속도와 무관하다', () => {
         while(ai<axes.length && axes[ai].time<=wall+dt+1e-7) xs.push(axes[ai++]);
         other=stepReelGame(other,dt,ts,xs);wall+=dt;
       }
-      for(const field of ['status','elapsed','zoneX','zone','fishX','fish','progress','tapCount'] as const) assert.equal(other[field],game[field],field);
+      for(const field of ['status','elapsed','zoneX','zone','fishX','fish','fishVX','fishVY','progress','tapCount','random','motion','motionStart','motionAngle','motionTurn','wanderFrequency','nextTarget','targetX','targetY'] as const) assert.equal(other[field],game[field],field);
     }
   }
+});
+
+test('원의 크기와 잡기 반경은 기존 공식 그대로다', () => {
+  for (const [d, arena, radius] of [[1, 1, .42], [2, .9375, .33], [3, .875, .32], [3.5, .84375, .315], [4, .8125, .31], [5, .75, .30]]) {
+    for (const duck of [false, true]) {
+      const g = createReelGame(d, duck);
+      assert.equal(g.arenaScale, arena);
+      assert.ok(Math.abs(g.zoneSize - radius - (duck ? .035 : 0)) < 1e-12);
+    }
+  }
+});
+
+test('불규칙한 행동은 회전 분산을 늘리고 속도와 위치는 제한된다', () => {
+  const variance = (difficulty: number) => {
+    const angles: number[] = [], modes = new Set<string>(), dwell = new Set<number>(), frequencies = new Set<number>();
+    let fullSweep = false, reversed = false;
+    for (let seed = 0; seed < 8; seed++) {
+      let g = createReelGame(difficulty, false, false, seed);
+      for (let tick = 0; tick < 3600; tick++) {
+        const next = stepReelGame({ ...g, progress: .5 }, 1000 / 120);
+        const d = difficulty - 1, erratic = Math.max(0, Math.min(1, (difficulty - 3.5) / 1.5));
+        const cap = (.455 + (d - 2) * .0925) * (1 + erratic * (2.45 - 2.4 * erratic)) * 1.9;
+        assert.ok(Math.hypot(next.fishX, next.fish) <= .94 + 1e-12);
+        if (difficulty > 3.5) {
+          assert.ok(Math.hypot(next.fishVX, next.fishVY) <= cap + 1e-12);
+          assert.ok(Math.hypot(next.fishX - g.fishX, next.fish - g.fish) <= cap / 120 + 1e-12);
+        }
+        if (Math.hypot(g.fishVX, g.fishVY) > .05 && Math.hypot(next.fishVX, next.fishVY) > .05) {
+          angles.push(Math.atan2(g.fishVX * next.fishVY - g.fishVY * next.fishVX, g.fishVX * next.fishVX + g.fishVY * next.fishVY));
+        }
+        modes.add(next.motion); frequencies.add(next.wanderFrequency);
+        if (next.nextTarget !== g.nextTarget) dwell.add(next.nextTarget - next.elapsed);
+        if (next.motion === 'sweep' && next.nextTarget - next.motionStart > 3) fullSweep = true;
+        if (next.motion === 'feint' && g.motion === 'feint' && next.targetX * g.targetX < 0) reversed = true;
+        g = next;
+      }
+    }
+    if (difficulty > 3.5) {
+      assert.equal(modes.size, 4); assert.ok(dwell.size > 50); assert.ok(frequencies.size > 50);
+      assert.ok(fullSweep); assert.ok(reversed);
+    }
+    const mean = angles.reduce((sum, angle) => sum + angle, 0) / angles.length;
+    return angles.reduce((sum, angle) => sum + (angle - mean) ** 2, 0) / angles.length;
+  };
+  const easy = variance(3), hard = variance(4), hardest = variance(5);
+  console.log(`MOTION turnVariance d3=${easy.toFixed(6)} d4=${hard.toFixed(6)} d5=${hardest.toFixed(6)}`);
+  assert.ok(hard > easy * 2); assert.ok(hardest > hard);
+  assert.deepEqual(stepReelGame(createReelGame(5, false, false, 12), 2000), stepReelGame(createReelGame(5, false, false, 12), 2000));
+  assert.notDeepEqual(stepReelGame(createReelGame(5, false, false, 12), 2000), stepReelGame(createReelGame(5, false, false, 13), 2000));
 });
 test('최소 시간, 불변성, 잘못된 입력과 미래 입력', () => {
   for(const d of [1,1.63,3,4.79,5]) for(const speed of [1,2]) {

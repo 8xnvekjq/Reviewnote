@@ -202,7 +202,7 @@ try {
   await page.route('**/rest/v1/**', async route => {
     const request = route.request(), url = new URL(request.url());
     const table = url.pathname.split('/').at(-1);
-    if (request.method() !== 'GET' && table !== 'get_pixel_farm') writes.push(request.url());
+    if (request.method() !== 'GET' && !['get_pixel_farm', 'get_pixel_level', 'get_pixel_fishing_state'].includes(table)) writes.push(request.url());
     let body = [];
     if (table === 'save_pixel_room_layout') {
       assert.equal(request.method(), 'POST');
@@ -224,6 +224,8 @@ try {
     else if (table === 'pixel_avatar_equipment') body = null;
     else if (table === 'pixel_pet_equipment') body = { active_pet: null };
     else if (table === 'get_pixel_farm') body = { serverNow: new Date().toISOString(), plots: [{ index: 0, crop: null }, { index: 1, crop: null }] };
+    else if (table === 'get_pixel_level') body = { xp: 0, level: 1, xpIntoLevel: 0, xpForNext: 50, maxLevel: 100 };
+    else if (table === 'get_pixel_fishing_state') body = { bait: { charges: 0 } };
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
   });
   await page.goto(`${BASE}/tests/pixel-world-phaser/harness.html?petWander=0&saved=1`);
