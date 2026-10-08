@@ -14,12 +14,12 @@ export { toPublicAvatarAppearance } from './pixelShopAppearance';
 
 interface PixelItemCatalogRow {
   item_id: string;
-  category: 'avatar' | 'furniture' | 'pet';
-  slot: PixelAvatarSlot | 'furniture' | 'pet';
+  category: PixelItem['category'];
+  slot: PixelItem['slot'];
   price: number;
   asset_key: string;
   display_name: string;
-  tier: 1 | 2 | 3;
+  tier: PixelItem['tier'];
   stackable: boolean;
 }
 
@@ -101,7 +101,7 @@ export async function purchasePixelItem(itemId: string): Promise<PurchasePixelIt
 }
 
 export type EquipPixelItemResult =
-  | { ok: true; slot: PixelAvatarSlot; itemId: string | null }
+  | { ok: true; slot: PixelAvatarSlot | 'rod'; itemId: string | null }
   | { ok: false; reason: 'invalid_slot' | 'not_found' | 'not_owned' | 'unknown'; message: string };
 
 /** Equip (or, with itemId null, unequip) an owned avatar item into one slot. Server verifies
@@ -145,4 +145,18 @@ export async function savePixelRoomLayout(placements: FurniturePlacementRow[]): 
     return { ok: false, reason: 'unknown', message: error.message || '가구 배치를 저장하지 못했어요.' };
   }
   return data as SavePixelRoomLayoutResult;
+}
+
+/** 서버가 소유권을 검사한 뒤 낚싯대를 장착하거나 기본 낚싯대로 되돌린다. */
+export async function equipPixelRod(itemId: string | null): Promise<EquipPixelItemResult> {
+  // TODO: 서버 보고서에서 별도 RPC를 선택했다면 equip_pixel_rod(p_item_id)로 바꾼다.
+  const { data, error } = await supabase.rpc('equip_pixel_item', { p_slot: 'rod', p_item_id: itemId });
+  if (error) return { ok: false, reason: 'unknown', message: error.message || '낚싯대를 장착하지 못했어요.' };
+  return data as EquipPixelItemResult;
+}
+/** 기존 장비 조회 경로에서 낚싯대 아이템 키를 읽는다. */
+export async function fetchEquippedRod(userId: string): Promise<string | null> {
+  const { data, error } = await supabase.from('pixel_avatar_equipment').select('*').eq('user_id', userId).maybeSingle();
+  if (error) throw error;
+  return typeof data?.rod === 'string' ? data.rod : null;
 }

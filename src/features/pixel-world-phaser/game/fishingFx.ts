@@ -1,3 +1,4 @@
+import { rodDisplay } from '../../pixel-room/shop/rods';
 import type Phaser from 'phaser';
 import type { Point } from '../logic/joystick';
 import type { FishingGame } from '../logic/fishingGame';
@@ -34,14 +35,14 @@ export function createFishingFx(scene: Phaser.Scene, anchors: FishingAnchors): F
       const progress = Math.max(0, Math.min(1, (now - game.startedAt) / Math.max(1, game.castDurationMs)));
       const x = from.x + (to.x - from.x) * progress;
       const y = from.y + (to.y - from.y) * progress - Math.sin(progress * Math.PI) * 24 + (game.phase === 'bite' ? 4 : game.nibble >= 0 ? 2 : game.phase === 'waiting' ? Math.sin(now / 360) * 0.5 : 0);
-      line.clear().lineStyle(1, 0xece3ca, 0.85).lineBetween(from.x, from.y, x, y);
+      line.clear().lineStyle(1, rodDisplay(game.cast?.rod).color, 0.85).lineBetween(from.x, from.y, x, y);
       bobber.setVisible(true).setPosition(x, y);
       if ('setFrame' in bobber) (bobber as Phaser.GameObjects.Sprite).setFrame(game.phase === 'bite' ? 2 : game.nibble >= 0 ? 1 : 0);
       bang.setPosition(from.x, from.y - 18).setVisible(game.phase === 'bite');
     } else if (game.phase === 'reeling') {
       // 릴을 감는 동안: 팽팽한 줄, 물에 잠긴 찌가 파르르 떤다(친구 화면의 riverPeers와 같은 느낌).
       const x = to.x + Math.sin(now / 45) * 1.5, y = to.y + 3 + Math.cos(now / 60);
-      line.clear().lineStyle(1, 0xece3ca, 0.95).lineBetween(from.x, from.y, x, y);
+      line.clear().lineStyle(1, rodDisplay(game.cast?.rod).color, 0.95).lineBetween(from.x, from.y, x, y);
       bobber.setVisible(true).setPosition(x, y);
       if ('setFrame' in bobber) (bobber as Phaser.GameObjects.Sprite).setFrame(2);
       bang.setVisible(false);

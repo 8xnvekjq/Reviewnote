@@ -1,7 +1,9 @@
 // Start the harness server before running this panel regression suite.
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
+import { mkdir } from 'node:fs/promises';
 const base = process.env.PWP_BASE ?? 'http://127.0.0.1:5174';
+await mkdir('scratch/rods', { recursive: true });
 const browser = await chromium.launch({ headless: true });
 try {
   for (const viewport of [{ width: 390, height: 844 }, { width: 1180, height: 820 }]) {
@@ -34,11 +36,16 @@ try {
     const crops = await shop.locator('.pwp-item-art').evaluateAll(nodes => nodes.map(node => ({
       item: node.closest('[data-item]').dataset.item,
       canvas: node.querySelector('canvas')?.dataset.ready,
+      rod: node.querySelector('img.pwp-rod-icon')?.complete && node.querySelector('img.pwp-rod-icon')?.naturalWidth === 16,
       svg: !!node.querySelector('svg'),
     })));
     assert.ok(crops.length > 0);
-    assert.ok(crops.every(crop => crop.canvas === 'true' && !crop.svg));
+    assert.ok(crops.every(crop => (crop.canvas === 'true' || crop.rod) && !crop.svg));
     await page.screenshot({ path: `scratch/fix-shop-top-${viewport.width}.png` });
+    await shop.getByRole('button', { name: '낚싯대', exact: true }).click();
+    assert.equal(await shop.locator('[data-item]').count(), 4);
+    await page.screenshot({ path: `scratch/rods/plaza-shop-${viewport.width}.png` });
+    await shop.getByRole('button', { name: '전체', exact: true }).click();
     const content = shop.locator('.pwp-panel-content');
     const tabs = await shop.locator('.pwp-tabs').boundingBox();
     const header = await shop.locator('header').boundingBox();
@@ -121,6 +128,7 @@ try {
     await page.keyboard.down('ArrowLeft'); await page.waitForTimeout(200); await page.keyboard.up('ArrowLeft');
     assert.notEqual((await debug()).x, before.x);
     assert.deepEqual(errors, []);
+    console.log(`PASS plaza panels ${viewport.width}px: rod tab, shop purchase, balance, wardrobe, previews, movement lock`);
     await context.close();
   }
 } finally { await browser.close(); }

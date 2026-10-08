@@ -1,5 +1,6 @@
 // 낚시(강가의 하루) 서버 연결의 고정 계약. 모양은 docs/pixel-world/FISHING_SPEC.md를 따른다.
 // 실제 Supabase 구현(createFishingAdapter)은 서버 작업에서 이 파일에 채운다.
+import type { RodEquipment } from '../../pixel-room/shop/rods';
 import { worldClockAt } from '../logic/worldClock';
 export type FishPhase = 'morning' | 'day' | 'evening' | 'night';
 export type FishWeather = 'clear' | 'cloudy' | 'rain';
@@ -7,8 +8,8 @@ export type FishRarity = 'common' | 'uncommon' | 'rare' | 'legendary';
 export type FishShadow = 'S' | 'M' | 'L';
 export type BitePattern = 'quick' | 'double' | 'long';
 export interface FishAlbumEntry { speciesId: string; count: number; bestCm: number; firstAt: string }
-export interface FishingState { kstDate: string; phase: FishPhase; weather: FishWeather; remaining: number; sparkleShadow: number | null; pigeonHint: string | null; album: FishAlbumEntry[] }
-export type CastStart = { ok: true; castId: string; shadow: FishShadow; biteDelayMs: number; difficulty?: number; big?: boolean; pattern: BitePattern; hint: 'sparkle' | null } | { ok: false; reason: 'budget' | 'pending' | 'error' };
+export interface FishingState { rod?: { id: string | null; tier: number }; kstDate: string; phase: FishPhase; weather: FishWeather; remaining: number; sparkleShadow: number | null; pigeonHint: string | null; album: FishAlbumEntry[] }
+export type CastStart = { ok: true; castId: string; shadow: FishShadow; biteDelayMs: number; difficulty?: number; big?: boolean; rod?: { id: string | null; tier: number }; speed?: number; trophy?: boolean; pattern: BitePattern; hint: 'sparkle' | null } | { ok: false; reason: 'budget' | 'pending' | 'error' };
 export type CastFinish = { ok: true; landed: true; speciesId: string; lengthCm: number; rarity: FishRarity; isNew: boolean; isBig: boolean; isPersonalBest: boolean; remaining: number } | { ok: true; landed: false } | { ok: false };
 export interface ClassFishBoard { rows: { speciesId: string; lengthCm: number; animal: string; caughtAt: string }[]; classSpecies: number }
 export interface FishingAdapter { state(): Promise<FishingState>; start(pet: string | null): Promise<CastStart>; finish(castId: string, landed: boolean): Promise<CastFinish>; board(): Promise<ClassFishBoard> }
@@ -36,9 +37,14 @@ const num = (v: unknown): number | null => {
 };
 const str = (v: unknown): string | null => typeof v === 'string' && v !== '' ? v : null;
 
+export function parseRod(raw: unknown): RodEquipment {
+  if (!isObj(raw) || !(raw.id === null || typeof raw.id === 'string')) return { id: null, tier: 0 };
+  const tier = num(raw.tier);
+  return tier != null && Number.isInteger(tier) && tier >= 0 && tier <= 4 ? { id: raw.id, tier } : { id: null, tier: 0 };
+}
 export function fallbackFishingState(now: number = Date.now(), override?: FishingOverride | null): FishingState {
   const c = worldClockAt(now, override);
-  return { kstDate: c.kstDate, phase: c.phase, weather: c.weather, remaining: 0, sparkleShadow: null, pigeonHint: null, album: [] };
+  return { rod: { id: null, tier: 0 }, kstDate: c.kstDate, phase: c.phase, weather: c.weather, remaining: 0, sparkleShadow: null, pigeonHint: null, album: [] };
 }
 
 export function parseFishingState(raw: unknown, fallback: FishingState = fallbackFishingState()): FishingState {
@@ -58,6 +64,7 @@ export function parseFishingState(raw: unknown, fallback: FishingState = fallbac
     sparkleShadow: spark != null && [0, 1, 2].includes(spark) ? spark : null,
     pigeonHint: str(raw.pigeonHint),
     album,
+    rod: parseRod(raw.rod),
   };
 }
 
@@ -66,7 +73,7 @@ export function parseCastStart(raw: unknown): CastStart {
   if (raw.ok !== true) return { ok: false, reason: raw.reason === 'budget' || raw.reason === 'pending' ? raw.reason : 'error' };
   const castId = str(raw.castId), biteDelayMs = num(raw.biteDelayMs);
   if (!castId || !oneOf(SHADOWS, raw.shadow) || biteDelayMs == null || biteDelayMs < 0) return { ok: false, reason: 'error' };
-  return { ok: true, castId, shadow: raw.shadow, biteDelayMs, difficulty: Math.max(1, Math.min(5, num(raw.difficulty) ?? 1)), ...(typeof raw.big === 'boolean' ? { big: raw.big } : {}), pattern: oneOf(PATTERNS, raw.pattern) ? raw.pattern : 'quick', hint: raw.hint === 'sparkle' ? 'sparkle' : null };
+  return { ok: true, rod: parseRod(raw.rod), speed: (num(raw.speed) ?? 1) > 0 ? num(raw.speed) ?? 1 : 1, trophy: raw.trophy === true, castId, shadow: raw.shadow, biteDelayMs, difficulty: Math.max(1, Math.min(5, num(raw.difficulty) ?? 1)), ...(typeof raw.big === 'boolean' ? { big: raw.big } : {}), pattern: oneOf(PATTERNS, raw.pattern) ? raw.pattern : 'quick', hint: raw.hint === 'sparkle' ? 'sparkle' : null };
 }
 
 export function parseCastFinish(raw: unknown): CastFinish {

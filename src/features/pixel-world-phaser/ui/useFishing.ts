@@ -96,7 +96,7 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
       const next = reelFishingGame(game.current, performance.now());
       if (next.phase === 'reeling') {
         game.current = next; setPhase('reeling');
-        reelGame.current = createReelGame(next.cast?.difficulty ?? 1, latest.current.pet === 'pet_duck', next.cast?.big ?? false);
+        reelGame.current = createReelGame(next.cast?.difficulty ?? 1, latest.current.pet === 'pet_duck', next.cast?.big ?? false, 0, next.cast?.speed ?? 1, next.cast?.rod, next.cast?.trophy ?? false);
         setReelState(reelGame.current); reelStarted.current = performance.now(); lastFrame.current = reelStarted.current; taps.current = [];
         latest.current.report?.({ phase: 'reeling' });
       } else finishRef.current(next);

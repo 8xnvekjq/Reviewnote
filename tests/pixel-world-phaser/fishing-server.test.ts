@@ -191,7 +191,7 @@ test('adapter parsing is defensive', () => {
   assert.deepEqual(parseCastStart({ ok: false, reason: 'weird' }), { ok: false, reason: 'error' });
   assert.deepEqual(parseCastStart({ ok: true, castId: 'c', shadow: 'XL', biteDelayMs: 1000 }), { ok: false, reason: 'error' });
   assert.deepEqual(parseCastStart({ ok: true, castId: 'c', shadow: 'M', biteDelayMs: 1500, pattern: 'zigzag', hint: 'x', speciesId: 'eel' }),
-    { ok: true, castId: 'c', shadow: 'M', biteDelayMs: 1500, difficulty: 1, pattern: 'quick', hint: null });
+    { ok: true, castId: 'c', shadow: 'M', biteDelayMs: 1500, difficulty: 1, pattern: 'quick', hint: null, rod: { id: null, tier: 0 }, speed: 1, trophy: false });
 
   assert.deepEqual(parseCastFinish('nope'), { ok: false });
   assert.deepEqual(parseCastFinish({ ok: true, landed: false }), { ok: true, landed: false });
@@ -222,7 +222,7 @@ test('adapter never throws and sends override args only when given', async () =>
   const seen: Record<string, unknown>[] = [];
   const ok: FishingRpcClient = { rpc(_fn, args) { seen.push(args ?? {}); return Promise.resolve({ data: { ok: true, castId: 'k', shadow: 'L', biteDelayMs: 2000, pattern: 'long', hint: 'sparkle' }, error: null }); } };
   const admin = createFishingAdapter(ok, { clock: '21:30', weather: 'rain' });
-  assert.deepEqual(await admin.start(null), { ok: true, castId: 'k', shadow: 'L', biteDelayMs: 2000, difficulty: 1, pattern: 'long', hint: 'sparkle' });
+  assert.deepEqual(await admin.start(null), { ok: true, castId: 'k', shadow: 'L', biteDelayMs: 2000, difficulty: 1, pattern: 'long', hint: 'sparkle', rod: { id: null, tier: 0 }, speed: 1, trophy: false });
   assert.deepEqual(seen[0], { p_pet: null, p_override_clock: '21:30', p_override_weather: 'rain' });
 });
 
