@@ -3,7 +3,8 @@
 // 얹는다. 그래서 이 파일은 node --test로 라이브 연결 없이 그대로 단위 테스트할 수 있다.
 
 import type { PlazaPlayerState } from './types';
-import { protocolExtras } from './presenceProtocol';
+import { PLAZA_BOUNDS, protocolExtras } from './presenceProtocol';
+import type { PresenceBounds } from './presenceProtocol';
 
 // 실시간 이동 버그(순간이동/경로 스킵) 조사 결과 — usePlazaRealtime.ts 상단 주석 참고. React는
 // 같은 태스크 안에서 여러 dispatch가 몰리면(예: presence의 leave+join 동시 diff, 브라우저가
@@ -112,10 +113,10 @@ export type PlazaStoreAction =
 // 그 값을 여기 도착하기 전에 따로 뽑아 각 액션의 presenceRef로 넘긴다). 저장/렌더링에 쓰이는
 // 값은 반드시 PlazaPlayerState 필드만 남도록 화이트리스트 방식으로 재구성한다 — 장차 실수로
 // 다른 필드(닉네임 등 개인식별정보)가 payload에 섞여도 여기서 걸러져 저장되지 않는다.
-function sanitizePlayerState(raw: PlazaPlayerState): PlazaPlayerState {
+function sanitizePlayerState(raw: PlazaPlayerState, bounds: PresenceBounds): PlazaPlayerState {
   const appearance = raw.appearance ?? { top: null, bottom: null, shoes: null, hair: null, eyes: null, skin: null };
   return {
-    ...protocolExtras(raw),
+    ...protocolExtras(raw, bounds),
     sessionId: raw.sessionId,
     x: raw.x,
     y: raw.y,
@@ -166,7 +167,14 @@ function sanitizePlayerState(raw: PlazaPlayerState): PlazaPlayerState {
 // - presence-sync도 대칭적으로 신원 확인을 한 번 거친다: sync에 들어있는 항목의 presence_ref가
 //   recentlyLeftRefs(우리가 이미 명시적으로 leave 처리를 확인한 join들)에 있으면, 그 항목은
 //   sync에서 빼고 취급한다 — 위 PlazaStoreState.recentlyLeftRefs 주석 참고.
+/** 채널마다 좌표 범위만 다른 같은 reducer. 광장은 plazaStoreReducer(16×12), 강가는 자기 크기로 만든다. */
+export function createPlazaStoreReducer(bounds: PresenceBounds) {
+  return (state: PlazaStoreState, action: PlazaStoreAction) => reducePlazaStore(state, action, bounds);
+}
 export function plazaStoreReducer(state: PlazaStoreState, action: PlazaStoreAction): PlazaStoreState {
+  return reducePlazaStore(state, action, PLAZA_BOUNDS);
+}
+function reducePlazaStore(state: PlazaStoreState, action: PlazaStoreAction, bounds: PresenceBounds): PlazaStoreState {
   switch (action.type) {
     case 'presence-sync': {
       const players = new Map<string, PlazaPlayerState>();
@@ -177,13 +185,13 @@ export function plazaStoreReducer(state: PlazaStoreState, action: PlazaStoreActi
         // 참고) — 정말로 재입장한 것이라면 그 새 join은 반드시 새 presence_ref를 달고 오므로,
         // 진짜 재입장을 놓치는 게 아니라 "이미 끝난 그 join"만 걸러낼 뿐이다.
         if (state.recentlyLeftRefs.has(presenceRef)) continue;
-        const sanitized = sanitizePlayerState(player);
+        const sanitized = sanitizePlayerState(player, bounds);
         players.set(sanitized.sessionId, sanitized);
         presenceRefs.set(sanitized.sessionId, presenceRef);
         // sync는 "지금 이 순간의 완전한 명단"이다 — 그 이전 경로는 우리가 관측하지 못했던
         // 구간이므로 재생하지 않고, 이 좌표 하나를 새 출발점으로 삼는다(스푼 없이 그 자리에서
         // 시작). 기존에 알고 있던 이력은 sync로 대체되므로 함께 초기화한다.
-        paths.set(sanitized.sessionId, [{ ...protocolExtras(sanitized), x: sanitized.x, y: sanitized.y, seq: sanitized.seq }]);
+        paths.set(sanitized.sessionId, [{ ...protocolExtras(sanitized, bounds), x: sanitized.x, y: sanitized.y, seq: sanitized.seq }]);
       }
       return { players, paths, presenceRefs, recentlyLeftRefs: state.recentlyLeftRefs };
     }
@@ -193,14 +201,14 @@ export function plazaStoreReducer(state: PlazaStoreState, action: PlazaStoreActi
       const presenceRefs = new Map(state.presenceRefs);
       let paths = state.paths;
       for (const { player, presenceRef } of action.players) {
-        const sanitized = sanitizePlayerState(player);
+        const sanitized = sanitizePlayerState(player, bounds);
         players.set(sanitized.sessionId, sanitized);
         presenceRefs.set(sanitized.sessionId, presenceRef);
         // presence-join은 이동 시작/정지 전이, appearance 변경, 최초 입장에서만 온다(빈도 낮음,
         // 항상 신뢰). moving:false 전이의 경우 "실제 최종 도착 칸"을 담고 있으므로, 혹시 그 사이
         // broadcast 일부가 유실되더라도 경로의 마지막 지점은 반드시 정확하게 재생되도록 이
         // 좌표도 경로에 추가한다.
-        paths = appendPath(paths, sanitized.sessionId, { ...protocolExtras(sanitized), x: sanitized.x, y: sanitized.y, seq: sanitized.seq });
+        paths = appendPath(paths, sanitized.sessionId, { ...protocolExtras(sanitized, bounds), x: sanitized.x, y: sanitized.y, seq: sanitized.seq });
       }
       return { players, paths, presenceRefs, recentlyLeftRefs: state.recentlyLeftRefs };
     }
@@ -226,7 +234,7 @@ export function plazaStoreReducer(state: PlazaStoreState, action: PlazaStoreActi
       return changed ? { players, paths, presenceRefs, recentlyLeftRefs } : state;
     }
     case 'broadcast': {
-      const incoming = sanitizePlayerState(action.player);
+      const incoming = sanitizePlayerState(action.player, bounds);
       const existing = state.players.get(incoming.sessionId);
       if (existing && incoming.seq <= existing.seq) {
         // Stale/out-of-order defense: never roll a visible position backward.
@@ -234,7 +242,7 @@ export function plazaStoreReducer(state: PlazaStoreState, action: PlazaStoreActi
       }
       const players = new Map(state.players);
       players.set(incoming.sessionId, incoming);
-      const paths = appendPath(state.paths, incoming.sessionId, { ...protocolExtras(incoming), x: incoming.x, y: incoming.y, seq: incoming.seq });
+      const paths = appendPath(state.paths, incoming.sessionId, { ...protocolExtras(incoming, bounds), x: incoming.x, y: incoming.y, seq: incoming.seq });
       return { players, paths, presenceRefs: state.presenceRefs, recentlyLeftRefs: state.recentlyLeftRefs };
     }
     default:

@@ -111,10 +111,10 @@ test('avatar frame index covers 8 poses × 4 frames', () => {
 });
 
 // ── 마당 월드 / 충돌 / 길찾기 ──
-test('world solidity matches the original yard (plus forest margin and an open door)', () => {
+test('world solidity preserves yard obstacles and adds the river sign', () => {
   for (let y = 0; y < 12; y++) for (let x = 0; x < 16; x++) {
     const w = toWorldCell({ x, y });
-    const expected = !yardWalkable({ x, y });
+    const expected = !yardWalkable({ x, y }) || (x === 14 && y === 6);
     assert.equal(worldSolid(w), expected, `${x},${y}`);
   }
   assert.ok(worldSolid({ x: 0, y: 0 }) && worldSolid({ x: WORLD_COLS - 1, y: WORLD_ROWS - 1 }));

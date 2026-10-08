@@ -25,6 +25,15 @@ try {
     await page.waitForFunction(() => document.querySelector('.pwp-plaza-reactions')?.dataset.ready === 'true');
   }
   for (const page of [a, b]) { await page.bringToFront(); await page.waitForFunction(() => window.__pixelWorldPhaser.debug().classmates?.length === 1 && window.__pixelWorldPhaser.debug().classmates[0].rendered && window.__pixelWorldPhaser.debug().classmates[0].pet); }
+  // 양쪽 잔디 여백에서도 상대 화면에 실제 위치가 전달되어야 한다.
+  for (const x of [-3, 18]) {
+    await a.bringToFront();
+    await a.evaluate(x => { const h = window.__pixelWorldPhaser, d = h.debug(); h.walkToScreen(((x + 5.5) * 16 - d.camera.x) * d.cssZoom, (200 - d.camera.y) * d.cssZoom); }, x);
+    await a.waitForFunction(x => { const d = window.__pixelWorldPhaser.debug(); return !d.moving && Math.abs(d.x - (x + 5.5) * 16) < 1; }, x, { timeout: 20000 });
+    await b.bringToFront();
+    await b.waitForFunction(x => { const p = window.__pixelWorldPhaser.debug().classmates[0]; return p && p.rendered && Math.abs(p.x - x) < .1 && Math.abs(p.y - 7) < .1; }, x);
+  }
+  console.log('PASS plaza margin presence: left/right grass positions render on the other page');
   // Tapping approaches the stall; only A opens the shop.
   assert.equal(await a.locator('.pwp-panel-access').getByRole('button', { name: '상점', exact: true }).count(), 0);
   await target(a, 'shop');
@@ -82,8 +91,11 @@ try {
   // 달리기 흙먼지: 걸을 때는 없고, 달릴 때만 생겼다가 스스로 사라진다.
   await target(a, 'shop');
   for (let i = 0; i < 8; i++) { const d = await a.evaluate(() => window.__pixelWorldPhaser.debug()); assert.equal(d.dust, 0, 'no dust while walking'); await a.waitForTimeout(60); }
+  await a.waitForFunction(() => window.__pixelWorldPhaser.debug().prompt === 'shop' && !window.__pixelWorldPhaser.debug().moving);
   await a.keyboard.down('Shift');
+  await a.keyboard.down('ArrowDown');
   await a.waitForFunction(() => { const d = window.__pixelWorldPhaser.debug(); return d.running && d.dust > 0; }, null, { timeout: 5000 });
+  await a.keyboard.up('ArrowDown');
   await a.keyboard.up('Shift');
   await a.waitForFunction(() => window.__pixelWorldPhaser.debug().dust === 0, null, { timeout: 3000 });
   await exit(a, 'yard'); await ready(a, 'yard');

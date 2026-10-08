@@ -4,8 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchPixelFurniturePlacement, savePixelRoomLayout } from '../../utils/pixelShop';
 import type { Placement } from '../pixel-room/model';
 import { furnitureRows } from './logic/roomEditing';
-import type { FurniturePlacementRow } from '../../utils/pixelShop';
 import { savedFurniture } from './logic/savedFurniture';
+import { useFurnitureSync } from './ui/useFurnitureSync';
+import type { FurnitureApi } from './ui/useFurnitureSync';
+import { hasNewerBuild } from '../../utils/appVersion';
 import { usePixelShop } from '../pixel-room/usePixelShop';
 import { usePet } from '../pixel-room/pet/usePet';
 import { useFarmInventory } from '../pixel-room/farm/useFarmInventory';
@@ -20,6 +22,9 @@ import type { FishingOverride } from './ui/fishingAdapter';
 import { GameShell } from './GameShell';
 import type { BedLook } from './game/sceneAssets';
 import './gameShell.css';
+
+// 가구 배치의 유일한 기준은 서버(pixel_furniture_placement). 로컬 저장소는 읽지도 쓰지도 않는다.
+const serverFurniture: FurnitureApi = { load: fetchPixelFurniturePlacement, save: savePixelRoomLayout };
 
 interface Props {
   isAdmin?: boolean;
@@ -42,26 +47,24 @@ export default function PixelWorldPhaser({ userId, pointsBalance, onExit, onPixe
   const inventory = useFarmInventory(userId);
   const harvestCount = farm.snapshot?.harvestCount;
   useEffect(() => { if (harvestCount !== undefined) void inventory.refresh(); }, [harvestCount, inventory.refresh]);
-  const [placement, setPlacement] = useState<{ userId: string; rows: FurniturePlacementRow[] } | null>(null);
-  const [roomError, setRoomError] = useState(false);
-  const [retry, setRetry] = useState(0);
-  useEffect(() => {
-    let cancelled = false;
-    setRoomError(false);
-    // 기존 방과 같은 서버 조회만 사용한다. 로컬 배치 이관/저장은 기존 방에서 맡는다.
-    fetchPixelFurniturePlacement(userId).then(rows => {
-      if (!cancelled) setPlacement({ userId, rows });
-    }).catch(() => { if (!cancelled) setRoomError(true); });
-    return () => { cancelled = true; };
-  }, [userId, retry]);
-  const furniture = useMemo(() => savedFurniture(placement?.userId === userId ? placement.rows : [],
-    shop.catalog, shop.ownedIds), [placement, userId, shop.catalog, shop.ownedIds]);
+  // 처음·내 방 입장·탭 복귀 때 서버에서 다시 읽고, 저장 전에는 다른 기기의 변경을 확인한다(ui/useFurnitureSync).
+  const room = useFurnitureSync(userId, serverFurniture);
+  const roomError = room.error;
+  const furniture = useMemo(() => savedFurniture(room.rows ?? [], shop.catalog, shop.ownedIds), [room.rows, shop.catalog, shop.ownedIds]);
   const saveFurniture = async (layout: Placement[]) => {
-    const rows = furnitureRows(layout, shop.catalog, shop.ownedIds);
-    const result = await savePixelRoomLayout(rows);
-    if (!result.ok) throw new Error('방 배치를 저장하지 못했어요. 다시 시도해 주세요.');
-    setPlacement({ userId, rows });
+    await room.save(furnitureRows(layout, shop.catalog, shop.ownedIds));
   };
+  const { refresh: refreshRoom } = room;
+  // 오래 켜 둔 기기가 예전 배포를 계속 돌리지 않도록, 들어올 때와 다시 보일 때 새 버전을 확인한다.
+  const [outdated, setOutdated] = useState(false);
+  const checkVersion = useCallback(() => { void hasNewerBuild().then(newer => { if (newer) setOutdated(true); }); }, []);
+  const onScene = useCallback((id: string) => { if (id === 'room') { refreshRoom(); checkVersion(); } }, [refreshRoom, checkVersion]);
+  useEffect(() => {
+    checkVersion();
+    const visible = () => { if (document.visibilityState === 'visible') checkVersion(); };
+    document.addEventListener('visibilitychange', visible);
+    return () => document.removeEventListener('visibilitychange', visible);
+  }, [checkVersion]);
   const farmRef = useRef(farm); farmRef.current = farm;
   // farm.now는 1초마다 바뀌지만, 밭 그림은 단계/촉촉함이 실제로 바뀔 때만 다시 만든다(문자열 키로 접기).
   const key = bedsKey(farm.snapshot, farm.now);
@@ -73,16 +76,21 @@ export default function PixelWorldPhaser({ userId, pointsBalance, onExit, onPixe
   // 외형은 서버 확인이 끝난 뒤에 한 번만 장면을 만든다(기본 모습으로 먼저 떴다가 바뀌는 깜빡임 방지).
   const appearance = shop.ready ? shop.equipped : null;
   if (roomError) return <div className="pwp-root pwp-loading" role="alert">방 배치를 불러오지 못했어요.
-    <button type="button" onClick={() => setRetry(value => value + 1)}>다시 불러오기</button>
+    <button type="button" onClick={room.retry}>다시 불러오기</button>
     <button type="button" onClick={onExit}>나가기</button></div>;
-  if (!appearance || !pet.ready || placement?.userId !== userId) return <div className="pwp-root pwp-loading" role="status">앞마당으로 가는 중…</div>;
-  return <GameShell fishingAdapter={fishingAdapter} clockOverride={clockOverride} userId={userId} appearance={appearance} pet={!pet.error && pet.active && shop.ownedIds.has(pet.active) ? pet.active : null} balance={shop.balance} beds={beds} furniture={furniture}
+  if (!appearance || !pet.ready || !room.rows) return <div className="pwp-root pwp-loading" role="status">앞마당으로 가는 중…</div>;
+  return <>{outdated && <div className="pwp-update" role="alert" style={UPDATE_STYLE}>새 버전이 나왔어요. 새로고침하면 다른 기기와 같은 화면이 돼요.
+    <button type="button" onClick={() => location.reload()} style={{ marginLeft: 8, font: 'inherit', fontWeight: 800 }}>새로고침</button></div>}
+  <GameShell onSceneChange={onScene} fishingAdapter={fishingAdapter} clockOverride={clockOverride} userId={userId} appearance={appearance} pet={!pet.error && pet.active && shop.ownedIds.has(pet.active) ? pet.active : null} balance={shop.balance} beds={beds} furniture={furniture}
     onSaveFurniture={saveFurniture} scarecrowLine={scarecrowLine} onExit={onExit} panels={{ shop, pet }} farmAdapter={{ farm, inventory, contest: fetchWeeklyCropContest, submit: async id => {
       const result = await submitFarmCrop(id);
       if (result.ok) { onPointsReward?.(result.rewardPoints); shop.reload(); }
       return result;
-    } }} />;
+    } }} /></>;
 }
+
+const UPDATE_STYLE = { position: 'fixed', left: '50%', top: 'max(56px, calc(env(safe-area-inset-top) + 56px))', transform: 'translateX(-50%)', zIndex: 2147483001,
+  background: '#fff4d9', color: '#3b2a1a', border: '2px solid #3b2a1a', borderRadius: 8, padding: '8px 12px', fontWeight: 700, fontSize: 14, maxWidth: 'calc(100vw - 32px)' } as const;
 
 function bedsKey(snapshot: ReturnType<typeof useFarm>['snapshot'], now: number): string {
   return FARM_BEDS.map((_, index) => {

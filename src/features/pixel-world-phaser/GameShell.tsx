@@ -31,9 +31,12 @@ import type { PanelKind } from './logic/panels';
 import { fishingPanelFor, panelFrozen } from './logic/panels';
 import { PlazaBridge } from './ui/PlazaBridge';
 import type { PlazaPanel } from './ui/PlazaBridge';
+import { RiverBridge } from './ui/RiverBridge';
+import type { RiverFishReporter } from './logic/riverPresence';
 
 import { useFishing } from './ui/useFishing';
 import type { FishingHandle } from './ui/useFishing';
+import { ReelBar } from './ui/ReelBar';
 import { CatchCard } from './ui/CatchCard';
 
 import { FarmPanels } from './ui/FarmPanels';
@@ -55,6 +58,8 @@ export interface GameShellProps {
   /** 내 방 가구 배치(서버 값). 완료된 편집 결과도 같은 경로로 반영한다. */
   furniture: readonly Placement[];
   onSaveFurniture?: (layout: Placement[]) => Promise<void>;
+  /** 장면이 바뀔 때(내 방 입장 시 서버 배치를 다시 읽는 데 쓴다). */
+  onSceneChange?: (id: SceneId) => void;
   /** 허수아비 대사 한 줄(기존 scarecrowLines.ts). 호출할 때마다 새로 뽑는다. */
   scarecrowLine: () => string;
   onExit: () => void;
@@ -105,7 +110,7 @@ async function leaveFullscreen() {
 }
 
 // 상위가 1초마다(밭 시계) 다시 그려져도, 넘겨받는 값이 같으면 셸은 다시 그리지 않는다.
-export const GameShell = memo(function GameShell({ appearance, pet, balance, beds, furniture, onSaveFurniture, scarecrowLine, onExit, panels, farmAdapter, fishingAdapter, newFishSpeciesId, clockOverride, userId = 'guest' }: GameShellProps) {
+export const GameShell = memo(function GameShell({ appearance, pet, balance, beds, furniture, onSaveFurniture, onSceneChange, scarecrowLine, onExit, panels, farmAdapter, fishingAdapter, newFishSpeciesId, clockOverride, userId = 'guest' }: GameShellProps) {
   useLayoutEffect(() => {
     let viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
     const created = !viewport;
@@ -156,7 +161,10 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     pointers.current.clear(); stickOrigin.current = null;
     if (ring.current) ring.current.style.opacity = '0';
   }, [controls]);
-  const fishing = useFishing({ adapter: fishingAdapter, handle: handle as RefObject<(WorldGameHandle & FishingHandle) | null>, scene: scene?.id ?? null, pet, freeze: freezeFishing });
+  // 강가 실시간(RiverBridge)이 마운트된 동안만 채워진다. 낚시 단계를 친구들에게 알린다.
+  const riverReporter = useRef<RiverFishReporter | null>(null);
+  const reportRiverFishing = useCallback<RiverFishReporter>(report => riverReporter.current?.(report), []);
+  const fishing = useFishing({ adapter: fishingAdapter, handle: handle as RefObject<(WorldGameHandle & FishingHandle) | null>, scene: scene?.id ?? null, pet, freeze: freezeFishing, report: reportRiverFishing });
   const fishingRef = useRef(fishing); fishingRef.current = fishing;
   // 방금 처음 잡은 물고기 — 거북이가 도감을 열 때 "새 친구" 인사를 한다. 도감을 한 번 닫으면 잊는다.
   const [freshSpecies, setFreshSpecies] = useState<string | null>(null);
@@ -200,8 +208,8 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
       handle.current?.setFurniture(next);
       endRoomEdit();
       setRoomMessage('가구 배치를 저장했어요.');
-    } catch {
-      setRoomMessage('방 배치를 저장하지 못했어요. 다시 시도해 주세요.');
+    } catch (error) {
+      setRoomMessage(error instanceof Error && error.message ? error.message : '방 배치를 저장하지 못했어요. 다시 시도해 주세요.');
     } finally { roomSaving.current = false; setRoomPending(false); }
   };
   const placeAt = (point: Point) => {
@@ -273,6 +281,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
   };
   const bedsRef = useRef(beds); bedsRef.current = beds;
   const furnitureRef = useRef(furniture); furnitureRef.current = furniture;
+  const onSceneChangeRef = useRef(onSceneChange); onSceneChangeRef.current = onSceneChange;
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -295,6 +304,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
           onScene: (id, title) => {
             const info = { id, title, visit: performance.now() };
             setScene(info); setToast(info);
+            onSceneChangeRef.current?.(id);
           },
         } satisfies WorldEvents);
         if (cancelled) { game.destroy(); return; }
@@ -639,6 +649,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     </div></div>}
     {(panel === 'shop' || panel === 'wardrobe') && panels && <GamePanels kind={panel} adapter={panels} onClose={closePanel} />}
     {(panel === 'turtle' || panel === 'fishboard') && <FishingPanels key={panel} kind={panel} adapter={fishingAdapter} newSpeciesId={newFishSpeciesId ?? freshSpecies} onClose={() => { if (panel === 'turtle') setFreshSpecies(null); closePanel(); }} />}
+    {scene?.id === 'river' && status === 'ready' && <RiverBridge key={'river:' + scene.visit} handle={handle} appearance={appearance} pet={pet} panel={panel} reporter={riverReporter} />}
     {scene?.id === 'plaza' && status === 'ready' && <PlazaBridge key={'plaza:' + scene.visit} handle={handle} appearance={appearance} pet={pet} userId={userId} panel={panel} onClose={closePanel} />}
     {panel && panel !== 'turtle' && panel !== 'fishboard' && panel !== 'furniture' && panel !== 'shop' && panel !== 'wardrobe' && panel !== 'contest' && panel !== 'well' && panel !== 'bench' && <FarmPanels key={panel} kind={panel} adapter={farmAdapter} onClose={closePanel}
       onCollection={() => openPanel('collection')} onTalk={() => { closePanel(); openDialogue('scarecrow'); }}
@@ -653,6 +664,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     {!placing && panel !== 'furniture' && roomMessage && <div className="pwp-room-result" role="status">{roomMessage}</div>}
     {!placing && petMessage && <div className="pwp-pet-message" role="status" aria-live="polite">{petMessage}</div>}
     {!placing && panel !== 'furniture' && toast && <div key={toast.visit} className="pwp-toast" role="status" style={{ top: hud.y + hud.height + 6 }}>{toast.title}</div>}
+    {fishing.reelState && <ReelBar game={fishing.reelState} />}
     {fishing.caught && <CatchCard caught={fishing.caught} onHide={fishing.hideCatch} />}
     {fishing.message && <div className="pwp-fishing-message" role="status">{fishing.message}</div>}
     {status !== 'ready' && <div className="pwp-loading" role="status">

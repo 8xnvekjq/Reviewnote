@@ -32,9 +32,21 @@ test('invalid extension falls back to legacy coordinates and invalid pets are st
   const state = plazaStoreReducer(createPlazaStoreState(), { type: 'broadcast', player: { ...old, version: 2, pet: 'unknown' as never } });
   assert.equal(state.players.get('old')!.pet, null);
 });
-test('plaza uses every legacy solid and tile footprint with open return entry and connected exits', () => {
+test('v2 preserves new plaza margin positions while legacy nearest cells remain clamped', () => {
+  for (const position of [{ x: -4.18, y: 7 }, { x: 19.18, y: 15.1 }, { x: 8, y: -4.1 }]) {
+    const payload = continuousPayload({ x: (position.x + 5.5) * 16, y: (position.y + 5.5) * 16 });
+    const state = plazaStoreReducer(createPlazaStoreState(), { type: 'broadcast', player: { ...old, ...payload } });
+    const actual = continuousPosition(state.players.get('old')!);
+    assert.ok(Math.abs(actual.x - position.x) < 1e-10 && Math.abs(actual.y - position.y) < 1e-10);
+    assert.ok(payload.x >= 0 && payload.x <= 15 && payload.y >= 0 && payload.y <= 11);
+  }
+  for (const position of [{ x: -4.51, y: 2 }, { x: 20, y: 2 }, { x: 2, y: 16 }]) {
+    assert.deepEqual(continuousPosition({ ...old, version: 2, position }), { x: old.x, y: old.y });
+  }
+});
+test('plaza preserves scenery footprints with open return entry and connected exits', () => {
   const scene = plazaScene();
-  for (let y = -1; y <= 12; y++) for (let x = -1; x <= 16; x++) assert.equal(scene.solid(plazaCell({ x, y })), !isWalkablePlaza({ x, y }));
+  for (let y = 0; y < 12; y++) for (let x = 0; x < 16; x++) assert.equal(scene.solid(plazaCell({ x, y })), !isWalkablePlaza({ x, y }));
   for (const item of SCENERY) assert.ok(scene.solid(plazaCell(item.footprint)));
   assert.equal(plazaGroundTile(8, 10), 25); assert.equal(plazaGroundTile(4, 3), 12);
   for (const id of ['yard', 'room', 'plaza'] as const) {

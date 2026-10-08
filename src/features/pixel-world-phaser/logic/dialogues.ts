@@ -8,6 +8,7 @@ export interface DialogueText { speaker: string; lines: string[] }
 export interface DialogueContext { scarecrowLine: () => string }
 
 export function dialogueFor(id: string, context: DialogueContext): DialogueText | null {
+  if (id === 'river-sign') return { speaker: '강가 안내판', lines: ['오른쪽으로 쭉 가면 강가가 나와요. 물고기 그림자를 눌러 낚시해 보세요!'] };
   if (id === 'scarecrow') {
     const first = context.scarecrowLine();
     let second = context.scarecrowLine();

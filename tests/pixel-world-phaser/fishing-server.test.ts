@@ -72,38 +72,38 @@ test('admin override params parse strictly', () => {
 });
 
 const noonKst = Date.parse('2026-10-08T03:00:00Z'); // KST 12:00, 낮
-const day = (fixedNow: number, extra: Parameters<typeof createMockFishingAdapter>[0] = {}) => createMockFishingAdapter({ now: () => fixedNow, override: { weather: 'clear' }, ...extra });
+const day = (fixedNow: number, extra: Parameters<typeof createMockFishingAdapter>[0] = {}) => { let now = fixedNow; return createMockFishingAdapter({ now: () => { now += 10_000; return now; }, override: { weather: 'clear' }, ...extra }); };
 
-test('mock: 6 catches per KST day, misses are free, one pending cast with 90 s expiry', async () => {
+test('mock: unlimited catches, throttle, expiry and minimum reel time', async () => {
   let now = noonKst;
-  const mock = createMockFishingAdapter({ now: () => now, seed: 7 });
-  assert.equal((await mock.state()).remaining, 6);
-  const first = await mock.start(null);
-  assert.ok(first.ok);
+  const mock = createMockFishingAdapter({ now: () => now, seed: 7, activePet: 'pet_dog' });
+  assert.equal((await mock.state()).remaining, -1);
+  const first = await mock.start(null); assert.ok(first.ok);
   assert.deepEqual(await mock.start(null), { ok: false, reason: 'pending' });
-  assert.deepEqual(await mock.finish(first.castId, false), { ok: true, landed: false });
-  assert.deepEqual(await mock.finish(first.castId, true), { ok: false }, 'a consumed cast cannot be reused');
-  assert.equal((await mock.state()).remaining, 6, 'a miss does not use the budget');
+  assert.deepEqual(await mock.finish(first.castId, true), { ok: true, landed: false });
+  assert.deepEqual(await mock.finish(first.castId, true), { ok: false });
+  assert.deepEqual(await mock.start(null), { ok: false, reason: 'pending' });
+  now += 2000;
   const stale = await mock.start(null); assert.ok(stale.ok);
   now += 90_000;
-  assert.deepEqual(await mock.finish(stale.castId, true), { ok: false }, 'expired');
-  for (let i = 0; i < 6; i++) {
-    const s = await mock.start(null); assert.ok(s.ok);
-    const f = await mock.finish(s.castId, true); assert.ok(f.ok && f.landed);
-    assert.equal(f.remaining, 5 - i);
+  assert.deepEqual(await mock.finish(stale.castId, true), { ok: false });
+  for (let i = 0; i < 12; i++) {
+    const cast = await mock.start(null); assert.ok(cast.ok);
+    assert.ok(cast.difficulty >= 1 && cast.difficulty <= 5);
+    now += 10_000;
+    const result = await mock.finish(cast.castId, true); assert.ok(result.ok && result.landed);
+    assert.equal(result.remaining, -1);
   }
-  assert.deepEqual(await mock.start(null), { ok: false, reason: 'budget' });
-  assert.equal((await mock.state()).remaining, 0);
-  now += 24 * 3600_000;
-  assert.equal((await mock.state()).remaining, 6, 'next KST day resets');
+  assert.equal((await mock.state()).remaining, -1);
+  assert.notEqual((await mock.state()).sparkleShadow, null);
 });
 
 test('mock: catch facts follow the catalog, phase and weather', async () => {
-  const mock = createMockFishingAdapter({ now: () => Date.parse('2026-10-08T13:00:00Z'), override: { weather: 'clear' }, seed: 3 }); // KST 22:00 밤
+  const mock = day(Date.parse('2026-10-08T13:00:00Z'), { seed: 3 }); // KST 22:00 밤
   const seen: string[] = [];
-  for (;;) {
+  for (let i = 0; i < 6; i++) {
     const s = await mock.start(null);
-    if (!s.ok) { assert.equal(s.reason, 'budget'); break; }
+    assert.ok(s.ok);
     const fish = fishById(mock.peek()!.speciesId)!;
     assert.equal(s.shadow, fish.shadow);
     const f = await mock.finish(s.castId, true);
@@ -142,7 +142,7 @@ test('mock: pet perks — dog sparkle, pigeon hint, bear length, unowned pet ign
     assert.equal(s.hint, rarity === 'rare' || rarity === 'legendary' ? 'sparkle' : null);
     await dog.finish(s.castId, true);
   }
-  assert.equal((await dog.state()).sparkleShadow, null, 'no sparkle once the budget is used');
+  assert.notEqual((await dog.state()).sparkleShadow, null);
 
   const pigeon = day(noonKst, { activePet: 'pet_pigeon' });
   assert.match((await pigeon.state()).pigeonHint ?? '', /친구가 나온대요!$/);
@@ -172,6 +172,11 @@ test('mock is deterministic for a seed', async () => {
 });
 
 test('adapter parsing is defensive', () => {
+  assert.equal(parseFishingState({ remaining: -1 }).remaining, -1);
+  const easy = parseCastStart({ ok: true, castId: 'easy', shadow: 'S', biteDelayMs: 1200, difficulty: -20 });
+  assert.ok(easy.ok && easy.difficulty === 1);
+  const hard = parseCastStart({ ok: true, castId: 'hard', shadow: 'S', biteDelayMs: 1200, difficulty: 99 });
+  assert.ok(hard.ok && hard.difficulty === 5);
   const fb = parseFishingState(null);
   assert.equal(fb.remaining, 0); assert.deepEqual(fb.album, []);
   const s = parseFishingState({ kstDate: '2026-10-08', phase: 'dusk', weather: 'rain', remaining: '3', sparkleShadow: 7, pigeonHint: 5,
@@ -185,7 +190,7 @@ test('adapter parsing is defensive', () => {
   assert.deepEqual(parseCastStart({ ok: false, reason: 'weird' }), { ok: false, reason: 'error' });
   assert.deepEqual(parseCastStart({ ok: true, castId: 'c', shadow: 'XL', biteDelayMs: 1000 }), { ok: false, reason: 'error' });
   assert.deepEqual(parseCastStart({ ok: true, castId: 'c', shadow: 'M', biteDelayMs: 1500, pattern: 'zigzag', hint: 'x', speciesId: 'eel' }),
-    { ok: true, castId: 'c', shadow: 'M', biteDelayMs: 1500, pattern: 'quick', hint: null });
+    { ok: true, castId: 'c', shadow: 'M', biteDelayMs: 1500, difficulty: 1, pattern: 'quick', hint: null });
 
   assert.deepEqual(parseCastFinish('nope'), { ok: false });
   assert.deepEqual(parseCastFinish({ ok: true, landed: false }), { ok: true, landed: false });
@@ -216,7 +221,7 @@ test('adapter never throws and sends override args only when given', async () =>
   const seen: Record<string, unknown>[] = [];
   const ok: FishingRpcClient = { rpc(_fn, args) { seen.push(args ?? {}); return Promise.resolve({ data: { ok: true, castId: 'k', shadow: 'L', biteDelayMs: 2000, pattern: 'long', hint: 'sparkle' }, error: null }); } };
   const admin = createFishingAdapter(ok, { clock: '21:30', weather: 'rain' });
-  assert.deepEqual(await admin.start(null), { ok: true, castId: 'k', shadow: 'L', biteDelayMs: 2000, pattern: 'long', hint: 'sparkle' });
+  assert.deepEqual(await admin.start(null), { ok: true, castId: 'k', shadow: 'L', biteDelayMs: 2000, difficulty: 1, pattern: 'long', hint: 'sparkle' });
   assert.deepEqual(seen[0], { p_pet: null, p_override_clock: '21:30', p_override_weather: 'rain' });
 });
 
@@ -230,4 +235,20 @@ test('migration keeps points untouched and never exposes user ids or names on th
   const faces = (src: string) => /v_faces constant text\[\] := array\[([^\]]+)\]/.exec(src)?.[1].replace(/\s+/g, '');
   const peer = readFileSync(new URL('../../supabase/migrations/20261005000000_exam_peer_solution_animal_faces.sql', import.meta.url), 'utf8');
   assert.equal(faces(board), faces(peer));
+});
+
+test('v2 migration retains security, unlimited compatibility and timing checks', () => {
+  const v2 = readFileSync(new URL('../../supabase/migrations/supabase_pixel_fishing_v2.sql', import.meta.url), 'utf8');
+  assert.equal((v2.match(/security definer set search_path = ''/g) ?? []).length, 3);
+  assert.equal((v2.match(/'remaining', -1/g) ?? []).length, 3);
+  assert.doesNotMatch(v2, /reason', 'budget'|>= 6|v_used < 6/);
+  assert.match(v2, /interval '2 seconds'/);
+  assert.match(v2, /interval '90 seconds'/);
+  assert.match(v2, /k.bite_delay_ms \+ 1500 \+ \(v_difficulty - 1\) \* 375/);
+  assert.match(v2, /fish_start_throttle enable row level security/);
+  assert.equal((v2.match(/if u is null then/g) ?? []).length, 3);
+  assert.match(v2, /where id = p_cast_id and user_id = u/);
+  assert.match(v2, /pg_advisory_xact_lock/);
+  assert.equal((v2.match(/v_difficulty := least\(5/g) ?? []).length, 2);
+  assert.match(v2, /select \* into s from public.pixel_fish_species where id = k.species_id/);
 });

@@ -55,7 +55,7 @@ try {
         await page.getByRole('button', { name: '거북이', exact: true }).click();
         if (mode === 'error' || mode === 'board-error') await page.getByRole('button', { name: '다시 시도' }).click();
         await page.locator('.pwp-fish-slot').last().waitFor();
-        if (mode === 'budget') assert.match(await page.locator('.pwp-turtle-lines').textContent(), /내일 또 와요/);
+        if (mode === 'budget') assert.doesNotMatch(await page.locator('.pwp-turtle-lines').textContent(), /내일 또 와요/);
         if (mode === 'empty') {
           assert.equal(await page.locator('[data-caught=true]').count(), 0);
           await page.keyboard.press('Escape');

@@ -38,6 +38,13 @@ export function createFishingFx(scene: Phaser.Scene, anchors: FishingAnchors): F
       bobber.setVisible(true).setPosition(x, y);
       if ('setFrame' in bobber) (bobber as Phaser.GameObjects.Sprite).setFrame(game.phase === 'bite' ? 2 : game.nibble >= 0 ? 1 : 0);
       bang.setPosition(from.x, from.y - 18).setVisible(game.phase === 'bite');
+    } else if (game.phase === 'reeling') {
+      // 릴을 감는 동안: 팽팽한 줄, 물에 잠긴 찌가 파르르 떤다(친구 화면의 riverPeers와 같은 느낌).
+      const x = to.x + Math.sin(now / 45) * 1.5, y = to.y + 3 + Math.cos(now / 60);
+      line.clear().lineStyle(1, 0xece3ca, 0.95).lineBetween(from.x, from.y, x, y);
+      bobber.setVisible(true).setPosition(x, y);
+      if ('setFrame' in bobber) (bobber as Phaser.GameObjects.Sprite).setFrame(2);
+      bang.setVisible(false);
     } else { line.clear(); bobber.setVisible(false); bang.setVisible(false); }
     if (game.phase === 'bite' && previous !== 'bite') {
       const splash = scene.textures.exists('fishing-splash') ? scene.add.sprite(to.x, to.y, 'fishing-splash') : scene.add.ellipse(to.x, to.y, 12, 5).setStrokeStyle(1, 0xe6f5f0);

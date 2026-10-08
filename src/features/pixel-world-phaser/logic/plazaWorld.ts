@@ -1,12 +1,14 @@
 // 기존 광장의 칸/충돌을 그대로 쓰고 카메라용 숲 여백만 더한다.
 import { SCENERY, COURTYARD, PATHS, inRect } from '../../pixel-room/plaza/plazaLayout';
-import { isWalkablePlaza, PLAZA_ENTRANCE, findSpawn } from '../../pixel-room/plaza/plazaModel';
+import { PLAZA_ENTRANCE, findSpawn } from '../../pixel-room/plaza/plazaModel';
 import type { SceneSpec } from './scenes';
 import type { Point } from './joystick';
 import { TILE, cellCenter } from './world';
 export const PLAZA_MARGIN = 5;
 export const plazaCell = (p: Point): Point => ({ x: p.x + PLAZA_MARGIN, y: p.y + PLAZA_MARGIN });
-export const plazaSolid = (p: Point) => !isWalkablePlaza({ x: p.x - PLAZA_MARGIN, y: p.y - PLAZA_MARGIN });
+export const plazaSolid = (p: Point) => !Number.isInteger(p.x) || !Number.isInteger(p.y)
+  || p.x <= 0 || p.y <= 0 || p.x >= 25 || p.y >= 21
+  || SCENERY.some(s => inRect({ x: p.x - PLAZA_MARGIN, y: p.y - PLAZA_MARGIN }, s.footprint));
 export function plazaScene(): SceneSpec {
   const targets = SCENERY.filter(s => ['shop', 'well', 'podium', 'notice', 'bench'].includes(s.kind));
   return {
