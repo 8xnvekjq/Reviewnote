@@ -1,6 +1,10 @@
 import type { PixelItem, PublicAvatarAppearance } from '../../pixel-room/shop/types';
 
-export type PanelKind = 'shop' | 'wardrobe';
+export type FishingPanelKind = 'turtle' | 'fishboard';
+export type PanelKind = 'shop' | 'wardrobe' | FishingPanelKind;
+export function fishingPanelFor(interactable: string): FishingPanelKind | null {
+  return interactable === 'turtle' || interactable === 'fishboard' ? interactable : null;
+}
 export function panelItems(catalog: readonly PixelItem[], category: string, owned?: ReadonlySet<string>) {
   return catalog.filter(item => (category === 'all' || item.slot === category) && (!owned || owned.has(item.itemId)));
 }
