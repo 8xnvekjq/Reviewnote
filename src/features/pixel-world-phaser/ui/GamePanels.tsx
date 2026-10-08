@@ -10,6 +10,14 @@ import { AVATAR_SLOTS, EYE_COLOR_OPTIONS, SKIN_TONE_OPTIONS, SLOT_LABELS } from 
 import { itemState, panelItems, pointsShort } from '../logic/panels';
 import type { PanelKind } from '../logic/panels';
 import './panels.css';
+import { FishAlbum } from './FishAlbum';
+import { FishBoard } from './FishBoard';
+import type { FishingAdapter } from './fishingAdapter';
+import type { FishingPanelKind } from '../logic/panels';
+
+export function FishingPanels({ kind, adapter, onClose, newSpeciesId }: { kind: FishingPanelKind; adapter?: FishingAdapter; onClose: () => void; newSpeciesId?: string | null }) {
+  return kind === 'turtle' ? <FishAlbum adapter={adapter} onClose={onClose} newSpeciesId={newSpeciesId} /> : <FishBoard adapter={adapter} onClose={onClose} />;
+}
 
 // 실제 훅과 하네스가 같은 계약으로 데이터와 동작을 전달한다.
 export interface PanelAdapter { shop: ReturnType<typeof usePixelShop>; pet: ReturnType<typeof usePet> }
@@ -49,7 +57,7 @@ export function Window({ title, onClose, onCancel = onClose, children, compact =
     }}><header><h2>{title}</h2><button type="button" aria-label={`${title} 닫기`} onClick={onClose}>✕</button></header>{children}</div>
   </div>;
 }
-export function GamePanels({ kind, adapter: { shop, pet }, onClose }: { kind: PanelKind; adapter: PanelAdapter; onClose: () => void }) {
+export function GamePanels({ kind, adapter: { shop, pet }, onClose }: { kind: Exclude<PanelKind, FishingPanelKind>; adapter: PanelAdapter; onClose: () => void }) {
   const [category, setCategory] = useState('all');
   const [slot, setSlot] = useState('hair');
   const [confirming, setConfirming] = useState<string | null>(null);

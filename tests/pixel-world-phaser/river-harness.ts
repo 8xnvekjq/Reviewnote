@@ -1,0 +1,15 @@
+import { startWorldGame } from '../../src/features/pixel-world-phaser/game/boot';
+import { composeAvatar } from '../../src/features/pixel-world-phaser/game/avatarTexture';
+import { loadTown, loadInterior, loadFloors, loadFurnitureSheets, loadScarecrow, loadPlazaStall } from '../../src/features/pixel-world-phaser/game/sceneAssets';
+import { createControls } from '../../src/features/pixel-world-phaser/controls';
+const avatar = composeAvatar({ top: 'stripe', bottom: 'denim', shoes: 'low', hair: 'bob' });
+const [town, interior, floors, furniture, canvas, scarecrow, plazaStall] = await Promise.all([loadTown(), loadInterior(), loadFloors(), loadFurnitureSheets(), avatar.canvas, loadScarecrow(), loadPlazaStall()]);
+const controls = createControls();
+const taps: number[] = [], panels: string[] = [];
+const handle = await startWorldGame(document.getElementById('stage')!, { assets: { town, interior, floors, furniture, avatar: { key: avatar.key, canvas }, scarecrow, plazaStall, pet: null }, beds: [], furniture: [] }, controls, { onPrompt() {}, onTalk() {}, onPanel(panel) { panels.push(panel); }, onScene() {}, onShadowTap(index) { taps.push(index); } });
+Object.assign(window, { riverTest: { handle, controls, taps, panels } });
+handle.setWorldTime('day', 'clear');
+handle.setShadows([{ index: 0, size: 'S', sparkle: true }, { index: 1, size: 'M', sparkle: false }, { index: 2, size: 'L', sparkle: false }]);
+document.getElementById('stage')!.addEventListener('pointerup', event => { handle.walkToScreen(event.clientX, event.clientY); });
+window.addEventListener('keydown', event => { if (event.code === 'Space') handle.interact(); });
+window.addEventListener('pagehide', () => handle.destroy(), { once: true });

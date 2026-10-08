@@ -1,6 +1,6 @@
 // 로그인 없이 새 Pixel World(베타) 앞마당을 띄우는 하네스. 실제 GameShell을 가짜 외형/펫으로 부팅한다.
 // 주소 파라미터: ?pet=pet_dog|pet_duck|pet_bear|pet_pigeon|none, ?top=blouse_rose&bottom=bootcut_blue&hair=long_black&shoes=low&skin=umber&eyes=sky
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { GameShell } from '../../src/features/pixel-world-phaser/GameShell';
 import PixelWorldPhaser from '../../src/features/pixel-world-phaser/PixelWorldPhaser';
@@ -13,6 +13,10 @@ import type { FarmSnapshot, HarvestedCrop } from '../../src/features/pixel-room/
 import { farmStage, farmMoisture, computeSubmitReward } from '../../src/features/pixel-room/farm/farmModel';
 import type { PanelAdapter } from '../../src/features/pixel-world-phaser/ui/GamePanels';
 import type { Placement } from '../../src/features/pixel-room/model';
+
+import type { FishingAdapter } from '../../src/features/pixel-world-phaser/ui/fishingAdapter';
+import { createMockFishingAdapter } from '../../src/features/pixel-world-phaser/ui/fishingAdapterMock';
+import { parseClockOverride } from '../../src/features/pixel-world-phaser/logic/worldClock';
 
 const params = new URLSearchParams(location.search);
 const appearance: PublicAvatarAppearance = {
@@ -27,6 +31,17 @@ const furniture = [{ type: 'desk', x: 3, y: 4 }, { type: 'bed', x: 0, y: 0 }, { 
 const farmNow = Date.parse('2026-10-08T03:00:00Z');
 const fakeContest: FarmAdapter['contest'] = async () => ({ weekStart: '2026-10-05', top: [{ rank: 1, sizeScore: 82, submitterLabel: '토마토 친구' }], mine: { rank: null, sizeScore: null, participantCount: 1 } });
 function Harness() {
+  // 낚시: ?fishing=1 이면 목(mock) 어댑터. 하네스는 관리자처럼 ?pwClock=21:30&pwWeather=rain 을 받는다.
+  const clockOverride = useMemo(() => parseClockOverride(location.search) ?? undefined, []);
+  const fishingAdapter = useMemo((): FishingAdapter | undefined => {
+    if (!params.has('fishing')) return undefined;
+    const adapter = createMockFishingAdapter({ seed: 7, override: clockOverride, classmates: [
+      { speciesId: 'carp', lengthCm: 41.2, animal: '🐻', caughtAt: new Date(Date.now() - 3 * 3600000).toISOString() },
+      { speciesId: 'pirami', lengthCm: 13.4, animal: '🐰', caughtAt: new Date(Date.now() - 20 * 60000).toISOString() },
+    ] });
+    if (params.get('fishingBudget') === '0') return { ...adapter, state: async () => ({ ...await adapter.state(), remaining: 0, sparkleShadow: null }) };
+    return adapter;
+  }, []);
   const [roomLayout, setRoomLayout] = useState<readonly Placement[]>(furniture);
   const [snapshot, setSnapshot] = useState<FarmSnapshot>({ serverNow: new Date(farmNow).toISOString(), today: '2026-10-08', harvestCount: 0, bestSize: null, lastHarvestSize: null,
     plots: [{ index: 0, revision: 1, crop: { id: 'ripe', plantedAt: '2026-10-01T00:00:00Z', readyAt: '2026-10-05T00:00:00Z', lastWateredOn: '2026-10-03', careCount: 3, reviewGained: 0 } }, { index: 1, revision: 1, crop: null }] });
@@ -73,7 +88,7 @@ function Harness() {
   return open
     ? params.has('saved')
       ? <PixelWorldPhaser userId="scene-test-user" pointsBalance={1234} onExit={() => setOpen(false)} />
-      : <GameShell appearance={look} pet={active} balance={balance} panels={adapter} farmAdapter={params.has('farm') ? farmAdapter : undefined} beds={params.has('farm') ? farmBeds : [...beds]} furniture={roomLayout} onSaveFurniture={async layout => { await new Promise(resolve => setTimeout(resolve, 100)); if (params.has('roomSaveError')) throw new Error('저장하지 못했어요. 다시 시도해 주세요.'); setRoomLayout(layout); }} scarecrowLine={() => pickScarecrowLine(null, Date.now())} onExit={() => setOpen(false)} />
+      : <GameShell fishingAdapter={fishingAdapter} clockOverride={clockOverride} appearance={look} pet={active} balance={balance} panels={adapter} farmAdapter={params.has('farm') ? farmAdapter : undefined} beds={params.has('farm') ? farmBeds : [...beds]} furniture={roomLayout} onSaveFurniture={async layout => { await new Promise(resolve => setTimeout(resolve, 100)); if (params.has('roomSaveError')) throw new Error('저장하지 못했어요. 다시 시도해 주세요.'); setRoomLayout(layout); }} scarecrowLine={() => pickScarecrowLine(null, Date.now())} onExit={() => setOpen(false)} />
     : <main style={{ padding: 24 }}><p data-testid="exited">게임에서 나왔어요.</p><button type="button" onClick={() => setOpen(true)}>다시 들어가기</button></main>;
 }
 createRoot(document.getElementById('root')!).render(<Harness />);

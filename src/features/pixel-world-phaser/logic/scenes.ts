@@ -9,8 +9,9 @@ import type { Placement } from '../../pixel-room/model';
 import { yardScene } from './yardWorld';
 import { roomScene } from './roomWorld';
 import { plazaScene } from './plazaWorld';
+import { riverScene } from './riverWorld';
 
-export type SceneId = 'yard' | 'room' | 'plaza';
+export type SceneId = 'yard' | 'room' | 'plaza' | 'river';
 /** 출구가 데려가는 곳: 장면 + 그 장면의 입구 이름. */
 export interface SceneLink { scene: SceneId; entry: string }
 /** 발이 이 칸들 중 하나에 들어서면 장면을 넘어간다. */
@@ -32,7 +33,7 @@ export interface SceneData { furniture: readonly Placement[] }
 
 export const FIRST_SCENE: SceneId = 'yard';
 export function buildScene(id: SceneId, data: SceneData): SceneSpec {
-  return id === 'plaza' ? plazaScene() : id === 'room' ? roomScene(data.furniture) : yardScene();
+  return id === 'river' ? riverScene() : id === 'plaza' ? plazaScene() : id === 'room' ? roomScene(data.furniture) : yardScene();
 }
 
 /** 지금 발이 밟고 있는 출구. */

@@ -28,7 +28,7 @@ try {
     console.debug=(...args)=>{window.plazaLogs.push(args);debug(...args);};
   });
   await page.route('**/src/services/supabase.ts',route=>route.fulfill({contentType:'application/javascript',body:"export { supabase } from '/tests/plaza/fakeRealtime.mjs';"}));
-  await page.goto('http://127.0.0.1:5174/tests/plaza/reconnect.html');
+  await page.goto((process.env.PWP_BASE ?? 'http://127.0.0.1:5174') + '/tests/plaza/reconnect.html');
   await page.waitForFunction(()=>document.querySelector('#sender')?.dataset.ready==='true');
   const move=async(x,moving=true)=>page.evaluate(({x,moving})=>window.plazaSender({x,y:0,direction:'Right',moving}),{x,moving});
   const read=async()=>page.evaluate(()=>({raw:JSON.parse(document.querySelector('#raw').textContent).find(p=>p.sessionId==='sender'),rendered:JSON.parse(document.querySelector('#smoothed').textContent).find(p=>p.sessionId==='sender')}));
