@@ -19,7 +19,7 @@ import { dialogueFor } from './logic/dialogues';
 import type { SceneId } from './logic/scenes';
 import type { FurnitureType, Placement } from '../pixel-room/model';
 import { composeAvatar } from './game/avatarTexture';
-import { loadBed, loadFloors, loadFurnitureSheets, loadInterior, loadPetSheet, loadScarecrow, loadTown, loadPlazaStall } from './game/sceneAssets';
+import { loadBearRide, loadBed, loadFloors, loadFurnitureSheets, loadInterior, loadPetSheet, loadScarecrow, loadTown, loadPlazaStall } from './game/sceneAssets';
 import type { BedLook } from './game/sceneAssets';
 import type { Prompt, WorldGameHandle, WorldEvents } from './game/boot';
 import './gameShell.css';
@@ -153,6 +153,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
   const [layout, setLayout] = useState<GameLayout>(() => gameLayout(window.innerWidth, window.innerHeight));
   const layoutRef = useRef(layout); layoutRef.current = layout;
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [riding, setRiding] = useState(false);
   const [petMessage, setPetMessage] = useState('');
   useEffect(() => { if (!petMessage) return; const timer = window.setTimeout(() => setPetMessage(''), 4500); return () => clearTimeout(timer); }, [petMessage]);
   const [prompt, setPrompt] = useState<Prompt | null>(null);
@@ -297,18 +298,19 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     (async () => {
       try {
         const avatar = composeAvatar(appearance);
-        const [town, interior, floors, furnitureSheets, avatarCanvas, petSource, scarecrow, bedImages, { startWorldGame }, plazaStall] = await Promise.all([
+        const [town, interior, floors, furnitureSheets, avatarCanvas, petSource, scarecrow, bedImages, { startWorldGame }, plazaStall, bearRide] = await Promise.all([
           loadTown(), loadInterior(), loadFloors(), loadFurnitureSheets(), avatar.canvas, pet ? loadPetSheet(pet) : Promise.resolve(null),
-          Promise.resolve().then(loadScarecrow), Promise.resolve().then(() => Promise.all(bedsRef.current.map(loadBed))), import('./game/boot'), Promise.resolve().then(loadPlazaStall),
+          Promise.resolve().then(loadScarecrow), Promise.resolve().then(() => Promise.all(bedsRef.current.map(loadBed))), import('./game/boot'), Promise.resolve().then(loadPlazaStall), loadBearRide(),
         ]);
         if (cancelled || !stage.current) return;
         const game = await startWorldGame(stage.current, {
-          assets: { town, interior, floors, furniture: furnitureSheets, avatar: { key: avatar.key, canvas: avatarCanvas }, pet: pet && petSource ? { id: pet, source: petSource } : null, scarecrow, plazaStall },
+          assets: { bearRide, town, interior, floors, furniture: furnitureSheets, avatar: { key: avatar.key, canvas: avatarCanvas }, pet: pet && petSource ? { id: pet, source: petSource } : null, scarecrow, plazaStall },
           beds: bedImages, furniture: furnitureRef.current, clockOverride,
         }, controls, {
           onShadowTap: (index: number) => { void fishingRef.current.onShadowTap(index); },
           onPrompt: next => setPrompt(next),
           onPetMessage: setPetMessage,
+          onRide: setRiding,
           onTalk: id => talkRef.current(id),
           onPanel: panel => scenePanelRef.current(panel),
           onScene: (id, title) => {
@@ -637,6 +639,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     {level.celebration && <LevelToast level={level.celebration.level} />}
     {panels && <div className="pwp-panel-access" style={{ left: hud.x + 10, top: hud.y + hud.height + 8 }}>
       <button type="button" className="pwp-chip" disabled={status !== 'ready' || !!placing || roomPending} onClick={() => openPanel('wardrobe')}>옷장</button>
+      {riding && <button type="button" className="pwp-chip" aria-label="곰에서 내리기" disabled={!!placing || roomPending} onClick={() => handle.current?.dismount()}>내리기</button>}
       {scene?.id === 'room' && <button type="button" className="pwp-chip" disabled={status !== 'ready' || !onSaveFurniture || !panels.shop.ready || panels.shop.loadError || !!panel || !!dialogue || !!placing || roomPending} onClick={() => { setRoomMessage(''); openPanel('furniture'); }}>꾸미기</button>}
     </div>}
     <button type="button" disabled={!!placing} className="pwp-btn pwp-btn-a" data-pressed={pressed.a} data-prompt={!!prompt || !!dialogue}
@@ -668,7 +671,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     {(panel === 'turtle' || panel === 'fishboard') && <FishingPanels key={panel} kind={panel} adapter={fishingAdapter} shop={panels} newSpeciesId={newFishSpeciesId ?? freshSpecies} onClose={() => { if (panel === 'turtle') setFreshSpecies(null); closePanel(); }} />}
     {scene?.id === 'river' && status === 'ready' && <RiverBridge key={'river:' + scene.visit} handle={handle} appearance={appearance} pet={pet} panel={panel} reporter={riverReporter} />}
     {scene?.id === 'plaza' && status === 'ready' && <PlazaBridge key={'plaza:' + scene.visit} handle={handle} appearance={appearance} pet={pet} userId={userId} panel={panel} onClose={closePanel} />}
-    {panel && panel !== 'weather' && panel !== 'level' && panel !== 'turtle' && panel !== 'fishboard' && panel !== 'furniture' && panel !== 'shop' && panel !== 'wardrobe' && panel !== 'contest' && panel !== 'well' && panel !== 'bench' && <FarmPanels key={panel} kind={panel} adapter={farmAdapter} onClose={closePanel}
+    {panel && panel !== 'weather' && panel !== 'level' && panel !== 'turtle' && panel !== 'fishboard' && panel !== 'furniture' && panel !== 'shop' && panel !== 'wardrobe' && panel !== 'contest' && panel !== 'well' && panel !== 'bench' && <FarmPanels key={panel} petId={pet} riding={riding} onRide={() => { closePanel(); handle.current?.toggleRide(); }} kind={panel} adapter={farmAdapter} onClose={closePanel}
       onXp={level.onXp} onCollection={() => openPanel('collection')} onTalk={() => { closePanel(); openDialogue('scarecrow'); }}
       onPet={kind => { closePanel(); handle.current?.reactPet(kind); }} onFx={(index, action) => handle.current?.farmFx(index, action)} />}
     {panel === 'furniture' && panels && <FurniturePanel furniture={handle.current?.getFurniture() ?? furniture} shop={panels.shop}

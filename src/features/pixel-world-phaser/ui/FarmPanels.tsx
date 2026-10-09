@@ -19,7 +19,8 @@ export interface FarmAdapter {
   contest: () => Promise<WeeklyCropContest>;
 }
 export type ActivityPanel = 'scarecrow' | 'collection' | 'pet' | `farm:${number}`;
-export function FarmPanels({ kind, adapter, onClose, onTalk, onPet, onFx, onCollection, onXp }: {
+export function FarmPanels({ petId, riding, onRide, kind, adapter, onClose, onTalk, onPet, onFx, onCollection, onXp }: {
+  petId?: import('../../pixel-room/pet/petKinds').PetId | null; riding?: boolean; onRide?: () => void;
   onXp?: (gain?: XpGain) => void;
   kind: ActivityPanel; adapter?: FarmAdapter; onClose: () => void; onTalk: () => void; onCollection: () => void;
   onPet: (kind: 'feed' | 'pet') => void; onFx: (index: number, action: string) => void;
@@ -65,7 +66,7 @@ export function FarmPanels({ kind, adapter, onClose, onTalk, onPet, onFx, onColl
   }, [revision, effect, farm?.message, farm?.error, index, onFx, onXp, farm]);
   return <Window title={title} onClose={onClose} compact={kind !== 'collection'}><div className="pwp-panel-content">
     {kind === 'scarecrow' ? <div className="pwp-options"><button onClick={onTalk}>이야기하기</button><button onClick={onCollection}>수확물 보기</button></div>
-      : kind === 'pet' ? <div className="pwp-options"><button onClick={() => onPet('feed')}>먹이 주기</button><button onClick={() => onPet('pet')}>쓰다듬기</button></div>
+      : kind === 'pet' ? <div className="pwp-options"><button onClick={() => onPet('feed')}>먹이 주기</button><button onClick={() => onPet('pet')}>쓰다듬기</button>{petId === 'pet_bear' && onRide && <button onClick={onRide}>{riding ? '내리기' : '타고 다니기'}</button>}</div>
       : !adapter ? <p role="status">농장 정보를 불러오지 못했어요.</p>
       : kind === 'collection' ? <>
         <h3>이번 주 토마토 대회</h3>

@@ -3,6 +3,7 @@
 // 여기서 한 번에 처리한다. 하위 장면은 drawWorld()로 그림만 그린다(어디가 막혔는지·출구·입구는
 // logic/scenes.ts의 장면 정의가 정한다). 입력은 공유 객체(ControlState)를 매 프레임 읽기만 한다.
 import Phaser from 'phaser';
+import { rideState, rideInScene, rideSpeed, riderOffset, rideRow } from '../logic/bearRide';
 import { WorldTint } from './worldTint';
 import { fallbackWorldTime, SERVER_TIME_TRUST_MS } from '../logic/worldTint';
 import type { FishPhase, FishWeather } from '../logic/worldTint';
@@ -41,6 +42,7 @@ const DUST_STEP = 11;
 const REDUCED_MOTION = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 export interface WorldAssets {
+  bearRide?: HTMLImageElement;
   town: HTMLImageElement;
   interior: HTMLImageElement;
   /** 방 바닥/벽 아틀라스(floors-walls). */
@@ -54,6 +56,7 @@ export interface WorldAssets {
 }
 export interface Prompt { id: string; verb: string }
 export interface WorldEvents {
+  onRide?(riding: boolean): void;
   onShadowTap?(index: 0 | 1 | 2): void;
   /** 바라보는 상호작용 대상이 바뀔 때만 호출(매 프레임 아님). */
   onPrompt(prompt: Prompt | null): void;
@@ -67,6 +70,7 @@ export interface WorldEvents {
 }
 /** 장면들이 함께 쓰는 것(장면이 바뀌어도 그대로): 그림, 입력, 셸 연결, 서버 데이터, 화면 비율. */
 export interface WorldContext {
+  riding: boolean;
   /** 서버가 마지막으로 알려 준 낚시 세계 시각(at = 받은 시각, Date.now 기준). */
   worldTime?: { phase: FishPhase; weather: FishWeather; at: number };
   /** 관리자 시험용 시각·날씨 덮어쓰기(관리자일 때만 셸이 넘긴다). */
@@ -82,6 +86,7 @@ export interface WorldContext {
   onSceneGone(scene: WorldScene): void;
 }
 export interface WorldDebug {
+  riding: boolean; mountAnimation: string | null; riderOffset: Point | null;
   worldTint?: ReturnType<WorldTint['debug']>;
   placing: boolean; playerAlpha: number; petAlpha: number | null; bangVisible: boolean;
   avatarKey: string; petId: PetId | null;
@@ -166,6 +171,8 @@ export abstract class WorldScene extends Phaser.Scene {
 
   create() {
     this.spec = buildScene(this.scene.key as SceneId, this.ctx.data);
+    this.ctx.riding = rideInScene(this.ctx.riding, this.spec.id, this.ctx.assets.pet?.id);
+    this.ctx.hooks.onRide?.(this.ctx.riding);
     const spawn = entrySpawn(this.spec, this.entry);
     this.feet = spawn.feet; this.facing = spawn.facing;
     this.ensureSharedTextures();
@@ -175,6 +182,7 @@ export abstract class WorldScene extends Phaser.Scene {
     this.player = this.add.sprite(this.feet.x, this.feet.y, this.ctx.assets.avatar.key, 0).setOrigin(0.5, 31 / 32);
     this.playAvatar(false, 1);
     if (this.ctx.assets.pet) this.addPet(this.ctx.assets.pet.id);
+    if (this.ctx.riding) this.updatePet(0);
     this.bang = this.add.image(0, 0, 'bang').setOrigin(0.5, 1).setVisible(false).setDepth(100000);
     this.tweens.add({ targets: this.bang, scaleY: { from: 1, to: 1.15 }, duration: 380, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     this.exitArmed = !exitAt(this.spec, this.feet);
@@ -201,6 +209,14 @@ export abstract class WorldScene extends Phaser.Scene {
   /** 장면이 바뀌어도 한 번만 만드는 텍스처/애니메이션(아바타·펫·"!"). 텍스처/애니메이션은 게임 전체 공용. */
   private ensureSharedTextures() {
     const { textures, anims } = this;
+    if (!textures.exists('bear-ride') && this.ctx.assets.bearRide) {
+      const texture = textures.addImage('bear-ride', this.ctx.assets.bearRide);
+      if (texture) for (let i = 0; i < 16; i++) texture.add(i, 0, i % 4 * 48, Math.floor(i / 4) * 48, 48, 48);
+      for (let row = 0; row < 3; row++) for (const walking of [false, true]) {
+        anims.create({ key: `bear-ride:${row}:${walking ? 'walk' : 'idle'}`, repeat: -1, frameRate: 1000 / 150,
+          frames: (walking ? [0, 1, 2, 3] : [0]).map(frame => ({ key: 'bear-ride', frame: walking ? row * 4 + frame : 12 + row })) });
+      }
+    }
     if (!textures.exists('bang')) textures.addCanvas('bang', drawBang());
     if (!textures.exists('run-dust')) textures.addCanvas('run-dust', drawDust());
     const { key, canvas } = this.ctx.assets.avatar;
@@ -226,6 +242,7 @@ export abstract class WorldScene extends Phaser.Scene {
   }
 
   refreshPet() {
+    if (this.ctx.assets.pet?.id !== 'pet_bear') this.dismount();
     this.pet?.destroy();
     if (this.petFlight || this.ctx.assets.pet?.id === 'pet_pigeon') {
       this.reaction = null; this.wander = { target: null, nextAt: 0 };
@@ -290,6 +307,9 @@ export abstract class WorldScene extends Phaser.Scene {
     if (this.transitioning) return;
     const target = cellOf(point);
     const item = this.spec.interactables.find(entry => coversCell(entry, target)) ?? null;
+    if (!item && this.ctx.assets.pet?.id === 'pet_bear' && this.pet && Math.hypot(point.x - this.pet.x, point.y - (this.pet.y - 15)) < 20) {
+      if (this.ctx.riding || Math.hypot(this.pet.x - this.feet.x, this.pet.y - this.feet.y) < 40) { this.cancelWalk(); this.ctx.hooks.onPanel('pet'); return; }
+    }
     const path = planPath(cellOf(this.feet), target, this.spec, exitCells(this.spec));
     this.path = path.map(cellCenter);
     this.pathTarget = item?.id ?? null;
@@ -357,14 +377,14 @@ export abstract class WorldScene extends Phaser.Scene {
     if (frozen) this.cancelWalk();
     else if (stick.magnitude > 0) {
       this.cancelWalk();
-      const speed = run ? RUN_SPEED : WALK_SPEED;
+      const speed = (run ? RUN_SPEED : WALK_SPEED) * rideSpeed(this.ctx.riding);
       vx = stick.x * speed; vy = stick.y * speed;
       speedScale = stick.magnitude * (run ? RUN_SPEED / WALK_SPEED : 1);
     } else if (this.path.length) {
       const next = this.path[0];
       const dx = next.x - this.feet.x, dy = next.y - this.feet.y;
       const distance = Math.hypot(dx, dy);
-      const speed = run ? RUN_SPEED : WALK_SPEED;
+      const speed = (run ? RUN_SPEED : WALK_SPEED) * rideSpeed(this.ctx.riding);
       if (distance <= speed * dt) {
         this.feet = { ...next };
         this.path.shift();
@@ -418,13 +438,14 @@ export abstract class WorldScene extends Phaser.Scene {
   }
 
   protected playAvatar(walking: boolean, timeScale: number) {
-    const key = `${this.ctx.assets.avatar.key}:${walking ? 'Walk' : 'Idle'}_${this.facing}`;
+    const key = `${this.ctx.assets.avatar.key}:${walking && !this.ctx.riding ? 'Walk' : 'Idle'}_${this.facing}`;
     if (key !== this.animKey) { this.player.play(key); this.animKey = key; }
     this.player.anims.timeScale = timeScale;
   }
 
   // 펫이 고개를 돌려 기존 시트의 먹기/앉기/짖기 동작을 보여 준다.
   reactPet(kind: 'feed' | 'pet') {
+    this.dismount();
     const pet = this.pet, id = this.ctx.assets.pet?.id;
     if (!pet || !id || this.reaction || (this.petFlight && this.petFlight.phase !== 'ground') || Math.hypot(pet.x - this.feet.x, pet.y - this.feet.y) > 34) return;
     this.cancelWalk();
@@ -478,8 +499,8 @@ export abstract class WorldScene extends Phaser.Scene {
   }
   private petTarget(): Interactable | null {
     const pet = this.pet;
-    if (!pet || this.reaction || (this.petFlight && this.petFlight.phase !== 'ground') || !facesPet(this.feet, this.facing, pet)) return null;
-    return { id: 'pet', cell: cellOf(pet), label: '친구', verb: '놀아주기', action: { kind: 'panel', panel: 'pet' }, bang: { x: pet.x, y: pet.y - 30 } };
+    if (!pet || this.reaction || (this.petFlight && this.petFlight.phase !== 'ground') || (!this.ctx.riding && !facesPet(this.feet, this.facing, pet))) return null;
+    return { id: 'pet', cell: cellOf(pet), label: '친구', verb: '놀아주기', action: { kind: 'panel', panel: 'pet' }, bang: { x: pet.x, y: pet.y - (this.ctx.riding ? 48 : 30) } };
   }
   private wanderPet(pet: Phaser.GameObjects.Sprite, sheet: PetSheet, deltaMs: number) {
     const now = this.time.now, solid = this.spec.solid, key = pet.texture.key;
@@ -510,10 +531,42 @@ export abstract class WorldScene extends Phaser.Scene {
     if (Math.abs(dx) > 4) pet.setFlipX(sheet.facesLeft ? dx > 0 : dx < 0);
     pet.play(key + ':walk', true); pet.setDepth(pet.y);
   }
+  toggleRide() {
+    if (this.transitioning || !this.textures.exists('bear-ride')) return;
+    this.setRide(rideState(this.ctx.riding, 'toggle', this.ctx.assets.pet?.id));
+  }
+  dismount() { this.setRide(false); }
+  private setRide(riding: boolean) {
+    if (this.ctx.riding === riding) return;
+    this.ctx.riding = riding; this.reaction = null;
+    this.wander = { target: null, nextAt: this.time.now + 1500 };
+    this.cancelWalk(); this.animKey = ''; this.player.setCrop(); this.shadow.setSize(14, 5);
+    this.playAvatar(false, 1);
+    this.ctx.hooks.onRide?.(riding);
+    this.updatePet(0);
+  }
   private updatePet(deltaMs: number) {
     const pet = this.pet, sheet = this.petSheet;
     if (!pet || !sheet) return;
     if (!this.petFollow) return;
+    if (this.ctx.riding) {
+      const row = rideRow(this.facing);
+      if (pet.texture.key !== 'bear-ride') { pet.anims.stop(); pet.setTexture('bear-ride'); }
+      pet.setFlipX(this.facing === 'Right');
+      pet.play(`bear-ride:${row}:${this.moving ? 'walk' : 'idle'}`, true);
+      pet.anims.timeScale = this.running ? RUN_SPEED / WALK_SPEED : 1;
+      const step = Number(pet.frame.name) % 4;
+      const bob = this.moving && step % 2 === 1 ? -1 : 0;
+      const offset = riderOffset(this.facing);
+      pet.setPosition(Math.round(this.feet.x), Math.round(this.feet.y)).setDepth(this.feet.y);
+      this.player.setCrop(0, 0, 32, 21).setPosition(Math.round(this.feet.x + offset.x), Math.round(this.feet.y + offset.y + bob)).setDepth(this.feet.y + 0.1);
+      this.shadow.setSize(28, 7);
+      return;
+    }
+    if (pet.texture.key === 'bear-ride') {
+      pet.anims.stop(); pet.setTexture('pet:pet_bear');
+      this.petFollow = createPetFollowState(pet);
+    }
     const follows = this.spec.id === 'plaza' || PET_ALWAYS_FOLLOWS;
     if (this.petFlight) {
       const wasAirborne = this.petFlight.phase !== 'ground';
@@ -634,6 +687,7 @@ export abstract class WorldScene extends Phaser.Scene {
     const ratio = this.ctx.view.ratio;
     const screen = (p: Point): Point => ({ x: Math.round((p.x - camera.worldView.x) * camera.zoom / ratio), y: Math.round((p.y - camera.worldView.y) * camera.zoom / ratio) });
     return {
+      riding: this.ctx.riding, mountAnimation: this.ctx.riding ? this.pet?.anims.currentAnim?.key ?? null : null, riderOffset: this.ctx.riding ? riderOffset(this.facing) : null,
       worldTint: this.outdoorTint?.debug(),
       avatarKey: this.player.texture.key, petId: this.pet ? this.ctx.assets.pet?.id ?? null : null,
       dust: this.dust.size,
@@ -644,7 +698,7 @@ export abstract class WorldScene extends Phaser.Scene {
       zoom: camera.zoom, cssZoom: camera.zoom / ratio, ratio,
       camera: { x: camera.worldView.x, y: camera.worldView.y }, fps: Math.round(this.game.loop.actualFps),
       renderer: this.game.renderer.type === Phaser.WEBGL ? 'webgl' : 'canvas', pathLength: this.path.length,
-      targets: Object.fromEntries(this.spec.interactables.map(item => [item.id, screen(cellCenter(item.cell))])),
+      targets: { ...Object.fromEntries(this.spec.interactables.map(item => [item.id, screen(cellCenter(item.cell))])), ...(this.pet ? { pet: screen({ x: this.pet.x, y: this.pet.y - 15 }) } : {}) },
       exits: Object.fromEntries(this.spec.exits.map(exit => [exit.id, screen(cellCenter(exit.cells[0]))])),
     };
   }

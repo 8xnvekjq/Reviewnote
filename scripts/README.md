@@ -12,6 +12,11 @@
 
 ## 🛠️ 보유 스크립트 목록
 
+### `pixel-world/draw-bear-ride.py`
+* **실행**: `python scripts/pixel-world/draw-bear-ride.py`
+* **용도**: 기존 곰의 색상을 추출해 네 발 걷기(옆·앞·뒤 각 4프레임)와 방향별 쉬기 그림을 재현한다.
+* **출력**: `src/features/pixel-room/pet/assets/bear_ride.png`, `.test-artifacts/bear-ride/sheet-4x.png`, `.test-artifacts/bear-ride/walk.gif`
+
 ### `draw-fishing-art.mjs`
 * **실행**: `node scripts/draw-fishing-art.mjs`
 * **용도**: 강가 타일, 어종, 소품과 기본·대나무·강철·행운·황금 낚싯대 아이콘을 읽기 쉬운 픽셀 맵으로 생성한다.
