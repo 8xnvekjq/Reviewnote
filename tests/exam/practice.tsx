@@ -104,7 +104,7 @@ const adminApi: AdminExamApi = {
 };
 
 if (params.get('compare') === '1') {
-  const compare = createMockReplayCompareApi(params.get('admin') === '1');
+  const compare = createMockReplayCompareApi(params.get('admin') === '1', params.get('compare6') === '1' ? 6 : 3);
   Object.assign(adminApi, compare.api, { listPaperActivity: async () => params.get('admin') !== '1' ? null : [{ paperId: '2025-06-math', students: compare.rows.map(row => ({
     ...row, paperId: '2025-06-math', paperTitle: '수학', round: 1, status: 'submitted', mode: 'free', elective: '미적분',
     startedAt: row.submittedAt, score: 4, maxScore: 100, answeredCount: 3, questionCount: 3, attemptCount: 1, inProgress: false,
