@@ -74,7 +74,7 @@ function PaperActivity({ students, paper, onOpen, onCompare }: { students: Admin
           {students.map(row => (
             <li key={row.studentId}>
               <button type="button" className="exam-admin-activity-row" onClick={() => onOpen(row)} data-testid="exam-admin-student">
-                <span className="exam-admin-activity-name">{row.studentName}</span>
+                <span className="exam-admin-activity-name">{row.isMine ? `내 풀이 · ${row.studentName}` : row.studentName}</span>
                 <span className="exam-admin-activity-score">{activityScore(row, paper)}</span>
                 <span className="exam-admin-activity-meta">{row.round}차{row.attemptCount > 1 ? ` (총 ${row.attemptCount}회)` : ''}{row.status === 'submitted' && row.inProgress ? ' · 다시 푸는 중' : ''} · {activityDate(row.submittedAt ?? row.startedAt)}</span>
               </button>
@@ -84,6 +84,34 @@ function PaperActivity({ students, paper, onOpen, onCompare }: { students: Admin
       </details>}
       {onCompare && <button type="button" className="exam-admin-activity-compare" data-testid="exam-compare-open" data-paper-id={paper.id} onClick={onCompare}>풀이 비교</button>}
     </div>
+  );
+}
+
+/** 관리자: "지난 OMR 결과" 대신 학생들이 최근에 제출한 결과(모든 시험지, 최신순). 누르면 읽기 전용 검토. */
+function RecentStudentResults({ activity, papers, onOpen }: { activity: Map<string, AdminPaperStudentActivity[]>; papers: ExamPaperSummary[]; onOpen: (row: AdminPaperStudentActivity) => void }) {
+  const rows = [...activity.values()].flat()
+    .filter(row => row.status === 'submitted' && row.submittedAt && !row.isMine)
+    .sort((a, b) => (b.submittedAt ?? '').localeCompare(a.submittedAt ?? ''))
+    .slice(0, 10);
+  if (!rows.length) return null;
+  return (
+    <section className="exam-past" aria-label="최근 학생 결과" data-testid="exam-recent-students">
+      <h2 className="exam-setup-title">최근 학생 결과</h2>
+      <ul>
+        {rows.map(row => {
+          const paper = papers.find(p => p.id === row.paperId);
+          return (
+            <li key={row.attemptId}>
+              <button type="button" className="exam-past-row" onClick={() => onOpen(row)} data-testid="exam-recent-student">
+                <span><strong>{row.studentName}</strong> · {paper ? activityScore(row, paper) : `${row.score ?? 0}/${row.maxScore}점`}</span>
+                <span className="rn-caption">{row.paperTitle} · {row.round}차 · {row.mode === 'real' ? '실전' : '자유'} · {activityDate(row.submittedAt!)}</span>
+                <span className="exam-past-arrow" aria-hidden="true">›</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 
@@ -364,7 +392,8 @@ export function ExamStartView({ client, currentUserId, admin, busy, error, onSta
       {livePaper && admin && <AdminLiveView api={admin} paperId={livePaper.id} title={livePaper.title} onClose={() => setLivePaper(null)} />}
       {comparePaper && admin && <AdminReplayCompare api={admin} paperId={comparePaper.id} title={comparePaper.title} onClose={() => setComparePaper(null)} />}
 
-      {past.length > 0 && (
+      {admin && activity && <RecentStudentResults activity={activity} papers={papers ?? []} onOpen={setReviewing} />}
+      {!(admin && activity) && past.length > 0 && (
         <section className="exam-past" aria-label="지난 OMR 결과">
           <h2 className="exam-setup-title">지난 OMR 결과</h2>
           <ul>

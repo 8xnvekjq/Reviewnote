@@ -91,6 +91,9 @@ if (adminMode) {
 const activityRows: AdminPaperStudentActivity[] = adminRows.map((row, index) => ({
   ...row, studentId: `s${index + 1}`, studentName: index === 0 ? '김학생' : '이학생', attemptCount: index === 0 ? 2 : 1, inProgress: index === 0,
 }));
+// 관리자 본인 응시도 학생별 최근 점수에 "내 풀이"로 섞여 온다(최근 학생 결과에는 빠진다).
+if (activityRows[0]) activityRows.push({ ...activityRows[0], studentId: 'me', studentName: '선생님', attemptCount: 1, inProgress: false, isMine: true,
+  submittedAt: new Date(Date.parse(activityRows[0].submittedAt ?? '2026-10-01T00:00:00Z') + 60000).toISOString() });
 const adminApi: AdminExamApi = {
   listPaperSubmissions: async () => [],
   listLivePapers: async () => [],
