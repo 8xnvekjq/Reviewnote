@@ -62,3 +62,18 @@ export function parseClockOverride(search: string | URLSearchParams | null | und
   if (isFishWeather(weather)) out.weather = weather;
   return out.clock || out.weather ? out : null;
 }
+
+export interface WorldOverride { weather?: FishWeather | null; phase?: FishPhase | null; expiresAt: string }
+export interface ServerWorldClock extends WorldClock { override: WorldOverride | null; serverNow: string }
+export const PHASE_MINUTES: Record<FishPhase, number> = { morning: 480, day: 720, evening: 1110, night: 1320 };
+/** 만료 전 전역 설정을 적용한다. */
+export function applyWorldOverride(clock: WorldClock, override: WorldOverride | null | undefined, now = Date.now()): WorldClock {
+ if (!override || !(Date.parse(override.expiresAt) > now)) return { ...clock };
+ const minutes = override.phase ? PHASE_MINUTES[override.phase] : clock.minutes;
+ return { ...clock, minutes, phase: phaseForMinutes(minutes), weather: override.weather ?? clock.weather };
+}
+/** 관리자 개인 시험값이 우선한다. */
+export function applyPersonalClock(clock: WorldClock, override?: FishingOverride | null): WorldClock {
+ const minutes = parseClock(override?.clock) ?? clock.minutes;
+ return { ...clock, minutes, phase: phaseForMinutes(minutes), weather: override?.weather ?? clock.weather };
+}

@@ -1,3 +1,4 @@
+import type { WorldOverride } from '../logic/worldClock';
 import { BAIT_CHARGES, BAIT_PRICE, FISH_XP, TROPHY_XP, MAX_LEVEL, levelForXp, levelBaitDifficulty, hardFishChance, nonnegativeInteger } from '../logic/levels';
 import type { PlayerLevel } from '../logic/levels';
 // 메모리 안에서만 도는 낚시 어댑터 — 브라우저 하네스와 단위 테스트용. 서버(supabase_pixel_fishing.sql)와 같은 규칙:
@@ -7,12 +8,14 @@ import type { PlayerLevel } from '../logic/levels';
 import { FISH_CATALOG, RARITY_WEIGHT, fishById } from '../logic/fishCatalog';
 import type { FishSpecies } from '../logic/fishCatalog';
 import { fishDifficulty } from '../logic/reelGame';
-import { fnv1a32, worldClockAt } from '../logic/worldClock';
+import { applyPersonalClock, applyWorldOverride, fnv1a32, kstParts, worldClockAt } from '../logic/worldClock';
 import { BASIC_ROD, FISHING_RODS, NO_ROD, rodBiteDelayMs, rodDifficulty, rodMinReelMs, rodSpec } from './fishingAdapter';
 import type { BitePattern, CastFinish, CastStart, ClassFishBoard, EquipRodResult, FishAlbumEntry, FishingAdapter, FishingOverride, FishingRod, FishingRodId, FishingState, FishPhase, FishWeather } from './fishingAdapter';
 
 export interface MockCatch { id: string; speciesId: string; lengthCm: number; caughtAt: string; kstDate: string }
 export interface MockFishingOptions {
+  isAdmin?: boolean;
+  worldStore?: { override: WorldOverride | null };
   seed?: number;
   xp?: number;
   baitCharges?: number;
@@ -156,7 +159,9 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
   let castSeq = 0;
   let lastStart = -Infinity;
   const delay = <T>(value: T): Promise<T> => opts.latencyMs ? new Promise(resolve => setTimeout(() => resolve(value), opts.latencyMs)) : Promise.resolve(value);
-  const clock = () => worldClockAt(now(), opts.override ?? null);
+  const store = opts.worldStore ?? { override: null };
+  const globalClock = () => applyWorldOverride(worldClockAt(now()), store.override, now());
+  const clock = () => applyPersonalClock(globalClock(), opts.override);
   const usedOn = (kstDate: string) => catches.filter(c => c.kstDate === kstDate).length;
   const caughtIds = () => new Set(catches.map(c => c.speciesId));
   const pet = (asked: string | null) => opts.activePet === undefined ? asked : asked != null && asked === opts.activePet ? asked : null;
@@ -170,6 +175,13 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
   }
 
   return {
+    async getWorldClock() { return { ...globalClock(), override: store.override && Date.parse(store.override.expiresAt)>now()?store.override:null, serverNow:new Date(now()).toISOString() }; },
+    async adminSetWorldOverride(weather, phase, hours) {
+      if (!opts.isAdmin) return false;
+      const midnight=Date.parse(kstParts(now()).kstDate+'T00:00:00+09:00')+86400000;
+      store.override=weather||phase?{weather,phase,expiresAt:new Date(hours===0?midnight:now()+Math.max(1,Math.min(24,hours))*3600000).toISOString()}:null;
+      return true;
+    },
     async getLevel() { return delay(playerLevel()); },
     async buyBait() {
       if (balance < BAIT_PRICE) return delay({ ok: false, reason: 'insufficient_balance', message: '포인트가 부족해요.' });

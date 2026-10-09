@@ -1,3 +1,4 @@
+import type { ServerWorldClock } from '../logic/worldClock';
 import { MAX_LEVEL, nonnegativeInteger, parseXpGain } from '../logic/levels';
 import type { PlayerLevel, XpGain } from '../logic/levels';
 export type { PlayerLevel, XpGain } from '../logic/levels';
@@ -43,7 +44,7 @@ export type EquipRodResult = { ok: true; rod: FishingRod } | { ok: false; reason
 export type CastFinish = { ok: true; landed: true; speciesId: string; lengthCm: number; rarity: FishRarity; isNew: boolean; isBig: boolean; isPersonalBest: boolean; remaining: number; xpGain?: XpGain } | { ok: true; landed: false } | { ok: false };
 export interface ClassFishBoard { rows: { speciesId: string; lengthCm: number; animal: string; caughtAt: string; teacher?: boolean }[]; classSpecies: number }
 export type BuyBaitResult = { ok: true; newBalance: number; charges: number } | { ok: false; reason: 'insufficient_balance' | 'error'; message?: string };
-export interface FishingAdapter { buyBait?(): Promise<BuyBaitResult>; getLevel?(): Promise<PlayerLevel | null>; state(): Promise<FishingState>; start(pet: string | null): Promise<CastStart>; finish(castId: string, landed: boolean): Promise<CastFinish>; board(): Promise<ClassFishBoard>; /** 낚싯대 장착(null = 해제). 서버 RPC equip_pixel_rod. */ equipRod?(itemId: FishingRodId | null): Promise<EquipRodResult> }
+export interface FishingAdapter { getWorldClock?(): Promise<ServerWorldClock | null>; adminSetWorldOverride?(weather: FishWeather | null, phase: FishPhase | null, hours: number): Promise<boolean>; buyBait?(): Promise<BuyBaitResult>; getLevel?(): Promise<PlayerLevel | null>; state(): Promise<FishingState>; start(pet: string | null): Promise<CastStart>; finish(castId: string, landed: boolean): Promise<CastFinish>; board(): Promise<ClassFishBoard>; /** 낚싯대 장착(null = 해제). 서버 RPC equip_pixel_rod. */ equipRod?(itemId: FishingRodId | null): Promise<EquipRodResult> }
 /** 관리자 시험용 시계·날씨 덮어쓰기(관리자만 서버가 받아 준다). */
 export interface FishingOverride { clock?: string; weather?: FishWeather }
 
@@ -185,6 +186,12 @@ export function createFishingAdapter(supabase: FishingRpcClient, override?: Fish
   if (override?.clock) overrideArgs.p_override_clock = override.clock;
   if (override?.weather) overrideArgs.p_override_weather = override.weather;
   return {
+    async getWorldClock() {
+      try { return parseWorldClock(await callRpc(supabase, 'get_pixel_world_clock')); } catch { return null; }
+    },
+    async adminSetWorldOverride(weather, phase, hours) {
+      try { await callRpc(supabase, 'admin_set_pixel_world_override', { p_weather: weather, p_phase: phase, p_hours: hours }); return true; } catch { return false; }
+    },
     async state() {
       const fallback = fallbackFishingState(Date.now(), override);
       try { return parseFishingState(await callRpc(supabase, 'get_pixel_fishing_state', overrideArgs), fallback); }
@@ -215,4 +222,11 @@ export function createFishingAdapter(supabase: FishingRpcClient, override?: Fish
       catch { return { ok: false, reason: 'error' }; }
     },
   };
+}
+
+export function parseWorldClock(raw: unknown): ServerWorldClock | null {
+ if (!isObj(raw) || typeof raw.kstDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(raw.kstDate) || !oneOf(PHASES,raw.phase) || !oneOf(WEATHERS,raw.weather) || typeof raw.minutes !== 'number' || !Number.isInteger(raw.minutes) || raw.minutes<0 || raw.minutes>=1440 || typeof raw.serverNow !== 'string' || !Number.isFinite(Date.parse(raw.serverNow))) return null;
+ const o=raw.override;
+ if (o !== null && (!isObj(o) || typeof o.expiresAt !== 'string' || !Number.isFinite(Date.parse(o.expiresAt)) || (o.weather != null && !oneOf(WEATHERS,o.weather)) || (o.phase != null && !oneOf(PHASES,o.phase)))) return null;
+ return { kstDate:raw.kstDate,phase:raw.phase,weather:raw.weather,minutes:raw.minutes,serverNow:raw.serverNow,override:isObj(o)?{weather:o.weather as FishWeather|null,phase:o.phase as FishPhase|null,expiresAt:o.expiresAt as string}:null };
 }
