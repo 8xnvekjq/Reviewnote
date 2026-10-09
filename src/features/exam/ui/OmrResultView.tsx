@@ -1,20 +1,21 @@
 // OMR 결과: 원점수·추정 등급·추정 표준점수·추정 백분위 + 맞은 개수·총 시간(+등급컷 표 접기) / 한능검 시대별 결과 / 문항별 줄 / 오답노트 후보 고르기.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import type { AdminExamApi, ExamClient, ExamResult, ExamResultItem, InkStroke } from '../contract';
+import type { AdminExamApi, ExamClient, ExamPaperSummary, ExamResult, ExamResultItem, InkStroke } from '../contract';
 import { composeInkImage } from '../ink/inkComposite';
 import { useExamInk } from './useExamInk';
 import { ResultInkNotes } from './ResultInkNotes';
 import { useHistoryClose } from './useHistoryClose';
 import { PeerSolutionSwitch } from './PeerSolutionView';
 import { PeerSolutionSession, type PeerSolutionApi } from './peerSolution';
+import { ExamHistoryView } from './ExamHistoryView';
 import { ExamAnswer } from './ExamAnswer';
 import { scoreDisplay } from './scoreDisplay';
 import { resultGradeLabel } from './hanneungLogic';
 import { eraLabel, eraStats, resultPaperId, weakEras, type EraStat, type HanneungEra } from './hanneungEra';
 import { hanneungTopicsFor } from '../data/hanneungTopics';
 import { HANNEUNG_LECTURES } from '../data/hanneungLectures';
-import { displayAnswer, ELECTIVE_SHORT, estimateStandardScore, formatClock, formatDuration, mistakeCandidates, praiseLine, roundLabel, usesWholePages } from './examLogic';
+import { displayAnswer, ELECTIVES, ELECTIVE_SHORT, estimateStandardScore, formatClock, formatDuration, mistakeCandidates, praiseLine, roundLabel, usesWholePages } from './examLogic';
 
 type Props = {
   result: ExamResult;
@@ -22,6 +23,9 @@ type Props = {
   backLabel?: string;
   /** 관리자 본인 결과: 문항 풀이(필기·녹음)를 고치러 다시 연다. */
   onRevise?: () => void;
+  busy?: boolean;
+  onOpenResult?: (attemptId: string) => void;
+  onContinueHistory?: (paper: ExamPaperSummary, active: boolean) => void;
 } & (
   | { client: ExamClient; review?: undefined }
   /** 관리자 읽기 전용 검토: 서버 필기만 읽고, 오답노트 담기·필기 저장은 하지 않는다. */
@@ -36,6 +40,7 @@ interface BodyProps {
   onRevise?: () => void;
   ink: Map<string, InkStroke[]>;
   inkBar: ReactNode;
+  historySection?: ReactNode;
   studentName?: string;
   /** 학생 본인: 원래 필기를 다 불러와 덧쓰기를 시작해도 되는지. */
   inkReady?: boolean;
@@ -46,10 +51,13 @@ interface BodyProps {
 export function OmrResultView(props: Props) {
   return props.review
     ? <ReviewResult client={props.client} result={props.result} onBack={props.onBack} backLabel={props.backLabel} studentName={props.review.studentName} />
-    : <StudentResult client={props.client} result={props.result} onBack={props.onBack} backLabel={props.backLabel} onRevise={props.onRevise} />;
+    : <StudentResult client={props.client} result={props.result} onBack={props.onBack} backLabel={props.backLabel} onRevise={props.onRevise} busy={props.busy} onOpenResult={props.onOpenResult} onContinueHistory={props.onContinueHistory} />;
 }
 
-function StudentResult({ client, result, onBack, backLabel, onRevise }: { client: ExamClient; result: ExamResult; onBack: () => void; backLabel?: string; onRevise?: () => void }) {
+function StudentResult({ client, result, onBack, backLabel, onRevise, busy = false, onOpenResult, onContinueHistory }: Extract<Props, { review?: undefined }>) {
+  const paper: ExamPaperSummary = { ...result, id: resultPaperId(result) ?? '', title: result.paperTitle, examDate: '', source: '',
+    timeLimitMinutes: null, electives: !result.kind || result.kind === 'csat' ? ELECTIVES : [],
+    questionCount: result.questionCount ?? result.totalCount, inProgress: null, lastResult: null, resultCount: 0 };
   const inkSync = useExamInk(client, result.attemptId, result.items.map(item => item.questionId));
   const inkBar = (
     <p className="rn-caption" role="status">
@@ -70,7 +78,9 @@ function StudentResult({ client, result, onBack, backLabel, onRevise }: { client
     return new Map(docs.map(doc => [doc.questionId, doc.strokes]));
   };
   return <OmrResultBody client={client} result={result} onBack={onBack} backLabel={backLabel} onRevise={onRevise} ink={inkSync.strokes} inkBar={inkBar}
-    inkReady={inkSync.ready} loadOriginalInk={loadOriginalInk} />;
+    inkReady={inkSync.ready} loadOriginalInk={loadOriginalInk}
+    historySection={onOpenResult && onContinueHistory && paper.id ? <ExamHistoryView embedded client={client} paper={paper} busy={busy} error={null}
+      onOpenResult={onOpenResult} onContinue={active => onContinueHistory(paper, active)} /> : null} />;
 }
 
 function ReviewResult({ client, result, onBack, backLabel, studentName }: {
@@ -91,7 +101,7 @@ function ReviewResult({ client, result, onBack, backLabel, studentName }: {
   return <OmrResultBody client={client} result={result} onBack={onBack} backLabel={backLabel} ink={ink ?? new Map()} inkBar={inkBar} studentName={studentName} inkReady={ink !== null} />;
 }
 
-function OmrResultBody({ client, result: initial, onBack, backLabel, onRevise, ink, inkBar, studentName, inkReady = false, loadOriginalInk }: BodyProps) {
+function OmrResultBody({ client, result: initial, onBack, backLabel, onRevise, ink, inkBar, studentName, inkReady = false, loadOriginalInk, historySection }: BodyProps) {
   const [result, setResult] = useState(initial);
   const reviewing = studentName != null;
   const wholePages = usesWholePages(initial.items);
@@ -237,6 +247,8 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, onRevise, i
         </details>
         </>}
       </section>
+
+      {historySection}
 
       {topics && <EraSection stats={eraStats(result.items, topics)} />}
 

@@ -19,12 +19,12 @@ try {
 
   await page.goto(`${base}/tests/exam/practice.html?activity=1&${query}`);
   await page.getByRole('button', { name: '고2', exact: true }).click();
-  const activity = page.getByTestId('exam-admin-activity').filter({ has: page.getByTestId('exam-admin-latest') });
+  const activity = page.getByTestId('exam-admin-activity').filter({ has: page.locator('summary') }).first();
+  await activity.locator('summary').click();
   assert.match(await activity.innerText(), /0점/);
   assert.match(await activity.innerText(), /원점수 0 \/ 7점/);
-  await activity.locator('summary').click();
   assert.match(await activity.getByTestId('exam-admin-student').first().innerText(), /원점수 0 \/ 7점/);
-  await activity.getByTestId('exam-admin-latest').click();
+  await activity.getByTestId('exam-admin-student').first().click();
   assert.equal(await page.getByTestId('exam-score').innerText(), '0점');
   assert.deepEqual(errors, []);
   console.log('PASS score display: admin attempt list, paper activity, read-only result');

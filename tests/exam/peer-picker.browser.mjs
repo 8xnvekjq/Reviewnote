@@ -1,3 +1,4 @@
+import { assertViewerDock } from './ui-cleanup.assertions.mjs';
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
@@ -52,7 +53,7 @@ async function checkCanvasPlayback(page, peer) {
   await cdp.detach();
 }
 try {
-  for (const viewport of [{ width:390,height:844 }, { width:820,height:1180 }, { width:1024,height:768 }]) {
+  for (const viewport of [{ width:390,height:844 }, { width:820,height:1180 }, { width:1180,height:820 }]) {
     const page = await browser.newPage({ viewport, hasTouch: true });
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
@@ -187,6 +188,7 @@ try {
     assert.ok(resultBox.width > 0 && resultBox.height > 0);
     await rows.last().click();
     await peer.getByTestId('exam-replay-dock').waitFor();
+    await assertViewerDock(page, peer.getByTestId('exam-replay-dock'), viewport.width);
     assert.equal(await page.locator('[role="dialog"]').count(), 1);
     assert.match(await peer.getByTestId('exam-peer-label').innerText(),/선생님/);
     assert.equal(await peer.getByTestId('exam-notes-tools').count(),0);
