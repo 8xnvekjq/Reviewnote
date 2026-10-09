@@ -6,7 +6,7 @@ import type { ExamInkCanvasHandle, InkStroke, InkTool } from '../../src/features
 import '../../src/index.css';
 import '../../src/styles/design-system.css';
 
-declare global { interface Window { __ink: { strokes: () => InkStroke[]; handle: () => ExamInkCanvasHandle | null; roundTrip: () => void } } }
+declare global { interface Window { __ink: { strokes: () => InkStroke[]; handle: () => ExamInkCanvasHandle | null; roundTrip: () => void; changes: () => number } } }
 
 const COLORS = ['#111827', '#2563eb', '#dc2626'];
 
@@ -19,14 +19,16 @@ function Harness() {
   const [narrow, setNarrow] = useState(false);
   const [readOnly, setReadOnly] = useState(false);
   const strokesRef = useRef(strokes);
+  const changes = useRef(0);
   strokesRef.current = strokes;
   window.__ink = { strokes: () => strokesRef.current, handle: () => handle.current,
+    changes: () => changes.current,
     roundTrip: () => setStrokes(strokesRef.current.map(stroke => decodeInkStroke(encodeInkStroke(stroke)))) };
   const toolButton = (value: InkTool, label: string) => (
     <button type="button" className={`rn-button rn-button-compact ${tool === value ? 'rn-button-primary' : 'rn-button-secondary'}`} aria-pressed={tool === value} onClick={() => setTool(value)}>{label}</button>
   );
   return (
-    <main style={{ padding: 16, display: 'grid', gap: 12 }}>
+    <main style={{ padding: 16, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 12 }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {toolButton('pen', '펜')}
         {toolButton('highlighter', '형광펜')}
@@ -51,7 +53,7 @@ function Harness() {
           ref={handle}
           imageUrl="/exams/2025-06-math/c-15.png"
           strokes={strokes}
-          onChange={setStrokes}
+          onChange={next => { changes.current++; setStrokes(next); }}
           tool={tool}
           color={color}
           size={size}

@@ -3,7 +3,7 @@ import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 
-const URL = 'http://127.0.0.1:5174/tests/exam/ink.html';
+const URL = `${process.env.EXAM_TEST_BASE_URL || 'http://127.0.0.1:5174'}/tests/exam/ink.html`;
 const browser = await chromium.launch({ headless: true });
 const out = `${process.env.EXAM_TEST_ARTIFACT_DIR || 'node_modules/.cache'}/exam-ink`;
 await mkdir(out, { recursive: true });
