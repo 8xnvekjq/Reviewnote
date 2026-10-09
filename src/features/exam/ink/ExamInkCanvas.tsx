@@ -17,7 +17,7 @@ import { MULTI_TAP_SPREAD_MS, MultiFingerTap } from './multiTap.ts';
 import type { MultiTapAction } from './multiTap.ts';
 import { MultiFingerPan } from './multiPan.ts';
 import {
-  IDENTITY, frameCorners, frameOf, hitFrame, isIdentity, lassoSelect, moveTransform, rotateHandle, rotateTransform, scaleTransform,
+  IDENTITY, frameCorners, frameOf, hitSelection, trashTarget, isIdentity, lassoSelect, moveTransform, rotateHandle, rotateTransform, scaleTransform,
   transformFrame, transformSelection,
 } from './lasso.ts';
 import type { FrameHit, LassoFrame, Similarity } from './lasso.ts';
@@ -48,6 +48,7 @@ const MOVE_INSET_PX = 6;
 /** 줄였을 때 선택 테두리 반변의 최소 길이(CSS px). */
 const SELECT_MIN_HALF_PX = 10;
 const SELECT_COLOR = '#f2b230';
+const TRASH_HIT_PX = 18;
 /** 올가미를 이보다 짧게 그으면(사실상 탭) 선택 없이 해제만. */
 const LASSO_MIN_PX = 12;
 
@@ -140,7 +141,7 @@ interface SelectGesture {
   start: Pt;
   transform: Similarity;
 }
-type Gesture = (DrawGesture | EraseGesture | PanGesture | LaserGesture | LassoGesture | SelectGesture) & { touch?: boolean };
+type Gesture = (DrawGesture | EraseGesture | PanGesture | LaserGesture | LassoGesture | SelectGesture | { kind: 'trash'; pointerId: number }) & { touch?: boolean };
 /** 올가미로 고른 획(원본 객체)과 감싸는 테두리. */
 interface Selection { ids: string[]; strokes: InkStroke[]; frame: LassoFrame }
 
@@ -205,6 +206,18 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
   };
   /** 고정 월드에 적용된 카메라의 화면 배율까지 포함한다. */
   const screenUnit = () => propsRef.current.surface ? (wrapRef.current?.getBoundingClientRect().width || 1) : (geomRef.current.imgW || 1);
+
+  const selectionTrash = (frame: LassoFrame) => {
+    const w = screenUnit();
+    const canvas = liveRef.current?.getBoundingClientRect();
+    const wrap = wrapRef.current?.getBoundingClientRect();
+    const left = propsRef.current.surface && canvas && wrap ? (canvas.left - wrap.left) / w : 0;
+    const top = propsRef.current.surface && canvas && wrap ? (canvas.top - wrap.top) / w : 0;
+    return trashTarget(frame, TRASH_HIT_PX / w, {
+      left, top, right: left + (canvas?.width ?? geomRef.current.cssWidth) / w,
+      bottom: top + (canvas?.height ?? geomRef.current.cssHeight) / w,
+    }, HANDLE_HIT_PX / w, ROTATE_OFFSET_PX / w);
+  };
 
   // 최신 props를 네이티브 이벤트 핸들러에서 읽기 위한 ref.
   const propsRef = useRef(props);
@@ -288,7 +301,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     if (!ctx) return;
     resetInkTransform(ctx, canvas);
     const g = gestureRef.current;
-    if (!g || g.kind === 'pan' || g.kind === 'laser' || g.kind === 'select') return;
+    if (!g || g.kind === 'pan' || g.kind === 'laser' || g.kind === 'select' || g.kind === 'trash') return;
     const REF = INK_REFERENCE_WIDTH;
     if (g.kind === 'lasso') {
       const px = REF / (propsRef.current.surface ? screenUnit() : (geomRef.current.imgW || wrap.clientWidth || 1));
@@ -376,7 +389,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     resetInkTransform(hctx, hl);
     resetInkTransform(pctx, pen);
     const sel = selectionRef.current;
-    if (!sel) return;
+    if (!sel || propsRef.current.readOnly) return;
     const g = gestureRef.current;
     const m = g?.kind === 'select' ? g.transform : IDENTITY;
     const REF = INK_REFERENCE_WIDTH;
@@ -449,6 +462,27 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       pctx.closePath();
       pctx.fill();
     }
+    pctx.restore();
+    // 삭제 버튼은 화면 크기를 유지하며 테두리의 회전과 가장자리 제한을 따른다.
+    const trash = selectionTrash(frame);
+    pctx.save();
+    pctx.translate(trash.center.x * REF, trash.center.y * REF);
+    pctx.scale(px, px);
+    pctx.fillStyle = '#e5484d';
+    pctx.beginPath();
+    pctx.roundRect(-12, -12, 24, 24, 5);
+    pctx.fill();
+    pctx.strokeStyle = '#fff';
+    pctx.lineWidth = 1.7;
+    pctx.lineCap = 'round';
+    pctx.lineJoin = 'round';
+    pctx.beginPath();
+    pctx.moveTo(-6, -4); pctx.lineTo(6, -4);
+    pctx.moveTo(-2, -4); pctx.lineTo(-2, -7); pctx.lineTo(2, -7); pctx.lineTo(2, -4);
+    pctx.moveTo(-4.5, -2); pctx.lineTo(-3.5, 7); pctx.lineTo(3.5, 7); pctx.lineTo(4.5, -2);
+    pctx.moveTo(-1.5, -1); pctx.lineTo(-1, 4);
+    pctx.moveTo(1.5, -1); pctx.lineTo(1, 4);
+    pctx.stroke();
     pctx.restore();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -630,11 +664,13 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       rect = canvas.getBoundingClientRect();
       const w = unit();
       const pt = toPoint(e, 0);
-      const hit = hitFrame(sel.frame, pt, HANDLE_HIT_PX / w, ROTATE_OFFSET_PX / w, MOVE_INSET_PX / w);
+      const hit = hitSelection(sel.frame, pt, HANDLE_HIT_PX / w, ROTATE_OFFSET_PX / w, MOVE_INSET_PX / w, selectionTrash(sel.frame));
       if (!hit) return false;
       e.preventDefault();
       try { canvas.setPointerCapture(e.pointerId); } catch { /* 합성 이벤트 등 */ }
-      gestureRef.current = { kind: 'select', pointerId: e.pointerId, hit, start: pt, transform: IDENTITY, touch };
+      gestureRef.current = hit.kind === 'trash'
+        ? { kind: 'trash', pointerId: e.pointerId, touch }
+        : { kind: 'select', pointerId: e.pointerId, hit, start: pt, transform: IDENTITY, touch };
       return true;
     };
 
@@ -760,6 +796,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
         return;
       }
       const w = unit();
+      if (g.kind === 'trash') return;
       if (g.kind === 'lasso') {
         const fresh = freshPointerSamples(e, g.lastTimeStamp);
         g.lastTimeStamp = fresh.lastTimeStamp;
@@ -867,6 +904,17 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       if (!g || e.pointerId !== g.pointerId) return;
       gestureRef.current = null;
       try { canvas.releasePointerCapture(e.pointerId); } catch { /* 이미 해제됨 */ }
+      if (g.kind === 'trash' && e.type === 'pointerup') {
+        const sel = selectionRef.current;
+        if (sel) {
+          const target = selectionTrash(sel.frame), pt = toPoint(e, 0);
+          if (Math.hypot(pt.x - target.center.x, pt.y - target.center.y) <= target.radius) {
+            const current = propsRef.current.strokes, ids = new Set(sel.ids);
+            setSelection(null);
+            commit(current.filter(s => !ids.has(s.id)), current);
+          }
+        }
+      }
       if (g.kind === 'draw') {
         g.predicted = [];
         finishDraw(g);

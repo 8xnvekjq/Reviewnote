@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   IDENTITY, INK_COORD_LIMIT, about, applyPt, compose, frameCorners, frameOf, hitFrame, isIdentity, lassoSelect, moveTransform, pointInPolygon,
-  rotateHandle, rotateTransform, scaleTransform, transformFrame, transformSelection, transformStroke,
+  rotateHandle, rotateTransform, scaleTransform, transformFrame, transformSelection, transformStroke, trashTarget, hitSelection,
 } from '../../src/features/exam/ink/lasso.ts';
 import { emptyHistory, recordChange, strokePolyline, undoHistory } from '../../src/features/exam/ink/inkModel.ts';
 import { applyInkEvent, inkDelta } from '../../src/features/exam/ink/inkReplay.ts';
@@ -14,6 +14,33 @@ const near = (a: number, b: number, eps = 1e-6) => assert.ok(Math.abs(a - b) <= 
 const square = (x0: number, y0: number, x1: number, y1: number) => [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }];
 let counter = 0;
 const nextId = () => `new-${++counter}`;
+
+test('trash follows rotated axes and clamps without covering corner hit areas', () => {
+  const viewport = { left: 0, top: 0, right: 390, bottom: 700 };
+  for (const angle of [0, Math.PI / 4, Math.PI / 2, Math.PI, -Math.PI / 3]) {
+    const frame = { cx: 200, cy: 300, hw: 60, hh: 40, angle };
+    const target = trashTarget(frame, 18, viewport, 18, 12);
+    const corner = frameCorners(frame)[0];
+    const offset = 38 / Math.SQRT2;
+    near(target.center.x, corner.x - offset * Math.cos(angle) + offset * Math.sin(angle));
+    near(target.center.y, corner.y - offset * Math.sin(angle) - offset * Math.cos(angle));
+  }
+  for (const cx of [10, 60, 330, 380]) for (const cy of [10, 40, 660, 690]) for (const angle of [0, Math.PI / 4, Math.PI / 2]) {
+    const frame = { cx, cy, hw: 40, hh: 20, angle };
+    const target = trashTarget(frame, 18, viewport, 18, 12);
+    assert.ok(target.center.x >= 18 && target.center.x <= 372);
+    assert.ok(target.center.y >= 18 && target.center.y <= 682);
+    for (const corner of frameCorners(frame)) assert.ok(Math.hypot(target.center.x - corner.x, target.center.y - corner.y) >= 36);
+    assert.deepEqual(hitSelection(frame, target.center, 18, 12, 6, target), { kind: 'trash' });
+    assert.deepEqual(hitSelection(frame, frameCorners(frame)[0], 18, 12, 6, target), { kind: 'corner', index: 0 });
+  }
+});
+
+test('trash hit wins before the corner when targets overlap', () => {
+  const frame = { cx: 100, cy: 100, hw: 40, hh: 30, angle: 0 };
+  const center = frameCorners(frame)[0];
+  assert.deepEqual(hitSelection(frame, center, 18, 12, 6, { center, radius: 18 }), { kind: 'trash' });
+});
 
 test('point in polygon (even-odd)', () => {
   const poly = square(0, 0, 1, 1);

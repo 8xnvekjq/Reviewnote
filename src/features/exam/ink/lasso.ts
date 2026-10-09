@@ -123,6 +123,41 @@ export function rotateHandle(frame: LassoFrame, offset: number): Pt {
 
 export type FrameHit = { kind: 'rotate' } | { kind: 'corner'; index: number } | { kind: 'move' };
 
+export interface TrashTarget { center: Pt; radius: number }
+export interface FrameViewport { left: number; top: number; right: number; bottom: number }
+
+/** 회전 축을 따라 왼쪽 위로 배치하고, 화면 안에서 손잡이 터치 영역과 떨어뜨린다. */
+export function trashTarget(frame: LassoFrame, radius: number, viewport: FrameViewport, handleRadius: number, rotateOffset: number): TrashTarget {
+  const corners = frameCorners(frame);
+  const offset = (radius + handleRadius + radius / 9) / Math.SQRT2;
+  const cos = Math.cos(frame.angle), sin = Math.sin(frame.angle);
+  const desired = { x: corners[0].x - offset * cos + offset * sin, y: corners[0].y - offset * sin - offset * cos };
+  const clamp = (p: Pt): Pt => ({
+    x: Math.max(viewport.left + radius, Math.min(viewport.right - radius, p.x)),
+    y: Math.max(viewport.top + radius, Math.min(viewport.bottom - radius, p.y)),
+  });
+  const handles = [...corners, rotateHandle(frame, rotateOffset)];
+  const gap = radius + handleRadius + radius / 9;
+  const candidates = [clamp(desired)];
+  const isClear = (p: Pt) => handles.every(h => Math.hypot(p.x - h.x, p.y - h.y) >= radius + handleRadius);
+  if (isClear(candidates[0])) return { center: candidates[0], radius };
+  // 가장자리에 붙으면 모서리 안쪽으로 겹치는 대신 옆의 빈 공간을 찾는다.
+  for (const h of handles) for (let i = 0; i < 64; i++) {
+    const angle = i * Math.PI / 32;
+    candidates.push(clamp({ x: h.x + gap * Math.cos(angle), y: h.y + gap * Math.sin(angle) }));
+  }
+  const clear = candidates.filter(isClear);
+  const distance = (p: Pt) => Math.hypot(p.x - desired.x, p.y - desired.y);
+  clear.sort((a, b) => distance(a) - distance(b));
+  return { center: clear[0] ?? candidates[0], radius };
+}
+
+/** 삭제 버튼을 먼저 검사하되 기존 모서리·회전 판정은 그대로 쓴다. */
+export function hitSelection(frame: LassoFrame, p: Pt, handleRadius: number, rotateOffset: number, inset: number, trash: TrashTarget): FrameHit | { kind: 'trash' } | null {
+  if (Math.hypot(p.x - trash.center.x, p.y - trash.center.y) <= trash.radius) return { kind: 'trash' };
+  return hitFrame(frame, p, handleRadius, rotateOffset, inset);
+}
+
 /** 누른 곳이 회전 손잡이·모서리 손잡이·선택 영역 안(inset 여유 포함)인지. 단위는 모두 정규화 좌표. */
 export function hitFrame(frame: LassoFrame, p: Pt, handleRadius: number, rotateOffset: number, inset = 0): FrameHit | null {
   const r = rotateHandle(frame, rotateOffset);
