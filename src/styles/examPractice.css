@@ -548,3 +548,12 @@
 }
 /* 학생별 최근 점수: 관리자 본인 풀이는 이름 색으로만 구분(라벨을 붙이지 않는다). */
 .exam-admin-activity-name.is-mine { color: var(--rn-warning, #f59e0b); }
+/* 관리자 해설 영상 링크(결과 화면) */
+.exam-video-panel { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--rn-line); border-radius: var(--rn-radius-md, 12px); background: var(--rn-surface); }
+.exam-video-panel h3 { margin: 0 0 8px; font-size: 15px; }
+.exam-video-panel h3 small { font-size: 11px; color: var(--rn-warning, #f2c777); margin-left: 4px; }
+.exam-video-panel ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.exam-video-panel li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.exam-video-section { min-width: 48px; font-weight: 700; font-size: 13px; }
+.exam-video-panel input { flex: 1 1 200px; min-width: 0; min-height: 36px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--rn-line); background: var(--rn-elevated); color: var(--rn-text); font-size: 16px; }
+.exam-video-link { text-decoration: none; }

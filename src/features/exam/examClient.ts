@@ -3,7 +3,7 @@ import { supabase } from '../../services/supabase';
 import { examLiveTransport } from './liveTransport';
 import { readInkAtBoundary, saveInkAtBoundary } from './inkApi';
 import { loadExamInk } from './inkLoader';
-import type { AdminExamApi, AdminExamAttemptSummary, AdminLiveStudent, LiveStudentOrderCount, LiveInkResponse, AdminPaperActivity, ExamClient, InkReplayData, PeerSolution, PeerSolutionCandidate } from './contract';
+import type { AdminExamApi, AdminExamAttemptSummary, AdminLiveStudent, LiveStudentOrderCount, LiveInkResponse, AdminPaperActivity, ExamClient, ExamElective, InkReplayData, PeerSolution, PeerSolutionCandidate } from './contract';
 import {
   ExamClientError,
   mapAddedMistakes,
@@ -252,6 +252,12 @@ export const adminExamClient = {
   },
   async listPaperActivity(): Promise<AdminPaperActivity[] | null> {
     return await callRpc('admin_list_exam_paper_activity', {}) as AdminPaperActivity[] | null;
+  },
+  async listPaperVideos(paperId: string) {
+    return (await callRpc('admin_list_exam_paper_videos', { p_paper_id: paperId }) ?? {}) as Partial<Record<'common' | ExamElective, string>>;
+  },
+  async setPaperVideo(paperId: string, section: 'common' | ExamElective, url: string | null) {
+    await callRpc('admin_set_exam_paper_video', { p_paper_id: paperId, p_section: section, p_url: url });
   },
 };
 
