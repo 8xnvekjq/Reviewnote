@@ -34,7 +34,7 @@ export function FishBoard({ adapter, onClose }: { adapter?: FishingAdapter; onCl
       <p className="pwp-fish-progress">우리 반이 찾은 물고기 {board.classSpecies}/12</p>
       {!rows.length ? <p>아직 기록이 없어요. 첫 물고기를 기다리고 있어요!</p> : <ol className="pwp-fish-board">{rows.map((row, index) => <li key={row.speciesId} data-species={row.speciesId} data-teacher={row.teacher || undefined}>
         <span className="pwp-fish-face" role="img" aria-label={row.teacher ? '선생님' : '익명 동물 얼굴'}>{row.teacher ? '🎓' : fishBoardFace(row.animal)}</span><FishIcon speciesId={row.speciesId}/>
-        <strong><span className="pwp-fish-rank">{index + 1}위</span> {fishById(row.speciesId)?.name ?? '물고기'}{row.teacher && <small className="pwp-fish-teacher"> 선생님</small>}</strong><span className="pwp-fish-length">{row.lengthCm.toFixed(1)}cm</span><time dateTime={row.caughtAt}>{fishRelativeTime(row.caughtAt, now)}</time>
+        <strong><span className="pwp-fish-rank">{index + 1}위</span> {fishById(row.speciesId)?.name ?? '물고기'}</strong><span className="pwp-fish-length">{row.lengthCm.toFixed(1)}cm</span><time dateTime={row.caughtAt}>{fishRelativeTime(row.caughtAt, now)}</time>
       </li>)}</ol>}
     </>}
   </div></Window>;
