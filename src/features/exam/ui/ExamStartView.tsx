@@ -22,7 +22,7 @@ interface Props {
   isAdmin?: boolean;
   busy: boolean;
   error: string | null;
-  onStart: (paper: ExamPaperSummary, mode: ExamMode, elective: ExamElective | null) => void;
+  onStart: (paper: ExamPaperSummary, mode: ExamMode, elective: ExamElective | null, electiveOnly?: boolean) => void;
   onResume: (attempt: ExamAttempt) => void;
   onOpenResult: (attemptId: string) => void;
   initialPaperId?: string;
@@ -224,6 +224,7 @@ export function ExamStartView({ client, currentUserId, admin, isAdmin = false, b
   const [resumeError, setResumeError] = useState<string | null>(null);
   const [resuming, setResuming] = useState<string | null>(null);
   const [mode, setMode] = useState<ExamMode>('real');
+  const [electiveOnly, setElectiveOnly] = useState(false);
   const [elective, setElective] = useState<ExamElective | null>(() => {
     try {
       const saved = localStorage.getItem(electiveKey(currentUserId));
@@ -354,8 +355,10 @@ export function ExamStartView({ client, currentUserId, admin, isAdmin = false, b
             const filters = isFilterSection(kind) ? buildPaperFilters(kind, all) : [];
             const selection = isFilterSection(kind) ? normalizeSelection(filters, savedFilters[filterScope(grade, kind)]) : {};
             const group = sortPapersNewest(kind, applyPaperFilters(all, selection));
-            return <section key={kind} aria-label={SECTION_LABEL[kind]} data-testid="exam-paper-section" data-section={kind}>
-            <h2 className="exam-setup-title">{SECTION_LABEL[kind]}</h2>
+            // 학교 프린트는 일회성 자료라 기본으로 접어 둔다(제목을 누르면 펼침).
+            const Section = kind === 'worksheet' ? 'details' : 'section';
+            return <Section key={kind} aria-label={SECTION_LABEL[kind]} data-testid="exam-paper-section" data-section={kind} className={kind === 'worksheet' ? 'exam-paper-fold' : undefined}>
+            {kind === 'worksheet' ? <summary className="exam-setup-title">{SECTION_LABEL[kind]} <small>({all.length})</small></summary> : <h2 className="exam-setup-title">{SECTION_LABEL[kind]}</h2>}
             {isFilterSection(kind) && <PaperFilterBar section={kind} filters={filters} selection={selection} onPick={(key, value) => pickFilter(kind, filters, key, value)} />}
             {group.length === 0 && <div className="rn-empty exam-filter-empty" data-testid="exam-filter-empty">
               <span>조건에 맞는 시험지가 없어요</span>
@@ -371,7 +374,7 @@ export function ExamStartView({ client, currentUserId, admin, isAdmin = false, b
                   onCompare={admin && (p.resultCount > 0 || activity.get(p.id)?.some(row => row.status === 'submitted')) ? () => setComparePaper(p) : undefined} />}
               </div>
             ))}
-          </div>}</section>;
+          </div>}</Section>;
           })}
         </>
       )}
@@ -400,17 +403,20 @@ export function ExamStartView({ client, currentUserId, admin, isAdmin = false, b
               </button>
             ))}
           </div>
-
+          {isAdmin && <label className="exam-elective-only" data-testid="exam-elective-only">
+            <input type="checkbox" checked={electiveOnly} onChange={e => setElectiveOnly(e.target.checked)} />
+            <span>선택과목만 풀기 <small>(관리자 · 공통 문항 없이 {elective ? ELECTIVE_SHORT[elective] : '선택과목'} 문항만)</small></span>
+          </label>}
           </>}
           {error && <p className="exam-error" role="alert">{error}</p>}
           <button
             type="button"
             className="rn-button rn-button-primary exam-start-button"
             disabled={(paper.electives.length > 0 && !elective) || busy}
-            onClick={() => { if (!paper.electives.length || elective) onStart(paper, (paper.practiceEra || paper.kind === 'worksheet') ? 'free' : mode, paper.electives.length ? elective : null); }}
+            onClick={() => { if (!paper.electives.length || elective) onStart(paper, (paper.practiceEra || paper.kind === 'worksheet') ? 'free' : mode, paper.electives.length ? elective : null, isAdmin && paper.electives.length > 0 && electiveOnly); }}
             data-testid="exam-start-button"
           >
-            {busy ? '준비 중…' : (!paper.electives.length || elective) ? `${!paper.practiceEra && paper.kind !== 'worksheet' && mode === 'real' ? '실전' : '자유'} 모드로 시작하기` : '선택과목을 골라 주세요'}
+            {busy ? '준비 중…' : (!paper.electives.length || elective) ? `${!paper.practiceEra && paper.kind !== 'worksheet' && mode === 'real' ? '실전' : '자유'} 모드로 시작하기${isAdmin && paper.electives.length > 0 && electiveOnly ? ' (선택과목만)' : ''}` : '선택과목을 골라 주세요'}
           </button>
           <p className="rn-caption exam-start-hint">시작하면 화면이 꽉 차게 바뀌어요. 애플펜슬로 문제 위에 바로 풀 수 있어요.</p>
         </section>

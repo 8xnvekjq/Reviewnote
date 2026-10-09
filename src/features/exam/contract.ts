@@ -193,7 +193,8 @@ export interface ExamClient {
   listPapers(): Promise<ExamPaperSummary[]>;
   /** 진행 중인 시도가 있으면 그것을 돌려준다(이어 풀기). 없으면 null. */
   getActiveAttempt(paperId: string): Promise<ExamAttempt | null>;
-  startAttempt(paperId: string, mode: ExamMode, elective: ExamElective | null): Promise<ExamAttempt>;
+  /** electiveOnly: 관리자만 — 선택과목 문항만으로 응시(서버 admin_start_elective_only_attempt). */
+  startAttempt(paperId: string, mode: ExamMode, elective: ExamElective | null, options?: { electiveOnly?: boolean }): Promise<ExamAttempt>;
   /** 진행 상황 자동 저장(디바운스는 호출 측 책임). 실패해도 throw 대신 false. */
   saveProgress(attemptId: string, items: ExamItemState[], visitOrder: number[]): Promise<boolean>;
   /** 자유 모드 전용: 문항 하나를 바로 채점. 실전 모드면 서버가 거부한다.

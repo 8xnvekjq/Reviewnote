@@ -555,3 +555,13 @@
 .exam-item-row.has-video { grid-template-columns: 32px 28px minmax(0, 1fr) 30px 24px auto; }
 .exam-item-video { display: flex; justify-content: center; }
 .exam-item-row:focus-visible { outline: 2px solid var(--rn-accent, #6d7cff); outline-offset: 2px; }
+/* 학교 프린트: 기본으로 접힌 구역 */
+.exam-paper-fold > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; }
+.exam-paper-fold > summary::-webkit-details-marker { display: none; }
+.exam-paper-fold > summary::before { content: '▸'; font-size: .8em; color: var(--rn-muted); transition: transform .15s; }
+.exam-paper-fold[open] > summary::before { transform: rotate(90deg); }
+.exam-paper-fold > summary small { font-size: 12px; font-weight: 600; color: var(--rn-muted); }
+/* 관리자: 선택과목만 풀기 */
+.exam-elective-only { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 14px; cursor: pointer; }
+.exam-elective-only input { width: 18px; height: 18px; accent-color: var(--rn-accent, #6d7cff); }
+.exam-elective-only small { color: var(--rn-muted); font-size: 12px; }

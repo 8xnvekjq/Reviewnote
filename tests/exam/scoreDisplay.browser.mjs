@@ -19,6 +19,7 @@ try {
 
   await page.goto(`${base}/tests/exam/practice.html?activity=1&${query}`);
   await page.getByRole('button', { name: '고2', exact: true }).click();
+  await page.locator('[data-testid="exam-paper-section"][data-section="worksheet"] > summary').click(); // 학교 프린트는 기본으로 접혀 있다
   const activity = page.getByTestId('exam-admin-activity').filter({ has: page.locator('summary') }).first();
   await activity.locator('summary').click();
   assert.match(await activity.innerText(), /0점/);

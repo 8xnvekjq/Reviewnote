@@ -569,8 +569,8 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       const active = [...store.values()].reverse().find(entry => entry.attempt.paperId === paperId && entry.attempt.status === 'in_progress');
       return active ? clone(active.attempt) : null;
     },
-    async startAttempt(paperId, mode: ExamMode, elective: ExamElective | null) {
-      record('startAttempt', [paperId, mode, elective]);
+    async startAttempt(paperId, mode: ExamMode, elective: ExamElective | null, startOptions?: { electiveOnly?: boolean }) {
+      record('startAttempt', [paperId, mode, elective, ...(startOptions?.electiveOnly ? [{ electiveOnly: true }] : [])]);
       await wait();
       // 서버처럼: 시험지마다 진행 중인 시도는 하나. 같은 시험지는 이어 풀기만.
       const existing = [...store.values()].find(entry => entry.attempt.paperId === paperId && entry.attempt.status === 'in_progress');
@@ -601,7 +601,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
           id: `${paperId}-${question.number}`, number: question.number, section: 'common',
           imageUrl: question.imageUrl, points: question.points, isChoice: true,
           answerType: question.answerType as ExamQuestion['answerType'],
-        })) : school ? schoolQuestions() : buildMockQuestions(elective ?? '미적분'),
+        })) : school ? schoolQuestions() : buildMockQuestions(elective ?? '미적분').filter(q => !startOptions?.electiveOnly || q.section !== 'common'),
         items: [],
         visitOrder: [],
       };
