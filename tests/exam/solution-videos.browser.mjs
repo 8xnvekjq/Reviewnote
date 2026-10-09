@@ -1,5 +1,5 @@
-// 관리자 해설 영상: 틀리거나 애매한 문항 줄의 걸린 시간 옆 유튜브 아이콘 → 그 문항 구역(공통·선택과목) 영상을 새 탭으로.
-// 줄을 눌러 크게 보기와는 따로 동작하고, 크게 보기 머리줄에도 아이콘. 학생·학생 응시 검토에는 없다.
+// 관리자 해설 영상: 틀리거나 애매한 문항 줄에서 [유튜브 아이콘] → [애매 표시] → [걸린 시간] 순서. 아이콘은 진짜 링크(<a>)라
+// 줄을 눌러 크게 보기와 따로 열리고, 크게 보기 안에는 아이콘이 없다. 학생·학생 응시 검토에는 없다.
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 const BASE = `${process.env.EXAM_TEST_BASE_URL || 'http://127.0.0.1:5174'}/tests/exam/practice.html`;
@@ -24,34 +24,40 @@ const browser = await chromium.launch({ headless: true });
 try {
   for (const viewport of [{ width: 390, height: 844 }, { width: 1180, height: 820 }]) {
     const context = await browser.newContext({ viewport });
-    await context.addInitScript(() => { window.__opened = []; window.open = (url) => { window.__opened.push(url); return null; }; });
     const page = await context.newPage();
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     await page.goto(`${BASE}?admin=1`);
     await page.getByTestId('exam-start').waitFor();
     await submitPaper(page);
     assert.equal(await page.getByTestId('exam-video-panel').count(), 0, '해설 영상 칸은 없다');
-    await page.getByTestId('exam-video-mark').first().waitFor();
-    const rows = await page.locator('.exam-item-row').evaluateAll(nodes => nodes.map(n => ({
-      number: Number(n.dataset.number), wrongOrUnsure: n.dataset.correct === 'false' || !!n.querySelector('.exam-item-unsure')?.textContent,
-      mark: n.querySelector('[data-testid="exam-video-mark"]')?.dataset.href ?? null,
-      inTime: !!n.querySelector('.exam-item-time [data-testid="exam-video-mark"]'),
-    })));
+    await page.locator('.exam-item-row [data-testid="exam-video-link"]').first().waitFor();
+    const rows = await page.locator('.exam-item-row').evaluateAll(nodes => nodes.map(n => {
+      const link = n.querySelector('[data-testid="exam-video-link"]'), unsure = n.querySelector('.exam-item-unsure'), time = n.querySelector('.exam-item-time');
+      return { number: Number(n.dataset.number), wrongOrUnsure: n.dataset.correct === 'false' || !!unsure?.textContent,
+        href: link?.getAttribute('href') ?? null, tag: link?.tagName ?? null,
+        order: link ? [link, unsure, time].map(el => el.getBoundingClientRect().left) : null };
+    }));
     for (const row of rows) {
-      if (row.wrongOrUnsure) { assert.equal(row.mark, row.number >= 23 ? CALC : COMMON, `${row.number}번 링크`); assert.ok(row.inTime, '걸린 시간 옆'); }
-      else assert.equal(row.mark, null, `${row.number}번은 맞힌 문항이라 아이콘 없음`);
+      if (row.wrongOrUnsure) {
+        assert.equal(row.href, row.number >= 23 ? CALC : COMMON, `${row.number}번 링크`);
+        assert.equal(row.tag, 'A');
+        assert.ok(row.order[0] < row.order[1] && row.order[1] < row.order[2], `${row.number}번: 유튜브 → 애매 → 시간 순서`);
+      } else assert.equal(row.href, null, `${row.number}번은 맞힌 문항이라 아이콘 없음`);
     }
-    // 아이콘 클릭: 새 탭으로 열고, 문항 크게 보기는 열리지 않는다.
+    // 아이콘 클릭: 새 탭(팝업)으로 그 영상이 열리고, 문항 크게 보기는 열리지 않는다.
     const wrong23 = page.locator('.exam-item-row[data-number="23"]');
-    await wrong23.getByTestId('exam-video-mark').click();
-    assert.deepEqual(await page.evaluate(() => window.__opened), [CALC]);
+    await context.route('https://www.youtube.com/**', route => route.fulfill({ status: 200, contentType: 'text/html', body: 'ok' }));
+    const [popup] = await Promise.all([page.waitForEvent('popup'), wrong23.getByTestId('exam-video-link').click()]);
+    assert.equal(popup.url(), CALC);
+    await popup.close();
     assert.equal(await page.getByTestId('exam-viewer').count(), 0);
-    // 크게 보기 머리줄에도 아이콘 링크.
+    // 줄을 누르면 크게 보기, 그 안에는 유튜브 아이콘이 없다. 키보드 Enter로도 열린다.
     await wrong23.click();
-    const link = page.getByTestId('exam-viewer').getByTestId('exam-video-link');
-    await link.waitFor();
-    assert.equal(await link.getAttribute('href'), CALC);
-    assert.equal(await link.getAttribute('target'), '_blank');
+    await page.getByTestId('exam-viewer').waitFor();
+    assert.equal(await page.getByTestId('exam-viewer').getByTestId('exam-video-link').count(), 0);
+    await page.getByTestId('exam-viewer').getByRole('button', { name: '닫기', exact: true }).click();
+    await wrong23.focus(); await page.keyboard.press('Enter');
+    await page.getByTestId('exam-viewer').waitFor();
     await page.getByTestId('exam-viewer').getByRole('button', { name: '닫기', exact: true }).click();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), false);
     await page.locator('.exam-item-row[data-number="23"]').screenshot({ path: `.test-artifacts/solution-video-row-${viewport.width}.png` }).catch(() => {});
@@ -64,9 +70,6 @@ try {
     await sp.goto(BASE);
     await sp.getByTestId('exam-start').waitFor();
     await submitPaper(sp);
-    assert.equal(await sp.getByTestId('exam-video-mark').count(), 0);
-    await sp.locator('.exam-item-row[data-number="23"]').click();
-    await sp.getByTestId('exam-viewer').waitFor();
     assert.equal(await sp.getByTestId('exam-video-link').count(), 0);
     await student.close();
 
@@ -80,12 +83,12 @@ try {
     const review = ap.getByTestId('admin-exam-review');
     await activity.getByTestId('exam-admin-student').filter({ has: ap.locator('.exam-admin-activity-name.is-mine') }).click();
     await review.getByTestId('exam-result').waitFor();
-    await review.getByTestId('exam-video-mark').first().waitFor();
+    await review.getByTestId('exam-video-link').first().waitFor();
     await ap.keyboard.press('Escape');
     await review.waitFor({ state: 'detached' });
     await activity.getByTestId('exam-admin-student').first().click();
     await review.getByTestId('exam-result').waitFor();
-    assert.equal(await review.getByTestId('exam-video-mark').count(), 0);
+    assert.equal(await review.getByTestId('exam-video-link').count(), 0);
     await admin.close();
     console.log(`ok — admin solution video icons (${viewport.width})`);
   }
