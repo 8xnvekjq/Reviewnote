@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import { FISH_CATALOG, RARITY_STARS } from '../logic/fishCatalog';
 import { fishHint } from '../logic/fishHints';
 import { turtleLines } from '../logic/turtleLines';
@@ -18,7 +19,7 @@ export function FishIcon({ speciesId, silhouette = false }: { speciesId: string;
   </span>;
 }
 
-export function FishAlbum({ adapter, onClose, newSpeciesId }: { adapter?: FishingAdapter; onClose: () => void; newSpeciesId?: string | null }) {
+export function FishAlbum({ adapter, onClose, newSpeciesId, top }: { adapter?: FishingAdapter; onClose: () => void; newSpeciesId?: string | null; top?: ReactNode }) {
   const [state, setState] = useState<FishingState | null>(null);
   const [board, setBoard] = useState<ClassFishBoard | null>(null);
   const [error, setError] = useState(false);
@@ -33,7 +34,7 @@ export function FishAlbum({ adapter, onClose, newSpeciesId }: { adapter?: Fishin
     }
     return () => { cancelled = true; };
   }, [adapter, retry]);
-  return <Window title="거북이의 물고기 도감" onClose={onClose}>
+  return <Window title="거북이의 물고기 도감" onClose={onClose} top={top}>
     <div className="pwp-panel-content pwp-fishing-content">
       {!adapter ? <p role="status">낚시 정보를 준비하고 있어요.</p> : error ? <div role="alert">도감을 불러오지 못했어요. <button onClick={() => setRetry(value => value + 1)}>다시 시도</button></div> : !state ? <p role="status">도감을 펼치는 중…</p> : <>
         <div className="pwp-turtle-lines">{turtleLines(state, newSpeciesId).map(line => <p key={line}>{line}</p>)}</div>

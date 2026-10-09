@@ -43,10 +43,10 @@ try {
     assert.ok(crops.length > 0);
     assert.ok(crops.every(crop => (crop.canvas === 'true' || crop.rod || crop.bait) && !crop.svg));
     await page.screenshot({ path: `scratch/fix-shop-top-${viewport.width}.png` });
-    await shop.getByRole('button', { name: '낚싯대', exact: true }).click();
-    assert.equal(await shop.locator('[data-item]').count(), 4);
-    await page.screenshot({ path: `scratch/rods/plaza-shop-${viewport.width}.png` });
-    await shop.getByRole('button', { name: '전체', exact: true }).click();
+    // 낚싯대·미끼는 강가 거북이가 판다 — 광장 상점에는 탭도 물건도 없다.
+    for (const name of ['낚싯대', '미끼']) assert.equal(await shop.getByRole('button', { name, exact: true }).count(), 0);
+    assert.equal(await shop.locator('[data-item^="rod_"], [data-item="bait_worm"]').count(), 0);
+    await shop.getByText('낚싯대·미끼는 강가 거북이에게!').waitFor();
     const content = shop.locator('.pwp-panel-content');
     const tabs = await shop.locator('.pwp-tabs').boundingBox();
     const header = await shop.locator('header').boundingBox();

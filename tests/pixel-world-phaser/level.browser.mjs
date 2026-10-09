@@ -49,11 +49,13 @@ try {
     await panel.getByRole('button', {name:'레벨 정보 닫기'}).click();
     assert.equal(await panel.count(),0);
     await badge.click(); await page.keyboard.press('Escape'); assert.equal(await panel.count(),0);
-    // 광장 상점까지 실제 걸어서 구매한다.
-    await exit(page, 'plaza|gate|south'); await ready(page, 'plaza');
-    await page.evaluate(() => { const h=window.__pixelWorldPhaser,t=h.debug().targets; const key=Object.keys(t).find(k=>/shop|stall/.test(k)); if(!key)throw new Error(JSON.stringify(t));h.walkToScreen(t[key].x,t[key].y); });
-    await page.waitForFunction(()=>{const d=window.__pixelWorldPhaser.debug();return d.prompt==='shop'&&!d.moving}); await page.locator('.pwp-btn-a').click();
-    const shop=page.getByRole('dialog',{name:'상점',exact:true}); await shop.waitFor();
+    // 강가 거북이까지 실제 걸어가 '상점' 탭에서 구매한다(광장 상점은 낚시 도구를 팔지 않는다).
+    await exit(page, 'river'); await ready(page, 'river');
+    await page.evaluate(() => { const h=window.__pixelWorldPhaser,t=h.debug().targets; if(!t.turtle)throw new Error(JSON.stringify(t));h.walkToScreen(t.turtle.x,t.turtle.y); });
+    // 거북이를 눌러 걸어가면 도착하자마자 창이 열린다.
+    const album=page.getByRole('dialog',{name:'거북이의 물고기 도감',exact:true}); await album.waitFor();
+    await album.getByRole('navigation',{name:'거북이 메뉴'}).getByRole('button',{name:'상점',exact:true}).click();
+    const shop=page.getByRole('dialog',{name:'거북이 낚시 상점',exact:true}); await shop.waitFor();
     await page.waitForFunction(()=>document.querySelector('[data-testid="balance-callback"]').dataset.baitCatalog==='true');
     await shop.getByRole('button',{name:'미끼',exact:true}).click();
     const bait=shop.locator('[data-item="bait_worm"]');await bait.getByText('남은 미끼 73회',{exact:true}).waitFor();
@@ -66,8 +68,8 @@ try {
     assert.equal(await page.evaluate(()=>window.baitCalls.includes('purchase_pixel_item')),false);
     assert.equal(await bait.locator('img').evaluate(img=>img.complete&&img.naturalWidth===16),true);
     await page.screenshot({path:`scratch/level/bait-${width}.png`});
-    await shop.getByRole('button',{name:'상점 닫기'}).click();
-    await exit(page,'yard|north'); await ready(page,'yard');
+    await shop.getByRole('button',{name:'거북이 낚시 상점 닫기'}).click();
+    await exit(page,'yard'); await ready(page,'yard');
     await exit(page,'river|east');await ready(page,'river');
     await page.waitForFunction(()=>window.__pixelWorldPhaser.debug().targets['shadow:0']);
     await page.evaluate(()=>{const h=window.__pixelWorldPhaser,t=h.debug().targets['shadow:0'];h.walkToScreen(t.x,t.y)});

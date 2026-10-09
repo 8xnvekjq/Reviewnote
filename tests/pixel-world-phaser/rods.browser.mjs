@@ -21,7 +21,7 @@ try {
     ` }));
     const page = await context.newPage(); const errors = []; page.on('pageerror', error => errors.push(error.message));
     await page.goto(`${base}/tests/pixel-world-phaser/rods.harness.html`);
-    const shop = page.getByRole('dialog', { name: '상점', exact: true });
+    const shop = page.getByRole('dialog', { name: '거북이 낚시 상점', exact: true });
     await shop.getByRole('button', { name: '낚싯대', exact: true }).click();
     await shop.locator('[data-item="rod_gold"]').waitFor();
     assert.equal(await shop.locator('[data-item]').count(), 4);
@@ -37,7 +37,7 @@ try {
     await page.waitForFunction(() => document.querySelector('[data-testid="balance"]').textContent === '834');
     assert.equal(await page.getByTestId('callback-count').textContent(), '1');
     await card.getByText('보유 중', { exact: true }).waitFor();
-    await shop.getByRole('button', { name: '상점 닫기' }).click(); await page.getByRole('button', { name: '옷장 열기' }).click();
+    await shop.getByRole('button', { name: '거북이 낚시 상점 닫기' }).click(); await page.getByRole('button', { name: '옷장 열기' }).click();
     const wardrobe = page.getByRole('dialog', { name: '옷장', exact: true });
     await wardrobe.getByRole('button', { name: '낚싯대', exact: true }).click();
     assert.equal(await wardrobe.locator('[data-item]').count(), 1);
@@ -49,7 +49,7 @@ try {
     await page.reload();
     await shop.getByRole('button', { name: '낚싯대', exact: true }).click();
     await shop.locator('[data-item="rod_lucky"][data-state="equipped"]').getByText('장착 중').first().waitFor();
-    await shop.getByRole('button', { name: '상점 닫기' }).click(); await page.getByRole('button', { name: '옷장 열기' }).click();
+    await shop.getByRole('button', { name: '거북이 낚시 상점 닫기' }).click(); await page.getByRole('button', { name: '옷장 열기' }).click();
     await wardrobe.getByRole('button', { name: '낚싯대', exact: true }).click();
     await wardrobe.locator('[data-item="rod_lucky"][data-state="equipped"]').waitFor();
     await wardrobe.getByRole('button', { name: '옷장 닫기' }).click();

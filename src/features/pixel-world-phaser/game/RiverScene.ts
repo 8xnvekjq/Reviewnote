@@ -61,10 +61,13 @@ export class RiverScene extends WorldScene {
       turtle.fillStyle(0x293b36).fillRect(t.x - 4, t.y - 17, 3, 3).fillRect(t.x + 1, t.y - 17, 3, 3);
       turtle.fillStyle(0xdf966a).fillRect(t.x - 6, t.y - 9, 12, 3);
     }
+    // 이번 주 물고기 랭킹 푯말 — 마당 안내판처럼 글씨를 써서 무엇인지 바로 알 수 있게.
     const b = cellCenter(FISHBOARD), board = this.add.graphics().setDepth(b.y);
-    board.fillStyle(0x775535).fillRect(b.x - 2, b.y - 9, 4, 16).fillRect(b.x - 12, b.y - 18, 24, 14);
-    board.fillStyle(0xf0d8a4).fillRect(b.x - 10, b.y - 16, 20, 10);
-    board.fillStyle(0x448ca3).fillRect(b.x - 5, b.y - 13, 9, 4).fillRect(b.x + 4, b.y - 14, 3, 6);
+    board.fillStyle(0x775535).fillRect(b.x - 2, b.y - 8, 4, 16).fillRect(b.x - 16, b.y - 27, 3, 20).fillRect(b.x + 13, b.y - 27, 3, 20);
+    board.fillStyle(0x62452d).fillRect(b.x - 19, b.y - 32, 38, 21);
+    board.fillStyle(0xf0d8a4).fillRect(b.x - 17, b.y - 30, 34, 17);
+    board.fillStyle(0xe2b13c).fillRect(b.x - 4, b.y - 35, 8, 4);
+    this.add.text(b.x, b.y - 21.5, '이번 주\n물고기 랭킹', { fontFamily: 'sans-serif', fontSize: '6px', fontStyle: 'bold', color: '#382918', align: 'center', lineSpacing: -1, resolution: 4 }).setOrigin(.5).setDepth(b.y + 1);
     this.drawDecorations();
     this.waterStars = this.add.graphics().setDepth(-898);
     // 조명은 기존 야간 틴트 위에 작은 빛만 더한다.
