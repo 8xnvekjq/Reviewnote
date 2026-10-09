@@ -64,7 +64,7 @@ insert into private.app_admins values ('00000000-0000-0000-0000-0000000000ad');
  '20261003010000_exam_ink_sync_admin','20261003020000_exam_ink_replay','20261003050000_exam_ink_delta','20261004010000_exam_ink_shapes',
  '20261004130000_exam_admin_live_view','20261004140000_exam_peer_solution','20261004220000_exam_peer_solution_unsure',
  '20261005000000_exam_peer_solution_animal_faces','20261005100000_exam_ink_capacity','20261005120000_exam_ink_compact','20261006100000_exam_peer_picker','20261006110000_exam_solve_time','20261006120000_exam_teacher_audio',
- '20261006160000_exam_teacher_audio_reset','20261006180000_exam_teacher_check_publish']) await db.exec(sql(name));
+ '20261006160000_exam_teacher_audio_reset','20261006180000_exam_teacher_check_publish','20261009200000_exam_peer_for_correct']) await db.exec(sql(name));
  const as=async(uid:string|null,query:string,args:unknown[]=[])=>{
   await db.exec(`reset role; select set_config('request.jwt.claim.sub','${uid??''}',false); set role ${uid?'authenticated':'anon'};`);
   try{return (await db.query(query,args)).rows;}finally{await db.exec('reset role');}
@@ -156,6 +156,13 @@ insert into private.app_admins values ('00000000-0000-0000-0000-0000000000ad');
  assert.equal((await list(q)).filter(x=>!x.label.isTeacher).length,0,'checked wrong student answer stays hidden');
  assert.equal((await list(q2)).filter(x=>!x.label.isTeacher).length,1,'checked correct student answer is shown');
  assert.equal(await teacherRow(q2),undefined);
+ // 맞힌 학생도 다른 풀이를 본다(20261009200000): 자유 모드에서 정답으로 채점한 문항, 제출한 시험의 정답 문항. 채점 전 문항은 여전히 막힌다.
+ const listAs=(uid:string,attempt:string,question:string)=>as(uid,'select list_peer_solutions_v2($1,$2) r',[attempt,question]);
+ assert.ok(Array.isArray((await listAs(S2,other.id,q2))[0].r),'checked correct viewer allowed');
+ await assert.rejects(listAs(S2,other.id,other.questions[2].id),/EXAM_PEER_NOT_ALLOWED/,'unchecked question stays closed');
+ await db.query('update exam_attempt_items set is_correct=true,unsure=false where attempt_id=$1',[mine.id]);
+ assert.ok((await list(q)).length>0,'submitted correct viewer allowed');
+ await db.query('update exam_attempt_items set is_correct=false where attempt_id=$1',[mine.id]);
  // 학생은 녹음을 쓸 수 없다.
  await assert.rejects(as(S2,`insert into exam_solution_audio(id,attempt_id,question_id,started_at_ms,duration_ms,mime,size_bytes,storage_path) values($1,$2,$3,0,1,'audio/webm',1,$4)`,
   [id(3000),other.id,q2,`${other.id}/${q2}/${id(3000)}.webm`]),/row-level security/);

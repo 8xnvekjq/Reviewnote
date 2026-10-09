@@ -317,11 +317,11 @@ async function spinWheel(page, place, steps) {
   assert.equal(await page.evaluate(() => window.__inkStats.requests), inkRequestsBefore, 'result-screen notes never hit the ink server');
   await page.getByTestId('exam-viewer').getByRole('button', { name: '닫기', exact: true }).click();
 
-  // 맞혔고 애매 표시도 없는 문항(22번)은 버튼이 없다.
+  // 맞혔고 애매 표시도 없는 문항(22번)도 다른 풀이를 볼 수 있다.
   assert.equal(await page.locator('.exam-item-row[data-number="22"] .exam-item-unsure').innerText(), '');
   await page.locator('.exam-item-row[data-number="22"]').click();
   await page.getByTestId('exam-viewer').waitFor();
-  assert.equal(await page.getByTestId('exam-peer-toggle').count(), 0, 'correct, not-unsure questions do not offer peer solutions');
+  assert.equal(await page.getByTestId('exam-peer-toggle').count(), 1, 'correct questions also offer peer solutions');
   await page.getByTestId('exam-viewer').getByRole('button', { name: '닫기', exact: true }).click();
 
   // 익명 동료 풀이: 요청은 클릭 때만, 재생은 재생 클릭 때만, 메모리 재사용과 내 덧쓰기 보존.
