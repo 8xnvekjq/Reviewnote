@@ -142,8 +142,8 @@ export const examClient: ExamClient = {
     return data == null ? null : mapExamAttempt(data);
   },
 
-  async startAttempt(paperId, mode, elective) {
-    const data = await callRpc('start_exam_attempt', { p_paper_id: paperId, p_mode: mode, p_elective: elective });
+  async startAttempt(paperId, mode, elective, options) {
+    const data = await callRpc(options?.electiveOnly ? 'admin_start_elective_only_attempt' : 'start_exam_attempt', { p_paper_id: paperId, p_mode: mode, p_elective: elective });
     return mapExamAttempt(data);
   },
 

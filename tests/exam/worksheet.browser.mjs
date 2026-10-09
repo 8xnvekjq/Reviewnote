@@ -6,6 +6,13 @@ import { mkdir } from 'node:fs/promises';
 import { duplicateSubmittedAttempt } from './ui-cleanup.assertions.mjs';
 import { assertCompactTopbar } from './compact-topbar.assertions.mjs';
 
+// 학교 프린트 구역은 기본으로 접혀 있다 — 학년 탭을 고른 뒤 펼친다(이미 펼쳐져 있으면 그대로).
+async function openPrints(page) {
+  const section = page.locator('[data-testid="exam-paper-section"][data-section="worksheet"]');
+  if (!(await section.count())) return;
+  if (!(await section.evaluate(el => el.tagName !== 'DETAILS' || el.open))) await section.locator(':scope > summary').click();
+}
+
 const base = process.env.EXAM_TEST_BASE_URL || 'http://127.0.0.1:5174';
 const output = 'scratch/worksheet-browser';
 const TRIG_IDS = ['2026-g3m-trig-creative-1', '2026-g3m-trig-creative-2'];
@@ -18,8 +25,7 @@ try {
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
     await page.goto(`${base}/tests/exam/practice.html?worksheet=1&persist=1`);
-    await page.getByRole('button', { name: '고2', exact: true }).click();
-    await page.getByRole('heading', { name: '학교 프린트', exact: true }).waitFor();
+    await page.getByRole('button', { name: '고2', exact: true }).click(); await openPrints(page);
     await page.locator('[data-paper-id="mock-worksheet"][data-testid="exam-paper-card"]').click();
     assert.equal(await page.getByRole('radio', { name: /실전 모드/ }).count(), 0);
     await page.getByTestId('exam-start-button').click();
@@ -43,8 +49,9 @@ try {
     assert.deepEqual(errors, []);
     await page.screenshot({ path: `${output}/result-${width}.png` });
     await page.getByRole('button', { name: '← 시험지 목록', exact: true }).click();
-    await page.getByRole('button', { name: '고2', exact: true }).click();
+    await page.getByRole('button', { name: '고2', exact: true }).click(); await openPrints(page);
     const card = page.locator('[data-paper-id="mock-worksheet"][data-testid="exam-paper-card"]');
+    await card.waitFor();
     assert.match(await card.innerText(), /42\.9점/);
     assert.match(await card.innerText(), /원점수 3 \/ 7점/);
     assert.match(await page.locator('.exam-past .exam-past-row').first().innerText(), /42\.9점/);
@@ -75,8 +82,7 @@ try {
     for (const label of ['중3', '고1', '고2', '고3', '한능검']) await page.getByRole('button', { name: label, exact: true }).waitFor();
     assert.equal(await page.getByRole('button', { name: '고3', exact: true }).getAttribute('aria-pressed'), 'true');
     for (const id of TRIG_IDS) assert.equal(await page.locator(`[data-paper-id="${id}"]`).count(), 0, '중3 학습지는 고3 탭에 없다');
-    await page.getByRole('button', { name: '중3', exact: true }).click();
-    await page.getByRole('heading', { name: '학교 프린트', exact: true }).waitFor();
+    await page.getByRole('button', { name: '중3', exact: true }).click(); await openPrints(page);
     assert.equal(await page.locator('[data-paper-id="mock-worksheet"][data-testid="exam-paper-card"]').count(), 0, '고2 학습지는 중3 탭에 없다');
     const trigCards = page.locator('[data-testid="exam-paper-card"][data-paper-id^="2026-g3m-trig-creative"]');
     assert.deepEqual(await trigCards.evaluateAll(cards => cards.map(card => card.dataset.paperId).sort()), TRIG_IDS, '중3 탭에 1차·2차가 보이고 기존 18문항판은 없다');
@@ -168,7 +174,7 @@ try {
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
     await page.goto(`${base}/tests/exam/practice.html?worksheet=1`);
-    await page.getByRole('button', { name: '중3', exact: true }).click();
+    await page.getByRole('button', { name: '중3', exact: true }).click(); await openPrints(page);
     await page.locator(`[data-paper-id="${TRIG_IDS[1]}"][data-testid="exam-paper-card"]`).click();
     assert.equal(await page.getByRole('radio', { name: /실전 모드/ }).count(), 0);
     await page.getByTestId('exam-start-button').click();
@@ -194,11 +200,10 @@ try {
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
     await page.goto(`${base}/tests/exam/practice.html?worksheet=1`);
-    await page.getByRole('button', { name: '중3', exact: true }).click();
-    await page.getByRole('heading', { name: '학교 프린트', exact: true }).waitFor();
+    await page.getByRole('button', { name: '중3', exact: true }).click(); await openPrints(page);
     assert.equal(await page.getByTestId('exam-filter-bar').count(), 0, '단원이 하나면 필터 없음');
     await page.goto(`${base}/tests/exam/practice.html?worksheet=1&filters=1`);
-    await page.getByRole('button', { name: '중3', exact: true }).click();
+    await page.getByRole('button', { name: '중3', exact: true }).click(); await openPrints(page);
     const section = page.locator('[data-testid="exam-paper-section"][data-section="worksheet"]');
     const unitRow = section.locator('[data-testid="exam-filter-row"][data-filter="unit"]');
     await unitRow.waitFor();
@@ -208,7 +213,7 @@ try {
     await unitRow.locator('[data-value="삼각비의 활용"]').click();
     assert.deepEqual((await cardIds()).sort(), TRIG_IDS);
     await page.reload();
-    await page.getByRole('button', { name: '중3', exact: true }).click();
+    await page.getByRole('button', { name: '중3', exact: true }).click(); await openPrints(page);
     await unitRow.waitFor();
     assert.equal(await unitRow.locator('[data-value="삼각비의 활용"]').getAttribute('aria-pressed'), 'true', '새로고침해도 단원 선택 유지');
     assert.deepEqual((await cardIds()).sort(), TRIG_IDS);

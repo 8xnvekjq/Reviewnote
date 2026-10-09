@@ -52,12 +52,12 @@ export function ExamPracticeScreen({ client, currentUserId, onExit, admin, isAdm
     setStartKey(k => k + 1); // 이어 풀기·지난 결과 목록 새로 읽기
   };
 
-  const start = async (paper: ExamPaperSummary, mode: ExamMode, elective: ExamElective | null) => {
+  const start = async (paper: ExamPaperSummary, mode: ExamMode, elective: ExamElective | null, electiveOnly = false) => {
     enterFullscreen();
     setBusy(true);
     setError(null);
     try {
-      const attempt = await client.startAttempt(paper.id, mode, elective);
+      const attempt = await client.startAttempt(paper.id, mode, elective, electiveOnly ? { electiveOnly: true } : undefined);
       setPhase({ kind: 'solve', attempt });
     } catch (e) {
       leaveFullscreen();
@@ -129,7 +129,7 @@ export function ExamPracticeScreen({ client, currentUserId, onExit, admin, isAdm
           isAdmin={isAdmin}
           busy={busy}
           error={error}
-          onStart={(paper, mode, elective) => { void start(paper, mode, elective); }}
+          onStart={(paper, mode, elective, electiveOnly) => { void start(paper, mode, elective, electiveOnly); }}
           onResume={resume}
           onOpenResult={id => { void openResult(id); }}
           initialPaperId={phase.paperId}
