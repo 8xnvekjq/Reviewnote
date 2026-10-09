@@ -1,0 +1,23 @@
+.exam-compare { position: fixed; inset: 0; z-index: 1600; overflow-y: auto; overflow-x: hidden; background: var(--rn-bg, #f4f5f7); padding: 0 12px max(16px, env(safe-area-inset-bottom)); box-sizing: border-box; color: var(--rn-text, #1f2937); }
+.exam-compare *, .exam-compare *::before, .exam-compare *::after { box-sizing: border-box; }
+.exam-compare-head { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: max(12px, env(safe-area-inset-top)) 0 12px; background: var(--rn-bg, #f4f5f7); }
+.exam-compare-head strong { min-width: 0; overflow-wrap: anywhere; }
+.exam-compare-head button { flex-shrink: 0; min-height: 44px; }
+.exam-compare-picker { max-width: 640px; margin: auto; }
+.exam-compare-picker label { display: flex; gap: 12px; align-items: center; padding: 12px; border-bottom: 1px solid #d1d5db; }
+.exam-compare-picker small { display: block; color: #6b7280; }
+.exam-compare-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 0 16px; }
+.exam-compare-controls button, .exam-compare-controls select { min-height: 44px; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #1f2937; }
+.exam-compare-controls button:disabled { opacity: .5; }
+.exam-compare-progress { display: flex; align-items: center; gap: 8px; flex: 1 1 240px; min-width: 0; }
+.exam-compare-progress input { flex: 1; min-width: 0; }
+.exam-compare-grid { display: grid; grid-template-columns: repeat(var(--live-columns), minmax(0, 1fr)); gap: 12px; align-items: start; }
+.exam-compare-cell { min-width: 0; overflow: hidden; border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; }
+.exam-compare-cell-open { display: block; width: 100%; padding: 0; border: 0; text-align: left; background: #fff; color: #1f2937; cursor: pointer; }
+.exam-compare-label { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; padding: 10px; overflow-wrap: anywhere; }
+.exam-compare-canvas { position: relative; min-height: 120px; pointer-events: none; }
+.exam-compare-cell.is-finished .exam-ink { filter: grayscale(1); }
+.exam-compare-ended { position: absolute; inset: 0; background: rgba(75, 85, 99, .22); display: flex; justify-content: flex-end; align-items: flex-start; padding: 10px; }
+.exam-compare-ended span { background: #4b5563; color: white; border-radius: 6px; padding: 4px 8px; }
+.exam-compare-grid.is-focused { max-width: 1024px; margin: auto; }
+.exam-compare-grid.is-focused .exam-compare-cell-open { cursor: default; }

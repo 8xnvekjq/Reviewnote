@@ -6,7 +6,7 @@ import { useState } from 'react';
 import '../../src/index.css';
 import '../../src/styles/design-system.css';
 import { ExamPracticeScreen } from '../../src/features/exam/ExamPracticeScreen';
-import { createMockExamClient, createMockLiveExamApi } from '../../src/features/exam/ui/mockExamClient';
+import { createMockExamClient, createMockLiveExamApi, createMockReplayCompareApi } from '../../src/features/exam/ui/mockExamClient';
 import AdminStudentExamSummary from '../../src/components/admin/AdminStudentExamSummary';
 import type { AdminExamApi, AdminExamAttemptSummary, AdminPaperStudentActivity, ExamAttempt } from '../../src/features/exam/contract';
 import { inkDelta, inkIdsHash } from '../../src/features/exam/ink/inkReplay';
@@ -92,6 +92,7 @@ const activityRows: AdminPaperStudentActivity[] = adminRows.map((row, index) => 
   ...row, studentId: `s${index + 1}`, studentName: index === 0 ? '김학생' : '이학생', attemptCount: index === 0 ? 2 : 1, inProgress: index === 0,
 }));
 const adminApi: AdminExamApi = {
+  listPaperSubmissions: async () => [],
   listLivePapers: async () => [],
   getLiveExam: async () => [],
   getLiveStudentOrder: async () => [],
@@ -101,6 +102,15 @@ const adminApi: AdminExamApi = {
   getInk: client.getInk, getInkReplay: client.getInkReplay, getResult: client.getResult,
   listPaperActivity: async () => params.get('activity') === '1' ? [{ paperId: recordsPaper, students: activityRows }] : null,
 };
+
+if (params.get('compare') === '1') {
+  const compare = createMockReplayCompareApi(params.get('admin') === '1');
+  Object.assign(adminApi, compare.api, { listPaperActivity: async () => params.get('admin') !== '1' ? null : [{ paperId: '2025-06-math', students: compare.rows.map(row => ({
+    ...row, paperId: '2025-06-math', paperTitle: '수학', round: 1, status: 'submitted', mode: 'free', elective: '미적분',
+    startedAt: row.submittedAt, score: 4, maxScore: 100, answeredCount: 3, questionCount: 3, attemptCount: 1, inProgress: false,
+  })) }] });
+  (window as unknown as { __compare: typeof compare }).__compare = compare;
+}
 
 // Two actual browser tabs share a mock WebSocket bus and saved RPC state.
 // Only this opt-in fixture uses BroadcastChannel/localStorage; production uses Supabase.

@@ -1,9 +1,18 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref } from 'react';
 import type { ExamClient, ExamInkCanvasHandle, InkChangeKind, InkReplayData, InkStroke, InkTool } from '../contract';
 import { ReplayAudio } from '../audio/ReplayAudio';
 import { ExamInkCanvas } from './ExamInkCanvas';
 import { inkExtent, replayStrokeLists } from './inkFit';
 import { REPLAY_MAX_PAUSE_MS, buildInkClock, buildInkTimeline, formatReplayTime } from './inkReplay';
+
+/** 여러 풀이가 하나의 시계를 공유할 때 기존 캔버스로 지정 시각의 프레임만 표시한다. */
+export const ExamInkReplayFrame = memo(function ExamInkReplayFrame({ data, clock, time, imageUrl, imageMaxWidth }: {
+  data: InkReplayData; clock: ReturnType<typeof buildInkClock>; time: number; imageUrl: string; imageMaxWidth: number;
+}) {
+  const fit = useMemo(() => inkExtent(data.strokes, ...replayStrokeLists(data)), [data]);
+  return <ExamInkCanvas imageUrl={imageUrl} strokes={clock.frame(time)} onChange={() => {}}
+    tool="pen" color="#1f2937" size={4} readOnly imageMaxWidth={imageMaxWidth} fitToInk={fit} />;
+});
 
 /** 결과 화면 덧쓰기(이 기기 전용). 재생 중에는 쓰지 않고 재생 프레임만 보여 준다. */
 export interface ReplayNotes {

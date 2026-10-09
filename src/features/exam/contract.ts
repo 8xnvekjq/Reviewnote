@@ -345,8 +345,19 @@ export interface AdminPaperActivity {
   students: AdminPaperStudentActivity[];
 }
 
+/** 제출한 응시만 제공하며 문항별 정답 여부는 관리자 화면에서만 쓴다. */
+export interface AdminPaperSubmission {
+  attemptId: string;
+  studentId: string;
+  studentName: string;
+  submittedAt: string;
+  isMine: boolean;
+  questions: Array<{ questionId: string; number: number; imageUrl: string; answer: string | null; isCorrect: boolean }>;
+}
+
 /** 관리자 읽기 전용 검토에 필요한 서버 호출 묶음. */
 export interface AdminExamApi {
+  listPaperSubmissions(paperId: string): Promise<AdminPaperSubmission[]>;
   liveTransport?: import('./liveTransport').LiveTransport;
   listLivePapers(): Promise<Array<{ paperId: string; liveCount: number }>>;
   getLiveExam(paperId: string): Promise<AdminLiveStudent[]>;
