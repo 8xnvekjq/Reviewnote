@@ -24,7 +24,6 @@ interface Props {
   onStart: (paper: ExamPaperSummary, mode: ExamMode, elective: ExamElective | null) => void;
   onResume: (attempt: ExamAttempt) => void;
   onOpenResult: (attemptId: string) => void;
-  onOpenHistory: (paper: ExamPaperSummary) => void;
   initialPaperId?: string;
   onExit: () => void;
 }
@@ -64,18 +63,12 @@ function activityScore(row: AdminPaperStudentActivity, paper: ExamPaperMetadata)
   return row.status === 'submitted' ? <ConvertedScore score={row.score ?? 0} paper={{ ...paper, maxScore: row.maxScore }}>{`${row.score ?? 0}/${row.maxScore}점`}</ConvertedScore> : `풀이 중 ${row.answeredCount}/${row.questionCount}`;
 }
 
-/** 관리자: 시험지 카드 아래 — 가장 최근 응시자 한 줄 + 학생별 최근 점수 목록(누르면 전체 화면 검토). */
-function PaperActivity({ students, paper, onOpen }: { students: AdminPaperStudentActivity[]; paper: ExamPaperMetadata; onOpen: (row: AdminPaperStudentActivity) => void }) {
-  const latest = students[0];
-  if (!latest) return <p className="exam-admin-activity is-empty" data-testid="exam-admin-activity">아직 응시한 학생이 없어요</p>;
+/** 관리자: 시험지 카드 아래 학생별 최근 점수 목록과 풀이 비교(누르면 전체 화면 검토). */
+function PaperActivity({ students, paper, onOpen, onCompare }: { students: AdminPaperStudentActivity[]; paper: ExamPaperSummary; onOpen: (row: AdminPaperStudentActivity) => void; onCompare?: () => void }) {
   return (
     <div className="exam-admin-activity" data-testid="exam-admin-activity">
-      <button type="button" className="exam-admin-activity-latest" onClick={() => onOpen(latest)} data-testid="exam-admin-latest">
-        <span className="exam-admin-activity-label">최근 응시</span>
-        <strong>{latest.studentName}</strong>
-        <span><b>{activityScore(latest, paper)}</b> · {activityDate(latest.submittedAt ?? latest.startedAt)}</span>
-      </button>
-      <details className="exam-admin-activity-more">
+      {!students.length && <p className="exam-admin-activity is-empty">아직 응시한 학생이 없어요</p>}
+      {students.length > 0 && <details className="exam-admin-activity-more">
         <summary>학생별 최근 점수 ({students.length}명)</summary>
         <ul>
           {students.map(row => (
@@ -88,7 +81,8 @@ function PaperActivity({ students, paper, onOpen }: { students: AdminPaperStuden
             </li>
           ))}
         </ul>
-      </details>
+      </details>}
+      {onCompare && <button type="button" className="exam-admin-activity-compare" data-testid="exam-compare-open" data-paper-id={paper.id} onClick={onCompare}>풀이 비교</button>}
     </div>
   );
 }
@@ -176,7 +170,7 @@ function PaperCard({ paper, selected, busy, now, onClick }: { paper: ExamPaperSu
   );
 }
 
-export function ExamStartView({ client, currentUserId, admin, busy, error, onStart, onResume, onOpenResult, onOpenHistory, onExit, initialPaperId }: Props) {
+export function ExamStartView({ client, currentUserId, admin, busy, error, onStart, onResume, onOpenResult, onExit, initialPaperId }: Props) {
   const [papers, setPapers] = useState<ExamPaperSummary[] | null>(null);
   const [paperId, setPaperId] = useState<string | null>(initialPaperId ?? null);
   const [grade, setGrade] = useState<number | 'hanneung'>(3);
@@ -316,11 +310,8 @@ export function ExamStartView({ client, currentUserId, admin, busy, error, onSta
               <div key={p.id} className="exam-paper-entry">
                 {activity && (liveCounts.get(p.id) ?? 0) > 0 && <button type="button" className="exam-live-badge" data-testid="exam-live-badge" aria-label={`${p.title} Live 보기`} onClick={() => setLivePaper(p)}><i aria-hidden="true" />Live</button>}
                 <PaperCard paper={p} selected={p.id === paperId} busy={busy || resuming != null} now={now} onClick={() => onCard(p)} />
-                <button type="button" className="rn-button rn-button-ghost rn-button-compact exam-history-open"
-                  disabled={busy || resuming != null} onClick={() => onOpenHistory(p)}
-                  aria-label={`${p.title} 풀이 기록 보기`} data-testid="exam-history-open" data-paper-id={p.id}>풀이 기록 보기</button>
-                {activity && <PaperActivity students={activity.get(p.id) ?? []} paper={p} onOpen={setReviewing} />}
-                {admin && activity && (p.resultCount > 0 || activity.get(p.id)?.some(row => row.status === 'submitted')) && <button type="button" className="rn-button rn-button-compact" data-testid="exam-compare-open" data-paper-id={p.id} onClick={() => setComparePaper(p)}>풀이 비교</button>}
+                {activity && <PaperActivity students={activity.get(p.id) ?? []} paper={p} onOpen={setReviewing}
+                  onCompare={admin && (p.resultCount > 0 || activity.get(p.id)?.some(row => row.status === 'submitted')) ? () => setComparePaper(p) : undefined} />}
               </div>
             ))}
           </div>}</section>;

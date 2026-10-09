@@ -87,7 +87,6 @@
 .exam-live-grid[data-focused="true"] { max-width: 1000px; margin-inline: auto; }
 .exam-live-grid[data-focused="true"] .exam-live-cell-open { cursor: default; }
 @media (max-width: 600px) { .exam-live-grid { grid-template-columns: minmax(0, 1fr); } .exam-live-view .exam-admin-review-bar { gap: 6px; padding-inline: 8px; } }
-.exam-history-open { width: 100%; white-space: normal; }
 .exam-paper-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 @media (min-width: 640px) { .exam-paper-list { grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: 14px; } }
 .exam-paper-card { position: relative; display: flex; flex-direction: column; gap: 6px; min-height: 250px; min-width: 0; width: 100%; padding: 12px; text-align: left; border-radius: 6px; background: #fbfaf7; color: #1d1d1f; border: 1px solid #d9d4c7; box-shadow: 0 1px 0 rgb(0 0 0 / .08), 0 10px 22px rgb(0 0 0 / .22); transition: transform var(--rn-fast), outline-color var(--rn-fast); outline: 3px solid transparent; outline-offset: 2px; touch-action: manipulation; }
@@ -433,10 +432,6 @@
 /* 관리자: 기출문제 풀이 패널 — 시험지별 학생 응시 현황 */
 .exam-admin-activity { display: grid; gap: 6px; min-width: 0; font-size: 12px; }
 .exam-admin-activity.is-empty { margin: 0; color: var(--rn-text-muted, #94a3b8); text-align: center; }
-.exam-admin-activity-latest { display: grid; gap: 2px; width: 100%; padding: 8px 10px; text-align: left; border: 1px solid var(--rn-line, #334155); border-radius: 10px; background: var(--rn-surface, #0f172a); color: inherit; }
-.exam-admin-activity-latest strong { font-size: 13px; overflow-wrap: anywhere; }
-.exam-admin-activity-latest span { overflow-wrap: anywhere; }
-.exam-admin-activity-label { font-size: 11px; color: var(--rn-text-muted, #94a3b8); }
 .exam-admin-activity-more summary { cursor: pointer; padding: 4px 2px; color: #93c5fd; }
 .exam-admin-activity-more ul { display: grid; gap: 4px; list-style: none; margin: 4px 0 0; padding: 0; }
 .exam-admin-activity-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; width: 100%; padding: 6px 8px; text-align: left; border: 1px solid var(--rn-line, #334155); border-radius: 8px; background: transparent; color: inherit; }
@@ -541,4 +536,13 @@
   .exam-viewer .exam-sheet-head { margin-bottom: 4px; gap: 4px 8px; }
   .exam-viewer .exam-sheet-head h2 { font-size: 17px; }
   .exam-viewer-paper { margin-top: 4px; }
+}
+
+/* 관리자 비교 버튼은 학생별 요약 아래 작은 칩으로 둔다. */
+.exam-admin-activity-compare { justify-self: start; width: fit-content; height: 32px; padding: 0 12px; border: 1px solid var(--rn-line, #334155); border-radius: 99px; background: var(--rn-surface, #0f172a); color: inherit; font-size: 12px; cursor: pointer; }
+/* 휴대폰 문항 보기의 재생 막대는 안전 영역 위에 고정한다. */
+@media (max-width: 640px) {
+  .exam-viewer-overlay .exam-replay-dock.exam-replay-inline { position: fixed; left: env(safe-area-inset-left); right: env(safe-area-inset-right); bottom: env(safe-area-inset-bottom); width: auto; max-width: none; margin: 0; border-radius: 10px 10px 0 0; z-index: 1; }
+  .exam-viewer-overlay .exam-viewer:has(.exam-replay-inline) { padding-bottom: calc(var(--exam-viewer-dock-height, 140px) + 20px); }
+  .exam-result .exam-history { gap: 10px; }
 }

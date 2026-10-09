@@ -4,12 +4,14 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
+import { assertViewerDock, duplicateSubmittedAttempt } from './ui-cleanup.assertions.mjs';
 import { assertCompactTopbar } from './compact-topbar.assertions.mjs';
 
 const BASE = `${process.env.EXAM_TEST_BASE_URL || 'http://127.0.0.1:5174'}/tests/exam/practice.html`;
-const out = `${process.env.EXAM_TEST_ARTIFACT_DIR || 'node_modules/.cache'}/exam-practice`;
+const out = '.test-artifacts/ui-cleanup';
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch({ headless: true });
+try {
 
 const LANDSCAPE = { width: 1180, height: 820 };
 const PORTRAIT = { width: 820, height: 1180 };
@@ -399,7 +401,7 @@ async function spinWheel(page, place, steps) {
   await peerView.getByRole('button', { name:'필기 순서 보기', exact:true }).click();
   await peerView.getByTestId('exam-replay-dock').waitFor();
   assert.equal(await peerCalls('getPeerSolutionByKey'), 1, 'replay reused in memory');
-  assert.equal(await peerView.getByTestId('exam-replay-dock').evaluate(el => getComputedStyle(el).position), 'static', 'peer controls stay inline');
+  await assertViewerDock(page, peerView.getByTestId('exam-replay-dock'), page.viewportSize().width);
   assert.deepEqual(await storedInk(), beforePeerStorage, 'peer drawings, replay and position never persist');
   await page.getByTestId('exam-peer-back').click();
   assert.equal(await peerView.count(), 0);
@@ -808,21 +810,20 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
 // 시나리오 작성만. 이 작업에서는 Vite와 브라우저를 실행하지 않는다.
 for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   const { context, page, errors } = await open(viewport, '?persist=1');
-  const historyButton = () => page.locator(`[data-testid="exam-history-open"][data-paper-id="${PAPER_A}"]`);
+  const historyButton = () => page.locator('.exam-past .exam-past-row').first();
   const submitCurrent = async () => {
     await page.getByRole('button', { name: '제출', exact: true }).click();
     await page.getByRole('button', { name: '제출하기', exact: true }).click();
     await page.getByTestId('exam-submit-confirm').click();
     await page.getByTestId('exam-result').waitFor();
+    await page.waitForFunction(() => window.__examLog.some(row => row.method === 'listPaperHistory'));
+    if (await page.locator('.exam-result-title').innerText().then(text => text.includes('1\uCC28'))) assert.equal(await page.getByTestId('exam-history').count(), 0);
     await page.getByRole('button', { name: '← 시험지 목록' }).click();
     await paperCard(page).waitFor();
   };
   // 빈 기록에서 새 회차를 시작하면 기존 모드·선택과목 설정으로 이어진다.
-  await historyButton().click();
-  await page.getByTestId('exam-history-continue').waitFor();
-  assert.match(await page.getByTestId('exam-history').innerText(), /아직 풀이 기록이 없어요/);
-  assert.equal(await page.getByRole('button', { name: '계속 틀리는 문제만 다시 풀기', exact: true }).isDisabled(), true);
-  await page.getByTestId('exam-history-continue').click();
+  assert.equal(await page.getByTestId('exam-history-open').count(), 0);
+  await paperCard(page).click();
   await page.getByTestId('exam-setup').waitFor();
   await page.getByRole('radio', { name: /자유 모드/ }).click();
   await page.getByRole('radio', { name: /미적분/ }).click();
@@ -879,13 +880,17 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   assert.equal(await table.locator('tr[data-number="23"] td[data-round="1"]').innerText(), '-');
   assert.match(await table.locator('tr[data-number="23"] td[data-round="3"]').innerText(), /X 미응답/);
   await noHorizontalOverflow(page, `history/${viewport.width}`);
+  if (viewport.width === 390) {
+    await page.getByTestId('exam-history').evaluate(el => el.scrollIntoView({ block: 'start' }));
+    await page.screenshot({ path: `${out}/result-history-390.png` });
+  }
+  assert.equal(await page.evaluate(() => window.__examLog.filter(row => row.method === 'listPaperHistory').length), 1, 'history loads once per result');
   await page.getByTestId('exam-history-scroll').evaluate(el => { el.scrollLeft = el.scrollWidth; });
   await noHorizontalOverflow(page, `history-scrolled/${viewport.width}`);
   // 제출 회차는 OMR로, 뒤로 돌아오면 같은 시험지의 기록으로.
   await page.locator('[data-testid="exam-history-attempt"][data-round="2"]').click();
   await page.getByTestId('exam-result').waitFor();
   assert.match(await page.locator('.exam-result-title').innerText(), /· 2차/);
-  await page.getByRole('button', { name: '← 풀이 기록', exact: true }).click();
   await page.getByTestId('exam-history-table').waitFor();
   await page.getByTestId('exam-history-continue').click();
   await page.getByTestId('exam-solve').waitFor();
@@ -991,12 +996,13 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   await noHorizontalOverflow(page, `school-result/${viewport.width}`);
   await page.getByRole('button', { name: '← 시험지 목록', exact: true }).click();
   await page.getByRole('button', { name: '고1', exact: true }).click();
-  await page.locator(`[data-testid="exam-history-open"][data-paper-id="${SCHOOL}"]`).click();
+  await duplicateSubmittedAttempt(page);
+  await page.locator('.exam-past .exam-past-row').first().click();
   await page.getByTestId('exam-history-table').waitFor();
   assert.equal(await page.getByTestId('exam-history-table').locator('tbody tr').count(), 21);
   assert.equal(await page.getByTestId('exam-history-elective').count(), 0);
   assert.doesNotMatch(await page.getByTestId('exam-history').innerText(), /등급|미적분/);
-  assert.match(await page.getByTestId('exam-history').innerText(), /2026 동북고/);
+  assert.match(await page.locator('.exam-result-title').innerText(), /2026 동북고/);
   await noHorizontalOverflow(page, `school-history/${viewport.width}`);
   assert.deepEqual(errors, []);
   await context.close();
@@ -1200,6 +1206,8 @@ for (const viewport of [LANDSCAPE, { width: 390, height: 844 }]) {
   assert.match(await review.innerText(), /읽기 전용/);
   await review.getByTestId('exam-result').waitFor();
   assert.equal(await review.getByTestId('exam-candidates').count(), 0);
+  assert.equal(await review.getByTestId('exam-history').count(), 0);
+  assert.equal(await page.evaluate(() => window.__examLog.filter(row => row.method === 'listPaperHistory').length), 0);
   assert.match(await review.locator('.exam-item-row[data-number="1"]').innerText(), /학생 답/);
   await noHorizontalOverflow(page, `admin-review-result/${viewport.width}`);
   await page.screenshot({ path: `${out}/admin-review-result-${viewport.width}.png` });
@@ -1211,7 +1219,8 @@ for (const viewport of [LANDSCAPE, { width: 390, height: 844 }]) {
   const dock = page.getByTestId('exam-replay-dock');
   await dock.waitFor();
   assert.equal(await page.getByRole('button', { name: '최종 풀이 보기', exact: true }).count(), 1);
-  assert.equal(await dock.evaluate(el => getComputedStyle(el).position), 'static');
+  await assertViewerDock(page, dock, viewport.width);
+  if (viewport.width === 390) await page.screenshot({ path: `${out}/viewer-bottom-dock-390.png` });
   assert.equal(await dock.evaluate(el => el.classList.contains('exam-replay-inline')), true);
   assert.equal(await dock.locator('.exam-replay-dock-head').isVisible(), false, 'no floating 필기 과정 header');
   const slider = page.getByRole('slider', { name: '필기 재생 위치' });
@@ -1304,11 +1313,18 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   const entry = page.locator('.exam-paper-entry').filter({ has: page.locator('[data-testid="exam-paper-card"][data-paper-id="2025-06-math"]') });
   const activity = entry.getByTestId('exam-admin-activity');
   await activity.waitFor();
-  const latest = activity.getByTestId('exam-admin-latest');
-  assert.match(await latest.innerText(), /최근 응시/);
-  assert.match(await latest.innerText(), /김학생/);
-  assert.match(await latest.innerText(), /100점/);
-  assert.match(await latest.innerText(), /\d+\.\d+ \d{2}:\d{2}/);
+  assert.equal(await page.getByTestId('exam-admin-latest').count(), 0);
+  assert.equal(await page.getByTestId('exam-history-open').count(), 0);
+  assert.equal(await activity.locator('details').getAttribute('open'), null);
+  const compare = activity.getByTestId('exam-compare-open');
+  const summaryBox = await activity.locator('summary').boundingBox();
+  const compareBox = await compare.boundingBox();
+  const cardBox = await entry.getByTestId('exam-paper-card').boundingBox();
+  assert.ok(compareBox.y >= summaryBox.y + summaryBox.height);
+  assert.ok(compareBox.width < cardBox.width && compareBox.height <= 40);
+  assert.ok(Math.abs(compareBox.x - summaryBox.x) <= 3);
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: `${out}/admin-list-${viewport.width}.png`, fullPage: true });
   await activity.locator('summary').click();
   assert.equal(await activity.getByTestId('exam-admin-student').count(), 2);
   assert.match(await activity.getByTestId('exam-admin-student').nth(0).innerText(), /총 2회/);
@@ -1322,7 +1338,7 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   await page.locator('.exam-admin-paper .exam-ink').waitFor();
   await page.locator('.exam-admin-review-bar').getByRole('button', { name: '← 닫기', exact: true }).click();
   await review.waitFor({ state: 'detached' });
-  await latest.click();
+  await activity.getByTestId('exam-admin-student').first().click();
   await review.getByTestId('exam-result').waitFor();
   await page.keyboard.press('Escape');
   await review.waitFor({ state: 'detached' });
@@ -1723,5 +1739,7 @@ for (const failure of [false, true]) {
   }
 }
 
-await browser.close();
+} finally {
+  await browser.close();
+}
 console.log('exam practice browser tests passed');

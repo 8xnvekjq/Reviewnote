@@ -162,6 +162,17 @@ export function ExamInkReplay({ client, attemptId, questionId, imageUrl, strokes
     };
   }, [peerPlayback]);
   const dock = useDockDrag(persistDock && !inline);
+  // 휴대폰 고정 막대가 줄바꿈하거나 음성 안내가 나타나도 문항 끝을 가리지 않는다.
+  useEffect(() => {
+    const element = dock.dockRef.current;
+    const viewer = inline && open ? element?.closest<HTMLElement>('.exam-viewer-overlay .exam-viewer') : null;
+    if (!element || !viewer) return;
+    const measure = () => viewer.style.setProperty('--exam-viewer-dock-height', `${element.getBoundingClientRect().height}px`);
+    const observer = new ResizeObserver(measure);
+    measure();
+    observer.observe(element);
+    return () => { observer.disconnect(); viewer.style.removeProperty('--exam-viewer-dock-height'); };
+  }, [inline, open, dock.dockRef]);
   const toggleInDock = inline && !notes && !barExtra;
   const timeline = useMemo(() => data ? buildInkTimeline(data) : null, [data]);
   const hasAudio = !!data?.audioClips?.length;

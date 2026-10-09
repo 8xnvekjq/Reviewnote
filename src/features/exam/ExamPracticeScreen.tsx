@@ -5,14 +5,12 @@ import type { ExamAttempt, ExamClient, ExamElective, ExamMode, ExamPaperSummary,
 import { ExamStartView } from './ui/ExamStartView';
 import { ExamSolveView } from './ui/ExamSolveView';
 import { OmrResultView } from './ui/OmrResultView';
-import { ExamHistoryView } from './ui/ExamHistoryView';
 import '../../styles/examPractice.css';
 
 type Phase =
   | { kind: 'start'; paperId?: string }
-  | { kind: 'history'; paper: ExamPaperSummary }
   | { kind: 'solve'; attempt: ExamAttempt }
-  | { kind: 'result'; result: ExamResult; historyPaper?: ExamPaperSummary };
+  | { kind: 'result'; result: ExamResult };
 
 type FullscreenDoc = Document & { webkitFullscreenElement?: Element | null; webkitExitFullscreen?: () => Promise<void> | void };
 type FullscreenEl = HTMLElement & { webkitRequestFullscreen?: () => Promise<void> | void };
@@ -78,7 +76,7 @@ export function ExamPracticeScreen({ client, currentUserId, onExit, admin, isAdm
     setBusy(true);
     setError(null);
     try {
-      setPhase({ kind: 'result', result: await client.getResult(attemptId), historyPaper: phase.kind === 'history' ? phase.paper : undefined });
+      setPhase({ kind: 'result', result: await client.getResult(attemptId) });
     } catch (e) {
       setError(e instanceof Error ? e.message : '결과를 불러오지 못했어요.');
     } finally {
@@ -133,15 +131,9 @@ export function ExamPracticeScreen({ client, currentUserId, onExit, admin, isAdm
           onStart={(paper, mode, elective) => { void start(paper, mode, elective); }}
           onResume={resume}
           onOpenResult={id => { void openResult(id); }}
-          onOpenHistory={paper => { setError(null); setPhase({ kind: 'history', paper }); }}
           initialPaperId={phase.paperId}
           onExit={onExit}
         />
-      )}
-      {phase.kind === 'history' && (
-        <ExamHistoryView client={client} paper={phase.paper} busy={busy} error={error}
-          onBack={backToStart} onContinue={active => { void continueHistory(phase.paper, active); }}
-          onOpenResult={id => { void openResult(id); }} />
       )}
       {phase.kind === 'solve' && (
         <ExamSolveView
@@ -158,8 +150,9 @@ export function ExamPracticeScreen({ client, currentUserId, onExit, admin, isAdm
       {phase.kind === 'result' && (
         <OmrResultView key={phase.result.attemptId} client={client} result={phase.result}
           onRevise={isAdmin && client.getAttemptForRevision && !busy ? () => { void revise(phase.result.attemptId); } : undefined}
-          backLabel={phase.historyPaper ? '← 풀이 기록' : undefined}
-          onBack={() => { if (phase.historyPaper) { setError(null); setPhase({ kind: 'history', paper: phase.historyPaper }); } else backToStart(); }} />
+          busy={busy} onOpenResult={id => { void openResult(id); }}
+          onContinueHistory={(paper, active) => { void continueHistory(paper, active); }}
+          onBack={backToStart} />
       )}
     </div>
   );

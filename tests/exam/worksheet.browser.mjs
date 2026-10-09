@@ -3,6 +3,7 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
+import { duplicateSubmittedAttempt } from './ui-cleanup.assertions.mjs';
 import { assertCompactTopbar } from './compact-topbar.assertions.mjs';
 
 const base = process.env.EXAM_TEST_BASE_URL || 'http://127.0.0.1:5174';
@@ -47,15 +48,20 @@ try {
     assert.match(await card.innerText(), /42\.9점/);
     assert.match(await card.innerText(), /원점수 3 \/ 7점/);
     assert.match(await page.locator('.exam-past .exam-past-row').first().innerText(), /42\.9점/);
-    await page.locator('[data-testid="exam-history-open"][data-paper-id="mock-worksheet"]').click();
+    assert.equal(await page.getByTestId('exam-history-open').count(), 0);
+    await page.locator('.exam-past .exam-past-row').first().click();
+    await page.waitForFunction(() => window.__examLog.some(row => row.method === 'listPaperHistory'));
+    assert.equal(await page.getByTestId('exam-history').count(), 0);
+    await duplicateSubmittedAttempt(page);
+    await page.locator('.exam-past .exam-past-row').first().click();
     await page.getByTestId('exam-history-table').waitFor();
-    assert.match(await page.getByTestId('exam-history-attempt').innerText(), /42\.9점/);
-    assert.match(await page.getByTestId('exam-history-attempt').innerText(), /원점수 3 \/ 7점/);
+    assert.match(await page.getByTestId('exam-history-attempt').first().innerText(), /42\.9점/);
+    assert.match(await page.getByTestId('exam-history-attempt').first().innerText(), /원점수 3 \/ 7점/);
     const trend = page.getByTestId('exam-history-trend');
     assert.deepEqual(await trend.locator('svg > g text').allTextContents(), ['0', '50', '100']);
     assert.match(await trend.locator('svg').getAttribute('aria-label'), /42\.9점/);
-    assert.match(await trend.locator('circle title').textContent(), /42\.9점/);
-    assert.ok(Math.abs(Number(await trend.locator('circle').getAttribute('cy')) - (96 - .429 * 72)) < .001);
+    assert.match(await trend.locator('circle title').first().textContent(), /42\.9점/);
+    assert.ok(Math.abs(Number(await trend.locator('circle').first().getAttribute('cy')) - (96 - .429 * 72)) < .001);
     await context.close();
   }
 

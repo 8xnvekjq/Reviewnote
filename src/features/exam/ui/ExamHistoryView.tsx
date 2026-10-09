@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ConvertedScore } from './ConvertedScore';
 import { scoreDisplay } from './scoreDisplay';
 import type { ExamClient, ExamElective, ExamPaperHistoryAttempt, ExamPaperSummary } from '../contract';
@@ -9,7 +9,8 @@ interface Props {
   paper: ExamPaperSummary;
   busy: boolean;
   error: string | null;
-  onBack: () => void;
+  onBack?: () => void;
+  embedded?: boolean;
   onContinue: (inProgress: boolean) => void;
   onOpenResult: (attemptId: string) => void;
 }
@@ -52,16 +53,19 @@ function ScoreTrend({ history, paper }: { history: ExamPaperHistoryAttempt[]; pa
   );
 }
 
-export function ExamHistoryView({ client, paper, busy, error, onBack, onContinue, onOpenResult }: Props) {
+export function ExamHistoryView({ client, paper, busy, error, onBack, onContinue, onOpenResult, embedded = false }: Props) {
   const [history, setHistory] = useState<ExamPaperHistoryAttempt[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [elective, setElective] = useState<ExamElective>(paper.inProgress?.elective ?? paper.electives[0] ?? '미적분');
   const [reload, setReload] = useState(0);
+  const request = useRef<{ key: string; promise: Promise<ExamPaperHistoryAttempt[]> } | null>(null);
   useEffect(() => {
     let alive = true;
     setLoadError(null);
     setHistory(null);
-    void client.listPaperHistory(paper.id).then(list => {
+    const key = `${paper.id}:${reload}`;
+    if (request.current?.key !== key) request.current = { key, promise: client.listPaperHistory(paper.id) };
+    void request.current.promise.then(list => {
       if (!alive) return;
       const sorted = [...list].sort((a, b) => a.round - b.round);
       setHistory(sorted);
@@ -74,11 +78,15 @@ export function ExamHistoryView({ client, paper, busy, error, onBack, onContinue
   const active = history?.find(a => a.status === 'in_progress');
   const rows = buildHistoryRows(history ?? [], elective, paper.questionCount ?? 30);
 
+  if (embedded && (!history || history.filter(a => a.status === 'submitted').length < 2)) {
+    return loadError ? <p className="exam-error" role="alert">{loadError}</p> : null;
+  }
+
   return (
     <div className="exam-history" data-testid="exam-history">
-      <button type="button" className="rn-button rn-button-ghost rn-button-compact" disabled={busy} onClick={onBack}>← 시험지 목록</button>
-      <p className="rn-eyebrow">내 풀이 기록</p>
-      <h1 className="exam-result-title">{paper.title}</h1>
+      {!embedded && <button type="button" className="rn-button rn-button-ghost rn-button-compact" disabled={busy} onClick={onBack}>← 시험지 목록</button>}
+      <h2 className="exam-setup-title">풀이 기록</h2>
+      {!embedded && <h1 className="exam-result-title">{paper.title}</h1>}
       {(error || loadError) && <p className="exam-error" role="alert">{error || loadError}</p>}
       {loadError && <button type="button" className="rn-button rn-button-secondary" onClick={() => setReload(n => n + 1)}>다시 불러오기</button>}
       {!history && !loadError && <p className="rn-caption" role="status">기록을 불러오는 중이에요…</p>}
@@ -87,10 +95,10 @@ export function ExamHistoryView({ client, paper, busy, error, onBack, onContinue
           <button type="button" className="rn-button rn-button-primary" disabled={busy} onClick={() => onContinue(Boolean(active))} data-testid="exam-history-continue">
             {busy ? '준비 중…' : active ? `${roundLabel(active.round)} 이어 풀기` : '새 회차 시작'}
           </button>
-          <div>
+          {!embedded && <div>
             <button type="button" className="rn-button rn-button-secondary" disabled aria-describedby="exam-history-coming">계속 틀리는 문제만 다시 풀기</button>
             <p id="exam-history-coming" className="rn-caption">준비 중이에요. 조금만 기다려 주세요.</p>
-          </div>
+          </div>}
         </div>
         {!history.length && <p className="rn-empty">아직 풀이 기록이 없어요. 첫 회차를 시작해 볼까요?</p>}
         <ScoreTrend history={history} paper={paper} />
