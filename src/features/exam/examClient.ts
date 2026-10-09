@@ -256,9 +256,6 @@ export const adminExamClient = {
   async listPaperVideos(paperId: string) {
     return (await callRpc('admin_list_exam_paper_videos', { p_paper_id: paperId }) ?? {}) as Partial<Record<'common' | ExamElective, string>>;
   },
-  async setPaperVideo(paperId: string, section: 'common' | ExamElective, url: string | null) {
-    await callRpc('admin_set_exam_paper_video', { p_paper_id: paperId, p_section: section, p_url: url });
-  },
 };
 
 /** 관리자 읽기 전용 검토(학생 결과·필기·필기 재생). 서버 함수가 관리자만 허용한다. */

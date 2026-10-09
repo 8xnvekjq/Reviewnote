@@ -152,7 +152,7 @@ export function ExamPracticeScreen({ client, currentUserId, onExit, admin, isAdm
           onRevise={isAdmin && client.getAttemptForRevision && !busy ? () => { void revise(phase.result.attemptId); } : undefined}
           busy={busy} onOpenResult={id => { void openResult(id); }}
           onContinueHistory={(paper, active) => { void continueHistory(paper, active); }}
-          videoApi={isAdmin && admin?.listPaperVideos && admin.setPaperVideo ? { listPaperVideos: admin.listPaperVideos, setPaperVideo: admin.setPaperVideo } : undefined}
+          videoApi={isAdmin && admin?.listPaperVideos ? { listPaperVideos: admin.listPaperVideos } : undefined}
           onBack={backToStart} />
       )}
     </div>

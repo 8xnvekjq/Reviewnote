@@ -362,7 +362,6 @@ export interface AdminExamApi {
   listPaperSubmissions(paperId: string): Promise<AdminPaperSubmission[]>;
   /** 관리자 전용 해설 영상 링크(시험지 × 공통·선택과목). */
   listPaperVideos?(paperId: string): Promise<Partial<Record<'common' | ExamElective, string>>>;
-  setPaperVideo?(paperId: string, section: 'common' | ExamElective, url: string | null): Promise<void>;
   liveTransport?: import('./liveTransport').LiveTransport;
   listLivePapers(): Promise<Array<{ paperId: string; liveCount: number }>>;
   getLiveExam(paperId: string): Promise<AdminLiveStudent[]>;
