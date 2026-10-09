@@ -1335,7 +1335,11 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   assert.equal(await activity.getByTestId('exam-admin-student').count(), 3);
   assert.match(await activity.getByTestId('exam-admin-student').nth(0).innerText(), /총 2회/);
   assert.match(await activity.getByTestId('exam-admin-student').nth(1).innerText(), /이학생[\s\S]*풀이 중/);
-  assert.match(await activity.getByTestId('exam-admin-student').nth(2).innerText(), /내 풀이 · 선생님/);
+  const mine = activity.getByTestId('exam-admin-student').nth(2).locator('.exam-admin-activity-name');
+  assert.equal(await mine.innerText(), '선생님');
+  assert.equal(await mine.evaluate(el => el.classList.contains('is-mine')), true);
+  assert.notEqual(await mine.evaluate(el => getComputedStyle(el).color),
+    await activity.getByTestId('exam-admin-student').nth(0).locator('.exam-admin-activity-name').evaluate(el => getComputedStyle(el).color));
   await noHorizontalOverflow(page, `admin-activity/${viewport.width}`);
   await page.screenshot({ path: `${out}/admin-activity-${viewport.width}.png`, fullPage: true });
   await activity.getByTestId('exam-admin-student').nth(1).click();

@@ -74,7 +74,7 @@ function PaperActivity({ students, paper, onOpen, onCompare }: { students: Admin
           {students.map(row => (
             <li key={row.studentId}>
               <button type="button" className="exam-admin-activity-row" onClick={() => onOpen(row)} data-testid="exam-admin-student">
-                <span className="exam-admin-activity-name">{row.isMine ? `내 풀이 · ${row.studentName}` : row.studentName}</span>
+                <span className={`exam-admin-activity-name${row.isMine ? ' is-mine' : ''}`}>{row.studentName}</span>
                 <span className="exam-admin-activity-score">{activityScore(row, paper)}</span>
                 <span className="exam-admin-activity-meta">{row.round}차{row.attemptCount > 1 ? ` (총 ${row.attemptCount}회)` : ''}{row.status === 'submitted' && row.inProgress ? ' · 다시 푸는 중' : ''} · {activityDate(row.submittedAt ?? row.startedAt)}</span>
               </button>
