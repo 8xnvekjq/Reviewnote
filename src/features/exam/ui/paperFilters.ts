@@ -93,7 +93,7 @@ const TERM_ORDER = (paper: ExamPaperSummary) => (paper.examTerm === 'final' ? 2 
 
 /** 최신 순: 수능·모평은 시행일, 내신은 연도→학기→기말/중간→학교. 값이 없는 시험지는 뒤로. 학교 프린트·한능검은 원래 순서. */
 export function sortPapersNewest(section: string, papers: ExamPaperSummary[]): ExamPaperSummary[] {
-  if (section === 'csat') return [...papers].sort((a, b) => (b.examDate || '').localeCompare(a.examDate || ''));
+  if (section === 'csat' || section === 'mock') return [...papers].sort((a, b) => (b.examDate || '').localeCompare(a.examDate || ''));
   if (section === 'school') {
     return [...papers].sort((a, b) => (b.year ?? -1) - (a.year ?? -1) || (b.semester ?? -1) - (a.semester ?? -1)
       || TERM_ORDER(b) - TERM_ORDER(a) || (a.schoolName ?? '').localeCompare(b.schoolName ?? '', 'ko'));

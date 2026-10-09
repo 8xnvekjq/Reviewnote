@@ -10,7 +10,7 @@ export type ExamElective = '확률과 통계' | '미적분' | '기하';
  *  자유 모드: 시간 제한 없음, 문항마다 "채점해 보기" 가능. */
 export type ExamMode = 'real' | 'free';
 
-export type ExamPaperKind = 'csat' | 'school' | 'hanneung' | 'worksheet';
+export type ExamPaperKind = 'csat' | 'mock' | 'school' | 'hanneung' | 'worksheet';
 export type ExamAnswerType = 'choice4' | 'choice5' | 'digits' | 'choice10';
 /** 선택 필드는 기존 운영 RPC 응답과의 호환용. 새 RPC는 모두 제공한다. */
 export interface ExamPaperMetadata {

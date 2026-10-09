@@ -9,6 +9,7 @@ import { ConvertedScore } from './ConvertedScore';
 import { browserPollEnvironment } from './livePolling';
 import { startLiveBadgePolling } from './liveBadgePolling';
 import { ELECTIVE_SHORT, ELECTIVES, formatClock, formatElapsed, progressRatio, remainingMs, roundLabel } from './examLogic';
+import { paperGrade, PAPER_SECTIONS, SECTION_LABEL } from './paperGrouping';
 import { HANNEUNG_ERAS } from './hanneungEra';
 import { resultGradeLabel } from './hanneungLogic';
 import { applyPaperFilters, browserFilterStorage, buildPaperFilters, filterScope, isFilterSection, loadSavedFilters, normalizeSelection, sortPapersNewest, storeSavedFilters, type FilterKey, type FilterSection, type FilterSelection, type PaperFilter, type SavedFilters } from './paperFilters';
@@ -43,10 +44,6 @@ function gradeLabel(value: number | 'hanneung') {
   return value === 'hanneung' ? '한능검' : value <= 6 ? `고${value}` : `중${value - 6}`;
 }
 
-function paperGrade(paper: ExamPaperMetadata) {
-  if (paper.kind === 'hanneung') return 'hanneung';
-  return (paper.kind ?? 'csat') === 'csat' ? 3 : paper.grade;
-}
 
 function formatDate(iso: string) {
   const d = new Date(iso.length === 10 ? `${iso}T00:00:00` : iso);
@@ -131,8 +128,6 @@ function RecentStudentResults({ activity, papers, onOpen }: { activity: Map<stri
     </section>
   );
 }
-
-const SECTION_LABEL: Record<'era' | 'csat' | 'school' | 'worksheet' | 'hanneung', string> = { era: '시대별 모아 풀기', csat: '수능·모평', school: '내신', worksheet: '학교 프린트', hanneung: '한능검' };
 
 /** 구역 제목 아래 필터 칩 줄(필터마다 한 줄, 넘치면 가로 스크롤). */
 function PaperFilterBar({ section, filters, selection, onPick }: { section: FilterSection; filters: PaperFilter[]; selection: FilterSelection; onPick: (key: FilterKey, value: string | null) => void }) {
@@ -349,7 +344,7 @@ export function ExamStartView({ client, currentUserId, admin, isAdmin = false, b
       {visiblePapers.length > 0 && (
         <>
           <p className="rn-caption">시험지를 눌러 시작해요. 풀던 시험지는 이어서 풀 수 있어요.</p>
-          {(['era', 'csat', 'school', 'worksheet', 'hanneung'] as const).map(kind => {
+          {PAPER_SECTIONS.map(kind => {
             const all = kind === 'era' ? HANNEUNG_ERAS.flatMap(era => visiblePapers.filter(p => p.practiceEra === era.id)) : visiblePapers.filter(p => !p.practiceEra && (p.kind ?? 'csat') === kind);
             if (all.length === 0) return null;
             const filters = isFilterSection(kind) ? buildPaperFilters(kind, all) : [];

@@ -50,6 +50,7 @@ const inkStats = { requests: 0, bytes: 0 }; // 필기 저장 요청 수·본문 
 const client = createMockExamClient({
   admin: params.get('admin') === '1',
   worksheet: params.get('worksheet') === '1',
+  mock: params.get('mock') === '1',
   filters: params.get('filters') === '1',
   timeLimitMinutes: params.has('limit') ? Number(params.get('limit')) : undefined,
   persistKey: params.get('persist') === '1' ? 'exam-practice-harness' : undefined,
