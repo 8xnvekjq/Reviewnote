@@ -9,6 +9,7 @@ import interior from '../../pixel-room/assets/interior/source-17655392.png';
 import floors from '../../pixel-room/assets/interior/source-17655391.png';
 import { furnitureArt } from '../../pixel-room/assets';
 import dogSheet from '../../pixel-room/pet/assets/dog.png';
+import bearRideSheet from '../../pixel-room/pet/assets/bear_ride.png';
 import bearSheet from '../../pixel-room/pet/assets/bear.png';
 import pigeonSheet from '../../pixel-room/pet/assets/pigeon.png';
 import duckSheet from '../../pixel-room/pet/assets/duck.png';
@@ -20,6 +21,7 @@ import type { PetId } from '../../pixel-room/pet/petKinds';
 import { DUCK_BOUNDS } from '../logic/petSheets';
 import { loadImage, svgToImage } from './loadImage';
 
+export const loadBearRide = () => loadImage(bearRideSheet);
 export const loadTown = () => loadImage(town);
 export const loadInterior = () => loadImage(interior);
 /** 방 벽/바닥 아틀라스(floors-walls, 같은 CC0 팩). */

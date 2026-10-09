@@ -40,6 +40,8 @@ export interface WorldGameHandle {
   cancelWalk(): void;
   /** A 버튼: 바라보는 대상과 상호작용(말 걸기/살펴보기/문으로 들어가기). */
   interact(): void;
+  toggleRide(): void;
+  dismount(): void;
   reactPet(kind: 'feed' | 'pet'): void;
   farmFx(index: number, action: string): void;
   setAppearance(avatar: WorldAssets['avatar']): void;
@@ -76,7 +78,7 @@ export function startWorldGame(parent: HTMLElement, start: WorldStart, controls:
     let lastScene: SceneId = FIRST_SCENE;
     let resolved = false;
     const ctx: WorldContext = {
-      assets: start.assets, controls, hooks: events, clockOverride: start.clockOverride,
+      riding: false, assets: start.assets, controls, hooks: events, clockOverride: start.clockOverride,
       data: { furniture: start.furniture, beds: start.beds },
       view: { ratio: size.ratio },
       onSceneReady: scene => {
@@ -172,6 +174,8 @@ export function startWorldGame(parent: HTMLElement, start: WorldStart, controls:
       walkToScreen: (x, y) => active?.walkToScreen(x, y),
       cancelWalk: () => active?.cancelWalk(),
       interact: () => active?.interact(),
+      toggleRide: () => active?.toggleRide(),
+      dismount: () => active?.dismount(),
       reactPet: kind => active?.reactPet(kind),
       farmFx: (index, action) => active?.farmFx(index, action),
       setAppearance: avatar => {

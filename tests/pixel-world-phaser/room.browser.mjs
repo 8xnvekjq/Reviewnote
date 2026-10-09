@@ -202,7 +202,7 @@ try {
   await page.route('**/rest/v1/**', async route => {
     const request = route.request(), url = new URL(request.url());
     const table = url.pathname.split('/').at(-1);
-    if (request.method() !== 'GET' && !['get_pixel_farm', 'get_pixel_level', 'get_pixel_fishing_state'].includes(table)) writes.push(request.url());
+    if (request.method() !== 'GET' && !['get_pixel_farm', 'get_pixel_level', 'get_pixel_fishing_state', 'get_pixel_world_clock'].includes(table)) writes.push(request.url());
     let body = [];
     if (table === 'save_pixel_room_layout') {
       assert.equal(request.method(), 'POST');

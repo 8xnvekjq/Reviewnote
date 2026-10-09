@@ -13,6 +13,7 @@ export type LandedCatch = Extract<CastFinish, { landed: true }>;
 export interface FishingShadow { index: 0 | 1 | 2; size: 'S' | 'M' | 'L'; sparkle: boolean }
 // 추가 연결점: RiverScene은 이 호출을 자신의 createFishingFx().update로 전달한다.
 export interface FishingHandle {
+  dismount?(): void;
   cancelWalk(): void;
   setShadows?(shadows: FishingShadow[]): void;
   setWorldTime?(phase: FishPhase, weather: FishWeather): void;
@@ -125,6 +126,7 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
   const onShadowTap = useCallback(async (index: number) => {
     const { adapter: current, scene: where, pet: companion } = latest.current;
     if (!current || where !== 'river' || lock.current || !stateRef.current || index < 0 || index > 2) return;
+    latest.current.handle.current?.dismount?.();
     lock.current = true; setBusy(true); setCaught(null); setMessage(''); game.current = idleFishingGame();
     latest.current.freeze(true); latest.current.handle.current?.cancelWalk();
     const epoch = generation.current;
