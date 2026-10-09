@@ -335,7 +335,7 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, onRevise, i
             )}
             <div className="exam-viewer-paper">
               <PeerSolutionSwitch key={viewing.questionId} session={peerSession} attemptId={result.attemptId}
-                eligible={result.kind !== 'hanneung' && (viewing.isCorrect === false || viewing.unsure === true)}
+                eligible={result.kind !== 'hanneung'}
                 questionId={viewing.questionId} imageUrl={viewing.imageUrl}>{peerButton => <>
               {wholePages && <button type="button" className="rn-button rn-button-compact" aria-pressed={pageZoom} onClick={() => setPageZoom(prev => !prev)}>{pageZoom ? '화면에 맞추기' : '원본 확대'}</button>}
               <div className={wholePages ? 'exam-original-scroll' : undefined}>

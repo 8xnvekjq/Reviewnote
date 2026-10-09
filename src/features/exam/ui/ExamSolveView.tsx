@@ -528,7 +528,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
           onCheck: () => { void runFreeCheck(); },
           onReveal: () => setRevealed(prev => ({ ...prev, [question.id]: true })),
           peerActive: peerMode,
-          onPeer: attempt.kind !== 'hanneung' && current.checked && (!current.checked.isCorrect || current.unsure)
+          onPeer: attempt.kind !== 'hanneung' && current.checked
             ? () => {
               if (peerMode) { exitPeer(); return; }
               peerTrigger.current = document.activeElement as HTMLElement;
