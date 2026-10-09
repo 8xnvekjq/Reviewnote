@@ -2,15 +2,18 @@ import { memo, useEffect, useMemo, useRef, useState, type CSSProperties, type Po
 import type { ExamClient, ExamInkCanvasHandle, InkChangeKind, InkReplayData, InkStroke, InkTool } from '../contract';
 import { ReplayAudio } from '../audio/ReplayAudio';
 import { ExamInkCanvas } from './ExamInkCanvas';
-import { inkExtent, replayStrokeLists } from './inkFit';
+import { inkExtent, replayStrokeLists, type InkExtent } from './inkFit';
 import { REPLAY_MAX_PAUSE_MS, buildInkClock, buildInkTimeline, formatReplayTime } from './inkReplay';
 
 /** 여러 풀이가 하나의 시계를 공유할 때 기존 캔버스로 지정 시각의 프레임만 표시한다. */
-export const ExamInkReplayFrame = memo(function ExamInkReplayFrame({ data, clock, time, imageUrl, imageMaxWidth, notes }: {
+export const ExamInkReplayFrame = memo(function ExamInkReplayFrame({ data, clock, time, imageUrl, imageMaxWidth, notes, fit: sharedFit }: {
   data: InkReplayData; clock: ReturnType<typeof buildInkClock>; time: number; imageUrl: string; imageMaxWidth: number;
   notes?: ReplayNotes;
+  /** 생략하면 기존처럼 해당 학생의 필기 범위를 사용한다. */
+  fit?: InkExtent;
 }) {
-  const fit = useMemo(() => inkExtent(data.strokes, ...replayStrokeLists(data)), [data]);
+  const localFit = useMemo(() => inkExtent(data.strokes, ...replayStrokeLists(data)), [data]);
+  const fit = sharedFit ?? localFit;
   return <div className="exam-replay-frame">
     <ExamInkCanvas imageUrl={imageUrl} strokes={clock.frame(time)} onChange={() => {}}
       tool="pen" color="#1f2937" size={4} readOnly imageMaxWidth={imageMaxWidth} fitToInk={fit} />

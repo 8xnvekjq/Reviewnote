@@ -27,9 +27,9 @@ import { applyInkEvent, inkDelta, inkIdsHash } from '../ink/inkReplay';
 import { latestSubmissions } from './replayCompareLogic';
 
 /** 비교 화면의 제출 목록·서로 다른 재생 길이를 제공하는 관리자 전용 하네스. */
-export function createMockReplayCompareApi(admin: boolean) {
+export function createMockReplayCompareApi(admin: boolean, count = 3) {
   const questions = buildMockQuestions('미적분').slice(0, 3);
-  const rows: AdminPaperSubmission[] = ['김학생', '이학생', '선생님'].map((studentName, index) => ({
+  const rows: AdminPaperSubmission[] = ['김학생', '이학생', '선생님', '박학생', '최학생', '정학생'].slice(0, count).map((studentName, index) => ({
     attemptId: `compare-${index}`, studentId: `compare-student-${index}`, studentName,
     submittedAt: '2026-10-09T10:00:00Z', isMine: index === 2,
     questions: questions.map(q => ({ questionId: q.id, number: q.number, imageUrl: q.imageUrl,
@@ -43,9 +43,9 @@ export function createMockReplayCompareApi(admin: boolean) {
       check(); calls.push({ attemptId, questionId });
       const index = Number(attemptId.split('-').at(-1));
       if (index === 2 && questionId === questions[2].id) return { batches: [], strokes: [], revision: 0 };
-      const duration = [400, 2200, 3800][index];
+      const duration = [400, 2200, 3800, 1500, 2800, 4200][index];
       const stroke: InkStroke = { id: `${attemptId}-${questionId}`, tool: 'pen', color: '#2563eb', size: 4,
-        points: Array.from({ length: 21 }, (_, n) => ({ x: .1 + n * .03, y: .5 + n * .01, t: duration * n / 20, pressure: .5 })) };
+        points: Array.from({ length: 21 }, (_, n) => ({ x: .1 + n * .03, y: .5 + n * (.01 + index * .018), t: duration * n / 20, pressure: .5 })) };
       const event = { ...inkDelta([], [stroke], 'draw'), at: 10000 + duration };
       return { batches: [{ id: `${attemptId}-${questionId}`, baseRevision: 0, revision: 1, baseline: [], events: [event] }], strokes: [stroke], revision: 1 };
     },

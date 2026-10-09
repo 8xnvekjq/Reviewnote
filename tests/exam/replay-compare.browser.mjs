@@ -2,8 +2,8 @@ import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 
-const base = `${process.env.EXAM_TEST_BASE_URL || 'http://127.0.0.1:5175'}/tests/exam/practice.html`;
-const out = '.test-artifacts/replay-compare';
+const base = `${process.env.EXAM_TEST_BASE_URL || 'http://127.0.0.1:5176'}/tests/exam/practice.html`;
+const out = '.test-artifacts/compare-fit6';
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 try {
@@ -177,7 +177,7 @@ try {
     await dialog.getByRole('button', { name: '이전 문항', exact: true }).click();
     await page.waitForFunction(() => document.querySelector('[data-testid="compare-grid"]')?.dataset.playing === 'true');
     const calls = await page.evaluate(() => window.__compare.calls);
-    assert.equal(calls.length, 9, 'only current questions load and revisits use cache');
+    assert.equal(calls.length, 9, 'adjacent questions prefetch and revisits use cache');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     assert.equal(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth), true);
     await dialog.evaluate(el => { el.scrollTop = el.scrollHeight; });
@@ -193,6 +193,64 @@ try {
     await page.waitForFunction(() => document.querySelector('[data-testid="compare-grid"]')?.dataset.playing === 'true');
     await close.click(); assert.equal(await dialog.count(), 0);
     assert.deepEqual(errors, []);
+    await page.close();
+  }
+
+  for (const [width, height] of [[1180,820], [820,1180], [1366,768], [1920,1080], [390,844]]) {
+    const page = await browser.newPage({ viewport: { width, height } });
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.goto(`${base}?admin=1&compare=1&compare6=1`);
+    await page.locator('[data-testid="exam-compare-open"][data-paper-id="2025-06-math"]').click();
+    const picker = page.getByTestId('compare-picker');
+    await picker.getByRole('checkbox').first().waitFor();
+    assert.equal(await picker.getByRole('checkbox').count(), 6);
+    for (const checkbox of await picker.getByRole('checkbox').all()) await checkbox.check();
+    await picker.getByRole('button', { name: '\uD568\uAED8 \uC7AC\uC0DD' }).click();
+    await page.waitForFunction(() => document.querySelector('[data-testid="compare-grid"]')?.dataset.playing === 'true');
+    await page.waitForFunction(() => window.__compare.calls.length === 12);
+    await page.waitForFunction(() => [...document.querySelectorAll('[data-testid="compare-cell"] img')].every(img => img.complete && img.width > 10));
+    const dialog = page.getByTestId('replay-compare');
+    const cells = page.getByTestId('compare-cell');
+    const geometry = await cells.evaluateAll(els => els.map(el => {
+      const r = el.getBoundingClientRect();
+      return { x: r.x, y: r.y, width: r.width, height: r.height, image: el.querySelector('img').getBoundingClientRect().width };
+    }));
+    assert.equal(geometry.length,6);
+    for (const cell of geometry) {
+      assert.ok(Math.abs(cell.width - geometry[0].width) <= 2);
+      assert.ok(Math.abs(cell.height - geometry[0].height) <= 2);
+      assert.ok(Math.abs(cell.image - geometry[0].image) <= 2);
+      if (width > 640) assert.ok(cell.x >= 0 && cell.y >= 0 && cell.x + cell.width <= width + 1 && cell.y + cell.height <= height + 1, JSON.stringify(cell));
+    }
+    if (width > 640) {
+      assert.equal(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight + 1),true);
+      assert.equal(await dialog.evaluate(el => el.scrollHeight <= el.clientHeight + 1),true);
+    } else {
+      assert.equal(await page.getByTestId('compare-grid').evaluate(el => getComputedStyle(el).gridTemplateColumns.split(' ').length),1);
+    }
+    if (width === 1180) {
+      assert.ok((await dialog.locator('.exam-compare-head').boundingBox()).height <= 60);
+      assert.ok((await page.getByTestId('compare-dock').boundingBox()).height <= 60);
+    }
+    await page.getByTestId('compare-dock').getByRole('slider').press('End');
+    await page.screenshot({ path: `${out}/six-${width}x${height}.png` });
+    // 캐시에 있는 문항은 준비 중 문구 없이 재생한다.
+    await page.evaluate(() => {
+      window.__loadingSeen = false;
+      window.__loadingObserver = new MutationObserver(() => {
+        if ([...document.querySelectorAll('[role="status"]')].some(el => el.textContent.includes('\uBAA8\uB4E0 \uD480\uC774'))) window.__loadingSeen = true;
+      });
+      window.__loadingObserver.observe(document.body,{ childList: true, subtree: true });
+    });
+    const prefetched = await page.evaluate(() => window.__compare.calls.filter(call => call.questionId === window.__compare.rows[0].questions[1].questionId).length);
+    assert.equal(prefetched,6);
+    await dialog.getByRole('button', { name: '\uB2E4\uC74C \uBB38\uD56D', exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('[data-testid="compare-grid"]')?.dataset.playing === 'true');
+    assert.equal(await page.evaluate(() => window.__loadingSeen),false);
+    assert.equal(await page.evaluate(() => window.__compare.calls.filter(call => call.questionId === window.__compare.rows[0].questions[1].questionId).length),6);
+    await page.evaluate(() => window.__loadingObserver.disconnect());
+    assert.deepEqual(errors,[]);
     await page.close();
   }
   const student = await browser.newPage();

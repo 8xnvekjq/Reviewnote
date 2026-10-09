@@ -3,13 +3,33 @@ import { createPortal } from 'react-dom';
 import type { AdminExamApi, AdminPaperSubmission, InkReplayData, InkStroke, InkTool } from '../contract';
 import { ExamInkReplayFrame, ReplayIcon } from '../ink/ExamInkReplay';
 import { formatReplayTime } from '../ink/inkReplay';
-import { loadInkImage } from '../ink/inkImages';
-import { advanceCompare, compareCellProgress, compareColumns, compareReplayClock, createCompareReplayLoader, latestSubmissions, restartCompare } from './replayCompareLogic';
+import { aspectCache, loadInkImage } from '../ink/inkImages';
+import { advanceCompare, compareCellProgress, compareGridShape, comparePrefetchOrder, sharedCompareFit, compareReplayClock, createCompareReplayLoader, latestSubmissions, restartCompare } from './replayCompareLogic';
+import { fitExtraBelow, type InkExtent } from '../ink/inkFit';
 import { ScratchNotesTools } from './ResultInkNotes';
 import '../../../styles/examPractice.css';
 import '../../../styles/adminReplayCompare.css';
 
 type Replay = { data: InkReplayData; clock: ReturnType<typeof compareReplayClock> };
+
+const emptyData: InkReplayData = { batches: [], strokes: [], revision: 0 };
+const emptyReplay: Replay = { data: emptyData, clock: compareReplayClock(emptyData) };
+
+function CompareFrame({ replay, imageUrl, fit, time }: { replay: Replay; imageUrl: string; fit: InkExtent; time: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [cap, setCap] = useState(1);
+  useEffect(() => {
+    const box = ref.current!;
+    const observer = new ResizeObserver(() => {
+      const aspect = aspectCache.get(imageUrl) ?? 1;
+      setCap(window.innerWidth <= 640 ? 480 : Math.max(1, Math.min(480, box.clientHeight / (aspect + fitExtraBelow(aspect, fit)))));
+    });
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, [imageUrl, fit]);
+  return <div ref={ref} className="exam-compare-fit"><ExamInkReplayFrame data={replay.data} clock={replay.clock} time={time}
+    imageUrl={imageUrl} imageMaxWidth={cap} fit={fit} /></div>;
+}
 
 export function AdminReplayCompare({ api, paperId, title, onClose }: {
   api: AdminExamApi; paperId: string; title: string; onClose: () => void;
@@ -33,7 +53,7 @@ export function AdminReplayCompare({ api, paperId, title, onClose }: {
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
-  const [width, setWidth] = useState(window.innerWidth);
+  const [viewport, setViewport] = useState({ width: window.innerWidth, height: window.innerHeight });
   const timeRef = useRef(0);
   const speedRef = useRef(speed);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -82,7 +102,7 @@ export function AdminReplayCompare({ api, paperId, title, onClose }: {
     };
     document.body.style.overflow = 'hidden';
     closeRef.current?.focus();
-    const resize = () => setWidth(window.innerWidth);
+    const resize = () => setViewport({ width: window.innerWidth, height: window.innerHeight });
     window.addEventListener('resize', resize);
     window.addEventListener('popstate', pop);
     return () => {
@@ -109,7 +129,17 @@ export function AdminReplayCompare({ api, paperId, title, onClose }: {
   useEffect(() => {
     if (!started) return;
     let alive = true;
-    setReplays(null); setPlaying(false); setError(null); timeRef.current = 0; setTime(0);
+    loader.prioritize(picked.flatMap(row => {
+      const q = row.questions.find(value => value.number === question);
+      return q ? [{ attemptId: row.attemptId, questionId: q.questionId }] : [];
+    }));
+    loader.clearPrefetch();
+    const cached = picked.map(row => {
+      const q = row.questions.find(value => value.number === question);
+      const data = q && loader.peek(row.attemptId, q.questionId);
+      return !q ? [row.attemptId, emptyReplay] as const : data ? [row.attemptId, { data, clock: compareReplayClock(data) }] as const : null;
+    });
+    setReplays(cached.every(value => value !== null) ? new Map(cached.filter(value => value !== null)) : null); setPlaying(false); setError(null); timeRef.current = 0; setTime(0);
     void Promise.all(picked.map(async row => {
       const q = row.questions.find(value => value.number === question);
       if (!q) return null;
@@ -120,9 +150,20 @@ export function AdminReplayCompare({ api, paperId, title, onClose }: {
       setReplays(new Map(values.filter(value => value !== null)));
       const restart = restartCompare(question);
       timeRef.current = restart.time; setTime(restart.time); setPlaying(restart.playing);
+      void (async () => {
+        for (const number of comparePrefetchOrder(numbers, question)) {
+          if (!alive) return;
+          const image = questionImages.get(number);
+          if (image) void loadInkImage(image);
+          await Promise.all(picked.map(row => {
+            const q = row.questions.find(value => value.number === number);
+            return q ? loader(row.attemptId, q.questionId, true).catch(() => {}) : Promise.resolve();
+          }));
+        }
+      })();
     }).catch(() => { if (alive) setError('필기 기록을 불러오지 못했어요. 다시 시도해 주세요.'); });
-    return () => { alive = false; };
-  }, [started, picked, question, questionRevision, loader, retry]);
+    return () => { alive = false; loader.clearPrefetch(); };
+  }, [started, picked, question, questionRevision, loader, retry, numbers, questionImages]);
 
   useEffect(() => {
     if (!playing || !replays) return;
@@ -151,7 +192,7 @@ export function AdminReplayCompare({ api, paperId, title, onClose }: {
     history.pushState({ ...history.state, compareOverview: true }, ''); setOverview(true);
   };
   const changeQuestion = (number: number) => {
-    setPlaying(false); timeRef.current = 0; setTime(0); setReplays(null); setQuestion(number);
+    setPlaying(false); timeRef.current = 0; setTime(0); setQuestion(number);
     setQuestionRevision(value => value + 1);
   };
   const seek = (next: number) => { setPlaying(false); timeRef.current = Math.min(controlTotal, Math.max(0, next)); setTime(timeRef.current); };
@@ -160,9 +201,21 @@ export function AdminReplayCompare({ api, paperId, title, onClose }: {
     setPlaying(value => !value);
   };
   const index = numbers.indexOf(question);
-  return createPortal(<div ref={dialogRef} className="exam-compare" role="dialog" aria-modal="true" aria-label="동시 풀이 재생" data-testid="replay-compare">
+  const shape = compareGridShape(picked.length, viewport.width, viewport.height);
+  const fit = useMemo(() => sharedCompareFit([...replays?.values() ?? []].map(value => value.data),
+    aspectCache.get(questionImages.get(question) ?? '') ?? 1), [replays, questionImages, question]);
+  return createPortal(<div ref={dialogRef} className={`exam-compare${started && !focused ? " is-grid" : ""}`} role="dialog" aria-modal="true" aria-label="동시 풀이 재생" data-testid="replay-compare">
     <header className="exam-admin-review-bar exam-compare-head">
       <strong>{title} · 풀이 비교</strong>
+      {started && <div className="exam-compare-navigation">
+        {focused && <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={() => history.back()}>← 전체 보기</button>}
+        <div className="exam-nav">
+          <button type="button" className="rn-icon-button exam-nav-btn" aria-label="이전 문항" disabled={index <= 0} onClick={() => changeQuestion(numbers[index - 1])}>◀</button>
+          <button type="button" className="exam-nav-count" aria-haspopup="dialog" data-testid="compare-counter" onClick={event => openOverview(event.currentTarget)}><strong>{question}번</strong> / 총{numbers.length}</button>
+          <button type="button" className="rn-icon-button exam-nav-btn" aria-label="다음 문항" disabled={index >= numbers.length - 1} onClick={() => changeQuestion(numbers[index + 1])}>▶</button>
+        </div>
+        <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={event => openOverview(event.currentTarget)}>▦ 전체 문제</button>
+      </div>}
       {started && <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={() => {
         if (focused) history.back();
         setPlaying(false); setStarted(false); setNotes([]);
@@ -181,15 +234,6 @@ export function AdminReplayCompare({ api, paperId, title, onClose }: {
       </label>)}
       <button type="button" className="rn-button rn-button-primary" disabled={!selected.length || !numbers.length} onClick={() => { setQuestion(numbers[0]); setStarted(true); }}>함께 재생</button>
     </div> : <>
-      <div className="exam-compare-navigation">
-        {focused && <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={() => history.back()}>← 전체 보기</button>}
-        <div className="exam-nav">
-          <button type="button" className="rn-icon-button exam-nav-btn" aria-label="이전 문항" disabled={index <= 0} onClick={() => changeQuestion(numbers[index - 1])}>◀</button>
-          <button type="button" className="exam-nav-count" aria-haspopup="dialog" data-testid="compare-counter" onClick={event => openOverview(event.currentTarget)}><strong>{question}번</strong> / 총{numbers.length}</button>
-          <button type="button" className="rn-icon-button exam-nav-btn" aria-label="다음 문항" disabled={index >= numbers.length - 1} onClick={() => changeQuestion(numbers[index + 1])}>▶</button>
-        </div>
-        <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={event => openOverview(event.currentTarget)}>▦ 전체 문제</button>
-      </div>
       <div className="exam-replay-dock exam-compare-dock" role="group" aria-label="필기 재생" data-testid="compare-dock">
         <div className="exam-replay-progress">
           <div className="exam-replay-slider exam-compare-track" role="slider" tabIndex={0} aria-label="필기 재생 위치"
@@ -226,7 +270,7 @@ export function AdminReplayCompare({ api, paperId, title, onClose }: {
       {focused && <ScratchNotesTools tool={noteTool} color={noteColor} onTool={setNoteTool} onColor={setNoteColor}
         onClear={() => { setNotes([]); setNoteGeneration(value => value + 1); }} />}
       {!replays && !error && <p role="status">모든 풀이를 준비하는 중…</p>}
-      <div className={`exam-live-grid exam-compare-grid${focused ? ' is-focused' : ''}`} style={{ '--live-columns': focused ? 1 : compareColumns(width) } as CSSProperties} data-testid="compare-grid" data-playing={playing} data-time={time}>
+      <div className={`exam-live-grid exam-compare-grid${focused ? ' is-focused' : ''}`} style={{ '--live-columns': focused ? 1 : shape.columns, '--compare-rows': shape.rows } as CSSProperties} data-testid="compare-grid" data-playing={playing} data-time={time}>
         {picked.filter(row => !focused || row.attemptId === focused).map(row => {
           const q = row.questions.find(value => value.number === question);
           const replay = replays?.get(row.attemptId);
@@ -240,7 +284,8 @@ export function AdminReplayCompare({ api, paperId, title, onClose }: {
             }}>
               <div className="exam-compare-label"><strong>{row.isMine ? `내 풀이 · ${row.studentName}` : row.studentName}</strong><span>{question}번 · 답 {q?.answer ?? '미응답'} {q ? q.isCorrect ? 'O' : 'X' : '—'}</span></div>
               <div className="exam-compare-canvas">
-                {q && replay && <ExamInkReplayFrame data={replay.data} clock={replay.clock} time={progress.time} imageUrl={q.imageUrl} imageMaxWidth={focused ? 1000 : 480}
+                {!focused && replays && <CompareFrame replay={replay ?? emptyReplay} imageUrl={q?.imageUrl ?? questionImages.get(question) ?? ''} fit={fit} time={progress.time} />}
+                {focused && q && replay && <ExamInkReplayFrame data={replay.data} clock={replay.clock} time={progress.time} imageUrl={q.imageUrl} imageMaxWidth={focused ? 1000 : 480}
                   notes={focused ? { strokes: notes, onChange: setNotes, tool: noteTool, color: noteColor, size: 4,
                     inkRef: null, toolbar: null, ready: true, canvasKey: noteGeneration } : undefined} />}
                 {finished && <div className="exam-compare-ended" data-testid="compare-ended"><span>{empty ? '풀이 없음' : '끝'}</span></div>}
