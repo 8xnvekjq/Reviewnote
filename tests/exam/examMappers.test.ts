@@ -169,6 +169,10 @@ test('papers, summaries and added mistakes map from rows', () => {
   assert.deepEqual(mapExamResultSummary({ attemptId: 'a', paperTitle: 't', mode: 'real', elective: '기하', score: 88, estimatedGrade: 1, submittedAt: 'z', extra: 1 }), {
     attemptId: 'a', paperTitle: 't', mode: 'real', elective: '기하', score: 88, estimatedGrade: 1, submittedAt: 'z',
   });
+  const summary = mapExamResultSummary({ paperId: 'paper-a', round: 3 });
+  assert.equal(summary.paperId, 'paper-a');
+  assert.equal(summary.round, 3);
+  assert.equal(mapExamResultSummary({ round: 0 }).round, undefined);
   assert.deepEqual(mapAddedMistakes([{ questionId: 'q1', mistakeId: 'm1', created: true }, { questionId: 'q2' }, null]), [{ questionId: 'q1', mistakeId: 'm1' }]);
   assert.deepEqual(mapAddedMistakes(null), []);
 });

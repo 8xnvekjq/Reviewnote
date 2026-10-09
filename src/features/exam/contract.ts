@@ -202,7 +202,7 @@ export interface ExamClient {
   /** 제출 + 서버 채점. 이후 정답 공개. */
   submitAttempt(attemptId: string, items: ExamItemState[], visitOrder: number[]): Promise<ExamResult>;
   getResult(attemptId: string): Promise<ExamResult>;
-  listMyResults(paperId?: string): Promise<Array<Pick<ExamResult, 'attemptId' | 'paperTitle' | 'mode' | 'elective' | 'score' | 'estimatedGrade' | 'submittedAt' | keyof ExamPaperMetadata>>>;
+  listMyResults(paperId?: string): Promise<Array<Pick<ExamResult, 'attemptId' | 'paperId' | 'round' | 'paperTitle' | 'mode' | 'elective' | 'score' | 'estimatedGrade' | 'submittedAt' | keyof ExamPaperMetadata>>>;
   /** 학생이 OMR 결과에서 고른 문항(틀린 문제·🤔 문제 후보)을 오답노트(mistakes)에 추가. 이미 추가된 건 건너뜀. */
   addToMistakes(attemptId: string, questionIds: string[]): Promise<Array<{ questionId: string; mistakeId: string }>>;
   /** 오답노트에 담은 문항마다 '원래풀이'(문항 이미지 + 서버에 저장된 필기를 합성한 PNG data URL)를 스캐폴딩으로 붙인다.
@@ -413,6 +413,8 @@ export interface ExamInkCanvasProps {
   imageUrl: string;
   strokes: InkStroke[];                       // 제어 컴포넌트: 문항별 획은 부모(W3)가 들고 있다
   onChange: (next: InkStroke[], kind?: InkChangeKind) => void;
+  /** 쓰기 제스처 시작 직전, 재생 프레임을 최종 필기로 바꿀 때 사용한다. */
+  onWriteStart?: () => void;
   tool: InkTool;
   color: string;
   size: number;
