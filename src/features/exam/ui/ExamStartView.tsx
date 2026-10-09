@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { AdminExamApi, AdminPaperStudentActivity, ExamAttempt, ExamClient, ExamElective, ExamMode, ExamPaperSummary, ExamResult, ExamPaperMetadata } from '../contract';
 import { AdminAttemptReview } from './AdminAttemptReview';
 import { AdminLiveView } from './AdminLiveView';
+import { AdminReplayCompare } from './AdminReplayCompare';
 import { ConvertedScore } from './ConvertedScore';
 import { browserPollEnvironment } from './livePolling';
 import { startLiveBadgePolling } from './liveBadgePolling';
@@ -194,6 +195,7 @@ export function ExamStartView({ client, currentUserId, admin, busy, error, onSta
   const [reviewing, setReviewing] = useState<AdminPaperStudentActivity | null>(null);
   const [liveCounts, setLiveCounts] = useState<Map<string, number>>(new Map());
   const [livePaper, setLivePaper] = useState<ExamPaperSummary | null>(null);
+  const [comparePaper, setComparePaper] = useState<ExamPaperSummary | null>(null);
   const [savedFilters, setSavedFilters] = useState<SavedFilters>(() => loadSavedFilters(browserFilterStorage(), currentUserId));
   const setupRef = useRef<HTMLElement>(null);
   const [now] = useState(() => Date.now());
@@ -214,9 +216,9 @@ export function ExamStartView({ client, currentUserId, admin, busy, error, onSta
 
   // 관리자만 시험지별 학생 응시 현황과 Live 배지를 받는다(학생이면 서버가 null). 화면이 보이는 동안 자동 갱신.
   useEffect(() => {
-    if (!admin || livePaper || reviewing) return;
+    if (!admin || livePaper || reviewing || comparePaper) return;
     return startLiveBadgePolling(admin, browserPollEnvironment, { activity: rows => setActivity(new Map(rows.map(row => [row.paperId, row.students]))), counts: setLiveCounts });
-  }, [admin, livePaper, reviewing]);
+  }, [admin, livePaper, reviewing, comparePaper]);
 
   const visiblePapers = papers?.filter(candidate => paperGrade(candidate) === grade) ?? [];
   const paper = visiblePapers.find(p => p.id === paperId) ?? null;
@@ -318,6 +320,7 @@ export function ExamStartView({ client, currentUserId, admin, busy, error, onSta
                   disabled={busy || resuming != null} onClick={() => onOpenHistory(p)}
                   aria-label={`${p.title} 풀이 기록 보기`} data-testid="exam-history-open" data-paper-id={p.id}>풀이 기록 보기</button>
                 {activity && <PaperActivity students={activity.get(p.id) ?? []} paper={p} onOpen={setReviewing} />}
+                {admin && activity && (p.resultCount > 0 || activity.get(p.id)?.some(row => row.status === 'submitted')) && <button type="button" className="rn-button rn-button-compact" data-testid="exam-compare-open" data-paper-id={p.id} onClick={() => setComparePaper(p)}>풀이 비교</button>}
               </div>
             ))}
           </div>}</section>;
@@ -368,6 +371,7 @@ export function ExamStartView({ client, currentUserId, admin, busy, error, onSta
       {reviewing && admin && <AdminAttemptReview key={reviewing.attemptId} target={reviewing} studentName={reviewing.studentName}
         api={admin} onClose={() => setReviewing(null)} />}
       {livePaper && admin && <AdminLiveView api={admin} paperId={livePaper.id} title={livePaper.title} onClose={() => setLivePaper(null)} />}
+      {comparePaper && admin && <AdminReplayCompare api={admin} paperId={comparePaper.id} title={comparePaper.title} onClose={() => setComparePaper(null)} />}
 
       {past.length > 0 && (
         <section className="exam-past" aria-label="지난 OMR 결과">

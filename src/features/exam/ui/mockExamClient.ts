@@ -19,11 +19,39 @@ import { hanneungGrade } from './hanneungLogic.ts';
 import paperJson from '../data/2025-06-math.json';
 import imagesJson from '../data/2025-06-math.images.json';
 import type {
-  AdminExamApi, AdminLiveStudent, InkStroke, LiveInkResponse,
+  AdminExamApi, AdminPaperSubmission, AdminLiveStudent, InkStroke, LiveInkResponse,
   ExamAttempt, ExamClient, ExamElective, ExamInkDocument, ExamItemState, ExamMode, ExamPaperSummary, ExamQuestion, ExamResult, ExamResultItem, InkReplayBatch,
 } from '../contract.ts';
 import { sanitizeExamAnswer } from '../examMappers';
 import { applyInkEvent, inkDelta, inkIdsHash } from '../ink/inkReplay';
+import { latestSubmissions } from './replayCompareLogic';
+
+/** 비교 화면의 제출 목록·서로 다른 재생 길이를 제공하는 관리자 전용 하네스. */
+export function createMockReplayCompareApi(admin: boolean) {
+  const questions = buildMockQuestions('미적분').slice(0, 3);
+  const rows: AdminPaperSubmission[] = ['김학생', '이학생', '선생님'].map((studentName, index) => ({
+    attemptId: `compare-${index}`, studentId: `compare-student-${index}`, studentName,
+    submittedAt: '2026-10-09T10:00:00Z', isMine: index === 2,
+    questions: questions.map(q => ({ questionId: q.id, number: q.number, imageUrl: q.imageUrl,
+      answer: index === 1 ? '2' : '1', isCorrect: index !== 1 })),
+  }));
+  const calls: Array<{ attemptId: string; questionId: string }> = [];
+  const check = () => { if (!admin) throw new Error('EXAM_ADMIN_REQUIRED'); };
+  const api: Pick<AdminExamApi, 'listPaperSubmissions' | 'getInkReplay'> = {
+    async listPaperSubmissions(paperId) { check(); return paperId === '2025-06-math' ? latestSubmissions(rows) : []; },
+    async getInkReplay(attemptId, questionId) {
+      check(); calls.push({ attemptId, questionId });
+      const index = Number(attemptId.split('-').at(-1));
+      if (index === 2 && questionId === questions[2].id) return { batches: [], strokes: [], revision: 0 };
+      const duration = [400, 2200, 3800][index];
+      const stroke: InkStroke = { id: `${attemptId}-${questionId}`, tool: 'pen', color: '#2563eb', size: 4,
+        points: Array.from({ length: 21 }, (_, n) => ({ x: .1 + n * .03, y: .5 + n * .01, t: duration * n / 20, pressure: .5 })) };
+      const event = { ...inkDelta([], [stroke], 'draw'), at: 10000 + duration };
+      return { batches: [{ id: `${attemptId}-${questionId}`, baseRevision: 0, revision: 1, baseline: [], events: [event] }], strokes: [stroke], revision: 1 };
+    },
+  };
+  return { api, rows, calls };
+}
 import { decodeInkPayload, encodeInkEvents } from '../ink/inkCodec';
 import { countAnswered, ELECTIVES, estimateGrade, isAnswerCorrect, keepCheckedAnswers } from './examLogic.ts';
 import { canReadSharedTeacherAudio, pickSharedTeacher, readSharedTeacher, writeSharedTeacher, type SharedTeacherAttempt } from './mockTeacherShare.ts';

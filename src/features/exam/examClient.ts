@@ -229,6 +229,9 @@ export const examClient: ExamClient = {
 };
 
 export const adminExamClient = {
+  async listPaperSubmissions(paperId: string) {
+    return await callRpc('admin_list_paper_submissions', { p_paper_id: paperId }) as import('./contract').AdminPaperSubmission[];
+  },
   async listLivePapers() {
     return await callRpc('admin_list_live_exam_papers', {}) as Array<{ paperId: string; liveCount: number }>;
   },
