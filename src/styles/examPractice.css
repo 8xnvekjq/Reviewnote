@@ -546,3 +546,5 @@
   .exam-viewer-overlay .exam-viewer:has(.exam-replay-inline) { padding-bottom: calc(var(--exam-viewer-dock-height, 140px) + 20px); }
   .exam-result .exam-history { gap: 10px; }
 }
+/* 학생별 최근 점수: 관리자 본인 풀이는 이름 색으로만 구분(라벨을 붙이지 않는다). */
+.exam-admin-activity-name.is-mine { color: var(--rn-warning, #f59e0b); }
