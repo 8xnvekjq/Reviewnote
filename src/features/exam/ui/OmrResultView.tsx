@@ -1,6 +1,7 @@
 // OMR 결과: 원점수·추정 등급·추정 표준점수·추정 백분위 + 맞은 개수·총 시간(+등급컷 표 접기) / 한능검 시대별 결과 / 문항별 줄 / 오답노트 후보 고르기.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { SolutionVideoLink, SolutionVideoPanel, usePaperVideos, type PaperVideos, type VideoApi, type VideoSection } from './SolutionVideos';
 import type { AdminExamApi, ExamClient, ExamPaperSummary, ExamResult, ExamResultItem, InkStroke } from '../contract';
 import { composeInkImage } from '../ink/inkComposite';
 import { useExamInk } from './useExamInk';
@@ -26,6 +27,8 @@ type Props = {
   busy?: boolean;
   onOpenResult?: (attemptId: string) => void;
   onContinueHistory?: (paper: ExamPaperSummary, active: boolean) => void;
+  /** 관리자 본인 결과: 해설 영상 링크(공통·선택과목). */
+  videoApi?: VideoApi;
 } & (
   | { client: ExamClient; review?: undefined }
   /** 관리자 읽기 전용 검토: 서버 필기만 읽고, 오답노트 담기·필기 저장은 하지 않는다. */
@@ -41,6 +44,9 @@ interface BodyProps {
   ink: Map<string, InkStroke[]>;
   inkBar: ReactNode;
   historySection?: ReactNode;
+  /** 관리자 본인 결과: 해설 영상 칸과 문항별 링크. */
+  videoPanel?: ReactNode;
+  videos?: PaperVideos;
   studentName?: string;
   /** 학생 본인: 원래 필기를 다 불러와 덧쓰기를 시작해도 되는지. */
   inkReady?: boolean;
@@ -51,10 +57,10 @@ interface BodyProps {
 export function OmrResultView(props: Props) {
   return props.review
     ? <ReviewResult client={props.client} result={props.result} onBack={props.onBack} backLabel={props.backLabel} studentName={props.review.studentName} />
-    : <StudentResult client={props.client} result={props.result} onBack={props.onBack} backLabel={props.backLabel} onRevise={props.onRevise} busy={props.busy} onOpenResult={props.onOpenResult} onContinueHistory={props.onContinueHistory} />;
+    : <StudentResult client={props.client} result={props.result} onBack={props.onBack} backLabel={props.backLabel} onRevise={props.onRevise} busy={props.busy} onOpenResult={props.onOpenResult} onContinueHistory={props.onContinueHistory} videoApi={props.videoApi} />;
 }
 
-function StudentResult({ client, result, onBack, backLabel, onRevise, busy = false, onOpenResult, onContinueHistory }: Extract<Props, { review?: undefined }>) {
+function StudentResult({ client, result, onBack, backLabel, onRevise, busy = false, onOpenResult, onContinueHistory, videoApi }: Extract<Props, { review?: undefined }>) {
   const paper: ExamPaperSummary = { ...result, id: resultPaperId(result) ?? '', title: result.paperTitle, examDate: '', source: '',
     timeLimitMinutes: null, electives: !result.kind || result.kind === 'csat' ? ELECTIVES : [],
     questionCount: result.questionCount ?? result.totalCount, inProgress: null, lastResult: null, resultCount: 0 };
@@ -77,8 +83,12 @@ function StudentResult({ client, result, onBack, backLabel, onRevise, busy = fal
     const docs = await client.getInk(result.attemptId);
     return new Map(docs.map(doc => [doc.questionId, doc.strokes]));
   };
+  const videoSections: VideoSection[] = result.elective ? ['common', result.elective] : ['common'];
+  const paperVideos = usePaperVideos(videoApi, paper.id || null);
   return <OmrResultBody client={client} result={result} onBack={onBack} backLabel={backLabel} onRevise={onRevise} ink={inkSync.strokes} inkBar={inkBar}
     inkReady={inkSync.ready} loadOriginalInk={loadOriginalInk}
+    videos={videoApi ? paperVideos.videos : undefined}
+    videoPanel={videoApi && paper.id ? <SolutionVideoPanel videos={paperVideos.videos} sections={videoSections} onSave={paperVideos.save} /> : null}
     historySection={onOpenResult && onContinueHistory && paper.id ? <ExamHistoryView embedded client={client} paper={paper} busy={busy} error={null}
       onOpenResult={onOpenResult} onContinue={active => onContinueHistory(paper, active)} /> : null} />;
 }
@@ -101,7 +111,7 @@ function ReviewResult({ client, result, onBack, backLabel, studentName }: {
   return <OmrResultBody client={client} result={result} onBack={onBack} backLabel={backLabel} ink={ink ?? new Map()} inkBar={inkBar} studentName={studentName} inkReady={ink !== null} />;
 }
 
-function OmrResultBody({ client, result: initial, onBack, backLabel, onRevise, ink, inkBar, studentName, inkReady = false, loadOriginalInk, historySection }: BodyProps) {
+function OmrResultBody({ client, result: initial, onBack, backLabel, onRevise, ink, inkBar, studentName, inkReady = false, loadOriginalInk, historySection, videoPanel, videos }: BodyProps) {
   const [result, setResult] = useState(initial);
   const reviewing = studentName != null;
   const wholePages = usesWholePages(initial.items);
@@ -248,6 +258,8 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, onRevise, i
         </>}
       </section>
 
+      {videoPanel}
+
       {historySection}
 
       {topics && <EraSection stats={eraStats(result.items, topics)} />}
@@ -342,6 +354,7 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, onRevise, i
             <div className="exam-sheet-head">
               <h2>{viewing.number}번 {viewing.sourceRound && <small>제{viewing.sourceRound}회 {viewing.sourceNumber}번</small>} <span className={viewing.isCorrect ? 'is-correct' : 'is-wrong'}>{viewing.isCorrect ? 'O' : 'X'}</span></h2>
               <span className="rn-caption">{reviewing ? '학생 답' : '내 답'} <ExamAnswer question={viewing} answer={viewing.answer} /> · 정답 <ExamAnswer question={viewing} answer={viewing.correctAnswer} /> · {formatClock(viewing.timeSpentMs)}</span>
+              {videos && <SolutionVideoLink videos={videos} section={viewing.section} />}
               <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={() => openQuestion(null)}>닫기</button>
             </div>
             {viewing.nationalChoiceRates && (
