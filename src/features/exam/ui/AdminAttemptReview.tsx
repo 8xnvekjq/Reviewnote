@@ -9,7 +9,7 @@ import { ExamAnswer } from './ExamAnswer';
 import { formatDuration, usesWholePages } from './examLogic';
 import { OmrResultView } from './OmrResultView';
 
-export type ReviewTarget = Pick<AdminExamAttemptSummary, 'attemptId' | 'paperTitle' | 'round' | 'status' | 'mode' | 'elective' | 'score' | 'maxScore'>;
+export type ReviewTarget = Pick<AdminExamAttemptSummary, 'attemptId' | 'paperTitle' | 'round' | 'status' | 'mode' | 'elective' | 'score' | 'maxScore'> & { isMine?: boolean };
 
 function InProgressReview({ target, api }: { target: ReviewTarget; api: AdminExamApi }) {
   const [data, setData] = useState<{ attempt: ExamAttempt; ink: Map<string, InkStroke[]> } | null>(null);
@@ -107,7 +107,8 @@ export function AdminAttemptReview({ target, studentName, api, onClose }: {
       {submitted ? <>
         {!result && !error && <p role="status">결과를 불러오는 중…</p>}
         {error && <p role="alert">결과를 불러오지 못했어요. <button type="button" className="rn-button rn-button-compact" onClick={() => setReload(n => n + 1)}>다시 시도</button></p>}
-        {result && <OmrResultView key={result.attemptId} client={api} result={result} onBack={onClose} backLabel="← 닫기" review={{ studentName }} />}
+        {result && <OmrResultView key={result.attemptId} client={api} result={result} onBack={onClose} backLabel="← 닫기" review={{ studentName }}
+          videoApi={target.isMine && api.listPaperVideos && api.setPaperVideo ? { listPaperVideos: api.listPaperVideos, setPaperVideo: api.setPaperVideo } : undefined} />}
       </> : <InProgressReview target={target} api={api} />}
     </div>
   </div>, document.body);

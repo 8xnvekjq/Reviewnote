@@ -76,6 +76,23 @@ try {
     await sp.getByTestId('exam-viewer').waitFor();
     assert.equal(await sp.getByTestId('exam-video-link').count(), 0);
     await student.close();
+    // 학생별 최근 점수에서 내 응시를 열면 검토 화면에도 해설 영상 칸이 있다. 학생 응시를 열면 없다.
+    const admin = await browser.newContext({ viewport });
+    const ap = await admin.newPage();
+    await ap.goto(`${BASE}?activity=1`);
+    const activity = ap.locator('.exam-paper-entry').filter({ has: ap.locator('[data-testid="exam-paper-card"][data-paper-id="2025-06-math"]') }).getByTestId('exam-admin-activity');
+    await activity.waitFor();
+    await activity.locator('summary').click();
+    const review = ap.getByTestId('admin-exam-review');
+    await activity.getByTestId('exam-admin-student').filter({ has: ap.locator('.exam-admin-activity-name.is-mine') }).click();
+    await review.getByTestId('exam-result').waitFor();
+    await review.getByTestId('exam-video-panel').waitFor();
+    await ap.keyboard.press('Escape');
+    await review.waitFor({ state: 'detached' });
+    await activity.getByTestId('exam-admin-student').first().click();
+    await review.getByTestId('exam-result').waitFor();
+    assert.equal(await review.getByTestId('exam-video-panel').count(), 0);
+    await admin.close();
     console.log(`ok — admin solution video links (${viewport.width})`);
   }
 } finally { await browser.close(); }
