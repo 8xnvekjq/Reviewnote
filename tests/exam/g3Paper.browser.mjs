@@ -1,0 +1,52 @@
+// 고3 수능·모평 → 10월 학평 → 미적분 실전 → OMR 제출 → 추정 등급.
+import { chromium } from 'playwright';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const base = process.env.EXAM_TEST_BASE_URL || 'http://127.0.0.1:5175';
+const data = JSON.parse(fs.readFileSync(new URL('../../src/features/exam/data/2025-10-g3-math.json', import.meta.url), 'utf8'));
+const browser = await chromium.launch({ headless: true });
+try {
+  const page = await browser.newPage({ viewport: { width: 1180, height: 820 } });
+  const errors = []; page.on('pageerror', e => errors.push(e.message));
+  await page.goto(`${base}/tests/exam/practice.html?mock=1`);
+  await page.getByTestId('exam-start').waitFor();
+  await page.getByRole('button', { name: '고2', exact: true }).click();
+  assert.equal(await page.locator(`[data-paper-id="${data.id}"]`).count(), 0);
+  await page.getByRole('button', { name: '고3', exact: true }).click();
+  await page.getByRole('heading', { name: '수능·모평', exact: true }).waitFor();
+  await page.getByRole('button', { name: '10월 학평', exact: true }).click();
+  const card = page.locator(`[data-paper-id="${data.id}"]`);
+  assert.match(await card.innerText(), /2025년 10월 고3/);
+  await card.click();
+  await page.getByTestId('exam-setup').waitFor();
+  for (const elective of data.electives) assert.equal(await page.getByRole('radio', { name: new RegExp(elective) }).count(), 1);
+  await page.getByRole('radio', { name: /미적분/ }).click();
+  await page.getByRole('radio', { name: /실전 모드/ }).click();
+  await page.getByTestId('exam-start-button').click();
+  await page.getByTestId('exam-solve').waitFor();
+  assert.deepEqual(await page.evaluate(() => window.__examLog.find(r => r.method === 'startAttempt').args), [data.id, 'real', '미적분']);
+  assert.match(await page.getByTestId('exam-counter').innerText(), /\/\s*30\b/);
+  const source = await page.locator('img').evaluateAll(imgs => imgs.map(i => i.getAttribute('src')));
+  assert.ok(source.some(url => url?.includes(`/exams/${data.id}/c-01.png`)));
+  await page.locator('.exam-choice[data-choice="3"]').click();
+  await page.getByRole('button', { name: '제출', exact: true }).click();
+  await page.getByRole('button', { name: '제출하기', exact: true }).click();
+  await page.getByTestId('exam-submit-confirm').click();
+  await page.getByTestId('exam-result').waitFor();
+  assert.equal(await page.getByTestId('exam-score').innerText(), '2');
+  assert.match(await page.getByTestId('exam-result').innerText(), /9등급/);
+  const result = await page.evaluate(async () => {
+    const papers = await window.__examClient.listPapers();
+    const paper = papers.find(p => p.id === '2025-10-g3-math');
+    return window.__examClient.getResult(paper.lastResult.attemptId);
+  });
+  assert.equal(result.elective, '미적분');
+  assert.deepEqual(result.gradeCut.rawByGrade, data.gradeCuts.rawByElective['미적분']);
+  assert.deepEqual(result.gradeCut.standardByGrade, data.gradeCuts.standardByElective['미적분']);
+  assert.equal(result.gradeCut.topStandard, null);
+  assert.equal(result.gradeCut.topPercentile, null);
+  assert.equal(result.items.filter(q => q.section === 'common').length, 22);
+  assert.equal(result.items.filter(q => q.section === '미적분').length, 8);
+  assert.deepEqual(errors, []);
+  console.log('ok — 고3 10월 학평·선택과목·미적분 실전·OMR·추정 등급');
+} finally { await browser.close(); }

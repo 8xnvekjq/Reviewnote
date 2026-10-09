@@ -12,6 +12,17 @@ const school = (id: string, schoolName: string, year: number, semester: number, 
   ({ ...base, id, title: id, examDate: '', kind: 'school', schoolName, year, semester, examTerm, grade: 1 });
 
 const CSAT = [csat('2025-06', '2024-06-04'), csat('2026-11', '2025-11-13'), csat('2025-09', '2024-09-04'), csat('2026-06', '2025-06-04')];
+test('고3 10월 학평 칩은 기존 모평·수능과 함께 학년도·월로 필터링한다', () => {
+  const october = { ...csat('2025-10-g3-math', '2025-10-14'), kind: 'csat' as const, year: 2026, grade: 3 };
+  const papers = [...CSAT, october];
+  assert.equal(csatAcademicYear(october), 2026);
+  assert.deepEqual(buildPaperFilters('csat', papers).find(f => f.key === 'month')!.options, [
+    { value: '11', label: '수능' }, { value: '10', label: '10월 학평' },
+    { value: '9', label: '9월 모평' }, { value: '6', label: '6월 모평' },
+  ]);
+  assert.deepEqual(applyPaperFilters(papers, { year: '2026', month: '10' }).map(p => p.id), [october.id]);
+  assert.deepEqual(applyPaperFilters(papers, { month: '6' }).map(p => p.id), ['2025-06', '2026-06']);
+});
 const SCHOOL = [
   school('a', '동북고', 2026, 2, 'mid'), school('b', '상일여고', 2026, 2, 'mid'),
   school('c', '둔촌고', 2026, 1, 'final'), school('d', '영파여고', 2024, 2, 'mid'),

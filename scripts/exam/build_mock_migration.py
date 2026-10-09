@@ -1,6 +1,7 @@
 """검토된 학력평가 JSON과 최신 함수 정의로 단일 마이그레이션을 만든다."""
 import json
 import re
+import argparse
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -24,6 +25,11 @@ def quote(value):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--grade', type=int, choices=(3,))
+    if parser.parse_args().grade == 3:
+        build_g3()
+        return
     parts = ['-- 학력평가: 선택과목 없이 30문항·100점·100분. 검토 후 별도로 공개한다.\nbegin;',
              "alter table public.exam_papers drop constraint if exists exam_papers_kind_check;\nalter table public.exam_papers add constraint exam_papers_kind_check check (kind in ('csat','mock','school','hanneung','worksheet'));",
              "alter table public.exam_papers drop constraint if exists exam_papers_mock_check;\nalter table public.exam_papers add constraint exam_papers_mock_check check (kind <> 'mock' or (grade in (1,2) and grade is not null and cardinality(electives)=0 and question_count=30 and max_score=100 and time_limit_minutes=100 and grade_cuts->'raw' is not null));"]
@@ -53,6 +59,29 @@ def main():
         parts.append('insert into public.exam_answer_keys (question_id,answer) select q.id,k.answer from (values\n' + ','.join(keys) + f') as k(number,answer) join public.exam_questions q on q.paper_id={pid} and q.section=\'common\' and q.number=k.number on conflict (question_id) do nothing;')
     parts.append('commit;')
     (MIGRATIONS / '20261010120000_exam_mock_2025_10.sql').write_text('\n\n'.join(parts) + '\n', encoding='utf8')
+
+
+def build_g3():
+    """고3는 기존 수능 스키마·함수를 그대로 사용한다. 데이터만 비공개로 추가한다."""
+    data = json.loads((ROOT / 'src/features/exam/data/2025-10-g3-math.json').read_text(encoding='utf8'))
+    pid = quote(data['id'])
+    parts = ['-- 고3 10월 학력평가: 공통 22문항 + 선택 8문항, 검토 후 별도로 공개한다.\nbegin;']
+    fields = ['id', 'title', 'exam_date', 'source', 'subject', 'school_grade', 'time_limit_minutes',
+              'electives', 'grade_cuts', 'published', 'kind', 'year', 'grade', 'question_count', 'max_score']
+    values = [pid, quote(data['title']), quote(data['examDate']), quote(data['source']), quote(data['subject']),
+              quote(data['schoolGrade']), '100', 'array[' + ','.join(map(quote, data['electives'])) + ']::text[]',
+              quote(json.dumps(data['gradeCuts'], ensure_ascii=False)) + '::jsonb', 'false', "'csat'", '2026', '3', '30', '100']
+    parts.append('insert into public.exam_papers (' + ','.join(fields) + ') values (' + ','.join(values) + ') on conflict (id) do nothing;')
+    rows, keys = [], []
+    for q in data['questions']:
+        rows.append('(' + ','.join([pid, str(q['number']), quote(q['section']), quote(q['imageUrl']),
+                                  str(q['isChoice']).lower(), str(q['points']), quote(q['curriculumGrade']),
+                                  quote(q['curriculumChapter']), quote(q['answerType'])]) + ')')
+        keys.append('(' + ','.join([str(q['number']), quote(q['section']), quote(q['answer'])]) + ')')
+    parts.append('insert into public.exam_questions (paper_id,number,section,image_url,is_choice,points,curriculum_grade,curriculum_chapter,answer_type) values\n' + ',\n'.join(rows) + '\non conflict (paper_id,section,number) do nothing;')
+    parts.append('insert into public.exam_answer_keys (question_id,answer) select q.id,k.answer from (values\n' + ',\n'.join(keys) + f') as k(number,section,answer) join public.exam_questions q on q.paper_id={pid} and q.section=k.section and q.number=k.number on conflict (question_id) do nothing;')
+    parts.append('commit;')
+    (MIGRATIONS / '20261010140000_exam_csat_2025_10_g3.sql').write_text('\n\n'.join(parts) + '\n', encoding='utf8')
 
 
 if __name__ == '__main__':
