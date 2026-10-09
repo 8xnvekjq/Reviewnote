@@ -43,7 +43,7 @@ test('tints are warm at evening, blue with player light at night, and rain is bo
   assert.equal(worldTint('evening', 'clear').color, 0xe88b52);
   assert.equal(worldTint('night', 'clear').color, 0x101e50); assert.equal(worldTint('night', 'clear').lightRadius, 48);
   for (const phase of ['morning', 'day', 'evening', 'night'] as const) {
-    assert.equal(worldTint(phase, 'rain').rainDrops, 36);
+    assert.equal(worldTint(phase, 'rain').rainDrops, 56);
     assert.equal(worldTint(phase, 'cloudy').rainDrops, 0);
     assert.ok(worldTint(phase, 'rain').alpha > worldTint(phase, 'clear').alpha);
     assert.ok(worldTint(phase, 'rain').alpha <= 0.68);

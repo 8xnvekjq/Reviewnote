@@ -9,7 +9,7 @@ export function worldTint(phase: FishPhase, weather: FishWeather): TintParameter
     evening: { color: 0xe88b52, alpha: 0.18, lightRadius: 0, shadowColor: 0x463c50 },
     night: { color: 0x101e50, alpha: 0.55, lightRadius: 48, shadowColor: 0x0a1935 },
   }[phase];
-  return { ...base, color: phase === 'day' && weather !== 'clear' ? 0x728aa3 : base.color, alpha: Math.min(0.68, base.alpha + (weather === 'clear' ? 0 : weather === 'rain' ? 0.13 : 0.08)), rainDrops: weather === 'rain' ? 36 : 0 };
+  return { ...base, color: phase === 'day' && weather !== 'clear' ? 0x728aa3 : base.color, alpha: Math.min(0.68, base.alpha + (weather === 'clear' ? 0 : weather === 'rain' ? 0.13 : 0.08)), rainDrops: weather === 'rain' ? 56 : 0 };
 }
 // 서버 응답(get_pixel_fishing_state)이 오기 전이나 오래됐을 때 쓰는 화면 시계 — SQL과 같은 규칙(logic/worldClock.ts).
 // 관리자 시험용 덮어쓰기(?pwClock/?pwWeather)도 같은 방식으로 반영한다.
