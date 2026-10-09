@@ -1,5 +1,6 @@
 // OMR 결과: 원점수·추정 등급·추정 표준점수·추정 백분위 + 맞은 개수·총 시간(+등급컷 표 접기) / 한능검 시대별 결과 / 문항별 줄 / 오답노트 후보 고르기.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import type { AdminExamApi, ExamClient, ExamResult, ExamResultItem, InkStroke } from '../contract';
 import { composeInkImage } from '../ink/inkComposite';
 import { useExamInk } from './useExamInk';
@@ -321,7 +322,8 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, onRevise, i
         </ul>
       </section>
 
-      {viewing && (
+      {/* 문항 크게 보기는 body로 띄운다 — 관리자 검토처럼 스크롤 영역 안에 있으면 iOS 사파리가 고정 창 윗부분(닫기·진행 막대·배속)을 상단바 밑으로 잘라 버린다. */}
+      {viewing && createPortal(<div className="rn-app exam-practice exam-portal">
         <div className="exam-overlay exam-overlay-full exam-viewer-overlay" role="dialog" aria-modal="true" aria-label={`${viewing.number}번 크게 보기`} onClick={() => openQuestion(null)}>
           <div className="exam-viewer" onClick={e => e.stopPropagation()} data-testid="exam-viewer">
             <HistoryClose onClose={() => openQuestion(null)} />
@@ -359,7 +361,7 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, onRevise, i
             </div>
           </div>
         </div>
-      )}
+      </div>, document.body)}
     </div>
   );
 }
