@@ -664,7 +664,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       if (gestureRef.current) return; // 두 번째 입력·손바닥은 무시
       gestureStartedAt = e.timeStamp;
       if (e.pointerType === 'pen' && !penEverDetected) { penEverDetected = true; setPenSeen(true); }
-      const p = propsRef.current;
+      let p = propsRef.current;
       if (touch && penEverDetected && p.penOnlyWhenPenDetected !== false) {
         // 올가미 선택 테두리 위의 손가락은 옮기기·확대·회전, 그 밖은 스크롤.
         if (startSelectGesture(e, true)) return;
@@ -676,6 +676,8 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
         return;
       }
       if (e.pointerType === 'mouse' && e.button !== 0) return;
+      p.onWriteStart?.();
+      p = propsRef.current;
       if (p.tool === 'lasso' && startSelectGesture(e, touch)) return;
       e.preventDefault();
       rect = canvas.getBoundingClientRect();

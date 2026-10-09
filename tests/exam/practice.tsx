@@ -68,6 +68,17 @@ const adminMode = params.get('records') === '1' || params.get('activity') === '1
 // ?recordsPaper=2026-hanneung-79-advanced: 관리자 검토 화면을 한능검 심화 응시로 띄운다(시대별 결과 확인용).
 const recordsPaper = params.get('recordsPaper') || '2025-06-math';
 const recordsMath = recordsPaper === '2025-06-math';
+// 학생 카드 기록: 두 제출 결과를 오래된 순서로 돌려줘 정렬·회차 보완도 확인한다.
+if (params.get('myRecords') === '1') {
+  for (const [index, mode] of (['real', 'free'] as const).entries()) {
+    const attempt = await client.startAttempt(recordsPaper, mode, '미적분');
+    await client.submitAttempt(attempt.id, attempt.questions.map(question => ({ questionId: question.id, answer: index ? '1' : '2', unsure: false, visits: 1, timeSpentMs: 15000 })), []);
+  }
+  const list = client.listMyResults.bind(client);
+  client.listMyResults = async paperId => (await list(paperId)).reverse().map((r, index) => ({
+    ...r, round: index === 0 ? undefined : r.round, submittedAt: `2026-10-0${index + 1}T03:00:00Z`,
+  }));
+}
 if (adminMode) {
   const completed = await client.startAttempt(recordsPaper, 'free', recordsMath ? '미적분' : null);
   const strokes = [{ id: 'example', tool: 'pen' as const, color: '#2563eb', size: 4,
@@ -248,7 +259,7 @@ createRoot(document.getElementById('root')!).render(params.get('broadcast') === 
     <main className="rn-main">
       <div className="screen-enter">
         <ExamPracticeScreen
-          isAdmin={params.get('admin') === '1'}
+          isAdmin={params.get('admin') === '1' || adminMode}
           client={client}
           currentUserId={params.get('user') || 'student-1'}
           admin={adminApi}

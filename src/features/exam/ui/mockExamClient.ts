@@ -670,7 +670,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
         .filter(entry => entry.result && (!paperId || entry.attempt.paperId === paperId))
         .map(entry => {
           const r = entry.result!;
-          return { ...(r.kind === 'worksheet' ? worksheetFixture(r.paperId ?? '')?.paper : r.kind === 'school' ? SCHOOL_META : {}), kind: r.kind, practiceEra: r.practiceEra, questionCount: r.questionCount, hanneungLevel: r.hanneungLevel, attemptId: r.attemptId, paperTitle: r.paperTitle, mode: r.mode, elective: r.elective, score: r.score, estimatedGrade: r.estimatedGrade, submittedAt: r.submittedAt };
+          return { ...(r.kind === 'worksheet' ? worksheetFixture(r.paperId ?? '')?.paper : r.kind === 'school' ? SCHOOL_META : {}), paperId: entry.attempt.paperId, round: roundFor(entry.attempt), kind: r.kind, practiceEra: r.practiceEra, questionCount: r.questionCount, hanneungLevel: r.hanneungLevel, attemptId: r.attemptId, paperTitle: r.paperTitle, mode: r.mode, elective: r.elective, score: r.score, estimatedGrade: r.estimatedGrade, submittedAt: r.submittedAt };
         })
         .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
     },

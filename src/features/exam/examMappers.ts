@@ -22,7 +22,7 @@ import type {
   ExamResultItem,
 } from './contract';
 
-export type ExamResultSummary = Pick<ExamResult, 'attemptId' | 'paperTitle' | 'mode' | 'elective' | 'score' | 'estimatedGrade' | 'submittedAt' | keyof ExamPaperMetadata>;
+export type ExamResultSummary = Pick<ExamResult, 'attemptId' | 'paperId' | 'round' | 'paperTitle' | 'mode' | 'elective' | 'score' | 'estimatedGrade' | 'submittedAt' | keyof ExamPaperMetadata>;
 
 const ELECTIVES: readonly ExamElective[] = ['확률과 통계', '미적분', '기하'];
 const CIRCLED = '①②③④⑤';
@@ -314,6 +314,8 @@ export function mapExamResultSummary(raw: unknown): ExamResultSummary {
   const r = asRow(raw);
   return {
     attemptId: asString(r.attemptId),
+    ...(r.paperId != null ? { paperId: asString(r.paperId) } : {}),
+    ...mapRound(r),
     ...mapMetadata(r),
     paperTitle: asString(r.paperTitle),
     mode: asMode(r.mode),

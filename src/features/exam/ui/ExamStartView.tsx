@@ -13,12 +13,13 @@ import { HANNEUNG_ERAS } from './hanneungEra';
 import { resultGradeLabel } from './hanneungLogic';
 import { applyPaperFilters, browserFilterStorage, buildPaperFilters, filterScope, isFilterSection, loadSavedFilters, normalizeSelection, sortPapersNewest, storeSavedFilters, type FilterKey, type FilterSection, type FilterSelection, type PaperFilter, type SavedFilters } from './paperFilters';
 
-type PastResult = Pick<ExamResult, 'attemptId' | 'paperTitle' | 'mode' | 'elective' | 'score' | 'estimatedGrade' | 'submittedAt' | keyof ExamPaperMetadata>;
+type PastResult = Pick<ExamResult, 'attemptId' | 'paperId' | 'round' | 'paperTitle' | 'mode' | 'elective' | 'score' | 'estimatedGrade' | 'submittedAt' | keyof ExamPaperMetadata>;
 
 interface Props {
   client: ExamClient;
   currentUserId: string;
   admin?: AdminExamApi;
+  isAdmin?: boolean;
   busy: boolean;
   error: string | null;
   onStart: (paper: ExamPaperSummary, mode: ExamMode, elective: ExamElective | null) => void;
@@ -87,7 +88,23 @@ function PaperActivity({ students, paper, onOpen, onCompare }: { students: Admin
   );
 }
 
-/** 관리자: "지난 OMR 결과" 대신 학생들이 최근에 제출한 결과(모든 시험지, 최신순). 누르면 읽기 전용 검토. */
+/** 학생: 시험지별 제출 기록. 누르면 해당 결과에서 이어 덧쓴다. */
+function MyPaperResults({ results, paper, onOpen }: { results: PastResult[]; paper: ExamPaperSummary; onOpen: (attemptId: string) => void }) {
+  if (!results.length) return null;
+  return <div className="exam-admin-activity" data-testid="exam-my-records">
+    <details className="exam-admin-activity-more">
+      <summary>내 최근 기록 ({results.length}회)</summary>
+      <ul>{results.map(r => <li key={r.attemptId}>
+        <button type="button" className="exam-admin-activity-row" data-testid="exam-my-record" onClick={() => onOpen(r.attemptId)}>
+          <span className="exam-admin-activity-name">{r.round}차 · <ConvertedScore score={r.score} paper={paper}>{r.score}/{paper.maxScore ?? 100}점</ConvertedScore>{resultGradeLabel(paper, r.estimatedGrade) && ` · ${resultGradeLabel(paper, r.estimatedGrade)}`}</span>
+          <span className="exam-admin-activity-meta">{r.mode === 'real' ? '실전' : '자유'}{r.elective && ` · ${ELECTIVE_SHORT[r.elective]}`} · {activityDate(r.submittedAt)}</span>
+        </button>
+      </li>)}</ul>
+    </details>
+  </div>;
+}
+
+/** 관리자: 모든 시험지에서 최근에 제출한 학생 결과. */
 function RecentStudentResults({ activity, papers, onOpen }: { activity: Map<string, AdminPaperStudentActivity[]>; papers: ExamPaperSummary[]; onOpen: (row: AdminPaperStudentActivity) => void }) {
   const rows = [...activity.values()].flat()
     .filter(row => row.status === 'submitted' && row.submittedAt && !row.isMine)
@@ -198,7 +215,7 @@ function PaperCard({ paper, selected, busy, now, onClick }: { paper: ExamPaperSu
   );
 }
 
-export function ExamStartView({ client, currentUserId, admin, busy, error, onStart, onResume, onOpenResult, onExit, initialPaperId }: Props) {
+export function ExamStartView({ client, currentUserId, admin, isAdmin = false, busy, error, onStart, onResume, onOpenResult, onExit, initialPaperId }: Props) {
   const [papers, setPapers] = useState<ExamPaperSummary[] | null>(null);
   const [paperId, setPaperId] = useState<string | null>(initialPaperId ?? null);
   const [grade, setGrade] = useState<number | 'hanneung'>(3);
@@ -243,6 +260,17 @@ export function ExamStartView({ client, currentUserId, admin, busy, error, onSta
   }, [admin, livePaper, reviewing, comparePaper]);
 
   const visiblePapers = papers?.filter(candidate => paperGrade(candidate) === grade) ?? [];
+  // 제출 순서로 회차를 보완한 뒤 최신순으로 묶는다. 원래 지난 결과 목록의 순서는 바꾸지 않는다.
+  const myResults = new Map<string, PastResult[]>();
+  if (!isAdmin) {
+    for (const result of [...past].sort((a, b) => a.submittedAt.localeCompare(b.submittedAt))) {
+      if (!result.paperId) continue;
+      const rows = myResults.get(result.paperId) ?? [];
+      rows.push({ ...result, round: result.round ?? rows.length + 1 });
+      myResults.set(result.paperId, rows);
+    }
+    for (const rows of myResults.values()) rows.reverse();
+  }
   const paper = visiblePapers.find(p => p.id === paperId) ?? null;
   const showSetup = paper != null && !paper.inProgress;
 
@@ -338,6 +366,7 @@ export function ExamStartView({ client, currentUserId, admin, busy, error, onSta
               <div key={p.id} className="exam-paper-entry">
                 {activity && (liveCounts.get(p.id) ?? 0) > 0 && <button type="button" className="exam-live-badge" data-testid="exam-live-badge" aria-label={`${p.title} Live 보기`} onClick={() => setLivePaper(p)}><i aria-hidden="true" />Live</button>}
                 <PaperCard paper={p} selected={p.id === paperId} busy={busy || resuming != null} now={now} onClick={() => onCard(p)} />
+                {!isAdmin && <MyPaperResults results={myResults.get(p.id) ?? []} paper={p} onOpen={onOpenResult} />}
                 {activity && <PaperActivity students={activity.get(p.id) ?? []} paper={p} onOpen={setReviewing}
                   onCompare={admin && (p.resultCount > 0 || activity.get(p.id)?.some(row => row.status === 'submitted')) ? () => setComparePaper(p) : undefined} />}
               </div>

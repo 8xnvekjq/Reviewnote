@@ -1,4 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref } from 'react';
+import { flushSync } from 'react-dom';
 import type { ExamClient, ExamInkCanvasHandle, InkChangeKind, InkReplayData, InkStroke, InkTool } from '../contract';
 import { ReplayAudio } from '../audio/ReplayAudio';
 import { ExamInkCanvas } from './ExamInkCanvas';
@@ -25,7 +26,7 @@ export const ExamInkReplayFrame = memo(function ExamInkReplayFrame({ data, clock
   </div>;
 });
 
-/** 결과 화면 덧쓰기(이 기기 전용). 재생 중에는 쓰지 않고 재생 프레임만 보여 준다. */
+/** 결과 화면 덧쓰기(이 기기 전용). 관리자 검토에서는 첫 쓰기로 재생을 끝낸다. */
 export interface ReplayNotes {
   strokes: InkStroke[];
   onChange: (next: InkStroke[], kind?: InkChangeKind) => void;
@@ -33,7 +34,7 @@ export interface ReplayNotes {
   color: string;
   size: number;
   inkRef: Ref<ExamInkCanvasHandle>;
-  /** 쓰기 도구 막대(재생 중에는 숨긴다). */
+  /** 쓰기 도구 막대(학생 화면에서는 재생 중 숨긴다). */
   toolbar: ReactNode;
   /** false면 아직 원래 필기를 불러오는 중이라 쓰지 않는다. */
   ready: boolean;
@@ -237,7 +238,7 @@ export function ExamInkReplay({ client, attemptId, questionId, imageUrl, strokes
   };
   const controls = (event: ReactPointerEvent<HTMLDivElement>) =>
     (event.target as Element).closest('button, input, select, a, [role="button"]');
-  const canvasGesture = peerPlayback ? {
+  const canvasGesture = peerPlayback && !(autoOpen && notes) ? {
     onPointerDownCapture: (event: ReactPointerEvent<HTMLDivElement>) => {
       pointers.current.add(event.pointerId);
       tap.current = pointers.current.size === 1 && event.isPrimary && event.button === 0 && !controls(event)
@@ -279,14 +280,19 @@ export function ExamInkReplay({ client, attemptId, questionId, imageUrl, strokes
   const finalStrokes = notes ? notes.strokes : data?.strokes ?? strokes;
   const displayed = open && clock ? clock.frame(time) : finalStrokes;
   const currentLabel = timeline && done > 0 ? timeline.steps[done - 1]?.label : null;
-  const writable = Boolean(notes && !open && notes.ready);
+  const writable = Boolean(notes && (!open || autoOpen) && notes.ready);
+  const startNotes = () => {
+    if (!open || !autoOpen || !notes?.ready) return;
+    // 같은 포인터 입력을 캔버스가 처리하기 전에 최종 획과 저장 콜백을 반영해 첫 획을 잃지 않는다.
+    flushSync(() => { setPlaying(false); setOpen(false); });
+  };
   const playLabel = playing ? '일시정지' : '재생';
   return <div className="exam-ink-replay" data-testid="exam-ink-replay" data-replaying={open ? 'true' : 'false'}>
     {/* 도구도 다른 버튼도 없는 얇은 막대(다른 풀이)는 재생 중이면 토글 한 줄을 없애고 재생 막대 안의 ✕로 닫는다. */}
     {!(toggleInDock && open) && <div className="exam-replay-bar">
       <button type="button" className="rn-button rn-button-compact" aria-expanded={open} onClick={toggleOpen}>{open ? '최종 풀이 보기' : '필기 순서 보기'}</button>
-      {/* 재생 중에는 쓸 수 없으니 덧쓰기 도구를 숨긴다(최종 풀이 보기로 닫으면 다시 나온다). */}
-      {notes && !open && <div className="exam-replay-notes">{notes.toolbar}</div>}
+      {/* 관리자 검토는 재생 중에도 도구를 보여 주고, 쓰기 시작 시 최종 풀이로 전환한다. */}
+      {notes && (!open || autoOpen) && <div className="exam-replay-notes">{notes.toolbar}</div>}
       {barExtra}
     </div>}
     {/* 재생 컨트롤은 화면 왼쪽에 떠 있는 작은 상자 — 풀이를 아래로 스크롤해도 늘 보이고 바로 멈출 수 있다. */}
@@ -335,6 +341,7 @@ export function ExamInkReplay({ client, attemptId, questionId, imageUrl, strokes
     <div className="exam-replay-canvas" data-testid={peerPlayback ? 'exam-peer-canvas' : undefined} {...canvasGesture}>
     <ExamInkCanvas key={notes?.canvasKey} ref={notes?.inkRef} imageUrl={imageUrl} strokes={displayed}
       onChange={writable ? notes!.onChange : () => {}}
+      onWriteStart={startNotes}
       tool={notes?.tool ?? 'pen'} color={notes?.color ?? '#1f2937'} size={notes?.size ?? 4}
       penOnlyWhenPenDetected shapeSnap readOnly={!writable} imageMaxWidth={imageMaxWidth} fitToInk={fit} />
     {feedback && <span key={feedback.id} className="exam-replay-feedback" data-testid="exam-replay-feedback" aria-hidden="true"

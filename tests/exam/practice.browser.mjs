@@ -10,6 +10,8 @@ import { assertCompactTopbar } from './compact-topbar.assertions.mjs';
 const BASE = `${process.env.EXAM_TEST_BASE_URL || 'http://127.0.0.1:5174'}/tests/exam/practice.html`;
 const out = '.test-artifacts/ui-cleanup';
 await mkdir(out, { recursive: true });
+const recordsOut = '.test-artifacts/my-records';
+await mkdir(recordsOut, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 try {
 
@@ -1186,6 +1188,39 @@ for (const viewport of [LANDSCAPE, { width: 390, height: 844 }]) {
   console.log(`ok — ink saves send deltas (${sizes.join(', ')} bytes per save)`);
 }
 
+// 학생은 카드별 제출 기록에서 과거 결과를 열고 이 기기에만 덧쓸 수 있다.
+for (const viewport of [LANDSCAPE, { width: 390, height: 844 }]) {
+  const { context, page, errors } = await open(viewport, '?myRecords=1');
+  const records = paperCard(page).locator('..').getByTestId('exam-my-records');
+  await records.getByText('내 최근 기록 (2회)', { exact: true }).waitFor();
+  assert.equal(await records.locator('details').evaluate(el => el.open), false);
+  assert.equal(await records.getByTestId('exam-my-record').first().isVisible(), false);
+  assert.equal(await paperCard(page, PAPER_B).locator('..').getByTestId('exam-my-records').count(), 0);
+  await records.locator('summary').click();
+  const rows = records.getByTestId('exam-my-record');
+  assert.equal(await rows.count(), 2);
+  const expected = await page.evaluate(() => window.__examClient.listMyResults());
+  assert.match(await rows.nth(0).innerText(), new RegExp(`2차 · ${expected[1].score}/100점[\\s\\S]*자유 · 미적[\\s\\S]*10\\.2`));
+  assert.match(await rows.nth(1).innerText(), new RegExp(`1차 · ${expected[0].score}/100점[\\s\\S]*실전 · 미적[\\s\\S]*10\\.1`));
+  await noHorizontalOverflow(page, `my-records/${viewport.width}`);
+  await page.screenshot({ path: `${recordsOut}/student-records-${viewport.width}.png`, fullPage: true });
+  await rows.nth(1).click();
+  await page.getByTestId('exam-result').waitFor();
+  assert.equal(await page.evaluate(() => window.__examLog.filter(row => row.method === 'getResult').at(-1).args[0]), expected[0].attemptId);
+  await page.locator('.exam-item-row[data-number="1"]').click();
+  const tools = page.getByTestId('exam-notes-tools');
+  await tools.waitFor();
+  await tools.getByRole('button', { name: '펜', exact: true }).click();
+  const ink = page.locator('[data-testid="exam-viewer"] .exam-ink');
+  const box = await ink.boundingBox();
+  await page.mouse.move(box.x + 30, box.y + 30); await page.mouse.down();
+  await page.mouse.move(box.x + 80, box.y + 90, { steps: 5 }); await page.mouse.up();
+  assert.equal(await ink.getAttribute('data-stroke-count'), '1');
+  assert.equal(await page.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith('rn-exam-result-notes:') && !key.endsWith(':admin')).length), 1);
+  assert.deepEqual(errors, []);
+  await context.close();
+}
+
 // Administrator can inspect both submitted and active attempts without editing a student's work.
 for (const viewport of [LANDSCAPE, { width: 390, height: 844 }]) {
   const context = await browser.newContext({ viewport });
@@ -1234,8 +1269,12 @@ for (const viewport of [LANDSCAPE, { width: 390, height: 844 }]) {
   else assert.ok(playBox.y < sliderBox.y + sliderBox.height && playBox.y + playBox.height > sliderBox.y, 'one row on wide screens');
   assert.ok((await dock.boundingBox()).height <= (viewport.width <= 640 ? 100 : 56), 'thin replay bar');
   await dock.screenshot({ path: `${out}/admin-review-replay-${viewport.width}.png` });
-  // 재생 중에는 쓸 수 없으니 덧쓰기 도구를 숨긴다(최종 풀이 보기로 닫으면 나온다).
-  assert.equal(await page.getByTestId('exam-notes-tools').count(), 0);
+  // 자동 재생 중에도 관리자 덧쓰기 도구가 바로 보인다.
+  assert.equal(await page.getByTestId('exam-notes-tools').isVisible(), true);
+  await page.getByRole('button', { name: '처음', exact: true }).click();
+  await dock.getByRole('button', { name: '재생', exact: true }).click();
+  await dock.getByRole('button', { name: '일시정지', exact: true }).waitFor();
+  await page.screenshot({ path: `${recordsOut}/admin-replay-tools-${viewport.width}.png` });
   // React가 다시 그린 뒤의 상태를 기다린다(버튼 클릭 직후에는 아직 반영 전일 수 있음).
   const expectReplay = (ink, step) => page.waitForFunction(([ink, step]) =>
     document.querySelector('[data-testid="exam-viewer"] .exam-ink')?.getAttribute('data-stroke-count') === ink
@@ -1263,20 +1302,23 @@ for (const viewport of [LANDSCAPE, { width: 390, height: 844 }]) {
   assert.ok(new Set(samples).size >= 4, `slider should move smoothly: ${samples}`);
   await page.getByRole('group', { name: '배속', exact: true }).getByRole('button', { name: '4×', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('[data-testid="exam-replay-position"]')?.getAttribute('data-step') === '3');
-  const box = await page.locator(inkSel).boundingBox();
-  await page.mouse.move(box.x + 30, box.y + 30); await page.mouse.down();
-  await page.mouse.move(box.x + 80, box.y + 90); await page.mouse.up();
-  assert.equal(await page.locator(inkSel).getAttribute('data-stroke-count'), '1', 'no writing while replaying');
-  // 최종 풀이 보기로 재생을 닫으면 덧쓰기 도구가 나오고 학생 필기 위에 쓸 수 있다(이 기기에서만, 학생 풀이에는 저장 안 됨)
-  await page.getByRole('button', { name: '최종 풀이 보기', exact: true }).click();
-  assert.equal(await dock.count(), 0);
-  assert.match(await page.getByTestId('exam-notes-tools').innerText(), /학생 풀이에는 저장되지 않아요/);
-  await page.getByTestId('exam-notes-tools').getByRole('button', { name: '펜', exact: true }).click();
+  // 재생 도중 첫 획 하나로 최종 풀이 위 덧쓰기를 시작한다.
+  await page.getByRole('button', { name: '처음', exact: true }).click();
+  await dock.getByRole('button', { name: '재생', exact: true }).click();
+  await dock.getByRole('button', { name: '일시정지', exact: true }).waitFor();
+  const savesBefore = await page.evaluate(() => window.__inkStats.requests);
   const paper = await page.locator(inkSel).boundingBox();
   await page.mouse.move(paper.x + 40, paper.y + 40); await page.mouse.down();
+  assert.equal(await dock.count(), 0, 'first pointer down exits replay');
   for (let i = 1; i <= 5; i++) await page.mouse.move(paper.x + 40 + i * 15, paper.y + 40 + i * 12);
   await page.mouse.up();
-  assert.equal(await page.locator(inkSel).getAttribute('data-stroke-count'), '2', 'admin can write over the student ink');
+  assert.equal(await page.locator(inkSel).getAttribute('data-stroke-count'), '2', 'the first stroke remains over the final student ink');
+  const stored = await page.evaluate(() => Object.entries(localStorage).filter(([key]) => key.startsWith('rn-exam-result-notes:')));
+  assert.equal(stored.length, 1);
+  assert.ok(stored[0][0].endsWith(':admin'), 'only the admin notes key is written');
+  assert.equal(JSON.parse(stored[0][1]).length, 2);
+  assert.equal(await page.evaluate(() => window.__inkStats.requests), savesBefore, 'no ink is saved to the server');
+  assert.match(await page.getByTestId('exam-notes-tools').innerText(), /학생 풀이에는 저장되지 않아요/);
   await noHorizontalOverflow(page, `admin-student-solution/${viewport.width}`);
   await page.screenshot({ path: `${out}/admin-student-${viewport.width}.png`, fullPage: true });
   // 크게 보기 → 닫기, Esc로 검토 화면 닫기.
@@ -1289,8 +1331,18 @@ for (const viewport of [LANDSCAPE, { width: 390, height: 844 }]) {
   await page.locator('.exam-admin-paper .exam-ink').waitFor();
   // 풀이 중 검토도 완료된 응시 화면처럼(이미지 480px 이하, 필기가 오른쪽 여백까지 있으면 그만큼 줄임) + 자동 재생.
   await page.locator('.exam-admin-paper [data-testid="exam-replay-dock"]').waitFor();
+  assert.equal(await page.getByTestId('exam-notes-tools').isVisible(), true);
   const progressImg = await page.locator('.exam-admin-paper .exam-ink img').boundingBox();
   assert.ok(progressImg.width <= 481, `in-progress review image ${progressImg.width}px is not zoomed in`);
+  // 진행 중 검토도 첫 획으로 재생을 끝내되 별도 덧쓰기 사본을 저장하지 않는다.
+  const progressInk = page.locator('.exam-admin-paper .exam-ink');
+  const progressBox = await progressInk.boundingBox();
+  await page.mouse.move(progressBox.x + 30, progressBox.y + 30); await page.mouse.down();
+  await page.mouse.move(progressBox.x + 80, progressBox.y + 90, { steps: 5 }); await page.mouse.up();
+  assert.equal(await page.locator('.exam-admin-paper [data-testid="exam-replay-dock"]').count(), 0);
+  assert.equal(await progressInk.getAttribute('data-stroke-count'), '1');
+  assert.deepEqual(await page.evaluate(() => Object.entries(localStorage).filter(([key]) => key.startsWith('rn-exam-result-notes:'))), stored);
+  assert.equal(await page.evaluate(() => window.__inkStats.requests), savesBefore);
   assert.doesNotMatch(await page.locator('.exam-admin-answer').innerText(), /정답/);
   assert.equal(await page.getByRole('button', { name: '제출하기', exact: true }).count(), 0);
   await page.getByRole('button', { name: '다음 문항', exact: true }).click();
@@ -1312,6 +1364,8 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   await page.goto(`${BASE}?activity=1`);
   const entry = page.locator('.exam-paper-entry').filter({ has: page.locator('[data-testid="exam-paper-card"][data-paper-id="2025-06-math"]') });
   const activity = entry.getByTestId('exam-admin-activity');
+  assert.equal(await page.getByTestId('exam-my-records').count(), 0);
+  assert.equal(await page.getByText(/내 최근 기록/).count(), 0);
   await activity.waitFor();
   assert.equal(await page.getByTestId('exam-admin-latest').count(), 0);
   assert.equal(await page.getByTestId('exam-history-open').count(), 0);

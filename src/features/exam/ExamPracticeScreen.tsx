@@ -126,6 +126,7 @@ export function ExamPracticeScreen({ client, currentUserId, onExit, admin, isAdm
           client={client}
           currentUserId={currentUserId}
           admin={admin}
+          isAdmin={isAdmin}
           busy={busy}
           error={error}
           onStart={(paper, mode, elective) => { void start(paper, mode, elective); }}
