@@ -56,7 +56,7 @@ interface BodyProps {
 
 export function OmrResultView(props: Props) {
   return props.review
-    ? <ReviewResult client={props.client} result={props.result} onBack={props.onBack} backLabel={props.backLabel} studentName={props.review.studentName} />
+    ? <ReviewResult client={props.client} result={props.result} onBack={props.onBack} backLabel={props.backLabel} studentName={props.review.studentName} videoApi={props.videoApi} />
     : <StudentResult client={props.client} result={props.result} onBack={props.onBack} backLabel={props.backLabel} onRevise={props.onRevise} busy={props.busy} onOpenResult={props.onOpenResult} onContinueHistory={props.onContinueHistory} videoApi={props.videoApi} />;
 }
 
@@ -93,9 +93,13 @@ function StudentResult({ client, result, onBack, backLabel, onRevise, busy = fal
       onOpenResult={onOpenResult} onContinue={active => onContinueHistory(paper, active)} /> : null} />;
 }
 
-function ReviewResult({ client, result, onBack, backLabel, studentName }: {
+function ReviewResult({ client, result, onBack, backLabel, studentName, videoApi }: {
   client: Pick<AdminExamApi, 'getInk' | 'getInkReplay'>; result: ExamResult; onBack: () => void; backLabel?: string; studentName: string;
+  /** 관리자 본인 응시를 검토할 때만: 해설 영상 칸과 문항별 링크. */
+  videoApi?: VideoApi;
 }) {
+  const paperId = resultPaperId(result) ?? null;
+  const paperVideos = usePaperVideos(videoApi, paperId);
   const [ink, setInk] = useState<Map<string, InkStroke[]> | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -108,7 +112,9 @@ function ReviewResult({ client, result, onBack, backLabel, studentName }: {
   const inkBar = <p className="rn-caption" role="status">
     {failed ? '학생 필기를 불러오지 못했어요. 닫았다가 다시 열어 주세요.' : ink ? '문항을 누르면 학생 필기와 필기 순서를 크게 볼 수 있어요.' : '학생 필기를 불러오는 중…'}
   </p>;
-  return <OmrResultBody client={client} result={result} onBack={onBack} backLabel={backLabel} ink={ink ?? new Map()} inkBar={inkBar} studentName={studentName} inkReady={ink !== null} />;
+  return <OmrResultBody client={client} result={result} onBack={onBack} backLabel={backLabel} ink={ink ?? new Map()} inkBar={inkBar} studentName={studentName} inkReady={ink !== null}
+    videos={videoApi ? paperVideos.videos : undefined}
+    videoPanel={videoApi && paperId ? <SolutionVideoPanel videos={paperVideos.videos} sections={result.elective ? ['common', result.elective] : ['common']} onSave={paperVideos.save} /> : null} />;
 }
 
 function OmrResultBody({ client, result: initial, onBack, backLabel, onRevise, ink, inkBar, studentName, inkReady = false, loadOriginalInk, historySection, videoPanel, videos }: BodyProps) {
