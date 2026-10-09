@@ -285,7 +285,8 @@
 .exam-toast { position: fixed; left: 50%; top: calc(env(safe-area-inset-top) + 120px); transform: translateX(-50%); z-index: 2100; max-width: calc(100vw - 32px); padding: 10px 16px; border-radius: 99px; background: var(--rn-warning); color: #1b1b1b; font-weight: 750; font-size: 14px; box-shadow: 0 8px 24px rgb(0 0 0 / .35); }
 .exam-overlay { position: fixed; inset: 0; z-index: 2050; display: flex; align-items: flex-end; justify-content: center; background: rgb(3 7 18 / .72); }
 .exam-overlay-full { align-items: stretch; background: var(--rn-bg); }
-.exam-viewer-overlay { background: rgb(3 7 18 / .9); align-items: center; padding: 12px; }
+/* 아이폰 노치·다이내믹 아일랜드 아래로 내린다(viewport-fit=cover라 safe-area를 직접 비워야 닫기가 눌린다). */
+.exam-viewer-overlay { background: rgb(3 7 18 / .9); align-items: center; padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
 /* 학습지 참고 이미지 보기 창(ExamImageViewer): 검은 반투명 배경, 화면에 맞춘 이미지, 브라우저 확대 대신 직접 핀치 처리 */
 .exam-image-viewer { padding: 0; align-items: stretch; background: rgb(0 0 0 / .88); touch-action: none; overscroll-behavior: contain; }
 .exam-image-viewer-stage { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: none; cursor: zoom-out; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; margin: calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 8px) calc(env(safe-area-inset-bottom) + 8px) calc(env(safe-area-inset-left) + 8px); }
@@ -535,7 +536,7 @@
 
 /* 휴대폰에서 문항 크게 보기는 화면 끝까지 쓴다(바깥 여백·둥근 테두리로 문제가 작아졌다). */
 @media (max-width: 640px) {
-  .exam-viewer-overlay { padding: 0; }
+  .exam-viewer-overlay { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
   .exam-viewer { border-radius: 0; border: 0; padding: 8px 6px; height: 100%; }
   .exam-viewer .exam-sheet-head { margin-bottom: 4px; gap: 4px 8px; }
   .exam-viewer .exam-sheet-head h2 { font-size: 17px; }
