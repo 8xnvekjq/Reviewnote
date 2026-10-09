@@ -18,6 +18,7 @@ import type { HanneungEra } from './hanneungEra';
 import { hanneungGrade } from './hanneungLogic.ts';
 import paperJson from '../data/2025-06-math.json';
 import mockJson from '../data/2025-10-g2-math.json';
+import g3Json from '../data/2025-10-g3-math.json';
 import imagesJson from '../data/2025-06-math.images.json';
 import type {
   AdminExamApi, AdminPaperSubmission, AdminLiveStudent, InkStroke, LiveInkResponse,
@@ -83,6 +84,17 @@ export const MOCK_PAPER_ID = '2025-06-math';
 export const MOCK_PAPER_B_ID = 'mock-practice-b';
 export const MOCK_SCHOOL_ID = schoolJson.id;
 export const MOCK_ACADEMIC_ID = mockJson.id;
+const G3_META: ExamPaperSummary = {
+  id: g3Json.id, title: g3Json.title, examDate: g3Json.examDate, source: g3Json.source,
+  kind: 'csat', year: g3Json.year, grade: 3, questionCount: 30, maxScore: 100, published: true,
+  timeLimitMinutes: 100, electives: [...ELECTIVES], inProgress: null, lastResult: null, resultCount: 0,
+};
+function g3Questions(elective: ExamElective): ExamQuestion[] {
+  return g3Json.questions.filter(q => q.section === 'common' || q.section === elective).map(q => ({
+    id: `g3-${q.section}-${q.number}`, number: q.number, section: q.section as ExamQuestion['section'],
+    imageUrl: q.imageUrl, isChoice: q.isChoice, answerType: q.answerType as ExamQuestion['answerType'], points: q.points,
+  }));
+}
 const ACADEMIC_META: ExamPaperSummary = {
   id: mockJson.id, title: mockJson.title, examDate: mockJson.examDate, source: mockJson.source,
   kind: 'mock', year: 2025, grade: 2, questionCount: 30, maxScore: 100, published: true,
@@ -175,6 +187,7 @@ export function buildMockQuestions(elective: ExamElective): ExamQuestion[] {
 }
 
 function correctAnswerFor(question: ExamQuestion): string {
+  if (question.id.startsWith('g3-')) return g3Json.questions.find(q => q.section === question.section && q.number === question.number)!.answer;
   if (question.id.startsWith('academic-')) return mockJson.questions[question.number - 1].answer;
   if (question.sourcePaperId) return ERA_SOURCES.find(p => p.id === question.sourcePaperId)?.questions.find(q => q.number === question.sourceNumber)?.answer ?? '';
   const historyPaper = HANNEUNG.find(paper => question.id.startsWith(paper.id));
@@ -215,7 +228,7 @@ export interface MockExamClientOptions {
 }
 
 export function createMockExamClient(options: MockExamClientOptions = {}): ExamClient {
-  const papers = [...(options.mock ? [ACADEMIC_META] : []), ...(options.worksheet ? WORKSHEET_FIXTURES.map(fixture => fixture.paper) : []), ...MOCK_PAPERS, ...HANNEUNG_META, ...ERA_META, ...(options.admin ? [SCHOOL_META] : []), ...(options.filters ? FILTER_FIXTURE_PAPERS : [])];
+  const papers = [...(options.mock ? [ACADEMIC_META, G3_META] : []), ...(options.worksheet ? WORKSHEET_FIXTURES.map(fixture => fixture.paper) : []), ...MOCK_PAPERS, ...HANNEUNG_META, ...ERA_META, ...(options.admin ? [SCHOOL_META] : []), ...(options.filters ? FILTER_FIXTURE_PAPERS : [])];
   const store = new Map<string, StoredAttempt>();
   const ink = new Map<string, ExamInkDocument[]>();
   const replay = new Map<string, InkReplayBatch[]>();
@@ -293,10 +306,13 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
     const { attempt } = entry;
     const byId = new Map(items.map(item => [item.questionId, item]));
     const academic = attempt.paperId === MOCK_ACADEMIC_ID;
+    const g3 = attempt.paperId === g3Json.id;
+    const electiveCuts = g3Json.gradeCuts;
+    const electiveKey = attempt.elective as keyof typeof electiveCuts.rawByElective;
     const worksheet = worksheetFixture(attempt.paperId)?.paper;
     const school = attempt.paperId === MOCK_SCHOOL_ID || worksheet != null;
     const historyMeta = [...HANNEUNG_META, ...ERA_META].find(paper => paper.id === attempt.paperId);
-    const rates = academic || school || historyMeta ? [] : PAPER.wrongRates.byElective[attempt.elective ?? '미적분'] ?? [];
+    const rates = academic || g3 || school || historyMeta ? [] : PAPER.wrongRates.byElective[attempt.elective ?? '미적분'] ?? [];
     const resultItems: ExamResultItem[] = attempt.questions.map(question => {
       const item = byId.get(question.id);
       const correctAnswer = correctAnswerFor(question);
@@ -322,9 +338,9 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       };
     });
     const score = resultItems.reduce((sum, item) => sum + (item.isCorrect ? item.points : 0), 0);
-    const rawByGrade = academic ? mockJson.gradeCuts.raw : PAPER.gradeCuts.rawByElective[attempt.elective ?? '미적분'] ?? [];
+    const rawByGrade = g3 ? electiveCuts.rawByElective[electiveKey] : academic ? mockJson.gradeCuts.raw : PAPER.gradeCuts.rawByElective[attempt.elective ?? '미적분'] ?? [];
     return {
-      ...(academic ? ACADEMIC_META : worksheet ?? (school ? SCHOOL_META : {})),
+      ...(g3 ? G3_META : academic ? ACADEMIC_META : worksheet ?? (school ? SCHOOL_META : {})),
       ...historyMeta,
       attemptId: attempt.id,
       paperId: attempt.paperId,
@@ -339,11 +355,11 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       estimatedGrade: school || historyMeta?.practiceEra ? null : historyMeta ? hanneungGrade(score, historyMeta.hanneungLevel) : estimateGrade(score, rawByGrade),
       gradeCut: {
         rawByGrade: school ? [] : rawByGrade,
-        standardByGrade: school ? [] : academic ? mockJson.gradeCuts.standard : PAPER.gradeCuts.standard,
-        percentileByGrade: school ? [] : academic ? mockJson.gradeCuts.percentile : PAPER.gradeCuts.percentile,
-        topStandard: school ? null : academic ? mockJson.gradeCuts.top.standard : PAPER.gradeCuts.topStandardByElective?.[attempt.elective ?? '미적분'] ?? MOCK_TOP.standard,
-        topPercentile: school ? null : academic ? mockJson.gradeCuts.top.percentile : PAPER.gradeCuts.topPercentileByElective?.[attempt.elective ?? '미적분'] ?? MOCK_TOP.percentile,
-        source: academic ? mockJson.gradeCuts.source : PAPER.gradeCuts.source,
+        standardByGrade: school ? [] : g3 ? electiveCuts.standardByElective[electiveKey] : academic ? mockJson.gradeCuts.standard : PAPER.gradeCuts.standard,
+        percentileByGrade: school ? [] : g3 ? electiveCuts.percentileByElective[electiveKey] : academic ? mockJson.gradeCuts.percentile : PAPER.gradeCuts.percentile,
+        topStandard: school || g3 ? null : academic ? mockJson.gradeCuts.top.standard : PAPER.gradeCuts.topStandardByElective?.[attempt.elective ?? '미적분'] ?? MOCK_TOP.standard,
+        topPercentile: school || g3 ? null : academic ? mockJson.gradeCuts.top.percentile : PAPER.gradeCuts.topPercentileByElective?.[attempt.elective ?? '미적분'] ?? MOCK_TOP.percentile,
+        source: g3 ? electiveCuts.source : academic ? mockJson.gradeCuts.source : PAPER.gradeCuts.source,
       },
       items: resultItems,
       submittedAt: new Date().toISOString(),
@@ -593,6 +609,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       const worksheet = worksheetFixture(paperId);
       if (worksheet && mode !== 'free') throw new Error('EXAM_INVALID_MODE');
       const academic = paperId === MOCK_ACADEMIC_ID;
+      const g3 = paperId === g3Json.id;
       const school = paperId === MOCK_SCHOOL_ID;
       const historyMeta = [...HANNEUNG_META, ...ERA_META].find(paper => paper.id === paperId);
       const eraSet = eraSets.find(set => set.id === paperId);
@@ -600,7 +617,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
       const historyPaper = HANNEUNG.find(paper => paper.id === paperId);
       seq += 1;
       const attempt: ExamAttempt = {
-        ...(academic ? { ...ACADEMIC_META, paperTitle: ACADEMIC_META.title } : worksheet ? { ...worksheet.paper, paperTitle: worksheet.paper.title } : school ? { ...SCHOOL_META, paperTitle: SCHOOL_META.title } : {}),
+        ...(g3 ? { ...G3_META, paperTitle: G3_META.title } : academic ? { ...ACADEMIC_META, paperTitle: ACADEMIC_META.title } : worksheet ? { ...worksheet.paper, paperTitle: worksheet.paper.title } : school ? { ...SCHOOL_META, paperTitle: SCHOOL_META.title } : {}),
         ...historyMeta,
         id: `attempt-${seq}`,
         paperId,
@@ -609,7 +626,7 @@ export function createMockExamClient(options: MockExamClientOptions = {}): ExamC
         startedAt: new Date().toISOString(),
         timeLimitMinutes: mode === 'real' ? options.timeLimitMinutes ?? historyMeta?.timeLimitMinutes ?? (school ? 50 : PAPER.timeLimitMinutes) : null,
         status: 'in_progress',
-        questions: academic ? academicQuestions() : worksheet ? clone(worksheet.questions) : eraSet ? eraSet.members.map((member, i) => ({
+        questions: g3 ? g3Questions(elective ?? '미적분').filter(q => !startOptions?.electiveOnly || q.section !== 'common') : academic ? academicQuestions() : worksheet ? clone(worksheet.questions) : eraSet ? eraSet.members.map((member, i) => ({
           ...member, id: `${paperId}-${i + 1}`, number: i + 1, section: 'common',
           points: 1, isChoice: true, answerType: 'choice5',
         })) : historyPaper ? historyPaper.questions.map(question => ({

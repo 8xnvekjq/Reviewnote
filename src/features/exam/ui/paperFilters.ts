@@ -51,7 +51,7 @@ export function paperFilterValue(paper: ExamPaperSummary, key: FilterKey): strin
 
 function optionLabel(section: FilterSection, key: FilterKey, value: string): string {
   if (key === 'year') return section === 'csat' ? `${value}학년도` : `${value}년`;
-  if (key === 'month') return value === '11' ? '수능' : value === '6' || value === '9' ? `${value}월 모평` : `${value}월`;
+  if (key === 'month') return value === '11' ? '수능' : value === '6' || value === '9' ? `${value}월 모평` : value === '10' ? '10월 학평' : `${value}월`;
   if (key === 'semester') return `${value}학기`;
   if (key === 'term') return value === 'final' ? '기말' : '중간';
   return value;
