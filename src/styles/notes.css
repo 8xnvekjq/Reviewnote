@@ -6,11 +6,13 @@
 .rn-online-wrap{position:relative}
 .rn-online-badge{display:flex;align-items:center;gap:4px;min-height:36px;padding:0 10px;border-radius:999px;background:var(--rn-elevated);border:1px solid var(--rn-line);color:var(--rn-text);font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;touch-action:manipulation}
 .rn-online-dot{width:6px;height:6px;border-radius:50%;background:var(--rn-success);flex:none}
-.rn-online-popup{position:absolute;top:calc(100% + 6px);right:0;z-index:20;width:180px;padding:10px;border-radius:var(--rn-radius-md);background:var(--rn-surface);border:1px solid var(--rn-line);box-shadow:0 12px 32px rgba(0,0,0,.35)}
+.rn-online-popup{position:absolute;top:calc(100% + 6px);right:0;z-index:20;width:200px;padding:10px;border-radius:var(--rn-radius-md);background:var(--rn-surface);border:1px solid var(--rn-line);box-shadow:0 12px 32px rgba(0,0,0,.35)}
 .rn-online-popup-title{display:flex;align-items:center;justify-content:space-between;font-size:11px;font-weight:800;color:var(--rn-muted);border-bottom:1px solid var(--rn-line);padding-bottom:6px;margin-bottom:6px}
 .rn-online-live{color:var(--rn-success);font-size:10px}
 .rn-online-popup-list{display:grid;gap:4px;max-height:140px;overflow-y:auto}
 .rn-online-popup-list li{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--rn-text)}
+.rn-online-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rn-online-tab{margin-left:auto;flex:none;max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;font-weight:600;color:var(--rn-muted)}
 .rn-notes-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:20px}
 /* 어드민 학생 필터 — 여러 학생을 빠르게 훑을 수 있도록 select 자체 폭을 줄인다(기존 전체폭
    flex-1 대신 고정 max-width). */

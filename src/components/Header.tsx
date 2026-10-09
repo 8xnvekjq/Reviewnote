@@ -4,6 +4,7 @@ import logoImg from '../assets/logo.jpg';
 import { AppIcon } from './ui/AppIcon';
 import { Sheet } from './ui/Sheet';
 import { getTitleBadgeStyle } from '../utils/gachaCatalog';
+import { onlineTabLabel } from '../utils/onlineTabLabel';
 // rn-online-* 클래스는 notes.css에 정의돼 있다(MistakeList의 "함께 공부 중" 배지와 동일
 // 컴포넌트/스타일 재사용 — 상단 네비바용으로 새로 만들지 않는다).
 import '../styles/notes.css';
@@ -45,7 +46,7 @@ interface HeaderProps {
   comboBoosterExpiresAt?: string | null; // 콤보 부스터 5배 버프 만료시각 (서버 profiles 기준)
   isAdmin?: boolean;
   onSelectTab?: (tab: ActiveTab) => void;
-  onlineUsers?: { id: string; display_name: string; nickname?: string; username: string }[]; // 실시간 온라인 학생 — App.tsx가 이미 계산해 MistakeList/BottomNavigation에도 넘기는 것과 동일한 배열 재사용(신규 realtime subscription 없음)
+  onlineUsers?: { id: string; display_name: string; nickname?: string; username: string; last_tab?: string | null }[]; // 실시간 온라인 학생 — App.tsx가 이미 계산해 MistakeList/BottomNavigation에도 넘기는 것과 동일한 배열 재사용(신규 realtime subscription 없음)
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -148,7 +149,7 @@ export const Header: React.FC<HeaderProps> = ({
                   ) : (
                     <ul className="rn-online-popup-list">
                       {onlineUsers.map(u => (
-                        <li key={u.id}><span className="rn-online-dot" aria-hidden="true" /><span>{u.nickname || u.display_name || u.username}</span></li>
+                        <li key={u.id}><span className="rn-online-dot" aria-hidden="true" /><span className="rn-online-name">{u.nickname || u.display_name || u.username}</span>{onlineTabLabel(u.last_tab) && <small className="rn-online-tab">{onlineTabLabel(u.last_tab)}</small>}</li>
                       ))}
                     </ul>
                   )}
