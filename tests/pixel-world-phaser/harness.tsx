@@ -37,10 +37,15 @@ function Harness() {
     if (!params.has('fishing')) return undefined;
     // seed 11: v4 모의 서버에서 처음 두 번이 어려운 물고기(15%)가 아니다(시계·날씨 무관). seed 7은 첫 캐스트가 늘 난이도 4 이상이라
     // 단순 탭 봇이 못 잡는다 — 어려운 물고기는 단위 테스트가 따로 검사한다.
-    const adapter = createMockFishingAdapter({ seed: 11, override: clockOverride, classmates: [
+    const adapter = createMockFishingAdapter({ seed: 11, isAdmin: params.has('admin'), override: clockOverride, classmates: [
       { speciesId: 'carp', lengthCm: 41.2, animal: '🐻', caughtAt: new Date(Date.now() - 3 * 3600000).toISOString() },
       { speciesId: 'pirami', lengthCm: 13.4, animal: '🐰', caughtAt: new Date(Date.now() - 20 * 60000).toISOString() },
     ] });
+    if (params.has('weatherTest')) {
+      const key = 'pwp-weather-test';
+      const store = { get override() { return JSON.parse(localStorage.getItem(key) ?? 'null'); }, set override(value) { localStorage.setItem(key, JSON.stringify(value)); } };
+      return createMockFishingAdapter({ isAdmin: params.has('admin'), worldStore: store, now: () => Date.parse('2026-10-01T03:00:00Z') });
+    }
     if (params.get('fishingBudget') === '0') return { ...adapter, state: async () => ({ ...await adapter.state(), remaining: 0, sparkleShadow: null }) };
     return adapter;
   }, []);
@@ -91,7 +96,7 @@ function Harness() {
   return open
     ? params.has('saved')
       ? <PixelWorldPhaser userId="scene-test-user" pointsBalance={1234} onExit={() => setOpen(false)} />
-      : <GameShell fishingAdapter={fishingAdapter} clockOverride={clockOverride} appearance={look} pet={active} balance={balance} panels={adapter} farmAdapter={params.has('farm') ? farmAdapter : undefined} beds={params.has('farm') ? farmBeds : [...beds]} furniture={roomLayout} onSaveFurniture={async layout => { await new Promise(resolve => setTimeout(resolve, 100)); if (params.has('roomSaveError')) throw new Error('저장하지 못했어요. 다시 시도해 주세요.'); setRoomLayout(layout); }} scarecrowLine={() => pickScarecrowLine(null, Date.now())} onExit={() => setOpen(false)} />
+      : <GameShell isAdmin={params.has('admin')} fishingAdapter={fishingAdapter} clockOverride={clockOverride} appearance={look} pet={active} balance={balance} panels={adapter} farmAdapter={params.has('farm') ? farmAdapter : undefined} beds={params.has('farm') ? farmBeds : [...beds]} furniture={roomLayout} onSaveFurniture={async layout => { await new Promise(resolve => setTimeout(resolve, 100)); if (params.has('roomSaveError')) throw new Error('저장하지 못했어요. 다시 시도해 주세요.'); setRoomLayout(layout); }} scarecrowLine={() => pickScarecrowLine(null, Date.now())} onExit={() => setOpen(false)} />
     : <main style={{ padding: 24 }}><p data-testid="exited">게임에서 나왔어요.</p><button type="button" onClick={() => setOpen(true)}>다시 들어가기</button></main>;
 }
 createRoot(document.getElementById('root')!).render(<Harness />);

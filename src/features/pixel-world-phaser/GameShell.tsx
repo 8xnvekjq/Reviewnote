@@ -1,3 +1,5 @@
+import { useWorldClock } from './ui/useWorldClock';
+import { WorldWeatherPanel } from './ui/WorldWeatherPanel';
 // 새 Pixel World(베타) 전체 화면 셸. 게임 캔버스가 화면 전체를 채우고, 모든 UI(포인트, 나가기, 전체화면,
 // 대화창, 조이스틱, A/B)는 그 프레임 "안"에 DOM으로 겹친다. 한글은 앱 웹폰트 그대로 선명하게 보이고
 // (Phaser Text는 도트 모드에서 최근접 보간이라 작은 한글이 뭉개진다), 버튼은 접근성/테스트도 쉽다.
@@ -45,9 +47,10 @@ import type { ActivityPanel, FarmAdapter } from './ui/FarmPanels';
 import { useLevel, gainFrom } from './ui/useLevel';
 import { LevelBadge, LevelToast } from './ui/LevelBadge';
 import { LevelPanel } from './ui/LevelPanel';
-type ShellPanel = 'level' | PanelKind | PlazaPanel | ActivityPanel | 'furniture';
+type ShellPanel = 'weather' | 'level' | PanelKind | PlazaPanel | ActivityPanel | 'furniture';
 
 export interface GameShellProps {
+  isAdmin?: boolean;
   panels?: PanelAdapter;
   fishingAdapter?: FishingAdapter;
   newFishSpeciesId?: string | null;
@@ -114,7 +117,7 @@ async function leaveFullscreen() {
 }
 
 // 상위가 1초마다(밭 시계) 다시 그려져도, 넘겨받는 값이 같으면 셸은 다시 그리지 않는다.
-export const GameShell = memo(function GameShell({ appearance, pet, balance, beds, furniture, onSaveFurniture, onSceneChange, scarecrowLine, onExit, panels, farmAdapter, fishingAdapter, newFishSpeciesId, clockOverride, userId = 'guest' }: GameShellProps) {
+export const GameShell = memo(function GameShell({ isAdmin = false, appearance, pet, balance, beds, furniture, onSaveFurniture, onSceneChange, scarecrowLine, onExit, panels, farmAdapter, fishingAdapter, newFishSpeciesId, clockOverride, userId = 'guest' }: GameShellProps) {
   useLayoutEffect(() => {
     let viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
     const created = !viewport;
@@ -154,6 +157,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
   useEffect(() => { if (!petMessage) return; const timer = window.setTimeout(() => setPetMessage(''), 4500); return () => clearTimeout(timer); }, [petMessage]);
   const [prompt, setPrompt] = useState<Prompt | null>(null);
   const [scene, setScene] = useState<SceneInfo | null>(null);
+  const worldClock = useWorldClock(fishingAdapter, handle, scene?.id, status === 'ready', clockOverride);
   const sceneRef = useRef(scene); sceneRef.current = scene;
   const [toast, setToast] = useState<SceneInfo | null>(null);
   const fishingFrozen = useRef(false);
@@ -621,11 +625,13 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     </div>
     <div className="pwp-hud" style={{ left: hud.x, top: hud.y, width: hud.width, height: hud.height }}>
       <button type="button" className="pwp-chip pwp-exit" onClick={exit} aria-label="Pixel World 나가기">← 나가기</button>
+      {isAdmin && <button type="button" className="pwp-chip" disabled={status !== 'ready' || fishing.busy || !!placing || roomPending} onClick={() => openPanel('weather')}>🌤 날씨</button>}
       <span className="pwp-chip pwp-points" aria-label={`포인트 ${balance}`}><span className="pwp-coin" aria-hidden="true">P</span>{balance.toLocaleString()}</span>
       <span className="pwp-hud-spacer" />
       <button type="button" className="pwp-chip pwp-icon" aria-pressed={bgm.enabled} aria-label="소리" title={bgm.enabled ? '소리 끄기' : '소리 켜기'} onClick={bgm.toggle}><span aria-hidden="true">♪</span></button>
       {fullscreenSupported() && <button type="button" className="pwp-chip pwp-icon" aria-pressed={fullscreen} aria-label={fullscreen ? '전체화면 끄기' : '전체화면'} onClick={toggleFullscreen}>⛶</button>}
     </div>
+    {isAdmin && panel === 'weather' && <WorldWeatherPanel adapter={fishingAdapter} clock={worldClock.clock} refresh={worldClock.refresh} onClose={closePanel} />}
     {!placing && !fishing.busy && !fishing.reelState && panel !== 'furniture' && <LevelBadge value={level} onClick={() => openPanel('level')} style={{ right: layout.width - hud.x - hud.width + 10, top: hud.y + hud.height + 8 }} />}
     {panel === 'level' && <LevelPanel value={level} onClose={closePanel} />}
     {level.celebration && <LevelToast level={level.celebration.level} />}
@@ -662,7 +668,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
     {(panel === 'turtle' || panel === 'fishboard') && <FishingPanels key={panel} kind={panel} adapter={fishingAdapter} shop={panels} newSpeciesId={newFishSpeciesId ?? freshSpecies} onClose={() => { if (panel === 'turtle') setFreshSpecies(null); closePanel(); }} />}
     {scene?.id === 'river' && status === 'ready' && <RiverBridge key={'river:' + scene.visit} handle={handle} appearance={appearance} pet={pet} panel={panel} reporter={riverReporter} />}
     {scene?.id === 'plaza' && status === 'ready' && <PlazaBridge key={'plaza:' + scene.visit} handle={handle} appearance={appearance} pet={pet} userId={userId} panel={panel} onClose={closePanel} />}
-    {panel && panel !== 'level' && panel !== 'turtle' && panel !== 'fishboard' && panel !== 'furniture' && panel !== 'shop' && panel !== 'wardrobe' && panel !== 'contest' && panel !== 'well' && panel !== 'bench' && <FarmPanels key={panel} kind={panel} adapter={farmAdapter} onClose={closePanel}
+    {panel && panel !== 'weather' && panel !== 'level' && panel !== 'turtle' && panel !== 'fishboard' && panel !== 'furniture' && panel !== 'shop' && panel !== 'wardrobe' && panel !== 'contest' && panel !== 'well' && panel !== 'bench' && <FarmPanels key={panel} kind={panel} adapter={farmAdapter} onClose={closePanel}
       onXp={level.onXp} onCollection={() => openPanel('collection')} onTalk={() => { closePanel(); openDialogue('scarecrow'); }}
       onPet={kind => { closePanel(); handle.current?.reactPet(kind); }} onFx={(index, action) => handle.current?.farmFx(index, action)} />}
     {panel === 'furniture' && panels && <FurniturePanel furniture={handle.current?.getFurniture() ?? furniture} shop={panels.shop}
