@@ -338,6 +338,8 @@ export interface AdminPaperStudentActivity extends AdminExamAttemptSummary {
   studentName: string;
   attemptCount: number;
   inProgress: boolean;
+  /** 관리자 본인 응시(학생별 최근 점수에 "내 풀이"로 함께 보인다). */
+  isMine?: boolean;
 }
 export interface AdminPaperActivity {
   paperId: string;

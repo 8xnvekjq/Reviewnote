@@ -1325,10 +1325,17 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   assert.ok(Math.abs(compareBox.x - summaryBox.x) <= 3);
   await page.waitForTimeout(400);
   await page.screenshot({ path: `${out}/admin-list-${viewport.width}.png`, fullPage: true });
+  // 관리자: 지난 OMR 결과 대신 최근 학생 결과(제출한 학생만, 내 풀이 제외).
+  assert.equal(await page.getByRole('region', { name: '지난 OMR 결과' }).count(), 0);
+  const recent = page.getByTestId('exam-recent-students');
+  assert.equal(await recent.getByTestId('exam-recent-student').count(), 1);
+  assert.match(await recent.innerText(), /김학생/);
+  assert.doesNotMatch(await recent.innerText(), /이학생|선생님/);
   await activity.locator('summary').click();
-  assert.equal(await activity.getByTestId('exam-admin-student').count(), 2);
+  assert.equal(await activity.getByTestId('exam-admin-student').count(), 3);
   assert.match(await activity.getByTestId('exam-admin-student').nth(0).innerText(), /총 2회/);
   assert.match(await activity.getByTestId('exam-admin-student').nth(1).innerText(), /이학생[\s\S]*풀이 중/);
+  assert.match(await activity.getByTestId('exam-admin-student').nth(2).innerText(), /내 풀이 · 선생님/);
   await noHorizontalOverflow(page, `admin-activity/${viewport.width}`);
   await page.screenshot({ path: `${out}/admin-activity-${viewport.width}.png`, fullPage: true });
   await activity.getByTestId('exam-admin-student').nth(1).click();
@@ -1340,6 +1347,11 @@ for (const viewport of [LANDSCAPE, PORTRAIT, { width: 390, height: 844 }]) {
   await review.waitFor({ state: 'detached' });
   await activity.getByTestId('exam-admin-student').first().click();
   await review.getByTestId('exam-result').waitFor();
+  await page.keyboard.press('Escape');
+  await review.waitFor({ state: 'detached' });
+  await recent.getByTestId('exam-recent-student').first().click();
+  await review.getByTestId('exam-result').waitFor();
+  assert.match(await review.innerText(), /김학생 학생/);
   await page.keyboard.press('Escape');
   await review.waitFor({ state: 'detached' });
   assert.deepEqual(errors, []);
