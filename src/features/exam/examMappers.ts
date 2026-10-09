@@ -72,7 +72,7 @@ function asArray(value: unknown): unknown[] {
 function mapMetadata(r: Row): ExamPaperMetadata {
   if (r.kind == null) return {};
   return {
-    kind: r.kind === 'worksheet' ? 'worksheet' : r.kind === 'school' ? 'school' : r.kind === 'hanneung' ? 'hanneung' : 'csat',
+    kind: r.kind === 'mock' ? 'mock' : r.kind === 'worksheet' ? 'worksheet' : r.kind === 'school' ? 'school' : r.kind === 'hanneung' ? 'hanneung' : 'csat',
     unitName: asNullableString(r.unitName),
     practiceEra: HANNEUNG_ERAS.find(era => era.id === r.practiceEra)?.id ?? null,
     hanneungLevel: r.hanneungLevel === 'advanced' || r.hanneungLevel === 'basic' ? r.hanneungLevel : null,
@@ -282,7 +282,7 @@ export function mapExamResult(raw: unknown): ExamResult {
   const r = asRow(raw);
   const cut = asRow(r.gradeCut);
   const numbers = (v: unknown) => asArray(v).map((n) => asNumber(n));
-  const rawByGrade = numbers(cut.rawByGrade);
+  const rawByGrade = numbers(cut.rawByGrade ?? cut.raw);
   const score = asNumber(r.score);
   return {
     attemptId: asString(r.attemptId),
