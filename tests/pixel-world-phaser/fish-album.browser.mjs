@@ -33,9 +33,9 @@ try {
       assert.equal(await page.locator('.pwp-fish-board li').count(), 10);
       assert.equal(await page.getByRole('dialog', { name: '이번 주 물고기 랭킹', exact: true }).count(), 1);
       assert.equal(await page.getByRole('img', { name: '익명 동물 얼굴' }).count(), 9);
-      // 선생님 기록도 랭킹에 오르고 🎓·'선생님'으로 표시된다. 순위는 1위부터.
+      // 선생님 기록도 랭킹에 오르고 🎓만 보인다('선생님' 글자 없음). 순위는 1위부터.
       assert.equal(await page.locator('.pwp-fish-board li[data-teacher="true"]').getByRole('img', { name: '선생님' }).textContent(), '🎓');
-      assert.match(await page.locator('.pwp-fish-board li[data-teacher="true"] strong').textContent(), /^\d+위 .+ 선생님$/);
+      assert.match(await page.locator('.pwp-fish-board li[data-teacher="true"] strong').textContent(), /^\d+위 \S+$/);
       assert.match(await page.locator('.pwp-fish-board li').first().locator('strong').textContent(), /^1위 /);
       await page.evaluate(async () => {
         const { fishBoardFace, fishRelativeTime } = await import('/src/features/pixel-world-phaser/ui/FishBoard.tsx');
