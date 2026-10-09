@@ -11,6 +11,18 @@ try {
     const page = await browser.newPage({ viewport: { width, height: 844 }, hasTouch: true });
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
+    await page.addInitScript(() => {
+      window.__scratchWrites = [];
+      for (const method of ['setItem', 'removeItem', 'clear']) {
+        const original = Storage.prototype[method];
+        Storage.prototype[method] = function (...args) { window.__scratchWrites.push(`storage:${method}`); return original.apply(this, args); };
+      }
+      const transaction = IDBDatabase.prototype.transaction;
+      IDBDatabase.prototype.transaction = function (...args) {
+        if (args[1] === 'readwrite') window.__scratchWrites.push('indexedDB:readwrite');
+        return transaction.apply(this, args);
+      };
+    });
     await page.goto(`${base}?admin=1&compare=1`);
     await page.locator('[data-testid="exam-compare-open"][data-paper-id="2025-06-math"]').click();
     const dialog = page.getByTestId('replay-compare');
@@ -38,47 +50,147 @@ try {
     const pausedTime = await gridTime(page);
     await page.waitForTimeout(120);
     assert.equal(await gridTime(page), pausedTime, 'pause freezes the shared clock');
-    assert.deepEqual(await dialog.getByRole('combobox', { name: '재생 배속' }).locator('option').allTextContents(), ['0.5×', '1×', '2×', '4×']);
+    assert.deepEqual(await dialog.locator('.exam-replay-speed button').allTextContents(), ['0.5×', '1×', '2×', '4×']);
+    for (const value of ['0.5×', '2×', '4×', '1×']) {
+      await dialog.getByRole('button', { name: value, exact: true }).click();
+      assert.equal(await dialog.getByRole('button', { name: value, exact: true }).getAttribute('aria-pressed'), 'true');
+    }
+    assert.equal(await dialog.locator('select, input[type="range"]').count(), 0);
+    const dock = page.getByTestId('compare-dock');
+    const slider = dock.getByRole('slider');
+    await dock.getByRole('button', { name: '마지막', exact: true }).click();
+    const end = Number(await slider.getAttribute('aria-valuemax'));
+    assert.equal(Number(await gridTime(page)), end);
+    await dock.getByRole('button', { name: '처음', exact: true }).click();
+    assert.equal(Number(await gridTime(page)), 0);
+    await dock.getByRole('button', { name: '3초 앞으로' }).click();
+    assert.equal(Number(await gridTime(page)), Math.min(3000, end));
+    await dock.getByRole('button', { name: '3초 뒤로' }).click();
+    assert.equal(Number(await gridTime(page)), 0);
+    await slider.click({ position: { x: (await slider.boundingBox()).width / 2, y: 16 } });
+    assert.ok(Math.abs(Number(await gridTime(page)) - end / 2) < 20);
+    assert.match(await page.getByTestId('compare-position').innerText(), /^\d+:\d{2} \/ \d+:\d{2}$/);
+    await page.getByTestId('compare-counter').click();
+    const overview = page.getByTestId('compare-overview');
+    await overview.waitFor();
+    assert.equal(await overview.locator('.is-current').getAttribute('aria-label'), '1번 문항');
+    assert.equal(await overview.locator('.exam-thumb img').count(), 3);
+    await page.screenshot({ path: `${out}/overview-${width}.png` });
+    await page.keyboard.press('Escape');
+    await overview.waitFor({ state: 'hidden' });
+    await dialog.getByRole('button', { name: '▦ 전체 문제', exact: true }).click();
+    await page.goBack();
+    await overview.waitFor({ state: 'hidden' });
+    assert.equal(await dialog.count(), 1);
+    await page.getByTestId('compare-counter').click();
+    await overview.getByRole('button', { name: '1번 문항', exact: true }).click();
+    await overview.waitFor({ state: 'hidden' });
+    await page.waitForFunction(() => document.querySelector('[data-testid="compare-grid"]')?.dataset.playing === 'true');
+    const overviewTimes = await cells.evaluateAll(els => els.map(el => Number(el.dataset.time)));
+    assert.equal(new Set(overviewTimes).size, 1, 'overview restarts every grid cell together, even for the current question');
+    assert.ok(overviewTimes[0] < 400);
+    await dialog.getByRole('button', { name: '일시정지', exact: true }).click();
     const grid = page.getByTestId('compare-grid');
     const columns = await grid.evaluate(el => getComputedStyle(el).gridTemplateColumns.split(' ').length);
     assert.equal(columns, width === 390 ? 1 : width === 820 ? 2 : 3);
     await page.screenshot({ path: `${out}/grid-${width}.png` });
     await dialog.getByRole('button', { name: '다음 문항', exact: true }).click();
     await page.waitForFunction(() => document.querySelector('[data-testid="compare-grid"]')?.dataset.playing === 'true');
-    assert.equal(await dialog.getByRole('combobox', { name: '문항 번호' }).inputValue(), '2');
+    assert.equal(await page.getByTestId('compare-counter').innerText(), '2번 / 총3');
     const restarted = await cells.evaluateAll(els => els.map(el => Number(el.dataset.time)));
     assert.equal(new Set(restarted).size, 1); assert.ok(restarted[0] < 400);
     await cells.nth(1).getByRole('button').click();
     assert.equal(await cells.count(), 1);
-    await dialog.getByRole('combobox', { name: '재생 배속' }).selectOption('2');
-    assert.equal(await dialog.getByRole('combobox', { name: '재생 배속' }).inputValue(), '2');
+    await dialog.getByRole('button', { name: '0.5×', exact: true }).click();
+    assert.equal(await dialog.getByRole('button', { name: '0.5×', exact: true }).getAttribute('aria-pressed'), 'true');
     await dialog.getByRole('slider', { name: '필기 재생 위치' }).press('End');
     assert.equal(await cells.first().getAttribute('data-finished'), 'true');
     await dialog.getByRole('slider', { name: '필기 재생 위치' }).press('Home');
     assert.equal(await cells.first().getAttribute('data-time'), '0');
-    await page.screenshot({ path: `${out}/focus-${width}.png` });
+    await dialog.getByRole('button', { name: '재생', exact: true }).click();
+    const notes = page.getByTestId('compare-notes');
+    const input = notes.locator('.exam-ink-input');
+    await input.scrollIntoViewIfNeeded();
+    await page.waitForFunction(() => Number(document.querySelector('[data-testid="compare-grid"]')?.dataset.time) >= 600);
+    const before = await scratchSnapshot(page);
+    const replayTime = Number(await gridTime(page));
+    const replayCanvas = cells.first().locator('.exam-replay-frame > .exam-ink canvas').nth(1);
+    const replayPixels = await replayCanvas.evaluate(el => el.toDataURL());
+    const box = await input.boundingBox();
+    const drawY = Math.max(180, box.y + 45);
+    await page.mouse.move(box.x + 30, drawY);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 130, drawY + 40, { steps: 10 });
+    await page.mouse.up();
+    assert.equal(await notes.locator('.exam-ink').getAttribute('data-stroke-count'), '1');
+    for (const [pointerId, pointerType] of [[71, 'touch'], [72, 'pen']]) {
+      await input.evaluate((el, { pointerId, pointerType }) => {
+        const r = el.getBoundingClientRect();
+        for (const [type, x, y, buttons] of [['pointerdown', 40, 110, 1], ['pointermove', 140, 140, 1], ['pointerup', 140, 140, 0]]) {
+          el.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerId, pointerType, isPrimary: true, button: 0, buttons, pressure: .5, clientX: r.x + x, clientY: r.y + y }));
+        }
+      }, { pointerId, pointerType });
+    }
+    assert.equal(await notes.locator('.exam-ink').getAttribute('data-stroke-count'), '3');
+    await page.waitForTimeout(150);
+    assert.ok(Number(await gridTime(page)) > replayTime, 'drawing leaves replay advancing');
+    assert.ok(await replayCanvas.evaluate(el => el.toDataURL()) !== replayPixels, 'replay pixels advance underneath the notes');
+    assert.equal(await page.getByTestId('compare-grid').getAttribute('data-playing'), 'true');
+    assert.deepEqual(await scratchSnapshot(page), before, 'scratch drawing never writes storage or calls the server');
+    assert.equal(await input.evaluate(el => getComputedStyle(el).touchAction), 'none');
+    assert.equal(await dialog.evaluate(el => getComputedStyle(el).touchAction), 'auto');
+    const painted = await notes.locator('canvas').nth(1).evaluate(el => {
+      const data = el.getContext('2d').getImageData(0, 0, el.width, el.height).data;
+      return data.some((value, i) => i % 4 === 3 && value > 0);
+    });
+    assert.ok(painted, 'notes have visible pixels');
+    await page.screenshot({ path: `${out}/focus-notes-${width}.png` });
+    await page.getByTestId('compare-counter').click();
+    await overview.getByRole('button', { name: '1번 문항', exact: true }).click();
+    await overview.waitFor({ state: 'hidden' });
+    await page.waitForFunction(() => document.querySelector('[data-testid="compare-grid"]')?.dataset.playing === 'true');
+    assert.equal(await notes.locator('.exam-ink').getAttribute('data-stroke-count'), '0', 'question change clears notes');
+    const jumps = await cells.evaluateAll(els => els.map(el => Number(el.dataset.time)));
+    assert.ok(jumps[0] < 400, 'overview jump restarts playback');
+    await input.evaluate(el => {
+      const r = el.getBoundingClientRect();
+      for (const type of ['pointerdown', 'pointermove', 'pointerup']) el.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerId: 73, pointerType: 'pen', isPrimary: true, buttons: type === 'pointerup' ? 0 : 1, clientX: r.x + (type === 'pointerdown' ? 30 : 130), clientY: r.y + 80 }));
+    });
+    assert.equal(await notes.locator('.exam-ink').getAttribute('data-stroke-count'), '1');
     await page.keyboard.press('Escape');
     await page.waitForFunction(() => document.querySelectorAll('[data-testid="compare-cell"]').length === 3);
     assert.equal(await cells.count(), 3);
+    assert.equal(await page.getByTestId('compare-notes').count(), 0);
+    assert.equal(await dialog.getByRole('toolbar').count(), 0, 'no pen tools in the grid');
     await cells.nth(1).getByRole('button').click();
+    assert.equal(await page.getByTestId('compare-notes').locator('.exam-ink').getAttribute('data-stroke-count'), '0', 'leaving focus clears notes');
     await dialog.getByRole('button', { name: '← 전체 보기', exact: true }).click();
     await page.waitForFunction(() => document.querySelectorAll('[data-testid="compare-cell"]').length === 3);
     await cells.nth(1).getByRole('button').click();
     await page.goBack();
     await page.waitForFunction(() => document.querySelectorAll('[data-testid="compare-cell"]').length === 3);
-    await dialog.getByRole('combobox', { name: '문항 번호' }).selectOption('3');
+    await dialog.getByRole('button', { name: '다음 문항', exact: true }).click();
+    await dialog.getByRole('button', { name: '다음 문항', exact: true }).click();
     await cells.nth(2).getByTestId('compare-ended').waitFor();
     assert.equal(await cells.nth(2).getByTestId('compare-ended').innerText(), '풀이 없음');
-    await dialog.getByRole('combobox', { name: '문항 번호' }).selectOption('1');
+    await dialog.getByRole('button', { name: '이전 문항', exact: true }).click();
+    await dialog.getByRole('button', { name: '이전 문항', exact: true }).click();
     await page.waitForFunction(() => document.querySelector('[data-testid="compare-grid"]')?.dataset.playing === 'true');
     const calls = await page.evaluate(() => window.__compare.calls);
     assert.equal(calls.length, 9, 'only current questions load and revisits use cache');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     assert.equal(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth), true);
     await dialog.evaluate(el => { el.scrollTop = el.scrollHeight; });
+    const lastBox = await cells.last().boundingBox();
+    const dockBox = await dock.boundingBox();
+    assert.ok(lastBox.y + lastBox.height <= dockBox.y, 'bottom padding keeps the last row above the fixed bar');
     const close = dialog.getByRole('button', { name: '풀이 비교 닫기' });
-    const box = await close.boundingBox();
-    assert.ok(box.y >= 0 && box.y + box.height <= 844, 'sticky close stays reachable');
+    const closeBox = await close.boundingBox();
+    assert.ok(closeBox.y >= 0 && closeBox.y + closeBox.height <= 844, 'sticky close stays reachable');
+    await dialog.getByRole('button', { name: '학생 다시 고르기', exact: true }).click();
+    await picker.waitFor();
+    await picker.getByRole('button', { name: '함께 재생' }).click();
+    await page.waitForFunction(() => document.querySelector('[data-testid="compare-grid"]')?.dataset.playing === 'true');
     await close.click(); assert.equal(await dialog.count(), 0);
     assert.deepEqual(errors, []);
     await page.close();
@@ -93,4 +205,14 @@ try {
 
 async function gridTime(page) {
   return page.getByTestId('compare-grid').getAttribute('data-time');
+}
+
+async function scratchSnapshot(page) {
+  return page.evaluate(async () => ({
+    writes: [...window.__scratchWrites],
+    storage: { ...localStorage },
+    databases: await indexedDB.databases(),
+    log: window.__examLog,
+    calls: window.__compare.calls,
+  }));
 }
