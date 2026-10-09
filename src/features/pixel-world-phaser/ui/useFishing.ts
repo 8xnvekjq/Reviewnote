@@ -1,3 +1,5 @@
+import { playSoundEffect } from '../../pixel-room/bgm/sfx';
+import { decideHaptics, idleHaptics, reelInZone, vibrate } from '../logic/reelHaptics';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import type { CastFinish, FishingAdapter, FishingState, FishPhase, FishWeather } from './fishingAdapter';
@@ -24,6 +26,11 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
   const [state, setState] = useState<FishingState | null>(null);
   const [phase, setPhase] = useState<FishingGame['phase']>('idle');
   const [reelState, setReelState] = useState<ReelGame | null>(null);
+  const haptics = useRef(idleHaptics());
+  const updateHaptics = (now: number, reel: ReelGame | null) => {
+    const next = decideHaptics(haptics.current, now, reel?.status === 'playing', !!reel && reelInZone(reel));
+    haptics.current = next.state; vibrate(next.command);
+  };
   const reelGame = useRef<ReelGame | null>(null);
   const taps = useRef<number[]>([]);
   const axes = useRef<ReelAxisInput[]>([]);
@@ -64,6 +71,7 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
     if (!next.cast || !lock.current || !fishingActive(game.current)) return;
     const current = castAdapter.current;
     const epoch = generation.current;
+    updateHaptics(performance.now(), null);
     game.current = next; setPhase(next.phase); reelGame.current = null; setReelState(null); taps.current = []; axes.current = [];
     latest.current.handle.current?.fishingFx?.(next, shadow.current, performance.now());
     const told = fishReportForGamePhase(next.phase);
@@ -74,7 +82,7 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
       if (mounted.current && epoch === generation.current) {
         // 릴을 다 감은 경우만 서버 결과를 알린다(놓침·너무 빠름·취소는 위에서 escaped/idle로 이미 보냈다).
         if (next.phase === 'landed') latest.current.report?.(result?.ok && result.landed ? { phase: 'landed', speciesId: result.speciesId, lengthCm: result.lengthCm } : result?.ok ? { phase: 'escaped' } : { phase: 'idle' });
-        if (result?.ok && result.landed) { setCaught(result); setMessage(''); await refresh(); }
+        if (result?.ok && result.landed) { playSoundEffect(result.isNew || result.isBig || next.cast.trophy ? 'fanfare' : 'catch'); setCaught(result); setMessage(''); await refresh(); }
         else if (!result?.ok) setMessage('낚시 결과를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.');
         else if (stateRef.current) shadows(stateRef.current);
       }
@@ -141,6 +149,7 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
           const delta = now - lastFrame.current; if (delta > 0) lastFrame.current = now;
           const result = stepReelGame(reelGame.current, delta, delta > 0 ? taps.current.splice(0) : [], delta > 0 ? axes.current.splice(0) : []);
           reelGame.current = result; setReelState(result);
+          updateHaptics(performance.now(), result);
           if (result.status !== 'playing') finishRef.current({ ...game.current, phase: result.status === 'landed' ? 'landed' : 'missed' });
         }
         const previous = game.current;
@@ -150,7 +159,7 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
           game.current = next;
           latest.current.handle.current?.fishingFx?.(next, shadow.current, now);
           if (previous.phase !== next.phase) {
-            setPhase(next.phase); if (next.phase === 'bite') navigator.vibrate?.(35);
+            setPhase(next.phase); if (next.phase === 'bite') playSoundEffect('bite');
             const told = fishReportForGamePhase(next.phase);
             if (told) latest.current.report?.(told);
           }
@@ -160,6 +169,7 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
     };
     frame = requestAnimationFrame(tick);
     return () => {
+      updateHaptics(performance.now(), null);
       mounted.current = false; generation.current++; cancelAnimationFrame(frame);
       if (fishingActive(game.current) && game.current.cast) void castAdapter.current?.finish(game.current.cast.castId, false).catch(() => {});
       game.current = idleFishingGame(); latest.current.freeze(false);

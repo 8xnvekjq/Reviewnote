@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react';
+import { playSoundEffect } from '../../pixel-room/bgm/sfx';
 import type { CSSProperties } from 'react';
 import type { PlayerLevel } from './useLevel';
 import { fishingPerkText } from '../logic/levels';
@@ -9,5 +11,9 @@ export function LevelBadge({ value, onClick, style }: { value: PlayerLevel; onCl
   </button>;
 }
 export function LevelToast({ level }: { level: number }) {
+  const sounded = useRef<number | null>(null);
+  useEffect(() => {
+    if (sounded.current !== level) { sounded.current = level; playSoundEffect('levelUp'); }
+  }, [level]);
   return <div className="pwp-level-toast" role="status"><span className="pwp-level-sparkles" aria-hidden="true">✦ ✧ ✦</span><strong>레벨 업! Lv. {level}</strong><small>{fishingPerkText(level)}</small></div>;
 }
