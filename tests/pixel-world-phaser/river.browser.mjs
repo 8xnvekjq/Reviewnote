@@ -90,7 +90,7 @@ try {
       await page.waitForTimeout(300);
       const d = await page.evaluate(() => window.riverTest.handle.debug());
       assert.equal(d.worldTint.phase, phase);
-      assert.equal(d.worldTint.parameters.rainDrops, weather === 'rain' ? 36 : 0);
+      assert.equal(d.worldTint.parameters.rainDrops, weather === 'rain' ? 56 : 0);
       await page.screenshot({ path: `${SHOTS}/${label}-${width}.png` });
     }
     const before = await page.evaluate(() => window.riverTest.handle.shadowPoint(1));

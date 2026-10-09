@@ -1,6 +1,7 @@
 import type Phaser from 'phaser';
 import type { Point } from '../logic/joystick';
 import { worldTint } from '../logic/worldTint';
+import { RAIN_SLANT, rainMark } from '../logic/rain';
 import type { FishPhase, FishWeather } from '../logic/worldTint';
 
 // 입력을 막지 않는 저비용 그래픽 효과.
@@ -46,10 +47,16 @@ export class WorldTint {
         g.fillStyle(tint.color, tint.alpha * light).fillRect(a, y, b - a, height);
       }
     }
-    g.lineStyle(1, 0xc4e2ed, 0.5);
     for (let i = 0; i < tint.rainDrops; i++) {
-      const x = left + ((i * 43 + this.elapsed * 0.014) % w), y = top + ((i * 29 + this.elapsed * 0.075) % h);
-      g.lineBetween(x, y, x - 1, y + 4);
+      const mark = rainMark(i, this.elapsed, w, h);
+      if (mark.alpha <= 0) continue;
+      const x = left + mark.x, y = top + mark.y;
+      if (mark.kind === 'drop') {
+        g.lineStyle(1, 0xc4e2ed, mark.alpha).lineBetween(x, y, x + RAIN_SLANT * mark.length, y + mark.length);
+      } else {
+        // 바닥에 닿은 방울: 좌우로 튀는 두 점.
+        g.fillStyle(0xd6eef5, mark.alpha).fillRect(x - 2, y - 1, 1, 1).fillRect(x + 1, y - 1, 1, 1).fillRect(x - 1, y, 2, 1);
+      }
     }
   }
 }
