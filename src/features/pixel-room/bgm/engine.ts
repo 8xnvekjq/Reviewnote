@@ -1,3 +1,5 @@
+import { scheduleEffect } from './sfx';
+import type { SoundEffect } from './sfx';
 // Web Audio 칩튠 재생 엔진. 음표는 song.ts가 정하고, 여기는 음색·믹스·스케줄링만 맡는다.
 // 실시간 재생(PixelBgm)과 검토용 오프라인 렌더(renderLoop)가 같은 scheduleNote/buildMix를 써서
 // 미리 듣는 wav와 실제 소리가 갈라지지 않게 한다.
@@ -116,6 +118,20 @@ export class PixelBgm {
     for (const note of this.song.notes) this.byStep[note.step].push(note);
   }
 
+  private effects = new Set<GainNode>();
+
+  playEffect(effect: SoundEffect) {
+    if (!this.playing || this.hidden || !this.ctx || this.ctx.state !== 'running') return;
+    const gain = scheduleEffect(this.ctx, effect);
+    this.effects.add(gain);
+    window.setTimeout(() => this.effects.delete(gain), 1400);
+  }
+
+  private muteEffects() {
+    for (const gain of this.effects) { gain.gain.value = 0; gain.disconnect(); }
+    this.effects.clear();
+  }
+
   play() {
     if (this.playing) return;
     this.playing = true;
@@ -132,6 +148,7 @@ export class PixelBgm {
 
   /** 페이드아웃 후 컨텍스트를 멈춘다. 다시 play()하면 멈춘 자리에서 이어진다. */
   stop() {
+    this.muteEffects();
     if (!this.playing || !this.ctx) return;
     this.playing = false;
     this.fadeTo(0);
@@ -155,6 +172,7 @@ export class PixelBgm {
   /** 탭이 숨겨지면 시계째 멈췄다가, 돌아오면 같은 자리에서 이어간다. */
   setHidden(hidden: boolean) {
     this.hidden = hidden;
+    if (hidden) this.muteEffects();
     if (!this.ctx || !this.playing) return;
     if (hidden) { this.stopTimer(); void this.ctx.suspend(); }
     else { void this.ctx.resume(); this.startTimer(); }
@@ -162,6 +180,7 @@ export class PixelBgm {
 
   /** Pixel World를 나갈 때: 스케줄러를 멈추고 AudioContext를 닫는다. */
   dispose() {
+    this.muteEffects();
     this.playing = false;
     this.stopTimer();
     window.clearTimeout(this.suspendTimer);

@@ -623,7 +623,7 @@ export const GameShell = memo(function GameShell({ appearance, pet, balance, bed
       <button type="button" className="pwp-chip pwp-exit" onClick={exit} aria-label="Pixel World 나가기">← 나가기</button>
       <span className="pwp-chip pwp-points" aria-label={`포인트 ${balance}`}><span className="pwp-coin" aria-hidden="true">P</span>{balance.toLocaleString()}</span>
       <span className="pwp-hud-spacer" />
-      <button type="button" className="pwp-chip pwp-icon" aria-pressed={bgm.enabled} aria-label="배경음악" title={bgm.enabled ? '배경음악 끄기' : '배경음악 켜기'} onClick={bgm.toggle}><span aria-hidden="true">♪</span></button>
+      <button type="button" className="pwp-chip pwp-icon" aria-pressed={bgm.enabled} aria-label="소리" title={bgm.enabled ? '소리 끄기' : '소리 켜기'} onClick={bgm.toggle}><span aria-hidden="true">♪</span></button>
       {fullscreenSupported() && <button type="button" className="pwp-chip pwp-icon" aria-pressed={fullscreen} aria-label={fullscreen ? '전체화면 끄기' : '전체화면'} onClick={toggleFullscreen}>⛶</button>}
     </div>
     {!placing && !fishing.busy && !fishing.reelState && panel !== 'furniture' && <LevelBadge value={level} onClick={() => openPanel('level')} style={{ right: layout.width - hud.x - hud.width + 10, top: hud.y + hud.height + 8 }} />}

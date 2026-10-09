@@ -1,3 +1,5 @@
+import { SFX_EVENT } from './sfx';
+import type { SoundEffect } from './sfx';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { PixelBgm } from './engine';
@@ -48,6 +50,12 @@ export function useBgm(scope: RefObject<HTMLElement | null>) {
       element.removeEventListener('keydown', onKeyDown, true);
     };
   }, [scope]);
+
+  useEffect(() => {
+    const play = (event: Event) => { if (enabledRef.current) playerRef.current?.playEffect((event as CustomEvent<SoundEffect>).detail); };
+    window.addEventListener(SFX_EVENT, play);
+    return () => window.removeEventListener(SFX_EVENT, play);
+  }, []);
 
   useEffect(() => {
     const sync = () => playerRef.current?.setHidden(document.visibilityState === 'hidden');

@@ -78,6 +78,10 @@ async function openPage({ blockStorage = false, storedOn = false, touch = false,
   await page.route('**/src/utils/pixelFarm.ts', route => route.fulfill({ contentType: 'application/javascript', body: `export const fetchPixelFarm=async()=>(${JSON.stringify(emptyFarm())}); export const actPixelFarm=async()=>{throw new Error('no farm actions in bgm test');}; export const fetchHarvestedCrops=async()=>[]; export const submitFarmCrop=async()=>({ok:false}); export const fetchWeeklyCropContest=async()=>({weekStart:'2026-09-21',top:[],mine:{rank:null,sizeScore:null,participantCount:0}});` }));
   await page.route('**/src/services/supabase.ts', route => route.fulfill({ contentType: 'application/javascript', body: "export { supabase } from '/tests/plaza/fakeRealtime.mjs';" }));
   await page.route('**/src/utils/pixelShop.ts', route => route.fulfill({ contentType: 'application/javascript', body: `
+    export const buyPixelBait = async () => ({ok:false});
+    export const fetchPixelBaitCharges = async () => 0;
+    export const equipPixelRod = async () => ({ok:false});
+    export const fetchEquippedRod = async () => null;
     export const fetchEquippedAppearance = async () => ({top:null,bottom:null,shoes:null,hair:null,eyes:null,skin:null});
     export const fetchOwnedPixelItemIds = async () => [];
     export const fetchPixelCatalog = async () => [];
