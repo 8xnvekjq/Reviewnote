@@ -60,6 +60,7 @@ interface ProfileDirectoryRow {
   last_seen_at: string | null;
   equipped_title: string | null;
   equipped_stamp: string | null;
+  last_tab: string | null;
 }
 
 function App() {
@@ -685,6 +686,18 @@ function App() {
     return () => clearInterval(timer);
   }, [session]);
 
+  // ── 최근 연 탭 기록 ─────────────────────────────────────
+  // 주기 없이 탭이 바뀔 때만 본인 행에 한 번 쓴다. 다른 학생들은 기존 30초 디렉터리 폴링으로 읽는다.
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId) return;
+    supabase
+      .from('profiles')
+      .update({ last_tab: activeTab, last_seen_at: new Date().toISOString() })
+      .eq('id', userId)
+      .then(({ error }) => { if (error) console.error('Failed to update last_tab:', error); });
+  }, [activeTab, session?.user?.id]);
+
   // ── 실시간 온라인 사용자 리스트 폴링 ──────────────────────────
   useEffect(() => {
     if (!session?.user) {
@@ -706,7 +719,8 @@ function App() {
               id: p.id,
               display_name: p.display_name,
               nickname: p.nickname,
-              username: p.username || 'User'
+              username: p.username || 'User',
+              last_tab: p.last_tab ?? null
             }));
           setOnlineUsers(mapped);
         }
