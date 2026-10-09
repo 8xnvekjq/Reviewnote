@@ -41,6 +41,7 @@ test('haptics only pulse in the active circle, throttle reentry, stop on exit/en
   assert.equal(reelInZone({ ...game, fishX: game.zoneSize + .001 }), false);
   assert.equal(reelInZone({ ...game, fishX: game.zoneSize }), true);
 });
-test('real OfflineAudioContext renders non-silent bounded effects and WAV previews', async () => {
+// 브라우저 OfflineAudioContext가 필요해 개발 서버(PWP_BASE)가 있을 때만 돈다.
+test('real OfflineAudioContext renders non-silent bounded effects and WAV previews', { skip: !process.env.PWP_BASE && 'PWP_BASE dev server not set' }, async () => {
   await promisify(execFile)(process.execPath, ['tests/pixel-world-phaser/sfx-offline.mjs']);
 });
