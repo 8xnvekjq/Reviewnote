@@ -1,17 +1,13 @@
-// 관리자 전용 해설 영상 링크(시험지 × 공통·선택과목). 결과 화면 위쪽에 넣고 고치는 칸, 문항마다 "▶ 해설" 링크.
-import { useEffect, useState } from 'react';
+// 관리자 전용 해설 영상(시험지 × 공통·선택과목, 한석만TV). 틀리거나 애매한 문항 줄의 걸린 시간 옆과 문항 크게 보기에
+// 작은 유튜브 아이콘으로만 보여 준다. 링크는 DB(exam_paper_videos)에 미리 넣어 둔다.
+import { useEffect, useState, type MouseEvent, type KeyboardEvent } from 'react';
 import type { AdminExamApi, ExamElective } from '../contract';
 
 export type VideoSection = 'common' | ExamElective;
 export type PaperVideos = Partial<Record<VideoSection, string>>;
-export type VideoApi = Required<Pick<AdminExamApi, 'listPaperVideos' | 'setPaperVideo'>>;
+export type VideoApi = Required<Pick<AdminExamApi, 'listPaperVideos'>>;
 
-const LABEL: Record<string, string> = { common: '공통', '확률과 통계': '확통', 미적분: '미적분', 기하: '기하' };
-export const videoSectionLabel = (section: string) => LABEL[section] ?? section;
-const YOUTUBE = /^https:\/\/(www\.|m\.)?(youtube\.com|youtu\.be)\//;
-export const isYoutubeUrl = (url: string) => YOUTUBE.test(url.trim()) && url.trim().length <= 500;
-
-export function usePaperVideos(api: VideoApi | undefined, paperId: string | null) {
+export function usePaperVideos(api: VideoApi | undefined, paperId: string | null): PaperVideos {
   const [videos, setVideos] = useState<PaperVideos>({});
   useEffect(() => {
     let alive = true;
@@ -19,55 +15,26 @@ export function usePaperVideos(api: VideoApi | undefined, paperId: string | null
     if (api && paperId) void api.listPaperVideos(paperId).then(v => { if (alive) setVideos(v); }).catch(() => {});
     return () => { alive = false; };
   }, [api, paperId]);
-  const save = async (section: VideoSection, url: string | null) => {
-    if (!api || !paperId) return;
-    await api.setPaperVideo(paperId, section, url);
-    setVideos(prev => { const next = { ...prev }; if (url) next[section] = url.trim(); else delete next[section]; return next; });
-  };
-  return { videos, save };
+  return videos;
 }
 
-/** 문항 크게 보기 머리줄에 붙는 링크. 그 문항 구역의 영상이 있을 때만. */
+function YoutubeMark() {
+  return <svg viewBox="0 0 24 17" width="22" height="16" aria-hidden="true" focusable="false">
+    <rect width="24" height="17" rx="4" fill="#ff0033" /><path d="M9.6 4.6 16.4 8.5 9.6 12.4Z" fill="#fff" />
+  </svg>;
+}
+
+/** 문항 크게 보기 머리줄용(일반 링크). */
 export function SolutionVideoLink({ videos, section }: { videos: PaperVideos; section: VideoSection }) {
   const url = videos[section];
   if (!url) return null;
-  return <a className="rn-button rn-button-compact exam-video-link" href={url} target="_blank" rel="noopener noreferrer" data-testid="exam-video-link">▶ 해설</a>;
+  return <a className="exam-video-icon" href={url} target="_blank" rel="noopener noreferrer" aria-label="해설 영상 보기" title="해설 영상" data-testid="exam-video-link"><YoutubeMark /></a>;
 }
 
-export function SolutionVideoPanel({ videos, sections, onSave }: { videos: PaperVideos; sections: VideoSection[]; onSave: (section: VideoSection, url: string | null) => Promise<void> }) {
-  const [editing, setEditing] = useState<VideoSection | null>(null);
-  const [draft, setDraft] = useState('');
-  const [message, setMessage] = useState('');
-  const [busy, setBusy] = useState(false);
-  const submit = async (section: VideoSection, url: string | null) => {
-    if (url !== null && !isYoutubeUrl(url)) { setMessage('유튜브 링크(https://youtube.com/… 또는 https://youtu.be/…)를 넣어 주세요.'); return; }
-    setBusy(true); setMessage('');
-    try { await onSave(section, url); setEditing(null); setDraft(''); }
-    catch { setMessage('저장하지 못했어요. 다시 시도해 주세요.'); }
-    finally { setBusy(false); }
-  };
-  return (
-    <section className="exam-video-panel" aria-label="해설 영상" data-testid="exam-video-panel">
-      <h3>해설 영상 <small>관리자</small></h3>
-      <ul>
-        {sections.map(section => (
-          <li key={section} data-section={section}>
-            <span className="exam-video-section">{videoSectionLabel(section)}</span>
-            {editing === section ? <>
-              <input type="url" inputMode="url" placeholder="https://www.youtube.com/watch?v=…" value={draft} onChange={e => setDraft(e.target.value)} aria-label={`${videoSectionLabel(section)} 해설 영상 링크`} disabled={busy} />
-              <button type="button" className="rn-button rn-button-compact" disabled={busy || !draft.trim()} onClick={() => void submit(section, draft)}>저장</button>
-              <button type="button" className="rn-button rn-button-ghost rn-button-compact" disabled={busy} onClick={() => { setEditing(null); setMessage(''); }}>취소</button>
-            </> : <>
-              {videos[section]
-                ? <a className="rn-button rn-button-compact" href={videos[section]} target="_blank" rel="noopener noreferrer">▶ 열기</a>
-                : <span className="rn-caption">없음</span>}
-              <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={() => { setEditing(section); setDraft(videos[section] ?? ''); setMessage(''); }}>{videos[section] ? '바꾸기' : '링크 넣기'}</button>
-              {videos[section] && <button type="button" className="rn-button rn-button-ghost rn-button-compact" disabled={busy} onClick={() => void submit(section, null)}>지우기</button>}
-            </>}
-          </li>
-        ))}
-      </ul>
-      {message && <p role="alert" className="rn-caption">{message}</p>}
-    </section>
-  );
+/** 결과 문항 줄(전체가 버튼) 안에 넣는 아이콘: 줄 클릭(크게 보기)과 따로 동작한다. */
+export function SolutionVideoMark({ url }: { url: string | undefined }) {
+  if (!url) return null;
+  const open = (event: MouseEvent | KeyboardEvent) => { event.stopPropagation(); event.preventDefault(); window.open(url, '_blank', 'noopener,noreferrer'); };
+  return <span className="exam-video-icon" role="link" tabIndex={0} aria-label="해설 영상 보기" title="해설 영상" data-testid="exam-video-mark" data-href={url}
+    onClick={open} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') open(event); }}><YoutubeMark /></span>;
 }

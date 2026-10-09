@@ -1,7 +1,7 @@
 // OMR 결과: 원점수·추정 등급·추정 표준점수·추정 백분위 + 맞은 개수·총 시간(+등급컷 표 접기) / 한능검 시대별 결과 / 문항별 줄 / 오답노트 후보 고르기.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { SolutionVideoLink, SolutionVideoPanel, usePaperVideos, type PaperVideos, type VideoApi, type VideoSection } from './SolutionVideos';
+import { SolutionVideoLink, SolutionVideoMark, usePaperVideos, type PaperVideos, type VideoApi } from './SolutionVideos';
 import type { AdminExamApi, ExamClient, ExamPaperSummary, ExamResult, ExamResultItem, InkStroke } from '../contract';
 import { composeInkImage } from '../ink/inkComposite';
 import { useExamInk } from './useExamInk';
@@ -44,8 +44,7 @@ interface BodyProps {
   ink: Map<string, InkStroke[]>;
   inkBar: ReactNode;
   historySection?: ReactNode;
-  /** 관리자 본인 결과: 해설 영상 칸과 문항별 링크. */
-  videoPanel?: ReactNode;
+  /** 관리자 본인 결과: 문항별 해설 영상 링크. */
   videos?: PaperVideos;
   studentName?: string;
   /** 학생 본인: 원래 필기를 다 불러와 덧쓰기를 시작해도 되는지. */
@@ -83,12 +82,10 @@ function StudentResult({ client, result, onBack, backLabel, onRevise, busy = fal
     const docs = await client.getInk(result.attemptId);
     return new Map(docs.map(doc => [doc.questionId, doc.strokes]));
   };
-  const videoSections: VideoSection[] = result.elective ? ['common', result.elective] : ['common'];
   const paperVideos = usePaperVideos(videoApi, paper.id || null);
   return <OmrResultBody client={client} result={result} onBack={onBack} backLabel={backLabel} onRevise={onRevise} ink={inkSync.strokes} inkBar={inkBar}
     inkReady={inkSync.ready} loadOriginalInk={loadOriginalInk}
-    videos={videoApi ? paperVideos.videos : undefined}
-    videoPanel={videoApi && paper.id ? <SolutionVideoPanel videos={paperVideos.videos} sections={videoSections} onSave={paperVideos.save} /> : null}
+    videos={videoApi ? paperVideos : undefined}
     historySection={onOpenResult && onContinueHistory && paper.id ? <ExamHistoryView embedded client={client} paper={paper} busy={busy} error={null}
       onOpenResult={onOpenResult} onContinue={active => onContinueHistory(paper, active)} /> : null} />;
 }
@@ -113,11 +110,10 @@ function ReviewResult({ client, result, onBack, backLabel, studentName, videoApi
     {failed ? '학생 필기를 불러오지 못했어요. 닫았다가 다시 열어 주세요.' : ink ? '문항을 누르면 학생 필기와 필기 순서를 크게 볼 수 있어요.' : '학생 필기를 불러오는 중…'}
   </p>;
   return <OmrResultBody client={client} result={result} onBack={onBack} backLabel={backLabel} ink={ink ?? new Map()} inkBar={inkBar} studentName={studentName} inkReady={ink !== null}
-    videos={videoApi ? paperVideos.videos : undefined}
-    videoPanel={videoApi && paperId ? <SolutionVideoPanel videos={paperVideos.videos} sections={result.elective ? ['common', result.elective] : ['common']} onSave={paperVideos.save} /> : null} />;
+    videos={videoApi ? paperVideos : undefined} />;
 }
 
-function OmrResultBody({ client, result: initial, onBack, backLabel, onRevise, ink, inkBar, studentName, inkReady = false, loadOriginalInk, historySection, videoPanel, videos }: BodyProps) {
+function OmrResultBody({ client, result: initial, onBack, backLabel, onRevise, ink, inkBar, studentName, inkReady = false, loadOriginalInk, historySection, videos }: BodyProps) {
   const [result, setResult] = useState(initial);
   const reviewing = studentName != null;
   const wholePages = usesWholePages(initial.items);
@@ -264,8 +260,6 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, onRevise, i
         </>}
       </section>
 
-      {videoPanel}
-
       {historySection}
 
       {topics && <EraSection stats={eraStats(result.items, topics)} />}
@@ -339,7 +333,7 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, onRevise, i
                     <span>정답 <b><ExamAnswer question={item} answer={item.correctAnswer} /></b></span>
                   </span>
                   <span className="exam-item-unsure" aria-label={item.unsure ? '애매 표시' : undefined}>{item.unsure ? '🤔' : ''}</span>
-                  <span className="exam-item-time">{formatClock(item.timeSpentMs)}</span>
+                  <span className="exam-item-time">{formatClock(item.timeSpentMs)}{videos && (!item.isCorrect || item.unsure) && <SolutionVideoMark url={videos[item.section]} />}</span>
                   {item.nationalWrongRate != null && (
                     <span className={`exam-item-rate${praise ? ' is-praise' : ''}`}>
                       {praise ?? `전국 오답률 ${item.nationalWrongRate}%`}

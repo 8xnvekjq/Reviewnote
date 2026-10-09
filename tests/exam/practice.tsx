@@ -94,18 +94,11 @@ const activityRows: AdminPaperStudentActivity[] = adminRows.map((row, index) => 
 // 관리자 본인 응시도 학생별 최근 점수에 "내 풀이"로 섞여 온다(최근 학생 결과에는 빠진다).
 if (activityRows[0]) activityRows.push({ ...activityRows[0], studentId: 'me', studentName: '선생님', attemptCount: 1, inProgress: false, isMine: true,
   submittedAt: new Date(Date.parse(activityRows[0].submittedAt ?? '2026-10-01T00:00:00Z') + 60000).toISOString() });
-const videoStore = new Map<string, Record<string, string>>();
-(window as unknown as { __videoCalls: unknown[] }).__videoCalls = [];
+// 관리자 해설 영상(한석만TV) 모의 데이터.
+const videoStore = new Map<string, Record<string, string>>([['2025-06-math', { common: 'https://www.youtube.com/watch?v=commonAAAAA', 미적분: 'https://www.youtube.com/watch?v=zBWOAOh0amQ' }]]);
 const adminApi: AdminExamApi = {
   listPaperSubmissions: async () => [],
-  // 관리자 해설 영상 링크(메모리). 테스트가 window.__videoCalls로 호출을 본다.
   listPaperVideos: async (paperId: string) => ({ ...(videoStore.get(paperId) ?? {}) }),
-  setPaperVideo: async (paperId: string, section: string, url: string | null) => {
-    (window as unknown as { __videoCalls: unknown[] }).__videoCalls.push({ paperId, section, url });
-    const next = { ...(videoStore.get(paperId) ?? {}) } as Record<string, string>;
-    if (url) next[section] = url; else delete next[section];
-    videoStore.set(paperId, next);
-  },
   listLivePapers: async () => [],
   getLiveExam: async () => [],
   getLiveStudentOrder: async () => [],
