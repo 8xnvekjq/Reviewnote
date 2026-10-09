@@ -14,6 +14,25 @@ const PEN_COLORS = [
   { value: '#16a34a', label: '초록' },
 ];
 
+/** 저장 없이 부모의 상태만 바꾸는 설명용 덧쓰기 도구. */
+export function ScratchNotesTools({ tool, color, onTool, onColor, onClear }: {
+  tool: InkTool; color: string; onTool: (tool: InkTool) => void; onColor: (color: string) => void; onClear: () => void;
+}) {
+  return <div className="exam-notes-tools" role="toolbar" aria-label="덧쓰기 도구">
+    <div className="exam-tool-group">
+      {([['pen', '펜', '✏️'], ['eraser', '지우개', '🧽']] as const).map(([value, label, icon]) =>
+        <button key={value} type="button" className={`exam-tool${tool === value ? ' is-on' : ''}`} aria-label={label}
+          aria-pressed={tool === value} onClick={() => onTool(value)}>{icon}</button>)}
+    </div>
+    <div className="exam-tool-group">
+      {PEN_COLORS.map(c => <button key={c.value} type="button" className={`exam-color${color === c.value ? ' is-on' : ''}`}
+        style={{ '--swatch': c.value } as CSSProperties} aria-label={`${c.label}색`} aria-pressed={color === c.value}
+        onClick={() => { onColor(c.value); onTool('pen'); }} />)}
+    </div>
+    <button type="button" className="exam-tool exam-tool-text" onClick={onClear}>모두 지우기</button>
+  </div>;
+}
+
 /** 원래 필기 로컬 캐시(IndexedDB, inkStore)와 섞이지 않는 별도 키. */
 const resultNotesKey = (attemptId: string, questionId: string) => `rn-exam-result-notes:v1:${attemptId}:${questionId}`;
 // localStorage를 못 쓰는 환경(사생활 보호 모드 등)에서도 이 화면을 연 동안은 남게 한다.

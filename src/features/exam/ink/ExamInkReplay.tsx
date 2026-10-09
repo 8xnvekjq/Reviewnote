@@ -6,12 +6,20 @@ import { inkExtent, replayStrokeLists } from './inkFit';
 import { REPLAY_MAX_PAUSE_MS, buildInkClock, buildInkTimeline, formatReplayTime } from './inkReplay';
 
 /** 여러 풀이가 하나의 시계를 공유할 때 기존 캔버스로 지정 시각의 프레임만 표시한다. */
-export const ExamInkReplayFrame = memo(function ExamInkReplayFrame({ data, clock, time, imageUrl, imageMaxWidth }: {
+export const ExamInkReplayFrame = memo(function ExamInkReplayFrame({ data, clock, time, imageUrl, imageMaxWidth, notes }: {
   data: InkReplayData; clock: ReturnType<typeof buildInkClock>; time: number; imageUrl: string; imageMaxWidth: number;
+  notes?: ReplayNotes;
 }) {
   const fit = useMemo(() => inkExtent(data.strokes, ...replayStrokeLists(data)), [data]);
-  return <ExamInkCanvas imageUrl={imageUrl} strokes={clock.frame(time)} onChange={() => {}}
-    tool="pen" color="#1f2937" size={4} readOnly imageMaxWidth={imageMaxWidth} fitToInk={fit} />;
+  return <div className="exam-replay-frame">
+    <ExamInkCanvas imageUrl={imageUrl} strokes={clock.frame(time)} onChange={() => {}}
+      tool="pen" color="#1f2937" size={4} readOnly imageMaxWidth={imageMaxWidth} fitToInk={fit} />
+    {notes && <div className="exam-compare-notes" data-testid="compare-notes">
+      <ExamInkCanvas key={notes.canvasKey} ref={notes.inkRef} imageUrl={imageUrl} strokes={notes.strokes}
+        onChange={notes.onChange} tool={notes.tool} color={notes.color} size={notes.size}
+        penOnlyWhenPenDetected={false} readOnly={!notes.ready} imageMaxWidth={imageMaxWidth} fitToInk={fit} />
+    </div>}
+  </div>;
 });
 
 /** 결과 화면 덧쓰기(이 기기 전용). 재생 중에는 쓰지 않고 재생 프레임만 보여 준다. */
@@ -61,7 +69,7 @@ const ICON_PATHS = {
   close: 'M6 6l12 12M18 6 6 18',
   grip: 'M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01',
 } as const;
-function ReplayIcon({ name }: { name: keyof typeof ICON_PATHS }) {
+export function ReplayIcon({ name }: { name: keyof typeof ICON_PATHS }) {
   const filled = name === 'play' || name === 'first' || name === 'last';
   return <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill={filled ? 'currentColor' : 'none'}
     stroke="currentColor" strokeWidth={name === 'pause' || name === 'grip' ? 3 : 2.2} strokeLinecap="round" strokeLinejoin="round"><path d={ICON_PATHS[name]} /></svg>;
