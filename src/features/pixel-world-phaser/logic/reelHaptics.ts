@@ -11,6 +11,13 @@ export function decideHaptics(state: HapticState, now: number, active: boolean, 
   const stop = (state.inZone && !inside) || (state.active && !active);
   return { state: { active, inZone: inside, lastPulse: pulse ? now : state.lastPulse }, command: stop ? 0 : pulse ? HAPTIC_PULSE_MS : null };
 }
+/** 진동이 없는 태블릿용: 물고기가 원 안에 있는 동안 릴 "따르르륵" 소리. 게이지가 찰수록 빨라진다(120ms → 55ms). */
+export const reelClickInterval = (progress: number) => Math.round(120 - 65 * Math.max(0, Math.min(1, progress)));
+export function decideReelClick(lastClick: number, now: number, active: boolean, inZone: boolean, progress: number): { lastClick: number; click: boolean } {
+  if (!active || !inZone) return { lastClick: -Infinity, click: false };
+  const click = now - lastClick >= reelClickInterval(progress);
+  return { lastClick: click ? now : lastClick, click };
+}
 export function vibrate(command: number | null) {
   if (HAPTICS_ENABLED && command !== null && typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') navigator.vibrate(command);
 }

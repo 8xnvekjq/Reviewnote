@@ -8,8 +8,8 @@ import { decideHaptics, idleHaptics, reelInZone } from '../../src/features/pixel
 import { createReelGame } from '../../src/features/pixel-world-phaser/logic/reelGame.ts';
 
 test('effects schedule pitches, offsets, gentle gain and envelopes', () => {
-  const expected = { bite: [84,57,100], catch: [72,76,79,84], fanfare: [72,76,79,84,88,91,72], levelUp: [72,76,79,84,79,84,88] } as const;
-  for (const effect of ['bite','catch','fanfare','levelUp'] as const) {
+  const expected = { bite: [84,57,100], catch: [72,76,79,84], fanfare: [72,76,79,84,88,91,72], levelUp: [72,76,79,84,79,84,88], reelClick: [98,74] } as const;
+  for (const effect of ['bite','catch','fanfare','levelUp','reelClick'] as const) {
     const starts: number[] = [], stops: number[] = [], pitches: number[] = [], ramps: number[] = [];
     const param = () => ({ value: 0, setValueAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime(_value: number, time: number) { ramps.push(time); } });
     const gains: any[] = [];
@@ -44,4 +44,19 @@ test('haptics only pulse in the active circle, throttle reentry, stop on exit/en
 // 브라우저 OfflineAudioContext가 필요해 개발 서버(PWP_BASE)가 있을 때만 돈다.
 test('real OfflineAudioContext renders non-silent bounded effects and WAV previews', { skip: !process.env.PWP_BASE && 'PWP_BASE dev server not set' }, async () => {
   await promisify(execFile)(process.execPath, ['tests/pixel-world-phaser/sfx-offline.mjs']);
+});
+
+test('릴 소리: 원 안에서 게임 중일 때만, 게이지가 찰수록 빨라진다', async () => {
+  const { decideReelClick, reelClickInterval } = await import('../../src/features/pixel-world-phaser/logic/reelHaptics.ts');
+  assert.equal(reelClickInterval(0), 120); assert.equal(reelClickInterval(1), 55); assert.equal(reelClickInterval(2), 55);
+  let last = -Infinity, clicks: number[] = [];
+  for (let t = 0; t <= 1000; t += 16) { const r = decideReelClick(last, t, true, true, 0); last = r.lastClick; if (r.click) clicks.push(t); }
+  for (let i = 1; i < clicks.length; i++) assert.ok(clicks[i] - clicks[i - 1] >= 120);
+  const slow = clicks.length;
+  last = -Infinity; clicks = [];
+  for (let t = 0; t <= 1000; t += 16) { const r = decideReelClick(last, t, true, true, 1); last = r.lastClick; if (r.click) clicks.push(t); }
+  assert.ok(clicks.length > slow * 1.6, '게이지가 차면 더 자주 딸깍');
+  assert.deepEqual(decideReelClick(500, 1000, true, false, .5), { lastClick: -Infinity, click: false });
+  assert.deepEqual(decideReelClick(500, 1000, false, true, .5), { lastClick: -Infinity, click: false });
+  assert.equal(decideReelClick(-Infinity, 1000, true, true, .5).click, true, '원 안으로 다시 들어오면 바로 딸깍');
 });

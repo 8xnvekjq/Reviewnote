@@ -6,7 +6,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
     const page = await browser.newPage();
     await page.goto((process.env.PWP_BASE ?? 'http://127.0.0.1:5177') + '/tests/pixel-world-phaser/sfx.harness.html');
     await mkdir('.test-artifacts/pw-sfx', { recursive: true });
-    for (const effect of ['bite','catch','fanfare','levelUp']) {
+    for (const effect of ['bite','catch','fanfare','levelUp','reelClick']) {
       const samples = await page.evaluate(async effect => {
         const { renderEffect } = await import('/src/features/pixel-room/bgm/sfx.ts');
         return Array.from((await renderEffect(effect, 22050)).getChannelData(0));
@@ -22,4 +22,4 @@ import { mkdir, writeFile } from 'node:fs/promises';
       await writeFile(`.test-artifacts/pw-sfx/${effect}.wav`, wav);
     }
   } finally { await browser.close(); }
-console.log('PASS OfflineAudioContext: four bounded non-silent effects and WAV previews');
+console.log('PASS OfflineAudioContext: five bounded non-silent effects and WAV previews');

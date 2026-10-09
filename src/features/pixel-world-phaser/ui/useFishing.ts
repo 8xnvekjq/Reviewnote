@@ -1,5 +1,5 @@
 import { playSoundEffect } from '../../pixel-room/bgm/sfx';
-import { decideHaptics, idleHaptics, reelInZone, vibrate } from '../logic/reelHaptics';
+import { decideHaptics, decideReelClick, idleHaptics, reelInZone, vibrate } from '../logic/reelHaptics';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import type { CastFinish, FishingAdapter, FishingState, FishPhase, FishWeather } from './fishingAdapter';
@@ -27,9 +27,14 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
   const [phase, setPhase] = useState<FishingGame['phase']>('idle');
   const [reelState, setReelState] = useState<ReelGame | null>(null);
   const haptics = useRef(idleHaptics());
+  const lastReelClick = useRef(-Infinity);
   const updateHaptics = (now: number, reel: ReelGame | null) => {
-    const next = decideHaptics(haptics.current, now, reel?.status === 'playing', !!reel && reelInZone(reel));
+    const active = reel?.status === 'playing', inZone = !!reel && reelInZone(reel);
+    const next = decideHaptics(haptics.current, now, active, inZone);
     haptics.current = next.state; vibrate(next.command);
+    const click = decideReelClick(lastReelClick.current, now, active, inZone, reel?.progress ?? 0);
+    lastReelClick.current = click.lastClick;
+    if (click.click) playSoundEffect('reelClick');
   };
   const reelGame = useRef<ReelGame | null>(null);
   const taps = useRef<number[]>([]);

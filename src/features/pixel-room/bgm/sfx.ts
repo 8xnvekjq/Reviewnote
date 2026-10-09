@@ -1,6 +1,6 @@
 import { midiToHz } from './song';
 
-export type SoundEffect = 'bite' | 'catch' | 'fanfare' | 'levelUp';
+export type SoundEffect = 'bite' | 'catch' | 'fanfare' | 'levelUp' | 'reelClick';
 export interface EffectNote { midi: number; at: number; duration: number; wave: OscillatorType; endMidi?: number; volume: number }
 export const SFX_GAIN = 0.065;
 export const SFX_EVENT = 'pixelWorld:sfx';
@@ -10,6 +10,11 @@ export function effectNotes(effect: SoundEffect): EffectNote[] {
     { ...note(84, 0, .14, 'sine', .7), endMidi: 60 },
     { ...note(57, .09, .21, 'triangle', .65), endMidi: 69 },
     { ...note(100, .01, .07, 'triangle', .18), endMidi: 45 },
+  ];
+  // 릴 감는 래칫 "딸깍" 한 번(약 20ms). 원 안에 있는 동안 빠르게 반복해 진동 대신 손맛을 소리로 준다.
+  if (effect === 'reelClick') return [
+    { ...note(98, 0, .018, 'square', .32), endMidi: 86 },
+    { ...note(74, .003, .014, 'triangle', .22), endMidi: 62 },
   ];
   if (effect === 'levelUp') return [72, 76, 79, 84, 79, 84, 88].map((midi, i) => note(midi, i * .14, i === 6 ? .36 : .13));
   const notes = [72, 76, 79, 84].map((midi, i) => note(midi, i * .14, i === 3 ? .38 : .13));
