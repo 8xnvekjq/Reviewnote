@@ -16,7 +16,7 @@ const state: FishingState = {
   sparkleShadow: null, pigeonHint: 'moonfish',
   album: params.get('mode') === 'empty' ? [] : FISH_CATALOG.slice(0, 4).map((fish, index) => ({ speciesId: fish.id, count: index + 1, bestCm: fish.maxCm - .6, firstAt: '2026-10-08T01:00:00Z' })),
 };
-const board = { classSpecies: 9, rows: params.get('mode') === 'empty' ? [] : FISH_CATALOG.slice(0, 10).map((fish, index) => ({ speciesId: fish.id, lengthCm: fish.maxCm - .2, animal: ['🐶', '🐰', '🐢'][index % 3], caughtAt: new Date(Date.now() - index * 3700000).toISOString() })) };
+const board = { classSpecies: 9, rows: params.get('mode') === 'empty' ? [] : FISH_CATALOG.slice(0, 10).map((fish, index) => ({ speciesId: fish.id, lengthCm: fish.maxCm - .2, animal: index === 1 ? '🎓' : ['🐶', '🐰', '🐢'][index % 3], teacher: index === 1, caughtAt: new Date(Date.now() - index * 3700000).toISOString() })) };
 const mock: FishingAdapter = factory?.() ?? { state: async () => state, board: async () => board, start: async () => ({ ok: false, reason: 'error' }), finish: async () => ({ ok: false }) };
 const adapter: FishingAdapter = { ...mock, state: async () => { if (failure) { failure = false; throw Error('테스트'); } return state; }, board: async () => { if (boardFailure) { boardFailure = false; throw Error('테스트'); } return board; } };
 function Harness() {

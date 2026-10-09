@@ -7,7 +7,8 @@ export const RIVER_ROWS = 22;
 export const WATER_X = 8;
 export const DOCK = { left: 7, right: 11, top: 10, bottom: 12 };
 export const TURTLE: Point = { x: 5, y: 8 };
-export const FISHBOARD: Point = { x: 4, y: 13 };
+// 랭킹 푯말은 거북이 바로 왼쪽 — 강가에 들어오면 함께 눈에 띈다.
+export const FISHBOARD: Point = { x: 3, y: 8 };
 export const inDock = ({ x, y }: Point) => x >= DOCK.left && x <= DOCK.right && y >= DOCK.top && y <= DOCK.bottom;
 // 위아래의 넓은 쉼터와 가운데의 열린 물가를 연결한다.
 export const bankEdge = (y: number) => y < 7 || y > 15 ? WATER_X + 2 : WATER_X;
@@ -64,7 +65,7 @@ export function riverScene(): SceneSpec {
     entries: { fromYard: { cell: { x: 5, y: 11 }, facing: 'Right' } }, defaultEntry: 'fromYard',
     exits: [{ id: 'river→yard', cells: [{ x: 2, y: 11 }], to: { scene: 'yard', entry: 'fromRiver' } }],
     interactables: [
-      { id: 'turtle', cell: TURTLE, label: '거북 도감지기', verb: '도감 보기', action: { kind: 'panel', panel: 'turtle' }, bang: { ...cellCenter(TURTLE), y: TURTLE.y * 16 - 18 } },
-      { id: 'fishboard', cell: FISHBOARD, label: '물고기 게시판', verb: '기록 보기', action: { kind: 'panel', panel: 'fishboard' }, bang: { ...cellCenter(FISHBOARD), y: FISHBOARD.y * 16 - 12 } },
+      { id: 'turtle', cell: TURTLE, label: '거북 도감지기', verb: '도감·상점', action: { kind: 'panel', panel: 'turtle' }, bang: { ...cellCenter(TURTLE), y: TURTLE.y * 16 - 18 } },
+      { id: 'fishboard', cell: FISHBOARD, label: '이번 주 물고기 랭킹', verb: '랭킹 보기', action: { kind: 'panel', panel: 'fishboard' }, bang: { ...cellCenter(FISHBOARD), y: FISHBOARD.y * 16 - 30 } },
     ] };
 }

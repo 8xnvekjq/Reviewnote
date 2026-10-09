@@ -12,14 +12,14 @@ function Harness() {
   const [balance, setBalance] = useState(1234);
   const [callbackCount, setCallbackCount] = useState(0);
   const shop = usePixelShop('rod-test', balance, value => { setBalance(value); setCallbackCount(count => count + 1); });
-  const [panel, setPanel] = useState<'shop' | 'wardrobe' | null>('shop');
+  const [panel, setPanel] = useState<'tackle' | 'shop' | 'wardrobe' | null>('tackle');
   const adapter = useMemo(() => createFishingAdapter(supabase), []);
   const handle = useRef({ cancelWalk() {} });
   const fishing = useFishing({ adapter, handle, scene: 'river', pet: null, freeze() {} });
   const pet = { active: null, ready: true, busy: false, error: false, reload() {}, activate: async () => true };
   return <div className="pwp-root" style={{ width: '100vw', height: '100vh', background: '#7bbaad' }}>
     <div style={{ padding: 12 }}><output data-testid="balance">{balance}</output><output data-testid="callback-count">{callbackCount}</output>
-      <button onClick={() => setPanel('shop')}>상점 열기</button><button onClick={() => setPanel('wardrobe')}>옷장 열기</button>
+      <button onClick={() => setPanel('tackle')}>상점 열기</button><button onClick={() => setPanel('shop')}>광장 상점 열기</button><button onClick={() => setPanel('wardrobe')}>옷장 열기</button>
       <button onClick={() => void fishing.onShadowTap(0)}>낚시 시작</button><button onClick={() => fishing.reel()}>릴 감기</button><button onClick={fishing.cancel}>낚시 취소</button>
       <output data-testid="phase">{fishing.phase}</output><output>{fishing.message}</output>
     </div>

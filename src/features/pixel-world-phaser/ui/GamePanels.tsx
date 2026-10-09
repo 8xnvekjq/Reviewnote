@@ -19,8 +19,14 @@ import { FishBoard } from './FishBoard';
 import type { FishingAdapter } from './fishingAdapter';
 import type { FishingPanelKind } from '../logic/panels';
 
-export function FishingPanels({ kind, adapter, onClose, newSpeciesId }: { kind: FishingPanelKind; adapter?: FishingAdapter; onClose: () => void; newSpeciesId?: string | null }) {
-  return kind === 'turtle' ? <FishAlbum adapter={adapter} onClose={onClose} newSpeciesId={newSpeciesId} /> : <FishBoard adapter={adapter} onClose={onClose} />;
+export function FishingPanels({ kind, adapter, shop, onClose, newSpeciesId }: { kind: FishingPanelKind; adapter?: FishingAdapter; shop?: PanelAdapter; onClose: () => void; newSpeciesId?: string | null }) {
+  return kind === 'turtle' ? <TurtlePanel adapter={adapter} shop={shop} onClose={onClose} newSpeciesId={newSpeciesId} /> : <FishBoard adapter={adapter} onClose={onClose} />;
+}
+// 거북이를 누르면 도감과 낚시 상점(낚싯대·미끼)을 탭으로 오간다 — 미끼를 사러 광장까지 가지 않아도 된다.
+function TurtlePanel({ adapter, shop, onClose, newSpeciesId }: { adapter?: FishingAdapter; shop?: PanelAdapter; onClose: () => void; newSpeciesId?: string | null }) {
+  const [tab, setTab] = useState<'album' | 'tackle'>('album');
+  const tabs = shop ? <Tabs label="거북이 메뉴" options={[['album', '도감 보기'], ['tackle', '상점']]} value={tab} onChange={value => setTab(value as 'album' | 'tackle')} /> : undefined;
+  return tab === 'tackle' && shop ? <GamePanels kind="tackle" adapter={shop} onClose={onClose} top={tabs} /> : <FishAlbum adapter={adapter} onClose={onClose} newSpeciesId={newSpeciesId} top={tabs} />;
 }
 
 // 실제 훅과 하네스가 같은 계약으로 데이터와 동작을 전달한다.
@@ -28,10 +34,10 @@ export interface PanelAdapter { shop: Omit<ReturnType<typeof usePixelShop>, 'bai
 export function PriceTag({ value }: { value: number }) {
   return <span className="pwp-price"><span className="pwp-coin" aria-hidden="true">P</span>{value.toLocaleString()}</span>;
 }
-function Tabs({ options, value, onChange }: { options: readonly (readonly [string, string])[]; value: string; onChange: (value: string) => void }) {
-  return <nav className="pwp-tabs" aria-label="분류">{options.map(([key, label]) => <button type="button" key={key} aria-pressed={key === value} onClick={() => onChange(key)}>{label}</button>)}</nav>;
+function Tabs({ options, value, onChange, label = '분류' }: { options: readonly (readonly [string, string])[]; value: string; onChange: (value: string) => void; label?: string }) {
+  return <nav className="pwp-tabs" aria-label={label}>{options.map(([key, label]) => <button type="button" key={key} aria-pressed={key === value} onClick={() => onChange(key)}>{label}</button>)}</nav>;
 }
-export function Window({ title, onClose, onCancel = onClose, children, compact = false, small = false }: { title: string; onClose: () => void; onCancel?: () => void; children: ReactNode; compact?: boolean; small?: boolean }) {
+export function Window({ title, onClose, onCancel = onClose, children, compact = false, small = false, top }: { title: string; onClose: () => void; onCancel?: () => void; children: ReactNode; compact?: boolean; small?: boolean; top?: ReactNode }) {
   const box = useRef<HTMLDivElement>(null);
   const cancel = useRef(onCancel); cancel.current = onCancel;
   useEffect(() => {
@@ -58,12 +64,14 @@ export function Window({ title, onClose, onCancel = onClose, children, compact =
         if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
         else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
       }
-    }}><header><h2>{title}</h2><button type="button" aria-label={`${title} 닫기`} onClick={onClose}>✕</button></header>{children}</div>
+    }}><header><h2>{title}</h2><button type="button" aria-label={`${title} 닫기`} onClick={onClose}>✕</button></header>{top}{children}</div>
   </div>;
 }
-export function GamePanels({ kind, adapter: { shop, pet }, onClose }: { kind: Exclude<PanelKind, FishingPanelKind>; adapter: PanelAdapter; onClose: () => void }) {
+// 'tackle' = 거북이 낚시 상점(낚싯대·미끼만). 광장 'shop'에서는 낚시 도구를 팔지 않는다.
+export function GamePanels({ kind, adapter: { shop, pet }, onClose, top }: { kind: Exclude<PanelKind, FishingPanelKind> | 'tackle'; adapter: PanelAdapter; onClose: () => void; top?: ReactNode }) {
   const refreshBait = useRef(shop.refreshBait); refreshBait.current = shop.refreshBait;
-  useEffect(() => { if (kind === 'shop') void refreshBait.current?.(); }, [kind]);
+  useEffect(() => { if (kind === 'tackle') void refreshBait.current?.(); }, [kind]);
+  const selling = kind !== 'wardrobe';
   const [category, setCategory] = useState('all');
   const [slot, setSlot] = useState('hair');
   const [confirming, setConfirming] = useState<string | null>(null);
@@ -88,10 +96,14 @@ export function GamePanels({ kind, adapter: { shop, pet }, onClose }: { kind: Ex
   const art = (item: PixelItem) => item.category === 'avatar'
     ? <PanelArt appearance={{ ...shop.equipped, [item.slot]: item.assetKey }} />
     : item.category === 'rod' ? <RodIcon rod={{ id: item.itemId, tier: item.tier }} /> : item.category === 'pet' ? <PanelArt pet={item.itemId} /> : <PanelArt furniture={item.assetKey as FurnitureType} />;
-  const entries = panelItems(shop.catalog.filter(item => item.category !== 'bait'), kind === 'shop' ? category : slot, kind === 'wardrobe' ? shop.ownedIds : undefined);
-  return <Window title={kind === 'shop' ? '상점' : '옷장'} onClose={onClose} onCancel={() => { if (confirming) { if (!busy) setConfirming(null); } else onClose(); }}>
-    <div className="pwp-panel-summary">{kind === 'shop' ? <><span>마음에 드는 스타일을 골라요.</span><PriceTag value={shop.balance} /></> : <><div className="pwp-preview"><PanelArt appearance={shop.equipped} /></div><span>오늘의 나 · 바꾸면 바로 보여요.</span></>}</div>
-    <Tabs options={kind === 'shop' ? [['all', '전체'], ...AVATAR_SLOTS.map(key => [key, SLOT_LABELS[key]] as const), ['furniture', '가구'], ['pet', '펫'], ['rod', '낚싯대'], ['bait', '미끼']] : [...AVATAR_SLOTS.map(key => [key, SLOT_LABELS[key]] as const), ['base', '기본 외형'], ['pet', '펫'], ['rod', '낚싯대']]} value={kind === 'shop' ? category : slot} onChange={value => { if (kind === 'shop') setCategory(value); else setSlot(value); setConfirming(null); }} />
+  const stock = shop.catalog.filter(item => kind === 'tackle' ? item.category === 'rod' : kind === 'shop' ? item.category !== 'rod' && item.category !== 'bait' : item.category !== 'bait');
+  const entries = panelItems(stock, selling ? category : slot, kind === 'wardrobe' ? shop.ownedIds : undefined);
+  const tabOptions: readonly (readonly [string, string])[] = kind === 'tackle' ? [['all', '전체'], ['rod', '낚싯대'], ['bait', '미끼']]
+    : kind === 'shop' ? [['all', '전체'], ...AVATAR_SLOTS.map(key => [key, SLOT_LABELS[key]] as const), ['furniture', '가구'], ['pet', '펫']]
+    : [...AVATAR_SLOTS.map(key => [key, SLOT_LABELS[key]] as const), ['base', '기본 외형'], ['pet', '펫'], ['rod', '낚싯대']];
+  return <Window title={kind === 'tackle' ? '거북이 낚시 상점' : kind === 'shop' ? '상점' : '옷장'} top={top} onClose={onClose} onCancel={() => { if (confirming) { if (!busy) setConfirming(null); } else onClose(); }}>
+    <div className="pwp-panel-summary">{selling ? <><span>{kind === 'tackle' ? '좋은 낚싯대와 미끼가 있어요.' : '마음에 드는 스타일을 골라요. 낚싯대·미끼는 강가 거북이에게!'}</span><PriceTag value={shop.balance} /></> : <><div className="pwp-preview"><PanelArt appearance={shop.equipped} /></div><span>오늘의 나 · 바꾸면 바로 보여요.</span></>}</div>
+    <Tabs options={tabOptions} value={selling ? category : slot} onChange={value => { if (selling) setCategory(value); else setSlot(value); setConfirming(null); }} />
     <div className="pwp-panel-content">
       {!shop.ready ? <p role="status">보유 정보를 불러오는 중…</p> : shop.loadError ? <div role="alert"><p>보유 정보를 불러오지 못했어요.</p><button onClick={shop.reload}>다시 시도</button></div> : kind === 'wardrobe' && slot === 'base' ? <>
         <p>피부색과 눈동자색은 무료예요.</p>
@@ -100,7 +112,7 @@ export function GamePanels({ kind, adapter: { shop, pet }, onClose }: { kind: Ex
           return await shop.setBaseAppearance(key === 'skin' ? value : shop.equipped.skin, key === 'eyes' ? value : shop.equipped.eyes) ? `${label}을 바꿨어요.` : '외형을 저장하지 못했어요.';
         })}>{option.label}</button>)}</div></section>)}
       </> : <div className="pwp-item-grid">
-        {kind === 'shop' && (category === 'all' || category === 'bait') && <article className="pwp-item" data-item="bait_worm">
+        {kind === 'tackle' && (category === 'all' || category === 'bait') && <article className="pwp-item" data-item="bait_worm">
           <div className="pwp-item-art"><img className="pwp-bait-icon" src={baitIcon} alt="지렁이가 든 미끼 통" /></div>
           <strong>{BAIT_ITEM.displayName}</strong><small>희귀 물고기 2배 · 난이도 −0.3 · 100번 낚시</small>
           <span>남은 미끼 {shop.baitCharges == null ? '확인 중' : `${shop.baitCharges}회`}</span><PriceTag value={BAIT_ITEM.price} />

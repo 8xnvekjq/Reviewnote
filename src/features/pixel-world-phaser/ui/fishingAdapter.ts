@@ -41,7 +41,7 @@ export interface FishingState { kstDate: string; phase: FishPhase; weather: Fish
 export type CastStart = { ok: true; castId: string; shadow: FishShadow; biteDelayMs: number; difficulty?: number; big?: boolean; pattern: BitePattern; hint: 'sparkle' | null; rod?: FishingRod; speed?: number; trophy?: boolean; bait?: { used: boolean; charges: number } } | { ok: false; reason: 'budget' | 'pending' | 'error' };
 export type EquipRodResult = { ok: true; rod: FishingRod } | { ok: false; reason: 'not_found' | 'not_owned' | 'error' };
 export type CastFinish = { ok: true; landed: true; speciesId: string; lengthCm: number; rarity: FishRarity; isNew: boolean; isBig: boolean; isPersonalBest: boolean; remaining: number; xpGain?: XpGain } | { ok: true; landed: false } | { ok: false };
-export interface ClassFishBoard { rows: { speciesId: string; lengthCm: number; animal: string; caughtAt: string }[]; classSpecies: number }
+export interface ClassFishBoard { rows: { speciesId: string; lengthCm: number; animal: string; caughtAt: string; teacher?: boolean }[]; classSpecies: number }
 export type BuyBaitResult = { ok: true; newBalance: number; charges: number } | { ok: false; reason: 'insufficient_balance' | 'error'; message?: string };
 export interface FishingAdapter { buyBait?(): Promise<BuyBaitResult>; getLevel?(): Promise<PlayerLevel | null>; state(): Promise<FishingState>; start(pet: string | null): Promise<CastStart>; finish(castId: string, landed: boolean): Promise<CastFinish>; board(): Promise<ClassFishBoard>; /** 낚싯대 장착(null = 해제). 서버 RPC equip_pixel_rod. */ equipRod?(itemId: FishingRodId | null): Promise<EquipRodResult> }
 /** 관리자 시험용 시계·날씨 덮어쓰기(관리자만 서버가 받아 준다). */
@@ -163,7 +163,7 @@ export function parseClassFishBoard(raw: unknown): ClassFishBoard {
   const rows = list.flatMap((r): ClassFishBoard['rows'] => {
     if (!isObj(r)) return [];
     const speciesId = str(r.speciesId), lengthCm = num(r.lengthCm);
-    return speciesId && lengthCm != null ? [{ speciesId, lengthCm, animal: str(r.animal) ?? '🐾', caughtAt: str(r.caughtAt) ?? '' }] : [];
+    return speciesId && lengthCm != null ? [{ speciesId, lengthCm, animal: str(r.animal) ?? '🐾', caughtAt: str(r.caughtAt) ?? '', ...(r.teacher === true ? { teacher: true } : {}) }] : [];
   }).slice(0, 10);
   const classSpecies = isObj(raw) ? num(raw.classSpecies) : null;
   return { rows, classSpecies: classSpecies == null ? new Set(rows.map(r => r.speciesId)).size : Math.max(0, Math.floor(classSpecies)) };
