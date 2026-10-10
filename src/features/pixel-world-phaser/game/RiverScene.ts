@@ -1,8 +1,10 @@
 import type Phaser from 'phaser';
 import type { Point } from '../logic/joystick';
-import { RIVER_COLS, RIVER_ROWS, DOCK, TURTLE, FISHBOARD, inDock, riverWater, bankEdge, RIVER_DECORATIONS, BANK_SPOTS, canCastFrom, nearestBankSpot } from '../logic/riverWorld';
-import { cellCenter, facingDelta, facingToward } from '../logic/world';
-import { worldTint } from '../logic/worldTint';
+import { RIVER_COLS, RIVER_ROWS, DOCK, TURTLE, FISHBOARD, inDock, riverWater, bankEdge, RIVER_DECORATIONS } from '../logic/riverWorld';
+import { cellCenter, facingDelta, facedInteractable } from '../logic/world';
+import { castPower, HOTSPOTS, HOTSPOT_RADIUS } from '../logic/hotspots';
+import { castLanding, canChargeCast } from '../logic/castThrow';
+import type { FishingState } from '../ui/fishingAdapter';
 import { preloadFishing, fishingFrames } from './sceneAssets';
 import { createFishingFx, preloadFishingFx } from './fishingFx';
 import type { FishingEffects } from './fishingFx';
@@ -11,15 +13,14 @@ import { RiverPeers } from './riverPeers';
 import { WorldScene } from './WorldScene';
 import type { WorldContext } from './WorldScene';
 
-export interface FishShadow { index: 0 | 1 | 2; size: 'S' | 'M' | 'L'; sparkle: boolean }
-type ShadowVisual = { data: FishShadow; body: Phaser.GameObjects.Image | Phaser.GameObjects.Ellipse; sparkle?: Phaser.GameObjects.Graphics };
 export class RiverScene extends WorldScene {
   protected readonly background = '#578d78';
-  private shadows: ShadowVisual[] = [];
-  private desired: FishShadow[] = [];
+  private spots: FishingState['spots'];
+  private spotVisuals = new Map<number, Phaser.GameObjects.Graphics>();
+  private chargeAt: number | null = null;
+  private preview: Phaser.GameObjects.Graphics | null = null;
   private water: Phaser.GameObjects.Image[] = [];
   private ready = false;
-  private pendingCast: { index: 0 | 1 | 2; spot: Point } | null = null;
   private waterFrame = -1;
   private lampPhase = '';
   private waterStars: Phaser.GameObjects.Graphics | null = null;
@@ -33,7 +34,7 @@ export class RiverScene extends WorldScene {
   readonly peers = { current: null as RiverPeers | null };
   constructor(ctx: WorldContext) { super('river', ctx); }
   preload() { preloadFishing(this); preloadFishingFx(this); }
-  init(data: { entry?: string } | undefined) { super.init(data); this.fishingCollision = false; this.ready = false; this.shadows = []; this.water = []; this.pendingCast = null; this.waterFrame = -1; this.lampPhase = ''; }
+  init(data: { entry?: string } | undefined) { super.init(data); this.fishingCollision = false; this.ready = false; this.spotVisuals = new Map(); this.chargeAt = null; this.water = [];  this.waterFrame = -1; this.lampPhase = ''; }
   protected drawWorld() {
     fishingFrames(this);
     const g = this.add.graphics().setDepth(-1000);
@@ -89,12 +90,13 @@ export class RiverScene extends WorldScene {
     this.waterStars = this.add.graphics().setDepth(-898);
     // 조명은 기존 야간 틴트 위에 작은 빛만 더한다.
     this.lampGlow = this.add.graphics().setDepth(200001);
-    this.ready = true; this.setShadows(this.desired);
-    // 찌·줄·물보라 효과. 닻(anchor)은 매번 지금 위치를 읽도록 getter로 넘긴다. 장면이 끝나면 fishingFx가 스스로 정리한다.
+    this.ready = true; this.setHotspots(this.spots);
+    this.preview = this.add.graphics().setDepth(10003);
+    // 찌와 줄은 날아간 착지점에 그린다.
     const scene = this;
-    this.fx = createFishingFx(this, { get castFrom() { return scene.castFrom; }, shadowPoint: index => scene.shadowPoint(index) });
+    this.fx = createFishingFx(this, { get castFrom() { return scene.castFrom; } });
     this.peers.current = new RiverPeers(this, this.spec.solid);
-    this.events.once('shutdown', () => { this.ready = false; this.shadows = []; this.water = []; this.fx = null; this.pendingCast = null; this.waterStars = null; this.lampGlow = null; this.peers.current?.clear(); this.peers.current = null; });
+    this.events.once('shutdown', () => { this.ready = false; this.spotVisuals = new Map(); this.chargeAt = null; this.water = []; this.fx = null; this.preview = null;  this.waterStars = null; this.lampGlow = null; this.peers.current?.clear(); this.peers.current = null; });
   }
   private drawDecorations() {
     if (!this.textures.exists('town')) this.textures.addSpriteSheet('town', this.ctx.assets.town, { frameWidth: 16, frameHeight: 16 });
@@ -122,69 +124,57 @@ export class RiverScene extends WorldScene {
       } else image(`fishing:${d.kind}`);
     }
   }
-  setShadows(shadows: FishShadow[]) {
-    this.desired = shadows.slice(0, 3).map(s => ({ ...s }));
+  setHotspots(spots: FishingState['spots']) {
+    this.spots = spots;
     if (!this.ready) return;
-    if (this.pendingCast && !this.desired.some(s => s.index === this.pendingCast?.index)) this.cancelWalk();
-    for (const shadow of this.shadows) { shadow.body.destroy(); shadow.sparkle?.destroy(); }
-    this.shadows = this.desired.filter((s, i, all) => all.findIndex(other => other.index === s.index) === i).map(data => {
-      const p = this.shadowPoint(data.index), sizes = { S: [16, 8], M: [24, 12], L: [32, 14] }, size = sizes[data.size];
-      const body = this.textures.exists('fishing:fish-shadow') ? this.add.image(p.x, p.y, 'fishing:fish-shadow', data.size) : this.add.ellipse(p.x, p.y, size[0], size[1], 0x193d49, 0.65);
-      // 그림 원본은 불투명(이진 알파)이라 화면에서 반투명하게 깐다(ART.md 권장 0.35 안팎).
-      body.setDepth(-900); if ('setTint' in body) body.setAlpha(0.4);
-      return { data, body, sparkle: data.sparkle ? this.add.graphics().setDepth(-899) : undefined };
-    });
-  }
-  /** useFishing이 매 프레임 넘겨주는 낚시 상태로 찌·줄·물보라를 그린다. */
-  fishingFx(game: FishingGame, index: number, now: number) { this.fishingCollision = ['casting', 'waiting', 'bite', 'reeling'].includes(game.phase); if (this.ready) this.fx?.update(game, index, now); }
-  get castFrom(): Point { const d = facingDelta(this.facing); return { x: this.feet.x + d.x * 9, y: this.feet.y - 14 + d.y * 4 }; }
-  shadowPoint(index: number): Point {
-    const t = (this.time?.now ?? 0) / 1000;
-    return { x: (index === 1 ? 13 : 9.5) * 16 + Math.sin(t * 0.28 + index * 2) * 9, y: [144, 183, 230][index] + Math.cos(t * 0.21 + index) * 6 };
-  }
-  private tapShadow(index: 0 | 1 | 2) {
-    if (this.ctx.controls.frozen || this.snapshot().transitioning) return;
-    this.cancelWalk();
-    const shadow = this.shadowPoint(index);
-    if (canCastFrom(this.feet, shadow)) { this.castShadow(index); return; }
-    const spot = nearestBankSpot(shadow, this.feet);
-    if (!spot) return;
-    super.walkToWorld(cellCenter(spot));
-    this.pendingCast = { index, spot: cellCenter(spot) };
-  }
-  private castShadow(index: 0 | 1 | 2) {
-    this.cancelWalk(); this.facing = facingToward(this.feet, this.shadowPoint(index));
-    this.playAvatar(false, 1); this.ctx.hooks.onShadowTap?.(index);
-  }
-  cancelWalk() { this.pendingCast = null; super.cancelWalk(); }
-  walkToWorld(point: Point) { this.pendingCast = null; super.walkToWorld(point); }
-  walkToScreen(x: number, y: number) {
-    const camera = this.cameras.main, ratio = this.ctx.view.ratio;
-    const p = { x: camera.worldView.x + x * ratio / camera.zoom, y: camera.worldView.y + y * ratio / camera.zoom };
-    const hit = this.shadows.find(s => Math.abs(s.body.x - p.x) <= Math.max(12, s.body.width / 2 + 4) && Math.abs(s.body.y - p.y) <= 12);
-    if (hit) { this.tapShadow(hit.data.index); return; }
-    super.walkToScreen(x, y);
-  }
-  interact() {
-    if (this.facing === 'Right') {
-      const nearest = this.shadows.filter(s => s.body.x > this.feet.x && Math.hypot(s.body.x - this.feet.x, s.body.y - this.feet.y) <= 80).sort((a, b) => Math.hypot(a.body.x - this.feet.x, a.body.y - this.feet.y) - Math.hypot(b.body.x - this.feet.x, b.body.y - this.feet.y))[0];
-      if (nearest) { this.tapShadow(nearest.data.index); return; }
+    for (const spot of HOTSPOTS) {
+      const active = spots === undefined || spots.some(s => s.id === spot.id && s.active);
+      let g = this.spotVisuals.get(spot.id);
+      if (active && !g) {
+        g = this.add.graphics().setDepth(-902);
+        const p = cellCenter(spot.cell);
+        g.fillStyle(0x9ee5d2, .09).fillCircle(p.x, p.y, HOTSPOT_RADIUS);
+        g.lineStyle(1, 0xb9eadd, .5).strokeCircle(p.x, p.y, HOTSPOT_RADIUS);
+        for (const [dx, dy] of [[-8,-6],[7,4],[-4,10]]) {
+          g.fillStyle(0x204e60, .4).fillRect(p.x + dx, p.y + dy, 6, 2).fillRect(p.x + dx - 2, p.y + dy - 1, 2, 4);
+        }
+        this.spotVisuals.set(spot.id, g);
+      } else if (!active && g) {
+        this.spotVisuals.delete(spot.id);
+        this.tweens.add({ targets: g, alpha: 0, duration: 450, onComplete: () => g?.destroy() });
+      }
     }
-    super.interact();
+  }
+  fishingFx(game: FishingGame, point: Point, now: number) { this.fishingCollision = ['casting', 'waiting', 'bite', 'reeling'].includes(game.phase); if (this.ready) this.fx?.update(game, point, now); }
+  get castFrom(): Point { const d = facingDelta(this.facing); return { x: this.feet.x + d.x * 9, y: this.feet.y - 14 + d.y * 4 }; }
+  get canCast() { return !this.ctx.controls.frozen && !super.snapshot().transitioning && !facedInteractable(this.feet, this.facing, this.spec.interactables) && canChargeCast(this.feet, this.facing); }
+  beginCast(): boolean {
+    if (!this.canCast || this.chargeAt !== null) return false;
+    this.cancelWalk(); this.chargeAt = performance.now(); return true;
+  }
+  releaseCast(cancelled = false): Point | null {
+    if (this.chargeAt === null) return null;
+    const power = castPower(performance.now() - this.chargeAt);
+    this.chargeAt = null; this.preview?.clear();
+    return !cancelled && this.canCast ? castLanding(this.castFrom, this.facing, power) : null;
   }
   update(time: number, delta: number) {
     super.update(time, delta);
-    if (this.pendingCast && !this.ctx.controls.frozen) {
-      const pending = this.pendingCast;
-      // 거의 도착하면 물가 자리에 딱 맞춰 세운 뒤 던진다(걷기를 멈추면 1~2px 앞에 서 있던 것). 친구 화면의 줄도 이 자리에서 시작한다.
-      if (Math.hypot(this.feet.x - pending.spot.x, this.feet.y - pending.spot.y) < 2) {
-        this.feet = { ...pending.spot };
-        this.castShadow(pending.index);
+    if (this.chargeAt !== null) {
+      if (!this.canCast) this.releaseCast(true);
+      else {
+        const power = castPower(performance.now() - this.chargeAt), from = this.castFrom, to = castLanding(from, this.facing, power), g = this.preview;
+        g?.clear().fillStyle(0xffefab, .85);
+        for (let t = 0; t < 1; t += .08) g?.fillRect(from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t, 1, 1);
+        g?.lineStyle(1, 0xffefab, .9).strokeCircle(to.x, to.y, 4);
+        g?.fillStyle(0x263f45, .9).fillRect(this.feet.x - 13, this.feet.y - 36, 26, 5);
+        g?.fillStyle(0xffd46b).fillRect(this.feet.x - 12, this.feet.y - 35, 24 * power, 3);
       }
     }
+    for (const [id, visual] of this.spotVisuals) visual.setAlpha(.85 + Math.sin(time / 900 + id) * .15);
     this.peers.current?.update(time, this.feet, delta, this.ctx.face ?? '🐶');
     this.spacePets(delta);
-    const clock = this.worldClock(), tint = worldTint(clock.phase, clock.weather);
+    const clock = this.worldClock();
     const frame = Math.floor(time / 650) % 3;
     if (frame !== this.waterFrame) {
       this.waterFrame = frame;
@@ -206,21 +196,11 @@ export class RiverScene extends WorldScene {
         glow?.fillStyle(0xfff1d2, 0.8).fillRect(lamp.x - 2, lamp.y - 21, 4, 5);
       }
     }
-    for (const s of this.shadows) {
-      const p = this.shadowPoint(s.data.index); s.body.setPosition(p.x, p.y);
-      // 그림자 그림은 시간대 화면 색(덮개)이 이미 어둡게 하므로 따로 물들이지 않는다. 도형 대체만 색을 바꾼다.
-      if (!('setTint' in s.body)) s.body.setFillStyle(tint.shadowColor, clock.phase === 'night' ? 0.9 : 0.65);
-      if (s.sparkle) { const g = s.sparkle; g.clear().fillStyle(0xffe99a, 0.6 + Math.sin(time / 350) * 0.3); g.fillRect(p.x - 1, p.y - 9, 2, 6).fillRect(p.x - 3, p.y - 7, 6, 2); }
-    }
   }
   snapshot() {
     const debug = super.snapshot();
-    const screen = (p: Point) => ({ x: (p.x - debug.camera.x) * debug.cssZoom, y: (p.y - debug.camera.y) * debug.cssZoom });
-    const shadows = this.shadows.map(s => ({ ...s.data, point: screen(s.body) }));
-    // 브라우저 테스트가 탭할 수 있도록 그림자 위치를 targets['shadow:0..2']로도 내보낸다(숨기면 사라짐).
-    const targets = { ...debug.targets, ...Object.fromEntries(shadows.map(s => [`shadow:${s.index}`, s.point])) };
-    return { ...debug, targets, shadows, castFrom: this.castFrom, pendingCast: this.pendingCast,
-      bankSpots: BANK_SPOTS.map(cellCenter), decorations: RIVER_DECORATIONS,
+    return { ...debug, castFrom: this.castFrom, canCast: this.canCast, charging: this.chargeAt !== null,
+      hotspots: HOTSPOTS.filter(s => this.spots === undefined || this.spots.some(v => v.id === s.id && v.active)), decorations: RIVER_DECORATIONS,
       waterBounds: { left: bankEdge(9) * 16, right: RIVER_COLS * 16, top: 0, bottom: RIVER_ROWS * 16 },
       ...(this.peers.current?.snapshot() ?? { classmates: [], bubbles: [], sparkles: [] }) };
   }

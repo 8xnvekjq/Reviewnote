@@ -27,7 +27,7 @@ export const activeFishPhase = (phase: RiverFishPhase) => phase === 'casting' ||
 
 /** useFishing → 강가 실시간 연결점(어댑터). useFishing은 이 모양만 알면 된다. 좌표 변환·전송·속도 제한은 RiverBridge가 맡는다. */
 export type RiverFishReport =
-  | { phase: 'casting'; shadow: number }
+  | { phase: 'casting'; target: Point }
   | { phase: 'waiting' | 'bite' | 'reeling' | 'escaped' | 'idle' }
   | { phase: 'landed'; speciesId: string; lengthCm: number };
 export type RiverFishReporter = (report: RiverFishReport) => void;
@@ -87,7 +87,11 @@ export function parseFishEvent(raw: unknown): RiverFishEvent | null {
     if (!target) return null;
     event.target = target;
   }
-  if (event.phase === 'casting' && !event.target) return null;
+  if (event.phase === 'casting' && !event.target) {
+    if (!Number.isInteger(raw.shadow) || (raw.shadow as number) < 0 || (raw.shadow as number) > 2) return null;
+    const index = raw.shadow as number;
+    event.target = { x: (index === 1 ? 13 : 9.5) * 16, y: [144, 183, 230][index] };
+  }
   if (event.phase === 'landed') {
     const caught = parseCatch(raw.speciesId, raw.lengthCm);
     if (!caught) return null;
@@ -100,7 +104,7 @@ export function parseFishEvent(raw: unknown): RiverFishEvent | null {
 export function buildFishEvent(sessionId: string, seq: number, report: RiverFishReport, target: Point | null): RiverFishEvent | null {
   const event: RiverFishEvent = { sessionId, seq, phase: report.phase };
   if (report.phase === 'casting') {
-    const point = target && parseTarget(target);
+    const point = parseTarget(report.target ?? target);
     if (!point) return null;
     event.target = point;
   } else if (report.phase === 'landed') {

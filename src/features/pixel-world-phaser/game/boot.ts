@@ -14,7 +14,7 @@ import { RoomScene } from './RoomScene';
 import { YardScene } from './YardScene';
 import { PlazaScene } from './PlazaScene';
 import { RiverScene } from './RiverScene';
-import type { FishShadow } from './RiverScene';
+import type { FishingState } from '../ui/fishingAdapter';
 import type { FishPhase, FishWeather } from '../logic/worldTint';
 import type { Point } from '../logic/joystick';
 import type { FishingOverride } from '../ui/fishingAdapter';
@@ -27,12 +27,14 @@ import type { WorldAssets, WorldContext, WorldDebug, WorldEvents, WorldScene } f
 export type { Prompt, WorldAssets, WorldDebug, WorldEvents } from './WorldScene';
 
 export interface WorldGameHandle {
-  setShadows(shadows: FishShadow[]): void;
+  setHotspots(spots: FishingState['spots']): void;
+  readonly canCast: boolean;
+  beginCast(): boolean;
+  releaseCast(cancelled?: boolean): Point | null;
   setWorldTime(phase: FishPhase, weather: FishWeather): void;
   readonly castFrom: Point | null;
-  shadowPoint(index: number): Point | null;
   /** 낚시 상태(찌·줄·물보라)를 강가 장면에 전달. 다른 장면에서는 무시한다. */
-  fishingFx(game: FishingGame, index: number, now: number): void;
+  fishingFx(game: FishingGame, point: Point, now: number): void;
   destroy(): void;
   setActive(active: boolean): void;
   /** 게임 프레임 기준 CSS 좌표를 탭 → 그 자리까지 걸어간다. */
@@ -157,11 +159,13 @@ export function startWorldGame(parent: HTMLElement, start: WorldStart, controls:
     window.addEventListener('resize', fit);
 
     const handle: WorldGameHandle = {
-      setShadows: shadows => river.setShadows(shadows),
+      setHotspots: spots => river.setHotspots(spots),
+      get canCast() { return active === river && river.canCast; },
+      beginCast: () => active === river && river.beginCast(),
+      releaseCast: cancelled => active === river ? river.releaseCast(cancelled) : null,
       setWorldTime: (phase, weather) => { ctx.worldTime = { phase, weather, at: Date.now() }; active?.setWorldTime(phase, weather); },
       get castFrom() { return active === river ? river.castFrom : null; },
-      shadowPoint: index => active === river && index >= 0 && index <= 2 ? river.shadowPoint(index) : null,
-      fishingFx: (game, index, now) => { if (active === river) river.fishingFx(game, index, now); },
+      fishingFx: (game, point, now) => { if (active === river) river.fishingFx(game, point, now); },
       getFurniture: () => ctx.data.furniture.map(item => ({ ...item })),
       setRoomPlacing: on => { if (active === room) room.setRoomPlacing(on); },
       roomEditPoint: (x, y) => active === room ? room.editPoint(x, y) : null,

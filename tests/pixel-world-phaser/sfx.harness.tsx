@@ -21,7 +21,7 @@ function Harness() {
   Object.assign(window, { sfxProbe: { fishing, setLevel } });
   return <div ref={root} className="pwp-root" style={{ width: '100vw', height: '100vh' }}>
     <button data-testid="sound" aria-pressed={bgm.enabled} onClick={bgm.toggle}>{'\uC18C\uB9AC'}</button>
-    <button data-testid="cast" onClick={() => void fishing.onShadowTap(0)}>{'\uB0DA\uC2DC \uC2DC\uC791'}</button>
+    <button data-testid="cast" onClick={() => void fishing.castAt({ x: 344, y: 168 })}>{'\uB0DA\uC2DC \uC2DC\uC791'}</button>
     <output data-testid="phase">{fishing.phase}</output>
     {fishing.reelState && <><ReelBar game={fishing.reelState} /><ReelJoystick onAxis={fishing.setReelX} /></>}
     {fishing.caught && <output data-testid="catch">{fishing.caught.speciesId}</output>}

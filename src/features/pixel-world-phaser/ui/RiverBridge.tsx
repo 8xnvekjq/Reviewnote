@@ -75,7 +75,7 @@ export function RiverBridge({ handle, appearance, pet, riding, face, panel, repo
       void sendRef.current(FISH_EVENT, event);
     };
     reporter.current = report => {
-      const target = report.phase === 'casting' ? handle.current?.shadowPoint(report.shadow) ?? null : null;
+      const target = report.phase === 'casting' ? report.target : null;
       seq.current += 1;
       const event = buildFishEvent(sessionId, seq.current, report, target);
       if (!event) return;
