@@ -1,0 +1,8 @@
+/* 주간 축하 창: 긴 보상 이름도 휴대폰 안에서 줄바꿈한다. */
+.pwp-weekly-rewards { text-align:center; overflow-wrap:anywhere; }
+.pwp-weekly-celebration { font-size:32px; color:#966820; }
+.pwp-weekly-rewards ul { list-style:none; padding:0; margin:16px 0; display:grid; gap:8px; }
+.pwp-weekly-rewards li { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:12px; align-items:center; padding:10px; border:2px solid #bb9560; background:#fffaf0; text-align:left; }
+.pwp-weekly-rewards strong { color:#785322; }
+.pwp-weekly-total { padding:12px; background:#f5e6b7; border-radius:6px; }
+.pwp-weekly-rewards > button { width:100%; min-height:44px; }
