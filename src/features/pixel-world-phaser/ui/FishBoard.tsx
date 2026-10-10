@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
-import { PEER_ANIMAL_FACES, peerSolutionLabelParts } from '../../exam/ui/peerSolution';
+import { peerSolutionLabelParts } from '../../exam/ui/peerSolution';
+import { validAnimalFace } from '../../../utils/animalFace';
 import { fishById } from '../logic/fishCatalog';
 import type { ClassFishBoard, FishingAdapter } from './fishingAdapter';
 import { FishIcon } from './FishAlbum';
 import { Window } from './GamePanels';
 
 export function fishBoardFace(animal: string): string {
-  return (PEER_ANIMAL_FACES as readonly string[]).includes(animal) ? animal : peerSolutionLabelParts({ character: animal, title: null, grade: null, isTeacher: false }).face;
+  return validAnimalFace(animal) ? animal : peerSolutionLabelParts({ character: animal, title: null, grade: null, isTeacher: false }).face;
 }
 export function fishRelativeTime(caughtAt: string, now = Date.now()): string {
   const timestamp = Date.parse(caughtAt);
@@ -33,7 +34,7 @@ export function FishBoard({ adapter, onClose }: { adapter?: FishingAdapter; onCl
     {!adapter ? <p role="status">낚시 정보를 준비하고 있어요.</p> : error ? <div role="alert">게시판을 불러오지 못했어요. <button onClick={() => setRetry(value => value + 1)}>다시 시도</button></div> : !board ? <p role="status">게시판을 읽는 중…</p> : <>
       <p className="pwp-fish-progress">우리 반이 찾은 물고기 {board.classSpecies}/12</p>
       {!rows.length ? <p>아직 기록이 없어요. 첫 물고기를 기다리고 있어요!</p> : <ol className="pwp-fish-board">{rows.map((row, index) => <li key={row.speciesId} data-species={row.speciesId} data-teacher={row.teacher || undefined}>
-        <span className="pwp-fish-face" role="img" aria-label={row.teacher ? '선생님' : '익명 동물 얼굴'}>{row.teacher ? '🎓' : fishBoardFace(row.animal)}</span><FishIcon speciesId={row.speciesId}/>
+        <span className="pwp-fish-face" role="img" aria-label={row.teacher ? '선생님' : '익명 동물 얼굴'}>{fishBoardFace(row.animal)}</span><FishIcon speciesId={row.speciesId}/>
         <strong><span className="pwp-fish-rank">{index + 1}위</span> {fishById(row.speciesId)?.name ?? '물고기'}</strong><span className="pwp-fish-length">{row.lengthCm.toFixed(1)}cm</span><time dateTime={row.caughtAt}>{fishRelativeTime(row.caughtAt, now)}</time>
       </li>)}</ol>}
     </>}

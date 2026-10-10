@@ -26,9 +26,9 @@ export function animalFaceHash(userId: string): number {
   return (((a0 & 255) << 24) | ((a0 & 0xff00) << 8) | ((a0 >>> 8) & 0xff00) | (a0 >>> 24)) >>> 0;
 }
 
-/** 서버 목록과 교사가 지정한 기린만 허용하며 여러 이모지나 글은 받지 않는다. */
+/** 서버 목록과 교사가 지정한 기린·고릴라(선생님)만 허용하며 여러 이모지나 글은 받지 않는다. */
 export function validAnimalFace(value: unknown): value is string {
-  return typeof value === 'string' && [...PEER_ANIMAL_FACES, '🦒'].includes(value as typeof PEER_ANIMAL_FACES[number]);
+  return typeof value === 'string' && [...PEER_ANIMAL_FACES, '🦒', '🦍'].includes(value as typeof PEER_ANIMAL_FACES[number]);
 }
 
 /** 서버 재정의가 우선. 계정 정보가 없는 구형 접속자는 익명 세션 UUID를 대신 쓴다. */

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { animalFaceHash, userAnimalFace, PEER_ANIMAL_FACES } from '../../src/utils/animalFace.ts';
+import { animalFaceHash, userAnimalFace, validAnimalFace, PEER_ANIMAL_FACES } from '../../src/utils/animalFace.ts';
 import { protocolExtras } from '../../src/features/pixel-room/plaza/presenceProtocol.ts';
 import { createPlazaStoreState, plazaStoreReducer } from '../../src/features/pixel-room/plaza/presenceStore.ts';
 import { avatarLayerPlan, avatarTextureKey } from '../../src/features/pixel-world-phaser/logic/avatarPlan.ts';
@@ -102,5 +102,15 @@ test('animal face migration executes twice, shares overrides, preserves teacher 
     assert.equal((await db.query("select has_function_privilege('authenticated','private.user_animal_face(uuid)','EXECUTE') allowed")).rows[0].allowed, false);
     await db.exec("select set_config('request.jwt.claim.sub','',false); set role authenticated");
     await assert.rejects(db.query('select get_my_animal_face()'), /Authentication required/);
+    // 다음 마이그레이션: 선생님은 🦍, 랭킹엔 무지개 잉어만, 학사모 없음
+    await db.exec("reset role; select set_config('request.jwt.claim.sub','" + ids[0] + "',false)");
+    for (const file of ['20261011120000_fish_board_teacher_rainbow_only.sql', '20261011130000_unique_animal_faces_teacher_gorilla.sql', '20261011130000_unique_animal_faces_teacher_gorilla.sql'])
+      await db.exec(readFileSync(new URL('../../supabase/migrations/' + file, import.meta.url), 'utf8'));
+    await db.query('update profiles set animal_face=$1 where id=$2', ['🦍', other]);
+    await db.query("insert into pixel_fish_catches values ('rainbow_koi',50,$1,now())", [other]);
+    const next = (await db.query('select pixel_private.get_class_fish_board() r')).rows[0].r as any;
+    assert.deepEqual(next.rows.filter((r: any) => r.teacher).map((r: any) => [r.speciesId, r.animal]), [['rainbow_koi', '🦍']]);
+    assert.equal(next.rows.some((r: any) => r.animal === '🎓'), false);
+    assert.equal(validAnimalFace('🦍'), true);
   } finally { await db.close(); }
 });
