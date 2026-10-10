@@ -23,7 +23,7 @@ export const PET_SHEETS: Record<PetId, PetSheet> = {
   pet_bear: { cell: 48, columns: 4, rows: 4, walk: { row: 1, frames: [0, 1, 2, 3], frameMs: 150 }, idle: { row: 0, frames: [0, 0, 0, 1, 1, 1, 3, 3, 2], frameMs: 450 }, facesLeft: true, footY: 46, pace: 1 },
   // pigeon.png 128×192, 32칸: 1행 종종걸음(75ms), 0행 고개 까딱.
   pet_pigeon: { cell: 32, columns: 4, rows: 6, walk: { row: 1, frames: [0, 1, 2, 3], frameMs: 75 }, idle: { row: 0, frames: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3], frameMs: 320 }, takeoff: { row: 4, frames: [0, 1], frameMs: 120 }, fly: { row: 5, frames: [0, 1, 2, 3], frameMs: 90 }, land: { row: 4, frames: [2, 3], frameMs: 120 }, facesLeft: true, footY: 31, pace: 1.1 },
-  // duck.png는 1254px 원본 — game/petTextures.ts가 Duck.tsx와 같은 알파 경계로 32px 칸 4×4 시트를 만든다.
+  // duck.png는 팔레트와 윤곽선을 정리한 128px 원본이다. 각 칸은 32px.
   pet_duck: { cell: 32, columns: 4, rows: 4, walk: { row: 1, frames: [0, 1, 2, 3], frameMs: 110 }, idle: { row: 0, frames: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3], frameMs: 330 }, facesLeft: true, footY: 30, pace: 1.05 },
 };
 

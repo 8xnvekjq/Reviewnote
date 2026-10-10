@@ -25,6 +25,7 @@ export function usePixelShop(userId: string, initialBalance: number, onBalanceCh
   const [catalog, setCatalog] = useState<PixelItem[]>(PIXEL_CATALOG as unknown as PixelItem[]);
   const [balance, setBalance] = useState(initialBalance);
   const [ready, setReady] = useState(false);
+  const loadedUser = useRef<string | null>(null);
   // 진짜 "새 계정이라 아무것도 없음"과 "불러오다 실패함"을 구분한다 — 구분 안 하면 네트워크
   // 오류가 조용히 "아직 아무것도 안 산 상태"로 보여서, 이미 산 아이템이 순간적으로 사라진 것처럼
   // 보이거나(실제로는 조회 실패일 뿐) 재시도할 방법이 없었다.
@@ -38,7 +39,8 @@ export function usePixelShop(userId: string, initialBalance: number, onBalanceCh
 
   useEffect(() => {
     let cancelled = false;
-    setReady(false); setBaitCharges(null);
+    // 같은 계정의 새로고침 중에는 게임과 열린 창을 유지한다.
+    if (loadedUser.current !== userId) { setReady(false); setBaitCharges(null); }
     void fetchPixelBaitCharges().then(charges => { if (!cancelled) setBaitCharges(charges); });
     setLoadError(false);
     Promise.all([fetchOwnedPixelItemIds(userId), fetchEquippedAppearance(userId), fetchEquippedRod(userId)])
@@ -47,10 +49,12 @@ export function usePixelShop(userId: string, initialBalance: number, onBalanceCh
         setOwnedIds(new Set(ids));
         setEquipped(appearance);
         setEquippedRod(rod);
+        loadedUser.current = userId;
         setReady(true);
       })
       .catch(() => {
         if (cancelled) return;
+        loadedUser.current = userId;
         setReady(true);
         setLoadError(true);
       });

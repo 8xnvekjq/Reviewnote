@@ -18,7 +18,6 @@ import { ScarecrowSprite } from '../../pixel-room/farm/Scarecrow';
 import { TomatoSprite } from '../../pixel-room/farm/TomatoSprite';
 import type { FarmMoisture, FarmStage } from '../../pixel-room/farm/farmModel';
 import type { PetId } from '../../pixel-room/pet/petKinds';
-import { DUCK_BOUNDS } from '../logic/petSheets';
 import { loadImage, svgToImage } from './loadImage';
 
 export const loadBearRide = () => loadImage(bearRideSheet);
@@ -33,23 +32,8 @@ export async function loadFurnitureSheets(): Promise<Map<string, HTMLImageElemen
 }
 
 const PET_SOURCES: Record<PetId, string> = { pet_dog: dogSheet, pet_bear: bearSheet, pet_pigeon: pigeonSheet, pet_duck: duckSheet };
-export async function loadPetSheet(pet: PetId): Promise<HTMLImageElement | HTMLCanvasElement> {
-  const image = await loadImage(PET_SOURCES[pet]);
-  return pet === 'pet_duck' ? duckSheetCanvas(image) : image;
-}
-/** 오리 원본(1254px)을 Duck.tsx와 같은 계산(알파 경계 + 2px 여백, 1/10 축소, 발끝 y=30)으로 32px 칸 4×4 시트로. */
-function duckSheetCanvas(image: HTMLImageElement): HTMLCanvasElement {
-  const canvas = document.createElement('canvas');
-  canvas.width = 128; canvas.height = 128;
-  const ctx = canvas.getContext('2d')!;
-  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-  DUCK_BOUNDS.forEach(([left, top, endX, endY], index) => {
-    const sw = endX - left + 4, sh = endY - top + 4;
-    const width = sw / 10, height = sh / 10;
-    const ox = (index % 4) * 32, oy = Math.floor(index / 4) * 32;
-    ctx.drawImage(image, left - 2, top - 2, sw, sh, ox + (32 - width) / 2, oy + 30 - height, width, height);
-  });
-  return canvas;
+export async function loadPetSheet(pet: PetId): Promise<HTMLImageElement> {
+  return loadImage(PET_SOURCES[pet]);
 }
 
 /** React 컴포넌트가 그리는 <svg>를 한 번 렌더해서 꺼낸 뒤 이미지로 만든다(원본 컴포넌트를 그대로 재사용). */

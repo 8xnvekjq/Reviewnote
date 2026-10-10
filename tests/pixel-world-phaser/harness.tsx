@@ -76,7 +76,7 @@ function Harness() {
   const [look, setLook] = useState(appearance);
   const [active, setActive] = useState(pet);
   const [balance, setBalance] = useState(1234);
-  const [ownedIds, setOwnedIds] = useState(new Set(PIXEL_CATALOG.filter(item => item.category === 'avatar' || item.category === 'pet' || params.has('roomEdit') && item.category === 'furniture' && ['desk', 'bed', 'plant', 'chair'].includes(item.assetKey)).map(item => item.itemId)));
+  const [ownedIds, setOwnedIds] = useState(new Set(PIXEL_CATALOG.filter(item => item.category === 'avatar' || item.category === 'pet' || params.has('roomEdit') && item.category === 'furniture' && (params.get('roomEdit') === 'all' || ['desk', 'bed', 'plant', 'chair'].includes(item.assetKey))).map(item => item.itemId)));
   // 서버 없이 모든 패션과 친구를 장착하고 가구 구매를 시험한다.
   const adapter: PanelAdapter = {
     shop: { equippedRod, equipRod: async id => { if (id && !ownedIds.has(id)) return false; setEquippedRod(id); return true; }, ready: true, loadError: false, mutating: false, catalog: [...PIXEL_CATALOG], equipped: look, ownedIds, balance, reload: () => {},
@@ -95,7 +95,7 @@ function Harness() {
   useEffect(() => { document.documentElement.dataset.farmCalls = String(calls); }, [calls]);
   return open
     ? params.has('saved')
-      ? <PixelWorldPhaser userId="scene-test-user" pointsBalance={1234} onExit={() => setOpen(false)} />
+      ? <PixelWorldPhaser userId="scene-test-user" pointsBalance={balance} onPixelPurchase={setBalance} onPointsReward={reward => setBalance(value => value + reward)} onExit={() => setOpen(false)} />
       : <GameShell isAdmin={params.has('admin')} fishingAdapter={fishingAdapter} clockOverride={clockOverride} appearance={look} pet={active} balance={balance} panels={adapter} farmAdapter={params.has('farm') ? farmAdapter : undefined} beds={params.has('farm') ? farmBeds : [...beds]} furniture={roomLayout} onSaveFurniture={async layout => { await new Promise(resolve => setTimeout(resolve, 100)); if (params.has('roomSaveError')) throw new Error('저장하지 못했어요. 다시 시도해 주세요.'); setRoomLayout(layout); }} scarecrowLine={() => pickScarecrowLine(null, Date.now())} onExit={() => setOpen(false)} />
     : <main style={{ padding: 24 }}><p data-testid="exited">게임에서 나왔어요.</p><button type="button" onClick={() => setOpen(true)}>다시 들어가기</button></main>;
 }
