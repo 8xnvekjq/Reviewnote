@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createReelGame, stepReelGame, minReelMs, REEL_MARGIN_MS } from '../../src/features/pixel-world-phaser/logic/reelGame.ts';
+import { createReelGame, stepReelGame, minReelMs, REEL_MARGIN_MS, HEAVY_PATTERNS } from '../../src/features/pixel-world-phaser/logic/reelGame.ts';
 import type { ReelGame, ReelAxisInput } from '../../src/features/pixel-world-phaser/logic/reelGame.ts';
 type Player = 'lazy' | 'novice' | 'good';
 function verticalBot(seed: number, heavy: boolean) {
@@ -26,30 +26,26 @@ test('상어·고래는 30개 시드에서 잡을 수 있고 일반 물고기보
   // 위로 15% 느려지고 좌우로도 헤엄쳐 덜 가혹해졌지만, 여전히 보통 물고기보다 탭이 많이 든다.
   assert.ok(heavyTaps >= normalTaps * 1.3);
 });
-test('무거운 물고기는 위아래 목표를 번갈아 향하고 돌진과 당기는 힘이 강하다', () => {
+test('상어·고래는 5가지 패턴을 섞고(연달아 같은 것 없음), 아래보다 위에 오래 있고, 좌우로도 크게 움직인다', () => {
   let g = createReelGame(5, false, false, 7, 1, undefined, false, 0, true);
-  const targets: number[] = [];
-  let maxY = 0, minY = 0, burstSpeed = 0, cruiseSpeed = 0;
-  for (let tick = 0; tick < 3600; tick++) {
+  const order: string[] = [];
+  let top = 0, bottom = 0, wide = 0;
+  for (let tick = 0; tick < 120 * 120; tick++) {
     const next = stepReelGame({ ...g, progress: .5 }, 1000 / 120);
-    if (next.nextTarget !== g.nextTarget) {
-      assert.ok(Math.abs(next.targetY) >= .75 && Math.abs(next.targetY) <= .9);
-      assert.ok(Math.abs(next.targetX) <= .65); // 좌우로도 보통 물고기처럼(2026-10)
-      if (targets.length) assert.ok(next.targetY * targets.at(-1)! < 0);
-      targets.push(next.targetY);
-    }
-    maxY = Math.max(maxY, next.fish); minY = Math.min(minY, next.fish);
-    if (next.elapsed < next.burstUntil) burstSpeed = Math.max(burstSpeed, Math.abs(next.fishVY));
-    else if (next.elapsed > next.burstUntil + .3) cruiseSpeed = Math.max(cruiseSpeed, Math.abs(next.fishVY));
+    if (next.motion !== g.motion) order.push(next.motion);
+    if (next.fish > .2) top++; else if (next.fish < -.2) bottom++;
+    if (Math.abs(next.fishX) > .55) wide++;
     assert.ok(Math.hypot(next.fishX, next.fish) <= .94 + 1e-12);
     assert.ok(Math.hypot(next.zoneX, next.zone) <= 1 - next.zoneSize + 1e-12);
     g = next;
   }
-  assert.ok(targets.length >= 7 && maxY > .7 && minY < -.7);
-  assert.ok(burstSpeed > cruiseSpeed * 1.3);
+  assert.deepEqual(new Set(order), new Set(HEAVY_PATTERNS.map(p => p.kind)));
+  for (let i = 1; i < order.length; i++) assert.notEqual(order[i], order[i - 1]);
+  // 위에 더 오래(아래는 위의 대략 절반 이하) — 시드 하나라 범위를 넉넉히 둔다(여러 시드 평균은 약 0.46).
+  assert.ok(bottom / top > .15 && bottom / top < .65, `bottom/top ${(bottom / top).toFixed(2)}`);
+  assert.ok(wide / (120 * 120) > .08, 'swings wide left and right');
   const normal = createReelGame(5);
   assert.ok(stepReelGame(createReelGame(5, false, false, 0, 1, undefined, false, 0, true), 100).velocity < stepReelGame(normal, 100).velocity);
-  assert.deepEqual(stepReelGame(normal, 2000), stepReelGame(createReelGame(5, false, false, 0, 1, undefined, false, 0, false), 2000));
 });
 export function simulate(d: number, player: Player, seed: number, big = false) {
   let g = createReelGame(d, false, big, seed), last = -1000, random = seed + 1, lazyAxis = 0;

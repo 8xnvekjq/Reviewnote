@@ -16,7 +16,8 @@ import type { WorldContext } from './WorldScene';
 export class RiverScene extends WorldScene {
   protected readonly background = '#578d78';
   private spots: FishingState['spots'];
-  private spotVisuals = new Map<number, Phaser.GameObjects.Graphics>();
+  /** 포인트별 그림과 지금 그려 둔 남은 물고기 수(1마리 낚을 때마다 그림자가 하나씩 줄어든다). */
+  private spotVisuals = new Map<number, { g: Phaser.GameObjects.Graphics; left: number }>();
   private chargeAt: number | null = null;
   private preview: Phaser.GameObjects.Graphics | null = null;
   private water: Phaser.GameObjects.Image[] = [];
@@ -128,20 +129,26 @@ export class RiverScene extends WorldScene {
     this.spots = spots;
     if (!this.ready) return;
     for (const spot of HOTSPOTS) {
-      const active = spots === undefined || spots.some(s => s.id === spot.id && s.active);
-      let g = this.spotVisuals.get(spot.id);
-      if (active && !g) {
-        g = this.add.graphics().setDepth(-902);
-        const p = cellCenter(spot.cell);
+      const state = spots?.find(s => s.id === spot.id);
+      const active = spots === undefined || (!!state && state.active && state.left > 0);
+      const left = Math.max(1, Math.min(3, state?.left ?? 3));
+      const shown = this.spotVisuals.get(spot.id);
+      if (active && shown?.left !== left) {
+        shown?.g.destroy();
+        const g = this.add.graphics().setDepth(-902), p = cellCenter(spot.cell);
         g.fillStyle(0x9ee5d2, .09).fillCircle(p.x, p.y, HOTSPOT_RADIUS);
         g.lineStyle(1, 0xb9eadd, .5).strokeCircle(p.x, p.y, HOTSPOT_RADIUS);
-        for (const [dx, dy] of [[-8,-6],[7,4],[-4,10]]) {
-          g.fillStyle(0x204e60, .4).fillRect(p.x + dx, p.y + dy, 6, 2).fillRect(p.x + dx - 2, p.y + dy - 1, 2, 4);
+        // 남은 마리 수만큼 물고기 그림자(처음 3마리, 낚을 때마다 하나씩 사라진다).
+        for (const [dx, dy, flip] of [[-9, -6, 1], [5, 3, -1], [-4, 10, 1]].slice(0, left)) {
+          const x = p.x + dx, y = p.y + dy;
+          g.fillStyle(0x16394a, .62).fillEllipse(x, y, 11, 5)
+            .fillTriangle(x - 6 * flip, y, x - 10 * flip, y - 3, x - 10 * flip, y + 3)
+            .fillRect(x - 1, y - 4, 3, 2);
         }
-        this.spotVisuals.set(spot.id, g);
-      } else if (!active && g) {
+        this.spotVisuals.set(spot.id, { g, left });
+      } else if (!active && shown) {
         this.spotVisuals.delete(spot.id);
-        this.tweens.add({ targets: g, alpha: 0, duration: 450, onComplete: () => g?.destroy() });
+        this.tweens.add({ targets: shown.g, alpha: 0, duration: 450, onComplete: () => shown.g.destroy() });
       }
     }
   }
@@ -163,15 +170,14 @@ export class RiverScene extends WorldScene {
     if (this.chargeAt !== null) {
       if (!this.canCast) this.releaseCast(true);
       else {
-        const power = castPower(performance.now() - this.chargeAt), from = this.castFrom, to = castLanding(from, this.facing, power), g = this.preview;
-        g?.clear().fillStyle(0xffefab, .85);
-        for (let t = 0; t < 1; t += .08) g?.fillRect(from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t, 1, 1);
-        g?.lineStyle(1, 0xffefab, .9).strokeCircle(to.x, to.y, 4);
+        // 떨어질 자리는 보여 주지 않는다(맞히는 재미, 2026-10 선생님 의견) — 힘 막대만.
+        const power = castPower(performance.now() - this.chargeAt), g = this.preview;
+        g?.clear();
         g?.fillStyle(0x263f45, .9).fillRect(this.feet.x - 13, this.feet.y - 36, 26, 5);
         g?.fillStyle(0xffd46b).fillRect(this.feet.x - 12, this.feet.y - 35, 24 * power, 3);
       }
     }
-    for (const [id, visual] of this.spotVisuals) visual.setAlpha(.85 + Math.sin(time / 900 + id) * .15);
+    for (const [id, visual] of this.spotVisuals) visual.g.setAlpha(.85 + Math.sin(time / 900 + id) * .15);
     this.peers.current?.update(time, this.feet, delta, this.ctx.face ?? '🐶');
     this.spacePets(delta);
     const clock = this.worldClock();
