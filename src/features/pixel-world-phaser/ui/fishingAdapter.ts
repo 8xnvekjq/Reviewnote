@@ -189,20 +189,43 @@ export function parseEquipRod(raw: unknown): EquipRodResult {
   return { ok: true, rod: parseFishingRod(raw.rod) };
 }
 
+export function parseGamePoints(raw: unknown): GamePointsResult | undefined {
+  if (!isObj(raw)) return undefined;
+  const awarded = nonnegativeInteger(raw.awarded), todayEarned = nonnegativeInteger(raw.todayEarned);
+  if (awarded === undefined || todayEarned === undefined || raw.cap !== 50 || typeof raw.capped !== 'boolean'
+    || awarded > todayEarned || raw.capped !== (todayEarned >= 50)) return undefined;
+  return { awarded, todayEarned, cap: 50, capped: raw.capped };
+}
+function parseChampions(raw: unknown): ClassFishBoard['champions'] {
+  if (!Array.isArray(raw)) return undefined;
+  const seen = new Set<string>();
+  return raw.flatMap(r => {
+    if (!isObj(r) || !oneOf(RARITIES, r.rarity) || seen.has(r.rarity)) return [];
+    const speciesId = str(r.speciesId), animal = str(r.animal);
+    const lengthCm = num(r.lengthCm), score = num(r.score), reward = nonnegativeInteger(r.reward);
+    if (!speciesId || !animal || lengthCm === null || lengthCm <= 0 || score === null || score < 0
+      || reward === undefined || (r.teacher !== undefined && typeof r.teacher !== 'boolean') || (r.teacher === true && reward !== 0)) return [];
+    seen.add(r.rarity);
+    return [{ rarity: r.rarity, speciesId, animal, lengthCm, score, reward, ...(typeof r.teacher === 'boolean' ? { teacher: r.teacher } : {}) }];
+  });
+}
+
 export function parseCastFinish(raw: unknown): CastFinish {
   if (!isObj(raw) || raw.ok !== true) return { ok: false };
   if (raw.landed !== true) return { ok: true, landed: false };
+  const points = parseGamePoints(raw.points);
   const speciesId = str(raw.speciesId), lengthCm = num(raw.lengthCm), remaining = num(raw.remaining);
   if (raw.junk != null) {
     if (!oneOf(JUNK_IDS, raw.junk)) return { ok: false };
     const xpGain = parseXpGain(raw.xpGain);
-    return { ok: true, landed: true, junk: raw.junk, remaining: remaining == null ? 0 : Math.max(-1, Math.floor(remaining)), ...(xpGain ? { xpGain } : {}) };
+    return { ok: true, landed: true, junk: raw.junk, ...(points ? { points } : {}), remaining: remaining == null ? 0 : Math.max(-1, Math.floor(remaining)), ...(xpGain ? { xpGain } : {}) };
   }
   if (!speciesId || lengthCm == null || !oneOf(RARITIES, raw.rarity)) return { ok: false };
   const xpGain = parseXpGain(raw.xpGain);
   const percentile = num(raw.percentile);
   return {
     ok: true, landed: true, speciesId, lengthCm, rarity: raw.rarity,
+    ...(points ? { points } : {}),
     ...(xpGain ? { xpGain } : {}),
     ...(percentile != null && percentile >= 0 && percentile <= 100 ? { percentile } : {}),
     isNew: raw.isNew === true, isBig: raw.isBig === true, isPersonalBest: raw.isPersonalBest === true,
@@ -218,7 +241,8 @@ export function parseClassFishBoard(raw: unknown): ClassFishBoard {
     return speciesId && lengthCm != null ? [{ speciesId, lengthCm, animal: str(r.animal) ?? '🐾', caughtAt: str(r.caughtAt) ?? '', ...(r.teacher === true ? { teacher: true } : {}) }] : [];
   }).slice(0, 10);
   const classSpecies = isObj(raw) ? num(raw.classSpecies) : null;
-  return { rows, classSpecies: classSpecies == null ? new Set(rows.map(r => r.speciesId)).size : Math.max(0, Math.floor(classSpecies)) };
+  const champions = isObj(raw) ? parseChampions(raw.champions) : undefined;
+  return { ...(champions ? { champions } : {}), rows, classSpecies: classSpecies == null ? new Set(rows.map(r => r.speciesId)).size : Math.max(0, Math.floor(classSpecies)) };
 }
 
 async function callRpc(client: FishingRpcClient, fn: string, args?: Record<string, unknown>): Promise<unknown> {

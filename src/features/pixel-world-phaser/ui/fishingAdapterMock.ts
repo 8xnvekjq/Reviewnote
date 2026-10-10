@@ -1,3 +1,4 @@
+import { FISH_POINTS, JUNK_POINTS, FISH_TIER_REWARDS, GAME_POINT_DAILY_CAP, sizeScore } from '../logic/gamePoints';
 import type { WorldOverride } from '../logic/worldClock';
 import { BAIT_CHARGES, BAIT_PRICE, FISH_XP, TROPHY_XP, MAX_LEVEL, levelForXp, levelBaitDifficulty, hardFishChance, nonnegativeInteger } from '../logic/levels';
 import type { PlayerLevel } from '../logic/levels';
@@ -20,6 +21,8 @@ export interface MockFishingOptions {
   xp?: number;
   baitCharges?: number;
   balance?: number;
+  todayEarned?: number;
+  pointCarry?: 0 | 1;
   /** 시계(ms). 기본값은 Date.now. */
   now?: () => number;
   override?: FishingOverride | null;
@@ -140,12 +143,30 @@ const DEFAULT_CLASSMATES: ClassFishBoard['rows'] = [
 ];
 
 export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFishingAdapter {
+  const now = opts.now ?? (() => Date.now());
   let xp = nonnegativeInteger(opts.xp) ?? 0;
   let charges = nonnegativeInteger(opts.baitCharges) ?? 0;
+  let pointDay = kstParts(now()).kstDate;
+  let earned = nonnegativeInteger(opts.todayEarned) ?? 0, carry = opts.pointCarry ?? 0;
+  const award = (points: number, kind: 'normal' | 'full' | 'junk') => {
+    const day = kstParts(now()).kstDate;
+    if (day !== pointDay) { pointDay = day; earned = 0; carry = 0; }
+    let awarded = 0;
+    if (kind === 'full') awarded = points;
+    else {
+      const full = Math.max(0, Math.min(points, GAME_POINT_DAILY_CAP - earned));
+      awarded = full;
+      if (kind === 'normal') {
+        const half = carry + points - full;
+        awarded += Math.floor(half / 2); carry = half % 2 as 0 | 1;
+      }
+    }
+    earned += awarded; balance += awarded;
+    return { awarded, todayEarned: earned, cap: GAME_POINT_DAILY_CAP, capped: earned >= GAME_POINT_DAILY_CAP };
+  };
   let balance = nonnegativeInteger(opts.balance) ?? 1000;
   const playerLevel = (): PlayerLevel => { const l = levelForXp(xp); return { xp, level: l.level, xpIntoLevel: l.xpIntoLevel, xpForNext: l.xpForNext, maxLevel: MAX_LEVEL }; };
   const rand = mulberry32(opts.seed ?? 20261008);
-  const now = opts.now ?? (() => Date.now());
   const catches: MockCatch[] = (opts.catches ?? []).map(c => ({ ...c }));
   const junkCounts: Record<JunkId, number> = { junk_shoe: 0, junk_can: 0, junk_coin: 0 };
   const classmates = opts.classmates ?? DEFAULT_CLASSMATES;
@@ -260,7 +281,7 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
         junkCounts[cast.junk]++;
         const oldLevel = levelForXp(xp).level;
         xp++;
-        return delay({ ok: true, landed: true, junk: cast.junk, remaining: -1, xpGain: { gained: 1, xp, level: levelForXp(xp).level, leveledUp: levelForXp(xp).level > oldLevel } });
+        return delay({ ok: true, landed: true, junk: cast.junk, points: award(JUNK_POINTS[cast.junk], 'junk'), remaining: -1, xpGain: { gained: 1, xp, level: levelForXp(xp).level, leveledUp: levelForXp(xp).level > oldLevel } });
       }
       let spotUpdate: { id: number; left: number; readyAt: string | null } | undefined;
       if (cast.spot?.bonus) {
@@ -280,7 +301,7 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
       const population = [...catches, ...classmates].filter(c => c.speciesId === cast.fish.id);
       const percentile = Math.round(1000 * population.filter(c => c.lengthCm >= cast.lengthCm).length / population.length) / 10;
       return delay({
-        ok: true, landed: true, percentile, speciesId: cast.fish.id, lengthCm: cast.lengthCm, rarity: cast.fish.rarity,
+        ok: true, landed: true, points: award(FISH_POINTS[cast.fish.rarity], ['legendary', 'mythic'].includes(cast.fish.rarity) ? 'full' : 'normal'), percentile, speciesId: cast.fish.id, lengthCm: cast.lengthCm, rarity: cast.fish.rarity,
         isNew, isBig: isBigCatch(cast.fish, cast.lengthCm), isPersonalBest, remaining: -1, xpGain,
         ...(spotUpdate ? { spot: spotUpdate } : {}),
       });
@@ -293,7 +314,18 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
         if (!prev || row.lengthCm > prev.lengthCm) best.set(row.speciesId, row);
       }
       const rows = [...best.values()].filter(r => fishById(r.speciesId)).sort((a, b) => b.lengthCm - a.lengthCm).slice(0, 10);
-      return delay({ rows, classSpecies: new Set([...classmates, ...mine].map(r => r.speciesId)).size });
+      const kst = new Date(now() + 9 * 3600000);
+      const week = Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate() - (kst.getUTCDay() + 6) % 7) - 9 * 3600000;
+      const champions = (['mythic','legendary','rare','uncommon','common'] as const).flatMap(rarity => {
+        const candidates = [...classmates, ...mine.map(r => ({ ...r, teacher: opts.isAdmin === true }))]
+          .filter(r => fishById(r.speciesId)?.rarity === rarity && Date.parse(r.caughtAt) >= week && Date.parse(r.caughtAt) < week + 7 * 86400000)
+          .sort((a,b) => Number(a.teacher === true) - Number(b.teacher === true)
+            || (b.lengthCm-fishById(b.speciesId)!.minCm)/(fishById(b.speciesId)!.maxCm-fishById(b.speciesId)!.minCm) - (a.lengthCm-fishById(a.speciesId)!.minCm)/(fishById(a.speciesId)!.maxCm-fishById(a.speciesId)!.minCm)
+            || Date.parse(a.caughtAt) - Date.parse(b.caughtAt));
+        const r = candidates[0], fish = r && fishById(r.speciesId);
+        return r && fish ? [{ rarity, speciesId: r.speciesId, lengthCm: r.lengthCm, score: sizeScore(r.lengthCm, fish.minCm, fish.maxCm), animal: r.animal, teacher: r.teacher === true, reward: r.teacher ? 0 : FISH_TIER_REWARDS[rarity] }] : [];
+      });
+      return delay({ rows, champions, classSpecies: new Set([...classmates, ...mine].map(r => r.speciesId)).size });
     },
   };
 }
