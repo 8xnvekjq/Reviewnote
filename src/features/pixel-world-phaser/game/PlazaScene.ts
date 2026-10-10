@@ -136,14 +136,15 @@ export class PlazaScene extends WorldScene {
   update(time: number, delta: number) {
     super.update(time, delta);
     const spots = new Map<string, { x: number; y: number }>([[this.selfId, this.feet]]);
+    const faces = new Map<string, string>([[this.selfId, this.ctx.face ?? '🐶']]);
     for (const [id, f] of this.friends) {
       const p = f.state, feet = { x: (p.x + PLAZA_MARGIN + .5) * 16, y: (p.y + PLAZA_MARGIN + .5) * 16 };
-      spots.set(id, feet);
-      if (f.tag) { updateAnimalTag(f.tag, feet, peerAnimalFace(p), p.riding === true && p.pet === 'pet_bear'); f.tag.setVisible(!!f.sprite); }
+      spots.set(id, feet); faces.set(id, peerAnimalFace(p));
+      if (f.tag) { updateAnimalTag(f.tag, feet, peerAnimalFace(p), p.riding === true && p.pet === 'pet_bear'); }
       updatePeerCompanion(f, feet, time, delta, this.spec.solid);
     }
     this.spacePets(delta);
-    this.bubbles?.update(this.wantedBubbles, spots);
+    this.bubbles?.update(this.wantedBubbles, spots, faces);
   }
   snapshot() {
     return { ...super.snapshot(), classmates: [...this.friends].map(([id, f]) => ({ id, x: f.state.x, y: f.state.y, rendered: !!f.sprite, animalTag: animalTagSnapshot(f.tag), pet: !!f.pet, ...peerCompanionSnapshot(f) })),

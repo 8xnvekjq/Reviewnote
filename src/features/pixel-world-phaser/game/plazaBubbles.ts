@@ -4,12 +4,13 @@ import type Phaser from 'phaser';
 import { CLOUD_PAD_Y, cloudMask } from '../logic/cloudBubble';
 
 export interface PlazaBubble { text: string; stamp: number }
-type Shown = { stamp: number; text: string; box: Phaser.GameObjects.Container; height: number; fading: boolean };
+type Shown = { stamp: number; text: string; face: string; box: Phaser.GameObjects.Container; height: number; fading: boolean };
 
 const FONT = 'Pretendard, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif';
 const COLORS = ['', '#fff9ec', '#5b3926', '#ecdcc0'];
 /** 글 줄 너비 후보(월드 px). 짧은 말은 한 줄, 길면 두 줄까지 넓혀 본다. */
 const WRAPS = [72, 100, 128];
+const EMOJI_FONT = '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
 export const BUBBLE_FADE_MS = 1000;
 
 export class PlazaBubbles {
@@ -17,8 +18,8 @@ export class PlazaBubbles {
   private readonly scene: Phaser.Scene;
   constructor(scene: Phaser.Scene) { this.scene = scene; }
 
-  /** 매 프레임: 원하는 풍선 목록과 사람들 발 위치. */
-  update(wanted: Record<string, PlazaBubble>, spots: ReadonlyMap<string, { x: number; y: number }>) {
+  /** 매 프레임: 원하는 풍선 목록과 사람들 발 위치, 그리고 사람마다 동물 얼굴(풍선 위 가장자리에 붙는다). */
+  update(wanted: Record<string, PlazaBubble>, spots: ReadonlyMap<string, { x: number; y: number }>, faces: ReadonlyMap<string, string> = new Map()) {
     for (const [id, shown] of this.shown) {
       const want = wanted[id];
       if (!spots.has(id) || (want && (want.stamp !== shown.stamp || want.text !== shown.text))) { this.drop(id); continue; }
@@ -26,7 +27,7 @@ export class PlazaBubbles {
     }
     for (const [id, want] of Object.entries(wanted)) {
       if (!spots.has(id) || this.shown.has(id)) continue;
-      this.shown.set(id, this.make(want));
+      this.shown.set(id, this.make(want, faces.get(id) ?? ''));
     }
     for (const [id, shown] of this.shown) {
       const spot = spots.get(id)!;
@@ -37,7 +38,7 @@ export class PlazaBubbles {
   /** 장면이 내려갈 때: 그림과 tween은 장면이 함께 지우므로 기억만 비운다. */
   clear() { this.shown.clear(); }
   /** 테스트용: 지금 머리 위에 떠 있는 글과 투명도. */
-  snapshot() { return [...this.shown].map(([id, s]) => ({ id, text: s.text, alpha: Math.round(s.box.alpha * 100) / 100 })); }
+  snapshot() { return [...this.shown].map(([id, s]) => ({ id, text: s.text, face: s.face, alpha: Math.round(s.box.alpha * 100) / 100 })); }
 
   private drop(id: string) {
     const shown = this.shown.get(id);
@@ -50,7 +51,7 @@ export class PlazaBubbles {
     shown.fading = true;
     this.scene.tweens.add({ targets: shown.box, alpha: 0, duration: BUBBLE_FADE_MS, ease: 'Sine.easeIn', onComplete: () => { if (this.shown.get(id) === shown) this.drop(id); } });
   }
-  private make(want: PlazaBubble): Shown {
+  private make(want: PlazaBubble, face: string): Shown {
     const label = this.scene.add.text(0, 0, want.text, {
       fontSize: '7px', fontFamily: FONT, fontStyle: 'bold', color: '#4f3a28', align: 'center', resolution: 6,
       wordWrap: { width: WRAPS[0], useAdvancedWrap: true },
@@ -67,8 +68,11 @@ export class PlazaBubbles {
     const mask = cloudMask(textW, textH);
     const image = this.scene.add.image(0, 0, key).setOrigin(0);
     label.setOrigin(.5, 0).setPosition(Math.round(mask.width / 2), CLOUD_PAD_Y - 1);
-    const box = this.scene.add.container(0, 0, [image, label]).setDepth(100001).setSize(mask.width, mask.height);
-    return { stamp: want.stamp, text: want.text, box, height: mask.height, fading: false };
+    // 얼굴은 풍선 윗선 가운데에 반쯤 걸쳐 얹는다 — 풍선 크기·글 자리는 그대로(글 영역이 줄지 않게).
+    const parts: Phaser.GameObjects.GameObject[] = [image, label];
+    if (face) parts.push(this.scene.add.text(Math.round(mask.width / 2), 0, face, { fontFamily: EMOJI_FONT, fontSize: '9px', resolution: 8 }).setOrigin(.5, .5));
+    const box = this.scene.add.container(0, 0, parts).setDepth(100001).setSize(mask.width, mask.height);
+    return { stamp: want.stamp, text: want.text, face, box, height: mask.height, fading: false };
   }
 }
 

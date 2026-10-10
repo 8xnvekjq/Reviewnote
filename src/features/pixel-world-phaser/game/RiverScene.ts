@@ -169,7 +169,7 @@ export class RiverScene extends WorldScene {
         this.castShadow(pending.index);
       }
     }
-    this.peers.current?.update(time, this.feet, delta);
+    this.peers.current?.update(time, this.feet, delta, this.ctx.face ?? '🐶');
     this.spacePets(delta);
     const clock = this.worldClock(), tint = worldTint(clock.phase, clock.weather);
     const frame = Math.floor(time / 650) % 3;

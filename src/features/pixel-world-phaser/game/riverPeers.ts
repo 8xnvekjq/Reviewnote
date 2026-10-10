@@ -60,13 +60,14 @@ export class RiverPeers {
   /** 친구(와 나)의 낚시 상태. 내 낚싯줄은 장면의 fishingFx가 그리므로 여기선 나의 반짝임만 쓴다. */
   setFishing(fishing: Record<string, RiverPeerFishing>) { this.fishing = fishing; }
 
-  update(time: number, selfFeet: Point, deltaMs: number) {
+  update(time: number, selfFeet: Point, deltaMs: number, selfFace = '') {
     const now = Date.now();
     const spots = new Map<string, Point>([[this.selfId, selfFeet]]);
+    const faces = new Map<string, string>([[this.selfId, selfFace]]);
     for (const [id, f] of this.friends) {
       const p = f.state, feet = riverFeet({ x: p.x, y: p.y });
-      spots.set(id, feet);
-      if (f.tag) { updateAnimalTag(f.tag, feet, peerAnimalFace(p), p.riding === true && p.pet === 'pet_bear'); f.tag.setVisible(!!f.sprite); }
+      spots.set(id, feet); faces.set(id, peerAnimalFace(p));
+      if (f.tag) { updateAnimalTag(f.tag, feet, peerAnimalFace(p), p.riding === true && p.pet === 'pet_bear'); }
       updatePeerCompanion(f, feet, time, deltaMs, this.solid);
       this.drawLine(f, feet, this.fishing[id], now, time);
     }
@@ -78,7 +79,7 @@ export class RiverPeers {
       const spot = spots.get(id);
       if (!spot || now - s.at >= SPARKLE_MS || this.fishing[id]?.sparkleAt !== s.at) { s.g.destroy(); this.sparkles.delete(id); }
     }
-    this.bubbles.update(this.wantedBubbles, spots);
+    this.bubbles.update(this.wantedBubbles, spots, faces);
   }
 
   /** 장면이 내려갈 때: 그림은 장면이 함께 지우므로 기억만 비운다. */

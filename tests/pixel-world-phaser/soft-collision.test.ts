@@ -119,3 +119,10 @@ for (const gate of [{ frozen: true }, { fishing: true }, { indoor: true }, { tra
     assert.deepEqual(stepPetSpacing(from, [from], [from], 50, open, gate), from);
   });
 }
+
+test('같은 점에 완전히 겹쳐 시작해도 어느 방향으로든 바로 걸어 나갈 수 있다', () => {
+  for (const velocity of [{ x: 56, y: 0 }, { x: 0, y: -56 }, { x: -40, y: 40 }]) {
+    const step = stepSoftCollision({ x: 100, y: 100 }, velocity, [{ id: 'b', x: 100, y: 100 }], createCollisionState(), 16);
+    assert.ok(Math.hypot(step.delta.x, step.delta.y) > 0.8, 'not frozen in place');
+  }
+});
