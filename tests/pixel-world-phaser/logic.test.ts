@@ -93,7 +93,7 @@ test('avatar texture key: same look → same key; defaults fold together; any ch
   assert.equal(keys.size, expected, 'every sold item / base option gets its own texture');
 });
 test('every sold avatar item resolves to a real atlas row or a fashion vector, in AvatarSprite layer order', () => {
-  const heights = { body: 160, eyes: 128, bottoms: 448, shoes: 320, tops: 928, hair: 928 } as const;
+  const heights = { body: 192, eyes: 128, bottoms: 448, shoes: 320, tops: 928, hair: 960 } as const;
   for (const item of PIXEL_CATALOG.filter(entry => entry.category === 'avatar')) {
     const plan = avatarLayerPlan({ ...BASE, [item.slot]: item.assetKey });
     assert.deepEqual(plan.map(step => step.layer), ['body', 'eyes', 'bottoms', 'shoes', 'tops', 'hair']);

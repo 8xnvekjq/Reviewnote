@@ -3,6 +3,7 @@
 // 여기서 한 번에 처리한다. 하위 장면은 drawWorld()로 그림만 그린다(어디가 막혔는지·출구·입구는
 // logic/scenes.ts의 장면 정의가 정한다). 입력은 공유 객체(ControlState)를 매 프레임 읽기만 한다.
 import Phaser from 'phaser';
+import { createAnimalTag, updateAnimalTag, animalTagSnapshot } from './animalTag';
 import { rideState, rideInScene, rideSpeed, riderOffset, rideRow } from '../logic/bearRide';
 import { WorldTint } from './worldTint';
 import { fallbackWorldTime, SERVER_TIME_TRUST_MS } from '../logic/worldTint';
@@ -71,6 +72,7 @@ export interface WorldEvents {
 }
 /** 장면들이 함께 쓰는 것(장면이 바뀌어도 그대로): 그림, 입력, 셸 연결, 서버 데이터, 화면 비율. */
 export interface WorldContext {
+  face?: string;
   riding: boolean;
   /** 서버가 마지막으로 알려 준 낚시 세계 시각(at = 받은 시각, Date.now 기준). */
   worldTime?: { phase: FishPhase; weather: FishWeather; at: number };
@@ -87,6 +89,7 @@ export interface WorldContext {
   onSceneGone(scene: WorldScene): void;
 }
 export interface WorldDebug {
+  animalTag?: ReturnType<typeof animalTagSnapshot>;
   riding: boolean; mountAnimation: string | null; riderOffset: Point | null;
   worldTint?: ReturnType<WorldTint['debug']>;
   placing: boolean; playerAlpha: number; petAlpha: number | null; bangVisible: boolean;
@@ -118,6 +121,7 @@ export abstract class WorldScene extends Phaser.Scene {
     return known && Date.now() - known.at < SERVER_TIME_TRUST_MS ? known : fallbackWorldTime(Date.now(), this.ctx.clockOverride);
   }
   protected spec!: SceneSpec;
+  private animalTag!: Phaser.GameObjects.Text;
   protected player!: Phaser.GameObjects.Sprite;
   private shadow!: Phaser.GameObjects.Ellipse;
   private placing = false;
@@ -180,6 +184,7 @@ export abstract class WorldScene extends Phaser.Scene {
     this.drawWorld();
 
     this.shadow = this.add.ellipse(this.feet.x, this.feet.y, 14, 5, 0x453d29, 0.22);
+    this.animalTag = createAnimalTag(this);
     this.player = this.add.sprite(this.feet.x, this.feet.y, this.ctx.assets.avatar.key, 0).setOrigin(0.5, 31 / 32);
     this.playAvatar(false, 1);
     if (this.ctx.assets.pet) this.addPet(this.ctx.assets.pet.id);
@@ -414,6 +419,7 @@ export abstract class WorldScene extends Phaser.Scene {
       if (this.dustDistance >= DUST_STEP) { this.dustDistance = 0; this.kickDust(vx, vy); }
     } else this.dustDistance = DUST_STEP * 0.7;
     if (this.moving || wasMoving || this.animKey === '') this.playAvatar(this.moving, Math.max(0.6, speedScale));
+    updateAnimalTag(this.animalTag, this.feet, this.ctx.face ?? '🐶', this.ctx.riding);
     this.player.setPosition(Math.round(this.feet.x), Math.round(this.feet.y)).setDepth(this.feet.y);
     this.shadow.setPosition(Math.round(this.feet.x), Math.round(this.feet.y)).setDepth(this.feet.y - 0.5);
     this.updatePet(deltaMs);
@@ -692,7 +698,7 @@ export abstract class WorldScene extends Phaser.Scene {
     return {
       riding: this.ctx.riding, mountAnimation: this.ctx.riding ? this.pet?.anims.currentAnim?.key ?? null : null, riderOffset: this.ctx.riding ? riderOffset(this.facing) : null,
       worldTint: this.outdoorTint?.debug(),
-      avatarKey: this.player.texture.key, petId: this.pet ? this.ctx.assets.pet?.id ?? null : null,
+      animalTag: animalTagSnapshot(this.animalTag), avatarKey: this.player.texture.key, petId: this.pet ? this.ctx.assets.pet?.id ?? null : null,
       dust: this.dust.size,
       petReaction: this.reaction?.kind ?? null, petFrame: this.pet ? Number(this.pet.frame.name) : null, petFlipX: this.pet?.flipX ?? false,
       scene: this.spec.id, transitioning: this.transitioning,

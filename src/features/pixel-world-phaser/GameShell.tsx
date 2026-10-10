@@ -1,3 +1,4 @@
+import { userAnimalFace } from '../../utils/animalFace';
 import { useWorldClock } from './ui/useWorldClock';
 import { WorldWeatherPanel } from './ui/WorldWeatherPanel';
 // 새 Pixel World(베타) 전체 화면 셸. 게임 캔버스가 화면 전체를 채우고, 모든 UI(포인트, 나가기, 전체화면,
@@ -50,6 +51,7 @@ import { LevelPanel } from './ui/LevelPanel';
 type ShellPanel = 'weather' | 'level' | PanelKind | PlazaPanel | ActivityPanel | 'furniture';
 
 export interface GameShellProps {
+  face?: string;
   isAdmin?: boolean;
   panels?: PanelAdapter;
   fishingAdapter?: FishingAdapter;
@@ -117,7 +119,7 @@ async function leaveFullscreen() {
 }
 
 // 상위가 1초마다(밭 시계) 다시 그려져도, 넘겨받는 값이 같으면 셸은 다시 그리지 않는다.
-export const GameShell = memo(function GameShell({ isAdmin = false, appearance, pet, balance, beds, furniture, onSaveFurniture, onSceneChange, scarecrowLine, onExit, panels, farmAdapter, fishingAdapter, newFishSpeciesId, clockOverride, userId = 'guest' }: GameShellProps) {
+export const GameShell = memo(function GameShell({ isAdmin = false, appearance, pet, balance, beds, furniture, onSaveFurniture, onSceneChange, scarecrowLine, onExit, panels, farmAdapter, fishingAdapter, newFishSpeciesId, clockOverride, userId = 'guest', face }: GameShellProps) {
   useLayoutEffect(() => {
     let viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
     const created = !viewport;
@@ -139,6 +141,8 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
       else viewport.setAttribute('content', original);
     };
   }, []);
+  const animalFace = userAnimalFace(userId, face);
+  const faceRef = useRef(animalFace); faceRef.current = animalFace;
   const root = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const probe = useRef<HTMLDivElement>(null);
@@ -153,6 +157,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
   const [layout, setLayout] = useState<GameLayout>(() => gameLayout(window.innerWidth, window.innerHeight));
   const layoutRef = useRef(layout); layoutRef.current = layout;
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  useEffect(() => { if (status === 'ready') handle.current?.setAnimalFace(animalFace); }, [animalFace, status]);
   const [riding, setRiding] = useState(false);
   const [petMessage, setPetMessage] = useState('');
   useEffect(() => { if (!petMessage) return; const timer = window.setTimeout(() => setPetMessage(''), 4500); return () => clearTimeout(timer); }, [petMessage]);
@@ -305,7 +310,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
         if (cancelled || !stage.current) return;
         const game = await startWorldGame(stage.current, {
           assets: { bearRide, town, interior, floors, furniture: furnitureSheets, avatar: { key: avatar.key, canvas: avatarCanvas }, pet: pet && petSource ? { id: pet, source: petSource } : null, scarecrow, plazaStall },
-          beds: bedImages, furniture: furnitureRef.current, clockOverride,
+          beds: bedImages, furniture: furnitureRef.current, clockOverride, face: faceRef.current,
         }, controls, {
           onShadowTap: (index: number) => { void fishingRef.current.onShadowTap(index); },
           onPrompt: next => setPrompt(next),
@@ -669,8 +674,8 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     </div></div>}
     {(panel === 'shop' || panel === 'wardrobe') && panels && <GamePanels kind={panel} adapter={panels} onClose={closePanel} />}
     {(panel === 'turtle' || panel === 'fishboard') && <FishingPanels key={panel} kind={panel} adapter={fishingAdapter} shop={panels} newSpeciesId={newFishSpeciesId ?? freshSpecies} onClose={() => { if (panel === 'turtle') setFreshSpecies(null); closePanel(); }} />}
-    {scene?.id === 'river' && status === 'ready' && <RiverBridge key={'river:' + scene.visit} handle={handle} appearance={appearance} pet={pet} riding={riding} panel={panel} reporter={riverReporter} />}
-    {scene?.id === 'plaza' && status === 'ready' && <PlazaBridge key={'plaza:' + scene.visit} handle={handle} appearance={appearance} pet={pet} riding={riding} userId={userId} panel={panel} onClose={closePanel} />}
+    {scene?.id === 'river' && status === 'ready' && <RiverBridge key={'river:' + scene.visit} handle={handle} appearance={appearance} face={animalFace} pet={pet} riding={riding} panel={panel} reporter={riverReporter} />}
+    {scene?.id === 'plaza' && status === 'ready' && <PlazaBridge key={'plaza:' + scene.visit} handle={handle} appearance={appearance} face={animalFace} pet={pet} riding={riding} userId={userId} panel={panel} onClose={closePanel} />}
     {panel && panel !== 'weather' && panel !== 'level' && panel !== 'turtle' && panel !== 'fishboard' && panel !== 'furniture' && panel !== 'shop' && panel !== 'wardrobe' && panel !== 'contest' && panel !== 'well' && panel !== 'bench' && <FarmPanels key={panel} petId={pet} riding={riding} onRide={() => { closePanel(); handle.current?.toggleRide(); }} kind={panel} adapter={farmAdapter} onClose={closePanel}
       onXp={level.onXp} onCollection={() => openPanel('collection')} onTalk={() => { closePanel(); openDialogue('scarecrow'); }}
       onPet={kind => { closePanel(); handle.current?.reactPet(kind); }} onFx={(index, action) => handle.current?.farmFx(index, action)} />}

@@ -97,7 +97,8 @@ export function GamePanels({ kind, adapter: { shop, pet }, onClose, top }: { kin
     ? <PanelArt appearance={{ ...shop.equipped, [item.slot]: item.assetKey }} />
     : item.category === 'rod' ? <RodIcon rod={{ id: item.itemId, tier: item.tier }} /> : item.category === 'pet' ? <PanelArt pet={item.itemId} /> : <PanelArt furniture={item.assetKey as FurnitureType} />;
   const stock = shop.catalog.filter(item => kind === 'tackle' ? item.category === 'rod' : kind === 'shop' ? item.category !== 'rod' && item.category !== 'bait' : item.category !== 'bait');
-  const entries = panelItems(stock, selling ? category : slot, kind === 'wardrobe' ? shop.ownedIds : undefined);
+  const wardrobeOwned = new Set([...shop.ownedIds, 'hair_bald']);
+  const entries = panelItems(stock, selling ? category : slot, kind === 'wardrobe' ? wardrobeOwned : undefined);
   const tabOptions: readonly (readonly [string, string])[] = kind === 'tackle' ? [['all', '전체'], ['rod', '낚싯대'], ['bait', '미끼']]
     : kind === 'shop' ? [['all', '전체'], ...AVATAR_SLOTS.map(key => [key, SLOT_LABELS[key]] as const), ['furniture', '가구'], ['pet', '펫']]
     : [...AVATAR_SLOTS.map(key => [key, SLOT_LABELS[key]] as const), ['base', '기본 외형'], ['pet', '펫'], ['rod', '낚싯대']];
@@ -122,7 +123,7 @@ export function GamePanels({ kind, adapter: { shop, pet }, onClose, top }: { kin
         </article>}
         {kind === 'wardrobe' && <button className="pwp-item" disabled={busy || (slot === 'pet' && (!pet.ready || pet.error))} aria-pressed={slot === 'rod' ? shop.equippedRod === null : slot === 'pet' ? pet.active === null : shop.equipped[slot as PixelAvatarSlot] === null} onClick={() => slot === 'rod' ? void act(async () => await shop.equipRod(null) ? '기본 낚싯대로 바꿨어요.' : '장착하지 못했어요.') : slot === 'pet' ? void changePet(null) : void act(async () => await shop.equip(slot as PixelAvatarSlot, null) ? '기본 모습으로 바꿨어요.' : '장착하지 못했어요.')}>{slot === 'rod' && <RodIcon />}<strong>{slot === 'rod' ? '기본 낚싯대' : slot === 'pet' ? '친구 쉬게 하기' : `기본 ${SLOT_LABELS[slot as PixelAvatarSlot]}`}</strong></button>}
         {entries.map(item => {
-          const state = itemState(item, shop.ownedIds, shop.equipped, pet.active, shop.equippedRod);
+          const state = itemState(item, wardrobeOwned, shop.equipped, pet.active, shop.equippedRod);
           const short = pointsShort(item.price, shop.balance);
           const disabled = busy || (item.category === 'pet' && (!pet.ready || pet.error));
           return <article className="pwp-item" key={item.itemId} data-item={item.itemId} data-state={state}>

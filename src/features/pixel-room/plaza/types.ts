@@ -13,6 +13,7 @@ export type PlazaDirection = 'Front' | 'Back' | 'Left' | 'Right';
 // 역추적할 수 없어야 한다(랜덤 값, user_id 아님).
 export interface PlazaPlayerState {
   /** 베타 연속 좌표. 없는 경우 기존 칸 좌표(v1)로 해석한다. */
+  face?: string;
   version?: 2;
   position?: { x: number; y: number };
   pet?: import('../pet/petKinds').PetId | null;

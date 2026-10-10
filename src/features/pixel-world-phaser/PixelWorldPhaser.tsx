@@ -19,6 +19,7 @@ import { supabase } from '../../services/supabase';
 import { createFishingAdapter } from './ui/fishingAdapter';
 import { parseClockOverride } from './logic/worldClock';
 import type { FishingOverride } from './ui/fishingAdapter';
+import { userAnimalFace } from '../../utils/animalFace';
 import { GameShell } from './GameShell';
 import type { BedLook } from './game/sceneAssets';
 import './gameShell.css';
@@ -41,6 +42,13 @@ export default function PixelWorldPhaser({ userId, pointsBalance, onExit, onPixe
   // 관리자(선생님)만 ?pwClock=HH:MM / ?pwWeather= 로 시간·날씨를 바꿔 볼 수 있다. 서버도 한 번 더 확인한다.
   const clockOverride = useMemo(() => fishingOverride(location.search, isAdmin), [isAdmin]);
   const fishingAdapter = useMemo(() => createFishingAdapter(supabase, clockOverride), [clockOverride, userId]);
+  const [face, setFace] = useState(() => userAnimalFace(userId));
+  useEffect(() => {
+    let cancelled = false;
+    setFace(userAnimalFace(userId));
+    void Promise.resolve(supabase.rpc('get_my_animal_face')).then(({ data }) => { if (!cancelled) setFace(userAnimalFace(userId, data)); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [userId]);
   const shop = usePixelShop(userId, pointsBalance, onPixelPurchase);
   const pet = usePet(userId);
   const farm = useFarm();
@@ -81,7 +89,7 @@ export default function PixelWorldPhaser({ userId, pointsBalance, onExit, onPixe
   if (!appearance || !pet.ready || !room.rows) return <div className="pwp-root pwp-loading" role="status">앞마당으로 가는 중…</div>;
   return <>{outdated && <div className="pwp-update" role="alert" style={UPDATE_STYLE}>새 버전이 나왔어요. 새로고침하면 다른 기기와 같은 화면이 돼요.
     <button type="button" onClick={() => location.reload()} style={{ marginLeft: 8, font: 'inherit', fontWeight: 800 }}>새로고침</button></div>}
-  <GameShell isAdmin={isAdmin} onSceneChange={onScene} fishingAdapter={fishingAdapter} clockOverride={clockOverride} userId={userId} appearance={appearance} pet={!pet.error && pet.active && shop.ownedIds.has(pet.active) ? pet.active : null} balance={shop.balance} beds={beds} furniture={furniture}
+  <GameShell face={face} isAdmin={isAdmin} onSceneChange={onScene} fishingAdapter={fishingAdapter} clockOverride={clockOverride} userId={userId} appearance={appearance} pet={!pet.error && pet.active && shop.ownedIds.has(pet.active) ? pet.active : null} balance={shop.balance} beds={beds} furniture={furniture}
     onSaveFurniture={saveFurniture} scarecrowLine={scarecrowLine} onExit={onExit} panels={{ shop, pet }} farmAdapter={{ farm, inventory, contest: fetchWeeklyCropContest, submit: async id => {
       const result = await submitFarmCrop(id);
       if (result.ok) { onPointsReward?.(result.rewardPoints); shop.reload(); }

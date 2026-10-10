@@ -46,7 +46,7 @@ export function usePixelShop(userId: string, initialBalance: number, onBalanceCh
     Promise.all([fetchOwnedPixelItemIds(userId), fetchEquippedAppearance(userId), fetchEquippedRod(userId)])
       .then(([ids, appearance, rod]) => {
         if (cancelled) return;
-        setOwnedIds(new Set(ids));
+        setOwnedIds(new Set([...ids, 'hair_bald']));
         setEquipped(appearance);
         setEquippedRod(rod);
         loadedUser.current = userId;

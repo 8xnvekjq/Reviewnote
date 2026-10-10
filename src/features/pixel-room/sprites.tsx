@@ -8,9 +8,9 @@ import { FASHION_PATHS } from './shop/fashionPaths';
 // 'skin'은 구매/소유 대상이 아닌 무료 기본 appearance라 PixelAvatarSlot(상점 카탈로그 슬롯)에는
 // 없지만, 렌더링 레이어로는 다른 슬롯과 완전히 동일하게 다룬다(행 선택 매커니즘 재사용).
 const layers: { key: keyof AvatarLayers; height: number; slot: AppearanceLayerKey | null }[] = [
-  { key: 'body', height: 160, slot: 'skin' }, { key: 'eyes', height: 128, slot: 'eyes' },
+  { key: 'body', height: 192, slot: 'skin' }, { key: 'eyes', height: 128, slot: 'eyes' },
   { key: 'bottoms', height: 448, slot: 'bottom' }, { key: 'shoes', height: 320, slot: 'shoes' },
-  { key: 'tops', height: 928, slot: 'top' }, { key: 'hair', height: 928, slot: 'hair' },
+  { key: 'tops', height: 928, slot: 'top' }, { key: 'hair', height: 960, slot: 'hair' },
 ];
 // Unset/unknown asset keys resolve to the original row 0; server equipment selects all other rows.
 function rowForSlot(slot: AppearanceLayerKey | null, assetKey: string | null): number {

@@ -16,7 +16,8 @@ export const AVATAR_ROW_BY_SLOT: Record<AppearanceLayerKey, Record<string, numbe
   bottom: { denim: 8, shorts_blue: 2, shorts_black: 4, pants_black: 10 },
   shoes: { low: 7 },
   hair: {
-    buns: 5, bob: 10, long: 15, swept: 20,
+    // 마지막 행은 완전히 투명하다. 몸 시트의 두피와 윤곽만 남기는 무료 기본 선택지.
+    bald: 29, buns: 5, bob: 10, long: 15, swept: 20,
     buns_blonde: 7, buns_black: 8, bob_blonde: 12, bob_black: 13,
     long_blonde: 17, long_black: 18, swept_blonde: 22, swept_black: 23,
     // rows 0-4: 상점에서 한 번도 판 적 없던 짧은 실루엣(볼륨/뎁 없는 단정한 숏컷). row 0(다크브라운)은
@@ -31,7 +32,7 @@ export const AVATAR_ROW_BY_SLOT: Record<AppearanceLayerKey, Record<string, numbe
     buzz: 25, buzz_blonde: 26, buzz_black: 27, buzz_brown: 28,
   },
   eyes: { navy: 0, sky: 1, olive: 2, brown: 3 },
-  skin: { tan: 0, sand: 1, wheat: 2, umber: 3, porcelain: 4 },
+  skin: { tan: 0, sand: 1, wheat: 2, umber: 3, porcelain: 4, deep: 5 },
 };
 export const AVATAR_SLOTS = ['hair', 'top', 'bottom', 'shoes'] as const;
 export const SLOT_LABELS: Record<PixelAvatarSlot, string> = { hair: '헤어', top: '상의', bottom: '하의', shoes: '신발', eyes: '눈' };
@@ -39,7 +40,7 @@ export const SLOT_LABELS: Record<PixelAvatarSlot, string> = { hair: '헤어', to
 // 무료 기본 appearance 선택지 — 상점 카드가 아니라 스와치(색상 견본)로 보여준다.
 export const SKIN_TONE_OPTIONS: { key: string; label: string }[] = [
   { key: 'tan', label: '기본' }, { key: 'sand', label: '살구빛' }, { key: 'wheat', label: '꿀빛' },
-  { key: 'umber', label: '초콜릿빛' }, { key: 'porcelain', label: '아이보리' },
+  { key: 'umber', label: '초콜릿빛' }, { key: 'porcelain', label: '아이보리' }, { key: 'deep', label: '진한 갈색' },
 ];
 export const EYE_COLOR_OPTIONS: { key: string; label: string }[] = [
   { key: 'navy', label: '네이비' }, { key: 'sky', label: '하늘색' }, { key: 'olive', label: '올리브' }, { key: 'brown', label: '브라운' },

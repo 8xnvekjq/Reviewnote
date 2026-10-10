@@ -6,10 +6,8 @@ import { getTitleBadgeStyle } from '../../../utils/gachaCatalog.ts';
 
 /** 서버 v_faces(20261005000000)와 같은 귀여운 동물 목록 — 앱은 성별·나이를 모르니 사람 얼굴은 쓰지 않는다.
  *  결합(ZWJ)·변형 선택자(FE0F) 이모지는 글꼴·터미널에 따라 두 글자로 갈라지거나 옆 글씨와 겹쳐 보여 단일 코드포인트만 쓴다. */
-export const PEER_ANIMAL_FACES = [
-  '🐶', '🐱', '🐰', '🦊', '🐼', '🐨', '🐯', '🦁', '🐻', '🐹', '🐧', '🐥', '🐸', '🐵', '🐷', '🐮', '🐙', '🦄',
-  '🐭', '🦔', '🦦', '🦥', '🐳', '🐬', '🦭', '🐢', '🦋', '🐝', '🐞', '🦉', '🦆', '🐤', '🐣',
-] as const;
+import { PEER_ANIMAL_FACES } from '../../../utils/animalFace.ts';
+export { PEER_ANIMAL_FACES } from '../../../utils/animalFace.ts';
 
 /** 구버전 서버 응답(character만 있음)용 대체 — 새 서버는 작성자 기준 얼굴(label.face)을 직접 준다. */
 const FACES: Record<string, string> = {

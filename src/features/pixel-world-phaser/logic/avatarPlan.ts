@@ -16,9 +16,9 @@ export const AVATAR_FRAMES_PER_POSE = 4;
 
 /** sprites.tsx의 layers 배열과 같은 순서·같은 시트 높이(행 범위 밖 행은 원본처럼 빈 칸으로 남는다). */
 export const AVATAR_LAYERS: readonly { key: AvatarLayerKey; height: number; slot: AppearanceLayerKey }[] = [
-  { key: 'body', height: 160, slot: 'skin' }, { key: 'eyes', height: 128, slot: 'eyes' },
+  { key: 'body', height: 192, slot: 'skin' }, { key: 'eyes', height: 128, slot: 'eyes' },
   { key: 'bottoms', height: 448, slot: 'bottom' }, { key: 'shoes', height: 320, slot: 'shoes' },
-  { key: 'tops', height: 928, slot: 'top' }, { key: 'hair', height: 928, slot: 'hair' },
+  { key: 'tops', height: 928, slot: 'top' }, { key: 'hair', height: 960, slot: 'hair' },
 ];
 
 export type LayerPlan =
