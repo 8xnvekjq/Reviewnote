@@ -25,11 +25,15 @@ export class RiverScene extends WorldScene {
   private waterStars: Phaser.GameObjects.Graphics | null = null;
   private lampGlow: Phaser.GameObjects.Graphics | null = null;
   private fx: FishingEffects | null = null;
+  private fishingCollision = false;
+  protected collisionFishing() { return this.fishingCollision; }
+  protected collisionObstacles() { return this.peers.current?.collisionObstacles() ?? []; }
+  protected collisionCompanions() { return this.peers.current?.collisionCompanions() ?? []; }
   /** 강가 친구들(실시간). 그리기는 riverPeers.ts가 맡는다. */
   readonly peers = { current: null as RiverPeers | null };
   constructor(ctx: WorldContext) { super('river', ctx); }
   preload() { preloadFishing(this); preloadFishingFx(this); }
-  init(data: { entry?: string } | undefined) { super.init(data); this.ready = false; this.shadows = []; this.water = []; this.pendingCast = null; this.waterFrame = -1; this.lampPhase = ''; }
+  init(data: { entry?: string } | undefined) { super.init(data); this.fishingCollision = false; this.ready = false; this.shadows = []; this.water = []; this.pendingCast = null; this.waterFrame = -1; this.lampPhase = ''; }
   protected drawWorld() {
     fishingFrames(this);
     const g = this.add.graphics().setDepth(-1000);
@@ -119,7 +123,7 @@ export class RiverScene extends WorldScene {
     });
   }
   /** useFishing이 매 프레임 넘겨주는 낚시 상태로 찌·줄·물보라를 그린다. */
-  fishingFx(game: FishingGame, index: number, now: number) { if (this.ready) this.fx?.update(game, index, now); }
+  fishingFx(game: FishingGame, index: number, now: number) { this.fishingCollision = ['casting', 'waiting', 'bite', 'reeling'].includes(game.phase); if (this.ready) this.fx?.update(game, index, now); }
   get castFrom(): Point { const d = facingDelta(this.facing); return { x: this.feet.x + d.x * 9, y: this.feet.y - 14 + d.y * 4 }; }
   shadowPoint(index: number): Point {
     const t = (this.time?.now ?? 0) / 1000;
@@ -166,6 +170,7 @@ export class RiverScene extends WorldScene {
       }
     }
     this.peers.current?.update(time, this.feet, delta);
+    this.spacePets(delta);
     const clock = this.worldClock(), tint = worldTint(clock.phase, clock.weather);
     const frame = Math.floor(time / 650) % 3;
     if (frame !== this.waterFrame) {
