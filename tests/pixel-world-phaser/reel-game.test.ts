@@ -23,7 +23,8 @@ test('상어·고래는 30개 시드에서 잡을 수 있고 일반 물고기보
   const normalTaps = normal.reduce((sum, g) => sum + g.tapCount, 0);
   console.log(`HEAVY wins=${wins.length}/30 taps=${heavyTaps} normalWins=${normal.filter(g => g.status === 'landed').length}/30 normalTaps=${normalTaps} ratio=${(heavyTaps / normalTaps).toFixed(2)}`);
   assert.ok(wins.length >= 18);
-  assert.ok(heavyTaps >= normalTaps * 1.8);
+  // 위로 15% 느려지고 좌우로도 헤엄쳐 덜 가혹해졌지만, 여전히 보통 물고기보다 탭이 많이 든다.
+  assert.ok(heavyTaps >= normalTaps * 1.3);
 });
 test('무거운 물고기는 위아래 목표를 번갈아 향하고 돌진과 당기는 힘이 강하다', () => {
   let g = createReelGame(5, false, false, 7, 1, undefined, false, 0, true);
@@ -33,7 +34,7 @@ test('무거운 물고기는 위아래 목표를 번갈아 향하고 돌진과 �
     const next = stepReelGame({ ...g, progress: .5 }, 1000 / 120);
     if (next.nextTarget !== g.nextTarget) {
       assert.ok(Math.abs(next.targetY) >= .75 && Math.abs(next.targetY) <= .9);
-      assert.ok(Math.abs(next.targetX) <= .15);
+      assert.ok(Math.abs(next.targetX) <= .65); // 좌우로도 보통 물고기처럼(2026-10)
       if (targets.length) assert.ok(next.targetY * targets.at(-1)! < 0);
       targets.push(next.targetY);
     }
@@ -212,4 +213,28 @@ test('난도가 높으면 더 빠르게 방향을 바꾸고 대물은 추가 돌
   assert.ok(hard.turns > easy.turns);
   assert.notEqual(motion(1, true).distance, easy.distance);
   assert.notEqual(motion(1, false, true).distance, easy.distance);
+});
+
+// 실력 좋은 학생: 화면을 0.1초 늦게 보고, 탭은 0.15초에 한 번까지.
+function skilledPlayer(seed: number, heavy: boolean) {
+  let g = createReelGame(5, false, false, seed, 1, undefined, false, 0, heavy), lastTap = -1000;
+  const seen: ReelGame[] = [];
+  for (let tick = 0; tick < 9000 && g.status === 'playing'; tick++) {
+    const time = (tick + 1) * 1000 / 120;
+    seen.push(g); const view = seen.length > 12 ? seen[seen.length - 12] : seen[0];
+    const tap = time - lastTap >= 150 && view.fish > view.zone;
+    if (tap) lastTap = time;
+    const x = Math.max(-1, Math.min(1, (view.fishX - view.zoneX) * 5 / 1.8));
+    g = stepReelGame(g, 1000 / 120, tap ? [time] : [], [{ time, x }]);
+  }
+  return g;
+}
+test('상어·고래는 실력 좋은 학생이면 대부분 낚지만 보통 난이도 5보다 어렵고 탭이 더 든다', () => {
+  const heavy = Array.from({ length: 40 }, (_, seed) => skilledPlayer(seed, true));
+  const normal = Array.from({ length: 40 }, (_, seed) => skilledPlayer(seed, false));
+  const win = (r: ReelGame[]) => r.filter(g => g.status === 'landed').length;
+  const rate = (r: ReelGame[]) => r.reduce((a, g) => a + g.tapCount, 0) / r.reduce((a, g) => a + g.elapsed, 0);
+  console.log(`SKILLED heavy ${win(heavy)}/40 normal ${win(normal)}/40 taps/s ${rate(heavy).toFixed(2)} vs ${rate(normal).toFixed(2)}`);
+  assert.ok(win(heavy) >= 24 && win(heavy) < win(normal), 'possible but harder');
+  assert.ok(rate(heavy) > rate(normal) * 1.15, 'more tapping');
 });
