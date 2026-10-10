@@ -1,6 +1,6 @@
-// 물고기 12종 — 서버 시드(supabase/migrations/supabase_pixel_fishing.sql)와 똑같아야 한다(단위 테스트가 대조).
+// 물고기 14종(2026-10-11 상어·고래 추가) — 서버 시드(supabase/migrations/supabase_pixel_fishing.sql)와 똑같아야 한다(단위 테스트가 대조).
 // 화면 표시용. 실제로 무엇이 잡힐지는 서버가 정한다.
-import type { FishPhase, FishRarity, FishShadow, FishWeather } from '../ui/fishingAdapter';
+import type { FishPhase, FishRarity, FishShadow, FishWeather, JunkId } from '../ui/fishingAdapter';
 export interface FishSpecies { id: string; name: string; rarity: FishRarity; phases: readonly FishPhase[] | 'any'; weather: readonly FishWeather[] | 'any'; minCm: number; maxCm: number; shadow: FishShadow }
 export const FISH_CATALOG: readonly FishSpecies[] = [
   { id: 'pirami', name: '피라미', rarity: 'common', phases: 'any', weather: 'any', minCm: 6, maxCm: 12, shadow: 'S' },
@@ -15,8 +15,17 @@ export const FISH_CATALOG: readonly FishSpecies[] = [
   { id: 'trout', name: '산천어', rarity: 'rare', phases: ['morning'], weather: ['clear'], minCm: 20, maxCm: 35, shadow: 'M' },
   { id: 'moonfish', name: '달빛 피라미', rarity: 'legendary', phases: ['night'], weather: ['clear'], minCm: 8, maxCm: 14, shadow: 'S' },
   { id: 'rainbow_koi', name: '무지개 잉어', rarity: 'legendary', phases: 'any', weather: ['rain'], minCm: 40, maxCm: 80, shadow: 'L' },
+  // 별 5개(mythic): 실제 크기, 릴에서 힘이 세다(위아래로 크게). 아이콘 시트 13·14번째 칸.
+  { id: 'shark', name: '상어', rarity: 'mythic', phases: ['evening', 'night'], weather: 'any', minCm: 120, maxCm: 400, shadow: 'L' },
+  { id: 'whale', name: '고래', rarity: 'mythic', phases: ['morning', 'day'], weather: ['clear', 'cloudy'], minCm: 500, maxCm: 1500, shadow: 'L' },
 ];
-export const RARITY_WEIGHT: Readonly<Record<FishRarity, number>> = { common: 60, uncommon: 28, rare: 10, legendary: 2 };
-export const RARITY_STARS: Readonly<Record<FishRarity, number>> = { common: 1, uncommon: 2, rare: 3, legendary: 4 };
+/** 잡동사니 — 물고기 대신 가끔 걸린다(던지기의 약 6%). 아이콘은 assets/fishing/junk-icons.png 순서. */
+export const JUNK_CATALOG: readonly { id: JunkId; name: string }[] = [
+  { id: 'junk_shoe', name: '헌 신발' },
+  { id: 'junk_can', name: '빈 깡통' },
+  { id: 'junk_coin', name: '녹슨 동전' },
+];
+export const RARITY_WEIGHT: Readonly<Record<FishRarity, number>> = { common: 60, uncommon: 28, rare: 10, legendary: 2, mythic: 0.5 };
+export const RARITY_STARS: Readonly<Record<FishRarity, number>> = { common: 1, uncommon: 2, rare: 3, legendary: 4, mythic: 5 };
 export const DAILY_CATCHES = 6;
 export const fishById = (id: string): FishSpecies | undefined => FISH_CATALOG.find(f => f.id === id);

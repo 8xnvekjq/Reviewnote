@@ -8,7 +8,10 @@ import { worldClockAt } from '../logic/worldClock';
 import { minReelMs } from '../logic/reelGame';
 export type FishPhase = 'morning' | 'day' | 'evening' | 'night';
 export type FishWeather = 'clear' | 'cloudy' | 'rain';
-export type FishRarity = 'common' | 'uncommon' | 'rare' | 'legendary';
+/** mythic = 별 5개(상어·고래). 2026-10-11 낚시 확장. */
+export type FishRarity = 'common' | 'uncommon' | 'rare' | 'legendary' | 'mythic';
+/** 잡동사니(물고기 대신 걸려 나오는 것). 도감·랭킹에는 들어가지 않는다. */
+export type JunkId = 'junk_shoe' | 'junk_can' | 'junk_coin';
 export type FishShadow = 'S' | 'M' | 'L';
 export type BitePattern = 'quick' | 'double' | 'long';
 export interface FishAlbumEntry { speciesId: string; count: number; bestCm: number; firstAt: string }
@@ -39,9 +42,16 @@ export const rodDifficulty = (base: number, difficultyDown: number, trophy = fal
 
 export interface FishingState { kstDate: string; phase: FishPhase; weather: FishWeather; remaining: number; sparkleShadow: number | null; pigeonHint: string | null; album: FishAlbumEntry[]; rod: FishingRod; level?: PlayerLevel; bait?: { charges: number } }
 /** rod·speed·trophy는 v4 서버부터 온다. 없으면 기본 낚싯대·속도 1·대물 아님으로 본다. */
-export type CastStart = { ok: true; castId: string; shadow: FishShadow; biteDelayMs: number; difficulty?: number; big?: boolean; pattern: BitePattern; hint: 'sparkle' | null; rod?: FishingRod; speed?: number; trophy?: boolean; bait?: { used: boolean; charges: number } } | { ok: false; reason: 'budget' | 'pending' | 'error' };
+export type CastStart = { ok: true; castId: string; shadow: FishShadow; biteDelayMs: number; difficulty?: number; big?: boolean; pattern: BitePattern; hint: 'sparkle' | null; rod?: FishingRod; speed?: number; trophy?: boolean; bait?: { used: boolean; charges: number };
+  /** 상어·고래처럼 힘이 센 물고기: 릴에서 위아래로 크게 움직인다(탭을 많이 해야 함). */
+  heavy?: boolean;
+  /** 잡동사니가 걸렸으면 그 종류(이때 릴은 아주 쉽다). */
+  junk?: JunkId } | { ok: false; reason: 'budget' | 'pending' | 'error' };
 export type EquipRodResult = { ok: true; rod: FishingRod } | { ok: false; reason: 'not_found' | 'not_owned' | 'error' };
-export type CastFinish = { ok: true; landed: true; speciesId: string; lengthCm: number; rarity: FishRarity; isNew: boolean; isBig: boolean; isPersonalBest: boolean; remaining: number; xpGain?: XpGain } | { ok: true; landed: false } | { ok: false };
+export type CastFinish = { ok: true; landed: true; speciesId: string; lengthCm: number; rarity: FishRarity; isNew: boolean; isBig: boolean; isPersonalBest: boolean; remaining: number; xpGain?: XpGain;
+  /** 이 종을 낚은 모든 기록 중 상위 몇 %인지(작을수록 큼, 0~100). */
+  percentile?: number }
+  | { ok: true; landed: true; junk: JunkId; remaining: number; xpGain?: XpGain } | { ok: true; landed: false } | { ok: false };
 export interface ClassFishBoard { rows: { speciesId: string; lengthCm: number; animal: string; caughtAt: string; teacher?: boolean }[]; classSpecies: number }
 export type BuyBaitResult = { ok: true; newBalance: number; charges: number } | { ok: false; reason: 'insufficient_balance' | 'error'; message?: string };
 export interface FishingAdapter { getWorldClock?(): Promise<ServerWorldClock | null>; adminSetWorldOverride?(weather: FishWeather | null, phase: FishPhase | null, hours: number): Promise<boolean>; buyBait?(): Promise<BuyBaitResult>; getLevel?(): Promise<PlayerLevel | null>; state(): Promise<FishingState>; start(pet: string | null): Promise<CastStart>; finish(castId: string, landed: boolean): Promise<CastFinish>; board(): Promise<ClassFishBoard>; /** 낚싯대 장착(null = 해제). 서버 RPC equip_pixel_rod. */ equipRod?(itemId: FishingRodId | null): Promise<EquipRodResult> }
@@ -57,7 +67,7 @@ export interface FishingRpcClient { rpc(fn: string, args?: Record<string, unknow
 const RPC_TIMEOUT_MS = 12_000;
 const PHASES: readonly FishPhase[] = ['morning', 'day', 'evening', 'night'];
 const WEATHERS: readonly FishWeather[] = ['clear', 'cloudy', 'rain'];
-const RARITIES: readonly FishRarity[] = ['common', 'uncommon', 'rare', 'legendary'];
+const RARITIES: readonly FishRarity[] = ['common', 'uncommon', 'rare', 'legendary', 'mythic'];
 const SHADOWS: readonly FishShadow[] = ['S', 'M', 'L'];
 const PATTERNS: readonly BitePattern[] = ['quick', 'double', 'long'];
 
