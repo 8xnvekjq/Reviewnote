@@ -21,6 +21,10 @@ export const reelSpeed = (speed = 1) => Number.isFinite(speed) && speed > 0 ? sp
 export const minReelMs = (difficulty: number, speed = 1) => (1500 + (clamp(difficulty, 1, 5) - 1) * 375) / reelSpeed(speed);
 // 서버 최소 릴 시간에 통신 여유를 더한다.
 export const REEL_MARGIN_MS = 150;
+/** 상어·고래 릴 설정: 위로 헤엄칠 때 속도 배율(0.85 = 15% 느리게), 내 원을 끌어내리는 힘과 최대 낙하 속도. */
+// 2026-10 조정: 처음 값(5.8·2.4)은 0.15초마다 탭해도 40번 중 1번만 잡혀 사실상 불가능했다 — 5.3·2.2면 같은 실력으로 약 80%,
+// 보통 난이도 5(약 95%)보다 어렵고 탭은 1.3배쯤 더 든다.
+export const HEAVY = { upSpeed: .85, gravity: 5.3, maxFall: 2.2 };
 /** 오리: 릴 원 +10%. 비둘기: 바닥나도 버텨 주는 시간(초). */
 export const DUCK_ZONE_BONUS = 1.1;
 export const PIGEON_RESCUE_S = 1;
@@ -61,12 +65,13 @@ export function stepReelGame(game: ReelGame, deltaMs: number, taps: readonly num
       g.taps.shift(); g.velocity = .85; g.lastTap = t; g.tapCount++;
     }
     g.velocityX += (g.axis * 1.8 - g.velocityX) * 9 * dt;
-    g.velocity = Math.max(g.heavy ? -2.4 : -1.6, g.velocity - (g.heavy ? 5.8 : 2.3) * dt);
+    g.velocity = Math.max(g.heavy ? -HEAVY.maxFall : -1.6, g.velocity - (g.heavy ? HEAVY.gravity : 2.3) * dt);
     [g.zoneX, g.zone, g.velocityX, g.velocity] = constrain(g.zoneX + g.velocityX * dt, g.zone + g.velocity * dt, g.velocityX, g.velocity, Math.max(0, 1 - g.zoneSize));
     if (g.heavy && t >= g.nextTarget) {
       // 상어·고래는 좌우보다 위아래로 크게 몸부림친다.
       g.targetY = (g.targetY > 0 ? -1 : 1) * (.75 + random(g) * .15);
-      g.targetX = (random(g) - .5) * .3;
+      // 좌우로도 보통 물고기처럼 크게 오간다(2026-10 선생님 의견: 위아래만이면 낚기가 거의 불가능).
+      g.targetX = (random(g) - .5) * 1.3;
       g.nextTarget = t + 3.5 + random(g) * .7;
       g.burstUntil = t + .55 + random(g) * .25;
     } else if (!g.heavy && t >= g.nextTarget) {
@@ -105,10 +110,12 @@ export function stepReelGame(game: ReelGame, deltaMs: number, taps: readonly num
     // 중간 난도는 속도로, 최고 난도는 짧은 머무름과 날카로운 회전으로 추적을 어렵게 한다.
     const cruiseSpeed = g.heavy ? .72 : swimmingSpeed * (1 + erratic * (2.45 - 2.4 * erratic));
     const speed = t < g.pauseUntil && !struggle ? .03 : cruiseSpeed * (t < g.burstUntil || struggle ? 1.9 : 1);
-    const curve = g.heavy ? 0 : Math.sin(t * g.wanderFrequency + g.seed) * (.12 + d * .04);
+    const curve = Math.sin(t * g.wanderFrequency + g.seed) * (.12 + d * .04);
     const edge = g.heavy ? 0 : Math.max(0, Math.hypot(g.fishX, g.fish) - .72) * 3;
     const vx = dx / (distance || 1) * Math.min(speed, distance * 3) - g.fishVY * curve - g.fishX * edge;
-    const vy = dy / (distance || 1) * Math.min(speed, distance * 3) + g.fishVX * curve - g.fish * edge;
+    // 상어·고래가 위로 올라갈 때만 15% 느리게 — 탭으로 따라잡을 틈을 준다.
+    const up = g.heavy && dy > 0 ? HEAVY.upSpeed : 1;
+    const vy = dy / (distance || 1) * Math.min(speed * up, distance * 3) + g.fishVX * curve - g.fish * edge;
     g.fishVX += (vx - g.fishVX) * (3 + d + erratic * 16) * dt; g.fishVY += (vy - g.fishVY) * (3 + d + erratic * 16) * dt;
     if (erratic > 0) {
       // 가속 후에도 속도를 제한하여 고정 스텝당 이동 거리가 항상 유한하다.
