@@ -40,7 +40,6 @@ import type { RiverFishReporter } from './logic/riverPresence';
 import { useFishing } from './ui/useFishing';
 import type { FishingHandle } from './ui/useFishing';
 import { ReelBar } from './ui/ReelBar';
-import { ReelJoystick } from './ui/ReelJoystick';
 import { CatchCard } from './ui/CatchCard';
 
 import { FarmPanels } from './ui/FarmPanels';
@@ -169,6 +168,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
   const fishingFrozen = useRef(false);
   const freezeFishing = useCallback((active: boolean) => {
     fishingFrozen.current = active;
+    fishingRef.current.setReelX(0);
     controls.frozen = active || editingRef.current || panelFrozen(panelRef.current, !!dialogueRef.current);
     controls.stick = ZERO_STICK; controls.run = false;
     keys.current = { up: false, down: false, left: false, right: false };
@@ -465,7 +465,16 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
   };
   const onSurfaceDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (fishingFrozen.current) {
-      if (event.pointerType !== 'mouse' || event.button === 0) { event.preventDefault(); fishingRef.current.reel(); }
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      event.preventDefault();
+      const point = framePoint(event);
+      const hasStick = [...pointers.current.values()].some(role => role.kind === 'stick');
+      if (!hasStick && insideRect(point, layoutRef.current.stickZone)) {
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+        pointers.current.set(event.pointerId, { kind: 'stick', start: point, at: performance.now(), moved: false });
+        stickOrigin.current = point; showStick(point, point);
+        fishingRef.current.setReelX(0);
+      } else if (!insideRect(point, layoutRef.current.stickZone)) fishingRef.current.reel();
       return;
     }
     if (editingRef.current) {
@@ -499,9 +508,13 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     if (role.kind === 'stick' && stickOrigin.current) {
       const origin = followOrigin(stickOrigin.current, point);
       stickOrigin.current = origin;
-      controls.stick = stickVector(origin, point);
+      const vector = stickVector(origin, point);
+      if (fishingFrozen.current) {
+        controls.stick = ZERO_STICK;
+        fishingRef.current.setReelX(vector.x);
+      } else controls.stick = vector;
       showStick(origin, point);
-    } else if (role.kind === 'pen' && role.moved && performance.now() - role.at > 120) {
+    } else if (!fishingFrozen.current && role.kind === 'pen' && role.moved && performance.now() - role.at > 120) {
       // 펜으로 끌면 펜 끝을 계속 따라간다.
       role.at = performance.now();
       handle.current?.walkToScreen(point.x, point.y);
@@ -515,10 +528,11 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     if (role.kind === 'stick') {
       stickOrigin.current = null;
       controls.stick = ZERO_STICK;
+      fishingRef.current.setReelX(0);
       showStick(null);
     }
     // 조이스틱 영역이라도 짧게 콕 찍으면 그 자리로 걸어간다(탭해서 걷기).
-    if (!cancelled && role.kind !== 'pen' && !role.moved && performance.now() - role.at < TAP_MS) {
+    if (!fishingFrozen.current && !cancelled && role.kind !== 'pen' && !role.moved && performance.now() - role.at < TAP_MS) {
       const point = framePoint(event);
       handle.current?.walkToScreen(point.x, point.y);
     }
@@ -542,7 +556,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
   // ── 키보드(데스크톱 테스트용) ──
   useEffect(() => {
     const map: Record<string, keyof typeof keys.current> = { ArrowUp: 'up', w: 'up', ArrowDown: 'down', s: 'down', ArrowLeft: 'left', a: 'left', ArrowRight: 'right', d: 'right' };
-    const sync = () => { if (!stickOrigin.current) controls.stick = keyboardVector(keys.current); };
+    const sync = () => { if (fishingFrozen.current) { controls.stick = ZERO_STICK; return; } if (!stickOrigin.current) controls.stick = keyboardVector(keys.current); };
     const down = (event: KeyboardEvent) => {
       const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
       if (editingRef.current) { if (map[event.key] || ['Shift', 'z', 'x'].includes(event.key)) event.preventDefault(); return; }
@@ -552,7 +566,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
         if (!event.repeat) { if (!cancelTopWindow(root.current) && dialogueRef.current) closeDialogue(); }
         return;
       }
-      if (panelRef.current) return;
+      if (fishingFrozen.current || panelRef.current) return;
       if (event.target instanceof HTMLElement && event.target.closest('button') && (event.key === 'Enter' || event.key === ' ')) return;
       if (event.altKey || event.ctrlKey || event.metaKey) return;
       const dir = map[key];
@@ -573,6 +587,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
       keys.current = { up: false, down: false, left: false, right: false };
       pointers.current.clear(); stickOrigin.current = null;
       controls.stick = ZERO_STICK; controls.run = false; showStick(null);
+      fishingRef.current.setReelX(0);
       setPressed({ a: false, b: false });
     };
     const visibility = () => { reset(); handle.current?.setActive(document.visibilityState === 'visible'); };
@@ -628,6 +643,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
       onPointerDown={onSurfaceDown} onPointerMove={onSurfaceMove}
       onPointerUp={event => releasePointer(event, false)} onPointerCancel={event => releasePointer(event, true)}
       onLostPointerCapture={event => releasePointer(event, true)} onContextMenu={event => event.preventDefault()}>
+      <div className="pwp-movement-stick-zone" aria-hidden="true" style={{ position: 'absolute', left: layout.stickZone.x, top: layout.stickZone.y, width: layout.stickZone.width, height: layout.stickZone.height }} />
       <div ref={ring} className="pwp-stick" aria-hidden="true" style={{ width: STICK_RADIUS * 2, height: STICK_RADIUS * 2 }}><div ref={knob} className="pwp-knob" /></div>
     </div>
     <div className="pwp-hud" style={{ left: hud.x, top: hud.y, width: hud.width, height: hud.height }}>
@@ -689,7 +705,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     {!placing && panel !== 'furniture' && roomMessage && <div className="pwp-room-result" role="status">{roomMessage}</div>}
     {!placing && petMessage && <div className="pwp-pet-message" role="status" aria-live="polite">{petMessage}</div>}
     {!placing && panel !== 'furniture' && toast && <div key={toast.visit} className="pwp-toast" role="status" style={{ top: hud.y + hud.height + 6 }}>{toast.title}</div>}
-    {fishing.reelState && <><ReelBar game={fishing.reelState} bait={fishing.bait} /><ReelJoystick onAxis={fishing.setReelX} /></>}
+    {fishing.reelState && <ReelBar game={fishing.reelState} bait={fishing.bait} />}
     {fishing.caught && <CatchCard caught={fishing.caught} onHide={fishing.hideCatch} />}
     {fishing.message && <div className="pwp-fishing-message" role="status">{fishing.message}</div>}
     {status !== 'ready' && <div className="pwp-loading" role="status">

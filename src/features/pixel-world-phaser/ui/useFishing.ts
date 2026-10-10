@@ -50,8 +50,10 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
   const reelGame = useRef<ReelGame | null>(null);
   const taps = useRef<number[]>([]);
   const axes = useRef<ReelAxisInput[]>([]);
+  const reelAxis = useRef(0);
   const setReelX = useCallback((x: number) => {
-    if (reelGame.current) axes.current.push({ time: performance.now() - reelStarted.current, x });
+    reelAxis.current = Number.isFinite(x) ? Math.max(-1, Math.min(1, x)) : 0;
+    if (reelGame.current) axes.current.push({ time: performance.now() - reelStarted.current, x: reelAxis.current });
   }, []);
   const reelStarted = useRef(0);
   const lastFrame = useRef(0);
@@ -127,8 +129,8 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
         // 캐스팅마다 다른 경로를 만들되 같은 캐스팅은 재현할 수 있게 한다.
         const seed = Array.from(next.cast?.castId ?? '').reduce((value, char) => (Math.imul(value, 31) + char.charCodeAt(0)) >>> 0, 0);
         reelGame.current = createReelGame(next.cast?.difficulty ?? 1, latest.current.pet === 'pet_duck', next.cast?.big ?? false, seed, next.cast?.speed ?? 1, next.cast?.rod, next.cast?.trophy ?? false,
-          latest.current.pet === 'pet_pigeon' ? pigeonRescuesLeft(stateRef.current?.kstDate) : 0);
-        setReelState(reelGame.current); reelStarted.current = performance.now(); lastFrame.current = reelStarted.current; taps.current = []; axes.current = [];
+          latest.current.pet === 'pet_pigeon' ? pigeonRescuesLeft(stateRef.current?.kstDate) : 0, next.cast?.heavy ?? false);
+        setReelState(reelGame.current); reelStarted.current = performance.now(); lastFrame.current = reelStarted.current; taps.current = []; axes.current = [{ time: 0, x: reelAxis.current }];
         latest.current.report?.({ phase: 'reeling' });
       } else finishRef.current(next);
     }
@@ -208,7 +210,7 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
     const boost = () => { if (game.current.phase === 'reeling') taps.current.push(performance.now() - reelStarted.current); };
     const down = (event: PointerEvent) => {
       const target = event.target;
-      if (editable(target) || !(target instanceof Element) || !target.closest('.pwp-root') || target.closest('.pwp-btn-b, .pwp-reel-stick')) return;
+      if (editable(target) || !(target instanceof Element) || !target.closest('.pwp-root') || target.closest('.pwp-btn-b, .pwp-reel-stick, .pwp-movement-stick-zone')) return;
       if (!['bite', 'reeling'].includes(game.current.phase) || (event.pointerType === 'mouse' && event.button !== 0)) return;
       event.preventDefault();
       if (pointers.has(event.pointerId)) return;

@@ -3,7 +3,7 @@ import type { FishSpecies } from './fishCatalog';
 
 export interface ReelAxisInput { time: number; x: number }
 export interface ReelGame {
-  difficulty: number; speed: number; rod?: RodEquipment; trophy?: boolean; big: boolean;
+  difficulty: number; speed: number; rod?: RodEquipment; trophy?: boolean; big: boolean; heavy: boolean;
   seed: number; random: number; arenaScale: number; zoneSize: number;
   // 좌표는 원 중심이 0이며 위쪽이 양수다. zone과 fish는 세로 좌표다.
   zoneX: number; zone: number; velocityX: number; velocity: number;
@@ -24,9 +24,9 @@ export const REEL_MARGIN_MS = 150;
 /** 오리: 릴 원 +10%. 비둘기: 바닥나도 버텨 주는 시간(초). */
 export const DUCK_ZONE_BONUS = 1.1;
 export const PIGEON_RESCUE_S = 1;
-export function createReelGame(difficulty = 1, duck = false, big = false, seed = 0, speed = 1, rod?: RodEquipment, trophy = false, rescues = 0): ReelGame {
+export function createReelGame(difficulty = 1, duck = false, big = false, seed = 0, speed = 1, rod?: RodEquipment, trophy = false, rescues = 0, heavy = false): ReelGame {
   const d = Number.isFinite(difficulty) ? clamp(difficulty, 1, 5) : 1;
-  return { difficulty: d, speed: reelSpeed(speed), rod, trophy, big, seed, random: (seed + 1) >>> 0,
+  return { difficulty: d, speed: reelSpeed(speed), rod, trophy, big, heavy, seed, random: (seed + 1) >>> 0,
     arenaScale: 1 - (d - 1) * .0625, zoneSize: (d <= 2 ? .42 - (d - 1) * .09 : .33 - (d - 2) * .01) * (duck ? DUCK_ZONE_BONUS : 1),
     zoneX: 0, zone: 0, velocityX: 0, velocity: 0, fishX: 0, fish: 0, fishVX: 0, fishVY: 0,
     targetX: 0, targetY: 0, nextTarget: 0, burstUntil: 0, pauseUntil: 0,
@@ -61,9 +61,15 @@ export function stepReelGame(game: ReelGame, deltaMs: number, taps: readonly num
       g.taps.shift(); g.velocity = .85; g.lastTap = t; g.tapCount++;
     }
     g.velocityX += (g.axis * 1.8 - g.velocityX) * 9 * dt;
-    g.velocity = Math.max(-1.6, g.velocity - 2.3 * dt);
+    g.velocity = Math.max(g.heavy ? -2.4 : -1.6, g.velocity - (g.heavy ? 5.8 : 2.3) * dt);
     [g.zoneX, g.zone, g.velocityX, g.velocity] = constrain(g.zoneX + g.velocityX * dt, g.zone + g.velocity * dt, g.velocityX, g.velocity, Math.max(0, 1 - g.zoneSize));
-    if (t >= g.nextTarget) {
+    if (g.heavy && t >= g.nextTarget) {
+      // 상어·고래는 좌우보다 위아래로 크게 몸부림친다.
+      g.targetY = (g.targetY > 0 ? -1 : 1) * (.75 + random(g) * .15);
+      g.targetX = (random(g) - .5) * .3;
+      g.nextTarget = t + 3.5 + random(g) * .7;
+      g.burstUntil = t + .55 + random(g) * .25;
+    } else if (!g.heavy && t >= g.nextTarget) {
       const angle = random(g) * Math.PI * 2, radius = Math.sqrt(random(g)) * .76;
       g.targetX = Math.cos(angle) * radius; g.targetY = Math.sin(angle) * radius;
       g.nextTarget = t + .9 + random(g) * 1.2 - d * .10;
@@ -85,11 +91,11 @@ export function stepReelGame(game: ReelGame, deltaMs: number, taps: readonly num
         }
       }
     }
-    if (erratic > 0 && g.motion === 'sweep') {
+    if (!g.heavy && erratic > 0 && g.motion === 'sweep') {
       // 가장자리를 따라 흐르는 호를 쫓되 좌표 자체는 순간 이동시키지 않는다.
       const angle = g.motionAngle + (t - g.motionStart) * g.motionTurn * (1 + erratic);
       g.targetX = Math.cos(angle) * .9; g.targetY = Math.sin(angle) * .9;
-    } else if (erratic > 0 && g.motion === 'feint' && t - g.motionStart >= .22) {
+    } else if (!g.heavy && erratic > 0 && g.motion === 'feint' && t - g.motionStart >= .22) {
       g.targetX = -Math.cos(g.motionAngle) * .88; g.targetY = -Math.sin(g.motionAngle) * .88;
     }
     const dx = g.targetX - g.fishX, dy = g.targetY - g.fish, distance = Math.hypot(dx, dy);
@@ -97,10 +103,10 @@ export function stepReelGame(game: ReelGame, deltaMs: number, taps: readonly num
     const struggle = (g.big || g.trophy) && (t + g.seed * .17) % 5.4 < .3;
     const swimmingSpeed = d <= 1 ? .24 + d * .21 : d <= 2 ? .45 + (d - 1) * .005 : .455 + (d - 2) * .0925;
     // 중간 난도는 속도로, 최고 난도는 짧은 머무름과 날카로운 회전으로 추적을 어렵게 한다.
-    const cruiseSpeed = swimmingSpeed * (1 + erratic * (2.45 - 2.4 * erratic));
+    const cruiseSpeed = g.heavy ? .72 : swimmingSpeed * (1 + erratic * (2.45 - 2.4 * erratic));
     const speed = t < g.pauseUntil && !struggle ? .03 : cruiseSpeed * (t < g.burstUntil || struggle ? 1.9 : 1);
-    const curve = Math.sin(t * g.wanderFrequency + g.seed) * (.12 + d * .04);
-    const edge = Math.max(0, Math.hypot(g.fishX, g.fish) - .72) * 3;
+    const curve = g.heavy ? 0 : Math.sin(t * g.wanderFrequency + g.seed) * (.12 + d * .04);
+    const edge = g.heavy ? 0 : Math.max(0, Math.hypot(g.fishX, g.fish) - .72) * 3;
     const vx = dx / (distance || 1) * Math.min(speed, distance * 3) - g.fishVY * curve - g.fishX * edge;
     const vy = dy / (distance || 1) * Math.min(speed, distance * 3) + g.fishVX * curve - g.fish * edge;
     g.fishVX += (vx - g.fishVX) * (3 + d + erratic * 16) * dt; g.fishVY += (vy - g.fishVY) * (3 + d + erratic * 16) * dt;
@@ -125,7 +131,7 @@ export function stepReelGame(game: ReelGame, deltaMs: number, taps: readonly num
 }
 
 export function fishDifficulty(fish: Pick<FishSpecies, 'rarity' | 'minCm' | 'maxCm'>, lengthCm: number): number {
-  const [base, span] = { common: [1, 1], uncommon: [1.8, 1.2], rare: [2.8, 1.4], legendary: [3.8, 1.2] }[fish.rarity];
+  const [base, span] = { common: [1, 1], uncommon: [1.8, 1.2], rare: [2.8, 1.4], legendary: [3.8, 1.2], mythic: [5, 0] }[fish.rarity];
   const ratio = clamp((lengthCm - fish.minCm) / (fish.maxCm - fish.minCm || 1), 0, 1);
   return Math.round(Math.min(5, base + span * ratio) * 100) / 100;
 }

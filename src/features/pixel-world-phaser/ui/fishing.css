@@ -42,3 +42,8 @@
 .pwp-reel-rod .pwp-rod-icon { width:32px; height:32px; }
 
 .pwp-reel .pwp-reel-bait { color: #386831; font-size: 11px; }
+
+.pwp-reel-heavy { display:block; margin-top:6px; font-size:14px; font-weight:900; color:#a33123; }
+.pwp-reel[data-heavy="true"] .pwp-reel-arena-wrap { animation:pwp-reel-heavy-shake .32s ease-in-out infinite; }
+@keyframes pwp-reel-heavy-shake { 25% { translate:1px -1px; } 75% { translate:-1px 1px; } }
+@media (prefers-reduced-motion:reduce) { .pwp-reel[data-heavy="true"] .pwp-reel-arena-wrap { animation:none; } }
