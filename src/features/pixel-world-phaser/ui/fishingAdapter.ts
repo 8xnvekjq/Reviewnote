@@ -40,7 +40,7 @@ export const rodMinReelMs = (difficulty: number, speed: number): number => minRe
 export const rodDifficulty = (base: number, difficultyDown: number, trophy = false): number =>
   Math.round(Math.max(1, Math.min(5, base + (trophy ? 1.5 : 0)) - difficultyDown) * 100) / 100;
 
-export interface FishingState { kstDate: string; phase: FishPhase; weather: FishWeather; remaining: number; sparkleShadow: number | null; pigeonHint: string | null; album: FishAlbumEntry[]; rod: FishingRod; level?: PlayerLevel; bait?: { charges: number } }
+export interface FishingState { kstDate: string; phase: FishPhase; weather: FishWeather; remaining: number; sparkleShadow: number | null; pigeonHint: string | null; album: FishAlbumEntry[]; junk?: Partial<Record<JunkId, number>>; rod: FishingRod; level?: PlayerLevel; bait?: { charges: number } }
 /** rod·speed·trophy는 v4 서버부터 온다. 없으면 기본 낚싯대·속도 1·대물 아님으로 본다. */
 export type CastStart = { ok: true; castId: string; shadow: FishShadow; biteDelayMs: number; difficulty?: number; big?: boolean; pattern: BitePattern; hint: 'sparkle' | null; rod?: FishingRod; speed?: number; trophy?: boolean; bait?: { used: boolean; charges: number };
   /** 상어·고래처럼 힘이 센 물고기: 릴에서 위아래로 크게 움직인다(탭을 많이 해야 함). */
@@ -68,6 +68,7 @@ const RPC_TIMEOUT_MS = 12_000;
 const PHASES: readonly FishPhase[] = ['morning', 'day', 'evening', 'night'];
 const WEATHERS: readonly FishWeather[] = ['clear', 'cloudy', 'rain'];
 const RARITIES: readonly FishRarity[] = ['common', 'uncommon', 'rare', 'legendary', 'mythic'];
+const JUNK_IDS: readonly JunkId[] = ['junk_shoe', 'junk_can', 'junk_coin'];
 const SHADOWS: readonly FishShadow[] = ['S', 'M', 'L'];
 const PATTERNS: readonly BitePattern[] = ['quick', 'double', 'long'];
 
@@ -128,6 +129,7 @@ export function parseFishingState(raw: unknown, fallback: FishingState = fallbac
     sparkleShadow: spark != null && [0, 1, 2].includes(spark) ? spark : null,
     pigeonHint: str(raw.pigeonHint),
     album,
+    junk: Object.fromEntries(JUNK_IDS.map(id => [id, isObj(raw.junk) ? nonnegativeInteger(raw.junk[id]) ?? 0 : 0])),
     rod: parseFishingRod(raw.rod),
     ...(level ? { level } : {}),
     ...(bait ? { bait } : {}),
@@ -142,6 +144,8 @@ export function parseCastStart(raw: unknown): CastStart {
   const speed = num(raw.speed);
   const bait = parseBait(raw.bait);
   return { ok: true, castId, shadow: raw.shadow, biteDelayMs, difficulty: Math.max(1, Math.min(5, num(raw.difficulty) ?? 1)), ...(typeof raw.big === 'boolean' ? { big: raw.big } : {}), pattern: oneOf(PATTERNS, raw.pattern) ? raw.pattern : 'quick', hint: raw.hint === 'sparkle' ? 'sparkle' : null,
+    ...(typeof raw.heavy === 'boolean' ? { heavy: raw.heavy } : {}),
+    ...(oneOf(JUNK_IDS, raw.junk) ? { junk: raw.junk } : {}),
     ...(raw.rod !== undefined ? { rod: parseFishingRod(raw.rod) } : {}),
     // 속도는 1~1.35(황금 낚싯대)지만, 이상한 값이 와도 미니게임이 깨지지 않게 1~2로 묶는다.
     ...(speed != null ? { speed: Math.max(1, Math.min(2, speed)) } : {}),
@@ -159,11 +163,18 @@ export function parseCastFinish(raw: unknown): CastFinish {
   if (!isObj(raw) || raw.ok !== true) return { ok: false };
   if (raw.landed !== true) return { ok: true, landed: false };
   const speciesId = str(raw.speciesId), lengthCm = num(raw.lengthCm), remaining = num(raw.remaining);
+  if (raw.junk != null) {
+    if (!oneOf(JUNK_IDS, raw.junk)) return { ok: false };
+    const xpGain = parseXpGain(raw.xpGain);
+    return { ok: true, landed: true, junk: raw.junk, remaining: remaining == null ? 0 : Math.max(-1, Math.floor(remaining)), ...(xpGain ? { xpGain } : {}) };
+  }
   if (!speciesId || lengthCm == null || !oneOf(RARITIES, raw.rarity)) return { ok: false };
   const xpGain = parseXpGain(raw.xpGain);
+  const percentile = num(raw.percentile);
   return {
     ok: true, landed: true, speciesId, lengthCm, rarity: raw.rarity,
     ...(xpGain ? { xpGain } : {}),
+    ...(percentile != null && percentile >= 0 && percentile <= 100 ? { percentile } : {}),
     isNew: raw.isNew === true, isBig: raw.isBig === true, isPersonalBest: raw.isPersonalBest === true,
     remaining: remaining == null ? 0 : Math.max(-1, Math.floor(remaining)),
   };
