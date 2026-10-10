@@ -17,7 +17,7 @@ export class RiverScene extends WorldScene {
   protected readonly background = '#578d78';
   private spots: FishingState['spots'];
   /** 포인트별 그림과 지금 그려 둔 남은 물고기 수(1마리 낚을 때마다 그림자가 하나씩 줄어든다). */
-  private spotVisuals = new Map<number, { g: Phaser.GameObjects.Graphics; left: number }>();
+  private spotVisuals = new Map<number, { g: Phaser.GameObjects.Graphics; fish: { body: Phaser.GameObjects.Image | Phaser.GameObjects.Ellipse; x: number; y: number; phase: number }[]; left: number }>();
   private chargeAt: number | null = null;
   private preview: Phaser.GameObjects.Graphics | null = null;
   private water: Phaser.GameObjects.Image[] = [];
@@ -134,21 +134,22 @@ export class RiverScene extends WorldScene {
       const left = Math.max(1, Math.min(3, state?.left ?? 3));
       const shown = this.spotVisuals.get(spot.id);
       if (active && shown?.left !== left) {
-        shown?.g.destroy();
+        shown?.g.destroy(); shown?.fish.forEach(f => f.body.destroy());
         const g = this.add.graphics().setDepth(-902), p = cellCenter(spot.cell);
         g.fillStyle(0x9ee5d2, .09).fillCircle(p.x, p.y, HOTSPOT_RADIUS);
         g.lineStyle(1, 0xb9eadd, .5).strokeCircle(p.x, p.y, HOTSPOT_RADIUS);
-        // 남은 마리 수만큼 물고기 그림자(처음 3마리, 낚을 때마다 하나씩 사라진다).
-        for (const [dx, dy, flip] of [[-9, -6, 1], [5, 3, -1], [-4, 10, 1]].slice(0, left)) {
+        // 남은 마리 수만큼 물고기 그림자(처음 3마리, 낚을 때마다 하나씩 사라진다) — 예전 헤엄치던 그림자 그림 그대로.
+        const fish = ([[-8, -6, 'M'], [6, 3, 'S'], [-3, 10, 'M']] as const).slice(0, left).map(([dx, dy, size], i) => {
           const x = p.x + dx, y = p.y + dy;
-          g.fillStyle(0x16394a, .62).fillEllipse(x, y, 11, 5)
-            .fillTriangle(x - 6 * flip, y, x - 10 * flip, y - 3, x - 10 * flip, y + 3)
-            .fillRect(x - 1, y - 4, 3, 2);
-        }
-        this.spotVisuals.set(spot.id, { g, left });
+          const body = this.textures.exists('fishing:fish-shadow')
+            ? this.add.image(x, y, 'fishing:fish-shadow', size).setDepth(-901).setFlipX(i % 2 === 1)
+            : this.add.ellipse(x, y, size === 'M' ? 24 : 16, size === 'M' ? 12 : 8, 0x193d49, .65).setDepth(-901);
+          return { body, x, y, phase: spot.id * 1.7 + i * 2.1 };
+        });
+        this.spotVisuals.set(spot.id, { g, fish, left });
       } else if (!active && shown) {
         this.spotVisuals.delete(spot.id);
-        this.tweens.add({ targets: shown.g, alpha: 0, duration: 450, onComplete: () => shown.g.destroy() });
+        this.tweens.add({ targets: [shown.g, ...shown.fish.map(f => f.body)], alpha: 0, duration: 450, onComplete: () => { shown.g.destroy(); shown.fish.forEach(f => f.body.destroy()); } });
       }
     }
   }
@@ -177,7 +178,15 @@ export class RiverScene extends WorldScene {
         g?.fillStyle(0xffd46b).fillRect(this.feet.x - 12, this.feet.y - 35, 24 * power, 3);
       }
     }
-    for (const [id, visual] of this.spotVisuals) visual.g.setAlpha(.85 + Math.sin(time / 900 + id) * .15);
+    for (const [id, visual] of this.spotVisuals) {
+      visual.g.setAlpha(.85 + Math.sin(time / 900 + id) * .15);
+      // 원 안에서 천천히 오가며 헤엄친다(가는 방향으로 몸을 돌린다).
+      for (const f of visual.fish) {
+        const dx = Math.sin(time / 1400 + f.phase) * 4;
+        f.body.setPosition(f.x + dx, f.y + Math.sin(time / 1100 + f.phase) * 1.5);
+        if ('setFlipX' in f.body) f.body.setFlipX(Math.cos(time / 1400 + f.phase) < 0);
+      }
+    }
     this.peers.current?.update(time, this.feet, delta, this.ctx.face ?? '🐶');
     this.spacePets(delta);
     const clock = this.worldClock();

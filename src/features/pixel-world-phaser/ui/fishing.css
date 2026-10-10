@@ -3,6 +3,9 @@
 .pwp-catch-card > strong { font-size: 15px; }
 .pwp-catch-card .pwp-fish-icon { grid-row: span 3; width: 32px; height: 32px; background-size: 384px 32px; image-rendering: pixelated; font-size: 25px; }
 .pwp-catch-card .pwp-fish-stars { color: #b88619; }
+/* 잡동사니 카드: 아이콘이 왼쪽 칸을 세 줄 다 차지해야 아래 문장이 32px 칸에 끼어 세로로 서지 않는다. */
+.pwp-catch-card[data-junk] > :first-child { grid-row: span 3; align-self: start; }
+.pwp-catch-card[data-junk] > :not(:first-child) { grid-column: 2; }
 .pwp-catch-badges, .pwp-catch-card > small { grid-column: 1 / -1; }
 .pwp-catch-badges { display: flex; gap: 6px; }
 .pwp-catch-badges b { padding: 2px 6px; border-radius: 4px; background: #edd58c; font-size: 12px; }
