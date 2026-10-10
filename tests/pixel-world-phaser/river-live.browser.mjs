@@ -1,3 +1,4 @@
+import { walkToCastDock, chargeCast } from './cast-player.browser-helper.mjs';
 import { trackReel } from './reel-player.browser-helper.mjs';
 // 강가 실시간: 두 페이지가 가짜 realtime(fakeRealtime.mjs)으로 같은 강가에 들어간다.
 // A는 B를 보고, B가 던지면 찌를, 입질이면 "!"를, 잡으면 "붕어 23.4cm!" 같은 구름을 본다. B가 떠나면 A에서 사라진다. 광장은 그대로 된다.
@@ -58,23 +59,18 @@ try {
   const payload = await b.evaluate(() => window.plazaTransport.last());
   assert.ok(!('name' in payload) && !('userId' in payload) && !('email' in payload), 'anonymous presence');
 
-  // B가 그림자를 톡 → A 화면에 B의 줄·찌.
   await b.bringToFront();
-  await b.waitForFunction(() => window.__pixelWorldPhaser.debug().targets['shadow:0']);
-  // B는 물가에서 멀고(안쪽 풀밭), 그림자 0은 화면 위쪽 밖일 수 있어 화면 좌표로 바로 누른다 → 가까운 물가 자리로 걸어간 뒤 던진다.
-  await b.evaluate(() => { const h = window.__pixelWorldPhaser, t = h.debug().targets['shadow:0']; h.walkToScreen(t.x, t.y); });
-  await b.waitForFunction(() => !!window.__pixelWorldPhaser.debug().pendingCast, null, { timeout: 3000 });
+  await walkToCastDock(b);
+  await chargeCast(b, 400, false);
   await b.waitForFunction(() => ['casting', 'waiting'].includes(document.querySelector('.pwp-root')?.dataset.fishingPhase));
   await a.bringToFront();
   await a.waitForFunction(() => { const f = window.__pixelWorldPhaser.debug().classmates[0]?.fishing; return f && ['casting', 'waiting'].includes(f.phase) && !f.bang; }, null, { timeout: 5000 });
   const cast = (await b.evaluate(() => window.plazaTransport.sent('fish'))).find(s => s.payload.phase === 'casting');
   assert.equal(cast.topic, 'pixel-world-river'); assert.ok(cast.payload.target.x > 0 && cast.payload.target.y > 0);
-  // B는 그림자 0에서 멀어서 가까운 물가 자리로 걸어간 뒤 던졌다. A가 보는 B는 그 물가 자리에 있고, 찌는 물 위 그림자 근처다.
   const bView = await debug(b);
-  const spot = bView.bankSpots.find(s => Math.hypot(s.x - bView.x, s.y - bView.y) < 2);
-  assert.ok(spot, `B cast from a bank spot (${bView.x},${bView.y})`);
+  const spot = { x: bView.x, y: bView.y };
   await a.waitForFunction(spot => { const c = window.__pixelWorldPhaser.debug().classmates[0]; return c && Math.hypot(c.x - (spot.x / 16 - .5), c.y - (spot.y / 16 - .5)) < .15; }, spot, { timeout: 5000 });
-  assert.ok(Math.hypot(cast.payload.target.x - bView.castFrom.x, cast.payload.target.y - bView.castFrom.y) < 4 * 16, 'bobber lands within reach of the bank spot');
+  assert.ok(Math.hypot(cast.payload.target.x - bView.castFrom.x, cast.payload.target.y - bView.castFrom.y) <= 112);
   await a.screenshot({ path: SHOTS + '/river-live-cast.png' });
   // 입질 → A에 "!".
   await b.bringToFront();

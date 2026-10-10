@@ -1,3 +1,5 @@
+import type { Point } from '../logic/joystick';
+import { activeHotspotAt, waterLanding } from '../logic/castThrow';
 import { playSoundEffect } from '../../pixel-room/bgm/sfx';
 import { decideHaptics, decideReelClick, idleHaptics, reelInZone, vibrate } from '../logic/reelHaptics';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -20,14 +22,14 @@ function spendPigeonRescues(day: string | undefined, used: number) {
   try { window.localStorage.setItem(rescueKey(day), String(PIGEON_RESCUES_PER_DAY - pigeonRescuesLeft(day) + used)); } catch { /* 저장 못 해도 낚시는 그대로 */ }
 }
 export type LandedCatch = Extract<CastFinish, { landed: true }>;
-export interface FishingShadow { index: 0 | 1 | 2; size: 'S' | 'M' | 'L'; sparkle: boolean }
 // 추가 연결점: RiverScene은 이 호출을 자신의 createFishingFx().update로 전달한다.
 export interface FishingHandle {
+  readonly canCast?: boolean;
   dismount?(): void;
   cancelWalk(): void;
-  setShadows?(shadows: FishingShadow[]): void;
+  setHotspots?(spots: FishingState['spots']): void;
   setWorldTime?(phase: FishPhase, weather: FishWeather): void;
-  fishingFx?(game: FishingGame, index: number, now: number): void;
+  fishingFx?(game: FishingGame, point: Point, now: number): void;
 }
 export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
   adapter?: FishingAdapter; handle: RefObject<FishingHandle | null>; scene: string | null; pet: string | null; freeze(active: boolean): void;
@@ -58,6 +60,7 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
   const reelStarted = useRef(0);
   const lastFrame = useRef(0);
   const [busy, setBusy] = useState(false);
+  const [canCast, setCanCast] = useState(false);
   const [message, setMessage] = useState('');
   const [caught, setCaught] = useState<LandedCatch | null>(null);
   const latest = useRef({ adapter, handle, scene, pet, freeze, report }); latest.current = { adapter, handle, scene, pet, freeze, report };
@@ -67,12 +70,11 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
   const generation = useRef(0);
   const mounted = useRef(true);
   const attempted = useRef(false);
-  const shadow = useRef(0);
+  const landing = useRef<Point>({ x: 0, y: 0 });
   const castAdapter = useRef<FishingAdapter | undefined>(undefined);
   const finishRef = useRef<(next: FishingGame) => void>(() => {});
-  const shadows = useCallback((value: FishingState) => {
-    if (latest.current.scene !== 'river') return;
-    latest.current.handle.current?.setShadows?.(([0, 1, 2] as const).map(index => ({ index, size: 'M', sparkle: index === value.sparkleShadow })));
+  const updateSpots = useCallback((value: FishingState) => {
+    if (latest.current.scene === 'river') latest.current.handle.current?.setHotspots?.(value.spots);
   }, []);
   const refresh = useCallback(async () => {
     const current = latest.current.adapter;
@@ -81,20 +83,26 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
     try {
       const value = await current.state();
       if (!mounted.current || epoch !== generation.current || current !== latest.current.adapter) return;
-      stateRef.current = value; setState(value); shadows(value);
+      if (stateRef.current?.spots?.some(old => old.active && value.spots?.some(next => next.id === old.id && !next.active))) setMessage('물고기들이 흩어졌어요. 잠시 후 다시 모여요.');
+      stateRef.current = value; setState(value); updateSpots(value);
       latest.current.handle.current?.setWorldTime?.(value.phase, value.weather);
     } catch { if (mounted.current) setMessage('낚시 정보를 불러오지 못했어요. 다시 시도해 주세요.'); }
-  }, [shadows]);
+  }, [updateSpots]);
   const finish = useCallback(async (next: FishingGame) => {
     if (!next.cast || !lock.current || !fishingActive(game.current)) return;
     const current = castAdapter.current;
     const epoch = generation.current;
     updateHaptics(performance.now(), null);
     game.current = next; setPhase(next.phase); reelGame.current = null; setReelState(null); taps.current = []; axes.current = [];
-    latest.current.handle.current?.fishingFx?.(next, shadow.current, performance.now());
+    latest.current.handle.current?.fishingFx?.(next, landing.current, performance.now());
     const told = fishReportForGamePhase(next.phase);
     if (told) latest.current.report?.(told);
     setMessage(next.phase === 'tooEarly' ? '너무 빨랐어요!' : next.phase === 'missed' ? '놓쳤어요!' : next.phase === 'cancelled' ? '낚시를 취소했어요.' : '물고기를 올리는 중…');
+    if (next.phase === 'landed' && next.cast.spot?.left === 0 && stateRef.current) {
+      const value = { ...stateRef.current, spots: stateRef.current.spots?.map(s => s.id === next.cast?.spot?.id ? { ...s, active: false, left: 0 } : s) };
+      stateRef.current = value; setState(value); updateSpots(value);
+      setMessage('물고기들이 흩어졌어요. 잠시 후 다시 모여요.');
+    }
     try {
       const result = await current?.finish(next.cast.castId, next.phase === 'landed');
       if (mounted.current && epoch === generation.current) {
@@ -102,9 +110,8 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
         if (next.phase === 'landed') latest.current.report?.(result?.ok && result.landed
           ? 'junk' in result ? { phase: 'idle' } : { phase: 'landed', speciesId: result.speciesId, lengthCm: result.lengthCm }
           : result?.ok ? { phase: 'escaped' } : { phase: 'idle' });
-        if (result?.ok && result.landed) { playSoundEffect(!('junk' in result) && (result.isNew || result.isBig || next.cast.trophy) ? 'fanfare' : 'catch'); setCaught(result); setMessage(''); await refresh(); }
+        if (result?.ok && result.landed) { playSoundEffect(!('junk' in result) && (result.isNew || result.isBig || next.cast.trophy) ? 'fanfare' : 'catch'); setCaught(result); if (next.cast.spot?.left !== 0) setMessage(''); }
         else if (!result?.ok) setMessage('낚시 결과를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.');
-        else if (stateRef.current) shadows(stateRef.current);
       }
     } catch {
       if (mounted.current && epoch === generation.current) {
@@ -113,10 +120,11 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
       }
     }
     finally {
+      if (mounted.current && epoch === generation.current) await refresh();
       lock.current = false;
       if (mounted.current) { setBusy(false); latest.current.freeze(false); }
     }
-  }, [refresh, shadows]);
+  }, [refresh, updateSpots]);
   finishRef.current = next => { void finish(next); };
   const cancel = useCallback(() => {
     if (fishingActive(game.current)) finishRef.current(cancelFishingGame(game.current));
@@ -138,27 +146,28 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
     }
     return lock.current;
   }, []);
-  const onShadowTap = useCallback(async (index: number) => {
+  const castAt = useCallback(async (point: Point) => {
     const { adapter: current, scene: where, pet: companion } = latest.current;
-    if (!current || where !== 'river' || lock.current || !stateRef.current || index < 0 || index > 2) return;
+    if (!current || where !== 'river' || lock.current || !stateRef.current) return;
+    if (!waterLanding(point)) { setMessage('물에 던져 주세요'); return; }
     latest.current.handle.current?.dismount?.();
     lock.current = true; setBusy(true); setCaught(null); setMessage(''); game.current = idleFishingGame();
     latest.current.freeze(true); latest.current.handle.current?.cancelWalk();
     const epoch = generation.current;
     try {
-      const cast = await current.start(companion);
+      const cast = await current.start(companion, activeHotspotAt(point, stateRef.current.spots));
       if (!mounted.current || epoch !== generation.current || latest.current.scene !== 'river') {
         if (cast.ok) await current.finish(cast.castId, false);
         lock.current = false; if (mounted.current) { setBusy(false); latest.current.freeze(false); } return;
       }
       if (!cast.ok) { setMessage('잠시 후 다시 시도해 주세요.'); lock.current = false; setBusy(false); latest.current.freeze(false); await refresh(); return; }
       castAdapter.current = current;
-      shadow.current = index;
-      latest.current.handle.current?.setShadows?.(([0, 1, 2] as const).map(slot => ({ index: slot, size: slot === index ? cast.shadow : 'M', sparkle: false })));
+      landing.current = point;
+      if (cast.spot?.bonus) setMessage('물고기 떼! 희귀 물고기·대물 확률 ↑');
       const firstEver = !attempted.current && stateRef.current.album.length === 0;
       attempted.current = true;
       game.current = startFishingGame(cast, companion, performance.now(), firstEver); setPhase('casting');
-      latest.current.report?.({ phase: 'casting', shadow: index });
+      latest.current.report?.({ phase: 'casting', target: point });
     } catch { lock.current = false; if (mounted.current) { setBusy(false); latest.current.freeze(false); setMessage('낚시를 시작하지 못했어요.'); } }
   }, [refresh]);
   useEffect(() => {
@@ -182,7 +191,7 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
         if (next.phase === 'missed') finishRef.current(next);
         else {
           game.current = next;
-          latest.current.handle.current?.fishingFx?.(next, shadow.current, now);
+          latest.current.handle.current?.fishingFx?.(next, landing.current, now);
           if (previous.phase !== next.phase) {
             setPhase(next.phase); if (next.phase === 'bite') playSoundEffect('bite');
             const told = fishReportForGamePhase(next.phase);
@@ -201,9 +210,22 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
     };
   }, []);
   useEffect(() => {
+    if (scene !== 'river') { setCanCast(false); return; }
+    const timer = setInterval(() => setCanCast(!!latest.current.handle.current?.canCast), 100);
+    return () => clearInterval(timer);
+  }, [scene]);
+  useEffect(() => {
     if (scene === 'river') void refresh();
     else { cancel(); generation.current++; }
   }, [scene, adapter, refresh, cancel]);
+  useEffect(() => {
+    if (scene !== 'river') return;
+    const deadlines = state?.spots?.filter(s => !s.active && s.readyAt).map(s => Date.parse(s.readyAt!)).filter(Number.isFinite) ?? [];
+    if (!deadlines.length) return;
+    const delay = Math.max(1000, Math.min(...deadlines) - Date.now() + 100);
+    const timer = setTimeout(() => void refresh(), Math.min(delay, 2147483647));
+    return () => clearTimeout(timer);
+  }, [state, scene, refresh]);
   useEffect(() => { if (!message || busy) return; const timer = setTimeout(() => setMessage(''), 3500); return () => clearTimeout(timer); }, [message, busy]);
   useEffect(() => {
     const pointers = new Set<number>();
@@ -254,5 +276,5 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
     };
   }, [reel, cancel, setReelX]);
   const hideCatch = useCallback(() => setCaught(null), []);
-  return { state, phase, bait: game.current.cast?.bait, reelState, busy, message, caught, onShadowTap, reel, cancel, refresh, hideCatch, setReelX };
+  return { state, canCast, phase, bait: game.current.cast?.bait, reelState, busy, message, caught, castAt, reel, cancel, refresh, hideCatch, setReelX };
 }

@@ -1,3 +1,4 @@
+import { walkToCastDock, chargeCast } from './cast-player.browser-helper.mjs';
 import { assertReelLayout, trackReel } from './reel-player.browser-helper.mjs';
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
@@ -26,18 +27,18 @@ async function controllerChecks() {
     import { CatchCard } from '/src/features/pixel-world-phaser/ui/CatchCard.tsx';
     import { fishingOverride } from '/src/features/pixel-world-phaser/PixelWorldPhaser.tsx';
     window.fishingOverride = fishingOverride;
-    let difficulty = 1, remaining = -1, pending = null, finished = [], starts = 0, startDelay = 0, finishDelay = 0, frozen = false, shadows = [], time = null;
+    let difficulty = 1, remaining = -1, pending = null, finished = [], starts = 0, startSpots = [], startDelay = 0, finishDelay = 0, frozen = false, spots = [], time = null;
     const adapter = {
-      state: async () => ({ kstDate: '2026-10-08', phase: 'night', weather: 'rain', remaining, sparkleShadow: 1, pigeonHint: null, album: [] }),
-      start: async () => { starts++; await new Promise(r => setTimeout(r, startDelay)); pending = 'cast-' + starts; return { ok: true, castId: pending, shadow: 'L', biteDelayMs: 500, difficulty, big: true, pattern: 'quick', hint: null }; },
+      state: async () => ({ kstDate: '2026-10-08', phase: 'night', weather: 'rain', remaining, sparkleShadow: null, pigeonHint: null, album: [], spots: [{ id: 1, active: true, left: 3, readyAt: null }] }),
+      start: async (_pet, spot) => { startSpots.push(spot); starts++; await new Promise(r => setTimeout(r, startDelay)); pending = 'cast-' + starts; return { ok: true, castId: pending, shadow: 'L', biteDelayMs: 500, difficulty, big: true, pattern: 'quick', hint: null }; },
       finish: async (id, landed) => { finished.push({ id, landed }); await new Promise(r => setTimeout(r, finishDelay)); if (id !== pending) return { ok: false }; pending = null; if (!landed) return { ok: true, landed: false };  return { ok: true, landed: true, speciesId: 'pirami', lengthCm: 10.5, rarity: 'rare', isNew: true, isBig: true, isPersonalBest: true, remaining }; },
       board: async () => ({ rows: [], classSpecies: 0 })
     };
     function Probe() {
       const [scene, setScene] = useState('river');
-      const handle = useRef({ cancelWalk() {}, setShadows(value) { shadows = value; }, setWorldTime(phase, weather) { time = { phase, weather }; } });
+      const handle = useRef({ cancelWalk() {}, setHotspots(value) { spots = value; }, setWorldTime(phase, weather) { time = { phase, weather }; } });
       const fishing = useFishing({ adapter, handle, scene, pet: null, freeze: value => { frozen = value; } });
-      window.probe = { fishing, get frozen() { return frozen; }, get shadows() { return shadows; }, get time() { return time; }, get finished() { return finished; }, get starts() { return starts; }, setScene, setDifficulty: value => { difficulty = value; }, setRemaining: value => { remaining = value; }, setStartDelay: value => { startDelay = value; }, setFinishDelay: value => { finishDelay = value; } };
+      window.probe = { fishing, get frozen() { return frozen; }, get spots() { return spots; }, get time() { return time; }, get finished() { return finished; }, get starts() { return starts; }, get startSpots() { return startSpots; }, setScene, setDifficulty: value => { difficulty = value; }, setRemaining: value => { remaining = value; }, setStartDelay: value => { startDelay = value; }, setFinishDelay: value => { finishDelay = value; } };
       return React.createElement('div', { className: 'pwp-root', onContextMenu: event => { if (!event.target.closest('input, textarea, select, [contenteditable="true"]')) event.preventDefault(); } },
         React.createElement(PlazaChat, { disabled: false, onSend: async () => 'ok', onStatus() {} }),
         React.createElement('p', { id: 'phase' }, fishing.phase),
@@ -50,22 +51,22 @@ async function controllerChecks() {
   </script>`;
   await writeFile('.fishing-controller-fixture.html', fixture);
   await page.goto(`${BASE}/.fishing-controller-fixture.html`);
-  await page.waitForFunction(() => window.probe?.shadows.length === 3);
+  await page.waitForFunction(() => window.probe?.spots.length === 1);
   assert.equal(await page.evaluate(() => window.fishingOverride('?pwClock=21:30&pwWeather=rain', false)), undefined);
   assert.deepEqual(await page.evaluate(() => window.fishingOverride('?pwClock=21:30&pwWeather=rain', true)), { clock: '21:30', weather: 'rain' });
   assert.equal(await page.evaluate(() => window.fishingOverride('?pwClock=24:00&pwWeather=snow', true)), undefined);
-  assert.equal(await page.evaluate(() => window.probe.shadows[1].sparkle), true);
+  assert.equal(await page.evaluate(() => window.probe.spots[0].active), true);
   assert.deepEqual(await page.evaluate(() => window.probe.time), { phase: 'night', weather: 'rain' });
-  await page.evaluate(() => { window.probe.fishing.onShadowTap(0); window.probe.fishing.onShadowTap(1); });
+  await page.evaluate(() => { window.probe.fishing.castAt({ x: 344, y: 168 }); window.probe.fishing.castAt({ x: 344, y: 168 }); });
   await page.waitForFunction(() => window.probe.fishing.phase === 'casting');
   assert.equal(await page.evaluate(() => window.probe.frozen), true);
   await page.evaluate(() => window.probe.fishing.reel());
   await page.waitForFunction(() => !window.probe.fishing.busy);
   assert.equal(await page.locator('#message').textContent(), '너무 빨랐어요!');
-  assert.equal(await page.evaluate(() => window.probe.shadows.length), 3);
+  assert.equal(await page.evaluate(() => window.probe.spots.length), 1);
   assert.equal(await page.evaluate(() => window.probe.starts), 1);
   assert.equal(await page.evaluate(() => window.probe.finished[0].landed), false);
-  await page.evaluate(() => window.probe.fishing.onShadowTap(0));
+  await page.evaluate(() => window.probe.fishing.castAt({ x: 344, y: 168 }));
   await page.waitForFunction(() => window.probe.fishing.phase === 'bite');
   await page.evaluate(() => window.probe.fishing.reel());
   await page.getByTestId('reel-bar').waitFor();
@@ -75,17 +76,26 @@ async function controllerChecks() {
   assert.equal(await page.getByTestId('catch-card').evaluate(el => getComputedStyle(el).pointerEvents), 'none');
   await page.waitForFunction(() => !window.probe.frozen && window.probe.fishing.state.remaining === -1);
   await page.getByTestId('catch-card').waitFor({ state: 'hidden', timeout: 5000 });
-  await page.evaluate(() => { window.probe.setStartDelay(200); window.probe.fishing.onShadowTap(0); window.probe.fishing.cancel(); });
+  await page.evaluate(() => { window.probe.setStartDelay(200); window.probe.fishing.castAt({ x: 344, y: 168 }); window.probe.fishing.cancel(); });
   await page.waitForFunction(() => !window.probe.fishing.busy && window.probe.finished.length === 3);
   assert.equal(await page.evaluate(() => window.probe.finished[2].landed), false);
-  await page.evaluate(() => { window.probe.setStartDelay(0); window.probe.setFinishDelay(200); window.probe.fishing.onShadowTap(0); });
+  await page.evaluate(() => { window.probe.setStartDelay(0); window.probe.setFinishDelay(200); window.probe.fishing.castAt({ x: 344, y: 168 }); });
   await page.waitForFunction(() => window.probe.fishing.phase === 'casting');
-  await page.evaluate(() => { window.probe.fishing.cancel(); window.probe.fishing.cancel(); window.probe.fishing.onShadowTap(0); });
+  await page.evaluate(() => { window.probe.fishing.cancel(); window.probe.fishing.cancel(); window.probe.fishing.castAt({ x: 344, y: 168 }); });
   await page.waitForFunction(() => !window.probe.fishing.busy);
   assert.equal(await page.evaluate(() => window.probe.finished.length), 4);
+  assert.equal(await page.evaluate(() => window.probe.startSpots[0]), 1);
+  await page.evaluate(() => window.probe.fishing.castAt({ x: 400, y: 300 }));
+  await page.waitForFunction(() => window.probe.fishing.phase === 'bite');
+  await page.evaluate(() => window.probe.fishing.cancel());
+  await page.waitForFunction(() => !window.probe.fishing.busy);
+  assert.equal(await page.evaluate(() => window.probe.startSpots.at(-1)), null);
+  const startsBeforeDry = await page.evaluate(() => window.probe.starts);
+  await page.evaluate(() => window.probe.fishing.castAt({ x: 280, y: 184 }));
+  assert.equal(await page.evaluate(() => window.probe.starts), startsBeforeDry);
   await page.evaluate(() => { window.probe.setRemaining(0); window.probe.fishing.refresh(); });
-  await page.waitForFunction(() => window.probe.shadows.length === 3);
-  await page.evaluate(() => { window.probe.setFinishDelay(0); window.probe.fishing.onShadowTap(0); });
+  await page.waitForFunction(() => window.probe.spots.length === 1);
+  await page.evaluate(() => { window.probe.setFinishDelay(0); window.probe.fishing.castAt({ x: 344, y: 168 }); });
   await page.waitForFunction(() => window.probe.fishing.phase === 'bite');
   await page.evaluate(() => window.probe.fishing.reel());
   await page.getByTestId('reel-bar').waitFor();
@@ -101,13 +111,13 @@ await page.waitForFunction(() => !window.probe.fishing.busy, null, { timeout: 80
   assert.doesNotMatch(await page.locator('body').textContent(), /budget|6\/day/);
   assert.equal(await page.getByText('오늘 남은 낚시', { exact: false }).count(), 0);
   assert.equal(await page.getByText('오늘은 물고기들이 쉬고 있어요.', { exact: false }).count(), 0);
-  await page.evaluate(() => window.probe.fishing.onShadowTap(0));
+  await page.evaluate(() => window.probe.fishing.castAt({ x: 344, y: 168 }));
   await page.waitForFunction(() => window.probe.fishing.phase === 'bite');
   await page.evaluate(() => window.probe.fishing.reel());
   await page.getByTestId('reel-bar').waitFor();
   await page.waitForFunction(() => !window.probe.fishing.busy);
   assert.equal(await page.evaluate(() => window.probe.finished.at(-1).landed), false, 'no taps escapes');
-  await page.evaluate(() => window.probe.fishing.onShadowTap(0));
+  await page.evaluate(() => window.probe.fishing.castAt({ x: 344, y: 168 }));
   await page.waitForFunction(() => window.probe.fishing.phase === 'bite');
   await page.evaluate(() => window.probe.fishing.reel());
   await page.mouse.move(20, 300); await page.mouse.down();
@@ -120,7 +130,7 @@ await page.waitForFunction(() => !window.probe.fishing.busy, null, { timeout: 80
   await page.mouse.up();
   await page.waitForFunction(() => !window.probe.fishing.busy);
   assert.equal(await page.evaluate(() => window.probe.finished.at(-1).landed), false);
-  await page.evaluate(() => window.probe.fishing.onShadowTap(0));
+  await page.evaluate(() => window.probe.fishing.castAt({ x: 344, y: 168 }));
   await page.waitForFunction(() => window.probe.fishing.phase === 'bite');
   await page.evaluate(() => window.probe.fishing.reel());
   await page.locator('.pwp-root').dispatchEvent('pointerdown', { pointerId: 101, pointerType: 'touch', button: 0 });
@@ -132,7 +142,7 @@ await page.waitForFunction(() => !window.probe.fishing.busy, null, { timeout: 80
   assert.equal(await page.evaluate(() => window.probe.fishing.reelState.tapCount), 1, 'compatibility and duplicate events do not boost twice');
   await page.evaluate(() => window.probe.fishing.cancel());
   await page.waitForFunction(() => !window.probe.fishing.busy);
-  await page.evaluate(() => window.probe.fishing.onShadowTap(0));
+  await page.evaluate(() => window.probe.fishing.castAt({ x: 344, y: 168 }));
   await page.waitForFunction(() => window.probe.fishing.phase === 'bite');
   await page.evaluate(() => window.probe.fishing.reel());
   await page.keyboard.down('ArrowRight'); await page.waitForTimeout(120); await page.keyboard.up('ArrowRight');
@@ -157,7 +167,7 @@ await page.waitForFunction(() => !window.probe.fishing.busy, null, { timeout: 80
   for (const width of [390, 1180]) for (const difficulty of [1, 5]) {
     await page.setViewportSize({ width, height: 844 });
     await page.evaluate(d => window.probe.setDifficulty(d), difficulty);
-    await page.evaluate(() => window.probe.fishing.onShadowTap(0));
+    await page.evaluate(() => window.probe.fishing.castAt({ x: 344, y: 168 }));
     await page.waitForFunction(() => window.probe.fishing.phase === 'bite');
     await page.evaluate(() => window.probe.fishing.reel());
     await page.getByTestId('reel-bar').waitFor();
@@ -172,7 +182,7 @@ await page.waitForFunction(() => !window.probe.fishing.busy, null, { timeout: 80
     await tapToLand(page, width === 390 ? 'touch' : 'pen');
     await page.waitForFunction(() => !window.probe.fishing.busy);
   }
-  await page.evaluate(() => window.probe.fishing.onShadowTap(0));
+  await page.evaluate(() => window.probe.fishing.castAt({ x: 344, y: 168 }));
   await page.waitForFunction(() => window.probe.fishing.phase === 'bite');
   await page.evaluate(() => window.probe.fishing.reel());
   await page.keyboard.press('b');
@@ -180,7 +190,7 @@ await page.waitForFunction(() => !window.probe.fishing.busy, null, { timeout: 80
   assert.equal(await page.evaluate(() => window.probe.finished.at(-1).landed), false);
   assert.deepEqual(errors, []);
   await page.close();
-  console.log('PASS isolated controller: shadows, sparkle, tint, duplicate tap, early retry, landed refresh, catch toast, pending cancellation, finish lock, unlimited, timestamped reel taps, pen cancellation');
+  console.log('PASS isolated controller: active hotspots, tint, duplicate tap, early retry, landed refresh, catch toast, pending cancellation, finish lock, unlimited, timestamped reel taps, pen cancellation');
 }
 async function enterRiver(page, query = '', walkToDock = true) {
   await page.goto(`${BASE}/tests/pixel-world-phaser/harness.html?fishing=1&pet=none${query}`);
@@ -195,16 +205,10 @@ async function enterRiver(page, query = '', walkToDock = true) {
   });
   await page.waitForFunction(() => window.__pixelWorldPhaser.debug().scene === 'river' && !window.__pixelWorldPhaser.debug().transitioning);
   if (!walkToDock) return;
-  // 선착장 끝(물가 자리 11,11)까지 걸어가 그 자리에서 바로 던진다(강가 꾸미기 이후 배치).
-  await page.evaluate(() => { const h = window.__pixelWorldPhaser, d = h.debug(); h.walkToScreen((11 * 16 + 8 - d.camera.x) * d.cssZoom, (11 * 16 + 8 - d.camera.y) * d.cssZoom); });
-  await page.waitForFunction(() => { const d = window.__pixelWorldPhaser.debug(); return !d.moving && d.pathLength === 0 && d.x > 11 * 16; }, null, { timeout: 20000 });
-  await page.waitForTimeout(400);
+  await walkToCastDock(page);
 }
-async function tapShadow(page) {
-  await page.waitForFunction(() => window.__pixelWorldPhaser.debug().targets['shadow:0']);
-  const point = await page.evaluate(() => window.__pixelWorldPhaser.debug().targets['shadow:0']);
-  await page.locator('.pwp-surface').tap({ position: point });
-}
+async function throwCast(page) { await chargeCast(page); }
+
 try {
   if (process.env.PWP_INTEGRATION_ONLY !== '1') await controllerChecks();
   if (process.env.PWP_CONTROLLER_ONLY === '1') {
@@ -214,7 +218,7 @@ try {
     const context = await browser.newContext({ viewport, hasTouch: true });
     const page = await context.newPage();
     const errors = []; page.on('pageerror', error => errors.push(error.message));
-    await enterRiver(page); await tapShadow(page);
+    await enterRiver(page); await throwCast(page);
     const before = await page.evaluate(() => window.__pixelWorldPhaser.debug());
     await page.keyboard.down('ArrowLeft'); await page.waitForTimeout(120); await page.keyboard.up('ArrowLeft');
     const after = await page.evaluate(() => window.__pixelWorldPhaser.debug());
@@ -248,7 +252,7 @@ try {
     await tapToLand(page);
     assert.equal(await page.getByTestId('catch-card').evaluate(el => getComputedStyle(el).pointerEvents), 'none');
     await page.getByTestId('catch-card').waitFor({ state: 'hidden', timeout: 5000 });
-    await tapShadow(page);
+    await throwCast(page);
     await page.waitForFunction(() => document.querySelector('.pwp-root')?.dataset.fishingPhase === 'bite');
     await page.locator('.pwp-btn-a').tap();
     await page.getByTestId('reel-bar').waitFor();
@@ -265,9 +269,9 @@ try {
     await page.mouse.up();
     await page.waitForFunction(() => document.querySelector('.pwp-root')?.dataset.fishingBusy === 'false');
     assert.equal(await page.getByTestId('catch-card').count(), 0, 'long press cannot land fish');
-    await tapShadow(page); await page.locator('.pwp-btn-a').tap();
+    await throwCast(page); await page.locator('.pwp-btn-a').tap();
     await page.getByText('너무 빨랐어요!', { exact: true }).waitFor();
-    await page.waitForFunction(() => !!window.__pixelWorldPhaser.debug().targets['shadow:0']);
+    await page.waitForFunction(() => document.querySelector('.pwp-root')?.dataset.fishingBusy === 'false');
     assert.deepEqual(errors, []);
     assert.equal(await page.getByText('오늘 남은 낚시', { exact: false }).count(), 0);
     assert.equal(await page.getByText('오늘은 물고기들이 쉬고 있어요.', { exact: false }).count(), 0);

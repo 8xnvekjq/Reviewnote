@@ -3,8 +3,8 @@ import type Phaser from 'phaser';
 import type { Point } from '../logic/joystick';
 import type { FishingGame } from '../logic/fishingGame';
 
-export interface FishingAnchors { castFrom: Point; shadowPoint(index: number): Point }
-export interface FishingEffects { update(game: FishingGame, index: number, now: number): void; clear(): void; destroy(): void }
+export interface FishingAnchors { castFrom: Point }
+export interface FishingEffects { update(game: FishingGame, to: Point, now: number): void; clear(): void; destroy(): void }
 const sheets = import.meta.glob('../assets/fishing/*.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
 // RiverScene.preload에서 호출한다. 누락된 그림은 도형으로 대신한다.
 export function preloadFishingFx(scene: Phaser.Scene) {
@@ -29,8 +29,8 @@ export function createFishingFx(scene: Phaser.Scene, anchors: FishingAnchors): F
     for (const object of transient) { scene.tweens.killTweensOf(object); object.destroy(); }
     transient.clear(); previous = 'idle';
   };
-  const update = (game: FishingGame, index: number, now: number) => {
-    const from = anchors.castFrom, to = anchors.shadowPoint(index);
+  const update = (game: FishingGame, to: Point, now: number) => {
+    const from = anchors.castFrom;
     if (game.phase === 'casting' || game.phase === 'waiting' || game.phase === 'bite') {
       const progress = Math.max(0, Math.min(1, (now - game.startedAt) / Math.max(1, game.castDurationMs)));
       const x = from.x + (to.x - from.x) * progress;

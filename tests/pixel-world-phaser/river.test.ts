@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { yardScene, RIVER_EXIT_CELLS } from '../../src/features/pixel-world-phaser/logic/yardWorld.ts';
-import { riverScene, riverWater, inDock, DOCK, RIVER_DECORATIONS, decorationCells, BANK_SPOTS, canCastFrom, nearestBankSpot, bankEdge, RIVER_COLS, RIVER_ROWS } from '../../src/features/pixel-world-phaser/logic/riverWorld.ts';
+import { riverScene, riverWater, inDock, DOCK, RIVER_DECORATIONS, decorationCells, bankEdge, RIVER_COLS, RIVER_ROWS } from '../../src/features/pixel-world-phaser/logic/riverWorld.ts';
 import { buildScene, entrySpawn, exitAt, exitCells } from '../../src/features/pixel-world-phaser/logic/scenes.ts';
 import { cellCenter, cellOf, feetBlocked, planPath, facedInteractable, facingToward } from '../../src/features/pixel-world-phaser/logic/world.ts';
 import { worldTint, fallbackWorldTime } from '../../src/features/pixel-world-phaser/logic/worldTint.ts';
@@ -71,22 +71,6 @@ test('decoration footprints block feet while flowers remain walkable', () => {
     assert.equal(feetBlocked(cellCenter(cell), spec.solid), d.blocking);
   }
 });
-test('every fishing spot is reachable and adjacent to water', () => {
-  const spec = riverScene(), from = cellOf(entrySpawn(spec, 'fromYard').feet);
-  for (const spot of BANK_SPOTS) {
-    assert.ok(!spec.solid(spot));
-    assert.deepEqual(planPath(from, spot, spec, exitCells(spec)).at(-1), spot);
-    const water = [[1,0],[-1,0],[0,1],[0,-1]].map(([dx,dy]) => ({ x: spot.x + dx, y: spot.y + dy })).find(riverWater);
-    assert.ok(water);
-    const shadow = cellCenter(water);
-    assert.ok(canCastFrom(cellCenter(spot), shadow));
-    assert.ok(nearestBankSpot(shadow, cellCenter(from)));
-    assert.ok(!canCastFrom(cellCenter({ x: 2, y: 11 }), shadow));
-  }
-  let wet = 0;
-  for (let y = 0; y < RIVER_ROWS; y++) for (let x = 0; x < RIVER_COLS; x++) if (riverWater({ x, y })) wet++;
-  assert.ok(wet > RIVER_COLS * RIVER_ROWS / 2);
-});
 test('entry viewport includes open water at phone and tablet sizes', async () => {
   const { cameraZoom, cameraCenterAxis } = await import('../../src/features/pixel-world-phaser/logic/layout.ts');
   const feet = entrySpawn(riverScene(), 'fromYard').feet;
@@ -94,47 +78,6 @@ test('entry viewport includes open water at phone and tablet sizes', async () =>
     const view = width / cameraZoom(width, height);
     const right = cameraCenterAxis(feet.x, view, RIVER_COLS * 16) + view / 2;
     assert.ok(right - bankEdge(9) * 16 >= 16);
-  }
-});
-
-test('cast range measures the shore rather than the selected landing spot', () => {
-  const shadow = { x: 152, y: 230 };
-  assert.ok(canCastFrom(cellCenter({ x: 4, y: 14 }), shadow));
-  assert.ok(!canCastFrom(cellCenter({ x: 3, y: 14 }), shadow));
-  assert.ok(canCastFrom(entrySpawn(riverScene(), 'fromYard').feet, { x: 208, y: 183 }));
-  assert.ok(!canCastFrom(cellCenter({ x: 8, y: 14 }), shadow));
-});
-
-test('three extra dock tiles connect to the bank and support casting on both sides and the tip', () => {
-  const spec = riverScene(), from = cellOf(entrySpawn(spec, 'fromYard').feet);
-  assert.equal(DOCK.right, 14);
-  for (let x = 12; x <= DOCK.right; x++) {
-    const spot = { x, y: DOCK.top };
-    assert.ok(inDock(spot));
-    assert.ok(!spec.solid(spot));
-    assert.ok(!feetBlocked(cellCenter(spot), spec.solid));
-    assert.deepEqual(planPath(from, spot, spec, exitCells(spec)).at(-1), spot);
-    for (const y of [DOCK.top - 1, DOCK.top + 1]) {
-      assert.ok(riverWater({ x, y }));
-      assert.ok(canCastFrom(cellCenter(spot), cellCenter({ x, y })));
-    }
-  }
-  const tip = { x: DOCK.right, y: DOCK.top };
-  assert.ok(BANK_SPOTS.some(spot => spot.x === tip.x && spot.y === tip.y));
-  assert.ok(canCastFrom(cellCenter(tip), cellCenter({ x: DOCK.right + 1, y: DOCK.top })));
-  assert.ok(!canCastFrom(cellCenter(tip), cellCenter(tip)));
-  assert.deepEqual(nearestBankSpot(cellCenter({ x: DOCK.right + 1, y: DOCK.top }), cellCenter(from)), tip);
-});
-
-test('all three moving fish shadows stay in water and can be reached from a fishing spot', () => {
-  const spec = riverScene(), from = cellCenter(cellOf(entrySpawn(spec, 'fromYard').feet));
-  for (let seconds = 0; seconds <= 300; seconds++) for (let index = 0; index < 3; index++) {
-    const shadow = { x: (index === 1 ? 13 : 9.5) * 16 + Math.sin(seconds * .28 + index * 2) * 9,
-      y: [144, 183, 230][index] + Math.cos(seconds * .21 + index) * 6 };
-    assert.ok(riverWater(cellOf(shadow)), `shadow ${index} at ${seconds}s`);
-    const spot = nearestBankSpot(shadow, from);
-    assert.ok(spot);
-    assert.ok(canCastFrom(cellCenter(spot), shadow));
   }
 });
 
@@ -148,4 +91,17 @@ test('expanded fish art preserves the original RGBA bytes and has five nonempty 
   assert.deepEqual(art.junkSize, [48, 16]);
   assert.equal(art.opaquePixels.length, 5);
   assert.ok(art.opaquePixels.every((count: number) => count > 0 && count < 256));
+});
+
+test('dock has eleven columns and three fully walkable rows without decorations or hotspots', async () => {
+  const { HOTSPOTS, HOTSPOT_RADIUS } = await import('../../src/features/pixel-world-phaser/logic/hotspots.ts');
+  assert.deepEqual(DOCK, { left: 7, right: 17, top: 10, bottom: 12 });
+  const spec = riverScene(), start = cellOf(entrySpawn(spec, 'fromYard').feet);
+  for (let x = 7; x <= 17; x++) for (let y = 10; y <= 12; y++) {
+    const cell = { x, y };
+    assert.ok(inDock(cell)); assert.ok(!spec.solid(cell)); assert.ok(!riverWater(cell));
+    assert.deepEqual(planPath(start, cell, spec, exitCells(spec)).at(-1), cell);
+    assert.ok(!RIVER_DECORATIONS.flatMap(decorationCells).some(c => c.x === x && c.y === y));
+    for (const spot of HOTSPOTS) assert.ok(Math.hypot(cellCenter(spot.cell).x - cellCenter(cell).x, cellCenter(spot.cell).y - cellCenter(cell).y) > HOTSPOT_RADIUS + 8);
+  }
 });
