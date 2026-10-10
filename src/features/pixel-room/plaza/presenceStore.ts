@@ -137,6 +137,8 @@ function sanitizePlayerState(raw: PlazaPlayerState, bounds: PresenceBounds): Pla
 
 // 정책 요약(중복/재접속 세션 처리):
 //
+// - (2026-10 변경) presence는 이제 가끔만 track되므로, broadcast로 받은 상태가 seq·updatedAt 둘 다
+//   더 새것이면 presence-sync/join이 위치를 되돌리지 않는다(newerThanPresence). 아래 설명은 그 외의 경우.
 // - presence-sync / presence-join은 항상 그대로 반영한다(seq 비교 없음). Supabase Presence는
 //   서버가 "이 key의 현재 상태"로 이미 합의를 끝낸 값을 밀어주는 채널이라, 클라이언트 입장에서는
 //   "presence가 말하는 현재 상태"가 곧 진실이다. 탭이 새로고침되면 PixelRoom.tsx가 sessionId 자체를
@@ -167,6 +169,12 @@ function sanitizePlayerState(raw: PlazaPlayerState, bounds: PresenceBounds): Pla
 // - presence-sync도 대칭적으로 신원 확인을 한 번 거친다: sync에 들어있는 항목의 presence_ref가
 //   recentlyLeftRefs(우리가 이미 명시적으로 leave 처리를 확인한 join들)에 있으면, 그 항목은
 //   sync에서 빼고 취급한다 — 위 PlazaStoreState.recentlyLeftRefs 주석 참고.
+/** broadcast로 이미 받은 상태가 presence 값보다 새것인가 — 같은 보낸이의 seq와 시계가 둘 다 앞서야
+ * 한다. 탭을 새로 연 재접속(seq가 처음부터 다시 시작)은 시계가 더 늦으므로 presence 쪽이 이긴다. */
+function newerThanPresence(existing: PlazaPlayerState, presence: PlazaPlayerState): boolean {
+  return existing.seq > presence.seq && existing.updatedAt > presence.updatedAt;
+}
+
 /** 채널마다 좌표 범위만 다른 같은 reducer. 광장은 plazaStoreReducer(16×12), 강가는 자기 크기로 만든다. */
 export function createPlazaStoreReducer(bounds: PresenceBounds) {
   return (state: PlazaStoreState, action: PlazaStoreAction) => reducePlazaStore(state, action, bounds);
@@ -186,8 +194,18 @@ function reducePlazaStore(state: PlazaStoreState, action: PlazaStoreAction, boun
         // 진짜 재입장을 놓치는 게 아니라 "이미 끝난 그 join"만 걸러낼 뿐이다.
         if (state.recentlyLeftRefs.has(presenceRef)) continue;
         const sanitized = sanitizePlayerState(player, bounds);
-        players.set(sanitized.sessionId, sanitized);
         presenceRefs.set(sanitized.sessionId, presenceRef);
+        // presence는 이제 가끔만 갱신되므로(접속·옷 변경·멈춘 뒤 잠시 후), 그 사이 broadcast로 받은
+        // 더 새 상태가 있으면 그대로 둔다 — 다른 학생이 들어올 때마다 오는 sync가 모두를 예전
+        // 자리로 되돌리던(순간이동) 것을 막는다.
+        const existing = state.players.get(sanitized.sessionId);
+        if (existing && newerThanPresence(existing, sanitized)) {
+          players.set(existing.sessionId, existing);
+          const path = state.paths.get(existing.sessionId);
+          if (path) paths.set(existing.sessionId, path);
+          continue;
+        }
+        players.set(sanitized.sessionId, sanitized);
         // sync는 "지금 이 순간의 완전한 명단"이다 — 그 이전 경로는 우리가 관측하지 못했던
         // 구간이므로 재생하지 않고, 이 좌표 하나를 새 출발점으로 삼는다(스푼 없이 그 자리에서
         // 시작). 기존에 알고 있던 이력은 sync로 대체되므로 함께 초기화한다.
@@ -202,8 +220,10 @@ function reducePlazaStore(state: PlazaStoreState, action: PlazaStoreAction, boun
       let paths = state.paths;
       for (const { player, presenceRef } of action.players) {
         const sanitized = sanitizePlayerState(player, bounds);
-        players.set(sanitized.sessionId, sanitized);
         presenceRefs.set(sanitized.sessionId, presenceRef);
+        const existing = players.get(sanitized.sessionId);
+        if (existing && newerThanPresence(existing, sanitized)) continue; // sync와 같은 이유
+        players.set(sanitized.sessionId, sanitized);
         // presence-join은 이동 시작/정지 전이, appearance 변경, 최초 입장에서만 온다(빈도 낮음,
         // 항상 신뢰). moving:false 전이의 경우 "실제 최종 도착 칸"을 담고 있으므로, 혹시 그 사이
         // broadcast 일부가 유실되더라도 경로의 마지막 지점은 반드시 정확하게 재생되도록 이

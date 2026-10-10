@@ -78,7 +78,8 @@ try {
           const p = window.__pixelWorldPhaser.debug().classmates[0];
           return p.riding && p.mountAnimation?.startsWith('bear-ride:') && !p.follower && p.avatarPosition.cropped;
         });
-        assert.equal(await a.evaluate(() => window.plazaTransport.last().riding), true, 'stationary mount updates presence');
+        // 상대 화면은 broadcast로 바로 바뀌고(위), presence는 3초 모아서, 30초 4번 예산 안에서 갱신된다.
+        await a.waitForFunction(() => window.plazaTransport.last().riding === true, null, { timeout: 35000 });
         await a.bringToFront();
         await a.keyboard.down('ArrowRight');
         await a.waitForTimeout(200);
@@ -93,7 +94,7 @@ try {
           const p = window.__pixelWorldPhaser.debug().classmates[0];
           return !p.riding && !p.mountAnimation && p.follower && !p.avatarPosition.cropped;
         });
-        assert.equal(await a.evaluate(() => window.plazaTransport.last().riding), false, 'stationary dismount updates presence');
+        await a.waitForFunction(() => window.plazaTransport.last().riding === false, null, { timeout: 35000 });
         await a.waitForTimeout(800);
         await b.screenshot({ path: `${shots}/${scene}-bear-dismounted.png` });
         await a.evaluate(topic => {

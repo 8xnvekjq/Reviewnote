@@ -524,3 +524,17 @@ test('recentlyLeftRefs는 MAX_RECENTLY_LEFT_REFS를 넘으면 가장 오래된 �
   // 가장 최근(ref-total)은 여전히 기억하고 있어야 한다.
   assert.ok(state.recentlyLeftRefs.has(`ref-${total}`));
 });
+
+test('presence-sync/join은 broadcast로 이미 받은 더 새 상태(seq·시각 모두 앞섬)를 예전 자리로 되돌리지 않는다', () => {
+  const joined = plazaStoreReducer(createPlazaStoreState(), { type: 'presence-join', players: [withRef(makePlayer({ seq: 2, x: 1, y: 1, updatedAt: 1000 }))] });
+  const moved = plazaStoreReducer(joined, { type: 'broadcast', player: makePlayer({ seq: 9, x: 7, y: 5, updatedAt: 9000 }) });
+  // 다른 학생이 들어오며 온 sync: 이 학생의 presence는 아직 예전 값(seq 2)
+  const synced = plazaStoreReducer(moved, { type: 'presence-sync', players: [withRef(makePlayer({ seq: 2, x: 1, y: 1, updatedAt: 1000 })), withRef(makePlayer({ sessionId: 'new', seq: 1 }), 'ref-n')] });
+  assert.deepEqual(synced.players.get('session-a'), makePlayer({ seq: 9, x: 7, y: 5, updatedAt: 9000 }));
+  assert.ok(synced.players.has('new'));
+  assert.deepEqual(synced.paths.get('session-a'), moved.paths.get('session-a'));
+  const rejoined = plazaStoreReducer(moved, { type: 'presence-join', players: [withRef(makePlayer({ seq: 3, x: 1, y: 1, updatedAt: 2000 }), 'ref-b')] });
+  assert.deepEqual(rejoined.players.get('session-a'), makePlayer({ seq: 9, x: 7, y: 5, updatedAt: 9000 }));
+  // presenceRef는 새것으로 갱신되어 그 뒤의 진짜 leave는 정상 처리된다
+  assert.equal(plazaStoreReducer(rejoined, { type: 'presence-leave', leaves: [{ sessionId: 'session-a', presenceRef: 'ref-b' }] }).players.size, 0);
+});

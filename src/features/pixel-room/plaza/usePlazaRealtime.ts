@@ -15,6 +15,7 @@ import { REACTION_COOLDOWN_MS, nearWell } from './plazaInteractions';
 import type { ReactionKind } from './plazaInteractions';
 import { usePlazaChat } from './usePlazaChat';
 import { CHAT_COOLDOWN_MS, CHAT_EVENT, normalizeChat } from './plazaChat';
+import { presenceTrackDelay, recordPresenceTrack } from './presenceTrackBudget';
 
 const MOVE_BROADCAST_EVENT = 'move';
 
@@ -209,6 +210,40 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
   const appearanceRef = useRef(appearance);
   appearanceRef.current = appearance;
 
+  // presence track은 30초에 4번까지만(presenceTrackBudget.ts). 넘칠 것 같으면 한 번으로 모아 나중에 보낸다.
+  const trackTimesRef = useRef<number[]>([]);
+  const trackTimerRef = useRef<number | null>(null);
+  const announceTimerRef = useRef<number | null>(null);
+  const lastTrackedAppearanceRef = useRef(appearance);
+
+  /** presence에 내 최신 상태를 올린다. 이미 예약돼 있으면 그 예약이 최신 상태로 보낸다. */
+  function requestTrack(delayMs = 0) {
+    if (trackTimerRef.current !== null) return;
+    const run = () => {
+      trackTimerRef.current = null;
+      const channel = channelRef.current;
+      if (!channel) return;
+      const now = Date.now();
+      const wait = presenceTrackDelay(trackTimesRef.current, now);
+      if (wait > 0) { trackTimerRef.current = window.setTimeout(run, wait); return; }
+      trackTimesRef.current = recordPresenceTrack(trackTimesRef.current, now);
+      lastTrackedAppearanceRef.current = appearanceRef.current;
+      seqRef.current += 1;
+      plazaDebugLog('send:track', sessionId, { seq: seqRef.current });
+      void channel.track(buildSelfState(seqRef.current));
+    };
+    if (delayMs > 0) trackTimerRef.current = window.setTimeout(run, delayMs);
+    else run();
+  }
+
+  /** 내 지금 상태를 broadcast로 한 번 알린다(가볍고 횟수 제한 없음). */
+  function broadcastSelf() {
+    const channel = channelRef.current;
+    if (!channel) return;
+    seqRef.current += 1;
+    void channel.send({ type: 'broadcast', event: MOVE_BROADCAST_EVENT, payload: buildSelfState(seqRef.current) });
+  }
+
   function buildSelfState(seq: number): PlazaPlayerState {
     const self = selfRef.current;
     return {
@@ -296,6 +331,14 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
         const players = (newPresences as RawPresenceEntry[]).map(p => ({ player: p, presenceRef: p.presence_ref }));
         plazaDebugLog('recv:presence-join', players.map(({ player: p, presenceRef }) => `${p.sessionId}(${p.x},${p.y})#${p.seq} moving=${p.moving} ref=${presenceRef}`), { t: performance.now().toFixed(1) });
         dispatch({ type: 'presence-join', players });
+        // 새로 들어온 학생은 presence의 (조금 예전일 수 있는) 자리만 안다 — 지금 내 자리를 broadcast로
+        // 한 번 알려 준다. 여럿이 한꺼번에 답하지 않게 조금씩 흩어서, 몰려 들어와도 한 번만.
+        if (players.some(({ player }) => player.sessionId !== sessionId) && announceTimerRef.current === null) {
+          announceTimerRef.current = window.setTimeout(() => {
+            announceTimerRef.current = null;
+            if (!cancelled && channel === nextChannel) broadcastSelf();
+          }, 150 + Math.random() * 450);
+        }
       });
 
       nextChannel.on<PlazaPlayerState>('presence', { event: 'leave' }, ({ leftPresences }) => {
@@ -334,8 +377,7 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
         plazaDebugLog('channel:status', sessionId, { status, seq: seqRef.current });
         if (status === 'SUBSCRIBED') {
           reconnectAttempt = 0; // 정상적으로 붙었으니 다음에 다시 끊기면 backoff를 처음부터 센다
-          seqRef.current += 1;
-          void nextChannel.track(buildSelfState(seqRef.current));
+          requestTrack();
           return;
         }
         // CHANNEL_ERROR / TIMED_OUT / CLOSED — 예전에는 여기서 아무것도 하지 않아서(issue #2) 한
@@ -372,6 +414,10 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
     return () => {
       cancelled = true;
       clearReconnectTimer();
+      for (const timer of [trackTimerRef, announceTimerRef]) {
+        if (timer.current !== null) window.clearTimeout(timer.current);
+        timer.current = null;
+      }
       window.removeEventListener('beforeunload', handleBeforeUnload);
       channelRef.current = null;
       setReady(false);
@@ -382,13 +428,12 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
-  // appearance가 바뀌면(옷 갈아입기) presence만 갱신한다 — 매 tick마다 도는 게 아니라 실제로
-  // 값이 바뀐 순간에만이므로 브리핑이 요구한 "appearance 변경 시" 조건과 정확히 일치한다.
+  // appearance가 실제로 바뀌면(옷 갈아입기) 곧바로 broadcast로 보여 주고, presence는 예산 안에서
+  // 갱신한다. 예전엔 ready가 켜질 때마다(=재접속마다) 한 번 더 track해서 예산을 갉아먹었다.
   useEffect(() => {
-    const channel = channelRef.current;
-    if (!channel || !ready) return;
-    seqRef.current += 1;
-    void channel.track(buildSelfState(seqRef.current));
+    if (!channelRef.current || !ready || lastTrackedAppearanceRef.current === appearance) return;
+    broadcastSelf();
+    requestTrack();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appearance, ready]);
 
@@ -408,24 +453,12 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
       plazaDebugLog('send:broadcast', sessionId, `(${state.x},${state.y})#${state.seq}`, { moving: state.moving, t: performance.now().toFixed(1) });
       void channel.send({ type: 'broadcast', event: MOVE_BROADCAST_EVENT, payload: state });
 
-      // Presence(track): 무거운 경로이므로 "이동 정지" 전이에서만 갱신한다 — moving 값이 실제로
-      // 바뀔 때 전부가 아니라 true->false(멈춤)일 때만 track을 호출한다. 실제 Supabase
-      // realtime_logs로 확인된 원인(2026-09 3차 조사): 우리 자신의 track() 트래픽이
-      // ClientPresenceRateLimitReached를 반복적으로 유발해 채널이 주기적으로 끊기고, 그때마다
-      // presence-sync가 상대 화면을 순간이동시켰다 — "5초 정상 → 5초 정지 → 순간이동" 패턴의
-      // 근본 원인. false->true(이동 시작)에서는 더 이상 track하지 않는다: 시작 직후 곧바로
-      // broadcast가 170ms 간격으로 나가므로(바로 아래), "이동 시작"을 presence로 한 번 더 알릴
-      // 필요가 없다 — 알려주는 정보가 broadcast보다 최대 170ms 빠를 뿐이고, 그 정도는 아무도
-      // 못 느낀다. 반면 정지 시의 track은 그대로 유지한다 — 정지하면 broadcast가 더 이상 안
-      // 나가므로(정책 그대로), "내가 최종적으로 멈춘 그 칸"을 presence로 알려주는 게 유일한
-      // 신호이기 때문이다. 이 변경만으로 이동당 track() 호출이 2번에서 1번으로 절반이 된다.
-      if (petChanged && (partial.moving || !movingRef.current)) void channel.track(state);
-      if (!partial.moving && movingRef.current) {
-        movingRef.current = false;
-        void channel.track(state);
-      } else if (partial.moving !== movingRef.current) {
-        movingRef.current = partial.moving;
-      }
+      // Presence(track): 30초에 5번을 넘으면 서버가 채널을 닫는다(presenceTrackBudget.ts). 멈춤·펫·탈것
+      // 변화는 위 broadcast로 이미 모두에게 갔으므로, presence는 늦게 들어올 학생용 "대략 최근
+      // 자리"만 맡는다 — 멈춘 뒤 3초 모았다가 예산 안에서 한 번. 늦게 들어온 학생에게는 join을
+      // 본 모두가 broadcast로 지금 자리를 다시 알려 준다(presence-join 핸들러).
+      if (petChanged || (!partial.moving && movingRef.current)) requestTrack(3000);
+      movingRef.current = partial.moving;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
