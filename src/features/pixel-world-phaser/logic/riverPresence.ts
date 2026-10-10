@@ -176,7 +176,7 @@ export function expireFishStore(store: RiverFishStore, now: number, roster: { ha
 /** 머리 위 구름 글. 숫자는 소수 한 자리. */
 export const catchBubbleText = (c: Pick<PeerCatch, 'name' | 'lengthCm'>) => `${c.name} ${c.lengthCm.toFixed(1)}cm!`;
 /** 희귀·전설 물고기는 모두에게 작은 반짝임을 보여 준다. */
-export const celebratesCatch = (rarity: FishRarity) => rarity === 'rare' || rarity === 'legendary';
+export const celebratesCatch = (rarity: FishRarity) => rarity === 'rare' || rarity === 'legendary' || rarity === 'mythic';
 
 /** Phaser 쪽에 넘기는 친구 낚시 모양(그리기에 필요한 것만). */
 export interface RiverPeerFishing { phase: RiverFishPhase; target: Point | null; since: number; sparkleAt: number | null }

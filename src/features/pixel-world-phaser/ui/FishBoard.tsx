@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { peerSolutionLabelParts } from '../../exam/ui/peerSolution';
 import { validAnimalFace } from '../../../utils/animalFace';
-import { fishById } from '../logic/fishCatalog';
+import { FISH_CATALOG, RARITY_STARS, fishById } from '../logic/fishCatalog';
 import type { ClassFishBoard, FishingAdapter } from './fishingAdapter';
 import { FishIcon } from './FishAlbum';
 import { Window } from './GamePanels';
@@ -32,10 +32,10 @@ export function FishBoard({ adapter, onClose }: { adapter?: FishingAdapter; onCl
   return <Window title="이번 주 물고기 랭킹" onClose={onClose}><div className="pwp-panel-content pwp-fishing-content">
     <p>이번 주에 잡은 가장 큰 물고기 순서예요. 월요일에 새로 시작해요.</p>
     {!adapter ? <p role="status">낚시 정보를 준비하고 있어요.</p> : error ? <div role="alert">게시판을 불러오지 못했어요. <button onClick={() => setRetry(value => value + 1)}>다시 시도</button></div> : !board ? <p role="status">게시판을 읽는 중…</p> : <>
-      <p className="pwp-fish-progress">우리 반이 찾은 물고기 {board.classSpecies}/12</p>
+      <p className="pwp-fish-progress">우리 반이 찾은 물고기 {board.classSpecies}/{FISH_CATALOG.length}</p>
       {!rows.length ? <p>아직 기록이 없어요. 첫 물고기를 기다리고 있어요!</p> : <ol className="pwp-fish-board">{rows.map((row, index) => <li key={row.speciesId} data-species={row.speciesId} data-teacher={row.teacher || undefined}>
         <span className="pwp-fish-face" role="img" aria-label={row.teacher ? '선생님' : '익명 동물 얼굴'}>{fishBoardFace(row.animal)}</span><FishIcon speciesId={row.speciesId}/>
-        <strong><span className="pwp-fish-rank">{index + 1}위</span> {fishById(row.speciesId)?.name ?? '물고기'}</strong><span className="pwp-fish-length">{row.lengthCm.toFixed(1)}cm</span><time dateTime={row.caughtAt}>{fishRelativeTime(row.caughtAt, now)}</time>
+        <strong><span className="pwp-fish-rank">{index + 1}위</span> {fishById(row.speciesId)?.name ?? '물고기'} <span className="pwp-fish-stars" data-rarity={fishById(row.speciesId)?.rarity}>{'★'.repeat(RARITY_STARS[fishById(row.speciesId)?.rarity ?? 'common'])}</span></strong><span className="pwp-fish-length">{row.lengthCm.toFixed(1)}cm</span><time dateTime={row.caughtAt}>{fishRelativeTime(row.caughtAt, now)}</time>
       </li>)}</ol>}
     </>}
   </div></Window>;

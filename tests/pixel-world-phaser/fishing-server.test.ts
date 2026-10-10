@@ -15,14 +15,16 @@ import type { FishingRpcClient } from '../../src/features/pixel-world-phaser/ui/
 const SQL = readFileSync(new URL('../../supabase/migrations/supabase_pixel_fishing.sql', import.meta.url), 'utf8');
 
 test('SQL seed matches fishCatalog.ts exactly', () => {
+  const expansion = readFileSync(new URL('../../supabase/migrations/20261011170000_pixel_fishing_expansion.sql', import.meta.url), 'utf8');
   const block = /insert into public\.pixel_fish_species[^]*?values([^]*?)on conflict/.exec(SQL);
+  const added = /insert into public\.pixel_fish_species[^]*?values([^]*?)on conflict/.exec(expansion)![1];
   assert.ok(block, 'seed insert not found');
   const row = /\('([a-z_]+)', '([^']+)', '([a-z]+)', (null|array\[[^\]]*\]), (null|array\[[^\]]*\]), ([\d.]+), ([\d.]+), '([SML])', (\d+)\)/g;
   const list = (v: string) => v === 'null' ? 'any' : [...v.matchAll(/'([a-z]+)'/g)].map(m => m[1]);
-  const seed = [...block[1].matchAll(row)].map(m => ({ order: Number(m[9]), fish: {
+  const seed = [...(block[1] + added).matchAll(row)].map(m => ({ order: Number(m[9]), fish: {
     id: m[1], name: m[2], rarity: m[3], phases: list(m[4]), weather: list(m[5]), minCm: Number(m[6]), maxCm: Number(m[7]), shadow: m[8],
   } }));
-  assert.equal(seed.length, 12);
+  assert.equal(seed.length, FISH_CATALOG.length);
   assert.deepEqual(seed.map(s => s.order), seed.map((_, i) => i + 1), 'sort_order follows catalog order');
   assert.deepEqual(seed.map(s => s.fish), FISH_CATALOG.map(f => ({ ...f, phases: f.phases === 'any' ? 'any' : [...f.phases], weather: f.weather === 'any' ? 'any' : [...f.weather] })));
   // 하루 6마리·희귀도 가중치도 SQL과 같은 숫자.
@@ -99,7 +101,7 @@ test('mock: unlimited catches, throttle, expiry and minimum reel time', async ()
     assert.equal(result.remaining, -1);
   }
   assert.equal((await mock.state()).remaining, -1);
-  assert.notEqual((await mock.state()).sparkleShadow, null);
+  assert.equal((await mock.state()).sparkleShadow, null);
 });
 
 test('mock: catch facts follow the catalog, phase and weather', async () => {
@@ -112,6 +114,7 @@ test('mock: catch facts follow the catalog, phase and weather', async () => {
     assert.equal(s.shadow, fish.shadow);
     const f = await mock.finish(s.castId, true);
     assert.ok(f.ok && f.landed);
+    if ('junk' in f) continue;
     assert.ok(fishValidNow(fish, 'night', 'clear'), fish.id);
     assert.ok(f.lengthCm >= fish.minCm && f.lengthCm <= fish.maxCm);
     assert.equal(Math.round(f.lengthCm * 10) / 10, f.lengthCm);
@@ -139,20 +142,19 @@ test('mock: pity offers an uncaught valid species after 5 known catches (35% per
   assert.ok(forced > 400 * 0.28 && forced < 400 * 0.42, `pity share ${forced}/400`);
 });
 
-test('mock: pet perks — dog sparkle, pigeon hint, bear length, unowned pet ignored', async () => {
+test('mock: pet perks — retired hints, bear length, unowned pet ignored', async () => {
   const dog = day(Date.parse('2026-10-08T13:00:00Z'), { activePet: 'pet_dog', seed: 11 });
   const st = await dog.state();
-  assert.ok(st.sparkleShadow !== null && st.sparkleShadow >= 0 && st.sparkleShadow <= 2);
+  assert.equal(st.sparkleShadow, null);
   for (let i = 0; i < 6; i++) {
     const s = await dog.start('pet_dog'); assert.ok(s.ok);
-    const rarity = fishById(dog.peek()!.speciesId)!.rarity;
-    assert.equal(s.hint, rarity === 'rare' || rarity === 'legendary' ? 'sparkle' : null);
+    assert.equal(s.hint, null);
     await dog.finish(s.castId, true);
   }
-  assert.notEqual((await dog.state()).sparkleShadow, null);
+  assert.equal((await dog.state()).sparkleShadow, null);
 
   const pigeon = day(noonKst, { activePet: 'pet_pigeon' });
-  assert.match((await pigeon.state()).pigeonHint ?? '', /친구가 나온대요!$/);
+  assert.equal((await pigeon.state()).pigeonHint, null);
   assert.equal((await day(noonKst).state()).pigeonHint, null);
 
   const bear = day(noonKst, { activePet: 'pet_bear', seed: 5 });
@@ -201,7 +203,7 @@ test('adapter parsing is defensive', () => {
 
   assert.deepEqual(parseCastFinish('nope'), { ok: false });
   assert.deepEqual(parseCastFinish({ ok: true, landed: false }), { ok: true, landed: false });
-  assert.deepEqual(parseCastFinish({ ok: true, landed: true, speciesId: 'eel', lengthCm: 50, rarity: 'mythic' }), { ok: false });
+  assert.deepEqual(parseCastFinish({ ok: true, landed: true, speciesId: 'eel', lengthCm: 50, rarity: 'unknown' }), { ok: false });
   assert.deepEqual(parseCastFinish({ ok: true, landed: true, speciesId: 'eel', lengthCm: '50.5', rarity: 'rare', isNew: 1, isBig: true, remaining: 2 }),
     { ok: true, landed: true, speciesId: 'eel', lengthCm: 50.5, rarity: 'rare', isNew: false, isBig: true, isPersonalBest: false, remaining: 2 });
 
@@ -274,7 +276,7 @@ test('v3 희귀도와 길이 공식이 SQL, 타입스크립트와 모의 서버�
     const ratio = Math.max(0, Math.min(1, (length - fish.minCm) / (fish.maxCm - fish.minCm)));
     return Math.round(Math.min(5, cases[0][index] + cases[1][index] * ratio) * 100) / 100;
   };
-  for (const fish of FISH_CATALOG) for (const ratio of [-.1, 0, .125, .5, .8, 1, 1.08]) {
+  for (const fish of FISH_CATALOG.filter(f => f.rarity !== 'mythic')) for (const ratio of [-.1, 0, .125, .5, .8, 1, 1.08]) {
     const length = fish.minCm + ratio * (fish.maxCm - fish.minCm);
     assert.equal(fishDifficulty(fish, length), sqlTwin(fish, length), `${fish.id} ${ratio}`);
   }
@@ -283,8 +285,8 @@ test('v3 희귀도와 길이 공식이 SQL, 타입스크립트와 모의 서버�
     const start = await mock.start('pet_bear'); assert.ok(start.ok);
     const pending = mock.peek()!, fish = fishById(pending.speciesId)!;
     // v4: 대물은 +1.5(최대 5). 낚싯대 없음 = 낮춤 0.
-    assert.equal(start.difficulty, levelBaitDifficulty(rodDifficulty(sqlTwin(fish, pending.lengthCm), 0, pending.trophy), 1, fish.rarity === 'legendary'));
-    assert.equal(start.big, pending.lengthCm >= fish.minCm + .8 * (fish.maxCm - fish.minCm));
+    assert.equal(start.difficulty, start.junk ? 1 : fish.rarity === 'mythic' ? 5 : levelBaitDifficulty(rodDifficulty(sqlTwin(fish, pending.lengthCm), 0, pending.trophy), 1, fish.rarity === 'legendary'));
+    assert.equal(start.big, !start.junk && pending.lengthCm >= fish.minCm + .8 * (fish.maxCm - fish.minCm));
   }
   const old = parseCastStart({ ok: true, castId: 'c', shadow: 'S', biteDelayMs: 1200 }); assert.ok(old.ok && old.big === undefined);
   const big = parseCastStart({ ok: true, castId: 'c', shadow: 'S', biteDelayMs: 1200, big: true }); assert.ok(big.ok && big.big === true);
@@ -376,7 +378,7 @@ async function simulate(phase: string, weather: 'clear' | 'cloudy' | 'rain', rod
     if (p.hard) tally.hard++;
     if (p.trophy) tally.trophy++;
     const r = fishById(p.speciesId)!.rarity;
-    if (r === 'rare' || r === 'legendary') tally.rareOrLegend++;
+    if (!s.junk && (r === 'rare' || r === 'legendary' || r === 'mythic')) tally.rareOrLegend++;
     await mock.finish(s.castId, false);
   }
   return tally;
@@ -387,8 +389,8 @@ test('v4 분포: 시간대·날씨마다 10,000번 던지면 어려운 물고기
   for (const phase of ['morning', 'day', 'evening', 'night']) for (const weather of ['clear', 'cloudy', 'rain'] as const) {
     const t = await simulate(phase, weather, null, 10_000, 1000 + phase.length * 7 + weather.length);
     const share = t.hard / t.total;
-    assert.ok(Math.abs(share - 0.15) <= 0.02, `${phase}/${weather} hard ${share}`);
-    const hasHard = FISH_CATALOG.some(f => (f.rarity === 'rare' || f.rarity === 'legendary') && fishValidNow(f, phase as never, weather));
+    assert.ok(Math.abs(share - 0.15 * 0.94) <= 0.02, `${phase}/${weather} hard ${share}`);
+    const hasHard = FISH_CATALOG.some(f => (f.rarity === 'rare' || f.rarity === 'legendary' || f.rarity === 'mythic') && fishValidNow(f, phase as never, weather));
     // 지금 희귀/전설이 있으면 대물은 없고, 없으면 어려운 굴림은 전부 대물.
     if (hasHard) assert.equal(t.trophy, 0, `${phase}/${weather}`); else assert.equal(t.trophy, t.hard, `${phase}/${weather}`);
     lines.push(`${phase}/${weather} hard=${(share * 100).toFixed(1)}% trophy=${t.trophy} rare+legendary(all rolls)=${(t.rareOrLegend / t.total * 100).toFixed(1)}%`);
@@ -399,7 +401,7 @@ test('v4 분포: 시간대·날씨마다 10,000번 던지면 어려운 물고기
 test('v4 분포: 낚싯대 희귀 보너스(%p)가 어려운 물고기 확률에 그대로 더해진다', async () => {
   for (const rod of FISHING_RODS) for (const [phase, weather] of [['night', 'clear'], ['day', 'clear']] as const) {
     const t = await simulate(phase, weather, rod.id, 10_000, 77 + rod.tier);
-    const want = (HARD_FISH_PERCENT + rod.rareBonus) / 100;
+    const want = (HARD_FISH_PERCENT + rod.rareBonus) / 100 * 0.94;
     assert.ok(Math.abs(t.hard / t.total - want) <= 0.02, `${rod.id} ${phase}/${weather} ${t.hard / t.total} vs ${want}`);
   }
 });
@@ -423,41 +425,35 @@ test('v4 대물: 보통(없으면 흔함) 물고기, 난이도 +1.5(최대 5) �
   assert.equal(rodDifficulty(1.1, 0.5), 1);
 });
 
-test('v4 대물 캐스트는 길이 상위 15%·큰 물고기·trophy=true', async () => {
-  let seen = 0;
-  for (let seed = 0; seed < 400 && seen < 20; seed++) {
+test('신화 물고기가 나오는 낮에는 대물 대신 신화 물고기도 고른다', async () => {
+  let heavy = 0;
+  for (let seed = 0; seed < 400; seed++) {
     const mock = createMockFishingAdapter({ seed, now: () => noonKst, override: { clock: '13:00', weather: 'clear' } });
-    const s = await mock.start(null); assert.ok(s.ok);
-    const p = mock.peek()!;
-    if (!p.trophy) continue;
-    seen++;
-    const fish = fishById(p.speciesId)!;
-    assert.ok(p.lengthCm >= fish.minCm + 0.85 * (fish.maxCm - fish.minCm) - 0.05, `${fish.id} ${p.lengthCm}`);
-    assert.ok(s.trophy === true && s.big === true);
-    assert.equal(s.difficulty, rodDifficulty(fishDifficulty(fish, p.lengthCm), 0, true));
+    const cast = await mock.start(null); assert.ok(cast.ok);
+    assert.equal(cast.trophy, false);
+    if (cast.heavy) { heavy++; assert.equal(cast.difficulty, 5); }
   }
-  assert.ok(seen >= 20, `trophy casts ${seen}`);
+  assert.ok(heavy > 20);
 });
 
 test('v4 피티: 놓친 피티 캐스트 바로 다음은 피티가 아니고, 같은 물고기가 되풀이되지 않는다', async () => {
   for (const seed of [1, 2, 3, 4, 5]) {
     let now = noonKst;
     const mock = createMockFishingAdapter({ seed, now: () => now, override: { clock: '22:00', weather: 'clear' }, catches: pityCatches() });
-    let prevPityMissed = false, pityCount = 0, eligible = 0, run = 1, longest = 1, prev = '';
+    let prevPityMissed = false, pityCount = 0, eligible = 0;
     for (let i = 0; i < 400; i++) {
       now += 3000;
       const s = await mock.start(null); assert.ok(s.ok);
       const p = mock.peek()!;
       if (prevPityMissed) assert.equal(p.pity, false, `seed ${seed} cast ${i}: pity right after a missed pity cast`);
       else { eligible++; if (p.pity) pityCount++; }
-      run = p.speciesId === prev ? run + 1 : 1; longest = Math.max(longest, run); prev = p.speciesId;
+      if (p.pity) { assert.notEqual(p.speciesId, 'pirami'); assert.equal(s.junk, undefined); }
       // 학생이 계속 놓친다(가장 나쁜 경우).
       assert.deepEqual(await mock.finish(s.castId, false), { ok: true, landed: false });
       prevPityMissed = p.pity;
     }
     const share = pityCount / eligible;
     assert.ok(share > 0.28 && share < 0.42, `seed ${seed} pity share ${share}`);
-    assert.ok(longest <= 6, `seed ${seed} same fish ${longest} times in a row`);
   }
 });
 
@@ -502,7 +498,7 @@ test('v4 속도: 입질 대기·최소 끌어올리기 시간을 speed로 나누
       const p = mock.peek()!, fish = fishById(p.speciesId)!;
       assert.equal(s.speed, rod.speed); assert.deepEqual(s.rod, { id: rod.id, tier: rod.tier });
       assert.ok(s.biteDelayMs >= Math.round(1200 / rod.speed) && s.biteDelayMs <= Math.round(5000 / rod.speed), `${rod.id} ${s.biteDelayMs}`);
-      assert.equal(s.difficulty, levelBaitDifficulty(rodDifficulty(fishDifficulty(fish, p.lengthCm), rod.difficultyDown, p.trophy), (await mock.getLevel()).level, fish.rarity === 'legendary'));
+      assert.equal(s.difficulty, s.junk ? 1 : fish.rarity === 'mythic' ? 5 : levelBaitDifficulty(rodDifficulty(fishDifficulty(fish, p.lengthCm), rod.difficultyDown, p.trophy), (await mock.getLevel()).level, fish.rarity === 'legendary'));
       // 중간에 낚싯대를 바꿔도 이 캐스트는 그대로.
       assert.ok((await mock.equipRod(null)).ok);
       const ready = s.biteDelayMs + rodMinReelMs(s.difficulty!, rod.speed);

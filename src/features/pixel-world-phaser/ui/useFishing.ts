@@ -99,8 +99,10 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
       const result = await current?.finish(next.cast.castId, next.phase === 'landed');
       if (mounted.current && epoch === generation.current) {
         // 릴을 다 감은 경우만 서버 결과를 알린다(놓침·너무 빠름·취소는 위에서 escaped/idle로 이미 보냈다).
-        if (next.phase === 'landed') latest.current.report?.(result?.ok && result.landed ? { phase: 'landed', speciesId: result.speciesId, lengthCm: result.lengthCm } : result?.ok ? { phase: 'escaped' } : { phase: 'idle' });
-        if (result?.ok && result.landed) { playSoundEffect(result.isNew || result.isBig || next.cast.trophy ? 'fanfare' : 'catch'); setCaught(result); setMessage(''); await refresh(); }
+        if (next.phase === 'landed') latest.current.report?.(result?.ok && result.landed
+          ? 'junk' in result ? { phase: 'idle' } : { phase: 'landed', speciesId: result.speciesId, lengthCm: result.lengthCm }
+          : result?.ok ? { phase: 'escaped' } : { phase: 'idle' });
+        if (result?.ok && result.landed) { playSoundEffect(!('junk' in result) && (result.isNew || result.isBig || next.cast.trophy) ? 'fanfare' : 'catch'); setCaught(result); setMessage(''); await refresh(); }
         else if (!result?.ok) setMessage('낚시 결과를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.');
         else if (stateRef.current) shadows(stateRef.current);
       }
