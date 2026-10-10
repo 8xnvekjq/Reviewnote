@@ -88,7 +88,8 @@ language sql stable security definer set search_path = '' as $$
       else case s.rarity when 'mythic' then 150 when 'legendary' then 100 when 'rare' then 60 when 'uncommon' then 40 else 25 end end
   from public.pixel_fish_catches c join public.pixel_fish_species s on s.id=c.species_id
   where c.caught_at>=p_week_start and c.caught_at<p_week_start+interval '7 days'
-    and (p_teacher or not exists(select 1 from private.app_admins a where a.user_id=c.user_id))
+    -- 선생님 기록은 게시판(p_teacher)에서도 무지개 잉어만(2026-10-11 결정), 보상 정산에서는 아예 제외.
+    and (not exists(select 1 from private.app_admins a where a.user_id=c.user_id) or (p_teacher and c.species_id='rainbow_koi'))
   order by s.rarity, exists(select 1 from private.app_admins a where a.user_id=c.user_id),
     (c.length_cm-s.min_cm)/coalesce(nullif(s.max_cm-s.min_cm,0),1) desc, c.caught_at, c.id;
 $$;

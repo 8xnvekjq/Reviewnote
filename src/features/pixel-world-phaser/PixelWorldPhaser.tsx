@@ -17,6 +17,7 @@ import { FARM_BEDS, farmMoisture, farmStage } from '../pixel-room/farm/farmModel
 import { pickScarecrowLine } from '../pixel-room/farm/scarecrowLines';
 import { supabase } from '../../services/supabase';
 import { createRewardsAdapter } from './ui/rewardsAdapter';
+import { createBugAdapter } from './ui/bugAdapter';
 import { createFishingAdapter } from './ui/fishingAdapter';
 import { parseClockOverride } from './logic/worldClock';
 import type { FishingOverride } from './ui/fishingAdapter';
@@ -45,6 +46,8 @@ export default function PixelWorldPhaser({ userId, pointsBalance, onExit, onPixe
   const fishingAdapter = useMemo(() => createFishingAdapter(supabase, clockOverride), [clockOverride, userId]);
   // 지난주 등급별 챔피언·수확 대회 보상(들어올 때 한 번 확인).
   const rewardsAdapter = useMemo(() => createRewardsAdapter(supabase), [userId]);
+  // 잠자리 잡기(잠자리채 소유·도감·시작/결과).
+  const bugAdapter = useMemo(() => createBugAdapter(supabase), [userId]);
   const [face, setFace] = useState(() => userAnimalFace(userId));
   useEffect(() => {
     let cancelled = false;
@@ -92,7 +95,7 @@ export default function PixelWorldPhaser({ userId, pointsBalance, onExit, onPixe
   if (!appearance || !pet.ready || !room.rows) return <div className="pwp-root pwp-loading" role="status">앞마당으로 가는 중…</div>;
   return <>{outdated && <div className="pwp-update" role="alert" style={UPDATE_STYLE}>새 버전이 나왔어요. 새로고침하면 다른 기기와 같은 화면이 돼요.
     <button type="button" onClick={() => location.reload()} style={{ marginLeft: 8, font: 'inherit', fontWeight: 800 }}>새로고침</button></div>}
-  <GameShell face={face} isAdmin={isAdmin} onSceneChange={onScene} fishingAdapter={fishingAdapter} rewardsAdapter={rewardsAdapter} clockOverride={clockOverride} userId={userId} appearance={appearance} pet={!pet.error && pet.active && shop.ownedIds.has(pet.active) ? pet.active : null} balance={shop.balance} beds={beds} furniture={furniture}
+  <GameShell face={face} isAdmin={isAdmin} onSceneChange={onScene} fishingAdapter={fishingAdapter} rewardsAdapter={rewardsAdapter} bugAdapter={bugAdapter} clockOverride={clockOverride} userId={userId} appearance={appearance} pet={!pet.error && pet.active && shop.ownedIds.has(pet.active) ? pet.active : null} balance={shop.balance} beds={beds} furniture={furniture}
     onSaveFurniture={saveFurniture} scarecrowLine={scarecrowLine} onExit={onExit} panels={{ shop, pet }} farmAdapter={{ farm, inventory, contest: fetchWeeklyCropContest, submit: async id => {
       const result = await submitFarmCrop(id);
       if (result.ok) { onPointsReward?.(result.rewardPoints); shop.reload(); }

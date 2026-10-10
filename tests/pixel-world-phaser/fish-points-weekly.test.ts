@@ -112,9 +112,15 @@ test('주간 정산: 크기 점수·동점·관리자 제외·공동 순위·참
     await db.exec("update pixel_fish_catches set caught_at=caught_at+interval '7 days' where caught_at>='"+new Date(week).toISOString()+"'::timestamptz");
     await add(admin,'moonfish',14,7*86400+10);
     const board = (await db.query<any>('select public.get_class_fish_board() r')).rows[0].r;
-    assert.deepEqual(board.champions.map((c:any)=>[c.rarity,c.speciesId,c.teacher,c.reward]),[['legendary','moonfish',true,0],['uncommon','goby',false,40],['common','pirami',false,25]]);
-    assert.equal(board.champions[1].score,80);
-    assert.equal(board.champions[2].score,50);
+    // 선생님 기록은 무지개 잉어만 게시판에 — 달빛 피라미는 챔피언 줄에도 나오지 않는다.
+    assert.deepEqual(board.champions.map((c:any)=>[c.rarity,c.speciesId,c.teacher,c.reward]),[['uncommon','goby',false,40],['common','pirami',false,25]]);
+    await add(admin,'rainbow_koi',70,7*86400+20);
+    const board2 = (await db.query<any>('select public.get_class_fish_board() r')).rows[0].r;
+    const koi = board2.champions.find((c:any)=>c.rarity==='legendary');
+    assert.deepEqual(koi && [koi.speciesId,koi.teacher,koi.reward],['rainbow_koi',true,0]);
+    await db.query("delete from pixel_fish_catches where species_id='rainbow_koi' and user_id=$1",[admin]); // 아래 기존 게시판 비교는 이 기록 없이
+    assert.equal(board.champions[0].score,80);
+    assert.equal(board.champions[1].score,50);
     const oldBoardSql = sql('20261011130000_unique_animal_faces_teacher_gorilla.sql');
     await db.exec(oldBoardSql.slice(oldBoardSql.indexOf('create or replace function pixel_private.get_class_fish_board()'),oldBoardSql.lastIndexOf('commit;')));
     const oldBoard = (await db.query<any>('select public.get_class_fish_board() r')).rows[0].r;
