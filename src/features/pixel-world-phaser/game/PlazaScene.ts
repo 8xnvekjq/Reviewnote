@@ -1,3 +1,4 @@
+import { RIDING_RADIUS, PERSON_RADIUS } from '../logic/softCollision';
 import { createAnimalTag, updateAnimalTag, animalTagSnapshot, peerAnimalFace } from './animalTag';
 import { updatePeerCompanion, peerCompanionSnapshot } from './peerCompanion';
 import type { PetFollowState } from '../logic/petFollow';
@@ -126,6 +127,12 @@ export class PlazaScene extends WorldScene {
       }
     }
   }
+  protected collisionObstacles() {
+    return [...this.friends].filter(([, f]) => !!f.sprite).map(([id, f]) => ({ id,
+      x: (f.state.x + PLAZA_MARGIN + .5) * 16, y: (f.state.y + PLAZA_MARGIN + .5) * 16,
+      radius: f.state.riding === true && f.state.pet === 'pet_bear' ? RIDING_RADIUS : PERSON_RADIUS, moving: f.state.moving }));
+  }
+  protected collisionCompanions() { return [...this.friends]; }
   update(time: number, delta: number) {
     super.update(time, delta);
     const spots = new Map<string, { x: number; y: number }>([[this.selfId, this.feet]]);
@@ -135,6 +142,7 @@ export class PlazaScene extends WorldScene {
       if (f.tag) { updateAnimalTag(f.tag, feet, peerAnimalFace(p), p.riding === true && p.pet === 'pet_bear'); f.tag.setVisible(!!f.sprite); }
       updatePeerCompanion(f, feet, time, delta, this.spec.solid);
     }
+    this.spacePets(delta);
     this.bubbles?.update(this.wantedBubbles, spots);
   }
   snapshot() {

@@ -3,6 +3,10 @@
 // 여기서 한 번에 처리한다. 하위 장면은 drawWorld()로 그림만 그린다(어디가 막혔는지·출구·입구는
 // logic/scenes.ts의 장면 정의가 정한다). 입력은 공유 객체(ControlState)를 매 프레임 읽기만 한다.
 import Phaser from 'phaser';
+import { createCollisionState, collisionEnabled, stepSoftCollision, safeSeparation, stepPetSpacing, RIDING_RADIUS, PERSON_RADIUS } from '../logic/softCollision';
+import type { PersonObstacle } from '../logic/softCollision';
+import { spacingPet } from './peerCompanion';
+import type { PeerCompanion } from './peerCompanion';
 import { createAnimalTag, updateAnimalTag, animalTagSnapshot } from './animalTag';
 import { rideState, rideInScene, rideSpeed, riderOffset, rideRow } from '../logic/bearRide';
 import { WorldTint } from './worldTint';
@@ -89,6 +93,7 @@ export interface WorldContext {
   onSceneGone(scene: WorldScene): void;
 }
 export interface WorldDebug {
+  collision: { contacts: number; passThrough: number };
   animalTag?: ReturnType<typeof animalTagSnapshot>;
   riding: boolean; mountAnimation: string | null; riderOffset: Point | null;
   worldTint?: ReturnType<WorldTint['debug']>;
@@ -147,6 +152,8 @@ export abstract class WorldScene extends Phaser.Scene {
   private animKey = '';
   private entry: string | undefined;
   private transitioning = false;
+  private collision = createCollisionState();
+  private readonly selfCollisionId = ' self';
   /** 출구 위에서 시작하면(그럴 일은 없지만) 한 번 벗어나야 출구가 작동한다 — 들어오자마자 튕겨 나가지 않게. */
   private exitArmed = false;
 
@@ -162,6 +169,7 @@ export abstract class WorldScene extends Phaser.Scene {
   /** 같은 장면 인스턴스가 다시 시작될 때마다 불린다 — 이전 방문의 상태를 모두 비운다. */
   init(data: { entry?: string } | undefined) {
     this.entry = data?.entry;
+    this.collision = createCollisionState();
     this.pet = null; this.petSheet = null; this.petFollow = null; this.reaction = null;
     this.petFlight = null; this.petShadow = null;
     this.moving = false; this.running = false; this.path = []; this.pathTarget = null;
@@ -171,6 +179,31 @@ export abstract class WorldScene extends Phaser.Scene {
 
   /** 맵 그림(바닥·벽·소품). spec은 이미 준비돼 있다. */
   protected abstract drawWorld(): void;
+  protected collisionObstacles(): PersonObstacle[] { return []; }
+  /** [주인 sessionId, 친구] 목록 — 펫은 자기 주인은 피하지 않는다. */
+  protected collisionCompanions(): Array<[string, PeerCompanion]> { return []; }
+  protected collisionFishing(): boolean { return false; }
+  protected collisionGate() {
+    return { frozen: this.ctx.controls.frozen, fishing: this.collisionFishing(), indoor: this.spec.id === 'room', transitioning: this.transitioning };
+  }
+  private collisionWorld() {
+    return { blocked: (p: Point) => p.x < 5 || p.y < 4 || p.x > this.spec.cols * TILE - 5 || p.y > this.spec.rows * TILE - 2 || feetBlocked(p, this.spec.solid) };
+  }
+  /** 추종·배회 갱신 뒤 펫의 발만 조금 옮긴다. 목표와 비행 상태는 유지한다. */
+  protected spacePets(deltaMs: number) {
+    if (!collisionEnabled(this.collisionGate())) return;
+    const pets = this.collisionCompanions().map(([owner, f]) => ({ owner, pet: spacingPet(f) }))
+      .filter((entry): entry is { owner: string; pet: Phaser.GameObjects.Sprite } => !!entry.pet);
+    if (this.pet && !this.ctx.riding && (!this.petFlight || this.petFlight.phase === 'ground')) pets.unshift({ owner: this.selfCollisionId, pet: this.pet });
+    // 펫은 지나가는(움직이는) 사람에게만 길을 비킨다. 가만히 선 사람까지 피하면 주인 곁으로 돌아오려는
+    // 추종과 번갈아 당겨져 펫이 계속 떨린다. 자기 주인은 추종 규칙이 거리를 맡으므로 빼고 계산한다.
+    const people = [...(this.moving ? [{ id: this.selfCollisionId, ...this.feet }] : []), ...this.collisionObstacles().filter(person => person.moving)];
+    for (const { owner, pet } of pets) {
+      const position = stepPetSpacing(pet, people.filter(person => person.id !== owner), pets.filter(other => other.pet !== pet).map(other => other.pet), deltaMs, this.collisionWorld());
+      pet.setPosition(position.x, position.y).setDepth(position.y);
+      if (pet === this.pet && this.petFlight) this.petFlight.position = { ...position };
+    }
+  }
   /** 월드 전체 크기(px) — 카메라가 맵 밖을 보이지 않게 자를 때. */
   protected worldSize(): { width: number; height: number } { return { width: this.spec.cols * TILE, height: this.spec.rows * TILE }; }
 
@@ -377,7 +410,7 @@ export abstract class WorldScene extends Phaser.Scene {
       this.tintClockMinute = minute; const clock = this.worldClock(); this.outdoorTint?.set(clock.phase, clock.weather);
     }
     this.outdoorTint?.update(deltaMs);
-    if (this.transitioning) { this.updatePet(deltaMs); return; }
+    if (this.transitioning) { this.collision = createCollisionState(); this.updatePet(deltaMs); return; }
     const dt = Math.min(deltaMs, 50) / 1000;
     const { stick, run, frozen } = this.ctx.controls;
     const solid = this.spec.solid;
@@ -394,23 +427,31 @@ export abstract class WorldScene extends Phaser.Scene {
       const distance = Math.hypot(dx, dy);
       const speed = (run ? RUN_SPEED : WALK_SPEED) * rideSpeed(this.ctx.riding);
       if (distance <= speed * dt) {
-        this.feet = { ...next };
-        this.path.shift();
-        if (!this.path.length && this.pathTarget) { const id = this.pathTarget; this.pathTarget = null; this.arrive(id); }
+        vx = dt > 0 ? dx / dt : 0; vy = dt > 0 ? dy / dt : 0;
       } else { vx = dx / distance * speed; vy = dy / distance * speed; }
       speedScale = run ? RUN_SPEED / WALK_SPEED : 1;
     }
+    const response = stepSoftCollision(this.feet, { x: vx, y: vy }, this.collisionObstacles(), this.collision,
+      deltaMs, this.ctx.riding ? RIDING_RADIUS : PERSON_RADIUS, this.collisionGate());
+    this.collision = response.state;
     const wasMoving = this.moving;
     let moved = 0;
     if (vx || vy) {
       const before = this.feet;
-      this.feet = moveFeet(before, vx * dt, vy * dt, solid);
+      this.feet = moveFeet(before, response.delta.x, response.delta.y, solid);
+      this.feet = safeSeparation(this.feet, response.separation, this.collisionWorld());
       moved = Math.hypot(this.feet.x - before.x, this.feet.y - before.y);
       this.facing = facingFor(vx, vy, this.facing);
       // 벽에 정면으로 막혀 제자리면 걷는 시늉도 멈춘다(제자리 걸음 방지).
       this.moving = Math.hypot(this.feet.x - before.x, this.feet.y - before.y) > 0.05 * speedScale;
-      if (!this.moving && this.path.length) this.cancelWalk();
+      // 마지막 한 걸음이 아주 짧아도 도착 처리가 먼저다(아래) — 그때는 취소하지 않는다.
+      const arriving = this.path.length > 0 && Math.hypot(this.feet.x - this.path[0].x, this.feet.y - this.path[0].y) < 0.1;
+      if (!this.moving && this.path.length && !this.collision.contacts && !arriving) this.cancelWalk();
     } else this.moving = false;
+    if (!frozen && this.path.length && Math.hypot(this.feet.x - this.path[0].x, this.feet.y - this.path[0].y) < 0.1) {
+      this.path.shift();
+      if (!this.path.length && this.pathTarget) { const id = this.pathTarget; this.pathTarget = null; this.arrive(id); }
+    }
     this.running = this.moving && run;
     if (this.transitioning) return; // 도착하자마자 문으로 들어간 경우
     // 달리기 흙먼지: 막 달리기 시작하면 곧바로 한 번, 그 뒤 DUST_STEP마다. 걷거나 멈추면 다시 센다.
@@ -423,6 +464,7 @@ export abstract class WorldScene extends Phaser.Scene {
     this.player.setPosition(Math.round(this.feet.x), Math.round(this.feet.y)).setDepth(this.feet.y);
     this.shadow.setPosition(Math.round(this.feet.x), Math.round(this.feet.y)).setDepth(this.feet.y - 0.5);
     this.updatePet(deltaMs);
+    if (this.spec.id !== 'plaza' && this.spec.id !== 'river') this.spacePets(deltaMs);
     // 출구를 밟으면 넘어간다(들어오자마자 출구 위였다면 한 번 벗어난 뒤부터).
     const exit = exitAt(this.spec, this.feet);
     if (!exit) this.exitArmed = true;
@@ -696,6 +738,7 @@ export abstract class WorldScene extends Phaser.Scene {
     const ratio = this.ctx.view.ratio;
     const screen = (p: Point): Point => ({ x: Math.round((p.x - camera.worldView.x) * camera.zoom / ratio), y: Math.round((p.y - camera.worldView.y) * camera.zoom / ratio) });
     return {
+      collision: { contacts: this.collision.contacts, passThrough: this.collision.passThrough },
       riding: this.ctx.riding, mountAnimation: this.ctx.riding ? this.pet?.anims.currentAnim?.key ?? null : null, riderOffset: this.ctx.riding ? riderOffset(this.facing) : null,
       worldTint: this.outdoorTint?.debug(),
       animalTag: animalTagSnapshot(this.animalTag), avatarKey: this.player.texture.key, petId: this.pet ? this.ctx.assets.pet?.id ?? null : null,

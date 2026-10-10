@@ -32,6 +32,9 @@ try {
     await b.goto(`${base}/tests/pixel-world-phaser/harness.html?pet=none&top=blouse_rose&fishing=1&pwClock=12:00`);
     await ready(b, 'yard');
     await exit(b, scene === 'plaza' ? '^gate$' : 'river', scene);
+    // 부드러운 충돌: 입구에 그대로 서 있으면 A가 들어오며 B를 비켜 가다 출구 쪽으로 밀릴 수 있다 — B는 입구 옆으로 비켜 선다.
+    await b.keyboard.down('ArrowLeft'); await b.waitForTimeout(500); await b.keyboard.up('ArrowLeft');
+    await b.waitForFunction(() => !window.__pixelWorldPhaser.debug().moving);
     for (const pet of ['pet_dog', 'pet_duck', 'pet_pigeon', 'pet_bear']) {
       await a.bringToFront();
       await a.goto(`${base}/tests/pixel-world-phaser/harness.html?pet=${pet}&fishing=1&pwClock=12:00`);
@@ -86,7 +89,8 @@ try {
         await b.bringToFront();
         await b.waitForFunction(() => window.__pixelWorldPhaser.debug().classmates[0].mountAnimation?.endsWith(':walk'));
         const mounted = (await debug(b)).classmates[0];
-        assert.ok(Math.abs(mounted.avatarPosition.depth - ((mounted.y + (scene === 'plaza' ? 5.5 : .5)) * 16 + .1)) < 1e-6);
+        // 걷는 중에 읽으므로 상태와 그림 사이 한 프레임(2px 이내) 차이는 허용한다.
+        assert.ok(Math.abs(mounted.avatarPosition.depth - ((mounted.y + (scene === 'plaza' ? 5.5 : .5)) * 16 + .1)) < 2);
         await b.screenshot({ path: `${shots}/${scene}-bear-mounted.png` });
         await a.keyboard.up('ArrowRight');
         await a.evaluate(() => window.__pixelWorldPhaser.dismount());

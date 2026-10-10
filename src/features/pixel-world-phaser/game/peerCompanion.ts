@@ -83,3 +83,8 @@ export function peerCompanionSnapshot(f: PeerCompanion) {
     avatarPosition: f.sprite ? { x: f.sprite.x, y: f.sprite.y, depth: f.sprite.depth, cropped: f.sprite.isCropped } : null,
     follower: !!f.pet && f.pet.texture.key !== 'bear-ride' };
 }
+
+/** 비행 중인 비둘기와 탑승 곰은 발 간격 계산에서 뺀다. */
+export function spacingPet(f: PeerCompanion) {
+  return f.state.riding === true && f.state.pet === 'pet_bear' || f.flight && f.flight.phase !== 'ground' ? undefined : f.pet;
+}

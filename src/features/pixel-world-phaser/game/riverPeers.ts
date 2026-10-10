@@ -1,3 +1,4 @@
+import { RIDING_RADIUS, PERSON_RADIUS } from '../logic/softCollision';
 import { createAnimalTag, updateAnimalTag, animalTagSnapshot, peerAnimalFace } from './animalTag';
 import { updatePeerCompanion, peerCompanionSnapshot } from './peerCompanion';
 import type { PetFollowState } from '../logic/petFollow';
@@ -83,6 +84,11 @@ export class RiverPeers {
   /** 장면이 내려갈 때: 그림은 장면이 함께 지우므로 기억만 비운다. */
   clear() { this.friends.clear(); this.sparkles.clear(); this.bubbles.clear(); this.fishing = {}; this.wantedBubbles = {}; }
 
+  collisionObstacles() {
+    return [...this.friends].filter(([, f]) => !!f.sprite).map(([id, f]) => ({ id, ...riverFeet(f.state),
+      radius: f.state.riding === true && f.state.pet === 'pet_bear' ? RIDING_RADIUS : PERSON_RADIUS, moving: f.state.moving }));
+  }
+  collisionCompanions(): Array<[string, Friend]> { return [...this.friends]; }
   snapshot() {
     return {
       classmates: [...this.friends].map(([id, f]) => ({ id, x: f.state.x, y: f.state.y, rendered: !!f.sprite, animalTag: animalTagSnapshot(f.tag), pet: !!f.pet, ...peerCompanionSnapshot(f),
