@@ -1,15 +1,24 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { FISH_CATALOG, RARITY_STARS } from '../logic/fishCatalog';
+import { FISH_CATALOG, JUNK_CATALOG, RARITY_STARS } from '../logic/fishCatalog';
 import { fishHint } from '../logic/fishHints';
 import { turtleLines } from '../logic/turtleLines';
-import type { ClassFishBoard, FishingAdapter, FishingState } from './fishingAdapter';
+import type { ClassFishBoard, FishingAdapter, FishingState, JunkId } from './fishingAdapter';
 import { Window } from './GamePanels';
 import './fishAlbum.css';
 
 // 도트 시트가 아직 없으면 16×16 격자로 만든 임시 그림을 쓴다.
 const sheets = import.meta.glob('../assets/fishing/fish-icons.png', { eager: true, query: '?url', import: 'default' });
 const sheet = Object.values(sheets)[0] as string | undefined;
+const junkSheets = import.meta.glob('../assets/fishing/junk-icons.png', { eager: true, query: '?url', import: 'default' });
+const junkSheet = Object.values(junkSheets)[0] as string | undefined;
+export function JunkIcon({ junk }: { junk: JunkId }) {
+  const [failed, setFailed] = useState(false);
+  const index = JUNK_CATALOG.findIndex(item => item.id === junk);
+  return <span className="pwp-junk-icon" aria-hidden="true">{junkSheet && !failed
+    ? <img src={junkSheet} onError={() => setFailed(true)} style={{ left: -index * 32 }} alt="" />
+    : ['👟', '🥫', '🪙'][index]}</span>;
+}
 export function FishIcon({ speciesId, silhouette = false }: { speciesId: string; silhouette?: boolean }) {
   const index = FISH_CATALOG.findIndex(fish => fish.id === speciesId);
   const [failed, setFailed] = useState(false);
@@ -38,7 +47,8 @@ export function FishAlbum({ adapter, onClose, newSpeciesId, top }: { adapter?: F
     <div className="pwp-panel-content pwp-fishing-content">
       {!adapter ? <p role="status">낚시 정보를 준비하고 있어요.</p> : error ? <div role="alert">도감을 불러오지 못했어요. <button onClick={() => setRetry(value => value + 1)}>다시 시도</button></div> : !state ? <p role="status">도감을 펼치는 중…</p> : <>
         <div className="pwp-turtle-lines">{turtleLines(state, newSpeciesId).map(line => <p key={line}>{line}</p>)}</div>
-        <p className="pwp-fish-progress">{board ? `우리 반이 찾은 물고기 ${board.classSpecies}/12` : boardError ? '우리 반 도감을 불러오지 못했어요.' : '우리 반 도감을 확인하는 중…'} {boardError && <button onClick={() => setRetry(value => value + 1)}>다시 시도</button>}</p>
+        <p className="pwp-fish-progress">{board ? `우리 반이 찾은 물고기 ${board.classSpecies}/${FISH_CATALOG.length}` : boardError ? '우리 반 도감을 불러오지 못했어요.' : '우리 반 도감을 확인하는 중…'} {boardError && <button onClick={() => setRetry(value => value + 1)}>다시 시도</button>}</p>
+        <div className="pwp-junk-row"><strong>잡동사니</strong>{JUNK_CATALOG.map(item => <span key={item.id}><JunkIcon junk={item.id} />{item.name} {state.junk?.[item.id] ?? 0}개</span>)}</div>
         <ul className="pwp-fish-grid">{FISH_CATALOG.map(fish => {
           const entry = state.album.find(value => value.speciesId === fish.id && value.count > 0);
           return <li className="pwp-fish-slot" key={fish.id} data-species={fish.id} data-caught={!!entry}>

@@ -93,8 +93,11 @@ async function controllerChecks() {
     document.querySelector('.pwp-root').dispatchEvent(new PointerEvent('pointerdown', { pointerId: 77, pointerType: 'pen', bubbles: true, cancelable: true }));
     document.querySelector('.pwp-root').dispatchEvent(new PointerEvent('pointercancel', { pointerId: 77, pointerType: 'pen', bubbles: true, cancelable: true }));
   });
-  await page.waitForFunction(() => window.probe.fishing.phase === 'missed');
-  assert.equal(await page.evaluate(() => window.probe.finished.at(-1).landed), false);
+  // 펜 취소는 릴을 망가뜨리지 않는다. 아무 입력이 없으면 보통 놓치지만, 모의 서버가 아주 쉬운 것(예: 잡동사니)을
+  // 주면 그대로 잡힐 수도 있다 — 어느 쪽이든 결과가 화면 상태와 맞게 기록되는지만 본다.
+  await page.waitForFunction(() => ['missed', 'landed'].includes(window.probe.fishing.phase));
+  assert.equal(await page.evaluate(() => window.probe.finished.at(-1).landed), await page.evaluate(() => window.probe.fishing.phase === 'landed'));
+await page.waitForFunction(() => !window.probe.fishing.busy, null, { timeout: 8000 });
   assert.doesNotMatch(await page.locator('body').textContent(), /budget|6\/day/);
   assert.equal(await page.getByText('오늘 남은 낚시', { exact: false }).count(), 0);
   assert.equal(await page.getByText('오늘은 물고기들이 쉬고 있어요.', { exact: false }).count(), 0);
@@ -219,6 +222,27 @@ try {
     await page.waitForFunction(() => document.querySelector('.pwp-root')?.dataset.fishingPhase === 'bite');
     await page.locator('.pwp-btn-a').tap();
     await page.getByTestId('reel-bar').waitFor();
+    assert.equal(await page.locator('.pwp-reel-stick').count(), 0, 'only the movement stick is used');
+    const stickZone = await page.locator('.pwp-movement-stick-zone').boundingBox();
+    assert.ok(stickZone);
+    const stickStart = { x: stickZone.x + 90, y: stickZone.y + stickZone.height - 110 };
+    const reelBeforeStick = await page.getByTestId('reel-bar').evaluate(el => ({ x: +el.dataset.zoneX }));
+    const playerBeforeStick = await page.evaluate(() => window.__pixelWorldPhaser.debug());
+    await page.mouse.move(stickStart.x, stickStart.y); await page.mouse.down();
+    await page.mouse.move(stickStart.x + 50, stickStart.y);
+    await page.waitForTimeout(180);
+    const reelAfterStick = await page.getByTestId('reel-bar').evaluate(el => ({ x: +el.dataset.zoneX }));
+    const playerAfterStick = await page.evaluate(() => window.__pixelWorldPhaser.debug());
+    assert.ok(reelAfterStick.x > reelBeforeStick.x + .1, 'movement stick drives reel x');
+    assert.equal(playerAfterStick.x, playerBeforeStick.x, 'stick does not move the player while fishing');
+    assert.equal(playerAfterStick.y, playerBeforeStick.y);
+    await page.mouse.up();
+    await page.waitForFunction(() => window.__pixelWorldPhaser.debug().moving === false);
+    await page.mouse.click(viewport.width * .75, 300);
+    await page.waitForTimeout(100);
+    const playerAfterGroundTap = await page.evaluate(() => window.__pixelWorldPhaser.debug());
+    assert.equal(playerAfterGroundTap.x, playerBeforeStick.x, 'ground tapping cannot walk while fishing');
+    assert.equal(playerAfterGroundTap.y, playerBeforeStick.y);
     await assertReelLayout(page);
     await page.screenshot({ path: `.pixel-world-test.local/fishing/river-reel-${viewport.width}.png` });
     await tapToLand(page);

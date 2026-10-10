@@ -3,6 +3,53 @@ import test from 'node:test';
 import { createReelGame, stepReelGame, minReelMs, REEL_MARGIN_MS } from '../../src/features/pixel-world-phaser/logic/reelGame.ts';
 import type { ReelGame, ReelAxisInput } from '../../src/features/pixel-world-phaser/logic/reelGame.ts';
 type Player = 'lazy' | 'novice' | 'good';
+function verticalBot(seed: number, heavy: boolean) {
+  let g = createReelGame(5, false, false, seed, 1, undefined, false, 0, heavy), lastTap = -1000;
+  for (let tick = 0; tick < 9000 && g.status === 'playing'; tick++) {
+    const time = (tick + 1) * 1000 / 120;
+    // 같은 봇이 물고기가 원 중심보다 위에 있으면 빠르게 탭하고 좌우를 따라간다.
+    const tap = time - lastTap >= 90 && g.fish > g.zone;
+    if (tap) lastTap = time;
+    const x = Math.max(-1, Math.min(1, (g.fishX - g.zoneX) * 5 / 1.8));
+    g = stepReelGame(g, 1000 / 120, tap ? [time] : [], [{ time, x }]);
+  }
+  return g;
+}
+test('상어·고래는 30개 시드에서 잡을 수 있고 일반 물고기보다 탭이 많이 필요하다', () => {
+  const heavy = Array.from({ length: 30 }, (_, seed) => verticalBot(seed, true));
+  const normal = Array.from({ length: 30 }, (_, seed) => verticalBot(seed, false));
+  const wins = heavy.filter(g => g.status === 'landed' && g.elapsed <= 75);
+  const heavyTaps = heavy.reduce((sum, g) => sum + g.tapCount, 0);
+  const normalTaps = normal.reduce((sum, g) => sum + g.tapCount, 0);
+  console.log(`HEAVY wins=${wins.length}/30 taps=${heavyTaps} normalWins=${normal.filter(g => g.status === 'landed').length}/30 normalTaps=${normalTaps} ratio=${(heavyTaps / normalTaps).toFixed(2)}`);
+  assert.ok(wins.length >= 18);
+  assert.ok(heavyTaps >= normalTaps * 1.8);
+});
+test('무거운 물고기는 위아래 목표를 번갈아 향하고 돌진과 당기는 힘이 강하다', () => {
+  let g = createReelGame(5, false, false, 7, 1, undefined, false, 0, true);
+  const targets: number[] = [];
+  let maxY = 0, minY = 0, burstSpeed = 0, cruiseSpeed = 0;
+  for (let tick = 0; tick < 3600; tick++) {
+    const next = stepReelGame({ ...g, progress: .5 }, 1000 / 120);
+    if (next.nextTarget !== g.nextTarget) {
+      assert.ok(Math.abs(next.targetY) >= .75 && Math.abs(next.targetY) <= .9);
+      assert.ok(Math.abs(next.targetX) <= .15);
+      if (targets.length) assert.ok(next.targetY * targets.at(-1)! < 0);
+      targets.push(next.targetY);
+    }
+    maxY = Math.max(maxY, next.fish); minY = Math.min(minY, next.fish);
+    if (next.elapsed < next.burstUntil) burstSpeed = Math.max(burstSpeed, Math.abs(next.fishVY));
+    else if (next.elapsed > next.burstUntil + .3) cruiseSpeed = Math.max(cruiseSpeed, Math.abs(next.fishVY));
+    assert.ok(Math.hypot(next.fishX, next.fish) <= .94 + 1e-12);
+    assert.ok(Math.hypot(next.zoneX, next.zone) <= 1 - next.zoneSize + 1e-12);
+    g = next;
+  }
+  assert.ok(targets.length >= 7 && maxY > .7 && minY < -.7);
+  assert.ok(burstSpeed > cruiseSpeed * 1.3);
+  const normal = createReelGame(5);
+  assert.ok(stepReelGame(createReelGame(5, false, false, 0, 1, undefined, false, 0, true), 100).velocity < stepReelGame(normal, 100).velocity);
+  assert.deepEqual(stepReelGame(normal, 2000), stepReelGame(createReelGame(5, false, false, 0, 1, undefined, false, 0, false), 2000));
+});
 export function simulate(d: number, player: Player, seed: number, big = false) {
   let g = createReelGame(d, false, big, seed), last = -1000, random = seed + 1, lazyAxis = 0;
   const history: ReelGame[] = [g], taps: number[] = [], axes: ReelAxisInput[] = [];

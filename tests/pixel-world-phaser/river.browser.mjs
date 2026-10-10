@@ -43,26 +43,30 @@ try {
       h.walkToScreen(p.x, p.y);
     });
     assert.deepEqual(await page.evaluate(() => window.riverTest.taps), []);
-    assert.ok(await page.evaluate(() => window.riverTest.handle.debug().pendingCast));
+    const pending = await page.evaluate(() => window.riverTest.handle.debug().pendingCast);
+    assert.ok(pending);
     await page.waitForFunction(() => window.riverTest.taps.length === 1, null, { timeout: 12000 });
     await idle();
     assert.deepEqual(await page.evaluate(() => window.riverTest.taps), [1]);
     const cast = await page.evaluate(() => window.riverTest.handle.debug());
-    assert.equal(cast.pendingCast, null); assert.equal(cast.facing, 'Right');
-    assert.ok(Math.hypot(cast.x - 184, cast.y - 184) < .5, JSON.stringify({ x: cast.x, y: cast.y }));
+    assert.equal(cast.pendingCast, null);
+    assert.ok(Math.hypot(cast.x - pending.spot.x, cast.y - pending.spot.y) < .5, JSON.stringify({ x: cast.x, y: cast.y }));
     await page.waitForTimeout(350);
     assert.deepEqual(await page.evaluate(() => window.riverTest.taps), [1]);
+    await walk(10 * 16 + 8, 11 * 16 + 8);
     const p = await page.evaluate(() => window.riverTest.handle.debug().targets['shadow:1']);
     await page.mouse.click(p.x, p.y);
     assert.deepEqual(await page.evaluate(() => window.riverTest.taps), [1,1]);
     await page.keyboard.press('Space');
     assert.deepEqual(await page.evaluate(() => window.riverTest.taps), [1,1,1]);
 
+    await page.evaluate(() => window.riverTest.handle.setShadows([]));
     for (const spot of entry.bankSpots) {
       await walk(spot.x, spot.y);
       const d = await page.evaluate(() => window.riverTest.handle.debug());
       assert.ok(Math.hypot(d.x - spot.x, d.y - spot.y) < 2);
     }
+    await page.evaluate(() => window.riverTest.handle.setShadows([{index:0,size:'S',sparkle:true},{index:1,size:'M',sparkle:false},{index:2,size:'L',sparkle:false}]));
     for (const id of ['turtle', 'fishboard']) {
       await page.evaluate(id => { const h = window.riverTest.handle, d = h.debug(); h.walkToScreen(d.targets[id].x, d.targets[id].y); }, id);
       await page.waitForFunction(id => window.riverTest.panels.includes(id), id, { timeout: 12000 });
@@ -103,6 +107,6 @@ try {
     assert.deepEqual(errors, []);
     await page.evaluate(() => window.riverTest.handle.destroy());
     await page.close();
-    console.log(`PASS river ${width}: entry water; five reachable spots; auto-walk then one cast; immediate pointer/A; cancellation; panels; transitions; day/night/rain; no browser errors`);
+    console.log(`PASS river ${width}: entry water; eight reachable spots including dock tip and sides; auto-walk then one cast; immediate pointer/A; cancellation; panels; transitions; day/night/rain; no browser errors`);
   }
 } finally { await browser.close(); }

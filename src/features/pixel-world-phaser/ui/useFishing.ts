@@ -50,8 +50,10 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
   const reelGame = useRef<ReelGame | null>(null);
   const taps = useRef<number[]>([]);
   const axes = useRef<ReelAxisInput[]>([]);
+  const reelAxis = useRef(0);
   const setReelX = useCallback((x: number) => {
-    if (reelGame.current) axes.current.push({ time: performance.now() - reelStarted.current, x });
+    reelAxis.current = Number.isFinite(x) ? Math.max(-1, Math.min(1, x)) : 0;
+    if (reelGame.current) axes.current.push({ time: performance.now() - reelStarted.current, x: reelAxis.current });
   }, []);
   const reelStarted = useRef(0);
   const lastFrame = useRef(0);
@@ -97,8 +99,10 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
       const result = await current?.finish(next.cast.castId, next.phase === 'landed');
       if (mounted.current && epoch === generation.current) {
         // 릴을 다 감은 경우만 서버 결과를 알린다(놓침·너무 빠름·취소는 위에서 escaped/idle로 이미 보냈다).
-        if (next.phase === 'landed') latest.current.report?.(result?.ok && result.landed ? { phase: 'landed', speciesId: result.speciesId, lengthCm: result.lengthCm } : result?.ok ? { phase: 'escaped' } : { phase: 'idle' });
-        if (result?.ok && result.landed) { playSoundEffect(result.isNew || result.isBig || next.cast.trophy ? 'fanfare' : 'catch'); setCaught(result); setMessage(''); await refresh(); }
+        if (next.phase === 'landed') latest.current.report?.(result?.ok && result.landed
+          ? 'junk' in result ? { phase: 'idle' } : { phase: 'landed', speciesId: result.speciesId, lengthCm: result.lengthCm }
+          : result?.ok ? { phase: 'escaped' } : { phase: 'idle' });
+        if (result?.ok && result.landed) { playSoundEffect(!('junk' in result) && (result.isNew || result.isBig || next.cast.trophy) ? 'fanfare' : 'catch'); setCaught(result); setMessage(''); await refresh(); }
         else if (!result?.ok) setMessage('낚시 결과를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.');
         else if (stateRef.current) shadows(stateRef.current);
       }
@@ -127,8 +131,8 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
         // 캐스팅마다 다른 경로를 만들되 같은 캐스팅은 재현할 수 있게 한다.
         const seed = Array.from(next.cast?.castId ?? '').reduce((value, char) => (Math.imul(value, 31) + char.charCodeAt(0)) >>> 0, 0);
         reelGame.current = createReelGame(next.cast?.difficulty ?? 1, latest.current.pet === 'pet_duck', next.cast?.big ?? false, seed, next.cast?.speed ?? 1, next.cast?.rod, next.cast?.trophy ?? false,
-          latest.current.pet === 'pet_pigeon' ? pigeonRescuesLeft(stateRef.current?.kstDate) : 0);
-        setReelState(reelGame.current); reelStarted.current = performance.now(); lastFrame.current = reelStarted.current; taps.current = []; axes.current = [];
+          latest.current.pet === 'pet_pigeon' ? pigeonRescuesLeft(stateRef.current?.kstDate) : 0, next.cast?.heavy ?? false);
+        setReelState(reelGame.current); reelStarted.current = performance.now(); lastFrame.current = reelStarted.current; taps.current = []; axes.current = [{ time: 0, x: reelAxis.current }];
         latest.current.report?.({ phase: 'reeling' });
       } else finishRef.current(next);
     }
@@ -208,7 +212,7 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
     const boost = () => { if (game.current.phase === 'reeling') taps.current.push(performance.now() - reelStarted.current); };
     const down = (event: PointerEvent) => {
       const target = event.target;
-      if (editable(target) || !(target instanceof Element) || !target.closest('.pwp-root') || target.closest('.pwp-btn-b, .pwp-reel-stick')) return;
+      if (editable(target) || !(target instanceof Element) || !target.closest('.pwp-root') || target.closest('.pwp-btn-b, .pwp-reel-stick, .pwp-movement-stick-zone')) return;
       if (!['bite', 'reeling'].includes(game.current.phase) || (event.pointerType === 'mouse' && event.button !== 0)) return;
       event.preventDefault();
       if (pointers.has(event.pointerId)) return;

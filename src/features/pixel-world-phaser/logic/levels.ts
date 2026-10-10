@@ -1,6 +1,6 @@
 /** 서버의 누적 경험치 곡선과 같은 계산. 최대 레벨 뒤에도 경험치는 쌓인다. */
 export const MAX_LEVEL = 100;
-export const FISH_XP = { common: 5, uncommon: 10, rare: 25, legendary: 60 } as const;
+export const FISH_XP = { common: 5, uncommon: 10, rare: 25, legendary: 60, mythic: 120 } as const;
 export const TROPHY_XP = 15;
 export const HARVEST_XP = 40;
 export const BAIT_PRICE = 50;
@@ -38,6 +38,6 @@ export function levelBaitDifficulty(afterRod: number, level: number, legendary: 
 export const hardFishChance = (rareBonus: number, bait = false): number => bait ? Math.min(60, (15 + rareBonus) * 2) : 15 + rareBonus;
 
 export const fishingPerkText = (level: number) => `낚시 난이도 −${Math.min(Math.max(level - 1, 0), 50)}%`;
-export const fishXpDisplay = (rarity: 'common' | 'uncommon' | 'rare' | 'legendary', trophy = false) =>
+export const fishXpDisplay = (rarity: 'common' | 'uncommon' | 'rare' | 'legendary' | 'mythic', trophy = false) =>
   FISH_XP[rarity] + (trophy ? TROPHY_XP : 0);
 export const harvestXpDisplay = () => HARVEST_XP;

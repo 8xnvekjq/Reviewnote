@@ -5,11 +5,13 @@ import { cellCenter, cellOf, planPath, sameCell } from './world';
 export const RIVER_COLS = 26;
 export const RIVER_ROWS = 22;
 export const WATER_X = 8;
-export const DOCK = { left: 7, right: 11, top: 10, bottom: 12 };
+export const DOCK = { left: 7, right: 14, top: 10, bottom: 12 };
 export const TURTLE: Point = { x: 5, y: 8 };
 // 랭킹 푯말은 거북이 바로 왼쪽 — 강가에 들어오면 함께 눈에 띈다.
 export const FISHBOARD: Point = { x: 3, y: 8 };
-export const inDock = ({ x, y }: Point) => x >= DOCK.left && x <= DOCK.right && y >= DOCK.top && y <= DOCK.bottom;
+// 위쪽 판자 길을 늘려 가운데 물고기가 헤엄치는 물길을 남긴다.
+export const inDock = ({ x, y }: Point) => x >= DOCK.left && x <= DOCK.right && y >= DOCK.top && y <= DOCK.bottom
+  && (x <= 11 || y === DOCK.top);
 // 위아래의 넓은 쉼터와 가운데의 열린 물가를 연결한다.
 export const bankEdge = (y: number) => y < 7 || y > 15 ? WATER_X + 2 : WATER_X;
 export const riverWater = (cell: Point) => cell.x >= bankEdge(cell.y) && !inDock(cell);
@@ -40,7 +42,8 @@ export const RIVER_DECORATIONS: readonly RiverDecoration[] = [
   { kind: 'sandbar', cell: { x: 19, y: 5 }, width: 3, blocking: true },
 ];
 export const decorationCells = (d: RiverDecoration): Point[] => Array.from({ length: d.width ?? 1 }, (_, i) => ({ x: d.cell.x + i, y: d.cell.y }));
-export const BANK_SPOTS: readonly Point[] = [{ x: 9, y: 6 }, { x: 7, y: 9 }, { x: 11, y: 11 }, { x: 7, y: 14 }, { x: 9, y: 16 }];
+export const BANK_SPOTS: readonly Point[] = [{ x: 9, y: 6 }, { x: 7, y: 9 }, { x: 11, y: 11 }, { x: 7, y: 14 }, { x: 9, y: 16 },
+  { x: DOCK.right, y: DOCK.top }, { x: 12, y: DOCK.top }, { x: 11, y: DOCK.bottom }];
 export const CAST_RANGE = 3 * 16;
 export function nearestBankSpot(shadow: Point, feet: Point): Point | null {
   const spec = riverScene(), from = cellOf(feet);
@@ -48,8 +51,9 @@ export function nearestBankSpot(shadow: Point, feet: Point): Point | null {
     .sort((a, b) => Math.hypot(cellCenter(a).x - shadow.x, cellCenter(a).y - shadow.y) - Math.hypot(cellCenter(b).x - shadow.x, cellCenter(b).y - shadow.y))[0] ?? null;
 }
 export function canCastFrom(feet: Point, shadow: Point): boolean {
-  return riverWater(cellOf(shadow)) && !riverSolid(cellOf(feet))
-    && FISHING_EDGE_CELLS.some(cell => Math.hypot(feet.x - cellCenter(cell).x, feet.y - cellCenter(cell).y) <= CAST_RANGE);
+  const from = cellOf(feet);
+  return riverWater(cellOf(shadow)) && !riverSolid(from)
+    && (inDock(from) || FISHING_EDGE_CELLS.some(cell => Math.hypot(feet.x - cellCenter(cell).x, feet.y - cellCenter(cell).y) <= CAST_RANGE));
 
 }
 const blockedDecorations = new Set(RIVER_DECORATIONS.filter(d => d.blocking).flatMap(decorationCells).map(c => `${c.x},${c.y}`));
