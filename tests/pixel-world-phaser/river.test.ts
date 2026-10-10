@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { yardScene, RIVER_EXIT_CELLS } from '../../src/features/pixel-world-phaser/logic/yardWorld.ts';
-import { riverScene, riverWater, DOCK, RIVER_DECORATIONS, decorationCells, BANK_SPOTS, canCastFrom, nearestBankSpot, bankEdge, RIVER_COLS, RIVER_ROWS } from '../../src/features/pixel-world-phaser/logic/riverWorld.ts';
+import { riverScene, riverWater, inDock, DOCK, RIVER_DECORATIONS, decorationCells, BANK_SPOTS, canCastFrom, nearestBankSpot, bankEdge, RIVER_COLS, RIVER_ROWS } from '../../src/features/pixel-world-phaser/logic/riverWorld.ts';
 import { buildScene, entrySpawn, exitAt, exitCells } from '../../src/features/pixel-world-phaser/logic/scenes.ts';
 import { cellCenter, cellOf, feetBlocked, planPath, facedInteractable, facingToward } from '../../src/features/pixel-world-phaser/logic/world.ts';
 import { worldTint, fallbackWorldTime } from '../../src/features/pixel-world-phaser/logic/worldTint.ts';
@@ -25,7 +27,7 @@ test('river water blocks feet and routes while the dock remains walkable', () =>
     const cell = { x, y }; if (riverWater(cell)) { assert.ok(spec.solid(cell)); assert.ok(feetBlocked(cellCenter(cell), spec.solid)); }
   }
   const spawn = cellOf(entrySpawn(spec, 'fromYard').feet);
-  const route = planPath(spawn, { x: DOCK.right, y: 11 }, spec, exitCells(spec));
+  const route = planPath(spawn, { x: DOCK.right, y: DOCK.top }, spec, exitCells(spec));
   assert.ok(route.length); assert.ok(route.every(cell => !riverWater(cell)));
 });
 test('turtle and fishboard have reachable facing interaction cells', () => {
@@ -74,8 +76,9 @@ test('every fishing spot is reachable and adjacent to water', () => {
   for (const spot of BANK_SPOTS) {
     assert.ok(!spec.solid(spot));
     assert.deepEqual(planPath(from, spot, spec, exitCells(spec)).at(-1), spot);
-    assert.ok(riverWater({ x: spot.x + 1, y: spot.y }));
-    const shadow = { x: (spot.x + 2) * 16, y: cellCenter(spot).y };
+    const water = [[1,0],[-1,0],[0,1],[0,-1]].map(([dx,dy]) => ({ x: spot.x + dx, y: spot.y + dy })).find(riverWater);
+    assert.ok(water);
+    const shadow = cellCenter(water);
     assert.ok(canCastFrom(cellCenter(spot), shadow));
     assert.ok(nearestBankSpot(shadow, cellCenter(from)));
     assert.ok(!canCastFrom(cellCenter({ x: 2, y: 11 }), shadow));
@@ -100,4 +103,49 @@ test('cast range measures the shore rather than the selected landing spot', () =
   assert.ok(!canCastFrom(cellCenter({ x: 3, y: 14 }), shadow));
   assert.ok(canCastFrom(entrySpawn(riverScene(), 'fromYard').feet, { x: 208, y: 183 }));
   assert.ok(!canCastFrom(cellCenter({ x: 8, y: 14 }), shadow));
+});
+
+test('three extra dock tiles connect to the bank and support casting on both sides and the tip', () => {
+  const spec = riverScene(), from = cellOf(entrySpawn(spec, 'fromYard').feet);
+  assert.equal(DOCK.right, 14);
+  for (let x = 12; x <= DOCK.right; x++) {
+    const spot = { x, y: DOCK.top };
+    assert.ok(inDock(spot));
+    assert.ok(!spec.solid(spot));
+    assert.ok(!feetBlocked(cellCenter(spot), spec.solid));
+    assert.deepEqual(planPath(from, spot, spec, exitCells(spec)).at(-1), spot);
+    for (const y of [DOCK.top - 1, DOCK.top + 1]) {
+      assert.ok(riverWater({ x, y }));
+      assert.ok(canCastFrom(cellCenter(spot), cellCenter({ x, y })));
+    }
+  }
+  const tip = { x: DOCK.right, y: DOCK.top };
+  assert.ok(BANK_SPOTS.some(spot => spot.x === tip.x && spot.y === tip.y));
+  assert.ok(canCastFrom(cellCenter(tip), cellCenter({ x: DOCK.right + 1, y: DOCK.top })));
+  assert.ok(!canCastFrom(cellCenter(tip), cellCenter(tip)));
+  assert.deepEqual(nearestBankSpot(cellCenter({ x: DOCK.right + 1, y: DOCK.top }), cellCenter(from)), tip);
+});
+
+test('all three moving fish shadows stay in water and can be reached from a fishing spot', () => {
+  const spec = riverScene(), from = cellCenter(cellOf(entrySpawn(spec, 'fromYard').feet));
+  for (let seconds = 0; seconds <= 300; seconds++) for (let index = 0; index < 3; index++) {
+    const shadow = { x: (index === 1 ? 13 : 9.5) * 16 + Math.sin(seconds * .28 + index * 2) * 9,
+      y: [144, 183, 230][index] + Math.cos(seconds * .21 + index) * 6 };
+    assert.ok(riverWater(cellOf(shadow)), `shadow ${index} at ${seconds}s`);
+    const spot = nearestBankSpot(shadow, from);
+    assert.ok(spot);
+    assert.ok(canCastFrom(cellCenter(spot), shadow));
+  }
+});
+
+test('expanded fish art preserves the original RGBA bytes and has five nonempty transparent icons', () => {
+  const result = spawnSync('python', ['-I', 'scripts/pixel-world/draw-fish-expansion.py', '--check'],
+    { cwd: fileURLToPath(new URL('../../', import.meta.url)), encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr || result.error?.message);
+  const art = JSON.parse(result.stdout);
+  assert.equal(art.originalHash, '2fde85e7e4b0ad943fd01843a139155993332d5fda27a27cdee89fc654d36134');
+  assert.deepEqual(art.fishSize, [224, 16]);
+  assert.deepEqual(art.junkSize, [48, 16]);
+  assert.equal(art.opaquePixels.length, 5);
+  assert.ok(art.opaquePixels.every((count: number) => count > 0 && count < 256));
 });

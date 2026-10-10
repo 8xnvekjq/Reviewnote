@@ -1,6 +1,6 @@
 import type Phaser from 'phaser';
 import type { Point } from '../logic/joystick';
-import { RIVER_COLS, RIVER_ROWS, TURTLE, FISHBOARD, inDock, riverWater, bankEdge, RIVER_DECORATIONS, BANK_SPOTS, canCastFrom, nearestBankSpot } from '../logic/riverWorld';
+import { RIVER_COLS, RIVER_ROWS, DOCK, TURTLE, FISHBOARD, inDock, riverWater, bankEdge, RIVER_DECORATIONS, BANK_SPOTS, canCastFrom, nearestBankSpot } from '../logic/riverWorld';
 import { cellCenter, facingDelta, facingToward } from '../logic/world';
 import { worldTint } from '../logic/worldTint';
 import { preloadFishing, fishingFrames } from './sceneAssets';
@@ -52,6 +52,19 @@ export class RiverScene extends WorldScene {
       }
     }
     // 길과 서쪽 출구 표식.
+    // 늘어난 부두의 가장자리와 기둥도 기존 판자와 같은 색으로 그린다.
+    const dockEdges = this.add.graphics().setDepth(-998);
+    for (let y = DOCK.top; y <= DOCK.bottom; y++) for (let x = DOCK.left; x <= DOCK.right; x++) {
+      if (!inDock({ x, y })) continue;
+      dockEdges.fillStyle(0x735536);
+      if (riverWater({ x, y: y - 1 })) dockEdges.fillRect(x * 16, y * 16, 16, 1);
+      if (riverWater({ x, y: y + 1 })) dockEdges.fillRect(x * 16, y * 16 + 15, 16, 1);
+      if (riverWater({ x: x + 1, y })) dockEdges.fillRect(x * 16 + 15, y * 16, 1, 16);
+    }
+    for (const x of [12, DOCK.right]) for (const y of [DOCK.top * 16, (DOCK.top + 1) * 16 - 4]) {
+      dockEdges.fillStyle(0x735536).fillRect(x * 16 + 11, y, 4, 4);
+      dockEdges.fillStyle(0xd3a46b).fillRect(x * 16 + 12, y, 2, 1);
+    }
     g.fillStyle(0xc6b98c).fillRect(32, 176, 96, 16);
     g.fillStyle(0xffecc4).fillRect(34, 181, 10, 3).fillRect(34, 179, 3, 7);
     const t = cellCenter(TURTLE);
