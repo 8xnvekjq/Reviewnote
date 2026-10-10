@@ -4,9 +4,10 @@ import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 const base = process.env.PWP_BASE ?? 'http://127.0.0.1:5174';
 await mkdir('scratch/rods', { recursive: true });
+await mkdir('.test-artifacts/pw-bugs-a', { recursive: true });
 const browser = await chromium.launch({ headless: true });
 try {
-  for (const viewport of [{ width: 390, height: 844 }, { width: 1180, height: 820 }]) {
+  for (const viewport of [{ width: 390, height: 844 }, { width: 820, height: 1180 }, { width: 1180, height: 820 }]) {
     const context = await browser.newContext({ viewport, hasTouch: true });
     await context.route('**/src/services/supabase.ts', route => route.fulfill({ contentType: 'application/javascript', body: "export { supabase } from '/tests/pixel-world-phaser/fakeRealtime.mjs';" }));
     const page = await context.newPage();
@@ -42,6 +43,20 @@ try {
     })));
     assert.ok(crops.length > 0);
     assert.ok(crops.every(crop => (crop.canvas === 'true' || crop.rod || crop.bait) && !crop.svg));
+    const assertArtFits = async panel => {
+      await page.waitForFunction(() => [...document.querySelectorAll('.pwp-item-art canvas')].every(c => c.dataset.ready === 'true'));
+      const overflow = await panel.locator('.pwp-item-art').evaluateAll(nodes => nodes.flatMap(node => {
+        const box = node.getBoundingClientRect(), card = node.closest('.pwp-item, [data-room-item]').getBoundingClientRect();
+        const fits = (a, b) => a.left >= b.left - .5 && a.top >= b.top - .5 && a.right <= b.right + .5 && a.bottom <= b.bottom + .5;
+        return [...node.children].filter(child => !fits(child.getBoundingClientRect(), box) || !fits(child.getBoundingClientRect(), card)).map(() => node.closest('[data-item]')?.dataset.item);
+      }));
+      assert.deepEqual(overflow, [], 'every catalog preview fits its art box and card');
+    };
+    await assertArtFits(shop);
+    const oldStyle = await page.addStyleTag({ content: '.pwp-item-art { grid-template-columns:none; grid-template-rows:none; } .pwp-item-art .pwp-art-canvas { min-width:auto; min-height:auto; }' });
+    await page.screenshot({ path: `.test-artifacts/pw-bugs-a/shop-before-${viewport.width}.png` });
+    await oldStyle.evaluate(node => node.remove());
+    await page.screenshot({ path: `.test-artifacts/pw-bugs-a/shop-after-${viewport.width}.png` });
     await page.screenshot({ path: `scratch/fix-shop-top-${viewport.width}.png` });
     // 낚싯대·미끼는 강가 거북이가 판다 — 광장 상점에는 탭도 물건도 없다.
     for (const name of ['낚싯대', '미끼']) assert.equal(await shop.getByRole('button', { name, exact: true }).count(), 0);
@@ -67,6 +82,11 @@ try {
     assert.equal(await page.evaluate(() => window.scrollY), 0);
     await page.screenshot({ path: `scratch/fix-shop-${viewport.width}.png` });
     await shop.getByRole('button', { name: '가구', exact: true }).click();
+    await assertArtFits(shop);
+    const previousFit = await page.addStyleTag({ content: '.pwp-item-art { grid-template-columns:none; grid-template-rows:none; } .pwp-item-art .pwp-art-canvas { min-width:auto; min-height:auto; }' });
+    await page.screenshot({ path: `.test-artifacts/pw-bugs-a/furniture-before-${viewport.width}.png` });
+    await previousFit.evaluate(node => node.remove());
+    await page.screenshot({ path: `.test-artifacts/pw-bugs-a/furniture-after-${viewport.width}.png` });
     const plant = shop.locator('[data-item="furniture_plant"]');
     await plant.getByRole('button', { name: '구매하기' }).click();
     await plant.getByRole('button', { name: '취소', exact: true }).click();
@@ -89,6 +109,7 @@ try {
     const wardrobe = page.getByRole('dialog', { name: '옷장', exact: true });
     const wardrobeBounds = await wardrobe.boundingBox();
     assert.ok(wardrobeBounds.x >= 0 && wardrobeBounds.y >= 0 && wardrobeBounds.x + wardrobeBounds.width <= viewport.width && wardrobeBounds.y + wardrobeBounds.height <= viewport.height);
+    await assertArtFits(wardrobe);
     const before = await debug();
     await wardrobe.getByRole('button', { name: '상의', exact: true }).click();
     await page.waitForFunction(() => [...document.querySelectorAll('.pwp-window canvas')].every(canvas => canvas.dataset.ready === 'true'));
@@ -128,6 +149,18 @@ try {
     await wardrobe.getByRole('button', { name: '옷장 닫기' }).click();
     await page.keyboard.down('ArrowLeft'); await page.waitForTimeout(200); await page.keyboard.up('ArrowLeft');
     assert.notEqual((await debug()).x, before.x);
+    await page.goto(`${base}/tests/pixel-world-phaser/harness.html?roomEdit=all&pet=none`);
+    await page.waitForFunction(() => document.querySelector('.pwp-root')?.dataset.status === 'ready');
+    await page.evaluate(() => { const h = window.__pixelWorldPhaser, p = h.debug().exits.door; h.walkToScreen(p.x, p.y); });
+    await page.waitForFunction(() => window.__pixelWorldPhaser.debug().scene === 'room' && !window.__pixelWorldPhaser.debug().transitioning);
+    await page.getByRole('button', { name: '\uAFB8\uBBF8\uAE30', exact: true }).click();
+    const placement = page.getByRole('dialog', { name: '\uAC00\uAD6C', exact: true });
+    await placement.waitFor(); await assertArtFits(placement);
+    assert.equal(await placement.locator('[data-room-item]').count(), await page.evaluate(async () => {
+      const { PIXEL_CATALOG } = await import('/src/features/pixel-room/shop/catalog.ts');
+      return PIXEL_CATALOG.filter(item => item.category === 'furniture').length;
+    }));
+    await page.screenshot({ path: `.test-artifacts/pw-bugs-a/placement-after-${viewport.width}.png` });
     assert.deepEqual(errors, []);
     console.log(`PASS plaza panels ${viewport.width}px: rod tab, shop purchase, balance, wardrobe, previews, movement lock`);
     await context.close();

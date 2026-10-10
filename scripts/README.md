@@ -12,6 +12,13 @@
 
 ## 🛠️ 보유 스크립트 목록
 
+### `pixel-world/pixelate-duck.py`
+
+* **실행**: `python scripts/pixel-world/pixelate-duck.py` (Pillow 필요)
+* **용도**: 보존한 병아리 원본의 각 자세를 32px 칸에 맞추고, 10색 팔레트·이진 알파·1px 윤곽선으로 정리한다.
+* **출력**: `src/features/pixel-room/pet/assets/duck.png` (128×128), `.test-artifacts/pw-bugs-a/duck-*-4x.png`
+* **원본**: `duck-source.png`는 방 UI에서 계속 사용하며 덮어쓰지 않는다.
+
 ### `pixel-world/draw-bear-ride.py`
 * **실행**: `python scripts/pixel-world/draw-bear-ride.py`
 * **용도**: 기존 곰의 색상을 추출해 네 발 걷기(옆·앞·뒤 각 4프레임)와 방향별 쉬기 그림을 재현한다.

@@ -2,6 +2,7 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
+import { economyRegression } from './economy.browser-helper.mjs';
 const BASE = process.env.PWP_BASE ?? 'http://127.0.0.1:5174';
 await mkdir('.pixel-world-test.local', { recursive: true });
 const browser = await chromium.launch({ headless: true });
@@ -32,6 +33,7 @@ const react = async (page, kind) => {
   await page.waitForFunction(() => window.__pixelWorldPhaser.debug().petReaction === null);
 };
 try {
+  await economyRegression(browser, BASE);
   for (const [name, viewport] of [['phone', { width: 390, height: 844 }], ['tablet', { width: 1180, height: 820 }]]) {
     const context = await browser.newContext({ viewport, hasTouch: true });
     const page = await context.newPage(); const errors = []; page.on('pageerror', e => errors.push(e.message));

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import sheet from './assets/duck.png';
+import sheet from './assets/duck-source.png';
 import { dogFits } from './dogModel';
 import { advanceDuck, duckPosition, holdDuck, spawnDuck } from './duckModel';
 import { PetInteractionFx } from './PetInteractionFx';
