@@ -110,7 +110,9 @@ try {
   await exit(a, 'gate'); await ready(a, 'plaza');
   await b.bringToFront();
   await b.waitForFunction(() => window.__pixelWorldPhaser.debug().classmates.length === 1);
+  // '나가기'로 게임을 끝내도 작별(bye) broadcast가 먼저 나가 상대 화면에서 바로 사라진다.
   await a.locator('.pwp-exit').click(); await a.getByTestId('exited').waitFor();
+  assert.ok(await a.evaluate(() => window.plazaTransport.sent('bye').length > 0), 'bye sent on exit');
   await a.waitForFunction(() => window.plazaTransport.audit().active.length === 0);
   await b.waitForFunction(() => window.__pixelWorldPhaser.debug().classmates.length === 0);
   await b.locator('.pwp-exit').click(); await b.getByTestId('exited').waitFor();

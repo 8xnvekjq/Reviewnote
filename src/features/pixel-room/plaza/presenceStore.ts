@@ -68,6 +68,11 @@ export interface PlazaStoreState {
   // presenceRefs 주석)과 같은 종류의 방어를, sync 쪽에서 겪는 "leave보다 sync가 늦게 일관되는"
   // 경우에도 적용하는 것.
   recentlyLeftRefs: Set<string>;
+  // 'bye'(나가는 사람이 직접 보낸 작별 broadcast)로 지운 sessionId -> 작별 시각(보낸 사람 시계).
+  // presence의 leave는 서버에서 수 초 늦게 오므로(2026-10 실측), 그 사이 도착하는 낡은 sync/join/
+  // broadcast(작별 이전에 만들어진 것)가 떠난 사람을 출구에 다시 세우지 못하게 막는다. 같은
+  // sessionId로 다시 들어온 경우(예전 화면)는 작별 이후 시각을 달고 오므로 정상으로 받아들인다.
+  departed: Map<string, number>;
 }
 
 // recentlyLeftRefs가 세션이 오래갈수록 무한정 자라지 않도록 하는 상한 — MAX_PATH_LENGTH와 같은
@@ -87,7 +92,7 @@ function rememberLeftRef(recentlyLeftRefs: Set<string>, presenceRef: string): Se
 }
 
 export function createPlazaStoreState(): PlazaStoreState {
-  return { players: new Map(), paths: new Map(), presenceRefs: new Map(), recentlyLeftRefs: new Set() };
+  return { players: new Map(), paths: new Map(), presenceRefs: new Map(), recentlyLeftRefs: new Set(), departed: new Map() };
 }
 
 // Presence(sync/join)와 Broadcast(move)를 분리한 이유: 정책이 서로 다르기 때문이다(아래 reducer
@@ -106,7 +111,8 @@ export type PlazaStoreAction =
   | { type: 'presence-sync'; players: Array<{ player: PlazaPlayerState; presenceRef: string }> }
   | { type: 'presence-join'; players: Array<{ player: PlazaPlayerState; presenceRef: string }> }
   | { type: 'presence-leave'; leaves: Array<{ sessionId: string; presenceRef: string }> }
-  | { type: 'broadcast'; player: PlazaPlayerState };
+  | { type: 'broadcast'; player: PlazaPlayerState }
+  | { type: 'bye'; sessionId: string; at: number };
 
 // Supabase Presence/Broadcast가 콜백에 건네주는 raw payload는 우리가 보낸 PlazaPlayerState보다
 // 필드가 더 많을 수 있다(대표적으로 Presence는 presence_ref를 얹는다 — usePlazaRealtime.ts가
@@ -169,6 +175,12 @@ function sanitizePlayerState(raw: PlazaPlayerState, bounds: PresenceBounds): Pla
 // - presence-sync도 대칭적으로 신원 확인을 한 번 거친다: sync에 들어있는 항목의 presence_ref가
 //   recentlyLeftRefs(우리가 이미 명시적으로 leave 처리를 확인한 join들)에 있으면, 그 항목은
 //   sync에서 빼고 취급한다 — 위 PlazaStoreState.recentlyLeftRefs 주석 참고.
+/** 작별(bye)을 보낸 사람의, 작별 이전에 만들어진 낡은 상태인가. */
+function sentBeforeBye(state: PlazaStoreState, player: PlazaPlayerState): boolean {
+  const at = state.departed.get(player.sessionId);
+  return at !== undefined && !(player.updatedAt > at);
+}
+
 /** broadcast로 이미 받은 상태가 presence 값보다 새것인가 — 같은 보낸이의 seq와 시계가 둘 다 앞서야
  * 한다. 탭을 새로 연 재접속(seq가 처음부터 다시 시작)은 시계가 더 늦으므로 presence 쪽이 이긴다. */
 function newerThanPresence(existing: PlazaPlayerState, presence: PlazaPlayerState): boolean {
@@ -192,7 +204,7 @@ function reducePlazaStore(state: PlazaStoreState, action: PlazaStoreAction, boun
         // 이미 leave를 직접 확인한 join이 sync에 되살아나 있으면 무시한다(recentlyLeftRefs 주석
         // 참고) — 정말로 재입장한 것이라면 그 새 join은 반드시 새 presence_ref를 달고 오므로,
         // 진짜 재입장을 놓치는 게 아니라 "이미 끝난 그 join"만 걸러낼 뿐이다.
-        if (state.recentlyLeftRefs.has(presenceRef)) continue;
+        if (state.recentlyLeftRefs.has(presenceRef) || sentBeforeBye(state, player)) continue;
         const sanitized = sanitizePlayerState(player, bounds);
         presenceRefs.set(sanitized.sessionId, presenceRef);
         // presence는 이제 가끔만 갱신되므로(접속·옷 변경·멈춘 뒤 잠시 후), 그 사이 broadcast로 받은
@@ -211,7 +223,7 @@ function reducePlazaStore(state: PlazaStoreState, action: PlazaStoreAction, boun
         // 시작). 기존에 알고 있던 이력은 sync로 대체되므로 함께 초기화한다.
         paths.set(sanitized.sessionId, [{ ...protocolExtras(sanitized, bounds), x: sanitized.x, y: sanitized.y, seq: sanitized.seq }]);
       }
-      return { players, paths, presenceRefs, recentlyLeftRefs: state.recentlyLeftRefs };
+      return { players, paths, presenceRefs, recentlyLeftRefs: state.recentlyLeftRefs, departed: state.departed };
     }
     case 'presence-join': {
       if (action.players.length === 0) return state;
@@ -219,6 +231,7 @@ function reducePlazaStore(state: PlazaStoreState, action: PlazaStoreAction, boun
       const presenceRefs = new Map(state.presenceRefs);
       let paths = state.paths;
       for (const { player, presenceRef } of action.players) {
+        if (sentBeforeBye(state, player)) continue;
         const sanitized = sanitizePlayerState(player, bounds);
         presenceRefs.set(sanitized.sessionId, presenceRef);
         const existing = players.get(sanitized.sessionId);
@@ -230,7 +243,7 @@ function reducePlazaStore(state: PlazaStoreState, action: PlazaStoreAction, boun
         // 좌표도 경로에 추가한다.
         paths = appendPath(paths, sanitized.sessionId, { ...protocolExtras(sanitized, bounds), x: sanitized.x, y: sanitized.y, seq: sanitized.seq });
       }
-      return { players, paths, presenceRefs, recentlyLeftRefs: state.recentlyLeftRefs };
+      return { players, paths, presenceRefs, recentlyLeftRefs: state.recentlyLeftRefs, departed: state.departed };
     }
     case 'presence-leave': {
       if (action.leaves.length === 0) return state;
@@ -251,9 +264,10 @@ function reducePlazaStore(state: PlazaStoreState, action: PlazaStoreAction, boun
         presenceRefs.delete(sessionId);
         recentlyLeftRefs = rememberLeftRef(recentlyLeftRefs, presenceRef);
       }
-      return changed ? { players, paths, presenceRefs, recentlyLeftRefs } : state;
+      return changed ? { players, paths, presenceRefs, recentlyLeftRefs, departed: state.departed } : state;
     }
     case 'broadcast': {
+      if (sentBeforeBye(state, action.player)) return state;
       const incoming = sanitizePlayerState(action.player, bounds);
       const existing = state.players.get(incoming.sessionId);
       if (existing && incoming.seq <= existing.seq) {
@@ -263,7 +277,16 @@ function reducePlazaStore(state: PlazaStoreState, action: PlazaStoreAction, boun
       const players = new Map(state.players);
       players.set(incoming.sessionId, incoming);
       const paths = appendPath(state.paths, incoming.sessionId, { ...protocolExtras(incoming, bounds), x: incoming.x, y: incoming.y, seq: incoming.seq });
-      return { players, paths, presenceRefs: state.presenceRefs, recentlyLeftRefs: state.recentlyLeftRefs };
+      return { players, paths, presenceRefs: state.presenceRefs, recentlyLeftRefs: state.recentlyLeftRefs, departed: state.departed };
+    }
+    case 'bye': {
+      // 나가는 사람이 직접 알린 작별 — presence leave를 기다리지 않고 바로 지운다.
+      const departed = new Map(state.departed);
+      departed.set(action.sessionId, action.at);
+      while (departed.size > MAX_RECENTLY_LEFT_REFS) departed.delete(departed.keys().next().value!);
+      const players = new Map(state.players), paths = new Map(state.paths), presenceRefs = new Map(state.presenceRefs);
+      players.delete(action.sessionId); paths.delete(action.sessionId); presenceRefs.delete(action.sessionId);
+      return { players, paths, presenceRefs, recentlyLeftRefs: state.recentlyLeftRefs, departed };
     }
     default:
       return state;
