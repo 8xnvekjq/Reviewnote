@@ -7,8 +7,9 @@ import { composeAvatar } from '../game/avatarTexture';
 import { loadImage } from '../game/loadImage';
 import { loadPetSheet } from '../game/sceneAssets';
 import { PET_SHEETS } from '../logic/petSheets';
+import netIcon from '../assets/bugs/net-icon.png';
 
-type Art = { appearance: PublicAvatarAppearance } | { pet: string } | { furniture: FurnitureType };
+type Art = { appearance: PublicAvatarAppearance } | { pet: string } | { furniture: FurnitureType | 'tool_net' };
 
 /** Crop at native resolution before CSS scaling, so the atlas cannot bleed into the preview. */
 export function PanelArt(props: Art) {
@@ -30,6 +31,9 @@ export function PanelArt(props: Art) {
         width = height = sheet.cell;
         x = sheet.idle.frames[0] * sheet.cell;
         y = sheet.idle.row * sheet.cell;
+      } else if (furniture === 'tool_net') {
+        source = await loadImage(netIcon);
+        width = height = 16;
       } else if (furniture) {
         const art = furnitureArt[furniture];
         source = await loadImage(art.src);
