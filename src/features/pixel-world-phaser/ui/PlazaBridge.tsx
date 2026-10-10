@@ -15,14 +15,14 @@ import type { PlazaBubble } from '../game/plazaBubbles';
 import { Window } from './GamePanels';
 import { PlazaChat } from './PlazaChat';
 export type PlazaPanel = 'contest' | 'well' | 'bench';
-export function PlazaBridge({ handle, appearance, pet, userId, panel, onClose }: {
-  handle: RefObject<WorldGameHandle | null>; appearance: PublicAvatarAppearance; pet: PetId | null;
+export function PlazaBridge({ handle, appearance, pet, riding, userId, panel, onClose }: {
+  handle: RefObject<WorldGameHandle | null>; appearance: PublicAvatarAppearance; pet: PetId | null; riding: boolean;
   userId: string; panel: string | null; onClose: () => void;
 }) {
   const [sessionId] = useState(() => crypto.randomUUID());
   const [initial] = useState(() => {
     const d = handle.current?.debug();
-    return { ...continuousPayload(d ?? { x: 216, y: 248 }), direction: d?.facing ?? 'Back' as const, moving: d?.moving ?? false, pet };
+    return { ...continuousPayload(d ?? { x: 216, y: 248 }), direction: d?.facing ?? 'Back' as const, moving: d?.moving ?? false, pet, riding: d?.riding ?? false };
   });
   const realtime = usePlazaRealtime(sessionId, appearance, initial);
   const { updateMyState } = realtime;
@@ -41,13 +41,13 @@ export function PlazaBridge({ handle, appearance, pet, userId, panel, onClose }:
     const update = () => {
       const d = handle.current?.debug();
       if (!d || d.scene !== 'plaza' || d.transitioning) return;
-      const state = { ...continuousPayload(d), direction: d.facing, moving: d.moving, pet };
+      const state = { ...continuousPayload(d), direction: d.facing, moving: d.moving, pet, riding: d.riding };
       const key = JSON.stringify(state);
       if (key !== last) { updateMyState(state); last = key; }
     };
     update(); const timer = window.setInterval(update, 170);
     return () => window.clearInterval(timer);
-  }, [handle, updateMyState, pet]);
+  }, [handle, updateMyState, pet, riding]);
   useEffect(() => {
     let cancelled = false; setFailed(false);
     void fetchWeeklyCropContest().then(value => { if (!cancelled) setContest(value); }).catch(() => { if (!cancelled) setFailed(true); });
