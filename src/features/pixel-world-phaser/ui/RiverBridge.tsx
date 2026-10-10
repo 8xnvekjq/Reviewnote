@@ -17,15 +17,15 @@ import {
 import type { FishBucket, RiverFishEvent, RiverFishReporter } from '../logic/riverPresence';
 import { PlazaChat } from './PlazaChat';
 
-export function RiverBridge({ handle, appearance, pet, panel, reporter }: {
-  handle: RefObject<WorldGameHandle | null>; appearance: PublicAvatarAppearance; pet: PetId | null; panel: string | null;
+export function RiverBridge({ handle, appearance, pet, riding, panel, reporter }: {
+  handle: RefObject<WorldGameHandle | null>; appearance: PublicAvatarAppearance; pet: PetId | null; riding: boolean; panel: string | null;
   /** useFishing의 낚시 보고가 들어오는 자리. 마운트 동안만 채운다. */
   reporter: MutableRefObject<RiverFishReporter | null>;
 }) {
   const [sessionId] = useState(() => crypto.randomUUID());
   const [initial] = useState(() => {
     const d = handle.current?.debug();
-    return { ...riverPayload(d ?? { x: 56, y: 184 }), direction: d?.facing ?? 'Right' as const, moving: d?.moving ?? false, pet };
+    return { ...riverPayload(d ?? { x: 56, y: 184 }), direction: d?.facing ?? 'Right' as const, moving: d?.moving ?? false, pet, riding: d?.riding ?? false };
   });
   const [fish, setFish] = useState(createRiverFishStore);
   const roster = useRef<Set<string>>(new Set([sessionId]));
@@ -50,13 +50,13 @@ export function RiverBridge({ handle, appearance, pet, panel, reporter }: {
     const update = () => {
       const d = handle.current?.debug();
       if (!d || d.scene !== 'river' || d.transitioning) return;
-      const state = { ...riverPayload(d), direction: d.facing, moving: d.moving, pet };
+      const state = { ...riverPayload(d), direction: d.facing, moving: d.moving, pet, riding: d.riding };
       const key = JSON.stringify(state);
       if (key !== last) { updateMyState(state); last = key; }
     };
     update(); const timer = window.setInterval(update, 170);
     return () => window.clearInterval(timer);
-  }, [handle, updateMyState, pet]);
+  }, [handle, updateMyState, pet, riding]);
 
   // 내 낚시 보고 → (찌 좌표를 붙여) 친구들에게. 몰아서 오면 마지막 상태만 조금 뒤에 보낸다(토큰 통).
   const seq = useRef(0);

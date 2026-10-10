@@ -1,3 +1,5 @@
+import { updatePeerCompanion, peerCompanionSnapshot } from './peerCompanion';
+import type { PetFollowState } from '../logic/petFollow';
 // 강가의 친구들: 아바타·펫(광장과 같은 그림), 머리 위 구름 말풍선, 친구의 낚싯줄·찌·입질 "!"·희귀 물고기 반짝임.
 // 강가 장면의 지형 코드와 섞지 않으려고 따로 둔다. RiverScene은 만들 때 한 번, 매 프레임 update 한 번만 부른다.
 // 글(말풍선)은 Phaser Text로만 그린다(HTML로 넣지 않는다). 구독 생명주기는 React RiverBridge가 맡는다.
@@ -5,9 +7,9 @@ import type Phaser from 'phaser';
 import type { PlazaPlayerState } from '../../pixel-room/plaza/types';
 import type { PetId } from '../../pixel-room/pet/petKinds';
 import { AVATAR_POSES, AVATAR_FRAMES_PER_POSE } from '../logic/avatarPlan';
-import { facingDelta, feetBlocked } from '../logic/world';
+import { facingDelta } from '../logic/world';
 import type { SolidFn } from '../logic/world';
-import { PET_SHEETS, petFollowSpot } from '../logic/petSheets';
+import { PET_SHEETS } from '../logic/petSheets';
 import type { Point } from '../logic/joystick';
 import { riverFeet } from '../logic/riverPresence';
 import type { RiverPeerFishing } from '../logic/riverPresence';
@@ -17,7 +19,7 @@ import { PlazaBubbles } from './plazaBubbles';
 import type { PlazaBubble } from './plazaBubbles';
 
 type Line = { line: Phaser.GameObjects.Graphics; bobber: Phaser.GameObjects.Sprite | Phaser.GameObjects.Rectangle; bang: Phaser.GameObjects.Text };
-type Friend = {
+type Friend = { follow?: PetFollowState;
   sprite?: Phaser.GameObjects.Sprite; pet?: Phaser.GameObjects.Sprite; look: string; petId: PetId | null; loading: boolean; state: PlazaPlayerState;
   fishing?: Line; lastPhase: RiverPeerFishing['phase'];
 };
@@ -55,22 +57,13 @@ export class RiverPeers {
   /** 친구(와 나)의 낚시 상태. 내 낚싯줄은 장면의 fishingFx가 그리므로 여기선 나의 반짝임만 쓴다. */
   setFishing(fishing: Record<string, RiverPeerFishing>) { this.fishing = fishing; }
 
-  update(time: number, selfFeet: Point) {
+  update(time: number, selfFeet: Point, deltaMs: number) {
     const now = Date.now();
     const spots = new Map<string, Point>([[this.selfId, selfFeet]]);
     for (const [id, f] of this.friends) {
-      const p = f.state, feet = riverFeet(p);
+      const p = f.state, feet = riverFeet({ x: p.x, y: p.y });
       spots.set(id, feet);
-      if (f.sprite) {
-        f.sprite.setPosition(feet.x, feet.y).setDepth(feet.y);
-        const anim = f.look + ':' + (p.moving ? 'Walk_' : 'Idle_') + p.direction;
-        if (f.sprite.anims.currentAnim?.key !== anim) f.sprite.play(anim);
-      }
-      if (f.pet && p.pet) {
-        const wanted = petFollowSpot(feet, p.direction), spot = feetBlocked(wanted, this.solid) ? feet : wanted;
-        const sheet = PET_SHEETS[p.pet], a = p.moving ? sheet.walk : sheet.idle;
-        f.pet.setPosition(spot.x, spot.y).setDepth(spot.y).setFrame(a.row * sheet.columns + a.frames[Math.floor(time / a.frameMs) % a.frames.length]);
-      }
+      updatePeerCompanion(f, feet, time, deltaMs, this.solid);
       this.drawLine(f, feet, this.fishing[id], now, time);
     }
     for (const [id, view] of Object.entries(this.fishing)) {
@@ -89,7 +82,7 @@ export class RiverPeers {
 
   snapshot() {
     return {
-      classmates: [...this.friends].map(([id, f]) => ({ id, x: f.state.x, y: f.state.y, rendered: !!f.sprite, pet: !!f.pet,
+      classmates: [...this.friends].map(([id, f]) => ({ id, x: f.state.x, y: f.state.y, rendered: !!f.sprite, pet: !!f.pet, ...peerCompanionSnapshot(f),
         fishing: f.fishing?.bobber.visible ? { phase: f.lastPhase, bobber: { x: Math.round(f.fishing.bobber.x), y: Math.round(f.fishing.bobber.y) }, bang: f.fishing.bang.visible } : null })),
       bubbles: this.bubbles.snapshot(),
       sparkles: [...this.sparkles.keys()],
@@ -123,7 +116,7 @@ export class RiverPeers {
   }
   private ensurePet(id: string, f: Friend, petId: PetId | null) {
     if (f.petId === petId) return;
-    f.petId = petId; f.pet?.destroy(); f.pet = undefined;
+    f.petId = petId; f.pet?.destroy(); f.pet = undefined; f.follow = undefined;
     if (!petId) return;
     void loadPetSheet(petId).then(source => {
       if (!this.scene.scene.isActive() || this.friends.get(id) !== f || f.petId !== petId) return;

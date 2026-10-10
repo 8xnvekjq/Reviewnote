@@ -16,6 +16,7 @@ export interface PlazaPlayerState {
   version?: 2;
   position?: { x: number; y: number };
   pet?: import('../pet/petKinds').PetId | null;
+  riding?: boolean;
   sessionId: string;   // 이 탭 하나의 고유 id(crypto.randomUUID() 등) — 같은 계정 여러 탭 구분용
   x: number;
   y: number;

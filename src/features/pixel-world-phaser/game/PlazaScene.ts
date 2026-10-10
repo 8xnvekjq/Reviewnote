@@ -1,11 +1,12 @@
+import { updatePeerCompanion, peerCompanionSnapshot } from './peerCompanion';
+import type { PetFollowState } from '../logic/petFollow';
 // 광장 그림과 친구들. 구독 생명주기는 React PlazaBridge가 맡는다.
 import type Phaser from 'phaser';
 import { SCENERY } from '../../pixel-room/plaza/plazaLayout';
 import type { PlazaPlayerState } from '../../pixel-room/plaza/types';
 import { AVATAR_POSES, AVATAR_FRAMES_PER_POSE } from '../logic/avatarPlan';
-import { feetBlocked } from '../logic/world';
 import { plazaGroundTile, PLAZA_MARGIN, PLAZA_EXIT, plazaBorderGap } from '../logic/plazaWorld';
-import { PET_SHEETS, petFollowSpot } from '../logic/petSheets';
+import { PET_SHEETS } from '../logic/petSheets';
 import { composeAvatar } from './avatarTexture';
 import { loadPetSheet, loadBed } from './sceneAssets';
 import { PlazaBubbles } from './plazaBubbles';
@@ -13,7 +14,7 @@ import type { PlazaBubble } from './plazaBubbles';
 import { WorldScene } from './WorldScene';
 import type { WorldContext } from './WorldScene';
 
-type Friend = { sprite?: Phaser.GameObjects.Sprite; pet?: Phaser.GameObjects.Sprite; look: string; petId: string | null; loading: boolean; state: PlazaPlayerState };
+type Friend = { follow?: PetFollowState; sprite?: Phaser.GameObjects.Sprite; pet?: Phaser.GameObjects.Sprite; look: string; petId: string | null; loading: boolean; state: PlazaPlayerState };
 export class PlazaScene extends WorldScene {
   protected readonly background = '#5d8a4a';
   private friends = new Map<string, Friend>();
@@ -109,7 +110,7 @@ export class PlazaScene extends WorldScene {
       }
       const petId = p.pet ?? null;
       if (f.petId !== petId) {
-        f.petId = petId; f.pet?.destroy(); f.pet = undefined;
+        f.petId = petId; f.pet?.destroy(); f.pet = undefined; f.follow = undefined;
         const friend = f;
         if (petId) void loadPetSheet(petId).then(source => {
           if (!this.scene.isActive() || this.friends.get(p.sessionId) !== friend || friend.petId !== petId) return;
@@ -129,21 +130,12 @@ export class PlazaScene extends WorldScene {
     for (const [id, f] of this.friends) {
       const p = f.state, feet = { x: (p.x + PLAZA_MARGIN + .5) * 16, y: (p.y + PLAZA_MARGIN + .5) * 16 };
       spots.set(id, feet);
-      if (f.sprite) {
-        f.sprite.setPosition(feet.x, feet.y).setDepth(feet.y);
-        const anim = f.look + ':' + (p.moving ? 'Walk_' : 'Idle_') + p.direction;
-        if (f.sprite.anims.currentAnim?.key !== anim) f.sprite.play(anim);
-      }
-      if (f.pet && p.pet) {
-        const wanted = petFollowSpot(feet, p.direction), spot = feetBlocked(wanted, this.spec.solid) ? feet : wanted;
-        const sheet = PET_SHEETS[p.pet], a = p.moving ? sheet.walk : sheet.idle;
-        f.pet.setPosition(spot.x, spot.y).setDepth(spot.y).setFrame(a.row * sheet.columns + a.frames[Math.floor(time / a.frameMs) % a.frames.length]);
-      }
+      updatePeerCompanion(f, feet, time, delta, this.spec.solid);
     }
     this.bubbles?.update(this.wantedBubbles, spots);
   }
   snapshot() {
-    return { ...super.snapshot(), classmates: [...this.friends].map(([id, f]) => ({ id, x: f.state.x, y: f.state.y, rendered: !!f.sprite, pet: !!f.pet })),
+    return { ...super.snapshot(), classmates: [...this.friends].map(([id, f]) => ({ id, x: f.state.x, y: f.state.y, rendered: !!f.sprite, pet: !!f.pet, ...peerCompanionSnapshot(f) })),
       reactions: Object.keys(this.wantedBubbles), bubbles: this.bubbles?.snapshot() ?? [] };
   }
 }

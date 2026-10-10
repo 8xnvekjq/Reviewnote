@@ -18,7 +18,9 @@ const exit = async (page, pattern) => { await page.bringToFront(); return page.e
 const walkTo = async (page, cell) => {
   await page.bringToFront();
   await page.evaluate(([x, y]) => { const h = window.__pixelWorldPhaser, d = h.debug(); h.walkToScreen((x * 16 + 8 - d.camera.x) * d.cssZoom, (y * 16 + 8 - d.camera.y) * d.cssZoom); }, cell);
-  await page.waitForFunction(x => { const d = window.__pixelWorldPhaser.debug(); return !d.moving && d.pathLength === 0 && d.x > x * 16; }, cell[0], { timeout: 20000 });
+  try {
+    await page.waitForFunction(x => { const d = window.__pixelWorldPhaser.debug(); return !d.moving && d.pathLength === 0 && d.x > x * 16; }, cell[0], { timeout: 20000 });
+  } catch (error) { console.error('WALK WAIT', cell, await debug(page)); throw error; }
 };
 const liveReady = page => page.waitForFunction(() => document.querySelector('.pwp-plaza-reactions')?.dataset.ready === 'true', null, { timeout: 20000 });
 const topics = page => page.evaluate(() => window.plazaTransport.audit().topics);

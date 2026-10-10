@@ -10,10 +10,10 @@ export function continuousPosition(p: Pick<PlazaPlayerState, 'x' | 'y' | 'versio
   return p.version === 2 && q && Number.isFinite(q.x) && Number.isFinite(q.y)
     && q.x >= -.5 - s && q.x < bounds.width + s && q.y >= -.5 - s && q.y < bounds.height + s ? { x: q.x, y: q.y } : { x: p.x, y: p.y };
 }
-export function protocolExtras(p: Pick<PlazaPlayerState, 'x' | 'y' | 'version' | 'position' | 'pet'>, bounds: PresenceBounds = PLAZA_BOUNDS): Partial<PlazaPlayerState> {
+export function protocolExtras(p: Pick<PlazaPlayerState, 'x' | 'y' | 'version' | 'position' | 'pet' | 'riding'>, bounds: PresenceBounds = PLAZA_BOUNDS): Partial<PlazaPlayerState> {
   if (p.version !== 2) return {};
   const q = continuousPosition(p, bounds);
-  return { version: 2, position: q, pet: isPetId(p.pet) ? p.pet : null };
+  return { version: 2, position: q, pet: isPetId(p.pet) ? p.pet : null, riding: p.pet === 'pet_bear' && p.riding === true };
 }
 export function continuousPayload(feet: { x: number; y: number }, margin = 5, bounds: PresenceBounds = PLAZA_BOUNDS) {
   const position = { x: feet.x / 16 - margin - .5, y: feet.y / 16 - margin - .5 };
