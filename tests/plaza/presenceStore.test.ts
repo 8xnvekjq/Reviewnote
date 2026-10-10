@@ -538,3 +538,20 @@ test('presence-sync/join은 broadcast로 이미 받은 더 새 상태(seq·시�
   // presenceRef는 새것으로 갱신되어 그 뒤의 진짜 leave는 정상 처리된다
   assert.equal(plazaStoreReducer(rejoined, { type: 'presence-leave', leaves: [{ sessionId: 'session-a', presenceRef: 'ref-b' }] }).players.size, 0);
 });
+
+test("bye: 나가는 사람의 작별은 presence leave를 기다리지 않고 바로 지우고, 늦게 온 sync·join·broadcast가 되살리지 못한다", () => {
+  const joined = plazaStoreReducer(createPlazaStoreState(), { type: 'presence-join', players: [withRef(makePlayer({ seq: 3 }))] });
+  const gone = plazaStoreReducer(joined, { type: 'bye', sessionId: 'session-a', at: 5000 });
+  assert.equal(gone.players.size, 0);
+  assert.equal(gone.paths.has('session-a'), false);
+  const lateSync = plazaStoreReducer(gone, { type: 'presence-sync', players: [withRef(makePlayer({ seq: 3 }))] });
+  const lateJoin = plazaStoreReducer(lateSync, { type: 'presence-join', players: [withRef(makePlayer({ seq: 4 }), 'ref-z')] });
+  const lateMove = plazaStoreReducer(lateJoin, { type: 'broadcast', player: makePlayer({ seq: 9 }) });
+  assert.equal(lateMove.players.size, 0);
+  // 다른 사람은 영향 없음
+  const other = plazaStoreReducer(lateMove, { type: 'broadcast', player: makePlayer({ sessionId: 'session-b', seq: 1 }) });
+  assert.ok(other.players.has('session-b'));
+  // 같은 sessionId로 작별 이후 다시 들어오면(예전 화면) 정상으로 받아들인다.
+  const back = plazaStoreReducer(other, { type: 'presence-join', players: [withRef(makePlayer({ seq: 1, updatedAt: 6000 }), 'ref-new')] });
+  assert.ok(back.players.has('session-a'));
+});

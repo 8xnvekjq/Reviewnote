@@ -150,8 +150,14 @@ async function leaveChannelSafely(channel: RealtimeChannel): Promise<void> {
 // 재사용될까봐"가 아니었다 — CLOSED 채널은 애초에 재사용될 수 없다(레지스트리에 없으므로).
 // 채널(topic)마다 따로 기억한다 — 광장과 강가는 서로의 퇴장을 기다릴 이유가 없다.
 const visitTeardowns = new Map<string, Promise<void>>();
+/** 광장/강가를 떠날 때 보내는 작별 broadcast. 예전 화면은 모르는 이벤트라 그냥 무시한다. */
+const BYE_EVENT = 'bye';
 
-function beginPlazaVisitTeardown(topic: string, channel: RealtimeChannel): void {
+function beginPlazaVisitTeardown(topic: string, channel: RealtimeChannel, sessionId: string): void {
+  // presence의 leave는 서버에서 수 초 늦게 퍼진다(2026-10 실측) — 그 사이 출구에 예전 캐릭터·펫이 남아
+  // 왔다 갔다 할수록 늘어나 보였다. 가벼운 broadcast로 먼저 작별을 알려 다른 화면이 곧바로 지우게 한다.
+  // 재연결(같은 sessionId로 계속 머묾) 때는 이 함수를 거치지 않으므로 작별을 보내지 않는다.
+  void channel.send({ type: 'broadcast', event: BYE_EVENT, payload: { sessionId, at: Date.now() } }).catch(() => {});
   // .catch(()=>{})로 감싼 버전을 추적한다 — connect()가 이 Promise를 곧바로 await하므로, 여기서
   // reject가 새어나가면 unhandled rejection이 되는 데다 connect() 자체가 채널을 만들어보지도
   // 못하고 중단된다. leaveChannelSafely는 best-effort 정리일 뿐이라 실패해도 다음 방문을
@@ -352,6 +358,10 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
         dispatch({ type: 'broadcast', player: payload });
       });
 
+      nextChannel.on('broadcast', { event: BYE_EVENT }, ({ payload }) => {
+        if (typeof payload?.sessionId === 'string' && payload.sessionId !== sessionId && typeof payload.at === 'number') dispatch({ type: 'bye', sessionId: payload.sessionId, at: payload.at });
+      });
+
       nextChannel.on('broadcast', { event: 'reaction' }, ({ payload }) => {
         if (!cancelled && channel === nextChannel) receiveRef.current(payload);
       });
@@ -408,7 +418,10 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
     // 보장해주지 않는다) — 진짜 안전망은 Supabase Presence 자신의 연결 끊김 감지(소켓이 끊기면
     // 서버가 자동으로 그 presence를 leave 처리)다. 여기서는 정상 종료 시 정리를 한 틱이라도
     // 앞당기는 정도의 역할만 한다.
-    const handleBeforeUnload = () => { void channel?.untrack(); };
+    const handleBeforeUnload = () => {
+      void channel?.send({ type: 'broadcast', event: BYE_EVENT, payload: { sessionId, at: Date.now() } }).catch(() => {});
+      void channel?.untrack();
+    };
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
@@ -423,7 +436,7 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
       setReady(false);
       const dying = channel;
       channel = null;
-      if (dying) beginPlazaVisitTeardown(topic, dying);
+      if (dying) beginPlazaVisitTeardown(topic, dying, sessionId);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
