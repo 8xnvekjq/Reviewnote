@@ -171,7 +171,7 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
   const refreshSpots = () => {
     for (let id = 0; id < 4; id++) {
       const spot = spots.get(id);
-      if (!spot || (spot.readyAt !== null && spot.readyAt <= now())) spots.set(id, { id, left: 3 + Math.floor(rand() * 3), readyAt: null });
+      if (!spot || (spot.readyAt !== null && spot.readyAt <= now())) spots.set(id, { id, left: Math.min(3, 3 + Math.floor(rand() * 3)), readyAt: null }); // 서버처럼 항상 3마리(난수 순서는 그대로 유지)
     }
   };
   const spotStates = () => {

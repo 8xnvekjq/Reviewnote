@@ -225,3 +225,10 @@ test('모의 포인트: 소모·잡동사니·도망·재생성·효과', async 
   assert.ok(averages[1].hard > averages[0].hard + 0.09);
   assert.ok(averages[1].size > averages[0].size + 0.12);
 });
+
+test('물고기 떼는 항상 3마리로 다시 모인다(그림자 3개가 하나씩 줄어든다)', () => {
+  const sql = readFileSync(new URL('../../supabase/migrations/20261011200000_pixel_fishing_spots_three.sql', import.meta.url), 'utf8');
+  assert.match(sql, /select p_user, id, 3 from generate_series\(0,3\)/);
+  assert.match(sql, /set "left"=3, ready_at=null/);
+  assert.doesNotMatch(sql, /random\(\)/);
+});
