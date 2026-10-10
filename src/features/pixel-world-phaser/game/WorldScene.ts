@@ -63,7 +63,6 @@ export interface WorldAssets {
 export interface Prompt { id: string; verb: string }
 export interface WorldEvents {
   onRide?(riding: boolean): void;
-  onShadowTap?(index: 0 | 1 | 2): void;
   /** 바라보는 상호작용 대상이 바뀔 때만 호출(매 프레임 아님). */
   onPrompt(prompt: Prompt | null): void;
   /** A(또는 탭해서 걷기 도착)로 말 걸기/살펴보기 → 셸이 대화창을 연다. */

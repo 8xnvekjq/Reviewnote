@@ -149,7 +149,7 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
   const catches: MockCatch[] = (opts.catches ?? []).map(c => ({ ...c }));
   const junkCounts: Record<JunkId, number> = { junk_shoe: 0, junk_can: 0, junk_coin: 0 };
   const classmates = opts.classmates ?? DEFAULT_CLASSMATES;
-  let pending: { castId: string; fish: FishSpecies; lengthCm: number; kstDate: string; expiresAt: number; startedAt: number; biteDelayMs: number; difficulty: number; speed: number; pity: boolean; trophy: boolean; hard: boolean; junk?: JunkId; pet: string | null } | null = null;
+  let pending: { castId: string; fish: FishSpecies; lengthCm: number; kstDate: string; expiresAt: number; startedAt: number; biteDelayMs: number; difficulty: number; speed: number; pity: boolean; trophy: boolean; hard: boolean; junk?: JunkId; pet: string | null; spot?: { id: number; bonus: boolean } } | null = null;
   const ownedRods = new Set<string>(opts.ownedRods ?? FISHING_RODS.map(r => r.id));
   if (opts.rod) ownedRods.add(opts.rod);
   let equippedRod: FishingRodId | null = opts.rod ?? null;
@@ -165,6 +165,19 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
   const clock = () => applyPersonalClock(globalClock(), opts.override);
   const caughtIds = () => new Set(catches.map(c => c.speciesId));
   const pet = (asked: string | null) => opts.activePet === undefined ? asked : asked != null && asked === opts.activePet ? asked : null;
+
+  // 어댑터 하나가 학생 한 명이다. 읽거나 사용할 때 만료된 포인트를 채운다.
+  const spots = new Map<number, { id: number; left: number; readyAt: number | null }>();
+  const refreshSpots = () => {
+    for (let id = 0; id < 4; id++) {
+      const spot = spots.get(id);
+      if (!spot || (spot.readyAt !== null && spot.readyAt <= now())) spots.set(id, { id, left: 3 + Math.floor(rand() * 3), readyAt: null });
+    }
+  };
+  const spotStates = () => {
+    refreshSpots();
+    return [...spots.values()].map(s => ({ id: s.id, left: s.left, active: s.readyAt === null || s.readyAt <= now(), readyAt: s.readyAt === null ? null : new Date(s.readyAt).toISOString() }));
+  };
 
   function album(): FishAlbumEntry[] {
     return FISH_CATALOG.flatMap(fish => {
@@ -199,25 +212,29 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
     async state(): Promise<FishingState> {
       const c = clock();
       const remaining = -1, sparkleShadow = null, pigeonHint = null;
-      return delay({ kstDate: c.kstDate, phase: c.phase, weather: c.weather, remaining, sparkleShadow, pigeonHint, junk: { ...junkCounts }, album: album(), rod: currentRod(), level: playerLevel(), bait: { charges } });
+      return delay({ kstDate: c.kstDate, phase: c.phase, weather: c.weather, remaining, sparkleShadow, pigeonHint, spots: spotStates(), junk: { ...junkCounts }, album: album(), rod: currentRod(), level: playerLevel(), bait: { charges } });
     },
-    async start(askedPet: string | null): Promise<CastStart> {
+    async start(askedPet: string | null, spotId?: number | null): Promise<CastStart> {
       const c = clock();
       if (pending && pending.expiresAt <= now()) dropPending();
       if (pending) return delay({ ok: false, reason: 'pending' });
       if (now() - lastStart < 2000) return delay({ ok: false, reason: 'pending' });
+      const validSpot = typeof spotId === 'number' && Number.isInteger(spotId) && spotId >= 0 && spotId <= 3;
+      if (validSpot) refreshSpots();
+      const spot = validSpot ? spots.get(spotId) : undefined;
+      const spotBonus = !!spot && (spot.readyAt === null || spot.readyAt <= now()) && spot.left > 0;
       const rod = currentRod();
       const spec = rodSpec(rod.id) ?? BASIC_ROD;
       const valid = FISH_CATALOG.filter(f => fishValidNow(f, c.phase, c.weather));
       const baitUsed = charges > 0;
-      const roll = rollCastFish({ valid, caught: caughtIds(), pityDue: pityDue(catches), skipPity, rareBonus: spec.rareBonus, bait: baitUsed, rand });
+      const roll = rollCastFish({ valid, caught: caughtIds(), pityDue: pityDue(catches), skipPity, rareBonus: spec.rareBonus + (spotBonus ? 15 : 0), bait: baitUsed, rand });
       skipPity = false;
       if (!roll) return delay({ ok: false, reason: 'error' });
       const junk = !roll.pity && rand() < 0.06 ? JUNK_CATALOG[Math.floor(rand() * JUNK_CATALOG.length)].id : undefined;
       const { fish } = roll;
       const trophy = !junk && roll.trophy;
       const myPet = pet(askedPet);
-      let lengthCm = fish.minCm + (trophy ? 1 - TROPHY_TOP + rand() * TROPHY_TOP : rand()) * (fish.maxCm - fish.minCm);
+      let lengthCm = fish.minCm + (trophy ? 1 - TROPHY_TOP + rand() * TROPHY_TOP : spotBonus ? Math.sqrt(rand()) : rand()) * (fish.maxCm - fish.minCm);
       if (myPet === 'pet_bear') lengthCm = Math.min(lengthCm * 1.08, fish.maxCm * 1.08);
       lengthCm = Math.round(lengthCm * 10) / 10;
       const patternRoll = rand();
@@ -228,9 +245,9 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
       const difficulty = junk ? 1 : fish.rarity === 'mythic' ? 5 : levelBaitDifficulty(rodDifficulty(fishDifficulty(fish, lengthCm), spec.difficultyDown, trophy), levelForXp(xp).level, fish.rarity === 'legendary', baitUsed);
       if (baitUsed) charges--;
       lastStart = now();
-      pending = { castId, fish, lengthCm, kstDate: c.kstDate, expiresAt: now() + CAST_TTL_MS, startedAt: now(), biteDelayMs, difficulty, speed: spec.speed, pity: roll.pity, trophy, hard: !junk && roll.hard, junk, pet: myPet };
+      pending = { castId, fish, lengthCm, kstDate: c.kstDate, expiresAt: now() + CAST_TTL_MS, startedAt: now(), biteDelayMs, difficulty, speed: spec.speed, pity: roll.pity, trophy, hard: !junk && roll.hard, junk, pet: myPet, ...(spot ? { spot: { id: spot.id, bonus: spotBonus } } : {}) };
       const hint = null;
-      return delay({ ok: true, castId, shadow: junk ? 'S' : fish.shadow, heavy: !junk && fish.rarity === 'mythic', ...(junk ? { junk } : {}), biteDelayMs, difficulty, big: !junk && isBigCatch(fish, lengthCm), pattern, hint, rod, speed: spec.speed, trophy, bait: { used: baitUsed, charges } });
+      return delay({ ok: true, castId, shadow: junk ? 'S' : fish.shadow, heavy: !junk && fish.rarity === 'mythic', ...(junk ? { junk } : {}), biteDelayMs, difficulty, big: !junk && isBigCatch(fish, lengthCm), pattern, hint, ...(spot ? { spot: { id: spot.id, bonus: spotBonus, left: spot.left } } : {}), rod, speed: spec.speed, trophy, bait: { used: baitUsed, charges } });
     },
     async finish(castId: string, landed: boolean): Promise<CastFinish> {
       const cast = pending;
@@ -245,6 +262,13 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
         xp++;
         return delay({ ok: true, landed: true, junk: cast.junk, remaining: -1, xpGain: { gained: 1, xp, level: levelForXp(xp).level, leveledUp: levelForXp(xp).level > oldLevel } });
       }
+      let spotUpdate: { id: number; left: number; readyAt: string | null } | undefined;
+      if (cast.spot?.bonus) {
+        const spot = spots.get(cast.spot.id)!;
+        spot.left = Math.max(0, spot.left - 1);
+        if (spot.left === 0) spot.readyAt = now() + 180_000 + Math.floor(rand() * 120_000);
+        spotUpdate = { id: spot.id, left: spot.left, readyAt: spot.readyAt === null ? null : new Date(spot.readyAt).toISOString() };
+      }
       const before = catches.filter(c => c.speciesId === cast.fish.id);
       const isNew = before.length === 0;
       const isPersonalBest = !isNew && cast.lengthCm > Math.max(...before.map(c => c.lengthCm));
@@ -258,6 +282,7 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
       return delay({
         ok: true, landed: true, percentile, speciesId: cast.fish.id, lengthCm: cast.lengthCm, rarity: cast.fish.rarity,
         isNew, isBig: isBigCatch(cast.fish, cast.lengthCm), isPersonalBest, remaining: -1, xpGain,
+        ...(spotUpdate ? { spot: spotUpdate } : {}),
       });
     },
     async board(): Promise<ClassFishBoard> {

@@ -313,7 +313,6 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
           assets: { bearRide, town, interior, floors, furniture: furnitureSheets, avatar: { key: avatar.key, canvas: avatarCanvas }, pet: pet && petSource ? { id: pet, source: petSource } : null, scarecrow, plazaStall },
           beds: bedImages, furniture: furnitureRef.current, clockOverride, face: faceRef.current,
         }, controls, {
-          onShadowTap: (index: number) => { void fishingRef.current.onShadowTap(index); },
           onPrompt: next => setPrompt(next),
           onPetMessage: setPetMessage,
           onRide: setRiding,
@@ -426,10 +425,15 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
   const pressA = useCallback(() => {
     if (fishingRef.current.reel()) return;
     if (panelRef.current || editingRef.current) return;
+    if (!dialogueRef.current && !promptRef.current && sceneRef.current?.id === 'river' && handle.current?.beginCast()) return;
     if (dialogueRef.current) advance();
-    // 강가에서는 안내가 없어도 장면에 맡긴다 — 물을 보고 그림자 가까이 서 있으면 A로 던진다.
+    // 물을 보며 A를 누르면 힘을 모으고, 놓으면 던진다.
     else if (promptRef.current || sceneRef.current?.id === 'river') handle.current?.interact();
   }, [advance]);
+  const releaseA = useCallback((cancelled = false) => {
+    const point = handle.current?.releaseCast(cancelled);
+    if (point) void fishingRef.current.castAt(point);
+  }, []);
   const pressB = useCallback((down: boolean) => {
     if (fishingFrozen.current) { if (down) fishingRef.current.cancel(); return; }
     if (editingRef.current) return;
@@ -551,7 +555,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     event.stopPropagation();
     if (event.type === 'pointerup') maybeFullscreen(event.pointerType);
     setPressed(state => ({ ...state, [which]: false }));
-    if (which === 'b') pressB(false);
+    if (which === 'a') releaseA(event.type !== 'pointerup'); else pressB(false);
   };
 
   // ── 키보드(데스크톱 테스트용) ──
@@ -581,6 +585,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
       const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
       const dir = map[key];
       if (dir) { keys.current[dir] = false; sync(); }
+      if (key === ' ' || key === 'z' || key === 'Enter') releaseA();
       if (key === 'Shift') controls.run = false;
     };
     // 창이 가려지거나 포커스를 잃으면 모든 입력을 놓는다(계속 걷는 버그 방지) + 게임 루프 정지.
@@ -589,6 +594,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
       pointers.current.clear(); stickOrigin.current = null;
       controls.stick = ZERO_STICK; controls.run = false; showStick(null);
       fishingRef.current.setReelX(0);
+      releaseA(true);
       setPressed({ a: false, b: false });
     };
     const visibility = () => { reset(); handle.current?.setActive(document.visibilityState === 'visible'); };
@@ -666,11 +672,12 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     </div>}
     <button type="button" disabled={!!placing} className="pwp-btn pwp-btn-a" data-pressed={pressed.a} data-prompt={!!prompt || !!dialogue}
       style={{ left: a.x - a.size / 2, top: a.y - a.size / 2, width: a.size, height: a.size }}
-      aria-label={dialogue ? 'A · 다음' : prompt ? `A · ${promptLabel}` : 'A'}
+      aria-label={dialogue ? 'A ? 다음' : prompt ? `A ? ${promptLabel}` : fishing.canCast ? 'A ? 낚시하기' : 'A'}
       onPointerDown={buttonDown('a')} onPointerUp={buttonUp('a')} onPointerCancel={buttonUp('a')} onLostPointerCapture={buttonUp('a')}
-      onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') event.stopPropagation(); }}
-      onClick={event => { if (event.detail === 0) pressA(); }}>
-      <b>A</b>{(prompt || dialogue) && <small>{dialogue ? '다음' : promptLabel}</small>}
+      onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); if (!event.repeat) pressA(); } }}
+      onKeyUp={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); releaseA(); } }}
+      onClick={event => { if (event.detail === 0) { pressA(); releaseA(); } }}>
+      <b>A</b>{(prompt || dialogue || fishing.canCast) && <small>{dialogue ? '다음' : prompt ? promptLabel : '낚시하기'}</small>}
     </button>
     <button type="button" disabled={!!placing} className="pwp-btn pwp-btn-b" data-pressed={pressed.b} data-closing={!!panel || !!dialogue}
       style={{ left: b.x - b.size / 2, top: b.y - b.size / 2, width: b.size, height: b.size }}

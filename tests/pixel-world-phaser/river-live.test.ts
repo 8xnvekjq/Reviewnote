@@ -64,8 +64,8 @@ test('parseFishEvent rejects bad payloads: unknown species, length out of range,
 });
 
 test('buildFishEvent: casting needs a target in the scene; landed needs a catalog species', () => {
-  assert.deepEqual(buildFishEvent('a', 1, { phase: 'casting', shadow: 1 }, { x: 320.04, y: 183 }), { sessionId: 'a', seq: 1, phase: 'casting', target: { x: 320, y: 183 } });
-  assert.equal(buildFishEvent('a', 1, { phase: 'casting', shadow: 1 }, null), null);
+  assert.deepEqual(buildFishEvent('a', 1, { phase: 'casting', target: { x: 320.04, y: 183 } }, null), { sessionId: 'a', seq: 1, phase: 'casting', target: { x: 320, y: 183 } });
+  assert.equal(buildFishEvent('a', 1, { phase: 'casting', target: { x: -1, y: 0 } }, null), null);
   assert.equal(buildFishEvent('a', 2, { phase: 'landed', speciesId: 'nope', lengthCm: 3 }, null), null);
   assert.deepEqual(buildFishEvent('a', 3, { phase: 'bite' }, null), { sessionId: 'a', seq: 3, phase: 'bite' });
 });
@@ -125,4 +125,10 @@ test('expireFishStore: results clear, stuck lines clear, catch bubble ends, leav
   assert.equal(expireFishStore(store, CATCH_BUBBLE_MS + 1, roster).peers.get('a')!.catch, null);
   const left = expireFishStore(store, 10, new Set(['a']));
   assert.equal(left.peers.has('b'), false); assert.equal(left.buckets.has('b'), false);
+});
+
+test('legacy shadow-only casts are accepted safely and new casts retain the point', () => {
+  for (let shadow = 0; shadow < 3; shadow++) assert.ok(parseFishEvent({ sessionId: 'old', seq: shadow, phase: 'casting', shadow })?.target);
+  assert.equal(parseFishEvent({ sessionId: 'old', seq: 1, phase: 'casting', shadow: 99 }), null);
+  assert.deepEqual(parseFishEvent({ sessionId: 'new', seq: 1, phase: 'casting', target: { x: 350, y: 200 } })?.target, { x: 350, y: 200 });
 });

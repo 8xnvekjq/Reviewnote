@@ -20,7 +20,7 @@ function Harness() {
   return <div className="pwp-root" style={{ width: '100vw', height: '100vh', background: '#7bbaad' }}>
     <div style={{ padding: 12 }}><output data-testid="balance">{balance}</output><output data-testid="callback-count">{callbackCount}</output>
       <button onClick={() => setPanel('tackle')}>상점 열기</button><button onClick={() => setPanel('shop')}>광장 상점 열기</button><button onClick={() => setPanel('wardrobe')}>옷장 열기</button>
-      <button onClick={() => void fishing.onShadowTap(0)}>낚시 시작</button><button onClick={() => fishing.reel()}>릴 감기</button><button onClick={fishing.cancel}>낚시 취소</button>
+      <button onClick={() => void fishing.castAt({ x: 344, y: 168 })}>낚시 시작</button><button onClick={() => fishing.reel()}>릴 감기</button><button onClick={fishing.cancel}>낚시 취소</button>
       <output data-testid="phase">{fishing.phase}</output><output>{fishing.message}</output>
     </div>
     {panel && <GamePanels key={panel} kind={panel} adapter={{ shop, pet }} onClose={() => setPanel(null)} />}
