@@ -1,3 +1,5 @@
+// 주의(2026-10-11): 두 창을 번갈아 앞으로 가져오며 키를 누르는 방식이라 실시간 타이밍에 따라 가끔 실패한다
+// (병합 전 원본에서도 2번 중 1번 실패). 실시간 품질·이동 개선 작업 때 함께 안정화할 것.
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
