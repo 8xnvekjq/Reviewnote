@@ -550,3 +550,9 @@ test('v4 어댑터: rod·speed·trophy는 덧붙이기만, 방어적으로 읽�
   const failing: FishingRpcClient = { rpc: () => Promise.reject(new Error('net')) };
   assert.deepEqual(await createFishingAdapter(failing).equipRod!('rod_gold'), { ok: false, reason: 'error' });
 });
+
+test('weekly board keeps only rainbow_koi from teacher catches without deleting records', () => {
+  const sql = readFileSync(new URL('../../supabase/migrations/20261011120000_fish_board_teacher_rainbow_only.sql', import.meta.url), 'utf8');
+  assert.match(sql, /where not k\.teacher or k\.species_id = 'rainbow_koi'/);
+  assert.doesNotMatch(sql, /\bdelete\b/i);
+});
