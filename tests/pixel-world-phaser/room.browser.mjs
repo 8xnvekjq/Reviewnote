@@ -202,7 +202,7 @@ try {
   await page.route('**/rest/v1/**', async route => {
     const request = route.request(), url = new URL(request.url());
     const table = url.pathname.split('/').at(-1);
-    if (request.method() !== 'GET' && !['get_pixel_farm', 'get_pixel_level', 'get_pixel_fishing_state', 'get_pixel_world_clock'].includes(table)) writes.push(request.url());
+    if (request.method() !== 'GET' && !['get_my_animal_face', 'get_pixel_farm', 'get_pixel_level', 'get_pixel_fishing_state', 'get_pixel_world_clock'].includes(table)) writes.push(request.url());
     let body = [];
     if (table === 'save_pixel_room_layout') {
       assert.equal(request.method(), 'POST');
@@ -223,6 +223,7 @@ try {
     } else if (table === 'pixel_item_ownership') body = [{ item_id: 'furniture_desk' }, { item_id: 'furniture_chair' }];
     else if (table === 'pixel_avatar_equipment') body = null;
     else if (table === 'pixel_pet_equipment') body = { active_pet: null };
+    else if (table === 'get_my_animal_face') body = '🦦';
     else if (table === 'get_pixel_farm') body = { serverNow: new Date().toISOString(), plots: [{ index: 0, crop: null }, { index: 1, crop: null }] };
     else if (table === 'get_pixel_level') body = { xp: 0, level: 1, xpIntoLevel: 0, xpForNext: 50, maxLevel: 100 };
     else if (table === 'get_pixel_fishing_state') body = { bait: { charges: 0 } };
@@ -238,6 +239,7 @@ try {
   await page.locator('.pwp-btn-a').click();
   await readyScene(page, 'room');
   const saved = await debug(page);
+  assert.equal(saved.animalTag.face, '🦦', 'local face RPC follows the player into the room');
   assert.ok(saved.targets['furniture:desk']);
   assert.equal(saved.targets['furniture:plant'], undefined, 'unowned placement is hidden');
   assert.equal(placementReads, 3, 'failed read, retry, and a fresh read on entering the room');

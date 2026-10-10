@@ -96,7 +96,7 @@ function Harness() {
   return open
     ? params.has('saved')
       ? <PixelWorldPhaser userId="scene-test-user" pointsBalance={balance} onPixelPurchase={setBalance} onPointsReward={reward => setBalance(value => value + reward)} onExit={() => setOpen(false)} />
-      : <GameShell isAdmin={params.has('admin')} fishingAdapter={fishingAdapter} clockOverride={clockOverride} appearance={look} pet={active} balance={balance} panels={adapter} farmAdapter={params.has('farm') ? farmAdapter : undefined} beds={params.has('farm') ? farmBeds : [...beds]} furniture={roomLayout} onSaveFurniture={async layout => { await new Promise(resolve => setTimeout(resolve, 100)); if (params.has('roomSaveError')) throw new Error('저장하지 못했어요. 다시 시도해 주세요.'); setRoomLayout(layout); }} scarecrowLine={() => pickScarecrowLine(null, Date.now())} onExit={() => setOpen(false)} />
+      : <GameShell userId={params.get('user') ?? 'guest'} face={params.get('face') ?? undefined} isAdmin={params.has('admin')} fishingAdapter={fishingAdapter} clockOverride={clockOverride} appearance={look} pet={active} balance={balance} panels={adapter} farmAdapter={params.has('farm') ? farmAdapter : undefined} beds={params.has('farm') ? farmBeds : [...beds]} furniture={roomLayout} onSaveFurniture={async layout => { await new Promise(resolve => setTimeout(resolve, 100)); if (params.has('roomSaveError')) throw new Error('저장하지 못했어요. 다시 시도해 주세요.'); setRoomLayout(layout); }} scarecrowLine={() => pickScarecrowLine(null, Date.now())} onExit={() => setOpen(false)} />
     : <main style={{ padding: 24 }}><p data-testid="exited">게임에서 나왔어요.</p><button type="button" onClick={() => setOpen(true)}>다시 들어가기</button></main>;
 }
 createRoot(document.getElementById('root')!).render(<Harness />);

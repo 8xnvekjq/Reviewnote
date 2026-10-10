@@ -1,3 +1,4 @@
+import { createAnimalTag, updateAnimalTag, animalTagSnapshot, peerAnimalFace } from './animalTag';
 import { updatePeerCompanion, peerCompanionSnapshot } from './peerCompanion';
 import type { PetFollowState } from '../logic/petFollow';
 // 강가의 친구들: 아바타·펫(광장과 같은 그림), 머리 위 구름 말풍선, 친구의 낚싯줄·찌·입질 "!"·희귀 물고기 반짝임.
@@ -19,7 +20,7 @@ import { PlazaBubbles } from './plazaBubbles';
 import type { PlazaBubble } from './plazaBubbles';
 
 type Line = { line: Phaser.GameObjects.Graphics; bobber: Phaser.GameObjects.Sprite | Phaser.GameObjects.Rectangle; bang: Phaser.GameObjects.Text };
-type Friend = { follow?: PetFollowState;
+type Friend = { tag?: Phaser.GameObjects.Text; follow?: PetFollowState;
   sprite?: Phaser.GameObjects.Sprite; pet?: Phaser.GameObjects.Sprite; look: string; petId: PetId | null; loading: boolean; state: PlazaPlayerState;
   fishing?: Line; lastPhase: RiverPeerFishing['phase'];
 };
@@ -50,6 +51,7 @@ export class RiverPeers {
       let f = this.friends.get(p.sessionId);
       if (!f) { f = { look: '', petId: null, loading: false, state: p, lastPhase: 'idle' }; this.friends.set(p.sessionId, f); }
       f.state = p;
+      f.tag ??= createAnimalTag(this.scene);
       this.ensureAvatar(p.sessionId, f);
       this.ensurePet(p.sessionId, f, p.pet ?? null);
     }
@@ -63,6 +65,7 @@ export class RiverPeers {
     for (const [id, f] of this.friends) {
       const p = f.state, feet = riverFeet({ x: p.x, y: p.y });
       spots.set(id, feet);
+      if (f.tag) { updateAnimalTag(f.tag, feet, peerAnimalFace(p), p.riding === true && p.pet === 'pet_bear'); f.tag.setVisible(!!f.sprite); }
       updatePeerCompanion(f, feet, time, deltaMs, this.solid);
       this.drawLine(f, feet, this.fishing[id], now, time);
     }
@@ -82,7 +85,7 @@ export class RiverPeers {
 
   snapshot() {
     return {
-      classmates: [...this.friends].map(([id, f]) => ({ id, x: f.state.x, y: f.state.y, rendered: !!f.sprite, pet: !!f.pet, ...peerCompanionSnapshot(f),
+      classmates: [...this.friends].map(([id, f]) => ({ id, x: f.state.x, y: f.state.y, rendered: !!f.sprite, animalTag: animalTagSnapshot(f.tag), pet: !!f.pet, ...peerCompanionSnapshot(f),
         fishing: f.fishing?.bobber.visible ? { phase: f.lastPhase, bobber: { x: Math.round(f.fishing.bobber.x), y: Math.round(f.fishing.bobber.y) }, bang: f.fishing.bang.visible } : null })),
       bubbles: this.bubbles.snapshot(),
       sparkles: [...this.sparkles.keys()],
@@ -92,7 +95,7 @@ export class RiverPeers {
   private remove(id: string) {
     const f = this.friends.get(id);
     if (!f) return;
-    f.sprite?.destroy(); f.pet?.destroy();
+    f.tag?.destroy(); f.sprite?.destroy(); f.pet?.destroy();
     if (f.fishing) { f.fishing.line.destroy(); f.fishing.bobber.destroy(); f.fishing.bang.destroy(); }
     this.friends.delete(id);
   }

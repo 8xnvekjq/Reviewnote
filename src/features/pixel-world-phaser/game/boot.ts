@@ -44,6 +44,7 @@ export interface WorldGameHandle {
   dismount(): void;
   reactPet(kind: 'feed' | 'pet'): void;
   farmFx(index: number, action: string): void;
+  setAnimalFace(face: string): void;
   setAppearance(avatar: WorldAssets['avatar']): void;
   setPet(pet: WorldAssets['pet']): void;
   setBeds(images: HTMLImageElement[]): void;
@@ -62,6 +63,7 @@ export interface WorldGameHandle {
   debug(): WorldDebug;
 }
 export interface WorldStart {
+  face?: string;
   assets: WorldAssets;
   beds: HTMLImageElement[];
   furniture: readonly Placement[];
@@ -78,7 +80,7 @@ export function startWorldGame(parent: HTMLElement, start: WorldStart, controls:
     let lastScene: SceneId = FIRST_SCENE;
     let resolved = false;
     const ctx: WorldContext = {
-      riding: false, assets: start.assets, controls, hooks: events, clockOverride: start.clockOverride,
+      face: start.face ?? '🐶', riding: false, assets: start.assets, controls, hooks: events, clockOverride: start.clockOverride,
       data: { furniture: start.furniture, beds: start.beds },
       view: { ratio: size.ratio },
       onSceneReady: scene => {
@@ -178,6 +180,7 @@ export function startWorldGame(parent: HTMLElement, start: WorldStart, controls:
       dismount: () => active?.dismount(),
       reactPet: kind => active?.reactPet(kind),
       farmFx: (index, action) => active?.farmFx(index, action),
+      setAnimalFace: face => { ctx.face = face; },
       setAppearance: avatar => {
         ctx.assets.avatar = avatar;
         active?.refreshAppearance();

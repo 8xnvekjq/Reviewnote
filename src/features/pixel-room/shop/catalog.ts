@@ -8,6 +8,7 @@ import { ROD_CATALOG } from './rods.ts';
 export const BAIT_ITEM: PixelItem = { itemId: 'bait_worm', category: 'bait', slot: 'bait', price: 50, assetKey: 'worm', displayName: '지렁이 미끼 (100회)', tier: 1, stackable: true };
 
 export const PIXEL_CATALOG: readonly PixelItem[] = [
+  { itemId: 'hair_bald', category: 'avatar', slot: 'hair', price: 0, assetKey: 'bald', displayName: '대머리', tier: 1, stackable: false },
   BAIT_ITEM,
   ...ROD_CATALOG,
   { itemId: 'top_sage', category: 'avatar', slot: 'top', price: 25, assetKey: 'sage', displayName: '세이지 티셔츠', tier: 1, stackable: false },

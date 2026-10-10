@@ -107,7 +107,9 @@ export type EquipPixelItemResult =
 /** Equip (or, with itemId null, unequip) an owned avatar item into one slot. Server verifies
  * ownership itself; this never assumes what the caller already checked client-side. */
 export async function equipPixelItem(slot: PixelAvatarSlot, itemId: string | null): Promise<EquipPixelItemResult> {
-  const { data, error } = await supabase.rpc('equip_pixel_item', { p_slot: slot, p_item_id: itemId });
+  const { data, error } = slot === 'hair' && itemId === 'hair_bald'
+    ? await supabase.rpc('equip_pixel_bald')
+    : await supabase.rpc('equip_pixel_item', { p_slot: slot, p_item_id: itemId });
   if (error) {
     return { ok: false, reason: 'unknown', message: error.message || '장착 중 오류가 발생했어요.' };
   }
