@@ -9,6 +9,16 @@ import type { ReelAxisInput, ReelGame } from '../logic/reelGame';
 import type { FishingGame } from '../logic/fishingGame';
 import { fishReportForGamePhase } from '../logic/riverPresence';
 import type { RiverFishReporter } from '../logic/riverPresence';
+
+// 비둘기 "한 번 더": 하루(KST) 2번. 릴 결과는 원래 화면이 판정하므로 횟수도 기기에 기억한다(막히면 이번 접속만).
+export const PIGEON_RESCUES_PER_DAY = 2;
+const rescueKey = (day?: string) => 'pixelWorld:pigeonRescue:' + (day ?? '');
+export function pigeonRescuesLeft(day?: string): number {
+  try { return Math.max(0, PIGEON_RESCUES_PER_DAY - Number(window.localStorage.getItem(rescueKey(day)) ?? 0)); } catch { return PIGEON_RESCUES_PER_DAY; }
+}
+function spendPigeonRescues(day: string | undefined, used: number) {
+  try { window.localStorage.setItem(rescueKey(day), String(PIGEON_RESCUES_PER_DAY - pigeonRescuesLeft(day) + used)); } catch { /* 저장 못 해도 낚시는 그대로 */ }
+}
 export type LandedCatch = Extract<CastFinish, { landed: true }>;
 export interface FishingShadow { index: 0 | 1 | 2; size: 'S' | 'M' | 'L'; sparkle: boolean }
 // 추가 연결점: RiverScene은 이 호출을 자신의 createFishingFx().update로 전달한다.
@@ -116,7 +126,8 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
         game.current = next; setPhase('reeling');
         // 캐스팅마다 다른 경로를 만들되 같은 캐스팅은 재현할 수 있게 한다.
         const seed = Array.from(next.cast?.castId ?? '').reduce((value, char) => (Math.imul(value, 31) + char.charCodeAt(0)) >>> 0, 0);
-        reelGame.current = createReelGame(next.cast?.difficulty ?? 1, latest.current.pet === 'pet_duck', next.cast?.big ?? false, seed, next.cast?.speed ?? 1, next.cast?.rod, next.cast?.trophy ?? false);
+        reelGame.current = createReelGame(next.cast?.difficulty ?? 1, latest.current.pet === 'pet_duck', next.cast?.big ?? false, seed, next.cast?.speed ?? 1, next.cast?.rod, next.cast?.trophy ?? false,
+          latest.current.pet === 'pet_pigeon' ? pigeonRescuesLeft(stateRef.current?.kstDate) : 0);
         setReelState(reelGame.current); reelStarted.current = performance.now(); lastFrame.current = reelStarted.current; taps.current = []; axes.current = [];
         latest.current.report?.({ phase: 'reeling' });
       } else finishRef.current(next);
@@ -139,7 +150,7 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
       if (!cast.ok) { setMessage('잠시 후 다시 시도해 주세요.'); lock.current = false; setBusy(false); latest.current.freeze(false); await refresh(); return; }
       castAdapter.current = current;
       shadow.current = index;
-      latest.current.handle.current?.setShadows?.(([0, 1, 2] as const).map(slot => ({ index: slot, size: slot === index ? cast.shadow : 'M', sparkle: slot === index ? cast.hint === 'sparkle' : slot === stateRef.current?.sparkleShadow })));
+      latest.current.handle.current?.setShadows?.(([0, 1, 2] as const).map(slot => ({ index: slot, size: slot === index ? cast.shadow : 'M', sparkle: false })));
       const firstEver = !attempted.current && stateRef.current.album.length === 0;
       attempted.current = true;
       game.current = startFishingGame(cast, companion, performance.now(), firstEver); setPhase('casting');
@@ -157,7 +168,10 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
           const result = stepReelGame(reelGame.current, delta, delta > 0 ? taps.current.splice(0) : [], delta > 0 ? axes.current.splice(0) : []);
           reelGame.current = result; setReelState(result);
           updateHaptics(performance.now(), result);
-          if (result.status !== 'playing') finishRef.current({ ...game.current, phase: result.status === 'landed' ? 'landed' : 'missed' });
+          if (result.status !== 'playing') {
+            if (result.rescuesUsed) spendPigeonRescues(stateRef.current?.kstDate, result.rescuesUsed);
+            finishRef.current({ ...game.current, phase: result.status === 'landed' ? 'landed' : 'missed' });
+          }
         }
         const previous = game.current;
         const next = tickFishingGame(previous, now);

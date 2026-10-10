@@ -14,6 +14,7 @@ export function ReelBar({ game, bait }: { game: ReelGame; bait?: Extract<CastSta
     {bait?.used && <small className="pwp-reel-bait" data-testid="reel-bait">미끼 {bait.charges}회</small>}
     {game.trophy && <b className="pwp-reel-big">대물이에요!</b>}
     {game.big && <b className="pwp-reel-big">힘이 센 녀석이에요!</b>}
+    {game.elapsed < game.rescueUntil && <b className="pwp-reel-big" data-testid="reel-rescue">비둘기가 버텨 줘요! 🐦</b>}
     <div className="pwp-reel-arena-wrap">
       <div className="pwp-reel-track" style={{ width: `${game.arenaScale * 100}%` }} aria-hidden="true">
         <div className="pwp-reel-zone" data-pulse={game.elapsed - game.lastTap < .16}
