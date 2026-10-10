@@ -1,4 +1,5 @@
 import type { ServerWorldClock } from '../logic/worldClock';
+import type { GamePointsResult } from '../logic/gamePoints';
 import { MAX_LEVEL, nonnegativeInteger, parseXpGain } from '../logic/levels';
 import type { PlayerLevel, XpGain } from '../logic/levels';
 export type { PlayerLevel, XpGain } from '../logic/levels';
@@ -52,8 +53,10 @@ export type CastStart = { ok: true; castId: string; shadow: FishShadow; biteDela
 export type EquipRodResult = { ok: true; rod: FishingRod } | { ok: false; reason: 'not_found' | 'not_owned' | 'error' };
 export type CastFinish = { ok: true; landed: true; speciesId: string; lengthCm: number; rarity: FishRarity; isNew: boolean; isBig: boolean; isPersonalBest: boolean; remaining: number; xpGain?: XpGain;
   /** 이 종을 낚은 모든 기록 중 상위 몇 %인지(작을수록 큼, 0~100). */
-  percentile?: number }
-  | { ok: true; landed: true; junk: JunkId; remaining: number; xpGain?: XpGain } | { ok: true; landed: false } | { ok: false };
+  percentile?: number;
+  /** 게임 포인트(하루 상한 50P, 넘으면 절반, 별 4·5는 전부). */
+  points?: GamePointsResult }
+  | { ok: true; landed: true; junk: JunkId; remaining: number; xpGain?: XpGain; points?: GamePointsResult } | { ok: true; landed: false } | { ok: false };
 export interface ClassFishBoard { rows: { speciesId: string; lengthCm: number; animal: string; caughtAt: string; teacher?: boolean }[]; classSpecies: number }
 export type BuyBaitResult = { ok: true; newBalance: number; charges: number } | { ok: false; reason: 'insufficient_balance' | 'error'; message?: string };
 export interface FishingAdapter { getWorldClock?(): Promise<ServerWorldClock | null>; adminSetWorldOverride?(weather: FishWeather | null, phase: FishPhase | null, hours: number): Promise<boolean>; buyBait?(): Promise<BuyBaitResult>; getLevel?(): Promise<PlayerLevel | null>; state(): Promise<FishingState>; /** spot: 찌가 떨어진 포인트 id(원 밖이면 null). 서버가 활성 여부·남은 마리를 확인한다. */ start(pet: string | null, spot?: number | null): Promise<CastStart>; finish(castId: string, landed: boolean): Promise<CastFinish>; board(): Promise<ClassFishBoard>; /** 낚싯대 장착(null = 해제). 서버 RPC equip_pixel_rod. */ equipRod?(itemId: FishingRodId | null): Promise<EquipRodResult> }
