@@ -7,6 +7,7 @@ import baitIcon from '../assets/fishing/bait.png';
 import { BAIT_ITEM } from '../../pixel-room/shop/catalog';
 import { RodIcon } from './RodIcon';
 import { rodEffectText } from '../../pixel-room/shop/rods';
+import { petEffectText } from '../../pixel-room/shop/petEffects';
 import { PanelArt } from './PanelArt';
 import type { FurnitureType } from '../../pixel-room/model';
 import type { PixelAvatarSlot, PixelItem } from '../../pixel-room/shop/types';
@@ -127,7 +128,7 @@ export function GamePanels({ kind, adapter: { shop, pet }, onClose, top }: { kin
           const short = pointsShort(item.price, shop.balance);
           const disabled = busy || (item.category === 'pet' && (!pet.ready || pet.error));
           return <article className="pwp-item" key={item.itemId} data-item={item.itemId} data-state={state}>
-            <div className="pwp-item-art" aria-hidden="true">{art(item)}</div><strong>{item.displayName}</strong>{item.category === 'rod' && <><span aria-label={`${item.tier}등급`}>{'★'.repeat(item.tier)}</span><small className="pwp-rod-effects">{rodEffectText(item.itemId)}</small>{state !== 'available' && <PriceTag value={item.price} />}</>}
+            <div className="pwp-item-art" aria-hidden="true">{art(item)}</div><strong>{item.displayName}</strong>{item.category === 'rod' && <><span aria-label={`${item.tier}등급`}>{'★'.repeat(item.tier)}</span><small className="pwp-rod-effects">{rodEffectText(item.itemId)}</small>{state !== 'available' && <PriceTag value={item.price} />}</>}{item.category === 'pet' && <small className="pwp-rod-effects pwp-pet-effects">{petEffectText(item.itemId)}</small>}
             {state !== 'available' ? <><span>{state === 'equipped' ? '장착 중' : '보유 중'}</span>{item.category === 'furniture' ? <span>집에서 배치할 수 있어요.</span> : <button disabled={disabled || state === 'equipped'} onClick={() => item.category === 'rod' ? void act(async () => await shop.equipRod(item.itemId) ? '낚싯대를 장착했어요.' : '장착하지 못했어요.') : item.category === 'pet' ? void changePet(item.itemId) : void act(async () => await shop.equip(item.slot as PixelAvatarSlot, item.itemId) ? '장착했어요.' : '장착하지 못했어요.')}>{state === 'equipped' ? '장착 중' : item.category === 'pet' ? '함께 살기' : '장착하기'}</button>}</>
               : <><PriceTag value={item.price} />{short > 0 ? <span className="pwp-short">{short.toLocaleString()}P 더 필요해요.</span> : confirming === item.itemId ? <><span>구매할까요?</span><button disabled={disabled} onClick={() => void act(async () => {
                 const result = await shop.purchase(item);
