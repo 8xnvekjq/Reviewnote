@@ -1,3 +1,8 @@
+import { NET_SWING_EVENT } from '../logic/bugCatalog';
+import { parseNetSwing } from '../logic/bugGame';
+import { dragonfliesFor } from '../game/dragonflies';
+import type { NetSwingReporter } from './useBugCatching';
+import type { MutableRefObject as SwingRef } from 'react';
 // 광장에 있을 때만 마운트한다. 기존 훅의 구독/재연결/퇴장 정리를 그대로 재사용한다.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
@@ -15,7 +20,8 @@ import type { PlazaBubble } from '../game/plazaBubbles';
 import { Window } from './GamePanels';
 import { PlazaChat } from './PlazaChat';
 export type PlazaPanel = 'contest' | 'well' | 'bench';
-export function PlazaBridge({ handle, appearance, pet, riding, face, userId, panel, onClose }: {
+export function PlazaBridge({ handle, appearance, pet, riding, face, userId, panel, onClose, swingReporter }: {
+  swingReporter: SwingRef<NetSwingReporter | null>;
   handle: RefObject<WorldGameHandle | null>; appearance: PublicAvatarAppearance; pet: PetId | null; riding: boolean; face?: string;
   userId: string; panel: string | null; onClose: () => void;
 }) {
@@ -24,8 +30,19 @@ export function PlazaBridge({ handle, appearance, pet, riding, face, userId, pan
     const d = handle.current?.debug();
     return { ...continuousPayload(d ?? { x: 216, y: 248 }), direction: d?.facing ?? 'Back' as const, moving: d?.moving ?? false, pet, face, riding: d?.riding ?? false };
   });
-  const realtime = usePlazaRealtime(sessionId, appearance, initial);
+  const roster = useRef(new Set<string>());
+  const events = useMemo(() => ({ [NET_SWING_EVENT]: (raw: unknown) => {
+    const payload = parseNetSwing(raw);
+    if (payload && payload.sessionId !== sessionId && roster.current.has(payload.sessionId)) dragonfliesFor('plaza')?.peerSwing(payload);
+  } }), [sessionId]);
+  const realtime = usePlazaRealtime(sessionId, appearance, initial, { events });
+  roster.current = new Set(realtime.players.map(p => p.sessionId));
   const { updateMyState } = realtime;
+  const swingSend = useRef(realtime.sendEvent); swingSend.current = realtime.sendEvent;
+  useEffect(() => {
+    swingReporter.current = direction => { void swingSend.current(NET_SWING_EVENT, { sessionId, direction, at: Date.now() }); };
+    return () => { swingReporter.current = null; };
+  }, [swingReporter, sessionId]);
   const reactionRef = useRef(realtime.sendReaction); reactionRef.current = realtime.sendReaction;
   const players = useMemo(() => realtime.players.map(p => ({ ...p, ...continuousPosition(p) })), [realtime.players]);
   const paths = useMemo(() => new Map([...realtime.paths].map(([id, points]) => [id, points.map(p => ({ ...p, ...continuousPosition(p) }))])), [realtime.paths]);

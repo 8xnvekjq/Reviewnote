@@ -1,4 +1,5 @@
 import type { ServerWorldClock } from '../logic/worldClock';
+import type { GamePointsResult } from '../logic/gamePoints';
 import { MAX_LEVEL, nonnegativeInteger, parseXpGain } from '../logic/levels';
 import type { PlayerLevel, XpGain } from '../logic/levels';
 export type { PlayerLevel, XpGain } from '../logic/levels';
@@ -52,9 +53,13 @@ export type CastStart = { ok: true; castId: string; shadow: FishShadow; biteDela
 export type EquipRodResult = { ok: true; rod: FishingRod } | { ok: false; reason: 'not_found' | 'not_owned' | 'error' };
 export type CastFinish = { ok: true; landed: true; speciesId: string; lengthCm: number; rarity: FishRarity; isNew: boolean; isBig: boolean; isPersonalBest: boolean; remaining: number; xpGain?: XpGain;
   /** 이 종을 낚은 모든 기록 중 상위 몇 %인지(작을수록 큼, 0~100). */
-  percentile?: number }
-  | { ok: true; landed: true; junk: JunkId; remaining: number; xpGain?: XpGain } | { ok: true; landed: false } | { ok: false };
-export interface ClassFishBoard { rows: { speciesId: string; lengthCm: number; animal: string; caughtAt: string; teacher?: boolean }[]; classSpecies: number }
+  percentile?: number;
+  /** 게임 포인트(하루 상한 50P, 넘으면 절반, 별 4·5는 전부). */
+  points?: GamePointsResult }
+  | { ok: true; landed: true; junk: JunkId; remaining: number; xpGain?: XpGain; points?: GamePointsResult } | { ok: true; landed: false } | { ok: false };
+export interface ClassFishBoard { rows: { speciesId: string; lengthCm: number; animal: string; caughtAt: string; teacher?: boolean }[]; classSpecies: number;
+  /** 이번 주 등급별 챔피언(★5→★1, 그 등급을 아무도 못 낚았으면 빠짐). */
+  champions?: import('../logic/gamePoints').FishTierChampion[] }
 export type BuyBaitResult = { ok: true; newBalance: number; charges: number } | { ok: false; reason: 'insufficient_balance' | 'error'; message?: string };
 export interface FishingAdapter { getWorldClock?(): Promise<ServerWorldClock | null>; adminSetWorldOverride?(weather: FishWeather | null, phase: FishPhase | null, hours: number): Promise<boolean>; buyBait?(): Promise<BuyBaitResult>; getLevel?(): Promise<PlayerLevel | null>; state(): Promise<FishingState>; /** spot: 찌가 떨어진 포인트 id(원 밖이면 null). 서버가 활성 여부·남은 마리를 확인한다. */ start(pet: string | null, spot?: number | null): Promise<CastStart>; finish(castId: string, landed: boolean): Promise<CastFinish>; board(): Promise<ClassFishBoard>; /** 낚싯대 장착(null = 해제). 서버 RPC equip_pixel_rod. */ equipRod?(itemId: FishingRodId | null): Promise<EquipRodResult> }
 /** 관리자 시험용 시계·날씨 덮어쓰기(관리자만 서버가 받아 준다). */
@@ -184,20 +189,43 @@ export function parseEquipRod(raw: unknown): EquipRodResult {
   return { ok: true, rod: parseFishingRod(raw.rod) };
 }
 
+export function parseGamePoints(raw: unknown): GamePointsResult | undefined {
+  if (!isObj(raw)) return undefined;
+  const awarded = nonnegativeInteger(raw.awarded), todayEarned = nonnegativeInteger(raw.todayEarned);
+  if (awarded === undefined || todayEarned === undefined || raw.cap !== 50 || typeof raw.capped !== 'boolean'
+    || awarded > todayEarned || raw.capped !== (todayEarned >= 50)) return undefined;
+  return { awarded, todayEarned, cap: 50, capped: raw.capped };
+}
+function parseChampions(raw: unknown): ClassFishBoard['champions'] {
+  if (!Array.isArray(raw)) return undefined;
+  const seen = new Set<string>();
+  return raw.flatMap(r => {
+    if (!isObj(r) || !oneOf(RARITIES, r.rarity) || seen.has(r.rarity)) return [];
+    const speciesId = str(r.speciesId), animal = str(r.animal);
+    const lengthCm = num(r.lengthCm), score = num(r.score), reward = nonnegativeInteger(r.reward);
+    if (!speciesId || !animal || lengthCm === null || lengthCm <= 0 || score === null || score < 0
+      || reward === undefined || (r.teacher !== undefined && typeof r.teacher !== 'boolean') || (r.teacher === true && reward !== 0)) return [];
+    seen.add(r.rarity);
+    return [{ rarity: r.rarity, speciesId, animal, lengthCm, score, reward, ...(typeof r.teacher === 'boolean' ? { teacher: r.teacher } : {}) }];
+  });
+}
+
 export function parseCastFinish(raw: unknown): CastFinish {
   if (!isObj(raw) || raw.ok !== true) return { ok: false };
   if (raw.landed !== true) return { ok: true, landed: false };
+  const points = parseGamePoints(raw.points);
   const speciesId = str(raw.speciesId), lengthCm = num(raw.lengthCm), remaining = num(raw.remaining);
   if (raw.junk != null) {
     if (!oneOf(JUNK_IDS, raw.junk)) return { ok: false };
     const xpGain = parseXpGain(raw.xpGain);
-    return { ok: true, landed: true, junk: raw.junk, remaining: remaining == null ? 0 : Math.max(-1, Math.floor(remaining)), ...(xpGain ? { xpGain } : {}) };
+    return { ok: true, landed: true, junk: raw.junk, ...(points ? { points } : {}), remaining: remaining == null ? 0 : Math.max(-1, Math.floor(remaining)), ...(xpGain ? { xpGain } : {}) };
   }
   if (!speciesId || lengthCm == null || !oneOf(RARITIES, raw.rarity)) return { ok: false };
   const xpGain = parseXpGain(raw.xpGain);
   const percentile = num(raw.percentile);
   return {
     ok: true, landed: true, speciesId, lengthCm, rarity: raw.rarity,
+    ...(points ? { points } : {}),
     ...(xpGain ? { xpGain } : {}),
     ...(percentile != null && percentile >= 0 && percentile <= 100 ? { percentile } : {}),
     isNew: raw.isNew === true, isBig: raw.isBig === true, isPersonalBest: raw.isPersonalBest === true,
@@ -213,7 +241,8 @@ export function parseClassFishBoard(raw: unknown): ClassFishBoard {
     return speciesId && lengthCm != null ? [{ speciesId, lengthCm, animal: str(r.animal) ?? '🐾', caughtAt: str(r.caughtAt) ?? '', ...(r.teacher === true ? { teacher: true } : {}) }] : [];
   }).slice(0, 10);
   const classSpecies = isObj(raw) ? num(raw.classSpecies) : null;
-  return { rows, classSpecies: classSpecies == null ? new Set(rows.map(r => r.speciesId)).size : Math.max(0, Math.floor(classSpecies)) };
+  const champions = isObj(raw) ? parseChampions(raw.champions) : undefined;
+  return { ...(champions ? { champions } : {}), rows, classSpecies: classSpecies == null ? new Set(rows.map(r => r.speciesId)).size : Math.max(0, Math.floor(classSpecies)) };
 }
 
 async function callRpc(client: FishingRpcClient, fn: string, args?: Record<string, unknown>): Promise<unknown> {

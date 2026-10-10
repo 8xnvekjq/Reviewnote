@@ -1,3 +1,8 @@
+import { NET_SWING_EVENT } from '../logic/bugCatalog';
+import { parseNetSwing } from '../logic/bugGame';
+import { dragonfliesFor } from '../game/dragonflies';
+import type { NetSwingReporter } from './useBugCatching';
+import type { MutableRefObject as SwingRef } from 'react';
 // 강가에 있을 때만 마운트한다. 광장 훅(usePlazaRealtime)을 강가 채널·강가 좌표 범위로 그대로 재사용하고
 // (구독/재연결/퇴장 정리 동일), 그 위에 낚시 상태 broadcast('fish')를 얹는다. 낚시 상태는 저장하지 않는다.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -17,7 +22,8 @@ import {
 import type { FishBucket, RiverFishEvent, RiverFishReporter } from '../logic/riverPresence';
 import { PlazaChat } from './PlazaChat';
 
-export function RiverBridge({ handle, appearance, pet, riding, face, panel, reporter }: {
+export function RiverBridge({ handle, appearance, pet, riding, face, panel, reporter, swingReporter }: {
+  swingReporter: SwingRef<NetSwingReporter | null>;
   handle: RefObject<WorldGameHandle | null>; appearance: PublicAvatarAppearance; pet: PetId | null; riding: boolean; face?: string; panel: string | null;
   /** useFishing의 낚시 보고가 들어오는 자리. 마운트 동안만 채운다. */
   reporter: MutableRefObject<RiverFishReporter | null>;
@@ -33,10 +39,18 @@ export function RiverBridge({ handle, appearance, pet, riding, face, panel, repo
     const now = Date.now();
     setFish(store => applyFishEvent(store, payload, now, roster.current));
   }, []);
-  const events = useMemo(() => ({ [FISH_EVENT]: receiveFish }), [receiveFish]);
+  const events = useMemo(() => ({ [FISH_EVENT]: receiveFish, [NET_SWING_EVENT]: (raw: unknown) => {
+    const payload = parseNetSwing(raw);
+    if (payload && payload.sessionId !== sessionId && roster.current.has(payload.sessionId)) dragonfliesFor('river')?.peerSwing(payload);
+  } }), [receiveFish, sessionId]);
   const realtime = usePlazaRealtime(sessionId, appearance, initial, { channel: RIVER_CHANNEL_NAME, bounds: RIVER_BOUNDS, events });
   roster.current = new Set([sessionId, ...realtime.players.map(p => p.sessionId)]);
   const { updateMyState } = realtime;
+  const swingSend = useRef(realtime.sendEvent); swingSend.current = realtime.sendEvent;
+  useEffect(() => {
+    swingReporter.current = direction => { void swingSend.current(NET_SWING_EVENT, { sessionId, direction, at: Date.now() }); };
+    return () => { swingReporter.current = null; };
+  }, [swingReporter, sessionId]);
   const sendRef = useRef(realtime.sendEvent); sendRef.current = realtime.sendEvent;
   const players = useMemo(() => realtime.players.map(p => ({ ...p, ...continuousPosition(p, RIVER_BOUNDS) })), [realtime.players]);
   const paths = useMemo(() => new Map([...realtime.paths].map(([id, points]) => [id, points.map(p => ({ ...p, ...continuousPosition(p, RIVER_BOUNDS) }))])), [realtime.paths]);

@@ -1,3 +1,4 @@
+import { dragonfliesFor } from './dragonflies';
 import { RIDING_RADIUS, PERSON_RADIUS } from '../logic/softCollision';
 import { createAnimalTag, updateAnimalTag, animalTagSnapshot, peerAnimalFace } from './animalTag';
 import { updatePeerCompanion, peerCompanionSnapshot } from './peerCompanion';
@@ -143,6 +144,7 @@ export class PlazaScene extends WorldScene {
       if (f.tag) { updateAnimalTag(f.tag, feet, peerAnimalFace(p), p.riding === true && p.pet === 'pet_bear'); }
       updatePeerCompanion(f, feet, time, delta, this.spec.solid);
     }
+    dragonfliesFor('plaza')?.setPeers(spots, this.selfId);
     this.spacePets(delta);
     this.bubbles?.update(this.wantedBubbles, spots, faces);
   }
