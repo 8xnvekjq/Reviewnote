@@ -7,7 +7,12 @@ import { ROD_CATALOG } from './rods.ts';
 // Asset selection and zero-based rows are documented in docs/pixel-world-content.md.
 export const BAIT_ITEM: PixelItem = { itemId: 'bait_worm', category: 'bait', slot: 'bait', price: 50, assetKey: 'worm', displayName: '지렁이 미끼 (100회)', tier: 1, stackable: true };
 
+// 공통 상점 타입에 tool을 추가한 뒤 PIXEL_CATALOG에도 연결한다.
+/** 잠자리채 — 광장 상점 '도구' 칸. 그림은 PanelArt의 tool_net. */
+export const NET_ITEM: PixelItem = { itemId: 'tool_net', category: 'tool', slot: 'tool', price: 150, assetKey: 'tool_net', displayName: '잠자리채', tier: 1, stackable: false };
+
 export const PIXEL_CATALOG: readonly PixelItem[] = [
+  NET_ITEM,
   { itemId: 'hair_bald', category: 'avatar', slot: 'hair', price: 0, assetKey: 'bald', displayName: '대머리', tier: 1, stackable: false },
   BAIT_ITEM,
   ...ROD_CATALOG,
