@@ -19,3 +19,5 @@ export const sizeScore = (lengthCm: number, minCm: number, maxCm: number) => Mat
 export interface WeeklyReward { id: string; weekStart: string; kind: 'fish_tier' | 'crop_rank' | 'crop_entry'; label: string; points: number }
 /** 이번 주 등급별 챔피언(게시판 맨 위). */
 export interface FishTierChampion { rarity: FishRarity; speciesId: string; lengthCm: number; score: number; animal: string; teacher?: boolean; reward: number }
+/** 주간 보상 서버 계약(get_pixel_rewards: 지난주 정산이 안 됐으면 먼저 정산하고, 아직 확인 안 한 내 보상을 돌려준다). */
+export interface RewardsAdapter { pending(): Promise<WeeklyReward[]>; ack(ids: readonly string[]): Promise<boolean> }
