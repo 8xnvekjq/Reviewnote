@@ -9,3 +9,10 @@
 .pwp-bug-album { list-style: none; padding: 0; }
 .pwp-bug-album li { display: flex; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid #d8c9a6; }
 .pwp-bug-album small { display: block; margin-top: 4px; }
+/* 가로로 눕힌 폰처럼 낮은 화면: 여백을 줄이고 키보드 안내를 숨겨 경기장과 안내 문구가 창 안에 다 들어오게 한다. */
+@media (max-height: 480px) {
+  .pwp-bug-content { padding: 0 12px 6px; }
+  .pwp-bug-content p { margin: 4px 0; }
+  .pwp-bug-content small { display: none; }
+  .pwp-bug-arena { width: min(280px, 65vw, calc(100dvh - 250px)); margin: 4px auto; }
+}

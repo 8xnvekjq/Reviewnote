@@ -75,7 +75,7 @@ export function BugGame({ catchId, bugId, difficulty, onFinish, onCancel }: {
     s.points.push(to);
     game.current = predictBugSwipe(game.current, s.points[0], to); setTrail([...s.points]);
   };
-  return <Window title="잠자리 잡기" onClose={onCancel} onCancel={onCancel} compact small>
+  return <Window title="잠자리 잡기" onClose={onCancel} onCancel={onCancel} compact>
     <div className="pwp-bug-content">
       <p>{bugById(bugId)?.name} · {'★'.repeat(view.stars)} · <b>{Math.max(0, (BUG_GAME_MS - view.elapsed) / 1000).toFixed(1)}초</b></p>
       <div className="pwp-bug-arena">

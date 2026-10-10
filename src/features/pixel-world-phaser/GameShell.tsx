@@ -11,7 +11,7 @@ import { WorldWeatherPanel } from './ui/WorldWeatherPanel';
 // (Phaser Text는 도트 모드에서 최근접 보간이라 작은 한글이 뭉개진다), 버튼은 접근성/테스트도 쉽다.
 // 입력은 controls 객체에만 쓰고 Phaser가 매 프레임 읽는다 — 손가락 이동으로 React가 다시 그리지 않는다.
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { PointerEvent as ReactPointerEvent, RefObject } from 'react';
+import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import type { PublicAvatarAppearance } from '../pixel-room/shop/types';
 import type { PetId } from '../pixel-room/pet/petKinds';
@@ -451,7 +451,8 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     if (bugFrozen.current) return;
     if (fishingRef.current.reel()) return;
     if (panelRef.current || editingRef.current) return;
-    if (!dialogueRef.current && bugsRef.current.nearby && (!promptRef.current || bugsRef.current.state?.netOwned)) { void bugsRef.current.start(); return; }
+    // 잠자리채가 있을 때만 A를 잠자리채로 쓴다. 없으면 말 걸기·낚시가 먼저이고, 할 일이 없을 때만 상점 안내를 띄운다.
+    if (!dialogueRef.current && bugsRef.current.nearby && (bugsRef.current.state?.netOwned || (!promptRef.current && sceneRef.current?.id !== 'river'))) { void bugsRef.current.start(); return; }
     if (!dialogueRef.current && !promptRef.current && sceneRef.current?.id === 'river' && handle.current?.beginCast()) return;
     if (dialogueRef.current) advance();
     // 물을 보며 A를 누르면 힘을 모으고, 놓으면 던진다.
@@ -572,6 +573,8 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     }
   };
 
+  // 키보드·보조기기로 누른 click만 받는다. 터치를 길게 누르면 detail 0인 click이 따라와 A가 두 번 눌리기도 한다.
+  const keyboardClick = (event: ReactMouseEvent<HTMLButtonElement>) => event.detail === 0 && !(event.nativeEvent as PointerEvent).pointerType;
   // ── 버튼(A/B): 각자 포인터 캡처 → 조이스틱과 동시에 눌러도 서로 안 섞인다 ──
   const buttonDown = (which: 'a' | 'b') => (event: ReactPointerEvent<HTMLButtonElement>) => {
     event.stopPropagation();
@@ -707,14 +710,14 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
       onPointerDown={buttonDown('a')} onPointerUp={buttonUp('a')} onPointerCancel={buttonUp('a')} onLostPointerCapture={buttonUp('a')}
       onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); if (!event.repeat) pressA(); } }}
       onKeyUp={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); releaseA(); } }}
-      onClick={event => { if (event.detail === 0) { pressA(); releaseA(); } }}>
+      onClick={event => { if (keyboardClick(event)) { pressA(); releaseA(); } }}>
       <b>A</b>{(prompt || dialogue || fishing.canCast || (bugs.nearby && bugs.state?.netOwned)) && <small>{dialogue ? '다음' : bugs.nearby && bugs.state?.netOwned ? '잠자리채' : prompt ? promptLabel : '낚시하기'}</small>}
     </button>
     <button type="button" disabled={!!placing} className="pwp-btn pwp-btn-b" data-pressed={pressed.b} data-closing={!!panel || !!dialogue}
       style={{ left: b.x - b.size / 2, top: b.y - b.size / 2, width: b.size, height: b.size }}
       aria-label={panel || dialogue || bugs.busy || bugs.result ? 'B · 닫기' : 'B · 누르는 동안 달리기'}
       onPointerDown={buttonDown('b')} onPointerUp={buttonUp('b')} onPointerCancel={buttonUp('b')} onLostPointerCapture={buttonUp('b')}
-      onClick={event => { if (event.detail === 0 && (fishingFrozen.current || bugFrozen.current || panelRef.current || dialogueRef.current || root.current?.querySelector('.pwp-chat-form'))) pressB(true); }}>
+      onClick={event => { if (keyboardClick(event) && (fishingFrozen.current || bugFrozen.current || panelRef.current || dialogueRef.current || root.current?.querySelector('.pwp-chat-form'))) pressB(true); }}>
       <b>B</b><small>{panel || dialogue || bugs.busy || bugs.result ? '닫기' : '달리기'}</small>
     </button>
     {dialogue && <div className="pwp-panel-shade pwp-dialogue-shade" onPointerDown={event => {

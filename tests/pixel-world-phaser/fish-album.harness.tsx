@@ -56,8 +56,9 @@ function Harness() {
     <button onClick={() => setReady(true)}>게임 준비</button>
     <button onClick={() => setEntry(false)}>나가기</button>
     <button onClick={() => setRender(render + 1)}>리렌더 {render}</button>
-    {entry && <WeeklyRewards ready={ready} rewards={rewards} />}
+    {/* 보상 창만 StrictMode로 이중 마운트를 검사한다. 도감은 1회용 실패 모의가 첫 effect에서 소모되지 않게 뺀다. */}
+    {entry && <StrictMode><WeeklyRewards ready={ready} rewards={rewards} /></StrictMode>}
     {panel && <FishingPanels key={panel} kind={panel} adapter={adapter} onClose={() => setPanel(null)} newSpeciesId="catfish_small" />}
   </main>;
 }
-createRoot(document.getElementById('root')!).render(<StrictMode><Harness /></StrictMode>);
+createRoot(document.getElementById('root')!).render(<Harness />);
