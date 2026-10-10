@@ -113,8 +113,27 @@ export function parseBuyBait(raw: unknown): BuyBaitResult {
   return newBalance !== undefined && bait ? { ok: true, newBalance, charges: bait.charges } : { ok: false, reason: 'error' };
 }
 
+// 포인트 id와 남은 마리는 서버가 정한 정수 범위만 받는다.
+function parseSpotCounts(raw: unknown): { id: number; left: number } | undefined {
+  if (!isObj(raw) || typeof raw.id !== 'number' || !Number.isInteger(raw.id) || raw.id < 0 || raw.id > 3
+    || typeof raw.left !== 'number' || !Number.isInteger(raw.left) || raw.left < 0 || raw.left > 5) return undefined;
+  return { id: raw.id, left: raw.left };
+}
+function parseSpots(raw: unknown): FishingState['spots'] {
+  if (!Array.isArray(raw)) return undefined;
+  const seen = new Set<number>();
+  return raw.flatMap(entry => {
+    const counts = parseSpotCounts(entry);
+    if (!counts || !isObj(entry) || typeof entry.active !== 'boolean' || seen.has(counts.id)
+      || (entry.readyAt !== null && (typeof entry.readyAt !== 'string' || !Number.isFinite(Date.parse(entry.readyAt))))) return [];
+    seen.add(counts.id);
+    return [{ ...counts, active: entry.active, readyAt: entry.readyAt as string | null }];
+  });
+}
+
 export function parseFishingState(raw: unknown, fallback: FishingState = fallbackFishingState()): FishingState {
   if (!isObj(raw)) return fallback;
+  const spots = parseSpots(raw.spots);
   const remaining = num(raw.remaining);
   const spark = num(raw.sparkleShadow);
   const level = parsePlayerLevel(raw.level), bait = parseBait(raw.bait);
@@ -131,6 +150,7 @@ export function parseFishingState(raw: unknown, fallback: FishingState = fallbac
     sparkleShadow: spark != null && [0, 1, 2].includes(spark) ? spark : null,
     pigeonHint: str(raw.pigeonHint),
     album,
+    ...(spots ? { spots } : {}),
     junk: Object.fromEntries(JUNK_IDS.map(id => [id, isObj(raw.junk) ? nonnegativeInteger(raw.junk[id]) ?? 0 : 0])),
     rod: parseFishingRod(raw.rod),
     ...(level ? { level } : {}),
@@ -143,9 +163,12 @@ export function parseCastStart(raw: unknown): CastStart {
   if (raw.ok !== true) return { ok: false, reason: raw.reason === 'budget' || raw.reason === 'pending' ? raw.reason : 'error' };
   const castId = str(raw.castId), biteDelayMs = num(raw.biteDelayMs);
   if (!castId || !oneOf(SHADOWS, raw.shadow) || biteDelayMs == null || biteDelayMs < 0) return { ok: false, reason: 'error' };
+  const counts = parseSpotCounts(raw.spot);
+  const spot = counts && isObj(raw.spot) && typeof raw.spot.bonus === 'boolean' ? { ...counts, bonus: raw.spot.bonus } : undefined;
   const speed = num(raw.speed);
   const bait = parseBait(raw.bait);
   return { ok: true, castId, shadow: raw.shadow, biteDelayMs, difficulty: Math.max(1, Math.min(5, num(raw.difficulty) ?? 1)), ...(typeof raw.big === 'boolean' ? { big: raw.big } : {}), pattern: oneOf(PATTERNS, raw.pattern) ? raw.pattern : 'quick', hint: raw.hint === 'sparkle' ? 'sparkle' : null,
+    ...(spot ? { spot } : {}),
     ...(typeof raw.heavy === 'boolean' ? { heavy: raw.heavy } : {}),
     ...(oneOf(JUNK_IDS, raw.junk) ? { junk: raw.junk } : {}),
     ...(raw.rod !== undefined ? { rod: parseFishingRod(raw.rod) } : {}),
@@ -220,8 +243,8 @@ export function createFishingAdapter(supabase: FishingRpcClient, override?: Fish
       try { return parseFishingState(await callRpc(supabase, 'get_pixel_fishing_state', overrideArgs), fallback); }
       catch { return fallback; }
     },
-    async start(pet) {
-      try { return parseCastStart(await callRpc(supabase, 'start_pixel_cast', { p_pet: pet ?? null, ...overrideArgs })); }
+    async start(pet, spot) {
+      try { return parseCastStart(await callRpc(supabase, 'start_pixel_cast', { p_pet: pet ?? null, ...overrideArgs, ...(typeof spot === 'number' ? { p_spot: spot } : {}) })); }
       catch { return { ok: false, reason: 'error' }; }
     },
     async finish(castId, landed) {
