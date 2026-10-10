@@ -12,6 +12,8 @@ export interface ReelGame {
   motion: 'wander' | 'dart' | 'sweep' | 'feint'; motionStart: number; motionAngle: number; motionTurn: number; wanderFrequency: number;
   progress: number; elapsed: number; remainder: number; taps: number[];
   axes: ReelAxisInput[]; axis: number; lastTap: number; tapCount: number;
+  // 비둘기: 진행이 바닥나도 1초 버텨 주기(남은 횟수·이번 판에 쓴 횟수·버티는 끝 시각).
+  rescueLeft: number; rescuesUsed: number; rescueUntil: number;
   status: 'playing' | 'landed' | 'escaped';
 }
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -19,14 +21,18 @@ export const reelSpeed = (speed = 1) => Number.isFinite(speed) && speed > 0 ? sp
 export const minReelMs = (difficulty: number, speed = 1) => (1500 + (clamp(difficulty, 1, 5) - 1) * 375) / reelSpeed(speed);
 // 서버 최소 릴 시간에 통신 여유를 더한다.
 export const REEL_MARGIN_MS = 150;
-export function createReelGame(difficulty = 1, duck = false, big = false, seed = 0, speed = 1, rod?: RodEquipment, trophy = false): ReelGame {
+/** 오리: 릴 원 +10%. 비둘기: 바닥나도 버텨 주는 시간(초). */
+export const DUCK_ZONE_BONUS = 1.1;
+export const PIGEON_RESCUE_S = 1;
+export function createReelGame(difficulty = 1, duck = false, big = false, seed = 0, speed = 1, rod?: RodEquipment, trophy = false, rescues = 0): ReelGame {
   const d = Number.isFinite(difficulty) ? clamp(difficulty, 1, 5) : 1;
   return { difficulty: d, speed: reelSpeed(speed), rod, trophy, big, seed, random: (seed + 1) >>> 0,
-    arenaScale: 1 - (d - 1) * .0625, zoneSize: (d <= 2 ? .42 - (d - 1) * .09 : .33 - (d - 2) * .01) + (duck ? .035 : 0),
+    arenaScale: 1 - (d - 1) * .0625, zoneSize: (d <= 2 ? .42 - (d - 1) * .09 : .33 - (d - 2) * .01) * (duck ? DUCK_ZONE_BONUS : 1),
     zoneX: 0, zone: 0, velocityX: 0, velocity: 0, fishX: 0, fish: 0, fishVX: 0, fishVY: 0,
     targetX: 0, targetY: 0, nextTarget: 0, burstUntil: 0, pauseUntil: 0,
     motion: 'wander', motionStart: 0, motionAngle: 0, motionTurn: 1, wanderFrequency: 3,
-    progress: .35, elapsed: 0, remainder: 0, taps: [], axes: [], axis: 0, lastTap: -1, tapCount: 0, status: 'playing' };
+    progress: .35, elapsed: 0, remainder: 0, taps: [], axes: [], axis: 0, lastTap: -1, tapCount: 0,
+    rescueLeft: Math.max(0, Math.floor(rescues)), rescuesUsed: 0, rescueUntil: -1, status: 'playing' };
 }
 function random(g: ReelGame) {
   g.random = (Math.imul(g.random, 1664525) + 1013904223) >>> 0;
@@ -107,7 +113,13 @@ export function stepReelGame(game: ReelGame, deltaMs: number, taps: readonly num
     const inside = Math.hypot(g.zoneX - g.fishX, g.zone - g.fish) <= g.zoneSize;
     g.progress = clamp(g.progress + (inside ? (.105 - d * .006) * g.speed : -(d <= 1 ? .13 + d * .12 : d <= 2 ? .25 - (d - 1) * .06 : .19 - (d - 2) * .015)) * dt, 0, 1);
     if (g.progress >= 1 && t * 1000 >= minReelMs(g.difficulty, g.speed) + REEL_MARGIN_MS) g.status = 'landed';
-    else if (g.progress <= 0 || t >= 75) g.status = 'escaped';
+    else if (t >= 75) g.status = 'escaped';
+    else if (g.progress <= 0) {
+      // 비둘기가 1초 버텨 준다 — 그 사이 다시 원 안에 넣으면 이어서 낚는다.
+      if (t < g.rescueUntil) continue;
+      if (g.rescueLeft > 0) { g.rescueLeft--; g.rescuesUsed++; g.rescueUntil = t + PIGEON_RESCUE_S; }
+      else g.status = 'escaped';
+    }
   }
   return g;
 }

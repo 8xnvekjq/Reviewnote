@@ -77,7 +77,7 @@ test('원의 크기와 잡기 반경은 기존 공식 그대로다', () => {
     for (const duck of [false, true]) {
       const g = createReelGame(d, duck);
       assert.equal(g.arenaScale, arena);
-      assert.ok(Math.abs(g.zoneSize - radius - (duck ? .035 : 0)) < 1e-12);
+      assert.ok(Math.abs(g.zoneSize - radius * (duck ? 1.1 : 1)) < 1e-12) // 오리: 원 +10%;
     }
   }
 });
