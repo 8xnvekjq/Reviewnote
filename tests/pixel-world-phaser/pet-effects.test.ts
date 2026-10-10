@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { petEffectText } from '../../src/features/pixel-room/shop/petEffects.ts';
 import { PIXEL_CATALOG } from '../../src/features/pixel-room/shop/catalog.ts';
 import { createReelGame, stepReelGame, DUCK_ZONE_BONUS, PIGEON_RESCUE_S } from '../../src/features/pixel-world-phaser/logic/reelGame.ts';
+import { PIGEON_RESCUES_PER_DAY } from '../../src/features/pixel-world-phaser/ui/useFishing.ts';
 
 test('모든 펫에 효과 설명이 있고, 숫자는 실제 규칙과 같다', () => {
   for (const pet of PIXEL_CATALOG.filter(item => item.category === 'pet')) assert.ok(petEffectText(pet.itemId), pet.itemId);
@@ -15,7 +16,7 @@ test('모든 펫에 효과 설명이 있고, 숫자는 실제 규칙과 같다',
   assert.match(petEffectText('pet_dog'), /경험치 \+10%/);
   assert.doesNotMatch(v2, /fish_hint_text|sparkle:/, '예전 강아지·비둘기 효과는 없앴다');
   assert.equal(DUCK_ZONE_BONUS, 1.1); assert.match(petEffectText('pet_duck'), /\+10%/);
-  assert.equal(PIGEON_RESCUE_S, 1); assert.match(petEffectText('pet_pigeon'), /1초.*하루 2번/);
+  assert.equal(PIGEON_RESCUE_S, 1); assert.match(petEffectText('pet_pigeon'), new RegExp('1초.*하루 ' + PIGEON_RESCUES_PER_DAY + '번'));
 });
 
 test('오리는 릴 원이 정확히 10% 크다', () => {

@@ -10,8 +10,8 @@ import type { FishingGame } from '../logic/fishingGame';
 import { fishReportForGamePhase } from '../logic/riverPresence';
 import type { RiverFishReporter } from '../logic/riverPresence';
 
-// 비둘기 "한 번 더": 하루(KST) 2번. 릴 결과는 원래 화면이 판정하므로 횟수도 기기에 기억한다(막히면 이번 접속만).
-export const PIGEON_RESCUES_PER_DAY = 2;
+// 비둘기 "한 번 더": 하루(KST) 10번. 릴 결과는 원래 화면이 판정하므로 횟수도 기기에 기억한다(막히면 이번 접속만).
+export const PIGEON_RESCUES_PER_DAY = 10;
 const rescueKey = (day?: string) => 'pixelWorld:pigeonRescue:' + (day ?? '');
 export function pigeonRescuesLeft(day?: string): number {
   try { return Math.max(0, PIGEON_RESCUES_PER_DAY - Number(window.localStorage.getItem(rescueKey(day)) ?? 0)); } catch { return PIGEON_RESCUES_PER_DAY; }
