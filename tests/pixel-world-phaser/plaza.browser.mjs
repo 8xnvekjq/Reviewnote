@@ -119,8 +119,10 @@ try {
   await a.bringToFront();
   await a.waitForFunction(() => document.querySelector('.pwp-root')?.dataset.status === 'ready');
   await exit(a, 'gate'); await ready(a, 'plaza');
+  const trackedBefore = await a.evaluate(() => window.plazaTransport.last()?.seq ?? 0);
   await a.keyboard.down('ArrowRight'); await a.waitForTimeout(430); await a.keyboard.up('ArrowRight');
-  await a.waitForTimeout(220);
+  // presence는 멈춘 뒤 3초 모아서 갱신한다(presenceTrackBudget). 그 사이 상대는 broadcast로 이미 안다.
+  await a.waitForFunction(seq => window.plazaTransport.last()?.seq > seq && window.plazaTransport.last().moving === false, trackedBefore, { timeout: 6000 });
   const betaPayload = await a.evaluate(() => window.plazaTransport.last());
   await b.bringToFront();
   await b.waitForFunction(p => {
