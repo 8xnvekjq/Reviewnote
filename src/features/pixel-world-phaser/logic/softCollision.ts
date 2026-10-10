@@ -34,9 +34,10 @@ export function stepSoftCollision(from: Point, velocity: Point, obstacles: reado
   for (const peer of obstacles) {
     const dx = from.x - peer.x, dy = from.y - peer.y, distance = Math.hypot(dx, dy);
     const reach = radius + (peer.radius ?? PERSON_RADIUS);
-    const speed = Math.hypot(velocity.x, velocity.y);
-    const nx = distance > 0.001 ? dx / distance : -velocity.x / speed;
-    const ny = distance > 0.001 ? dy / distance : -velocity.y / speed;
+    // 완전히 같은 점에 겹쳐 있으면(같은 입구로 동시에 들어옴) 어느 쪽이 '친구 쪽'인지 정할 수 없다 —
+    // 막지 않고 가려는 방향으로 그대로 보내 자연스럽게 떨어지게 한다.
+    if (distance <= 0.001) continue;
+    const nx = dx / distance, ny = dy / distance;
     const into = velocity.x * nx + velocity.y * ny;
     // 통과 중에는 원 밖으로 완전히 나올 때까지 허용한다.
     const passing = (state.pushes[peer.id] ?? 0) >= PASS_THROUGH_MS && distance < reach + 3;

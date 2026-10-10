@@ -78,10 +78,15 @@ try {
   await chatInput.press('Enter');
   assert.equal(await chatInput.inputValue(), '', 'sent text clears');
   await a.waitForFunction(() => window.__pixelWorldPhaser.debug().bubbles?.some(v => v.text === '같이 토마토 키우자!'));
+  await mkdir('.pixel-world-test.local', { recursive: true });
+  await a.screenshot({ path: '.pixel-world-test.local/plaza-bubble-face.png' });
   await chatInput.fill('또 보내기'); await chatInput.press('Enter');
   await a.getByText('조금만 천천히 보내요.').waitFor();
   await b.bringToFront();
   await b.waitForFunction(() => window.__pixelWorldPhaser.debug().bubbles?.some(v => v.text === '같이 토마토 키우자!' && v.alpha === 1));
+  // 말풍선 윗선 가운데에 보낸 사람의 동물 얼굴이 붙는다(발밑 표찰은 기본 숨김).
+  assert.ok(/\p{Extended_Pictographic}/u.test(await b.evaluate(() => window.__pixelWorldPhaser.debug().bubbles.find(v => v.text === '같이 토마토 키우자!').face)));
+  assert.equal(await b.evaluate(() => window.__pixelWorldPhaser.debug().classmates[0].animalTag.visible), false);
   assert.equal(await b.evaluate(() => window.__pixelWorldPhaser.debug().bubbles.some(v => v.text === '또 보내기')), false, 'cooldown message was not sent');
   await b.screenshot({ path: '.pixel-world-test.local/plaza-chat.png' });
   await b.waitForFunction(() => { const v = window.__pixelWorldPhaser.debug().bubbles.find(x => x.text === '같이 토마토 키우자!'); return v && v.alpha > 0 && v.alpha < 1; }, null, { timeout: 9000 });
