@@ -65,7 +65,7 @@ test('animal face migration executes twice, shares overrides, preserves teacher 
       create table private.app_admins(user_id uuid);
       create table pixel_fish_catches(species_id text,length_cm numeric,user_id uuid,caught_at timestamptz);
       create table pixel_avatar_equipment(user_id uuid primary key,hair text,skin_tone text,eye_color text,updated_at timestamptz);
-      create table pixel_item_catalog(item_id text primary key,category text,slot text,price int,asset_key text,display_name text,tier int,stackable boolean);
+      create table pixel_item_catalog(item_id text primary key,category text,slot text,price int constraint pixel_item_catalog_price_check check (price > 0),asset_key text,display_name text,tier int,stackable boolean); -- 운영과 같은 가격 규칙
       create table exam_solution_audio(attempt_id uuid,question_id uuid);
       create function private.exam_peer_candidates(uuid,uuid) returns table(peer_id uuid,revision int,author_id uuid,teacher boolean,time_spent_ms bigint,sort_position int)
       language sql as $$ select p.id,1,p.id,exists(select 1 from private.app_admins a where a.user_id=p.id),5000::bigint,1 from public.profiles p $$;

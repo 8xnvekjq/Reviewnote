@@ -132,6 +132,9 @@ revoke all on function public.set_pixel_base_appearance(text, text) from public,
 grant execute on function public.set_pixel_base_appearance(text, text) to authenticated;
 
 -- 대머리는 무료 기본 선택지다. 기존 유료 헤어 소유권 검증은 그대로 둔다.
+-- 상점 목록은 가격 > 0만 허용하므로, 무료 기본 선택지인 대머리 하나만 예외로 둔다(장비 표가 상점 목록을 참조).
+alter table public.pixel_item_catalog drop constraint if exists pixel_item_catalog_price_check;
+alter table public.pixel_item_catalog add constraint pixel_item_catalog_price_check check (price > 0 or item_id = 'hair_bald');
 insert into public.pixel_item_catalog(item_id,category,slot,price,asset_key,display_name,tier,stackable)
 values ('hair_bald','avatar','hair',0,'bald','대머리',1,false)
 on conflict (item_id) do update set price=0,asset_key='bald',display_name='대머리';
