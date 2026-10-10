@@ -1,3 +1,4 @@
+import { Dragonflies } from './dragonflies';
 // 모든 걸어 다니는 장면(앞마당·방, 다음은 광장·밭)의 공통 바탕. 플레이어 이동/충돌/달리기, 카메라 따라가기,
 // A 대상 "!" 표시, 탭해서 걷기, 따라오는 펫, 출구를 밟으면 화면을 어둡게 했다가 다음 장면으로 넘어가기까지
 // 여기서 한 번에 처리한다. 하위 장면은 drawWorld()로 그림만 그린다(어디가 막혔는지·출구·입구는
@@ -117,6 +118,7 @@ export interface WorldDebug {
 
 export abstract class WorldScene extends Phaser.Scene {
   private outdoorTint?: WorldTint;
+  private dragonflies?: Dragonflies;
   private tintClockMinute = -1;
   setWorldTime(phase: FishPhase, weather: FishWeather) { this.ctx.worldTime = { phase, weather, at: Date.now() }; this.outdoorTint?.set(phase, weather); }
   /** 지금 화면에 쓸 시각·날씨: 최근 서버 값, 없으면 같은 규칙의 클라이언트 시계. */
@@ -214,6 +216,7 @@ export abstract class WorldScene extends Phaser.Scene {
     this.feet = spawn.feet; this.facing = spawn.facing;
     this.ensureSharedTextures();
     this.drawWorld();
+    this.dragonflies = ['yard', 'plaza', 'river'].includes(this.spec.id) ? new Dragonflies(this, this.spec, this.spec.id) : undefined;
 
     this.shadow = this.add.ellipse(this.feet.x, this.feet.y, 14, 5, 0x453d29, 0.22);
     this.animalTag = createAnimalTag(this);
@@ -404,6 +407,7 @@ export abstract class WorldScene extends Phaser.Scene {
   }
 
   update(_time: number, deltaMs: number) {
+    this.dragonflies?.update(_time, deltaMs, this.feet, this.facing);
     const minute = Math.floor(Date.now() / 60000);
     if (minute !== this.tintClockMinute) {
       this.tintClockMinute = minute; const clock = this.worldClock(); this.outdoorTint?.set(clock.phase, clock.weather);

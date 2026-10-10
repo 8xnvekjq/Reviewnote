@@ -1,3 +1,4 @@
+import { dragonfliesFor } from './dragonflies';
 import { RIDING_RADIUS, PERSON_RADIUS } from '../logic/softCollision';
 import { createAnimalTag, updateAnimalTag, animalTagSnapshot, peerAnimalFace } from './animalTag';
 import { updatePeerCompanion, peerCompanionSnapshot } from './peerCompanion';
@@ -79,6 +80,7 @@ export class RiverPeers {
       const spot = spots.get(id);
       if (!spot || now - s.at >= SPARKLE_MS || this.fishing[id]?.sparkleAt !== s.at) { s.g.destroy(); this.sparkles.delete(id); }
     }
+    dragonfliesFor('river')?.setPeers(spots, this.selfId);
     this.bubbles.update(this.wantedBubbles, spots, faces);
   }
 

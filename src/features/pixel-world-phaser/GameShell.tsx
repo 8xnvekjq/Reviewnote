@@ -1,3 +1,8 @@
+import { useBugCatching } from './ui/useBugCatching';
+import type { NetSwingReporter } from './ui/useBugCatching';
+import type { BugAdapter } from './ui/bugAdapter';
+import { BugGame, BugResult } from './ui/BugGame';
+import { BugAlbum } from './ui/BugAlbum';
 import { userAnimalFace } from '../../utils/animalFace';
 import { useWorldClock } from './ui/useWorldClock';
 import { WorldWeatherPanel } from './ui/WorldWeatherPanel';
@@ -47,13 +52,14 @@ import type { ActivityPanel, FarmAdapter } from './ui/FarmPanels';
 import { useLevel, gainFrom } from './ui/useLevel';
 import { LevelBadge, LevelToast } from './ui/LevelBadge';
 import { LevelPanel } from './ui/LevelPanel';
-type ShellPanel = 'weather' | 'level' | PanelKind | PlazaPanel | ActivityPanel | 'furniture';
+type ShellPanel = 'bugs' | 'weather' | 'level' | PanelKind | PlazaPanel | ActivityPanel | 'furniture';
 
 export interface GameShellProps {
   face?: string;
   isAdmin?: boolean;
   panels?: PanelAdapter;
   fishingAdapter?: FishingAdapter;
+  bugAdapter?: BugAdapter;
   newFishSpeciesId?: string | null;
   /** 관리자 시험용 시각·날씨(?pwClock/?pwWeather) — 화면 색감용. 서버에는 어댑터가 따로 보낸다. */
   clockOverride?: FishingOverride;
@@ -118,7 +124,7 @@ async function leaveFullscreen() {
 }
 
 // 상위가 1초마다(밭 시계) 다시 그려져도, 넘겨받는 값이 같으면 셸은 다시 그리지 않는다.
-export const GameShell = memo(function GameShell({ isAdmin = false, appearance, pet, balance, beds, furniture, onSaveFurniture, onSceneChange, scarecrowLine, onExit, panels, farmAdapter, fishingAdapter, newFishSpeciesId, clockOverride, userId = 'guest', face }: GameShellProps) {
+export const GameShell = memo(function GameShell({ isAdmin = false, appearance, pet, balance, beds, furniture, onSaveFurniture, onSceneChange, scarecrowLine, onExit, panels, farmAdapter, fishingAdapter, bugAdapter, newFishSpeciesId, clockOverride, userId = 'guest', face }: GameShellProps) {
   useLayoutEffect(() => {
     let viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
     const created = !viewport;
@@ -166,10 +172,12 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
   const sceneRef = useRef(scene); sceneRef.current = scene;
   const [toast, setToast] = useState<SceneInfo | null>(null);
   const fishingFrozen = useRef(false);
+  const bugFrozen = useRef(false);
+  const swingReporter = useRef<NetSwingReporter | null>(null);
   const freezeFishing = useCallback((active: boolean) => {
     fishingFrozen.current = active;
     fishingRef.current.setReelX(0);
-    controls.frozen = active || editingRef.current || panelFrozen(panelRef.current, !!dialogueRef.current);
+    controls.frozen = active || bugFrozen.current || editingRef.current || panelFrozen(panelRef.current, !!dialogueRef.current);
     controls.stick = ZERO_STICK; controls.run = false;
     keys.current = { up: false, down: false, left: false, right: false };
     pointers.current.clear(); stickOrigin.current = null;
@@ -179,6 +187,17 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
   const riverReporter = useRef<RiverFishReporter | null>(null);
   const reportRiverFishing = useCallback<RiverFishReporter>(report => riverReporter.current?.(report), []);
   const fishing = useFishing({ adapter: fishingAdapter, handle: handle as RefObject<(WorldGameHandle & FishingHandle) | null>, scene: scene?.id ?? null, pet, freeze: freezeFishing, report: reportRiverFishing });
+  const freezeBugs = useCallback((active: boolean) => {
+    bugFrozen.current = active;
+    controls.frozen = active || fishingFrozen.current || editingRef.current || panelFrozen(panelRef.current, !!dialogueRef.current);
+    controls.stick = ZERO_STICK; controls.run = false;
+    keys.current = { up: false, down: false, left: false, right: false };
+    pointers.current.clear(); stickOrigin.current = null;
+    if (ring.current) ring.current.style.opacity = '0';
+  }, [controls]);
+  const reportSwing = useCallback<NetSwingReporter>(direction => swingReporter.current?.(direction), []);
+  const bugs = useBugCatching({ adapter: bugAdapter, scene: scene?.id ?? null, handle, freeze: freezeBugs, report: reportSwing });
+  const bugsRef = useRef(bugs); bugsRef.current = bugs;
   const level = useLevel(fishingAdapter, fishing.state);
   useEffect(() => { if (fishing.caught) level.onXp(gainFrom(fishing.caught)); }, [fishing.caught, level.onXp]);
   const fishingRef = useRef(fishing); fishingRef.current = fishing;
@@ -191,6 +210,9 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
   const [dialogue, setDialogue] = useState<Dialogue | null>(null);
   const dialogueRef = useRef(dialogue); dialogueRef.current = dialogue;
   const [panel, setPanel] = useState<ShellPanel | null>(null);
+  const refreshBugs = bugs.refresh, bugResult = bugs.result, onBugXp = level.onXp;
+  useEffect(() => { if (panel === null) void refreshBugs(); }, [panel, refreshBugs]);
+  useEffect(() => { if (bugResult?.ok && bugResult.caught) onBugXp(bugResult.xpGain); }, [bugResult, onBugXp]);
   const [placing, setPlacing] = useState<FurnitureType | null>(null);
   const [roomMessage, setRoomMessage] = useState('');
   const [roomPending, setRoomPending] = useState(false);
@@ -215,7 +237,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     handle.current?.setRoomPlacing(false);
     controls.stick = ZERO_STICK; controls.run = false;
     keys.current = { up: false, down: false, left: false, right: false };
-    controls.frozen = fishingFrozen.current || panelFrozen(panelRef.current, !!dialogueRef.current);
+    controls.frozen = fishingFrozen.current || bugFrozen.current || panelFrozen(panelRef.current, !!dialogueRef.current);
   };
   const saveRoomLayout = async (next: Placement[]) => {
     if (roomSaving.current || !onSaveFurniture) return;
@@ -242,13 +264,13 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
   const closePanel = useCallback(() => {
     if (panelRef.current === 'furniture' && roomSaving.current) return;
     panelRef.current = null; setPanel(null);
-    controls.frozen = fishingFrozen.current || editingRef.current || panelFrozen(null, !!dialogueRef.current);
+    controls.frozen = fishingFrozen.current || bugFrozen.current || editingRef.current || panelFrozen(null, !!dialogueRef.current);
     controls.stick = ZERO_STICK; controls.run = false;
     keys.current = { up: false, down: false, left: false, right: false };
   }, [controls]);
   const openPanel = (kind: ShellPanel) => {
     panelRef.current = kind; setPanel(kind);
-    controls.frozen = fishingFrozen.current || panelFrozen(kind, !!dialogueRef.current); controls.stick = ZERO_STICK; controls.run = false;
+    controls.frozen = fishingFrozen.current || bugFrozen.current || panelFrozen(kind, !!dialogueRef.current); controls.stick = ZERO_STICK; controls.run = false;
     pointers.current.clear(); stickOrigin.current = null;
     if (ring.current) ring.current.style.opacity = '0';
     handle.current?.cancelWalk();
@@ -396,7 +418,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
   }, [controls]);
   talkRef.current = id => { if (id === 'scarecrow') openPanel('scarecrow'); else openDialogue(id); };
   const closeDialogue = useCallback(() => {
-    controls.frozen = fishingFrozen.current || panelFrozen(panelRef.current, false); dialogueRef.current = null; setDialogue(null);
+    controls.frozen = fishingFrozen.current || bugFrozen.current || panelFrozen(panelRef.current, false); dialogueRef.current = null; setDialogue(null);
     controls.stick = ZERO_STICK; controls.run = false;
     keys.current = { up: false, down: false, left: false, right: false };
   }, [controls]);
@@ -423,8 +445,10 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
   }, [closeDialogue]);
   // 대화 중이면 다음 줄, 아니면 장면에 맡긴다(말 걸기 → onTalk, 문 → 장면 전환).
   const pressA = useCallback(() => {
+    if (bugFrozen.current) return;
     if (fishingRef.current.reel()) return;
     if (panelRef.current || editingRef.current) return;
+    if (!dialogueRef.current && bugsRef.current.nearby && (!promptRef.current || bugsRef.current.state?.netOwned)) { void bugsRef.current.start(); return; }
     if (!dialogueRef.current && !promptRef.current && sceneRef.current?.id === 'river' && handle.current?.beginCast()) return;
     if (dialogueRef.current) advance();
     // 물을 보며 A를 누르면 힘을 모으고, 놓으면 던진다.
@@ -435,6 +459,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     if (point) void fishingRef.current.castAt(point);
   }, []);
   const pressB = useCallback((down: boolean) => {
+    if (bugFrozen.current) { if (down) bugsRef.current.cancel(); return; }
     if (fishingFrozen.current) { if (down) fishingRef.current.cancel(); return; }
     if (editingRef.current) return;
     if (down && cancelTopWindow(root.current)) { controls.run = false; return; }
@@ -469,6 +494,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     if (fullscreenSupported() && !fullscreenElement() && root.current) void enterFullscreen(root.current, layoutRef.current.device === 'phone');
   };
   const onSurfaceDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (bugFrozen.current) return;
     if (fishingFrozen.current) {
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       event.preventDefault();
@@ -514,12 +540,12 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
       const origin = followOrigin(stickOrigin.current, point);
       stickOrigin.current = origin;
       const vector = stickVector(origin, point);
-      if (fishingFrozen.current) {
+      if (fishingFrozen.current || bugFrozen.current) {
         controls.stick = ZERO_STICK;
         fishingRef.current.setReelX(vector.x);
       } else controls.stick = vector;
       showStick(origin, point);
-    } else if (!fishingFrozen.current && role.kind === 'pen' && role.moved && performance.now() - role.at > 120) {
+    } else if (!fishingFrozen.current && !bugFrozen.current && role.kind === 'pen' && role.moved && performance.now() - role.at > 120) {
       // 펜으로 끌면 펜 끝을 계속 따라간다.
       role.at = performance.now();
       handle.current?.walkToScreen(point.x, point.y);
@@ -537,7 +563,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
       showStick(null);
     }
     // 조이스틱 영역이라도 짧게 콕 찍으면 그 자리로 걸어간다(탭해서 걷기).
-    if (!fishingFrozen.current && !cancelled && role.kind !== 'pen' && !role.moved && performance.now() - role.at < TAP_MS) {
+    if (!fishingFrozen.current && !bugFrozen.current && !cancelled && role.kind !== 'pen' && !role.moved && performance.now() - role.at < TAP_MS) {
       const point = framePoint(event);
       handle.current?.walkToScreen(point.x, point.y);
     }
@@ -561,17 +587,17 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
   // ── 키보드(데스크톱 테스트용) ──
   useEffect(() => {
     const map: Record<string, keyof typeof keys.current> = { ArrowUp: 'up', w: 'up', ArrowDown: 'down', s: 'down', ArrowLeft: 'left', a: 'left', ArrowRight: 'right', d: 'right' };
-    const sync = () => { if (fishingFrozen.current) { controls.stick = ZERO_STICK; return; } if (!stickOrigin.current) controls.stick = keyboardVector(keys.current); };
+    const sync = () => { if (fishingFrozen.current || bugFrozen.current) { controls.stick = ZERO_STICK; return; } if (!stickOrigin.current) controls.stick = keyboardVector(keys.current); };
     const down = (event: KeyboardEvent) => {
       const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
       if (editingRef.current) { if (map[event.key] || ['Shift', 'z', 'x'].includes(event.key)) event.preventDefault(); return; }
       if (key === 'Escape' || key === 'x') {
         event.preventDefault();
-        if (!event.repeat && fishingFrozen.current) { fishingRef.current.cancel(); return; }
+        if (!event.repeat && (fishingFrozen.current || bugFrozen.current)) { if (bugFrozen.current) bugsRef.current.cancel(); else fishingRef.current.cancel(); return; }
         if (!event.repeat) { if (!cancelTopWindow(root.current) && dialogueRef.current) closeDialogue(); }
         return;
       }
-      if (fishingFrozen.current || panelRef.current) return;
+      if (fishingFrozen.current || bugFrozen.current || panelRef.current) return;
       if (event.target instanceof HTMLElement && event.target.closest('button') && (event.key === 'Enter' || event.key === ' ')) return;
       if (event.altKey || event.ctrlKey || event.metaKey) return;
       const dir = map[key];
@@ -655,12 +681,14 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     </div>
     <div className="pwp-hud" style={{ left: hud.x, top: hud.y, width: hud.width, height: hud.height }}>
       <button type="button" className="pwp-chip pwp-exit" onClick={exit} aria-label="Pixel World 나가기">← 나가기</button>
+      <button type="button" className="pwp-chip" disabled={status !== 'ready' || fishing.busy || bugs.busy || !!placing} onClick={() => { void bugs.refresh(); openPanel('bugs'); }}>곤충 도감</button>
       {isAdmin && <button type="button" className="pwp-chip" disabled={status !== 'ready' || fishing.busy || !!placing || roomPending} onClick={() => openPanel('weather')}>🌤 날씨</button>}
       <span className="pwp-chip pwp-points" aria-label={`포인트 ${balance}`}><span className="pwp-coin" aria-hidden="true">P</span>{balance.toLocaleString()}</span>
       <span className="pwp-hud-spacer" />
       <button type="button" className="pwp-chip pwp-icon" aria-pressed={bgm.enabled} aria-label="소리" title={bgm.enabled ? '소리 끄기' : '소리 켜기'} onClick={bgm.toggle}><span aria-hidden="true">♪</span></button>
       {fullscreenSupported() && <button type="button" className="pwp-chip pwp-icon" aria-pressed={fullscreen} aria-label={fullscreen ? '전체화면 끄기' : '전체화면'} onClick={toggleFullscreen}>⛶</button>}
     </div>
+    {panel === 'bugs' && <BugAlbum state={bugs.state} onClose={closePanel} />}
     {isAdmin && panel === 'weather' && <WorldWeatherPanel adapter={fishingAdapter} clock={worldClock.clock} refresh={worldClock.refresh} onClose={closePanel} />}
     {!placing && !fishing.busy && !fishing.reelState && panel !== 'furniture' && <LevelBadge value={level} onClick={() => openPanel('level')} style={{ right: layout.width - hud.x - hud.width + 10, top: hud.y + hud.height + 8 }} />}
     {panel === 'level' && <LevelPanel value={level} onClose={closePanel} />}
@@ -672,19 +700,19 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     </div>}
     <button type="button" disabled={!!placing} className="pwp-btn pwp-btn-a" data-pressed={pressed.a} data-prompt={!!prompt || !!dialogue}
       style={{ left: a.x - a.size / 2, top: a.y - a.size / 2, width: a.size, height: a.size }}
-      aria-label={dialogue ? 'A ? 다음' : prompt ? `A ? ${promptLabel}` : fishing.canCast ? 'A ? 낚시하기' : 'A'}
+      aria-label={dialogue ? 'A · 다음' : bugs.nearby && bugs.state?.netOwned ? 'A · 잠자리채' : prompt ? `A · ${promptLabel}` : fishing.canCast ? 'A · 낚시하기' : 'A'}
       onPointerDown={buttonDown('a')} onPointerUp={buttonUp('a')} onPointerCancel={buttonUp('a')} onLostPointerCapture={buttonUp('a')}
       onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); if (!event.repeat) pressA(); } }}
       onKeyUp={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); releaseA(); } }}
       onClick={event => { if (event.detail === 0) { pressA(); releaseA(); } }}>
-      <b>A</b>{(prompt || dialogue || fishing.canCast) && <small>{dialogue ? '다음' : prompt ? promptLabel : '낚시하기'}</small>}
+      <b>A</b>{(prompt || dialogue || fishing.canCast || (bugs.nearby && bugs.state?.netOwned)) && <small>{dialogue ? '다음' : bugs.nearby && bugs.state?.netOwned ? '잠자리채' : prompt ? promptLabel : '낚시하기'}</small>}
     </button>
     <button type="button" disabled={!!placing} className="pwp-btn pwp-btn-b" data-pressed={pressed.b} data-closing={!!panel || !!dialogue}
       style={{ left: b.x - b.size / 2, top: b.y - b.size / 2, width: b.size, height: b.size }}
-      aria-label={panel || dialogue ? 'B · 닫기' : 'B · 누르는 동안 달리기'}
+      aria-label={panel || dialogue || bugs.busy || bugs.result ? 'B · 닫기' : 'B · 누르는 동안 달리기'}
       onPointerDown={buttonDown('b')} onPointerUp={buttonUp('b')} onPointerCancel={buttonUp('b')} onLostPointerCapture={buttonUp('b')}
-      onClick={event => { if (event.detail === 0 && (fishingFrozen.current || panelRef.current || dialogueRef.current || root.current?.querySelector('.pwp-chat-form'))) pressB(true); }}>
-      <b>B</b><small>{panel || dialogue ? '닫기' : '달리기'}</small>
+      onClick={event => { if (event.detail === 0 && (fishingFrozen.current || bugFrozen.current || panelRef.current || dialogueRef.current || root.current?.querySelector('.pwp-chat-form'))) pressB(true); }}>
+      <b>B</b><small>{panel || dialogue || bugs.busy || bugs.result ? '닫기' : '달리기'}</small>
     </button>
     {dialogue && <div className="pwp-panel-shade pwp-dialogue-shade" onPointerDown={event => {
       event.stopPropagation();
@@ -698,9 +726,9 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     </div></div>}
     {(panel === 'shop' || panel === 'wardrobe') && panels && <GamePanels kind={panel} adapter={panels} onClose={closePanel} />}
     {(panel === 'turtle' || panel === 'fishboard') && <FishingPanels key={panel} kind={panel} adapter={fishingAdapter} shop={panels} newSpeciesId={newFishSpeciesId ?? freshSpecies} onClose={() => { if (panel === 'turtle') setFreshSpecies(null); closePanel(); }} />}
-    {scene?.id === 'river' && status === 'ready' && <RiverBridge key={'river:' + scene.visit} handle={handle} appearance={appearance} face={animalFace} pet={pet} riding={riding} panel={panel} reporter={riverReporter} />}
-    {scene?.id === 'plaza' && status === 'ready' && <PlazaBridge key={'plaza:' + scene.visit} handle={handle} appearance={appearance} face={animalFace} pet={pet} riding={riding} userId={userId} panel={panel} onClose={closePanel} />}
-    {panel && panel !== 'weather' && panel !== 'level' && panel !== 'turtle' && panel !== 'fishboard' && panel !== 'furniture' && panel !== 'shop' && panel !== 'wardrobe' && panel !== 'contest' && panel !== 'well' && panel !== 'bench' && <FarmPanels key={panel} petId={pet} riding={riding} onRide={() => { closePanel(); handle.current?.toggleRide(); }} kind={panel} adapter={farmAdapter} onClose={closePanel}
+    {scene?.id === 'river' && status === 'ready' && <RiverBridge key={'river:' + scene.visit} handle={handle} appearance={appearance} face={animalFace} pet={pet} riding={riding} panel={panel} reporter={riverReporter} swingReporter={swingReporter} />}
+    {scene?.id === 'plaza' && status === 'ready' && <PlazaBridge key={'plaza:' + scene.visit} handle={handle} appearance={appearance} face={animalFace} pet={pet} riding={riding} userId={userId} panel={panel} onClose={closePanel} swingReporter={swingReporter} />}
+    {panel && panel !== 'bugs' && panel !== 'weather' && panel !== 'level' && panel !== 'turtle' && panel !== 'fishboard' && panel !== 'furniture' && panel !== 'shop' && panel !== 'wardrobe' && panel !== 'contest' && panel !== 'well' && panel !== 'bench' && <FarmPanels key={panel} petId={pet} riding={riding} onRide={() => { closePanel(); handle.current?.toggleRide(); }} kind={panel} adapter={farmAdapter} onClose={closePanel}
       onXp={level.onXp} onCollection={() => openPanel('collection')} onTalk={() => { closePanel(); openDialogue('scarecrow'); }}
       onPet={kind => { closePanel(); handle.current?.reactPet(kind); }} onFx={(index, action) => handle.current?.farmFx(index, action)} />}
     {panel === 'furniture' && panels && <FurniturePanel furniture={handle.current?.getFurniture() ?? furniture} shop={panels.shop}
@@ -713,6 +741,9 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     {!placing && panel !== 'furniture' && roomMessage && <div className="pwp-room-result" role="status">{roomMessage}</div>}
     {!placing && petMessage && <div className="pwp-pet-message" role="status" aria-live="polite">{petMessage}</div>}
     {!placing && panel !== 'furniture' && toast && <div key={toast.visit} className="pwp-toast" role="status" style={{ top: hud.y + hud.height + 6 }}>{toast.title}</div>}
+    {bugs.round && <BugGame key={bugs.round.catchId} {...bugs.round} onFinish={caught => { void bugs.finish(caught); }} onCancel={bugs.cancel} />}
+    {bugs.result && <BugResult result={bugs.result} onClose={bugs.hideResult} />}
+    {bugs.message && <div className="pwp-fishing-message" role="status">{bugs.message}</div>}
     {fishing.reelState && <ReelBar game={fishing.reelState} bait={fishing.bait} />}
     {fishing.caught && <CatchCard caught={fishing.caught} onHide={fishing.hideCatch} />}
     {fishing.message && <div className="pwp-fishing-message" role="status">{fishing.message}</div>}
