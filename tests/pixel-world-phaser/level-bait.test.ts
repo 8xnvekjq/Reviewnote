@@ -5,6 +5,7 @@ import { BAIT_CHARGES, BAIT_PRICE, FISH_XP, HARVEST_XP, MAX_LEVEL, TROPHY_XP, ha
 import { createFishingAdapter, parseBait, parseBuyBait, parseCastFinish, parseCastStart, parseFishingState, parsePlayerLevel } from '../../src/features/pixel-world-phaser/ui/fishingAdapter.ts';
 import { createMockFishingAdapter } from '../../src/features/pixel-world-phaser/ui/fishingAdapterMock.ts';
 import { FISH_CATALOG, RARITY_WEIGHT, fishById } from '../../src/features/pixel-world-phaser/logic/fishCatalog.ts';
+/** 잡동사니 확률(서버·모의 서버 모두 약 6%). */const JUNK_RATE = 0.06;
 
 const sql = readFileSync(new URL('../../supabase/migrations/supabase_pixel_level_bait.sql', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 const curve = /function pixel_private.level_for_xp\(p_xp integer\)([^]*?)end \$\$;/.exec(sql)![1];
@@ -32,7 +33,7 @@ test('SQL에서 읽은 레벨 곡선과 TS는 모든 경계와 최대 레벨 뒤
 });
 
 test('경험치 보상은 계약과 SQL을 따른다', () => {
-  assert.deepEqual(FISH_XP, { common: 5, uncommon: 10, rare: 25, legendary: 60 });
+  assert.deepEqual(FISH_XP, { common: 5, uncommon: 10, rare: 25, legendary: 60, mythic: 120 });
   assert.equal(TROPHY_XP, 15); assert.equal(HARVEST_XP, 40);
   assert.match(sql, /case s.rarity when 'common' then 5 when 'uncommon' then 10 when 'rare' then 25 else 60 end/);
   assert.match(sql, /case when k.trophy then 15 else 0 end/);
@@ -81,10 +82,11 @@ test('모의 서버는 성공한 물고기와 대물에 한 번만 경험치를 
     let now = Date.UTC(2026, 9, 8, 3);
     const mock = createMockFishingAdapter({ seed, xp: 49, now: () => now, override: { clock: '12:00', weather: 'clear' } });
     const start = await mock.start(null); assert.ok(start.ok);
-    const p = mock.peek()!, fish = fishById(p.speciesId)!;
+    const p = mock.peek()!;
     now += 20_000;
     const result = await mock.finish(start.castId, true); assert.ok(result.ok && result.landed);
-    const gained = FISH_XP[fish.rarity] + (p.trophy ? TROPHY_XP : 0);
+    // 잡동사니(2026-10 낚시 확장)는 경험치 1.
+    const gained = start.junk ? 1 : FISH_XP[fishById(p.speciesId!)!.rarity] + (p.trophy ? TROPHY_XP : 0);
     assert.deepEqual(result.xpGain, { gained, xp: 49 + gained, level: levelForXp(49 + gained).level, leveledUp: true });
     assert.deepEqual(await mock.finish(start.castId, true), { ok: false });
     assert.equal((await mock.getLevel()).xp, 49 + gained);
@@ -95,26 +97,28 @@ test('미끼 유무별 10,000회 캐스트의 어려운 굴림 분포와 소비�
   const counts: number[] = [];
   const valid = FISH_CATALOG.filter(f => (f.phases === 'any' || f.phases.includes('night')) && (f.weather === 'any' || f.weather.includes('clear')));
   const totalWeight = valid.reduce((sum, f) => sum + RARITY_WEIGHT[f.rarity], 0);
-  const hardWeight = valid.filter(f => f.rarity === 'rare' || f.rarity === 'legendary').reduce((sum, f) => sum + RARITY_WEIGHT[f.rarity], 0);
+  const hardWeight = valid.filter(f => f.rarity === 'rare' || f.rarity === 'legendary' || f.rarity === 'mythic').reduce((sum, f) => sum + RARITY_WEIGHT[f.rarity], 0);
   for (const baitCharges of [0, 10000]) {
     let now = Date.UTC(2026, 9, 8, 3), hard = 0, rareFish = 0;
     const mock = createMockFishingAdapter({ seed: 1234, baitCharges, now: () => now, override: { clock: '22:00', weather: 'clear' } });
     for (let i = 0; i < 10000; i++) {
       const start = await mock.start(null); assert.ok(start.ok);
       if (mock.peek()!.hard) hard++;
-      if (['rare', 'legendary'].includes(fishById(mock.peek()!.speciesId)!.rarity)) rareFish++;
+      if (!start.junk && ['rare', 'legendary', 'mythic'].includes(fishById(mock.peek()!.speciesId!)!.rarity)) rareFish++;
       assert.deepEqual(start.bait, { used: baitCharges > 0, charges: Math.max(0, baitCharges - i - 1) });
       await mock.finish(start.castId, false); now += 3000;
     }
     assert.equal((await mock.state()).bait?.charges, 0);
     const chance = baitCharges > 0 ? 0.3 : 0.15;
-    const expectedRare = chance + (1 - chance) * hardWeight / totalWeight;
+    // 잡동사니(약 6%)가 먼저 굴려지고, 나머지에서 어려운 굴림·일반 굴림을 한다.
+    const expectedRare = (1 - JUNK_RATE) * (chance + (1 - chance) * hardWeight / totalWeight);
     assert.ok(Math.abs(rareFish / 10000 - expectedRare) < 0.02, `rare ${rareFish}, expected ${expectedRare}`);
     t.diagnostic(`bait=${baitCharges > 0}: hard rolls=${hard}/10000, rare/legendary fish=${rareFish}/10000`);
     counts.push(hard);
   }
-  assert.ok(counts[0] > 1400 && counts[0] < 1600, String(counts));
-  assert.ok(counts[1] > 2850 && counts[1] < 3150, String(counts));
+  // 잡동사니가 걸린 던지기(약 6%)는 어려운 굴림을 하지 않는다: 15%·30% × 0.94.
+  assert.ok(Math.abs(counts[0] - 10000 * 0.15 * (1 - JUNK_RATE)) < 110, String(counts));
+  assert.ok(Math.abs(counts[1] - 10000 * 0.30 * (1 - JUNK_RATE)) < 150, String(counts));
 });
 
 test('어댑터는 추가 필드를 검증하고 구형 응답·잘못된 값·RPC 실패도 처리한다', async () => {

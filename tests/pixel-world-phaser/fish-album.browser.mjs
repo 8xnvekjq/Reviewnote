@@ -14,11 +14,11 @@ try {
       await page.goto(`${base}/tests/pixel-world-phaser/fish-album.harness.html`);
       await page.getByRole('button', { name: '거북이', exact: true }).click();
       await page.locator('.pwp-fish-slot').last().waitFor();
-      assert.equal(await page.locator('.pwp-fish-slot').count(), 12);
+      assert.equal(await page.locator('.pwp-fish-slot').count(), 14); // 상어·고래 추가(2026-10)
       assert.equal(await page.locator('[data-caught=true]').count(), 4);
-      assert.equal(await page.locator('.is-silhouette').count(), 8);
+      assert.equal(await page.locator('.is-silhouette').count(), 10);
       assert.match(await page.locator('.pwp-turtle-lines').textContent(), /새 친구.*비둘기/s);
-      assert.match(await page.locator('.pwp-fish-progress').textContent(), /9\/12/);
+      assert.match(await page.locator('.pwp-fish-progress').textContent(), /9\/14/);
       const checkBounds = async () => {
         const box = await page.getByRole('dialog').boundingBox();
         assert.ok(box.x >= 0 && box.y >= 0 && box.x + box.width <= viewport.width && box.y + box.height <= viewport.height);
@@ -35,7 +35,7 @@ try {
       assert.equal(await page.getByRole('img', { name: '익명 동물 얼굴' }).count(), 9);
       // 선생님 기록은 학사모 대신 선생님 동물(🦍)로 보인다('선생님' 글자 없음). 순위는 1위부터.
       assert.equal(await page.locator('.pwp-fish-board li[data-teacher="true"]').getByRole('img', { name: '선생님' }).textContent(), '🦍');
-      assert.match(await page.locator('.pwp-fish-board li[data-teacher="true"] strong').textContent(), /^\d+위 \S+$/);
+      assert.match(await page.locator('.pwp-fish-board li[data-teacher="true"] strong').textContent(), /^\d+위 \S+ ★+$/); // 이름 뒤에 별(희귀도)
       assert.match(await page.locator('.pwp-fish-board li').first().locator('strong').textContent(), /^1위 /);
       await page.evaluate(async () => {
         const { fishBoardFace, fishRelativeTime } = await import('/src/features/pixel-world-phaser/ui/FishBoard.tsx');

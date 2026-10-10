@@ -9,7 +9,8 @@ export async function trackReel(page, pointerType = 'keyboard', onFrame = async 
   assert.ok(box, 'joystick input area is available');
   const cx = box.x + (movementStick ? Math.min(100, box.width / 2) : box.width / 2);
   const cy = movementStick ? box.y + box.height - 110 : box.y + box.height / 2;
-  const tapX = page.viewportSize().width * .75;
+  // 실제 게임은 왼쪽이 이동 조이스틱이라 오른쪽을 톡톡, 단독 낚시 화면(probe)은 예전처럼 왼쪽 끝(게임 영역 안).
+  const tapX = movementStick ? page.viewportSize().width * .75 : 20;
   const touch = pointerType === 'touch' ? await page.context().newCDPSession(page) : null;
   let stickX = cx;
   const point = () => ({ x: stickX, y: cy, id: 1 });
@@ -37,7 +38,8 @@ export async function trackReel(page, pointerType = 'keyboard', onFrame = async 
         if (pointerType === 'keyboard') await page.keyboard.press('Space');
         else if (touch) {
           await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point(), { x: tapX, y: 300, id: 2 }] });
-          await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [point()] });
+          // touchEnd의 touchPoints는 '떼는' 손가락 — 톡톡 손가락(id 2)만 떼고 조이스틱 손가락은 그대로 둔다.
+          await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [{ x: tapX, y: 300, id: 2 }] });
         }
         else {
           await page.locator('.pwp-root').dispatchEvent('pointerdown', { pointerId: 91, pointerType, button: 0, bubbles: true, cancelable: true });
@@ -57,7 +59,8 @@ export async function trackReel(page, pointerType = 'keyboard', onFrame = async 
 export async function assertReelLayout(page) {
   await assertDifficultyHidden(page);
   const circle = await page.locator('.pwp-reel-track').boundingBox();
-  const movementZone = await page.locator('.pwp-movement-stick-zone').boundingBox();
+  // 단독 낚시 화면(probe)엔 이동 조이스틱 영역이 없다 — 없으면 기다리지 않고 예전 릴 조이스틱을 본다.
+  const movementZone = await page.locator('.pwp-movement-stick-zone').count() ? await page.locator('.pwp-movement-stick-zone').boundingBox() : null;
   const stick = movementZone
     ? { x: movementZone.x + Math.min(100, movementZone.width / 2) - 56, y: movementZone.y + movementZone.height - 166, width: 112, height: 112 }
     : await page.locator('.pwp-reel-stick').boundingBox();

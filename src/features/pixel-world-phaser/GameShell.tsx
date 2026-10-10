@@ -184,7 +184,8 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
   const fishingRef = useRef(fishing); fishingRef.current = fishing;
   // 방금 처음 잡은 물고기 — 거북이가 도감을 열 때 "새 친구" 인사를 한다. 도감을 한 번 닫으면 잊는다.
   const [freshSpecies, setFreshSpecies] = useState<string | null>(null);
-  const caughtNew = fishing.caught?.isNew ? fishing.caught.speciesId : null;
+  // 잡동사니는 도감에 들어가지 않는다.
+  const caughtNew = fishing.caught && !('junk' in fishing.caught) && fishing.caught.isNew ? fishing.caught.speciesId : null;
   useEffect(() => { if (caughtNew) setFreshSpecies(caughtNew); }, [caughtNew]);
   const promptRef = useRef(prompt); promptRef.current = prompt;
   const [dialogue, setDialogue] = useState<Dialogue | null>(null);
