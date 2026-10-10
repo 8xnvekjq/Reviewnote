@@ -28,3 +28,21 @@
   .pwp-fish-board li { grid-template-columns:32px 48px minmax(0,1fr) auto; gap:6px; padding:8px 4px; }
   .pwp-fish-board time { grid-column:3 / 5; }
 }
+/* 별 등급 챔피언과 크기 점수는 화면 폭에 맞춰 두 줄로 정돈한다. */
+.pwp-fish-champions { margin-bottom:20px; min-width:0; }
+.pwp-fish-champions h3 { margin:0 0 6px; }
+.pwp-fish-weekly-note { font-size:12px; line-height:1.6; }
+.pwp-fish-champions ol { list-style:none; padding:0; margin:0; display:grid; gap:8px; }
+.pwp-fish-champions li { display:grid; grid-template-columns:100px 40px 48px minmax(0,1fr) auto; gap:8px; align-items:center; padding:10px; border:2px solid #bb9560; background:#fff5db; }
+.pwp-fish-prize { grid-column:4 / 6; font-weight:700; color:#785322; }
+.pwp-fish-champions strong, .pwp-fish-board strong { min-width:0; overflow-wrap:anywhere; }
+.pwp-fish-length small { display:block; font-size:12px; color:#625d50; }
+.pwp-catch-card .pwp-catch-points { line-height:1.5; }
+.pwp-catch-card > .pwp-xp-gain { grid-column:1 / -1; }
+.pwp-catch-points span { display:block; }
+@media(max-width:600px) {
+  .pwp-fish-champions li { grid-template-columns:32px 48px minmax(0,1fr) auto; gap:6px; padding:8px 4px; }
+  .pwp-fish-champions .pwp-fish-stars { grid-column:1 / -1; }
+  .pwp-fish-champions .pwp-fish-prize { grid-column:3 / 5; font-size:12px; }
+  .pwp-fish-board .pwp-fish-stars { display:block; }
+}

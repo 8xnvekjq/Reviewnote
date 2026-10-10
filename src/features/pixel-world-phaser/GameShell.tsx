@@ -41,6 +41,8 @@ import { useFishing } from './ui/useFishing';
 import type { FishingHandle } from './ui/useFishing';
 import { ReelBar } from './ui/ReelBar';
 import { CatchCard } from './ui/CatchCard';
+import { WeeklyRewards } from './ui/WeeklyRewards';
+import type { RewardsAdapter } from './logic/gamePoints';
 
 import { FarmPanels } from './ui/FarmPanels';
 import type { ActivityPanel, FarmAdapter } from './ui/FarmPanels';
@@ -54,6 +56,7 @@ export interface GameShellProps {
   isAdmin?: boolean;
   panels?: PanelAdapter;
   fishingAdapter?: FishingAdapter;
+  rewardsAdapter?: RewardsAdapter;
   newFishSpeciesId?: string | null;
   /** 관리자 시험용 시각·날씨(?pwClock/?pwWeather) — 화면 색감용. 서버에는 어댑터가 따로 보낸다. */
   clockOverride?: FishingOverride;
@@ -118,7 +121,7 @@ async function leaveFullscreen() {
 }
 
 // 상위가 1초마다(밭 시계) 다시 그려져도, 넘겨받는 값이 같으면 셸은 다시 그리지 않는다.
-export const GameShell = memo(function GameShell({ isAdmin = false, appearance, pet, balance, beds, furniture, onSaveFurniture, onSceneChange, scarecrowLine, onExit, panels, farmAdapter, fishingAdapter, newFishSpeciesId, clockOverride, userId = 'guest', face }: GameShellProps) {
+export const GameShell = memo(function GameShell({ isAdmin = false, appearance, pet, balance, beds, furniture, onSaveFurniture, onSceneChange, scarecrowLine, onExit, panels, farmAdapter, fishingAdapter, rewardsAdapter, newFishSpeciesId, clockOverride, userId = 'guest', face }: GameShellProps) {
   useLayoutEffect(() => {
     let viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
     const created = !viewport;
@@ -715,6 +718,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     {!placing && panel !== 'furniture' && toast && <div key={toast.visit} className="pwp-toast" role="status" style={{ top: hud.y + hud.height + 6 }}>{toast.title}</div>}
     {fishing.reelState && <ReelBar game={fishing.reelState} bait={fishing.bait} />}
     {fishing.caught && <CatchCard caught={fishing.caught} onHide={fishing.hideCatch} />}
+    <WeeklyRewards ready={status === 'ready'} rewards={rewardsAdapter} />
     {fishing.message && <div className="pwp-fishing-message" role="status">{fishing.message}</div>}
     {status !== 'ready' && <div className="pwp-loading" role="status">
       {status === 'loading' ? '앞마당으로 가는 중…' : <>게임을 시작하지 못했어요.<button type="button" className="pwp-chip" onClick={exit}>돌아가기</button></>}
