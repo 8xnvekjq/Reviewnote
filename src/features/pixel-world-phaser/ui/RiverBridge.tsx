@@ -22,9 +22,9 @@ import {
 import type { FishBucket, RiverFishEvent, RiverFishReporter } from '../logic/riverPresence';
 import { PlazaChat } from './PlazaChat';
 
-export function RiverBridge({ handle, appearance, pet, riding, face, panel, reporter, swingReporter }: {
+export function RiverBridge({ handle, appearance, pet, riding, face, tool, panel, reporter, swingReporter }: {
   swingReporter: SwingRef<NetSwingReporter | null>;
-  handle: RefObject<WorldGameHandle | null>; appearance: PublicAvatarAppearance; pet: PetId | null; riding: boolean; face?: string; panel: string | null;
+  handle: RefObject<WorldGameHandle | null>; appearance: PublicAvatarAppearance; pet: PetId | null; riding: boolean; face?: string; /** 손에 든 도구 표시(친구 화면에 그린다). */ tool?: string; panel: string | null;
   /** useFishing의 낚시 보고가 들어오는 자리. 마운트 동안만 채운다. */
   reporter: MutableRefObject<RiverFishReporter | null>;
 }) {
@@ -64,13 +64,13 @@ export function RiverBridge({ handle, appearance, pet, riding, face, panel, repo
     const update = () => {
       const d = handle.current?.debug();
       if (!d || d.scene !== 'river' || d.transitioning) return;
-      const state = { ...riverPayload(d), direction: d.facing, moving: d.moving, pet, face, riding: d.riding };
+      const state = { ...riverPayload(d), direction: d.facing, moving: d.moving, pet, face, riding: d.riding, ...(tool ? { tool } : {}) };
       const key = JSON.stringify(state);
       if (key !== last) { updateMyState(state); last = key; }
     };
     update(); const timer = window.setInterval(update, 170);
     return () => window.clearInterval(timer);
-  }, [handle, updateMyState, pet, riding, face]);
+  }, [handle, updateMyState, pet, riding, face, tool]);
 
   // 내 낚시 보고 → (찌 좌표를 붙여) 친구들에게. 몰아서 오면 마지막 상태만 조금 뒤에 보낸다(토큰 통).
   const seq = useRef(0);

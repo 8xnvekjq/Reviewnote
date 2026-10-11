@@ -63,6 +63,8 @@ export class Dragonflies {
       return next;
     });
   }
+  /** 지금 날고 있는 잠자리 위치(디버그·시험용). */
+  get positions(): Point[] { return this.bugs.flatMap(b => b.position ? [{ ...b.position }] : []); }
   get nearby() { return this.bugs.some(b => b.position && Math.hypot(b.position.x - this.feet.x, b.position.y - this.feet.y) <= 24); }
   swing(): Facing {
     this.swungIndex = this.bugs.findIndex(b => b.position && Math.hypot(b.position.x - this.feet.x, b.position.y - this.feet.y) <= 24);

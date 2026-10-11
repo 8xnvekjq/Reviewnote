@@ -17,7 +17,8 @@ import type { Placement } from '../../src/features/pixel-room/model';
 import type { FishingAdapter } from '../../src/features/pixel-world-phaser/ui/fishingAdapter';
 import { createMockFishingAdapter } from '../../src/features/pixel-world-phaser/ui/fishingAdapterMock';
 import { parseClockOverride } from '../../src/features/pixel-world-phaser/logic/worldClock';
-import type { Bag } from '../../src/features/pixel-world-phaser/logic/bag';
+import { DEFAULT_HAND, type Bag } from '../../src/features/pixel-world-phaser/logic/bag';
+import { createMockBugAdapter } from '../../src/features/pixel-world-phaser/ui/bugAdapter';
 
 const params = new URLSearchParams(location.search);
 const appearance: PublicAvatarAppearance = {
@@ -50,6 +51,8 @@ function Harness() {
     if (params.get('fishingBudget') === '0') return { ...adapter, state: async () => ({ ...await adapter.state(), remaining: 0, sparkleShadow: null }) };
     return adapter;
   }, []);
+  // 잠자리: ?bugs=1 이면 모의 어댑터(잠자리채 보유). ?bugSeed= 로 어떤 잠자리가 걸릴지 정한다.
+  const bugAdapter = useMemo(() => params.has('bugs') ? createMockBugAdapter({ netOwned: true, seed: Number(params.get('bugSeed') ?? '42') }) : undefined, []);
   const [roomLayout, setRoomLayout] = useState<readonly Placement[]>(furniture);
   const [snapshot, setSnapshot] = useState<FarmSnapshot>({ serverNow: new Date(farmNow).toISOString(), today: '2026-10-08', harvestCount: 0, bestSize: null, lastHarvestSize: null,
     plots: [{ index: 0, revision: 1, crop: { id: 'ripe', plantedAt: '2026-10-01T00:00:00Z', readyAt: '2026-10-05T00:00:00Z', lastWateredOn: '2026-10-03', careCount: 3, reviewGained: 0 } }, { index: 1, revision: 1, crop: null }] });
@@ -87,9 +90,11 @@ function Harness() {
     if (extra > 0) items.push({ kind: 'fish', ref: 'pirami', qty: extra, unitWeight: 1, unitPoints: 1 });
     const crops: Bag['crops'] = [{ id: 'crop-1', sizeScore: 82, unitWeight: 1.5 }];
     const weight = items.reduce((n, i) => n + i.qty * i.unitWeight, 0) + crops.length * 1.5;
-    return { capacity: 20, weight: Math.round(weight * 100) / 100, items, crops };
+    // 손 칸(?hand=net|bare|rod, ?net=1이면 잠자리채 보유, 황금 낚싯대는 늘 보유).
+    const hand = params.get('hand') === 'net' || params.get('hand') === 'bare' ? params.get('hand') as 'net' | 'bare' : 'rod';
+    return { capacity: 20, weight: Math.round(weight * 100) / 100, items, crops, ...DEFAULT_HAND, hand, netOwned: params.has('net'), rods: ['rod_gold'] };
   });
-  const reweigh = (next: Omit<Bag, 'weight'>): Bag => ({ ...next, weight: Math.round((next.items.reduce((n, i) => n + i.qty * i.unitWeight, 0) + next.crops.length * 1.5) * 100) / 100 });
+  const reweigh = (next: Pick<Bag, 'capacity' | 'items' | 'crops'>): Bag => ({ ...bag, ...next, weight: Math.round((next.items.reduce((n, i) => n + i.qty * i.unitWeight, 0) + next.crops.length * 1.5) * 100) / 100 });
   const bagState: NonNullable<PanelAdapter['bag']> = { bag, busy: false, refresh: async () => {},
     sell: async items => {
       let sold = 0, value = 0;
@@ -98,6 +103,13 @@ function Harness() {
       const next = reweigh({ capacity: bag.capacity, items: left, crops: bag.crops });
       setBag(next); setBalance(v => v + value);
       return sold ? { ok: true as const, sold, value, awarded: value, bag: next } : { ok: false as const, message: '팔 물건이 없어요.', bag: next };
+    },
+    equip: async id => {
+      if (id === 'tool_net' && !bag.netOwned) return { ok: false as const, message: '아직 가지고 있지 않아요.' };
+      const next = { hand: id === null ? 'bare' as const : id === 'tool_net' ? 'net' as const : 'rod' as const,
+        rod: id && id.startsWith('rod_') ? { id: id === 'rod_basic' ? null : id, tier: id === 'rod_gold' ? 4 : 0 } : bag.rod, netOwned: bag.netOwned, rods: bag.rods };
+      setBag(current => ({ ...current, ...next }));
+      return { ok: true as const, ...next };
     },
     submitCrop: async id => { setBag(current => reweigh({ capacity: current.capacity, items: current.items, crops: current.crops.filter(c => c.id !== id) })); setBalance(v => v + 43); return { ok: true, cropId: id, rewardPoints: 43, submittedAt: new Date().toISOString(), status: 'submitted' }; },
   };
@@ -129,7 +141,7 @@ function Harness() {
   return open
     ? params.has('saved')
       ? <PixelWorldPhaser userId="scene-test-user" pointsBalance={balance} onPixelPurchase={setBalance} onPointsReward={reward => setBalance(value => value + reward)} onExit={() => setOpen(false)} />
-      : <GameShell userId={params.get('user') ?? 'guest'} face={params.get('face') ?? undefined} isAdmin={params.has('admin')} fishingAdapter={fishingAdapter} clockOverride={clockOverride} appearance={look} pet={active} balance={balance} panels={adapter} farmAdapter={params.has('farm') ? farmAdapter : undefined} beds={params.has('farm') ? farmBeds : [...beds]} furniture={roomLayout} onSaveFurniture={async layout => { await new Promise(resolve => setTimeout(resolve, 100)); if (params.has('roomSaveError')) throw new Error('저장하지 못했어요. 다시 시도해 주세요.'); setRoomLayout(layout); }} scarecrowLine={() => pickScarecrowLine(null, Date.now())} onExit={() => setOpen(false)} />
+      : <GameShell userId={params.get('user') ?? 'guest'} face={params.get('face') ?? undefined} isAdmin={params.has('admin')} fishingAdapter={fishingAdapter} bugAdapter={bugAdapter} clockOverride={clockOverride} appearance={look} pet={active} balance={balance} panels={adapter} farmAdapter={params.has('farm') ? farmAdapter : undefined} beds={params.has('farm') ? farmBeds : [...beds]} furniture={roomLayout} onSaveFurniture={async layout => { await new Promise(resolve => setTimeout(resolve, 100)); if (params.has('roomSaveError')) throw new Error('저장하지 못했어요. 다시 시도해 주세요.'); setRoomLayout(layout); }} scarecrowLine={() => pickScarecrowLine(null, Date.now())} onExit={() => setOpen(false)} />
     : <main style={{ padding: 24 }}><p data-testid="exited">게임에서 나왔어요.</p><button type="button" onClick={() => setOpen(true)}>다시 들어가기</button></main>;
 }
 createRoot(document.getElementById('root')!).render(<Harness />);

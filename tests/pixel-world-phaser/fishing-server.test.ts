@@ -528,7 +528,9 @@ test('v4 어댑터: rod·speed·trophy는 덧붙이기만, 방어적으로 읽�
   assert.ok(v4.ok); assert.deepEqual([v4.rod, v4.speed, v4.trophy], [{ id: 'rod_gold', tier: 4 }, 1.35, true]);
   const weird = parseCastStart({ ok: true, castId: 'c', shadow: 'S', biteDelayMs: 900, rod: { id: 'rod_laser', tier: 9 }, speed: 50, trophy: 'yes' });
   assert.ok(weird.ok); assert.deepEqual([weird.rod, weird.speed, weird.trophy], [{ id: null, tier: 0 }, 2, undefined]);
-  const slow = parseCastStart({ ok: true, castId: 'c', shadow: 'S', biteDelayMs: 900, speed: 0.1 }); assert.ok(slow.ok && slow.speed === 1);
+  const slow = parseCastStart({ ok: true, castId: 'c', shadow: 'S', biteDelayMs: 900, speed: 0.1 }); assert.ok(slow.ok && slow.speed === 0.5);
+  // 맨손 낚시는 서버가 0.8을 준다 — 서버 최소 릴 시간과 맞게 그대로 받는다.
+  const bare = parseCastStart({ ok: true, castId: 'c', shadow: 'S', biteDelayMs: 900, speed: 0.8 }); assert.ok(bare.ok && bare.speed === 0.8);
   // 서버가 tier를 잘못 보내도 카탈로그 tier를 믿는다.
   assert.deepEqual(parseFishingState({ rod: { id: 'rod_steel', tier: 99 } }).rod, { id: 'rod_steel', tier: 2 });
   assert.deepEqual(parseFishingState({}).rod, { id: null, tier: 0 });

@@ -3,12 +3,15 @@ import type { RefObject } from 'react';
 import type { BugAdapter, BugFinish, BugStart, BugState } from './bugAdapter';
 import type { Facing } from '../logic/joystick';
 import { dragonfliesFor } from '../game/dragonflies';
+import type { Hand } from '../logic/bag';
+import { BUG_AUTO_CATCH_STARS } from '../logic/bugCatalog';
 
 export type NetSwingReporter = (direction: Facing) => void;
 type Round = Extract<BugStart, { ok: true }>;
-export function useBugCatching({ adapter, scene, handle, freeze, report }: {
+/** hand: 손 칸. 잠자리채('net')를 들었을 때만 잡는다. 별 BUG_AUTO_CATCH_STARS 이하는 미니게임 없이 바로 잡힌다. */
+export function useBugCatching({ adapter, scene, handle, freeze, report, hand = 'net' }: {
   adapter?: BugAdapter; scene: string | null; handle: RefObject<{ cancelWalk(): void; dismount?(): void } | null>;
-  freeze(active: boolean): void; report: NetSwingReporter;
+  freeze(active: boolean): void; report: NetSwingReporter; hand?: Hand;
 }) {
   const [state, setState] = useState<BugState | null>(null);
   const [round, setRound] = useState<Round | null>(null);
@@ -60,6 +63,7 @@ export function useBugCatching({ adapter, scene, handle, freeze, report }: {
     const flies = dragonfliesFor(where);
     if (locked.current || !flies?.nearby) return;
     if (!state?.netOwned) { setMessage('광장 상점에서 잠자리채를 사 보세요'); return; }
+    if (hand !== 'net') { setMessage('가방에서 잠자리채를 손에 들어 보세요'); return; }
     if (!current) { setMessage('곤충 잡기를 준비하고 있어요.'); return; }
     locked.current = true; setBusy(true); setResult(null); setMessage('');
     latest.current.handle.current?.dismount?.(); latest.current.handle.current?.cancelWalk();
@@ -72,16 +76,20 @@ export function useBugCatching({ adapter, scene, handle, freeze, report }: {
         if (value.ok) await current.finish(value.catchId, false);
         return;
       }
-      if (value.ok) { pending.current = { adapter: current, round: value, scene: where, started: performance.now() }; setRound(value); }
+      if (value.ok) {
+        pending.current = { adapter: current, round: value, scene: where, started: performance.now() };
+        // 쉬운 잠자리(별1~2)는 휘두르면 바로 잡힌다(서버 최소 시간 0.6초는 finish가 지킨다).
+        if (value.difficulty <= BUG_AUTO_CATCH_STARS) void finish(true); else setRound(value);
+      }
       else {
         locked.current = false; setBusy(false); latest.current.freeze(false);
-        setMessage(value.reason === 'no_net' ? '광장 상점에서 잠자리채를 사 보세요' : '잠시 후 다시 시도해 주세요.');
+        setMessage(value.reason === 'no_net' ? '광장 상점에서 잠자리채를 사 보세요' : value.reason === 'net_not_equipped' ? '가방에서 잠자리채를 손에 들어 보세요' : '잠시 후 다시 시도해 주세요.');
         void refresh();
       }
     } catch {
       if (mounted.current && generation === epoch.current) { locked.current = false; setBusy(false); latest.current.freeze(false); setMessage('곤충 잡기를 시작하지 못했어요.'); }
     }
-  }, [state?.netOwned, refresh]);
+  }, [state?.netOwned, hand, refresh, finish]);
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -102,5 +110,6 @@ export function useBugCatching({ adapter, scene, handle, freeze, report }: {
   }, [adapter, scene, refresh]);
   useEffect(() => { if (!message) return; const timer = setTimeout(() => setMessage(''), 3500); return () => clearTimeout(timer); }, [message]);
   const hideResult = useCallback(() => { resultOpen.current = false; setResult(null); latest.current.freeze(false); }, []);
-  return { state, round, result, busy, nearby, start, finish, cancel, refresh, hideResult, message };
+  const notify = useCallback((text: string) => setMessage(text), []);
+  return { state, round, result, busy, nearby, start, finish, cancel, refresh, hideResult, message, notify };
 }

@@ -1,4 +1,5 @@
 import { dragonfliesFor } from './dragonflies';
+import { HeldTool, updatePeerTool } from './heldTool';
 import { RIDING_RADIUS, PERSON_RADIUS } from '../logic/softCollision';
 import { createAnimalTag, updateAnimalTag, animalTagSnapshot, peerAnimalFace } from './animalTag';
 import { updatePeerCompanion, peerCompanionSnapshot } from './peerCompanion';
@@ -17,7 +18,7 @@ import type { PlazaBubble } from './plazaBubbles';
 import { WorldScene } from './WorldScene';
 import type { WorldContext } from './WorldScene';
 
-type Friend = { tag?: Phaser.GameObjects.Text; follow?: PetFollowState; sprite?: Phaser.GameObjects.Sprite; pet?: Phaser.GameObjects.Sprite; look: string; petId: string | null; loading: boolean; state: PlazaPlayerState };
+type Friend = { tool?: HeldTool; tag?: Phaser.GameObjects.Text; follow?: PetFollowState; sprite?: Phaser.GameObjects.Sprite; pet?: Phaser.GameObjects.Sprite; look: string; petId: string | null; loading: boolean; state: PlazaPlayerState };
 export class PlazaScene extends WorldScene {
   protected readonly background = '#5d8a4a';
   private friends = new Map<string, Friend>();
@@ -88,7 +89,7 @@ export class PlazaScene extends WorldScene {
   setClassmates(players: PlazaPlayerState[], bubbles: Record<string, PlazaBubble>, selfId: string) {
     this.wantedBubbles = bubbles; this.selfId = selfId;
     const ids = new Set(players.map(p => p.sessionId));
-    for (const [id, f] of this.friends) if (!ids.has(id)) { f.tag?.destroy(); f.sprite?.destroy(); f.pet?.destroy(); this.friends.delete(id); }
+    for (const [id, f] of this.friends) if (!ids.has(id)) { f.tool?.destroy(); f.tag?.destroy(); f.sprite?.destroy(); f.pet?.destroy(); this.friends.delete(id); }
     for (const p of players) {
       let f = this.friends.get(p.sessionId);
       if (!f) { f = { look: '', petId: null, loading: false, state: p }; this.friends.set(p.sessionId, f); }
@@ -143,6 +144,7 @@ export class PlazaScene extends WorldScene {
       spots.set(id, feet); faces.set(id, peerAnimalFace(p));
       if (f.tag) { updateAnimalTag(f.tag, feet, peerAnimalFace(p), p.riding === true && p.pet === 'pet_bear'); }
       updatePeerCompanion(f, feet, time, delta, this.spec.solid);
+      updatePeerTool(this, f, f.sprite ? { x: f.sprite.x, y: f.sprite.y } : feet);
     }
     dragonfliesFor('plaza')?.setPeers(spots, this.selfId);
     this.spacePets(delta);

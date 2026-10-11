@@ -11,8 +11,10 @@ export function continuousPosition(p: Pick<PlazaPlayerState, 'x' | 'y' | 'versio
   return p.version === 2 && q && Number.isFinite(q.x) && Number.isFinite(q.y)
     && q.x >= -.5 - s && q.x < bounds.width + s && q.y >= -.5 - s && q.y < bounds.height + s ? { x: q.x, y: q.y } : { x: p.x, y: p.y };
 }
-export function protocolExtras(p: Pick<PlazaPlayerState, 'x' | 'y' | 'version' | 'position' | 'pet' | 'riding' | 'face'>, bounds: PresenceBounds = PLAZA_BOUNDS): Partial<PlazaPlayerState> {
-  const face = validAnimalFace(p.face) ? { face: p.face } : {};
+/** 손에 든 도구 표시는 짧은 정해진 모양만 받는다. */
+export const validToolTag = (tag: unknown): tag is string => typeof tag === 'string' && /^(net|rod_[a-z]{2,12})$/.test(tag);
+export function protocolExtras(p: Pick<PlazaPlayerState, 'x' | 'y' | 'version' | 'position' | 'pet' | 'riding' | 'face' | 'tool'>, bounds: PresenceBounds = PLAZA_BOUNDS): Partial<PlazaPlayerState> {
+  const face = { ...(validAnimalFace(p.face) ? { face: p.face } : {}), ...(validToolTag(p.tool) ? { tool: p.tool } : {}) };
   if (p.version !== 2) return face;
   const q = continuousPosition(p, bounds);
   return { ...face, version: 2, position: q, pet: isPetId(p.pet) ? p.pet : null, riding: p.pet === 'pet_bear' && p.riding === true };

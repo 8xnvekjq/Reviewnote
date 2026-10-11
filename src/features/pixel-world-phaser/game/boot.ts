@@ -23,6 +23,7 @@ import type { PlazaPlayerState } from '../../pixel-room/plaza/types';
 import type { PlazaBubble } from './plazaBubbles';
 import type { RiverPeerFishing } from '../logic/riverPresence';
 import type { WorldAssets, WorldContext, WorldDebug, WorldEvents, WorldScene } from './WorldScene';
+import type { HeldToolSpec } from './heldTool';
 
 export type { Prompt, WorldAssets, WorldDebug, WorldEvents } from './WorldScene';
 
@@ -46,6 +47,8 @@ export interface WorldGameHandle {
   dismount(): void;
   /** 가방 무게 → 이동 속도 배율(장면이 바뀌어도 유지된다). */
   setLoadFactor(factor: number): void;
+  /** 손에 든 도구(가방 손 칸) — 걸어 다닐 때 보인다. null = 맨손. */
+  setHeldTool(tool: HeldToolSpec | null): void;
   reactPet(kind: 'feed' | 'pet'): void;
   farmFx(index: number, action: string): void;
   setAnimalFace(face: string): void;
@@ -187,6 +190,7 @@ export function startWorldGame(parent: HTMLElement, start: WorldStart, controls:
       toggleRide: () => active?.toggleRide(),
       dismount: () => active?.dismount(),
       setLoadFactor: factor => { ctx.loadFactor = Math.min(1, Math.max(0.2, factor)); },
+      setHeldTool: tool => { ctx.heldTool = tool; },
       reactPet: kind => active?.reactPet(kind),
       farmFx: (index, action) => active?.farmFx(index, action),
       setAnimalFace: face => { ctx.face = face; },
