@@ -38,7 +38,7 @@ test('포인트는 XP 옆에 표시하고 오늘 합계와 상한 안내를 보�
   const html = renderToStaticMarkup(createElement(CatchCard, { caught: { ...fish, points: points(2) }, onHide() {} }));
   assert.match(html, /XP · \+2 P/);
   assert.match(html, /오늘 54\/50P/);
-  assert.match(html, /오늘 상한을 넘어서 절반만 받았어요/);
+  assert.match(html, /오늘 상한을 넘어서 1\/5만 받았어요/);
   const zero = renderToStaticMarkup(createElement(CatchCard, { caught: { ...junk, points: points(0) }, onHide() {} }));
   assert.match(zero, /XP · \+0 P/);
   assert.match(zero, /오늘 상한을 넘어 잡동사니는 포인트가 없어요/);
@@ -52,6 +52,9 @@ test('상한 안내는 실제 기본 포인트보다 적게 받은 경우에만 
   }
   for (const [id, base] of Object.entries(JUNK_POINTS)) assert.equal(catchPointNote({ ...junk, junk: id, points: points(base) }), null);
   assert.equal(catchPointNote(fish), null);
+  // 오늘 100P를 넘긴 뒤에는 별 4·5도 1/10.
+  assert.equal(catchPointNote({ ...fish, rarity: 'mythic', points: { awarded: 4, todayEarned: 104, cap: 50, capped: true } }), '오늘 100P를 넘어서 1/10만 받았어요');
+  assert.equal(catchPointNote({ ...fish, rarity: 'mythic', points: { awarded: 40, todayEarned: 90, cap: 50, capped: true } }), null);
 });
 
 test('챔피언은 별 5부터 중복 없이 표시하며 선생님에게 상금을 표시하지 않는다', () => {

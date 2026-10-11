@@ -37,6 +37,7 @@ async function database() {
     await db.exec(sql('20261011190000_pixel_fishing_hotspots.sql'));
     await db.exec(sql('20261011220000_pixel_game_points.sql'));
     await db.exec(sql('20261011250000_pixel_game_points_fifth.sql'));
+    await db.exec(sql('20261011260000_pixel_game_points_total_cap.sql'));
     await db.exec(`create table public.pixel_farm_crops(user_id uuid, status text, submitted_at timestamptz, size_score numeric);`);
     await db.exec(sql('20260922090000_pixel_farm_weekly_contest.sql'));
     await db.exec(sql('20261011230000_pixel_fish_points_weekly.sql'));
@@ -196,19 +197,22 @@ test('포인트와 챔피언 파싱, 보상 어댑터와 오류 복구', async (
   assert.equal((await mock.pending())[0].points,25); await mock.ack([user]); assert.deepEqual(await mock.pending(),[]);
 });
 
-test('모의 낚시도 1/5 조각 누적과 날짜 초기화 규칙을 따른다', async () => {
+test('모의 낚시도 1/5·1/10 조각 누적과 날짜 초기화 규칙을 따른다', async () => {
   let now=Date.parse('2026-10-11T03:00:00Z');
   const mock=createMockFishingAdapter({seed:42,now:()=>now,todayEarned:50,override:{clock:'13:00',weather:'clear'}});
-  let earned=50,carry=0;
+  // 1/10P 단위 기준표: 50P까지 그대로, 50~100P는 별 1~3이 1/5(2조각)·별 4·5는 그대로, 100P 넘으면 모두 1/10, 동전은 50P 뒤 0.
+  let tenths=500, seenTotalCap=false;
   for(let i=0;i<150;i++) {
     now+=3000; const start=await mock.start(null); assert.ok(start.ok); now+=15000;
     const r=await mock.finish(start.castId,true); assert.ok(r.ok&&r.landed);
     const base='junk' in r ? (r.junk==='junk_coin'?1:0) : FISH_POINTS[r.rarity];
-    let expected=0;
-    if(!('junk' in r)&&['legendary','mythic'].includes(r.rarity)) expected=base;
-    else if(!('junk' in r)){expected=Math.floor((carry+base)/5);carry=(carry+base)%5;}
-    earned+=expected; assert.equal(r.points?.awarded,expected); assert.equal(r.points?.todayEarned,earned);
+    const full=!('junk' in r)&&['legendary','mythic'].includes(r.rarity), before=Math.floor(tenths/10);
+    for(let p=0;p<base;p++) tenths+='junk' in r ? (tenths<500?10:0) : tenths>=1000 ? 1 : full ? 10 : 2;
+    const expected=Math.floor(tenths/10)-before;
+    if(tenths>=1000) seenTotalCap=true;
+    assert.equal(r.points?.awarded,expected); assert.equal(r.points?.todayEarned,Math.floor(tenths/10));
   }
+  assert.ok(seenTotalCap,'150번 낚시면 100P 전체 상한까지 간다');
   now+=86400000; const start=await mock.start(null); assert.ok(start.ok); now+=15000;
   const r=await mock.finish(start.castId,true); assert.ok(r.ok&&r.landed);
   const base='junk' in r ? (r.junk==='junk_coin'?1:0) : FISH_POINTS[r.rarity];

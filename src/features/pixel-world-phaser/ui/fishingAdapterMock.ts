@@ -1,4 +1,4 @@
-import { FISH_POINTS, JUNK_POINTS, FISH_TIER_REWARDS, GAME_POINT_DAILY_CAP, awardOverCap, sizeScore } from '../logic/gamePoints';
+import { FISH_POINTS, JUNK_POINTS, FISH_TIER_REWARDS, GAME_POINT_DAILY_CAP, awardGamePoints, sizeScore } from '../logic/gamePoints';
 import type { WorldOverride } from '../logic/worldClock';
 import { BAIT_CHARGES, BAIT_PRICE, FISH_XP, TROPHY_XP, MAX_LEVEL, levelForXp, levelBaitDifficulty, hardFishChance, nonnegativeInteger } from '../logic/levels';
 import type { PlayerLevel } from '../logic/levels';
@@ -151,10 +151,8 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
   const award = (points: number, kind: 'normal' | 'full' | 'junk') => {
     const day = kstParts(now()).kstDate;
     if (day !== pointDay) { pointDay = day; earned = 0; carry = 0; }
-    let awarded = 0;
-    if (kind === 'full') awarded = points;
-    else if (kind === 'normal') ({ awarded, carry } = awardOverCap(points, earned, carry));
-    else awarded = Math.max(0, Math.min(points, GAME_POINT_DAILY_CAP - earned));
+    let awarded: number;
+    ({ awarded, carry } = awardGamePoints(points, kind, earned, carry));
     earned += awarded; balance += awarded;
     return { awarded, todayEarned: earned, cap: GAME_POINT_DAILY_CAP, capped: earned >= GAME_POINT_DAILY_CAP };
   };

@@ -24,6 +24,7 @@ async function setup() {
   await db.exec(levels.slice(0, levels.indexOf('create or replace function pixel_private.get_pixel_fishing_state')) + '\ncommit;');
   await db.exec(sql('20261011220000_pixel_game_points.sql'));
   await db.exec(sql('20261011250000_pixel_game_points_fifth.sql'));
+  await db.exec(sql('20261011260000_pixel_game_points_total_cap.sql'));
   await db.exec(sql('20261011240000_pixel_bugs.sql'));
   await db.exec(sql('20261011240000_pixel_bugs.sql'));
   const rpc = async (query: string, args: any[] = []) => (await db.query<any>(query, args)).rows[0].r;
@@ -67,8 +68,8 @@ test('잠자리 시드·채·소유·대기·시간·재생·도감·보상이 �
     await reset();
     let xp = 0;
     await db.exec(`select pixel_private.award_game_points('${U}',49,'normal')`);
-    // 49P에서 시작: 고추(2P) 1+조각1, 밀(3P) 조각4, 실(6P) 조각10→2P, 별 4·5는 전부.
-    const awards = [1,0,2,15,40];
+    // 49P에서 시작: 고추(2P) 1P+0.2, 밀(3P) 0.6, 실(6P) 1.2→2P(52P), 왕(★4) 15P(67P), 황금(★5) 33P로 100P + 7조각×1/10.
+    const awards = [1,0,2,15,33];
     for (const [i, bug] of BUG_CATALOG.entries()) {
       attempt = await start('river');
       await db.query('update pixel_bug_attempts set bug_id=$1,difficulty=$2', [bug.id,bug.stars]); await age(1);
@@ -88,7 +89,7 @@ test('잠자리 시드·채·소유·대기·시간·재생·도감·보상이 �
     assert.equal((await finish(attempt.catchId)).isNew,false);
     assert.deepEqual((await state()).album[0], { ...album[0],count: 2 });
     assert.equal((await db.query<any>("select count(*) n from pixel_bug_catches where scene='river'")).rows[0].n,5);
-    assert.equal((await db.query<any>('select point_adjustment from profiles where id=$1',[U])).rows[0].point_adjustment,107); // 49 + (1+0+2+15+40) + 마지막 고추(조각 2개, 0P)
+    assert.equal((await db.query<any>('select point_adjustment from profiles where id=$1',[U])).rows[0].point_adjustment,100); // 49 + (1+0+2+15+33) + 마지막 고추(100P 넘어 1/10 조각 2개, 0P)
   } finally { await db.close(); }
 });
 
