@@ -13,7 +13,7 @@ export function BugAlbum({ state, onClose }: { state: BugState | null; onClose()
       <h3>🏆 업적</h3>
       <ul>{BUG_ACHIEVEMENTS.map(goal => {
         const a = state.achievements!, done = a.earned.includes(goal.id);
-        const progress = goal.id === 'bug_doctor' ? `도감 ${Math.min(a.species, a.speciesTotal)}/${a.speciesTotal} · 별5 ${Math.min(a.star5, 1)}/1` : `별5 ${Math.min(a.star5, 10)}/10`;
+        const progress = goal.id === 'bug_doctor' ? `도감 ${Math.min(a.species, a.speciesTotal)}/${a.speciesTotal} · 별5 ${Math.min(a.star5, 1)}/1` : `별5 ${Math.min(a.star5, 30)}/30`;
         return <li key={goal.id} data-achievement={goal.id} data-done={done}>
           <strong>{done ? '✅' : '⬜'} {goal.name}</strong> <span>→ {goal.reward}</span>
           <small>{goal.goal} · {done ? '달성!' : progress}</small>
