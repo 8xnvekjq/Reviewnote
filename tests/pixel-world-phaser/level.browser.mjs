@@ -38,18 +38,22 @@ try {
     await ready(page, 'yard');
     const badge = page.getByRole('button', { name: '레벨 정보 낚시 Lv. 12 · 농사 Lv. 12 · 채집 Lv. 1' });
     await badge.waitFor();
-    assert.equal(await badge.getByRole('progressbar', { name: '낚시 다음 레벨 경험치' }).getAttribute('aria-valuenow'), '145');
+    // 접힌 'Lv' 버튼만 보이고, 누르면 옆으로 세 활동 레벨이 펼쳐진다.
+    assert.equal(await page.getByRole('progressbar', { name: '낚시 다음 레벨 경험치' }).count(), 0);
     const overlaps = await badge.evaluate(el => {
       const a=el.getBoundingClientRect(); return [...document.querySelectorAll('.pwp-hud .pwp-chip,.pwp-panel-access .pwp-chip,.pwp-btn')].some(other => {const b=other.getBoundingClientRect();return a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;});
     });
     assert.equal(overlaps, false);
     await page.screenshot({ path: `scratch/level/hud-${width}.png` });
-    await badge.click(); const panel=page.getByRole('dialog', {name:'레벨 정보'});
+    await badge.click();
+    assert.equal(await page.getByRole('progressbar', { name: '낚시 다음 레벨 경험치' }).getAttribute('aria-valuenow'), '145');
+    await page.getByRole('button', { name: '자세히' }).click(); const panel=page.getByRole('dialog', {name:'레벨 정보'});
     await panel.locator('[data-track="fishing"]').getByText('145 / 165 XP · 다음 레벨까지 20 XP', {exact:true}).waitFor();
     await page.screenshot({ path: `scratch/level/panel-${width}.png` });
     await panel.getByRole('button', {name:'레벨 정보 닫기'}).click();
     assert.equal(await panel.count(),0);
-    await badge.click(); await page.keyboard.press('Escape'); assert.equal(await panel.count(),0);
+    await page.getByRole('button', { name: '자세히' }).click(); await page.keyboard.press('Escape'); assert.equal(await panel.count(),0);
+    await badge.click(); assert.equal(await page.getByRole('button', { name: '자세히' }).count(), 0, 'Lv 버튼을 다시 누르면 접힌다');
     // 강가 거북이까지 실제 걸어가 '상점' 탭에서 구매한다(광장 상점은 낚시 도구를 팔지 않는다).
     await exit(page, 'river'); await ready(page, 'river');
     await page.evaluate(() => { const h=window.__pixelWorldPhaser,t=h.debug().targets; if(!t.turtle)throw new Error(JSON.stringify(t));h.walkToScreen(t.turtle.x,t.turtle.y); });
@@ -110,7 +114,8 @@ try {
     // 수확 경험치는 농사 레벨에만 쌓인다(낚시 레벨은 그대로 12).
     await page.locator('.pwp-level-toast').getByText('🌱 농사 레벨 업! Lv. 13',{exact:true}).waitFor();
     const farmBadge = page.getByRole('button',{name:'레벨 정보 낚시 Lv. 12 · 농사 Lv. 13 · 채집 Lv. 1'}); await farmBadge.waitFor();
-    assert.equal(await farmBadge.getByRole('progressbar',{name:'농사 다음 레벨 경험치'}).getAttribute('aria-valuenow'),'20');
+    await liveFarm.getByRole('button',{name:'1번 토마토 밭 닫기'}).click(); await farmBadge.click();
+    assert.equal(await page.getByRole('progressbar',{name:'농사 다음 레벨 경험치'}).getAttribute('aria-valuenow'),'20');
     assert.ok(await page.evaluate(()=>window.baitCalls.includes('act_pixel_farm')&&window.baitCalls.includes('get_pixel_level')));
     await page.screenshot({path:`scratch/level/harvest-server-${width}.png`});
     assert.deepEqual(errors,[]);

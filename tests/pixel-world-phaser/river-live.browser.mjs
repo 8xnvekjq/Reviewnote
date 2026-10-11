@@ -134,7 +134,10 @@ try {
   await b.getByRole('button', { name: '한마디 닫기' }).click();
   await a.bringToFront();
   await a.waitForFunction(() => window.__pixelWorldPhaser.debug().bubbles.some(v => v.text === '여기 붕어 많아!'));
+  // 리액션은 구름 버튼을 눌러 펼친 서랍 안에 있다.
+  await a.getByRole('button', { name: '한마디 하기' }).click();
   await a.getByRole('button', { name: '안녕!', exact: true }).click();
+  await a.getByRole('button', { name: '한마디 닫기' }).click();
   await b.bringToFront();
   await b.waitForFunction(() => window.__pixelWorldPhaser.debug().bubbles.some(v => v.text === '안녕!'));
 

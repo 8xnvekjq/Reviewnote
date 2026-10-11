@@ -1,11 +1,17 @@
-/* 광장 한마디: 뭉게구름 버튼은 반응 버튼(👋 🙌 🌿) 옆, 입력창은 HUD 바로 아래 가운데(조이스틱·A/B와 겹치지 않는다). */
+/* 광장 한마디: 구름 버튼 하나만 보이고, 누르면 왼쪽으로 서랍이 펼쳐진다(조이스틱·A/B와 겹치지 않는 위쪽). */
 .pwp-chat-button { min-width:48px; padding:0 6px; justify-content:center; background:#cfe8f6; }
 .pwp-chat-button[aria-expanded="true"] { background:#ffd76a; }
 .pwp-chat-button:disabled, .pwp-chat-form button:disabled { opacity:.55; cursor:default; }
 .pwp-chat-cloud { width:33px; height:24px; image-rendering:pixelated; display:block; }
-.pwp-chat-form { position:fixed; z-index:13; left:50%; transform:translateX(-50%); top:calc(env(safe-area-inset-top, 0px) + 58px);
-  width:min(440px, calc(100vw - 24px)); display:flex; gap:6px; align-items:center; padding:6px; border-radius:14px;
+.pwp-chat-dock { display:flex; flex-direction:row; align-items:flex-start; gap:6px; }
+/* 구름 버튼 왼쪽으로 쭉 펼쳐지는 서랍: 리액션 · 입력창 · 보내기 · 닫기, 아래 한 줄 상태. */
+.pwp-chat-drawer { display:grid; gap:4px; justify-items:end; transform-origin:right center; animation:pwp-drawer-out .2s ease-out; }
+.pwp-chat-form { width:min(520px, calc(100vw - 96px)); display:flex; gap:6px; align-items:center; padding:6px; border-radius:14px;
   border:2px solid #5b3926; background:rgba(255,244,217,.96); box-shadow:0 3px 0 rgba(58,36,22,.45); }
+.pwp-chat-reactions { display:flex; gap:4px; flex:none; }
+.pwp-chat-reactions .pwp-chip { min-width:36px; min-height:40px; padding:0 4px; justify-content:center; }
+.pwp-chat-status { max-width:100%; color:#fff4ce; font-size:12px; text-shadow:1px 1px #453429; }
+@media (max-width:520px) { .pwp-chat-form { flex-wrap:wrap; } .pwp-chat-reactions { width:100%; } }
 /* 게임 프레임은 글 선택을 막지만 입력창은 글을 써야 한다(iPad Safari). 16px 이상이라 확대되지 않는다. */
 .pwp-root .pwp-chat-form input { flex:1; min-width:0; height:40px; padding:0 10px; border-radius:10px; border:2px solid #a8875a;
   background:#fffdf6; color:#4f3a28; font:inherit; font-size:16px; font-weight:700;

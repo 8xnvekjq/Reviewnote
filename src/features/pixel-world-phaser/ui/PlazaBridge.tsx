@@ -105,13 +105,13 @@ export function PlazaBridge({ handle, appearance, pet, riding, face, userId, pan
   const title = panel === 'contest' ? '이번 주 토마토 대회' : panel === 'well' ? '우물의 오늘 한마디' : '광장 벤치';
   return <>
     <div className="pwp-plaza-reactions" role="group" aria-label="리액션 선택" data-ready={realtime.ready} data-players={smoothed.length}>
-      {(['wave', 'cheer', 'rest'] as const).map(kind => <button type="button" className="pwp-chip" key={kind} aria-label={REACTIONS[kind].label}
+      <PlazaChat disabled={!realtime.ready || !!panel} onSend={realtime.sendChat} onStatus={setMessage}
+      status={!realtime.ready ? '다시 연결하는 중…' : now < coolUntil ? '잠깐 쉬었다 보내요' : message}
+      reactions={<>{(['wave', 'cheer', 'rest'] as const).map(kind => <button type="button" className="pwp-chip" key={kind} aria-label={REACTIONS[kind].label}
         disabled={!realtime.ready || now < coolUntil || !!panel} onClick={() => {
           setCoolUntil(Date.now() + 4000);
           void realtime.sendReaction(kind).then(sent => setMessage(sent ? REACTIONS[kind].label : '반응을 보내지 못했어요. 잠시 후 다시 해 주세요.'));
-        }}>{REACTIONS[kind].emoji}</button>)}
-      <PlazaChat disabled={!realtime.ready || !!panel} onSend={realtime.sendChat} onStatus={setMessage} />
-      <span role="status">{!realtime.ready ? '다시 연결하는 중…' : now < coolUntil ? '잠깐 쉬었다 보내요' : message}</span>
+        }}>{REACTIONS[kind].emoji}</button>)}</>} />
     </div>
     {(panel === 'contest' || panel === 'well' || panel === 'bench') && <Window title={title} onClose={onClose} compact small>
       <div className="pwp-panel-content">
