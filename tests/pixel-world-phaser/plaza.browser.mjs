@@ -59,7 +59,10 @@ try {
   assert.equal(payload.version, 2); assert.ok(Number.isInteger(payload.x) && Number.isInteger(payload.y)); assert.ok(payload.position);
   assert.ok(!('name' in payload) && !('userId' in payload));
   await a.waitForTimeout(4200);
+  // 리액션은 구름 버튼을 눌러 펼친 서랍 안에 있다.
+  await a.getByRole('button', { name: '한마디 하기' }).click();
   await a.getByRole('button', { name: '안녕!', exact: true }).click();
+  await a.getByRole('button', { name: '한마디 닫기' }).click();
   await b.bringToFront();
   await b.waitForFunction(() => window.__pixelWorldPhaser.debug().reactions?.length === 1);
   await mkdir('.pixel-world-test.local', { recursive: true });

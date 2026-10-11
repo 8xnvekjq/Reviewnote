@@ -70,8 +70,8 @@ html.pwp-open, html.pwp-open body { overflow:hidden; overscroll-behavior:none; h
 @keyframes pwp-toast { 0% { opacity:0; transform:translate(-50%, -6px); } 12%, 75% { opacity:1; transform:translate(-50%, 0); } 100% { opacity:0; transform:translate(-50%, 0); } }
 
 /* 광장에서만 나타나는 게임 프레임 안 반응 버튼. */
-.pwp-plaza-reactions { position: absolute; z-index: 12; top: calc(env(safe-area-inset-top, 0px) + 110px); right: max(12px, env(safe-area-inset-right, 0px)); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; max-width: 240px; }
-.pwp-plaza-reactions [role="status"] { flex-basis: 100%; text-align: right; color: #fff4ce; font-size: 12px; text-shadow: 1px 1px #453429; }
+.pwp-plaza-reactions { position: absolute; z-index: 12; top: calc(env(safe-area-inset-top, 0px) + 110px); right: max(12px, env(safe-area-inset-right, 0px)); display: flex; align-items: flex-start; }
+
 
 /* 배치 안내는 HUD 아래에 두고, 버튼 밖의 터치는 방 바닥으로 보낸다. */
 .pwp-room-placing { position:absolute; left:12px; right:12px; display:flex; gap:8px; align-items:center; pointer-events:none; }
@@ -86,9 +86,17 @@ html.pwp-open, html.pwp-open body { overflow:hidden; overscroll-behavior:none; h
 .pwp-stage, .pwp-surface { -webkit-touch-callout:none; user-select:none; -webkit-user-select:none; touch-action:none; }
 
 /* 옷장과 반대편 두 번째 HUD 줄에 표시한다. */
-.pwp-level-badge { position:absolute; width:92px; min-height:40px; flex-direction:column; align-items:stretch; justify-content:center; gap:3px; padding:5px 8px; font-size:12px; }
-.pwp-level-row { display:grid; grid-template-columns:16px 22px 1fr; align-items:center; gap:3px; line-height:1; }
-.pwp-level-row strong { text-align:right; font-variant-numeric:tabular-nums; }
+.pwp-level-dock { position:absolute; z-index:12; display:flex; flex-direction:row; align-items:center; gap:6px; }
+.pwp-level-badge { min-width:48px; min-height:40px; justify-content:center; font-size:14px; font-weight:900; }
+.pwp-level-badge[aria-expanded="true"] { background:#ffd76a; }
+/* 옆으로 쭉: 오른쪽 버튼에서 왼쪽으로 펼쳐진다. */
+.pwp-level-drawer { display:flex; align-items:center; gap:7px; padding:4px 5px 4px 8px; border:2px solid #5b3926; border-radius:12px; background:rgba(255,244,217,.96);
+  box-shadow:0 3px 0 rgba(58,36,22,.45); color:#4f3a28; font-size:13px; transform-origin:right center; animation:pwp-drawer-out .2s ease-out; }
+.pwp-level-row { display:grid; grid-template-columns:auto auto 22px; align-items:center; gap:3px; line-height:1; }
+.pwp-level-row strong { font-variant-numeric:tabular-nums; }
+.pwp-level-more { min-height:32px; padding:0 7px; font-size:12px; }
+@keyframes pwp-drawer-out { from { opacity:0; transform:translateX(16px) scaleX(.85); } to { opacity:1; transform:none; } }
+@media (prefers-reduced-motion:reduce) { .pwp-level-drawer, .pwp-chat-drawer { animation:none; } }
 .pwp-level-track { padding:6px 0; border-top:1px solid rgba(58,36,22,.18); }
 .pwp-level-sources { display:block; opacity:.75; font-size:11px; }
 .pwp-xp-track { display:block; width:100%; height:5px; background:#d7c4a1; overflow:hidden; border-radius:2px; }
