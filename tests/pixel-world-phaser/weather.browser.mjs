@@ -17,10 +17,21 @@ try {
     await ready(admin);
     await student.goto(`${BASE}/tests/pixel-world-phaser/harness.html?fishing=1&weatherTest=1`);
     await ready(student);
-    assert.equal(await student.getByRole('button', { name: '🌤 날씨', exact: true }).count(), 0);
-    await admin.getByRole('button', { name: '🌤 날씨', exact: true }).click();
-    const panel = admin.getByRole('dialog', { name: '전역 날씨' });
-    await panel.waitFor();
+    // 날씨 관리는 상단 버튼이 아니라 관리자 앞마당의 자판기 안에 있다. 학생 마당에는 자판기가 없다.
+    for (const page of [admin, student]) assert.equal(await page.getByRole('button', { name: /날씨/ }).count(), 0, 'no weather chip in the HUD');
+    assert.equal(await student.evaluate(() => 'kiosk' in window.__pixelWorldPhaser.debug().targets), false);
+    const openKiosk = async () => {
+      // 게임 입력(A·걷기)은 게임 루프가 처리하니, 뒤에 깔린 탭이면 앞으로 가져온다.
+      await admin.bringToFront();
+      const kiosk = admin.getByRole('dialog', { name: '관리자 자판기' });
+      // 자판기를 눌러 걸어가면 도착하자마자 열린다. 이미 앞에 서 있으면 A로 연다.
+      if (await admin.evaluate(() => window.__pixelWorldPhaser.debug().prompt) === 'kiosk') await admin.locator('.pwp-btn-a').click();
+      else await admin.evaluate(() => { const h = window.__pixelWorldPhaser, p = h.debug().targets.kiosk; h.walkToScreen(p.x, p.y); });
+      await kiosk.waitFor();
+      await kiosk.getByRole('button', { name: '날씨 관리', exact: true }).click();
+      return kiosk;
+    };
+    const panel = await openKiosk();
     await panel.getByRole('button', { name: '🌧 비', exact: true }).click();
     await panel.getByRole('button', { name: '밤', exact: true }).click();
     await panel.getByRole('button', { name: '적용', exact: true }).click();
@@ -35,9 +46,9 @@ try {
     // 실제 60초 폴링과 같은 경로를 별도 학생 클라이언트에서 즉시 실행한다.
     await student.evaluate(() => window.__pixelWorldRefreshClock());
     await waitWeather(student, 'night', 'rain');
-    await panel.getByRole('button', { name: '전역 날씨 닫기' }).click();
+    await panel.getByRole('button', { name: '관리자 자판기 닫기' }).click();
     await admin.screenshot({ path: `${SHOTS}/rain-night-${width}.png` });
-    await admin.getByRole('button', { name: '🌤 날씨', exact: true }).click();
+    await openKiosk();
     await panel.getByRole('button', { name: '모두 자동으로', exact: true }).click();
     await panel.getByText('모두 자동으로 돌아왔어요.').waitFor();
     assert.equal(await admin.evaluate(() => JSON.parse(localStorage.getItem('pwp-weather-test'))), null);

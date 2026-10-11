@@ -28,6 +28,14 @@ export const supabase = {
   channel(name, { config }) { const ch = new Channel(name, config.presence.key); channels.add(ch); return ch; },
   async removeChannel(ch) { ch.active = false; channels.delete(ch); removed++; },
   async rpc(name) {
+    // 관리자 자판기의 조각 현황(지식의 조각) — 시험용 고정 값.
+    if (name === 'admin_knowledge_shard_board') return { data: {
+      students: [
+        { userId: 's1', name: '토마토 친구', balance: 50, earnedTotal: 50, earnedWeek: 3.4, spent: 0, lastEarnedAt: new Date(Date.now() - 2 * 3600e3).toISOString() },
+        { userId: 's2', name: '아주아주긴닉네임을가진학생친구', balance: 12.3, earnedTotal: 27.3, earnedWeek: 0.6, spent: 15, lastEarnedAt: null },
+      ],
+      recentSpends: [{ name: '아주아주긴닉네임을가진학생친구', item: '수정 서재', amount: 15, spentAt: new Date(Date.now() - 5 * 60e3).toISOString() }],
+    }, error: null };
     if (name !== 'get_weekly_crop_contest') throw new Error('예상하지 못한 RPC: ' + name);
     return { data: { top: [{ rank: 1, sizeScore: 87, submitterLabel: '토마토 친구' }], mine: { rank: null, sizeScore: null } }, error: null };
   },

@@ -52,3 +52,21 @@ export async function buyCrystalBait(): Promise<ShardBaitResult> {
     return { ok: false, reason: data?.reason === 'insufficient_balance' ? 'insufficient_balance' : 'unknown', message: data?.message ?? '구매 결과를 확인하지 못했어요.' };
   } catch { return { ok: false, reason: 'unknown', message: '구매 결과를 확인하지 못했어요. 다시 확인해 주세요.' }; }
 }
+
+// ── 관리자: 집 앞 자판기의 조각 현황 ─────────────────────────────────────────────
+export interface AdminShardStudent { userId: string; name: string; balance: number; earnedTotal: number; earnedWeek: number; spent: number; lastEarnedAt: string | null }
+export interface AdminShardSpend { name: string; item: string; amount: number; spentAt: string }
+export interface AdminShardBoard { students: AdminShardStudent[]; recentSpends: AdminShardSpend[] }
+
+export async function fetchAdminShardBoard(): Promise<AdminShardBoard> {
+  const { data, error } = await supabase.rpc('admin_knowledge_shard_board');
+  if (error) throw error;
+  const students = Array.isArray(data?.students) ? data.students : [];
+  const spends = Array.isArray(data?.recentSpends) ? data.recentSpends : [];
+  return {
+    students: students.map((s: Record<string, unknown>) => ({ userId: String(s.userId), name: String(s.name ?? ''), balance: toNumber(s.balance) || 0,
+      earnedTotal: toNumber(s.earnedTotal) || 0, earnedWeek: toNumber(s.earnedWeek) || 0, spent: toNumber(s.spent) || 0,
+      lastEarnedAt: typeof s.lastEarnedAt === 'string' ? s.lastEarnedAt : null })),
+    recentSpends: spends.map((s: Record<string, unknown>) => ({ name: String(s.name ?? ''), item: String(s.item ?? ''), amount: toNumber(s.amount) || 0, spentAt: String(s.spentAt ?? '') })),
+  };
+}

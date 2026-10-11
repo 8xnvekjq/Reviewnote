@@ -1,6 +1,6 @@
 // 앞마당 그림: 기존 마당과 같은 타일·집·나무·울타리·밭·허수아비. 움직임/출구/대화는 WorldScene이 맡는다.
 import type Phaser from 'phaser';
-import { BED_CELLS, BIG_TREES, FENCE_ROWS, RIVER_SIGN, RIVER_EXIT, GATE, WORLD_COLS, WORLD_HEIGHT, WORLD_ROWS, WORLD_WIDTH, borderTrees, groundTile, toWorldCell } from '../logic/yardWorld';
+import { BED_CELLS, BIG_TREES, FENCE_ROWS, KIOSK, RIVER_SIGN, RIVER_EXIT, GATE, WORLD_COLS, WORLD_HEIGHT, WORLD_ROWS, WORLD_WIDTH, borderTrees, groundTile, toWorldCell } from '../logic/yardWorld';
 import { TILE } from '../logic/world';
 import { SCARECROW_CELL } from '../../pixel-room/farm/farmModel';
 import { WorldScene } from './WorldScene';
@@ -37,6 +37,12 @@ export class YardScene extends WorldScene {
     });
     this.beds = [];
     this.setBeds(this.ctx.data.beds);
+    // 관리자 마당에만: 문 오른쪽의 관리자 자판기(조각 현황·날씨 관리).
+    if (this.ctx.data.admin) {
+      if (!textures.exists('kiosk')) textures.addCanvas('kiosk', drawKiosk());
+      const kiosk = this.add.image(KIOSK.x * TILE + TILE / 2, (KIOSK.y + 1) * TILE, 'kiosk').setOrigin(0.5, 1).setDepth((KIOSK.y + 1) * TILE - 1);
+      this.tweens.add({ targets: kiosk, alpha: { from: 1, to: .92 }, duration: 1200, yoyo: true, repeat: -1 });
+    }
     const scarecrow = toWorldCell(SCARECROW_CELL);
     this.add.image(scarecrow.x * TILE + TILE / 2, (scarecrow.y + 1) * TILE, 'scarecrow').setOrigin(0.5, 1).setDepth((scarecrow.y + 1) * TILE - 1);
     // 작은 나무 안내판과 출구의 반짝이는 화살표.
@@ -95,6 +101,31 @@ export class YardScene extends WorldScene {
     });
     return canvas;
   }
+}
+
+/** 16×26 픽셀 자판기: 보라 몸통, 유리창 속 음료 3단, 위에 지식의 조각 간판, 아래 꺼내는 구멍. */
+function drawKiosk(): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.width = 16; canvas.height = 26;
+  const c = canvas.getContext('2d')!;
+  const px = (x: number, y: number, w: number, h: number, color: string) => { c.fillStyle = color; c.fillRect(x, y, w, h); };
+  px(1, 4, 14, 22, '#2a1450');            // 테두리
+  px(2, 5, 12, 20, '#5a2aa8');            // 몸통
+  px(2, 5, 1, 20, '#7c4ddb');             // 왼쪽 빛
+  px(3, 7, 7, 11, '#c9e6ff');             // 유리창
+  ['#e05a5a', '#ecbe40', '#5aa0e0'].forEach((color, row) => {
+    for (let i = 0; i < 3; i++) px(4 + i * 2, 8 + row * 3, 1, 2, color);
+    px(3, 10 + row * 3, 7, 1, '#8fb3d6');
+  });
+  px(11, 7, 2, 6, '#3b1678');             // 버튼판
+  px(11, 8, 2, 1, '#ecbe40'); px(11, 10, 2, 1, '#e6d6ff');
+  px(11, 14, 2, 2, '#ecbe40');            // 동전 넣는 곳
+  px(3, 20, 10, 3, '#1b0c36');            // 꺼내는 구멍
+  px(1, 25, 14, 1, '#1b0c36');
+  // 간판: 작은 조각 아이콘
+  px(5, 0, 6, 5, '#2a1450'); px(6, 1, 4, 3, '#e6d6ff');
+  px(7, 1, 2, 1, '#a878f0'); px(7, 2, 1, 1, '#e6d6ff'); px(8, 2, 1, 1, '#5a2aa8'); px(7, 3, 2, 1, '#8a52e0');
+  return canvas;
 }
 
 function hash(text: string): number { let h = 0; for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) | 0; return h >>> 0; }

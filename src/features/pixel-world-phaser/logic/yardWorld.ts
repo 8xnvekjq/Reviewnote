@@ -42,7 +42,12 @@ export function worldSolid(cell: Point): boolean {
   return !yardWalkable({ x, y });
 }
 
-export type InteractableId = 'scarecrow' | 'door' | 'gate' | 'river-sign' | `farm:${number}`;
+export type InteractableId = 'scarecrow' | 'door' | 'gate' | 'river-sign' | 'kiosk' | `farm:${number}`;
+/** 관리자 자판기 — 집 문 오른쪽 벽 앞(마당 칸 9,6). 관리자 마당에만 놓이고, 놓이면 그 칸은 막힌다. */
+export const KIOSK: Point = toWorldCell({ x: 9, y: 6 });
+export const KIOSK_INTERACTABLE: Interactable & { id: InteractableId } = { id: 'kiosk', cell: KIOSK, label: '관리자 자판기', verb: '열기',
+  action: { kind: 'panel', panel: 'kiosk' }, bang: { x: KIOSK.x * TILE + TILE / 2, y: KIOSK.y * TILE - 14 } };
+const kioskSolid = (cell: Point) => (cell.x === KIOSK.x && cell.y === KIOSK.y) || worldSolid(cell);
 const DOOR = toWorldCell(YARD_DOOR);
 const SCARECROW = toWorldCell(SCARECROW_CELL);
 export const INTERACTABLES: readonly (Interactable & { id: InteractableId })[] = [
@@ -63,10 +68,10 @@ export const BED_CELLS: readonly Point[] = FARM_BEDS.map(toWorldCell);
 export const SPAWN: Point = cellCenter(toWorldCell(YARD_SPAWNS.room));
 
 /** 앞마당 장면 정의: 집 문 = 방으로 가는 출구, 방에서 나오면 문 앞에서 아래를 보고 선다. */
-export function yardScene(): SceneSpec {
+export function yardScene(admin = false): SceneSpec {
   return {
-    id: 'yard', title: '앞마당', cols: WORLD_COLS, rows: WORLD_ROWS, solid: worldSolid,
-    interactables: INTERACTABLES,
+    id: 'yard', title: '앞마당', cols: WORLD_COLS, rows: WORLD_ROWS, solid: admin ? kioskSolid : worldSolid,
+    interactables: admin ? [...INTERACTABLES, KIOSK_INTERACTABLE] : INTERACTABLES,
     exits: [{ id: 'door', cells: [DOOR], to: { scene: 'room', entry: 'door' } },
       { id: 'gate', cells: GATE_CELLS, to: { scene: 'plaza', entry: 'yard' } },
       { id: 'yard→river', cells: RIVER_EXIT_CELLS, to: { scene: 'river', entry: 'fromYard' } }],
