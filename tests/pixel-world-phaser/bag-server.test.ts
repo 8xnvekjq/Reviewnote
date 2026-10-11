@@ -7,6 +7,7 @@ import { bagSpeedFactor } from '../../src/features/pixel-world-phaser/logic/bag.
 const pkg = '@electric-sql/pglite';
 const { PGlite } = await import(pkg);
 const migration = fs.readFileSync(new URL('../../supabase/migrations/20261012120000_pixel_bag.sql', import.meta.url), 'utf8');
+const weights = fs.readFileSync(new URL('../../supabase/migrations/20261012130000_pixel_bag_fish_weights.sql', import.meta.url), 'utf8');
 const U = '00000000-0000-0000-0000-000000000001';
 
 test('bag: catches go to the bag, weight includes stored tomatoes, selling pays the old points through the daily cap (PGlite)', async () => {
@@ -71,6 +72,14 @@ test('bag: catches go to the bag, weight includes stored tomatoes, selling pays 
     assert.equal(await points(), 20);
     assert.equal((await one(`select public.get_pixel_bag() r`)).items.length, 0);
     assert.equal((await one(`select public.sell_pixel_bag(null) r`)).reason, 'nothing');
+
+    // 종류별 무게(현실 순서): 모르는 종류는 희귀도별 무게 그대로.
+    await db.exec(`insert into public.pixel_fish_species values ('minnow','common'), ('shark','mythic'), ('whale','mythic')`);
+    await db.exec(weights);
+    const kg = async (ref: string) => Number((await db.query<{ w: string }>(`select weight w from pixel_private.bag_item_spec('fish', $1)`, [ref])).rows[0].w);
+    assert.deepEqual([await kg('minnow'), await kg('carp'), await kg('shark'), await kg('whale'), await kg('king')], [0.1, 3, 30, 80, 4]);
+    assert.equal((await db.query<{ p: number }>(`select points p from pixel_private.bag_item_spec('fish','whale')`)).rows[0].p, 40, 'price unchanged');
+    assert.equal(bagSpeedFactor(80, 20), 0.2); assert.equal(bagSpeedFactor(30, 20), 0.6);
 
     // 다시 돌려도 호출부는 한 번만 바뀐다.
     await db.exec(migration.replace(/create table if not exists[\s\S]*?grant select on public.pixel_bag_items to authenticated;/, ''));
