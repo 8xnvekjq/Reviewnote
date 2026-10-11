@@ -2,7 +2,8 @@
 -- 별3 이상은 사람이 다가오면 도망가게 할 수 있다. 클라이언트는 종류를 고를 수 없다.
 -- · spawn_bug(scene, release): 내 잠자리 한 마리를 정한다. 살아 있는 건 최대 2마리, 새로 정하는 건 20초에 한 번.
 --   release: 날아가 버린(또는 잡힌) 자리의 이전 잠자리를 놓아 준다(내 것만).
--- · start_bug_catch(scene, spawn): 그 잠자리로 잡기를 시작한다(한 번 쓰면 사라짐). 예전 1인자 함수는 그대로 둔다.
+-- · start_bug_catch(scene, spawn): 그 잠자리로 잡기를 시작한다(한 번 쓰면 끝). 예전 1인자 함수는 그대로 둔다.
+-- · 아무것도 지우지 않는다: 쓴(놓아준) 잠자리는 used_at을 적고, 만료된 잡기 시도는 새 시도로 덮어쓴다(사람당 1줄).
 begin;
 
 create table if not exists public.pixel_bug_spawns (
@@ -11,8 +12,10 @@ create table if not exists public.pixel_bug_spawns (
   bug_id text not null references public.pixel_bug_species(id),
   scene text not null,
   created_at timestamptz not null default clock_timestamp(),
-  expires_at timestamptz not null
+  expires_at timestamptz not null,
+  used_at timestamptz
 );
+alter table public.pixel_bug_spawns add column if not exists used_at timestamptz;
 create index if not exists pixel_bug_spawns_user on public.pixel_bug_spawns(user_id);
 alter table public.pixel_bug_spawns enable row level security;
 revoke all on public.pixel_bug_spawns from anon, authenticated;
@@ -25,8 +28,10 @@ begin
   perform pg_advisory_xact_lock(hashtextextended('pixel_bug:' || u::text, 0));
   if p_scene is null or p_scene not in ('yard', 'plaza', 'river') then return jsonb_build_object('ok', false, 'reason', 'error'); end if;
   t := clock_timestamp();
-  delete from public.pixel_bug_spawns where user_id = u and (expires_at <= t or id = p_release);
-  if (select count(*) from public.pixel_bug_spawns where user_id = u) >= 2 then return jsonb_build_object('ok', false, 'reason', 'full'); end if;
+  if p_release is not null then
+    update public.pixel_bug_spawns set used_at = t where id = p_release and user_id = u and used_at is null;
+  end if;
+  if (select count(*) from public.pixel_bug_spawns where user_id = u and used_at is null and expires_at > t) >= 2 then return jsonb_build_object('ok', false, 'reason', 'full'); end if;
   if exists (select 1 from public.pixel_bug_spawns where user_id = u and created_at > t - interval '20 seconds') then
     return jsonb_build_object('ok', false, 'reason', 'wait');
   end if;
@@ -51,17 +56,21 @@ begin
   if pixel_private.hand_of(u) <> 'net' then return jsonb_build_object('ok', false, 'reason', 'net_not_equipped'); end if;
   if p_scene is null or p_scene not in ('yard', 'plaza', 'river') then return jsonb_build_object('ok', false, 'reason', 'error'); end if;
   t := clock_timestamp();
-  delete from public.pixel_bug_attempts where user_id = u and expires_at < t;
-  if exists (select 1 from public.pixel_bug_attempts where user_id = u)
+  if exists (select 1 from public.pixel_bug_attempts where user_id = u and expires_at >= t)
      or exists (select 1 from pixel_private.bug_start_throttle where user_id = u and started_at > t - interval '2 seconds') then
     return jsonb_build_object('ok', false, 'reason', 'pending');
   end if;
   -- 대기 검사 뒤에 쓴다: 거절돼도 잠자리는 남는다.
-  delete from public.pixel_bug_spawns where id = p_spawn and user_id = u and expires_at > t returning bug_id into v_bug;
+  update public.pixel_bug_spawns set used_at = t where id = p_spawn and user_id = u and used_at is null and expires_at > t
+    returning bug_id into v_bug;
   if v_bug is null then return jsonb_build_object('ok', false, 'reason', 'gone'); end if;
   select * into b from public.pixel_bug_species where id = v_bug;
+  -- 만료된 이전 시도(사람당 1줄)는 새 시도로 덮어쓴다.
   insert into public.pixel_bug_attempts(user_id, bug_id, difficulty, scene, created_at, expires_at)
-    values (u, b.id, b.stars, p_scene, t, t + interval '15 seconds') returning id into v_id;
+    values (u, b.id, b.stars, p_scene, t, t + interval '15 seconds')
+    on conflict (user_id) do update set id = gen_random_uuid(), bug_id = excluded.bug_id, difficulty = excluded.difficulty,
+      scene = excluded.scene, created_at = excluded.created_at, expires_at = excluded.expires_at
+    returning id into v_id;
   insert into pixel_private.bug_start_throttle values (u, t) on conflict (user_id) do update set started_at = excluded.started_at;
   return jsonb_build_object('ok', true, 'catchId', v_id, 'bugId', b.id, 'difficulty', b.stars);
 end $$;

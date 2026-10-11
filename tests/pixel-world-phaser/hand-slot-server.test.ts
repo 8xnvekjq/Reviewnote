@@ -189,9 +189,18 @@ test('잠자리 미리 정하기: 최대 2마리·20초에 한 번, 그 잠자�
     const start = (id: string) => rpc('select public.start_bug_catch($1, $2) r', ['plaza', id]);
     const started = await start(second.spawnId);
     assert.equal(started.ok, true); assert.equal(started.bugId, second.bugId); assert.equal(started.difficulty, second.stars);
-    await db.exec('delete from public.pixel_bug_attempts; delete from pixel_private.bug_start_throttle;');
+    // 살아 있는 시도가 있으면 대기(잠자리는 쓰지 않는다), 만료되면 새 시도로 덮어쓴다(지우지 않는다).
+    await db.exec('delete from pixel_private.bug_start_throttle;');
+    assert.equal((await start(third.spawnId)).reason, 'pending');
+    await db.exec("update public.pixel_bug_attempts set expires_at = clock_timestamp() - interval '1 second'");
+    const again = await start(third.spawnId);
+    assert.equal(again.ok, true); assert.notEqual(again.catchId, started.catchId);
+    assert.equal(Number((await db.query<any>('select count(*) n from public.pixel_bug_attempts')).rows[0].n), 1);
+    await db.exec('delete from pixel_private.bug_start_throttle;');
+    await db.exec("update public.pixel_bug_attempts set expires_at = clock_timestamp() - interval '1 second'");
     assert.equal((await start(second.spawnId)).reason, 'gone');
+    await older(); const fourth = await spawn();
     await db.exec("update public.pixel_bug_spawns set expires_at = clock_timestamp() - interval '1 second'");
-    assert.equal((await start(third.spawnId)).reason, 'gone');
+    assert.equal((await start(fourth.spawnId)).reason, 'gone');
   } finally { await db.close(); }
 });
