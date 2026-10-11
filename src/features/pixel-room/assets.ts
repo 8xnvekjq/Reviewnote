@@ -47,6 +47,7 @@ import sheet44 from './assets/character/Hair_Walk_Left-Sheet.png';
 import sheet45 from './assets/character/Hair_Walk_Right-Sheet.png';
 import interior from './assets/interior/source-17655392.png';
 import decorations from './assets/interior/source-17737185.png';
+import crystalShelf from './assets/interior/crystal-shelf.png';
 
 export type AvatarAnimation = 'Idle' | 'Walk';
 export type AvatarDirection = 'Front' | 'Back' | 'Left' | 'Right';
@@ -92,4 +93,6 @@ export const furnitureArt: Record<import('./model').FurnitureType, FurnitureArt>
   bookshelf: { src: interior, x: 176, y: 80, width: 16, height: 48, sheetWidth: 256, sheetHeight: 256 },
   plant: { src: decorations, x: 112, y: 48, width: 16, height: 32, sheetWidth: 128, sheetHeight: 128 },
   decoration: { src: decorations, x: 96, y: 0, width: 32, height: 32, sheetWidth: 128, sheetHeight: 128 },
+  // 지식의 조각 전용 — scripts/pixel-world/draw-crystal-shelf.py로 그린 16x48 한 장.
+  crystalshelf: { src: crystalShelf, x: 0, y: 0, width: 16, height: 48, sheetWidth: 16, sheetHeight: 48 },
 };

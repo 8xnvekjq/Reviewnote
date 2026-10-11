@@ -33,6 +33,7 @@ import { applyThemeColor } from './utils/theme';
 import { loadStreakState, reconcileStreakState, getKSTDateString, type StreakState } from './utils/streak';
 import { canViewOwnExamPrep } from './utils/examPrepAccess';
 import { fetchLatestReviewCheckVerdictByMistake } from './utils/reviewCheckClient';
+import { ShardGainToast } from './components/ShardGainToast';
 
 // PR9: 관리자 전용 화면(AdminPanel/ScaffoldingPanel)과 럭키상점(GachaStore)은 첫 화면(오답노트
 // 목록)을 보여주는 데는 필요 없는데, 지금까지는 일반 import라 학생 계정에서도 초기 번들에
@@ -2252,7 +2253,7 @@ function App() {
         aiVoice={equippedItems.aiVoice}
         isUploadingPhoto={isUploadingPhoto}
       />
-
+      {session?.user?.id && <ShardGainToast key={session.user.id} />}
     </div>
   );
 }

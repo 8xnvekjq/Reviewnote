@@ -31,6 +31,7 @@ export const FURNITURE_ART_SIZE: Record<FurnitureType, { width: number; height: 
   globe: { width: 16, height: 32 }, tallplant: { width: 16, height: 48 }, floorlamp: { width: 16, height: 32 },
   bed: { width: 32, height: 48 }, desk: { width: 48, height: 32 }, chair: { width: 16, height: 32 },
   bookshelf: { width: 16, height: 48 }, plant: { width: 16, height: 32 }, decoration: { width: 32, height: 32 },
+  crystalshelf: { width: 16, height: 48 },
 };
 
 /** 가구 한 개가 그려질 자리(월드 px): 왼쪽 위/크기. 아래 끝 = 가구 칸 아래 끝. */

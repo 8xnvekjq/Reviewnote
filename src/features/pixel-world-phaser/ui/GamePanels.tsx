@@ -9,6 +9,8 @@ import { RodIcon } from './RodIcon';
 import { rodEffectText } from '../../pixel-room/shop/rods';
 import { petEffectText } from '../../pixel-room/shop/petEffects';
 import { PanelArt } from './PanelArt';
+import { KnowledgeShardIcon } from '../../../components/KnowledgeShardIcon';
+import { CRYSTAL_BAIT, formatShards, shardsShort } from '../../../utils/knowledgeShards';
 import type { FurnitureType } from '../../pixel-room/model';
 import type { PixelAvatarSlot, PixelItem } from '../../pixel-room/shop/types';
 import { AVATAR_SLOTS, EYE_COLOR_OPTIONS, SKIN_TONE_OPTIONS, SLOT_LABELS } from '../../pixel-room/shop/appearanceRows';
@@ -31,9 +33,14 @@ function TurtlePanel({ adapter, shop, onClose, newSpeciesId }: { adapter?: Fishi
 }
 
 // 실제 훅과 하네스가 같은 계약으로 데이터와 동작을 전달한다.
-export interface PanelAdapter { shop: Omit<ReturnType<typeof usePixelShop>, 'baitCharges' | 'buyBait' | 'refreshBait'> & Partial<Pick<ReturnType<typeof usePixelShop>, 'baitCharges' | 'buyBait' | 'refreshBait'>>; pet: ReturnType<typeof usePet> }
+type ShopOptional = 'baitCharges' | 'buyBait' | 'refreshBait' | 'shards' | 'purchaseShardItem' | 'buyBaitWithShards';
+export interface PanelAdapter { shop: Omit<ReturnType<typeof usePixelShop>, ShopOptional> & Partial<Pick<ReturnType<typeof usePixelShop>, ShopOptional>>; pet: ReturnType<typeof usePet> }
 export function PriceTag({ value }: { value: number }) {
   return <span className="pwp-price"><span className="pwp-coin" aria-hidden="true">P</span>{value.toLocaleString()}</span>;
+}
+/** 지식의 조각 가격/잔액 — 소수 둘째 자리까지. null은 아직 불러오지 못한 잔액. */
+export function ShardTag({ value, label }: { value: number | null; label?: string }) {
+  return <span className="pwp-price pwp-shard-price" aria-label={`${label ?? '지식의 조각'} ${value == null ? '확인 중' : formatShards(value)}`}><KnowledgeShardIcon size={18} />{value == null ? '…' : formatShards(value)}</span>;
 }
 function Tabs({ options, value, onChange, label = '분류' }: { options: readonly (readonly [string, string])[]; value: string; onChange: (value: string) => void; label?: string }) {
   return <nav className="pwp-tabs" aria-label={label}>{options.map(([key, label]) => <button type="button" key={key} aria-pressed={key === value} onClick={() => onChange(key)}>{label}</button>)}</nav>;
@@ -97,14 +104,16 @@ export function GamePanels({ kind, adapter: { shop, pet }, onClose, top }: { kin
   const art = (item: PixelItem) => item.category === 'avatar'
     ? <PanelArt appearance={{ ...shop.equipped, [item.slot]: item.assetKey }} />
     : item.category === 'rod' ? <RodIcon rod={{ id: item.itemId, tier: item.tier }} /> : item.category === 'pet' ? <PanelArt pet={item.itemId} /> : <PanelArt furniture={item.assetKey as FurnitureType} />;
-  const stock = shop.catalog.filter(item => kind === 'tackle' ? item.category === 'rod' : kind === 'shop' ? item.category !== 'rod' && item.category !== 'bait' : item.category !== 'bait');
+  const shardTab = kind === 'shop' && category === 'shard';
+  // 조각 전용 아이템은 상점의 '지식의 조각' 칸에만 놓는다(옷장에서는 다른 보유 아이템과 같이 보인다).
+  const stock = shop.catalog.filter(item => kind === 'tackle' ? item.category === 'rod' : kind === 'shop' ? item.category !== 'rod' && item.category !== 'bait' && (item.shardPrice != null) === shardTab : item.category !== 'bait');
   const wardrobeOwned = new Set([...shop.ownedIds, 'hair_bald']);
-  const entries = panelItems(stock, selling ? category : slot, kind === 'wardrobe' ? wardrobeOwned : undefined);
+  const entries = shardTab ? stock : panelItems(stock, selling ? category : slot, kind === 'wardrobe' ? wardrobeOwned : undefined);
   const tabOptions: readonly (readonly [string, string])[] = kind === 'tackle' ? [['all', '전체'], ['rod', '낚싯대'], ['bait', '미끼']]
-    : kind === 'shop' ? [['all', '전체'], ...AVATAR_SLOTS.map(key => [key, SLOT_LABELS[key]] as const), ['furniture', '가구'], ['pet', '펫'], ['tool', '도구']]
+    : kind === 'shop' ? [['all', '전체'], ['shard', '지식의 조각'], ...AVATAR_SLOTS.map(key => [key, SLOT_LABELS[key]] as const), ['furniture', '가구'], ['pet', '펫'], ['tool', '도구']]
     : [...AVATAR_SLOTS.map(key => [key, SLOT_LABELS[key]] as const), ['base', '기본 외형'], ['pet', '펫'], ['rod', '낚싯대']];
   return <Window title={kind === 'tackle' ? '거북이 낚시 상점' : kind === 'shop' ? '상점' : '옷장'} top={top} onClose={onClose} onCancel={() => { if (confirming) { if (!busy) setConfirming(null); } else onClose(); }}>
-    <div className="pwp-panel-summary">{selling ? <><span>{kind === 'tackle' ? '좋은 낚싯대와 미끼가 있어요.' : '마음에 드는 스타일을 골라요. 낚싯대·미끼는 강가 거북이에게!'}</span><PriceTag value={shop.balance} /></> : <><div className="pwp-preview"><PanelArt appearance={shop.equipped} /></div><span>오늘의 나 · 바꾸면 바로 보여요.</span></>}</div>
+    <div className="pwp-panel-summary">{selling ? <><span>{kind === 'tackle' ? '좋은 낚싯대와 미끼가 있어요.' : shardTab ? '오답 복습으로 모은 지식의 조각으로만 살 수 있어요.' : '마음에 드는 스타일을 골라요. 낚싯대·미끼는 강가 거북이에게!'}</span>{shardTab ? <ShardTag value={shop.shards ?? null} /> : <PriceTag value={shop.balance} />}</> : <><div className="pwp-preview"><PanelArt appearance={shop.equipped} /></div><span>오늘의 나 · 바꾸면 바로 보여요.</span></>}</div>
     <Tabs options={tabOptions} value={selling ? category : slot} onChange={value => { if (selling) setCategory(value); else setSlot(value); setConfirming(null); }} />
     <div className="pwp-panel-content">
       {!shop.ready ? <p role="status">보유 정보를 불러오는 중…</p> : shop.loadError ? <div role="alert"><p>보유 정보를 불러오지 못했어요.</p><button onClick={shop.reload}>다시 시도</button></div> : kind === 'wardrobe' && slot === 'base' ? <>
@@ -122,17 +131,27 @@ export function GamePanels({ kind, adapter: { shop, pet }, onClose, top }: { kin
             const result = await shop.buyBait!(); return result.ok ? `미끼 구매 완료! 남은 미끼 ${result.charges}회` : result.message;
           })}>미끼 구매하기</button>
         </article>}
+        {shardTab && <article className="pwp-item" data-item={CRYSTAL_BAIT.itemId}>
+          <div className="pwp-item-art"><img className="pwp-bait-icon pwp-bait-crystal" src={baitIcon} alt="보랏빛 결정이 든 미끼 통" /></div>
+          <strong>{CRYSTAL_BAIT.displayName}</strong><small>지렁이 미끼와 같은 효과 · {CRYSTAL_BAIT.charges}번 낚시</small>
+          <span>남은 미끼 {shop.baitCharges == null ? '확인 중' : `${shop.baitCharges}회`}</span><ShardTag value={CRYSTAL_BAIT.shardPrice} label="가격" />
+          <button disabled={busy || !shop.buyBaitWithShards || shop.shards == null || shardsShort(CRYSTAL_BAIT.shardPrice, shop.shards) > 0} onClick={() => void act(async () => {
+            const result = await shop.buyBaitWithShards!(); return result.ok ? `결정 미끼 구매 완료! 남은 미끼 ${result.charges}회` : result.message;
+          })}>조각으로 구매하기</button>
+        </article>}
         {kind === 'wardrobe' && <button className="pwp-item" disabled={busy || (slot === 'pet' && (!pet.ready || pet.error))} aria-pressed={slot === 'rod' ? shop.equippedRod === null : slot === 'pet' ? pet.active === null : shop.equipped[slot as PixelAvatarSlot] === null} onClick={() => slot === 'rod' ? void act(async () => await shop.equipRod(null) ? '기본 낚싯대로 바꿨어요.' : '장착하지 못했어요.') : slot === 'pet' ? void changePet(null) : void act(async () => await shop.equip(slot as PixelAvatarSlot, null) ? '기본 모습으로 바꿨어요.' : '장착하지 못했어요.')}>{slot === 'rod' && <RodIcon />}<strong>{slot === 'rod' ? '기본 낚싯대' : slot === 'pet' ? '친구 쉬게 하기' : `기본 ${SLOT_LABELS[slot as PixelAvatarSlot]}`}</strong></button>}
         {entries.map(item => {
           const state = itemState(item, wardrobeOwned, shop.equipped, pet.active, shop.equippedRod);
-          const short = pointsShort(item.price, shop.balance);
+          const shardPrice = item.shardPrice;
+          const short = shardPrice != null ? (shop.shards == null ? shardPrice : shardsShort(shardPrice, shop.shards)) : pointsShort(item.price, shop.balance);
           const disabled = busy || (item.category === 'pet' && (!pet.ready || pet.error));
           return <article className="pwp-item" key={item.itemId} data-item={item.itemId} data-state={state}>
             <div className="pwp-item-art" aria-hidden="true">{art(item)}</div><strong>{item.displayName}</strong>{item.category === 'rod' && <><span aria-label={`${item.tier}등급`}>{'★'.repeat(item.tier)}</span><small className="pwp-rod-effects">{rodEffectText(item.itemId)}</small>{state !== 'available' && <PriceTag value={item.price} />}</>}{item.category === 'pet' && <small className="pwp-rod-effects pwp-pet-effects">{petEffectText(item.itemId)}</small>}
             {state !== 'available' ? <><span>{state === 'equipped' ? '장착 중' : '보유 중'}</span>{item.category === 'furniture' ? <span>집에서 배치할 수 있어요.</span> : item.category === 'tool' ? <span>잠자리 가까이에서 A로 휘둘러요.</span> : <button disabled={disabled || state === 'equipped'} onClick={() => item.category === 'rod' ? void act(async () => await shop.equipRod(item.itemId) ? '낚싯대를 장착했어요.' : '장착하지 못했어요.') : item.category === 'pet' ? void changePet(item.itemId) : void act(async () => await shop.equip(item.slot as PixelAvatarSlot, item.itemId) ? '장착했어요.' : '장착하지 못했어요.')}>{state === 'equipped' ? '장착 중' : item.category === 'pet' ? '함께 살기' : '장착하기'}</button>}</>
-              : <><PriceTag value={item.price} />{short > 0 ? <span className="pwp-short">{short.toLocaleString()}P 더 필요해요.</span> : confirming === item.itemId ? <><span>구매할까요?</span><button disabled={disabled} onClick={() => void act(async () => {
-                const result = await shop.purchase(item);
-                if (!result.ok) return result.reason === 'insufficient_balance' ? '포인트가 부족해요.' : result.message;
+              : <>{shardPrice != null ? <ShardTag value={shardPrice} label="가격" /> : <PriceTag value={item.price} />}{short > 0 ? <span className="pwp-short">{shardPrice != null ? `조각 ${formatShards(short)}개 더 필요해요.` : `${short.toLocaleString()}P 더 필요해요.`}</span> : confirming === item.itemId ? <><span>구매할까요?</span><button disabled={disabled} onClick={() => void act(async () => {
+                if (shardPrice != null && !shop.purchaseShardItem) return '지금은 조각으로 살 수 없어요.';
+                const result = shardPrice != null ? await shop.purchaseShardItem!(item) : await shop.purchase(item);
+                if (!result.ok) return result.reason === 'insufficient_balance' ? (shardPrice != null ? '지식의 조각이 부족해요.' : '포인트가 부족해요.') : result.message;
                 if (item.category === 'pet' && isPetId(item.itemId) && !await pet.activate(item.itemId)) return '구매 완료! 펫은 옷장에서 다시 선택해 주세요.';
                 return result.equipFailed ? '구매 완료! 옷장에서 다시 장착해 주세요.' : `${item.displayName} 구매 완료!`;
               })}>구매 확정</button><button disabled={busy} onClick={() => setConfirming(null)}>취소</button></> : <button disabled={disabled} onClick={() => setConfirming(item.itemId)}>구매하기</button>}</>}

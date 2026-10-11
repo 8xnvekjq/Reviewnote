@@ -14,6 +14,7 @@ export const FURNITURE = {
   bookshelf: { width: 1, height: 1 },
   plant: { width: 1, height: 1 },
   decoration: { width: 2, height: 1 },
+  crystalshelf: { width: 1, height: 1 },
 } as const;
 export const SHIRTS = ['default', 'blue', 'sage'] as const;
 export const HATS = ['none'] as const;

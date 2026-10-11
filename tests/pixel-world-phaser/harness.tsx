@@ -76,7 +76,9 @@ function Harness() {
   const [look, setLook] = useState(appearance);
   const [active, setActive] = useState(pet);
   const [balance, setBalance] = useState(1234);
-  const [ownedIds, setOwnedIds] = useState(new Set(PIXEL_CATALOG.filter(item => item.category === 'avatar' || item.category === 'pet' || params.has('roomEdit') && item.category === 'furniture' && (params.get('roomEdit') === 'all' || ['desk', 'bed', 'plant', 'chair'].includes(item.assetKey))).map(item => item.itemId)));
+  const [shards, setShards] = useState(Number(params.get('shards') ?? '20.5'));
+  // 지식의 조각 전용 아이템은 처음엔 갖고 있지 않다(조각 상점 칸을 시험한다).
+  const [ownedIds, setOwnedIds] = useState(new Set(PIXEL_CATALOG.filter(item => item.shardPrice == null || params.get('roomEdit') === 'all').filter(item => item.category === 'avatar' || item.category === 'pet' || params.has('roomEdit') && item.category === 'furniture' && (params.get('roomEdit') === 'all' || ['desk', 'bed', 'plant', 'chair'].includes(item.assetKey))).map(item => item.itemId)));
   // 서버 없이 모든 패션과 친구를 장착하고 가구 구매를 시험한다.
   const adapter: PanelAdapter = {
     shop: { equippedRod, equipRod: async id => { if (id && !ownedIds.has(id)) return false; setEquippedRod(id); return true; }, ready: true, loadError: false, mutating: false, catalog: [...PIXEL_CATALOG], equipped: look, ownedIds, balance, reload: () => {},
@@ -88,6 +90,14 @@ function Harness() {
         setOwnedIds(value => new Set([...value, item.itemId])); setBalance(value => value - item.price);
         if (item.category === 'avatar') setLook(value => ({ ...value, [item.slot]: item.assetKey }));
         return { ok: true, itemId: item.itemId, newBalance: balance - item.price };
+      },
+      shards,
+      purchaseShardItem: async item => {
+        if (ownedIds.has(item.itemId)) return { ok: false, reason: 'already_owned', message: '이미 보유하고 있어요.' };
+        if (item.shardPrice == null || shards < item.shardPrice) return { ok: false, reason: 'insufficient_balance', message: '지식의 조각이 부족해요.' };
+        setOwnedIds(value => new Set([...value, item.itemId])); setShards(value => Math.round((value - item.shardPrice!) * 100) / 100);
+        if (item.category === 'avatar') setLook(value => ({ ...value, [item.slot]: item.assetKey }));
+        return { ok: true, itemId: item.itemId, newBalance: balance };
       },
     },
     pet: { active, ready: true, busy: false, error: false, reload: () => {}, activate: async id => { setActive(id); return true; } },

@@ -46,3 +46,7 @@
 .pwp-window-small > *:not(:first-child) { overflow-y: auto; min-height: 0; }
 
 .pwp-rod-effects { font-size:12px; line-height:1.5; overflow-wrap:anywhere; }
+/* 지식의 조각 — 보라색 재화. 포인트(P) 가격과 한눈에 구분되게 글자도 보라로. */
+.pwp-shard-price { color:#7c4ddb; font-variant-numeric:tabular-nums; }
+.pwp-shard-price svg { flex:none; filter:drop-shadow(0 0 2px rgba(168,120,240,.6)); }
+.pwp-bait-crystal { filter:hue-rotate(220deg) saturate(1.4); }

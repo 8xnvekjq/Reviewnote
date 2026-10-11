@@ -4,7 +4,7 @@ import type { FurnitureType } from '../../pixel-room/model';
 export const FURNITURE_NAMES: Record<FurnitureType, string> = {
   bed: '포근한 침대', desk: '나무 책상', chair: '작은 의자', bookshelf: '나의 책장', plant: '초록 화분', decoration: '작은 장식',
   roundtable: '레이스 원형 테이블', television: '레트로 TV 장식장', aquarium: '작은 바다 수조', globe: '여행자의 지구본',
-  tallplant: '키 큰 초록 식물', floorlamp: '격자 갓 스탠드',
+  tallplant: '키 큰 초록 식물', floorlamp: '격자 갓 스탠드', crystalshelf: '수정 서재',
 };
 
 export const FURNITURE_LINES: Record<FurnitureType, readonly string[]> = {
@@ -20,4 +20,5 @@ export const FURNITURE_LINES: Record<FurnitureType, readonly string[]> = {
   globe: ['지구본을 빙글 돌려 봤어요.', '언젠가 가 보고 싶은 나라에 손가락이 멈췄어요.'],
   tallplant: ['천장에 닿을 만큼 키가 컸어요.', '초록 잎을 보니 눈이 시원해져요.'],
   floorlamp: ['딸깍! 은은한 불빛이 방을 채워요.', '밤늦게 공부할 때 든든한 친구예요.'],
+  crystalshelf: ['복습을 마칠 때마다 모은 지식의 조각이 은은하게 빛나요.', '틀렸던 문제를 다시 맞힌 기억이 한 칸씩 꽂혀 있어요.'],
 };

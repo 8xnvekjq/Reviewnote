@@ -12,6 +12,8 @@ export const AVATAR_ROW_BY_SLOT: Record<AppearanceLayerKey, Record<string, numbe
   top: {
     default: 0, sage: 1, blue: 2, necktie: 8, stripe: 11, vest: 17, sleeveless: 25,
     ribbon_red: 14, ribbon_blue: 15, ribbon_black: 16, vest_black: 19,
+    // row 29: 지식의 조각 전용 학자 로브 — row 17(조끼)을 보라·금색으로 바꾼 행(scripts/pixel-world/draw-scholar-robe.py).
+    scholar: 29,
   },
   bottom: { denim: 8, shorts_blue: 2, shorts_black: 4, pants_black: 10 },
   shoes: { low: 7 },
