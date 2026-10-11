@@ -32,7 +32,7 @@ type Props = {
 } & (
   | { client: ExamClient; review?: undefined }
   /** 관리자 읽기 전용 검토: 서버 필기만 읽고, 오답노트 담기·필기 저장은 하지 않는다. */
-  | { client: Pick<AdminExamApi, 'getInk' | 'getInkReplay'>; review: { studentName: string } }
+  | { client: Pick<AdminExamApi, 'getInk' | 'getInkReplay' | 'listPeerSolutions' | 'getPeerSolutionByKey'>; review: { studentName: string } }
 );
 
 interface BodyProps {
@@ -91,7 +91,7 @@ function StudentResult({ client, result, onBack, backLabel, onRevise, busy = fal
 }
 
 function ReviewResult({ client, result, onBack, backLabel, studentName, videoApi }: {
-  client: Pick<AdminExamApi, 'getInk' | 'getInkReplay'>; result: ExamResult; onBack: () => void; backLabel?: string; studentName: string;
+  client: Pick<AdminExamApi, 'getInk' | 'getInkReplay' | 'listPeerSolutions' | 'getPeerSolutionByKey'>; result: ExamResult; onBack: () => void; backLabel?: string; studentName: string;
   /** 관리자 본인 응시를 검토할 때만: 해설 영상 칸과 문항별 링크. */
   videoApi?: VideoApi;
 }) {
@@ -122,8 +122,9 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, onRevise, i
   const [addMessage, setAddMessage] = useState<string | null>(null);
   const [viewing, setViewing] = useState<ExamResultItem | null>(null);
   const [pageZoom, setPageZoom] = useState(false);
-  const peerSession = useMemo(() => !reviewing && client.listPeerSolutions && client.getPeerSolutionByKey
-    ? new PeerSolutionSession(client as PeerSolutionApi, initial.attemptId) : null, [client, initial.attemptId, reviewing]);
+  // 관리자 검토 화면에서도 다른 학생 풀이를 볼 수 있다(검토 중인 학생 본인 풀이는 서버가 뺀다).
+  const peerSession = useMemo(() => client.listPeerSolutions && client.getPeerSolutionByKey
+    ? new PeerSolutionSession(client as PeerSolutionApi, initial.attemptId) : null, [client, initial.attemptId]);
   const openQuestion = (item: ExamResultItem | null) => { setViewing(item); };
 
   const candidates = useMemo(() => mistakeCandidates(result.items), [result.items]);

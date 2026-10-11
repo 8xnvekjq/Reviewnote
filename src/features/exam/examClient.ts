@@ -265,4 +265,6 @@ export const adminExamApi: AdminExamApi = {
   getInk: (attemptId: string) => examClient.getInk(attemptId),
   getInkReplay: (attemptId: string, questionId: string) => examClient.getInkReplay(attemptId, questionId),
   getResult: (attemptId: string) => examClient.getResult(attemptId),
+  listPeerSolutions: (attemptId, questionId) => examClient.listPeerSolutions(attemptId, questionId),
+  getPeerSolutionByKey: (attemptId, questionId, solutionKey) => examClient.getPeerSolutionByKey(attemptId, questionId, solutionKey),
 };
