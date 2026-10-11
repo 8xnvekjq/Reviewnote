@@ -18,6 +18,8 @@ export class Dragonflies {
   private feet: Point = { x: 0, y: 0 };
   private direction: Facing = 'Front';
   private swungIndex = -1;
+  /** 휘두르는 중(그림 4장 ≈ 280ms) — 그동안 손에 든 잠자리채를 감춘다. 'self' = 나, 그 밖은 친구 sessionId. */
+  private swingUntil = new Map<string, number>();
   private scene: Phaser.Scene;
   private grid: Grid;
   constructor(scene: Phaser.Scene, grid: Grid, id: string) {
@@ -65,9 +67,11 @@ export class Dragonflies {
   }
   /** 지금 날고 있는 잠자리 위치(디버그·시험용). */
   get positions(): Point[] { return this.bugs.flatMap(b => b.position ? [{ ...b.position }] : []); }
+  isSwinging(id: string) { return (this.swingUntil.get(id) ?? -1) > this.scene.time.now; }
   get nearby() { return this.bugs.some(b => b.position && Math.hypot(b.position.x - this.feet.x, b.position.y - this.feet.y) <= 24); }
   swing(): Facing {
     this.swungIndex = this.bugs.findIndex(b => b.position && Math.hypot(b.position.x - this.feet.x, b.position.y - this.feet.y) <= 24);
+    this.swingUntil.set('self', this.scene.time.now + 300);
     this.drawSwing(this.feet, this.direction); return this.direction;
   }
   caught() {
@@ -81,7 +85,7 @@ export class Dragonflies {
   peerSwing(payload: NetSwingPayload) {
     const spot = this.peers.get(payload.sessionId);
     if (!spot || payload.at <= (this.seen.get(payload.sessionId) ?? -Infinity)) return;
-    this.seen.set(payload.sessionId, payload.at); this.drawSwing(spot, payload.direction);
+    this.seen.set(payload.sessionId, payload.at); this.swingUntil.set(payload.sessionId, this.scene.time.now + 300); this.drawSwing(spot, payload.direction);
   }
   private drawSwing(feet: Point, direction: Facing) {
     const d = facingDelta(direction), angle = Math.atan2(d.y, d.x);

@@ -144,7 +144,7 @@ export class PlazaScene extends WorldScene {
       spots.set(id, feet); faces.set(id, peerAnimalFace(p));
       if (f.tag) { updateAnimalTag(f.tag, feet, peerAnimalFace(p), p.riding === true && p.pet === 'pet_bear'); }
       updatePeerCompanion(f, feet, time, delta, this.spec.solid);
-      updatePeerTool(this, f, f.sprite ? { x: f.sprite.x, y: f.sprite.y } : feet);
+      updatePeerTool(this, f, f.sprite ? { x: f.sprite.x, y: f.sprite.y } : feet, 'carry', dragonfliesFor('plaza')?.isSwinging(id) ?? false);
     }
     dragonfliesFor('plaza')?.setPeers(spots, this.selfId);
     this.spacePets(delta);

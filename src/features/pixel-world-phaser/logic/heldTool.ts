@@ -2,6 +2,36 @@
 import { rodDisplay } from '../../pixel-room/shop/rods';
 import type { Hand } from './bag';
 import type { HeldToolSpec } from '../game/heldTool';
+import type { Facing } from './joystick';
+
+export type HeldToolMode = 'carry' | 'windup' | 'cast';
+type Pt = { x: number; y: number };
+/** 손 위치와 낚싯대 끝(발 기준). behind: 몸 뒤라 캐릭터보다 먼저 그린다. */
+export function heldToolPose(facing: Facing, mode: HeldToolMode = 'carry'): { hand: Pt; tip: Pt; behind: boolean } {
+  const side = facing === 'Left' ? -1 : 1;
+  if (facing === 'Left' || facing === 'Right') {
+    const hand = { x: 6 * side, y: -11 };
+    if (mode === 'windup') return { hand, tip: { x: -16 * side, y: -33 }, behind: true };   // 머리 뒤로 젖힘
+    if (mode === 'cast') return { hand, tip: { x: 24 * side, y: -19 }, behind: false };     // 물 쪽으로 내밂
+    return { hand, tip: { x: 13 * side, y: -31 }, behind: false };
+  }
+  if (facing === 'Back') {
+    const hand = { x: -6, y: -12 };
+    if (mode === 'windup') return { hand, tip: { x: -4, y: 2 }, behind: false };            // 화면 쪽으로 젖힘
+    if (mode === 'cast') return { hand, tip: { x: -5, y: -38 }, behind: true };             // 위(물 쪽)로 내밂
+    return { hand, tip: { x: -10, y: -31 }, behind: true };
+  }
+  const hand = { x: 6, y: -11 };
+  if (mode === 'windup') return { hand, tip: { x: 4, y: -36 }, behind: true };              // 머리 위 뒤로
+  if (mode === 'cast') return { hand, tip: { x: 8, y: 9 }, behind: false };                 // 아래(물 쪽)로 내밂
+  return { hand, tip: { x: 10, y: -30 }, behind: false };
+}
+/** 낚싯줄이 나가는 곳(낚싯대 끝, 발 기준 → 월드 좌표). */
+export const rodTip = (feet: Pt, facing: Facing, mode: HeldToolMode): Pt => {
+  const { tip } = heldToolPose(facing, mode);
+  return { x: feet.x + tip.x, y: feet.y + tip.y };
+};
+
 
 export function heldToolFor(hand: Hand | null | undefined, rodId: string | null): HeldToolSpec | null {
   if (hand === 'net') return { kind: 'net', color: 0 };

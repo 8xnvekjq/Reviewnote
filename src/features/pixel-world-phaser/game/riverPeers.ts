@@ -1,5 +1,6 @@
 import { dragonfliesFor } from './dragonflies';
-import { HeldTool, updatePeerTool } from './heldTool';
+import { HeldTool, rodTip, updatePeerTool } from './heldTool';
+import { heldToolFromTag } from '../logic/heldTool';
 import { RIDING_RADIUS, PERSON_RADIUS } from '../logic/softCollision';
 import { createAnimalTag, updateAnimalTag, animalTagSnapshot, peerAnimalFace } from './animalTag';
 import { updatePeerCompanion, peerCompanionSnapshot } from './peerCompanion';
@@ -71,7 +72,8 @@ export class RiverPeers {
       spots.set(id, feet); faces.set(id, peerAnimalFace(p));
       if (f.tag) { updateAnimalTag(f.tag, feet, peerAnimalFace(p), p.riding === true && p.pet === 'pet_bear'); }
       updatePeerCompanion(f, feet, time, deltaMs, this.solid);
-      updatePeerTool(this.scene, f, f.sprite ? { x: f.sprite.x, y: f.sprite.y } : feet);
+      const view = this.fishing[id], lineOut = !!view?.target && ['casting', 'waiting', 'bite', 'reeling'].includes(view.phase);
+      updatePeerTool(this.scene, f, f.sprite ? { x: f.sprite.x, y: f.sprite.y } : feet, lineOut ? 'cast' : 'carry', dragonfliesFor('river')?.isSwinging(id) ?? false);
       this.drawLine(f, feet, this.fishing[id], now, time);
     }
     for (const [id, view] of Object.entries(this.fishing)) {
@@ -152,7 +154,9 @@ export class RiverPeers {
       return;
     }
     const line = f.fishing ?? (f.fishing = this.makeLine());
-    const d = facingDelta(f.state.direction), from = { x: feet.x + d.x * 9, y: feet.y - 14 + d.y * 4 }, to = view.target!;
+    const d = facingDelta(f.state.direction), to = view.target!;
+    // 낚싯대를 든 친구는 내민 낚싯대 끝에서 줄이 나간다.
+    const from = heldToolFromTag(f.state.tool)?.kind === 'rod' ? rodTip(feet, f.state.direction, 'cast') : { x: feet.x + d.x * 9, y: feet.y - 14 + d.y * 4 };
     const progress = view.phase === 'casting' ? Math.max(0, Math.min(1, (now - view.since) / CAST_FLIGHT_MS)) : 1;
     const x = from.x + (to.x - from.x) * progress;
     const y = from.y + (to.y - from.y) * progress - Math.sin(progress * Math.PI) * 24

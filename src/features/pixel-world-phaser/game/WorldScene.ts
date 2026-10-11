@@ -1,6 +1,6 @@
 import { Dragonflies } from './dragonflies';
 import { HeldTool } from './heldTool';
-import type { HeldToolSpec } from './heldTool';
+import type { HeldToolMode, HeldToolSpec } from './heldTool';
 // 모든 걸어 다니는 장면(앞마당·방, 다음은 광장·밭)의 공통 바탕. 플레이어 이동/충돌/달리기, 카메라 따라가기,
 // A 대상 "!" 표시, 탭해서 걷기, 따라오는 펫, 출구를 밟으면 화면을 어둡게 했다가 다음 장면으로 넘어가기까지
 // 여기서 한 번에 처리한다. 하위 장면은 drawWorld()로 그림만 그린다(어디가 막혔는지·출구·입구는
@@ -479,7 +479,8 @@ export abstract class WorldScene extends Phaser.Scene {
     this.player.setPosition(Math.round(this.feet.x), Math.round(this.feet.y)).setDepth(this.feet.y);
     this.shadow.setPosition(Math.round(this.feet.x), Math.round(this.feet.y)).setDepth(this.feet.y - 0.5);
     // 곰을 탄 동안은 도구를 감춘다(손이 고삐에 있다).
-    this.heldTool.update(this.ctx.riding ? null : this.ctx.heldTool, this.feet.x, this.feet.y, this.facing, this.feet.y, this.player.alpha);
+    this.heldTool.update(this.ctx.riding ? null : this.ctx.heldTool, this.feet.x, this.feet.y, this.facing, this.feet.y, this.player.alpha,
+      this.heldToolMode(), this.dragonflies?.isSwinging('self') ?? false);
     this.updatePet(deltaMs);
     if (this.spec.id !== 'plaza' && this.spec.id !== 'river') this.spacePets(deltaMs);
     // 출구를 밟으면 넘어간다(들어오자마자 출구 위였다면 한 번 벗어난 뒤부터).
@@ -721,6 +722,8 @@ export abstract class WorldScene extends Phaser.Scene {
   }
 
   /** 배치 중에는 캐릭터·펫을 흐리게 하고 상호작용 표시를 숨긴다. */
+  /** 손에 든 도구의 자세. 강가는 낚시할 때 젖히고 내민다. */
+  protected heldToolMode(): HeldToolMode { return 'carry'; }
   protected setPlacingActors(active: boolean) {
     this.placing = active;
     this.player.setAlpha(active ? 0.35 : 1);

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_HAND, parseBag, parseHand } from '../../src/features/pixel-world-phaser/logic/bag';
 import { heldToolFor, heldToolFromTag, heldToolTag } from '../../src/features/pixel-world-phaser/logic/heldTool';
-import { heldToolPose } from '../../src/features/pixel-world-phaser/game/heldTool';
+import { heldToolPose, rodTip } from '../../src/features/pixel-world-phaser/logic/heldTool';
 import { parseBugFinish, parseBugStart, parseBugState } from '../../src/features/pixel-world-phaser/ui/bugAdapter';
 import { protocolExtras } from '../../src/features/pixel-room/plaza/presenceProtocol';
 import { minReelMs } from '../../src/features/pixel-world-phaser/logic/reelGame';
@@ -36,6 +36,10 @@ test('손에 든 도구 그리기·친구에게 보내는 표시', () => {
   // 위를 볼 때만 몸 뒤, 왼쪽·오른쪽은 반대편 손.
   assert.equal(heldToolPose('Back').behind, true); assert.equal(heldToolPose('Front').behind, false);
   assert.ok(heldToolPose('Left').hand.x < 0 && heldToolPose('Right').hand.x > 0);
+  // 낚싯대: A를 누르면 뒤로 젖히고(끝이 등 뒤), 던지면 앞으로 내밀어 줄이 그 끝에서 나간다.
+  assert.ok(heldToolPose('Right', 'windup').tip.x < 0 && heldToolPose('Left', 'windup').tip.x > 0);
+  assert.ok(heldToolPose('Right', 'cast').tip.x > heldToolPose('Right').tip.x);
+  assert.deepEqual(rodTip({ x: 100, y: 200 }, 'Right', 'cast'), { x: 124, y: 181 });
 });
 
 test('광장·강가 신호: 도구 표시는 정해진 모양만 통과한다', () => {

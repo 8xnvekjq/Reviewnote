@@ -1,4 +1,6 @@
 import type Phaser from 'phaser';
+import { rodTip } from './heldTool';
+import type { HeldToolMode } from './heldTool';
 import type { Point } from '../logic/joystick';
 import { RIVER_COLS, RIVER_ROWS, DOCK, TURTLE, FISHBOARD, inDock, riverWater, bankEdge, RIVER_DECORATIONS } from '../logic/riverWorld';
 import { cellCenter, facingDelta, facedInteractable } from '../logic/world';
@@ -95,7 +97,7 @@ export class RiverScene extends WorldScene {
     this.preview = this.add.graphics().setDepth(10003);
     // 찌와 줄은 날아간 착지점에 그린다.
     const scene = this;
-    this.fx = createFishingFx(this, { get castFrom() { return scene.castFrom; } });
+    this.fx = createFishingFx(this, { get castFrom() { return scene.lineFrom; } });
     this.peers.current = new RiverPeers(this, this.spec.solid);
     this.events.once('shutdown', () => { this.ready = false; this.spotVisuals = new Map(); this.chargeAt = null; this.water = []; this.fx = null; this.preview = null;  this.waterStars = null; this.lampGlow = null; this.peers.current?.clear(); this.peers.current = null; });
   }
@@ -155,6 +157,9 @@ export class RiverScene extends WorldScene {
   }
   fishingFx(game: FishingGame, point: Point, now: number) { this.fishingCollision = ['casting', 'waiting', 'bite', 'reeling'].includes(game.phase); if (this.ready) this.fx?.update(game, point, now); }
   get castFrom(): Point { const d = facingDelta(this.facing); return { x: this.feet.x + d.x * 9, y: this.feet.y - 14 + d.y * 4 }; }
+  /** 낚싯줄이 나가는 곳: 낚싯대를 들었으면 내민 낚싯대 끝, 맨손이면 손(예전 castFrom). 찌가 떨어지는 곳은 그대로 castFrom 기준. */
+  get lineFrom(): Point { return this.ctx.heldTool?.kind === 'rod' ? rodTip(this.feet, this.facing, 'cast') : this.castFrom; }
+  protected heldToolMode(): HeldToolMode { return this.chargeAt !== null ? 'windup' : this.fishingCollision ? 'cast' : 'carry'; }
   get canCast() { return !this.ctx.controls.frozen && !super.snapshot().transitioning && !facedInteractable(this.feet, this.facing, this.spec.interactables) && canChargeCast(this.feet, this.facing); }
   beginCast(): boolean {
     if (!this.canCast || this.chargeAt !== null) return false;
