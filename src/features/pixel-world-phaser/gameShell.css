@@ -118,3 +118,5 @@ html.pwp-open, html.pwp-open body { overflow:hidden; overscroll-behavior:none; h
 @keyframes pwp-xp-pop { from { transform:translateY(8px); opacity:0; } to { transform:translateY(0); opacity:1; } }
 @media (prefers-reduced-motion:reduce) { .pwp-xp-gain, .pwp-level-sparkles { animation:none; } }
 .pwp-shards svg { flex:none; filter:drop-shadow(0 0 2px rgba(168,120,240,.7)); }
+.pwp-bag-chip { gap:3px; padding:0 9px; font-variant-numeric:tabular-nums; }
+.pwp-bag-chip[data-heavy="true"] { background:#ffc58a; }

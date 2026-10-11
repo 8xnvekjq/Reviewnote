@@ -23,7 +23,8 @@ export const FISH_POINTS: Readonly<Record<FishRarity, number>> = { common: 1, un
 /** 잡동사니: 녹슨 동전만 1P(kind 'junk' — 상한 넘으면 0). */
 export const JUNK_POINTS: Readonly<Record<JunkId, number>> = { junk_shoe: 0, junk_can: 0, junk_coin: 1 };
 /** 서버가 결과에 실어 주는 포인트 정보. */
-export interface GamePointsResult { awarded: number; todayEarned: number; cap: number; capped: boolean }
+/** bagged: 포인트 대신 가방에 넣었다(광장 상점에서 팔면 그때 포인트). */
+export interface GamePointsResult { awarded: number; todayEarned: number; cap: number; capped: boolean; bagged?: boolean }
 
 /** 매주 월요일 0시(KST) 지난주 정산 — 등급별 물고기 챔피언(크기 점수 1등)과 수확 대회. 학생만(관리자 제외, 자리는 다음 학생에게). */
 export const FISH_TIER_REWARDS: Readonly<Record<FishRarity, number>> = { mythic: 150, legendary: 100, rare: 60, uncommon: 40, common: 25 };

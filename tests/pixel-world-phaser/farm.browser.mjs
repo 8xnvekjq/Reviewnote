@@ -64,9 +64,9 @@ try {
     await page.getByRole('button', { name: '수확물 보기', exact: true }).click();
     const collection = page.getByRole('dialog', { name: '수확물 보기', exact: true });
     await collection.getByText('이번 주 토마토 대회', { exact: true }).waitFor();
-    await collection.getByRole('button', { name: '출품하기 (+43P)', exact: true }).click();
-    await collection.getByText('🏅 출품됨 · +43P', { exact: true }).waitFor();
-    assert.match(await page.locator('.pwp-points').textContent(), /1,277/);
+    // 출품은 광장 상점 '판매'에서(가방에 들고 간다) — 수확물 보기에는 안내만.
+    await collection.getByText('🎒 가방에 있어요 · 광장 상점에서 출품 (+43P)', { exact: true }).waitFor();
+    assert.equal(await collection.getByRole('button', { name: /출품하기/ }).count(), 0);
     await page.screenshot({ path: '.pixel-world-test.local/' + name + '-collection.png' });
     await page.keyboard.press('Escape');
     await page.evaluate(() => { const h = window.__pixelWorldPhaser, p = h.debug().exits.door; h.walkToScreen(p.x, p.y); });

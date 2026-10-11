@@ -15,7 +15,7 @@ export function catchPointNote(caught: LandedCatch): string | null {
   return caught.points.todayEarned >= GAME_POINT_TOTAL_CAP ? '오늘 100P를 넘어서 1/10만 받았어요' : '오늘 상한을 넘어서 1/5만 받았어요';
 }
 function CatchPoints({ caught }: { caught: LandedCatch }) {
-  if (!caught.points) return null;
+  if (!caught.points || caught.points.bagged) return null;
   const note = catchPointNote(caught);
   return <small className="pwp-catch-points">오늘 {caught.points.todayEarned}/50P{note && <span>{note}</span>}</small>;
 }
@@ -24,7 +24,7 @@ export function CatchCard({ caught, onHide }: { caught: LandedCatch; onHide(): v
   useEffect(() => { const timer = setTimeout(onHide, 3500); return () => clearTimeout(timer); }, [caught, onHide]);
   if ('junk' in caught) return <div className="pwp-catch-card" role="status" data-testid="catch-card" data-junk={caught.junk}>
     <JunkIcon junk={caught.junk} /><strong>{JUNK_CATALOG.find(item => item.id === caught.junk)?.name}을 낚았어요!</strong>
-    <span>다음엔 물고기를 만나요!</span><span className="pwp-xp-gain">+{gainFrom(caught)?.gained ?? 1} XP{caught.points && <> · +{caught.points.awarded} P</>}</span>
+    <span>다음엔 물고기를 만나요!</span><span className="pwp-xp-gain">+{gainFrom(caught)?.gained ?? 1} XP{caught.points && (caught.points.bagged ? <> · 🎒 가방에 넣었어요</> : <> · +{caught.points.awarded} P</>)}</span>
     <CatchPoints caught={caught} />
   </div>;
   const index = FISH_CATALOG.findIndex(fish => fish.id === caught.speciesId);
@@ -36,7 +36,7 @@ export function CatchCard({ caught, onHide }: { caught: LandedCatch; onHide(): v
     <span className="pwp-fish-stars" data-rarity={caught.rarity} aria-label={`희귀도 ${RARITY_STARS[caught.rarity]}별`}>{'★'.repeat(RARITY_STARS[caught.rarity])}</span>
     {caught.percentile !== undefined && <span>상위 {caught.percentile}%</span>}
     <div className="pwp-catch-badges">{caught.isNew && <b>새 친구!</b>}{caught.isBig && <b>대물</b>}{caught.isPersonalBest && <b>새 기록!</b>}</div>
-    <span className="pwp-xp-gain">+{gainFrom(caught)?.gained ?? fishXpDisplay(caught.rarity, caught.isBig)} XP{caught.points && <> · +{caught.points.awarded} P</>}</span>
+    <span className="pwp-xp-gain">+{gainFrom(caught)?.gained ?? fishXpDisplay(caught.rarity, caught.isBig)} XP{caught.points && (caught.points.bagged ? <> · 🎒 가방에 넣었어요</> : <> · +{caught.points.awarded} P</>)}</span>
     <CatchPoints caught={caught} />
     <small aria-hidden="true">✦ ✧ ✦</small>
   </div>;

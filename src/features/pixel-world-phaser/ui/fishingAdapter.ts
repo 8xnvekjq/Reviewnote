@@ -198,7 +198,7 @@ export function parseGamePoints(raw: unknown): GamePointsResult | undefined {
   const awarded = nonnegativeInteger(raw.awarded), todayEarned = nonnegativeInteger(raw.todayEarned);
   if (awarded === undefined || todayEarned === undefined || raw.cap !== 50 || typeof raw.capped !== 'boolean'
     || awarded > todayEarned || raw.capped !== (todayEarned >= 50)) return undefined;
-  return { awarded, todayEarned, cap: 50, capped: raw.capped };
+  return { awarded, todayEarned, cap: 50, capped: raw.capped, ...(raw.bagged === true ? { bagged: true } : {}) };
 }
 function parseChampions(raw: unknown): ClassFishBoard['champions'] {
   if (!Array.isArray(raw)) return undefined;

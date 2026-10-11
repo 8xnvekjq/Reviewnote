@@ -109,7 +109,7 @@ export function BugResult({ result, onClose }: { result: BugFinish; onClose(): v
   return <Window title={caught ? '잠자리를 잡았어요!' : '놓쳤어요…'} onClose={onClose} compact small>
     <div className="pwp-bug-content" role="status">{caught && species ? <>
       <BugIcon id={caught.bugId} /><p>{species.name} · {'★'.repeat(species.stars)}{caught.isNew ? ' · 새 친구!' : ''}</p>
-      {caught.points && <p>+{caught.points.awarded} P (오늘 {caught.points.todayEarned}/{caught.points.cap}P)</p>}
+      {caught.points && (caught.points.bagged ? <p>🎒 가방에 넣었어요 · 광장 상점에서 팔 수 있어요</p> : <p>+{caught.points.awarded} P (오늘 {caught.points.todayEarned}/{caught.points.cap}P)</p>)}
       <p>+{caught.xpGain?.gained ?? species.xp} XP</p>
     </> : <p>{result.ok ? '놓쳤어요… 다시 날아올 거예요' : '결과를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.'}</p>}</div>
   </Window>;

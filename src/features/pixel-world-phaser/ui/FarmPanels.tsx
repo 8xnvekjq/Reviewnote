@@ -79,11 +79,8 @@ export function FarmPanels({ petId, riding, onRide, kind, adapter, onClose, onTa
             {adapter.inventory.crops.length === 0 && <p>아직 수확한 작물이 없어요. 토마토를 심고 키워보세요!</p>}
             {adapter.inventory.crops.map(crop => <article className="pwp-item" key={crop.id} data-crop={crop.id}>
               <div className="pwp-crop-art"><TomatoSprite stage="ripe" moisture="normal" /></div><strong>{sizeLabel(crop.sizeScore)}</strong><span>{crop.sizeScore}/100 · {formatHarvestDate(crop.harvestedAt)} 수확</span>
-              {crop.status === 'submitted' ? <span>🏅 출품됨 · +{crop.rewardPoints}P</span> : <button disabled={pending || adapter.inventory.busy} onClick={() => void act(async () => {
-                const result = await adapter.submit(crop.id);
-                if (alive.current) setMessage(result.ok ? '출품 완료! +' + result.rewardPoints + 'P' : result.reason === 'already_submitted' ? '이미 출품된 작물이에요.' : result.message);
-                await adapter.inventory.refresh(); if (alive.current) setReload(v => v + 1);
-              })}>출품하기 (+{computeSubmitReward(crop.sizeScore)}P)</button>}
+              {/* 출품은 광장 상점 '판매'에서 한다(가방에 들고 광장까지 간다). */}
+              {crop.status === 'submitted' ? <span>🏅 출품됨 · +{crop.rewardPoints}P</span> : <span>🎒 가방에 있어요 · 광장 상점에서 출품 (+{computeSubmitReward(crop.sizeScore)}P)</span>}
             </article>)}
           </div>}
       </> : <>
