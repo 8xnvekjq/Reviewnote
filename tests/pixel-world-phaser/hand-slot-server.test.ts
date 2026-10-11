@@ -74,6 +74,7 @@ end $f$;`);
   await db.exec(sql('20261012160000_pixel_bug_master_30.sql'));
   await db.exec(sql('20261012160000_pixel_bug_master_30.sql'));
   await db.exec(sql('20261012170000_pixel_bug_spawns.sql'));
+  await db.exec(sql('20261012180000_pixel_bug_spawn_reclaim.sql'));
   const rpc = async (query: string, args: any[] = []) => (await db.query<any>(query, args)).rows[0].r;
   return { db, rpc };
 }
@@ -202,5 +203,22 @@ test('잠자리 미리 정하기: 최대 2마리·20초에 한 번, 그 잠자�
     await older(); const fourth = await spawn();
     await db.exec("update public.pixel_bug_spawns set expires_at = clock_timestamp() - interval '1 second'");
     assert.equal((await start(fourth.spawnId)).reason, 'gone');
+  } finally { await db.close(); }
+});
+
+test('맵을 다시 들어오면 살아 있는 내 잠자리를 그대로 돌려준다(새로 뽑지 않는다) (PGlite)', async () => {
+  const { db, rpc } = await setup();
+  try {
+    const next = (holding: string[], release: string | null = null) => rpc('select public.next_bug_spawn($1, $2, $3) r', ['yard', release, holding]);
+    const a = await next([]);
+    await db.exec("update public.pixel_bug_spawns set created_at = created_at - interval '21 seconds'");
+    const b = await next([a.spawnId]);
+    assert.equal(a.ok && b.ok, true); assert.notEqual(a.spawnId, b.spawnId);
+    // 다시 들어온 화면(아무것도 없음): 새로 뽑지 않고 a, b를 차례로 돌려준다.
+    const again1 = await next([]), again2 = await next([again1.spawnId]);
+    assert.deepEqual([again1.spawnId, again2.spawnId].sort(), [a.spawnId, b.spawnId].sort());
+    assert.equal(again1.bugId, [a, b].find(x => x.spawnId === again1.spawnId).bugId);
+    assert.equal((await next([a.spawnId, b.spawnId])).reason, 'full');
+    assert.equal(Number((await db.query<any>('select count(*) n from public.pixel_bug_spawns')).rows[0].n), 2);
   } finally { await db.close(); }
 });
