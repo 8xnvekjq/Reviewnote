@@ -434,10 +434,10 @@
 .exam-admin-activity.is-empty { margin: 0; color: var(--rn-text-muted, #94a3b8); text-align: center; }
 .exam-admin-activity-more summary { cursor: pointer; padding: 4px 2px; color: #93c5fd; }
 .exam-admin-activity-more ul { display: grid; gap: 4px; list-style: none; margin: 4px 0 0; padding: 0; }
-.exam-admin-activity-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; width: 100%; padding: 6px 8px; text-align: left; border: 1px solid var(--rn-line, #334155); border-radius: 8px; background: transparent; color: inherit; }
-.exam-admin-activity-name { min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
-.exam-admin-activity-score { font-weight: 700; white-space: nowrap; }
-.exam-admin-activity-meta { grid-column: 1 / -1; color: var(--rn-text-muted, #94a3b8); font-size: 11px; }
+.exam-admin-activity-row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 8px; width: 100%; padding: 6px 8px; text-align: left; border: 1px solid var(--rn-line, #334155); border-radius: 8px; background: transparent; color: inherit; }
+.exam-admin-activity-name { flex: 1 0 auto; max-width: 100%; font-weight: 700; overflow-wrap: anywhere; }
+.exam-admin-activity-score { max-width: 100%; margin-left: auto; font-weight: 700; text-align: right; }
+.exam-admin-activity-meta { flex-basis: 100%; color: var(--rn-text-muted, #94a3b8); font-size: 11px; }
 
 /* ── 한능검 시대별 결과 ── */
 .exam-eras { padding: 16px 18px; display: grid; gap: 6px; }
