@@ -13,13 +13,16 @@ const active = new Map<string, Dragonflies>();
 export const dragonfliesFor = (scene: string | null) => scene ? active.get(scene) : undefined;
 const sheets = import.meta.glob('../assets/bugs/*.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
 /** 새 잠자리 받기(서버가 종류를 정한다). release: 그 자리의 이전 잠자리. */
-export type BugSpawner = (release?: string) => Promise<BugSpawn | null | 'unsupported'>;
+export type BugSpawner = (release?: string, holding?: string[]) => Promise<BugSpawn | null | 'unsupported'>;
 type Dizzy = { until: number; eyes: Phaser.GameObjects.Graphics; stars: Phaser.GameObjects.Graphics };
 export class Dragonflies {
   private bugs = [emptyRoamingBug(), emptyRoamingBug()];
   /** 자리마다 서버가 정한 잠자리(spawner가 없으면 늘 null — 예전처럼 종류 없이 난다). */
   private kinds: (BugSpawn | null)[] = [null, null];
-  private requesting = [false, false];
+  /** 한 번에 하나만 받아 온다(두 자리가 같은 잠자리를 돌려받지 않게). */
+  private requesting = false;
+  /** 맵에 들어온 시각 — 서버 연결 전 잠깐은 종류 없는 잠자리를 띄우지 않는다. */
+  private bornAt: number;
   private releases: (string | undefined)[] = [undefined, undefined];
   private spawner?: BugSpawner;
   private images: Phaser.GameObjects.Sprite[] = [];
@@ -36,7 +39,7 @@ export class Dragonflies {
   private scene: Phaser.Scene;
   private grid: Grid;
   constructor(scene: Phaser.Scene, grid: Grid, id: string) {
-    this.scene = scene; this.grid = grid;
+    this.scene = scene; this.grid = grid; this.bornAt = scene.time.now;
     active.set(id, this);
     if (!scene.textures.exists('bug-fallback')) {
       const c = document.createElement('canvas'); c.width = 16; c.height = 16;
@@ -75,10 +78,11 @@ export class Dragonflies {
   }
   private request(i: number) {
     const spawner = this.spawner;
-    if (!spawner || this.requesting[i]) return;
-    this.requesting[i] = true;
-    void spawner(this.releases[i]).catch(() => null).then(kind => {
-      this.requesting[i] = false;
+    if (!spawner || this.requesting) return;
+    this.requesting = true;
+    const holding = this.kinds.flatMap(k => k ? [k.spawnId] : []);
+    void spawner(this.releases[i], holding).catch(() => null).then(kind => {
+      this.requesting = false;
       if (!this.alive) return;
       if (kind === 'unsupported') { this.spawner = undefined; return; } // 서버가 아직 옛 버전 → 예전처럼 종류 없이
       if (kind) { this.kinds[i] = kind; this.releases[i] = undefined; }
@@ -90,7 +94,8 @@ export class Dragonflies {
     const people = [feet, ...this.peers.values()];
     this.bugs = this.bugs.map((bug, i) => {
       const image = this.images[i];
-      // 종류를 받기 전에는 나타나지 않는다.
+      // 종류를 받기 전에는 나타나지 않는다. 연결 전 1.5초도 기다린다(종류 없이 떴다가 사라지지 않게).
+      if (!bug.position && !this.spawner && time - this.bornAt < 1500) { image.setVisible(false); return bug; }
       if (!bug.position && this.spawner && !this.kinds[i]) {
         if (time >= bug.nextAt) this.request(i);
         image.setVisible(false);

@@ -22,7 +22,7 @@ export interface BugAdapter {
   start(scene: string, spawnId?: string): Promise<BugStart>;
   /** 새 잠자리 한 마리(최대 2마리, 20초에 한 번). release: 날아간 자리의 이전 잠자리. 지금은 안 되면 null,
    *  서버에 아직 이 기능이 없으면 'unsupported'(예전처럼 종류 없이 난다). */
-  spawn?(scene: string, release?: string): Promise<BugSpawn | null | 'unsupported'>;
+  spawn?(scene: string, release?: string, holding?: string[]): Promise<BugSpawn | null | 'unsupported'>;
   finish(catchId: string, caught: boolean): Promise<BugFinish>;
 }
 
@@ -100,10 +100,11 @@ export function createBugAdapter(supabase: FishingRpcClient): BugAdapter {
         return parseBugStart(await rpc('start_bug_catch', spawnId ? { p_scene: scene, p_spawn: spawnId } : { p_scene: scene }));
       } catch { return { ok: false, reason: 'error' }; }
     },
-    async spawn(scene, release) {
+    async spawn(scene, release, holding = []) {
       try {
         if (!sceneValid(scene)) return null;
-        const result = await call('spawn_bug', { p_scene: scene, p_release: release ?? null });
+        // 화면에 이미 있는 잠자리(holding)를 빼고, 살아 있는 내 잠자리를 먼저 돌려받는다(맵을 다시 들어온 경우).
+        const result = await call('next_bug_spawn', { p_scene: scene, p_release: release ?? null, p_holding: holding });
         // PostgREST: 함수가 없으면 PGRST202 — 서버가 아직 옛 버전.
         if (result.error) return (result.error as { code?: string }).code === 'PGRST202' ? 'unsupported' : null;
         return parseBugSpawn(result.data);
@@ -148,9 +149,11 @@ export function createMockBugAdapter(options: MockBugOptions = {}): BugAdapter {
     async state() {
       return { netOwned: options.netOwned === true, album: BUG_CATALOG.flatMap(b => { const entry = album.get(b.id); return entry ? [{ ...entry }] : []; }) };
     },
-    async spawn(scene, release) {
+    async spawn(scene, release, holding = []) {
       if (!sceneValid(scene)) return null;
       if (release) spawns.delete(release);
+      const kept = [...spawns].find(([id]) => !holding.includes(id));
+      if (kept) return { spawnId: kept[0], bugId: kept[1], stars: bugById(kept[1])!.stars };
       if (spawns.size >= 2) return null;
       const bug = roll(), spawnId = `mock-spawn-${++sequence}`;
       spawns.set(spawnId, bug.id);
