@@ -5,6 +5,7 @@ import { MistakeCard } from './MistakeCard';
 import { LaTeXRenderer } from './LaTeXRenderer';
 import { supabase } from '../services/supabase';
 import { getScreenState, setScreenState } from '../app/screenStateStore';
+import { onlineDisplayName } from '../utils/onlineTabLabel';
 
 interface StoredMistakeListState {
   scrollTop: number;
@@ -273,7 +274,7 @@ export const MistakeList: React.FC<MistakeListProps> = ({
                   ) : (
                     <ul className="rn-online-popup-list">
                       {onlineUsers.map(u => (
-                        <li key={u.id}><span className="rn-online-dot" aria-hidden="true" /><span>{u.nickname || u.display_name || u.username}</span></li>
+                        <li key={u.id}><span className="rn-online-dot" aria-hidden="true" /><span title={u.nickname || u.display_name || u.username}>{onlineDisplayName(u.nickname || u.display_name || u.username, isAdmin)}</span></li>
                       ))}
                     </ul>
                   )}
