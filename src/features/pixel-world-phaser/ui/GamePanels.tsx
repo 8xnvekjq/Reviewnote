@@ -9,6 +9,9 @@ import { RodIcon } from './RodIcon';
 import { rodEffectText } from '../../pixel-room/shop/rods';
 import { petEffectText } from '../../pixel-room/shop/petEffects';
 import { PanelArt } from './PanelArt';
+import { BagContents } from './BagPanel';
+import type { BagState } from './useBag';
+import type { SubmitFarmCropResult } from '../../../utils/pixelFarm';
 import { KnowledgeShardIcon } from '../../../components/KnowledgeShardIcon';
 import { CRYSTAL_BAIT, formatShards, shardsShort } from '../../../utils/knowledgeShards';
 import type { FurnitureType } from '../../pixel-room/model';
@@ -34,7 +37,9 @@ function TurtlePanel({ adapter, shop, onClose, newSpeciesId }: { adapter?: Fishi
 
 // 실제 훅과 하네스가 같은 계약으로 데이터와 동작을 전달한다.
 type ShopOptional = 'baitCharges' | 'buyBait' | 'refreshBait' | 'shards' | 'purchaseShardItem' | 'buyBaitWithShards';
-export interface PanelAdapter { shop: Omit<ReturnType<typeof usePixelShop>, ShopOptional> & Partial<Pick<ReturnType<typeof usePixelShop>, ShopOptional>>; pet: ReturnType<typeof usePet> }
+export interface PanelAdapter { shop: Omit<ReturnType<typeof usePixelShop>, ShopOptional> & Partial<Pick<ReturnType<typeof usePixelShop>, ShopOptional>>; pet: ReturnType<typeof usePet>;
+  /** 가방(광장 상점 '판매' 칸에서 팔기·토마토 출품). */
+  bag?: BagState & { submitCrop: (id: string) => Promise<SubmitFarmCropResult> } }
 export function PriceTag({ value }: { value: number }) {
   return <span className="pwp-price"><span className="pwp-coin" aria-hidden="true">P</span>{value.toLocaleString()}</span>;
 }
@@ -76,7 +81,7 @@ export function Window({ title, onClose, onCancel = onClose, children, compact =
   </div>;
 }
 // 'tackle' = 거북이 낚시 상점(낚싯대·미끼만). 광장 'shop'에서는 낚시 도구를 팔지 않는다.
-export function GamePanels({ kind, adapter: { shop, pet }, onClose, top }: { kind: Exclude<PanelKind, FishingPanelKind> | 'tackle'; adapter: PanelAdapter; onClose: () => void; top?: ReactNode }) {
+export function GamePanels({ kind, adapter: { shop, pet, bag }, onClose, top }: { kind: Exclude<PanelKind, FishingPanelKind> | 'tackle'; adapter: PanelAdapter; onClose: () => void; top?: ReactNode }) {
   const refreshBait = useRef(shop.refreshBait); refreshBait.current = shop.refreshBait;
   useEffect(() => { if (kind === 'tackle') void refreshBait.current?.(); }, [kind]);
   const selling = kind !== 'wardrobe';
@@ -110,13 +115,14 @@ export function GamePanels({ kind, adapter: { shop, pet }, onClose, top }: { kin
   const wardrobeOwned = new Set([...shop.ownedIds, 'hair_bald']);
   const entries = shardTab ? stock : panelItems(stock, selling ? category : slot, kind === 'wardrobe' ? wardrobeOwned : undefined);
   const tabOptions: readonly (readonly [string, string])[] = kind === 'tackle' ? [['all', '전체'], ['rod', '낚싯대'], ['bait', '미끼']]
-    : kind === 'shop' ? [['all', '전체'], ['shard', '지식의 조각'], ...AVATAR_SLOTS.map(key => [key, SLOT_LABELS[key]] as const), ['furniture', '가구'], ['pet', '펫'], ['tool', '도구']]
+    : kind === 'shop' ? [...(bag ? [['sell', '판매 🎒'] as const] : []), ['all', '전체'], ['shard', '지식의 조각'], ...AVATAR_SLOTS.map(key => [key, SLOT_LABELS[key]] as const), ['furniture', '가구'], ['pet', '펫'], ['tool', '도구']]
     : [...AVATAR_SLOTS.map(key => [key, SLOT_LABELS[key]] as const), ['base', '기본 외형'], ['pet', '펫'], ['rod', '낚싯대']];
   return <Window title={kind === 'tackle' ? '거북이 낚시 상점' : kind === 'shop' ? '상점' : '옷장'} top={top} onClose={onClose} onCancel={() => { if (confirming) { if (!busy) setConfirming(null); } else onClose(); }}>
-    <div className="pwp-panel-summary">{selling ? <><span>{kind === 'tackle' ? '좋은 낚싯대와 미끼가 있어요.' : shardTab ? '오답 복습으로 모은 지식의 조각으로만 살 수 있어요.' : '마음에 드는 스타일을 골라요. 낚싯대·미끼는 강가 거북이에게!'}</span>{shardTab ? <ShardTag value={shop.shards ?? null} /> : <PriceTag value={shop.balance} />}</> : <><div className="pwp-preview"><PanelArt appearance={shop.equipped} /></div><span>오늘의 나 · 바꾸면 바로 보여요.</span></>}</div>
+    <div className="pwp-panel-summary">{selling ? <><span>{kind === 'tackle' ? '좋은 낚싯대와 미끼가 있어요.' : kind === 'shop' && category === 'sell' ? '가방 속 물고기·곤충을 팔고, 토마토를 출품해요.' : shardTab ? '오답 복습으로 모은 지식의 조각으로만 살 수 있어요.' : '마음에 드는 스타일을 골라요. 낚싯대·미끼는 강가 거북이에게!'}</span>{shardTab ? <ShardTag value={shop.shards ?? null} /> : <PriceTag value={shop.balance} />}</> : <><div className="pwp-preview"><PanelArt appearance={shop.equipped} /></div><span>오늘의 나 · 바꾸면 바로 보여요.</span></>}</div>
     <Tabs options={tabOptions} value={selling ? category : slot} onChange={value => { if (selling) setCategory(value); else setSlot(value); setConfirming(null); }} />
     <div className="pwp-panel-content">
-      {!shop.ready ? <p role="status">보유 정보를 불러오는 중…</p> : shop.loadError ? <div role="alert"><p>보유 정보를 불러오지 못했어요.</p><button onClick={shop.reload}>다시 시도</button></div> : kind === 'wardrobe' && slot === 'base' ? <>
+      {kind === 'shop' && category === 'sell' && bag ? (bag.bag ? <BagContents bag={bag.bag} selling={{ state: bag, submitCrop: bag.submitCrop }} /> : <p role="status">가방을 확인하는 중…</p>)
+        : !shop.ready ? <p role="status">보유 정보를 불러오는 중…</p> : shop.loadError ? <div role="alert"><p>보유 정보를 불러오지 못했어요.</p><button onClick={shop.reload}>다시 시도</button></div> : kind === 'wardrobe' && slot === 'base' ? <>
         <p>피부색과 눈동자색은 무료예요.</p>
         {([['skin', '피부색', SKIN_TONE_OPTIONS, 'tan'], ['eyes', '눈동자색', EYE_COLOR_OPTIONS, 'navy']] as const).map(([key, label, options, fallback]) => <section key={key}><h3>{label}</h3><div className="pwp-options">{options.map(option => <button key={option.key} aria-pressed={(shop.equipped[key] ?? fallback) === option.key} disabled={busy} onClick={() => void act(async () => {
           const value = option.key === fallback ? null : option.key;

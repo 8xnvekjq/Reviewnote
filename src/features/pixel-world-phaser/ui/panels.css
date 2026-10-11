@@ -59,3 +59,21 @@
 .pwp-kiosk-list li small { grid-column:1 / -1; opacity:.75; font-size:11px; }
 .pwp-kiosk-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .pwp-kiosk-heading { margin:6px 0; font-size:14px; }
+/* 가방 */
+.pwp-bag { display:grid; gap:8px; }
+.pwp-bag-weight { display:grid; gap:3px; }
+.pwp-bag-meter { position:relative; display:block; height:8px; border-radius:4px; background:#d7c4a1; overflow:hidden; }
+.pwp-bag-meter > span { display:block; height:100%; background:#6d9d48; }
+.pwp-bag-weight[data-heavy="true"] .pwp-bag-meter > span { background:#d27a2c; }
+.pwp-bag-meter > i { position:absolute; top:0; bottom:0; width:2px; background:rgba(58,36,22,.55); }
+.pwp-bag-weight small { font-size:12px; }
+.pwp-bag-sell-all { display:flex; align-items:center; justify-content:space-between; gap:8px; font-weight:800; }
+.pwp-bag-list { display:grid; gap:6px; margin:0; padding:0; list-style:none; }
+.pwp-bag-list li { display:grid; grid-template-columns:24px minmax(0,1fr) auto; align-items:center; gap:2px 8px; padding:6px 8px; border:2px solid rgba(58,36,22,.18); border-radius:8px; background:rgba(255,255,255,.55); }
+.pwp-bag-list li > strong { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pwp-bag-list li > small { grid-column:2 / 3; font-size:11px; opacity:.8; }
+.pwp-bag-actions { grid-column:3; grid-row:1 / span 2; display:flex; gap:4px; }
+.pwp-bag-actions button { min-height:34px; padding:0 8px; }
+.pwp-bag-tomato { width:24px; height:24px; display:block; }
+.pwp-bag-tomato > * { width:100%; height:100%; }
+.pwp-bag-hint { font-size:12px; opacity:.8; }

@@ -6,6 +6,8 @@ import { BugAlbum } from './ui/BugAlbum';
 import { userAnimalFace } from '../../utils/animalFace';
 import { useWorldClock } from './ui/useWorldClock';
 import { AdminKiosk } from './ui/AdminKiosk';
+import { BagContents } from './ui/BagPanel';
+import { bagSpeedFactor } from './logic/bag';
 // 새 Pixel World(베타) 전체 화면 셸. 게임 캔버스가 화면 전체를 채우고, 모든 UI(포인트, 나가기, 전체화면,
 // 대화창, 조이스틱, A/B)는 그 프레임 "안"에 DOM으로 겹친다. 한글은 앱 웹폰트 그대로 선명하게 보이고
 // (Phaser Text는 도트 모드에서 최근접 보간이라 작은 한글이 뭉개진다), 버튼은 접근성/테스트도 쉽다.
@@ -31,7 +33,7 @@ import { loadBearRide, loadBed, loadFloors, loadFurnitureSheets, loadInterior, l
 import type { BedLook } from './game/sceneAssets';
 import type { Prompt, WorldGameHandle, WorldEvents } from './game/boot';
 import './gameShell.css';
-import { GamePanels, FishingPanels } from './ui/GamePanels';
+import { GamePanels, FishingPanels, Window } from './ui/GamePanels';
 import type { FishingAdapter, FishingOverride } from './ui/fishingAdapter';
 import { FurniturePanel } from './ui/FurniturePanel';
 import { moveFurniture, ownedFurniture, snapRoomPoint } from './logic/roomEditing';
@@ -56,7 +58,7 @@ import type { ActivityPanel, FarmAdapter } from './ui/FarmPanels';
 import { useLevel, gainFrom } from './ui/useLevel';
 import { LevelBadge, LevelToast } from './ui/LevelBadge';
 import { LevelPanel } from './ui/LevelPanel';
-type ShellPanel = 'bugs' | 'kiosk' | 'level' | PanelKind | PlazaPanel | ActivityPanel | 'furniture';
+type ShellPanel = 'bugs' | 'kiosk' | 'bag' | 'level' | PanelKind | PlazaPanel | ActivityPanel | 'furniture';
 
 export interface GameShellProps {
   face?: string;
@@ -169,6 +171,10 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   useEffect(() => { if (status === 'ready') handle.current?.setAnimalFace(animalFace); }, [animalFace, status]);
   const [riding, setRiding] = useState(false);
+  const [hudMenu, setHudMenu] = useState(false);
+  // 가방 무게 → 이동 속도(용량을 넘으면 점점 느려지고 최하 20%). 장면이 바뀌어도 boot가 기억한다.
+  const bagFactor = panels?.bag?.bag ? bagSpeedFactor(panels.bag.bag.weight, panels.bag.bag.capacity) : 1;
+  useEffect(() => { handle.current?.setLoadFactor?.(bagFactor); }, [bagFactor, status]);
   const [petMessage, setPetMessage] = useState('');
   useEffect(() => { if (!petMessage) return; const timer = window.setTimeout(() => setPetMessage(''), 4500); return () => clearTimeout(timer); }, [petMessage]);
   const [prompt, setPrompt] = useState<Prompt | null>(null);
@@ -689,21 +695,32 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
       <div ref={ring} className="pwp-stick" aria-hidden="true" style={{ width: STICK_RADIUS * 2, height: STICK_RADIUS * 2 }}><div ref={knob} className="pwp-knob" /></div>
     </div>
     <div className="pwp-hud" style={{ left: hud.x, top: hud.y, width: hud.width, height: hud.height }}>
-      <button type="button" className="pwp-chip pwp-exit" onClick={exit} aria-label="Pixel World 나가기">← 나가기</button>
-      <button type="button" className="pwp-chip" disabled={status !== 'ready' || fishing.busy || bugs.busy || !!placing} onClick={() => { void bugs.refresh(); openPanel('bugs'); }}>곤충 도감</button>
-      <span className="pwp-chip pwp-points" aria-label={`포인트 ${balance}`}><span className="pwp-coin" aria-hidden="true">P</span>{balance.toLocaleString()}</span>
-      {panels?.shop.shards != null && <span className="pwp-chip pwp-shards" title="오답 복습으로 모으는 지식의 조각" aria-label={`지식의 조각 ${formatShards(panels.shop.shards)}`}><KnowledgeShardIcon size={18} />{formatShards(panels.shop.shards)}</span>}
+      {/* 폰 한 줄에 다 보이도록: 나가기(아이콘) · 지갑(포인트|조각) · ⚙(소리·전체화면). 곤충 도감은 아래 줄(옷장 옆). */}
+      <button type="button" className="pwp-chip pwp-exit" onClick={exit} aria-label="Pixel World 나가기">←<span className="pwp-wide-only"> 나가기</span></button>
+      <span className="pwp-chip pwp-wallet">
+        <span className="pwp-points" aria-label={`포인트 ${balance}`}><span className="pwp-coin" aria-hidden="true">P</span>{balance.toLocaleString()}</span>
+        {panels?.shop.shards != null && <span className="pwp-shards" title="오답 복습으로 모으는 지식의 조각" aria-label={`지식의 조각 ${formatShards(panels.shop.shards)}`}><KnowledgeShardIcon size={16} />{formatShards(panels.shop.shards)}</span>}
+      </span>
       <span className="pwp-hud-spacer" />
-      <button type="button" className="pwp-chip pwp-icon" aria-pressed={bgm.enabled} aria-label="소리" title={bgm.enabled ? '소리 끄기' : '소리 켜기'} onClick={bgm.toggle}><span aria-hidden="true">♪</span></button>
-      {fullscreenSupported() && <button type="button" className="pwp-chip pwp-icon" aria-pressed={fullscreen} aria-label={fullscreen ? '전체화면 끄기' : '전체화면'} onClick={toggleFullscreen}>⛶</button>}
+      <span className="pwp-hud-menu">
+        <button type="button" className="pwp-chip pwp-icon" aria-label="설정" aria-expanded={hudMenu} onClick={() => setHudMenu(v => !v)}><span aria-hidden="true">⚙</span></button>
+        {hudMenu && <span className="pwp-hud-menu-list" role="group" aria-label="설정">
+          <button type="button" className="pwp-chip" aria-pressed={bgm.enabled} aria-label="소리" onClick={bgm.toggle}><span aria-hidden="true">♪</span> {bgm.enabled ? '소리 끄기' : '소리 켜기'}</button>
+          {fullscreenSupported() && <button type="button" className="pwp-chip" aria-pressed={fullscreen} aria-label={fullscreen ? '전체화면 끄기' : '전체화면'} onClick={() => { setHudMenu(false); toggleFullscreen(); }}><span aria-hidden="true">⛶</span> {fullscreen ? '전체화면 끄기' : '전체화면'}</button>}
+        </span>}
+      </span>
     </div>
     {panel === 'bugs' && <BugAlbum state={bugs.state} onClose={closePanel} />}
+    {panel === 'bag' && panels?.bag?.bag && <Window title="가방" onClose={closePanel} small><div className="pwp-panel-content"><BagContents bag={panels.bag.bag} /></div></Window>}
     {isAdmin && panel === 'kiosk' && <AdminKiosk weather={{ adapter: fishingAdapter, clock: worldClock.clock, refresh: worldClock.refresh }} onClose={closePanel} />}
     {!placing && !fishing.busy && !fishing.reelState && panel !== 'furniture' && <LevelBadge value={level} onClick={() => openPanel('level')} style={{ right: layout.width - hud.x - hud.width + 10, top: hud.y + hud.height + 8 }} />}
     {panel === 'level' && <LevelPanel value={level} onClose={closePanel} />}
     {level.celebration && <LevelToast gain={level.celebration} />}
     {panels && <div className="pwp-panel-access" style={{ left: hud.x + 10, top: hud.y + hud.height + 8 }}>
       <button type="button" className="pwp-chip" disabled={status !== 'ready' || !!placing || roomPending} onClick={() => openPanel('wardrobe')}>옷장</button>
+      <button type="button" className="pwp-chip" aria-label="곤충 도감" disabled={status !== 'ready' || fishing.busy || bugs.busy || !!placing} onClick={() => { void bugs.refresh(); openPanel('bugs'); }}><span aria-hidden="true">🦋</span>도감</button>
+      {panels.bag?.bag && <button type="button" className="pwp-chip pwp-bag-chip" data-heavy={bagFactor < 1} aria-label={`가방 ${panels.bag.bag.weight}kg / ${panels.bag.bag.capacity}kg`}
+        disabled={status !== 'ready' || !!placing} onClick={() => { void panels.bag?.refresh(); openPanel('bag'); }}><span aria-hidden="true">🎒</span>{Math.round(panels.bag.bag.weight)}/{Math.round(panels.bag.bag.capacity)}</button>}
       {riding && <button type="button" className="pwp-chip" aria-label="곰에서 내리기" disabled={!!placing || roomPending} onClick={() => handle.current?.dismount()}>내리기</button>}
       {scene?.id === 'room' && <button type="button" className="pwp-chip" disabled={status !== 'ready' || !onSaveFurniture || !panels.shop.ready || panels.shop.loadError || !!panel || !!dialogue || !!placing || roomPending} onClick={() => { setRoomMessage(''); openPanel('furniture'); }}>꾸미기</button>}
     </div>}
@@ -737,7 +754,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     {(panel === 'turtle' || panel === 'fishboard') && <FishingPanels key={panel} kind={panel} adapter={fishingAdapter} shop={panels} newSpeciesId={newFishSpeciesId ?? freshSpecies} onClose={() => { if (panel === 'turtle') setFreshSpecies(null); closePanel(); }} />}
     {scene?.id === 'river' && status === 'ready' && <RiverBridge key={'river:' + scene.visit} handle={handle} appearance={appearance} face={animalFace} pet={pet} riding={riding} panel={panel} reporter={riverReporter} swingReporter={swingReporter} />}
     {scene?.id === 'plaza' && status === 'ready' && <PlazaBridge key={'plaza:' + scene.visit} handle={handle} appearance={appearance} face={animalFace} pet={pet} riding={riding} userId={userId} panel={panel} onClose={closePanel} swingReporter={swingReporter} />}
-    {panel && panel !== 'bugs' && panel !== 'kiosk' && panel !== 'level' && panel !== 'turtle' && panel !== 'fishboard' && panel !== 'furniture' && panel !== 'shop' && panel !== 'wardrobe' && panel !== 'contest' && panel !== 'well' && panel !== 'bench' && <FarmPanels key={panel} petId={pet} riding={riding} onRide={() => { closePanel(); handle.current?.toggleRide(); }} kind={panel} adapter={farmAdapter} onClose={closePanel}
+    {panel && panel !== 'bugs' && panel !== 'kiosk' && panel !== 'bag' && panel !== 'level' && panel !== 'turtle' && panel !== 'fishboard' && panel !== 'furniture' && panel !== 'shop' && panel !== 'wardrobe' && panel !== 'contest' && panel !== 'well' && panel !== 'bench' && <FarmPanels key={panel} petId={pet} riding={riding} onRide={() => { closePanel(); handle.current?.toggleRide(); }} kind={panel} adapter={farmAdapter} onClose={closePanel}
       onXp={level.onXp} onCollection={() => openPanel('collection')} onTalk={() => { closePanel(); openDialogue('scarecrow'); }}
       onPet={kind => { closePanel(); handle.current?.reactPet(kind); }} onFx={(index, action) => handle.current?.farmFx(index, action)} />}
     {panel === 'furniture' && panels && <FurniturePanel furniture={handle.current?.getFurniture() ?? furniture} shop={panels.shop}
@@ -749,7 +766,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     </div>}
     {!placing && panel !== 'furniture' && roomMessage && <div className="pwp-room-result" role="status">{roomMessage}</div>}
     {!placing && petMessage && <div className="pwp-pet-message" role="status" aria-live="polite">{petMessage}</div>}
-    {!placing && panel !== 'furniture' && toast && <div key={toast.visit} className="pwp-toast" role="status" style={{ top: hud.y + hud.height + 6 }}>{toast.title}</div>}
+    {!placing && panel !== 'furniture' && toast && <div key={toast.visit} className="pwp-toast" role="status" style={{ top: hud.y + hud.height + 58 }}>{toast.title}</div>}
     {bugs.round && <BugGame key={bugs.round.catchId} {...bugs.round} onFinish={caught => { void bugs.finish(caught); }} onCancel={bugs.cancel} />}
     {bugs.result && <BugResult result={bugs.result} onClose={bugs.hideResult} />}
     {bugs.message && <div className="pwp-fishing-message" role="status">{bugs.message}</div>}

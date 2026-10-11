@@ -78,6 +78,8 @@ export interface WorldEvents {
 export interface WorldContext {
   face?: string;
   riding: boolean;
+  /** 가방 무게에 따른 이동 속도 배율(1 = 평소, 최하 0.2). logic/bag.ts bagSpeedFactor. */
+  loadFactor?: number;
   /** 서버가 마지막으로 알려 준 낚시 세계 시각(at = 받은 시각, Date.now 기준). */
   worldTime?: { phase: FishPhase; weather: FishWeather; at: number };
   /** 관리자 시험용 시각·날씨 덮어쓰기(관리자일 때만 셸이 넘긴다). */
@@ -93,6 +95,8 @@ export interface WorldContext {
   onSceneGone(scene: WorldScene): void;
 }
 export interface WorldDebug {
+  /** 가방 무게에 따른 이동 속도 배율. */
+  loadFactor: number;
   collision: { contacts: number; passThrough: number };
   animalTag?: ReturnType<typeof animalTagSnapshot>;
   riding: boolean; mountAnimation: string | null; riderOffset: Point | null;
@@ -421,14 +425,14 @@ export abstract class WorldScene extends Phaser.Scene {
     if (frozen) this.cancelWalk();
     else if (stick.magnitude > 0) {
       this.cancelWalk();
-      const speed = (run ? RUN_SPEED : WALK_SPEED) * rideSpeed(this.ctx.riding);
+      const speed = (run ? RUN_SPEED : WALK_SPEED) * rideSpeed(this.ctx.riding) * (this.ctx.loadFactor ?? 1);
       vx = stick.x * speed; vy = stick.y * speed;
       speedScale = stick.magnitude * (run ? RUN_SPEED / WALK_SPEED : 1);
     } else if (this.path.length) {
       const next = this.path[0];
       const dx = next.x - this.feet.x, dy = next.y - this.feet.y;
       const distance = Math.hypot(dx, dy);
-      const speed = (run ? RUN_SPEED : WALK_SPEED) * rideSpeed(this.ctx.riding);
+      const speed = (run ? RUN_SPEED : WALK_SPEED) * rideSpeed(this.ctx.riding) * (this.ctx.loadFactor ?? 1);
       if (distance <= speed * dt) {
         vx = dt > 0 ? dx / dt : 0; vy = dt > 0 ? dy / dt : 0;
       } else { vx = dx / distance * speed; vy = dy / distance * speed; }
@@ -742,6 +746,7 @@ export abstract class WorldScene extends Phaser.Scene {
     const screen = (p: Point): Point => ({ x: Math.round((p.x - camera.worldView.x) * camera.zoom / ratio), y: Math.round((p.y - camera.worldView.y) * camera.zoom / ratio) });
     return {
       collision: { contacts: this.collision.contacts, passThrough: this.collision.passThrough },
+      loadFactor: this.ctx.loadFactor ?? 1,
       riding: this.ctx.riding, mountAnimation: this.ctx.riding ? this.pet?.anims.currentAnim?.key ?? null : null, riderOffset: this.ctx.riding ? riderOffset(this.facing) : null,
       worldTint: this.outdoorTint?.debug(),
       animalTag: animalTagSnapshot(this.animalTag), avatarKey: this.player.texture.key, petId: this.pet ? this.ctx.assets.pet?.id ?? null : null,

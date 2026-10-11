@@ -26,6 +26,7 @@ export async function economyRegression(browser, base) {
       else if (name === 'get_pixel_farm') body = snapshot();
       else if (name === 'act_pixel_farm') { harvested = true; body = { ...snapshot(), result: 'ok', harvest: { sizeScore: 82 } }; }
       else if (name === 'pixel_farm_crops') body = harvested ? [{ id: 'crop', crop_type: 'tomato', size_score: 82, harvested_at: '2026-10-08T03:00:00Z', care_count: 3, status: submitted ? 'submitted' : 'stored', submitted_at: submitted ? '2026-10-08T03:00:00Z' : null, reward_points: submitted ? 43 : null }] : [];
+      else if (name === 'get_pixel_bag') body = { capacity: 20, weight: harvested && !submitted ? 1.5 : 0, items: [], crops: harvested && !submitted ? [{ id: 'crop', sizeScore: 82, unitWeight: 1.5 }] : [] };
       else if (name === 'get_weekly_crop_contest') body = { weekStart: '2026-10-05', top: [], mine: { rank: null, sizeScore: null, participantCount: 0 } };
       else if (name === 'submit_farm_crop') { submitted = true; balance += 43; body = { ok: true, cropId: 'crop', rewardPoints: 43, status: 'submitted', submittedAt: '2026-10-08T03:00:00Z' }; }
       else if (name === 'purchase_pixel_item') { const id = route.request().postDataJSON().p_item_id; owned.add(id); balance -= 25; body = { ok: true, itemId: id, newBalance: balance }; }
@@ -55,19 +56,24 @@ export async function economyRegression(browser, base) {
     await page.keyboard.press('Escape'); await walk('targets', 'scarecrow');
     await page.getByRole('button', { name: '수확물 보기', exact: true }).click();
     const collection = page.getByRole('dialog', { name: '수확물 보기', exact: true });
-    await collection.getByRole('button', { name: '출품하기 (+43P)', exact: true }).waitFor();
-    before = await debug(); const initialReads = reads;
-    await page.screenshot({ path: '.test-artifacts/pw-bugs-a/contest-before.png' });
-    await collection.getByRole('button', { name: '출품하기 (+43P)', exact: true }).click();
-    await collection.getByText(/\uCD9C\uD488\uB428 \u00b7 \+43P/).waitFor();
-    await page.waitForTimeout(600); assert.ok(reads > initialReads); await stable(before);
-    assert.match(await page.locator('.pwp-points').textContent(), /1,277/);
-    await page.screenshot({ path: '.test-artifacts/pw-bugs-a/contest-after.png' });
+    // 수확한 토마토는 가방에 들고 광장 상점 '판매'에서 출품한다.
+    await collection.getByText('🎒 가방에 있어요 · 광장 상점에서 출품 (+43P)', { exact: true }).waitFor();
+    await page.getByRole('button', { name: /^가방 1\.5kg/ }).waitFor();
     await page.keyboard.press('Escape'); await walk('exits', 'gate');
     await page.waitForFunction(() => window.__pixelWorldPhaser.debug().scene === 'plaza' && !window.__pixelWorldPhaser.debug().transitioning);
     await walk('targets', 'shop'); await page.waitForFunction(() => window.__pixelWorldPhaser.debug().prompt === 'shop' && !window.__pixelWorldPhaser.debug().moving);
     await page.locator('.pwp-btn-a').tap();
-    const shop = page.getByRole('dialog', { name: '상점', exact: true }); await shop.waitFor(); before = await debug();
+    const shop = page.getByRole('dialog', { name: '상점', exact: true }); await shop.waitFor();
+    await shop.getByRole('button', { name: '판매 🎒', exact: true }).click();
+    before = await debug(); const initialReads = reads;
+    await page.screenshot({ path: '.test-artifacts/pw-bugs-a/contest-before.png' });
+    await shop.getByRole('button', { name: '토마토 82점 출품하기' }).click();
+    await shop.getByText('출품 완료! +43P', { exact: true }).waitFor();
+    await page.waitForTimeout(600); assert.ok(reads > initialReads); await stable(before);
+    assert.match(await page.locator('.pwp-points').textContent(), /1,277/);
+    await page.getByRole('button', { name: /^가방 0kg/ }).waitFor();
+    await page.screenshot({ path: '.test-artifacts/pw-bugs-a/contest-after.png' });
+    await shop.getByRole('button', { name: '전체', exact: true }).click(); before = await debug();
     const plant = shop.locator('[data-item="furniture_plant"]');
     await plant.getByRole('button', { name: '구매하기' }).click(); await plant.getByRole('button', { name: '구매 확정' }).click();
     await plant.getByText('보유 중', { exact: true }).waitFor(); await stable(before);
@@ -85,6 +91,7 @@ export async function economyRegression(browser, base) {
     assert.equal(auto, 1, '첫 터치(A 버튼)에서 한 번');
     await page.keyboard.press('Escape'); await page.locator('.pwp-surface').tap({ position: { x: 100, y: 200 } });
     assert.equal(await page.evaluate(() => window.fullscreenCalls), auto);
+    await page.getByRole('button', { name: '설정', exact: true }).click();
     await page.getByRole('button', { name: '전체화면', exact: true }).click();
     assert.equal(await page.evaluate(() => window.fullscreenCalls), auto + 1);
     assert.deepEqual(errors, []);

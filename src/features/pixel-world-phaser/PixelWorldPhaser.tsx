@@ -9,6 +9,7 @@ import { useFurnitureSync } from './ui/useFurnitureSync';
 import type { FurnitureApi } from './ui/useFurnitureSync';
 import { hasNewerBuild } from '../../utils/appVersion';
 import { usePixelShop } from '../pixel-room/usePixelShop';
+import { useBag } from './ui/useBag';
 import { usePet } from '../pixel-room/pet/usePet';
 import { useFarmInventory } from '../pixel-room/farm/useFarmInventory';
 import { submitFarmCrop, fetchWeeklyCropContest } from '../../utils/pixelFarm';
@@ -47,7 +48,10 @@ export default function PixelWorldPhaser({ userId, pointsBalance, onExit, onPixe
   const refreshPoints = useCallback(() => pointsChanged.current?.(), []);
   // 관리자(선생님)만 ?pwClock=HH:MM / ?pwWeather= 로 시간·날씨를 바꿔 볼 수 있다. 서버도 한 번 더 확인한다.
   const clockOverride = useMemo(() => fishingOverride(location.search, isAdmin), [isAdmin]);
-  const fishingAdapter = useMemo(() => refreshAfterAward(createFishingAdapter(supabase, clockOverride), refreshPoints), [clockOverride, userId, refreshPoints]);
+  // 잡은 물고기·곤충은 가방으로 간다 — 결과가 bagged면 가방을 다시 읽는다(무게·이동 속도).
+  const bagRefresh = useRef<() => void>(() => {});
+  const refreshBag = useCallback(() => bagRefresh.current(), []);
+  const fishingAdapter = useMemo(() => refreshAfterAward(createFishingAdapter(supabase, clockOverride), refreshPoints, refreshBag), [clockOverride, userId, refreshPoints, refreshBag]);
   // 지난주 등급별 챔피언·수확 대회 보상(들어올 때 한 번 확인).
   const rewardsAdapter = useMemo(() => {
     const adapter = createRewardsAdapter(supabase);
@@ -55,7 +59,7 @@ export default function PixelWorldPhaser({ userId, pointsBalance, onExit, onPixe
     return { ...adapter, pending: async () => { const rewards = await adapter.pending(); if (rewards.length) refreshPoints(); return rewards; } };
   }, [userId, refreshPoints]);
   // 잠자리 잡기(잠자리채 소유·도감·시작/결과).
-  const bugAdapter = useMemo(() => refreshAfterAward(createBugAdapter(supabase), refreshPoints), [userId, refreshPoints]);
+  const bugAdapter = useMemo(() => refreshAfterAward(createBugAdapter(supabase), refreshPoints, refreshBag), [userId, refreshPoints, refreshBag]);
   const [face, setFace] = useState(() => userAnimalFace(userId));
   useEffect(() => {
     let cancelled = false;
@@ -64,11 +68,13 @@ export default function PixelWorldPhaser({ userId, pointsBalance, onExit, onPixe
     return () => { cancelled = true; };
   }, [userId]);
   const shop = usePixelShop(userId, pointsBalance, onPixelPurchase);
+  const bag = useBag(userId, refreshPoints);
+  bagRefresh.current = () => { void bag.refresh(); };
   const pet = usePet(userId);
   const farm = useFarm();
   const inventory = useFarmInventory(userId);
   const harvestCount = farm.snapshot?.harvestCount;
-  useEffect(() => { if (harvestCount !== undefined) void inventory.refresh(); }, [harvestCount, inventory.refresh]);
+  useEffect(() => { if (harvestCount !== undefined) { void inventory.refresh(); bagRefresh.current(); } }, [harvestCount, inventory.refresh]);
   // 처음·내 방 입장·탭 복귀 때 서버에서 다시 읽고, 저장 전에는 다른 기기의 변경을 확인한다(ui/useFurnitureSync).
   const room = useFurnitureSync(userId, serverFurniture);
   const roomError = room.error;
@@ -94,6 +100,13 @@ export default function PixelWorldPhaser({ userId, pointsBalance, onExit, onPixe
     const [stage, moisture] = part.split('/');
     return { stage, moisture } as BedLook;
   }), [key]);
+  // 토마토 출품(광장 상점 '판매'). 포인트·보관함·가방 무게를 함께 맞춘다.
+  const submitCrop = async (id: string) => {
+    const result = await submitFarmCrop(id);
+    if (result.ok) { onPointsReward?.(result.rewardPoints); shop.reload(); }
+    void inventory.refresh(); bagRefresh.current();
+    return result;
+  };
   const scarecrowLine = useCallback(() => pickScarecrowLine(farmRef.current.snapshot, farmRef.current.now), []);
   // 외형은 서버 확인이 끝난 뒤에 한 번만 장면을 만든다(기본 모습으로 먼저 떴다가 바뀌는 깜빡임 방지).
   const appearance = shop.ready ? shop.equipped : null;
@@ -104,21 +117,18 @@ export default function PixelWorldPhaser({ userId, pointsBalance, onExit, onPixe
   return <>{outdated && <div className="pwp-update" role="alert" style={UPDATE_STYLE}>새 버전이 나왔어요. 새로고침하면 다른 기기와 같은 화면이 돼요.
     <button type="button" onClick={() => location.reload()} style={{ marginLeft: 8, font: 'inherit', fontWeight: 800 }}>새로고침</button></div>}
   <GameShell face={face} isAdmin={isAdmin} onSceneChange={onScene} fishingAdapter={fishingAdapter} rewardsAdapter={rewardsAdapter} bugAdapter={bugAdapter} clockOverride={clockOverride} userId={userId} appearance={appearance} pet={!pet.error && pet.active && shop.ownedIds.has(pet.active) ? pet.active : null} balance={shop.balance} beds={beds} furniture={furniture}
-    onSaveFurniture={saveFurniture} scarecrowLine={scarecrowLine} onExit={onExit} panels={{ shop, pet }} farmAdapter={{ farm, inventory, contest: fetchWeeklyCropContest, submit: async id => {
-      const result = await submitFarmCrop(id);
-      if (result.ok) { onPointsReward?.(result.rewardPoints); shop.reload(); }
-      return result;
-    } }} /></>;
+    onSaveFurniture={saveFurniture} scarecrowLine={scarecrowLine} onExit={onExit} panels={{ shop, pet, bag: { ...bag, submitCrop } }} farmAdapter={{ farm, inventory, contest: fetchWeeklyCropContest, submit: submitCrop }} /></>;
 }
 
 const UPDATE_STYLE = { position: 'fixed', left: '50%', top: 'max(56px, calc(env(safe-area-inset-top) + 56px))', transform: 'translateX(-50%)', zIndex: 2147483001,
   background: '#fff4d9', color: '#3b2a1a', border: '2px solid #3b2a1a', borderRadius: 8, padding: '8px 12px', fontWeight: 700, fontSize: 14, maxWidth: 'calc(100vw - 32px)' } as const;
 
 // 서버가 결과에 실어 준 포인트(points.awarded)가 있으면 이미 point_adjustment에 더해진 것 — 잔액을 다시 읽게 한다.
-function refreshAfterAward<A extends { finish(...args: never[]): Promise<unknown> }>(adapter: A, refresh: () => void): A {
+function refreshAfterAward<A extends { finish(...args: never[]): Promise<unknown> }>(adapter: A, refresh: () => void, bagged?: () => void): A {
   return { ...adapter, finish: async (...args: Parameters<A['finish']>) => {
-    const result = await adapter.finish(...args) as { points?: { awarded?: number } } | undefined;
+    const result = await adapter.finish(...args) as { points?: { awarded?: number; bagged?: boolean } } | undefined;
     if ((result?.points?.awarded ?? 0) > 0) refresh();
+    if (result?.points?.bagged) bagged?.();
     return result;
   } };
 }

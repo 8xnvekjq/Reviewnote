@@ -17,6 +17,7 @@ import type { Placement } from '../../src/features/pixel-room/model';
 import type { FishingAdapter } from '../../src/features/pixel-world-phaser/ui/fishingAdapter';
 import { createMockFishingAdapter } from '../../src/features/pixel-world-phaser/ui/fishingAdapterMock';
 import { parseClockOverride } from '../../src/features/pixel-world-phaser/logic/worldClock';
+import type { Bag } from '../../src/features/pixel-world-phaser/logic/bag';
 
 const params = new URLSearchParams(location.search);
 const appearance: PublicAvatarAppearance = {
@@ -79,8 +80,30 @@ function Harness() {
   const [shards, setShards] = useState(Number(params.get('shards') ?? '20.5'));
   // 지식의 조각 전용 아이템은 처음엔 갖고 있지 않다(조각 상점 칸을 시험한다).
   const [ownedIds, setOwnedIds] = useState(new Set(PIXEL_CATALOG.filter(item => item.shardPrice == null || params.get('roomEdit') === 'all').filter(item => item.category === 'avatar' || item.category === 'pet' || params.has('roomEdit') && item.category === 'furniture' && (params.get('roomEdit') === 'all' || ['desk', 'bed', 'plant', 'chair'].includes(item.assetKey))).map(item => item.itemId)));
+  // 가방(?bag=무게kg 시험): 서버 없이 물고기·곤충 팔기와 토마토 출품을 시험한다.
+  const [bag, setBag] = useState<Bag>(() => {
+    const extra = Number(params.get('bag') ?? '0');
+    const items: Bag['items'] = [{ kind: 'fish', ref: 'buri', qty: 3, unitWeight: 1, unitPoints: 1 }, { kind: 'bug', ref: 'dragonfly_red', qty: 1, unitWeight: 0.3, unitPoints: 2 }];
+    if (extra > 0) items.push({ kind: 'fish', ref: 'pirami', qty: extra, unitWeight: 1, unitPoints: 1 });
+    const crops: Bag['crops'] = [{ id: 'crop-1', sizeScore: 82, unitWeight: 1.5 }];
+    const weight = items.reduce((n, i) => n + i.qty * i.unitWeight, 0) + crops.length * 1.5;
+    return { capacity: 20, weight: Math.round(weight * 100) / 100, items, crops };
+  });
+  const reweigh = (next: Omit<Bag, 'weight'>): Bag => ({ ...next, weight: Math.round((next.items.reduce((n, i) => n + i.qty * i.unitWeight, 0) + next.crops.length * 1.5) * 100) / 100 });
+  const bagState: NonNullable<PanelAdapter['bag']> = { bag, busy: false, refresh: async () => {},
+    sell: async items => {
+      let sold = 0, value = 0;
+      const left = bag.items.flatMap(item => { const want = items === null ? item.qty : Math.min(item.qty, items.filter(i => i.kind === item.kind && i.ref === item.ref).reduce((n, i) => n + i.qty, 0));
+        sold += want; value += want * item.unitPoints; return item.qty - want > 0 ? [{ ...item, qty: item.qty - want }] : []; });
+      const next = reweigh({ capacity: bag.capacity, items: left, crops: bag.crops });
+      setBag(next); setBalance(v => v + value);
+      return sold ? { ok: true as const, sold, value, awarded: value, bag: next } : { ok: false as const, message: '팔 물건이 없어요.', bag: next };
+    },
+    submitCrop: async id => { setBag(current => reweigh({ capacity: current.capacity, items: current.items, crops: current.crops.filter(c => c.id !== id) })); setBalance(v => v + 43); return { ok: true, cropId: id, rewardPoints: 43, submittedAt: new Date().toISOString(), status: 'submitted' }; },
+  };
   // 서버 없이 모든 패션과 친구를 장착하고 가구 구매를 시험한다.
   const adapter: PanelAdapter = {
+    bag: bagState,
     shop: { equippedRod, equipRod: async id => { if (id && !ownedIds.has(id)) return false; setEquippedRod(id); return true; }, ready: true, loadError: false, mutating: false, catalog: [...PIXEL_CATALOG], equipped: look, ownedIds, balance, reload: () => {},
       equip: async (slot, id) => { const item = PIXEL_CATALOG.find(entry => entry.itemId === id); if (id && (!item || !ownedIds.has(id))) return false; setLook(value => ({ ...value, [slot]: item?.assetKey ?? null })); return true; },
       setBaseAppearance: async (skin, eyes) => { setLook(value => ({ ...value, skin, eyes })); return true; },

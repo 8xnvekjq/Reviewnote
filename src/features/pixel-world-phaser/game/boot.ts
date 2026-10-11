@@ -44,6 +44,8 @@ export interface WorldGameHandle {
   interact(): void;
   toggleRide(): void;
   dismount(): void;
+  /** 가방 무게 → 이동 속도 배율(장면이 바뀌어도 유지된다). */
+  setLoadFactor(factor: number): void;
   reactPet(kind: 'feed' | 'pet'): void;
   farmFx(index: number, action: string): void;
   setAnimalFace(face: string): void;
@@ -184,6 +186,7 @@ export function startWorldGame(parent: HTMLElement, start: WorldStart, controls:
       interact: () => active?.interact(),
       toggleRide: () => active?.toggleRide(),
       dismount: () => active?.dismount(),
+      setLoadFactor: factor => { ctx.loadFactor = Math.min(1, Math.max(0.2, factor)); },
       reactPet: kind => active?.reactPet(kind),
       farmFx: (index, action) => active?.farmFx(index, action),
       setAnimalFace: face => { ctx.face = face; },
