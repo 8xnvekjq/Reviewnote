@@ -4,7 +4,8 @@ import { GameShell } from '../../src/features/pixel-world-phaser/GameShell';
 import { usePixelShop } from '../../src/features/pixel-room/usePixelShop';
 import { createMockFishingAdapter } from '../../src/features/pixel-world-phaser/ui/fishingAdapterMock';
 import type { LevelFishingAdapter } from '../../src/features/pixel-world-phaser/ui/useLevel';
-import { levelForXp } from '../../src/features/pixel-world-phaser/logic/levels';
+import { levelForXp, playerLevelFromXp } from '../../src/features/pixel-world-phaser/logic/levels';
+import { parsePlayerLevel } from '../../src/features/pixel-world-phaser/ui/fishingAdapter';
 import { useFarm } from '../../src/features/pixel-room/farm/useFarm';
 import { supabase } from '../../src/services/supabase';
 import type { FarmAdapter } from '../../src/features/pixel-world-phaser/ui/FarmPanels';
@@ -15,17 +16,17 @@ function Harness() {
   const [count, setCount] = useState(0);
   const shop = usePixelShop('level-test', balance, value => { setBalance(value); setCount(v => v + 1); });
   const adapter = useMemo<LevelFishingAdapter>(() => {
-    let xp = 1245;
+    let xp = 1148;
     let clockOffset = 0;
     const mock = createMockFishingAdapter({ seed: 11, baitCharges: 273, now: () => Date.now() + clockOffset });
-    const getLevel = async () => harvestFixture ? (await supabase.rpc('get_pixel_level')).data : ({ xp, ...levelForXp(xp), maxLevel: 100 });
+    const getLevel = async () => harvestFixture ? parsePlayerLevel((await supabase.rpc('get_pixel_level')).data) ?? null : playerLevelFromXp({ fishing: xp, farming: 1148 });
     return { ...mock, getLevel, state: async () => ({ ...await mock.state(), level: await getLevel() }),
       start: async index => { const cast = await mock.start(index); return cast.ok ? { ...cast, difficulty: 1 } : cast; },
       finish: async (id, landed) => {
         // UI 확인용 쉬운 릴이 서버 모의 캐스트의 최소 시간을 채우게 한다.
         if (landed) clockOffset += 20000;
         const result = await mock.finish(id, landed);
-        if (result.ok && result.landed) { xp += 25; return { ...result, rarity: 'rare', xpGain: { gained: 25, xp, level: levelForXp(xp).level, leveledUp: true } }; }
+        if (result.ok && result.landed) { xp += 25; return { ...result, rarity: 'rare', xpGain: { gained: 25, xp, level: levelForXp(xp).level, leveledUp: true, track: 'fishing' as const } }; }
         return result;
       },
     };

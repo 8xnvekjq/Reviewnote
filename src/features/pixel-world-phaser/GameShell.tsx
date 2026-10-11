@@ -701,7 +701,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     {isAdmin && panel === 'kiosk' && <AdminKiosk weather={{ adapter: fishingAdapter, clock: worldClock.clock, refresh: worldClock.refresh }} onClose={closePanel} />}
     {!placing && !fishing.busy && !fishing.reelState && panel !== 'furniture' && <LevelBadge value={level} onClick={() => openPanel('level')} style={{ right: layout.width - hud.x - hud.width + 10, top: hud.y + hud.height + 8 }} />}
     {panel === 'level' && <LevelPanel value={level} onClose={closePanel} />}
-    {level.celebration && <LevelToast level={level.celebration.level} />}
+    {level.celebration && <LevelToast gain={level.celebration} />}
     {panels && <div className="pwp-panel-access" style={{ left: hud.x + 10, top: hud.y + hud.height + 8 }}>
       <button type="button" className="pwp-chip" disabled={status !== 'ready' || !!placing || roomPending} onClick={() => openPanel('wardrobe')}>옷장</button>
       {riding && <button type="button" className="pwp-chip" aria-label="곰에서 내리기" disabled={!!placing || roomPending} onClick={() => handle.current?.dismount()}>내리기</button>}
