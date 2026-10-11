@@ -170,5 +170,7 @@ export function usePixelShop(userId: string, initialBalance: number, onBalanceCh
     } finally { mutationLock.current = false; if (mounted.current) setMutating(false); }
   }
   async function refreshBait() { const charges = await fetchPixelBaitCharges(); if (mounted.current) setBaitCharges(charges); }
-  return { shards, purchaseShardItem, buyBaitWithShards, refreshBait, baitCharges, buyBait, equippedRod, equipRod, ownedIds, equipped, catalog, balance, ready, loadError, reload, equip, purchase, setBaseAppearance, mutating };
+  // 가방 손 칸에서 낚싯대를 바꾸면 옷장 표시도 맞춘다(서버는 이미 바뀌었다).
+  const syncEquippedRod = (rodId: string | null) => { if (mounted.current) setEquippedRod(rodId); };
+  return { shards, purchaseShardItem, buyBaitWithShards, refreshBait, baitCharges, buyBait, equippedRod, equipRod, syncEquippedRod, ownedIds, equipped, catalog, balance, ready, loadError, reload, equip, purchase, setBaseAppearance, mutating };
 }

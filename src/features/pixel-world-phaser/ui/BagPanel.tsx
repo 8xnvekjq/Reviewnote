@@ -3,7 +3,11 @@
 import { useState } from 'react';
 import { FISH_CATALOG } from '../logic/fishCatalog';
 import { BUG_CATALOG } from '../logic/bugCatalog';
-import { bagSpeedFactor, bagValue, type Bag, type BagItem } from '../logic/bag';
+import { BARE_HAND, bagSpeedFactor, bagValue, handLabel, type Bag, type BagItem } from '../logic/bag';
+import { RODS, rodDisplay, rodEffectText } from '../../pixel-room/shop/rods';
+import { RodIcon } from './RodIcon';
+import netIcon from '../assets/bugs/net-icon.png';
+import type { EquipHandResult } from '../../../utils/pixelBag';
 import { computeSubmitReward, sizeLabel } from '../../pixel-room/farm/farmModel';
 import { TomatoSprite } from '../../pixel-room/farm/TomatoSprite';
 import type { BagState } from './useBag';
@@ -24,7 +28,45 @@ export function BagWeight({ bag }: { bag: Bag }) {
   </div>;
 }
 
-export function BagContents({ bag, selling }: { bag: Bag; selling?: { state: BagState; submitCrop: (id: string) => Promise<SubmitFarmCropResult> } }) {
+/** 손 칸: 기본 낚싯대·산 낚싯대·잠자리채 중 하나를 손에 든다. 내려놓으면 맨손(가방으로 돌아간다). */
+export function HandSlot({ bag, busy, onEquip }: { bag: Bag; busy: boolean; onEquip: (itemId: string | null) => Promise<EquipHandResult> }) {
+  const [message, setMessage] = useState('');
+  const [pending, setPending] = useState(false);
+  const held = bag.hand === 'net' ? 'tool_net' : bag.hand === 'rod' ? bag.rod.id ?? 'rod_basic' : null;
+  const tools = [
+    { id: 'rod_basic', name: '기본 낚싯대', note: '처음부터 있는 낚싯대', icon: <RodIcon rod={null} /> },
+    ...RODS.filter(r => bag.rods.includes(r.itemId)).map(r => ({ id: r.itemId as string, name: r.displayName as string, note: rodEffectText(r.itemId), icon: <RodIcon rod={{ id: r.itemId, tier: r.tier }} /> })),
+    ...(bag.netOwned ? [{ id: 'tool_net', name: '잠자리채', note: '별1~2는 휘두르면 바로, 별3~5는 미니게임', icon: <img className="pwp-hand-net" src={netIcon} alt="" width={24} height={24} draggable={false} /> }] : []),
+  ];
+  const equip = async (id: string | null) => {
+    if (busy || pending) return;
+    setPending(true);
+    try {
+      const result = await onEquip(id);
+      setMessage(result.ok ? (id ? `${tools.find(t => t.id === id)?.name ?? '도구'}를 손에 들었어요.` : '맨손이 되었어요. 도구는 가방에 넣었어요.') : result.message);
+    } finally { setPending(false); }
+  };
+  const heldName = handLabel(bag.hand, rodDisplay(bag.rod).displayName);
+  return <section className="pwp-hand" aria-label="손 칸">
+    <h3><span aria-hidden="true">✋</span> 손에 든 것: <strong data-hand={bag.hand}>{heldName}</strong></h3>
+    <p className="pwp-bag-hint">{bag.hand === 'net' ? '잠자리만 잡을 수 있어요(낚시는 못 해요).'
+      : bag.hand === 'bare' ? `맨손 낚시는 더 어렵고(난이도 +${BARE_HAND.difficultyUp}) 느려요(속도 −${Math.round((1 - BARE_HAND.speed) * 100)}%). 잠자리는 못 잡아요.`
+      : '낚시만 할 수 있어요(잠자리는 잠자리채로).'}</p>
+    <ul className="pwp-bag-list" aria-label="도구">
+      {tools.map(tool => <li key={tool.id} data-tool={tool.id} data-held={held === tool.id}>
+        <span className="pwp-hand-icon" aria-hidden="true">{tool.icon}</span>
+        <strong>{tool.name}{held === tool.id ? ' · 손에 듦' : ''}</strong>
+        <small>{tool.note || '효과 없음'}</small>
+        <span className="pwp-bag-actions">{held === tool.id
+          ? <button type="button" disabled={busy || pending} aria-label={`${tool.name} 내려놓기`} onClick={() => void equip(null)}>내려놓기</button>
+          : <button type="button" disabled={busy || pending} aria-label={`${tool.name} 손에 들기`} onClick={() => void equip(tool.id)}>들기</button>}</span>
+      </li>)}
+    </ul>
+    {message && <p role="status">{message}</p>}
+  </section>;
+}
+
+export function BagContents({ bag, selling, hand }: { bag: Bag; selling?: { state: BagState; submitCrop: (id: string) => Promise<SubmitFarmCropResult> }; hand?: { busy: boolean; equip: (itemId: string | null) => Promise<EquipHandResult> } }) {
   const [message, setMessage] = useState('');
   const [pending, setPending] = useState(false);
   const busy = pending || !!selling?.state.busy;
@@ -40,6 +82,7 @@ export function BagContents({ bag, selling }: { bag: Bag; selling?: { state: Bag
   const empty = bag.items.length === 0 && bag.crops.length === 0;
   return <div className="pwp-bag">
     <BagWeight bag={bag} />
+    {hand && <HandSlot bag={bag} busy={hand.busy} onEquip={hand.equip} />}
     {selling && bag.items.length > 0 && <div className="pwp-bag-sell-all">
       <span>물고기·곤충 전부 {bagValue(bag).toLocaleString()}P</span>
       <button type="button" disabled={busy} onClick={() => void sell(null)}>모두 팔기</button>

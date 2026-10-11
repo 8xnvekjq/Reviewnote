@@ -1,4 +1,6 @@
 import { Dragonflies } from './dragonflies';
+import { HeldTool } from './heldTool';
+import type { HeldToolSpec } from './heldTool';
 // 모든 걸어 다니는 장면(앞마당·방, 다음은 광장·밭)의 공통 바탕. 플레이어 이동/충돌/달리기, 카메라 따라가기,
 // A 대상 "!" 표시, 탭해서 걷기, 따라오는 펫, 출구를 밟으면 화면을 어둡게 했다가 다음 장면으로 넘어가기까지
 // 여기서 한 번에 처리한다. 하위 장면은 drawWorld()로 그림만 그린다(어디가 막혔는지·출구·입구는
@@ -80,6 +82,8 @@ export interface WorldContext {
   riding: boolean;
   /** 가방 무게에 따른 이동 속도 배율(1 = 평소, 최하 0.2). logic/bag.ts bagSpeedFactor. */
   loadFactor?: number;
+  /** 손에 든 도구(가방 손 칸). 없으면 맨손. */
+  heldTool?: HeldToolSpec | null;
   /** 서버가 마지막으로 알려 준 낚시 세계 시각(at = 받은 시각, Date.now 기준). */
   worldTime?: { phase: FishPhase; weather: FishWeather; at: number };
   /** 관리자 시험용 시각·날씨 덮어쓰기(관리자일 때만 셸이 넘긴다). */
@@ -102,7 +106,9 @@ export interface WorldDebug {
   riding: boolean; mountAnimation: string | null; riderOffset: Point | null;
   worldTint?: ReturnType<WorldTint['debug']>;
   placing: boolean; playerAlpha: number; petAlpha: number | null; bangVisible: boolean;
-  avatarKey: string; petId: PetId | null;
+  avatarKey: string; petId: PetId | null; heldTool?: 'rod' | 'net' | null;
+  /** 날고 있는 잠자리(화면 좌표, 시험용). */
+  bugs?: Point[]; bugNearby?: boolean;
   scene: SceneId; transitioning: boolean;
   x: number; y: number; facing: Facing; moving: boolean; running: boolean; prompt: string | null;
   pet: { x: number; y: number } | null;
@@ -133,6 +139,7 @@ export abstract class WorldScene extends Phaser.Scene {
   protected spec!: SceneSpec;
   private animalTag!: Phaser.GameObjects.Text;
   protected player!: Phaser.GameObjects.Sprite;
+  protected heldTool!: HeldTool;
   private shadow!: Phaser.GameObjects.Ellipse;
   private placing = false;
   private pet: Phaser.GameObjects.Sprite | null = null;
@@ -225,6 +232,7 @@ export abstract class WorldScene extends Phaser.Scene {
     this.shadow = this.add.ellipse(this.feet.x, this.feet.y, 14, 5, 0x453d29, 0.22);
     this.animalTag = createAnimalTag(this);
     this.player = this.add.sprite(this.feet.x, this.feet.y, this.ctx.assets.avatar.key, 0).setOrigin(0.5, 31 / 32);
+    this.heldTool = new HeldTool(this);
     this.playAvatar(false, 1);
     if (this.ctx.assets.pet) this.addPet(this.ctx.assets.pet.id);
     if (this.ctx.riding) this.updatePet(0);
@@ -470,6 +478,8 @@ export abstract class WorldScene extends Phaser.Scene {
     updateAnimalTag(this.animalTag, this.feet, this.ctx.face ?? '🐶', this.ctx.riding);
     this.player.setPosition(Math.round(this.feet.x), Math.round(this.feet.y)).setDepth(this.feet.y);
     this.shadow.setPosition(Math.round(this.feet.x), Math.round(this.feet.y)).setDepth(this.feet.y - 0.5);
+    // 곰을 탄 동안은 도구를 감춘다(손이 고삐에 있다).
+    this.heldTool.update(this.ctx.riding ? null : this.ctx.heldTool, this.feet.x, this.feet.y, this.facing, this.feet.y, this.player.alpha);
     this.updatePet(deltaMs);
     if (this.spec.id !== 'plaza' && this.spec.id !== 'river') this.spacePets(deltaMs);
     // 출구를 밟으면 넘어간다(들어오자마자 출구 위였다면 한 번 벗어난 뒤부터).
@@ -749,7 +759,7 @@ export abstract class WorldScene extends Phaser.Scene {
       loadFactor: this.ctx.loadFactor ?? 1,
       riding: this.ctx.riding, mountAnimation: this.ctx.riding ? this.pet?.anims.currentAnim?.key ?? null : null, riderOffset: this.ctx.riding ? riderOffset(this.facing) : null,
       worldTint: this.outdoorTint?.debug(),
-      animalTag: animalTagSnapshot(this.animalTag), avatarKey: this.player.texture.key, petId: this.pet ? this.ctx.assets.pet?.id ?? null : null,
+      animalTag: animalTagSnapshot(this.animalTag), avatarKey: this.player.texture.key, heldTool: this.ctx.riding ? null : this.ctx.heldTool?.kind ?? null, petId: this.pet ? this.ctx.assets.pet?.id ?? null : null,
       dust: this.dust.size,
       petReaction: this.reaction?.kind ?? null, petFrame: this.pet ? Number(this.pet.frame.name) : null, petFlipX: this.pet?.flipX ?? false,
       scene: this.spec.id, transitioning: this.transitioning,
@@ -759,6 +769,7 @@ export abstract class WorldScene extends Phaser.Scene {
       camera: { x: camera.worldView.x, y: camera.worldView.y }, fps: Math.round(this.game.loop.actualFps),
       renderer: this.game.renderer.type === Phaser.WEBGL ? 'webgl' : 'canvas', pathLength: this.path.length,
       targets: { ...Object.fromEntries(this.spec.interactables.map(item => [item.id, screen(cellCenter(item.cell))])), ...(this.pet ? { pet: screen({ x: this.pet.x, y: this.pet.y - 15 }) } : {}) },
+      bugs: (this.dragonflies?.positions ?? []).map(screen), bugNearby: this.dragonflies?.nearby ?? false,
       exits: Object.fromEntries(this.spec.exits.map(exit => [exit.id, screen(cellCenter(exit.cells[0]))])),
     };
   }

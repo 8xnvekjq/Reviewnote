@@ -1,6 +1,6 @@
 // 가방 RPC(supabase/migrations/20261012120000_pixel_bag.sql). 무게·판매값 계산은 서버가 한다.
 import { supabase } from '../services/supabase';
-import { parseBag, type Bag, type BagItemKind } from '../features/pixel-world-phaser/logic/bag';
+import { parseBag, parseHand, type Bag, type BagItemKind, type HandState } from '../features/pixel-world-phaser/logic/bag';
 
 export type SellBagResult = { ok: true; sold: number; value: number; awarded: number; bag: Bag | null } | { ok: false; message: string; bag: Bag | null };
 
@@ -17,4 +17,15 @@ export async function sellPixelBag(items: { kind: BagItemKind; ref: string; qty:
     if (data?.ok === true) return { ok: true, sold: Number(data.sold) || 0, value: Number(data.value) || 0, awarded: Number(data.points?.awarded) || 0, bag };
     return { ok: false, message: data?.reason === 'nothing' ? '팔 물건이 없어요.' : '팔지 못했어요. 다시 시도해 주세요.', bag };
   } catch { return { ok: false, message: '판매 결과를 확인하지 못했어요. 다시 확인해 주세요.', bag: null }; }
+}
+
+/** 손에 들기: null = 맨손, 'rod_basic' = 기본 낚싯대, 'rod_*' = 산 낚싯대, 'tool_net' = 잠자리채. */
+export type EquipHandResult = ({ ok: true } & HandState) | { ok: false; message: string };
+export async function equipPixelHand(itemId: string | null): Promise<EquipHandResult> {
+  try {
+    const { data, error } = await supabase.rpc('equip_pixel_hand', { p_item_id: itemId });
+    if (error) throw error;
+    if (data?.ok === true) return { ok: true, ...parseHand(data) };
+    return { ok: false, message: data?.reason === 'not_owned' ? '아직 가지고 있지 않아요.' : '손에 들지 못했어요. 다시 시도해 주세요.' };
+  } catch { return { ok: false, message: '손에 들지 못했어요. 다시 시도해 주세요.' }; }
 }

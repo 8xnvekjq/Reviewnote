@@ -20,9 +20,9 @@ import type { PlazaBubble } from '../game/plazaBubbles';
 import { Window } from './GamePanels';
 import { PlazaChat } from './PlazaChat';
 export type PlazaPanel = 'contest' | 'well' | 'bench';
-export function PlazaBridge({ handle, appearance, pet, riding, face, userId, panel, onClose, swingReporter }: {
+export function PlazaBridge({ handle, appearance, pet, riding, face, tool, userId, panel, onClose, swingReporter }: {
   swingReporter: SwingRef<NetSwingReporter | null>;
-  handle: RefObject<WorldGameHandle | null>; appearance: PublicAvatarAppearance; pet: PetId | null; riding: boolean; face?: string;
+  handle: RefObject<WorldGameHandle | null>; appearance: PublicAvatarAppearance; pet: PetId | null; riding: boolean; face?: string; /** 손에 든 도구 표시(친구 화면에 그린다). */ tool?: string;
   userId: string; panel: string | null; onClose: () => void;
 }) {
   const [sessionId] = useState(() => crypto.randomUUID());
@@ -58,13 +58,13 @@ export function PlazaBridge({ handle, appearance, pet, riding, face, userId, pan
     const update = () => {
       const d = handle.current?.debug();
       if (!d || d.scene !== 'plaza' || d.transitioning) return;
-      const state = { ...continuousPayload(d), direction: d.facing, moving: d.moving, pet, face, riding: d.riding };
+      const state = { ...continuousPayload(d), direction: d.facing, moving: d.moving, pet, face, riding: d.riding, ...(tool ? { tool } : {}) };
       const key = JSON.stringify(state);
       if (key !== last) { updateMyState(state); last = key; }
     };
     update(); const timer = window.setInterval(update, 170);
     return () => window.clearInterval(timer);
-  }, [handle, updateMyState, pet, riding, face]);
+  }, [handle, updateMyState, pet, riding, face, tool]);
   useEffect(() => {
     let cancelled = false; setFailed(false);
     void fetchWeeklyCropContest().then(value => { if (!cancelled) setContest(value); }).catch(() => { if (!cancelled) setFailed(true); });

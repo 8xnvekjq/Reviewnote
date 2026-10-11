@@ -32,7 +32,7 @@ function reconnectDelayFor(attempt: number): number {
   return Math.min(RECONNECT_BASE_DELAY_MS * 2 ** attempt, RECONNECT_MAX_DELAY_MS);
 }
 
-export type PlazaSelfState = Pick<PlazaPlayerState, 'x' | 'y' | 'direction' | 'moving' | 'version' | 'position' | 'pet' | 'riding' | 'face'>;
+export type PlazaSelfState = Pick<PlazaPlayerState, 'x' | 'y' | 'direction' | 'moving' | 'version' | 'position' | 'pet' | 'riding' | 'face' | 'tool'>;
 
 export interface UsePlazaRealtimeResult {
   players: PlazaPlayerState[]; // everyone else currently in the plaza (not me)
@@ -452,7 +452,7 @@ export function usePlazaRealtime(sessionId: string, appearance: PublicAvatarAppe
 
   const updateMyState = useMemo(() => {
     return (partial: PlazaSelfState) => {
-      const petChanged = partial.pet !== selfRef.current.pet || partial.riding !== selfRef.current.riding || partial.face !== selfRef.current.face;
+      const petChanged = partial.pet !== selfRef.current.pet || partial.riding !== selfRef.current.riding || partial.face !== selfRef.current.face || partial.tool !== selfRef.current.tool;
       selfRef.current = partial;
       const channel = channelRef.current;
       if (!channel) return;

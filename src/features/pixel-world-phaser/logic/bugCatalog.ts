@@ -25,6 +25,8 @@ export const bugTimeLimitMs = (stars: number) => 5000 - 500 * (starsOf(stars) - 
 export const bugStrokeMs = (stars: number) => 3000 - 500 * (starsOf(stars) - 1);
 /** 가장 긴 판(별1). */
 export const BUG_GAME_MS = bugTimeLimitMs(1);
+/** 잠자리채를 들고 휘두르면 이 별 이하는 미니게임 없이 바로 잡힌다(2026-10-12). */
+export const BUG_AUTO_CATCH_STARS = 2;
 /** 실시간: 잠자리채 휘두르기 broadcast 이벤트(광장·강가 채널). 마당은 혼자라 보내지 않는다. */
 export const NET_SWING_EVENT = 'net-swing';
 export interface NetSwingPayload { sessionId: string; direction: 'Front' | 'Back' | 'Left' | 'Right'; at: number }

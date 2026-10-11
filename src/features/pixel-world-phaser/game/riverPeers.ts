@@ -1,4 +1,5 @@
 import { dragonfliesFor } from './dragonflies';
+import { HeldTool, updatePeerTool } from './heldTool';
 import { RIDING_RADIUS, PERSON_RADIUS } from '../logic/softCollision';
 import { createAnimalTag, updateAnimalTag, animalTagSnapshot, peerAnimalFace } from './animalTag';
 import { updatePeerCompanion, peerCompanionSnapshot } from './peerCompanion';
@@ -22,7 +23,7 @@ import { PlazaBubbles } from './plazaBubbles';
 import type { PlazaBubble } from './plazaBubbles';
 
 type Line = { line: Phaser.GameObjects.Graphics; bobber: Phaser.GameObjects.Sprite | Phaser.GameObjects.Rectangle; bang: Phaser.GameObjects.Text };
-type Friend = { tag?: Phaser.GameObjects.Text; follow?: PetFollowState;
+type Friend = { tool?: HeldTool; tag?: Phaser.GameObjects.Text; follow?: PetFollowState;
   sprite?: Phaser.GameObjects.Sprite; pet?: Phaser.GameObjects.Sprite; look: string; petId: PetId | null; loading: boolean; state: PlazaPlayerState;
   fishing?: Line; lastPhase: RiverPeerFishing['phase'];
 };
@@ -70,6 +71,7 @@ export class RiverPeers {
       spots.set(id, feet); faces.set(id, peerAnimalFace(p));
       if (f.tag) { updateAnimalTag(f.tag, feet, peerAnimalFace(p), p.riding === true && p.pet === 'pet_bear'); }
       updatePeerCompanion(f, feet, time, deltaMs, this.solid);
+      updatePeerTool(this.scene, f, f.sprite ? { x: f.sprite.x, y: f.sprite.y } : feet);
       this.drawLine(f, feet, this.fishing[id], now, time);
     }
     for (const [id, view] of Object.entries(this.fishing)) {
@@ -104,7 +106,7 @@ export class RiverPeers {
   private remove(id: string) {
     const f = this.friends.get(id);
     if (!f) return;
-    f.tag?.destroy(); f.sprite?.destroy(); f.pet?.destroy();
+    f.tool?.destroy(); f.tag?.destroy(); f.sprite?.destroy(); f.pet?.destroy();
     if (f.fishing) { f.fishing.line.destroy(); f.fishing.bobber.destroy(); f.fishing.bang.destroy(); }
     this.friends.delete(id);
   }

@@ -4,9 +4,16 @@ import type { GamePointsResult } from '../logic/gamePoints';
 import type { XpGain } from './fishingAdapter';
 
 export interface BugAlbumEntry { bugId: BugId; count: number; firstAt: string }
-export interface BugState { netOwned: boolean; album: BugAlbumEntry[] }
-export type BugStart = { ok: true; catchId: string; bugId: BugId; difficulty: number } | { ok: false; reason: 'no_net' | 'pending' | 'error' };
-export type BugFinish = { ok: true; caught: true; bugId: BugId; isNew: boolean; xpGain?: XpGain; points?: GamePointsResult } | { ok: true; caught: false } | { ok: false };
+/** 잠자리 업적(supabase/migrations/20261012150000_pixel_hand_slot.sql). 별5는 새 규칙(2026-10-12) 이후 잡은 것만 센다. */
+export type BugAchievementId = 'bug_doctor' | 'bug_master';
+export const BUG_ACHIEVEMENTS: readonly { id: BugAchievementId; name: string; goal: string; reward: string; capacity: number }[] = [
+  { id: 'bug_doctor', name: '잠자리 박사', goal: '도감 5종 완성 + 별5 잠자리 1마리', reward: '가방 30kg', capacity: 30 },
+  { id: 'bug_master', name: '잠자리 명인', goal: '별5 잠자리 10마리', reward: '가방 60kg', capacity: 60 },
+];
+export interface BugAchievementState { star5: number; species: number; speciesTotal: number; earned: BugAchievementId[] }
+export interface BugState { netOwned: boolean; album: BugAlbumEntry[]; achievements?: BugAchievementState }
+export type BugStart = { ok: true; catchId: string; bugId: BugId; difficulty: number } | { ok: false; reason: 'no_net' | 'net_not_equipped' | 'pending' | 'error' };
+export type BugFinish = { ok: true; caught: true; bugId: BugId; isNew: boolean; xpGain?: XpGain; points?: GamePointsResult; achievements?: BugAchievementId[] } | { ok: true; caught: false } | { ok: false };
 export interface BugAdapter {
   state(): Promise<BugState>;
   /** scene: 'yard' | 'plaza' | 'river' — 어디서 잡았는지 기록용. */
@@ -23,6 +30,8 @@ const object = (value: unknown): value is Record<string, unknown> => !!value && 
 const integer = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 const sceneValid = (scene: unknown) => scene === 'yard' || scene === 'plaza' || scene === 'river';
 const validBug = (value: unknown): value is BugId => typeof value === 'string' && !!bugById(value);
+const achievementIds = (value: unknown): BugAchievementId[] => Array.isArray(value)
+  ? BUG_ACHIEVEMENTS.map(a => a.id).filter(id => value.includes(id)) : [];
 
 export function parseBugState(raw: unknown): BugState {
   if (!object(raw)) return { netOwned: false, album: [] };
@@ -34,12 +43,15 @@ export function parseBugState(raw: unknown): BugState {
     seen.add(entry.bugId);
     album.push({ bugId: entry.bugId, count: entry.count, firstAt: entry.firstAt });
   }
-  return { netOwned: raw.netOwned === true, album };
+  const a = raw.achievements;
+  const achievements = object(a) && integer(a.star5) && integer(a.species) && integer(a.speciesTotal)
+    ? { star5: a.star5, species: a.species, speciesTotal: a.speciesTotal, earned: achievementIds(a.earned) } : undefined;
+  return { netOwned: raw.netOwned === true, album, ...(achievements ? { achievements } : {}) };
 }
 
 export function parseBugStart(raw: unknown): BugStart {
   if (!object(raw)) return { ok: false, reason: 'error' };
-  if (raw.ok === false) return { ok: false, reason: raw.reason === 'no_net' || raw.reason === 'pending' ? raw.reason : 'error' };
+  if (raw.ok === false) return { ok: false, reason: raw.reason === 'no_net' || raw.reason === 'net_not_equipped' || raw.reason === 'pending' ? raw.reason : 'error' };
   if (raw.ok !== true || typeof raw.catchId !== 'string' || !raw.catchId.trim() || !validBug(raw.bugId)
     || raw.difficulty !== bugById(raw.bugId)!.stars) return { ok: false, reason: 'error' };
   return { ok: true, catchId: raw.catchId, bugId: raw.bugId, difficulty: raw.difficulty as number };
@@ -55,7 +67,8 @@ export function parseBugFinish(raw: unknown): BugFinish {
     && p.awarded <= p.todayEarned && p.cap === GAME_POINT_DAILY_CAP && typeof p.capped === 'boolean'
     && p.capped === (p.todayEarned >= p.cap)
     ? { awarded: p.awarded, todayEarned: p.todayEarned, cap: p.cap, capped: p.capped } : undefined;
-  return { ok: true, caught: true, bugId: raw.bugId, isNew: raw.isNew, ...(xpGain ? { xpGain } : {}), ...(points ? { points } : {}) };
+  const achievements = achievementIds(raw.achievements);
+  return { ok: true, caught: true, bugId: raw.bugId, isNew: raw.isNew, ...(xpGain ? { xpGain } : {}), ...(points ? { points } : {}), ...(achievements.length ? { achievements } : {}) };
 }
 
 /** 네트워크 오류와 잘못된 응답은 안전한 실패로 돌려준다. */

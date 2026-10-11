@@ -181,8 +181,8 @@ export function parseCastStart(raw: unknown): CastStart {
     ...(typeof raw.heavy === 'boolean' ? { heavy: raw.heavy } : {}),
     ...(oneOf(JUNK_IDS, raw.junk) ? { junk: raw.junk } : {}),
     ...(raw.rod !== undefined ? { rod: parseFishingRod(raw.rod) } : {}),
-    // 속도는 1~1.35(황금 낚싯대)지만, 이상한 값이 와도 미니게임이 깨지지 않게 1~2로 묶는다.
-    ...(speed != null ? { speed: Math.max(1, Math.min(2, speed)) } : {}),
+    // 속도는 0.8(맨손)~1.35(황금 낚싯대). 서버 최소 릴 시간과 같은 값을 써야 하므로 0.8 그대로 받고, 이상한 값만 0.5~2로 묶는다.
+    ...(speed != null ? { speed: Math.max(0.5, Math.min(2, speed)) } : {}),
     ...(isObj(raw.bait) && typeof raw.bait.used === 'boolean' && bait ? { bait: { used: raw.bait.used, charges: bait.charges } } : {}),
     ...(typeof raw.trophy === 'boolean' ? { trophy: raw.trophy } : {}) };
 }

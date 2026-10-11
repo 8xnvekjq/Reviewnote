@@ -8,11 +8,12 @@ import { useWorldClock } from './ui/useWorldClock';
 import { AdminKiosk } from './ui/AdminKiosk';
 import { BagContents } from './ui/BagPanel';
 import { bagSpeedFactor } from './logic/bag';
+import { heldToolFor, heldToolTag } from './logic/heldTool';
 // 새 Pixel World(베타) 전체 화면 셸. 게임 캔버스가 화면 전체를 채우고, 모든 UI(포인트, 나가기, 전체화면,
 // 대화창, 조이스틱, A/B)는 그 프레임 "안"에 DOM으로 겹친다. 한글은 앱 웹폰트 그대로 선명하게 보이고
 // (Phaser Text는 도트 모드에서 최근접 보간이라 작은 한글이 뭉개진다), 버튼은 접근성/테스트도 쉽다.
 // 입력은 controls 객체에만 쓰고 Phaser가 매 프레임 읽는다 — 손가락 이동으로 React가 다시 그리지 않는다.
-import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import type { PublicAvatarAppearance } from '../pixel-room/shop/types';
@@ -175,6 +176,10 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
   // 가방 무게 → 이동 속도(용량을 넘으면 점점 느려지고 최하 20%). 장면이 바뀌어도 boot가 기억한다.
   const bagFactor = panels?.bag?.bag ? bagSpeedFactor(panels.bag.bag.weight, panels.bag.bag.capacity) : 1;
   useEffect(() => { handle.current?.setLoadFactor?.(bagFactor); }, [bagFactor, status]);
+  // 손에 든 도구를 캐릭터에 그린다(낚싯대는 등급 색).
+  const heldRodId = panels?.bag?.bag?.rod.id ?? null, heldHand = panels?.bag?.bag?.hand ?? null;
+  const heldTool = useMemo(() => heldToolFor(heldHand, heldRodId), [heldHand, heldRodId]);
+  useEffect(() => { handle.current?.setHeldTool?.(heldTool); }, [heldTool, status]);
   const [petMessage, setPetMessage] = useState('');
   useEffect(() => { if (!petMessage) return; const timer = window.setTimeout(() => setPetMessage(''), 4500); return () => clearTimeout(timer); }, [petMessage]);
   const [prompt, setPrompt] = useState<Prompt | null>(null);
@@ -207,7 +212,11 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     if (ring.current) ring.current.style.opacity = '0';
   }, [controls]);
   const reportSwing = useCallback<NetSwingReporter>(direction => swingReporter.current?.(direction), []);
-  const bugs = useBugCatching({ adapter: bugAdapter, scene: scene?.id ?? null, handle, freeze: freezeBugs, report: reportSwing });
+  // 손 칸: 가방이 아직 없으면(읽는 중·모의 환경) 예전처럼 낚싯대를 든 것으로 본다.
+  const hand = panels?.bag?.bag?.hand ?? 'rod';
+  const bagRefreshRef = useRef(panels?.bag?.refresh); bagRefreshRef.current = panels?.bag?.refresh;
+  const handRef = useRef(hand); handRef.current = hand;
+  const bugs = useBugCatching({ adapter: bugAdapter, scene: scene?.id ?? null, handle, freeze: freezeBugs, report: reportSwing, hand });
   const bugsRef = useRef(bugs); bugsRef.current = bugs;
   const level = useLevel(fishingAdapter, fishing.state);
   useEffect(() => { if (fishing.caught) level.onXp(gainFrom(fishing.caught)); }, [fishing.caught, level.onXp]);
@@ -274,6 +283,8 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
   const panelRef = useRef(panel); panelRef.current = panel;
   const closePanel = useCallback(() => {
     if (panelRef.current === 'furniture' && roomSaving.current) return;
+    // 옷장·거북이 상점에서 낚싯대를 고르면 서버가 손에도 낚싯대를 쥐여 준다 — 닫을 때 손 칸을 다시 읽는다.
+    if (panelRef.current === 'wardrobe' || panelRef.current === 'turtle') void bagRefreshRef.current?.();
     panelRef.current = null; setPanel(null);
     controls.frozen = fishingFrozen.current || bugFrozen.current || editingRef.current || panelFrozen(null, !!dialogueRef.current);
     controls.stick = ZERO_STICK; controls.run = false;
@@ -460,9 +471,14 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     if (bugFrozen.current) return;
     if (fishingRef.current.reel()) return;
     if (panelRef.current || editingRef.current) return;
-    // 잠자리채가 있을 때만 A를 잠자리채로 쓴다. 없으면 말 걸기·낚시가 먼저이고, 할 일이 없을 때만 상점 안내를 띄운다.
-    if (!dialogueRef.current && bugsRef.current.nearby && (bugsRef.current.state?.netOwned || (!promptRef.current && sceneRef.current?.id !== 'river'))) { void bugsRef.current.start(); return; }
-    if (!dialogueRef.current && !promptRef.current && sceneRef.current?.id === 'river' && handle.current?.beginCast()) return;
+    // 손 칸이 정한다: 잠자리채를 들면 A는 잠자리채(낚시는 안 함), 낚싯대·맨손이면 낚시(잠자리는 무시).
+    // 잠자리채를 안 들었으면 말 걸기·낚시가 먼저이고, 할 일이 없을 때만 잠자리채 안내를 띄운다.
+    const net = handRef.current === 'net';
+    if (!dialogueRef.current && bugsRef.current.nearby && (net || (!promptRef.current && sceneRef.current?.id !== 'river'))) { void bugsRef.current.start(); return; }
+    if (!dialogueRef.current && !promptRef.current && sceneRef.current?.id === 'river') {
+      if (!net && handle.current?.beginCast()) return;
+      if (net && fishingRef.current.canCast) { bugsRef.current.notify('낚시하려면 가방에서 낚싯대를 손에 들어 보세요'); return; }
+    }
     if (dialogueRef.current) advance();
     // 물을 보며 A를 누르면 힘을 모으고, 놓으면 던진다.
     else if (promptRef.current || sceneRef.current?.id === 'river') handle.current?.interact();
@@ -711,7 +727,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
       </span>
     </div>
     {panel === 'bugs' && <BugAlbum state={bugs.state} onClose={closePanel} />}
-    {panel === 'bag' && panels?.bag?.bag && <Window title="가방" onClose={closePanel} small><div className="pwp-panel-content"><BagContents bag={panels.bag.bag} /></div></Window>}
+    {panel === 'bag' && panels?.bag?.bag && <Window title="가방" onClose={closePanel} small><div className="pwp-panel-content"><BagContents bag={panels.bag.bag} hand={{ busy: panels.bag.busy, equip: panels.bag.equip }} /></div></Window>}
     {isAdmin && panel === 'kiosk' && <AdminKiosk weather={{ adapter: fishingAdapter, clock: worldClock.clock, refresh: worldClock.refresh }} onClose={closePanel} />}
     {!placing && !fishing.busy && !fishing.reelState && panel !== 'furniture' && <LevelBadge value={level} onClick={() => openPanel('level')} style={{ right: layout.width - hud.x - hud.width + 10, top: hud.y + hud.height + 8 }} />}
     {panel === 'level' && <LevelPanel value={level} onClose={closePanel} />}
@@ -726,12 +742,12 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     </div>}
     <button type="button" disabled={!!placing} className="pwp-btn pwp-btn-a" data-pressed={pressed.a} data-prompt={!!prompt || !!dialogue}
       style={{ left: a.x - a.size / 2, top: a.y - a.size / 2, width: a.size, height: a.size }}
-      aria-label={dialogue ? 'A · 다음' : bugs.nearby && bugs.state?.netOwned ? 'A · 잠자리채' : prompt ? `A · ${promptLabel}` : fishing.canCast ? 'A · 낚시하기' : 'A'}
+      aria-label={dialogue ? 'A · 다음' : bugs.nearby && hand === 'net' ? 'A · 잠자리채' : prompt ? `A · ${promptLabel}` : fishing.canCast && hand !== 'net' ? 'A · 낚시하기' : 'A'}
       onPointerDown={buttonDown('a')} onPointerUp={buttonUp('a')} onPointerCancel={buttonUp('a')} onLostPointerCapture={buttonUp('a')}
       onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); if (!event.repeat) pressA(); } }}
       onKeyUp={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); releaseA(); } }}
       onClick={event => { if (keyboardClick(event)) { pressA(); releaseA(); } }}>
-      <b>A</b>{(prompt || dialogue || fishing.canCast || (bugs.nearby && bugs.state?.netOwned)) && <small>{dialogue ? '다음' : bugs.nearby && bugs.state?.netOwned ? '잠자리채' : prompt ? promptLabel : '낚시하기'}</small>}
+      <b>A</b>{(prompt || dialogue || (fishing.canCast && hand !== 'net') || (bugs.nearby && hand === 'net')) && <small>{dialogue ? '다음' : bugs.nearby && hand === 'net' ? '잠자리채' : prompt ? promptLabel : '낚시하기'}</small>}
     </button>
     <button type="button" disabled={!!placing} className="pwp-btn pwp-btn-b" data-pressed={pressed.b} data-closing={!!panel || !!dialogue}
       style={{ left: b.x - b.size / 2, top: b.y - b.size / 2, width: b.size, height: b.size }}
@@ -752,8 +768,8 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     </div></div>}
     {(panel === 'shop' || panel === 'wardrobe') && panels && <GamePanels kind={panel} adapter={panels} onClose={closePanel} />}
     {(panel === 'turtle' || panel === 'fishboard') && <FishingPanels key={panel} kind={panel} adapter={fishingAdapter} shop={panels} newSpeciesId={newFishSpeciesId ?? freshSpecies} onClose={() => { if (panel === 'turtle') setFreshSpecies(null); closePanel(); }} />}
-    {scene?.id === 'river' && status === 'ready' && <RiverBridge key={'river:' + scene.visit} handle={handle} appearance={appearance} face={animalFace} pet={pet} riding={riding} panel={panel} reporter={riverReporter} swingReporter={swingReporter} />}
-    {scene?.id === 'plaza' && status === 'ready' && <PlazaBridge key={'plaza:' + scene.visit} handle={handle} appearance={appearance} face={animalFace} pet={pet} riding={riding} userId={userId} panel={panel} onClose={closePanel} swingReporter={swingReporter} />}
+    {scene?.id === 'river' && status === 'ready' && <RiverBridge key={'river:' + scene.visit} handle={handle} appearance={appearance} face={animalFace} tool={heldToolTag(heldTool, heldRodId)} pet={pet} riding={riding} panel={panel} reporter={riverReporter} swingReporter={swingReporter} />}
+    {scene?.id === 'plaza' && status === 'ready' && <PlazaBridge key={'plaza:' + scene.visit} handle={handle} appearance={appearance} face={animalFace} tool={heldToolTag(heldTool, heldRodId)} pet={pet} riding={riding} userId={userId} panel={panel} onClose={closePanel} swingReporter={swingReporter} />}
     {panel && panel !== 'bugs' && panel !== 'kiosk' && panel !== 'bag' && panel !== 'level' && panel !== 'turtle' && panel !== 'fishboard' && panel !== 'furniture' && panel !== 'shop' && panel !== 'wardrobe' && panel !== 'contest' && panel !== 'well' && panel !== 'bench' && <FarmPanels key={panel} petId={pet} riding={riding} onRide={() => { closePanel(); handle.current?.toggleRide(); }} kind={panel} adapter={farmAdapter} onClose={closePanel}
       onXp={level.onXp} onCollection={() => openPanel('collection')} onTalk={() => { closePanel(); openDialogue('scarecrow'); }}
       onPet={kind => { closePanel(); handle.current?.reactPet(kind); }} onFx={(index, action) => handle.current?.farmFx(index, action)} />}

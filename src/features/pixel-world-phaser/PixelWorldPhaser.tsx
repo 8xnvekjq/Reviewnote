@@ -68,8 +68,11 @@ export default function PixelWorldPhaser({ userId, pointsBalance, onExit, onPixe
     return () => { cancelled = true; };
   }, [userId]);
   const shop = usePixelShop(userId, pointsBalance, onPixelPurchase);
-  const bag = useBag(userId, refreshPoints);
+  const syncRod = useRef(shop.syncEquippedRod); syncRod.current = shop.syncEquippedRod;
+  const bag = useBag(userId, refreshPoints, hand => { if (hand.hand === 'rod') syncRod.current(hand.rod.id); });
   bagRefresh.current = () => { void bag.refresh(); };
+  // 옷장에서 낚싯대를 고르거나(손에도 낚싯대를 든다) 잠자리채·낚싯대를 사면 손 칸을 다시 읽는다.
+  useEffect(() => { if (shop.ready) bagRefresh.current(); }, [shop.ready, shop.equippedRod, shop.ownedIds]);
   const pet = usePet(userId);
   const farm = useFarm();
   const inventory = useFarmInventory(userId);

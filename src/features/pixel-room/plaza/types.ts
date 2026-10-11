@@ -18,6 +18,8 @@ export interface PlazaPlayerState {
   position?: { x: number; y: number };
   pet?: import('../pet/petKinds').PetId | null;
   riding?: boolean;
+  /** 손에 든 도구 표시('net' | 'rod_basic' | 'rod_gold' …). 맨손이면 없음. */
+  tool?: string;
   sessionId: string;   // 이 탭 하나의 고유 id(crypto.randomUUID() 등) — 같은 계정 여러 탭 구분용
   x: number;
   y: number;

@@ -2,8 +2,16 @@
 export type BagItemKind = 'fish' | 'bug';
 export interface BagItem { kind: BagItemKind; ref: string; qty: number; unitWeight: number; unitPoints: number }
 export interface BagCrop { id: string; sizeScore: number; unitWeight: number }
-export interface Bag { capacity: number; weight: number; items: BagItem[]; crops: BagCrop[] }
-export const EMPTY_BAG: Bag = { capacity: 20, weight: 0, items: [], crops: [] };
+/** 손 칸(supabase/migrations/20261012150000_pixel_hand_slot.sql): 낚싯대(rod: 고른 낚싯대, id null = 기본 낚싯대)·잠자리채·맨손 중 하나. */
+export type Hand = 'rod' | 'net' | 'bare';
+export interface HandState { hand: Hand; rod: { id: string | null; tier: number }; netOwned: boolean; rods: string[] }
+export const DEFAULT_HAND: HandState = { hand: 'rod', rod: { id: null, tier: 0 }, netOwned: false, rods: [] };
+export interface Bag extends HandState { capacity: number; weight: number; items: BagItem[]; crops: BagCrop[] }
+export const EMPTY_BAG: Bag = { capacity: 20, weight: 0, items: [], crops: [], ...DEFAULT_HAND };
+/** 맨손 낚시 벌칙(서버와 같은 값, 안내용): 난이도 +0.5, 속도 ×0.8. */
+export const BARE_HAND = { difficultyUp: 0.5, speed: 0.8 };
+/** 손에 든 것의 짧은 이름. */
+export const handLabel = (hand: Hand, rodName: string) => hand === 'net' ? '잠자리채' : hand === 'bare' ? '맨손' : rodName;
 /** 이동 속도 최하(평소의 20%). */
 export const MIN_BAG_SPEED = 0.2;
 
@@ -30,5 +38,14 @@ export function parseBag(raw: unknown): Bag | null {
     const sizeScore = num(c.sizeScore), unitWeight = num(c.unitWeight);
     return typeof c.id === 'string' && Number.isFinite(sizeScore) ? [{ id: c.id, sizeScore, unitWeight: Number.isFinite(unitWeight) ? unitWeight : 1.5 }] : [];
   });
-  return { capacity, weight, items, crops };
+  return { capacity, weight, items, crops, ...parseHand(raw) };
+}
+/** 손 칸 응답(가방·장착 결과 공통). 없거나 이상한 값은 기본(기본 낚싯대를 든 상태)으로 본다. */
+export function parseHand(raw: unknown): HandState {
+  if (!isObj(raw)) return DEFAULT_HAND;
+  const hand: Hand = raw.hand === 'net' || raw.hand === 'bare' ? raw.hand : 'rod';
+  const rod = isObj(raw.rod) && (typeof raw.rod.id === 'string' || raw.rod.id === null) && Number.isInteger(num(raw.rod.tier))
+    ? { id: raw.rod.id as string | null, tier: num(raw.rod.tier) } : DEFAULT_HAND.rod;
+  const rods = Array.isArray(raw.rods) ? raw.rods.filter((id): id is string => typeof id === 'string') : [];
+  return { hand, rod, netOwned: raw.netOwned === true, rods };
 }
