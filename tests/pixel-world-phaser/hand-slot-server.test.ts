@@ -71,6 +71,8 @@ end $f$;`);
   const hand = sql('20261012150000_pixel_hand_slot.sql');
   await db.exec(hand);
   await db.exec(hand.replace(/create policy[^;]*;/g, '')); // 다시 돌려도 한 번만 바뀐다
+  await db.exec(sql('20261012160000_pixel_bug_master_30.sql'));
+  await db.exec(sql('20261012160000_pixel_bug_master_30.sql'));
   const rpc = async (query: string, args: any[] = []) => (await db.query<any>(query, args)).rows[0].r;
   return { db, rpc };
 }
@@ -121,7 +123,7 @@ test('손 칸: 낚싯대·잠자리채·맨손은 하나만, 잠자리채라야 
   } finally { await db.close(); }
 });
 
-test('잠자리 업적: 새 규칙 이후 별5만 세고, 박사 30kg·명인 60kg 가방 (PGlite)', async () => {
+test('잠자리 업적: 새 규칙 이후 별5만 세고, 박사 30kg·명인(별5 30마리) 60kg 가방 (PGlite)', async () => {
   const { db, rpc } = await setup();
   try {
     await db.exec(`insert into pixel_item_ownership values ('${U}','tool_net')`);
@@ -146,11 +148,11 @@ test('잠자리 업적: 새 규칙 이후 별5만 세고, 박사 30kg·명인 60
     assert.deepEqual(doctor.achievements, ['bug_doctor']);
     assert.equal(Number(doctor.points.bag.capacity), 30);
     assert.deepEqual((await catchOne('dragonfly_red', 1)).achievements, [], '한 번만 받는다');
-    for (let i = 2; i <= 9; i++) assert.deepEqual((await catchOne('dragonfly_gold', 5)).achievements, []);
+    for (let i = 2; i <= 29; i++) assert.deepEqual((await catchOne('dragonfly_gold', 5)).achievements, []);
     const master = await catchOne('dragonfly_gold', 5);
     assert.deepEqual(master.achievements, ['bug_master']); assert.equal(Number(master.points.bag.capacity), 60);
     state = await rpc('select public.get_bug_state() r');
-    assert.deepEqual(state.achievements, { star5: 10, species: 5, speciesTotal: 5, earned: ['bug_doctor', 'bug_master'] });
+    assert.deepEqual(state.achievements, { star5: 30, species: 5, speciesTotal: 5, earned: ['bug_doctor', 'bug_master'] });
   } finally { await db.close(); }
 });
 

@@ -8,7 +8,7 @@ export interface BugAlbumEntry { bugId: BugId; count: number; firstAt: string }
 export type BugAchievementId = 'bug_doctor' | 'bug_master';
 export const BUG_ACHIEVEMENTS: readonly { id: BugAchievementId; name: string; goal: string; reward: string; capacity: number }[] = [
   { id: 'bug_doctor', name: '잠자리 박사', goal: '도감 5종 완성 + 별5 잠자리 1마리', reward: '가방 30kg', capacity: 30 },
-  { id: 'bug_master', name: '잠자리 명인', goal: '별5 잠자리 10마리', reward: '가방 60kg', capacity: 60 },
+  { id: 'bug_master', name: '잠자리 명인', goal: '별5 잠자리 30마리', reward: '가방 60kg', capacity: 60 },
 ];
 export interface BugAchievementState { star5: number; species: number; speciesTotal: number; earned: BugAchievementId[] }
 export interface BugState { netOwned: boolean; album: BugAlbumEntry[]; achievements?: BugAchievementState }
