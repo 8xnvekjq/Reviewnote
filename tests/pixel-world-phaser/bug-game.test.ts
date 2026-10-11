@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { bugStrokeMs, bugTimeLimitMs } from '../../src/features/pixel-world-phaser/logic/bugCatalog';
 import { createBugGame, segmentDistance, stepBugGame, swingBugNet, predictBugSwipe, parseNetSwing, emptyRoamingBug, stepRoamingBug, removeRoamingBug } from '../../src/features/pixel-world-phaser/logic/bugGame';
 
 test('선분의 끝과 짧은 휘두름도 올바르게 판정한다', () => {
@@ -9,14 +10,18 @@ test('선분의 끝과 짧은 휘두름도 올바르게 판정한다', () => {
   assert.equal(swingBugNet(game, { x: -40, y: 50 }, { x: 40, y: 50 }).status, 'playing');
   assert.equal(swingBugNet(game, { x: 0, y: 0 }, { x: 1, y: 1 }).status, 'playing');
 });
-test('10초 타이머와 350ms 회복을 지킨다', () => {
+test('별마다 짧아지는 타이머(별1 5초~별5 3초)와 350ms 회복을 지킨다', () => {
   const game = { ...createBugGame(1), position: { x: 0, y: 0 } };
   const missed = swingBugNet(game, { x: -40, y: 80 }, { x: 40, y: 80 });
   assert.equal(swingBugNet({ ...missed, elapsed: 349 }, { x: -40, y: 0 }, { x: 40, y: 0 }).status, 'playing');
   assert.equal(swingBugNet({ ...missed, elapsed: 350 }, { x: -40, y: 0 }, { x: 40, y: 0 }).status, 'caught');
-  assert.equal(stepBugGame(game, 9999).status, 'playing');
+  assert.equal(stepBugGame(game, 4999).status, 'playing');
   const timeout = stepBugGame(game, 10000);
-  assert.equal(timeout.elapsed, 10000); assert.equal(timeout.status, 'missed');
+  assert.equal(timeout.elapsed, 5000); assert.equal(timeout.status, 'missed');
+  assert.deepEqual([1, 2, 3, 4, 5].map(bugTimeLimitMs), [5000, 4500, 4000, 3500, 3000]);
+  assert.deepEqual([1, 2, 3, 4, 5].map(bugStrokeMs), [3000, 2500, 2000, 1500, 1000]);
+  const five = { ...createBugGame(5), position: { x: 0, y: 0 } };
+  assert.equal(stepBugGame(five, 2999).status, 'playing'); assert.equal(stepBugGame(five, 3000).status, 'missed');
   assert.equal(swingBugNet(timeout, { x: -100, y: 0 }, { x: 100, y: 0 }).status, 'missed');
   assert.equal(stepBugGame(game, NaN), game);
 });
@@ -31,10 +36,11 @@ test('별 다섯은 지연 후 피하고 체력을 무한히 쓰지 않는다', 
   assert.deepEqual(predictBugSwipe({ ...predicted, elapsed: 61 }, { x: 0, y: 0 }, { x: 0, y: 60 }).dodge, predicted.dodge);
 });
 
-// 한 봇이 관찰 후 260ms 반응하고 180ms 동안 쓴다. 한 판에 세 번, 같은 규칙을 모든 별에 적용한다.
+// 한 봇이 관찰 후 260ms 반응하고 180ms 동안 쓴다. 0.8초부터 3초마다, 시간 제한 안에 끝나는 만큼만 휘두른다
+// (별1·2는 두 번, 별3~5는 한 번). 같은 규칙을 모든 별에 적용한다.
 function bot(stars: number, seed: number, evasive = true) {
   let game = createBugGame(stars, seed);
-  for (const time of [800, 3800, 6800]) {
+  for (const time of [800, 3800, 6800].filter(t => t + 440 < bugTimeLimitMs(stars))) {
     game = stepBugGame(game, time - game.elapsed);
     const target = { ...game.position }, vertical = seed % 2 === 0;
     const from = { x: target.x - (vertical ? 0 : 45), y: target.y - (vertical ? 45 : 0) };
@@ -55,8 +61,8 @@ test('같은 별 다섯이라도 입력 회피가 있으면 더 어렵다', () =
 for (let stars = 1; stars <= 5; stars++) test(`별 ${stars} 가벼운 봇 균형 확인`, () => {
   console.log(`별 ${stars}: ${(rates[stars - 1] * 100).toFixed(1)}%`);
   if (stars === 1) assert.ok(rates[0] >= .9);
-  if (stars === 3) assert.ok(rates[2] >= .5 && rates[2] <= .8);
-  if (stars === 5) assert.ok(rates[4] >= .15 && rates[4] <= .4);
+  if (stars === 3) assert.ok(rates[2] >= .3 && rates[2] <= .55);
+  if (stars === 5) assert.ok(rates[4] >= .05 && rates[4] <= .2);
   assert.ok(rates[stars - 1] <= (stars === 1 ? 1 : rates[stars - 2]));
 });
 test('기존 이벤트와 잘못된 휘두름 페이로드를 무시한다', () => {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PointerEvent } from 'react';
-import { BUG_CATALOG, BUG_GAME_MS, bugById } from '../logic/bugCatalog';
+import { BUG_CATALOG, bugById, bugStrokeMs, bugTimeLimitMs } from '../logic/bugCatalog';
 import type { BugId } from '../logic/bugCatalog';
 import { BUG_RECOVERY_MS, createBugGame, predictBugSwipe, stepBugGame, swingBugNet } from '../logic/bugGame';
 import type { Point } from '../logic/joystick';
@@ -22,7 +22,8 @@ export function BugGame({ catchId, bugId, difficulty, onFinish, onCancel }: {
   const game = useRef(createBugGame(difficulty, Array.from(catchId).reduce((n, c) => Math.imul(n, 31) + c.charCodeAt(0), 1)));
   const [view, setView] = useState(game.current);
   const [trail, setTrail] = useState<Point[]>([]);
-  const stroke = useRef<{ pointer: number; points: Point[]; caught: boolean; length: number } | null>(null);
+  const stroke = useRef<{ pointer: number; points: Point[]; caught: boolean; length: number; startedAt: number } | null>(null);
+  const strokeMs = bugStrokeMs(game.current.stars), limitMs = bugTimeLimitMs(game.current.stars);
   const aim = useRef<Point>({ x: 1, y: 0 });
   const callbacks = useRef({ onFinish, onCancel }); callbacks.current = { onFinish, onCancel };
   const completed = useRef(false);
@@ -31,13 +32,28 @@ export function BugGame({ catchId, bugId, difficulty, onFinish, onCancel }: {
     if (!completed.current && game.current.status !== 'playing') { completed.current = true; callbacks.current.onFinish(game.current.status === 'caught'); }
   };
   const updateRef = useRef(update); updateRef.current = update;
+  // 획 끝내기(손을 뗐거나 획 시간이 다 됐을 때): 그은 동안 맞혔으면 잡은 것, 아니면 채를 다시 드는 시간.
+  const endStroke = () => {
+    const s = stroke.current; if (!s) return;
+    stroke.current = null; setTrail([]);
+    // 지나간 자리를 나중 위치로 재검사하지 않는다. 회복 시간은 획이 끝날 때 한 번만 적용한다.
+    if (game.current.status === 'playing' && s.length >= 8) game.current = {
+      ...game.current, status: s.caught ? 'caught' : 'playing', recoveryUntil: game.current.elapsed + BUG_RECOVERY_MS,
+    };
+  };
+  const endStrokeRef = useRef(endStroke); endStrokeRef.current = endStroke;
   const clock = useRef(0);
   const advance = () => {
     const now = performance.now(); game.current = stepBugGame(game.current, now - clock.current); clock.current = now;
   };
   useEffect(() => {
     let frame = 0; clock.current = performance.now();
-    const tick = () => { advance(); updateRef.current(); if (!completed.current) frame = requestAnimationFrame(tick); };
+    const tick = () => {
+      advance();
+      const s = stroke.current;
+      if (s && game.current.elapsed - s.startedAt >= bugStrokeMs(game.current.stars)) endStrokeRef.current();
+      updateRef.current(); if (!completed.current) frame = requestAnimationFrame(tick);
+    };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
   }, []);
@@ -66,7 +82,9 @@ export function BugGame({ catchId, bugId, difficulty, onFinish, onCancel }: {
   const move = (event: PointerEvent<SVGSVGElement>) => {
     const s = stroke.current;
     if (!s || s.pointer !== event.pointerId) return;
-    advance(); const to = point(event), from = s.points.at(-1)!;
+    advance();
+    if (game.current.elapsed - s.startedAt >= strokeMs) { endStroke(); updateRef.current(); return; }
+    const to = point(event), from = s.points.at(-1)!;
     s.length += Math.hypot(to.x - from.x, to.y - from.y);
     // 짧은 포인터 샘플도 선분으로 검사하되, 탭은 휘두름으로 인정하지 않는다.
     if (s.length >= 8) {
@@ -77,25 +95,22 @@ export function BugGame({ catchId, bugId, difficulty, onFinish, onCancel }: {
   };
   return <Window title="잠자리 잡기" onClose={onCancel} onCancel={onCancel} compact>
     <div className="pwp-bug-content">
-      <p>{bugById(bugId)?.name} · {'★'.repeat(view.stars)} · <b>{Math.max(0, (BUG_GAME_MS - view.elapsed) / 1000).toFixed(1)}초</b></p>
+      <p>{bugById(bugId)?.name} · {'★'.repeat(view.stars)} · <b>{Math.max(0, (limitMs - view.elapsed) / 1000).toFixed(1)}초</b></p>
       <div className="pwp-bug-arena">
         <svg viewBox="-110 -110 220 220" role="img" aria-label="잠자리를 향해 손가락으로 쓸어 주세요" onPointerDown={event => {
           event.stopPropagation(); if (event.button !== 0 || stroke.current) return;
           advance(); if (game.current.elapsed < game.current.recoveryUntil || game.current.status !== 'playing') return;
           event.currentTarget.setPointerCapture(event.pointerId); const from = point(event);
-          stroke.current = { pointer: event.pointerId, points: [from], caught: false, length: 0 }; setTrail([from]);
+          stroke.current = { pointer: event.pointerId, points: [from], caught: false, length: 0, startedAt: game.current.elapsed }; setTrail([from]);
           game.current = predictBugSwipe(game.current, from, game.current.position, true);
         }} onPointerMove={move} onPointerUp={event => {
           const s = stroke.current; if (!s || s.pointer !== event.pointerId) return;
-          move(event); stroke.current = null;
-          // 지나간 자리를 나중 위치로 재검사하지 않는다. 회복 시간은 손을 뗄 때 한 번만 적용한다.
-          if (game.current.status === 'playing' && s.length >= 8) game.current = {
-            ...game.current, status: s.caught ? 'caught' : 'playing', recoveryUntil: game.current.elapsed + BUG_RECOVERY_MS,
-          };
+          move(event); endStroke();
           updateRef.current();
         }} onPointerCancel={() => { stroke.current = null; setTrail([]); }}>
           <circle r="100" fill="#e4efd4" stroke="#8fbc82" strokeWidth="3" />
-          <polyline points={trail.map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke="#e7b562" strokeWidth="8" strokeLinecap="round" opacity=".7" />
+          <polyline points={trail.map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke="#e7b562" strokeWidth="8" strokeLinecap="round"
+            opacity={stroke.current ? .7 * Math.max(.15, 1 - (view.elapsed - stroke.current.startedAt) / strokeMs) : .7} />
         </svg>
         <span className="pwp-bug-flying" style={{ left: `${(view.position.x + 110) / 220 * 100}%`, top: `${(view.position.y + 110) / 220 * 100}%` }}><BugIcon id={bugId} frame={Math.floor(view.elapsed / 100)} /></span>
       </div>

@@ -16,8 +16,15 @@ export const bugById = (id: string) => BUG_CATALOG.find(b => b.id === id);
 /** 잠자리채 상점 아이템(광장 상점, 150P). 카탈로그 category 'tool', slot 'tool'. */
 export const NET_ITEM_ID = 'tool_net';
 export const NET_PRICE = 150;
-/** 미니게임: 한 판 10초. 서버는 시작 후 0.6초 전 성공·15초 넘은 결과를 받지 않는다. */
-export const BUG_GAME_MS = 10_000;
+const starsOf = (stars: number) => Math.max(1, Math.min(5, Math.round(stars) || 1));
+/** 미니게임 시간 제한: 별1 5초, 별이 하나 늘 때마다 0.5초씩 짧아진다(별5 3초).
+ *  서버는 시작 후 0.6초 전 성공·(제한+2초) 넘은 결과를 받지 않는다(supabase/migrations/20261012140000_pixel_bug_timing.sql). */
+export const bugTimeLimitMs = (stars: number) => 5000 - 500 * (starsOf(stars) - 1);
+/** 한 번 그은 획(채 휘두르기)이 유효한 시간: 별1 3초, 별마다 0.5초씩 짧아진다(별5 1초).
+ *  지나면 손을 뗀 것처럼 그 획은 끝나고 사라진다 — 손을 떼지 않고 계속 그어서 잡을 수 없다. */
+export const bugStrokeMs = (stars: number) => 3000 - 500 * (starsOf(stars) - 1);
+/** 가장 긴 판(별1). */
+export const BUG_GAME_MS = bugTimeLimitMs(1);
 /** 실시간: 잠자리채 휘두르기 broadcast 이벤트(광장·강가 채널). 마당은 혼자라 보내지 않는다. */
 export const NET_SWING_EVENT = 'net-swing';
 export interface NetSwingPayload { sessionId: string; direction: 'Front' | 'Back' | 'Left' | 'Right'; at: number }
