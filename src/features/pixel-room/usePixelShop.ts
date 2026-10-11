@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { buyPixelBait, fetchPixelBaitCharges, equipPixelRod, fetchEquippedRod, equipPixelItem, fetchEquippedAppearance, fetchOwnedPixelItemIds, fetchPixelCatalog, purchasePixelItem, setPixelBaseAppearance } from '../../utils/pixelShop';
 import { PIXEL_CATALOG } from './shop/catalog';
+import { buyCrystalBait, fetchKnowledgeShards, purchaseWithShards } from '../../utils/knowledgeShards';
 import type { PixelAvatarSlot, PixelItem, PublicAvatarAppearance, PurchasePixelItemResult } from './shop/types';
 
 const EMPTY_APPEARANCE: PublicAvatarAppearance = { top: null, bottom: null, shoes: null, hair: null, eyes: null, skin: null };
@@ -24,6 +25,8 @@ export function usePixelShop(userId: string, initialBalance: number, onBalanceCh
   // 보장하므로, 여기 실패해도 화면이 정적 카탈로그로 계속 동작하는 정도의 영향만 있다).
   const [catalog, setCatalog] = useState<PixelItem[]>(PIXEL_CATALOG as unknown as PixelItem[]);
   const [balance, setBalance] = useState(initialBalance);
+  // 지식의 조각(오답 복습으로만 모음). null = 아직 모름/불러오기 실패 — 0으로 보이면 '조각이 없다'로 오해한다.
+  const [shards, setShards] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
   const loadedUser = useRef<string | null>(null);
   // 진짜 "새 계정이라 아무것도 없음"과 "불러오다 실패함"을 구분한다 — 구분 안 하면 네트워크
@@ -42,6 +45,7 @@ export function usePixelShop(userId: string, initialBalance: number, onBalanceCh
     // 같은 계정의 새로고침 중에는 게임과 열린 창을 유지한다.
     if (loadedUser.current !== userId) { setReady(false); setBaitCharges(null); }
     void fetchPixelBaitCharges().then(charges => { if (!cancelled) setBaitCharges(charges); });
+    void fetchKnowledgeShards().then(value => { if (!cancelled && value) setShards(value.balance); });
     setLoadError(false);
     Promise.all([fetchOwnedPixelItemIds(userId), fetchEquippedAppearance(userId), fetchEquippedRod(userId)])
       .then(([ids, appearance, rod]) => {
@@ -141,6 +145,30 @@ export function usePixelShop(userId: string, initialBalance: number, onBalanceCh
       return result;
     } finally { mutationLock.current = false; if (mounted.current) setMutating(false); }
   }
+  // 조각 전용 아이템 — 포인트 잔액은 건드리지 않고 조각만 차감한다. 아바타는 사면 바로 장착한다.
+  async function purchaseShardItem(item: PixelItem): Promise<PurchaseOutcome> {
+    if (mutationLock.current || !ready || loadError) return { ok: false, reason: 'unknown', message: '이전 처리를 마친 뒤 다시 시도해 주세요.' };
+    mutationLock.current = true; setMutating(true);
+    try {
+      const result = await purchaseWithShards(item.itemId);
+      if (!mounted.current) return { ok: false, reason: 'unknown', message: '계정 화면이 변경되었어요. 다시 입장해 구매 결과를 확인해 주세요.' };
+      if (!result.ok) { if (result.reason === 'already_owned') reload(); return result; }
+      setOwnedIds(previous => new Set(previous).add(item.itemId));
+      setShards(result.newShards);
+      const outcome: PurchaseOutcome = { ok: true, itemId: item.itemId, newBalance: balance };
+      if (item.category === 'avatar' && !await equipConfirmed(item.slot as PixelAvatarSlot, item.itemId)) return { ...outcome, equipFailed: true };
+      return outcome;
+    } finally { mutationLock.current = false; if (mounted.current) setMutating(false); }
+  }
+  async function buyBaitWithShards() {
+    if (mutationLock.current || !ready || loadError) return { ok: false as const, reason: 'unknown' as const, message: '이전 처리를 마친 뒤 다시 시도해 주세요.' };
+    mutationLock.current = true; setMutating(true);
+    try {
+      const result = await buyCrystalBait();
+      if (result.ok && mounted.current) { setBaitCharges(result.charges); setShards(result.newShards); }
+      return result;
+    } finally { mutationLock.current = false; if (mounted.current) setMutating(false); }
+  }
   async function refreshBait() { const charges = await fetchPixelBaitCharges(); if (mounted.current) setBaitCharges(charges); }
-  return { refreshBait, baitCharges, buyBait, equippedRod, equipRod, ownedIds, equipped, catalog, balance, ready, loadError, reload, equip, purchase, setBaseAppearance, mutating };
+  return { shards, purchaseShardItem, buyBaitWithShards, refreshBait, baitCharges, buyBait, equippedRod, equipRod, ownedIds, equipped, catalog, balance, ready, loadError, reload, equip, purchase, setBaseAppearance, mutating };
 }

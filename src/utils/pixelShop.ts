@@ -21,6 +21,7 @@ interface PixelItemCatalogRow {
   display_name: string;
   tier: PixelItem['tier'];
   stackable: boolean;
+  shard_price?: number | string | null;
 }
 
 function mapCatalogRow(row: PixelItemCatalogRow): PixelItem {
@@ -33,6 +34,7 @@ function mapCatalogRow(row: PixelItemCatalogRow): PixelItem {
     displayName: row.display_name,
     tier: row.tier,
     stackable: row.stackable,
+    ...(row.shard_price != null ? { shardPrice: Number(row.shard_price) } : {}),
   };
 }
 
@@ -40,7 +42,7 @@ function mapCatalogRow(row: PixelItemCatalogRow): PixelItem {
 export async function fetchPixelCatalog(): Promise<PixelItem[]> {
   const { data, error } = await supabase
     .from('pixel_item_catalog')
-    .select('item_id, category, slot, price, asset_key, display_name, tier, stackable');
+    .select('item_id, category, slot, price, asset_key, display_name, tier, stackable, shard_price');
   if (error) throw error;
   return (data || []).map(mapCatalogRow);
 }

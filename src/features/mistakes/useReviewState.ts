@@ -3,6 +3,7 @@ import type { MistakeAnalysis, MistakeEntry, ReviewState } from '../../types';
 import type { NoticeModalState } from '../../components/CustomNoticeModal';
 import { supabase } from '../../services/supabase';
 import { recordReviewStreak, getNewlyReachedMilestones, getKSTDateString, type StreakState } from '../../utils/streak';
+import { checkShardGain } from '../../utils/knowledgeShardFeed';
 
 interface UseReviewStateParams {
   // mistakes/selectedEntry 자체는 이 훅이 소유하지 않는다 — App.tsx의 최상위 state를 그대로 받아
@@ -346,6 +347,9 @@ export function useReviewState({
           }
         });
       }
+
+      // 💎 새로 찍힌 O가 있으면 서버 트리거가 지식의 조각을 줬을 수 있다 — 늘어난 만큼 잠깐 보여 준다.
+      if (!skipPointRecalc && newReviews.some((r, i) => r === 'O' && oldReviews[i] !== 'O')) void checkShardGain();
 
       // 매일 연속 복습 스트릭 갱신 (🔥 Daily Streak) — 신규 등록/복습 완료 공용 함수
       applyDailyStreakUpdate();

@@ -11,7 +11,14 @@ export const BAIT_ITEM: PixelItem = { itemId: 'bait_worm', category: 'bait', slo
 /** 잠자리채 — 광장 상점 '도구' 칸. 그림은 PanelArt의 tool_net. */
 export const NET_ITEM: PixelItem = { itemId: 'tool_net', category: 'tool', slot: 'tool', price: 150, assetKey: 'tool_net', displayName: '잠자리채', tier: 1, stackable: false };
 
+/** 지식의 조각 전용 — 오답 복습으로만 모은 조각으로 산다(포인트로는 못 산다). 가격은 서버 shard_price가 기준. */
+export const SHARD_ITEMS: readonly PixelItem[] = [
+  { itemId: 'furniture_crystal_shelf', category: 'furniture', slot: 'furniture', price: 0, shardPrice: 15, assetKey: 'crystalshelf', displayName: '수정 서재', tier: 3, stackable: false },
+  { itemId: 'top_scholar_robe', category: 'avatar', slot: 'top', price: 0, shardPrice: 30, assetKey: 'scholar', displayName: '지식의 학자 로브', tier: 4, stackable: false },
+];
+
 export const PIXEL_CATALOG: readonly PixelItem[] = [
+  ...SHARD_ITEMS,
   NET_ITEM,
   { itemId: 'hair_bald', category: 'avatar', slot: 'hair', price: 0, assetKey: 'bald', displayName: '대머리', tier: 1, stackable: false },
   BAIT_ITEM,

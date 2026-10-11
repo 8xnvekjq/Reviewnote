@@ -24,7 +24,7 @@ import './pixel-room.css';
 export type Direction = 'Front' | 'Back' | 'Left' | 'Right';
 const directions: Record<Direction, Cell> = { Front: { x: 0, y: 1 }, Back: { x: 0, y: -1 }, Left: { x: -1, y: 0 }, Right: { x: 1, y: 0 } };
 const keys: Record<string, Direction> = { ArrowDown: 'Front', s: 'Front', ArrowUp: 'Back', w: 'Back', ArrowLeft: 'Left', a: 'Left', ArrowRight: 'Right', d: 'Right' };
-const names: Record<FurnitureType, string> = { bed: '포근한 침대', desk: '나무 책상', chair: '작은 의자', bookshelf: '나의 책장', plant: '초록 화분', decoration: '작은 장식', roundtable: '레이스 원형 테이블', television: '레트로 TV 장식장', aquarium: '작은 바다 수조', globe: '여행자의 지구본', tallplant: '키 큰 초록 식물', floorlamp: '격자 갓 스탠드' };
+const names: Record<FurnitureType, string> = { bed: '포근한 침대', desk: '나무 책상', chair: '작은 의자', bookshelf: '나의 책장', plant: '초록 화분', decoration: '작은 장식', roundtable: '레이스 원형 테이블', television: '레트로 TV 장식장', aquarium: '작은 바다 수조', globe: '여행자의 지구본', tallplant: '키 큰 초록 식물', floorlamp: '격자 갓 스탠드', crystalshelf: '수정 서재' };
 const cells = Array.from({ length: ROOM_WIDTH * ROOM_HEIGHT }, (_, i) => ({ x: i % ROOM_WIDTH, y: Math.floor(i / ROOM_WIDTH) }));
 type WalkStep = { cell: Cell; direction: Direction };
 type Panel = 'clothes' | 'furniture';

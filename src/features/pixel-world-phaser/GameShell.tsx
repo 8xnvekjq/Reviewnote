@@ -14,6 +14,8 @@ import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import type { PublicAvatarAppearance } from '../pixel-room/shop/types';
+import { KnowledgeShardIcon } from '../../components/KnowledgeShardIcon';
+import { formatShards } from '../../utils/knowledgeShards';
 import type { PetId } from '../pixel-room/pet/petKinds';
 import { useBgm } from '../pixel-room/bgm/useBgm';
 import { createControls } from './controls';
@@ -690,6 +692,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
       <button type="button" className="pwp-chip" disabled={status !== 'ready' || fishing.busy || bugs.busy || !!placing} onClick={() => { void bugs.refresh(); openPanel('bugs'); }}>곤충 도감</button>
       {isAdmin && <button type="button" className="pwp-chip" disabled={status !== 'ready' || fishing.busy || !!placing || roomPending} onClick={() => openPanel('weather')}>🌤 날씨</button>}
       <span className="pwp-chip pwp-points" aria-label={`포인트 ${balance}`}><span className="pwp-coin" aria-hidden="true">P</span>{balance.toLocaleString()}</span>
+      {panels?.shop.shards != null && <span className="pwp-chip pwp-shards" title="오답 복습으로 모으는 지식의 조각" aria-label={`지식의 조각 ${formatShards(panels.shop.shards)}`}><KnowledgeShardIcon size={18} />{formatShards(panels.shop.shards)}</span>}
       <span className="pwp-hud-spacer" />
       <button type="button" className="pwp-chip pwp-icon" aria-pressed={bgm.enabled} aria-label="소리" title={bgm.enabled ? '소리 끄기' : '소리 켜기'} onClick={bgm.toggle}><span aria-hidden="true">♪</span></button>
       {fullscreenSupported() && <button type="button" className="pwp-chip pwp-icon" aria-pressed={fullscreen} aria-label={fullscreen ? '전체화면 끄기' : '전체화면'} onClick={toggleFullscreen}>⛶</button>}

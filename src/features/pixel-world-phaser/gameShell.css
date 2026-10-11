@@ -99,3 +99,6 @@ html.pwp-open, html.pwp-open body { overflow:hidden; overscroll-behavior:none; h
 @keyframes pwp-sparkle { to { transform:scale(1.35); opacity:.35; } }
 @keyframes pwp-xp-pop { from { transform:translateY(8px); opacity:0; } to { transform:translateY(0); opacity:1; } }
 @media (prefers-reduced-motion:reduce) { .pwp-xp-gain, .pwp-level-sparkles { animation:none; } }
+.pwp-shards { gap:5px; cursor:default; background:#f3ebff; color:#4b2590; font-variant-numeric:tabular-nums; }
+.pwp-shards:active { transform:none; box-shadow:0 3px 0 rgba(58,36,22,.45); }
+.pwp-shards svg { flex:none; filter:drop-shadow(0 0 2px rgba(168,120,240,.7)); }

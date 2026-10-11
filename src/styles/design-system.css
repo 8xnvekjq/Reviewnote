@@ -105,3 +105,11 @@
 @keyframes rn-sheet-exit { to { opacity: 0; transform: translateY(16px); } }
 @media (prefers-reduced-motion: reduce) { .rn-sheet-closing .rn-sheet-panel { animation: none; } }
 @media (max-width: 359px) { .rn-header { padding-block: calc(env(safe-area-inset-top) + 12px) 12px; } }
+
+/* 지식의 조각 획득 알림(복습에서 O) — 화면 아래 가운데, 하단 메뉴 위. */
+.rn-shard-toast { position:fixed; left:50%; bottom:calc(88px + env(safe-area-inset-bottom)); z-index:60; transform:translateX(-50%); display:grid; grid-template-columns:auto auto; align-items:center; column-gap:8px; padding:10px 16px; border-radius:16px; background:linear-gradient(135deg,#2a1450,#4b2590); border:1px solid #a878f0; color:#f3eaff; box-shadow:0 8px 24px rgba(60,20,120,.45); pointer-events:none; animation:rn-shard-pop .28s ease-out; max-width:calc(100vw - 32px); }
+.rn-shard-toast svg { grid-row:span 2; filter:drop-shadow(0 0 4px rgba(200,160,255,.8)); }
+.rn-shard-toast strong { color:#e6d6ff; font-size:15px; }
+.rn-shard-toast small { color:#c9b3f0; font-size:11px; }
+@keyframes rn-shard-pop { from { opacity:0; transform:translate(-50%,8px) scale(.96); } to { opacity:1; transform:translate(-50%,0); } }
+@media (prefers-reduced-motion: reduce) { .rn-shard-toast { animation:none; } }
