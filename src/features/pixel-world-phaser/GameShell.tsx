@@ -1,4 +1,5 @@
 import { useBugCatching } from './ui/useBugCatching';
+import { dragonfliesFor } from './game/dragonflies';
 import type { NetSwingReporter } from './ui/useBugCatching';
 import type { BugAdapter } from './ui/bugAdapter';
 import { BugGame, BugResult } from './ui/BugGame';
@@ -216,8 +217,10 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
   const hand = panels?.bag?.bag?.hand ?? 'rod';
   const bagRefreshRef = useRef(panels?.bag?.refresh); bagRefreshRef.current = panels?.bag?.refresh;
   const handRef = useRef(hand); handRef.current = hand;
+  // 잠자리채를 들고 잠자리가 나는 곳이면 A는 잠자리채(잠자리 근처, 또는 말 걸 대상이 없을 때 허공에).
   const bugs = useBugCatching({ adapter: bugAdapter, scene: scene?.id ?? null, handle, freeze: freezeBugs, report: reportSwing, hand });
   const bugsRef = useRef(bugs); bugsRef.current = bugs;
+  const netSwing = hand === 'net' && (bugs.nearby || (!prompt && ['yard', 'plaza', 'river'].includes(scene?.id ?? '')));
   const level = useLevel(fishingAdapter, fishing.state);
   useEffect(() => { if (fishing.caught) level.onXp(gainFrom(fishing.caught)); }, [fishing.caught, level.onXp]);
   const fishingRef = useRef(fishing); fishingRef.current = fishing;
@@ -475,10 +478,9 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     // 잠자리채를 안 들었으면 말 걸기·낚시가 먼저이고, 할 일이 없을 때만 잠자리채 안내를 띄운다.
     const net = handRef.current === 'net';
     if (!dialogueRef.current && bugsRef.current.nearby && (net || (!promptRef.current && sceneRef.current?.id !== 'river'))) { void bugsRef.current.start(); return; }
-    if (!dialogueRef.current && !promptRef.current && sceneRef.current?.id === 'river') {
-      if (!net && handle.current?.beginCast()) return;
-      if (net && fishingRef.current.canCast) { bugsRef.current.notify('낚시하려면 가방에서 낚싯대를 손에 들어 보세요'); return; }
-    }
+    if (!dialogueRef.current && !promptRef.current && !net && sceneRef.current?.id === 'river' && handle.current?.beginCast()) return;
+    // 잠자리채를 들었으면 말 걸 대상이 없을 때 허공에도 휘두른다(잠자리가 나는 곳에서만).
+    if (!dialogueRef.current && !promptRef.current && net && dragonfliesFor(sceneRef.current?.id ?? null)) { bugsRef.current.swingAir(); return; }
     if (dialogueRef.current) advance();
     // 물을 보며 A를 누르면 힘을 모으고, 놓으면 던진다.
     else if (promptRef.current || sceneRef.current?.id === 'river') handle.current?.interact();
@@ -742,12 +744,12 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     </div>}
     <button type="button" disabled={!!placing} className="pwp-btn pwp-btn-a" data-pressed={pressed.a} data-prompt={!!prompt || !!dialogue}
       style={{ left: a.x - a.size / 2, top: a.y - a.size / 2, width: a.size, height: a.size }}
-      aria-label={dialogue ? 'A · 다음' : bugs.nearby && hand === 'net' ? 'A · 잠자리채' : prompt ? `A · ${promptLabel}` : fishing.canCast && hand !== 'net' ? 'A · 낚시하기' : 'A'}
+      aria-label={dialogue ? 'A · 다음' : netSwing ? 'A · 잠자리채' : prompt ? `A · ${promptLabel}` : fishing.canCast && hand !== 'net' ? 'A · 낚시하기' : 'A'}
       onPointerDown={buttonDown('a')} onPointerUp={buttonUp('a')} onPointerCancel={buttonUp('a')} onLostPointerCapture={buttonUp('a')}
       onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); if (!event.repeat) pressA(); } }}
       onKeyUp={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); releaseA(); } }}
       onClick={event => { if (keyboardClick(event)) { pressA(); releaseA(); } }}>
-      <b>A</b>{(prompt || dialogue || (fishing.canCast && hand !== 'net') || (bugs.nearby && hand === 'net')) && <small>{dialogue ? '다음' : bugs.nearby && hand === 'net' ? '잠자리채' : prompt ? promptLabel : '낚시하기'}</small>}
+      <b>A</b>{(prompt || dialogue || (fishing.canCast && hand !== 'net') || netSwing) && <small>{dialogue ? '다음' : netSwing ? '잠자리채' : prompt ? promptLabel : '낚시하기'}</small>}
     </button>
     <button type="button" disabled={!!placing} className="pwp-btn pwp-btn-b" data-pressed={pressed.b} data-closing={!!panel || !!dialogue}
       style={{ left: b.x - b.size / 2, top: b.y - b.size / 2, width: b.size, height: b.size }}

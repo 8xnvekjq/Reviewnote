@@ -1,4 +1,5 @@
 import { dragonfliesFor } from './dragonflies';
+import type { Facing } from '../logic/joystick';
 import { HeldTool, updatePeerTool } from './heldTool';
 import { RIDING_RADIUS, PERSON_RADIUS } from '../logic/softCollision';
 import { createAnimalTag, updateAnimalTag, animalTagSnapshot, peerAnimalFace } from './animalTag';
@@ -138,15 +139,16 @@ export class PlazaScene extends WorldScene {
   update(time: number, delta: number) {
     super.update(time, delta);
     const spots = new Map<string, { x: number; y: number }>([[this.selfId, this.feet]]);
+    const facings = new Map<string, Facing>();
     const faces = new Map<string, string>([[this.selfId, this.ctx.face ?? '🐶']]);
     for (const [id, f] of this.friends) {
       const p = f.state, feet = { x: (p.x + PLAZA_MARGIN + .5) * 16, y: (p.y + PLAZA_MARGIN + .5) * 16 };
-      spots.set(id, feet); faces.set(id, peerAnimalFace(p));
+      spots.set(id, feet); faces.set(id, peerAnimalFace(p)); facings.set(id, p.direction);
       if (f.tag) { updateAnimalTag(f.tag, feet, peerAnimalFace(p), p.riding === true && p.pet === 'pet_bear'); }
       updatePeerCompanion(f, feet, time, delta, this.spec.solid);
       updatePeerTool(this, f, f.sprite ? { x: f.sprite.x, y: f.sprite.y } : feet, 'carry', dragonfliesFor('plaza')?.isSwinging(id) ?? false);
     }
-    dragonfliesFor('plaza')?.setPeers(spots, this.selfId);
+    dragonfliesFor('plaza')?.setPeers(spots, this.selfId, facings);
     this.spacePets(delta);
     this.bubbles?.update(this.wantedBubbles, spots, faces);
   }

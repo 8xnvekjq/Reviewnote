@@ -73,6 +73,7 @@ end $f$;`);
   await db.exec(hand.replace(/create policy[^;]*;/g, '')); // 다시 돌려도 한 번만 바뀐다
   await db.exec(sql('20261012160000_pixel_bug_master_30.sql'));
   await db.exec(sql('20261012160000_pixel_bug_master_30.sql'));
+  await db.exec(sql('20261012170000_pixel_bug_spawns.sql'));
   const rpc = async (query: string, args: any[] = []) => (await db.query<any>(query, args)).rows[0].r;
   return { db, rpc };
 }
@@ -167,5 +168,30 @@ test('손 칸·업적 표는 본인만 읽고 RPC는 로그인 사용자만', as
       for (const table of ['public.pixel_hand_equipment', 'public.pixel_achievements'])
         assert.equal((await db.query<any>("select has_table_privilege($1,$2,'INSERT,UPDATE,DELETE') a", [role, table])).rows[0].a, false);
     }
+  } finally { await db.close(); }
+});
+
+test('잠자리 미리 정하기: 최대 2마리·20초에 한 번, 그 잠자리로 시작하면 한 번만 쓴다 (PGlite)', async () => {
+  const { db, rpc } = await setup();
+  try {
+    await db.exec(`insert into pixel_item_ownership values ('${U}','tool_net')`);
+    await rpc("select public.equip_pixel_hand('tool_net') r");
+    const spawn = (release: string | null = null) => rpc('select public.spawn_bug($1, $2) r', ['plaza', release]);
+    const older = async () => db.exec("update public.pixel_bug_spawns set created_at = created_at - interval '21 seconds'");
+    const first = await spawn();
+    assert.equal(first.ok, true); assert.ok(first.stars >= 1 && first.stars <= 5);
+    assert.equal((await spawn()).reason, 'wait');
+    await older(); const second = await spawn(); assert.equal(second.ok, true);
+    await older(); assert.equal((await spawn()).reason, 'full');
+    // 날아가 버린 자리를 놓아 주면 새로 받는다.
+    await older(); const third = await spawn(first.spawnId); assert.equal(third.ok, true);
+    // 그 잠자리로 시작: 종류가 같고, 한 번 쓰면 사라진다. 다른 사람·지난 것은 안 된다.
+    const start = (id: string) => rpc('select public.start_bug_catch($1, $2) r', ['plaza', id]);
+    const started = await start(second.spawnId);
+    assert.equal(started.ok, true); assert.equal(started.bugId, second.bugId); assert.equal(started.difficulty, second.stars);
+    await db.exec('delete from public.pixel_bug_attempts; delete from pixel_private.bug_start_throttle;');
+    assert.equal((await start(second.spawnId)).reason, 'gone');
+    await db.exec("update public.pixel_bug_spawns set expires_at = clock_timestamp() - interval '1 second'");
+    assert.equal((await start(third.spawnId)).reason, 'gone');
   } finally { await db.close(); }
 });

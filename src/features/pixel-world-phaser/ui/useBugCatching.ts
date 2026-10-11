@@ -71,7 +71,7 @@ export function useBugCatching({ adapter, scene, handle, freeze, report, hand = 
     latest.current.report(flies.swing());
     const generation = epoch.current;
     try {
-      const value = await current.start(where!);
+      const value = await current.start(where!, flies.swungSpawn);
       if (!mounted.current || generation !== epoch.current || where !== latest.current.scene) {
         if (value.ok) await current.finish(value.catchId, false);
         return;
@@ -83,7 +83,9 @@ export function useBugCatching({ adapter, scene, handle, freeze, report, hand = 
       }
       else {
         locked.current = false; setBusy(false); latest.current.freeze(false);
-        setMessage(value.reason === 'no_net' ? '광장 상점에서 잠자리채를 사 보세요' : value.reason === 'net_not_equipped' ? '가방에서 잠자리채를 손에 들어 보세요' : '잠시 후 다시 시도해 주세요.');
+        if (value.reason === 'gone') flies.caught(); // 서버에서 이미 사라진 잠자리(시간이 지남)
+        setMessage(value.reason === 'no_net' ? '광장 상점에서 잠자리채를 사 보세요' : value.reason === 'net_not_equipped' ? '가방에서 잠자리채를 손에 들어 보세요'
+          : value.reason === 'gone' ? '잠자리가 멀리 날아가 버렸어요' : '잠시 후 다시 시도해 주세요.');
         void refresh();
       }
     } catch {
@@ -105,11 +107,29 @@ export function useBugCatching({ adapter, scene, handle, freeze, report, hand = 
     if (attempt) void attempt.adapter.finish(attempt.round.catchId, false).catch(() => {});
     void refresh();
     setNearby(false);
-    const timer = window.setInterval(() => setNearby(!!dragonfliesFor(scene)?.nearby), 100);
+    // 잠자리 종류는 서버가 정한다(어댑터에 spawn이 있으면). 장면의 잠자리 컨트롤러가 생기면 연결한다.
+    let linked: ReturnType<typeof dragonfliesFor>;
+    const timer = window.setInterval(() => {
+      const flies = dragonfliesFor(scene);
+      if (flies && flies !== linked && scene) {
+        linked = flies;
+        const spawn = adapter?.spawn?.bind(adapter);
+        flies.setSpawner(spawn ? release => spawn(scene, release) : undefined);
+      }
+      setNearby(!!flies?.nearby);
+    }, 100);
     return () => clearInterval(timer);
   }, [adapter, scene, refresh]);
   useEffect(() => { if (!message) return; const timer = setTimeout(() => setMessage(''), 3500); return () => clearTimeout(timer); }, [message]);
   const hideResult = useCallback(() => { resultOpen.current = false; setResult(null); latest.current.freeze(false); }, []);
   const notify = useCallback((text: string) => setMessage(text), []);
-  return { state, round, result, busy, nearby, start, finish, cancel, refresh, hideResult, message, notify };
+  // 잠자리채로 허공 휘두르기(잠자리 근처가 아닐 때). 서버는 부르지 않는다. 범위 안 친구는 어지러워진다.
+  const lastAirSwing = useRef(0);
+  const swingAir = useCallback(() => {
+    const flies = dragonfliesFor(latest.current.scene), now = performance.now();
+    if (locked.current || !flies || now - lastAirSwing.current < 400) return;
+    lastAirSwing.current = now;
+    latest.current.report(flies.swing());
+  }, []);
+  return { state, round, result, busy, nearby, start, finish, cancel, refresh, hideResult, message, notify, swingAir };
 }
