@@ -75,6 +75,7 @@ end $f$;`);
   await db.exec(sql('20261012160000_pixel_bug_master_30.sql'));
   await db.exec(sql('20261012170000_pixel_bug_spawns.sql'));
   await db.exec(sql('20261012180000_pixel_bug_spawn_reclaim.sql'));
+  await db.exec(sql('20261012190000_pixel_bug_world.sql'));
   const rpc = async (query: string, args: any[] = []) => (await db.query<any>(query, args)).rows[0].r;
   return { db, rpc };
 }
@@ -220,5 +221,38 @@ test('맵을 다시 들어오면 살아 있는 내 잠자리를 그대로 돌려
     assert.equal(again1.bugId, [a, b].find(x => x.spawnId === again1.spawnId).bugId);
     assert.equal((await next([a.spawnId, b.spawnId])).reason, 'full');
     assert.equal(Number((await db.query<any>('select count(*) n from public.pixel_bug_spawns')).rows[0].n), 2);
+  } finally { await db.close(); }
+});
+
+test('맵의 잠자리: 마당은 내 것 4마리, 광장은 모두 같은 8마리, 먼저 시작한 한 명만, 다시 불러도 그대로 (PGlite)', async () => {
+  const { db, rpc } = await setup();
+  const V = '22222222-2222-2222-2222-222222222222';
+  try {
+    await db.exec(`insert into public.profiles(id) values ('${V}'); insert into pixel_item_ownership values ('${U}','tool_net'),('${V}','tool_net')`);
+    const as = (who: string) => db.exec(`select set_config('request.jwt.claim.sub','${who}',false)`);
+    const world = (scene: string) => rpc('select public.get_bug_world($1) r', [scene]);
+    await as(U); await rpc("select public.equip_pixel_hand('tool_net') r");
+    await as(V); await rpc("select public.equip_pixel_hand('tool_net') r");
+    await as(U);
+    const yardU = await world('yard'), plazaU = await world('plaza');
+    assert.equal(yardU.bugs.length, 4); assert.equal(plazaU.bugs.length, 8);
+    await as(V);
+    const yardV = await world('yard'), plazaV = await world('plaza');
+    const ids = (w: any) => w.bugs.map((b: any) => b.spawnId);
+    assert.deepEqual(ids(plazaV), ids(plazaU), '광장은 모두 같은 잠자리');
+    assert.equal(ids(yardV).some((id: string) => ids(yardU).includes(id)), false, '마당은 각자');
+    assert.deepEqual(ids(await world('plaza')), ids(plazaU), '다시 불러도 그대로(리셋 없음)');
+    // 같은 잠자리를 둘이 동시에: 먼저 시작한 한 명만, 늦으면 gone. 잡힌 잠자리는 모두의 목록에서 빠진다.
+    const target = plazaU.bugs[0];
+    const start = (id: string) => rpc('select public.start_world_bug_catch($1, $2) r', ['plaza', id]);
+    const first = await start(target.spawnId);
+    assert.equal(first.ok, true); assert.equal(first.bugId, target.bugId);
+    await as(U); assert.equal((await start(target.spawnId)).reason, 'gone');
+    assert.equal((await world('plaza')).bugs.some((b: any) => b.spawnId === target.spawnId), false);
+    // 30~60초 뒤 그 자리에 새 잠자리(줄은 그대로 8개).
+    await db.exec("update public.pixel_bug_world set caught_at = caught_at - interval '61 seconds', next_at = null where caught_at is not null");
+    const later = await world('plaza');
+    assert.equal(later.bugs.length, 8); assert.equal(later.bugs.some((b: any) => b.spawnId === target.spawnId), false);
+    assert.equal(Number((await db.query<any>("select count(*) n from public.pixel_bug_world where scene='plaza'")).rows[0].n), 8);
   } finally { await db.close(); }
 });

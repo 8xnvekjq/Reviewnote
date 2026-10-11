@@ -2,30 +2,37 @@ import type Phaser from 'phaser';
 import type { Point, Facing } from '../logic/joystick';
 import type { Grid } from '../logic/world';
 import { facingDelta } from '../logic/world';
-import { bugThreat, emptyRoamingBug, removeRoamingBug, stepRoamingBug } from '../logic/bugGame';
+import { advanceBugPath, bugThreat, createBugPath, emptyRoamingBug, removeRoamingBug, stepFleeOffset, stepRoamingBug } from '../logic/bugGame';
+import type { BugPath } from '../logic/bugGame';
 import { BUG_CATALOG } from '../logic/bugCatalog';
 import type { NetSwingPayload } from '../logic/bugCatalog';
-import type { BugSpawn } from '../ui/bugAdapter';
+import type { BugWorld, WorldBug } from '../ui/bugAdapter';
 import { DIZZY_MS, dizzyEyes, netHits } from '../logic/netHit';
 
 // 셸과 장면의 연결은 이 작은 방문별 컨트롤러로만 한다. 장면 종료 시 반드시 제거한다.
 const active = new Map<string, Dragonflies>();
 export const dragonfliesFor = (scene: string | null) => scene ? active.get(scene) : undefined;
+/** 서버 맵 잠자리를 쓸 예정이면(어댑터에 world가 있으면) 예전 방식 잠자리를 아예 띄우지 않는다 — 떴다 사라지지 않게. */
+let worldExpected = false;
+export const expectBugWorld = (on: boolean) => { worldExpected = on; };
 const sheets = import.meta.glob('../assets/bugs/*.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
-/** 새 잠자리 받기(서버가 종류를 정한다). release: 그 자리의 이전 잠자리. */
-export type BugSpawner = (release?: string, holding?: string[]) => Promise<BugSpawn | null | 'unsupported'>;
+/** 맵의 잠자리 목록 받기(서버). 'unsupported'면 서버가 아직 옛 버전 → 예전처럼 종류 없이 난다. */
+export type BugWorldFetcher = () => Promise<BugWorld | null | 'unsupported'>;
+/** 맵 잠자리 목록을 다시 받는 간격(ms) — 다른 친구가 잡은 잠자리가 사라지고 새 잠자리가 나타난다. */
+const WORLD_REFRESH_MS = 5000;
 type Dizzy = { until: number; eyes: Phaser.GameObjects.Graphics; stars: Phaser.GameObjects.Graphics };
+/** 서버가 정한 잠자리 한 마리: 씨앗 경로(모든 화면 같음) + 도망으로 비켜 난 거리(이 화면만). */
+type WorldEntry = { bug: WorldBug; path: BugPath; offset: Point; pos: Point | null; image: Phaser.GameObjects.Sprite };
 export class Dragonflies {
+  /** 서버가 없을 때(시험 하네스 등)의 예전 방식: 화면마다 2마리가 따로 난다. */
   private bugs = [emptyRoamingBug(), emptyRoamingBug()];
-  /** 자리마다 서버가 정한 잠자리(spawner가 없으면 늘 null — 예전처럼 종류 없이 난다). */
-  private kinds: (BugSpawn | null)[] = [null, null];
-  /** 한 번에 하나만 받아 온다(두 자리가 같은 잠자리를 돌려받지 않게). */
-  private requesting = false;
-  /** 맵에 들어온 시각 — 서버 연결 전 잠깐은 종류 없는 잠자리를 띄우지 않는다. */
-  private bornAt: number;
-  private releases: (string | undefined)[] = [undefined, undefined];
-  private spawner?: BugSpawner;
   private images: Phaser.GameObjects.Sprite[] = [];
+  private fetcher?: BugWorldFetcher;
+  private fetching = false;
+  private lastFetch = -Infinity;
+  /** 서버 시각 − 내 시각(ms). */
+  private clockOffset = 0;
+  private world = new Map<string, WorldEntry>();
   private peers = new Map<string, Point>();
   private peerFacing = new Map<string, Facing>();
   private seen = new Map<string, number>();
@@ -34,12 +41,17 @@ export class Dragonflies {
   private feet: Point = { x: 0, y: 0 };
   private direction: Facing = 'Front';
   private swungIndex = -1;
+  private swungId: string | undefined;
   /** 휘두르는 중(그림 4장 ≈ 280ms) — 그동안 손에 든 잠자리채를 감춘다. 'self' = 나, 그 밖은 친구 sessionId. */
   private swingUntil = new Map<string, number>();
+  /** 맵에 들어온 시각 — 서버 연결 전 잠깐은 예전 방식 잠자리를 띄우지 않는다. */
+  private bornAt: number;
+  /** 서버 맵 잠자리를 기다리는 중(옛 서버로 밝혀지면 false). */
+  private waitForWorld: boolean;
   private scene: Phaser.Scene;
   private grid: Grid;
   constructor(scene: Phaser.Scene, grid: Grid, id: string) {
-    this.scene = scene; this.grid = grid; this.bornAt = scene.time.now;
+    this.scene = scene; this.grid = grid; this.bornAt = scene.time.now; this.waitForWorld = worldExpected;
     active.set(id, this);
     if (!scene.textures.exists('bug-fallback')) {
       const c = document.createElement('canvas'); c.width = 16; c.height = 16;
@@ -49,16 +61,17 @@ export class Dragonflies {
       g.fillStyle = '#483c36'; g.fillRect(6, 2, 4, 2);
       scene.textures.addCanvas('bug-fallback', c);
     }
-    this.images = this.bugs.map(() => scene.add.sprite(0, 0, 'bug-fallback').setDepth(9990).setVisible(false));
+    this.images = this.bugs.map(() => this.makeImage());
     this.loadSheet('dragonflies', 16, 16, 20);
     this.loadSheet('net-swing', 32, 32, 4);
     scene.events.once('shutdown', () => {
       this.alive = false; this.peers.clear(); this.seen.clear();
       for (const d of this.dizzy.values()) { d.eyes.destroy(); d.stars.destroy(); }
-      this.dizzy.clear();
+      this.dizzy.clear(); this.world.clear();
       if (active.get(id) === this) active.delete(id);
     });
   }
+  private makeImage() { return this.scene.add.sprite(0, 0, 'bug-fallback').setDepth(9990).setVisible(false); }
   private loadSheet(name: string, width: number, height: number, frames: number) {
     const url = sheets[`../assets/bugs/${name}.png`], key = 'bug:' + name;
     if (!url || this.scene.textures.exists(key)) return;
@@ -70,71 +83,89 @@ export class Dragonflies {
     };
     image.src = url;
   }
-  /** 서버에서 잠자리 종류를 받아 오게 한다(없으면 예전처럼 종류 없이 난다). */
-  setSpawner(spawner: BugSpawner | undefined) {
-    this.spawner = spawner;
-    // 연결 전에 종류 없이 나타난 잠자리는 거두고 서버가 정한 잠자리로 다시 띄운다.
-    if (spawner) this.bugs = this.bugs.map((bug, i) => this.kinds[i] ? bug : emptyRoamingBug());
+  /** 맵 잠자리를 서버에서 받아 오게 한다(광장·강가는 모두 같은 잠자리, 마당은 내 잠자리). */
+  setWorld(fetcher: BugWorldFetcher | undefined) {
+    this.fetcher = fetcher;
+    if (fetcher) { this.bugs = this.bugs.map(() => emptyRoamingBug()); this.images.forEach(i => i.setVisible(false)); this.lastFetch = -Infinity; }
   }
-  private request(i: number) {
-    const spawner = this.spawner;
-    if (!spawner || this.requesting) return;
-    this.requesting = true;
-    const holding = this.kinds.flatMap(k => k ? [k.spawnId] : []);
-    void spawner(this.releases[i], holding).catch(() => null).then(kind => {
-      this.requesting = false;
+  private fetchWorld(time: number) {
+    const fetcher = this.fetcher;
+    if (!fetcher || this.fetching) return;
+    this.fetching = true; this.lastFetch = time;
+    void fetcher().catch(() => null).then(result => {
+      this.fetching = false;
       if (!this.alive) return;
-      if (kind === 'unsupported') { this.spawner = undefined; return; } // 서버가 아직 옛 버전 → 예전처럼 종류 없이
-      if (kind) { this.kinds[i] = kind; this.releases[i] = undefined; }
-      else this.bugs[i] = { ...this.bugs[i], nextAt: this.scene.time.now + 5000 }; // 20초 제한·가득 참 → 조금 뒤 다시
+      if (result === 'unsupported') { this.fetcher = undefined; this.waitForWorld = false; return; }
+      if (result) this.reconcile(result);
     });
+  }
+  /** 서버 목록에 맞춘다: 잡혔거나 떠난 잠자리는 지우고, 새 잠자리는 나타난 뒤 지금까지의 경로를 계산해 띄운다. */
+  private reconcile(world: BugWorld) {
+    this.clockOffset = world.serverNow - Date.now();
+    const ids = new Set(world.bugs.map(b => b.spawnId));
+    for (const [id, e] of this.world) if (!ids.has(id)) { e.image.destroy(); this.world.delete(id); }
+    for (const bug of world.bugs) if (!this.world.has(bug.spawnId))
+      this.world.set(bug.spawnId, { bug, path: createBugPath(bug.seed), offset: { x: 0, y: 0 }, pos: null, image: this.makeImage() });
+  }
+  private frame(image: Phaser.GameObjects.Sprite, row: number, time: number, fast: boolean) {
+    if (this.scene.textures.exists('bug:dragonflies')) image.setTexture('bug:dragonflies', row * 4 + Math.floor(time / (fast ? 50 : 100)) % 4);
+    else image.setScale(1, .8 + Math.sin(time / 65) * .2);
   }
   update(time: number, delta: number, feet: Point, direction: Facing) {
     this.feet = feet; this.direction = direction;
-    const people = [feet, ...this.peers.values()];
-    this.bugs = this.bugs.map((bug, i) => {
-      const image = this.images[i];
-      // 종류를 받기 전에는 나타나지 않는다. 연결 전 1.5초도 기다린다(종류 없이 떴다가 사라지지 않게).
-      if (!bug.position && !this.spawner && time - this.bornAt < 1500) { image.setVisible(false); return bug; }
-      if (!bug.position && this.spawner && !this.kinds[i]) {
-        if (time >= bug.nextAt) this.request(i);
-        image.setVisible(false);
-        return bug;
+    if (this.fetcher) {
+      if (time - this.lastFetch >= WORLD_REFRESH_MS) this.fetchWorld(time);
+      const people = [feet, ...this.peers.values()], now = Date.now() + this.clockOffset;
+      for (const [id, e] of this.world) {
+        if (now >= e.bug.leaveAt) { e.image.destroy(); this.world.delete(id); continue; }
+        const base = advanceBugPath(e.path, this.grid, Math.max(0, now - e.bug.bornAt));
+        if (!base) { e.pos = null; e.image.setVisible(false); continue; }
+        // 별3 이상: 사람이 다가오면 그 화면에서 Z자로 비켜 난다(아무도 없으면 천천히 경로로 돌아온다).
+        const at = { x: base.x + e.offset.x, y: base.y + e.offset.y };
+        const threat = e.bug.stars >= 3 ? bugThreat(at, people) : null;
+        if (e.bug.stars >= 3) e.offset = stepFleeOffset(e.offset, base, threat, time, delta, this.grid);
+        e.pos = { x: base.x + e.offset.x, y: base.y + e.offset.y };
+        e.image.setVisible(true).setPosition(e.pos.x, e.pos.y);
+        this.frame(e.image, Math.max(0, BUG_CATALOG.findIndex(b => b.id === e.bug.bugId)), time, !!threat);
       }
-      const kind = this.kinds[i];
-      const threat = kind && kind.stars >= 3 && bug.position ? bugThreat(bug.position, people) : null;
-      const next = stepRoamingBug(bug, this.grid, time, delta, Math.random, threat);
-      if (bug.position && !next.position) { this.releases[i] = kind?.spawnId; this.kinds[i] = null; } // 날아가 버림
-      image.setVisible(!!next.position);
-      if (next.position) {
-        image.setPosition(next.position.x, next.position.y);
-        const row = Math.max(0, BUG_CATALOG.findIndex(b => b.id === kind?.bugId));
-        if (this.scene.textures.exists('bug:dragonflies')) image.setTexture('bug:dragonflies', row * 4 + Math.floor(time / (threat ? 50 : 100)) % 4);
-        else image.setScale(1, .8 + Math.sin(time / 65) * .2);
-      }
-      return next;
-    });
+    } else if (!this.waitForWorld && time - this.bornAt >= 1500) {
+      this.bugs = this.bugs.map((bug, i) => {
+        const next = stepRoamingBug(bug, this.grid, time, delta), image = this.images[i];
+        image.setVisible(!!next.position);
+        if (next.position) { image.setPosition(next.position.x, next.position.y); this.frame(image, 0, time, false); }
+        return next;
+      });
+    }
     this.drawDizzy(time);
   }
+  private get flying(): { id: string | number; pos: Point; bugId: string | null }[] {
+    return this.fetcher
+      ? [...this.world].flatMap(([id, e]) => e.pos ? [{ id, pos: e.pos, bugId: e.bug.bugId as string }] : [])
+      : this.bugs.flatMap((b, i) => b.position ? [{ id: i, pos: b.position, bugId: null }] : []);
+  }
   /** 지금 날고 있는 잠자리(디버그·시험용). */
-  get positions(): Point[] { return this.bugs.flatMap(b => b.position ? [{ ...b.position }] : []); }
-  get kindsDebug() { return this.bugs.flatMap((b, i) => b.position ? [{ ...b.position, bugId: this.kinds[i]?.bugId ?? null }] : []); }
+  get positions(): Point[] { return this.flying.map(f => ({ ...f.pos })); }
+  get kindsDebug() { return this.flying.map(f => ({ ...f.pos, bugId: f.bugId })); }
   isSwinging(id: string) { return (this.swingUntil.get(id) ?? -1) > this.scene.time.now; }
-  get nearby() { return this.bugs.some(b => b.position && Math.hypot(b.position.x - this.feet.x, b.position.y - this.feet.y) <= 24); }
-  /** 마지막으로 휘두른 잠자리의 서버 종류 id(있으면 그 잠자리로 잡기를 시작한다). */
-  get swungSpawn() { return this.swungIndex >= 0 ? this.kinds[this.swungIndex]?.spawnId : undefined; }
+  private within(pos: Point) { return Math.hypot(pos.x - this.feet.x, pos.y - this.feet.y) <= 24; }
+  get nearby() { return this.flying.some(f => this.within(f.pos)); }
+  /** 마지막으로 휘두른 맵 잠자리 id(그 잠자리로 잡기를 시작한다). */
+  get swungSpawn() { return this.swungId; }
   /** 잠자리 근처가 아니어도 휘두른다(허공). 범위 안 친구는 어지러워진다. */
   swing(): Facing {
-    this.swungIndex = this.bugs.findIndex(b => b.position && Math.hypot(b.position.x - this.feet.x, b.position.y - this.feet.y) <= 24);
+    const hit = this.flying.filter(f => this.within(f.pos)).sort((a, b) => Math.hypot(a.pos.x - this.feet.x, a.pos.y - this.feet.y) - Math.hypot(b.pos.x - this.feet.x, b.pos.y - this.feet.y))[0];
+    this.swungId = typeof hit?.id === 'string' ? hit.id : undefined;
+    this.swungIndex = typeof hit?.id === 'number' ? hit.id : -1;
     this.swingUntil.set('self', this.scene.time.now + 300);
     this.drawSwing(this.feet, this.direction);
     for (const id of netHits(this.feet, this.direction, this.peers)) this.makeDizzy(id);
     return this.direction;
   }
-  /** 잡았거나(서버가 그 잠자리를 썼다) 사라졌다 — 그 자리를 비운다. */
+  /** 잡았거나(서버가 그 잠자리를 가졌다) 이미 없는 잠자리 — 이 화면에서 지운다. */
   caught() {
+    if (this.swungId) { this.world.get(this.swungId)?.image.destroy(); this.world.delete(this.swungId); this.swungId = undefined; return; }
     const index = this.swungIndex; this.swungIndex = -1;
-    if (index >= 0) { this.bugs[index] = removeRoamingBug(this.scene.time.now); this.kinds[index] = null; this.images[index].setVisible(false); }
+    if (index >= 0) { this.bugs[index] = removeRoamingBug(this.scene.time.now); this.images[index].setVisible(false); }
   }
   setPeers(spots: Map<string, Point>, selfId: string, facings?: Map<string, Facing>) {
     this.peers = new Map([...spots].filter(([id]) => id !== selfId));

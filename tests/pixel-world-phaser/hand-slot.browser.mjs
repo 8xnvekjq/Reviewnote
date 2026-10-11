@@ -48,6 +48,17 @@ try {
   await slot.getByText('잠자리채를 손에 들었어요.').waitFor();
   assert.equal(await slot.locator('[data-hand]').textContent(), '잠자리채');
   await until(page, () => window.__pixelWorldPhaser.debug().heldTool === 'net');
+  await page.keyboard.press('Escape');
+  // 잠자리 근처가 아니어도 A로 허공에 휘두른다(시작 자리에는 잠자리가 없다).
+  assert.equal((await debug(page)).bugNearby, false);
+  assert.equal(await aLabel(page), 'A · 잠자리채');
+  await page.locator('.pwp-btn-a').tap();
+  await until(page, () => window.__pixelWorldPhaser.debug().heldTool === 'net' && document.querySelector('[role=dialog]') === null);
+  // 맞은 사람 표시(x.x 눈 + 별): 화면 모양만 확인한다(맞히기 판정은 단위 테스트).
+  await page.evaluate(async () => { const m = await import('/src/features/pixel-world-phaser/game/dragonflies.ts'); m.dragonfliesFor('yard').makeDizzy('self'); });
+  await until(page, () => window.__pixelWorldPhaser.debug().dizzy?.includes('self'));
+  await page.screenshot({ path: `${SHOTS}/dizzy.png` });
+  await page.locator('.pwp-bag-chip').click(); await bag.waitFor();
   await slot.getByRole('button', { name: '잠자리채 내려놓기' }).click();
   await slot.getByText('맨손이 되었어요. 도구는 가방에 넣었어요.').waitFor();
   await until(page, () => window.__pixelWorldPhaser.debug().heldTool === null);
@@ -59,7 +70,8 @@ try {
   await page.screenshot({ path: `${SHOTS}/walk-rod.png` });
 
   // 잠자리는 서버(모의)가 정한 종류로 난다.
-  await until(page, () => window.__pixelWorldPhaser.debug().bugKinds?.some(b => b.bugId));
+  // 잠자리는 서버(모의)가 정한 맵 잠자리 — 마당은 4마리.
+  await until(page, () => window.__pixelWorldPhaser.debug().bugKinds?.filter(b => b.bugId).length === 4);
   // 낚싯대를 든 채로는 잠자리 가까이 가도 A가 잠자리채가 되지 않는다.
   const reached = await approachBug(page);
   assert.ok(reached, '잠자리 가까이 가기');
@@ -71,14 +83,6 @@ try {
   await until(page, () => window.__pixelWorldPhaser.debug().heldTool === 'net');
   await page.keyboard.press('Escape');
   await page.screenshot({ path: `${SHOTS}/walk-net.png` });
-  // 잠자리 근처가 아니어도 A로 허공에 휘두른다(손의 잠자리채는 그동안 감춘다).
-  assert.equal(await aLabel(page), 'A · 잠자리채');
-  await page.locator('.pwp-btn-a').tap();
-  await until(page, () => window.__pixelWorldPhaser.debug().heldTool === 'net' && document.querySelector('[role=dialog]') === null);
-  // 맞은 사람 표시(x.x 눈 + 별): 화면 모양만 확인한다(맞히기 판정은 단위 테스트).
-  await page.evaluate(async () => { const m = await import('/src/features/pixel-world-phaser/game/dragonflies.ts'); m.dragonfliesFor('yard').makeDizzy('self'); });
-  await until(page, () => window.__pixelWorldPhaser.debug().dizzy?.includes('self'));
-  await page.screenshot({ path: `${SHOTS}/dizzy.png` });
   assert.ok(await approachBug(page)); await until(page, () => document.querySelector('.pwp-btn-a')?.getAttribute('aria-label') === 'A · 잠자리채');
   await page.locator('.pwp-btn-a').tap();
   const game = page.getByRole('dialog', { name: '잠자리 잡기', exact: true });
