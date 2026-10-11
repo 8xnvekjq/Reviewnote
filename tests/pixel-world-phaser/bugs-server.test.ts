@@ -93,6 +93,23 @@ test('잠자리 시드·채·소유·대기·시간·재생·도감·보상이 �
   } finally { await db.close(); }
 });
 
+test('결과 접수 마감은 별마다 (시간 제한 + 2초): 별1 7초 ~ 별5 5초', async () => {
+  const { db,start,finish,reset,age } = await setup();
+  try {
+    await db.exec(sql('20261012140000_pixel_bug_timing.sql'));
+    await db.exec(sql('20261012140000_pixel_bug_timing.sql')); // 다시 돌려도 그대로
+    await db.exec(`insert into pixel_item_ownership values ('${U}','tool_net')`);
+    const attempt = async (stars: number, seconds: number) => {
+      await reset(); const a = await start();
+      await db.query('update pixel_bug_attempts set bug_id=$1,difficulty=$2', [BUG_CATALOG.find(b => b.stars===stars)!.id,stars]); await age(seconds);
+      return (await finish(a.catchId)).ok;
+    };
+    assert.deepEqual([await attempt(1,6.9), await attempt(1,7.1)], [true,false]);
+    assert.deepEqual([await attempt(3,5.9), await attempt(3,6.1)], [true,false]);
+    assert.deepEqual([await attempt(5,4.9), await attempt(5,5.1)], [true,false]);
+  } finally { await db.close(); }
+});
+
 test('잠자리 RPC만 인증 사용자에게 열고 테이블은 RLS로 잠근다', async () => {
   const { db,rpc } = await setup();
   try {

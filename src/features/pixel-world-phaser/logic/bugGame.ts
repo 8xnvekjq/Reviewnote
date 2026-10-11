@@ -1,4 +1,4 @@
-import { BUG_GAME_MS } from './bugCatalog';
+import { bugTimeLimitMs } from './bugCatalog';
 import type { NetSwingPayload } from './bugCatalog';
 import type { Point } from './joystick';
 import type { Grid } from './world';
@@ -45,7 +45,8 @@ export function predictBugSwipe(game: BugGame, from: Point, to: Point, down = fa
 export function stepBugGame(game: BugGame, delta: number): BugGame {
   if (game.status !== 'playing' || !Number.isFinite(delta) || delta <= 0) return game;
   const g = { ...game, position: { ...game.position }, velocity: { ...game.velocity } };
-  const end = Math.min(BUG_GAME_MS, g.elapsed + delta);
+  const limit = bugTimeLimitMs(g.stars);
+  const end = Math.min(limit, g.elapsed + delta);
   while (g.elapsed < end) {
     const dt = Math.min(16, end - g.elapsed); g.elapsed += dt;
     if (g.dodge && g.elapsed >= g.dodgeAt) {
@@ -69,7 +70,7 @@ export function stepBugGame(game: BugGame, delta: number): BugGame {
       if (dot > 0) g.velocity = { x: g.velocity.x - 2 * dot * nx, y: g.velocity.y - 2 * dot * ny };
     }
   }
-  if (g.elapsed >= BUG_GAME_MS) g.status = 'missed';
+  if (g.elapsed >= limit) g.status = 'missed';
   return g;
 }
 export function swingBugNet(game: BugGame, from: Point, to: Point, minimumLength = 8): BugGame {
