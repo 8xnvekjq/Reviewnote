@@ -1,4 +1,4 @@
-import { FISH_POINTS, JUNK_POINTS, FISH_TIER_REWARDS, GAME_POINT_DAILY_CAP, sizeScore } from '../logic/gamePoints';
+import { FISH_POINTS, JUNK_POINTS, FISH_TIER_REWARDS, GAME_POINT_DAILY_CAP, awardOverCap, sizeScore } from '../logic/gamePoints';
 import type { WorldOverride } from '../logic/worldClock';
 import { BAIT_CHARGES, BAIT_PRICE, FISH_XP, TROPHY_XP, MAX_LEVEL, levelForXp, levelBaitDifficulty, hardFishChance, nonnegativeInteger } from '../logic/levels';
 import type { PlayerLevel } from '../logic/levels';
@@ -22,7 +22,7 @@ export interface MockFishingOptions {
   baitCharges?: number;
   balance?: number;
   todayEarned?: number;
-  pointCarry?: 0 | 1;
+  pointCarry?: number;
   /** 시계(ms). 기본값은 Date.now. */
   now?: () => number;
   override?: FishingOverride | null;
@@ -153,14 +153,8 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
     if (day !== pointDay) { pointDay = day; earned = 0; carry = 0; }
     let awarded = 0;
     if (kind === 'full') awarded = points;
-    else {
-      const full = Math.max(0, Math.min(points, GAME_POINT_DAILY_CAP - earned));
-      awarded = full;
-      if (kind === 'normal') {
-        const half = carry + points - full;
-        awarded += Math.floor(half / 2); carry = half % 2 as 0 | 1;
-      }
-    }
+    else if (kind === 'normal') ({ awarded, carry } = awardOverCap(points, earned, carry));
+    else awarded = Math.max(0, Math.min(points, GAME_POINT_DAILY_CAP - earned));
     earned += awarded; balance += awarded;
     return { awarded, todayEarned: earned, cap: GAME_POINT_DAILY_CAP, capped: earned >= GAME_POINT_DAILY_CAP };
   };

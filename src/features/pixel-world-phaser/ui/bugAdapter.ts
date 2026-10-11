@@ -15,7 +15,7 @@ export interface BugAdapter {
 }
 
 import { BUG_CATALOG, bugById } from '../logic/bugCatalog';
-import { GAME_POINT_DAILY_CAP } from '../logic/gamePoints';
+import { GAME_POINT_DAILY_CAP, GAME_POINT_OVER_CAP_DIVISOR, awardOverCap } from '../logic/gamePoints';
 import { levelForXp, parseXpGain } from '../logic/levels';
 import type { FishingRpcClient } from './fishingAdapter';
 
@@ -92,7 +92,7 @@ export interface MockBugOptions {
   random?: () => number;
   xp?: number;
   todayEarned?: number;
-  carry?: 0 | 1;
+  carry?: number;
 }
 
 /** 모의 환경에서도 소유·시간·하루 포인트 규칙은 서버와 같다. */
@@ -102,7 +102,7 @@ export function createMockBugAdapter(options: MockBugOptions = {}): BugAdapter {
   const random = options.random ?? (() => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; });
   let xp = integer(options.xp) ? options.xp : 0;
   let earned = integer(options.todayEarned) ? options.todayEarned : 0;
-  let carry = options.carry === 1 ? 1 : 0;
+  let carry = integer(options.carry) && options.carry > 0 && options.carry < GAME_POINT_OVER_CAP_DIVISOR ? options.carry : 0;
   const dayAt = (time: number) => new Date(time + 9 * 3600000).toISOString().slice(0, 10);
   let day: string | undefined;
   try { day = dayAt(now()); } catch { /* 잘못된 모의 시계는 RPC에서 안전하게 실패한다. */ }
@@ -146,9 +146,7 @@ export function createMockBugAdapter(options: MockBugOptions = {}): BugAdapter {
         const oldLevel = levelForXp(xp).level; xp += bug.xp;
         let awarded = bug.points;
         if (bug.stars < 4) {
-          const full = Math.max(0, Math.min(bug.points, GAME_POINT_DAILY_CAP - earned));
-          const half = carry + bug.points - full;
-          awarded = full + Math.floor(half / 2); carry = half % 2;
+          ({ awarded, carry } = awardOverCap(bug.points, earned, carry));
         }
         earned += awarded;
         return { ok: true, caught: true, bugId: bug.id, isNew: !previous,

@@ -11,7 +11,7 @@ import { FISH_POINTS, JUNK_POINTS } from '../logic/gamePoints';
 export function catchPointNote(caught: LandedCatch): string | null {
   const expected = 'junk' in caught ? JUNK_POINTS[caught.junk] : FISH_POINTS[caught.rarity];
   if (!caught.points?.capped || caught.points.awarded >= expected) return null;
-  return 'junk' in caught ? '오늘 상한을 넘어 잡동사니는 포인트가 없어요' : '오늘 상한을 넘어서 절반만 받았어요';
+  return 'junk' in caught ? '오늘 상한을 넘어 잡동사니는 포인트가 없어요' : '오늘 상한을 넘어서 1/5만 받았어요';
 }
 function CatchPoints({ caught }: { caught: LandedCatch }) {
   if (!caught.points) return null;

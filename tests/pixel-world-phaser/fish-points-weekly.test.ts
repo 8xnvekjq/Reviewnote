@@ -36,6 +36,7 @@ async function database() {
     await db.exec(sql('20261011170000_pixel_fishing_expansion.sql'));
     await db.exec(sql('20261011190000_pixel_fishing_hotspots.sql'));
     await db.exec(sql('20261011220000_pixel_game_points.sql'));
+    await db.exec(sql('20261011250000_pixel_game_points_fifth.sql'));
     await db.exec(`create table public.pixel_farm_crops(user_id uuid, status text, submitted_at timestamptz, size_score numeric);`);
     await db.exec(sql('20260922090000_pixel_farm_weekly_contest.sql'));
     await db.exec(sql('20261011230000_pixel_fish_points_weekly.sql'));
@@ -43,7 +44,7 @@ async function database() {
     return db;
 }
 
-test('어종별 포인트, 상한 이후 절반과 전액, 동전과 탈출', async () => {
+test('어종별 포인트, 상한 이후 1/5과 전액, 동전과 탈출', async () => {
   const db = await database();
   try {
     const species = (await db.query<any>('select distinct on (rarity) id,rarity,min_cm from pixel_fish_species order by rarity,id')).rows;
@@ -58,7 +59,7 @@ test('어종별 포인트, 상한 이후 절반과 전액, 동전과 탈출', as
       assert.equal((await finish(s)).points.awarded, FISH_POINTS[s.rarity as keyof typeof FISH_POINTS]);
       await db.exec('update pixel_private.game_point_days set earned=50,carry=0');
       const base = FISH_POINTS[s.rarity as keyof typeof FISH_POINTS];
-      assert.equal((await finish(s)).points.awarded, ['legendary','mythic'].includes(s.rarity) ? base : Math.floor(base/2));
+      assert.equal((await finish(s)).points.awarded, ['legendary','mythic'].includes(s.rarity) ? base : Math.floor(base/5));
     }
     await db.exec('delete from pixel_private.game_point_days');
     assert.equal((await finish(species[0], 'junk_coin')).points.awarded,1);
@@ -195,7 +196,7 @@ test('포인트와 챔피언 파싱, 보상 어댑터와 오류 복구', async (
   assert.equal((await mock.pending())[0].points,25); await mock.ack([user]); assert.deepEqual(await mock.pending(),[]);
 });
 
-test('모의 낚시도 반 포인트 누적과 날짜 초기화 규칙을 따른다', async () => {
+test('모의 낚시도 1/5 조각 누적과 날짜 초기화 규칙을 따른다', async () => {
   let now=Date.parse('2026-10-11T03:00:00Z');
   const mock=createMockFishingAdapter({seed:42,now:()=>now,todayEarned:50,override:{clock:'13:00',weather:'clear'}});
   let earned=50,carry=0;
@@ -205,7 +206,7 @@ test('모의 낚시도 반 포인트 누적과 날짜 초기화 규칙을 따른
     const base='junk' in r ? (r.junk==='junk_coin'?1:0) : FISH_POINTS[r.rarity];
     let expected=0;
     if(!('junk' in r)&&['legendary','mythic'].includes(r.rarity)) expected=base;
-    else if(!('junk' in r)){expected=Math.floor((carry+base)/2);carry=(carry+base)%2;}
+    else if(!('junk' in r)){expected=Math.floor((carry+base)/5);carry=(carry+base)%5;}
     earned+=expected; assert.equal(r.points?.awarded,expected); assert.equal(r.points?.todayEarned,earned);
   }
   now+=86400000; const start=await mock.start(null); assert.ok(start.ok); now+=15000;

@@ -57,11 +57,11 @@ test('모의 채 소유·대기·스로틀·시간 경계·재생·도감', asyn
   assert.deepEqual(await adapter.finish(replacement.catchId,false), { ok: true,caught: false });
 });
 
-test('모의 가중치·경험치·상한 뒤 절반과 이월·별 4·5 전액·KST 자정', async () => {
+test('모의 가중치·경험치·상한 뒤 1/5과 이월·별 4·5 전액·KST 자정', async () => {
   let time = Date.parse('2026-10-11T14:00:00Z'),roll = 0;
   const adapter = createMockBugAdapter({ netOwned: true,now: () => time,random: () => roll,todayEarned: 49 });
   const rolls = [0,0.5,0.78,0.92,0.98];
-  const awards = [1,2,3,15,40];
+  const awards = [1,0,2,15,40];
   let xp = 0;
   for (let i=0;i<BUG_CATALOG.length;i++) {
     roll=rolls[i]; const start = await adapter.start('plaza'); assert.ok(start.ok);
@@ -75,7 +75,7 @@ test('모의 가중치·경험치·상한 뒤 절반과 이월·별 4·5 전액�
   let result=await adapter.finish(start.catchId,true); assert.ok(result.ok && result.caught);
   assert.deepEqual(result.points, { awarded: 3,todayEarned: 3,cap: 50,capped: false });
   const capped = createMockBugAdapter({ netOwned: true,now: () => time,random: () => 0.5,todayEarned: 50 });
-  for (const awarded of [1,2]) {
+  for (const awarded of [0,1]) {
     start=await capped.start('plaza'); assert.ok(start.ok); time+=1000;
     result=await capped.finish(start.catchId,true); assert.ok(result.ok && result.caught); assert.equal(result.points?.awarded,awarded); time+=1000;
   }
