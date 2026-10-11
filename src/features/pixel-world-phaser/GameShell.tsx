@@ -169,6 +169,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   useEffect(() => { if (status === 'ready') handle.current?.setAnimalFace(animalFace); }, [animalFace, status]);
   const [riding, setRiding] = useState(false);
+  const [hudMenu, setHudMenu] = useState(false);
   const [petMessage, setPetMessage] = useState('');
   useEffect(() => { if (!petMessage) return; const timer = window.setTimeout(() => setPetMessage(''), 4500); return () => clearTimeout(timer); }, [petMessage]);
   const [prompt, setPrompt] = useState<Prompt | null>(null);
@@ -689,13 +690,20 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
       <div ref={ring} className="pwp-stick" aria-hidden="true" style={{ width: STICK_RADIUS * 2, height: STICK_RADIUS * 2 }}><div ref={knob} className="pwp-knob" /></div>
     </div>
     <div className="pwp-hud" style={{ left: hud.x, top: hud.y, width: hud.width, height: hud.height }}>
-      <button type="button" className="pwp-chip pwp-exit" onClick={exit} aria-label="Pixel World 나가기">← 나가기</button>
-      <button type="button" className="pwp-chip" disabled={status !== 'ready' || fishing.busy || bugs.busy || !!placing} onClick={() => { void bugs.refresh(); openPanel('bugs'); }}>곤충 도감</button>
-      <span className="pwp-chip pwp-points" aria-label={`포인트 ${balance}`}><span className="pwp-coin" aria-hidden="true">P</span>{balance.toLocaleString()}</span>
-      {panels?.shop.shards != null && <span className="pwp-chip pwp-shards" title="오답 복습으로 모으는 지식의 조각" aria-label={`지식의 조각 ${formatShards(panels.shop.shards)}`}><KnowledgeShardIcon size={18} />{formatShards(panels.shop.shards)}</span>}
+      {/* 폰 한 줄에 다 보이도록: 나가기(아이콘) · 지갑(포인트|조각) · ⚙(소리·전체화면). 곤충 도감은 아래 줄(옷장 옆). */}
+      <button type="button" className="pwp-chip pwp-exit" onClick={exit} aria-label="Pixel World 나가기">←<span className="pwp-wide-only"> 나가기</span></button>
+      <span className="pwp-chip pwp-wallet">
+        <span className="pwp-points" aria-label={`포인트 ${balance}`}><span className="pwp-coin" aria-hidden="true">P</span>{balance.toLocaleString()}</span>
+        {panels?.shop.shards != null && <span className="pwp-shards" title="오답 복습으로 모으는 지식의 조각" aria-label={`지식의 조각 ${formatShards(panels.shop.shards)}`}><KnowledgeShardIcon size={16} />{formatShards(panels.shop.shards)}</span>}
+      </span>
       <span className="pwp-hud-spacer" />
-      <button type="button" className="pwp-chip pwp-icon" aria-pressed={bgm.enabled} aria-label="소리" title={bgm.enabled ? '소리 끄기' : '소리 켜기'} onClick={bgm.toggle}><span aria-hidden="true">♪</span></button>
-      {fullscreenSupported() && <button type="button" className="pwp-chip pwp-icon" aria-pressed={fullscreen} aria-label={fullscreen ? '전체화면 끄기' : '전체화면'} onClick={toggleFullscreen}>⛶</button>}
+      <span className="pwp-hud-menu">
+        <button type="button" className="pwp-chip pwp-icon" aria-label="설정" aria-expanded={hudMenu} onClick={() => setHudMenu(v => !v)}><span aria-hidden="true">⚙</span></button>
+        {hudMenu && <span className="pwp-hud-menu-list" role="group" aria-label="설정">
+          <button type="button" className="pwp-chip" aria-pressed={bgm.enabled} aria-label="소리" onClick={bgm.toggle}><span aria-hidden="true">♪</span> {bgm.enabled ? '소리 끄기' : '소리 켜기'}</button>
+          {fullscreenSupported() && <button type="button" className="pwp-chip" aria-pressed={fullscreen} aria-label={fullscreen ? '전체화면 끄기' : '전체화면'} onClick={() => { setHudMenu(false); toggleFullscreen(); }}><span aria-hidden="true">⛶</span> {fullscreen ? '전체화면 끄기' : '전체화면'}</button>}
+        </span>}
+      </span>
     </div>
     {panel === 'bugs' && <BugAlbum state={bugs.state} onClose={closePanel} />}
     {isAdmin && panel === 'kiosk' && <AdminKiosk weather={{ adapter: fishingAdapter, clock: worldClock.clock, refresh: worldClock.refresh }} onClose={closePanel} />}
@@ -704,6 +712,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     {level.celebration && <LevelToast gain={level.celebration} />}
     {panels && <div className="pwp-panel-access" style={{ left: hud.x + 10, top: hud.y + hud.height + 8 }}>
       <button type="button" className="pwp-chip" disabled={status !== 'ready' || !!placing || roomPending} onClick={() => openPanel('wardrobe')}>옷장</button>
+      <button type="button" className="pwp-chip" aria-label="곤충 도감" disabled={status !== 'ready' || fishing.busy || bugs.busy || !!placing} onClick={() => { void bugs.refresh(); openPanel('bugs'); }}><span aria-hidden="true">🦋</span>도감</button>
       {riding && <button type="button" className="pwp-chip" aria-label="곰에서 내리기" disabled={!!placing || roomPending} onClick={() => handle.current?.dismount()}>내리기</button>}
       {scene?.id === 'room' && <button type="button" className="pwp-chip" disabled={status !== 'ready' || !onSaveFurniture || !panels.shop.ready || panels.shop.loadError || !!panel || !!dialogue || !!placing || roomPending} onClick={() => { setRoomMessage(''); openPanel('furniture'); }}>꾸미기</button>}
     </div>}
@@ -749,7 +758,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     </div>}
     {!placing && panel !== 'furniture' && roomMessage && <div className="pwp-room-result" role="status">{roomMessage}</div>}
     {!placing && petMessage && <div className="pwp-pet-message" role="status" aria-live="polite">{petMessage}</div>}
-    {!placing && panel !== 'furniture' && toast && <div key={toast.visit} className="pwp-toast" role="status" style={{ top: hud.y + hud.height + 6 }}>{toast.title}</div>}
+    {!placing && panel !== 'furniture' && toast && <div key={toast.visit} className="pwp-toast" role="status" style={{ top: hud.y + hud.height + 58 }}>{toast.title}</div>}
     {bugs.round && <BugGame key={bugs.round.catchId} {...bugs.round} onFinish={caught => { void bugs.finish(caught); }} onCancel={bugs.cancel} />}
     {bugs.result && <BugResult result={bugs.result} onClose={bugs.hideResult} />}
     {bugs.message && <div className="pwp-fishing-message" role="status">{bugs.message}</div>}

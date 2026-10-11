@@ -85,6 +85,7 @@ export async function economyRegression(browser, base) {
     assert.equal(auto, 1, '첫 터치(A 버튼)에서 한 번');
     await page.keyboard.press('Escape'); await page.locator('.pwp-surface').tap({ position: { x: 100, y: 200 } });
     assert.equal(await page.evaluate(() => window.fullscreenCalls), auto);
+    await page.getByRole('button', { name: '설정', exact: true }).click();
     await page.getByRole('button', { name: '전체화면', exact: true }).click();
     assert.equal(await page.evaluate(() => window.fullscreenCalls), auto + 1);
     assert.deepEqual(errors, []);
