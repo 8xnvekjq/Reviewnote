@@ -38,16 +38,24 @@ interface Props {
   onPixelPurchase?: (newBalance: number) => void;
   /** 출품 RPC가 서버에서 point_adjustment에 더한 보상 점수 — App이 같은 양을 반영한다. */
   onPointsReward?: (rewardPoints: number) => void;
+  /** 낚시·잠자리·주간 보상 RPC가 서버에서 point_adjustment를 바꾼 뒤 — App이 서버 값을 다시 읽어 잔액을 맞춘다. */
+  onPointsChanged?: () => void;
 }
 
-export default function PixelWorldPhaser({ userId, pointsBalance, onExit, onPixelPurchase, onPointsReward, isAdmin = false }: Props) {
+export default function PixelWorldPhaser({ userId, pointsBalance, onExit, onPixelPurchase, onPointsReward, onPointsChanged, isAdmin = false }: Props) {
+  const pointsChanged = useRef(onPointsChanged); pointsChanged.current = onPointsChanged;
+  const refreshPoints = useCallback(() => pointsChanged.current?.(), []);
   // 관리자(선생님)만 ?pwClock=HH:MM / ?pwWeather= 로 시간·날씨를 바꿔 볼 수 있다. 서버도 한 번 더 확인한다.
   const clockOverride = useMemo(() => fishingOverride(location.search, isAdmin), [isAdmin]);
-  const fishingAdapter = useMemo(() => createFishingAdapter(supabase, clockOverride), [clockOverride, userId]);
+  const fishingAdapter = useMemo(() => refreshAfterAward(createFishingAdapter(supabase, clockOverride), refreshPoints), [clockOverride, userId, refreshPoints]);
   // 지난주 등급별 챔피언·수확 대회 보상(들어올 때 한 번 확인).
-  const rewardsAdapter = useMemo(() => createRewardsAdapter(supabase), [userId]);
+  const rewardsAdapter = useMemo(() => {
+    const adapter = createRewardsAdapter(supabase);
+    // 지난주 정산은 보상 조회 때 서버에서 바로 point_adjustment에 더해진다.
+    return { ...adapter, pending: async () => { const rewards = await adapter.pending(); if (rewards.length) refreshPoints(); return rewards; } };
+  }, [userId, refreshPoints]);
   // 잠자리 잡기(잠자리채 소유·도감·시작/결과).
-  const bugAdapter = useMemo(() => createBugAdapter(supabase), [userId]);
+  const bugAdapter = useMemo(() => refreshAfterAward(createBugAdapter(supabase), refreshPoints), [userId, refreshPoints]);
   const [face, setFace] = useState(() => userAnimalFace(userId));
   useEffect(() => {
     let cancelled = false;
@@ -105,6 +113,15 @@ export default function PixelWorldPhaser({ userId, pointsBalance, onExit, onPixe
 
 const UPDATE_STYLE = { position: 'fixed', left: '50%', top: 'max(56px, calc(env(safe-area-inset-top) + 56px))', transform: 'translateX(-50%)', zIndex: 2147483001,
   background: '#fff4d9', color: '#3b2a1a', border: '2px solid #3b2a1a', borderRadius: 8, padding: '8px 12px', fontWeight: 700, fontSize: 14, maxWidth: 'calc(100vw - 32px)' } as const;
+
+// 서버가 결과에 실어 준 포인트(points.awarded)가 있으면 이미 point_adjustment에 더해진 것 — 잔액을 다시 읽게 한다.
+function refreshAfterAward<A extends { finish(...args: never[]): Promise<unknown> }>(adapter: A, refresh: () => void): A {
+  return { ...adapter, finish: async (...args: Parameters<A['finish']>) => {
+    const result = await adapter.finish(...args) as { points?: { awarded?: number } } | undefined;
+    if ((result?.points?.awarded ?? 0) > 0) refresh();
+    return result;
+  } };
+}
 
 function bedsKey(snapshot: ReturnType<typeof useFarm>['snapshot'], now: number): string {
   return FARM_BEDS.map((_, index) => {

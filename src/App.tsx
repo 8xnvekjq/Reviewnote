@@ -263,6 +263,15 @@ function App() {
   };
   const handlePixelPurchase = (newBalance: number) => syncServerPointAdjustment(() => adjustmentForServerBalance(newBalance, myBonusPoints));
   const handlePixelReward = (rewardPoints: number) => syncServerPointAdjustment(previous => adjustmentAfterServerReward(previous, rewardPoints));
+  // 낚시·잠자리·주간 보상은 서버가 point_adjustment에 더한다. 서버 값을 다시 읽어 맞추지 않으면 잔액이 늘지 않고,
+  // 이후 럭키상점 차감이 오래된 값으로 서버를 덮어써 번 포인트가 사라진다.
+  const handlePixelPointsChanged = () => {
+    const userId = session?.user?.id;
+    if (!userId) return;
+    void Promise.resolve(supabase.from('profiles').select('point_adjustment').eq('id', userId).single()).then(({ data, error }) => {
+      if (!error && data && Number.isFinite(data.point_adjustment)) syncServerPointAdjustment(() => data.point_adjustment);
+    }).catch(() => {});
+  };
   
   const prevTabRef = useRef(activeTab);
 
@@ -2182,7 +2191,7 @@ function App() {
       {activeTab === 'pixelRoom' && !!session?.user?.id && canAccessPixelWorld && (
         <LazyScreenBoundary fallback={<div role="status" style={{ position: 'fixed', inset: 0, zIndex: 2147483000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#3f6b3a', color: '#fff4d9', fontWeight: 800 }}>앞마당으로 가는 중…</div>}>
           <PixelWorldPhaser isAdmin={isAdmin} userId={session.user.id} pointsBalance={currentDisplayPoints} onExit={() => setActiveTab('notes')}
-            onPixelPurchase={handlePixelPurchase} onPointsReward={handlePixelReward} />
+            onPixelPurchase={handlePixelPurchase} onPointsReward={handlePixelReward} onPointsChanged={handlePixelPointsChanged} />
         </LazyScreenBoundary>
       )}
 

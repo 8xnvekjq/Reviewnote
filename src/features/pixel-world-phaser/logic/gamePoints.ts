@@ -2,6 +2,14 @@
 import type { FishRarity, JunkId } from '../ui/fishingAdapter';
 
 export const GAME_POINT_DAILY_CAP = 50;
+/** 상한을 넘은 뒤로는 1/5만 준다(2026-10-11 변경, 이전 1/2). 남는 조각은 모았다가 1P가 되면 준다. */
+export const GAME_POINT_OVER_CAP_DIVISOR = 5;
+/** 상한(50P) 안쪽은 그대로, 넘는 부분은 1/5(조각 이월). 별 4·5('full')와 잡동사니('junk')는 호출 쪽에서 따로 처리한다. */
+export function awardOverCap(points: number, earned: number, carry: number): { awarded: number; carry: number } {
+  const full = Math.max(0, Math.min(points, GAME_POINT_DAILY_CAP - earned));
+  const pieces = carry + points - full;
+  return { awarded: full + Math.floor(pieces / GAME_POINT_OVER_CAP_DIVISOR), carry: pieces % GAME_POINT_OVER_CAP_DIVISOR };
+}
 /** 물고기 1마리 기본 포인트(별 1~5). 별 4·5는 상한과 상관없이 전부(kind 'full'). */
 export const FISH_POINTS: Readonly<Record<FishRarity, number>> = { common: 1, uncommon: 2, rare: 4, legendary: 15, mythic: 40 };
 /** 잡동사니: 녹슨 동전만 1P(kind 'junk' — 상한 넘으면 0). */

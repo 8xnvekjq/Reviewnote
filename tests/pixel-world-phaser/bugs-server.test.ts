@@ -23,6 +23,7 @@ async function setup() {
   const levels = sql('supabase_pixel_level_bait.sql');
   await db.exec(levels.slice(0, levels.indexOf('create or replace function pixel_private.get_pixel_fishing_state')) + '\ncommit;');
   await db.exec(sql('20261011220000_pixel_game_points.sql'));
+  await db.exec(sql('20261011250000_pixel_game_points_fifth.sql'));
   await db.exec(sql('20261011240000_pixel_bugs.sql'));
   await db.exec(sql('20261011240000_pixel_bugs.sql'));
   const rpc = async (query: string, args: any[] = []) => (await db.query<any>(query, args)).rows[0].r;
@@ -66,14 +67,16 @@ test('잠자리 시드·채·소유·대기·시간·재생·도감·보상이 �
     await reset();
     let xp = 0;
     await db.exec(`select pixel_private.award_game_points('${U}',49,'normal')`);
-    for (const bug of BUG_CATALOG) {
+    // 49P에서 시작: 고추(2P) 1+조각1, 밀(3P) 조각4, 실(6P) 조각10→2P, 별 4·5는 전부.
+    const awards = [1,0,2,15,40];
+    for (const [i, bug] of BUG_CATALOG.entries()) {
       attempt = await start('river');
       await db.query('update pixel_bug_attempts set bug_id=$1,difficulty=$2', [bug.id,bug.stars]); await age(1);
       const result = await finish(attempt.catchId);
       xp += bug.xp;
       assert.equal(result.caught,true); assert.equal(result.isNew,true);
       assert.equal(result.xpGain.gained,bug.xp); assert.equal(result.xpGain.xp,xp);
-      assert.equal(result.points.awarded,bug.stars>=4 ? bug.points : bug.id==='dragonfly_wheat' ? 2 : Math.floor(bug.points/2));
+      assert.equal(result.points.awarded,awards[i]);
       assert.deepEqual(await finish(attempt.catchId), { ok: false }); await reset();
     }
     const album = (await state()).album; assert.equal(album.length,5);
@@ -85,7 +88,7 @@ test('잠자리 시드·채·소유·대기·시간·재생·도감·보상이 �
     assert.equal((await finish(attempt.catchId)).isNew,false);
     assert.deepEqual((await state()).album[0], { ...album[0],count: 2 });
     assert.equal((await db.query<any>("select count(*) n from pixel_bug_catches where scene='river'")).rows[0].n,5);
-    assert.equal((await db.query<any>('select point_adjustment from profiles where id=$1',[U])).rows[0].point_adjustment,111);
+    assert.equal((await db.query<any>('select point_adjustment from profiles where id=$1',[U])).rows[0].point_adjustment,107); // 49 + (1+0+2+15+40) + 마지막 고추(조각 2개, 0P)
   } finally { await db.close(); }
 });
 
