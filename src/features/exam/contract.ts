@@ -373,6 +373,9 @@ export interface AdminExamApi {
   getInk(attemptId: string): Promise<ExamInkDocument[]>;
   getInkReplay(attemptId: string, questionId: string): Promise<InkReplayData>;
   getResult(attemptId: string): Promise<ExamResult>;
+  /** 학생 결과 검토 중에도 다른 학생 풀이를 본다(서버가 관리자에게 허용). */
+  listPeerSolutions?: ExamClient['listPeerSolutions'];
+  getPeerSolutionByKey?: ExamClient['getPeerSolutionByKey'];
   /** 관리자가 아니면 null. */
   listPaperActivity(): Promise<AdminPaperActivity[] | null>;
 }

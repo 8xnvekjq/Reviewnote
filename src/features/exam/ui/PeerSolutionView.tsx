@@ -128,6 +128,7 @@ export function PeerSolutionSwitch({ session, eligible, attemptId, questionId, i
     <button ref={triggerRef} type="button" className="exam-tool exam-tool-text exam-peer-toggle" data-testid="exam-peer-toggle"
       disabled={loading} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? menuId : undefined}
       onClick={() => { if (open) close(); else void showList(); }}>
+      {!loading && !none && <span className="exam-peer-toggle-icon" aria-hidden="true">👀</span>}
       {loading ? '불러오는 중…' : none ? '다른 풀이 없음' : '다른 학생 풀이'}
     </button>
     {open && <div id={menuId} ref={menuRef} style={menuStyle} className="exam-peer-menu" role="menu" aria-label="풀이 고르기" data-testid="exam-peer-list"
