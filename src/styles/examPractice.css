@@ -182,7 +182,6 @@
 .exam-tool.exam-peer-toggle:active:not(:disabled) { transform: translateY(0) scale(.97); }
 .exam-tool.exam-peer-toggle[aria-expanded="true"] { background: rgb(var(--color-indigo-500)); }
 .exam-tool.exam-peer-toggle:disabled { opacity: .6; }
-.exam-peer-toggle-icon { font-size: 14px; line-height: 1; }
 @media (max-width: 540px) {
   .exam-past-row { grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; }
   .exam-past-row .rn-caption { grid-column: 1; }
