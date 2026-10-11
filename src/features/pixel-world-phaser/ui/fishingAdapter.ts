@@ -1,6 +1,7 @@
 import type { ServerWorldClock } from '../logic/worldClock';
 import type { GamePointsResult } from '../logic/gamePoints';
-import { MAX_LEVEL, nonnegativeInteger, parseXpGain } from '../logic/levels';
+import { MAX_LEVEL, nonnegativeInteger, parseXpGain, playerLevelFromXp } from '../logic/levels';
+import type { LevelTrack } from '../logic/levels';
 import type { PlayerLevel, XpGain } from '../logic/levels';
 export type { PlayerLevel, XpGain } from '../logic/levels';
 // 낚시(강가의 하루) 서버 연결의 고정 계약. 모양은 docs/pixel-world/FISHING_SPEC.md를 따른다.
@@ -103,8 +104,11 @@ export function parsePlayerLevel(raw: unknown): PlayerLevel | undefined {
   if (!isObj(raw)) return undefined;
   const xp = nonnegativeInteger(raw.xp), level = nonnegativeInteger(raw.level), xpIntoLevel = nonnegativeInteger(raw.xpIntoLevel);
   const xpForNext = nonnegativeInteger(raw.xpForNext), maxLevel = nonnegativeInteger(raw.maxLevel);
-  return xp !== undefined && level !== undefined && level >= 1 && maxLevel === MAX_LEVEL && level <= maxLevel && xpIntoLevel !== undefined && xpForNext !== undefined
-    ? { xp, level, xpIntoLevel, xpForNext, maxLevel } : undefined;
+  if (xp === undefined || level === undefined || level < 1 || maxLevel !== MAX_LEVEL || level > maxLevel || xpIntoLevel === undefined || xpForNext === undefined) return undefined;
+  // 활동별 레벨(tracks). 없거나 잘못된 활동은 그 XP로 다시 계산하고, 예전 응답(tracks 없음)은 맨 위 값을 낚시로 본다.
+  const tracks = isObj(raw.tracks) ? raw.tracks : {};
+  const xpOf = (track: LevelTrack) => { const t = (tracks as Record<string, unknown>)[track]; return isObj(t) ? nonnegativeInteger(t.xp) ?? 0 : track === 'fishing' ? xp : 0; };
+  return playerLevelFromXp({ fishing: xpOf('fishing'), farming: xpOf('farming'), gathering: xpOf('gathering') });
 }
 export function parseBait(raw: unknown): { charges: number } | undefined {
   if (!isObj(raw)) return undefined;

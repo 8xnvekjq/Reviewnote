@@ -1,6 +1,6 @@
 import { FISH_POINTS, JUNK_POINTS, FISH_TIER_REWARDS, GAME_POINT_DAILY_CAP, awardGamePoints, sizeScore } from '../logic/gamePoints';
 import type { WorldOverride } from '../logic/worldClock';
-import { BAIT_CHARGES, BAIT_PRICE, FISH_XP, TROPHY_XP, MAX_LEVEL, levelForXp, levelBaitDifficulty, hardFishChance, nonnegativeInteger } from '../logic/levels';
+import { BAIT_CHARGES, BAIT_PRICE, FISH_XP, TROPHY_XP, levelForXp, playerLevelFromXp, levelBaitDifficulty, hardFishChance, nonnegativeInteger } from '../logic/levels';
 import type { PlayerLevel } from '../logic/levels';
 // 메모리 안에서만 도는 낚시 어댑터 — 브라우저 하네스와 단위 테스트용. 서버(supabase_pixel_fishing.sql)와 같은 규칙:
 // 무제한, 시작 간격 2초, 대기 캐스트 1개·90초, 어려운 물고기 15%+낚싯대 보너스(없으면 대물),
@@ -157,7 +157,7 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
     return { awarded, todayEarned: earned, cap: GAME_POINT_DAILY_CAP, capped: earned >= GAME_POINT_DAILY_CAP };
   };
   let balance = nonnegativeInteger(opts.balance) ?? 1000;
-  const playerLevel = (): PlayerLevel => { const l = levelForXp(xp); return { xp, level: l.level, xpIntoLevel: l.xpIntoLevel, xpForNext: l.xpForNext, maxLevel: MAX_LEVEL }; };
+  const playerLevel = (): PlayerLevel => playerLevelFromXp({ fishing: xp });
   const rand = mulberry32(opts.seed ?? 20261008);
   const catches: MockCatch[] = (opts.catches ?? []).map(c => ({ ...c }));
   const junkCounts: Record<JunkId, number> = { junk_shoe: 0, junk_can: 0, junk_coin: 0 };
@@ -273,7 +273,7 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
         junkCounts[cast.junk]++;
         const oldLevel = levelForXp(xp).level;
         xp++;
-        return delay({ ok: true, landed: true, junk: cast.junk, points: award(JUNK_POINTS[cast.junk], 'junk'), remaining: -1, xpGain: { gained: 1, xp, level: levelForXp(xp).level, leveledUp: levelForXp(xp).level > oldLevel } });
+        return delay({ ok: true, landed: true, junk: cast.junk, points: award(JUNK_POINTS[cast.junk], 'junk'), remaining: -1, xpGain: { gained: 1, xp, level: levelForXp(xp).level, leveledUp: levelForXp(xp).level > oldLevel, track: 'fishing' as const } });
       }
       let spotUpdate: { id: number; left: number; readyAt: string | null } | undefined;
       if (cast.spot?.bonus) {
@@ -289,7 +289,7 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
       const oldLevel = levelForXp(xp).level;
       const gained = Math.round((FISH_XP[cast.fish.rarity] + (cast.trophy ? TROPHY_XP : 0)) * (cast.pet === 'pet_dog' ? 1.1 : 1));
       xp += gained;
-      const xpGain = { gained, xp, level: levelForXp(xp).level, leveledUp: levelForXp(xp).level > oldLevel };
+      const xpGain = { gained, xp, level: levelForXp(xp).level, leveledUp: levelForXp(xp).level > oldLevel, track: 'fishing' as const };
       const population = [...catches, ...classmates].filter(c => c.speciesId === cast.fish.id);
       const percentile = Math.round(1000 * population.filter(c => c.lengthCm >= cast.lengthCm).length / population.length) / 10;
       return delay({

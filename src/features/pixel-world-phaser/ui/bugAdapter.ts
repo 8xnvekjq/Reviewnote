@@ -148,7 +148,7 @@ export function createMockBugAdapter(options: MockBugOptions = {}): BugAdapter {
         ({ awarded, carry } = awardGamePoints(bug.points, bug.stars >= 4 ? 'full' : 'normal', earned, carry));
         earned += awarded;
         return { ok: true, caught: true, bugId: bug.id, isNew: !previous,
-          xpGain: { gained: bug.xp, xp, level: levelForXp(xp).level, leveledUp: levelForXp(xp).level > oldLevel },
+          xpGain: { gained: bug.xp, xp, level: levelForXp(xp).level, leveledUp: levelForXp(xp).level > oldLevel, track: 'gathering' as const },
           points: { awarded, todayEarned: earned, cap: GAME_POINT_DAILY_CAP, capped: earned >= GAME_POINT_DAILY_CAP } };
       } catch { return { ok: false }; }
     },
