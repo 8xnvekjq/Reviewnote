@@ -71,6 +71,8 @@ export interface WorldStart {
   furniture: readonly Placement[];
   /** 관리자 시험용 시각·날씨(?pwClock/?pwWeather). 학생에게는 넘기지 않는다. */
   clockOverride?: FishingOverride;
+  /** 관리자면 앞마당에 관리자 자판기를 놓는다. */
+  admin?: boolean;
 }
 
 export function startWorldGame(parent: HTMLElement, start: WorldStart, controls: ControlState, events: WorldEvents): Promise<WorldGameHandle> {
@@ -83,7 +85,7 @@ export function startWorldGame(parent: HTMLElement, start: WorldStart, controls:
     let resolved = false;
     const ctx: WorldContext = {
       face: start.face ?? '🐶', riding: false, assets: start.assets, controls, hooks: events, clockOverride: start.clockOverride,
-      data: { furniture: start.furniture, beds: start.beds },
+      data: { furniture: start.furniture, beds: start.beds, admin: start.admin },
       view: { ratio: size.ratio },
       onSceneReady: scene => {
         active = scene;

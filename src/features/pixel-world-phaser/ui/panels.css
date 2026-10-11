@@ -50,3 +50,12 @@
 .pwp-shard-price { color:#7c4ddb; font-variant-numeric:tabular-nums; }
 .pwp-shard-price svg { flex:none; filter:drop-shadow(0 0 2px rgba(168,120,240,.6)); }
 .pwp-bait-crystal { filter:hue-rotate(220deg) saturate(1.4); }
+/* 관리자 자판기 — 조각 현황 목록 */
+.pwp-kiosk { overflow-y:auto; }
+.pwp-kiosk-summary { display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; padding:4px 0 8px; font-size:13px; }
+.pwp-kiosk-summary button { margin-left:auto; }
+.pwp-kiosk-list { display:grid; gap:6px; margin:0 0 10px; padding:0; list-style:none; }
+.pwp-kiosk-list li { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:2px 8px; padding:6px 8px; border:2px solid rgba(58,36,22,.18); border-radius:8px; background:rgba(255,255,255,.55); }
+.pwp-kiosk-list li small { grid-column:1 / -1; opacity:.75; font-size:11px; }
+.pwp-kiosk-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pwp-kiosk-heading { margin:6px 0; font-size:14px; }

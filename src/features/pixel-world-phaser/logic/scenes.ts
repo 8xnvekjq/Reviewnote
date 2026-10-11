@@ -29,11 +29,11 @@ export interface SceneSpec extends Grid {
   defaultEntry: string;
 }
 /** 장면을 만들 때 필요한 서버 데이터(방 가구 배치 등). 읽기 전용. */
-export interface SceneData { furniture: readonly Placement[] }
+export interface SceneData { furniture: readonly Placement[]; /** 관리자면 앞마당에 관리자 자판기가 놓인다. */ admin?: boolean }
 
 export const FIRST_SCENE: SceneId = 'yard';
 export function buildScene(id: SceneId, data: SceneData): SceneSpec {
-  return id === 'river' ? riverScene() : id === 'plaza' ? plazaScene() : id === 'room' ? roomScene(data.furniture) : yardScene();
+  return id === 'river' ? riverScene() : id === 'plaza' ? plazaScene() : id === 'room' ? roomScene(data.furniture) : yardScene(data.admin);
 }
 
 /** 지금 발이 밟고 있는 출구. */
