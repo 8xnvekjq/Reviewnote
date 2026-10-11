@@ -15,7 +15,7 @@ export interface BugAdapter {
 }
 
 import { BUG_CATALOG, bugById } from '../logic/bugCatalog';
-import { GAME_POINT_DAILY_CAP, GAME_POINT_OVER_CAP_DIVISOR, awardOverCap } from '../logic/gamePoints';
+import { GAME_POINT_DAILY_CAP, awardGamePoints } from '../logic/gamePoints';
 import { levelForXp, parseXpGain } from '../logic/levels';
 import type { FishingRpcClient } from './fishingAdapter';
 
@@ -102,7 +102,7 @@ export function createMockBugAdapter(options: MockBugOptions = {}): BugAdapter {
   const random = options.random ?? (() => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; });
   let xp = integer(options.xp) ? options.xp : 0;
   let earned = integer(options.todayEarned) ? options.todayEarned : 0;
-  let carry = integer(options.carry) && options.carry > 0 && options.carry < GAME_POINT_OVER_CAP_DIVISOR ? options.carry : 0;
+  let carry = integer(options.carry) && options.carry > 0 && options.carry < 10 ? options.carry : 0;
   const dayAt = (time: number) => new Date(time + 9 * 3600000).toISOString().slice(0, 10);
   let day: string | undefined;
   try { day = dayAt(now()); } catch { /* 잘못된 모의 시계는 RPC에서 안전하게 실패한다. */ }
@@ -144,10 +144,8 @@ export function createMockBugAdapter(options: MockBugOptions = {}): BugAdapter {
         const previous = album.get(bug.id);
         album.set(bug.id, { bugId: bug.id, count: (previous?.count ?? 0) + 1, firstAt: previous?.firstAt ?? firstAt });
         const oldLevel = levelForXp(xp).level; xp += bug.xp;
-        let awarded = bug.points;
-        if (bug.stars < 4) {
-          ({ awarded, carry } = awardOverCap(bug.points, earned, carry));
-        }
+        let awarded: number;
+        ({ awarded, carry } = awardGamePoints(bug.points, bug.stars >= 4 ? 'full' : 'normal', earned, carry));
         earned += awarded;
         return { ok: true, caught: true, bugId: bug.id, isNew: !previous,
           xpGain: { gained: bug.xp, xp, level: levelForXp(xp).level, leveledUp: levelForXp(xp).level > oldLevel },

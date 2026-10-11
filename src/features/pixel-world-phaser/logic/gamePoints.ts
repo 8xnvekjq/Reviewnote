@@ -2,13 +2,21 @@
 import type { FishRarity, JunkId } from '../ui/fishingAdapter';
 
 export const GAME_POINT_DAILY_CAP = 50;
-/** 상한을 넘은 뒤로는 1/5만 준다(2026-10-11 변경, 이전 1/2). 남는 조각은 모았다가 1P가 되면 준다. */
-export const GAME_POINT_OVER_CAP_DIVISOR = 5;
-/** 상한(50P) 안쪽은 그대로, 넘는 부분은 1/5(조각 이월). 별 4·5('full')와 잡동사니('junk')는 호출 쪽에서 따로 처리한다. */
-export function awardOverCap(points: number, earned: number, carry: number): { awarded: number; carry: number } {
-  const full = Math.max(0, Math.min(points, GAME_POINT_DAILY_CAP - earned));
-  const pieces = carry + points - full;
-  return { awarded: full + Math.floor(pieces / GAME_POINT_OVER_CAP_DIVISOR), carry: pieces % GAME_POINT_OVER_CAP_DIVISOR };
+/** 하루 전체 상한(2026-10-11): 100P를 넘으면 별 4·5까지 모든 게임 포인트가 1/10. */
+export const GAME_POINT_TOTAL_CAP = 100;
+export type GamePointKind = 'normal' | 'full' | 'junk';
+/** 서버 pixel_private.award_game_points와 같은 규칙(모의·표시용). carry는 1/10P 조각(0~9)이다.
+ * - normal(별 1~3): 50P까지 그대로, 50~100P는 1/5, 100P 넘으면 1/10
+ * - full(별 4·5): 100P까지 그대로, 넘으면 1/10
+ * - junk(녹슨 동전): 50P까지 그대로, 넘으면 0 */
+export function awardGamePoints(points: number, kind: GamePointKind, earned: number, carry: number): { awarded: number; carry: number } {
+  let tenths = earned * 10 + carry;
+  for (let i = 0; i < points; i++) {
+    tenths += kind === 'junk' ? (tenths < GAME_POINT_DAILY_CAP * 10 ? 10 : 0)
+      : tenths >= GAME_POINT_TOTAL_CAP * 10 ? 1
+      : kind === 'full' || tenths < GAME_POINT_DAILY_CAP * 10 ? 10 : 2;
+  }
+  return { awarded: Math.floor(tenths / 10) - earned, carry: tenths % 10 };
 }
 /** 물고기 1마리 기본 포인트(별 1~5). 별 4·5는 상한과 상관없이 전부(kind 'full'). */
 export const FISH_POINTS: Readonly<Record<FishRarity, number>> = { common: 1, uncommon: 2, rare: 4, legendary: 15, mythic: 40 };

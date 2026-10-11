@@ -7,11 +7,12 @@ import './fishing.css';
 import { JUNK_CATALOG } from '../logic/fishCatalog';
 import { JunkIcon } from './FishAlbum';
 import './fishAlbum.css';
-import { FISH_POINTS, JUNK_POINTS } from '../logic/gamePoints';
+import { FISH_POINTS, GAME_POINT_TOTAL_CAP, JUNK_POINTS } from '../logic/gamePoints';
 export function catchPointNote(caught: LandedCatch): string | null {
   const expected = 'junk' in caught ? JUNK_POINTS[caught.junk] : FISH_POINTS[caught.rarity];
   if (!caught.points?.capped || caught.points.awarded >= expected) return null;
-  return 'junk' in caught ? '오늘 상한을 넘어 잡동사니는 포인트가 없어요' : '오늘 상한을 넘어서 1/5만 받았어요';
+  if ('junk' in caught) return '오늘 상한을 넘어 잡동사니는 포인트가 없어요';
+  return caught.points.todayEarned >= GAME_POINT_TOTAL_CAP ? '오늘 100P를 넘어서 1/10만 받았어요' : '오늘 상한을 넘어서 1/5만 받았어요';
 }
 function CatchPoints({ caught }: { caught: LandedCatch }) {
   if (!caught.points) return null;

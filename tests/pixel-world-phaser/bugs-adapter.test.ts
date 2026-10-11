@@ -61,7 +61,7 @@ test('모의 가중치·경험치·상한 뒤 1/5과 이월·별 4·5 전액·KS
   let time = Date.parse('2026-10-11T14:00:00Z'),roll = 0;
   const adapter = createMockBugAdapter({ netOwned: true,now: () => time,random: () => roll,todayEarned: 49 });
   const rolls = [0,0.5,0.78,0.92,0.98];
-  const awards = [1,0,2,15,40];
+  const awards = [1,0,2,15,33];
   let xp = 0;
   for (let i=0;i<BUG_CATALOG.length;i++) {
     roll=rolls[i]; const start = await adapter.start('plaza'); assert.ok(start.ok);

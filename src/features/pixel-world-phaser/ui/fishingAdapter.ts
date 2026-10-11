@@ -54,7 +54,7 @@ export type EquipRodResult = { ok: true; rod: FishingRod } | { ok: false; reason
 export type CastFinish = { ok: true; landed: true; speciesId: string; lengthCm: number; rarity: FishRarity; isNew: boolean; isBig: boolean; isPersonalBest: boolean; remaining: number; xpGain?: XpGain;
   /** 이 종을 낚은 모든 기록 중 상위 몇 %인지(작을수록 큼, 0~100). */
   percentile?: number;
-  /** 게임 포인트(하루 상한 50P, 넘으면 1/5, 별 4·5는 전부). */
+  /** 게임 포인트(하루 상한 50P, 넘으면 1/5, 별 4·5는 100P까지 전부, 100P 넘으면 모두 1/10). */
   points?: GamePointsResult }
   | { ok: true; landed: true; junk: JunkId; remaining: number; xpGain?: XpGain; points?: GamePointsResult } | { ok: true; landed: false } | { ok: false };
 export interface ClassFishBoard { rows: { speciesId: string; lengthCm: number; animal: string; caughtAt: string; teacher?: boolean }[]; classSpecies: number;
