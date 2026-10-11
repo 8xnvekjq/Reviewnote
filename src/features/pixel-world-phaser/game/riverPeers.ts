@@ -1,4 +1,5 @@
 import { dragonfliesFor } from './dragonflies';
+import type { Facing } from '../logic/joystick';
 import { HeldTool, rodTip, updatePeerTool } from './heldTool';
 import { heldToolFromTag } from '../logic/heldTool';
 import { RIDING_RADIUS, PERSON_RADIUS } from '../logic/softCollision';
@@ -66,10 +67,11 @@ export class RiverPeers {
   update(time: number, selfFeet: Point, deltaMs: number, selfFace = '') {
     const now = Date.now();
     const spots = new Map<string, Point>([[this.selfId, selfFeet]]);
+    const facings = new Map<string, Facing>();
     const faces = new Map<string, string>([[this.selfId, selfFace]]);
     for (const [id, f] of this.friends) {
       const p = f.state, feet = riverFeet({ x: p.x, y: p.y });
-      spots.set(id, feet); faces.set(id, peerAnimalFace(p));
+      spots.set(id, feet); faces.set(id, peerAnimalFace(p)); facings.set(id, p.direction);
       if (f.tag) { updateAnimalTag(f.tag, feet, peerAnimalFace(p), p.riding === true && p.pet === 'pet_bear'); }
       updatePeerCompanion(f, feet, time, deltaMs, this.solid);
       const view = this.fishing[id], lineOut = !!view?.target && ['casting', 'waiting', 'bite', 'reeling'].includes(view.phase);
@@ -84,7 +86,7 @@ export class RiverPeers {
       const spot = spots.get(id);
       if (!spot || now - s.at >= SPARKLE_MS || this.fishing[id]?.sparkleAt !== s.at) { s.g.destroy(); this.sparkles.delete(id); }
     }
-    dragonfliesFor('river')?.setPeers(spots, this.selfId);
+    dragonfliesFor('river')?.setPeers(spots, this.selfId, facings);
     this.bubbles.update(this.wantedBubbles, spots, faces);
   }
 

@@ -18,7 +18,9 @@ async function approachBug(page, timeout = 30000) {
   while (Date.now() < end) {
     const d = await debug(page);
     if (d.bugNearby) return true;
-    if (d.bugs?.length) await page.evaluate(({ x, y }) => window.__pixelWorldPhaser.walkToScreen(x, y), d.bugs[0]);
+    // 별3 이상은 도망가므로 쉬운(별1~2) 잠자리로 다가간다.
+    const easy = d.bugs?.find((_, i) => ['dragonfly_red', 'dragonfly_wheat'].includes(d.bugKinds?.[i]?.bugId));
+    if (easy) await page.evaluate(({ x, y }) => window.__pixelWorldPhaser.walkToScreen(x, y), easy);
     await page.waitForTimeout(200);
   }
   return false;
@@ -56,6 +58,8 @@ try {
   await page.keyboard.press('Escape');
   await page.screenshot({ path: `${SHOTS}/walk-rod.png` });
 
+  // 잠자리는 서버(모의)가 정한 종류로 난다.
+  await until(page, () => window.__pixelWorldPhaser.debug().bugKinds?.some(b => b.bugId));
   // 낚싯대를 든 채로는 잠자리 가까이 가도 A가 잠자리채가 되지 않는다.
   const reached = await approachBug(page);
   assert.ok(reached, '잠자리 가까이 가기');
@@ -67,6 +71,14 @@ try {
   await until(page, () => window.__pixelWorldPhaser.debug().heldTool === 'net');
   await page.keyboard.press('Escape');
   await page.screenshot({ path: `${SHOTS}/walk-net.png` });
+  // 잠자리 근처가 아니어도 A로 허공에 휘두른다(손의 잠자리채는 그동안 감춘다).
+  assert.equal(await aLabel(page), 'A · 잠자리채');
+  await page.locator('.pwp-btn-a').tap();
+  await until(page, () => window.__pixelWorldPhaser.debug().heldTool === 'net' && document.querySelector('[role=dialog]') === null);
+  // 맞은 사람 표시(x.x 눈 + 별): 화면 모양만 확인한다(맞히기 판정은 단위 테스트).
+  await page.evaluate(async () => { const m = await import('/src/features/pixel-world-phaser/game/dragonflies.ts'); m.dragonfliesFor('yard').makeDizzy('self'); });
+  await until(page, () => window.__pixelWorldPhaser.debug().dizzy?.includes('self'));
+  await page.screenshot({ path: `${SHOTS}/dizzy.png` });
   assert.ok(await approachBug(page)); await until(page, () => document.querySelector('.pwp-btn-a')?.getAttribute('aria-label') === 'A · 잠자리채');
   await page.locator('.pwp-btn-a').tap();
   const game = page.getByRole('dialog', { name: '잠자리 잡기', exact: true });

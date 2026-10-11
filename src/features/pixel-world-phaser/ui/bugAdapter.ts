@@ -12,12 +12,17 @@ export const BUG_ACHIEVEMENTS: readonly { id: BugAchievementId; name: string; go
 ];
 export interface BugAchievementState { star5: number; species: number; speciesTotal: number; earned: BugAchievementId[] }
 export interface BugState { netOwned: boolean; album: BugAlbumEntry[]; achievements?: BugAchievementState }
-export type BugStart = { ok: true; catchId: string; bugId: BugId; difficulty: number } | { ok: false; reason: 'no_net' | 'net_not_equipped' | 'pending' | 'error' };
+export type BugStart = { ok: true; catchId: string; bugId: BugId; difficulty: number } | { ok: false; reason: 'no_net' | 'net_not_equipped' | 'pending' | 'gone' | 'error' };
+/** 서버가 미리 정한 날아다니는 잠자리 한 마리(supabase/migrations/20261012170000_pixel_bug_spawns.sql). */
+export interface BugSpawn { spawnId: string; bugId: BugId; stars: number }
 export type BugFinish = { ok: true; caught: true; bugId: BugId; isNew: boolean; xpGain?: XpGain; points?: GamePointsResult; achievements?: BugAchievementId[] } | { ok: true; caught: false } | { ok: false };
 export interface BugAdapter {
   state(): Promise<BugState>;
-  /** scene: 'yard' | 'plaza' | 'river' — 어디서 잡았는지 기록용. */
-  start(scene: string): Promise<BugStart>;
+  /** scene: 'yard' | 'plaza' | 'river' — 어디서 잡았는지 기록용. spawnId: 휘두른 잠자리(있으면 그 종류로). */
+  start(scene: string, spawnId?: string): Promise<BugStart>;
+  /** 새 잠자리 한 마리(최대 2마리, 20초에 한 번). release: 날아간 자리의 이전 잠자리. 지금은 안 되면 null,
+   *  서버에 아직 이 기능이 없으면 'unsupported'(예전처럼 종류 없이 난다). */
+  spawn?(scene: string, release?: string): Promise<BugSpawn | null | 'unsupported'>;
   finish(catchId: string, caught: boolean): Promise<BugFinish>;
 }
 
@@ -51,10 +56,16 @@ export function parseBugState(raw: unknown): BugState {
 
 export function parseBugStart(raw: unknown): BugStart {
   if (!object(raw)) return { ok: false, reason: 'error' };
-  if (raw.ok === false) return { ok: false, reason: raw.reason === 'no_net' || raw.reason === 'net_not_equipped' || raw.reason === 'pending' ? raw.reason : 'error' };
+  if (raw.ok === false) return { ok: false, reason: raw.reason === 'no_net' || raw.reason === 'net_not_equipped' || raw.reason === 'pending' || raw.reason === 'gone' ? raw.reason : 'error' };
   if (raw.ok !== true || typeof raw.catchId !== 'string' || !raw.catchId.trim() || !validBug(raw.bugId)
     || raw.difficulty !== bugById(raw.bugId)!.stars) return { ok: false, reason: 'error' };
   return { ok: true, catchId: raw.catchId, bugId: raw.bugId, difficulty: raw.difficulty as number };
+}
+
+export function parseBugSpawn(raw: unknown): BugSpawn | null {
+  if (!object(raw) || raw.ok !== true || typeof raw.spawnId !== 'string' || !raw.spawnId || !validBug(raw.bugId)
+    || raw.stars !== bugById(raw.bugId)!.stars) return null;
+  return { spawnId: raw.spawnId, bugId: raw.bugId, stars: raw.stars as number };
 }
 
 export function parseBugFinish(raw: unknown): BugFinish {
@@ -73,21 +84,30 @@ export function parseBugFinish(raw: unknown): BugFinish {
 
 /** 네트워크 오류와 잘못된 응답은 안전한 실패로 돌려준다. */
 export function createBugAdapter(supabase: FishingRpcClient): BugAdapter {
-  async function rpc(name: string, args?: Record<string, unknown>) {
+  async function call(name: string, args?: Record<string, unknown>) {
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       const timeout = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('timeout')), 8000); });
-      const result = await Promise.race([Promise.resolve(supabase.rpc(name, args)), timeout]);
-      return result.error ? null : result.data;
+      return await Promise.race([Promise.resolve(supabase.rpc(name, args)), timeout]);
     } finally { if (timer) clearTimeout(timer); }
   }
+  async function rpc(name: string, args?: Record<string, unknown>) { const result = await call(name, args); return result.error ? null : result.data; }
   return {
     async state() { try { return parseBugState(await rpc('get_bug_state')); } catch { return { netOwned: false, album: [] }; } },
-    async start(scene) {
+    async start(scene, spawnId) {
       try {
         if (!sceneValid(scene)) return { ok: false, reason: 'error' };
-        return parseBugStart(await rpc('start_bug_catch', { p_scene: scene }));
+        return parseBugStart(await rpc('start_bug_catch', spawnId ? { p_scene: scene, p_spawn: spawnId } : { p_scene: scene }));
       } catch { return { ok: false, reason: 'error' }; }
+    },
+    async spawn(scene, release) {
+      try {
+        if (!sceneValid(scene)) return null;
+        const result = await call('spawn_bug', { p_scene: scene, p_release: release ?? null });
+        // PostgREST: 함수가 없으면 PGRST202 — 서버가 아직 옛 버전.
+        if (result.error) return (result.error as { code?: string }).code === 'PGRST202' ? 'unsupported' : null;
+        return parseBugSpawn(result.data);
+      } catch { return null; }
     },
     async finish(catchId, caught) {
       try {
@@ -121,12 +141,22 @@ export function createMockBugAdapter(options: MockBugOptions = {}): BugAdapter {
   try { day = dayAt(now()); } catch { /* 잘못된 모의 시계는 RPC에서 안전하게 실패한다. */ }
   let lastStart = -Infinity, sequence = 0;
   let pending: { id: string; bugId: BugId; startedAt: number } | undefined;
+  const spawns = new Map<string, BugId>();
+  const roll = () => { let threshold = random() * BUG_CATALOG.reduce((n, b) => n + b.weight, 0); return BUG_CATALOG.find(b => (threshold -= b.weight) < 0) ?? BUG_CATALOG[0]; };
   const album = new Map<BugId, BugAlbumEntry>();
   return {
     async state() {
       return { netOwned: options.netOwned === true, album: BUG_CATALOG.flatMap(b => { const entry = album.get(b.id); return entry ? [{ ...entry }] : []; }) };
     },
-    async start(scene) {
+    async spawn(scene, release) {
+      if (!sceneValid(scene)) return null;
+      if (release) spawns.delete(release);
+      if (spawns.size >= 2) return null;
+      const bug = roll(), spawnId = `mock-spawn-${++sequence}`;
+      spawns.set(spawnId, bug.id);
+      return { spawnId, bugId: bug.id, stars: bug.stars };
+    },
+    async start(scene, spawnId) {
       try {
         if (options.netOwned !== true) return { ok: false, reason: 'no_net' };
         if (!sceneValid(scene)) return { ok: false, reason: 'error' };
@@ -134,10 +164,14 @@ export function createMockBugAdapter(options: MockBugOptions = {}): BugAdapter {
         if (!Number.isFinite(time)) return { ok: false, reason: 'error' };
         if (pending && time > pending.startedAt + 15000) pending = undefined;
         if (pending || time - lastStart < 2000) return { ok: false, reason: 'pending' };
-        const roll = random();
-        if (!Number.isFinite(roll) || roll < 0 || roll >= 1) return { ok: false, reason: 'error' };
-        let threshold = roll * BUG_CATALOG.reduce((n, b) => n + b.weight, 0);
-        const bug = BUG_CATALOG.find(b => (threshold -= b.weight) < 0)!;
+        let bug;
+        if (spawnId) { const id = spawns.get(spawnId); if (!id) return { ok: false, reason: 'gone' }; spawns.delete(spawnId); bug = bugById(id)!; }
+        else {
+          const value = random();
+          if (!Number.isFinite(value) || value < 0 || value >= 1) return { ok: false, reason: 'error' };
+          let threshold = value * BUG_CATALOG.reduce((n, b) => n + b.weight, 0);
+          bug = BUG_CATALOG.find(b => (threshold -= b.weight) < 0)!;
+        }
         const id = `mock-bug-${++sequence}`;
         pending = { id, bugId: bug.id, startedAt: time }; lastStart = time;
         return { ok: true, catchId: id, bugId: bug.id, difficulty: bug.stars };

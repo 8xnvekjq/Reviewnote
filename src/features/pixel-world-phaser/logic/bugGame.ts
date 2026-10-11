@@ -92,8 +92,30 @@ export function emptyRoamingBug(): RoamingBug { return { position: null, target:
 export function removeRoamingBug(now: number, random = Math.random): RoamingBug {
   return { ...emptyRoamingBug(), nextAt: now + 30000 + random() * 30000 };
 }
-export function stepRoamingBug(bug: RoamingBug, grid: Grid, now: number, delta: number, random = Math.random): RoamingBug {
+/** 별3 이상 잠자리가 사람을 피하는 거리·속도(px, px/초). 걷기(56)보다 빠르고 달리기(96)보다 느리다 — 달려야 따라잡는다. */
+export const BUG_FLEE = { radius: 44, speed: 82, zigzagMs: 170 };
+/** 가장 가까운 사람이 도망 거리 안이면 그 사람(없으면 null). */
+export function bugThreat(bug: Point, people: readonly Point[]): Point | null {
+  let best: Point | null = null, distance = BUG_FLEE.radius;
+  for (const p of people) { const d = Math.hypot(p.x - bug.x, p.y - bug.y); if (d < distance) { distance = d; best = p; } }
+  return best;
+}
+/** threat: 피할 사람(별3 이상일 때만 넘긴다). 있으면 사람 반대쪽으로 Z자(좌우로 번갈아 꺾으며) 빠르게 날아간다. */
+export function stepRoamingBug(bug: RoamingBug, grid: Grid, now: number, delta: number, random = Math.random, threat: Point | null = null): RoamingBug {
   let b = { ...bug };
+  if (b.position && threat && now < b.leaveAt) {
+    const ax = b.position.x - threat.x, ay = b.position.y - threat.y, len = Math.hypot(ax, ay) || 1;
+    const ux = ax / len, uy = ay / len, side = Math.floor(now / BUG_FLEE.zigzagMs) % 2 ? 1 : -1;
+    const step = BUG_FLEE.speed * Math.max(0, Math.min(delta, 100)) / 1000;
+    const inside = (q: Point) => q.x >= 8 && q.y >= 8 && q.x < grid.cols * 16 - 8 && q.y < grid.rows * 16 - 8;
+    // 앞으로 + 옆으로 번갈아(Z자). 막히면 옆으로만, 그래도 막히면 반대 옆으로.
+    for (const [fx, fy] of [[ux - uy * side, uy + ux * side], [-uy * side, ux * side], [uy * side, -ux * side]]) {
+      const n = Math.hypot(fx, fy) || 1, next = moveFeet(b.position, fx / n * step, fy / n * step, grid.solid);
+      if (inside(next) && Math.hypot(next.x - b.position.x, next.y - b.position.y) > .01) { b.position = next; break; }
+    }
+    b.target = null; b.nextAt = now + 600;
+    return b;
+  }
   if (!b.position) {
     if (now < b.nextAt) return b;
     for (let i = 0; i < 80; i++) {

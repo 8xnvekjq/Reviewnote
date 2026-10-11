@@ -108,7 +108,7 @@ export interface WorldDebug {
   placing: boolean; playerAlpha: number; petAlpha: number | null; bangVisible: boolean;
   avatarKey: string; petId: PetId | null; heldTool?: 'rod' | 'net' | null;
   /** 날고 있는 잠자리(화면 좌표, 시험용). */
-  bugs?: Point[]; bugNearby?: boolean;
+  bugs?: Point[]; bugNearby?: boolean; bugKinds?: { x: number; y: number; bugId: string | null }[]; dizzy?: string[];
   scene: SceneId; transitioning: boolean;
   x: number; y: number; facing: Facing; moving: boolean; running: boolean; prompt: string | null;
   pet: { x: number; y: number } | null;
@@ -772,7 +772,7 @@ export abstract class WorldScene extends Phaser.Scene {
       camera: { x: camera.worldView.x, y: camera.worldView.y }, fps: Math.round(this.game.loop.actualFps),
       renderer: this.game.renderer.type === Phaser.WEBGL ? 'webgl' : 'canvas', pathLength: this.path.length,
       targets: { ...Object.fromEntries(this.spec.interactables.map(item => [item.id, screen(cellCenter(item.cell))])), ...(this.pet ? { pet: screen({ x: this.pet.x, y: this.pet.y - 15 }) } : {}) },
-      bugs: (this.dragonflies?.positions ?? []).map(screen), bugNearby: this.dragonflies?.nearby ?? false,
+      bugs: (this.dragonflies?.positions ?? []).map(screen), bugNearby: this.dragonflies?.nearby ?? false, bugKinds: this.dragonflies?.kindsDebug ?? [], dizzy: this.dragonflies?.dizzyIds ?? [],
       exits: Object.fromEntries(this.spec.exits.map(exit => [exit.id, screen(cellCenter(exit.cells[0]))])),
     };
   }
