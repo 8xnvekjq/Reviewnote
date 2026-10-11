@@ -139,3 +139,44 @@ export function stepRoamingBug(bug: RoamingBug, grid: Grid, now: number, delta: 
   }
   return b;
 }
+
+/** 씨앗으로 만드는 난수(모든 화면에서 같은 수열). */
+export function seededRandom(seed: number) {
+  let a = seed >>> 0;
+  return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+/** 서버가 정한 잠자리의 비행 경로: 같은 씨앗·같은 맵이면 모든 화면에서 같은 자리(50ms씩 같은 규칙으로 계산). */
+export interface BugPath { bug: RoamingBug; t: number; random: () => number }
+export const BUG_PATH_STEP_MS = 50;
+export function createBugPath(seed: number): BugPath {
+  return { bug: { position: null, target: null, nextAt: 0, leaveAt: Infinity }, t: 0, random: seededRandom(seed) };
+}
+/** 나타난 뒤 ms까지 경로를 진행한다(이미 지난 시간은 다시 계산하지 않는다). */
+export function advanceBugPath(path: BugPath, grid: Grid, ms: number): Point | null {
+  // 처음 자리를 정한 뒤에는 스스로 떠나지 않는다(떠나는 시각은 서버의 leaveAt).
+  if (!path.bug.position) path.bug = { ...stepRoamingBug(path.bug, grid, 0, 0, path.random), leaveAt: Infinity };
+  while (path.t + BUG_PATH_STEP_MS <= ms) {
+    path.t += BUG_PATH_STEP_MS;
+    path.bug = stepRoamingBug(path.bug, grid, path.t, BUG_PATH_STEP_MS, path.random);
+  }
+  return path.bug.position;
+}
+/** 별3 이상의 도망(화면마다 따로): 경로에서 비켜 난 거리(offset). 사람이 가까우면 반대쪽으로 Z자로 커지고,
+ *  아무도 없으면 천천히(초당 20px) 경로로 돌아온다. 막히거나 맵 밖이면 그대로 둔다. */
+export function stepFleeOffset(offset: Point, base: Point, threat: Point | null, now: number, delta: number, grid: Grid): Point {
+  const dt = Math.max(0, Math.min(delta, 100)) / 1000;
+  const ok = (o: Point) => { const q = { x: base.x + o.x, y: base.y + o.y }; return q.x >= 8 && q.y >= 8 && q.x < grid.cols * 16 - 8 && q.y < grid.rows * 16 - 8 && !grid.solid(cellOf(q)); };
+  if (!threat) {
+    const len = Math.hypot(offset.x, offset.y), back = Math.min(len, 20 * dt);
+    const next = len ? { x: offset.x - offset.x / len * back, y: offset.y - offset.y / len * back } : offset;
+    return ok(next) ? next : offset;
+  }
+  const at = { x: base.x + offset.x, y: base.y + offset.y };
+  const ax = at.x - threat.x, ay = at.y - threat.y, len = Math.hypot(ax, ay) || 1, ux = ax / len, uy = ay / len;
+  const side = Math.floor(now / BUG_FLEE.zigzagMs) % 2 ? 1 : -1, step = BUG_FLEE.speed * dt;
+  for (const [fx, fy] of [[ux - uy * side, uy + ux * side], [-uy * side, ux * side], [uy * side, -ux * side]]) {
+    const n = Math.hypot(fx, fy) || 1, next = { x: offset.x + fx / n * step, y: offset.y + fy / n * step };
+    if (ok(next)) return next;
+  }
+  return offset;
+}

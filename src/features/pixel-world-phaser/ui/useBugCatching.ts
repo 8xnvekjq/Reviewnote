@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import type { BugAdapter, BugFinish, BugStart, BugState } from './bugAdapter';
 import type { Facing } from '../logic/joystick';
-import { dragonfliesFor } from '../game/dragonflies';
+import { dragonfliesFor, expectBugWorld } from '../game/dragonflies';
 import type { Hand } from '../logic/bag';
 import { BUG_AUTO_CATCH_STARS } from '../logic/bugCatalog';
 
@@ -77,15 +77,17 @@ export function useBugCatching({ adapter, scene, handle, freeze, report, hand = 
         return;
       }
       if (value.ok) {
+        // 맵 잠자리는 시작한 순간 내 것 — 미니게임 결과와 상관없이 맵에서 빠진다.
+        if (flies.swungSpawn) flies.caught();
         pending.current = { adapter: current, round: value, scene: where, started: performance.now() };
         // 쉬운 잠자리(별1~2)는 휘두르면 바로 잡힌다(서버 최소 시간 0.6초는 finish가 지킨다).
         if (value.difficulty <= BUG_AUTO_CATCH_STARS) void finish(true); else setRound(value);
       }
       else {
         locked.current = false; setBusy(false); latest.current.freeze(false);
-        if (value.reason === 'gone') flies.caught(); // 서버에서 이미 사라진 잠자리(시간이 지남)
-        setMessage(value.reason === 'no_net' ? '광장 상점에서 잠자리채를 사 보세요' : value.reason === 'net_not_equipped' ? '가방에서 잠자리채를 손에 들어 보세요'
-          : value.reason === 'gone' ? '잠자리가 멀리 날아가 버렸어요' : '잠시 후 다시 시도해 주세요.');
+        // 이미 없는 잠자리(친구가 먼저 잡았거나 떠남)는 조용히 지운다.
+        if (value.reason === 'gone') flies.caught();
+        else setMessage(value.reason === 'no_net' ? '광장 상점에서 잠자리채를 사 보세요' : value.reason === 'net_not_equipped' ? '가방에서 잠자리채를 손에 들어 보세요' : '잠시 후 다시 시도해 주세요.');
         void refresh();
       }
     } catch {
@@ -107,14 +109,15 @@ export function useBugCatching({ adapter, scene, handle, freeze, report, hand = 
     if (attempt) void attempt.adapter.finish(attempt.round.catchId, false).catch(() => {});
     void refresh();
     setNearby(false);
-    // 잠자리 종류는 서버가 정한다(어댑터에 spawn이 있으면). 장면의 잠자리 컨트롤러가 생기면 연결한다.
+    // 맵 잠자리는 서버가 정한다(어댑터에 world가 있으면). 장면의 잠자리 컨트롤러가 생기면 연결한다.
+    expectBugWorld(!!adapter?.world);
     let linked: ReturnType<typeof dragonfliesFor>;
     const timer = window.setInterval(() => {
       const flies = dragonfliesFor(scene);
       if (flies && flies !== linked && scene) {
         linked = flies;
-        const spawn = adapter?.spawn?.bind(adapter);
-        flies.setSpawner(spawn ? release => spawn(scene, release) : undefined);
+        const world = adapter?.world?.bind(adapter);
+        flies.setWorld(world ? () => world(scene) : undefined);
       }
       setNearby(!!flies?.nearby);
     }, 100);

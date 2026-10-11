@@ -13,16 +13,17 @@ export const BUG_ACHIEVEMENTS: readonly { id: BugAchievementId; name: string; go
 export interface BugAchievementState { star5: number; species: number; speciesTotal: number; earned: BugAchievementId[] }
 export interface BugState { netOwned: boolean; album: BugAlbumEntry[]; achievements?: BugAchievementState }
 export type BugStart = { ok: true; catchId: string; bugId: BugId; difficulty: number } | { ok: false; reason: 'no_net' | 'net_not_equipped' | 'pending' | 'gone' | 'error' };
-/** 서버가 미리 정한 날아다니는 잠자리 한 마리(supabase/migrations/20261012170000_pixel_bug_spawns.sql). */
-export interface BugSpawn { spawnId: string; bugId: BugId; stars: number }
+/** 맵의 잠자리 한 마리(supabase/migrations/20261012190000_pixel_bug_world.sql). 광장·강가는 모두 같은 잠자리,
+ *  마당은 내 잠자리. seed로 모든 화면이 같은 비행 경로를 계산한다. 시각은 ms. */
+export interface WorldBug { spawnId: string; slot: number; bugId: BugId; stars: number; seed: number; bornAt: number; leaveAt: number }
+export interface BugWorld { serverNow: number; bugs: WorldBug[] }
 export type BugFinish = { ok: true; caught: true; bugId: BugId; isNew: boolean; xpGain?: XpGain; points?: GamePointsResult; achievements?: BugAchievementId[] } | { ok: true; caught: false } | { ok: false };
 export interface BugAdapter {
   state(): Promise<BugState>;
   /** scene: 'yard' | 'plaza' | 'river' — 어디서 잡았는지 기록용. spawnId: 휘두른 잠자리(있으면 그 종류로). */
   start(scene: string, spawnId?: string): Promise<BugStart>;
-  /** 새 잠자리 한 마리(최대 2마리, 20초에 한 번). release: 날아간 자리의 이전 잠자리. 지금은 안 되면 null,
-   *  서버에 아직 이 기능이 없으면 'unsupported'(예전처럼 종류 없이 난다). */
-  spawn?(scene: string, release?: string, holding?: string[]): Promise<BugSpawn | null | 'unsupported'>;
+  /** 지금 맵의 잠자리. 실패면 null, 서버에 아직 이 기능이 없으면 'unsupported'(예전처럼 종류 없이 난다). */
+  world?(scene: string): Promise<BugWorld | null | 'unsupported'>;
   finish(catchId: string, caught: boolean): Promise<BugFinish>;
 }
 
@@ -62,10 +63,17 @@ export function parseBugStart(raw: unknown): BugStart {
   return { ok: true, catchId: raw.catchId, bugId: raw.bugId, difficulty: raw.difficulty as number };
 }
 
-export function parseBugSpawn(raw: unknown): BugSpawn | null {
-  if (!object(raw) || raw.ok !== true || typeof raw.spawnId !== 'string' || !raw.spawnId || !validBug(raw.bugId)
-    || raw.stars !== bugById(raw.bugId)!.stars) return null;
-  return { spawnId: raw.spawnId, bugId: raw.bugId, stars: raw.stars as number };
+export function parseBugWorld(raw: unknown): BugWorld | null {
+  if (!object(raw) || raw.ok !== true || !Array.isArray(raw.bugs)) return null;
+  const serverNow = Date.parse(String(raw.serverNow));
+  if (!Number.isFinite(serverNow)) return null;
+  const bugs = raw.bugs.flatMap((b): WorldBug[] => {
+    if (!object(b) || typeof b.spawnId !== 'string' || !b.spawnId || !validBug(b.bugId) || b.stars !== bugById(b.bugId)!.stars
+      || !integer(b.slot) || typeof b.seed !== 'number' || !Number.isInteger(b.seed)) return [];
+    const bornAt = Date.parse(String(b.bornAt)), leaveAt = Date.parse(String(b.leaveAt));
+    return Number.isFinite(bornAt) && Number.isFinite(leaveAt) ? [{ spawnId: b.spawnId, slot: b.slot, bugId: b.bugId, stars: b.stars as number, seed: b.seed, bornAt, leaveAt }] : [];
+  });
+  return { serverNow, bugs };
 }
 
 export function parseBugFinish(raw: unknown): BugFinish {
@@ -97,17 +105,16 @@ export function createBugAdapter(supabase: FishingRpcClient): BugAdapter {
     async start(scene, spawnId) {
       try {
         if (!sceneValid(scene)) return { ok: false, reason: 'error' };
-        return parseBugStart(await rpc('start_bug_catch', spawnId ? { p_scene: scene, p_spawn: spawnId } : { p_scene: scene }));
+        return parseBugStart(spawnId ? await rpc('start_world_bug_catch', { p_scene: scene, p_spawn: spawnId }) : await rpc('start_bug_catch', { p_scene: scene }));
       } catch { return { ok: false, reason: 'error' }; }
     },
-    async spawn(scene, release, holding = []) {
+    async world(scene) {
       try {
         if (!sceneValid(scene)) return null;
-        // 화면에 이미 있는 잠자리(holding)를 빼고, 살아 있는 내 잠자리를 먼저 돌려받는다(맵을 다시 들어온 경우).
-        const result = await call('next_bug_spawn', { p_scene: scene, p_release: release ?? null, p_holding: holding });
+        const result = await call('get_bug_world', { p_scene: scene });
         // PostgREST: 함수가 없으면 PGRST202 — 서버가 아직 옛 버전.
         if (result.error) return (result.error as { code?: string }).code === 'PGRST202' ? 'unsupported' : null;
-        return parseBugSpawn(result.data);
+        return parseBugWorld(result.data);
       } catch { return null; }
     },
     async finish(catchId, caught) {
@@ -142,22 +149,24 @@ export function createMockBugAdapter(options: MockBugOptions = {}): BugAdapter {
   try { day = dayAt(now()); } catch { /* 잘못된 모의 시계는 RPC에서 안전하게 실패한다. */ }
   let lastStart = -Infinity, sequence = 0;
   let pending: { id: string; bugId: BugId; startedAt: number } | undefined;
-  const spawns = new Map<string, BugId>();
+  const worlds = new Map<string, { spawnId: string; bugId: BugId; seed: number; bornAt: number; leaveAt: number; caughtAt: number | null; nextAt: number | null }[]>();
   const roll = () => { let threshold = random() * BUG_CATALOG.reduce((n, b) => n + b.weight, 0); return BUG_CATALOG.find(b => (threshold -= b.weight) < 0) ?? BUG_CATALOG[0]; };
   const album = new Map<BugId, BugAlbumEntry>();
   return {
     async state() {
       return { netOwned: options.netOwned === true, album: BUG_CATALOG.flatMap(b => { const entry = album.get(b.id); return entry ? [{ ...entry }] : []; }) };
     },
-    async spawn(scene, release, holding = []) {
+    // 서버와 같은 규칙(마당 4·그 밖 8자리, 잡히거나 떠나면 30~60초 뒤 새로).
+    async world(scene) {
       if (!sceneValid(scene)) return null;
-      if (release) spawns.delete(release);
-      const kept = [...spawns].find(([id]) => !holding.includes(id));
-      if (kept) return { spawnId: kept[0], bugId: kept[1], stars: bugById(kept[1])!.stars };
-      if (spawns.size >= 2) return null;
-      const bug = roll(), spawnId = `mock-spawn-${++sequence}`;
-      spawns.set(spawnId, bug.id);
-      return { spawnId, bugId: bug.id, stars: bug.stars };
+      const t = now(), make = () => { const bug = roll(); return { spawnId: `mock-spawn-${++sequence}`, bugId: bug.id, seed: Math.floor(random() * 2147483647), bornAt: t, leaveAt: t + 45000 + random() * 60000, caughtAt: null, nextAt: null }; };
+      const slots = worlds.get(scene) ?? Array.from({ length: scene === 'yard' ? 4 : 8 }, make);
+      worlds.set(scene, slots);
+      slots.forEach((s, i) => {
+        if (s.nextAt === null && (s.caughtAt !== null || t >= s.leaveAt)) s.nextAt = (s.caughtAt ?? s.leaveAt) + 30000 + random() * 30000;
+        if (s.nextAt !== null && t >= s.nextAt) slots[i] = make();
+      });
+      return { serverNow: t, bugs: slots.flatMap((s, slot) => s.caughtAt === null && s.bornAt <= t && s.leaveAt > t ? [{ spawnId: s.spawnId, slot, bugId: s.bugId, stars: bugById(s.bugId)!.stars, seed: s.seed, bornAt: s.bornAt, leaveAt: s.leaveAt }] : []) };
     },
     async start(scene, spawnId) {
       try {
@@ -168,7 +177,11 @@ export function createMockBugAdapter(options: MockBugOptions = {}): BugAdapter {
         if (pending && time > pending.startedAt + 15000) pending = undefined;
         if (pending || time - lastStart < 2000) return { ok: false, reason: 'pending' };
         let bug;
-        if (spawnId) { const id = spawns.get(spawnId); if (!id) return { ok: false, reason: 'gone' }; spawns.delete(spawnId); bug = bugById(id)!; }
+        if (spawnId) {
+          const s = worlds.get(scene)?.find(w => w.spawnId === spawnId && w.caughtAt === null && w.leaveAt > time);
+          if (!s) return { ok: false, reason: 'gone' };
+          s.caughtAt = time; bug = bugById(s.bugId)!;
+        }
         else {
           const value = random();
           if (!Number.isFinite(value) || value < 0 || value >= 1) return { ok: false, reason: 'error' };

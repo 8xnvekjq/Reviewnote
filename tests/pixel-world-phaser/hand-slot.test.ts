@@ -8,8 +8,8 @@ import { protocolExtras } from '../../src/features/pixel-room/plaza/presenceProt
 import { minReelMs } from '../../src/features/pixel-world-phaser/logic/reelGame';
 import { BUG_AUTO_CATCH_STARS } from '../../src/features/pixel-world-phaser/logic/bugCatalog';
 import { dizzyEyes, netHits } from '../../src/features/pixel-world-phaser/logic/netHit';
-import { BUG_FLEE, bugThreat, stepRoamingBug } from '../../src/features/pixel-world-phaser/logic/bugGame';
-import { createBugAdapter, parseBugSpawn } from '../../src/features/pixel-world-phaser/ui/bugAdapter';
+import { BUG_FLEE, advanceBugPath, bugThreat, createBugPath, stepFleeOffset, stepRoamingBug } from '../../src/features/pixel-world-phaser/logic/bugGame';
+import { createBugAdapter, parseBugWorld } from '../../src/features/pixel-world-phaser/ui/bugAdapter';
 
 test('손 칸 응답: 낚싯대·잠자리채·맨손, 이상한 값은 기본 낚싯대를 든 것으로', () => {
   assert.deepEqual(parseHand({ hand: 'net', rod: { id: 'rod_gold', tier: 4 }, netOwned: true, rods: ['rod_gold', 3] }),
@@ -93,15 +93,26 @@ test('별3 이상 잠자리: 가까이 오면 사람 반대쪽으로 Z자로 빠
   assert.ok(calm.position!.x - 300 <= 12 * 0.1 + 1e-9);
 });
 
-test('서버가 정한 잠자리: 별이 종류와 맞아야 받는다', () => {
-  assert.deepEqual(parseBugSpawn({ ok: true, spawnId: 's1', bugId: 'dragonfly_gold', stars: 5 }), { spawnId: 's1', bugId: 'dragonfly_gold', stars: 5 });
-  assert.equal(parseBugSpawn({ ok: true, spawnId: 's1', bugId: 'dragonfly_gold', stars: 1 }), null);
-  assert.equal(parseBugSpawn({ ok: false, reason: 'wait' }), null);
+test('맵 잠자리: 같은 씨앗이면 모든 화면에서 같은 자리, 나중에 들어와도 같다', () => {
+  const grid = { cols: 20, rows: 15, solid: (c: { x: number; y: number }) => c.x === 7 };
+  const a = createBugPath(1234), b = createBugPath(1234);
+  advanceBugPath(a, grid, 10000); // 처음부터 본 화면
+  assert.deepEqual(advanceBugPath(a, grid, 30000), advanceBugPath(b, grid, 30000), '30초 뒤에 들어온 화면');
+  assert.notDeepEqual(advanceBugPath(createBugPath(99), grid, 30000), advanceBugPath(b, grid, 30000));
+  assert.ok(advanceBugPath(a, grid, 200000), '스스로 떠나지 않는다(떠나는 시각은 서버)');
+  // 도망: 사람 반대쪽으로 비켜 나고, 사람이 없으면 천천히 경로로 돌아온다.
+  const open = { cols: 40, rows: 40, solid: () => false }, base = { x: 300, y: 300 };
+  const fled = stepFleeOffset({ x: 0, y: 0 }, base, { x: 280, y: 300 }, 0, 100, open);
+  assert.ok(fled.x > 0);
+  const back = stepFleeOffset({ x: 30, y: 0 }, base, null, 0, 100, open);
+  assert.ok(back.x < 30 && back.x > 25);
 });
 
-test('서버에 잠자리 미리 정하기가 아직 없으면 unsupported(예전처럼 난다)', async () => {
+test('맵 잠자리 응답 읽기·서버가 옛 버전이면 unsupported', async () => {
+  const world = parseBugWorld({ ok: true, serverNow: '2026-10-12T03:00:00Z', bugs: [
+    { spawnId: 's1', slot: 0, bugId: 'dragonfly_gold', stars: 5, seed: 7, bornAt: '2026-10-12T02:59:00Z', leaveAt: '2026-10-12T03:01:00Z' },
+    { spawnId: 's2', slot: 1, bugId: 'dragonfly_gold', stars: 1, seed: 7, bornAt: '2026-10-12T02:59:00Z', leaveAt: '2026-10-12T03:01:00Z' }] });
+  assert.equal(world?.bugs.length, 1); assert.equal(world?.bugs[0].bornAt, Date.parse('2026-10-12T02:59:00Z'));
   const old = createBugAdapter({ rpc: async () => ({ data: null, error: { code: 'PGRST202' } }) });
-  assert.equal(await old.spawn!('plaza'), 'unsupported');
-  const busy = createBugAdapter({ rpc: async () => ({ data: { ok: false, reason: 'wait' }, error: null }) });
-  assert.equal(await busy.spawn!('plaza'), null);
+  assert.equal(await old.world!('plaza'), 'unsupported');
 });
