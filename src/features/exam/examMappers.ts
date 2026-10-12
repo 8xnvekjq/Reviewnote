@@ -236,6 +236,7 @@ export function mapExamAttempt(raw: unknown, clientNowMs: number = Date.now()): 
   const r = asRow(raw);
   const questions = asArray(r.questions).map(mapExamQuestion).sort((a, b) => a.number - b.number);
   return {
+    attemptKind: r.attemptKind === 'single_redo' ? 'single_redo' : 'regular',
     id: asString(r.id),
     ...mapMetadata(r),
     ...(r.paperTitle != null ? { paperTitle: asString(r.paperTitle) } : {}),
@@ -393,6 +394,9 @@ const ERROR_MESSAGES: Record<string, string> = {
   EXAM_ATTEMPT_NOT_FOUND: '풀이 기록을 찾지 못했어요.',
   EXAM_NOT_IN_PROGRESS: '이미 제출한 시험이에요.',
   EXAM_NOT_SUBMITTED: '아직 제출하지 않은 시험이에요.',
+  EXAM_REDO_ANSWER_REQUIRED: '답을 입력한 뒤 제출해 주세요.',
+  EXAM_REDO_SUBMIT_REQUIRED: '다시 풀기는 답을 입력한 뒤 제출해 주세요.',
+  EXAM_REDO_SOURCE_REQUIRED: '본인이 제출한 선생님 풀이에서 문제를 골라 주세요.',
   EXAM_REAL_MODE_LOCKED: '실전 모드에서는 제출 전에 정답을 볼 수 없어요.',
   EXAM_QUESTION_NOT_FOUND: '이 시험에 없는 문항이에요.',
   EXAM_INVALID_ANSWER: '채점할 답을 먼저 입력해 주세요.',

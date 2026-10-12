@@ -41,6 +41,8 @@ export function ExamPracticeScreen({ client, currentUserId, onExit, admin, isAdm
   isAdmin?: boolean;
 }) {
   const [phase, setPhase] = useState<Phase>({ kind: 'start' });
+  const [redoSource, setRedoSource] = useState<string | null>(null);
+  const [redoMessage, setRedoMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [startKey, setStartKey] = useState(0);
@@ -48,6 +50,7 @@ export function ExamPracticeScreen({ client, currentUserId, onExit, admin, isAdm
   const backToStart = () => {
     leaveFullscreen();
     setError(null);
+    setRedoMessage(null);
     setPhase({ kind: 'start' });
     setStartKey(k => k + 1); // 이어 풀기·지난 결과 목록 새로 읽기
   };
@@ -65,6 +68,22 @@ export function ExamPracticeScreen({ client, currentUserId, onExit, admin, isAdm
     } finally {
       setBusy(false);
     }
+  };
+
+  const redoQuestion = async (sourceAttemptId: string, questionId: string) => {
+    if (!isAdmin || !client.startSingleRedo || busy) return;
+    enterFullscreen();
+    setBusy(true);
+    setError(null);
+    try {
+      const attempt = await client.startSingleRedo(sourceAttemptId, questionId);
+      setRedoSource(sourceAttemptId);
+      setRedoMessage(null);
+      setPhase({ kind: 'solve', attempt });
+    } catch (e) {
+      leaveFullscreen();
+      setError(e instanceof Error ? e.message : '다시 풀기를 시작하지 못했어요.');
+    } finally { setBusy(false); }
   };
 
   const resume = (attempt: ExamAttempt) => {
@@ -131,6 +150,7 @@ export function ExamPracticeScreen({ client, currentUserId, onExit, admin, isAdm
           error={error}
           onStart={(paper, mode, elective, electiveOnly) => { void start(paper, mode, elective, electiveOnly); }}
           onResume={resume}
+          onRedoQuestion={isAdmin && client.startSingleRedo ? (id, q) => { void redoQuestion(id, q); } : undefined}
           onOpenResult={id => { void openResult(id); }}
           initialPaperId={phase.paperId}
           onExit={onExit}
@@ -143,13 +163,23 @@ export function ExamPracticeScreen({ client, currentUserId, onExit, admin, isAdm
           key={phase.attempt.id}
           client={client}
           attempt={phase.attempt}
-          onExit={phase.attempt.status === 'submitted' ? () => { leaveFullscreen(); void openResult(phase.attempt.id); } : backToStart}
-          onSubmitted={result => { leaveFullscreen(); setPhase({ kind: 'result', result }); }}
+          onExit={phase.attempt.attemptKind === 'single_redo' && redoSource ? () => { leaveFullscreen(); setPhase({ kind: 'start' }); void openResult(redoSource); }
+            : phase.attempt.status === 'submitted' ? () => { leaveFullscreen(); void openResult(phase.attempt.id); } : backToStart}
+          onSubmitted={result => {
+            leaveFullscreen();
+            if (phase.attempt.attemptKind === 'single_redo' && redoSource) {
+              setRedoMessage(result.items[0]?.isCorrect ? '다시 푼 풀이를 저장했어요. 학생에게는 공개 기준을 충족한 최신 정답 풀이가 보여요.' : '다시 푼 풀이를 저장했어요. 오답 풀이는 학생에게 공개하지 않아요.');
+              setPhase({ kind: 'start' });
+              void openResult(redoSource);
+            } else setPhase({ kind: 'result', result });
+          }}
         />
       )}
+      {phase.kind !== 'solve' && redoMessage && <p role="status">{redoMessage}</p>}
       {phase.kind === 'result' && error && <p className="exam-error" role="alert">{error}</p>}
       {phase.kind === 'result' && (
         <OmrResultView key={phase.result.attemptId} client={client} result={phase.result}
+          onRedoQuestion={isAdmin && client.startSingleRedo && !busy ? q => { void redoQuestion(phase.result.attemptId, q); } : undefined}
           onRevise={isAdmin && client.getAttemptForRevision && !busy ? () => { void revise(phase.result.attemptId); } : undefined}
           busy={busy} onOpenResult={id => { void openResult(id); }}
           onContinueHistory={(paper, active) => { void continueHistory(paper, active); }}

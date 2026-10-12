@@ -90,6 +90,7 @@ export interface ExamItemState {
 }
 
 export interface ExamAttempt extends ExamPaperMetadata {
+  attemptKind?: 'regular' | 'single_redo';
   paperTitle?: string;
   id: string;
   paperId: string;
@@ -170,6 +171,7 @@ export interface ExamPaperHistoryAttempt extends ExamPaperMetadata {
 
 /** src/features/exam/examClient.ts의 서버 경계. */
 export interface ExamClient {
+  startSingleRedo?(sourceAttemptId: string, questionId: string): Promise<ExamAttempt>;
   uploadSolutionAudio?(clip: SolutionAudioUpload, blob: Blob): Promise<void>;
   /** 관리자 본인 응시: 이 문항에 올라간 녹음(시작 시각 순). */
   listSolutionAudio?(attemptId: string, questionId: string): Promise<TeacherAudioClip[]>;
