@@ -9,7 +9,11 @@ export const advanceCompare = (time: number, elapsed: number, speed: number, tot
 export const compareCellProgress = (time: number, duration: number) => ({
   time: Math.min(Math.max(0, time), duration), finished: duration === 0 || time >= duration,
 });
-export const compareReplayClock = (data: InkReplayData) => buildInkClock(buildInkTimeline(data));
+export const compareReplayClock = (data: InkReplayData) => buildInkClock(buildInkTimeline(data),
+  data.audioClips?.length ? { origin: data.audioOriginMs ?? 0, clips: data.audioClips } : undefined);
+/** 비교 행의 원래 응시는 유지하고 해당 문항의 재생 대상만 바꾼다. */
+export const compareReplayAttemptId = (row: AdminPaperSubmission, question: AdminPaperSubmission['questions'][number]) =>
+  question.replayAttemptId ?? row.attemptId;
 
 /** 같은 학생의 최근 제출만 비교 후보로 남긴다. */
 export function latestSubmissions(rows: AdminPaperSubmission[]) {
