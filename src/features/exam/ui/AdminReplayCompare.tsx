@@ -4,8 +4,9 @@ import type { AdminExamApi, AdminPaperSubmission, InkReplayData, InkStroke, InkT
 import { ExamInkReplayFrame, ReplayIcon } from '../ink/ExamInkReplay';
 import { formatReplayTime } from '../ink/inkReplay';
 import { aspectCache, loadInkImage } from '../ink/inkImages';
-import { advanceCompare, compareCellProgress, compareGridShape, comparePrefetchOrder, sharedCompareFit, compareReplayClock, createCompareReplayLoader, latestSubmissions, restartCompare } from './replayCompareLogic';
+import { compareReplayAttemptId, advanceCompare, compareCellProgress, compareGridShape, comparePrefetchOrder, sharedCompareFit, compareReplayClock, createCompareReplayLoader, latestSubmissions, restartCompare } from './replayCompareLogic';
 import { fitExtraBelow, type InkExtent } from '../ink/inkFit';
+import { ReplayAudio } from '../audio/ReplayAudio';
 import { ScratchNotesTools } from './ResultInkNotes';
 import '../../../styles/examPractice.css';
 import '../../../styles/adminReplayCompare.css';
@@ -131,19 +132,19 @@ export function AdminReplayCompare({ api, paperId, title, onClose }: {
     let alive = true;
     loader.prioritize(picked.flatMap(row => {
       const q = row.questions.find(value => value.number === question);
-      return q ? [{ attemptId: row.attemptId, questionId: q.questionId }] : [];
+      return q ? [{ attemptId: compareReplayAttemptId(row, q), questionId: q.questionId }] : [];
     }));
     loader.clearPrefetch();
     const cached = picked.map(row => {
       const q = row.questions.find(value => value.number === question);
-      const data = q && loader.peek(row.attemptId, q.questionId);
+      const data = q && loader.peek(compareReplayAttemptId(row, q), q.questionId);
       return !q ? [row.attemptId, emptyReplay] as const : data ? [row.attemptId, { data, clock: compareReplayClock(data) }] as const : null;
     });
     setReplays(cached.every(value => value !== null) ? new Map(cached.filter(value => value !== null)) : null); setPlaying(false); setError(null); timeRef.current = 0; setTime(0);
     void Promise.all(picked.map(async row => {
       const q = row.questions.find(value => value.number === question);
       if (!q) return null;
-      const [data] = await Promise.all([loader(row.attemptId, q.questionId), loadInkImage(q.imageUrl)]);
+      const [data] = await Promise.all([loader(compareReplayAttemptId(row, q), q.questionId), loadInkImage(q.imageUrl)]);
       return [row.attemptId, { data, clock: compareReplayClock(data) }] as const;
     })).then(values => {
       if (!alive) return;
@@ -157,7 +158,7 @@ export function AdminReplayCompare({ api, paperId, title, onClose }: {
           if (image) void loadInkImage(image);
           await Promise.all(picked.map(row => {
             const q = row.questions.find(value => value.number === number);
-            return q ? loader(row.attemptId, q.questionId, true).catch(() => {}) : Promise.resolve();
+            return q ? loader(compareReplayAttemptId(row, q), q.questionId, true).catch(() => {}) : Promise.resolve();
           }));
         }
       })();
@@ -275,14 +276,16 @@ export function AdminReplayCompare({ api, paperId, title, onClose }: {
           const q = row.questions.find(value => value.number === question);
           const replay = replays?.get(row.attemptId);
           const progress = compareCellProgress(time, replay?.clock.total ?? 0);
-          const empty = !!replays && (!q || !replay || replay.clock.ends.length === 0);
+          const empty = !!replays && (!q || !replay || (replay.clock.ends.length === 0 && !replay.clock.audioClips.length));
           const finished = !!replays && (empty || progress.finished);
           const Content = focused ? 'div' : 'button';
           return <section key={row.attemptId} className={`exam-live-cell exam-compare-cell${finished ? ' is-finished' : ''}`} data-testid="compare-cell" data-time={progress.time} data-finished={finished} data-attempt-id={row.attemptId}>
             <Content type={focused ? undefined : 'button'} className="exam-compare-cell-open" aria-label={`${row.studentName} 풀이 확대`} onClick={() => {
               if (!focused) { lastFocused.current = row.attemptId; history.pushState({ ...history.state, compareFocus: row.attemptId }, ''); setFocused(row.attemptId); }
             }}>
-              <div className="exam-compare-label"><strong>{row.isMine ? `내 풀이 · ${row.studentName}` : row.studentName}</strong><span>{question}번 · 답 {q?.answer ?? '미응답'} {q ? q.isCorrect ? 'O' : 'X' : '—'}</span></div>
+              <div className="exam-compare-label"><strong>{row.isMine ? `내 풀이 · ${row.studentName}` : row.studentName}</strong><span>{question}번 · 답 {q?.answer ?? '미응답'} {q ? q.isCorrect ? 'O' : 'X' : '—'}</span>{q?.isSingleRedo && <small>다시 풀기</small>}</div>
+              {focused && q && replay && replay.clock.audioClips.length > 0 && <ReplayAudio key={`${compareReplayAttemptId(row, q)}:${q.questionId}`}
+                clips={replay.clock.audioClips} time={progress.time} playing={playing} speed={speed} shift={0} />}
               <div className="exam-compare-canvas">
                 {!focused && replays && <CompareFrame replay={replay ?? emptyReplay} imageUrl={q?.imageUrl ?? questionImages.get(question) ?? ''} fit={fit} time={progress.time} />}
                 {focused && q && replay && <ExamInkReplayFrame data={replay.data} clock={replay.clock} time={progress.time} imageUrl={q.imageUrl} imageMaxWidth={focused ? 1000 : 480}

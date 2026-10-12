@@ -357,7 +357,7 @@ export interface AdminPaperSubmission {
   studentName: string;
   submittedAt: string;
   isMine: boolean;
-  questions: Array<{ questionId: string; number: number; imageUrl: string; answer: string | null; isCorrect: boolean }>;
+  questions: Array<{ questionId: string; number: number; imageUrl: string; answer: string | null; isCorrect: boolean; replayAttemptId?: string; isSingleRedo?: boolean }>;
 }
 
 /** 관리자 읽기 전용 검토에 필요한 서버 호출 묶음. */

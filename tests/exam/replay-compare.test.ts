@@ -1,7 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { compareGridShape, sharedCompareFit, comparePrefetchOrder, advanceCompare, compareCellProgress, compareColumns, restartCompare, latestSubmissions, createCompareReplayLoader } from '../../src/features/exam/ui/replayCompareLogic.ts';
+import { compareReplayAttemptId, compareReplayClock, compareGridShape, sharedCompareFit, comparePrefetchOrder, advanceCompare, compareCellProgress, compareColumns, restartCompare, latestSubmissions, createCompareReplayLoader } from '../../src/features/exam/ui/replayCompareLogic.ts';
 import type { AdminPaperSubmission, InkReplayData } from '../../src/features/exam/contract.ts';
+
+test('다시 풀기 문항은 별도 재생 캐시를 쓰고 원래 비교 행은 유지한다', async () => {
+  const row: AdminPaperSubmission = { attemptId: 'original', studentId: 'teacher', studentName: '선생님', submittedAt: '2026-10-01', isMine: true,
+    questions: [{ questionId: 'q', number: 1, imageUrl: '', answer: '2', isCorrect: false, replayAttemptId: 'redo', isSingleRedo: true }] };
+  const calls: string[] = [];
+  const load = createCompareReplayLoader(async a => { calls.push(a); return { batches: [], strokes: [], revision: 0 }; });
+  await load(row.attemptId, 'q');
+  await load(compareReplayAttemptId(row, row.questions[0]), 'q');
+  assert.deepEqual(calls, ['original', 'redo']);
+  assert.equal(row.attemptId, 'original');
+  assert.equal(compareReplayAttemptId(row, { ...row.questions[0], replayAttemptId: undefined }), 'original');
+});
+
+test('비교 재생 시계는 음성만 있는 풀이도 끝까지 재생한다', () => {
+  const clock = compareReplayClock({ batches: [], strokes: [], revision: 0, audioOriginMs: 0,
+    audioClips: [{ id: 'clip', storagePath: 'redo/q/clip.webm', mime: 'audio/webm', offsetMs: 0, durationMs: 5000 }] });
+  assert.equal(clock.total, 5000);
+  assert.equal(clock.audioClips[0].storagePath, 'redo/q/clip.webm');
+});
 
 test('shared clock clamps each cell and leaves completed cells on their final frame', () => {
   const time = advanceCompare(0, 500, 2, 3000);

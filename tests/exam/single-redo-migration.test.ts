@@ -105,6 +105,24 @@ insert into private.app_admins values ('00000000-0000-0000-0000-0000000000ad');
  const teacher=async(question=q)=>(await candidates(question)).find((r:any)=>r.label.isTeacher);
  const first=await teacher(), first2=await teacher(q2);
  assert.ok(first && first2);
+ // 기존 자료: 시작 이전 최신 제출, 이전 제출이 없을 때 최신 제출, 원본이 없는 경우.
+ await db.exec(`insert into exam_attempts(id,student_id,paper_id,mode,status,attempt_kind,started_at,submitted_at) values
+ ('${id(9001)}','${AD}','2025-06-math','free','submitted','regular','2020-01-01','2020-01-02'),
+ ('${id(9002)}','${AD}','2025-06-math','free','submitted','regular','2020-02-01','2020-02-02'),
+ ('${id(9003)}','${AD}','2025-06-math','free','submitted','single_redo','2020-01-03','2020-01-04'),
+ ('${id(9004)}','${AD}','2025-06-math','free','submitted','single_redo','2019-01-01','2019-01-02'),
+ ('${id(9005)}','${AD}','2025-06-math','free','submitted','single_redo','2020-03-01','2020-03-02'),
+ ('${id(9006)}','${S1}','2025-06-math','free','submitted','single_redo','2020-03-01','2020-03-02');`);
+ await db.exec(sql('20261013010000_exam_single_redo_source_compare'));
+ const sourceOf=async(attempt:string)=>(await db.query('select source_attempt_id s from exam_attempts where id=$1',[attempt])).rows[0].s;
+ assert.equal(await sourceOf(id(9003)),id(9001));
+ assert.equal(await sourceOf(id(9004)),original.id);
+ assert.equal(await sourceOf(id(9005)),id(9002));
+ assert.equal(await sourceOf(id(9006)),null,'학생의 행은 백필하지 않는다');
+ await db.query('delete from exam_attempts where id=any($1::uuid[])',[[9001,9002,9003,9004,9005,9006].map(id)]);
+ const comparison=async()=> (await as(AD,"select admin_list_paper_submissions('2025-06-math') r"))[0].r;
+ const cell=async(question=q)=>(await comparison()).find((r:any)=>r.isMine).questions.find((i:any)=>i.questionId===question);
+ await assert.rejects(as(S1,"select admin_list_paper_submissions('2025-06-math')"),/EXAM_ADMIN_REQUIRED/);
  const before=(await db.query('select * from exam_attempts where id=$1',[original.id])).rows[0];
  await assert.rejects(redo(original.id,q,S1),/EXAM_ADMIN_REQUIRED/);
  await assert.rejects(redo(original.id,q,''),/permission denied/);
@@ -116,6 +134,8 @@ insert into private.app_admins values ('00000000-0000-0000-0000-0000000000ad');
  assert.equal(one.attemptKind,'single_redo'); assert.equal(one.questions.length,1);
  assert.equal(one.questions[0].id,q); assert.equal(one.items.length,1);
  assert.equal((await redo()).id,one.id);
+ assert.equal(await sourceOf(one.id),original.id);
+ assert.equal((await cell()).replayAttemptId,original.id,'진행 중 다시 풀기는 비교에 반영하지 않는다');
  assert.equal((await start(AD)).id,regular.id);
  assert.equal((await as(AD,"select get_active_exam_attempt('2025-06-math') r"))[0].r.id,regular.id);
  await assert.rejects(check(AD,one.id,q,await key(q)),/EXAM_REDO_SUBMIT_REQUIRED/);
@@ -124,6 +144,16 @@ insert into private.app_admins values ('00000000-0000-0000-0000-0000000000ad');
  const submit=async(attempt:string,answer:string)=>(await as(AD,'select submit_exam_attempt($1,$2::jsonb,null) r',[attempt,
    JSON.stringify([{questionId:q,answer,unsure:false,timeSpentMs:5000,visits:1}])]))[0].r;
  await submit(one.id,await wrong(q));
+ assert.equal((await cell()).replayAttemptId,one.id);
+ assert.equal((await cell()).answer,await wrong(q));
+ assert.equal((await cell()).isCorrect,false,'관리자 비교에는 오답도 반영한다');
+ assert.equal((await cell()).isSingleRedo,true);
+ assert.equal((await cell(q2)).replayAttemptId,original.id);
+ assert.equal((await cell(q2)).isSingleRedo,false);
+ await assert.rejects(redo(one.id),/EXAM_REDO_SOURCE_REQUIRED/);
+ const adminReplay=(await as(AD,'select get_exam_ink_replay($1,$2) r',[one.id,q]))[0].r;
+ assert.equal(adminReplay.strokes.length,3);
+ assert.equal(adminReplay.audioClips[0].storagePath,wrongClip.path);
  assert.equal((await teacher()).solutionKey,first.solutionKey,'오답 다시 풀기는 이전 정답 풀이를 가리지 않는다');
  assert.equal((await teacher(q2)).solutionKey,first2.solutionKey,'다른 문항은 유지한다');
  assert.equal((await as(S1,'select * from exam_solution_audio where id=$1',[wrongClip.id])).length,0);
@@ -132,8 +162,11 @@ insert into private.app_admins values ('00000000-0000-0000-0000-0000000000ad');
  const two=await redo(); assert.notEqual(two.id,one.id);
  await solve(two.id,AD,q); const clip=await addClip(two.id,q);
  assert.equal((await teacher()).solutionKey,first.solutionKey,'제출 전에는 공개하지 않는다');
+ assert.equal((await cell()).replayAttemptId,one.id,'새 진행 중 응시는 최근 제출을 가리지 않는다');
  const result=await submit(two.id,await key(q));
  assert.equal(result.items.length,1); assert.equal(result.items[0].isCorrect,true);
+ assert.equal((await cell()).replayAttemptId,two.id);
+ assert.equal((await cell()).isCorrect,true);
  const latest=await teacher(); assert.notEqual(latest.solutionKey,first.solutionKey); assert.equal(latest.hasAudio,true);
  assert.equal((await teacher(q2)).solutionKey,first2.solutionKey);
  const replay=(await as(S1,'select get_peer_solution_by_key_v2($1,$2,$3) r',[student.id,q,latest.solutionKey]))[0].r;
@@ -170,5 +203,19 @@ insert into private.app_admins values ('00000000-0000-0000-0000-0000000000ad');
  // 관리자 본인 이전 풀이 접근과 학생 결과 검토 권한을 유지한다.
  assert.ok((await as(AD,'select list_peer_solutions_v2($1,$2) r',[original.id,q]))[0].r.some((r:any)=>r.label.isTeacher));
  assert.ok((await as(AD,'select list_peer_solutions_v2($1,$2) r',[student.id,q]))[0].r.some((r:any)=>r.label.isTeacher));
+ // 다른 원본의 같은 문제는 진행 중 다시 풀기를 공유하지 않는다.
+ await submitAll(AD,regular);
+ const oldRedo=await redo(), otherRedo=await redo(regular.id);
+ assert.notEqual(oldRedo.id,otherRedo.id);
+ assert.equal(await sourceOf(otherRedo.id),regular.id);
+ assert.equal((await redo(regular.id)).id,otherRedo.id);
+ assert.equal((await cell()).replayAttemptId,regular.id,'다른 원본에 묶인 다시 풀기는 섞이지 않는다');
+ await db.query('update exam_attempts set submitted_at=$2 where id=any($1::uuid[])',[[one.id,two.id],'2025-01-01']);
+ await db.query('update exam_attempts set submitted_at=$2 where id=$1',[regular.id,'2020-01-01']);
+ assert.equal((await cell()).replayAttemptId,[one.id,two.id].sort().at(-1),'동일 제출 시각은 ID로 결정한다');
+ await submit(oldRedo.id,await wrong(q));
+ assert.equal((await cell()).replayAttemptId,oldRedo.id,'최신 오답도 이전 정답 다시 풀기를 덮어쓴다');
+ assert.equal((await cell()).isCorrect,false);
+ assert.equal((await cell(q2)).replayAttemptId,original.id);
  } finally { await db.close(); }
 });
