@@ -58,6 +58,9 @@ async function removeAudioObjects(paths: string[]) {
 }
 
 export const examClient: ExamClient = {
+  async startSingleRedo(sourceAttemptId, questionId) {
+    return mapExamAttempt(await callRpc('admin_start_single_redo', { p_source_attempt_id: sourceAttemptId, p_question_id: questionId }));
+  },
   async uploadSolutionAudio(clip, blob) {
     const storagePath = `${clip.attemptId}/${clip.questionId}/${clip.id}.${audioExtension(clip.mime)}`;
     const { error: uploadError } = await supabase.storage.from('exam-solution-audio').upload(storagePath, blob, {

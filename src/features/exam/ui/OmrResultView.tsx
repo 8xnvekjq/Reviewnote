@@ -24,6 +24,7 @@ type Props = {
   backLabel?: string;
   /** 관리자 본인 결과: 문항 풀이(필기·녹음)를 고치러 다시 연다. */
   onRevise?: () => void;
+  onRedoQuestion?: (questionId: string) => void;
   busy?: boolean;
   onOpenResult?: (attemptId: string) => void;
   onContinueHistory?: (paper: ExamPaperSummary, active: boolean) => void;
@@ -41,6 +42,7 @@ interface BodyProps {
   onBack: () => void;
   backLabel?: string;
   onRevise?: () => void;
+  onRedoQuestion?: (questionId: string) => void;
   ink: Map<string, InkStroke[]>;
   inkBar: ReactNode;
   historySection?: ReactNode;
@@ -55,11 +57,11 @@ interface BodyProps {
 
 export function OmrResultView(props: Props) {
   return props.review
-    ? <ReviewResult client={props.client} result={props.result} onBack={props.onBack} backLabel={props.backLabel} studentName={props.review.studentName} videoApi={props.videoApi} />
-    : <StudentResult client={props.client} result={props.result} onBack={props.onBack} backLabel={props.backLabel} onRevise={props.onRevise} busy={props.busy} onOpenResult={props.onOpenResult} onContinueHistory={props.onContinueHistory} videoApi={props.videoApi} />;
+    ? <ReviewResult client={props.client} result={props.result} onBack={props.onBack} backLabel={props.backLabel} onRedoQuestion={props.onRedoQuestion} studentName={props.review.studentName} videoApi={props.videoApi} />
+    : <StudentResult client={props.client} result={props.result} onBack={props.onBack} backLabel={props.backLabel} onRedoQuestion={props.onRedoQuestion} onRevise={props.onRevise} busy={props.busy} onOpenResult={props.onOpenResult} onContinueHistory={props.onContinueHistory} videoApi={props.videoApi} />;
 }
 
-function StudentResult({ client, result, onBack, backLabel, onRevise, busy = false, onOpenResult, onContinueHistory, videoApi }: Extract<Props, { review?: undefined }>) {
+function StudentResult({ client, result, onBack, backLabel, onRevise, onRedoQuestion, busy = false, onOpenResult, onContinueHistory, videoApi }: Extract<Props, { review?: undefined }>) {
   const paper: ExamPaperSummary = { ...result, id: resultPaperId(result) ?? '', title: result.paperTitle, examDate: '', source: '',
     timeLimitMinutes: null, electives: !result.kind || result.kind === 'csat' ? ELECTIVES : [],
     questionCount: result.questionCount ?? result.totalCount, inProgress: null, lastResult: null, resultCount: 0 };
@@ -83,17 +85,18 @@ function StudentResult({ client, result, onBack, backLabel, onRevise, busy = fal
     return new Map(docs.map(doc => [doc.questionId, doc.strokes]));
   };
   const paperVideos = usePaperVideos(videoApi, paper.id || null);
-  return <OmrResultBody client={client} result={result} onBack={onBack} backLabel={backLabel} onRevise={onRevise} ink={inkSync.strokes} inkBar={inkBar}
+  return <OmrResultBody client={client} result={result} onBack={onBack} backLabel={backLabel} onRevise={onRevise} onRedoQuestion={onRedoQuestion} ink={inkSync.strokes} inkBar={inkBar}
     inkReady={inkSync.ready} loadOriginalInk={loadOriginalInk}
     videos={videoApi ? paperVideos : undefined}
     historySection={onOpenResult && onContinueHistory && paper.id ? <ExamHistoryView embedded client={client} paper={paper} busy={busy} error={null}
       onOpenResult={onOpenResult} onContinue={active => onContinueHistory(paper, active)} /> : null} />;
 }
 
-function ReviewResult({ client, result, onBack, backLabel, studentName, videoApi }: {
+function ReviewResult({ client, result, onBack, backLabel, studentName, videoApi, onRedoQuestion }: {
   client: Pick<AdminExamApi, 'getInk' | 'getInkReplay' | 'listPeerSolutions' | 'getPeerSolutionByKey'>; result: ExamResult; onBack: () => void; backLabel?: string; studentName: string;
   /** 관리자 본인 응시를 검토할 때만: 해설 영상 칸과 문항별 링크. */
   videoApi?: VideoApi;
+  onRedoQuestion?: (questionId: string) => void;
 }) {
   const paperId = resultPaperId(result) ?? null;
   const paperVideos = usePaperVideos(videoApi, paperId);
@@ -109,11 +112,11 @@ function ReviewResult({ client, result, onBack, backLabel, studentName, videoApi
   const inkBar = <p className="rn-caption" role="status">
     {failed ? '학생 필기를 불러오지 못했어요. 닫았다가 다시 열어 주세요.' : ink ? '문항을 누르면 학생 필기와 필기 순서를 크게 볼 수 있어요.' : '학생 필기를 불러오는 중…'}
   </p>;
-  return <OmrResultBody client={client} result={result} onBack={onBack} backLabel={backLabel} ink={ink ?? new Map()} inkBar={inkBar} studentName={studentName} inkReady={ink !== null}
+  return <OmrResultBody client={client} result={result} onBack={onBack} backLabel={backLabel} onRedoQuestion={onRedoQuestion} ink={ink ?? new Map()} inkBar={inkBar} studentName={studentName} inkReady={ink !== null}
     videos={videoApi ? paperVideos : undefined} />;
 }
 
-function OmrResultBody({ client, result: initial, onBack, backLabel, onRevise, ink, inkBar, studentName, inkReady = false, loadOriginalInk, historySection, videos }: BodyProps) {
+function OmrResultBody({ client, result: initial, onBack, backLabel, onRevise, onRedoQuestion, ink, inkBar, studentName, inkReady = false, loadOriginalInk, historySection, videos }: BodyProps) {
   const [result, setResult] = useState(initial);
   const reviewing = studentName != null;
   const wholePages = usesWholePages(initial.items);
@@ -365,6 +368,7 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, onRevise, i
               <p className="rn-caption">전국 선택 비율: {viewing.nationalChoiceRates.map((rate, i) => `${displayAnswer(String(i + 1), true)} ${rate}%`).join(' · ')}</p>
             )}
             <div className="exam-viewer-paper">
+              {onRedoQuestion && <button type="button" className="rn-button rn-button-primary rn-button-compact" onClick={() => { const id = viewing.questionId; openQuestion(null); onRedoQuestion(id); }}>이 문제 다시 풀기</button>}
               <PeerSolutionSwitch key={viewing.questionId} session={peerSession} attemptId={result.attemptId}
                 eligible={result.kind !== 'hanneung'}
                 questionId={viewing.questionId} imageUrl={viewing.imageUrl}>{peerButton => <>

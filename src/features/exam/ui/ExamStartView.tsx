@@ -24,6 +24,7 @@ interface Props {
   busy: boolean;
   error: string | null;
   onStart: (paper: ExamPaperSummary, mode: ExamMode, elective: ExamElective | null, electiveOnly?: boolean) => void;
+  onRedoQuestion?: (attemptId: string, questionId: string) => void;
   onResume: (attempt: ExamAttempt) => void;
   onOpenResult: (attemptId: string) => void;
   initialPaperId?: string;
@@ -210,7 +211,7 @@ function PaperCard({ paper, selected, busy, now, onClick }: { paper: ExamPaperSu
   );
 }
 
-export function ExamStartView({ client, currentUserId, admin, isAdmin = false, busy, error, onStart, onResume, onOpenResult, onExit, initialPaperId }: Props) {
+export function ExamStartView({ client, currentUserId, admin, isAdmin = false, busy, error, onStart, onResume, onRedoQuestion, onOpenResult, onExit, initialPaperId }: Props) {
   const [papers, setPapers] = useState<ExamPaperSummary[] | null>(null);
   const [paperId, setPaperId] = useState<string | null>(initialPaperId ?? null);
   const [grade, setGrade] = useState<number | 'hanneung'>(3);
@@ -418,7 +419,7 @@ export function ExamStartView({ client, currentUserId, admin, isAdmin = false, b
       )}
 
       {reviewing && admin && <AdminAttemptReview key={reviewing.attemptId} target={reviewing} studentName={reviewing.studentName}
-        api={admin} onClose={() => setReviewing(null)} />}
+        api={admin} onRedoQuestion={onRedoQuestion ? questionId => { setReviewing(null); onRedoQuestion(reviewing.attemptId, questionId); } : undefined} onClose={() => setReviewing(null)} />}
       {livePaper && admin && <AdminLiveView api={admin} paperId={livePaper.id} title={livePaper.title} onClose={() => setLivePaper(null)} />}
       {comparePaper && admin && <AdminReplayCompare api={admin} paperId={comparePaper.id} title={comparePaper.title} onClose={() => setComparePaper(null)} />}
 

@@ -88,6 +88,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
   const [pageZoom, setPageZoom] = useState(false);
   const [pagePan, setPagePan] = useState(hanneung);
   const isReal = attempt.mode === 'real';
+  const singleRedo = attempt.attemptKind === 'single_redo';
   // 관리자가 제출한 자기 응시를 다시 연 "풀이 고치기": 필기·녹음만 바꾼다(답·시간·점수는 그대로, 제출 없음).
   const revising = attempt.status === 'submitted';
   const peerSession = useMemo(() => new PeerSolutionSession(client, attempt.id), [client, attempt.id]);
@@ -128,7 +129,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
     };
   }, []);
   const [submitting, setSubmitting] = useState(false);
-  const broadcastInk = useInkBroadcast(client.liveTransport, attempt.paperId, attempt.id, attempt.status === 'in_progress' && !submitting);
+  const broadcastInk = useInkBroadcast(client.liveTransport, attempt.paperId, attempt.id, attempt.status === 'in_progress' && !singleRedo && !submitting);
   // Live: after each server save, tell a watching admin which broadcasts that save contains.
   useEffect(() => {
     inkSync.onSaved = broadcastInk.saved;
@@ -282,6 +283,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
   // ── 제출 ──
   const submit = useCallback(async (auto: boolean) => {
     if (submittedRef.current) return;
+    if (singleRedo && !snapshot()[0]?.answer?.trim()) { setSubmitError('답을 입력한 뒤 제출해 주세요.'); return; }
     submittedRef.current = true;
     setSubmitting(true);
     setSubmitError(null);
@@ -306,7 +308,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
       setSubmitError(error instanceof Error ? error.message : '제출하지 못했어요.');
       setOverlay(auto ? 'review' : 'submit');
     }
-  }, [client, attempt.id, snapshot, flushInk, onSubmitted, inkSync, questions, isAdmin, audioGateUi]);
+  }, [client, attempt.id, snapshot, flushInk, onSubmitted, inkSync, questions, isAdmin, audioGateUi, singleRedo]);
 
   const remaining = revising ? null : remainingMs(attempt.startedAt, attempt.timeLimitMinutes, now);
   useEffect(() => {
@@ -521,7 +523,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
         unsure={current.unsure}
         onAnswer={setAnswer}
         onUnsure={next => updateItem(question.id, { unsure: next })}
-        free={isReal || revising ? undefined : {
+        free={isReal || revising || singleRedo ? undefined : {
           check: current.checked,
           checking,
           revealed: revealed[question.id] ?? false,
@@ -579,7 +581,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
           <ExamInkCanvas
             key={`${inkKey}:${inkSync.generation}`}
             ref={inkRef}
-            overlay={imageWidth => <ExamAssistOverlay key={question.id} transport={client.liveTransport} attemptId={attempt.id} questionId={inkKey} imageWidth={imageWidth} active={attempt.status === 'in_progress' && !submitting} />}
+            overlay={imageWidth => <ExamAssistOverlay key={question.id} transport={client.liveTransport} attemptId={attempt.id} questionId={inkKey} imageWidth={imageWidth} active={attempt.status === 'in_progress' && !singleRedo && !submitting} />}
             imageUrl={question.imageUrl}
             strokes={strokes.get(inkKey) ?? []}
             onChange={onInkChange}
