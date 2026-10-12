@@ -260,7 +260,15 @@ function mapChoiceRates(value: unknown): number[] | null {
 
 export function mapExamResultItem(raw: unknown): ExamResultItem {
   const r = asRow(raw);
+  const redo = asRow(r.singleRedo);
+  const latest = asRow(redo.latestSubmitted);
   return {
+    ...(r.singleRedo != null ? { singleRedo: {
+      inProgress: redo.inProgress === true,
+      latestSubmitted: typeof latest.submittedAt === 'string' ? {
+        submittedAt: latest.submittedAt, isCorrect: latest.isCorrect === true,
+      } : null,
+    } } : {}),
     questionId: asString(r.questionId),
     number: asNumber(r.number),
     section: asSection(r.section),

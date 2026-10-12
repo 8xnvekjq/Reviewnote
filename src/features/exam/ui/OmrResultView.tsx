@@ -12,6 +12,7 @@ import { PeerSolutionSession, type PeerSolutionApi } from './peerSolution';
 import { ExamHistoryView } from './ExamHistoryView';
 import { ExamAnswer } from './ExamAnswer';
 import { scoreDisplay } from './scoreDisplay';
+import { singleRedoLabels } from './singleRedo';
 import { resultGradeLabel } from './hanneungLogic';
 import { eraLabel, eraStats, resultPaperId, weakEras, type EraStat, type HanneungEra } from './hanneungEra';
 import { hanneungTopicsFor } from '../data/hanneungTopics';
@@ -129,6 +130,10 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, onRevise, o
   const peerSession = useMemo(() => client.listPeerSolutions && client.getPeerSolutionByKey
     ? new PeerSolutionSession(client as PeerSolutionApi, initial.attemptId) : null, [client, initial.attemptId]);
   const openQuestion = (item: ExamResultItem | null) => { setViewing(item); };
+  const viewingRedo = viewing ? singleRedoLabels(viewing.singleRedo) : null;
+  // 관리자 본인 응시: 확대 화면 상단 바(필기 순서 보기·다른 학생 풀이와 같은 줄)에 같은 크기의 글자 버튼으로 둔다.
+  const redoButton = viewing && viewingRedo && onRedoQuestion ? <button type="button" className="exam-tool exam-tool-text exam-redo-toggle" data-testid="exam-redo-question"
+    onClick={() => { const id = viewing.questionId; openQuestion(null); onRedoQuestion(id); }}>{viewingRedo.button}</button> : null;
 
   const candidates = useMemo(() => mistakeCandidates(result.items), [result.items]);
   // 한능검 시대 태그가 있는 시험지만 시대별 결과를 보여 준다.
@@ -317,6 +322,7 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, onRevise, o
         <ul className="exam-item-list">
           {result.items.map(item => {
             const praise = praiseLine(item);
+            const redo = singleRedoLabels(item.singleRedo);
             return (
               <li key={item.questionId}>
                 {/* 줄 전체가 누르는 영역이지만 <button>이 아니다 — 안의 해설 영상 링크(<a>)가 어느 브라우저에서나 따로 눌리도록. */}
@@ -336,6 +342,7 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, onRevise, o
 
                     {item.sourceLabel && <span className="rn-caption">{item.sourceLabel}</span>}
                     {eraOf.has(item.number) && <span className="exam-era-chip">{eraLabel(eraOf.get(item.number)!)}</span>}
+                    {redo.badge && <span className={`exam-redo-chip is-${redo.tone}`} data-testid="exam-redo-chip">{redo.badge}</span>}
                     <span>{reviewing ? '학생 답' : '내 답'} <b><ExamAnswer question={item} answer={item.answer} /></b></span>
                     <span>정답 <b><ExamAnswer question={item} answer={item.correctAnswer} /></b></span>
                   </span>
@@ -355,7 +362,7 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, onRevise, o
       </section>
 
       {/* 문항 크게 보기는 body로 띄운다 — 관리자 검토처럼 스크롤 영역 안에 있으면 iOS 사파리가 고정 창 윗부분(닫기·진행 막대·배속)을 상단바 밑으로 잘라 버린다. */}
-      {viewing && createPortal(<div className="rn-app exam-practice exam-portal">
+      {viewing && viewingRedo && createPortal(<div className="rn-app exam-practice exam-portal">
         <div className="exam-overlay exam-overlay-full exam-viewer-overlay" role="dialog" aria-modal="true" aria-label={`${viewing.number}번 크게 보기`} onClick={() => openQuestion(null)}>
           <div className="exam-viewer" onClick={e => e.stopPropagation()} data-testid="exam-viewer">
             <HistoryClose onClose={() => openQuestion(null)} />
@@ -364,11 +371,11 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, onRevise, o
               <span className="rn-caption">{reviewing ? '학생 답' : '내 답'} <ExamAnswer question={viewing} answer={viewing.answer} /> · 정답 <ExamAnswer question={viewing} answer={viewing.correctAnswer} /> · {formatClock(viewing.timeSpentMs)}</span>
               <button type="button" className="rn-button rn-button-ghost rn-button-compact" onClick={() => openQuestion(null)}>닫기</button>
             </div>
+            {onRedoQuestion && viewingRedo.notice && <p className={`rn-caption exam-redo-notice is-${viewingRedo.tone}`} role="status" data-testid="exam-redo-notice">{viewingRedo.notice}</p>}
             {viewing.nationalChoiceRates && (
               <p className="rn-caption">전국 선택 비율: {viewing.nationalChoiceRates.map((rate, i) => `${displayAnswer(String(i + 1), true)} ${rate}%`).join(' · ')}</p>
             )}
             <div className="exam-viewer-paper">
-              {onRedoQuestion && <button type="button" className="rn-button rn-button-primary rn-button-compact" onClick={() => { const id = viewing.questionId; openQuestion(null); onRedoQuestion(id); }}>이 문제 다시 풀기</button>}
               <PeerSolutionSwitch key={viewing.questionId} session={peerSession} attemptId={result.attemptId}
                 eligible={result.kind !== 'hanneung'}
                 questionId={viewing.questionId} imageUrl={viewing.imageUrl}>{peerButton => <>
@@ -386,7 +393,7 @@ function OmrResultBody({ client, result: initial, onBack, backLabel, onRevise, o
                 strokes={ink.get(inkKeyOf(viewing)) ?? []}
                 imageMaxWidth={wholePages ? (pageZoom ? 1100 : 980) : 480}
                 ready={inkReady}
-                extraTool={peerButton}
+                extraTool={<>{peerButton}{redoButton}</>}
               />
               </div>
               </div>

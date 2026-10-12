@@ -571,3 +571,11 @@
 .exam-elective-only { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 14px; cursor: pointer; }
 .exam-elective-only input { width: 18px; height: 18px; accent-color: var(--rn-accent, #6d7cff); }
 .exam-elective-only small { color: var(--rn-muted); font-size: 12px; }
+/* 관리자 본인 결과: 문항 다시 풀기. 상단 바 버튼은 '다른 학생 풀이' 알약과 같은 높이·모양(색만 차분하게). */
+.exam-tool.exam-redo-toggle { display: inline-flex; align-items: center; min-height: 32px; height: 32px; padding: 0 12px; border-radius: 99px; border: 1px solid var(--rn-line); background: var(--rn-elevated, transparent); color: var(--rn-text); font-size: 12.5px; font-weight: 800; cursor: pointer; }
+.exam-tool.exam-redo-toggle:hover { border-color: var(--rn-accent); }
+.exam-redo-chip { font-size: 11px; font-weight: 750; padding: 1px 7px; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
+.exam-redo-chip.is-correct, .exam-redo-notice.is-correct { color: var(--rn-success); }
+.exam-redo-chip.is-wrong, .exam-redo-notice.is-wrong { color: var(--rn-danger); }
+.exam-redo-chip.is-pending, .exam-redo-notice.is-pending { color: var(--rn-muted); }
+.exam-redo-notice { margin: 0 0 4px; font-weight: 700; }

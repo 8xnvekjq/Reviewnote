@@ -217,5 +217,36 @@ insert into private.app_admins values ('00000000-0000-0000-0000-0000000000ad');
  assert.equal((await cell()).replayAttemptId,oldRedo.id,'최신 오답도 이전 정답 다시 풀기를 덮어쓴다');
  assert.equal((await cell()).isCorrect,false);
  assert.equal((await cell(q2)).replayAttemptId,original.id);
+ // 결과 응답의 문항별 다시 풀기 요약: 관리자 본인 원래 응시에만, 점수·등급은 그대로.
+ const resultOf=async(uid:string,attempt:string)=>(await as(uid,'select get_exam_result($1) r',[attempt]))[0].r;
+ const strip=(r:any)=>({...r,items:r.items.map(({singleRedo,...item}:any)=>item)});
+ const beforeSummary={own:await resultOf(AD,original.id),student:await resultOf(S1,student.id),
+   adminView:await resultOf(AD,student.id),redoResult:await resultOf(AD,oldRedo.id)};
+ await db.exec(sql('20261013020000_exam_single_redo_summary'));
+ const own=await resultOf(AD,original.id), item=(r:any,question:string)=>r.items.find((i:any)=>i.questionId===question);
+ assert.deepEqual(strip(own),beforeSummary.own,'원래 점수·등급·문항 정보는 그대로');
+ assert.equal(item(own,q).singleRedo.inProgress,false);
+ assert.equal(item(own,q).singleRedo.latestSubmitted.isCorrect,false,'가장 최근 제출(오답)을 보여 준다');
+ assert.ok(item(own,q).singleRedo.latestSubmitted.submittedAt);
+ assert.deepEqual(item(own,q2).singleRedo,{inProgress:false,latestSubmitted:null});
+ const other=await resultOf(AD,regular.id);
+ assert.deepEqual(item(other,q).singleRedo,{inProgress:true,latestSubmitted:null},'다른 원본의 진행 중 다시 풀기만 반영');
+ await submit(otherRedo.id,await key(q));
+ assert.equal(item(await resultOf(AD,regular.id),q).singleRedo.latestSubmitted.isCorrect,true,'제출 후 바로 반영');
+ assert.equal(item(await resultOf(AD,regular.id),q).singleRedo.inProgress,false);
+ const pending=await redo();
+ assert.equal(item(await resultOf(AD,original.id),q).singleRedo.inProgress,true);
+ assert.equal(item(await resultOf(AD,original.id),q).singleRedo.latestSubmitted.isCorrect,false);
+ // 학생 본인 결과, 관리자가 보는 학생 결과, 다시 풀기 응시 결과에는 요약이 없다.
+ assert.deepEqual(await resultOf(S1,student.id),beforeSummary.student);
+ assert.deepEqual(await resultOf(AD,student.id),beforeSummary.adminView);
+ assert.deepEqual(await resultOf(AD,oldRedo.id),beforeSummary.redoResult);
+ assert.ok((await resultOf(S1,student.id)).items.every((i:any)=>!('singleRedo' in i)));
+ const redoSubmit=await submit(pending.id,await key(q));
+ assert.ok(redoSubmit.items.every((i:any)=>!('singleRedo' in i)));
+ // 학생이 관리자 응시를 직접 열 수 없다.
+ await assert.rejects(resultOf(S1,original.id),/EXAM_ATTEMPT_NOT_FOUND/);
+ // 대상 정의가 바뀌었으면 조용히 넘어가지 않고 실패한다.
+ await assert.rejects(db.exec(sql('20261013020000_exam_single_redo_summary')),/다시 풀기 요약 수정 대상이 없습니다/);
  } finally { await db.close(); }
 });
