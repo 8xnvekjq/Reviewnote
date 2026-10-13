@@ -81,6 +81,8 @@ export interface CardRpsAdapter {
   getMatch(matchId: string): Promise<RpsMatchView>;
   /** 진행 중이거나 응답 대기 중인 내 경기(다시 들어왔을 때 이어 하기). */
   getActive(): Promise<RpsMatchView | null>;
+  /** 나에게 온, 아직 답하지 않은 친구 신청(실시간 알림을 놓쳤을 때 확인용). 없으면 null. */
+  pendingInvite?(): Promise<RpsInvite | null>;
   /** 내 경기 변화·받은 신청 알림. 해제 함수를 돌려준다. */
   subscribe(handlers: { onMatch?: (m: RpsMatchView) => void; onInvite?: (i: RpsInvite) => void }): () => void;
 }

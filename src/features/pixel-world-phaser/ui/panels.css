@@ -83,3 +83,8 @@
 .pwp-hand-icon { width:24px; height:24px; display:block; }
 .pwp-hand-icon img { width:24px; height:24px; image-rendering:pixelated; }
 .pwp-bag-list li[data-held="true"] { border-color:#6d9d48; background:rgba(214,236,190,.7); }
+/* Window guardMs: 뜬 직후 잠깐 안쪽 버튼을 막는 틀 — 모양은 없는 것처럼. */
+.pwp-window-guard { border:0; margin:0; padding:0; min-width:0; min-height:0; display:flex; flex-direction:column; flex:1 1 auto; }
+.pwp-window[data-modal="strict"]:focus { outline:none; }
+/* 엄격한 창(카드 대결 신청)은 다른 창·B 버튼(z 21) 위에 — 열려 있던 창이 신청을 가리지 않게. */
+.pwp-panel-shade[data-modal="strict"] { z-index:25; }

@@ -3,6 +3,8 @@ import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 const BASE = process.env.PWP_BASE ?? 'http://127.0.0.1:5174';
+/** 받은 신청 4초 확인 한 번을 넘기는 대기(같은 신청이 다시 뜨지 않는지). */
+const RPS_POLL_WAIT = 4500;
 const browser = await chromium.launch({ headless: true, ...(process.env.EXAM_BROWSER_CHANNEL ? { channel: process.env.EXAM_BROWSER_CHANNEL } : {}) });
 const ready = (page, scene) => page.waitForFunction(scene => window.__pixelWorldPhaser?.debug().scene === scene && !window.__pixelWorldPhaser.debug().transitioning, scene, { timeout: 20000 });
 const target = async (page, name) => { await page.bringToFront(); return page.evaluate(name => { const h = window.__pixelWorldPhaser, p = h.debug().targets[name]; h.walkToScreen(p.x, p.y); }, name); };
@@ -103,6 +105,74 @@ try {
   await a.evaluate(() => { const h = window.__pixelWorldPhaser, d = h.debug(); h.walkToScreen(((18 + 5.5) * 16 - d.camera.x) * d.cssZoom, (200 - d.camera.y) * d.cssZoom); });
   await a.waitForFunction(() => { const d = window.__pixelWorldPhaser.debug(); return !d.moving && d.pathLength === 0; }, null, { timeout: 20000 });
   console.log('PASS plaza duel bubble: shown over both players while dueling, gone on both pages when the match ends');
+  // 포인트 부족: HUD 잔액보다 큰 판돈은 막히고 "포인트가 부족해요". 판돈 창은 바깥 터치로 안 닫힌다(Esc·✕는 된다).
+  await a.bringToFront();
+  await a.evaluate(() => window.__setHarnessBalance(30));
+  await walkNearFriend(-16);
+  await a.waitForFunction(() => { const d = window.__pixelWorldPhaser.debug(); return !d.moving && d.pathLength === 0; }, null, { timeout: 20000 });
+  await nearButton.waitFor({ state: 'visible', timeout: 5000 });
+  await nearButton.click();
+  const stakeDialog = a.getByRole('dialog', { name: '카드 대결 신청' }); await stakeDialog.waitFor({ timeout: 5000 });
+  await a.waitForFunction(() => document.querySelector('.pwp-window[data-armed="true"]'));
+  assert.equal(await stakeDialog.locator('button[data-stake="50"]').isDisabled(), true, '50P is disabled with 30P');
+  assert.equal(await stakeDialog.locator('button[data-stake="20"]').isDisabled(), false, '20P stays enabled');
+  assert.ok(await stakeDialog.getByText('포인트가 부족해요').first().isVisible(), 'shows 포인트가 부족해요');
+  const outsideTap = async page => {
+    const box = await page.locator('.pwp-window').last().boundingBox();
+    await page.mouse.click(Math.max(8, box.x - 40), box.y + box.height / 2);
+  };
+  await outsideTap(a); await a.waitForTimeout(200);
+  assert.equal(await stakeDialog.count(), 1, 'outside tap does not close the stake dialog');
+  await a.keyboard.press('Escape'); await stakeDialog.waitFor({ state: 'detached' });
+  await a.evaluate(() => window.__setHarnessBalance(1234));
+  console.log('PASS plaza duel stake: unaffordable stake disabled with 포인트가 부족해요, outside tap keeps the dialog');
+  // 신청 전달: 받는 쪽 실시간 알림(onInvite)을 버려도 신청한 쪽 광장 알림(+4초 확인)으로 신청 창이 뜬다.
+  // 받은 신청 창은 바깥 터치·B·Esc로 닫히지 않고, 뜬 직후 잠깐 버튼이 막혀 있다. 거절만 닫는다.
+  await b.bringToFront();
+  await b.evaluate(() => {
+    window.__rpsHarness.dropRealtime = true; window.__firstAcceptDisabled = null;
+    new MutationObserver((_, observer) => {
+      const button = [...document.querySelectorAll('.pwp-window button')].find(x => x.textContent === '수락');
+      if (button) { window.__firstAcceptDisabled = button.matches(':disabled'); observer.disconnect(); }
+    }).observe(document.body, { childList: true, subtree: true });
+  });
+  await a.bringToFront();
+  await a.evaluate(() => { window.__rpsHarness.sendInvites = true; });
+  await nearButton.waitFor({ state: 'visible', timeout: 5000 });
+  await nearButton.click();
+  const sentAt = Date.now();
+  await a.getByRole('dialog', { name: '카드 대결 신청' }).getByRole('button', { name: '20P' }).click();
+  await a.getByText('친구가 수락하기를 기다리는 중…').waitFor({ timeout: 5000 });
+  await b.bringToFront();
+  const inviteDialog = b.getByRole('dialog', { name: '카드 대결 신청' });
+  await inviteDialog.waitFor({ timeout: 6000 });
+  console.log(`invite dialog shown ${Date.now() - sentAt} ms after sending (realtime dropped)`);
+  assert.equal(await b.evaluate(() => window.__firstAcceptDisabled), true, 'accept starts disabled (stray-tap guard)');
+  assert.equal(await inviteDialog.getByRole('button', { name: /닫기/ }).count(), 0, 'no ✕ on the invite dialog');
+  await b.waitForFunction(() => document.querySelector('.pwp-window[data-armed="true"]'));
+  await outsideTap(b); await b.waitForTimeout(150);
+  await b.keyboard.press('Escape'); await b.keyboard.press('x'); await b.waitForTimeout(150);
+  for (const which of ['.pwp-btn-b', '.pwp-btn-a']) {
+    const box = await b.locator(which).boundingBox();
+    await b.mouse.click(box.x + box.width / 2, box.y + box.height / 2); await b.waitForTimeout(100);
+  }
+  await b.evaluate(() => document.querySelector('.pwp-window').dispatchEvent(new Event('pwp-cancel')));
+  await b.waitForTimeout(200);
+  assert.equal(await inviteDialog.count(), 1, 'outside tap, B, A, Esc and pwp-cancel do not close the invite dialog');
+  assert.ok(await inviteDialog.getByText('친구가 20P 카드 대결을 신청했어요.', { exact: false }).isVisible());
+  await inviteDialog.getByRole('button', { name: '거절' }).click();
+  await inviteDialog.waitFor({ state: 'detached', timeout: 5000 });
+  await b.waitForTimeout(RPS_POLL_WAIT);
+  assert.equal(await inviteDialog.count(), 0, 'the same invite does not come back after declining');
+  await a.bringToFront();
+  await a.getByText('친구가 대결을 거절했어요.').waitFor({ timeout: 5000 });
+  await a.getByRole('button', { name: '나가기', exact: true }).last().click();
+  await a.getByRole('button', { name: '카드 대결 닫기' }).waitFor({ state: 'detached', timeout: 5000 });
+  await a.evaluate(() => { window.__rpsHarness.sendInvites = false; });
+  await b.evaluate(() => { window.__rpsHarness.dropRealtime = false; });
+  await a.evaluate(() => { const h = window.__pixelWorldPhaser, d = h.debug(); h.walkToScreen(((18 + 5.5) * 16 - d.camera.x) * d.cssZoom, (200 - d.camera.y) * d.cssZoom); });
+  await a.waitForFunction(() => { const d = window.__pixelWorldPhaser.debug(); return !d.moving && d.pathLength === 0; }, null, { timeout: 20000 });
+  console.log('PASS plaza duel invite: arrives without the realtime path, survives stray taps/B/Esc, closes only on 거절');
   // Tapping approaches the stall; only A opens the shop.
   assert.equal(await a.locator('.pwp-panel-access').getByRole('button', { name: '상점', exact: true }).count(), 0);
   await target(a, 'shop');
