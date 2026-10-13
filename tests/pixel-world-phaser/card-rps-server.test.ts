@@ -40,3 +40,17 @@ test('거절·만료 환불, NPC 연습 판, 시간 초과 기권',async()=>{con
   await db.query("insert into pixel_private.card_rps_npc_wins values($1,(now() at time zone 'Asia/Seoul')::date,5)",[A]);m=(await as(A,'select public.start_npc_card_rps() r'))[0].r as any;assert.equal(m.stake,0);assert.equal(m.prize,0);await as(A,"select public.submit_card_rps_cards($1::uuid,array['rock'])",[m.matchId]);
   await as(A,'select public.leave_card_rps($1::uuid)',[m.matchId]);m=(await as(A,'select public.start_npc_card_rps() r'))[0].r as any;await db.query("update pixel_card_rps_matches set deadline_at=now()-interval '1 second' where id=$1",[m.matchId]);const timed=(await as(A,'select public.get_card_rps_match($1::uuid) r',[m.matchId]))[0].r as any;assert.equal(timed.status,'finished');assert.equal(timed.endReason,'timeout');assert.equal(timed.winnerId,'npc_mouse');
 }finally{await db.close();}});
+
+test('승부차기는 비기면 다시 낼 수 있고, 신청 상태에서는 나가기로 판돈을 만들 수 없다',async()=>{const {db,as}=await database();try{
+  const pts=async(u:string)=>(await db.query('select bonus_points+point_adjustment p from profiles where id=$1',[u])).rows[0].p;
+  const inv=(await as(A,'select public.invite_card_rps($1::uuid,10) r',[B]))[0].r as any;
+  await assert.rejects(as(B,'select public.leave_card_rps($1::uuid)',[inv.matchId]),/not_your_turn/);
+  await assert.rejects(as(A,'select public.leave_card_rps($1::uuid)',[inv.matchId]),/not_your_turn/);
+  await as(B,'select public.respond_card_rps($1::uuid,true)',[inv.matchId]);
+  for(let i=0;i<3;i++){await as(A,"select public.submit_card_rps_cards($1::uuid,array['rock'])",[inv.matchId]);await as(B,"select public.submit_card_rps_cards($1::uuid,array['rock'])",[inv.matchId]);}
+  let m=(await as(A,'select public.get_card_rps_match($1::uuid) r',[inv.matchId]))[0].r as any;assert.equal(m.status,'shootout');
+  await as(A,"select public.submit_card_rps_shootout($1::uuid,'rock')",[inv.matchId]);await as(B,"select public.submit_card_rps_shootout($1::uuid,'rock')",[inv.matchId]);
+  m=(await as(A,'select public.get_card_rps_match($1::uuid) r',[inv.matchId]))[0].r as any;assert.equal(m.status,'shootout');assert.equal(m.shootout.length,1);
+  await as(A,"select public.submit_card_rps_shootout($1::uuid,'paper')",[inv.matchId]);m=(await as(B,"select public.submit_card_rps_shootout($1::uuid,'rock') r",[inv.matchId]))[0].r as any;
+  assert.equal(m.status,'finished');assert.equal(m.endReason,'shootout');assert.equal(m.winnerId,A);assert.equal(await pts(A),110);assert.equal(await pts(B),90);
+}finally{await db.close();}});
