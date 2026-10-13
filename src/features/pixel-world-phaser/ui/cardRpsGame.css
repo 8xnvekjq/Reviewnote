@@ -1,8 +1,220 @@
-.pwp-rps{width:min(880px,calc(100vw - 28px));max-height:min(88dvh,850px);overflow:auto;color:#422b20;touch-action:pan-y;box-sizing:border-box}.pwp-rps button{min-height:44px;touch-action:manipulation}.pwp-rps-status{display:flex;flex-wrap:wrap;gap:5px 14px;align-items:center;padding:7px 12px;background:#f7e4b5;border:2px solid #69442b;border-radius:10px}.pwp-rps-status .urgent{color:#a32020;animation:pwp-rps-pulse .8s infinite alternate}
-.pwp-rps-table{position:relative;min-height:410px;margin:8px 0;padding:8px;background:#7b4d2d radial-gradient(#a86e3a,#633a25);background-size:cover;background-position:center;border:5px solid #42291c;border-radius:16px;box-shadow:inset 0 0 0 3px #c79652;overflow:hidden}.pwp-rps-player{position:absolute;left:50%;z-index:3;display:flex;justify-content:center;align-items:center;gap:8px;transform:translateX(-50%)}.pwp-rps-player.opponent{top:12px;flex-direction:column;gap:0}.pwp-rps-player.me{bottom:-8px;flex-direction:column-reverse;gap:0}.pwp-rps-player b{padding:2px 9px;background:#f8e9c4;border:2px solid #503236;border-radius:10px;line-height:1.2;white-space:nowrap}.pwp-rps-player img,.pwp-rps-avatar{width:112px;height:112px;object-fit:contain;image-rendering:pixelated;font-size:70px}.pwp-rps-player.me img{width:132px;height:132px}.pwp-rps-face{position:absolute;top:8px;left:100%;padding:2px 6px;background:#fff;border:2px solid #38251d;border-radius:12px;font-weight:900}.pwp-rps-dealer{transform:scale(2.8);margin:30px 30px 24px}
-.pwp-rps-clash{position:absolute;inset:126px 0 104px;z-index:2;display:flex;align-items:center;justify-content:center;gap:22px;min-height:105px}.pwp-rps-clash>strong{position:absolute;margin-top:128px;color:#fff;text-shadow:1px 2px #3d2015}.pwp-rps-card{position:relative;display:inline-grid;place-items:center;width:72px;height:96px;background:none;border:0;box-shadow:none}.pwp-rps-sprite{display:inline-block;width:var(--frame-w);height:var(--frame-h);flex:none;background-image:var(--sprite);background-position:var(--sprite-x) var(--sprite-y);background-repeat:no-repeat;image-rendering:pixelated}.pwp-rps-card>.pwp-rps-sprite{transform:scale(3)}.pwp-rps-glow{position:absolute!important;transform:scale(3)!important;z-index:0}.pwp-rps-card>.pwp-rps-sprite:last-child{z-index:1}.pwp-rps-card.glow{filter:none;transform:translateY(-5px)}.pwp-rps-clash-sprite{transform:scale(2);animation:pwp-rps-clash .35s ease-out}
-.pwp-rps-playback,.pwp-rps-result,.pwp-rps-shootout{text-align:center}.pwp-rps-playback{display:flex;justify-content:center;align-items:center;gap:8px}.pwp-rps-choose{padding:2px 8px 8px;background:#fff4d8;border:2px solid #d2a561;border-radius:12px}.pwp-rps-choose>p{margin:4px;text-align:center}.pwp-rps-hand{display:flex;justify-content:center;gap:14px}.pwp-rps-hand>button{display:flex;flex-direction:column;align-items:center;gap:1px;padding:0 5px;border:0;background:transparent}.pwp-rps-hand small{font-weight:800}.pwp-rps-queue{display:flex;justify-content:center;gap:8px;min-height:70px;margin:4px 8px;overflow-x:auto}.pwp-rps-queue>span{position:relative;display:flex;flex-direction:column;align-items:center;padding-left:20px}.pwp-rps-queue>span>i{position:absolute;left:0;top:10px;display:grid;place-items:center;width:22px;height:22px;color:#fff;background:#476f96;border-radius:50%;font-style:normal;font-weight:900}.pwp-rps-queue>span>button{font-size:23px;background:#fff7dd;border:2px solid #476f96;border-radius:6px}.pwp-rps-queue>span>span{display:flex}.pwp-rps-queue>span>span button{min-width:34px;min-height:28px}.pwp-rps-submit{display:block;margin:auto;padding:6px 36px;font-weight:900;background:#f2b944;border:3px solid #6a421e;border-radius:8px}.pwp-rps-shootout button,.pwp-rps-result button{margin:5px;padding:6px 14px}.pwp-rps-message{text-align:center;color:#a32020}
-.pwp-rps-rules{width:100%;box-sizing:border-box;text-align:center;overflow:auto}.pwp-rps-rules img{display:block;max-width:100%;max-height:72dvh;margin:auto;object-fit:contain}.pwp-rps-rules-placeholder{display:grid;place-content:center;min-height:55dvh;padding:30px;background:#f6e7bd;border:5px double #60402c}.pwp-rps-rules nav{display:flex;justify-content:center;align-items:center;gap:16px;margin-top:8px}.pwp-rps-rules nav button{min-height:44px}.pwp-rps-friends{position:absolute;right:12px;top:88px;z-index:20;display:flex;max-width:min(45vw,360px);gap:5px;overflow-x:auto}.pwp-rps-friends .pwp-chip{white-space:nowrap}@keyframes pwp-rps-pulse{to{transform:scale(1.08)}}@keyframes pwp-rps-clash{from{transform:scale(2);opacity:0}}
-@media(max-width:600px){.pwp-rps{width:calc(100vw - 14px);max-height:92dvh;font-size:13px}.pwp-rps-status{gap:2px 8px;padding:5px 8px}.pwp-rps-table{min-height:330px;margin:5px 0}.pwp-rps-player img,.pwp-rps-avatar{width:86px;height:86px}.pwp-rps-player.me img{width:102px;height:102px}.pwp-rps-player.opponent{top:5px}.pwp-rps-player.me{bottom:-8px}.pwp-rps-dealer{transform:scale(2.2);margin:23px 23px 17px}.pwp-rps-clash{inset:90px 0 76px;gap:8px}.pwp-rps-card{width:58px;height:78px}.pwp-rps-card>.pwp-rps-sprite{transform:scale(2.5)}.pwp-rps-glow{transform:scale(2.5)!important}.pwp-rps-hand{gap:1px}.pwp-rps-hand>button{padding:0}.pwp-rps-queue{justify-content:flex-start;margin-inline:0}.pwp-rps-playback{position:sticky;bottom:0;z-index:4;background:#fff5dc;padding:4px}.pwp-rps-choose{padding-inline:3px}}
-.pwp-rps{width:100%}.pwp-rps-queue:empty{display:none}@media(max-width:600px){.pwp-rps{width:100%}}
-.pwp-rps-player.me b{position:absolute;left:calc(100% - 8px);top:44%;z-index:5}
+/* 천광명월 카드 가위바위보 — 화면 전체 픽셀 게임 화면(2026-10-13 다시 그림).
+   색은 table.png(나무 벽·등불·파란 깃발)에 맞춘 따뜻한 갈색 계열, 굵은 어두운 테두리. */
+.pwp-window.pwp-rps-screen{
+  --ink:#2b1a10;--wood:#9a6236;--wood-d:#6e4122;--wood-l:#c98f4e;--cream:#fbe7b5;--gold:#f2b944;--gold-d:#b8741a;--gold-l:#ffe08a;
+  --blue:#3f78b5;--red:#c9473b;--green:#5f9b3c;
+  position:fixed;inset:0;z-index:60;box-sizing:border-box;display:grid;
+  grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;grid-template-areas:"hud" "stage" "tray";gap:6px;
+  width:auto;height:auto;max-height:none;min-height:0;margin:0;border:0;overflow:hidden;
+  padding:max(6px,env(safe-area-inset-top)) max(6px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left));
+  color:var(--cream);font-weight:800;line-height:1.2;letter-spacing:-.2px;
+  background:#24150d repeating-linear-gradient(0deg,#2a190f 0 14px,#24150d 14px 16px);box-shadow:none;
+  user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:manipulation;outline:none;
+}
+.pwp-rps-screen *{box-sizing:border-box}
+.pwp-rps-screen .pwp-rps-sprite{display:block;background-repeat:no-repeat;image-rendering:pixelated}
+.pwp-rps-screen img{image-rendering:pixelated}
+/* 굵은 글씨 테두리(픽셀 게임 자막 느낌). */
+.pwp-rps-screen .outline,.pwp-rps-banner span,.pwp-rps-plate-name,.pwp-rps-pips b,.pwp-rps-tray-head b,.pwp-rps-delta,.pwp-rps-timer b{
+  text-shadow:2px 0 var(--ink),-2px 0 var(--ink),0 2px var(--ink),0 -2px var(--ink),2px 2px var(--ink),-2px 2px var(--ink),2px -2px var(--ink),-2px -2px var(--ink);
+}
+
+/* ── 버튼: 두꺼운 테두리 + 안쪽 명암 + 아래 그림자, 누르면 내려감 ── */
+.pwp-rps-screen .pwp-rps-btn{
+  --b:var(--gold);--d:var(--gold-d);--l:var(--gold-l);
+  min-width:44px;min-height:46px;padding:0 18px;margin:0;border:3px solid var(--ink);border-radius:0;cursor:pointer;
+  background:var(--b);color:#3a210f;font:inherit;font-size:17px;font-weight:900;text-shadow:1px 1px 0 var(--l);
+  box-shadow:inset -3px -4px 0 var(--d),inset 3px 3px 0 var(--l),0 4px 0 #120a05;transform:translateY(0);touch-action:manipulation;
+  transition:transform .06s,box-shadow .06s;
+}
+.pwp-rps-screen .pwp-rps-btn.wood{--b:#d49a58;--d:#8a5a2e;--l:#f2c88c}
+.pwp-rps-screen .pwp-rps-btn.red{--b:#d65a46;--d:#9c3324;--l:#f39a84;color:#fff3df;text-shadow:1px 1px 0 #6d1f14}
+.pwp-rps-screen .pwp-rps-btn.green{--b:#7cbc4f;--d:#4b7e2c;--l:#b8e68a}
+.pwp-rps-screen .pwp-rps-btn:active:not(:disabled){transform:translateY(3px);box-shadow:inset -3px -4px 0 var(--d),inset 3px 3px 0 var(--l),0 1px 0 #120a05}
+.pwp-rps-screen .pwp-rps-btn:disabled{cursor:default;filter:grayscale(.75) brightness(.8);opacity:.85}
+.pwp-rps-screen button:focus-visible{outline:3px solid #fff4c4;outline-offset:2px}
+
+/* ── HUD ── */
+.pwp-rps-screen .pwp-rps-hud{grid-area:hud;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) 46px;gap:6px;align-items:stretch}
+.pwp-rps-plate,.pwp-rps-hud-mid,.pwp-rps-tray,.pwp-rps-frame,.pwp-rps-rules{
+  border:3px solid var(--ink);background:var(--wood) repeating-linear-gradient(0deg,#9a6236 0 9px,#8f5a31 9px 11px);
+  box-shadow:inset 0 0 0 2px var(--wood-l),inset 0 0 0 4px var(--wood-d),0 3px 0 #120a05;
+}
+.pwp-rps-plate{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto;gap:2px 6px;align-items:center;min-width:0;padding:5px 9px}
+.pwp-rps-plate.me{border-left:6px solid var(--blue)}
+.pwp-rps-plate.them{border-left:6px solid var(--red)}
+.pwp-rps-plate-name{grid-column:1/-1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:15px;color:var(--cream)}
+.pwp-rps-stars{display:flex;gap:3px}
+.pwp-rps-stars i{width:15px;height:15px;background:#4b2d18;clip-path:polygon(50% 0,63% 35%,100% 38%,71% 61%,81% 100%,50% 78%,19% 100%,29% 61%,0 38%,37% 35%)}
+.pwp-rps-stars i.on{background:var(--gold-l);filter:drop-shadow(0 0 2px #ffd34d);animation:pwp-rps-star .45s steps(3)}
+.pwp-rps-left{display:inline-flex;align-items:center;gap:3px;font-size:13px;color:var(--cream);font-variant-numeric:tabular-nums}
+.pwp-rps-mini-back{width:9px;height:12px;background:#7b2f2a;border:2px solid var(--ink);box-shadow:inset 0 0 0 1px #e8b860}
+.pwp-rps-hud-mid{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:4px 10px;min-width:118px}
+.pwp-rps-pips{display:flex;align-items:center;gap:5px}
+.pwp-rps-pips i{width:13px;height:13px;border:2px solid var(--ink);background:#4b2d18}
+.pwp-rps-pips i.now{background:var(--gold);animation:pwp-rps-blink 1s steps(2) infinite}
+.pwp-rps-pips i.done.me{background:var(--blue)}.pwp-rps-pips i.done.them{background:var(--red)}.pwp-rps-pips i.done.draw{background:#b9a88a}
+.pwp-rps-pips b{margin-left:4px;font-size:15px;color:var(--gold-l)}
+.pwp-rps-points{font-size:12px;color:var(--cream);white-space:nowrap}
+.pwp-rps-timer{display:flex;align-items:center;gap:5px}
+.pwp-rps-timer svg{display:block;image-rendering:pixelated}
+.pwp-rps-timebar{display:block;width:62px;height:10px;border:2px solid var(--ink);background:#3a2416}
+.pwp-rps-timebar i{display:block;height:100%;background:var(--gold);transition:width .25s linear}
+.pwp-rps-timer b{min-width:20px;font-size:14px;font-variant-numeric:tabular-nums}
+.pwp-rps-timer.urgent .pwp-rps-timebar i{background:#e0442f}
+.pwp-rps-timer.urgent b{color:#ff8a70}
+.pwp-rps-timer.urgent svg{animation:pwp-rps-shake .5s steps(2) infinite}
+.pwp-rps-screen .pwp-rps-close{--b:var(--red);--d:#9c3324;--l:#f39a84;
+  width:46px;min-width:46px;height:auto;min-height:46px;padding:0;border:3px solid var(--ink);border-radius:0;cursor:pointer;background:var(--b);color:#fff3df;
+  font:inherit;font-size:20px;font-weight:900;box-shadow:inset -3px -4px 0 var(--d),inset 3px 3px 0 var(--l),0 3px 0 #120a05}
+.pwp-rps-screen .pwp-rps-close:active{transform:translateY(2px);box-shadow:inset -3px -4px 0 var(--d),inset 3px 3px 0 var(--l),0 1px 0 #120a05}
+
+/* ── 테이블 무대: 논리 320×200을 통째로 확대 ── */
+.pwp-rps-stagebox{grid-area:stage;position:relative;display:grid;place-items:center;min-width:0;min-height:0;padding:10px}
+.pwp-rps-stage-frame{position:relative;box-shadow:0 0 0 3px var(--ink),0 0 0 7px var(--wood-l),0 0 0 10px var(--ink),0 8px 0 7px #120a05}
+.pwp-rps-stage{position:absolute;left:0;top:0;transform-origin:0 0;overflow:hidden;background-size:100% 100%;image-rendering:pixelated;font-size:9px;color:var(--cream)}
+.pwp-rps-opponent{position:absolute;left:50%;top:24px;z-index:1;transform:translateX(-50%)}
+.pwp-rps-dealer{animation:pwp-rps-frames 1.1s steps(4) infinite}
+.pwp-rps-dealer.mood-shuffle{animation-duration:.6s}
+.pwp-rps-dealer.mood-win{animation:pwp-rps-frames .55s steps(4) infinite,pwp-rps-hop .55s steps(3) infinite}
+.pwp-rps-dealer.mood-lose{animation:pwp-rps-frames 1.4s steps(4) infinite}
+.pwp-rps-foe{display:block;width:60px;height:60px;image-rendering:pixelated}
+.pwp-rps-foe.placeholder,.pwp-rps-me.placeholder{background:#0003}
+.pwp-rps-face{position:absolute;left:calc(100% - 4px);top:-4px;padding:3px;background:#fffaf0;border:2px solid var(--ink);box-shadow:0 2px 0 #0006;animation:pwp-rps-pop .25s steps(3)}
+.pwp-rps-face::after{content:"";position:absolute;left:-6px;bottom:2px;width:6px;height:5px;background:#fffaf0;border:2px solid var(--ink);border-right:0;border-top:0}
+.pwp-rps-me{position:absolute;left:6px;bottom:-8px;z-index:1;width:64px;height:64px;image-rendering:pixelated}
+.pwp-rps-speech{position:absolute;z-index:4;transform:translate(-50%,-100%);padding:3px 6px;white-space:nowrap;font-size:10px;color:#3a210f;background:#fffaf0;border:2px solid var(--ink);box-shadow:0 2px 0 #0006;animation:pwp-rps-bob 1.2s steps(2) infinite}
+.pwp-rps-cards{position:absolute;inset:0;z-index:2}
+.pwp-rps-vs{position:absolute;left:50%;top:142px;z-index:2;transform:translate(-50%,-50%);font-size:11px;font-weight:900;color:var(--gold-l);text-shadow:1px 0 var(--ink),-1px 0 var(--ink),0 1px var(--ink),0 -1px var(--ink)}
+
+/* 탁자 위 카드: 자리(transform) → 들기·흔들기(.lift) → 뒤집기(.flip) 세 겹. */
+.pwp-rps-tcard{position:absolute;left:0;top:0;display:block;transform:translate(var(--x),var(--y));transition:transform .2s cubic-bezier(.2,.8,.3,1)}
+.pwp-rps-tcard.spot-arena{z-index:3}
+.pwp-rps-lift{position:relative;display:block;width:100%;height:100%;perspective:180px}
+.pwp-rps-flip{position:relative;display:block;width:100%;height:100%;transform-style:preserve-3d;transition:transform .36s cubic-bezier(.4,.1,.3,1.3)}
+.pwp-rps-tcard.down .pwp-rps-flip{transform:rotateY(180deg)}
+.pwp-rps-flip .pwp-rps-cardface{position:absolute;inset:0;width:100%;height:100%;backface-visibility:hidden;-webkit-backface-visibility:hidden;filter:drop-shadow(0 2px 0 #0008)}
+.pwp-rps-flip .pwp-rps-cardface.back{transform:rotateY(180deg)}
+.pwp-rps-tcard.flipping .pwp-rps-lift{animation:pwp-rps-lift .42s ease-out}
+.pwp-rps-tcard.mark-win .pwp-rps-lift{animation:pwp-rps-win .38s cubic-bezier(.3,1.6,.5,1) both}
+.pwp-rps-tcard.mark-lose .pwp-rps-lift{animation:pwp-rps-shake .28s steps(4) 2}
+.pwp-rps-tcard.mark-draw .pwp-rps-lift{animation:pwp-rps-shake .3s steps(3)}
+.pwp-rps-tcard.spot-out .pwp-rps-lift{animation:pwp-rps-drop .26s ease-in forwards}
+.pwp-rps-tcard.spot-out{pointer-events:none}
+.pwp-rps-glow{position:absolute;left:-30%;top:-22%;width:160%;height:144%;z-index:-1;animation:pwp-rps-glow .5s steps(2) infinite alternate}
+.pwp-rps-spark{position:absolute;z-index:5;transform:translate(-50%,-50%) scale(1.6);animation:pwp-rps-frames .3s steps(4) forwards,pwp-rps-fade .5s steps(3) .3s forwards}
+.pwp-rps-spark.draw{filter:grayscale(1) brightness(1.4)}
+
+.pwp-rps-banner{position:absolute;left:50%;top:44%;z-index:6;transform:translate(-50%,-50%);padding:5px 16px;white-space:nowrap;
+  background:#c94c3a;border:3px solid var(--ink);box-shadow:inset 0 0 0 2px #f39a84,inset 0 -4px 0 2px #8e2b1f,0 4px 0 #120a05;animation:pwp-rps-banner .35s cubic-bezier(.3,1.6,.5,1)}
+.pwp-rps-banner span{font-size:20px;color:#fff6d8}
+.pwp-rps-banner.win{background:var(--gold);box-shadow:inset 0 0 0 2px var(--gold-l),inset 0 -4px 0 2px var(--gold-d),0 4px 0 #120a05}
+.pwp-rps-banner.lose{background:#5b6f8c;box-shadow:inset 0 0 0 2px #9fb3cf,inset 0 -4px 0 2px #36475e,0 4px 0 #120a05}
+.pwp-rps-banner.draw{background:#b39b72;box-shadow:inset 0 0 0 2px #e6d3a6,inset 0 -4px 0 2px #7c6646,0 4px 0 #120a05}
+.pwp-rps-banner.big{top:40%;padding:7px 26px}.pwp-rps-banner.big span{font-size:34px}
+.pwp-rps-banner.small span{font-size:15px}
+
+/* ── 손패 쟁반(항상 화면 아래에 고정) ── */
+.pwp-rps-tray{grid-area:tray;position:relative;min-width:0;padding:8px 10px 10px;
+  --tw:clamp(34px,calc((100vw - 64px) / 5 - 8px),64px)}
+.pwp-rps-handtray{display:flex;flex-direction:column;gap:5px}
+.pwp-rps-tray-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;min-width:0}
+.pwp-rps-tray-head b{font-size:15px;white-space:nowrap}
+.pwp-rps-tray-head em{font-style:normal;color:var(--gold-l)}
+.pwp-rps-tray-head small{overflow:hidden;font-size:12px;color:#f7dcae;white-space:nowrap;text-overflow:ellipsis}
+.pwp-rps-queue,.pwp-rps-hand{display:flex;flex-wrap:wrap;align-content:flex-start;gap:8px 6px;padding:7px 7px 5px;
+  min-height:calc(var(--tw) * var(--card-hr) + 14px);background:#3a2416;border:2px solid var(--ink);box-shadow:inset 0 3px 0 #1c110a}
+.pwp-rps-queue{background:#2f4a3a;box-shadow:inset 0 3px 0 #1b2c22,inset 0 0 0 2px #3f6450}
+.pwp-rps-hand.drop{outline:3px dashed var(--gold);outline-offset:-5px}
+.pwp-rps-queue-empty{align-self:center;margin:auto;font-size:12px;color:#cdb98e}
+.pwp-rps-screen .pwp-rps-slot,.pwp-rps-screen .pwp-rps-handcard{position:relative;flex:none;width:var(--tw);height:auto;min-width:0;min-height:0;aspect-ratio:var(--card-ratio);
+  padding:0;margin:0;border:0;border-radius:0;background:none;box-shadow:none;cursor:grab;touch-action:none;transition:transform .12s}
+.pwp-rps-slot .pwp-rps-cardface,.pwp-rps-handcard .pwp-rps-cardface,.pwp-rps-ghost .pwp-rps-cardface,.pwp-rps-shoot-card .pwp-rps-cardface{width:100%;height:100%;filter:drop-shadow(0 3px 0 #0009)}
+.pwp-rps-screen .pwp-rps-handcard:hover:not(:disabled),.pwp-rps-screen .pwp-rps-slot:hover:not(:disabled){transform:translateY(-4px)}
+.pwp-rps-screen .pwp-rps-handcard.lifted{opacity:.25}
+.pwp-rps-slot>i,.pwp-rps-slot.hole>i{position:absolute;left:-5px;top:-6px;display:grid;place-items:center;min-width:19px;height:19px;padding:0 3px;font-size:12px;font-style:normal;font-weight:900;color:#3a210f;background:var(--gold);border:2px solid var(--ink)}
+.pwp-rps-slot.hole{display:block;flex:none;width:var(--tw);aspect-ratio:var(--card-ratio);border:3px dashed var(--gold-l);background:#ffe08a22;animation:pwp-rps-blink .7s steps(2) infinite}
+.pwp-rps-handtray.locked .pwp-rps-queue,.pwp-rps-handtray.locked .pwp-rps-hand{filter:saturate(.55) brightness(.8)}
+.pwp-rps-screen .pwp-rps-handtray button:disabled{cursor:default;opacity:1}
+.pwp-rps-ghost{position:fixed;z-index:100;display:block;aspect-ratio:var(--card-ratio);pointer-events:none;transform:rotate(-5deg) scale(1.15);filter:drop-shadow(0 8px 0 #0007)}
+.pwp-rps-screen .pwp-rps-submit{width:100%;min-height:50px;font-size:20px}
+.pwp-rps-tray-note{margin:10px 4px;text-align:center;font-size:15px}
+.pwp-rps-message{position:absolute;left:10px;right:10px;bottom:calc(100% + 6px);z-index:5;margin:0;padding:4px 8px;text-align:center;font-size:13px;color:#fff3df;background:#8e2b1f;border:2px solid var(--ink)}
+
+.pwp-rps-shootout{display:flex;flex-direction:column;gap:6px}
+.pwp-rps-shoot-cards{display:flex;justify-content:center;gap:clamp(10px,4vw,28px);padding:4px 0 2px}
+.pwp-rps-screen .pwp-rps-shoot-card{display:flex;flex-direction:column;align-items:center;gap:4px;width:auto;min-height:0;padding:6px 8px 4px;margin:0;border:3px solid var(--ink);border-radius:0;cursor:pointer;
+  background:#3a2416;color:var(--cream);font:inherit;box-shadow:inset 0 0 0 2px var(--wood-d),0 4px 0 #120a05;touch-action:manipulation;transition:transform .1s}
+.pwp-rps-shoot-card .pwp-rps-cardface{width:clamp(56px,calc(var(--tw) * 1.5),104px);height:auto;aspect-ratio:var(--card-ratio)}
+.pwp-rps-screen .pwp-rps-shoot-card:hover:not(:disabled){transform:translateY(-5px)}
+.pwp-rps-screen .pwp-rps-shoot-card:disabled{opacity:.6;cursor:default}
+.pwp-rps-shoot-card b{font-size:15px}
+
+.pwp-rps-result{display:flex;flex-direction:column;align-items:center;gap:8px;padding:4px 0}
+.pwp-rps-delta{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:4px 10px;margin:0;font-size:32px;color:var(--gold-l);animation:pwp-rps-pop .4s cubic-bezier(.3,1.6,.5,1)}
+.pwp-rps-delta[data-sign=minus]{color:#ff9a86}.pwp-rps-delta[data-sign=zero]{color:var(--cream)}
+.pwp-rps-delta small{flex-basis:100%;text-align:center;font-size:13px;color:#f7dcae;text-shadow:none}
+.pwp-rps-delta small:empty{display:none}
+.pwp-rps-coin{display:inline-grid;place-items:center;width:30px;height:30px;font-size:17px;color:#7a4f12;text-shadow:none;background:var(--gold);border:3px solid var(--ink);box-shadow:inset -2px -3px 0 var(--gold-d),inset 2px 2px 0 var(--gold-l)}
+.pwp-rps-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:10px 14px}
+.pwp-rps-actions .pwp-rps-btn{min-width:130px;min-height:52px;font-size:19px}
+
+.pwp-rps-confirm{position:absolute;inset:0;z-index:20;display:grid;place-items:center;padding:16px;background:#120a05b3}
+.pwp-rps-frame{max-width:340px;padding:16px 18px;text-align:center}
+.pwp-rps-frame p{margin:0 0 14px;font-size:17px;line-height:1.45}.pwp-rps-frame p b{color:#ffb19f}
+
+/* ── 설명서 ── */
+.pwp-window.pwp-rps-rules-screen{grid-template-rows:minmax(0,1fr);grid-template-areas:"main";place-items:center}
+.pwp-rps-rules{grid-area:main;display:flex;flex-direction:column;gap:8px;width:min(900px,100%);height:100%;min-height:0;padding:8px 10px 10px;text-align:center}
+.pwp-rps-rules-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.pwp-rps-rules-head b{font-size:18px}
+.pwp-rps-rules-page{flex:1;min-height:0;display:grid;place-items:center;background:#3a2416;border:2px solid var(--ink)}
+.pwp-rps-rules-page img{display:block;max-width:100%;max-height:100%;object-fit:contain}
+.pwp-rps-rules-placeholder{display:grid;place-content:center;padding:30px;color:#3a210f;background:#f6e7bd;border:5px double #60402c}
+.pwp-rps-rules nav{display:flex;justify-content:center;align-items:center;gap:16px}
+
+/* 광장 친구 대결 칩(PlazaBridge) */
+.pwp-rps-friends{position:absolute;right:12px;top:88px;z-index:20;display:flex;max-width:min(45vw,360px);gap:5px;overflow-x:auto}.pwp-rps-friends .pwp-chip{white-space:nowrap}
+
+/* 폰 가로: 무대 왼쪽, 쟁반 오른쪽. */
+@media (orientation:landscape) and (max-height:560px){
+  .pwp-window.pwp-rps-screen:not(.pwp-rps-rules-screen){grid-template-columns:minmax(0,1fr) minmax(280px,50%);grid-template-rows:auto minmax(0,1fr);grid-template-areas:"hud hud" "stage tray";gap:5px}
+  .pwp-rps-tray{--tw:clamp(26px,calc((50vw - 64px) / 9 - 6px),52px);align-self:end;max-height:100%;overflow:auto;padding:6px 8px 8px}
+  .pwp-rps-queue,.pwp-rps-hand{gap:6px 5px;padding:6px 5px 4px}
+  .pwp-rps-plate{padding:3px 8px}.pwp-rps-plate-name{font-size:13px}
+  .pwp-rps-hud-mid{padding:2px 8px}
+  .pwp-rps-screen .pwp-rps-close{min-height:40px}
+  .pwp-rps-stagebox{padding:8px}
+  .pwp-rps-screen .pwp-rps-submit{min-height:44px}
+}
+@media (max-width:420px){
+  .pwp-rps-screen .pwp-rps-hud{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) 42px;gap:4px}
+  .pwp-rps-hud-mid{min-width:0;padding:4px 6px}
+  .pwp-rps-timebar{width:40px}
+  .pwp-rps-plate{padding:4px 6px}.pwp-rps-plate-name{font-size:13px}
+  .pwp-rps-screen .pwp-rps-close{width:42px;min-width:42px}
+  .pwp-rps-tray-head small{font-size:11px}
+}
+
+@keyframes pwp-rps-frames{from{background-position-x:0%}to{background-position-x:133.333%}}
+@keyframes pwp-rps-hop{50%{transform:translateY(-3px)}}
+@keyframes pwp-rps-blink{50%{opacity:.35}}
+@keyframes pwp-rps-bob{50%{transform:translate(-50%,calc(-100% - 2px))}}
+@keyframes pwp-rps-pop{from{transform:scale(.3)}}
+@keyframes pwp-rps-star{from{transform:scale(1.8)}}
+@keyframes pwp-rps-lift{40%{transform:translateY(-9px) scale(1.28)}100%{transform:none}}
+@keyframes pwp-rps-win{0%{transform:none}45%{transform:translateY(-10px) scale(1.22)}100%{transform:translateY(-3px) scale(1.08)}}
+@keyframes pwp-rps-shake{25%{transform:translateX(-3px) rotate(-4deg)}75%{transform:translateX(3px) rotate(4deg)}}
+@keyframes pwp-rps-drop{to{transform:translateY(18px) rotate(16deg) scale(.85);opacity:0}}
+@keyframes pwp-rps-glow{from{opacity:.55}to{opacity:1}}
+@keyframes pwp-rps-fade{to{opacity:0}}
+@keyframes pwp-rps-banner{from{transform:translate(-50%,-50%) scale(.2)}}
+
+@media (prefers-reduced-motion:reduce){
+  .pwp-rps-tcard{transition-duration:.08s}
+  .pwp-rps-flip{transition-duration:.16s}
+  .pwp-rps-tcard .pwp-rps-lift{animation-duration:.14s!important}
+  .pwp-rps-dealer,.pwp-rps-speech,.pwp-rps-pips i.now,.pwp-rps-slot.hole,.pwp-rps-glow{animation:none}
+  .pwp-rps-spark{animation-duration:.15s,.2s;animation-delay:0s,.15s}
+  .pwp-rps-banner,.pwp-rps-delta,.pwp-rps-face,.pwp-rps-stars i.on{animation:none}
+}

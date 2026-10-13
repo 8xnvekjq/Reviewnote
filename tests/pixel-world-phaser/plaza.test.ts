@@ -2,9 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { continuousPayload, continuousPosition } from '../../src/features/pixel-room/plaza/presenceProtocol.ts';
 import { createPlazaStoreState, plazaStoreReducer } from '../../src/features/pixel-room/plaza/presenceStore.ts';
-import { plazaScene, plazaCell, plazaGroundTile } from '../../src/features/pixel-world-phaser/logic/plazaWorld.ts';
+import { plazaScene, plazaCell, plazaGroundTile, RPS_TABLE, RPS_RULE_SIGN } from '../../src/features/pixel-world-phaser/logic/plazaWorld.ts';
 import { isWalkablePlaza } from '../../src/features/pixel-room/plaza/plazaModel.ts';
-import { SCENERY } from '../../src/features/pixel-room/plaza/plazaLayout.ts';
+import { SCENERY, PATHS, inRect } from '../../src/features/pixel-room/plaza/plazaLayout.ts';
 import { cellCenter, feetBlocked, planPath, facedInteractable } from '../../src/features/pixel-world-phaser/logic/world.ts';
 import { buildScene, entrySpawn, exitAt, exitCells } from '../../src/features/pixel-world-phaser/logic/scenes.ts';
 const appearance = { top: null, bottom: null, hair: null, shoes: null, eyes: null, skin: null };
@@ -68,4 +68,35 @@ test('plaza return path extends to its bottom perimeter', () => {
   assert.equal(exitAt(scene, cellCenter(plazaCell({ x: 8, y: 11 }))), null);
   assert.equal(scene.entries.yard.cell.y, 19);
   for (const cell of scene.exits[0].cells) assert.equal(cell.y, 20);
+});
+
+test('카드 테이블과 설명서 팻말은 벽 안 열린 잔디에 있고 앞에서 닿는다', () => {
+  const scene = plazaScene();
+  const cellsOf = (r: { x: number; y: number; w: number; h: number }) => Array.from({ length: r.w * r.h }, (_, n) => ({ x: r.x + n % r.w, y: r.y + Math.floor(n / r.w) }));
+  // 테이블 그림(64px)은 칸보다 양옆 반 칸, 위로 두 칸 더 크다. 팻말 그림은 위로 반 칸.
+  const tableArt = { x: RPS_TABLE.x - 1, y: RPS_TABLE.y - 2, w: RPS_TABLE.w + 2, h: RPS_TABLE.h + 2 };
+  const signArt = { x: RPS_RULE_SIGN.x, y: RPS_RULE_SIGN.y - 1, w: 1, h: 2 };
+  for (const cell of [...cellsOf(RPS_TABLE), ...cellsOf(RPS_RULE_SIGN)]) {
+    const s = plazaCell(cell);
+    assert.ok(s.x > 0 && s.x < 25 && s.y > 0 && s.y < 21, `벽 안: ${JSON.stringify(s)}`);
+    assert.ok(scene.solid(s));
+    assert.ok(!PATHS.some(p => inRect(cell, p)));
+  }
+  for (const art of [tableArt, signArt]) for (const cell of cellsOf(art)) {
+    if (art === tableArt && (cell.x === tableArt.x || cell.x === tableArt.x + tableArt.w - 1)) continue; // 반 칸만 걸침
+    assert.ok(!SCENERY.some(item => inRect(cell, item) || inRect(cell, item.footprint)), `그림 겹침: ${JSON.stringify(cell)}`);
+  }
+  assert.ok(!cellsOf(tableArt).some(cell => inRect(cell, RPS_RULE_SIGN)));
+  const spawn = entrySpawn(scene, 'yard');
+  const from = { x: Math.floor(spawn.feet.x / 16), y: Math.floor(spawn.feet.y / 16) };
+  for (let dx = 0; dx < RPS_TABLE.w; dx++) {
+    const front = plazaCell({ x: RPS_TABLE.x + dx, y: RPS_TABLE.y + RPS_TABLE.h });
+    assert.equal(scene.solid(front), false);
+    assert.ok(planPath(from, front, scene, exitCells(scene)).length);
+    assert.equal(facedInteractable(cellCenter(front), 'Back', scene.interactables)?.id, 'rps-table');
+  }
+  const besideSign = plazaCell({ x: RPS_RULE_SIGN.x - 1, y: RPS_RULE_SIGN.y });
+  assert.equal(scene.solid(besideSign), false);
+  assert.ok(planPath(from, besideSign, scene, exitCells(scene)).length);
+  assert.equal(facedInteractable(cellCenter(besideSign), 'Right', scene.interactables)?.id, 'rps-rules');
 });

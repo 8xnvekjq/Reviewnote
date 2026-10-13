@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 from PIL import Image
 root=Path.cwd()/'src/features/pixel-world-phaser/assets/cardRps'
-specs={'cards.png':((96,64),(24,32)),'table.png':((320,200),None),'glow.png':((32,40),None),'clash.png':((128,32),(32,32)),'faces.png':((72,16),(24,16)),'duel-bubble.png':((48,16),(16,16)),'mouse-dealer.png':((128,160),(32,40)),'card-table-prop.png':((64,64),None),'rule-sign.png':((32,48),None)}
+specs={'cards.png':((128,88),(32,44)),'table.png':((320,200),None),'glow.png':((32,40),None),'clash.png':((128,32),(32,32)),'faces.png':((72,16),(24,16)),'duel-bubble.png':((48,16),(16,16)),'mouse-dealer.png':((128,160),(32,40)),'card-table-prop.png':((64,64),None),'rule-sign.png':((32,48),None)}
 for name,(size,cell) in specs.items():
  im=Image.open(root/name); assert im.mode=='RGBA',(name,im.mode); assert im.size==size,(name,im.size)
  assert set(im.getchannel('A').getdata()) <= {0,255},name

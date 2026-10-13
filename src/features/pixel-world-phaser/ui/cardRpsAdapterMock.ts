@@ -16,12 +16,15 @@ export function createMockCardRpsAdapter(options: MockCardRpsOptions = {}): Mock
   const latency = options.latencyMs ?? 0;
   let serial = 0;
   let active: LocalMatch | null = null;
+  /** 가짜 사용자가 치즈를 한 번이라도 이겼는지 — 첫 승리만 보상. */
+  let wonNpcOnce = false;
   const history: RpsMatchView[] = [];
   const matchHandlers = new Set<(match: RpsMatchView) => void>();
   const inviteHandlers = new Set<(invite: RpsInvite) => void>();
   const delay = async <T>(value: T): Promise<T> => latency ? new Promise(resolve => setTimeout(() => resolve(value), latency)) : value;
 
   const publish = (match: LocalMatch) => {
+    if (match.mode === 'npc' && match.status === 'finished' && match.state.winner === 'a' && !match.paid) { match.paid = true; wonNpcOnce = true; }
     const view = toView(match, now());
     history.push(view);
     matchHandlers.forEach(handler => handler(view));
@@ -32,7 +35,8 @@ export function createMockCardRpsAdapter(options: MockCardRpsOptions = {}): Mock
     return active;
   };
   const start = (mode: 'npc' | 'friend', stake: number, opponentId: string, opponentName: string) => {
-    active = { id: `mock-rps-${++serial}`, mode, stake, state: createMatch(), opponentId, opponentName, status: 'choosing', deadlineAt: now() + 60_000, endReason: null };
+    const prize = mode === 'npc' ? (wonNpcOnce ? 0 : RPS_NPC_REWARD) : stake * 2;
+    active = { id: `mock-rps-${++serial}`, mode, stake, prize, paid: false, state: createMatch(), opponentId, opponentName, status: 'choosing', deadlineAt: now() + 60_000, endReason: null };
     return active;
   };
   const settleRound = (match: LocalMatch, mine: readonly RpsHand[]) => {
@@ -90,7 +94,7 @@ export function createMockCardRpsAdapter(options: MockCardRpsOptions = {}): Mock
 }
 
 interface LocalMatch {
-  id: string; mode: 'npc' | 'friend'; stake: number; state: RpsMatchState;
+  id: string; mode: 'npc' | 'friend'; stake: number; prize: number; paid: boolean; state: RpsMatchState;
   opponentId: string; opponentName: string; status: RpsMatchStatus; deadlineAt: number | null;
   endReason: RpsMatchView['endReason'];
 }
@@ -101,12 +105,12 @@ function toView(match: LocalMatch, _now: number): RpsMatchView {
   const won = winnerId === 'mock-user';
   return {
     matchId: match.id, mode: match.mode, status: match.status, stake: match.stake,
-    prize: match.mode === 'npc' ? RPS_NPC_REWARD : match.stake * 2,
+    prize: match.prize,
     me: { id: 'mock-user', nickname: '나', isNpc: false, inventory: { ...match.state.inventory.a }, wins: match.state.wins.a, submitted: false },
     opponent: { id: match.opponentId, nickname: match.opponentName, isNpc: match.mode === 'npc', inventory: { ...match.state.inventory.b }, wins: match.state.wins.b, submitted: match.status === 'revealing' },
     round: match.state.rounds.length + (finished ? 0 : 1), rounds: match.state.rounds,
     shootout: match.state.shootout.map(item => ({ ...item, result: item.result })), deadlineAt: match.deadlineAt,
     winnerId, endReason: match.endReason,
-    pointDelta: finished ? (match.mode === 'npc' ? (won ? RPS_NPC_REWARD - RPS_NPC_ENTRY : -RPS_NPC_ENTRY) : won ? match.stake : -match.stake) : null,
+    pointDelta: finished ? (match.mode === 'npc' ? (won ? match.prize : 0) : won ? match.stake : -match.stake) : null,
   };
 }

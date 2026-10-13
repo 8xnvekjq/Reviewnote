@@ -18,7 +18,7 @@ import { PlazaBubbles } from './plazaBubbles';
 import type { PlazaBubble } from './plazaBubbles';
 import { WorldScene } from './WorldScene';
 import type { WorldContext } from './WorldScene';
-import { cardRpsAssets } from '../assets/cardRps';
+import { cardRpsAssets, MOUSE_DEALER_H, MOUSE_DEALER_ROWS, MOUSE_DEALER_W } from '../assets/cardRps';
 import { loadImage } from './loadImage';
 
 type Friend = { tool?: HeldTool; tag?: Phaser.GameObjects.Text; follow?: PetFollowState; sprite?: Phaser.GameObjects.Sprite; pet?: Phaser.GameObjects.Sprite; look: string; petId: string | null; loading: boolean; state: PlazaPlayerState };
@@ -75,11 +75,18 @@ export class PlazaScene extends WorldScene {
     });
     const tx = (RPS_TABLE.x + PLAZA_MARGIN) * 16, ty = (RPS_TABLE.y + PLAZA_MARGIN) * 16;
     const sx = (RPS_RULE_SIGN.x + PLAZA_MARGIN) * 16, sy = (RPS_RULE_SIGN.y + PLAZA_MARGIN) * 16;
-    void Promise.all([loadImage(cardRpsAssets.cardTableProp), loadImage(cardRpsAssets.ruleSign)]).then(([table, sign]) => {
+    void Promise.all([loadImage(cardRpsAssets.cardTableProp), loadImage(cardRpsAssets.ruleSign), loadImage(cardRpsAssets.mouseDealer)]).then(([table, sign, dealer]) => {
       if (!this.scene.isActive()) return;
       if (!this.textures.exists('card-rps-table-prop')) this.textures.addImage('card-rps-table-prop', table);
       if (!this.textures.exists('card-rps-rule-sign')) this.textures.addImage('card-rps-rule-sign', sign);
-      this.add.image(tx + 24, ty + 32, 'card-rps-table-prop').setOrigin(.5, 1).setDepth((RPS_TABLE.y + PLAZA_MARGIN + RPS_TABLE.h) * 16 - 2);
+      if (!this.textures.exists('card-rps-dealer')) {
+        const texture = this.textures.addImage('card-rps-dealer', dealer);
+        texture?.add(0, 0, 0, MOUSE_DEALER_ROWS.idle * MOUSE_DEALER_H, MOUSE_DEALER_W, MOUSE_DEALER_H);
+      }
+      const tableDepth = (RPS_TABLE.y + PLAZA_MARGIN + RPS_TABLE.h) * 16 - 2;
+      // 치즈는 테이블 뒤 왼쪽(가운데 카드 받침에 가리지 않게)에 서 있다.
+      this.add.image(tx + 12, ty - 4, 'card-rps-dealer', 0).setOrigin(.5, 1).setDepth(tableDepth - 1);
+      this.add.image(tx + 24, ty + 32, 'card-rps-table-prop').setOrigin(.5, 1).setDepth(tableDepth);
       this.add.image(sx + 8, sy + 16, 'card-rps-rule-sign').setOrigin(.5, 1).setDisplaySize(16, 24).setDepth((RPS_RULE_SIGN.y + PLAZA_MARGIN + 1) * 16 - 2);
     }).catch(() => {});
     const hint = this.add.text((PLAZA_EXIT.x + .5) * 16, (PLAZA_EXIT.y + .5) * 16, '↓', { fontSize: '12px', color: '#fff4ce' }).setOrigin(.5).setDepth(-900);
