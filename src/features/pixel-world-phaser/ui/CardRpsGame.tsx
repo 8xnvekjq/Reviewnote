@@ -6,7 +6,7 @@ import type { ButtonHTMLAttributes, CSSProperties, KeyboardEvent as ReactKeyboar
 import type { PublicAvatarAppearance } from '../../pixel-room/shop/types';
 import { composeAvatar } from '../game/avatarTexture';
 import { AVATAR_FRAME, AVATAR_POSES } from '../logic/avatarPlan';
-import { inventoryTotal, RPS_HAND_LABEL, RPS_HANDS, RPS_MAX_ROUNDS, RPS_WINS_TO_WIN, type RpsHand, type RpsRoundResult } from '../logic/cardRps';
+import { inventoryTotal, RPS_HAND_LABEL, RPS_HANDS, RPS_MAX_ROUNDS, RPS_TURN_MS, RPS_WINS_TO_WIN, type RpsHand, type RpsRoundResult } from '../logic/cardRps';
 import type { CardRpsAdapter, RpsMatchView } from '../logic/cardRpsContract';
 import {
   addQueuedCard, dropIndex, handCards, initialRevealProgress, insertQueuedCard, moveQueuedCard, removeQueuedCard,
@@ -260,7 +260,7 @@ function SidePlate({ who, name, wins, left }: { who: 'me' | 'them'; name: string
 }
 
 function Hourglass({ seconds }: { seconds: number }) {
-  const ratio = Math.max(0, Math.min(1, seconds / 60));
+  const ratio = Math.max(0, Math.min(1, seconds / (RPS_TURN_MS / 1000)));
   return <div className={`pwp-rps-timer ${seconds <= 10 ? 'urgent' : ''}`} role="timer" aria-label={`남은 시간 ${seconds}초`}>
     <svg viewBox="0 0 9 12" width="18" height="24" shapeRendering="crispEdges" aria-hidden="true">
       <rect x="0" y="0" width="9" height="1" fill="#5a3418" /><rect x="0" y="11" width="9" height="1" fill="#5a3418" />
