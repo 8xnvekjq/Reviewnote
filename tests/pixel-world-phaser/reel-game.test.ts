@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createReelGame, stepReelGame, minReelMs, REEL_MARGIN_MS, HEAVY_PATTERNS } from '../../src/features/pixel-world-phaser/logic/reelGame.ts';
+import { createReelGame, stepReelGame, minReelMs, REEL_MARGIN_MS, HEAVY_PATTERNS, HEAVY } from '../../src/features/pixel-world-phaser/logic/reelGame.ts';
 import type { ReelGame, ReelAxisInput } from '../../src/features/pixel-world-phaser/logic/reelGame.ts';
 type Player = 'lazy' | 'novice' | 'good';
 function verticalBot(seed: number, heavy: boolean) {
@@ -225,12 +225,75 @@ function skilledPlayer(seed: number, heavy: boolean) {
   }
   return g;
 }
-test('상어·고래는 실력 좋은 학생이면 대부분 낚지만 보통 난이도 5보다 어렵고 탭이 더 든다', () => {
+test('상어·고래는 실력 좋은 학생이면 대부분 낚지만 보통 난이도 5보다 탭이 더 든다', () => {
   const heavy = Array.from({ length: 40 }, (_, seed) => skilledPlayer(seed, true));
   const normal = Array.from({ length: 40 }, (_, seed) => skilledPlayer(seed, false));
   const win = (r: ReelGame[]) => r.filter(g => g.status === 'landed').length;
   const rate = (r: ReelGame[]) => r.reduce((a, g) => a + g.tapCount, 0) / r.reduce((a, g) => a + g.elapsed, 0);
   console.log(`SKILLED heavy ${win(heavy)}/40 normal ${win(normal)}/40 taps/s ${rate(heavy).toFixed(2)} vs ${rate(normal).toFixed(2)}`);
-  assert.ok(win(heavy) >= 24 && win(heavy) < win(normal), 'possible but harder');
+  // 2026-10-14 완화 뒤엔 실력 좋은 학생이면 거의 다 낚는다(전 33/40). 무거운 느낌은 탭 수로 남긴다.
+  assert.ok(win(heavy) >= 34, 'easier than before the 2026-10-14 tuning');
   assert.ok(rate(heavy) > rate(normal) * 1.15, 'more tapping');
+});
+
+// 2026-10-14 상어·고래 완화: 탭 점프·원 밖 감소·패턴 사이 휴식. 일반 물고기는 그대로.
+function peakAfterTap(heavy: boolean) {
+  let g = createReelGame(5, false, false, 3, 1, undefined, false, 0, heavy);
+  g = stepReelGame({ ...g, zone: -.4, velocity: 0 }, 1000 / 120, [g.elapsed * 1000 + 1]);
+  const start = -.4 + 0; let peak = g.zone;
+  for (let i = 0; i < 120; i++) { g = stepReelGame({ ...g, progress: .5 }, 1000 / 120); peak = Math.max(peak, g.zone); }
+  return { rise: peak - start, velocity: g.velocity };
+}
+test('상어·고래 탭 점프가 예전(.85)보다 약 40% 높고 일반 물고기 탭은 그대로', () => {
+  const rise = (v0: number, gravity: number) => v0 * v0 / (2 * gravity);
+  assert.equal(HEAVY.tapVelocity, 1);
+  assert.ok(rise(HEAVY.tapVelocity, HEAVY.gravity) / rise(.85, HEAVY.gravity) > 1.35);
+  const heavy = peakAfterTap(true);
+  assert.ok(heavy.rise > rise(.85, HEAVY.gravity) * 1.25, `heavy rise ${heavy.rise.toFixed(3)}`);
+  // 일반 물고기는 탭 직후 속도 .85에서 시작한다.
+  const g = createReelGame(5);
+  const tapped = stepReelGame(g, 1000 / 120, [1]);
+  assert.ok(Math.abs(tapped.velocity - (.85 - 2.3 / 120)) < 1e-12);
+  const heavyTapped = stepReelGame(createReelGame(5, false, false, 0, 1, undefined, false, 0, true), 1000 / 120, [1]);
+  assert.ok(Math.abs(heavyTapped.velocity - (1 - HEAVY.gravity / 120)) < 1e-12);
+});
+test('상어·고래는 원 밖에서 진행이 25% 느리게 줄고, 얻는 속도는 같다', () => {
+  const lossOver = (heavy: boolean) => {
+    // 물고기를 원과 먼 곳에 두고 0.2초 동안만 본다(물고기가 원에 닿지 않을 만큼 짧게).
+    const g = { ...createReelGame(5, false, false, 1, 1, undefined, false, 0, heavy), progress: .5, zone: -.6, fish: .8 };
+    return .5 - stepReelGame(g, 200).progress;
+  };
+  const normal = lossOver(false), heavy = lossOver(true);
+  assert.ok(normal > 0);
+  assert.ok(Math.abs(heavy / normal - HEAVY.lossScale) < 1e-9, `ratio ${(heavy / normal).toFixed(4)}`);
+  const gainOver = (heavy: boolean) => {
+    const g = { ...createReelGame(5, false, false, 1, 1, undefined, false, 0, heavy), progress: .5, zone: 0, fish: 0, nextTarget: 99, targetX: 0, targetY: 0 };
+    return stepReelGame(g, 50).progress - .5;
+  };
+  assert.ok(Math.abs(gainOver(true) - gainOver(false)) < 1e-12);
+});
+test('상어·고래는 패턴이 바뀐 뒤 0.5초 지쳐 절반 속도로 헤엄치고 그동안 돌진하지 않는다', () => {
+  let g = createReelGame(5, false, false, 11, 1, undefined, false, 0, true);
+  g = stepReelGame(g, 1000 / 120);
+  assert.ok(g.tiredUntil <= g.elapsed + 1e-9, 'first pattern starts without rest');
+  let changes = 0;
+  for (let tick = 0; tick < 120 * 30; tick++) {
+    const prev = g;
+    g = stepReelGame({ ...g, progress: .5 }, 1000 / 120);
+    if (g.motion !== prev.motion) {
+      changes++;
+      assert.ok(Math.abs(g.tiredUntil - (g.elapsed + HEAVY.tiredSeconds)) < 1e-9);
+      assert.ok(g.burstUntil <= g.elapsed || g.burstUntil >= g.tiredUntil, 'no burst inside tired window');
+    }
+    if (g.elapsed > 1 && g.elapsed < g.tiredUntil - .3) {
+      // 휴식 중엔 목표 속도가 cruise(최대 1.15) × .5 — 관성을 감안해 넉넉히 확인.
+      assert.ok(Math.hypot(g.fishVX, g.fishVY) < 1.15 * 1.9, 'never bursting while tired');
+    }
+  }
+  assert.ok(changes >= 5);
+  // 같은 상태에서 지친 물고기가 덜 움직인다.
+  const base = { ...g, motion: 'climb' as const, motionStart: g.elapsed, nextTarget: g.elapsed + 5, burstUntil: 0, fishX: 0, fish: -.6, fishVX: 0, fishVY: 0, progress: .5 };
+  const rested = stepReelGame({ ...base, tiredUntil: 0 }, 300), tired = stepReelGame({ ...base, tiredUntil: g.elapsed + 5 }, 300);
+  const moved = (s: ReelGame) => Math.hypot(s.fishX - base.fishX, s.fish - base.fish);
+  assert.ok(moved(tired) < moved(rested) * .7, `tired ${moved(tired).toFixed(3)} vs ${moved(rested).toFixed(3)}`);
 });
