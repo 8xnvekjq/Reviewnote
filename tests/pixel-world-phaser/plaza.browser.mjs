@@ -79,6 +79,30 @@ try {
   assert.ok(await friendDistance() > 34);
   await nearButton.waitFor({ state: 'detached', timeout: 5000 });
   console.log('PASS plaza duel button: hidden far, above the near classmate, opens stake dialog without walking, gone after walking away');
+  // 대결 말풍선: A가 B에게 신청(모의 어댑터는 바로 시작) → B 화면에 두 사람(B 자신 포함) 머리 위 ✊ ✌️ ✋ →
+  // A가 경기를 나가 끝나면 B 화면에서 둘 다 사라진다. (예전엔 끝 알림이 [보낸 사람]만 지워 B 자신의 풍선이 남았다.)
+  const duelBubbles = page => page.evaluate(() => window.__pixelWorldPhaser.debug().bubbles.filter(v => v.text === '✊ ✌️ ✋').length);
+  await walkNearFriend(-16);
+  await a.waitForFunction(() => { const d = window.__pixelWorldPhaser.debug(); return !d.moving && d.pathLength === 0; }, null, { timeout: 20000 });
+  await nearButton.waitFor({ state: 'visible', timeout: 5000 });
+  await nearButton.click();
+  await a.getByRole('dialog', { name: '카드 대결 신청' }).getByRole('button', { name: '20P' }).click();
+  await a.getByRole('button', { name: '카드 대결 닫기' }).waitFor({ timeout: 10000 });
+  await b.bringToFront();
+  await b.waitForFunction(() => window.__pixelWorldPhaser.debug().bubbles.filter(v => v.text === '✊ ✌️ ✋').length === 2, null, { timeout: 5000 });
+  assert.equal(await b.locator('.pwp-rps-near').count(), 0, 'no duel button while marked as dueling');
+  await a.bringToFront();
+  await a.getByRole('button', { name: '카드 대결 닫기' }).click();
+  await a.getByRole('alertdialog', { name: '경기 나가기' }).getByRole('button', { name: '나가기' }).click();
+  await a.getByRole('button', { name: '카드 대결 닫기' }).waitFor({ state: 'detached', timeout: 5000 });
+  await b.bringToFront();
+  await b.waitForFunction(() => !window.__pixelWorldPhaser.debug().bubbles.some(v => v.text === '✊ ✌️ ✋'), null, { timeout: 5000 });
+  assert.equal(await duelBubbles(a), 0, 'inviter never shows a duel bubble after the end');
+  // A를 원래 자리로 돌려 놓는다.
+  await a.bringToFront();
+  await a.evaluate(() => { const h = window.__pixelWorldPhaser, d = h.debug(); h.walkToScreen(((18 + 5.5) * 16 - d.camera.x) * d.cssZoom, (200 - d.camera.y) * d.cssZoom); });
+  await a.waitForFunction(() => { const d = window.__pixelWorldPhaser.debug(); return !d.moving && d.pathLength === 0; }, null, { timeout: 20000 });
+  console.log('PASS plaza duel bubble: shown over both players while dueling, gone on both pages when the match ends');
   // Tapping approaches the stall; only A opens the shop.
   assert.equal(await a.locator('.pwp-panel-access').getByRole('button', { name: '상점', exact: true }).count(), 0);
   await target(a, 'shop');
