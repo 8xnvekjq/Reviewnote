@@ -60,7 +60,10 @@ import type { ActivityPanel, FarmAdapter } from './ui/FarmPanels';
 import { useLevel, gainFrom } from './ui/useLevel';
 import { LevelBadge, LevelToast } from './ui/LevelBadge';
 import { LevelPanel } from './ui/LevelPanel';
-type ShellPanel = 'bugs' | 'kiosk' | 'bag' | 'level' | PanelKind | PlazaPanel | ActivityPanel | 'furniture';
+import type { CardRpsAdapter } from './logic/cardRpsContract';
+import { createMockCardRpsAdapter } from './ui/cardRpsAdapterMock';
+import { CardRpsGame, CardRpsRules } from './ui/CardRpsGame';
+type ShellPanel = 'bugs' | 'kiosk' | 'bag' | 'level' | 'card-rps' | 'card-rps-rules' | PanelKind | PlazaPanel | ActivityPanel | 'furniture';
 
 export interface GameShellProps {
   face?: string;
@@ -69,6 +72,8 @@ export interface GameShellProps {
   fishingAdapter?: FishingAdapter;
   rewardsAdapter?: RewardsAdapter;
   bugAdapter?: BugAdapter;
+  /** 서버 어댑터가 합쳐지기 전에는 로컬 연습 어댑터를 사용한다. */
+  cardRpsAdapter?: CardRpsAdapter;
   newFishSpeciesId?: string | null;
   /** 관리자 시험용 시각·날씨(?pwClock/?pwWeather) — 화면 색감용. 서버에는 어댑터가 따로 보낸다. */
   clockOverride?: FishingOverride;
@@ -133,7 +138,9 @@ async function leaveFullscreen() {
 }
 
 // 상위가 1초마다(밭 시계) 다시 그려져도, 넘겨받는 값이 같으면 셸은 다시 그리지 않는다.
-export const GameShell = memo(function GameShell({ isAdmin = false, appearance, pet, balance, beds, furniture, onSaveFurniture, onSceneChange, scarecrowLine, onExit, panels, farmAdapter, fishingAdapter, rewardsAdapter, bugAdapter, newFishSpeciesId, clockOverride, userId = 'guest', face }: GameShellProps) {
+export const GameShell = memo(function GameShell({ isAdmin = false, appearance, pet, balance, beds, furniture, onSaveFurniture, onSceneChange, scarecrowLine, onExit, panels, farmAdapter, fishingAdapter, rewardsAdapter, bugAdapter, cardRpsAdapter, newFishSpeciesId, clockOverride, userId = 'guest', face }: GameShellProps) {
+  const rpsAdapter = useMemo(() => cardRpsAdapter ?? createMockCardRpsAdapter(), [cardRpsAdapter]);
+  const [rpsOpponentAppearance, setRpsOpponentAppearance] = useState<PublicAvatarAppearance>();
   useLayoutEffect(() => {
     let viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
     const created = !viewport;
@@ -341,7 +348,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     const fishing = fishingPanelFor(kind);
     if (fishing) openPanel(fishing);
     else if (kind === 'kiosk') { if (isAdmin) openPanel('kiosk'); }
-    else if (kind === 'shop' || kind === 'wardrobe' || kind === 'contest' || kind === 'well' || kind === 'bench') openPanel(kind);
+    else if (kind === 'shop' || kind === 'wardrobe' || kind === 'contest' || kind === 'well' || kind === 'bench' || kind === 'card-rps' || kind === 'card-rps-rules') openPanel(kind);
     else if (kind === 'pet' || /^farm:\d+$/.test(kind)) { farmAdapter?.farm.clearMessage(); openPanel(kind as ActivityPanel); }
   };
   const bedsRef = useRef(beds); bedsRef.current = beds;
@@ -733,6 +740,8 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     {isAdmin && panel === 'kiosk' && <AdminKiosk weather={{ adapter: fishingAdapter, clock: worldClock.clock, refresh: worldClock.refresh }} onClose={closePanel} />}
     {!placing && !fishing.busy && !fishing.reelState && panel !== 'furniture' && <LevelBadge value={level} onClick={() => openPanel('level')} style={{ right: layout.width - hud.x - hud.width + 10, top: hud.y + hud.height + 8 }} />}
     {panel === 'level' && <LevelPanel value={level} onClose={closePanel} />}
+    {panel === 'card-rps' && <CardRpsGame adapter={rpsAdapter} appearance={appearance} opponentAppearance={rpsOpponentAppearance} onClose={closePanel} />}
+    {panel === 'card-rps-rules' && <CardRpsRules onClose={closePanel} />}
     {level.celebration && <LevelToast gain={level.celebration} />}
     {panels && <div className="pwp-panel-access" style={{ left: hud.x + 10, top: hud.y + hud.height + 8 }}>
       <button type="button" className="pwp-chip" disabled={status !== 'ready' || !!placing || roomPending} onClick={() => openPanel('wardrobe')}>옷장</button>
@@ -771,8 +780,8 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     {(panel === 'shop' || panel === 'wardrobe') && panels && <GamePanels kind={panel} adapter={panels} onClose={closePanel} />}
     {(panel === 'turtle' || panel === 'fishboard') && <FishingPanels key={panel} kind={panel} adapter={fishingAdapter} shop={panels} newSpeciesId={newFishSpeciesId ?? freshSpecies} onClose={() => { if (panel === 'turtle') setFreshSpecies(null); closePanel(); }} />}
     {scene?.id === 'river' && status === 'ready' && <RiverBridge key={'river:' + scene.visit} handle={handle} appearance={appearance} face={animalFace} tool={heldToolTag(heldTool, heldRodId)} pet={pet} riding={riding} panel={panel} reporter={riverReporter} swingReporter={swingReporter} />}
-    {scene?.id === 'plaza' && status === 'ready' && <PlazaBridge key={'plaza:' + scene.visit} handle={handle} appearance={appearance} face={animalFace} tool={heldToolTag(heldTool, heldRodId)} pet={pet} riding={riding} userId={userId} panel={panel} onClose={closePanel} swingReporter={swingReporter} />}
-    {panel && panel !== 'bugs' && panel !== 'kiosk' && panel !== 'bag' && panel !== 'level' && panel !== 'turtle' && panel !== 'fishboard' && panel !== 'furniture' && panel !== 'shop' && panel !== 'wardrobe' && panel !== 'contest' && panel !== 'well' && panel !== 'bench' && <FarmPanels key={panel} petId={pet} riding={riding} onRide={() => { closePanel(); handle.current?.toggleRide(); }} kind={panel} adapter={farmAdapter} onClose={closePanel}
+    {scene?.id === 'plaza' && status === 'ready' && <PlazaBridge key={'plaza:' + scene.visit} handle={handle} appearance={appearance} face={animalFace} tool={heldToolTag(heldTool, heldRodId)} pet={pet} riding={riding} userId={userId} panel={panel} onClose={closePanel} swingReporter={swingReporter} rpsAdapter={rpsAdapter} onOpenRps={opponent => { setRpsOpponentAppearance(opponent); openPanel('card-rps'); }} />}
+    {panel && panel !== 'bugs' && panel !== 'kiosk' && panel !== 'bag' && panel !== 'level' && panel !== 'card-rps' && panel !== 'card-rps-rules' && panel !== 'turtle' && panel !== 'fishboard' && panel !== 'furniture' && panel !== 'shop' && panel !== 'wardrobe' && panel !== 'contest' && panel !== 'well' && panel !== 'bench' && <FarmPanels key={panel} petId={pet} riding={riding} onRide={() => { closePanel(); handle.current?.toggleRide(); }} kind={panel} adapter={farmAdapter} onClose={closePanel}
       onXp={level.onXp} onCollection={() => openPanel('collection')} onTalk={() => { closePanel(); openDialogue('scarecrow'); }}
       onPet={kind => { closePanel(); handle.current?.reactPet(kind); }} onFx={(index, action) => handle.current?.farmFx(index, action)} />}
     {panel === 'furniture' && panels && <FurniturePanel furniture={handle.current?.getFurniture() ?? furniture} shop={panels.shop}

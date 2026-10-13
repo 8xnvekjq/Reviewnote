@@ -10,7 +10,7 @@ import type Phaser from 'phaser';
 import { SCENERY } from '../../pixel-room/plaza/plazaLayout';
 import type { PlazaPlayerState } from '../../pixel-room/plaza/types';
 import { AVATAR_POSES, AVATAR_FRAMES_PER_POSE } from '../logic/avatarPlan';
-import { plazaGroundTile, PLAZA_MARGIN, PLAZA_EXIT, plazaBorderGap } from '../logic/plazaWorld';
+import { plazaGroundTile, PLAZA_MARGIN, PLAZA_EXIT, plazaBorderGap, RPS_RULE_SIGN, RPS_TABLE } from '../logic/plazaWorld';
 import { PET_SHEETS } from '../logic/petSheets';
 import { composeAvatar } from './avatarTexture';
 import { loadPetSheet, loadBed } from './sceneAssets';
@@ -18,6 +18,8 @@ import { PlazaBubbles } from './plazaBubbles';
 import type { PlazaBubble } from './plazaBubbles';
 import { WorldScene } from './WorldScene';
 import type { WorldContext } from './WorldScene';
+import { cardRpsAssets } from '../assets/cardRps';
+import { loadImage } from './loadImage';
 
 type Friend = { tool?: HeldTool; tag?: Phaser.GameObjects.Text; follow?: PetFollowState; sprite?: Phaser.GameObjects.Sprite; pet?: Phaser.GameObjects.Sprite; look: string; petId: string | null; loading: boolean; state: PlazaPlayerState };
 export class PlazaScene extends WorldScene {
@@ -71,6 +73,15 @@ export class PlazaScene extends WorldScene {
       if (!this.textures.exists(key)) this.textures.addCanvas(key, c);
       this.add.image((s.x + 5) * 16, (s.y + 5) * 16, key).setOrigin(0).setDepth((s.footprint.y + 5 + s.footprint.h) * 16 - 2);
     });
+    const tx = (RPS_TABLE.x + PLAZA_MARGIN) * 16, ty = (RPS_TABLE.y + PLAZA_MARGIN) * 16;
+    const sx = (RPS_RULE_SIGN.x + PLAZA_MARGIN) * 16, sy = (RPS_RULE_SIGN.y + PLAZA_MARGIN) * 16;
+    void Promise.all([loadImage(cardRpsAssets.cardTableProp), loadImage(cardRpsAssets.ruleSign)]).then(([table, sign]) => {
+      if (!this.scene.isActive()) return;
+      if (!this.textures.exists('card-rps-table-prop')) this.textures.addImage('card-rps-table-prop', table);
+      if (!this.textures.exists('card-rps-rule-sign')) this.textures.addImage('card-rps-rule-sign', sign);
+      this.add.image(tx + 24, ty + 32, 'card-rps-table-prop').setOrigin(.5, 1).setDepth((RPS_TABLE.y + PLAZA_MARGIN + RPS_TABLE.h) * 16 - 2);
+      this.add.image(sx + 8, sy + 16, 'card-rps-rule-sign').setOrigin(.5, 1).setDisplaySize(16, 24).setDepth((RPS_RULE_SIGN.y + PLAZA_MARGIN + 1) * 16 - 2);
+    }).catch(() => {});
     const hint = this.add.text((PLAZA_EXIT.x + .5) * 16, (PLAZA_EXIT.y + .5) * 16, '↓', { fontSize: '12px', color: '#fff4ce' }).setOrigin(.5).setDepth(-900);
     this.tweens.add({ targets: hint, alpha: .35, y: hint.y + 3, duration: 850, yoyo: true, repeat: -1 });
     const clear = () => { this.friends.clear(); this.bubbles?.clear(); this.bubbles = null; };
