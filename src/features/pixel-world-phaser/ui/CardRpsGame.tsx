@@ -1,39 +1,43 @@
 // 천광명월 카드 가위바위보 화면(2026-10-13 다시 그림). 웹 창 대신 화면 전체를 덮는 픽셀 게임 화면.
-// 위: HUD(판 표시·별·남은 카드·모래시계) / 가운데: 카드 테이블(table.png, 비율 고정으로 줄어듦) / 아래: 손패 쟁반(항상 보임).
+// 위: HUD(판 표시·별·남은 카드·모래시계) / 가운데: 선술집 탁자 무대(hd/room.webp, 16:10 고정으로 줄어듦) / 아래: 손패 쟁반(항상 보임).
+// 무대는 설명서 2쪽(전투 진행 예시 & 화면 연출) 위 그림처럼: 맞은편 의자에 상대, 앞쪽 아래에 내 뒷모습, 탁자 위 세 줄(상대·가운데·나).
 // 공개 연출은 logic/cardRpsPresentation.ts 의 박자표(roundTimeline·revealCardsAt)를 그대로 그린다.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ButtonHTMLAttributes, CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import type { PublicAvatarAppearance } from '../../pixel-room/shop/types';
 import { composeAvatar } from '../game/avatarTexture';
 import { AVATAR_FRAME, AVATAR_POSES } from '../logic/avatarPlan';
-import { inventoryTotal, RPS_HAND_LABEL, RPS_HANDS, RPS_MAX_ROUNDS, RPS_WINS_TO_WIN, type RpsHand, type RpsRoundResult } from '../logic/cardRps';
+import { inventoryTotal, RPS_HAND_LABEL, RPS_HANDS, RPS_MAX_ROUNDS, RPS_TURN_MS, RPS_WINS_TO_WIN, type RpsHand, type RpsRoundResult } from '../logic/cardRps';
 import type { CardRpsAdapter, RpsMatchView } from '../logic/cardRpsContract';
 import {
   addQueuedCard, dropIndex, handCards, initialRevealProgress, insertQueuedCard, moveQueuedCard, removeQueuedCard,
   revealCardsAt, roundTimeline, shootoutRound, winsAfter, type RevealCard,
 } from '../logic/cardRpsPresentation';
 import {
-  cardRpsAssets, CARD_COLUMNS, CARD_H, CARD_ORDER, CARD_ROWS, CARD_W,
-  CLASH_FRAME_H, CLASH_FRAME_W, CLASH_FRAMES, FACE_H, FACE_ORDER, FACE_W,
-  MOUSE_DEALER_COLUMNS, MOUSE_DEALER_H, MOUSE_DEALER_ROWS, MOUSE_DEALER_W,
+  cardRpsAssets, cardRpsHd, CARD_COLUMNS, CARD_ORDER, CARD_ROWS,
+  HD_CARD_H, HD_CARD_W, HD_CHEESE_ORDER, HD_LAYOUT, HD_ROOM_H, HD_ROOM_W,
 } from '../assets/cardRps';
 import './cardRpsGame.css';
 
 const LABEL = RPS_HAND_LABEL;
 const DEFAULT_APPEARANCE: PublicAvatarAppearance = { skin: null, eyes: null, top: null, bottom: null, shoes: null, hair: null };
-/** 무대(테이블) 논리 크기 = table.png 크기. 화면에 맞게 통째로 확대·축소한다. */
-const STAGE_W = 320;
-const STAGE_H = 200;
+/** 무대 논리 크기 = room.webp 크기(layout.json 좌표계). 화면에 맞게 통째로 확대·축소한다. */
+const STAGE_W = HD_ROOM_W;
+const STAGE_H = HD_ROOM_H;
 const DRAG_SLOP = 6;
-/** 카드 크기는 그림 상수에서만 — 그림이 커져도(24×32 → 32×44) CSS가 비율을 따라간다. */
-const CARD_VARS = { '--card-ratio': `${CARD_W} / ${CARD_H}`, '--card-hr': CARD_H / CARD_W } as CSSProperties;
-const DEALER_SCALE = 1.5;
+/** 카드 비율은 그림 칸(192×256)에서만 — CSS가 비율을 따라간다. */
+const CARD_VARS = { '--card-ratio': `${HD_CARD_W} / ${HD_CARD_H}`, '--card-hr': HD_CARD_H / HD_CARD_W } as CSSProperties;
+
+// 고해상도 그림은 모듈을 처음 불러올 때 한 번만 미리 받아 둔다(경기 화면을 열 때 깜빡이지 않게).
+const preloaded = typeof Image === 'undefined' ? [] : Object.values(cardRpsHd).map(src => { const image = new Image(); image.decoding = 'async'; image.src = src; return image; });
+void preloaded;
 
 /** 어느 판·승부차기까지 연출을 보여 줬는지(창을 닫았다 열어도 다시 보지 않게). */
 const revealProgress = new Map<string, { rounds: number; shootout: number }>();
 
 type Mode = 'loading' | 'invited' | 'choosing' | 'waiting' | 'reveal' | 'shootout' | 'result' | 'closed';
 type Anim = { kind: 'round' | 'shootout'; index: number; round: RpsRoundResult };
+type Mood = (typeof HD_CHEESE_ORDER)[number];
 
 const prefersReducedMotion = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
@@ -140,18 +144,16 @@ export function CardRpsGame({ adapter, appearance, opponentAppearance, onClose, 
   const seconds = match?.deadlineAt ? Math.max(0, Math.ceil((match.deadlineAt - now) / 1000)) : null;
   const showTimer = seconds !== null && (mode === 'choosing' || mode === 'waiting' || mode === 'shootout');
 
-  // 표정: 그 판 마지막 맞붙음이 공개된 뒤(배너)부터만. 상대 기준 win/lose.
+  // 표정: 그 판 공개가 다 끝난 뒤(배너)와 경기 결과에서만 — 공개 중에는 스포일러 없음. 상대 기준 win/lose.
   const lastOutcome = (() => {
     if (!match) return null;
     if (mode === 'reveal') return beat?.stage === 'banner' && anim ? anim.round.winner : null;
     if (mode === 'result') return match.winnerId ? match.winnerId === match.me.id ? 'a' : 'b' : null;
-    if (mode === 'shootout') return match.shootout.at(-1)?.result ?? match.rounds.at(-1)?.winner ?? null;
-    if (mode === 'choosing') return match.rounds.at(-1)?.winner ?? null;
     return null;
   })();
-  const opponentMood: 'idle' | 'win' | 'lose' | 'shuffle' = lastOutcome === 'a' ? 'lose' : lastOutcome === 'b' ? 'win'
-    : mode === 'waiting' || (mode === 'choosing' && !match?.rounds.length) ? 'shuffle' : 'idle';
-  const face = lastOutcome === 'a' ? 'lose' : lastOutcome === 'b' ? 'win' : lastOutcome === 'draw' ? 'draw' : null;
+  const face: Mood | null = lastOutcome === 'a' ? 'lose' : lastOutcome === 'b' ? 'win' : lastOutcome === 'draw' ? 'draw' : null;
+  // 내가 고르는 동안은 카드를 섞고, 공개 중에는 가만히 지켜본다.
+  const opponentMood: Mood = face ?? (mode === 'choosing' || mode === 'shootout' || mode === 'loading' ? 'shuffle' : 'idle');
 
   const pointsText = !match ? '' : match.mode === 'npc' ? match.prize > 0 ? `첫 승리 보상 ${match.prize}P` : '연습 판 (보상 없음)' : `판돈 ${match.stake}P`;
   const iWon = !!match && match.winnerId === match.me.id;
@@ -182,6 +184,11 @@ export function CardRpsGame({ adapter, appearance, opponentAppearance, onClose, 
     <section className="pwp-rps-tray" aria-label="내 카드">
       {!match ? <p className="pwp-rps-tray-note" role="status">{failed ? message : '치즈가 카드를 섞고 있어요…'}</p>
         : mode === 'result' ? <div className="pwp-rps-result" role="status">
+          <b className="pwp-rps-result-title">경기 결과</b>
+          <ol className="pwp-rps-rounds" aria-label="판별 결과">
+            {match.rounds.map((round, k) => <li key={k} data-result={round.winner === 'a' ? 'win' : round.winner === 'b' ? 'lose' : 'draw'}>{k + 1}판 <b>{round.winner === 'a' ? '승' : round.winner === 'b' ? '패' : '무'}</b></li>)}
+            {match.shootout.length > 0 && <li data-result={match.winnerId === match.me.id ? 'win' : 'lose'}>승부차기 <b>{match.winnerId === match.me.id ? '승' : '패'}</b></li>}
+          </ol>
           <p className="pwp-rps-delta" data-sign={(match.pointDelta ?? 0) > 0 ? 'plus' : (match.pointDelta ?? 0) < 0 ? 'minus' : 'zero'}>
             <span className="pwp-rps-coin" aria-hidden="true">P</span>
             {(match.pointDelta ?? 0) > 0 ? '+' : ''}{match.pointDelta ?? 0}P
@@ -260,7 +267,7 @@ function SidePlate({ who, name, wins, left }: { who: 'me' | 'them'; name: string
 }
 
 function Hourglass({ seconds }: { seconds: number }) {
-  const ratio = Math.max(0, Math.min(1, seconds / 60));
+  const ratio = Math.max(0, Math.min(1, seconds / (RPS_TURN_MS / 1000)));
   return <div className={`pwp-rps-timer ${seconds <= 10 ? 'urgent' : ''}`} role="timer" aria-label={`남은 시간 ${seconds}초`}>
     <svg viewBox="0 0 9 12" width="18" height="24" shapeRendering="crispEdges" aria-hidden="true">
       <rect x="0" y="0" width="9" height="1" fill="#5a3418" /><rect x="0" y="11" width="9" height="1" fill="#5a3418" />
@@ -286,23 +293,24 @@ function Sprite({ image, columns, rows, column, row, className = '', label, styl
 }
 
 const CARD_SHEET_ROWS = Object.keys(CARD_ROWS).length;
+/** HD 카드 한 장(hd/cards.png — 옛 작은 cards.png와 칸 순서가 같다). */
 function CardFace({ hand, side, className = '' }: { hand?: RpsHand; side: 'mine' | 'theirs'; className?: string }) {
-  return <Sprite className={`pwp-rps-cardface ${className}`} image={cardRpsAssets.cards} columns={CARD_COLUMNS} rows={CARD_SHEET_ROWS}
+  return <Sprite className={`pwp-rps-cardface hd ${className}`} image={cardRpsHd.cards} columns={CARD_COLUMNS} rows={CARD_SHEET_ROWS}
     column={CARD_ORDER.indexOf(hand ?? 'back')} row={CARD_ROWS[side === 'mine' ? 'player' : 'opponent']} />;
 }
 
-// ── 테이블 무대 ─────────────────────────────────────────────
-/** 남은 자리에 맞춰 논리 무대(320×200)를 확대·축소한다. */
+// ── 탁자 무대 ─────────────────────────────────────────────
+/** 남은 자리에 맞춰 논리 무대(방 그림 1600×1000)를 통째로 확대·축소한다. 남는 곳은 어두운 나무 틀(레터박스). */
 function StageBox({ children }: { children: ReactNode }) {
   const box = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
+  const [scale, setScale] = useState(.25);
   useLayoutEffect(() => {
     const element = box.current; if (!element) return;
     const measure = () => {
       const style = getComputedStyle(element);
       const width = element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
       const height = element.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
-      if (width > 0 && height > 0) setScale(Math.max(.5, Math.min(width / STAGE_W, height / STAGE_H)));
+      if (width > 0 && height > 0) setScale(Math.max(.1, Math.min(width / STAGE_W, height / STAGE_H)));
     };
     measure();
     const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
@@ -311,70 +319,109 @@ function StageBox({ children }: { children: ReactNode }) {
     return () => { observer?.disconnect(); window.removeEventListener('resize', measure); };
   }, []);
   return <div ref={box} className="pwp-rps-stagebox">
-    <div className="pwp-rps-stage-frame" style={{ width: STAGE_W * scale, height: STAGE_H * scale }}>
-      <div className="pwp-rps-stage" style={{ width: STAGE_W, height: STAGE_H, transform: `scale(${scale})`, backgroundImage: `url(${cardRpsAssets.table})` }}>{children}</div>
+    <div className="pwp-rps-stage-frame" style={{ width: Math.floor(STAGE_W * scale), height: Math.floor(STAGE_H * scale) }}>
+      <div className="pwp-rps-stage" style={{ width: STAGE_W, height: STAGE_H, transform: `scale(${scale})`, backgroundImage: `url(${cardRpsHd.room})` }}>{children}</div>
     </div>
   </div>;
 }
 
-const THEIR_ROW_Y = 104;
-const ARENA_Y = 142;
-const MY_ROW_Y = STAGE_H - CARD_H / 2 - 4;
-function rowX(index: number, count: number) {
-  const spacing = count > 1 ? Math.min(CARD_W + 4, (STAGE_W - 84 - CARD_W) / (count - 1)) : 0;
-  return STAGE_W / 2 + (index - (count - 1) / 2) * spacing;
+const L = HD_LAYOUT;
+/** 탁자 위 카드는 가운데 줄 크기로 그리고, 줄마다 scale로 원근(먼 줄은 작게)을 준다. */
+const TCARD_H = L.cardHeight.clash;
+const TCARD_W = Math.round(TCARD_H * HD_CARD_W / HD_CARD_H);
+const SEAT = L.opponentSeat;
+const [TABLE_FL, TABLE_FR, TABLE_NR, TABLE_NL] = L.tableTop;
+/** 탁자 윗면의 y 높이에서 왼쪽·오른쪽 끝 x. */
+function tableEdges(y: number) {
+  const t = Math.max(0, Math.min(1, (y - TABLE_FL[1]) / (TABLE_NL[1] - TABLE_FL[1])));
+  return { left: TABLE_FL[0] + (TABLE_NL[0] - TABLE_FL[0]) * t, right: TABLE_FR[0] + (TABLE_NR[0] - TABLE_FR[0]) * t };
 }
+function rowSpot(side: 'a' | 'b', index: number, count: number) {
+  const y = side === 'a' ? L.rows.mine : L.rows.opponent;
+  const h = side === 'a' ? L.cardHeight.mine : L.cardHeight.opponent;
+  const w = h * HD_CARD_W / HD_CARD_H;
+  const { left, right } = tableEdges(y);
+  const room = right - left - w * 1.2;
+  const spacing = count > 1 ? Math.min(w * 1.1, room / (count - 1)) : 0;
+  return { x: (left + right) / 2 + (index - (count - 1) / 2) * spacing, y, s: h / TCARD_H };
+}
+/** 가운데 맞붙는 자리: 두 장이면 나란히(내 카드 왼쪽 아래, 상대 오른쪽 위), 한 장(살아남은 카드)이면 한가운데. */
+function arenaSpot(side: 'a' | 'b', alone: boolean) {
+  if (alone) return { x: SEAT.x, y: L.rows.clash, s: 1.3 };
+  const dir = side === 'a' ? -1 : 1;
+  return { x: SEAT.x + dir * (TCARD_W * .66 + 14), y: L.rows.clash - dir * 12, s: 1.2 };
+}
+
+const FACE_TEXT: Record<Mood, string> = { lose: '×.×', win: '^.^', draw: '-.-', idle: '', shuffle: '' };
+const FACE_LABEL: Record<Mood, string> = { lose: '상대가 울상이에요', win: '상대가 웃어요', draw: '상대가 덤덤해요', idle: '', shuffle: '' };
 
 function TableStage({ match, mode, anim, beat, avatar, opponentAvatar, mood, face, submitted }: {
   match: RpsMatchView | null; mode: Mode; anim: Anim | null; beat: { stage: string; clash: number } | null;
-  avatar: string; opponentAvatar: string; mood: 'idle' | 'win' | 'lose' | 'shuffle'; face: 'win' | 'lose' | 'draw' | null; submitted: RpsHand[];
+  avatar: string; opponentAvatar: string; mood: Mood; face: Mood | null; submitted: RpsHand[];
 }) {
   const cards: RevealCard[] = anim && beat ? revealCardsAt(anim.round, beat as Parameters<typeof revealCardsAt>[1]) : [];
   const clash = anim && beat && (beat.stage === 'hit' || beat.stage === 'exit') ? anim.round.clashes[beat.clash] : null;
+  const arenaCount = cards.filter(card => card.spot === 'arena').length;
+  const shootout = anim?.kind === 'shootout' || mode === 'shootout';
+  const result = mode === 'result' && match ? match.winnerId === match.me.id ? 'win' : 'lose' : null;
   const banner = !match ? null
     : mode === 'reveal' && beat?.stage === 'banner' && anim ? anim.kind === 'shootout'
       ? anim.round.winner === 'draw' ? { text: '한 번 더!', tone: 'draw' } : anim.round.winner === 'a' ? { text: '승부차기 승리!', tone: 'win' } : { text: '승부차기 패배', tone: 'lose' }
       : anim.round.winner === 'a' ? { text: '이번 판 승리!', tone: 'win' } : anim.round.winner === 'b' ? { text: '이번 판 패배', tone: 'lose' } : { text: '이번 판 무승부', tone: 'draw' }
-      : mode === 'result' ? match.winnerId === match.me.id ? { text: '승리!', tone: 'win big' } : { text: '패배…', tone: 'lose big' }
-        : mode === 'shootout' && !match.shootout.length ? { text: '승부차기!', tone: 'draw small' } : null;
+      : result ? result === 'win' ? { text: '승리!', tone: 'win big' } : { text: '패배', tone: 'lose big' } : null;
+  const matText = mode === 'shootout' ? match?.shootout.length ? '한 번 더!' : '승부차기!' : shootout ? '한 장씩!' : 'VS';
   const waitingMine = mode === 'waiting' ? submitted : [];
   const opponentIsNpc = match?.opponent.isNpc ?? true;
+  const opponentName = match?.opponent.nickname ?? '치즈';
   return <>
-    <div className="pwp-rps-opponent">
+    {/* 맞은편 의자: 상대는 탁자 뒤에 앉아 있다(아래 끝 = 탁자 먼 가장자리). */}
+    <div className={`pwp-rps-opponent mood-${mood} ${result ? `result-${result === 'win' ? 'lose' : 'win'}` : ''}`}
+      style={{ left: SEAT.x, top: SEAT.bottomY - L.opponentScale, width: L.opponentScale, height: L.opponentScale }}>
       {opponentIsNpc
-        ? <Sprite className={`pwp-rps-dealer mood-${mood}`} image={cardRpsAssets.mouseDealer} columns={MOUSE_DEALER_COLUMNS} rows={Object.keys(MOUSE_DEALER_ROWS).length} column={0} row={MOUSE_DEALER_ROWS[mood]} label="쥐 카드 딜러 치즈" style={{ width: MOUSE_DEALER_W * DEALER_SCALE, height: MOUSE_DEALER_H * DEALER_SCALE }} />
-        : opponentAvatar ? <img className="pwp-rps-foe" src={opponentAvatar} alt="상대 아바타 앞모습" /> : <span className="pwp-rps-foe placeholder" aria-hidden="true" />}
-      {face && <span className="pwp-rps-face" role="img" aria-label={face === 'win' ? '상대가 웃어요' : face === 'lose' ? '상대가 울상이에요' : '상대가 덤덤해요'}>
-        <Sprite image={cardRpsAssets.faces} columns={FACE_ORDER.length} rows={1} column={FACE_ORDER.indexOf(face)} row={0} style={{ width: FACE_W, height: FACE_H }} />
-      </span>}
+        ? <span className="pwp-rps-cheese" role="img" aria-label={`쥐 카드 딜러 치즈${mood === 'shuffle' ? ' — 카드를 섞는 중' : ''}`}
+          style={{ backgroundImage: `url(${cardRpsHd.cheese})`, backgroundPosition: `${HD_CHEESE_ORDER.indexOf(mood) / (HD_CHEESE_ORDER.length - 1) * 100}% 0` }} />
+        : opponentAvatar ? <img className="pwp-rps-foe" src={opponentAvatar} alt={`${opponentName} 앞모습`} /> : <span className="pwp-rps-foe placeholder" aria-hidden="true" />}
     </div>
-    {mode === 'waiting' && match && <span className="pwp-rps-speech" style={{ left: STAGE_W / 2, top: THEIR_ROW_Y - 6 }}>{match.opponent.submitted ? '다 골랐어요!' : '고르는 중…'}</span>}
-    {avatar ? <img className="pwp-rps-me" src={avatar} alt="내 아바타 뒷모습" /> : <span className="pwp-rps-me placeholder" aria-hidden="true" />}
+    {face && FACE_TEXT[face] && <span key={face} className={`pwp-rps-face ${face}`} role="img" aria-label={FACE_LABEL[face]}
+      style={{ left: SEAT.x + L.opponentScale * .42, top: SEAT.bottomY - L.opponentScale * .98 }}><b>{FACE_TEXT[face]}</b></span>}
+    {mode === 'waiting' && match && <span className="pwp-rps-speech" style={{ left: SEAT.x - L.opponentScale * .45, top: SEAT.bottomY - L.opponentScale * .72 }}>{match.opponent.submitted ? '다 골랐어요!' : '고르는 중…'}</span>}
 
-    {/* 줄·가운데 카드: 위치는 CSS 변수, 옮겨 가는 동작은 transition. */}
+    {/* 가운데 맞붙는 자리(설명서 2쪽의 탁자 가운데 판). */}
+    <div className={`pwp-rps-mat ${result ? 'hidden' : ''}`} style={{ left: SEAT.x, top: L.rows.clash }} aria-hidden="true">
+      {(anim ? beat?.stage === 'facedown' : mode !== 'result' && mode !== 'closed') && <b>{matText}</b>}
+    </div>
+
+    {/* 줄·가운데 카드: 위치·크기는 CSS 변수, 옮겨 가는 동작은 transition. */}
     <div className="pwp-rps-cards" aria-live="polite">
       {cards.map(card => {
-        const count = anim!.round[card.side].length;
-        const x = card.spot === 'row' ? rowX(card.index, count) : STAGE_W / 2 + (card.side === 'a' ? -1 : 1) * (CARD_W / 2 + 12);
-        const y = card.spot === 'row' ? card.side === 'a' ? MY_ROW_Y : THEIR_ROW_Y : ARENA_Y + (card.side === 'a' ? 6 : -6);
-        return <TableCard key={`${anim!.kind}${anim!.index}-${card.side}${card.index}`} card={card} x={x} y={y} />;
+        const spot = card.spot === 'row' ? rowSpot(card.side, card.index, anim!.round[card.side].length)
+          : card.spot === 'arena' ? arenaSpot(card.side, arenaCount === 1)
+            : (() => { const from = arenaSpot(card.side, false); const dir = card.side === 'a' ? -1 : 1; return { x: from.x + dir * 230, y: from.y - dir * 70, s: .8 }; })();
+        const survivor = card.spot === 'arena' && arenaCount === 1 && !!beat && beat.stage !== 'flip' && beat.stage !== 'enter';
+        return <TableCard key={`${anim!.kind}${anim!.index}-${card.side}${card.index}`} card={card} spot={spot} halo={card.mark === 'win' || survivor} />;
       })}
-      {waitingMine.map((_, index) => <TableCard key={`wait-${index}`} card={{ side: 'a', index, hand: 'rock', spot: 'row', faceUp: false, mark: null, flipping: false }} x={rowX(index, waitingMine.length)} y={MY_ROW_Y} />)}
-      {clash && <Sprite key={`${anim!.index}-${beat!.clash}`} className={`pwp-rps-spark ${clash.result === 'draw' ? 'draw' : ''}`} image={cardRpsAssets.clash} columns={CLASH_FRAMES} rows={1} column={0} row={0}
-        style={{ left: STAGE_W / 2, top: ARENA_Y, width: CLASH_FRAME_W, height: CLASH_FRAME_H }} label="카드 충돌" />}
+      {waitingMine.map((_, index) => <TableCard key={`wait-${index}`} card={{ side: 'a', index, hand: 'rock', spot: 'row', faceUp: false, mark: null, flipping: false }} spot={rowSpot('a', index, waitingMine.length)} halo={false} />)}
+      {clash && <span key={`${anim!.index}-${beat!.clash}`} className={`pwp-rps-burst ${clash.result === 'draw' ? 'draw' : ''}`} role="img" aria-label="카드 충돌"
+        style={{ left: SEAT.x, top: L.rows.clash, backgroundImage: `url(${cardRpsHd.fx})` }} />}
     </div>
-    {anim && beat?.stage !== 'banner' && <span className="pwp-rps-vs" aria-hidden="true">VS</span>}
+
+    {/* 나: 앞쪽 아래, 뒷모습이 화면 아래 끝에 잘린다(설명서 2쪽의 플레이어 A). */}
+    <div className={`pwp-rps-me-wrap ${result ? `result-${result}` : ''}`}>
+      {avatar ? <img className="pwp-rps-me" src={avatar} alt="내 아바타 뒷모습" /> : <span className="pwp-rps-me placeholder" aria-hidden="true" />}
+      {result === 'lose' && <span className="pwp-rps-face lose mine" role="img" aria-label="내가 울상이에요"><b>×.×</b></span>}
+    </div>
+
     {banner && <div key={banner.text} className={`pwp-rps-banner ${banner.tone}`} role="status"><span>{banner.text}</span></div>}
   </>;
 }
 
-function TableCard({ card, x, y }: { card: RevealCard; x: number; y: number }) {
+function TableCard({ card, spot, halo }: { card: RevealCard; spot: { x: number; y: number; s: number }; halo: boolean }) {
   const side = card.side === 'a' ? 'mine' : 'theirs';
   const label = card.faceUp ? `${card.side === 'a' ? '내' : '상대'} ${LABEL[card.hand]} 카드` : `${card.side === 'a' ? '내' : '상대'} 뒤집힌 카드`;
   return <span className={`pwp-rps-tcard ${side} spot-${card.spot} ${card.faceUp ? 'up' : 'down'} ${card.mark ? `mark-${card.mark}` : ''} ${card.flipping ? 'flipping' : ''}`}
-    style={{ '--x': `${x - CARD_W / 2}px`, '--y': `${y - CARD_H / 2}px`, width: CARD_W, height: CARD_H } as CSSProperties} role="img" aria-label={label}>
+    style={{ '--x': `${spot.x - TCARD_W / 2}px`, '--y': `${spot.y - TCARD_H / 2}px`, '--s': spot.s, width: TCARD_W, height: TCARD_H } as CSSProperties} role="img" aria-label={label}>
     <span className="pwp-rps-lift">
-      {card.mark === 'win' && <Sprite className="pwp-rps-glow" image={cardRpsAssets.glow} columns={1} rows={1} column={0} row={0} />}
+      {halo && <span className="pwp-rps-halo" aria-hidden="true" style={{ backgroundImage: `url(${cardRpsHd.fx})` }}><i /><i /><i /><i /></span>}
       <span className="pwp-rps-flip">
         <CardFace className="front" hand={card.hand} side={side} />
         <CardFace className="back" side={side} />
@@ -533,7 +580,17 @@ async function avatarFrame(appearance: PublicAvatarAppearance, pose: 'Idle_Front
   const ctx = canvas.getContext('2d'); if (!ctx) return '';
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(sheet, 0, AVATAR_POSES.indexOf(pose) * AVATAR_FRAME, AVATAR_FRAME, AVATAR_FRAME, 0, 0, AVATAR_FRAME, AVATAR_FRAME);
-  return canvas.toDataURL();
+  // 그림이 있는 부분만 잘라 낸다(무대에서 키를 정확히 맞추려고).
+  const { data } = ctx.getImageData(0, 0, AVATAR_FRAME, AVATAR_FRAME);
+  let left = AVATAR_FRAME, top = AVATAR_FRAME, right = -1, bottom = -1;
+  for (let y = 0; y < AVATAR_FRAME; y++) for (let x = 0; x < AVATAR_FRAME; x++) {
+    if (data[(y * AVATAR_FRAME + x) * 4 + 3] < 16) continue;
+    left = Math.min(left, x); right = Math.max(right, x); top = Math.min(top, y); bottom = Math.max(bottom, y);
+  }
+  if (right < 0) return canvas.toDataURL();
+  const cut = document.createElement('canvas'); cut.width = right - left + 1; cut.height = bottom - top + 1;
+  cut.getContext('2d')?.drawImage(canvas, left, top, cut.width, cut.height, 0, 0, cut.width, cut.height);
+  return cut.toDataURL();
 }
 
 export function CardRpsRules({ onClose }: { onClose(): void }) {

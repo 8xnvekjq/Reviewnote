@@ -120,6 +120,7 @@ try {
     await page.locator('.pwp-rps-banner.big').waitFor();
     assert.match(await page.locator('.pwp-rps-delta').innerText(), /P/);
     assert.equal(await page.locator('.pwp-rps-result button:has-text("다시 하기")').count(), 1);
+    await page.waitForTimeout(700); // 결과 판이 튀어나오는 연출이 끝난 모습으로 찍는다.
     await page.screenshot({ path: '.test-artifacts/card-rps-result.png' });
     await page.getByTestId('rules').evaluate(button => button.click());
     await page.locator('.pwp-rps-rules').waitFor();
@@ -127,7 +128,30 @@ try {
     await page.screenshot({ path: '.test-artifacts/card-rps-rules-2.png' });
     await page.close();
   }
-  console.log(`PASS card RPS: layout ${SIZES.map(s => s.join('x')).join(', ')}; NPC match with tap/drag/autoplay reveal/result; rules page 2`);
+  // 3) 승부차기(seed 25 + 위와 같은 고르기): 같은 탁자 가운데에 한 장씩 던져 동시에 뒤집는다.
+  {
+    const page = await browser.newPage({ viewport: { width: 1180, height: 820 } });
+    await page.goto(`${base}/tests/pixel-world-phaser/card-rps.harness.html?seed=25`);
+    const picks = [async () => { await page.locator('.pwp-rps-handcard[data-hand="paper"]').first().click(); await page.locator('.pwp-rps-handcard[data-hand="paper"]').first().click(); },
+      async () => { for (let i = 0; i < 2; i++) await page.locator('.pwp-rps-handcard').first().click(); },
+      async () => { while (await page.locator('.pwp-rps-handcard').count()) await page.locator('.pwp-rps-handcard').first().click(); }];
+    for (const pick of picks) {
+      await waitMode(page, ['choosing', 'shootout', 'result']);
+      if (await mode(page) !== 'choosing') break;
+      await pick();
+      await page.locator('.pwp-rps-submit:enabled').click();
+      await waitMode(page, ['reveal']);
+    }
+    await waitMode(page, ['shootout'], 40000);
+    await page.screenshot({ path: '.test-artifacts/card-rps-shootout.png' });
+    await page.locator('.pwp-rps-shoot-card:enabled').first().click();
+    await page.waitForSelector('.pwp-rps[data-beat="hit"]', { timeout: 8000 });
+    assert.equal(await page.locator('.pwp-rps-tcard.spot-arena').count(), 2, '승부차기: 두 장이 가운데에서 맞붙는다');
+    await page.screenshot({ path: '.test-artifacts/card-rps-shootout-hit.png' });
+    await waitMode(page, ['shootout', 'result'], 20000);
+    await page.close();
+  }
+  console.log(`PASS card RPS: layout ${SIZES.map(s => s.join('x')).join(', ')}; NPC match with tap/drag/autoplay reveal/result; rules page 2; shootout`);
 } finally {
   await browser.close();
 }
