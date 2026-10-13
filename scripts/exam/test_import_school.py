@@ -63,14 +63,14 @@ class CoverTests(unittest.TestCase):
             yield path, config, resolve_pdf(config, path)
 
     def test_three_real_covers(self):
-        expected = {'dunchon': dict(questionCount=22, points=100), 'yeongpa': dict(questionCount=20, points=25), 'dongbuk': None, 'sangil': dict(questionCount=23, points=None), 'daedong': dict(questionCount=22, points=100), 'godeok': dict(questionCount=26, points=100)}
+        expected = {'dunchon': dict(questionCount=22, points=100), 'yeongpa': dict(questionCount=20, points=25), 'dongbuk': None, 'sangil': dict(questionCount=23, points=None), 'daedong': dict(questionCount=22, points=100), 'godeok': dict(questionCount=26, points=100), 'seongdeok': None}
         for _, config, pdf in self.configs():
             with self.subTest(school=config['slug']), fitz.open(pdf) as doc:
                 self.assertEqual(read_cover(doc), expected[config['slug']])
 
     def test_omitted_count_identical_output_bytes(self):
         for _, config, pdf in self.configs():
-            if config['slug'] == 'dongbuk':
+            if config['slug'] in ('dongbuk', 'seongdeok'):
                 continue
             self.assertNotIn('questionCount', config['paper'])
             config['pdf'] = str(pdf)
@@ -93,7 +93,7 @@ class CoverTests(unittest.TestCase):
 
     def test_config_cover_mismatch_leaves_no_output(self):
         for _, config, pdf in self.configs():
-            if config['slug'] == 'dongbuk':
+            if config['slug'] in ('dongbuk', 'seongdeok'):
                 continue
             config['pdf'] = str(pdf)
             config['paper']['questionCount'] = 99
@@ -116,7 +116,7 @@ class CoverTests(unittest.TestCase):
 
     def test_cover_point_scale_mismatch_leaves_no_output(self):
         for _, config, pdf in self.configs():
-            if config['slug'] == 'dongbuk':
+            if config['slug'] in ('dongbuk', 'seongdeok'):
                 continue
             config['pdf'] = str(pdf)
             config['pointScale'] = 2
