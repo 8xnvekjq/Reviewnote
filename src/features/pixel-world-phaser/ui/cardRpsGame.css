@@ -1,6 +1,6 @@
 /* 천광명월 카드 가위바위보 — 화면 전체 픽셀 게임 화면(2026-10-13 다시 그림).
    색은 table.png(나무 벽·등불·파란 깃발)에 맞춘 따뜻한 갈색 계열, 굵은 어두운 테두리. */
-.pwp-rps-screen{
+.pwp-window.pwp-rps-screen{
   --ink:#2b1a10;--wood:#9a6236;--wood-d:#6e4122;--wood-l:#c98f4e;--cream:#fbe7b5;--gold:#f2b944;--gold-d:#b8741a;--gold-l:#ffe08a;
   --blue:#3f78b5;--red:#c9473b;--green:#5f9b3c;
   position:fixed;inset:0;z-index:60;box-sizing:border-box;display:grid;
@@ -35,7 +35,7 @@
 .pwp-rps-screen button:focus-visible{outline:3px solid #fff4c4;outline-offset:2px}
 
 /* ── HUD ── */
-.pwp-rps-hud{grid-area:hud;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) 46px;gap:6px;align-items:stretch}
+.pwp-rps-screen .pwp-rps-hud{grid-area:hud;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) 46px;gap:6px;align-items:stretch}
 .pwp-rps-plate,.pwp-rps-hud-mid,.pwp-rps-tray,.pwp-rps-frame,.pwp-rps-rules{
   border:3px solid var(--ink);background:var(--wood) repeating-linear-gradient(0deg,#9a6236 0 9px,#8f5a31 9px 11px);
   box-shadow:inset 0 0 0 2px var(--wood-l),inset 0 0 0 4px var(--wood-d),0 3px 0 #120a05;
@@ -88,9 +88,9 @@
 .pwp-rps-vs{position:absolute;left:50%;top:142px;z-index:2;transform:translate(-50%,-50%);font-size:11px;font-weight:900;color:var(--gold-l);text-shadow:1px 0 var(--ink),-1px 0 var(--ink),0 1px var(--ink),0 -1px var(--ink)}
 
 /* 탁자 위 카드: 자리(transform) → 들기·흔들기(.lift) → 뒤집기(.flip) 세 겹. */
-.pwp-rps-tcard{position:absolute;left:0;top:0;display:block;transform:translate(var(--x),var(--y));transition:transform .2s cubic-bezier(.2,.8,.3,1);perspective:180px}
+.pwp-rps-tcard{position:absolute;left:0;top:0;display:block;transform:translate(var(--x),var(--y));transition:transform .2s cubic-bezier(.2,.8,.3,1)}
 .pwp-rps-tcard.spot-arena{z-index:3}
-.pwp-rps-lift{position:relative;display:block;width:100%;height:100%}
+.pwp-rps-lift{position:relative;display:block;width:100%;height:100%;perspective:180px}
 .pwp-rps-flip{position:relative;display:block;width:100%;height:100%;transform-style:preserve-3d;transition:transform .36s cubic-bezier(.4,.1,.3,1.3)}
 .pwp-rps-tcard.down .pwp-rps-flip{transform:rotateY(180deg)}
 .pwp-rps-flip .pwp-rps-cardface{position:absolute;inset:0;width:100%;height:100%;backface-visibility:hidden;-webkit-backface-visibility:hidden;filter:drop-shadow(0 2px 0 #0008)}
@@ -139,7 +139,7 @@
 .pwp-rps-ghost{position:fixed;z-index:100;display:block;aspect-ratio:var(--card-ratio);pointer-events:none;transform:rotate(-5deg) scale(1.15);filter:drop-shadow(0 8px 0 #0007)}
 .pwp-rps-screen .pwp-rps-submit{width:100%;min-height:50px;font-size:20px}
 .pwp-rps-tray-note{margin:10px 4px;text-align:center;font-size:15px}
-.pwp-rps-message{margin:6px 0 0;padding:4px 8px;text-align:center;font-size:13px;color:#fff3df;background:#8e2b1f;border:2px solid var(--ink)}
+.pwp-rps-message{position:absolute;left:10px;right:10px;bottom:calc(100% + 6px);z-index:5;margin:0;padding:4px 8px;text-align:center;font-size:13px;color:#fff3df;background:#8e2b1f;border:2px solid var(--ink)}
 
 .pwp-rps-shootout{display:flex;flex-direction:column;gap:6px}
 .pwp-rps-shoot-cards{display:flex;justify-content:center;gap:clamp(10px,4vw,28px);padding:4px 0 2px}
@@ -164,7 +164,7 @@
 .pwp-rps-frame p{margin:0 0 14px;font-size:17px;line-height:1.45}.pwp-rps-frame p b{color:#ffb19f}
 
 /* ── 설명서 ── */
-.pwp-rps-rules-screen{grid-template-rows:minmax(0,1fr);grid-template-areas:"main";place-items:center}
+.pwp-window.pwp-rps-rules-screen{grid-template-rows:minmax(0,1fr);grid-template-areas:"main";place-items:center}
 .pwp-rps-rules{grid-area:main;display:flex;flex-direction:column;gap:8px;width:min(900px,100%);height:100%;min-height:0;padding:8px 10px 10px;text-align:center}
 .pwp-rps-rules-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .pwp-rps-rules-head b{font-size:18px}
@@ -178,7 +178,7 @@
 
 /* 폰 가로: 무대 왼쪽, 쟁반 오른쪽. */
 @media (orientation:landscape) and (max-height:560px){
-  .pwp-rps-screen:not(.pwp-rps-rules-screen){grid-template-columns:minmax(0,1fr) minmax(280px,50%);grid-template-rows:auto minmax(0,1fr);grid-template-areas:"hud hud" "stage tray";gap:5px}
+  .pwp-window.pwp-rps-screen:not(.pwp-rps-rules-screen){grid-template-columns:minmax(0,1fr) minmax(280px,50%);grid-template-rows:auto minmax(0,1fr);grid-template-areas:"hud hud" "stage tray";gap:5px}
   .pwp-rps-tray{--tw:clamp(26px,calc((50vw - 64px) / 9 - 6px),52px);align-self:end;max-height:100%;overflow:auto;padding:6px 8px 8px}
   .pwp-rps-queue,.pwp-rps-hand{gap:6px 5px;padding:6px 5px 4px}
   .pwp-rps-plate{padding:3px 8px}.pwp-rps-plate-name{font-size:13px}
@@ -188,7 +188,7 @@
   .pwp-rps-screen .pwp-rps-submit{min-height:44px}
 }
 @media (max-width:420px){
-  .pwp-rps-hud{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) 42px;gap:4px}
+  .pwp-rps-screen .pwp-rps-hud{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) 42px;gap:4px}
   .pwp-rps-hud-mid{min-width:0;padding:4px 6px}
   .pwp-rps-timebar{width:40px}
   .pwp-rps-plate{padding:4px 6px}.pwp-rps-plate-name{font-size:13px}
