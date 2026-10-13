@@ -14,6 +14,8 @@ export interface ReelGame {
   axes: ReelAxisInput[]; axis: number; lastTap: number; tapCount: number;
   // 비둘기: 진행이 바닥나도 1초 버텨 주기(남은 횟수·이번 판에 쓴 횟수·버티는 끝 시각).
   rescueLeft: number; rescuesUsed: number; rescueUntil: number;
+  // 상어·고래: 패턴이 바뀐 뒤 잠깐 지쳐 느리게 헤엄치는 끝 시각.
+  tiredUntil: number;
   status: 'playing' | 'landed' | 'escaped';
 }
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -31,9 +33,12 @@ function pickHeavyPattern(g: ReelGame, t: number) {
   const pool = HEAVY_PATTERNS.filter(p => p.kind !== g.motion);
   let roll = random(g) * pool.reduce((sum, p) => sum + p.weight, 0);
   const pattern = pool.find(p => (roll -= p.weight) < 0) ?? pool[pool.length - 1];
+  // 첫 패턴(아직 wander)이 아니면 패턴 사이에 잠깐 지친다 — 돌진은 쉬고 난 뒤에.
+  const rest = g.motion === 'wander' ? 0 : HEAVY.tiredSeconds;
+  g.tiredUntil = t + rest;
   g.motion = pattern.kind; g.motionStart = t; g.motionTurn = random(g) < .5 ? -1 : 1;
   g.nextTarget = t + pattern.seconds[0] + random(g) * (pattern.seconds[1] - pattern.seconds[0]);
-  if (pattern.kind === 'dive' || pattern.kind === 'zigzag') g.burstUntil = t + .35 + random(g) * .25;
+  if (pattern.kind === 'dive' || pattern.kind === 'zigzag') g.burstUntil = t + rest + .35 + random(g) * .25;
 }
 /** 지금 패턴이 향하는 목표점(원 중심 0, 위가 +). */
 function heavyTarget(g: ReelGame, t: number): [number, number] {
@@ -53,7 +58,9 @@ export const REEL_MARGIN_MS = 150;
 /** 상어·고래 릴 설정: 위로 헤엄칠 때 속도 배율(0.85 = 15% 느리게), 내 원을 끌어내리는 힘과 최대 낙하 속도. */
 // 2026-10 조정: 5가지 패턴(위 오래·아래 짧게, 좌우 크게)과 함께 끌어내리는 힘 6.1 — 실력 좋은 학생 약 80% 성공,
 // 아래 머무는 시간은 위의 절반 정도, 탭은 보통 난이도 5의 약 1.6배.
-export const HEAVY = { upSpeed: .85, gravity: 6.1, maxFall: 2.2 };
+// 2026-10-14 완화(학생들이 너무 어렵다고 함): 탭 점프 1.0(약 40% 높이), 원 밖 진행 감소 25% 느리게,
+// 패턴이 바뀔 때마다 0.5초 지쳐서 절반 속도(그동안 돌진 없음). 끌어내리는 힘·최대 낙하는 그대로.
+export const HEAVY = { upSpeed: .85, gravity: 6.1, maxFall: 2.2, tapVelocity: 1, lossScale: .75, tiredScale: .5, tiredSeconds: .5 };
 /** 오리: 릴 원 +10%. 비둘기: 바닥나도 버텨 주는 시간(초). */
 export const DUCK_ZONE_BONUS = 1.1;
 export const PIGEON_RESCUE_S = 1;
@@ -65,7 +72,7 @@ export function createReelGame(difficulty = 1, duck = false, big = false, seed =
     targetX: 0, targetY: 0, nextTarget: 0, burstUntil: 0, pauseUntil: 0,
     motion: 'wander', motionStart: 0, motionAngle: 0, motionTurn: 1, wanderFrequency: 3,
     progress: .35, elapsed: 0, remainder: 0, taps: [], axes: [], axis: 0, lastTap: -1, tapCount: 0,
-    rescueLeft: Math.max(0, Math.floor(rescues)), rescuesUsed: 0, rescueUntil: -1, status: 'playing' };
+    rescueLeft: Math.max(0, Math.floor(rescues)), rescuesUsed: 0, rescueUntil: -1, tiredUntil: 0, status: 'playing' };
 }
 function random(g: ReelGame) {
   g.random = (Math.imul(g.random, 1664525) + 1013904223) >>> 0;
@@ -91,7 +98,7 @@ export function stepReelGame(game: ReelGame, deltaMs: number, taps: readonly num
     const erratic = clamp((g.difficulty - 3.5) / 1.5, 0, 1);
     while (g.axes.length && g.axes[0].time <= t * 1000 + 1e-7) g.axis = clamp(g.axes.shift()!.x, -1, 1);
     while (g.taps.length && g.taps[0] <= t * 1000 + 1e-7) {
-      g.taps.shift(); g.velocity = .85; g.lastTap = t; g.tapCount++;
+      g.taps.shift(); g.velocity = g.heavy ? HEAVY.tapVelocity : .85; g.lastTap = t; g.tapCount++;
     }
     g.velocityX += (g.axis * 1.8 - g.velocityX) * 9 * dt;
     g.velocity = Math.max(g.heavy ? -HEAVY.maxFall : -1.6, g.velocity - (g.heavy ? HEAVY.gravity : 2.3) * dt);
@@ -135,7 +142,8 @@ export function stepReelGame(game: ReelGame, deltaMs: number, taps: readonly num
     // 중간 난도는 속도로, 최고 난도는 짧은 머무름과 날카로운 회전으로 추적을 어렵게 한다.
     // 상어·고래는 좌우로 끝까지 휩쓸 만큼 빠르게(휩쓸기·아래 처박기는 더 빠르게).
     const cruiseSpeed = g.heavy ? (g.motion === 'climb' ? .8 : 1.15) : swimmingSpeed * (1 + erratic * (2.45 - 2.4 * erratic));
-    const speed = t < g.pauseUntil && !struggle ? .03 : cruiseSpeed * (t < g.burstUntil || struggle ? 1.9 : 1);
+    const tired = g.heavy && t < g.tiredUntil;
+    const speed = t < g.pauseUntil && !struggle ? .03 : cruiseSpeed * (tired ? HEAVY.tiredScale : t < g.burstUntil || struggle ? 1.9 : 1);
     const curve = Math.sin(t * g.wanderFrequency + g.seed) * (.12 + d * .04);
     const edge = g.heavy ? 0 : Math.max(0, Math.hypot(g.fishX, g.fish) - .72) * 3;
     const vx = dx / (distance || 1) * Math.min(speed, distance * 3) - g.fishVY * curve - g.fishX * edge;
@@ -150,7 +158,7 @@ export function stepReelGame(game: ReelGame, deltaMs: number, taps: readonly num
     }
     [g.fishX, g.fish, g.fishVX, g.fishVY] = constrain(g.fishX + g.fishVX * dt, g.fish + g.fishVY * dt, g.fishVX, g.fishVY, .94);
     const inside = Math.hypot(g.zoneX - g.fishX, g.zone - g.fish) <= g.zoneSize;
-    g.progress = clamp(g.progress + (inside ? (.105 - d * .006) * g.speed : -(d <= 1 ? .13 + d * .12 : d <= 2 ? .25 - (d - 1) * .06 : .19 - (d - 2) * .015)) * dt, 0, 1);
+    g.progress = clamp(g.progress + (inside ? (.105 - d * .006) * g.speed : -(d <= 1 ? .13 + d * .12 : d <= 2 ? .25 - (d - 1) * .06 : .19 - (d - 2) * .015) * (g.heavy ? HEAVY.lossScale : 1)) * dt, 0, 1);
     if (g.progress >= 1 && t * 1000 >= minReelMs(g.difficulty, g.speed) + REEL_MARGIN_MS) g.status = 'landed';
     else if (t >= 75) g.status = 'escaped';
     else if (g.progress <= 0) {
