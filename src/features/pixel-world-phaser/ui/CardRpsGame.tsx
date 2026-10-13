@@ -124,12 +124,22 @@ export function CardRpsGame({ adapter, appearance, opponentAppearance, onClose, 
     setBusy(true); setMessage('');
     try { setMatch(await task()); return true; } catch { setMessage('잠시 뒤 다시 해 주세요.'); return false; } finally { setBusy(false); }
   };
-  const submit = () => {
-    if (!match || !queue.length || busy) return;
-    const cards = [...queue];
+  const send = (cards: RpsHand[]) => {
+    if (!match) return Promise.resolve(false);
     setSubmitted({ matchId: match.matchId, round: match.rounds.length, cards });
-    void act(() => adapter.submitCards(match.matchId, cards)).then(ok => { if (!ok) setSubmitted(null); });
+    return act(() => adapter.submitCards(match.matchId, cards)).then(ok => { if (!ok) setSubmitted(null); return ok; });
   };
+  const submit = () => { if (match && queue.length && !busy) void send([...queue]); };
+  // 낼 카드가 하나도 없으면 빈 손으로 낸 것으로 친다(규칙: 그 판은 진다). 120초를 그냥 기다리지 않게 자동으로 보낸다.
+  const autoEmpty = useRef('');
+  const outOfCards = mode === 'choosing' && !!match && inventoryTotal(match.me.inventory) === 0;
+  useEffect(() => {
+    if (!outOfCards || busy || !match) return;
+    const key = `${match.matchId}:${match.rounds.length}`;
+    if (autoEmpty.current === key) return;
+    autoEmpty.current = key;
+    void send([]).then(ok => { if (!ok) autoEmpty.current = ''; });
+  }, [outOfCards, busy, match?.matchId, match?.rounds.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const leaveNow = () => { if (match && !['finished', 'declined', 'expired', 'cancelled'].includes(match.status)) void adapter.leave(match.matchId).catch(() => {}); onClose(); };
   const active = !!match && !['finished', 'declined', 'expired', 'cancelled'].includes(match.status);
   const requestClose = () => { if (active) setConfirmLeave(true); else onClose(); };
