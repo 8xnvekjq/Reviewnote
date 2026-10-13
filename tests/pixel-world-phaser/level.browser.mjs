@@ -12,6 +12,14 @@ const exit = (page, pattern) => page.evaluate(pattern => {
   if (!key) throw new Error('출구 없음: ' + JSON.stringify(exits));
   h.walkToScreen(exits[key].x, exits[key].y);
 }, pattern);
+// 텃밭 0번 칸(익은 토마토): 아래 칸까지 걸어간 뒤 그 칸을 찍어 딴다(도구 막대가 뜬 뒤).
+async function harvestCell0(page) {
+  await page.evaluate(()=>{const h=window.__pixelWorldPhaser,p=h.debug().garden.points[8];h.walkToScreen(p.x,p.y)});
+  await page.waitForFunction(()=>{const d=window.__pixelWorldPhaser.debug();return !d.moving&&d.pathLength===0&&d.garden?.near});
+  await page.locator('.pwp-garden-tools').waitFor();
+  const p=(await page.evaluate(()=>window.__pixelWorldPhaser.debug())).garden.points[0];
+  await page.mouse.click(p.x,p.y);
+}
 try {
   for (const width of [390, 1180]) {
     const context = await browser.newContext({ viewport: { width, height: 844 } });
@@ -98,23 +106,18 @@ try {
     await page.screenshot({path:`scratch/level/xp-${width}.png`});
     // 구형 서버의 성공한 수확도 표시용 경험치만 보여 준다.
     await page.goto(base + '/tests/pixel-world-phaser/harness.html?farm=1'); await ready(page,'yard');
-    await page.evaluate(()=>{const h=window.__pixelWorldPhaser,t=h.debug().targets['farm:0'];h.walkToScreen(t.x,t.y)});
-    const farm=page.getByRole('dialog',{name:'1번 토마토 밭',exact:true}); await farm.waitFor();
-    await farm.getByRole('button',{name:'토마토 수확하기',exact:true}).click();
-    await farm.getByText('+40 XP',{exact:true}).waitFor();
+    await harvestCell0(page);
+    const farm=page.locator('.pwp-garden-message'); await farm.filter({hasText:'+40 XP'}).waitFor();
     await page.getByRole('button',{name:/^레벨 정보 낚시 Lv\. 1 · 농사 Lv\. 1 /}).waitFor();
-    await farm.locator('.pwp-xp-gain').evaluate(el=>Promise.all(el.getAnimations().map(a=>a.finished)));
     await page.screenshot({path:`scratch/level/harvest-${width}.png`});
     await page.goto(base + '/tests/pixel-world-phaser/level.harness.html?harvest=1'); await ready(page,'yard');
     await page.getByRole('button',{name:/농사 Lv\. 12 /}).waitFor();
-    await page.evaluate(()=>{const h=window.__pixelWorldPhaser,t=h.debug().targets['farm:0'];h.walkToScreen(t.x,t.y)});
-    const liveFarm=page.getByRole('dialog',{name:'1번 토마토 밭',exact:true}); await liveFarm.waitFor();
-    await liveFarm.getByRole('button',{name:'토마토 수확하기',exact:true}).click();
-    await liveFarm.getByText('+40 XP',{exact:true}).waitFor();
+    await harvestCell0(page);
+    await page.locator('.pwp-garden-message').filter({hasText:'+40 XP'}).waitFor();
     // 수확 경험치는 농사 레벨에만 쌓인다(낚시 레벨은 그대로 12).
     await page.locator('.pwp-level-toast').getByText('🌱 농사 레벨 업! Lv. 13',{exact:true}).waitFor();
     const farmBadge = page.getByRole('button',{name:'레벨 정보 낚시 Lv. 12 · 농사 Lv. 13 · 채집 Lv. 1'}); await farmBadge.waitFor();
-    await liveFarm.getByRole('button',{name:'1번 토마토 밭 닫기'}).click(); await farmBadge.click();
+    await farmBadge.click();
     assert.equal(await page.getByRole('progressbar',{name:'농사 다음 레벨 경험치'}).getAttribute('aria-valuenow'),'20');
     assert.ok(await page.evaluate(()=>window.baitCalls.includes('act_pixel_farm')&&window.baitCalls.includes('get_pixel_level')));
     await page.screenshot({path:`scratch/level/harvest-server-${width}.png`});

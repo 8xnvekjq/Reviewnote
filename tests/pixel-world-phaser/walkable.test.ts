@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { yardScene, toWorldCell, RIVER_SIGN, RIVER_EXIT, groundTile, borderTrees } from '../../src/features/pixel-world-phaser/logic/yardWorld.ts';
 import { plazaScene, plazaCell, plazaBorderGap } from '../../src/features/pixel-world-phaser/logic/plazaWorld.ts';
 import { yardWalkable } from '../../src/features/pixel-room/yard/yardModel.ts';
+import { inGardenFootprint, isGardenFence } from '../../src/features/pixel-room/farm/gardenModel.ts';
 import { SCENERY, inRect } from '../../src/features/pixel-room/plaza/plazaLayout.ts';
 import { cellCenter, feetBlocked, facedInteractable, planPath } from '../../src/features/pixel-world-phaser/logic/world.ts';
 import { riverScene } from '../../src/features/pixel-world-phaser/logic/riverWorld.ts';
@@ -15,7 +16,8 @@ for (const scene of [yardScene(), plazaScene()]) {
   test(`${scene.id}: all drawn open cells, exits and interaction approaches reachable from every entry`, () => {
     // 보이지 않는 벽을 찾도록 그리기용 배치에서 기대값을 따로 만든다.
     const obstacle = (x: number, y: number) => scene.id === 'yard'
-      ? (x === RIVER_SIGN.x && y === RIVER_SIGN.y) || (x >= 5 && x < 21 && y >= 5 && y < 17 && !yardWalkable({ x: x - 5, y: y - 5 }))
+      ? (x === RIVER_SIGN.x && y === RIVER_SIGN.y) || (inGardenFootprint({ x: x - 5, y: y - 5 })
+        ? isGardenFence({ x: x - 5, y: y - 5 }) : x >= 5 && x < 21 && y >= 5 && y < 17 && !yardWalkable({ x: x - 5, y: y - 5 }))
       : SCENERY.some(s => inRect({ x: x - 5, y: y - 5 }, s.footprint));
     const terminals = new Set(scene.exits.flatMap(e => e.cells.map(key)));
     for (const entry of Object.values(scene.entries)) {
@@ -65,7 +67,8 @@ test('river sign is solid, readable with A from the path, and uses the requested
   assert.deepEqual(dialogueFor('river-sign', { scarecrowLine: () => '' }), { speaker: '강가 안내판', lines: ['오른쪽으로 쭉 가면 강가가 나와요. 물고기 그림자를 눌러 낚시해 보세요!'] });
   const path = [...Array.from({ length: 8 }, (_, i) => toWorldCell({ x: 7 + i, y: 9 })), toWorldCell({ x: 14, y: 8 }), toWorldCell({ x: 14, y: 7 }), RIVER_EXIT];
   for (const p of path) { assert.equal(groundTile(p.x, p.y), 25); assert.equal(scene.solid(p), false); }
-  for (let x = 19; x <= 25; x++) for (let y = 12; y <= 15; y++) assert.equal(groundTile(x, y), 25);
+  // 강가로 가는 흙길은 텃밭 울타리 윗줄(y=15) 바로 위까지.
+  for (let x = 19; x <= 25; x++) for (let y = 12; y <= 14; y++) assert.equal(groundTile(x, y), 25);
   for (const tree of borderTrees()) assert.equal(scene.solid({ x: tree.x, y: tree.y - 1 }), true);
   assert.equal(plazaScene().solid(plazaCell({ x: -1, y: 6 })), false);
 });

@@ -25,6 +25,7 @@ import type { PlazaBubble } from './plazaBubbles';
 import type { RiverPeerFishing } from '../logic/riverPresence';
 import type { WorldAssets, WorldContext, WorldDebug, WorldEvents, WorldScene } from './WorldScene';
 import type { HeldToolSpec } from './heldTool';
+import type { GardenLook } from '../../pixel-room/farm/gardenModel';
 
 export type { Prompt, WorldAssets, WorldDebug, WorldEvents } from './WorldScene';
 export type { PlazaFrame } from './PlazaScene';
@@ -52,11 +53,15 @@ export interface WorldGameHandle {
   /** 손에 든 도구(가방 손 칸) — 걸어 다닐 때 보인다. null = 맨손. */
   setHeldTool(tool: HeldToolSpec | null): void;
   reactPet(kind: 'feed' | 'pet'): void;
-  farmFx(index: number, action: string): void;
+  /** 텃밭 칸에 도구를 쓴 뒤 효과(수확이면 열매가 가방으로). 앞마당이 아니면 무시. */
+  gardenFx(index: number, action: string, crop?: string): void;
+  /** 텃밭 도구 막대에서 도구를 골랐는지 — 고르면 칸 테두리가 보이고 칸을 찍으면 그 칸에 쓴다. */
+  setGardenTool(active: boolean): void;
   setAnimalFace(face: string): void;
   setAppearance(avatar: WorldAssets['avatar']): void;
   setPet(pet: WorldAssets['pet']): void;
-  setBeds(images: HTMLImageElement[]): void;
+  /** 텃밭 모습(서버 값). 앞마당에 있으면 바로 다시 그린다. */
+  setGarden(look: GardenLook): void;
   /** 방 가구 배치(서버 값). 방에 있으면 바로 다시 그린다. */
   setFurniture(furniture: readonly Placement[]): void;
   getFurniture(): Placement[];
@@ -76,7 +81,7 @@ export interface WorldGameHandle {
 export interface WorldStart {
   face?: string;
   assets: WorldAssets;
-  beds: HTMLImageElement[];
+  garden?: GardenLook;
   furniture: readonly Placement[];
   /** 관리자 시험용 시각·날씨(?pwClock/?pwWeather). 학생에게는 넘기지 않는다. */
   clockOverride?: FishingOverride;
@@ -94,7 +99,7 @@ export function startWorldGame(parent: HTMLElement, start: WorldStart, controls:
     let resolved = false;
     const ctx: WorldContext = {
       face: start.face ?? '🐶', riding: false, assets: start.assets, controls, hooks: events, clockOverride: start.clockOverride,
-      data: { furniture: start.furniture, beds: start.beds, admin: start.admin },
+      data: { furniture: start.furniture, garden: start.garden, admin: start.admin },
       view: { ratio: size.ratio },
       onSceneReady: scene => {
         active = scene;
@@ -196,7 +201,8 @@ export function startWorldGame(parent: HTMLElement, start: WorldStart, controls:
       setLoadFactor: factor => { ctx.loadFactor = Math.min(1, Math.max(0.2, factor)); },
       setHeldTool: tool => { ctx.heldTool = tool; },
       reactPet: kind => active?.reactPet(kind),
-      farmFx: (index, action) => active?.farmFx(index, action),
+      gardenFx: (index, action, crop) => active?.gardenFx(index, action, crop),
+      setGardenTool: on => { ctx.gardenTool = on; },
       setAnimalFace: face => { ctx.face = face; },
       setAppearance: avatar => {
         ctx.assets.avatar = avatar;
@@ -206,8 +212,8 @@ export function startWorldGame(parent: HTMLElement, start: WorldStart, controls:
         ctx.assets.pet = pet;
         active?.refreshPet();
       },
-      setBeds: images => {
-        ctx.data.beds = images;
+      setGarden: look => {
+        ctx.data.garden = look;
         if (active?.scene.key === 'yard') active.refreshData();
       },
       setFurniture: furniture => {

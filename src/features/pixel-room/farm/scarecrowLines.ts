@@ -5,6 +5,7 @@ import type { FarmSnapshot } from './farmModel';
 // bubble) and never mentions numbers/formulas; the actual mechanics stay invisible here.
 const GENERIC_LINES = [
   '토마토는 4일 동안 자란다구~',
+  '괭이로 갈고, 씨앗 심고, 물 주고! 딸기는 세 번이나 열린대.',
   '하루에 물은 한 번이면 충분해!',
   '복습도 하고 왔어? 작물이 좋아할지도?',
   '물을 좀 빼먹었다고 죽진 않아. 너무 걱정 마!',

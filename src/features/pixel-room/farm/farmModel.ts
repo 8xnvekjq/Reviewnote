@@ -1,9 +1,6 @@
-export const FARM_BEDS = [{ x: 11, y: 4 }, { x: 11, y: 7 }] as const;
-export function isFarmCell({ x, y }: { x: number; y: number }): boolean {
-  return FARM_BEDS.some(bed => x >= bed.x && x < bed.x + 2 && y >= bed.y && y < bed.y + 2);
-}
-// The scarecrow guide stands just above the first plot — a fixed, solid decoration (same "treat
-// as a wall" treatment as the beds themselves), not a walkable/passable tile.
+// 예전 2×2 밭 두 개는 울타리 친 텃밭 하나로 바뀌었다 — 자리·칸 번호는 gardenModel.ts.
+// The scarecrow guide stood just above the old first plot and stays there (the garden moved to the
+// lower right, gardenModel.ts) — a fixed, solid decoration, not a walkable/passable tile.
 // - y=3 is deliberately OUTSIDE the dog's yard roaming box (yardDogWorld restricts it to y 4-9):
 //   an earlier attempt placed the scarecrow inside that box, in the gap between the two beds
 //   (y=6), which combined with the beds' own 2x2 cutouts narrowed the dog's remaining paths enough
@@ -22,8 +19,11 @@ export interface FarmCrop {
   // and the number actually LOCKED IN at harvest is computed fresh at that moment regardless of
   // what this live estimate said a moment earlier — this field is purely an in-progress hint.
   reviewGained: number;
+  /** 텃밭(2026-10-20): 작물 종류(없으면 토마토), 딸기는 몇 번 땄는지·최대 몇 번. */
+  type?: 'tomato' | 'strawberry'; harvests?: number; maxHarvests?: number;
 }
-export interface FarmPlot { index: number; revision: number; crop: FarmCrop | null }
+/** 텃밭 한 칸. index = y*8+x(gardenModel.ts). soil·wateredOn·sprinkler가 없으면(예전 응답) 작물 유무로 본다. */
+export interface FarmPlot { index: number; revision: number; crop: FarmCrop | null; soil?: 'grass' | 'tilled'; wateredOn?: string | null; sprinkler?: boolean }
 export type FarmCropStatus = 'stored' | 'submitted';
 // One collection entry — a harvested pixel_farm_crops row, read directly (existing SELECT grant +
 // RLS, see 20260920090000_pixel_farm_crop_collection.sql). id doubles as the link back to that
@@ -53,8 +53,11 @@ export function weeklyRankLabel(rank: number, allRanks: number[]): string {
   const tied = allRanks.filter(r => r === rank).length > 1;
   return `${tied ? '공동 ' : ''}${rank}위`;
 }
-export interface FarmSnapshot { serverNow: string; today: string; harvestCount: number; bestSize: number | null; lastHarvestSize: number | null; plots: FarmPlot[] }
-export type FarmAction = 'plant' | 'water' | 'harvest';
+export interface FarmSnapshot {
+  serverNow: string; today: string; harvestCount: number; bestSize: number | null; lastHarvestSize: number | null; plots: FarmPlot[];
+  /** 오늘(today) 서버 날씨가 비인가(낚시와 같은 날씨). 스프링클러를 샀나. 오늘 받은 농사 경험치·포인트와 상한. */
+  rainToday?: boolean; sprinklerOwned?: boolean; farmToday?: { xp: number; xpCap: number; points: number; pointsCap: number };
+}
 export type FarmStage = 'empty' | 'sprout' | 'leaf' | 'fruit' | 'ripe';
 export function farmStage(crop: FarmCrop | null, now: number): FarmStage {
   if (!crop) return 'empty';

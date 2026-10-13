@@ -13,7 +13,7 @@ import { AVATAR_POSES, AVATAR_FRAMES_PER_POSE } from '../logic/avatarPlan';
 import { plazaGroundTile, PLAZA_MARGIN, PLAZA_EXIT, plazaBorderGap, RPS_RULE_SIGN, RPS_TABLE } from '../logic/plazaWorld';
 import { PET_SHEETS } from '../logic/petSheets';
 import { composeAvatar } from './avatarTexture';
-import { loadPetSheet, loadBed } from './sceneAssets';
+import { loadPetSheet, loadRipeTomato } from './sceneAssets';
 import { PlazaBubbles } from './plazaBubbles';
 import type { PlazaBubble } from './plazaBubbles';
 import { WorldScene } from './WorldScene';
@@ -104,7 +104,7 @@ export class PlazaScene extends WorldScene {
     this.exhibitWanted = show;
     if (!show) { this.exhibit?.destroy(); this.exhibit = null; return; }
     if (this.exhibit) return;
-    void Promise.resolve().then(() => loadBed({ stage: 'ripe', moisture: 'normal' })).then(image => {
+    void Promise.resolve().then(loadRipeTomato).then(image => {
       if (!this.scene.isActive() || !this.exhibitWanted || this.exhibit) return;
       if (!this.textures.exists('plaza-tomato')) this.textures.addImage('plaza-tomato', image);
       this.exhibit = this.add.image(160, 136, 'plaza-tomato').setDisplaySize(24, 24).setOrigin(.5, 1).setDepth(143);

@@ -10,6 +10,8 @@ export const BAIT_ITEM: PixelItem = { itemId: 'bait_worm', category: 'bait', slo
 // 공통 상점 타입에 tool을 추가한 뒤 PIXEL_CATALOG에도 연결한다.
 /** 잠자리채 — 광장 상점 '도구' 칸. 그림은 PanelArt의 tool_net. */
 export const NET_ITEM: PixelItem = { itemId: 'tool_net', category: 'tool', slot: 'tool', price: 150, assetKey: 'tool_net', displayName: '잠자리채', tier: 1, stackable: false };
+/** 스프링클러 — 광장 상점 '도구' 칸(300P, 하나만). 텃밭 칸에 놓으면 매일 둘레 8칸에 물을 준다(서버 20261020100100_pixel_garden_economy.sql). */
+export const SPRINKLER_ITEM: PixelItem = { itemId: 'tool_sprinkler', category: 'tool', slot: 'tool', price: 300, assetKey: 'tool_sprinkler', displayName: '스프링클러', tier: 2, stackable: false };
 
 /** 지식의 조각 전용 — 오답 복습으로만 모은 조각으로 산다(포인트로는 못 산다). 가격은 서버 shard_price가 기준. */
 export const SHARD_ITEMS: readonly PixelItem[] = [
@@ -20,6 +22,7 @@ export const SHARD_ITEMS: readonly PixelItem[] = [
 export const PIXEL_CATALOG: readonly PixelItem[] = [
   ...SHARD_ITEMS,
   NET_ITEM,
+  SPRINKLER_ITEM,
   { itemId: 'hair_bald', category: 'avatar', slot: 'hair', price: 0, assetKey: 'bald', displayName: '대머리', tier: 1, stackable: false },
   BAIT_ITEM,
   ...ROD_CATALOG,

@@ -8,6 +8,7 @@ import { PET_SHEETS, petFollowSpot } from '../../src/features/pixel-world-phaser
 import { PIXEL_CATALOG } from '../../src/features/pixel-room/shop/catalog.ts';
 import { SKIN_TONE_OPTIONS, EYE_COLOR_OPTIONS } from '../../src/features/pixel-room/shop/appearanceRows.ts';
 import { yardWalkable, YARD_DOOR } from '../../src/features/pixel-room/yard/yardModel.ts';
+import { inGardenFootprint, isGardenFence } from '../../src/features/pixel-room/farm/gardenModel.ts';
 
 const BASE = { top: null, bottom: null, shoes: null, hair: null, eyes: null, skin: null };
 const close = (a: number, b: number, eps = 1e-9) => Math.abs(a - b) < eps;
@@ -114,7 +115,8 @@ test('avatar frame index covers 8 poses × 4 frames', () => {
 test('world solidity preserves yard obstacles and adds the river sign', () => {
   for (let y = 0; y < 12; y++) for (let x = 0; x < 16; x++) {
     const w = toWorldCell({ x, y });
-    const expected = !yardWalkable({ x, y }) || (w.x === RIVER_SIGN.x && w.y === RIVER_SIGN.y);
+    // 텃밭은 예전 마당에서는 막힌 장식이지만, 새 월드에서는 울타리만 막히고 밭 칸·문은 걸어 다닌다.
+    const expected = inGardenFootprint({ x, y }) ? isGardenFence({ x, y }) : !yardWalkable({ x, y }) || (w.x === RIVER_SIGN.x && w.y === RIVER_SIGN.y);
     assert.equal(worldSolid(w), expected, `${x},${y}`);
   }
   assert.ok(worldSolid({ x: 0, y: 0 }) && worldSolid({ x: WORLD_COLS - 1, y: WORLD_ROWS - 1 }));
@@ -156,7 +158,7 @@ test('A-button target: facing the scarecrow from the cell below finds it; facing
   const scarecrow = INTERACTABLES.find(item => item.id === 'scarecrow')!;
   const below = cellCenter({ x: scarecrow.cell.x, y: scarecrow.cell.y + 1 });
   assert.equal(facedInteractable(below, 'Back', [scarecrow])?.id, 'scarecrow');
-  assert.equal(facedInteractable(below, 'Front')?.id, 'farm:0');
+  assert.equal(facedInteractable(below, 'Front'), null, 'the old bed below the scarecrow is open grass now');
   assert.equal(facedInteractable(SPAWN, 'Back')?.id, 'door');
 });
 test('pet follow spot trails behind the player for each facing', () => {

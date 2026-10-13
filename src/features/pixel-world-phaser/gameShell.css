@@ -120,3 +120,16 @@ html.pwp-open, html.pwp-open body { overflow:hidden; overscroll-behavior:none; h
 .pwp-shards svg { flex:none; filter:drop-shadow(0 0 2px rgba(168,120,240,.7)); }
 .pwp-bag-chip { gap:3px; padding:0 9px; font-variant-numeric:tabular-nums; }
 .pwp-bag-chip[data-heavy="true"] { background:#ffc58a; }
+
+/* 텃밭 도구 막대(화면 위쪽 가운데, 상단 칩 줄 아래). 텃밭은 맵 아래쪽이라 폰에서는 화면 아래에 그려진다 —
+   막대·안내를 위에 두고, 버튼 말고는 터치를 그대로 통과시켜 밭 칸을 가리지 않는다. 손가락·펜으로 누르기 쉽게 52px 버튼. */
+.pwp-garden-tools { position:absolute; left:50%; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; gap:6px; z-index:5; pointer-events:none; max-width:calc(100% - 16px); }
+.pwp-garden-tools [role="toolbar"] { display:flex; gap:6px; padding:6px; border-radius:14px; background:rgba(58,36,22,.55); }
+.pwp-garden-tool { pointer-events:auto; display:flex; flex-direction:column; align-items:center; justify-content:center; width:52px; height:56px; padding:2px 0 0; border-radius:10px;
+  border:2px solid #5b3926; background:#fff4d9; color:#5b3926; font:inherit; cursor:pointer; touch-action:manipulation; box-shadow:0 3px 0 rgba(58,36,22,.45); }
+.pwp-garden-tool small { font-size:10px; font-weight:800; line-height:1.1; margin-top:1px; white-space:nowrap; letter-spacing:-.3px; }
+.pwp-garden-tool[aria-pressed="true"] { background:#ffd76a; border-color:#9a5a1c; transform:translateY(-2px); box-shadow:0 5px 0 rgba(58,36,22,.45), 0 0 0 3px rgba(255,247,227,.7); }
+.pwp-garden-tool:focus-visible { outline:3px solid #ffd76a; outline-offset:2px; }
+.pwp-garden-atlas { display:block; flex:none; }
+.pwp-garden-message { margin:0; max-width:320px; padding:6px 10px; border-radius:10px; border:2px solid #5b3926; background:#fff4d9; color:#4f3a28; font-size:13px; font-weight:700; text-align:center; }
+.pwp-garden-tools[data-busy="true"] .pwp-garden-tool { opacity:.75; }

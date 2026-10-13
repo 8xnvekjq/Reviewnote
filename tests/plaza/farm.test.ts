@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { FARM_BEDS, farmStage, farmDay, growthLabel, isFarmCell, computeCropSize, cropCareRatio, maxCareDaysFor, rollLuck, sizeLabel, FARM_GROWTH_DAYS, reviewRatioFor, bonusChanceFor, computeBonusAmount, computeCropSizeV2, REVIEW_RATIO_CAP, SCARECROW_CELL, farmMoisture, computeSubmitReward, weeklyRankLabel } from '../../src/features/pixel-room/farm/farmModel.ts';
+import { farmStage, farmDay, growthLabel, computeCropSize, cropCareRatio, maxCareDaysFor, rollLuck, sizeLabel, FARM_GROWTH_DAYS, reviewRatioFor, bonusChanceFor, computeBonusAmount, computeCropSizeV2, REVIEW_RATIO_CAP, SCARECROW_CELL, farmMoisture, computeSubmitReward, weeklyRankLabel } from '../../src/features/pixel-room/farm/farmModel.ts';
 import { pickScarecrowLine } from '../../src/features/pixel-room/farm/scarecrowLines.ts';
+import { GARDEN_FENCE, GARDEN_SIZE, inGardenFootprint } from '../../src/features/pixel-room/farm/gardenModel.ts';
 import { YARD_SPAWNS, yardPath, yardWalkable, yardExit } from '../../src/features/pixel-room/yard/yardModel.ts';
 import { yardDogWorld } from '../../src/features/pixel-room/pet/dogWorld.ts';
 import { advanceDog, dogFits } from '../../src/features/pixel-room/pet/dogModel.ts';
@@ -27,29 +28,25 @@ test('watering date resets at midnight Korea, independent of device timezone', (
   assert.equal(farmDay(Date.parse('2026-09-18T14:59:59Z')), '2026-09-18');
   assert.equal(farmDay(Date.parse('2026-09-18T15:00:00Z')), '2026-09-19');
 });
-test('farm footprints block walking; both approach cells are reachable from either arrival', () => {
-  for (const bed of FARM_BEDS) {
-    for (let x = bed.x; x < bed.x + 2; x++) for (let y = bed.y; y < bed.y + 2; y++) assert.equal(yardWalkable({ x,y }), false);
-    for (const from of Object.values(YARD_SPAWNS)) {
-      const approach = { x: bed.x - 1, y: bed.y + 1 };
-      const path = yardPath(from, approach);
-      assert.deepEqual(path.at(-1), approach);
-      assert.ok(path.every(p => yardWalkable(p) && !yardExit(p)));
-    }
+test('the fenced garden is a solid decoration in the old yard view, and every other yard cell stays reachable', () => {
+  for (let x = GARDEN_FENCE.x; x < 16; x++) for (let y = GARDEN_FENCE.y; y < 12; y++) assert.equal(yardWalkable({ x, y }), false);
+  assert.ok(GARDEN_FENCE.x + GARDEN_SIZE.cols + 1 <= 15 + 1 && GARDEN_FENCE.y >= 10, 'garden sits in the lower-right corner of the yard');
+  // 문 앞·광장 길은 텃밭 왼쪽(x 5..7)으로 그대로 이어진다.
+  for (const from of Object.values(YARD_SPAWNS)) for (const to of [{ x: 7, y: 11 }, { x: 15, y: 9 }, { x: 13, y: 4 }]) {
+    const path = yardPath(from, to);
+    assert.deepEqual(path.at(-1), to);
+    assert.ok(path.every(p => yardWalkable(p) && !yardExit(p) && !inGardenFootprint(p)));
   }
 });
-test('the scarecrow guide is a solid fixed decoration (blocks walking) but never disconnects either farm approach', () => {
+test('the scarecrow guide is a solid fixed decoration (blocks walking) with an open cell beside it', () => {
   assert.equal(yardWalkable(SCARECROW_CELL), false);
-  for (const bed of FARM_BEDS) {
-    for (const from of Object.values(YARD_SPAWNS)) {
-      const approach = { x: bed.x - 1, y: bed.y + 1 };
-      const path = yardPath(from, approach);
-      assert.ok(path.length > 0, `still reachable from ${JSON.stringify(from)} with the scarecrow in place`);
-      assert.ok(path.every(p => !(p.x === SCARECROW_CELL.x && p.y === SCARECROW_CELL.y)));
-    }
+  for (const from of Object.values(YARD_SPAWNS)) {
+    const path = yardPath(from, { x: SCARECROW_CELL.x, y: SCARECROW_CELL.y + 1 });
+    assert.ok(path.length > 0, `reachable from ${JSON.stringify(from)}`);
+    assert.ok(path.every(p => !(p.x === SCARECROW_CELL.x && p.y === SCARECROW_CELL.y)));
   }
 });
-test('dog retains two-cell-wide routes around both plots and avoids a tending player', () => {
+test('dog retains two-cell-wide routes outside the garden and avoids a tending player', () => {
   for (const player of [{x:6,y:7}, {x:10,y:5}, {x:10,y:8}]) {
     const world = yardDogWorld(player);
     let state = null;
@@ -59,7 +56,7 @@ test('dog retains two-cell-wide routes around both plots and avoids a tending pl
     for (let now = 0; now < 300000; now += 100) {
       state = advanceDog(state, world, now, false, random);
       assert.ok(state && dogFits(world, state.cell) && dogFits(world, state.from));
-      assert.ok(!isFarmCell(state.cell) && !isFarmCell({x:state.cell.x+1,y:state.cell.y}));
+      assert.ok(!inGardenFootprint(state.cell) && !inGardenFootprint({x:state.cell.x+1,y:state.cell.y}));
       visited.add(`${state.cell.x},${state.cell.y}`);
     }
     assert.ok(visited.size > 10, `enough dog movement remains: ${visited.size}`);

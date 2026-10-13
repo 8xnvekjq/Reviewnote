@@ -9,7 +9,7 @@ import { parsePlayerLevel } from '../../src/features/pixel-world-phaser/ui/fishi
 import { useFarm } from '../../src/features/pixel-room/farm/useFarm';
 import { supabase } from '../../src/services/supabase';
 import type { FarmAdapter } from '../../src/features/pixel-world-phaser/ui/FarmPanels';
-import { farmStage, farmMoisture } from '../../src/features/pixel-room/farm/farmModel';
+import { gardenLook } from '../../src/features/pixel-room/farm/gardenModel';
 const harvestFixture = new URLSearchParams(location.search).has('harvest');
 function Harness() {
   const [balance, setBalance] = useState(200);
@@ -35,9 +35,9 @@ function Harness() {
   const farmAdapter: FarmAdapter = { farm, inventory: { crops: [], busy: false, error: false, refresh: async () => {} },
     contest: async () => ({ weekStart: '2026-10-05', top: [], mine: { rank: null, sizeScore: null, participantCount: 0 } }),
     submit: async () => ({ ok: false, reason: 'error', message: '출품할 수 없어요.' }) };
-  const beds = farm.snapshot?.plots.map(plot => ({ stage: farmStage(plot.crop, farm.now), moisture: farmMoisture(plot.crop, farm.now) })) ?? [];
+  const garden = gardenLook(harvestFixture ? farm.snapshot : null, farm.now);
   return <><output style={{ position: 'fixed', zIndex: 2147483001, bottom: 0 }} data-testid="balance-callback" data-bait-catalog={shop.catalog.some(item => item.itemId === 'bait_worm' && item.category === 'bait' && item.assetKey === 'worm')}>{balance}/{count}</output>
-    <GameShell appearance={shop.equipped} pet={null} balance={balance} beds={harvestFixture ? beds : []} furniture={[]}
+    <GameShell appearance={shop.equipped} pet={null} balance={balance} garden={garden} furniture={[]}
       farmAdapter={harvestFixture ? farmAdapter : undefined}
       panels={{ shop, pet: { active: null, ready: true, busy: false, error: false, reload() {}, activate: async () => true } }}
       fishingAdapter={adapter} scarecrowLine={() => '안녕!'} onExit={() => {}} />
