@@ -12,6 +12,8 @@ export type PlazaDirection = 'Front' | 'Back' | 'Left' | 'Right';
 // 정보는 절대 포함하지 않는다 — 다른 사용자는 이 shape만 보고, sessionId로는 실제 계정을
 // 역추적할 수 없어야 한다(랜덤 값, user_id 아님).
 export interface PlazaPlayerState {
+  /** 카드 대결 전용 단기 토큰. 계정 id가 아니며 서버에서만 소유자를 확인한다. */
+  duelToken?: string;
   /** 베타 연속 좌표. 없는 경우 기존 칸 좌표(v1)로 해석한다. */
   face?: string;
   version?: 2;
