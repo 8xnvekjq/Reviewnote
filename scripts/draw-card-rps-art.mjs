@@ -66,7 +66,8 @@ poly(table,[[112,87],[208,87],[286,193],[34,193]],P.ink);poly(table,[[115,91],[2
 for(let y=98;y<188;y+=13){const inset=Math.floor((188-y)*.68);rect(table,43+inset,y,235-inset*2,2,P.deep)}
 line(table,160,92,160,189,P.deep);line(table,116,92,45,188,P.lightWood);line(table,204,92,275,188,P.deep);box(table,132,100,56,30,P.deep,P.wood);rect(table,138,104,44,2,P.gold);rect(table,138,124,44,2,P.gold);
 box(table,111,176,98,20,P.ink,P.wood2);rect(table,118,180,84,4,P.lightWood);
-for(const [x,y,b,k] of [[142,105,P.red,0],[166,105,P.red,3],[130,148,P.blue,1],[154,148,P.blue,2],[178,148,P.blue,3]]){const mini=cv(24,32);card(mini,0,0,b,k);blit(table,mini,x,y)} save('table.png',table);
+// These are empty card rests. Live cards are rendered by CardRpsGame.
+save('table.png',table);
 
 const glow=cv(32,40);for(let r=15;r>5;r-=3){const col=r>10?P.glow:P.white;for(let a=0;a<360;a+=12)px(glow,16+Math.round(Math.cos(a*Math.PI/180)*r),20+Math.round(Math.sin(a*Math.PI/180)*r),col)}for(let i=0;i<8;i++){rect(glow,(i*11)%28,3+(i*13)%34,2,2,P.glow)}save('glow.png',glow);
 const clash=cv(128,32);for(let f=0;f<4;f++){const ox=f*32,cx=ox+16,cy=16;for(let i=0;i<8;i++){const len=4+f*2;line(clash,cx+Math.round(Math.cos(i*Math.PI/4)*3),cy+Math.round(Math.sin(i*Math.PI/4)*3),cx+Math.round(Math.cos(i*Math.PI/4)*len),cy+Math.round(Math.sin(i*Math.PI/4)*len),i%2?P.gold:P.white)}rect(clash,cx-2-f,cy-2-f,4+f*2,4+f*2,P.glow)}save('clash.png',clash);

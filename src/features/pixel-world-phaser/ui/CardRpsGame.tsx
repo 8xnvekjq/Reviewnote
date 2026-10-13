@@ -17,6 +17,8 @@ import './cardRpsGame.css';
 const LABEL: Record<RpsHand, string> = { rock: '바위', scissors: '가위', paper: '보' };
 const ICON: Record<RpsHand, string> = { rock: '✊', scissors: '✌️', paper: '✋' };
 
+const DEFAULT_APPEARANCE: PublicAvatarAppearance = { skin: null, eyes: null, top: null, bottom: null, shoes: null, hair: null };
+
 export function CardRpsGame({ adapter, appearance, opponentAppearance, onClose, onFinished }: { adapter: CardRpsAdapter; appearance?: PublicAvatarAppearance; opponentAppearance?: PublicAvatarAppearance; onClose(): void; onFinished?: (matchId: string) => void }) {
   const [match, setMatch] = useState<RpsMatchView | null>(null);
   const [queue, setQueue] = useState<RpsHand[]>([]);
@@ -32,9 +34,9 @@ export function CardRpsGame({ adapter, appearance, opponentAppearance, onClose, 
   const initialized = useRef(false);
 
   useEffect(() => {
-    if (!appearance) return;
+    const resolved = appearance ?? DEFAULT_APPEARANCE;
     let cancelled = false;
-    void avatarFrame(appearance, 'Idle_Back').then(value => { if (!cancelled) setAvatar(value); });
+    void avatarFrame(resolved, 'Idle_Back').then(value => { if (!cancelled) setAvatar(value); });
     return () => { cancelled = true; };
   }, [appearance]);
   useEffect(() => {
@@ -103,7 +105,7 @@ export function CardRpsGame({ adapter, appearance, opponentAppearance, onClose, 
           <div className="pwp-rps-hand">{RPS_HANDS.map(hand => <button type="button" key={hand} disabled={busy || queue.filter(c => c === hand).length >= remaining[hand]} onClick={() => setQueue(q => addQueuedCard(q, hand, remaining[hand]))}>
             <Card hand={hand} side="mine" /><small>{LABEL[hand]} {remaining[hand] - queue.filter(c => c === hand).length}장</small>
           </button>)}</div>
-          <div className="pwp-rps-queue" aria-label="낼 카드 순서">{queue.map((hand, index) => <span key={`${hand}-${index}`}>
+          <div className="pwp-rps-queue" aria-label="낼 카드 순서">{queue.map((hand, index) => <span key={`${hand}-${index}`}><i>{index + 1}</i>
             <button type="button" aria-label={`${LABEL[hand]} 빼기`} onClick={() => setQueue(q => removeQueuedCard(q, index))}>{ICON[hand]}</button>
             <span><button type="button" disabled={index === 0} onClick={() => setQueue(q => moveQueuedCard(q, index, index - 1))}>←</button><button type="button" disabled={index === queue.length - 1} onClick={() => setQueue(q => moveQueuedCard(q, index, index + 1))}>→</button></span>
           </span>)}</div>
