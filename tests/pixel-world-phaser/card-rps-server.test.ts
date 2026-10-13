@@ -5,6 +5,7 @@ const pkg = '@electric-sql/pglite';
 const { PGlite } = await import(pkg);
 const migration = readFileSync(new URL('../../supabase/migrations/20261014000000_pixel_card_rps.sql', import.meta.url), 'utf8');
 const npcFirstWin = readFileSync(new URL('../../supabase/migrations/20261015000000_card_rps_npc_first_win.sql', import.meta.url), 'utf8');
+const turn120 = readFileSync(new URL('../../supabase/migrations/20261016000000_card_rps_turn_120s.sql', import.meta.url), 'utf8');
 const cases = JSON.parse(readFileSync(new URL('./fixtures/card-rps-cases.json', import.meta.url), 'utf8'));
 const A='00000000-0000-0000-0000-00000000000a', B='00000000-0000-0000-0000-00000000000b', C='00000000-0000-0000-0000-00000000000c';
 
@@ -19,6 +20,7 @@ async function database() {
     grant usage on schema public to authenticated;`);
   await db.exec(migration.replace(/do \$\$ begin alter publication[\s\S]*?end \$\$;/,''));
   await db.exec(npcFirstWin);
+  await db.exec(turn120);
   // 마이그레이션이 만든 RPC는 아래 호출들로 존재와 권한을 함께 검증한다.
   const as=async(uid:string,sql:string,args:unknown[]=[])=>{await db.exec(`reset role;select set_config('request.jwt.claim.sub','${uid}',false);set role authenticated;`);try{return (await db.query(sql,args)).rows;}finally{await db.exec('reset role');}};
   return {db,as};
@@ -71,4 +73,16 @@ test('NPC 대결은 무료이고 상금은 사람마다 최초 1승만 준다',a
   m=(await as(A,'select public.start_npc_card_rps() r'))[0].r as any;done=await finish(m.matchId,'npc_mouse');assert.equal(done.pointDelta,0);assert.equal(await pts(A),120);
   assert.equal((await db.query('select sum(wins)::int n from pixel_private.card_rps_npc_wins where user_id=$1',[A])).rows[0].n,1);
   const other=(await as(B,'select public.start_npc_card_rps() r'))[0].r as any;assert.equal(other.prize,20,'다른 사람은 따로 최초 1승을 받는다');
+}finally{await db.close();}});
+
+test('한 턴 제한 시간은 120초(NPC 시작·한 판 제출·친구 수락·승부차기)',async()=>{const {db,as}=await database();try{
+  const left=(v:any)=>(v.deadlineAt-Date.now())/1000;const near120=(v:any,label:string)=>{const s=left(v);assert.ok(s>110&&s<125,`${label}: ${s}초`);};
+  let m=(await as(A,'select public.start_npc_card_rps() r'))[0].r as any;near120(m,'NPC 시작');
+  m=(await as(A,"select public.submit_card_rps_cards($1::uuid,array['rock']) r",[m.matchId]))[0].r as any;assert.equal(m.status,'choosing');near120(m,'NPC 한 판 제출 후');
+  await as(A,'select public.leave_card_rps($1::uuid)',[m.matchId]);
+  const invited=(await as(A,'select public.invite_card_rps($1::uuid,10) r',[B]))[0].r as any;const accepted=(await as(B,'select public.respond_card_rps($1::uuid,true) r',[invited.matchId]))[0].r as any;near120(accepted,'친구 수락');
+  for(const [who,hand] of [[A,'rock'],[B,'paper'],[A,'paper'],[B,'rock']] as const) m=(await as(who,"select public.submit_card_rps_cards($1::uuid,array[$2]) r",[invited.matchId,hand]))[0].r as any;
+  for(const [who,hand] of [[A,'scissors'],[B,'scissors']] as const) m=(await as(who,"select public.submit_card_rps_cards($1::uuid,array[$2]) r",[invited.matchId,hand]))[0].r as any;
+  assert.equal(m.status,'shootout');near120(m,'승부차기 시작');
+  m=(await as(A,"select public.submit_card_rps_shootout($1::uuid,'rock') r",[invited.matchId]))[0].r as any;m=(await as(B,"select public.submit_card_rps_shootout($1::uuid,'rock') r",[invited.matchId]))[0].r as any;assert.equal(m.status,'shootout');near120(m,'승부차기 비김 후');
 }finally{await db.close();}});

@@ -1,5 +1,5 @@
 import {
-  createMatch, forfeit, npcChooseCards, npcShootoutHand, playRound, playShootout, seededRng,
+  createMatch, forfeit, npcChooseCards, npcShootoutHand, playRound, playShootout, RPS_TURN_MS, seededRng,
   type RpsHand, type RpsMatchState,
 } from '../logic/cardRps';
 import {
@@ -36,14 +36,14 @@ export function createMockCardRpsAdapter(options: MockCardRpsOptions = {}): Mock
   };
   const start = (mode: 'npc' | 'friend', stake: number, opponentId: string, opponentName: string) => {
     const prize = mode === 'npc' ? (wonNpcOnce ? 0 : RPS_NPC_REWARD) : stake * 2;
-    active = { id: `mock-rps-${++serial}`, mode, stake, prize, paid: false, state: createMatch(), opponentId, opponentName, status: 'choosing', deadlineAt: now() + 60_000, endReason: null };
+    active = { id: `mock-rps-${++serial}`, mode, stake, prize, paid: false, state: createMatch(), opponentId, opponentName, status: 'choosing', deadlineAt: now() + RPS_TURN_MS, endReason: null };
     return active;
   };
   const settleRound = (match: LocalMatch, mine: readonly RpsHand[]) => {
     const theirs = npcChooseCards(match.state, 'b', rng);
     match.state = playRound(match.state, mine, theirs);
     match.status = match.state.phase === 'finished' ? 'finished' : match.state.phase === 'shootout' ? 'shootout' : 'choosing';
-    match.deadlineAt = match.status === 'finished' ? null : now() + 60_000;
+    match.deadlineAt = match.status === 'finished' ? null : now() + RPS_TURN_MS;
     if (match.status === 'finished') match.endReason = 'wins';
   };
   const api: MockCardRpsAdapter = {
@@ -56,7 +56,7 @@ export function createMockCardRpsAdapter(options: MockCardRpsOptions = {}): Mock
     async respond(matchId: string, accept: boolean) {
       const match = get(matchId);
       match.status = accept ? 'choosing' : 'declined';
-      match.deadlineAt = accept ? now() + 60_000 : null;
+      match.deadlineAt = accept ? now() + RPS_TURN_MS : null;
       return delay(publish(match));
     },
     async cancelInvite(matchId: string) { const match = get(matchId); match.status = 'cancelled'; match.deadlineAt = null; publish(match); },
@@ -72,7 +72,7 @@ export function createMockCardRpsAdapter(options: MockCardRpsOptions = {}): Mock
       if (match.status !== 'shootout') throw new Error('not_your_turn');
       match.state = playShootout(match.state, hand, npcShootoutHand(rng));
       match.status = match.state.phase === 'finished' ? 'finished' : 'shootout';
-      match.deadlineAt = match.status === 'finished' ? null : now() + 60_000;
+      match.deadlineAt = match.status === 'finished' ? null : now() + RPS_TURN_MS;
       if (match.status === 'finished') match.endReason = 'shootout';
       return delay(publish(match));
     },
