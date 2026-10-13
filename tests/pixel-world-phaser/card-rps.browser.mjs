@@ -23,6 +23,27 @@ async function assertNoScroll(page, width, height, label) {
   assert.ok(size.tray <= 1, `${label}: 쟁반 안 스크롤 ${size.tray}px`);
 }
 const tapCard = async (page, locator, touch) => touch ? locator.tap() : locator.click();
+// 공개 박자(hit 380ms 등)는 짧아서 waitForSelector 폴링이 놓칠 수 있다(바쁜 headless에서 3~4번에 1번).
+// 그래서 페이지 안에서 data-beat가 바뀔 때마다 기록해 두고, 기록으로 순서·그 순간의 화면을 확인한다.
+const recordBeats = page => page.addInitScript(() => {
+  const log = window.__rpsBeats = [];
+  new MutationObserver(() => {
+    const root = document.querySelector('.pwp-rps');
+    const stage = root?.getAttribute('data-beat') ?? '';
+    if (!stage || log.at(-1)?.stage === stage) return;
+    log.push({ stage, face: document.querySelectorAll('.pwp-rps-face').length, arena: document.querySelectorAll('.pwp-rps-tcard.spot-arena').length });
+  }).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-beat'] });
+});
+const beatCount = page => page.evaluate(() => window.__rpsBeats.length);
+/** from번째 기록부터 stage 박자가 나올 때까지 기다리고, 그 사이 기록을 돌려준다. */
+async function waitBeat(page, from, stage, timeout) {
+  await page.waitForFunction(([from, stage]) => window.__rpsBeats.slice(from).some(b => b.stage === stage), [from, stage], { timeout });
+  return page.evaluate(from => window.__rpsBeats.slice(from), from);
+}
+const assertOrder = (log, stages, label) => {
+  let at = 0;
+  for (const stage of stages) { at = log.findIndex((b, i) => i >= at && b.stage === stage); assert.ok(at >= 0, `${label}: ${stages.join('→')} 순서가 아님 ${log.map(b => b.stage).join('→')}`); at += 1; }
+};
 
 try {
   await mkdir('.test-artifacts', { recursive: true });
@@ -57,6 +78,7 @@ try {
   {
     const [width, height] = [820, 1180];
     const page = await browser.newPage({ viewport: { width, height }, hasTouch: true });
+    await recordBeats(page);
     await page.goto(`${base}/tests/pixel-world-phaser/card-rps.harness.html`);
     await waitMode(page, ['choosing']);
     assert.equal(await page.locator('.pwp-rps-playback, button:has-text("한 단계"), button:has-text("자동 재생")').count(), 0, '단계 버튼은 없다');
@@ -99,6 +121,7 @@ try {
         for (let i = 0; i < take; i++) await hand.first().tap();
       }
       await assertInside(page, '.pwp-rps-submit', width, height, `${round}판`);
+      const from = await beatCount(page);
       await page.locator('.pwp-rps-submit:enabled').click();
       await waitMode(page, ['reveal']);
       // 공개 중: 뒤집힌 줄이 먼저(양쪽 장수), 끝나기 전엔 상대 표정이 없다.
@@ -107,12 +130,15 @@ try {
       assert.ok(await page.locator('.pwp-rps-tcard.theirs.down').count() > 0);
       assert.equal(await page.locator('.pwp-rps-face').count(), 0, '공개 전 표정 스포일러 없음');
       if (!revealShot) {
-        await page.waitForSelector('.pwp-rps[data-beat="hit"]', { timeout: 8000 });
-        assert.equal(await page.locator('.pwp-rps-face').count(), 0, '맞붙는 중에도 표정 없음');
+        const log = await waitBeat(page, from, 'hit', 8000);
+        assertOrder(log, ['facedown', 'enter', 'flip', 'hit'], `${round}판 공개`);
+        assert.ok(log.every(b => b.face === 0), '맞붙는 중에도 표정 없음');
         await page.screenshot({ path: '.test-artifacts/card-rps-reveal.png' });
         revealShot = true;
       }
-      await page.waitForSelector('.pwp-rps[data-beat="banner"]', { timeout: 30000 });
+      const log = await waitBeat(page, from, 'banner', 30000);
+      assert.equal(log[0].stage, 'facedown', `${round}판: 뒤집힌 줄부터`);
+      assert.ok(log.filter(b => b.stage !== 'banner').every(b => b.face === 0), `${round}판: 배너 전 표정 없음`);
       await page.locator('.pwp-rps-banner').waitFor();
       await waitMode(page, ['choosing', 'shootout', 'result']);
     }
@@ -131,6 +157,7 @@ try {
   // 3) 승부차기(seed 25 + 위와 같은 고르기): 같은 탁자 가운데에 한 장씩 던져 동시에 뒤집는다.
   {
     const page = await browser.newPage({ viewport: { width: 1180, height: 820 } });
+    await recordBeats(page);
     await page.goto(`${base}/tests/pixel-world-phaser/card-rps.harness.html?seed=25`);
     const picks = [async () => { await page.locator('.pwp-rps-handcard[data-hand="paper"]').first().click(); await page.locator('.pwp-rps-handcard[data-hand="paper"]').first().click(); },
       async () => { for (let i = 0; i < 2; i++) await page.locator('.pwp-rps-handcard').first().click(); },
@@ -144,9 +171,11 @@ try {
     }
     await waitMode(page, ['shootout'], 40000);
     await page.screenshot({ path: '.test-artifacts/card-rps-shootout.png' });
+    const from = await beatCount(page);
     await page.locator('.pwp-rps-shoot-card:enabled').first().click();
-    await page.waitForSelector('.pwp-rps[data-beat="hit"]', { timeout: 8000 });
-    assert.equal(await page.locator('.pwp-rps-tcard.spot-arena').count(), 2, '승부차기: 두 장이 가운데에서 맞붙는다');
+    const log = await waitBeat(page, from, 'hit', 8000);
+    assertOrder(log, ['facedown', 'enter', 'flip', 'hit'], '승부차기');
+    assert.equal(log.find(b => b.stage === 'hit').arena, 2, '승부차기: 두 장이 가운데에서 맞붙는다');
     await page.screenshot({ path: '.test-artifacts/card-rps-shootout-hit.png' });
     await waitMode(page, ['shootout', 'result'], 20000);
     await page.close();
