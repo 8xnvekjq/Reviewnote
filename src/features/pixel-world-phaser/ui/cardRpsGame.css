@@ -314,3 +314,6 @@
   .pwp-rps-burst{animation-duration:.2s}
   .pwp-rps-banner,.pwp-rps-delta,.pwp-rps-face,.pwp-rps-stars i.on{animation:none}
 }
+/* 광장 카드 대결 신청 창: 판돈·수락/거절 줄, 잠깐 뜨는 안내. */
+.pwp-rps-stakes{display:flex;flex-wrap:wrap;gap:8px}
+.pwp-rps-notice{position:absolute;left:50%;top:150px;z-index:15;transform:translateX(-50%);margin:0;padding:10px 14px;max-width:calc(100% - 32px);border:2px solid #5b3926;background:#fff4d9;color:#4f3a28;font-weight:700;pointer-events:none}

@@ -110,6 +110,11 @@ function cancelTopWindow(root: HTMLElement | null) {
   return true;
 }
 
+/** 바깥 터치·B·Esc로 닫히지 않는 창(Window modal="strict")이 떠 있는지. */
+function strictWindowOpen(root: HTMLElement | null) {
+  return !!root?.querySelector('.pwp-window[data-modal="strict"]');
+}
+
 function readInsets(probe: HTMLElement | null): Insets {
   if (!probe) return NO_INSETS;
   const style = getComputedStyle(probe);
@@ -481,6 +486,8 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
   // 대화 중이면 다음 줄, 아니면 장면에 맡긴다(말 걸기 → onTalk, 문 → 장면 전환).
   const pressA = useCallback(() => {
     if (bugFrozen.current) return;
+    // 카드 대결 신청처럼 엄격한 창이 떠 있으면 A는 아무것도 하지 않는다(연타로 다른 창을 열어 가리지 않게).
+    if (strictWindowOpen(root.current)) return;
     if (fishingRef.current.reel()) return;
     if (panelRef.current || editingRef.current) return;
     // 손 칸이 정한다: 잠자리채를 들면 A는 잠자리채(낚시는 안 함), 낚싯대·맨손이면 낚시(잠자리는 무시).
@@ -782,7 +789,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     {(panel === 'shop' || panel === 'wardrobe') && panels && <GamePanels kind={panel} adapter={panels} onClose={closePanel} />}
     {(panel === 'turtle' || panel === 'fishboard') && <FishingPanels key={panel} kind={panel} adapter={fishingAdapter} shop={panels} newSpeciesId={newFishSpeciesId ?? freshSpecies} onClose={() => { if (panel === 'turtle') setFreshSpecies(null); closePanel(); }} />}
     {scene?.id === 'river' && status === 'ready' && <RiverBridge key={'river:' + scene.visit} handle={handle} appearance={appearance} face={animalFace} tool={heldToolTag(heldTool, heldRodId)} pet={pet} riding={riding} panel={panel} reporter={riverReporter} swingReporter={swingReporter} />}
-    {scene?.id === 'plaza' && status === 'ready' && <PlazaBridge key={'plaza:' + scene.visit} handle={handle} appearance={appearance} face={animalFace} tool={heldToolTag(heldTool, heldRodId)} pet={pet} riding={riding} userId={userId} panel={panel} blocked={!!dialogue} onClose={closePanel} swingReporter={swingReporter} rpsEndReporter={rpsEndReporter} rpsAdapter={rpsAdapter} onOpenRps={opponent => { setRpsOpponentAppearance(opponent); openPanel('card-rps'); }} />}
+    {scene?.id === 'plaza' && status === 'ready' && <PlazaBridge key={'plaza:' + scene.visit} handle={handle} appearance={appearance} face={animalFace} tool={heldToolTag(heldTool, heldRodId)} pet={pet} riding={riding} userId={userId} panel={panel} blocked={!!dialogue} balance={balance} onClose={closePanel} swingReporter={swingReporter} rpsEndReporter={rpsEndReporter} rpsAdapter={rpsAdapter} onOpenRps={opponent => { setRpsOpponentAppearance(opponent); openPanel('card-rps'); }} />}
     {panel && panel !== 'bugs' && panel !== 'kiosk' && panel !== 'bag' && panel !== 'level' && panel !== 'card-rps' && panel !== 'card-rps-rules' && panel !== 'turtle' && panel !== 'fishboard' && panel !== 'furniture' && panel !== 'shop' && panel !== 'wardrobe' && panel !== 'contest' && panel !== 'well' && panel !== 'bench' && <FarmPanels key={panel} petId={pet} riding={riding} onRide={() => { closePanel(); handle.current?.toggleRide(); }} kind={panel} adapter={farmAdapter} onClose={closePanel}
       onXp={level.onXp} onCollection={() => openPanel('collection')} onTalk={() => { closePanel(); openDialogue('scarecrow'); }}
       onPet={kind => { closePanel(); handle.current?.reactPet(kind); }} onFx={(index, action) => handle.current?.farmFx(index, action)} />}

@@ -50,9 +50,21 @@ export function ShardTag({ value, label }: { value: number | null; label?: strin
 function Tabs({ options, value, onChange, label = '분류' }: { options: readonly (readonly [string, string])[]; value: string; onChange: (value: string) => void; label?: string }) {
   return <nav className="pwp-tabs" aria-label={label}>{options.map(([key, label]) => <button type="button" key={key} aria-pressed={key === value} onClick={() => onChange(key)}>{label}</button>)}</nav>;
 }
-export function Window({ title, onClose, onCancel = onClose, children, compact = false, small = false, top }: { title: string; onClose: () => void; onCancel?: () => void; children: ReactNode; compact?: boolean; small?: boolean; top?: ReactNode }) {
+/**
+ * modal="strict": 바깥 터치·B(pwp-cancel)·Esc로 닫히지 않는다(받은 카드 대결 신청처럼 실수로 꺼지면 안 되는 창).
+ * 닫기는 창 안의 버튼(✕를 보이면 ✕도)만. modal="sticky": 바깥 터치로만 안 닫힌다(✕·B·Esc는 된다).
+ * guardMs: 뜬 직후 그 시간 동안 안쪽 버튼을 막는다(연타하던 손가락 보호).
+ */
+export function Window({ title, onClose, onCancel = onClose, children, compact = false, small = false, top, modal, guardMs = 0, hideClose = false }: { title: string; onClose: () => void; onCancel?: () => void; children: ReactNode; compact?: boolean; small?: boolean; top?: ReactNode; modal?: 'strict' | 'sticky'; guardMs?: number; hideClose?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
-  const cancel = useRef(onCancel); cancel.current = onCancel;
+  const strict = modal === 'strict';
+  const cancel = useRef(onCancel); cancel.current = strict ? () => {} : onCancel;
+  const [armed, setArmed] = useState(guardMs <= 0);
+  useEffect(() => {
+    if (guardMs <= 0) return;
+    const timer = window.setTimeout(() => setArmed(true), guardMs);
+    return () => window.clearTimeout(timer);
+  }, [guardMs]);
   useEffect(() => {
     const element = box.current;
     const back = () => cancel.current();
@@ -61,23 +73,24 @@ export function Window({ title, onClose, onCancel = onClose, children, compact =
   }, []);
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
-    box.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    // 엄격한 창은 버튼이 아니라 창 자체에 포커스 — Enter·Space 연타가 수락/거절을 누르지 않게.
+    if (strict) box.current?.focus(); else box.current?.querySelector<HTMLButtonElement>('button')?.focus();
     return () => previous?.focus();
-  }, []);
-  return <div className="pwp-panel-shade" onPointerDown={event => {
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return <div className="pwp-panel-shade" data-modal={modal} onPointerDown={event => {
     event.stopPropagation();
-    if (event.target === event.currentTarget && event.button === 0) { event.preventDefault(); onCancel(); }
+    if (event.target === event.currentTarget && event.button === 0) { event.preventDefault(); if (!modal) onCancel(); }
   }}>
-    <div ref={box} className={(compact ? "pwp-window pwp-window-compact" : "pwp-window") + (small ? " pwp-window-small" : "")} role="dialog" aria-modal="true" aria-label={title} onKeyDown={event => {
+    <div ref={box} tabIndex={strict ? -1 : undefined} data-modal={modal} data-armed={armed} className={(compact ? "pwp-window pwp-window-compact" : "pwp-window") + (small ? " pwp-window-small" : "")} role="dialog" aria-modal="true" aria-label={title} onKeyDown={event => {
       event.stopPropagation();
-      if (event.key === 'Escape' || event.key.toLowerCase() === 'x') { event.preventDefault(); if (!event.repeat) onCancel(); }
+      if (event.key === 'Escape' || event.key.toLowerCase() === 'x') { event.preventDefault(); if (!event.repeat && !strict) onCancel(); }
       if (event.key === 'Tab') {
         const buttons = [...box.current!.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
         const first = buttons[0], last = buttons.at(-1);
         if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
         else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
       }
-    }}><header><h2>{title}</h2><button type="button" aria-label={`${title} 닫기`} onClick={onClose}>✕</button></header>{top}{children}</div>
+    }}><header><h2>{title}</h2>{!hideClose && <button type="button" aria-label={`${title} 닫기`} onClick={onClose}>✕</button>}</header>{top}{guardMs > 0 ? <fieldset className="pwp-window-guard" disabled={!armed}>{children}</fieldset> : children}</div>
   </div>;
 }
 // 'tackle' = 거북이 낚시 상점(낚싯대·미끼만). 광장 'shop'에서는 낚시 도구를 팔지 않는다.

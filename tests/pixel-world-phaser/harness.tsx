@@ -20,6 +20,7 @@ import { parseClockOverride } from '../../src/features/pixel-world-phaser/logic/
 import { DEFAULT_HAND, type Bag } from '../../src/features/pixel-world-phaser/logic/bag';
 import { createMockBugAdapter } from '../../src/features/pixel-world-phaser/ui/bugAdapter';
 import { createMockCardRpsAdapter } from '../../src/features/pixel-world-phaser/ui/cardRpsAdapterMock';
+import type { CardRpsAdapter, RpsInvite, RpsMatchView } from '../../src/features/pixel-world-phaser/logic/cardRpsContract';
 
 const params = new URLSearchParams(location.search);
 const appearance: PublicAvatarAppearance = {
@@ -54,7 +55,7 @@ function Harness() {
   }, []);
   // 잠자리: ?bugs=1 이면 모의 어댑터(잠자리채 보유). ?bugSeed= 로 어떤 잠자리가 걸릴지 정한다.
   // ?duel: 광장 친구 대결용 presence 토큰(실제 어댑터의 registerPresenceToken 흉내 — 서버처럼 UUID여야 presence 검사를 통과한다). 없으면 GameShell 기본 목.
-  const cardRpsAdapter = useMemo(() => params.has('duel') ? Object.assign(createMockCardRpsAdapter(), { registerPresenceToken: async () => crypto.randomUUID() }) : undefined, []);
+  const cardRpsAdapter = useMemo(() => params.has('duel') ? crossPageRps() : undefined, []);
   const bugAdapter = useMemo(() => params.has('bugs') ? createMockBugAdapter({ netOwned: true, seed: Number(params.get('bugSeed') ?? '42') }) : undefined, []);
   const [roomLayout, setRoomLayout] = useState<readonly Placement[]>(furniture);
   const [snapshot, setSnapshot] = useState<FarmSnapshot>({ serverNow: new Date(farmNow).toISOString(), today: '2026-10-08', harvestCount: 0, bestSize: null, lastHarvestSize: null,
@@ -83,6 +84,8 @@ function Harness() {
   const [look, setLook] = useState(appearance);
   const [active, setActive] = useState(pet);
   const [balance, setBalance] = useState(1234);
+  // 시험이 실행 중에 잔액을 바꾼다(카드 대결 판돈 막기 등).
+  useEffect(() => { (window as unknown as { __setHarnessBalance?: (v: number) => void }).__setHarnessBalance = setBalance; }, []);
   const [shards, setShards] = useState(Number(params.get('shards') ?? '20.5'));
   // 지식의 조각 전용 아이템은 처음엔 갖고 있지 않다(조각 상점 칸을 시험한다).
   const [ownedIds, setOwnedIds] = useState(new Set(PIXEL_CATALOG.filter(item => item.shardPrice == null || params.get('roomEdit') === 'all').filter(item => item.category === 'avatar' || item.category === 'pet' || params.has('roomEdit') && item.category === 'furniture' && (params.get('roomEdit') === 'all' || ['desk', 'bed', 'plant', 'chair'].includes(item.assetKey))).map(item => item.itemId)));
@@ -146,5 +149,69 @@ function Harness() {
       ? <PixelWorldPhaser userId="scene-test-user" pointsBalance={balance} onPixelPurchase={setBalance} onPointsReward={reward => setBalance(value => value + reward)} onExit={() => setOpen(false)} />
       : <GameShell userId={params.get('user') ?? 'guest'} face={params.get('face') ?? undefined} isAdmin={params.has('admin')} fishingAdapter={fishingAdapter} bugAdapter={bugAdapter} cardRpsAdapter={cardRpsAdapter} clockOverride={clockOverride} appearance={look} pet={active} balance={balance} panels={adapter} farmAdapter={params.has('farm') ? farmAdapter : undefined} beds={params.has('farm') ? farmBeds : [...beds]} furniture={roomLayout} onSaveFurniture={async layout => { await new Promise(resolve => setTimeout(resolve, 100)); if (params.has('roomSaveError')) throw new Error('저장하지 못했어요. 다시 시도해 주세요.'); setRoomLayout(layout); }} scarecrowLine={() => pickScarecrowLine(null, Date.now())} onExit={() => setOpen(false)} />
     : <main style={{ padding: 24 }}><p data-testid="exited">게임에서 나왔어요.</p><button type="button" onClick={() => setOpen(true)}>다시 들어가기</button></main>;
+}
+
+// ?duel: 두 페이지 사이 친구 대결 신청 흉내(BroadcastChannel). 기본은 예전처럼 모의 상대가 바로 수락한다.
+// 시험이 window.__rpsHarness.sendInvites = true 로 켜면 진짜 신청(invited)을 상대 페이지에 보내고,
+// 받는 쪽 dropRealtime = true 면 실시간 알림(onInvite)을 버린다 — 광장 broadcast·4초 확인 길만 남는다.
+type RpsHarnessFlags = { sendInvites: boolean; dropRealtime: boolean };
+function crossPageRps(): CardRpsAdapter & { registerPresenceToken(): Promise<string> } {
+  const base = createMockCardRpsAdapter();
+  const flags: RpsHarnessFlags = { sendInvites: false, dropRealtime: false };
+  (window as unknown as { __rpsHarness: RpsHarnessFlags }).__rpsHarness = flags;
+  const token = crypto.randomUUID();
+  const bus = new BroadcastChannel('phaser-rps-test');
+  const received = new Map<string, RpsInvite>();
+  let sent: RpsMatchView | null = null;
+  const inviteHandlers = new Set<(invite: RpsInvite) => void>();
+  const matchHandlers = new Set<(match: RpsMatchView) => void>();
+  const view = (matchId: string, status: RpsMatchView['status'], stake: number, deadlineAt: number | null): RpsMatchView => ({
+    matchId, mode: 'friend', status, stake, prize: stake * 2, round: 1, rounds: [], shootout: [], deadlineAt, winnerId: null, endReason: null, pointDelta: null,
+    me: { id: 'me-' + token, nickname: '나', isNpc: false, inventory: { rock: 3, scissors: 3, paper: 3 }, wins: 0, submitted: false },
+    opponent: { id: 'friend', nickname: '친구', isNpc: false, inventory: { rock: 3, scissors: 3, paper: 3 }, wins: 0, submitted: false } });
+  bus.onmessage = ({ data }) => {
+    if (data.kind === 'invite' && data.to === token) {
+      const invite: RpsInvite = { matchId: data.matchId, from: { id: 'friend', nickname: '친구' }, stake: data.stake, expiresAt: data.expiresAt };
+      received.set(invite.matchId, invite);
+      if (!flags.dropRealtime) inviteHandlers.forEach(handler => handler(invite));
+    } else if (data.kind === 'answer' && sent?.matchId === data.matchId) {
+      sent = view(sent.matchId, data.accept ? 'choosing' : 'declined', sent.stake, null);
+      const update = sent; if (!data.accept) sent = null;
+      matchHandlers.forEach(handler => handler(update));
+    }
+  };
+  return {
+    ...base,
+    registerPresenceToken: async () => token,
+    async invite(opponent, stake) {
+      if (!flags.sendInvites) return base.invite(opponent, stake);
+      const matchId = 'x-' + crypto.randomUUID(), expiresAt = Date.now() + 30_000;
+      sent = view(matchId, 'invited', stake, expiresAt);
+      bus.postMessage({ kind: 'invite', to: opponent, matchId, stake, expiresAt });
+      return sent;
+    },
+    async respond(matchId, accept) {
+      const invite = received.get(matchId);
+      if (!invite) return base.respond(matchId, accept);
+      received.delete(matchId);
+      bus.postMessage({ kind: 'answer', matchId, accept });
+      return view(matchId, accept ? 'choosing' : 'declined', invite.stake, null);
+    },
+    async cancelInvite(matchId) { if (sent?.matchId === matchId) { sent = null; return; } return base.cancelInvite(matchId); },
+    async getMatch(matchId) {
+      const invite = received.get(matchId);
+      if (invite) return view(matchId, 'invited', invite.stake, invite.expiresAt);
+      if (sent?.matchId === matchId) return sent;
+      return base.getMatch(matchId);
+    },
+    async getActive() { return sent ?? base.getActive(); },
+    async pendingInvite() { return [...received.values()].find(invite => invite.expiresAt > Date.now()) ?? null; },
+    subscribe(handlers) {
+      if (handlers.onInvite) inviteHandlers.add(handlers.onInvite);
+      if (handlers.onMatch) matchHandlers.add(handlers.onMatch);
+      const stop = base.subscribe(handlers);
+      return () => { stop(); if (handlers.onInvite) inviteHandlers.delete(handlers.onInvite); if (handlers.onMatch) matchHandlers.delete(handlers.onMatch); };
+    },
+  };
 }
 createRoot(document.getElementById('root')!).render(<Harness />);

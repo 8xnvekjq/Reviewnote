@@ -92,3 +92,25 @@ test('한 턴 제한 시간은 120초(NPC 시작·한 판 제출·친구 수락�
   assert.equal(m.status,'shootout');near120(m,'승부차기 시작');
   m=(await as(A,"select public.submit_card_rps_shootout($1::uuid,'rock') r",[invited.matchId]))[0].r as any;m=(await as(B,"select public.submit_card_rps_shootout($1::uuid,'rock') r",[invited.matchId]))[0].r as any;assert.equal(m.status,'shootout');near120(m,'승부차기 비김 후');
 }finally{await db.close();}});
+
+test('포인트가 판돈보다 적으면 신청·수락 모두 not_enough_points, 포인트·경기는 그대로',async()=>{const {db,as}=await database();try{
+  const pts=async(u:string)=>(await db.query('select bonus_points+point_adjustment p from profiles where id=$1',[u])).rows[0].p;
+  // 상점과 같은 잔액 정의: max(0, bonus_points + point_adjustment). 40P(=100-60)로 50P 신청은 안 된다.
+  await db.query('update profiles set point_adjustment=-60 where id=$1',[A]);
+  await assert.rejects(as(A,'select public.invite_card_rps($1::uuid,50)',[B]),/not_enough_points/);
+  assert.equal(await pts(A),40);assert.equal((await db.query('select count(*)::int n from pixel_card_rps_matches')).rows[0].n,0,'실패한 신청은 남지 않는다(받는 쪽 알림도 없음)');
+  const ok=(await as(A,'select public.invite_card_rps($1::uuid,20) r',[B]))[0].r as any;assert.equal(ok.status,'invited');assert.equal(await pts(A),20);
+  // 받는 쪽: 잔액 0 → 수락은 not_enough_points, 신청은 그대로 남아 거절할 수 있다.
+  await db.query('update profiles set point_adjustment=-100 where id=$1',[B]);
+  await assert.rejects(as(B,'select public.respond_card_rps($1::uuid,true)',[ok.matchId]),/not_enough_points/);
+  assert.equal(await pts(B),0);assert.equal((await db.query('select status from pixel_card_rps_matches where id=$1',[ok.matchId])).rows[0].status,'invited');
+  // 음수 잔액도 0으로 본다(상점 purchase_pixel_item과 같다).
+  await db.query('update profiles set point_adjustment=-150 where id=$1',[B]);
+  await assert.rejects(as(B,'select public.respond_card_rps($1::uuid,true)',[ok.matchId]),/not_enough_points/);
+  const declined=(await as(B,'select public.respond_card_rps($1::uuid,false) r',[ok.matchId]))[0].r as any;assert.equal(declined.status,'declined');assert.equal(await pts(A),40,'거절하면 맡긴 판돈을 돌려받는다');
+  // 딱 맞는 잔액이면 된다.
+  await db.query('update profiles set point_adjustment=-50 where id=$1',[B]);
+  const again=(await as(A,'select public.invite_card_rps($1::uuid,10) r',[B]))[0].r as any;
+  await db.query('update profiles set point_adjustment=-90 where id=$1',[B]);
+  assert.equal(((await as(B,'select public.respond_card_rps($1::uuid,true) r',[again.matchId]))[0].r as any).status,'choosing');assert.equal(await pts(B),0);
+}finally{await db.close();}});
