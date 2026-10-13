@@ -21,6 +21,8 @@ import type { WorldContext } from './WorldScene';
 import { cardRpsAssets, MOUSE_DEALER_H, MOUSE_DEALER_ROWS, MOUSE_DEALER_W } from '../assets/cardRps';
 import { loadImage } from './loadImage';
 
+/** 매 프레임 광장 친구 자리(카드 대결 버튼용). me·feet는 월드 px, head는 게임 프레임 CSS px(머리·말풍선 위 가운데). */
+export interface PlazaFrame { me: { x: number; y: number }; peers: { id: string; feet: { x: number; y: number }; head: { x: number; y: number } }[] }
 type Friend = { tool?: HeldTool; tag?: Phaser.GameObjects.Text; follow?: PetFollowState; sprite?: Phaser.GameObjects.Sprite; pet?: Phaser.GameObjects.Sprite; look: string; petId: string | null; loading: boolean; state: PlazaPlayerState };
 export class PlazaScene extends WorldScene {
   protected readonly background = '#5d8a4a';
@@ -30,6 +32,7 @@ export class PlazaScene extends WorldScene {
   private selfId = '';
   private exhibit: Phaser.GameObjects.Image | null = null;
   private exhibitWanted = false;
+  private frameListener: ((frame: PlazaFrame) => void) | null = null;
   constructor(ctx: WorldContext) { super('plaza', ctx); }
   protected drawWorld() {
     this.exhibit = null; this.exhibitWanted = false;
@@ -91,7 +94,10 @@ export class PlazaScene extends WorldScene {
     }).catch(() => {});
     const hint = this.add.text((PLAZA_EXIT.x + .5) * 16, (PLAZA_EXIT.y + .5) * 16, '↓', { fontSize: '12px', color: '#fff4ce' }).setOrigin(.5).setDepth(-900);
     this.tweens.add({ targets: hint, alpha: .35, y: hint.y + 3, duration: 850, yoyo: true, repeat: -1 });
-    const clear = () => { this.friends.clear(); this.bubbles?.clear(); this.bubbles = null; };
+    // 카메라 worldView는 그리기 직전에 갱신된다 — 그린 뒤에 알려야 머리 위 DOM 버튼이 한 프레임 늦지 않는다.
+    const onRender = () => { if (this.frameListener) this.frameListener(this.frame()); };
+    this.game.events.on('postrender', onRender);
+    const clear = () => { this.friends.clear(); this.bubbles?.clear(); this.bubbles = null; this.game.events.off('postrender', onRender); };
     this.events.once('shutdown', clear);
   }
   setExhibit(show: boolean) {
@@ -103,6 +109,19 @@ export class PlazaScene extends WorldScene {
       if (!this.textures.exists('plaza-tomato')) this.textures.addImage('plaza-tomato', image);
       this.exhibit = this.add.image(160, 136, 'plaza-tomato').setDisplaySize(24, 24).setOrigin(.5, 1).setDepth(143);
     }).catch(() => {});
+  }
+  setFrameListener(listener: ((frame: PlazaFrame) => void) | null) { this.frameListener = listener; }
+  private frame(): PlazaFrame {
+    const camera = this.cameras.main, ratio = this.ctx.view.ratio;
+    const peers: PlazaFrame['peers'] = [];
+    for (const [id, f] of this.friends) {
+      if (!f.sprite) continue;
+      const feet = { x: (f.state.x + PLAZA_MARGIN + .5) * 16, y: (f.state.y + PLAZA_MARGIN + .5) * 16 };
+      // 머리 꼭대기(발에서 31px 위), 말풍선이 떠 있으면 그 위.
+      const top = Math.min(feet.y - 31, this.bubbles?.topOf(id) ?? Infinity);
+      peers.push({ id, feet, head: { x: (feet.x - camera.worldView.x) * camera.zoom / ratio, y: (top - camera.worldView.y) * camera.zoom / ratio } });
+    }
+    return { me: { x: this.feet.x, y: this.feet.y }, peers };
   }
   /** bubbles: 머리 위 말풍선(인사·한마디). 목록에서 빠지면 장면이 천천히 흐리게 지운다. */
   setClassmates(players: PlazaPlayerState[], bubbles: Record<string, PlazaBubble>, selfId: string) {

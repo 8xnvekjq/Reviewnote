@@ -19,6 +19,7 @@ import { createMockFishingAdapter } from '../../src/features/pixel-world-phaser/
 import { parseClockOverride } from '../../src/features/pixel-world-phaser/logic/worldClock';
 import { DEFAULT_HAND, type Bag } from '../../src/features/pixel-world-phaser/logic/bag';
 import { createMockBugAdapter } from '../../src/features/pixel-world-phaser/ui/bugAdapter';
+import { createMockCardRpsAdapter } from '../../src/features/pixel-world-phaser/ui/cardRpsAdapterMock';
 
 const params = new URLSearchParams(location.search);
 const appearance: PublicAvatarAppearance = {
@@ -52,6 +53,8 @@ function Harness() {
     return adapter;
   }, []);
   // 잠자리: ?bugs=1 이면 모의 어댑터(잠자리채 보유). ?bugSeed= 로 어떤 잠자리가 걸릴지 정한다.
+  // ?duel: 광장 친구 대결용 presence 토큰(실제 어댑터의 registerPresenceToken 흉내). 없으면 GameShell 기본 목.
+  const cardRpsAdapter = useMemo(() => params.has('duel') ? Object.assign(createMockCardRpsAdapter(), { registerPresenceToken: async () => 'duel-' + crypto.randomUUID() }) : undefined, []);
   const bugAdapter = useMemo(() => params.has('bugs') ? createMockBugAdapter({ netOwned: true, seed: Number(params.get('bugSeed') ?? '42') }) : undefined, []);
   const [roomLayout, setRoomLayout] = useState<readonly Placement[]>(furniture);
   const [snapshot, setSnapshot] = useState<FarmSnapshot>({ serverNow: new Date(farmNow).toISOString(), today: '2026-10-08', harvestCount: 0, bestSize: null, lastHarvestSize: null,
@@ -141,7 +144,7 @@ function Harness() {
   return open
     ? params.has('saved')
       ? <PixelWorldPhaser userId="scene-test-user" pointsBalance={balance} onPixelPurchase={setBalance} onPointsReward={reward => setBalance(value => value + reward)} onExit={() => setOpen(false)} />
-      : <GameShell userId={params.get('user') ?? 'guest'} face={params.get('face') ?? undefined} isAdmin={params.has('admin')} fishingAdapter={fishingAdapter} bugAdapter={bugAdapter} clockOverride={clockOverride} appearance={look} pet={active} balance={balance} panels={adapter} farmAdapter={params.has('farm') ? farmAdapter : undefined} beds={params.has('farm') ? farmBeds : [...beds]} furniture={roomLayout} onSaveFurniture={async layout => { await new Promise(resolve => setTimeout(resolve, 100)); if (params.has('roomSaveError')) throw new Error('저장하지 못했어요. 다시 시도해 주세요.'); setRoomLayout(layout); }} scarecrowLine={() => pickScarecrowLine(null, Date.now())} onExit={() => setOpen(false)} />
+      : <GameShell userId={params.get('user') ?? 'guest'} face={params.get('face') ?? undefined} isAdmin={params.has('admin')} fishingAdapter={fishingAdapter} bugAdapter={bugAdapter} cardRpsAdapter={cardRpsAdapter} clockOverride={clockOverride} appearance={look} pet={active} balance={balance} panels={adapter} farmAdapter={params.has('farm') ? farmAdapter : undefined} beds={params.has('farm') ? farmBeds : [...beds]} furniture={roomLayout} onSaveFurniture={async layout => { await new Promise(resolve => setTimeout(resolve, 100)); if (params.has('roomSaveError')) throw new Error('저장하지 못했어요. 다시 시도해 주세요.'); setRoomLayout(layout); }} scarecrowLine={() => pickScarecrowLine(null, Date.now())} onExit={() => setOpen(false)} />
     : <main style={{ padding: 24 }}><p data-testid="exited">게임에서 나왔어요.</p><button type="button" onClick={() => setOpen(true)}>다시 들어가기</button></main>;
 }
 createRoot(document.getElementById('root')!).render(<Harness />);

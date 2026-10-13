@@ -248,8 +248,10 @@
 .pwp-rps-rules-placeholder{display:grid;place-content:center;padding:30px;color:#3a210f;background:#f6e7bd;border:5px double #60402c}
 .pwp-rps-rules nav{display:flex;justify-content:center;align-items:center;gap:16px}
 
-/* 광장 친구 대결 칩(PlazaBridge) */
-.pwp-rps-friends{position:absolute;right:12px;top:88px;z-index:20;display:flex;max-width:min(45vw,360px);gap:5px;overflow-x:auto}.pwp-rps-friends .pwp-chip{white-space:nowrap}
+/* 광장: 가까이 선 친구 머리 위 카드 대결 버튼(PlazaBridge가 매 프레임 transform으로 머리 위에 놓는다). */
+.pwp-rps-near{position:absolute;left:0;top:0;z-index:15;display:inline-flex;align-items:center;gap:4px;min-height:44px;margin-top:-4px;padding:0 13px;white-space:nowrap;font-family:inherit;font-size:14px;font-weight:800;line-height:1;color:#3a210f;background:linear-gradient(#f8ebc4,#e6cf98);border:3px solid #3a210f;border-radius:999px;box-shadow:inset 0 -3px 0 #b88b52,0 3px 0 rgba(58,33,15,.45);cursor:pointer;touch-action:manipulation;will-change:transform}
+.pwp-rps-near:active{box-shadow:inset 0 2px 0 #b88b52;filter:brightness(.96)}
+.pwp-rps-near:focus-visible{outline:3px solid #fff4ce;outline-offset:2px}
 
 /* 폰 가로: 무대 왼쪽, 쟁반 오른쪽. */
 @media (orientation:landscape) and (max-height:560px){

@@ -13,6 +13,7 @@ import type { ControlState } from '../controls';
 import { RoomScene } from './RoomScene';
 import { YardScene } from './YardScene';
 import { PlazaScene } from './PlazaScene';
+import type { PlazaFrame } from './PlazaScene';
 import { RiverScene } from './RiverScene';
 import type { FishingState } from '../ui/fishingAdapter';
 import type { FishPhase, FishWeather } from '../logic/worldTint';
@@ -26,6 +27,7 @@ import type { WorldAssets, WorldContext, WorldDebug, WorldEvents, WorldScene } f
 import type { HeldToolSpec } from './heldTool';
 
 export type { Prompt, WorldAssets, WorldDebug, WorldEvents } from './WorldScene';
+export type { PlazaFrame } from './PlazaScene';
 
 export interface WorldGameHandle {
   setHotspots(spots: FishingState['spots']): void;
@@ -65,6 +67,8 @@ export interface WorldGameHandle {
   setExhibit(show: boolean): void;
   /** 광장·강가의 친구들. 다른 장면에서는 무시한다. */
   setClassmates(players: PlazaPlayerState[], bubbles: Record<string, PlazaBubble>, selfId: string): void;
+  /** 광장: 매 프레임(그린 뒤) 나와 친구들 자리. null = 그만 받기. */
+  setPlazaFrameListener(listener: ((frame: PlazaFrame) => void) | null): void;
   /** 강가 친구(와 나)의 낚시 모습. 강가가 아니면 무시한다. */
   setRiverFishing(fishing: Record<string, RiverPeerFishing>): void;
   debug(): WorldDebug;
@@ -212,6 +216,7 @@ export function startWorldGame(parent: HTMLElement, start: WorldStart, controls:
       },
       scene: () => lastScene,
       setExhibit: show => { if (active instanceof PlazaScene) active.setExhibit(show); },
+      setPlazaFrameListener: listener => plaza.setFrameListener(listener),
       setClassmates: (players, bubbles, selfId) => {
         if (active instanceof PlazaScene) active.setClassmates(players, bubbles, selfId);
         else if (active === river) river.peers.current?.set(players, bubbles, selfId);
