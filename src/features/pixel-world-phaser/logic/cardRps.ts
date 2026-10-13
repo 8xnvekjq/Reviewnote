@@ -22,7 +22,7 @@ export const RPS_CARDS_PER_HAND = 3;
 export const RPS_WINS_TO_WIN = 2;
 export const RPS_MAX_ROUNDS = 3;
 /** 카드(또는 승부차기 손)를 내는 시간 제한. 넘기면 서버가 기권 처리한다. */
-export const RPS_TURN_MS = 60_000;
+export const RPS_TURN_MS = 120_000;
 
 export const startingInventory = (): RpsInventory => ({ rock: RPS_CARDS_PER_HAND, scissors: RPS_CARDS_PER_HAND, paper: RPS_CARDS_PER_HAND });
 export const inventoryTotal = (inv: RpsInventory) => inv.rock + inv.scissors + inv.paper;

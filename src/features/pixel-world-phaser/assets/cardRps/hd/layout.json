@@ -1,0 +1,35 @@
+{
+  "tableTop": [
+    [
+      300,
+      410
+    ],
+    [
+      1270,
+      410
+    ],
+    [
+      1580,
+      900
+    ],
+    [
+      20,
+      900
+    ]
+  ],
+  "opponentSeat": {
+    "x": 800,
+    "bottomY": 408
+  },
+  "opponentScale": 300,
+  "rows": {
+    "opponent": 485,
+    "clash": 650,
+    "mine": 805
+  },
+  "cardHeight": {
+    "opponent": 118,
+    "clash": 145,
+    "mine": 176
+  }
+}
