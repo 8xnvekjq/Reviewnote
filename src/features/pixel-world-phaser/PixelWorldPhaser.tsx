@@ -21,6 +21,7 @@ import { createRewardsAdapter } from './ui/rewardsAdapter';
 import { createBugAdapter } from './ui/bugAdapter';
 import { createFishingAdapter } from './ui/fishingAdapter';
 import { createCardRpsAdapter } from './ui/cardRpsAdapter';
+import { withPointsRefresh } from './logic/cardRpsPoints';
 import { parseClockOverride } from './logic/worldClock';
 import type { FishingOverride } from './ui/fishingAdapter';
 import { userAnimalFace } from '../../utils/animalFace';
@@ -61,7 +62,8 @@ export default function PixelWorldPhaser({ userId, pointsBalance, onExit, onPixe
   }, [userId, refreshPoints]);
   // 잠자리 잡기(잠자리채 소유·도감·시작/결과).
   const bugAdapter = useMemo(() => refreshAfterAward(createBugAdapter(supabase), refreshPoints, refreshBag), [userId, refreshPoints, refreshBag]);
-  const cardRpsAdapter = useMemo(() => createCardRpsAdapter(supabase), [userId]);
+  // 카드 대결의 판돈 맡김·환불·승리 보상도 서버가 point_adjustment를 바꾼다 — 내 행동이든 상대 행동(구독)이든 바로 다시 읽는다.
+  const cardRpsAdapter = useMemo(() => withPointsRefresh(createCardRpsAdapter(supabase), refreshPoints), [userId, refreshPoints]);
   const [face, setFace] = useState(() => userAnimalFace(userId));
   useEffect(() => {
     let cancelled = false;
