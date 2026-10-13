@@ -6,11 +6,10 @@ import type { RpsHand, RpsInventory, RpsRoundResult } from './cardRps';
 export const RPS_FRIEND_STAKES = [10, 20, 50] as const;
 export type RpsFriendStake = (typeof RPS_FRIEND_STAKES)[number];
 export const RPS_FRIEND_DEFAULT_STAKE: RpsFriendStake = 20;
-/** NPC 대결: 참가비를 내고, 이기면 보상(참가비 포함 금액)을 받는다. 임시 수치. */
-export const RPS_NPC_ENTRY = 10;
+/** NPC 대결은 무료(참가비 0). */
+export const RPS_NPC_ENTRY = 0;
+/** NPC 보상: 한 사람이 치즈를 처음으로 이겼을 때 딱 한 번만 받는다. 그 뒤로는 보상 없는 연습 판. 임시 수치. */
 export const RPS_NPC_REWARD = 20;
-/** NPC 보상은 하루 이 횟수까지만(KST). 넘으면 대결은 되지만 참가비·보상 없이 연습 판. 임시 수치. */
-export const RPS_NPC_DAILY_REWARD_WINS = 5;
 /** 친구 신청 응답 대기 시간. 지나면 신청이 사라지고 맡긴 포인트는 돌려준다. */
 export const RPS_INVITE_MS = 30_000;
 
@@ -38,9 +37,9 @@ export interface RpsMatchView {
   matchId: string;
   mode: RpsMode;
   status: RpsMatchStatus;
-  /** 친구: 1인당 판돈, NPC: 참가비(연습 판이면 0) */
+  /** 친구: 1인당 판돈, NPC: 0(무료) */
   stake: number;
-  /** 이기면 받는 포인트(친구: stake×2, NPC: RPS_NPC_REWARD, 연습 판 0) */
+  /** 이기면 받는 포인트(친구: stake×2, NPC: 첫 승리 전이면 RPS_NPC_REWARD, 그 뒤 0) */
   prize: number;
   me: RpsPlayerView;
   opponent: RpsPlayerView;
@@ -71,7 +70,7 @@ export interface CardRpsAdapter {
   respond(matchId: string, accept: boolean): Promise<RpsMatchView>;
   /** 보낸 신청 취소(맡긴 판돈 돌려받음). */
   cancelInvite(matchId: string): Promise<void>;
-  /** 쥐 딜러와 대결 시작(참가비). */
+  /** 쥐 딜러와 대결 시작(무료). */
   startNpc(): Promise<RpsMatchView>;
   /** 이번 판에 낼 카드(순서대로). */
   submitCards(matchId: string, cards: RpsHand[]): Promise<RpsMatchView>;
