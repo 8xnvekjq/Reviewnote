@@ -137,7 +137,7 @@ test('다시 들어오면 가장 최근 판(또는 승부차기) 하나만 다�
   assert.deepEqual(revealCardsAt(shoot, { stage: 'flip', clash: 0 }).map(c => c.faceUp), [true, true]);
 });
 
-test('NPC 대결은 무료이고 보상은 처음 이겼을 때 한 번만', async () => {
+test('NPC 대결은 무료이고 보상은 하루 첫 승리만(모의 어댑터 하나가 하루)', async () => {
   assert.equal(RPS_NPC_ENTRY, 0);
   assert.equal(RPS_NPC_REWARD, 20);
   const adapter = createMockCardRpsAdapter({ seed: 3 });

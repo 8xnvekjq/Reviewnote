@@ -8,7 +8,7 @@ export type RpsFriendStake = (typeof RPS_FRIEND_STAKES)[number];
 export const RPS_FRIEND_DEFAULT_STAKE: RpsFriendStake = 20;
 /** NPC 대결은 무료(참가비 0). */
 export const RPS_NPC_ENTRY = 0;
-/** NPC 보상: 한 사람이 치즈를 처음으로 이겼을 때 딱 한 번만 받는다. 그 뒤로는 보상 없는 연습 판. 임시 수치. */
+/** NPC 보상: 하루 첫 승리(KST)만 받는다. 그날 이후 승리는 보상 없는 연습 판, 다음 날 다시 받는다. 임시 수치. */
 export const RPS_NPC_REWARD = 20;
 /** 친구 신청 응답 대기 시간. 지나면 신청이 사라지고 맡긴 포인트는 돌려준다. */
 export const RPS_INVITE_MS = 30_000;
@@ -39,7 +39,7 @@ export interface RpsMatchView {
   status: RpsMatchStatus;
   /** 친구: 1인당 판돈, NPC: 0(무료) */
   stake: number;
-  /** 이기면 받는 포인트(친구: stake×2, NPC: 첫 승리 전이면 RPS_NPC_REWARD, 그 뒤 0) */
+  /** 이기면 받는 포인트(친구: stake×2, NPC: 오늘(KST) 첫 승리 전이면 RPS_NPC_REWARD, 그날은 그 뒤 0) */
   prize: number;
   me: RpsPlayerView;
   opponent: RpsPlayerView;
