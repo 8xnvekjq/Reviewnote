@@ -31,8 +31,10 @@ import { dialogueFor } from './logic/dialogues';
 import type { SceneId } from './logic/scenes';
 import type { FurnitureType, Placement } from '../pixel-room/model';
 import { composeAvatar } from './game/avatarTexture';
-import { loadBearRide, loadBed, loadFloors, loadFurnitureSheets, loadInterior, loadPetSheet, loadScarecrow, loadTown, loadPlazaStall } from './game/sceneAssets';
-import type { BedLook } from './game/sceneAssets';
+import { loadBearRide, loadFloors, loadFurnitureSheets, loadInterior, loadPetSheet, loadScarecrow, loadTown, loadPlazaStall } from './game/sceneAssets';
+import { GardenToolbar } from './ui/GardenToolbar';
+import { CROP_RULES, SPRINKLER_ITEM_ID, cropTypeOf, gardenAction, gardenLookKey, gardenResultMessage, sprinklerPlaced } from '../pixel-room/farm/gardenModel';
+import type { GardenLook, GardenTool } from '../pixel-room/farm/gardenModel';
 import type { Prompt, WorldGameHandle, WorldEvents } from './game/boot';
 import './gameShell.css';
 import { GamePanels, FishingPanels, Window } from './ui/GamePanels';
@@ -82,7 +84,8 @@ export interface GameShellProps {
   appearance: PublicAvatarAppearance;
   pet: PetId | null;
   balance: number;
-  beds: BedLook[];
+  /** 텃밭 모습(gardenModel.ts gardenLook). 서버 값이 바뀌면 칸 그림만 갈아 끼운다. */
+  garden: GardenLook;
   /** 내 방 가구 배치(서버 값). 완료된 편집 결과도 같은 경로로 반영한다. */
   furniture: readonly Placement[];
   onSaveFurniture?: (layout: Placement[]) => Promise<void>;
@@ -143,7 +146,7 @@ async function leaveFullscreen() {
 }
 
 // 상위가 1초마다(밭 시계) 다시 그려져도, 넘겨받는 값이 같으면 셸은 다시 그리지 않는다.
-export const GameShell = memo(function GameShell({ isAdmin = false, appearance, pet, balance, beds, furniture, onSaveFurniture, onSceneChange, scarecrowLine, onExit, panels, farmAdapter, fishingAdapter, rewardsAdapter, bugAdapter, cardRpsAdapter, newFishSpeciesId, clockOverride, userId = 'guest', face }: GameShellProps) {
+export const GameShell = memo(function GameShell({ isAdmin = false, appearance, pet, balance, garden, furniture, onSaveFurniture, onSceneChange, scarecrowLine, onExit, panels, farmAdapter, fishingAdapter, rewardsAdapter, bugAdapter, cardRpsAdapter, newFishSpeciesId, clockOverride, userId = 'guest', face }: GameShellProps) {
   const rpsAdapter = useMemo(() => cardRpsAdapter ?? createMockCardRpsAdapter(), [cardRpsAdapter]);
   const [rpsOpponentAppearance, setRpsOpponentAppearance] = useState<PublicAvatarAppearance>();
   useLayoutEffect(() => {
@@ -236,6 +239,45 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
   const bugsRef = useRef(bugs); bugsRef.current = bugs;
   const netSwing = hand === 'net' && (bugs.nearby || (!prompt && ['yard', 'plaza', 'river'].includes(scene?.id ?? '')));
   const level = useLevel(fishingAdapter, fishing.state);
+  // ── 텃밭: 가까이 오면 도구 막대. A(또는 도구를 든 채 밭 칸 찍기)가 바라보는 칸에 고른 도구를 쓴다 ──
+  const [gardenAt, setGardenAt] = useState<{ near: boolean; target: number | null }>({ near: false, target: null });
+  const [gardenTool, setGardenTool] = useState<GardenTool>('hoe');
+  const [gardenMessage, setGardenMessage] = useState('');
+  const [gardenBusy, setGardenBusy] = useState(false);
+  useEffect(() => { if (!gardenMessage) return; const timer = window.setTimeout(() => setGardenMessage(''), 4000); return () => clearTimeout(timer); }, [gardenMessage]);
+  const sprinklerOwned = !!farmAdapter?.farm.snapshot?.sprinklerOwned || !!panels?.shop.ownedIds.has(SPRINKLER_ITEM_ID);
+  const gardenChoiceFor = (index: number, tool: GardenTool) => {
+    const farm = farmAdapter?.farm;
+    return gardenAction(farm?.snapshot?.plots.find(plot => plot.index === index), tool, { now: farm?.now ?? 0, sprinklerOwned, sprinklerAt: sprinklerPlaced(farm?.snapshot ?? null) });
+  };
+  const gardenBusyRef = useRef(false);
+  const applyGardenTool = async (index: number) => {
+    const adapter = farmAdapter;
+    if (!adapter || gardenBusyRef.current) return;
+    const choice = gardenChoiceFor(index, gardenToolRef.current);
+    if (!choice.action) { setGardenMessage(choice.reason ?? ''); return; }
+    const plot = adapter.farm.snapshot?.plots.find(entry => entry.index === index);
+    const crop = plot?.crop ? cropTypeOf(plot.crop) : undefined;
+    gardenBusyRef.current = true; setGardenBusy(true); setGardenMessage('');
+    try {
+      const result = await adapter.farm.act(index, choice.action);
+      if (!result) { setGardenMessage('저장 결과를 확인하지 못했어요. 다시 확인해 주세요.'); return; }
+      let text = gardenResultMessage(choice.action, result.result, result.harvest);
+      if (result.result === 'ok') {
+        handle.current?.gardenFx(index, choice.action, crop);
+        if (choice.action === 'harvest') {
+          const gain = gainFrom(result);
+          level.onXp(gain);
+          // 경험치 영수증이 없는 응답(예전 서버)은 표시용 값만 보여 준다.
+          text += !gain ? ` +${CROP_RULES[crop ?? 'tomato'].xp} XP` : gain.gained > 0 ? ` +${gain.gained} XP` : ' (오늘 농사 경험치는 다 받았어요)';
+          void adapter.inventory.refresh(); void panels?.bag?.refresh();
+        }
+      }
+      setGardenMessage(text);
+    } finally { gardenBusyRef.current = false; setGardenBusy(false); }
+  };
+  const applyGardenRef = useRef(applyGardenTool); applyGardenRef.current = applyGardenTool;
+  const gardenToolRef = useRef(gardenTool); gardenToolRef.current = gardenTool;
   useEffect(() => { if (fishing.caught) level.onXp(gainFrom(fishing.caught)); }, [fishing.caught, level.onXp]);
   const fishingRef = useRef(fishing); fishingRef.current = fishing;
   // 방금 처음 잡은 물고기 — 거북이가 도감을 열 때 "새 친구" 인사를 한다. 도감을 한 번 닫으면 잊는다.
@@ -251,6 +293,10 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
   useEffect(() => { if (panel === null) void refreshBugs(); }, [panel, refreshBugs]);
   useEffect(() => { if (bugResult?.ok && bugResult.caught) onBugXp(bugResult.xpGain); }, [bugResult, onBugXp]);
   const [placing, setPlacing] = useState<FurnitureType | null>(null);
+  const gardenActive = scene?.id === 'yard' && gardenAt.near && !!farmAdapter && !placing;
+  const gardenChoice = gardenActive && gardenAt.target !== null && !panel && !dialogue ? gardenChoiceFor(gardenAt.target, gardenTool) : null;
+  const gardenRef = useRef({ active: gardenActive, target: gardenAt.target }); gardenRef.current = { active: gardenActive, target: gardenAt.target };
+  useEffect(() => { handle.current?.setGardenTool(gardenActive); }, [gardenActive, status]);
   const [roomMessage, setRoomMessage] = useState('');
   const [roomPending, setRoomPending] = useState(false);
   const roomSaving = useRef(false);
@@ -356,9 +402,9 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     if (fishing) openPanel(fishing);
     else if (kind === 'kiosk') { if (isAdmin) openPanel('kiosk'); }
     else if (kind === 'shop' || kind === 'wardrobe' || kind === 'contest' || kind === 'well' || kind === 'bench' || kind === 'card-rps' || kind === 'card-rps-rules') openPanel(kind);
-    else if (kind === 'pet' || /^farm:\d+$/.test(kind)) { farmAdapter?.farm.clearMessage(); openPanel(kind as ActivityPanel); }
+    else if (kind === 'pet') openPanel(kind as ActivityPanel);
   };
-  const bedsRef = useRef(beds); bedsRef.current = beds;
+  const gardenLookRef = useRef(garden); gardenLookRef.current = garden;
   const furnitureRef = useRef(furniture); furnitureRef.current = furniture;
   const onSceneChangeRef = useRef(onSceneChange); onSceneChangeRef.current = onSceneChange;
   useEffect(() => {
@@ -366,20 +412,22 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     (async () => {
       try {
         const avatar = composeAvatar(appearance);
-        const [town, interior, floors, furnitureSheets, avatarCanvas, petSource, scarecrow, bedImages, { startWorldGame }, plazaStall, bearRide] = await Promise.all([
+        const [town, interior, floors, furnitureSheets, avatarCanvas, petSource, scarecrow, { startWorldGame }, plazaStall, bearRide] = await Promise.all([
           loadTown(), loadInterior(), loadFloors(), loadFurnitureSheets(), avatar.canvas, pet ? loadPetSheet(pet) : Promise.resolve(null),
-          Promise.resolve().then(loadScarecrow), Promise.resolve().then(() => Promise.all(bedsRef.current.map(loadBed))), import('./game/boot'), Promise.resolve().then(loadPlazaStall), loadBearRide(),
+          Promise.resolve().then(loadScarecrow), import('./game/boot'), Promise.resolve().then(loadPlazaStall), loadBearRide(),
         ]);
         if (cancelled || !stage.current) return;
         const game = await startWorldGame(stage.current, {
           assets: { bearRide, town, interior, floors, furniture: furnitureSheets, avatar: { key: avatar.key, canvas: avatarCanvas }, pet: pet && petSource ? { id: pet, source: petSource } : null, scarecrow, plazaStall },
-          beds: bedImages, furniture: furnitureRef.current, clockOverride, face: faceRef.current, admin: isAdmin,
+          garden: gardenLookRef.current, furniture: furnitureRef.current, clockOverride, face: faceRef.current, admin: isAdmin,
         }, controls, {
           onPrompt: next => setPrompt(next),
           onPetMessage: setPetMessage,
           onRide: setRiding,
           onTalk: id => talkRef.current(id),
           onPanel: panel => scenePanelRef.current(panel),
+          onGarden: next => setGardenAt(next),
+          onGardenUse: index => { void applyGardenRef.current(index); },
           onScene: (id, title) => {
             const info = { id, title, visit: performance.now() };
             setScene(info); setToast(info);
@@ -421,14 +469,9 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     return () => { cancelled = true; };
   }, [pet, status]);
 
-  // 밭 모습이 바뀌면(서버 새로고침) 밭 그림만 갈아 끼운다.
-  const bedKey = beds.map(bed => `${bed.stage}/${bed.moisture}`).join(',');
-  useEffect(() => {
-    if (status !== 'ready') return;
-    let cancelled = false;
-    void Promise.resolve().then(() => Promise.all(bedsRef.current.map(loadBed))).then(images => { if (!cancelled) handle.current?.setBeds(images); }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [bedKey, status]);
+  // 텃밭 모습이 바뀌면(서버 새로고침·도구 사용) 칸 그림만 갈아 끼운다.
+  const gardenKey = gardenLookKey(garden);
+  useEffect(() => { if (status === 'ready') handle.current?.setGarden(gardenLookRef.current); }, [gardenKey, status]);
 
   // 가구 배치가 (서버에서) 새로 오면 방에 반영한다. 방에 있지 않으면 다음에 들어갈 때 쓴다.
   useEffect(() => {
@@ -490,6 +533,8 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     if (strictWindowOpen(root.current)) return;
     if (fishingRef.current.reel()) return;
     if (panelRef.current || editingRef.current) return;
+    // 텃밭에서 밭 칸을 보고 있으면 A는 고른 도구(익은 작물은 따기).
+    if (!dialogueRef.current && gardenRef.current.active && gardenRef.current.target !== null) { void applyGardenRef.current(gardenRef.current.target); return; }
     // 손 칸이 정한다: 잠자리채를 들면 A는 잠자리채(낚시는 안 함), 낚싯대·맨손이면 낚시(잠자리는 무시).
     // 잠자리채를 안 들었으면 말 걸기·낚시가 먼저이고, 할 일이 없을 때만 잠자리채 안내를 띄운다.
     const net = handRef.current === 'net';
@@ -760,14 +805,17 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
       {riding && <button type="button" className="pwp-chip" aria-label="곰에서 내리기" disabled={!!placing || roomPending} onClick={() => handle.current?.dismount()}>내리기</button>}
       {scene?.id === 'room' && <button type="button" className="pwp-chip" disabled={status !== 'ready' || !onSaveFurniture || !panels.shop.ready || panels.shop.loadError || !!panel || !!dialogue || !!placing || roomPending} onClick={() => { setRoomMessage(''); openPanel('furniture'); }}>꾸미기</button>}
     </div>}
-    <button type="button" disabled={!!placing} className="pwp-btn pwp-btn-a" data-pressed={pressed.a} data-prompt={!!prompt || !!dialogue}
+    {gardenActive && !panel && !dialogue && <GardenToolbar tool={gardenTool} onTool={tool => { setGardenTool(tool); setGardenMessage(''); }} sprinkler={sprinklerOwned}
+      message={gardenMessage} busy={gardenBusy}
+      style={{ top: hud.y + hud.height + 56 }} />}
+    <button type="button" disabled={!!placing} className="pwp-btn pwp-btn-a" data-pressed={pressed.a} data-prompt={!!prompt || !!dialogue || !!gardenChoice?.action}
       style={{ left: a.x - a.size / 2, top: a.y - a.size / 2, width: a.size, height: a.size }}
-      aria-label={dialogue ? 'A · 다음' : netSwing ? 'A · 잠자리채' : prompt ? `A · ${promptLabel}` : fishing.canCast && hand !== 'net' ? 'A · 낚시하기' : 'A'}
+      aria-label={dialogue ? 'A · 다음' : gardenChoice ? `A · ${gardenChoice.verb}` : netSwing ? 'A · 잠자리채' : prompt ? `A · ${promptLabel}` : fishing.canCast && hand !== 'net' ? 'A · 낚시하기' : 'A'}
       onPointerDown={buttonDown('a')} onPointerUp={buttonUp('a')} onPointerCancel={buttonUp('a')} onLostPointerCapture={buttonUp('a')}
       onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); if (!event.repeat) pressA(); } }}
       onKeyUp={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); releaseA(); } }}
       onClick={event => { if (keyboardClick(event)) { pressA(); releaseA(); } }}>
-      <b>A</b>{(prompt || dialogue || (fishing.canCast && hand !== 'net') || netSwing) && <small>{dialogue ? '다음' : netSwing ? '잠자리채' : prompt ? promptLabel : '낚시하기'}</small>}
+      <b>A</b>{(prompt || dialogue || gardenChoice || (fishing.canCast && hand !== 'net') || netSwing) && <small>{dialogue ? '다음' : gardenChoice ? gardenChoice.verb : netSwing ? '잠자리채' : prompt ? promptLabel : '낚시하기'}</small>}
     </button>
     <button type="button" disabled={!!placing} className="pwp-btn pwp-btn-b" data-pressed={pressed.b} data-closing={!!panel || !!dialogue}
       style={{ left: b.x - b.size / 2, top: b.y - b.size / 2, width: b.size, height: b.size }}
@@ -791,8 +839,8 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     {scene?.id === 'river' && status === 'ready' && <RiverBridge key={'river:' + scene.visit} handle={handle} appearance={appearance} face={animalFace} tool={heldToolTag(heldTool, heldRodId)} pet={pet} riding={riding} panel={panel} reporter={riverReporter} swingReporter={swingReporter} />}
     {scene?.id === 'plaza' && status === 'ready' && <PlazaBridge key={'plaza:' + scene.visit} handle={handle} appearance={appearance} face={animalFace} tool={heldToolTag(heldTool, heldRodId)} pet={pet} riding={riding} userId={userId} panel={panel} blocked={!!dialogue} balance={balance} onClose={closePanel} swingReporter={swingReporter} rpsEndReporter={rpsEndReporter} rpsAdapter={rpsAdapter} onOpenRps={opponent => { setRpsOpponentAppearance(opponent); openPanel('card-rps'); }} />}
     {panel && panel !== 'bugs' && panel !== 'kiosk' && panel !== 'bag' && panel !== 'level' && panel !== 'card-rps' && panel !== 'card-rps-rules' && panel !== 'turtle' && panel !== 'fishboard' && panel !== 'furniture' && panel !== 'shop' && panel !== 'wardrobe' && panel !== 'contest' && panel !== 'well' && panel !== 'bench' && <FarmPanels key={panel} petId={pet} riding={riding} onRide={() => { closePanel(); handle.current?.toggleRide(); }} kind={panel} adapter={farmAdapter} onClose={closePanel}
-      onXp={level.onXp} onCollection={() => openPanel('collection')} onTalk={() => { closePanel(); openDialogue('scarecrow'); }}
-      onPet={kind => { closePanel(); handle.current?.reactPet(kind); }} onFx={(index, action) => handle.current?.farmFx(index, action)} />}
+      onCollection={() => openPanel('collection')} onTalk={() => { closePanel(); openDialogue('scarecrow'); }}
+      onPet={kind => { closePanel(); handle.current?.reactPet(kind); }} />}
     {panel === 'furniture' && panels && <FurniturePanel furniture={handle.current?.getFurniture() ?? furniture} shop={panels.shop}
       pending={roomPending} message={roomMessage} onClose={() => { if (!roomSaving.current) closePanel(); }} onPick={beginRoomEdit}
       onStore={type => void saveRoomLayout(handle.current!.getFurniture().filter(item => item.type !== type))} />}

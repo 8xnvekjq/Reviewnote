@@ -1,4 +1,4 @@
-// 장면에 넣을 이미지 준비: 기존 아틀라스 PNG, 펫 시트, 그리고 기존 React SVG 그림(허수아비/토마토 밭)을
+// 장면에 넣을 이미지 준비: 기존 아틀라스 PNG, 펫 시트, 그리고 기존 React SVG 그림(허수아비·상점 노점)을
 // 같은 모양 그대로 래스터화한 것. 그림 자체는 하나도 새로 그리지 않는다.
 import { createElement } from 'react';
 import type { ReactElement } from 'react';
@@ -16,7 +16,6 @@ import duckSheet from '../../pixel-room/pet/assets/duck.png';
 import { ShopStallArt } from '../../pixel-room/plaza/ShopStallArt';
 import { ScarecrowSprite } from '../../pixel-room/farm/Scarecrow';
 import { TomatoSprite } from '../../pixel-room/farm/TomatoSprite';
-import type { FarmMoisture, FarmStage } from '../../pixel-room/farm/farmModel';
 import type { PetId } from '../../pixel-room/pet/petKinds';
 import { loadImage, svgToImage } from './loadImage';
 
@@ -47,8 +46,8 @@ function renderSvg(element: ReactElement, width: number, height: number): Promis
   return image;
 }
 export const loadScarecrow = () => renderSvg(createElement(ScarecrowSprite), 24, 30);
-export type BedLook = { stage: FarmStage; moisture: FarmMoisture };
-export const loadBed = (look: BedLook) => renderSvg(createElement(TomatoSprite, look), 32, 32);
+/** 광장 대회 전시용 익은 토마토(기존 토마토 밭 그림 그대로). */
+export const loadRipeTomato = () => renderSvg(createElement(TomatoSprite, { stage: 'ripe', moisture: 'normal' }), 32, 32);
 
 export const loadPlazaStall = () => renderSvg(createElement(ShopStallArt), 48, 48);
 

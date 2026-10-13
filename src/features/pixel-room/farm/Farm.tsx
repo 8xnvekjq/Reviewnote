@@ -1,72 +1,37 @@
-import { useEffect, useRef, useState } from 'react';
-import { FARM_BEDS, farmDay, farmMoisture, farmStage, growthLabel } from './farmModel';
-import type { FarmAction } from './farmModel';
+import { useEffect, useState } from 'react';
+import { GARDEN_FENCE, GARDEN_SIZE, gardenStage } from './gardenModel';
 import type { useFarm } from './useFarm';
 import { TomatoSprite } from './TomatoSprite';
-import type { YardCell } from '../yard/yardModel';
 import './farm.css';
 
-const names = { empty: '빈 밭', sprout: '토마토 새싹', leaf: '자라는 토마토', fruit: '초록 토마토', ripe: '익은 토마토' };
-const moistureLabel = { moist: '흙이 촉촉해요', normal: '흙이 적당해요', dry: '흙이 말랐어요' };
-// farm is owned by the caller (FrontYard) and shared with <Scarecrow> so both react to the exact
-// same snapshot — a second independent useFarm() here would poll/fetch separately and could show
-// the scarecrow and the beds slightly out of sync.
-export function Farm({ farm, actor, moving, walkTo }: { farm: ReturnType<typeof useFarm>; actor: YardCell; moving: boolean; walkTo: (cell: YardCell) => void }) {
-  const [selected, setSelected] = useState<number | null>(null);
-  const popover = useRef<HTMLDivElement>(null);
-  const near = selected !== null && actor.x === FARM_BEDS[selected].x - 1 && actor.y === FARM_BEDS[selected].y + 1 && !moving;
-  // Open only on arrival; subsequent movement dismisses the bubble without stealing movement keys.
-  const wasNear = useRef(false);
+// 예전 Pixel World(관리자 비교용) 마당의 텃밭 자리. 2×2 밭 두 개는 울타리 친 텃밭(칸마다 도구로 가꾸기)으로 바뀌었고,
+// 칸 하나하나를 돌보는 것은 새 Pixel World 앞마당에서만 한다 — 여기서는 같은 서버 상태를 읽기만 하고 안내한다
+// (심기·물주기·수확 요청을 보내지 않는다). 수확물·출품(농작물 탭)은 그대로 쓴다.
+export function Farm({ farm }: { farm: ReturnType<typeof useFarm> }) {
+  const [open, setOpen] = useState(false);
   useEffect(() => {
-    if (near && !wasNear.current) popover.current?.focus({ preventScroll: true });
-    if (!near && (wasNear.current || !moving)) setSelected(null);
-    wasNear.current = near;
-  }, [near, moving, selected]);
-  function close() { setSelected(null); walkTo(actor); }
-  useEffect(() => {
-    if (!near) return;
-    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') { setSelected(null); walkTo(actor); } };
+    if (!open) return;
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false); };
     document.addEventListener('keydown', escape);
     return () => document.removeEventListener('keydown', escape);
-  }, [near, actor, walkTo]);
-  const plot = farm.snapshot?.plots.find(p => p.index === selected);
-  const crop = plot?.crop ?? null;
-  const stage = farmStage(crop, farm.now);
-  const watered = !!crop && crop.lastWateredOn === farmDay(farm.now);
-  const action: FarmAction = !crop ? 'plant' : stage === 'ripe' ? 'harvest' : 'water';
+  }, [open]);
+  const crops = (farm.snapshot?.plots ?? []).flatMap(plot => plot.crop ? [plot.crop] : []);
+  const ripe = crops.filter(crop => gardenStage(crop, farm.now) === 'ripe').length;
+  // 마당 판(16×12칸) 안에 보이는 텃밭 윗부분(울타리 윗줄과 첫 줄)에 놓는다.
+  const style = { left: `${GARDEN_FENCE.x / 16 * 100}%`, top: `${GARDEN_FENCE.y / 12 * 100}%`, width: `${(GARDEN_SIZE.cols + 2) / 16 * 100}%`, height: `${2 / 12 * 100}%`, zIndex: GARDEN_FENCE.y + 1 };
   return <>
-    {FARM_BEDS.map((bed, index) => {
-      const current = farm.snapshot?.plots.find(p => p.index === index)?.crop ?? null;
-      const currentStage = farmStage(current, farm.now);
-      return <button key={index} type="button" className="pr-farm-bed" data-plot={index} data-stage={currentStage} data-moisture={farmMoisture(current, farm.now)}
-        // +1 to match the yard's dog (Math.floor(y)+1 in Dog.tsx) — this stays tie-free against the
-        // dog at every reachable row near a bed (its own footprint rows are unwalkable, so it can
-        // never land exactly on bed.y). The player (.pr-plaza-actor uses y+2, not y+1, a pre-existing
-        // yard-specific offset) ties with this at exactly one row above a bed instead — a corner
-        // position, not the approach cell where tending actually happens, and far less likely to be
-        // noticed than the dog visibly vanishing behind a bed it's standing in front of would be.
-        style={{ left: `${bed.x / 16 * 100}%`, top: `${bed.y / 12 * 100}%`, zIndex: bed.y + 1 }}
-        aria-label={`${index + 1}번 밭 · ${farm.snapshot ? names[currentStage] : '농장 확인'} · 돌보러 가기`}
-        aria-expanded={selected === index && near} onClick={() => { wasNear.current = false; farm.clearMessage(); setSelected(index); walkTo({ x: bed.x - 1, y: bed.y + 1 }); }}>
-        <TomatoSprite stage={currentStage} moisture={farmMoisture(current, farm.now)} />
-        <span className="pr-farm-marker" aria-hidden="true">{!farm.snapshot ? '…' : currentStage === 'ripe' ? '✓' : currentStage === 'empty' ? '+' : ''}</span>
-      </button>;
-    })}
-    {selected !== null && near && <div ref={popover} className="pr-farm-bubble" tabIndex={-1} role="dialog" aria-label={`${selected + 1}번 토마토 밭`}
-      style={{ top: selected === 0 ? '8px' : 'min(30%, max(8px, calc(100% - 210px)))' }}>
-      <button className="pr-farm-close" type="button" aria-label="밭 닫기" onClick={close}>×</button>
-      <strong>{crop ? names[stage] : '작은 토마토 밭'}</strong>
+    <button type="button" className="pr-farm-garden" style={style} data-crops={crops.length} data-ripe={ripe} aria-expanded={open}
+      aria-label={`텃밭 · ${farm.snapshot ? `자라는 작물 ${crops.length - ripe}개, 익은 작물 ${ripe}개` : '확인 중'} · 안내 보기`} onClick={() => setOpen(value => !value)}>
+      <span className="pr-farm-garden-sign"><TomatoSprite stage={ripe ? 'ripe' : crops.length ? 'leaf' : 'empty'} moisture="normal" />텃밭</span>
+    </button>
+    {open && <div className="pr-farm-bubble" role="dialog" aria-label="텃밭 안내" style={{ top: '8px' }}>
+      <button className="pr-farm-close" type="button" aria-label="안내 닫기" onClick={() => setOpen(false)}>×</button>
+      <strong>울타리 텃밭 ({GARDEN_SIZE.cols}×{GARDEN_SIZE.rows}칸)</strong>
       {!farm.snapshot ? <p>{farm.error ? '밭을 불러오지 못했어요.' : '밭을 확인하고 있어요…'}</p> : <>
-        <p>{crop ? growthLabel(crop, farm.now) : '씨앗은 무료 · 4일 후 수확'}</p>
-        {crop && <small>{moistureLabel[farmMoisture(crop, farm.now)]}{watered ? '' : ' · 오늘의 물을 주세요'} · 돌봄 {crop.careCount}회</small>}
-        {!crop && <small>물주기를 놓쳐도 시들지 않아요.</small>}
-        <span className="pr-farm-total">지금까지 수확 {farm.snapshot.harvestCount}개{farm.snapshot.bestSize ? ` · 최고 기록 ${farm.snapshot.bestSize}` : ''}{farm.snapshot.lastHarvestSize ? ` · 최근 ${farm.snapshot.lastHarvestSize}` : ''}</span>
+        <p>자라는 작물 {crops.length - ripe}개 · 익은 작물 {ripe}개</p>
+        <small>텃밭은 새 Pixel World 앞마당에서 괭이·씨앗·물뿌리개로 칸마다 가꿔요.</small>
+        <span className="pr-farm-total">지금까지 토마토 수확 {farm.snapshot.harvestCount}개{farm.snapshot.bestSize ? ` · 최고 기록 ${farm.snapshot.bestSize}` : ''}{farm.snapshot.lastHarvestSize ? ` · 최근 ${farm.snapshot.lastHarvestSize}` : ''}</span>
       </>}
-      <p className="pr-farm-feedback" role="status">{farm.message || (farm.error ? '연결을 확인하고 다시 불러와 주세요.' : '')}</p>
-      {farm.error ? <button type="button" className="pr-farm-action" disabled={farm.busy} onClick={() => void farm.refresh()}>다시 확인</button>
-        : <button type="button" className="pr-farm-action" disabled={!plot || farm.busy || (action === 'water' && watered)} onClick={() => void farm.act(selected, action)}>
-          {farm.busy ? '확인 중…' : action === 'plant' ? '토마토 심기' : action === 'harvest' ? '토마토 수확하기' : watered ? '오늘은 촉촉해요' : '물주기 · 무료'}
-        </button>}
     </div>}
   </>;
 }

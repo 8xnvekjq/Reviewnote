@@ -18,7 +18,6 @@ import type { FishPhase, FishWeather } from '../logic/worldTint';
 import type { FishingOverride } from '../ui/fishingAdapter';
 import { PET_INTERACTIONS } from '../../pixel-room/pet/petInteraction';
 import { facesPet, reactionFrame } from '../logic/petReaction';
-import { BED_CELLS } from '../logic/yardWorld';
 import { cameraCenterAxis, cameraZoom } from '../logic/layout';
 import { facingFor } from '../logic/joystick';
 import type { Facing, Point } from '../logic/joystick';
@@ -37,6 +36,7 @@ import { buildScene, entrySpawn, exitAt, exitById, exitCells } from '../logic/sc
 import type { SceneData, SceneExit, SceneId, SceneSpec } from '../logic/scenes';
 import type { ControlState } from '../controls';
 import type { Placement } from '../../pixel-room/model';
+import type { GardenLook } from '../../pixel-room/farm/gardenModel';
 
 /** 걷기/달리기 속도(월드 px/초). 16px 칸 기준 약 3.5칸/6칸. */
 export const WALK_SPEED = 56;
@@ -75,6 +75,10 @@ export interface WorldEvents {
   onPetMessage?(message: string): void;
   /** 장면에 들어왔을 때(첫 장면 포함) — 장면 이름 알림용. */
   onScene(id: SceneId, title: string): void;
+  /** 앞마당 텃밭: 가까이 왔는지(도구 막대), 도구를 쓸 칸(바라보는 칸·서 있는 칸). 바뀔 때만 호출. */
+  onGarden?(state: { near: boolean; target: number | null }): void;
+  /** 도구를 든 채 밭 칸을 콕 찍어 그 앞에 도착했을 때 — 그 칸에 도구를 쓴다. */
+  onGardenUse?(index: number): void;
 }
 /** 장면들이 함께 쓰는 것(장면이 바뀌어도 그대로): 그림, 입력, 셸 연결, 서버 데이터, 화면 비율. */
 export interface WorldContext {
@@ -91,7 +95,9 @@ export interface WorldContext {
   assets: WorldAssets;
   controls: ControlState;
   hooks: WorldEvents;
-  data: { furniture: readonly Placement[]; beds: HTMLImageElement[] } & SceneData;
+  data: { furniture: readonly Placement[]; garden?: GardenLook } & SceneData;
+  /** 텃밭 도구 막대에서 고른 도구가 있으면 밭 칸을 콕 찍을 때 그 칸 앞까지 가서 쓴다. */
+  gardenTool?: boolean;
   /** 캔버스 기기 픽셀 / CSS px. */
   view: { ratio: number };
   /** 장면이 만들어지거나 내려갈 때 boot가 "지금 장면"을 기억하게. */
@@ -112,7 +118,8 @@ export interface WorldDebug {
   scene: SceneId; transitioning: boolean;
   x: number; y: number; facing: Facing; moving: boolean; running: boolean; prompt: string | null;
   pet: { x: number; y: number } | null;
-  bedTextures?: string[];
+  /** 텃밭(앞마당): 도구를 쓸 칸, 가까이 있나, 칸마다 그린 모습(시험용). */
+  garden?: { target: number | null; near: boolean; cells: string[]; cursor: boolean; points: Record<number, Point> };
   petReaction: string | null;
   petFrame: number | null;
   petFlipX: boolean;
@@ -153,7 +160,7 @@ export abstract class WorldScene extends Phaser.Scene {
   private bang!: Phaser.GameObjects.Image;
   protected feet: Point = { x: 0, y: 0 };
   protected facing: Facing = 'Front';
-  private moving = false;
+  protected moving = false;
   private running = false;
   private dust = new Set<Phaser.GameObjects.Image>();
   private dustDistance = 0;
@@ -365,11 +372,22 @@ export abstract class WorldScene extends Phaser.Scene {
     if (!item && this.ctx.assets.pet?.id === 'pet_bear' && this.pet && Math.hypot(point.x - this.pet.x, point.y - (this.pet.y - 15)) < 20) {
       if (this.ctx.riding || Math.hypot(this.pet.x - this.feet.x, this.pet.y - this.feet.y) < 40) { this.cancelWalk(); this.ctx.hooks.onPanel('pet'); return; }
     }
+    const tap = item ? null : this.tapTarget(target);
     const path = planPath(cellOf(this.feet), target, this.spec, exitCells(this.spec));
+    // 도구로 쓸 칸이면 그 칸 바로 앞에서 멈춘다(이미 그 칸 위나 옆이면 그 자리에서).
+    if (tap && path.length && path[path.length - 1].x === target.x && path[path.length - 1].y === target.y) path.pop();
     this.path = path.map(cellCenter);
-    this.pathTarget = item?.id ?? null;
-    if (!path.length && item) this.arrive(item.id);
+    this.pathTarget = item?.id ?? tap;
+    if (!path.length && (item || tap)) this.arrive((item?.id ?? tap)!);
   }
+  /** 콕 찍은 칸이 장면의 특별한 대상이면 그 id(앞마당: 도구를 든 채 찍은 텃밭 칸). */
+  protected tapTarget(_cell: Point): string | null { return null; }
+  /** tapTarget으로 걸어가 도착했을 때. */
+  protected arriveTap(_id: string) { /* 기본: 할 일 없음 */ }
+  /** 매 프레임 움직임·대상 갱신이 끝난 뒤(장면별 표시). */
+  protected afterStep() { /* 기본: 할 일 없음 */ }
+  /** 혼자 돌아다니는 펫이 가지 않을 곳(앞마당: 텃밭). */
+  protected petAvoid(_point: Point): boolean { return false; }
   /** 게임 프레임 기준 CSS 좌표 → 캔버스(기기 픽셀) 좌표 → 월드. */
   walkToScreen(x: number, y: number) {
     const ratio = this.ctx.view.ratio;
@@ -380,7 +398,7 @@ export abstract class WorldScene extends Phaser.Scene {
 
   private arrive(id: string) {
     const item = this.spec.interactables.find(entry => entry.id === id);
-    if (!item) return;
+    if (!item) { this.arriveTap(id); return; }
     this.facing = facingToward(this.feet, nearestCellCenter(item, this.feet));
     this.playAvatar(false, 1);
     this.updatePrompt();
@@ -488,6 +506,7 @@ export abstract class WorldScene extends Phaser.Scene {
     if (!exit) this.exitArmed = true;
     else if (this.exitArmed) { this.leave(exit); return; }
     this.updatePrompt();
+    this.afterStep();
     this.positionCamera(dt);
   }
 
@@ -541,12 +560,9 @@ export abstract class WorldScene extends Phaser.Scene {
     }
     this.tweens.add({ targets: prop, x: pet.x + side * 4, alpha: 0, duration: id === 'pet_duck' || id === 'pet_pigeon' ? 1900 : 600, onComplete: () => prop.destroy() });
   }
-  farmFx(index: number, action: string) {
-    if (this.spec.id !== 'yard') return;
-    const cell = BED_CELLS[index]; if (!cell) return;
-    this.sparkles((cell.x + 1) * TILE, (cell.y + 1) * TILE, action === 'water' ? 0x83d9fa : 0xffdf75);
-  }
-  private sparkles(x: number, y: number, color: number) {
+  /** 텃밭 칸에 도구를 쓴 뒤의 짧은 효과(앞마당만). */
+  gardenFx(_index: number, _action: string, _crop?: string) { /* 기본: 할 일 없음 */ }
+  protected sparkles(x: number, y: number, color: number) {
     if (color === 0xf477a6) {
       const key = 'pet-heart';
       if (!this.textures.exists(key)) {
@@ -585,7 +601,7 @@ export abstract class WorldScene extends Phaser.Scene {
       for (let i = 0; i < 12; i++) {
         const t = { x: pet.x + (Math.random() - 0.5) * TILE * 8, y: pet.y + (Math.random() - 0.5) * TILE * 6 };
         const size = this.worldSize();
-        if (t.x < TILE || t.y < TILE || t.x > size.width - TILE || t.y > size.height - TILE || feetBlocked(t, solid)) continue;
+        if (t.x < TILE || t.y < TILE || t.x > size.width - TILE || t.y > size.height - TILE || feetBlocked(t, solid) || this.petAvoid(t)) continue;
         this.wander.target = t; break;
       }
       this.wander.nextAt = now + 2000 + Math.random() * 4000;
@@ -753,10 +769,15 @@ export abstract class WorldScene extends Phaser.Scene {
     camera.centerOn(cameraCenterAxis(this.camCenter.x, viewW, world.width), cameraCenterAxis(this.camCenter.y, viewH, world.height));
   }
 
+  /** 월드 px → 게임 프레임 CSS px(시험용 좌표). */
+  protected screenPoint(p: Point): Point {
+    const camera = this.cameras.main, ratio = this.ctx.view.ratio;
+    return { x: Math.round((p.x - camera.worldView.x) * camera.zoom / ratio), y: Math.round((p.y - camera.worldView.y) * camera.zoom / ratio) };
+  }
   snapshot(): WorldDebug {
     const camera = this.cameras.main;
     const ratio = this.ctx.view.ratio;
-    const screen = (p: Point): Point => ({ x: Math.round((p.x - camera.worldView.x) * camera.zoom / ratio), y: Math.round((p.y - camera.worldView.y) * camera.zoom / ratio) });
+    const screen = (p: Point): Point => this.screenPoint(p);
     return {
       collision: { contacts: this.collision.contacts, passThrough: this.collision.passThrough },
       loadFactor: this.ctx.loadFactor ?? 1,

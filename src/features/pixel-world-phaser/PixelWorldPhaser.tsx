@@ -14,7 +14,7 @@ import { usePet } from '../pixel-room/pet/usePet';
 import { useFarmInventory } from '../pixel-room/farm/useFarmInventory';
 import { submitFarmCrop, fetchWeeklyCropContest } from '../../utils/pixelFarm';
 import { useFarm } from '../pixel-room/farm/useFarm';
-import { FARM_BEDS, farmMoisture, farmStage } from '../pixel-room/farm/farmModel';
+import { SPRINKLER_ITEM_ID, gardenLook, gardenLookKey } from '../pixel-room/farm/gardenModel';
 import { pickScarecrowLine } from '../pixel-room/farm/scarecrowLines';
 import { supabase } from '../../services/supabase';
 import { createRewardsAdapter } from './ui/rewardsAdapter';
@@ -25,7 +25,6 @@ import { parseClockOverride } from './logic/worldClock';
 import type { FishingOverride } from './ui/fishingAdapter';
 import { userAnimalFace } from '../../utils/animalFace';
 import { GameShell } from './GameShell';
-import type { BedLook } from './game/sceneAssets';
 import './gameShell.css';
 
 // 가구 배치의 유일한 기준은 서버(pixel_furniture_placement). 로컬 저장소는 읽지도 쓰지도 않는다.
@@ -100,12 +99,13 @@ export default function PixelWorldPhaser({ userId, pointsBalance, onExit, onPixe
     return () => document.removeEventListener('visibilitychange', visible);
   }, [checkVersion]);
   const farmRef = useRef(farm); farmRef.current = farm;
-  // farm.now는 1초마다 바뀌지만, 밭 그림은 단계/촉촉함이 실제로 바뀔 때만 다시 만든다(문자열 키로 접기).
-  const key = bedsKey(farm.snapshot, farm.now);
-  const beds = useMemo<BedLook[]>(() => key.split(',').map(part => {
-    const [stage, moisture] = part.split('/');
-    return { stage, moisture } as BedLook;
-  }), [key]);
+  // farm.now는 1초마다 바뀌지만, 텃밭 그림은 칸 모습(흙·젖음·단계)이 실제로 바뀔 때만 새로 넘긴다(문자열 키로 접기).
+  const key = gardenLookKey(gardenLook(farm.snapshot, farm.now));
+  const garden = useMemo(() => gardenLook(farmRef.current.snapshot, farmRef.current.now), [key]);
+  // 상점에서 스프링클러를 사면 텃밭을 다시 읽는다(도구 막대에 스프링클러가 생긴다).
+  const ownsSprinkler = shop.ownedIds.has(SPRINKLER_ITEM_ID);
+  const refreshFarm = farm.refresh;
+  useEffect(() => { if (ownsSprinkler) void refreshFarm(); }, [ownsSprinkler, refreshFarm]);
   // 토마토 출품(광장 상점 '판매'). 포인트·보관함·가방 무게를 함께 맞춘다.
   const submitCrop = async (id: string) => {
     const result = await submitFarmCrop(id);
@@ -122,7 +122,7 @@ export default function PixelWorldPhaser({ userId, pointsBalance, onExit, onPixe
   if (!appearance || !pet.ready || !room.rows) return <div className="pwp-root pwp-loading" role="status">앞마당으로 가는 중…</div>;
   return <>{outdated && <div className="pwp-update" role="alert" style={UPDATE_STYLE}>새 버전이 나왔어요. 새로고침하면 다른 기기와 같은 화면이 돼요.
     <button type="button" onClick={() => location.reload()} style={{ marginLeft: 8, font: 'inherit', fontWeight: 800 }}>새로고침</button></div>}
-  <GameShell face={face} isAdmin={isAdmin} onSceneChange={onScene} fishingAdapter={fishingAdapter} rewardsAdapter={rewardsAdapter} bugAdapter={bugAdapter} cardRpsAdapter={cardRpsAdapter} clockOverride={clockOverride} userId={userId} appearance={appearance} pet={!pet.error && pet.active && shop.ownedIds.has(pet.active) ? pet.active : null} balance={shop.balance} beds={beds} furniture={furniture}
+  <GameShell face={face} isAdmin={isAdmin} onSceneChange={onScene} fishingAdapter={fishingAdapter} rewardsAdapter={rewardsAdapter} bugAdapter={bugAdapter} cardRpsAdapter={cardRpsAdapter} clockOverride={clockOverride} userId={userId} appearance={appearance} pet={!pet.error && pet.active && shop.ownedIds.has(pet.active) ? pet.active : null} balance={shop.balance} garden={garden} furniture={furniture}
     onSaveFurniture={saveFurniture} scarecrowLine={scarecrowLine} onExit={onExit} panels={{ shop, pet, bag: { ...bag, submitCrop } }} farmAdapter={{ farm, inventory, contest: fetchWeeklyCropContest, submit: submitCrop }} /></>;
 }
 
@@ -137,13 +137,6 @@ function refreshAfterAward<A extends { finish(...args: never[]): Promise<unknown
     if (result?.points?.bagged) bagged?.();
     return result;
   } };
-}
-
-function bedsKey(snapshot: ReturnType<typeof useFarm>['snapshot'], now: number): string {
-  return FARM_BEDS.map((_, index) => {
-    const crop = snapshot?.plots.find(plot => plot.index === index)?.crop ?? null;
-    return `${farmStage(crop, now)}/${farmMoisture(crop, now)}`;
-  }).join(',');
 }
 
 /** 관리자만 주소의 ?pwClock=HH:MM / ?pwWeather=clear|cloudy|rain 을 쓴다. 규칙은 logic/worldClock.ts 하나. */

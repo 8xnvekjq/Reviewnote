@@ -1,14 +1,27 @@
-// 앞마당 그림: 기존 마당과 같은 타일·집·나무·울타리·밭·허수아비. 움직임/출구/대화는 WorldScene이 맡는다.
+// 앞마당 그림: 기존 마당과 같은 타일·집·나무·울타리·허수아비, 그리고 오른쪽 아래 텃밭(울타리 + 칸마다 흙·작물).
+// 움직임/출구/대화는 WorldScene이 맡는다. 텃밭에서는 바라보는(또는 서 있는) 칸에 테두리를 그리고 셸에 알린다.
 import type Phaser from 'phaser';
-import { BED_CELLS, BIG_TREES, FENCE_ROWS, KIOSK, RIVER_SIGN, RIVER_EXIT, GATE, WORLD_COLS, WORLD_HEIGHT, WORLD_ROWS, WORLD_WIDTH, borderTrees, groundTile, toWorldCell } from '../logic/yardWorld';
-import { TILE } from '../logic/world';
+import { BIG_TREES, FENCE_ROWS, GARDEN_AREA, KIOSK, MARGIN, RIVER_SIGN, RIVER_EXIT, GATE, WORLD_COLS, WORLD_HEIGHT, WORLD_ROWS, WORLD_WIDTH, borderTrees, gardenIndexAtWorld, gardenTarget, gardenWorldCell, groundTile, nearGarden, toWorldCell } from '../logic/yardWorld';
+import { TILE, cellCenter, cellOf, facingToward } from '../logic/world';
+import type { Point } from '../logic/joystick';
 import { SCARECROW_CELL } from '../../pixel-room/farm/farmModel';
+import { GARDEN_INDEXES, isGardenGate } from '../../pixel-room/farm/gardenModel';
+import type { GardenLook } from '../../pixel-room/farm/gardenModel';
+import { cropTextureKey } from '../logic/gardenSprites';
+import { ensureGardenTextures, fenceKey } from './gardenArt';
+
+const isGardenFenceGap = (x: number, y: number) => isGardenGate({ x: x - MARGIN, y: y - MARGIN });
 import { WorldScene } from './WorldScene';
 import type { WorldContext } from './WorldScene';
 
+const REDUCED_MOTION = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 export class YardScene extends WorldScene {
   protected readonly background = '#5d8a4a';
-  private beds: Phaser.GameObjects.Image[] = [];
+  private gardenImages: Phaser.GameObjects.Image[] = [];
+  private gardenKeys: string[] = [];
+  private cursor!: Phaser.GameObjects.Graphics;
+  private garden: { near: boolean; target: number | null; cursor: boolean } = { near: false, target: null, cursor: false };
 
   constructor(ctx: WorldContext) { super('yard', ctx); }
 
@@ -35,8 +48,12 @@ export class YardScene extends WorldScene {
       const cell = toWorldCell({ x: 10 + i, y: row });
       this.add.image(cell.x * TILE, cell.y * TILE, 'town', frame).setOrigin(0, 0).setDepth((cell.y + 1) * TILE - 4);
     });
-    this.beds = [];
-    this.setBeds(this.ctx.data.beds);
+    ensureGardenTextures(textures);
+    this.drawGardenFence();
+    this.cursor = this.add.graphics().setDepth(-400);
+    this.gardenImages = []; this.gardenKeys = [];
+    this.garden = { near: false, target: null, cursor: false };
+    this.setGarden(this.ctx.data.garden);
     // 관리자 마당에만: 문 오른쪽의 관리자 자판기(조각 현황·날씨 관리).
     if (this.ctx.data.admin) {
       if (!textures.exists('kiosk')) textures.addCanvas('kiosk', drawKiosk());
@@ -59,20 +76,92 @@ export class YardScene extends WorldScene {
 
   protected worldSize() { return { width: WORLD_WIDTH, height: WORLD_HEIGHT }; }
 
-  refreshData() { this.setBeds(this.ctx.data.beds); }
+  refreshData() { this.setGarden(this.ctx.data.garden); }
 
-  snapshot() { return { ...super.snapshot(), bedTextures: this.beds.map(bed => bed.texture.key) }; }
+  snapshot() {
+    const points = Object.fromEntries(GARDEN_INDEXES.map(index => [index, this.screenPoint(cellCenter(gardenWorldCell(index)))]));
+    return { ...super.snapshot(), garden: { ...this.garden, cells: [...this.gardenKeys], points } };
+  }
 
-  private setBeds(images: HTMLImageElement[]) {
-    this.beds.forEach(bed => bed.destroy());
-    this.beds = [];
-    images.forEach((image, index) => {
-      const cell = BED_CELLS[index];
-      if (!cell) return;
-      const key = `bed:${index}:${image.src.length}:${hash(image.src)}`;
-      if (!this.textures.exists(key)) this.textures.addImage(key, image);
-      this.beds.push(this.add.image(cell.x * TILE, cell.y * TILE, key).setOrigin(0, 0).setDepth((cell.y + 2) * TILE - 3));
+  /** 텃밭 울타리: 둘레 칸마다 기둥 + 옆 울타리 칸 쪽으로 가로대. 윗줄 가운데 두 칸은 드나드는 문으로 비운다. */
+  private drawGardenFence() {
+    const { x: x0, y: y0, cols, rows } = GARDEN_AREA;
+    const fenced = (x: number, y: number) => x >= x0 && y >= y0 && x < x0 + cols && y < y0 + rows
+      && (x === x0 || y === y0 || x === x0 + cols - 1 || y === y0 + rows - 1) && !isGardenFenceGap(x, y);
+    for (let y = y0; y < y0 + rows; y++) for (let x = x0; x < x0 + cols; x++) {
+      if (!fenced(x, y)) continue;
+      const key = fenceKey({ n: fenced(x, y - 1), e: fenced(x + 1, y), s: fenced(x, y + 1), w: fenced(x - 1, y) });
+      this.add.image(x * TILE, y * TILE, key).setOrigin(0, 0).setDepth((y + 1) * TILE - 4);
+    }
+  }
+
+  /** 칸마다 흙(간 흙: 마름/젖음)·작물·스프링클러를 다시 놓는다. 모습이 하나도 안 바뀌었으면 그대로 둔다. */
+  private setGarden(look: GardenLook | undefined) {
+    const cells = look?.cells ?? [];
+    const keys = cells.map(cell => [cell.soil === 'tilled' ? (cell.wet ? 'garden:soil:wet' : 'garden:soil:dry') : '',
+      cell.sprinkler ? 'garden:sprinkler' : '', cell.crop ? cropTextureKey(cell.crop.type, cell.crop.stage, cell.crop.late) : ''].join('|'));
+    if (keys.length === this.gardenKeys.length && keys.every((key, i) => key === this.gardenKeys[i])) return;
+    this.gardenImages.forEach(image => image.destroy());
+    this.gardenImages = [];
+    cells.forEach((cell, i) => {
+      const at = gardenWorldCell(cell.index);
+      const [soilKey, sprinklerKey, cropKey] = keys[i].split('|');
+      if (soilKey) this.gardenImages.push(this.add.image(at.x * TILE, at.y * TILE, soilKey).setOrigin(0, 0).setDepth(-500));
+      const bottom = (at.y + 1) * TILE - 1;
+      for (const key of [sprinklerKey, cropKey]) if (key) {
+        this.gardenImages.push(this.add.image(at.x * TILE + TILE / 2, bottom, key).setOrigin(0.5, 1).setDepth(bottom - 2));
+      }
     });
+    this.gardenKeys = keys;
+  }
+
+  /** 도구 막대를 띄울지(텃밭 가까이), 어느 칸에 쓸지 — 바뀔 때만 셸에 알린다. 도구를 골랐으면 그 칸에 테두리. */
+  protected afterStep() {
+    const near = nearGarden(cellOf(this.feet));
+    const target = near ? gardenTarget(this.feet, this.facing) : null;
+    const cursor = target !== null && !!this.ctx.gardenTool;
+    if (near === this.garden.near && target === this.garden.target && cursor === this.garden.cursor) return;
+    this.cursor.clear();
+    if (cursor) {
+      const at = gardenWorldCell(target!);
+      this.cursor.lineStyle(1, 0xfff4d9, 0.95).strokeRect(at.x * TILE + 0.5, at.y * TILE + 0.5, TILE - 1, TILE - 1);
+      this.cursor.fillStyle(0xfff4d9, 0.18).fillRect(at.x * TILE + 1, at.y * TILE + 1, TILE - 2, TILE - 2);
+    }
+    const changed = near !== this.garden.near || target !== this.garden.target;
+    this.garden = { near, target, cursor };
+    if (changed) this.ctx.hooks.onGarden?.({ near, target });
+  }
+  /** 도구를 고른 채 밭 칸을 찍으면 그 칸 앞(또는 그 칸 위)에서 쓴다. */
+  protected tapTarget(cell: Point): string | null {
+    if (!this.ctx.gardenTool) return null;
+    const index = gardenIndexAtWorld(cell);
+    return index === null ? null : `garden:${index}`;
+  }
+  protected arriveTap(id: string) {
+    const index = Number(id.split(':')[1]);
+    if (!id.startsWith('garden:') || !Number.isInteger(index)) return;
+    const at = gardenWorldCell(index), here = cellOf(this.feet);
+    if (here.x !== at.x || here.y !== at.y) this.facing = facingToward(this.feet, cellCenter(at));
+    this.playAvatar(false, 1);
+    this.afterStep();
+    this.ctx.hooks.onGardenUse?.(index);
+  }
+  protected petAvoid(point: Point) { return gardenIndexAtWorld(cellOf(point)) !== null; }
+
+  /** 도구를 쓴 뒤: 흙먼지·물방울·새싹 반짝임. 수확이면 열매가 톡 튀어 올랐다가 캐릭터(가방) 쪽으로 쏙 들어간다. */
+  gardenFx(index: number, action: string, crop?: string) {
+    if (this.spec.id !== 'yard') return;
+    const at = gardenWorldCell(index);
+    const x = at.x * TILE + TILE / 2, y = at.y * TILE + TILE / 2;
+    if (action !== 'harvest') {
+      this.sparkles(x, y + 4, action === 'water' ? 0x83d9fa : action === 'till' ? 0xc2986a : action.startsWith('plant') ? 0x70a747 : 0xdfe6ea);
+      return;
+    }
+    const pop = this.add.image(x, y - 4, `garden:pop:${crop === 'strawberry' ? 'strawberry' : 'tomato'}`).setScale(2).setDepth(99999);
+    if (REDUCED_MOTION) { this.time.delayedCall(500, () => pop.destroy()); return; }
+    this.tweens.add({ targets: pop, y: y - 20, duration: 220, ease: 'Quad.easeOut', onComplete: () => {
+      this.tweens.add({ targets: pop, x: this.feet.x, y: this.feet.y - 14, scale: 0.6, alpha: 0.2, duration: 320, ease: 'Quad.easeIn', onComplete: () => pop.destroy() });
+    } });
   }
 
   private drawGround(): HTMLCanvasElement {
@@ -127,5 +216,3 @@ function drawKiosk(): HTMLCanvasElement {
   px(7, 1, 2, 1, '#a878f0'); px(7, 2, 1, 1, '#e6d6ff'); px(8, 2, 1, 1, '#5a2aa8'); px(7, 3, 2, 1, '#8a52e0');
   return canvas;
 }
-
-function hash(text: string): number { let h = 0; for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) | 0; return h >>> 0; }

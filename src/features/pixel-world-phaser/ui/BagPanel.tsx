@@ -1,4 +1,4 @@
-// 가방: 잡은 물고기·곤충(종류별로 겹쳐 쌓임)과 보관 중인 토마토. 무게가 용량을 넘으면 점점 느려진다.
+// 가방: 잡은 물고기·곤충·딴 딸기(종류별로 겹쳐 쌓임)와 보관 중인 토마토. 무게가 용량을 넘으면 점점 느려진다.
 // sell이 있으면(광장 상점 '판매' 칸) 팔기·출품 버튼을 보여 준다.
 import { useState } from 'react';
 import { FISH_CATALOG } from '../logic/fishCatalog';
@@ -12,9 +12,11 @@ import { computeSubmitReward, sizeLabel } from '../../pixel-room/farm/farmModel'
 import { TomatoSprite } from '../../pixel-room/farm/TomatoSprite';
 import type { BagState } from './useBag';
 import type { SubmitFarmCropResult } from '../../../utils/pixelFarm';
+import { PixelGrid } from './GardenToolbar';
+import { POP_GRID } from '../logic/gardenSprites';
 
 export const itemName = (item: Pick<BagItem, 'kind' | 'ref'>) =>
-  (item.kind === 'fish' ? FISH_CATALOG.find(f => f.id === item.ref)?.name : BUG_CATALOG.find(b => b.id === item.ref)?.name) ?? item.ref;
+  (item.kind === 'fish' ? FISH_CATALOG.find(f => f.id === item.ref)?.name : item.kind === 'crop' ? (item.ref === 'strawberry' ? '딸기' : undefined) : BUG_CATALOG.find(b => b.id === item.ref)?.name) ?? item.ref;
 const kg = (value: number) => `${(Math.round(value * 10) / 10).toLocaleString()}kg`;
 
 /** 무게 막대 + 속도 안내(가방 칩·창 공통). */
@@ -77,19 +79,19 @@ export function BagContents({ bag, selling, hand }: { bag: Bag; selling?: { stat
   };
   const sell = (items: { kind: BagItem['kind']; ref: string; qty: number }[] | null) => act(async () => {
     const result = await selling!.state.sell(items);
-    return result.ok ? `${result.sold}개를 팔았어요! +${result.awarded}P${result.awarded < result.value ? ' (오늘 상한 적용)' : ''}` : result.message;
+    return result.ok ? `${result.sold}개를 팔았어요! +${result.awarded}P${result.awarded < result.value ? ' (오늘 상한 적용)' : ''}${result.farmCapped ? ' · 딸기 일부는 오늘 농사 상한이라 가방에 남겼어요.' : ''}` : result.message;
   });
   const empty = bag.items.length === 0 && bag.crops.length === 0;
   return <div className="pwp-bag">
     <BagWeight bag={bag} />
     {hand && <HandSlot bag={bag} busy={hand.busy} onEquip={hand.equip} />}
     {selling && bag.items.length > 0 && <div className="pwp-bag-sell-all">
-      <span>물고기·곤충 전부 {bagValue(bag).toLocaleString()}P</span>
+      <span>{bag.items.some(item => item.kind === 'crop') ? '물고기·곤충·딸기' : '물고기·곤충'} 전부 {bagValue(bag).toLocaleString()}P</span>
       <button type="button" disabled={busy} onClick={() => void sell(null)}>모두 팔기</button>
     </div>}
-    {empty ? <p>가방이 비어 있어요. 낚시·잠자리 잡기·수확으로 채워 보세요!</p> : <ul className="pwp-bag-list" aria-label="가방 속 물건">
+    {empty ? <p>가방이 비어 있어요. 낚시·잠자리 잡기·텃밭 수확으로 채워 보세요!</p> : <ul className="pwp-bag-list" aria-label="가방 속 물건">
       {bag.items.map(item => <li key={item.kind + ':' + item.ref} data-bag-item={item.ref}>
-        <span aria-hidden="true">{item.kind === 'fish' ? '🐟' : '🦋'}</span>
+        <span aria-hidden="true">{item.kind === 'fish' ? '🐟' : item.kind === 'crop' ? <PixelGrid grid={POP_GRID.strawberry} size={18} /> : '🦋'}</span>
         <strong>{itemName(item)} ×{item.qty}</strong>
         <small>{kg(item.unitWeight * item.qty)} · {(item.unitPoints * item.qty).toLocaleString()}P</small>
         {selling && <span className="pwp-bag-actions">

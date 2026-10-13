@@ -2,7 +2,8 @@
 import { supabase } from '../services/supabase';
 import { parseBag, parseHand, type Bag, type BagItemKind, type HandState } from '../features/pixel-world-phaser/logic/bag';
 
-export type SellBagResult = { ok: true; sold: number; value: number; awarded: number; bag: Bag | null } | { ok: false; message: string; bag: Bag | null };
+/** farmCapped: 딸기 일부가 오늘 농사 상한 때문에 팔리지 않고 가방에 남았다. */
+export type SellBagResult = { ok: true; sold: number; value: number; awarded: number; farmCapped?: boolean; bag: Bag | null } | { ok: false; message: string; bag: Bag | null };
 
 export async function fetchPixelBag(): Promise<Bag | null> {
   try { const { data, error } = await supabase.rpc('get_pixel_bag'); return error ? null : parseBag(data); }
@@ -14,8 +15,8 @@ export async function sellPixelBag(items: { kind: BagItemKind; ref: string; qty:
     const { data, error } = await supabase.rpc('sell_pixel_bag', { p_items: items });
     if (error) throw error;
     const bag = parseBag(data?.bag);
-    if (data?.ok === true) return { ok: true, sold: Number(data.sold) || 0, value: Number(data.value) || 0, awarded: Number(data.points?.awarded) || 0, bag };
-    return { ok: false, message: data?.reason === 'nothing' ? '팔 물건이 없어요.' : '팔지 못했어요. 다시 시도해 주세요.', bag };
+    if (data?.ok === true) return { ok: true, sold: Number(data.sold) || 0, value: Number(data.value) || 0, awarded: Number(data.points?.awarded) || 0, farmCapped: data.farmCapped === true, bag };
+    return { ok: false, message: data?.reason === 'nothing' ? '팔 물건이 없어요.' : data?.reason === 'farm_cap' ? '오늘 받을 수 있는 농사 포인트를 다 받았어요. 딸기는 내일 팔아 주세요!' : '팔지 못했어요. 다시 시도해 주세요.', bag };
   } catch { return { ok: false, message: '판매 결과를 확인하지 못했어요. 다시 확인해 주세요.', bag: null }; }
 }
 

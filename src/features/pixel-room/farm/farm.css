@@ -41,3 +41,8 @@
 .pr-crop-submit:focus-visible { outline:2px solid #346b98; outline-offset:2px; }
 .pr-crop-badge { display:block; width:100%; margin-top:2px; padding:5px 4px; border-radius:6px; background:#fff1c8; color:#7d5a1e; font-size:11px; font-weight:700; }
 .pr-crop-error { color:#a13c3c; }
+/* 예전 마당의 텃밭 자리(읽기 전용 안내). 울타리처럼 보이는 나무 테두리 + 작은 팻말. */
+.pr-farm-garden { position:absolute; padding:0; border:3px solid #b8834f; border-bottom:0; border-radius:6px 6px 0 0; background:repeating-linear-gradient(90deg, #99653c 0 10px, #8a5a36 10px 12px); cursor:pointer; touch-action:manipulation; }
+.pr-farm-garden:focus-visible { outline:2px solid #fff0c0; outline-offset:2px; }
+.pr-farm-garden-sign { position:absolute; left:50%; top:-4px; transform:translateX(-50%); display:inline-flex; align-items:center; gap:2px; padding:1px 6px 1px 2px; border:1.5px solid #8c704c; border-radius:6px; background:#fff4d9; color:#4f422f; font-size:11px; font-weight:800; white-space:nowrap; }
+.pr-farm-garden-sign svg { width:18px; height:18px; }

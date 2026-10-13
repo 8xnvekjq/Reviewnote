@@ -10,7 +10,9 @@ import { pickScarecrowLine } from '../../src/features/pixel-room/farm/scarecrowL
 import { PIXEL_CATALOG } from '../../src/features/pixel-room/shop/catalog';
 import type { FarmAdapter } from '../../src/features/pixel-world-phaser/ui/FarmPanels';
 import type { FarmSnapshot, HarvestedCrop } from '../../src/features/pixel-room/farm/farmModel';
-import { farmStage, farmMoisture, computeSubmitReward } from '../../src/features/pixel-room/farm/farmModel';
+import { computeSubmitReward } from '../../src/features/pixel-room/farm/farmModel';
+import { gardenLook } from '../../src/features/pixel-room/farm/gardenModel';
+import { gardenFixture, simulateGarden } from './gardenSim';
 import type { PanelAdapter } from '../../src/features/pixel-world-phaser/ui/GamePanels';
 import type { Placement } from '../../src/features/pixel-room/model';
 
@@ -29,7 +31,6 @@ const appearance: PublicAvatarAppearance = {
 };
 const petParam = params.get('pet') ?? 'pet_dog';
 const pet = isPetId(petParam) ? petParam : null;
-const beds = [{ stage: 'leaf', moisture: 'moist' }, { stage: 'empty', moisture: 'normal' }] as const;
 const furniture = [{ type: 'desk', x: 3, y: 4 }, { type: 'bed', x: 0, y: 0 }, { type: 'plant', x: 8, y: 3 }] as const;
 
 const farmNow = Date.parse('2026-10-08T03:00:00Z');
@@ -58,27 +59,32 @@ function Harness() {
   const cardRpsAdapter = useMemo(() => params.has('duel') ? crossPageRps() : undefined, []);
   const bugAdapter = useMemo(() => params.has('bugs') ? createMockBugAdapter({ netOwned: true, seed: Number(params.get('bugSeed') ?? '42') }) : undefined, []);
   const [roomLayout, setRoomLayout] = useState<readonly Placement[]>(furniture);
-  const [snapshot, setSnapshot] = useState<FarmSnapshot>({ serverNow: new Date(farmNow).toISOString(), today: '2026-10-08', harvestCount: 0, bestSize: null, lastHarvestSize: null,
-    plots: [{ index: 0, revision: 1, crop: { id: 'ripe', plantedAt: '2026-10-01T00:00:00Z', readyAt: '2026-10-05T00:00:00Z', lastWateredOn: '2026-10-03', careCount: 3, reviewGained: 0 } }, { index: 1, revision: 1, crop: null }] });
+  // 텃밭(?farm=1): 0번 칸(왼쪽 위)에 익은 토마토, 나머지는 잔디. ?sprinkler=1이면 스프링클러 보유.
+  // 시험은 window.__gardenAdvance(시간)으로 밭 시계를 앞당긴다(익기·하루 지나기).
+  const [now, setNow] = useState(farmNow);
+  useEffect(() => { (window as unknown as { __gardenAdvance?: (hours: number) => void }).__gardenAdvance = hours => setNow(value => value + hours * 3600000); }, []);
+  const [snapshot, setSnapshot] = useState<FarmSnapshot>(() => ({ ...gardenFixture(farmNow), sprinklerOwned: params.has('sprinkler') }));
   const [crops, setCrops] = useState<HarvestedCrop[]>([]);
   const [farmMessage, setFarmMessage] = useState('');
   const [farmError, setFarmError] = useState(false);
   const [calls, setCalls] = useState(0);
   const farmAdapter: FarmAdapter = {
-    farm: { snapshot, now: farmNow, busy: false, error: farmError, message: farmMessage, clearMessage: () => setFarmMessage(''), refresh: async () => { setFarmError(false); }, act: async (index, action) => {
+    farm: { snapshot: { ...snapshot, today: new Date(now + 9 * 3600000).toISOString().slice(0, 10) }, now, busy: false, error: farmError, message: farmMessage, clearMessage: () => setFarmMessage(''), refresh: async () => { setFarmError(false); }, act: async (index, action) => {
       setCalls(v => v + 1);
       await new Promise(resolve => setTimeout(resolve, 150));
-      if (params.has('farmError')) { setFarmError(true); setFarmMessage('저장 결과를 확인하지 못했어요. 다시 확인해 주세요.'); return; }
-      if (params.has('farmChanged')) { setFarmMessage('다른 곳에서 바뀐 밭을 불러왔어요.'); return; }
-      setSnapshot(value => ({ ...value, harvestCount: value.harvestCount + (action === 'harvest' ? 1 : 0), lastHarvestSize: action === 'harvest' ? 82 : value.lastHarvestSize,
-        plots: value.plots.map(plot => plot.index !== index ? plot : { ...plot, revision: plot.revision + 1, crop: action === 'harvest' ? null : action === 'plant' ? { id: 'new', plantedAt: new Date(farmNow).toISOString(), readyAt: new Date(farmNow + 4 * 86400000).toISOString(), careCount: 0, lastWateredOn: null, reviewGained: 0 } : plot.crop && { ...plot.crop, careCount: plot.crop.careCount + 1, lastWateredOn: '2026-10-08' } }) }));
-      setFarmMessage(action === 'harvest' ? '수확 기록에 보관했어요! 이번 토마토는 큰 토마토예요 (82/100)' : action === 'water' ? '물을 줬어요. 오늘의 돌봄 +1' : '심었어요. 첫 물을 주세요!');
-      if (action === 'harvest') setCrops(value => [...value, { id: 'harvest', cropType: 'tomato', sizeScore: 82, harvestedAt: new Date(farmNow).toISOString(), careCount: 3, status: 'stored', submittedAt: null, rewardPoints: null }]);
+      if (params.has('farmError')) { setFarmError(true); setFarmMessage('저장 결과를 확인하지 못했어요. 다시 확인해 주세요.'); return undefined; }
+      if (params.has('farmChanged')) { setFarmMessage('다른 곳에서 바뀐 밭을 불러왔어요.'); return { ...snapshot, result: 'changed' }; }
+      const next = simulateGarden(snapshot, now, index, action);
+      setSnapshot(next);
+      if (next.harvest?.cropType === 'tomato') setCrops(value => [...value, { id: 'harvest-' + value.length, cropType: 'tomato', sizeScore: 82, harvestedAt: new Date(now).toISOString(), careCount: 3, status: 'stored', submittedAt: null, rewardPoints: null }]);
+      if (next.harvest?.cropType === 'strawberry') { const berries = next.harvest.berries ?? 1; setBag(current => reweigh({ capacity: current.capacity, crops: current.crops,
+        items: current.items.some(i => i.kind === 'crop') ? current.items.map(i => i.kind === 'crop' ? { ...i, qty: i.qty + berries } : i) : [...current.items, { kind: 'crop', ref: 'strawberry', qty: berries, unitWeight: 0.1, unitPoints: 2 }] })); }
+      return next;
     } },
     inventory: { crops, busy: false, error: false, refresh: async () => {} }, contest: fakeContest,
-    submit: async id => { const rewardPoints = computeSubmitReward(crops.find(c => c.id === id)!.sizeScore); setCrops(value => value.map(c => c.id === id ? { ...c, status: 'submitted', rewardPoints } : c)); setBalance(value => value + rewardPoints); return { ok: true, cropId: id, rewardPoints, submittedAt: new Date(farmNow).toISOString(), status: 'submitted' }; },
+    submit: async id => { const rewardPoints = computeSubmitReward(crops.find(c => c.id === id)!.sizeScore); setCrops(value => value.map(c => c.id === id ? { ...c, status: 'submitted', rewardPoints } : c)); setBalance(value => value + rewardPoints); return { ok: true, cropId: id, rewardPoints, submittedAt: new Date(now).toISOString(), status: 'submitted' }; },
   };
-  const farmBeds = snapshot.plots.map(p => ({ stage: farmStage(p.crop, farmNow), moisture: farmMoisture(p.crop, farmNow) }));
+  const garden = gardenLook(params.has('farm') ? farmAdapter.farm.snapshot : null, now);
   const [open, setOpen] = useState(true);
   const [equippedRod, setEquippedRod] = useState<string | null>(null);
   const [look, setLook] = useState(appearance);
@@ -147,7 +153,7 @@ function Harness() {
   return open
     ? params.has('saved')
       ? <PixelWorldPhaser userId="scene-test-user" pointsBalance={balance} onPixelPurchase={setBalance} onPointsReward={reward => setBalance(value => value + reward)} onExit={() => setOpen(false)} />
-      : <GameShell userId={params.get('user') ?? 'guest'} face={params.get('face') ?? undefined} isAdmin={params.has('admin')} fishingAdapter={fishingAdapter} bugAdapter={bugAdapter} cardRpsAdapter={cardRpsAdapter} clockOverride={clockOverride} appearance={look} pet={active} balance={balance} panels={adapter} farmAdapter={params.has('farm') ? farmAdapter : undefined} beds={params.has('farm') ? farmBeds : [...beds]} furniture={roomLayout} onSaveFurniture={async layout => { await new Promise(resolve => setTimeout(resolve, 100)); if (params.has('roomSaveError')) throw new Error('저장하지 못했어요. 다시 시도해 주세요.'); setRoomLayout(layout); }} scarecrowLine={() => pickScarecrowLine(null, Date.now())} onExit={() => setOpen(false)} />
+      : <GameShell userId={params.get('user') ?? 'guest'} face={params.get('face') ?? undefined} isAdmin={params.has('admin')} fishingAdapter={fishingAdapter} bugAdapter={bugAdapter} cardRpsAdapter={cardRpsAdapter} clockOverride={clockOverride} appearance={look} pet={active} balance={balance} panels={adapter} farmAdapter={params.has('farm') ? farmAdapter : undefined} garden={garden} furniture={roomLayout} onSaveFurniture={async layout => { await new Promise(resolve => setTimeout(resolve, 100)); if (params.has('roomSaveError')) throw new Error('저장하지 못했어요. 다시 시도해 주세요.'); setRoomLayout(layout); }} scarecrowLine={() => pickScarecrowLine(null, Date.now())} onExit={() => setOpen(false)} />
     : <main style={{ padding: 24 }}><p data-testid="exited">게임에서 나왔어요.</p><button type="button" onClick={() => setOpen(true)}>다시 들어가기</button></main>;
 }
 

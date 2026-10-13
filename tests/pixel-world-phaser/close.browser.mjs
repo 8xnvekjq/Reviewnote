@@ -57,8 +57,6 @@ try {
       await wardrobe.locator('h2').tap(); assert.equal(await wardrobe.count(), 1);
       await page.screenshot({ path: `${SHOTS}/close-wardrobe-${viewport.width}-${pointerType}.png` });
       await closeB(page, cdp, pointerType);
-      await walk(page, 'targets', 'farm:0'); await page.getByRole('dialog', { name: '1번 토마토 밭', exact: true }).waitFor();
-      await closeB(page, cdp, pointerType);
       await walk(page, 'targets', 'scarecrow'); await page.getByRole('button', { name: '수확물 보기', exact: true }).click();
       await page.getByRole('dialog', { name: '수확물 보기', exact: true }).waitFor(); await closeB(page, cdp, pointerType);
       await walk(page, 'targets', 'scarecrow'); await page.getByRole('button', { name: '이야기하기', exact: true }).click();

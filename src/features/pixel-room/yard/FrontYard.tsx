@@ -109,7 +109,7 @@ export default function FrontYard({ from, appearance, onExit, activePet = null, 
       <button type="button" className="pr-yard-gate" aria-label="길을 따라 광장으로 걸어가기" onClick={() => walkTo(YARD_GATE)}>↓</button>
       {activePet && <Companion key={activePet} pet={activePet} world={yardDogWorld(actor)} interaction={petTalk.interaction} onTap={petTalk.tap} link={petTalk.link} />}
       <StepDust puffs={trail.puffs} cols={YARD_WIDTH} rows={YARD_HEIGHT} />
-      <Farm farm={farm} actor={actor} moving={moving} walkTo={walkTo} />
+      <Farm farm={farm} />
       <Scarecrow snapshot={farm.snapshot} now={farm.now} />
       <div className="pr-plaza-actor" aria-hidden="true" {...hopProps(trail.step)} data-x={actor.x} data-y={actor.y} data-direction={direction} style={{ left: `${(actor.x - .6) / 16 * 100}%`, bottom: `${(11 - actor.y) / 12 * 100}%`, width: '13.75%', height: '18%', zIndex: actor.y + 2 }}><span className="pr-shadow" /><AvatarSprite direction={direction} frame={moving ? frame : 0} walking={moving} appearance={appearance} /></div>
     </div></div>

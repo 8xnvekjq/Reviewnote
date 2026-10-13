@@ -2,7 +2,8 @@
 // 쓰고, 둘레 잔디도 걸을 수 있게 한다. 지도 끝의 나무 줄만 경계로 막는다. 순수 모듈.
 // 충돌/길찾기 계산 자체는 world.ts(모든 장면 공통)에 있고, 여기 함수들은 마당 격자를 기본값으로 채운 얇은 포장이다.
 import { yardWalkable, YARD_DOOR, YARD_HEIGHT, YARD_SPAWNS, YARD_WIDTH } from '../../pixel-room/yard/yardModel';
-import { FARM_BEDS, SCARECROW_CELL } from '../../pixel-room/farm/farmModel';
+import { SCARECROW_CELL } from '../../pixel-room/farm/farmModel';
+import { GARDEN_FENCE, GARDEN_SIZE, gardenIndexAt, gardenYardCell, inGardenFootprint, isGardenFence } from '../../pixel-room/farm/gardenModel';
 import type { Facing, Point } from './joystick';
 import * as world from './world';
 import type { Interactable, SolidFn } from './world';
@@ -38,11 +39,13 @@ export function worldSolid(cell: Point): boolean {
     || cell.x <= 0 || cell.y <= 0 || cell.x >= WORLD_COLS - 1 || cell.y >= WORLD_ROWS - 1) return true;
   if (cell.x === RIVER_SIGN.x && cell.y === RIVER_SIGN.y) return true;
   const x = cell.x - MARGIN, y = cell.y - MARGIN;
+  // 텃밭: 울타리만 막히고 밭 칸(과 윗줄 문)은 걸어 다닌다 — 칸 위에 서거나 옆 칸을 보며 도구를 쓴다.
+  if (inGardenFootprint({ x, y })) return isGardenFence({ x, y });
   if (x < 0 || y < 0 || x >= YARD_WIDTH || y >= YARD_HEIGHT) return false;
   return !yardWalkable({ x, y });
 }
 
-export type InteractableId = 'scarecrow' | 'door' | 'gate' | 'river-sign' | 'kiosk' | `farm:${number}`;
+export type InteractableId = 'scarecrow' | 'door' | 'gate' | 'river-sign' | 'kiosk';
 /** 관리자 자판기 — 집 문 오른쪽 벽 앞(마당 칸 9,6). 관리자 마당에만 놓이고, 놓이면 그 칸은 막힌다. */
 export const KIOSK: Point = toWorldCell({ x: 9, y: 6 });
 export const KIOSK_INTERACTABLE: Interactable & { id: InteractableId } = { id: 'kiosk', cell: KIOSK, label: '관리자 자판기', verb: '열기',
@@ -53,17 +56,26 @@ const SCARECROW = toWorldCell(SCARECROW_CELL);
 export const INTERACTABLES: readonly (Interactable & { id: InteractableId })[] = [
   { id: 'river-sign', cell: RIVER_SIGN, label: '강가 (낚시터)', verb: '읽기', action: { kind: 'talk' },
     bang: { x: (RIVER_SIGN.x + .5) * TILE, y: RIVER_SIGN.y * TILE - 4 } },
-  ...FARM_BEDS.map((bed, index): Interactable & { id: InteractableId } => {
-    const cell = toWorldCell(bed);
-    return { id: `farm:${index}`, cell, cells: [cell, { x: cell.x + 1, y: cell.y }, { x: cell.x, y: cell.y + 1 }, { x: cell.x + 1, y: cell.y + 1 }],
-      label: '토마토 밭', verb: '돌보기', action: { kind: 'panel', panel: `farm:${index}` }, bang: { x: (cell.x + 1) * TILE, y: cell.y * TILE } };
-  }),
   { id: 'scarecrow', cell: SCARECROW, label: '허수아비', verb: '말 걸기', action: { kind: 'talk' }, bang: { x: SCARECROW.x * TILE + TILE / 2, y: (SCARECROW.y + 1) * TILE - 32 } },
   { id: 'door', cell: DOOR, label: '우리 집 문', verb: '들어가기', action: { kind: 'exit', exit: 'door' }, bang: { x: DOOR.x * TILE + TILE / 2, y: DOOR.y * TILE - 2 } },
   // 광장 길목을 밟거나 A를 누르면 광장으로 넘어간다.
   { id: 'gate', cell: GATE, cells: GATE_CELLS, label: '광장 가는 길', verb: '광장 가기', action: { kind: 'exit', exit: 'gate' }, bang: { x: GATE.x * TILE + TILE / 2, y: GATE.y * TILE + 2 } },
 ];
-export const BED_CELLS: readonly Point[] = FARM_BEDS.map(toWorldCell);
+// ── 텃밭(마당 오른쪽 아래, 울타리 안 6×4칸) ─────────────────────────────────────────
+/** 텃밭 칸 번호 → 월드 칸. */
+export const gardenWorldCell = (index: number): Point => toWorldCell(gardenYardCell(index));
+/** 월드 칸 → 텃밭 칸 번호(밭 칸이 아니면 null). */
+export const gardenIndexAtWorld = (cell: Point): number | null => gardenIndexAt({ x: cell.x - MARGIN, y: cell.y - MARGIN });
+/** 울타리까지 포함한 텃밭 자리(월드 칸). */
+export const GARDEN_AREA = { ...toWorldCell(GARDEN_FENCE), cols: GARDEN_SIZE.cols + 2, rows: GARDEN_SIZE.rows + 2 } as const;
+/** 도구 막대를 보여 줄 만큼 가까운가: 울타리 둘레 한 칸까지. */
+export const nearGarden = (cell: Point) => cell.x >= GARDEN_AREA.x - 1 && cell.y >= GARDEN_AREA.y - 1
+  && cell.x <= GARDEN_AREA.x + GARDEN_AREA.cols && cell.y <= GARDEN_AREA.y + GARDEN_AREA.rows;
+/** 도구를 쓸 칸: 바라보는 앞 칸이 밭이면 그 칸, 아니면 서 있는 칸(밭 위에 서 있을 때). */
+export function gardenTarget(feet: Point, facing: Facing): number | null {
+  const d = world.facingDelta(facing);
+  return gardenIndexAtWorld(world.cellOf({ x: feet.x + d.x * 11, y: feet.y + d.y * 11 })) ?? gardenIndexAtWorld(world.cellOf(feet));
+}
 /** 처음 서 있는 곳 — 기존 마당의 "방에서 나왔을 때" 자리(문 바로 앞). */
 export const SPAWN: Point = cellCenter(toWorldCell(YARD_SPAWNS.room));
 
@@ -97,7 +109,8 @@ export const facedInteractable = (feet: Point, facing: Facing, list: readonly In
 export function groundTile(worldX: number, worldY: number): number {
   const x = worldX - MARGIN, y = worldY - MARGIN;
   // 밭을 피해 아래로 돌아간 뒤 오른쪽 강가 출구로 이어지는 흙길.
-  if ((y === 9 && x >= 7 && x <= 14) || (x === 14 && y >= 7 && y <= 9) || (worldX >= 19 && worldY >= 12 && worldY <= 15)) return 25;
+  // 텃밭 울타리 윗줄 바로 위까지만(울타리 밑으로 흙길이 지나가지 않게).
+  if ((y === 9 && x >= 7 && x <= 14) || (x === 14 && y >= 7 && y <= 9) || (worldX >= 19 && worldY >= 12 && worldY <= 14)) return 25;
   if (x >= 5 && x <= 7 && y >= 5 && y < YARD_HEIGHT) return x === 5 ? 24 : x === 7 ? 26 : 25;
   // 광장 쪽으로 이어지는 길도 바깥 나무 줄 전까지 걸을 수 있다.
   if (x >= 5 && x <= 7 && y >= YARD_HEIGHT) return x === 5 ? 24 : x === 7 ? 26 : 25;
@@ -114,6 +127,6 @@ export function borderTrees(): Point[] {
   }
   return trees;
 }
-/** 기존 마당의 큰 나무 3그루(2배 크기), 울타리 2줄 — 마당 칸 좌표. */
+/** 기존 마당의 큰 나무 3그루(2배 크기), 울타리 한 줄 — 마당 칸 좌표. 아래쪽 울타리 줄은 텃밭 울타리가 대신한다. */
 export const BIG_TREES: readonly Point[] = [{ x: 0, y: 1 }, { x: 0, y: 7 }, { x: 14, y: 0 }];
-export const FENCE_ROWS: readonly number[] = [2, 10];
+export const FENCE_ROWS: readonly number[] = [2];

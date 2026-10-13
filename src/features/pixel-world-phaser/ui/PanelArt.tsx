@@ -8,8 +8,9 @@ import { loadImage } from '../game/loadImage';
 import { loadPetSheet } from '../game/sceneAssets';
 import { PET_SHEETS } from '../logic/petSheets';
 import netIcon from '../assets/bugs/net-icon.png';
+import { GARDEN_PALETTE, SPRINKLER_GRID } from '../logic/gardenSprites';
 
-type Art = { appearance: PublicAvatarAppearance } | { pet: string } | { furniture: FurnitureType | 'tool_net' };
+type Art = { appearance: PublicAvatarAppearance } | { pet: string } | { furniture: FurnitureType | 'tool_net' | 'tool_sprinkler' };
 
 /** Crop at native resolution before CSS scaling, so the atlas cannot bleed into the preview. */
 export function PanelArt(props: Art) {
@@ -34,6 +35,12 @@ export function PanelArt(props: Art) {
       } else if (furniture === 'tool_net') {
         source = await loadImage(netIcon);
         width = height = 16;
+      } else if (furniture === 'tool_sprinkler') {
+        // 텃밭에 놓이는 스프링클러 그림 그대로(16×20 격자의 아래쪽 16줄).
+        const art = document.createElement('canvas'); art.width = 16; art.height = 20;
+        const paint = art.getContext('2d')!;
+        SPRINKLER_GRID.forEach((row, py) => [...row].forEach((ch, px) => { if (GARDEN_PALETTE[ch]) { paint.fillStyle = GARDEN_PALETTE[ch]; paint.fillRect(px, py, 1, 1); } }));
+        source = art; y = 4; width = height = 16;
       } else if (furniture) {
         const art = furnitureArt[furniture];
         source = await loadImage(art.src);

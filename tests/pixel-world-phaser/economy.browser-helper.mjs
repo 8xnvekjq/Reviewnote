@@ -48,12 +48,14 @@ export async function economyRegression(browser, base) {
     const walk = async (group, id) => {
       await page.evaluate(({ group, id }) => { const h = window.__pixelWorldPhaser, points = h.debug()[group], key = Object.keys(points).find(k => new RegExp(id).test(k)), p = points[key]; if (!p) throw new Error(JSON.stringify(points)); h.walkToScreen(p.x, p.y); }, { group, id });
     };
-    await walk('targets', 'farm:0');
-    const bed = page.getByRole('dialog', { name: '1번 토마토 밭', exact: true }); await bed.waitFor();
+    // 텃밭: 0번 칸(익은 토마토) 아래 칸까지 걸어가서, 0번 칸을 찍어 딴다(제자리에서).
+    await page.evaluate(() => { const h = window.__pixelWorldPhaser, p = h.debug().garden.points[8]; h.walkToScreen(p.x, p.y); });
+    await page.waitForFunction(() => { const d = window.__pixelWorldPhaser.debug(); return !d.moving && d.pathLength === 0 && d.garden?.near; });
     let before = await debug();
-    await bed.getByRole('button', { name: '토마토 수확하기', exact: true }).click();
-    await bed.getByRole('status').filter({ hasText: '82/100' }).waitFor(); await stable(before);
-    await page.keyboard.press('Escape'); await walk('targets', 'scarecrow');
+    const ripe = before.garden.points[0];
+    await page.mouse.click(ripe.x, ripe.y); // 마우스: 이 시험의 '첫 터치 = 전체화면 한 번' 확인을 건드리지 않게
+    await page.locator('.pwp-garden-message').filter({ hasText: '82/100' }).waitFor(); await stable(before);
+    await walk('targets', 'scarecrow');
     await page.getByRole('button', { name: '수확물 보기', exact: true }).click();
     const collection = page.getByRole('dialog', { name: '수확물 보기', exact: true });
     // 수확한 토마토는 가방에 들고 광장 상점 '판매'에서 출품한다.

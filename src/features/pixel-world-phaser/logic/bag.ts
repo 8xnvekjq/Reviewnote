@@ -1,5 +1,6 @@
 // 가방(순수 모듈): 무게에 따른 이동 속도와 서버 응답 파싱. 서버 계산은 supabase/migrations/20261012120000_pixel_bag.sql.
-export type BagItemKind = 'fish' | 'bug';
+/** crop: 텃밭 딸기 열매(ref 'strawberry') — 판매값은 하루 농사 상한 안에서만(서버 sell_pixel_bag). */
+export type BagItemKind = 'fish' | 'bug' | 'crop';
 export interface BagItem { kind: BagItemKind; ref: string; qty: number; unitWeight: number; unitPoints: number }
 export interface BagCrop { id: string; sizeScore: number; unitWeight: number }
 /** 손 칸(supabase/migrations/20261012150000_pixel_hand_slot.sql): 낚싯대(rod: 고른 낚싯대, id null = 기본 낚싯대)·잠자리채·맨손 중 하나. */
@@ -31,7 +32,7 @@ export function parseBag(raw: unknown): Bag | null {
   if (!Number.isFinite(capacity) || !Number.isFinite(weight)) return null;
   const items = (Array.isArray(raw.items) ? raw.items : []).filter(isObj).flatMap(i => {
     const qty = num(i.qty), unitWeight = num(i.unitWeight), unitPoints = num(i.unitPoints);
-    return (i.kind === 'fish' || i.kind === 'bug') && typeof i.ref === 'string' && Number.isInteger(qty) && qty > 0 && Number.isFinite(unitWeight) && Number.isFinite(unitPoints)
+    return (i.kind === 'fish' || i.kind === 'bug' || i.kind === 'crop') && typeof i.ref === 'string' && Number.isInteger(qty) && qty > 0 && Number.isFinite(unitWeight) && Number.isFinite(unitPoints)
       ? [{ kind: i.kind, ref: i.ref, qty, unitWeight, unitPoints } as BagItem] : [];
   });
   const crops = (Array.isArray(raw.crops) ? raw.crops : []).filter(isObj).flatMap(c => {

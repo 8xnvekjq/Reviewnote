@@ -1,17 +1,24 @@
 import { parseFarmResult } from '../features/pixel-world-phaser/logic/farmResult';
 import type { XpGain } from '../features/pixel-world-phaser/logic/levels';
 import { supabase } from '../services/supabase';
-import type { FarmAction, FarmSnapshot, HarvestedCrop, WeeklyCropContest } from '../features/pixel-room/farm/farmModel';
-export interface FarmResult extends FarmSnapshot { xpGain?: XpGain; result?: 'ok' | 'changed' | 'already_watered' | 'ready' | 'growing'; harvest?: { sizeScore: number; bonusApplied?: boolean } }
+import type { FarmSnapshot, HarvestedCrop, WeeklyCropContest } from '../features/pixel-room/farm/farmModel';
+import type { GardenAction } from '../features/pixel-room/farm/gardenModel';
+/** result: 'ok' | 'changed' | 'already_watered' | 'ready' | 'growing' | 'untilled' | 'occupied' | 'already' | 'blocked' | 'no_sprinkler' | 'sprinkler_elsewhere'. */
+export interface FarmResult extends FarmSnapshot {
+  xpGain?: XpGain; result?: string;
+  harvest?: { cropType?: 'tomato' | 'strawberry'; sizeScore?: number; bonusApplied?: boolean; berries?: number; harvests?: number; maxHarvests?: number };
+}
 async function request(name: string, args?: Record<string, unknown>): Promise<FarmResult> {
   const { data, error } = await supabase.rpc(name, args).abortSignal(AbortSignal.timeout(12000));
   if (error) throw error;
   return parseFarmResult(data);
 }
 export const fetchPixelFarm = () => request('get_pixel_farm');
-export const actPixelFarm = (plot: number, action: FarmAction, revision: number) => request('act_pixel_farm', { p_plot: plot, p_action: action, p_revision: revision });
+/** 텃밭 칸 하나에 도구 쓰기(supabase/migrations/20261020100200_pixel_garden_actions.sql). plot = 칸 번호(y*8+x). */
+export const actPixelFarm = (plot: number, action: GardenAction, revision: number) => request('act_pixel_farm', { p_plot: plot, p_action: action, p_revision: revision });
 
-/** The "농작물" collection — harvested pixel_farm_crops rows, newest first. Direct table read (the
+/** The "농작물" collection — harvested tomato pixel_farm_crops rows, newest first (strawberry plants are
+ * not collection items — their berries go to the bag). Direct table read (the
  * existing pixel_farm_crops_read RLS policy already scopes this to the caller's own rows; the
  * explicit .eq is defense in depth, not the only thing enforcing it). No RPC needed — nothing here
  * is written, only read. */
@@ -20,6 +27,7 @@ export async function fetchHarvestedCrops(userId: string): Promise<HarvestedCrop
     .from('pixel_farm_crops')
     .select('id, crop_type, size_score, harvested_at, care_count, status, submitted_at, reward_points')
     .eq('user_id', userId)
+    .eq('crop_type', 'tomato')
     .not('harvested_at', 'is', null)
     .order('harvested_at', { ascending: false });
   if (error) throw error;
@@ -34,7 +42,7 @@ export async function fetchHarvestedCrops(userId: string): Promise<HarvestedCrop
 
 export type SubmitFarmCropResult =
   | { ok: true; cropId: string; rewardPoints: number; submittedAt: string; status: 'submitted' }
-  | { ok: false; reason: 'not_found' | 'not_stored' | 'already_submitted' | 'unknown'; message: string };
+  | { ok: false; reason: 'not_found' | 'not_stored' | 'already_submitted' | 'daily_cap' | 'unknown'; message: string };
 
 /** Submit one stored crop for its one-time reward. Server re-checks status itself (status='stored'
  * under a row lock) — safe to call again after a failed/uncertain network response: a retry on an

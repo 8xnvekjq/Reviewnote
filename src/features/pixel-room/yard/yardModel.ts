@@ -1,4 +1,5 @@
-import { isFarmCell, SCARECROW_CELL } from '../farm/farmModel';
+import { SCARECROW_CELL } from '../farm/farmModel';
+import { inGardenFootprint } from '../farm/gardenModel';
 export type YardCell = { x: number; y: number };
 export type YardDestination = 'room' | 'plaza';
 export const YARD_WIDTH = 16;
@@ -12,12 +13,13 @@ export function yardExit(cell: YardCell): YardDestination | null {
   return null;
 }
 export function yardWalkable({ x, y }: YardCell): boolean {
-  if (isFarmCell({ x, y })) return false;
+  // 텃밭(울타리 포함)은 예전 마당 화면에서는 들어갈 수 없는 장식이다 — 텃밭 안을 걷는 것은 새 Pixel World(yardWorld.ts).
+  if (inGardenFootprint({ x, y })) return false;
   if (x === SCARECROW_CELL.x && y === SCARECROW_CELL.y) return false;
   if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= YARD_WIDTH || y >= YARD_HEIGHT) return false;
   if (x >= 3 && x <= 8 && y >= 1 && y <= 6) return x === 6 && y === 6;
   if ((x <= 1 && (y === 4 || y === 10)) || (x >= 14 && y === 3)) return false;
-  if ((y === 2 && x >= 10 && x <= 13) || (y === 10 && x >= 10 && x <= 13)) return false;
+  if (y === 2 && x >= 10 && x <= 13) return false;
   return true;
 }
 export function yardPath(from: YardCell, to: YardCell): YardCell[] {
