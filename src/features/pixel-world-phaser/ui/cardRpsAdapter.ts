@@ -82,10 +82,15 @@ async function matchCall(client: CardRpsSupabaseClient, fn: string, args?: Recor
 }
 
 export function createCardRpsAdapter(supabase: CardRpsSupabaseClient): CardRpsAdapter {
-  const adapter: CardRpsAdapter = {
+  const adapter: CardRpsAdapter & { registerPresenceToken(): Promise<string> } = {
+    async registerPresenceToken() {
+      const value = await call(supabase, 'register_card_rps_presence');
+      if (typeof value !== 'string') throw new CardRpsError('network');
+      return value;
+    },
     invite(opponentId, stake) {
       if (!opponentId || !(RPS_FRIEND_STAKES as readonly number[]).includes(stake)) return Promise.reject(new CardRpsError('not_found'));
-      return matchCall(supabase, 'invite_card_rps', { p_opponent: opponentId, p_stake: stake });
+      return matchCall(supabase, 'invite_card_rps_presence', { p_token: opponentId, p_stake: stake });
     },
     respond(matchId, accept) { return matchCall(supabase, 'respond_card_rps', { p_match_id: matchId, p_accept: accept }); },
     async cancelInvite(matchId) { await call(supabase, 'cancel_card_rps_invite', { p_match_id: matchId }); },

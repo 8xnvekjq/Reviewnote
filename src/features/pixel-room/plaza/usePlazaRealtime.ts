@@ -32,7 +32,7 @@ function reconnectDelayFor(attempt: number): number {
   return Math.min(RECONNECT_BASE_DELAY_MS * 2 ** attempt, RECONNECT_MAX_DELAY_MS);
 }
 
-export type PlazaSelfState = Pick<PlazaPlayerState, 'x' | 'y' | 'direction' | 'moving' | 'version' | 'position' | 'pet' | 'riding' | 'face' | 'tool'>;
+export type PlazaSelfState = Pick<PlazaPlayerState, 'x' | 'y' | 'direction' | 'moving' | 'version' | 'position' | 'pet' | 'riding' | 'face' | 'tool' | 'duelToken'>;
 
 export interface UsePlazaRealtimeResult {
   players: PlazaPlayerState[]; // everyone else currently in the plaza (not me)

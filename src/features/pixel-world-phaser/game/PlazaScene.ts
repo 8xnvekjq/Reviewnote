@@ -18,6 +18,8 @@ import { PlazaBubbles } from './plazaBubbles';
 import type { PlazaBubble } from './plazaBubbles';
 import { WorldScene } from './WorldScene';
 import type { WorldContext } from './WorldScene';
+import { cardRpsAssets } from '../assets/cardRps';
+import { loadImage } from './loadImage';
 
 type Friend = { tool?: HeldTool; tag?: Phaser.GameObjects.Text; follow?: PetFollowState; sprite?: Phaser.GameObjects.Sprite; pet?: Phaser.GameObjects.Sprite; look: string; petId: string | null; loading: boolean; state: PlazaPlayerState };
 export class PlazaScene extends WorldScene {
@@ -71,18 +73,15 @@ export class PlazaScene extends WorldScene {
       if (!this.textures.exists(key)) this.textures.addCanvas(key, c);
       this.add.image((s.x + 5) * 16, (s.y + 5) * 16, key).setOrigin(0).setDepth((s.footprint.y + 5 + s.footprint.h) * 16 - 2);
     });
-    // 카드 대결 그림 자산이 합쳐지기 전에도 자리와 상호작용이 보이는 임시 픽셀 도형.
-    const rps = this.add.graphics().setDepth((RPS_TABLE.y + PLAZA_MARGIN + RPS_TABLE.h) * 16 - 2);
     const tx = (RPS_TABLE.x + PLAZA_MARGIN) * 16, ty = (RPS_TABLE.y + PLAZA_MARGIN) * 16;
-    rps.fillStyle(0x6b3e28).fillRect(tx, ty + 9, 48, 23);
-    rps.fillStyle(0xc78c48).fillRect(tx + 2, ty + 8, 44, 9);
-    rps.fillStyle(0xd8d1c0).fillCircle(tx + 24, ty + 3, 8);
-    rps.fillStyle(0x8e8175).fillCircle(tx + 18, ty - 3, 5).fillCircle(tx + 30, ty - 3, 5);
     const sx = (RPS_RULE_SIGN.x + PLAZA_MARGIN) * 16, sy = (RPS_RULE_SIGN.y + PLAZA_MARGIN) * 16;
-    rps.fillStyle(0x68442b).fillRect(sx + 6, sy + 8, 4, 15);
-    rps.fillStyle(0xf1d891).fillRect(sx, sy, 16, 12);
-    rps.lineStyle(2, 0x68442b).strokeRect(sx, sy, 16, 12);
-    this.add.text(tx + 24, ty - 13, '치즈', { fontSize: '7px', color: '#fff4ce', stroke: '#3b261d', strokeThickness: 2 }).setOrigin(.5).setDepth(rps.depth + 1);
+    void Promise.all([loadImage(cardRpsAssets.cardTableProp), loadImage(cardRpsAssets.ruleSign)]).then(([table, sign]) => {
+      if (!this.scene.isActive()) return;
+      if (!this.textures.exists('card-rps-table-prop')) this.textures.addImage('card-rps-table-prop', table);
+      if (!this.textures.exists('card-rps-rule-sign')) this.textures.addImage('card-rps-rule-sign', sign);
+      this.add.image(tx + 24, ty + 32, 'card-rps-table-prop').setOrigin(.5, 1).setDepth((RPS_TABLE.y + PLAZA_MARGIN + RPS_TABLE.h) * 16 - 2);
+      this.add.image(sx + 8, sy + 16, 'card-rps-rule-sign').setOrigin(.5, 1).setDisplaySize(16, 24).setDepth((RPS_RULE_SIGN.y + PLAZA_MARGIN + 1) * 16 - 2);
+    }).catch(() => {});
     const hint = this.add.text((PLAZA_EXIT.x + .5) * 16, (PLAZA_EXIT.y + .5) * 16, '↓', { fontSize: '12px', color: '#fff4ce' }).setOrigin(.5).setDepth(-900);
     this.tweens.add({ targets: hint, alpha: .35, y: hint.y + 3, duration: 850, yoyo: true, repeat: -1 });
     const clear = () => { this.friends.clear(); this.bubbles?.clear(); this.bubbles = null; };

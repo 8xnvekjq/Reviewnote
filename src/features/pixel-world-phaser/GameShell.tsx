@@ -140,6 +140,7 @@ async function leaveFullscreen() {
 // 상위가 1초마다(밭 시계) 다시 그려져도, 넘겨받는 값이 같으면 셸은 다시 그리지 않는다.
 export const GameShell = memo(function GameShell({ isAdmin = false, appearance, pet, balance, beds, furniture, onSaveFurniture, onSceneChange, scarecrowLine, onExit, panels, farmAdapter, fishingAdapter, rewardsAdapter, bugAdapter, cardRpsAdapter, newFishSpeciesId, clockOverride, userId = 'guest', face }: GameShellProps) {
   const rpsAdapter = useMemo(() => cardRpsAdapter ?? createMockCardRpsAdapter(), [cardRpsAdapter]);
+  const [rpsOpponentAppearance, setRpsOpponentAppearance] = useState<PublicAvatarAppearance>();
   useLayoutEffect(() => {
     let viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
     const created = !viewport;
@@ -739,7 +740,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     {isAdmin && panel === 'kiosk' && <AdminKiosk weather={{ adapter: fishingAdapter, clock: worldClock.clock, refresh: worldClock.refresh }} onClose={closePanel} />}
     {!placing && !fishing.busy && !fishing.reelState && panel !== 'furniture' && <LevelBadge value={level} onClick={() => openPanel('level')} style={{ right: layout.width - hud.x - hud.width + 10, top: hud.y + hud.height + 8 }} />}
     {panel === 'level' && <LevelPanel value={level} onClose={closePanel} />}
-    {panel === 'card-rps' && <CardRpsGame adapter={rpsAdapter} appearance={appearance} onClose={closePanel} />}
+    {panel === 'card-rps' && <CardRpsGame adapter={rpsAdapter} appearance={appearance} opponentAppearance={rpsOpponentAppearance} onClose={closePanel} />}
     {panel === 'card-rps-rules' && <CardRpsRules onClose={closePanel} />}
     {level.celebration && <LevelToast gain={level.celebration} />}
     {panels && <div className="pwp-panel-access" style={{ left: hud.x + 10, top: hud.y + hud.height + 8 }}>
@@ -779,7 +780,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     {(panel === 'shop' || panel === 'wardrobe') && panels && <GamePanels kind={panel} adapter={panels} onClose={closePanel} />}
     {(panel === 'turtle' || panel === 'fishboard') && <FishingPanels key={panel} kind={panel} adapter={fishingAdapter} shop={panels} newSpeciesId={newFishSpeciesId ?? freshSpecies} onClose={() => { if (panel === 'turtle') setFreshSpecies(null); closePanel(); }} />}
     {scene?.id === 'river' && status === 'ready' && <RiverBridge key={'river:' + scene.visit} handle={handle} appearance={appearance} face={animalFace} tool={heldToolTag(heldTool, heldRodId)} pet={pet} riding={riding} panel={panel} reporter={riverReporter} swingReporter={swingReporter} />}
-    {scene?.id === 'plaza' && status === 'ready' && <PlazaBridge key={'plaza:' + scene.visit} handle={handle} appearance={appearance} face={animalFace} tool={heldToolTag(heldTool, heldRodId)} pet={pet} riding={riding} userId={userId} panel={panel} onClose={closePanel} swingReporter={swingReporter} rpsAdapter={rpsAdapter} onOpenRps={() => openPanel('card-rps')} />}
+    {scene?.id === 'plaza' && status === 'ready' && <PlazaBridge key={'plaza:' + scene.visit} handle={handle} appearance={appearance} face={animalFace} tool={heldToolTag(heldTool, heldRodId)} pet={pet} riding={riding} userId={userId} panel={panel} onClose={closePanel} swingReporter={swingReporter} rpsAdapter={rpsAdapter} onOpenRps={opponent => { setRpsOpponentAppearance(opponent); openPanel('card-rps'); }} />}
     {panel && panel !== 'bugs' && panel !== 'kiosk' && panel !== 'bag' && panel !== 'level' && panel !== 'card-rps' && panel !== 'card-rps-rules' && panel !== 'turtle' && panel !== 'fishboard' && panel !== 'furniture' && panel !== 'shop' && panel !== 'wardrobe' && panel !== 'contest' && panel !== 'well' && panel !== 'bench' && <FarmPanels key={panel} petId={pet} riding={riding} onRide={() => { closePanel(); handle.current?.toggleRide(); }} kind={panel} adapter={farmAdapter} onClose={closePanel}
       onXp={level.onXp} onCollection={() => openPanel('collection')} onTalk={() => { closePanel(); openDialogue('scarecrow'); }}
       onPet={kind => { closePanel(); handle.current?.reactPet(kind); }} onFx={(index, action) => handle.current?.farmFx(index, action)} />}
