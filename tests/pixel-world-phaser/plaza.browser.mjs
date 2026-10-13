@@ -15,7 +15,7 @@ try {
   for (const [page, pet] of [[a, 'pet_dog'], [b, 'pet_duck']]) {
     page.on('pageerror', e => errors.push(e.message));
     await page.bringToFront();
-    await page.goto(BASE + '/tests/pixel-world-phaser/harness.html?top=' + (pet === 'pet_duck' ? 'blouse_rose' : 'stripe') + '&pet=' + pet);
+    await page.goto(BASE + '/tests/pixel-world-phaser/harness.html?top=' + (pet === 'pet_duck' ? 'blouse_rose' : 'stripe') + '&pet=' + pet + '&duel');
     await page.waitForFunction(() => document.querySelector('.pwp-root')?.dataset.status === 'ready');
     await ready(page, 'yard');
     assert.equal(await page.evaluate(() => window.plazaTransport?.audit().active.length ?? 0), 0, 'yard has no subscription');
@@ -34,6 +34,51 @@ try {
     await b.waitForFunction(x => { const p = window.__pixelWorldPhaser.debug().classmates[0]; return p && p.rendered && Math.abs(p.x - x) < .1 && Math.abs(p.y - 7) < .1; }, x);
   }
   console.log('PASS plaza margin presence: left/right grass positions render on the other page');
+  // 걷기는 다음 프레임에 시작하므로 moving만 보면 출발 전에 끝난 것으로 잘못 본다 — 남은 경로(pathLength)까지 본다.
+  // 카드 대결 버튼: 멀면 없음 → 친구 바로 위 칸으로 걸어가면 친구 머리 위에 뜸 → 누르면 판돈 창 → 멀어지면 사라짐.
+  // (예전처럼 늘 떠 있는 칩 목록은 없다.)
+  await a.bringToFront();
+  const nearButton = a.locator('.pwp-rps-near');
+  const walkNearFriend = (dy) => a.evaluate(dy => {
+    const h = window.__pixelWorldPhaser, d = h.debug(), p = d.classmates[0];
+    h.walkToScreen(((p.x + 5.5) * 16 - d.camera.x) * d.cssZoom, ((p.y + 5.5) * 16 + dy - d.camera.y) * d.cssZoom);
+  }, dy);
+  const friendDistance = () => a.evaluate(() => { const d = window.__pixelWorldPhaser.debug(), p = d.classmates[0]; return Math.hypot(d.x - (p.x + 5.5) * 16, d.y - (p.y + 5.5) * 16); });
+  assert.ok(await friendDistance() > 40, 'start far from the classmate');
+  await a.waitForTimeout(300);
+  assert.equal(await nearButton.count(), 0, 'no duel button while far');
+  assert.equal(await a.locator('.pwp-rps-friends').count(), 0, 'old always-visible chip list is gone');
+  await walkNearFriend(-16);
+  await a.waitForFunction(() => { const d = window.__pixelWorldPhaser.debug(); return !d.moving && d.pathLength === 0; }, null, { timeout: 20000 });
+  { const where = await a.evaluate(() => { const d = window.__pixelWorldPhaser.debug(), p = d.classmates[0]; return { me: [d.x, d.y], friend: [(p.x + 5.5) * 16, (p.y + 5.5) * 16], pathLength: d.pathLength }; });
+    assert.ok(Math.hypot(where.me[0] - where.friend[0], where.me[1] - where.friend[1]) <= 28, 'standing within duel reach ' + JSON.stringify(where)); }
+  await nearButton.waitFor({ state: 'visible', timeout: 5000 });
+  assert.equal(await nearButton.count(), 1);
+  // 버튼 아래 가운데가 친구 머리 위(발에서 31 월드 px 위)에 붙어 있다. 카메라가 멈출 때까지 기다린다.
+  await a.waitForFunction(() => {
+    const d = window.__pixelWorldPhaser.debug(), p = d.classmates[0], box = document.querySelector('.pwp-rps-near')?.getBoundingClientRect(), root = document.querySelector('.pwp-root').getBoundingClientRect();
+    if (!box) return false;
+    const headX = ((p.x + 5.5) * 16 - d.camera.x) * d.cssZoom, headY = ((p.y + 5.5) * 16 - 31 - d.camera.y) * d.cssZoom;
+    return Math.abs(box.left - root.left + box.width / 2 - headX) < 3 && box.bottom - root.top <= headY + 1 && box.bottom - root.top > headY - 16 && box.height >= 44;
+  }, null, { timeout: 5000 });
+  await a.screenshot({ path: '.pixel-world-test.local/plaza-duel-button.png' });
+  const before = await a.evaluate(() => { const d = window.__pixelWorldPhaser.debug(); return { x: d.x, y: d.y }; });
+  await nearButton.click();
+  const stake = a.getByRole('dialog', { name: '카드 대결 신청' }); await stake.waitFor({ timeout: 5000 });
+  assert.ok(await stake.getByRole('button', { name: '20P' }).isVisible());
+  await a.waitForTimeout(200);
+  const after = await a.evaluate(() => { const d = window.__pixelWorldPhaser.debug(); return { x: d.x, y: d.y, pathLength: d.pathLength }; });
+  assert.deepEqual({ x: after.x, y: after.y }, { x: before.x, y: before.y }, 'tapping the button does not walk');
+  assert.equal(after.pathLength, 0);
+  assert.equal(await nearButton.count(), 0, 'button hides while the stake dialog is open');
+  await a.keyboard.press('Escape'); await stake.waitFor({ state: 'detached' });
+  await nearButton.waitFor({ state: 'visible', timeout: 5000 });
+  // 처음 서 있던 오른쪽 잔디로 돌아간다(아래로 가면 출구에 닿을 수 있다).
+  await a.evaluate(() => { const h = window.__pixelWorldPhaser, d = h.debug(); h.walkToScreen(((18 + 5.5) * 16 - d.camera.x) * d.cssZoom, (200 - d.camera.y) * d.cssZoom); });
+  await a.waitForFunction(() => { const d = window.__pixelWorldPhaser.debug(); return !d.moving && d.pathLength === 0; }, null, { timeout: 20000 });
+  assert.ok(await friendDistance() > 34);
+  await nearButton.waitFor({ state: 'detached', timeout: 5000 });
+  console.log('PASS plaza duel button: hidden far, above the near classmate, opens stake dialog without walking, gone after walking away');
   // Tapping approaches the stall; only A opens the shop.
   assert.equal(await a.locator('.pwp-panel-access').getByRole('button', { name: '상점', exact: true }).count(), 0);
   await target(a, 'shop');

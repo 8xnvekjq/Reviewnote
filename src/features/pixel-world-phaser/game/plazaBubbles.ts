@@ -35,6 +35,8 @@ export class PlazaBubbles {
       shown.box.setPosition(Math.round(spot.x - shown.box.width / 2), Math.round(spot.y - 31 - shown.height));
     }
   }
+  /** 이 사람 머리 위 풍선의 윗변(월드 y). 풍선이 없으면 null — 그 위에 다른 표시를 얹을 때 쓴다. */
+  topOf(id: string): number | null { const shown = this.shown.get(id); return shown && shown.box.alpha > 0 ? shown.box.y : null; }
   /** 장면이 내려갈 때: 그림과 tween은 장면이 함께 지우므로 기억만 비운다. */
   clear() { this.shown.clear(); }
   /** 테스트용: 지금 머리 위에 떠 있는 글과 투명도. */

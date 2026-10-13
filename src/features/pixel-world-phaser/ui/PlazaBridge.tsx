@@ -4,7 +4,7 @@ import { dragonfliesFor } from '../game/dragonflies';
 import type { NetSwingReporter } from './useBugCatching';
 import type { MutableRefObject as SwingRef } from 'react';
 // 광장에 있을 때만 마운트한다. 기존 훅의 구독/재연결/퇴장 정리를 그대로 재사용한다.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { usePlazaRealtime } from '../../pixel-room/plaza/usePlazaRealtime';
 import { useSmoothedPlayerPositions } from '../../pixel-room/plaza/useSmoothedPlayerPositions';
@@ -20,12 +20,13 @@ import type { WorldGameHandle } from '../game/boot';
 import type { PlazaBubble } from '../game/plazaBubbles';
 import { Window } from './GamePanels';
 import { PlazaChat } from './PlazaChat';
+import { pickDuelTarget } from '../logic/plazaDuel';
 import { RPS_DUEL_EVENT, RPS_FRIEND_STAKES, type CardRpsAdapter, type RpsDuelPayload, type RpsFriendStake, type RpsInvite } from '../logic/cardRpsContract';
 export type PlazaPanel = 'contest' | 'well' | 'bench';
-export function PlazaBridge({ handle, appearance, pet, riding, face, tool, userId, panel, onClose, swingReporter, rpsAdapter, onOpenRps }: {
+export function PlazaBridge({ handle, appearance, pet, riding, face, tool, userId, panel, blocked = false, onClose, swingReporter, rpsAdapter, onOpenRps }: {
   swingReporter: SwingRef<NetSwingReporter | null>;
   handle: RefObject<WorldGameHandle | null>; appearance: PublicAvatarAppearance; pet: PetId | null; riding: boolean; face?: string; /** 손에 든 도구 표시(친구 화면에 그린다). */ tool?: string;
-  userId: string; panel: string | null; onClose: () => void; rpsAdapter: CardRpsAdapter; onOpenRps(opponentAppearance?: PublicAvatarAppearance): void;
+  userId: string; panel: string | null; /** 대화창 등 패널 말고도 화면을 막는 것이 열려 있다. */ blocked?: boolean; onClose: () => void; rpsAdapter: CardRpsAdapter; onOpenRps(opponentAppearance?: PublicAvatarAppearance): void;
 }) {
   const [sessionId] = useState(() => crypto.randomUUID());
   const [initial] = useState(() => {
@@ -132,6 +133,33 @@ export function PlazaBridge({ handle, appearance, pet, riding, face, tool, userI
   useEffect(() => {
     handle.current?.setClassmates(smoothed, bubbles, sessionId);
   }, [handle, smoothed, bubbles, sessionId]);
+  // 가까이 선 친구 머리 위 "카드 대결" 버튼. 대상 고르기는 순수 함수(pickDuelTarget), 자리는 장면이
+  // 매 프레임 그린 뒤 알려 주는 머리 위 화면 좌표를 DOM에 바로 적는다(React를 매 프레임 다시 그리지 않는다).
+  const [duelNear, setDuelNear] = useState<string | null>(null);
+  const duelNearRef = useRef<string | null>(null);
+  const duelHead = useRef<{ x: number; y: number } | null>(null);
+  const duelButton = useRef<HTMLButtonElement | null>(null);
+  const duelAllowed = useRef(new Set<string>());
+  duelAllowed.current = panel || blocked || challenge || invite || duels[sessionId] ? new Set()
+    : new Set(smoothed.filter(p => p.duelToken && !duels[p.sessionId]).map(p => p.sessionId));
+  const placeDuel = useCallback((element: HTMLButtonElement | null) => {
+    duelButton.current = element;
+    const head = duelHead.current;
+    if (element && head) element.style.transform = `translate3d(${Math.round(head.x)}px, ${Math.round(head.y)}px, 0) translate(-50%, -100%)`;
+  }, []);
+  useEffect(() => {
+    const game = handle.current;
+    if (!game) return;
+    game.setPlazaFrameListener(frame => {
+      const allowed = duelAllowed.current;
+      const next = pickDuelTarget(frame.me, frame.peers.filter(p => allowed.has(p.id)).map(p => ({ id: p.id, ...p.feet })), duelNearRef.current);
+      duelHead.current = next ? frame.peers.find(p => p.id === next)!.head : null;
+      if (next !== duelNearRef.current) { duelNearRef.current = next; setDuelNear(next); }
+      placeDuel(duelButton.current);
+    });
+    return () => game.setPlazaFrameListener(null);
+  }, [handle, placeDuel]);
+  const duelPlayer = duelNear && duelAllowed.current.has(duelNear) ? smoothed.find(p => p.sessionId === duelNear) : undefined;
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 250);
     return () => window.clearInterval(timer);
@@ -157,9 +185,9 @@ export function PlazaBridge({ handle, appearance, pet, riding, face, tool, userI
           void realtime.sendReaction(kind).then(sent => setMessage(sent ? REACTIONS[kind].label : '반응을 보내지 못했어요. 잠시 후 다시 해 주세요.'));
         }}>{REACTIONS[kind].emoji}</button>)}</>} />
     </div>
-    {smoothed.length > 0 && <div className="pwp-rps-friends" role="group" aria-label="친구 카드 대결">
-      {smoothed.map(player => <button type="button" className="pwp-chip" key={player.sessionId} disabled={!!panel || !player.duelToken} onClick={() => player.duelToken && setChallenge({ token: player.duelToken, appearance: player.appearance, sessionId: player.sessionId })}>{player.face ?? '🙂'} 카드 대결</button>)}
-    </div>}
+    {duelPlayer?.duelToken && <button type="button" ref={placeDuel} className="pwp-rps-near" data-session={duelPlayer.sessionId} aria-label="이 친구에게 카드 대결 신청"
+      onPointerDown={event => event.stopPropagation()} onClick={() => duelPlayer.duelToken && setChallenge({ token: duelPlayer.duelToken, appearance: duelPlayer.appearance, sessionId: duelPlayer.sessionId })}>
+      <span aria-hidden="true">🃏</span> 카드 대결</button>}
     {challenge && <Window title="카드 대결 신청" onClose={() => setChallenge(null)} compact small><div className="pwp-panel-content"><p>판돈을 골라 친구에게 신청해요.</p>{RPS_FRIEND_STAKES.map(stake => <button type="button" key={stake} onClick={() => {
       const opponent = challenge; setChallenge(null);
       void rpsAdapter.invite(opponent.token, stake as RpsFriendStake).then(match => {

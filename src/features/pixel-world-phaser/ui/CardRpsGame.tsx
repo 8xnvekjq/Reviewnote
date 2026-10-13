@@ -155,7 +155,7 @@ export function CardRpsGame({ adapter, appearance, opponentAppearance, onClose, 
   // 내가 고르는 동안은 카드를 섞고, 공개 중에는 가만히 지켜본다.
   const opponentMood: Mood = face ?? (mode === 'choosing' || mode === 'shootout' || mode === 'loading' ? 'shuffle' : 'idle');
 
-  const pointsText = !match ? '' : match.mode === 'npc' ? match.prize > 0 ? `첫 승리 보상 ${match.prize}P` : '연습 판 (보상 없음)' : `판돈 ${match.stake}P`;
+  const pointsText = !match ? '' : match.mode === 'npc' ? match.prize > 0 ? `오늘 첫 승리 보상 ${match.prize}P` : '오늘 보상 받음 · 연습 판' : `판돈 ${match.stake}P`;
   const iWon = !!match && match.winnerId === match.me.id;
 
   return <GameOverlay label="천광명월 카드 가위바위보" onCancel={confirmLeave ? () => setConfirmLeave(false) : onClose}
