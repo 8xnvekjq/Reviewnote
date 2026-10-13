@@ -41,7 +41,7 @@ function chunk(t,d){const n=Buffer.from(t),l=Buffer.alloc(4),r=Buffer.alloc(4);l
 function png(c){const h=Buffer.alloc(13);h.writeUInt32BE(c.w);h.writeUInt32BE(c.h,4);h[8]=8;h[9]=6;const s=Buffer.alloc((c.w*4+1)*c.h);for(let y=0;y<c.h;y++)c.data.copy(s,y*(c.w*4+1)+1,y*c.w*4,(y+1)*c.w*4);return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',h),chunk('IDAT',deflateSync(s,{level:9})),chunk('IEND',Buffer.alloc(0))])}
 
 mkdirSync(out,{recursive:true}); mkdirSync(previewDir,{recursive:true});
-const cards=cv(96,64); for(let row=0;row<2;row++)for(let i=0;i<4;i++)card(cards,i*24,row*32,row?P.red:P.blue,i); save('cards.png',cards);
+const cards=cv(96,64); for(let row=0;row<2;row++)for(let i=0;i<4;i++)card(cards,i*24,row*32,row?P.red:P.blue,i); // cards.png는 scripts/art/card_rps_cards.py가 32x44 새 그림으로 만든다(여기서는 미리보기용만).
 
 const table=cv(320,200,P.deep); rect(table,4,4,312,192,P.ink); rect(table,7,7,306,186,P.wood); // 선술집 벽
 for(let y=8;y<83;y+=12){rect(table,8,y,304,1,P.deep);for(let x=(y%24?18:8);x<312;x+=42)rect(table,x,y,1,12,P.deep)}
@@ -78,7 +78,7 @@ for(const x of [6,15]){line(faces,x,5,x+3,8,P.ink);line(faces,x+3,5,x,8,P.ink)}p
 for(const x of [30,39]){line(faces,x,8,x+2,5,P.ink);line(faces,x+2,5,x+4,8,P.ink)}line(faces,34,10,38,10,P.ink);
 for(const x of [54,63])line(faces,x,7,x+3,7,P.ink);line(faces,58,10,62,10,P.ink);save('faces.png',faces);
 
-const bubble=cv(48,16);for(let f=0;f<3;f++){box(bubble,f*16+1,1,14,12,P.ink,P.white);px(bubble,f*16+7,13,P.ink);const tiny=cv(14,14);hand(tiny,1,1,f);blit(bubble,tiny,f*16+1,0)}save('duel-bubble.png',bubble);
+const bubble=cv(48,16);for(let f=0;f<3;f++){box(bubble,f*16+1,1,14,12,P.ink,P.white);px(bubble,f*16+7,13,P.ink);const tiny=cv(14,14);hand(tiny,1,1,f);blit(bubble,tiny,f*16+1,0)} // duel-bubble.png도 scripts/art/card_rps_cards.py가 만든다.
 
 // 치즈: 32x40, 4행(idle / win / lose / shuffle), 행마다 4프레임.
 const mouse=cv(128,160);

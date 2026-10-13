@@ -11,8 +11,8 @@ import rules1 from './rules-1.webp';
 import rules2 from './rules-2.webp';
 
 export const cardRpsAssets = { cards, table, glow, clash, faces, duelBubble, mouseDealer, cardTableProp, ruleSign, rules1, rules2 } as const;
-export const CARD_W = 24;
-export const CARD_H = 32;
+export const CARD_W = 32;
+export const CARD_H = 44;
 export const CARD_COLUMNS = 4;
 export const CARD_ROWS = { player: 0, opponent: 1 } as const;
 export const CARD_ORDER = ['rock', 'scissors', 'paper', 'back'] as const;
