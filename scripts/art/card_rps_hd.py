@@ -152,16 +152,24 @@ def build_cards() -> Image.Image:
     return sheet
 
 
+def solid_bbox(image: Image.Image) -> tuple[int, int, int, int]:
+    bbox = image.getchannel("A").point(lambda value: 255 if value > 128 else 0).getbbox()
+    if bbox is None:
+        raise ValueError("empty sprite cell")
+    return bbox
+
+
 def build_cheese() -> Image.Image:
     source = clean_alpha(Image.open(RAW / "cheese.png"))
-    raw_cells = split_cells(source, 5, 1)
+    source.putalpha(source.getchannel("A").point(lambda value: 0 if value < 48 else value))
+    sprites = [cell.crop(solid_bbox(cell)) for cell in split_cells(source, 5, 1)]
+    # One shared scale so Cheese keeps the same size in every pose.
+    scale = min(min(372 / sprite.width, 376 / sprite.height) for sprite in sprites)
     sheet = Image.new("RGBA", (1920, 384))
-    for index, raw_cell in enumerate(raw_cells):
-        sprite = raw_cell.crop(alpha_bbox(raw_cell))
-        scale = min(370 / sprite.width, 360 / sprite.height)
+    for index, sprite in enumerate(sprites):
         sprite = sprite.resize((round(sprite.width * scale), round(sprite.height * scale)), LANCZOS)
         frame = Image.new("RGBA", (384, 384))
-        # Straight lower cut sits on the frame bottom/table edge.
+        # Straight lower cut sits exactly on the frame bottom/table edge.
         frame.alpha_composite(sprite, ((384 - sprite.width) // 2, 384 - sprite.height))
         sheet.alpha_composite(frame, (index * 384, 0))
     sheet = clean_alpha(sheet)
