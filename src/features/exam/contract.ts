@@ -105,6 +105,8 @@ export interface ExamAttempt extends ExamPaperMetadata {
 }
 
 export interface ExamResultItem extends ExamAnswerMetadata {
+  /** 관리자 본인의 원래 응시에서만 서버가 제공한다. */
+  singleRedo?: { inProgress: boolean; latestSubmitted: { submittedAt: string; isCorrect: boolean } | null };
   questionId: string;
   number: number;
   section: 'common' | ExamElective;

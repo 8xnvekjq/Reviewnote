@@ -24,12 +24,23 @@ try {
       window.__redoId = attempt.id;
       return { ...attempt, attemptKind: 'single_redo', questions: attempt.questions.filter(q => q.id === questionId), items: [] };
     };
+    // 서버 요약 모의: 원래 응시 결과에 제출된 다시 풀기의 최신 정답/오답을 붙인다.
+    const getResult = c.getResult.bind(c);
+    c.getResult = async id => {
+      const result = await getResult(id);
+      if (!window.__redoId || id === window.__redoId) return result;
+      const redo = await getResult(window.__redoId).catch(() => null);
+      const item = redo?.items.find(i => i.answer);
+      return !item ? result : { ...result, items: result.items.map(i => i.questionId !== item.questionId ? i
+        : { ...i, singleRedo: { inProgress: false, latestSubmitted: { submittedAt: redo.submittedAt, isCorrect: item.isCorrect } } }) };
+    };
   });
   await page.locator('.exam-past-row').first().click();
   await page.getByTestId('exam-result').waitFor();
   const oldScore = await page.getByTestId('exam-score').innerText();
   await page.locator('.exam-item-row[data-number="1"]').click();
-  await page.getByRole('button', { name: '이 문제 다시 풀기', exact: true }).click();
+  // 버튼은 확대 화면 상단 바 안에 있다.
+  await page.locator('.exam-replay-bar').getByRole('button', { name: '이 문제 다시 풀기', exact: true }).click();
   await page.getByTestId('exam-solve').waitFor();
   assert.equal(await page.getByTestId('exam-solve').getAttribute('data-question'), '1');
   assert.equal(await page.getByRole('button', { name: '채점해 보기', exact: true }).count(), 0);
@@ -50,6 +61,12 @@ try {
   await page.getByTestId('exam-submit-confirm').click();
   await page.getByTestId('exam-result').waitFor();
   assert.equal(await page.getByTestId('exam-score').innerText(), oldScore);
+  // 돌아오자마자 문항 칸·확대 화면 표시가 갱신된다.
+  assert.match(await page.locator('.exam-item-row[data-number="1"]').getByTestId('exam-redo-chip').innerText(), /^다시 풂 · (정답|오답)$/);
+  assert.equal(await page.getByTestId('exam-redo-chip').count(), 1);
+  await page.locator('.exam-item-row[data-number="1"]').click();
+  assert.match(await page.getByTestId('exam-redo-notice').innerText(), /^다시 푼 풀이 있음 · (정답|오답) · /);
+  assert.equal(await page.getByTestId('exam-redo-question').innerText(), '한 번 더 다시 풀기');
   const evidence = await page.evaluate(async () => ({
     submit: window.__examLog.find(r => r.method === 'submitAttempt' && r.args[0] === window.__redoId),
     ink: await window.__examClient.getInk(window.__redoId),
