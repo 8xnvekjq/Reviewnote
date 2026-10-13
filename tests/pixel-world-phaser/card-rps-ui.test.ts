@@ -77,8 +77,8 @@ test('공개 박자표: 뒤집힌 줄 → 맞붙음마다 들어옴·뒤집기·
   const beats = roundTimeline(round);
   assert.deepEqual(beats.map(b => b.stage), ['facedown', ...round.clashes.flatMap(() => ['enter', 'flip', 'hit', 'exit']), 'banner']);
   const perClash = beats.filter(b => b.clash === 0 && b.stage !== 'facedown').reduce((sum, b) => sum + b.ms, 0);
-  assert.ok(perClash >= 900 && perClash <= 1300, `맞붙음 하나 ${perClash}ms`);
-  assert.ok(beats[0].ms >= 900, '뒤집힌 줄을 1초쯤 먼저 보여 준다');
+  assert.ok(perClash >= 900 && perClash <= 1600, `맞붙음 하나 ${perClash}ms`);
+  assert.ok(beats[0].ms >= 2000, '뒤집힌 줄을 2.5초쯤 먼저 보여 준다(긴장감)');
   const reduced = roundTimeline(round, true);
   assert.ok(reduced.reduce((s, b) => s + b.ms, 0) < beats.reduce((s, b) => s + b.ms, 0) / 2);
 

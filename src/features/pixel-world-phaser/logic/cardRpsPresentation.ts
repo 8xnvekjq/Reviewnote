@@ -62,13 +62,13 @@ export function revealSteps(round: RpsRoundResult): RevealStep[] {
 export const nextRevealIndex = (current: number, total: number) => Math.min(total, current + 1);
 
 /**
- * facedown: 양쪽 낸 카드가 뒤집힌 채 줄지어 놓임(몇 장 냈는지 보기).
+ * facedown: 양쪽 낸 카드가 뒤집힌 채 줄지어 놓임(몇 장 냈는지 보기). 긴장감을 위해 2.5초 머문다(선생님 요청).
  * 맞붙음마다 enter(가운데로) → flip(뒤집기) → hit(승패 표시) → exit(진 카드 퇴장). 마지막에 banner.
  */
 export type RevealStage = 'facedown' | 'enter' | 'flip' | 'hit' | 'exit' | 'banner';
 export interface RevealBeat { stage: RevealStage; clash: number; ms: number }
 
-const BEAT_MS: Record<RevealStage, number> = { facedown: 1000, enter: 200, flip: 420, hit: 380, exit: 240, banner: 1500 };
+const BEAT_MS: Record<RevealStage, number> = { facedown: 2500, enter: 450, flip: 420, hit: 380, exit: 240, banner: 1500 };
 
 /** 한 판 공개 순서. 맞붙음 하나는 약 1.2초, 동작 줄이기면 그 절반 이하. */
 export function roundTimeline(round: RpsRoundResult, reduced = false, short = false): RevealBeat[] {
