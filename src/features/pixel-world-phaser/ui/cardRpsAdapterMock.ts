@@ -16,7 +16,7 @@ export function createMockCardRpsAdapter(options: MockCardRpsOptions = {}): Mock
   const latency = options.latencyMs ?? 0;
   let serial = 0;
   let active: LocalMatch | null = null;
-  /** 가짜 사용자가 치즈를 한 번이라도 이겼는지 — 첫 승리만 보상. */
+  /** 가짜 사용자가 오늘 치즈를 이겼는지 — 하루 첫 승리만 보상(모의에서는 어댑터 하나가 하루). */
   let wonNpcOnce = false;
   const history: RpsMatchView[] = [];
   const matchHandlers = new Set<(match: RpsMatchView) => void>();
