@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { chromium } from 'playwright';
 const base = process.env.PWP_BASE ?? 'http://127.0.0.1:5174';
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, ...(process.env.EXAM_BROWSER_CHANNEL ? { channel: process.env.EXAM_BROWSER_CHANNEL } : {}) });
 try {
   await mkdir('.test-artifacts', { recursive: true });
   for (const width of [390, 820, 1180]) {

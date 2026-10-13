@@ -146,7 +146,7 @@ begin select * into m from public.pixel_card_rps_matches where id=p_id for updat
  if m.status='invited' and m.invite_expires_at<=now() then update public.pixel_card_rps_matches set status='expired',settled=true,a_delta=0,updated_at=now() where id=p_id; perform pixel_private.card_rps_adjust(p_id,m.player_a,m.stake,'invite_refund');
  elsif m.status in('choosing','shootout') and m.deadline_at<=now() then
   select exists(select 1 from pixel_private.card_rps_submissions where match_id=p_id and side='a' and turn=jsonb_array_length(m.state->'rounds')+1),exists(select 1 from pixel_private.card_rps_submissions where match_id=p_id and side='b' and turn=jsonb_array_length(m.state->'rounds')+1) into a_sub,b_sub;
-  perform pixel_private.card_rps_settle(p_id,case when a_sub and not b_sub then m.player_a::text when b_sub and not a_sub then coalesce(m.player_b::text,'npc_mouse') else case when random()<.5 then m.player_a::text else coalesce(m.player_b::text,'npc_mouse') end end,'timeout');
+  perform pixel_private.card_rps_settle(p_id,case when m.mode='npc' then 'npc_mouse' when a_sub and not b_sub then m.player_a::text when b_sub and not a_sub then coalesce(m.player_b::text,'npc_mouse') else case when random()<.5 then m.player_a::text else coalesce(m.player_b::text,'npc_mouse') end end,'timeout');
  end if; end $$;
 
 create or replace function public.invite_card_rps(p_opponent uuid,p_stake integer) returns jsonb language plpgsql security definer set search_path='' as $$
