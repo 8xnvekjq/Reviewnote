@@ -6,9 +6,9 @@ import { TILE, cellCenter } from './world';
 export const PLAZA_MARGIN = 5;
 export const PLAZA_EXIT: Point = { x: 13, y: 20 };
 // 카드 테이블(쥐 딜러 치즈)과 설명서 팻말: 광장 왼쪽 위 열린 잔디(큰 나무·토마토 단상 왼쪽 위).
-// 레이아웃 칸 기준이라 장면 칸은 +PLAZA_MARGIN → 테이블 (2..4, 3..4), 팻말 (6, 4). 앞줄(장면 y 5)에서 닿는다.
-export const RPS_TABLE = { x: -3, y: -2, w: 3, h: 2 } as const;
-export const RPS_RULE_SIGN = { x: 1, y: -1, w: 1, h: 1 } as const;
+// 레이아웃 칸 기준이라 장면 칸은 +PLAZA_MARGIN → 테이블 (7..9, 3..4), 팻말 (5, 4). 앞줄(장면 y 5)에서 닿는다.
+export const RPS_TABLE = { x: 2, y: -2, w: 3, h: 2 } as const;
+export const RPS_RULE_SIGN = { x: 0, y: -1, w: 1, h: 1 } as const;
 export const PLAZA_EXIT_CELLS: readonly Point[] = [-1, 0, 1].map(dx => ({ x: PLAZA_EXIT.x + dx, y: PLAZA_EXIT.y }));
 export const plazaBorderGap = (x: number, y: number) => y === 21 && PLAZA_EXIT_CELLS.some(c => c.x === x);
 export const plazaCell = (p: Point): Point => ({ x: p.x + PLAZA_MARGIN, y: p.y + PLAZA_MARGIN });
