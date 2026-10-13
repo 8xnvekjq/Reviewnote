@@ -83,22 +83,66 @@ def build_room() -> Image.Image:
     return room
 
 
+def opaque_runs(profile: list[int], min_len: int) -> list[tuple[int, int]]:
+    """Return [start, end) runs where the projection profile is non-zero."""
+    runs, start = [], None
+    for index, value in enumerate(profile + [0]):
+        if value and start is None:
+            start = index
+        elif not value and start is not None:
+            if index - start >= min_len:
+                runs.append((start, index))
+            start = None
+    return runs
+
+
+def find_cards(image: Image.Image) -> list[tuple[int, int, int, int]]:
+    """Locate the 8 cards by their solid alpha, ignoring faint generator haze."""
+    solid = image.getchannel("A").point(lambda value: 255 if value > 128 else 0)
+    width, height = solid.size
+    data = solid.load()
+    rows = opaque_runs([sum(1 for x in range(0, width, 2) if data[x, y]) for y in range(height)], 40)
+    boxes = []
+    for top, bottom in rows:
+        columns = opaque_runs(
+            [sum(1 for y in range(top, bottom, 2) if data[x, y]) for x in range(width)], 40
+        )
+        for left, right in columns:
+            boxes.append((left, top, right, bottom))
+    if len(boxes) != 8:
+        raise ValueError(f"expected 8 cards, found {len(boxes)}: {boxes}")
+    return boxes
+
+
+CARD_FRAME = (192, 256)
+# Every card is scaled to exactly this outline so faces and backs line up.
+CARD_SIZE = (180, 248)
+CARD_RADIUS = 12
+
+
 def build_cards() -> Image.Image:
     source = clean_alpha(Image.open(RAW / "cards.png"))
-    raw_cells = split_cells(source, 4, 2)
+    boxes = find_cards(source)
+    # Drop the faint haze around the cards before scaling.
+    source.putalpha(source.getchannel("A").point(lambda value: 0 if value < 48 else value))
     # Generated order is scissors, rock, paper, back; runtime order is required below.
     order = (1, 0, 2, 3, 5, 4, 6, 7)
-    cells = [fit_sprite(raw_cells[index], (192, 256), (5, 5)) for index in order]
-    # The generator kept gold around both backs; add the required owner-color
-    # outer frame while retaining its brown-and-gold back design.
+    offset = ((CARD_FRAME[0] - CARD_SIZE[0]) // 2, (CARD_FRAME[1] - CARD_SIZE[1]) // 2)
+    cells = []
+    for index in order:
+        card = source.crop(boxes[index]).resize(CARD_SIZE, LANCZOS)
+        cell = Image.new("RGBA", CARD_FRAME)
+        cell.alpha_composite(card, offset)
+        cells.append(cell)
+    # The generator kept gold around both backs; draw the owner colour as a
+    # ring hugging the back's own rounded border (just inside its dark outline).
     for index, color in ((3, (47, 133, 211, 255)), (7, (205, 47, 55, 255))):
-        bbox = alpha_bbox(cells[index])
-        inset = 1
-        ImageDraw.Draw(cells[index]).rounded_rectangle(
-            (bbox[0] + inset, bbox[1] + inset, bbox[2] - inset - 1, bbox[3] - inset - 1),
-            radius=8,
-            outline=color,
-            width=4,
+        x0, y0 = offset
+        x1, y1 = x0 + CARD_SIZE[0] - 1, y0 + CARD_SIZE[1] - 1
+        draw = ImageDraw.Draw(cells[index])
+        draw.rounded_rectangle((x0, y0, x1, y1), radius=CARD_RADIUS, outline=(43, 24, 16, 255), width=4)
+        draw.rounded_rectangle(
+            (x0 + 4, y0 + 4, x1 - 4, y1 - 4), radius=CARD_RADIUS - 4, outline=color, width=6
         )
     sheet = Image.new("RGBA", (768, 512))
     for index, cell in enumerate(cells):
