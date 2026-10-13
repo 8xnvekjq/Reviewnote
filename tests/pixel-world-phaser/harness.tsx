@@ -53,8 +53,8 @@ function Harness() {
     return adapter;
   }, []);
   // 잠자리: ?bugs=1 이면 모의 어댑터(잠자리채 보유). ?bugSeed= 로 어떤 잠자리가 걸릴지 정한다.
-  // ?duel: 광장 친구 대결용 presence 토큰(실제 어댑터의 registerPresenceToken 흉내). 없으면 GameShell 기본 목.
-  const cardRpsAdapter = useMemo(() => params.has('duel') ? Object.assign(createMockCardRpsAdapter(), { registerPresenceToken: async () => 'duel-' + crypto.randomUUID() }) : undefined, []);
+  // ?duel: 광장 친구 대결용 presence 토큰(실제 어댑터의 registerPresenceToken 흉내 — 서버처럼 UUID여야 presence 검사를 통과한다). 없으면 GameShell 기본 목.
+  const cardRpsAdapter = useMemo(() => params.has('duel') ? Object.assign(createMockCardRpsAdapter(), { registerPresenceToken: async () => crypto.randomUUID() }) : undefined, []);
   const bugAdapter = useMemo(() => params.has('bugs') ? createMockBugAdapter({ netOwned: true, seed: Number(params.get('bugSeed') ?? '42') }) : undefined, []);
   const [roomLayout, setRoomLayout] = useState<readonly Placement[]>(furniture);
   const [snapshot, setSnapshot] = useState<FarmSnapshot>({ serverNow: new Date(farmNow).toISOString(), today: '2026-10-08', harvestCount: 0, bestSize: null, lastHarvestSize: null,
