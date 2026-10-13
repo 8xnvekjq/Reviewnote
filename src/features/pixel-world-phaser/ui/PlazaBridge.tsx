@@ -19,11 +19,12 @@ import type { WorldGameHandle } from '../game/boot';
 import type { PlazaBubble } from '../game/plazaBubbles';
 import { Window } from './GamePanels';
 import { PlazaChat } from './PlazaChat';
+import { RPS_DUEL_EVENT, RPS_FRIEND_STAKES, type CardRpsAdapter, type RpsDuelPayload, type RpsFriendStake, type RpsInvite } from '../logic/cardRpsContract';
 export type PlazaPanel = 'contest' | 'well' | 'bench';
-export function PlazaBridge({ handle, appearance, pet, riding, face, tool, userId, panel, onClose, swingReporter }: {
+export function PlazaBridge({ handle, appearance, pet, riding, face, tool, userId, panel, onClose, swingReporter, rpsAdapter, onOpenRps }: {
   swingReporter: SwingRef<NetSwingReporter | null>;
   handle: RefObject<WorldGameHandle | null>; appearance: PublicAvatarAppearance; pet: PetId | null; riding: boolean; face?: string; /** 손에 든 도구 표시(친구 화면에 그린다). */ tool?: string;
-  userId: string; panel: string | null; onClose: () => void;
+  userId: string; panel: string | null; onClose: () => void; rpsAdapter: CardRpsAdapter; onOpenRps(): void;
 }) {
   const [sessionId] = useState(() => crypto.randomUUID());
   const [initial] = useState(() => {
@@ -31,14 +32,26 @@ export function PlazaBridge({ handle, appearance, pet, riding, face, tool, userI
     return { ...continuousPayload(d ?? { x: 216, y: 248 }), direction: d?.facing ?? 'Back' as const, moving: d?.moving ?? false, pet, face, riding: d?.riding ?? false };
   });
   const roster = useRef(new Set<string>());
+  const [challenge, setChallenge] = useState<string | null>(null);
+  const [invite, setInvite] = useState<RpsInvite | null>(null);
+  const [duels, setDuels] = useState<Record<string, number>>({});
   const events = useMemo(() => ({ [NET_SWING_EVENT]: (raw: unknown) => {
     const payload = parseNetSwing(raw);
     if (payload && payload.sessionId !== sessionId && roster.current.has(payload.sessionId)) dragonfliesFor('plaza')?.peerSwing(payload);
+  }, [RPS_DUEL_EVENT]: (raw: unknown) => {
+    const payload = raw as Partial<RpsDuelPayload>;
+    if (!Array.isArray(payload.sessionIds) || typeof payload.active !== 'boolean') return;
+    setDuels(current => {
+      const next = { ...current };
+      for (const id of payload.sessionIds!) payload.active ? next[id] = Date.now() : delete next[id];
+      return next;
+    });
   } }), [sessionId]);
   const realtime = usePlazaRealtime(sessionId, appearance, initial, { events });
   roster.current = new Set(realtime.players.map(p => p.sessionId));
   const { updateMyState } = realtime;
   const swingSend = useRef(realtime.sendEvent); swingSend.current = realtime.sendEvent;
+  useEffect(() => rpsAdapter.subscribe({ onInvite: setInvite }), [rpsAdapter]);
   useEffect(() => {
     swingReporter.current = direction => { void swingSend.current(NET_SWING_EVENT, { sessionId, direction, at: Date.now() }); };
     return () => { swingReporter.current = null; };
@@ -83,8 +96,9 @@ export function PlazaBridge({ handle, appearance, pet, riding, face, tool, userI
     };
     for (const [id, r] of realtime.reactions) offer(id, REACTIONS[r.kind].label, r.expires - REACTION_MS);
     for (const [id, c] of realtime.chats) offer(id, c.text, c.receivedAt);
+    for (const [id, stamp] of Object.entries(duels)) offer(id, '✊ ✌️ ✋', stamp);
     return out;
-  }, [realtime.reactions, realtime.chats]);
+  }, [realtime.reactions, realtime.chats, duels]);
   useEffect(() => {
     handle.current?.setClassmates(smoothed, bubbles, sessionId);
   }, [handle, smoothed, bubbles, sessionId]);
@@ -113,6 +127,17 @@ export function PlazaBridge({ handle, appearance, pet, riding, face, tool, userI
           void realtime.sendReaction(kind).then(sent => setMessage(sent ? REACTIONS[kind].label : '반응을 보내지 못했어요. 잠시 후 다시 해 주세요.'));
         }}>{REACTIONS[kind].emoji}</button>)}</>} />
     </div>
+    {smoothed.length > 0 && <div className="pwp-rps-friends" role="group" aria-label="친구 카드 대결">
+      {smoothed.map(player => <button type="button" className="pwp-chip" key={player.sessionId} disabled={!!panel} onClick={() => setChallenge(player.sessionId)}>{player.face ?? '🙂'} 카드 대결</button>)}
+    </div>}
+    {challenge && <Window title="카드 대결 신청" onClose={() => setChallenge(null)} compact small><div className="pwp-panel-content"><p>판돈을 골라 친구에게 신청해요.</p>{RPS_FRIEND_STAKES.map(stake => <button type="button" key={stake} onClick={() => {
+      const opponent = challenge; setChallenge(null);
+      void rpsAdapter.invite(opponent, stake as RpsFriendStake).then(match => {
+        void realtime.sendEvent(RPS_DUEL_EVENT, { matchId: match.matchId, sessionIds: [sessionId, opponent], active: true, at: Date.now() } satisfies RpsDuelPayload);
+        onOpenRps();
+      });
+    }}>{stake}P</button>)}</div></Window>}
+    {invite && <Window title="카드 대결 신청" onClose={() => setInvite(null)} compact small><div className="pwp-panel-content"><p>친구가 {invite.stake}P 카드 대결을 신청했어요. 30초 안에 골라 주세요.</p><button type="button" onClick={() => { const current = invite; setInvite(null); void rpsAdapter.respond(current.matchId, true).then(onOpenRps); }}>수락</button><button type="button" onClick={() => { const current = invite; setInvite(null); void rpsAdapter.respond(current.matchId, false); }}>거절</button></div></Window>}
     {(panel === 'contest' || panel === 'well' || panel === 'bench') && <Window title={title} onClose={onClose} compact small>
       <div className="pwp-panel-content">
         {panel === 'well' ? <p role="status">{dailyWellMessage(plazaDay(now))}</p> : panel === 'bench' ? <p>잠깐 앉아 쉬어 가요. 천천히 가도 괜찮아요.</p>
