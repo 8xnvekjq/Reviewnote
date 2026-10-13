@@ -1,0 +1,366 @@
+{
+  "_comment": "카드 가위바위보 공용 사례. 클라이언트(cardRps.ts)와 서버(SQL) 테스트가 모두 통과해야 한다. clashes는 [a, b, result].",
+  "rounds": [
+    {
+      "name": "설명서 2쪽 예시: B 바위가 가위 둘을 이기고, A 보가 바위를 이기고, B 가위가 보를 이겨 A 소진",
+      "a": [
+        "scissors",
+        "scissors",
+        "paper"
+      ],
+      "b": [
+        "rock",
+        "scissors",
+        "paper"
+      ],
+      "winner": "b",
+      "clashes": [
+        [
+          "scissors",
+          "rock",
+          "b"
+        ],
+        [
+          "scissors",
+          "rock",
+          "b"
+        ],
+        [
+          "paper",
+          "rock",
+          "a"
+        ],
+        [
+          "paper",
+          "scissors",
+          "b"
+        ]
+      ]
+    },
+    {
+      "name": "같은 카드는 둘 다 빠지고 다음 카드 비교",
+      "a": [
+        "rock",
+        "paper"
+      ],
+      "b": [
+        "rock",
+        "rock"
+      ],
+      "winner": "a",
+      "clashes": [
+        [
+          "rock",
+          "rock",
+          "draw"
+        ],
+        [
+          "paper",
+          "rock",
+          "a"
+        ]
+      ]
+    },
+    {
+      "name": "동시에 다 떨어지면 무승부",
+      "a": [
+        "rock",
+        "paper"
+      ],
+      "b": [
+        "rock",
+        "paper"
+      ],
+      "winner": "draw",
+      "clashes": [
+        [
+          "rock",
+          "rock",
+          "draw"
+        ],
+        [
+          "paper",
+          "paper",
+          "draw"
+        ]
+      ]
+    },
+    {
+      "name": "한 장이 여러 장을 이김",
+      "a": [
+        "paper"
+      ],
+      "b": [
+        "rock",
+        "rock",
+        "rock"
+      ],
+      "winner": "a",
+      "clashes": [
+        [
+          "paper",
+          "rock",
+          "a"
+        ],
+        [
+          "paper",
+          "rock",
+          "a"
+        ],
+        [
+          "paper",
+          "rock",
+          "a"
+        ]
+      ]
+    },
+    {
+      "name": "많이 낸 쪽이 남아서 이김",
+      "a": [
+        "rock"
+      ],
+      "b": [
+        "rock",
+        "scissors"
+      ],
+      "winner": "b",
+      "clashes": [
+        [
+          "rock",
+          "rock",
+          "draw"
+        ]
+      ]
+    },
+    {
+      "name": "빈 손은 짐",
+      "a": [],
+      "b": [
+        "scissors"
+      ],
+      "winner": "b",
+      "clashes": []
+    },
+    {
+      "name": "둘 다 빈 손이면 무승부",
+      "a": [],
+      "b": [],
+      "winner": "draw",
+      "clashes": []
+    }
+  ],
+  "matches": [
+    {
+      "name": "2연승으로 끝",
+      "rounds": [
+        [
+          [
+            "paper"
+          ],
+          [
+            "rock"
+          ]
+        ],
+        [
+          [
+            "rock"
+          ],
+          [
+            "scissors"
+          ]
+        ]
+      ],
+      "shootout": [],
+      "winner": "a",
+      "phase": "finished",
+      "wins": {
+        "a": 2,
+        "b": 0
+      }
+    },
+    {
+      "name": "1승 1패 1무 → 승부차기, 비기고 다시 해서 B 승",
+      "rounds": [
+        [
+          [
+            "paper"
+          ],
+          [
+            "rock"
+          ]
+        ],
+        [
+          [
+            "rock"
+          ],
+          [
+            "paper"
+          ]
+        ],
+        [
+          [
+            "scissors"
+          ],
+          [
+            "scissors"
+          ]
+        ]
+      ],
+      "shootout": [
+        [
+          "rock",
+          "rock"
+        ],
+        [
+          "scissors",
+          "rock"
+        ]
+      ],
+      "winner": "b",
+      "phase": "finished",
+      "wins": {
+        "a": 1,
+        "b": 1
+      }
+    },
+    {
+      "name": "1승 2무면 승수 많은 쪽 승리",
+      "rounds": [
+        [
+          [
+            "paper"
+          ],
+          [
+            "rock"
+          ]
+        ],
+        [
+          [
+            "rock"
+          ],
+          [
+            "rock"
+          ]
+        ],
+        [
+          [
+            "scissors"
+          ],
+          [
+            "scissors"
+          ]
+        ]
+      ],
+      "shootout": [],
+      "winner": "a",
+      "phase": "finished",
+      "wins": {
+        "a": 1,
+        "b": 0
+      }
+    },
+    {
+      "name": "첫 판에 둘 다 9장을 같은 순서로 내서 동시에 소진 → 바로 승부차기",
+      "rounds": [
+        [
+          [
+            "rock",
+            "rock",
+            "rock",
+            "scissors",
+            "scissors",
+            "scissors",
+            "paper",
+            "paper",
+            "paper"
+          ],
+          [
+            "rock",
+            "rock",
+            "rock",
+            "scissors",
+            "scissors",
+            "scissors",
+            "paper",
+            "paper",
+            "paper"
+          ]
+        ]
+      ],
+      "shootout": [],
+      "winner": null,
+      "phase": "shootout",
+      "wins": {
+        "a": 0,
+        "b": 0
+      }
+    },
+    {
+      "name": "첫 판에 9장을 다 쓴 쪽은 그 판을 이겨도 남은 판을 빈 손으로 져서 짐",
+      "rounds": [
+        [
+          [
+            "rock",
+            "rock",
+            "rock",
+            "scissors",
+            "scissors",
+            "scissors",
+            "paper",
+            "paper",
+            "paper"
+          ],
+          [
+            "paper",
+            "paper",
+            "paper",
+            "rock"
+          ]
+        ],
+        [
+          [],
+          [
+            "rock"
+          ]
+        ],
+        [
+          [],
+          [
+            "scissors"
+          ]
+        ]
+      ],
+      "shootout": [],
+      "winner": "b",
+      "phase": "finished",
+      "wins": {
+        "a": 1,
+        "b": 2
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "name": "가진 것보다 많이 냄",
+      "cards": [
+        "rock",
+        "rock",
+        "rock",
+        "rock"
+      ],
+      "reason": "not_owned"
+    },
+    {
+      "name": "카드가 남았는데 빈 손",
+      "cards": [],
+      "reason": "empty"
+    },
+    {
+      "name": "없는 카드",
+      "cards": [
+        "lizard"
+      ],
+      "reason": "bad_card"
+    }
+  ]
+}
