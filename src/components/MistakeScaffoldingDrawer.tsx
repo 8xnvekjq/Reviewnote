@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useScaffoldingRefresh } from '../features/mistakes/useScaffoldingRefresh';
+import React, { useState, useEffect, useEffectEvent, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../services/supabase';
 
@@ -49,7 +50,9 @@ export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> =
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // 스캐폴딩 힌트 사진 내역 로드
+  const fetchRequestRef = useRef(0);
   const fetchScaffoldings = async () => {
+    const request = ++fetchRequestRef.current;
     if (!mistakeId) return;
     try {
       setLoading(true);
@@ -60,17 +63,24 @@ export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> =
         .order('created_at', { ascending: true });
 
       if (error) throw error;
+      if (request !== fetchRequestRef.current) return;
       setScaffoldings(data || []);
+      setZoomImageUrl(prev => prev && !(data || []).some(row => row.image_url === prev) ? null : prev);
     } catch (err) {
       console.error('Failed to load scaffoldings:', err);
     } finally {
-      setLoading(false);
+      if (request === fetchRequestRef.current) setLoading(false);
     }
   };
 
+  const loadLatestScaffoldings = useEffectEvent(() => { void fetchScaffoldings(); });
   useEffect(() => {
-    fetchScaffoldings();
+    const requestRef = fetchRequestRef;
+    loadLatestScaffoldings();
+    return () => { requestRef.current++; };
   }, [mistakeId, refreshSignal]);
+
+  useScaffoldingRefresh(fetchScaffoldings, mistakeId);
 
   // 펼쳤을 때 스크롤 위치 조절
   const handleToggleExpand = () => {

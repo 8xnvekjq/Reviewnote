@@ -1,3 +1,4 @@
+import { useScaffoldingRefresh } from './useScaffoldingRefresh';
 import { useRef } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { MistakeEntry } from '../../types';
@@ -76,9 +77,10 @@ export function useMistakes({
       if (error) throw error;
       setMistakes((dbMistakes || []).map(mapDbMistakeRow));
 
-      const { data: scaffoldingRows } = await supabase
+      const { data: scaffoldingRows, error: scaffoldingError } = await supabase
         .from('mistake_scaffoldings')
         .select('mistake_id');
+      if (scaffoldingError) throw scaffoldingError;
       setScaffoldedMistakeIds(new Set((scaffoldingRows || []).map((r: any) => r.mistake_id)));
     } catch (err) {
       console.error('Error refreshing mistakes:', err);
@@ -90,6 +92,8 @@ export function useMistakes({
       }
     }
   };
+
+  useScaffoldingRefresh(refreshMistakesLight, undefined, false);
 
   // Delete mistake from Supabase & local state
   const handleDeleteMistake = async (id: string, e: React.MouseEvent) => {
