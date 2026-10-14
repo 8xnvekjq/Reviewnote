@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { LectureDeckSection } from "./LectureDeckSection";
 
 export type GradeLevel = '예비고1' | '고1' | '고2' | '고3';
 
@@ -12,9 +13,11 @@ interface SlideItem {
 interface SlideListModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** 관리자에게만 교재 스캔 슬라이드(비공개 저장소) 목록과 올리기를 보인다. */
+  isAdmin?: boolean;
 }
 
-export const SlideListModal: React.FC<SlideListModalProps> = ({ isOpen, onClose }) => {
+export const SlideListModal: React.FC<SlideListModalProps> = ({ isOpen, onClose, isAdmin = false }) => {
   if (!isOpen) return null;
 
   // ── 학년별 수업 슬라이드 마스터 리스트 ──────────────────────────────────────
@@ -185,6 +188,7 @@ export const SlideListModal: React.FC<SlideListModalProps> = ({ isOpen, onClose 
 
         {/* Body: 학년별 그룹 및 상위 3개 제한 + 더 보기 */}
         <div className="p-4 overflow-y-auto space-y-5 flex-1 min-h-0 scrollbar-thin scrollbar-thumb-slate-800">
+          {isAdmin && <LectureDeckSection grade={selectedGradeTab} />}
           {groupedByGrade
             .filter(g => selectedGradeTab === 'ALL' || selectedGradeTab === g.grade)
             .map(group => {

@@ -184,6 +184,7 @@ export function OverlayHost({
       <SlideListModal
         isOpen={isSlideListOpen}
         onClose={onCloseSlideList}
+        isAdmin={isAdmin}
       />
 
       {/* 인쇄 전용 2열 세로 구분선 레이아웃 (@media print 시에만 노출) */}
