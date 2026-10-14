@@ -18,6 +18,10 @@ interface LectureDeckViewerProps {
   onRecorded?: () => void;
   /** 저장된 녹음 재생. 이때는 필기·녹음 도구 대신 재생 막대가 나온다. */
   replay?: LoadedRecording;
+  /** 처음 보여 줄 슬라이드(이어서 보기). */
+  initialIndex?: number;
+  /** 넘긴 슬라이드 위치를 알려 준다(재생 중에는 부르지 않는다). */
+  onIndexChange?: (index: number) => void;
 }
 
 const EMPTY: InkStroke[] = [];
@@ -40,8 +44,11 @@ function useElementSize(ref: React.RefObject<HTMLElement | null>) {
 
 // 교재 슬라이드 전체 화면 보기. 가로 태블릿(갤럭시 탭 + S펜) 우선.
 // 슬라이드 영역은 1920×1080 좌표계를 그대로 확대/축소하고, 슬라이드마다 필기 레이어를 같은 상자에 겹친다.
-export const LectureDeckViewer: React.FC<LectureDeckViewerProps> = ({ deck, urls, onClose, recordingBackend, onRecorded, replay }) => {
-  const [manualIndex, setIndex] = useState(0);
+export const LectureDeckViewer: React.FC<LectureDeckViewerProps> = ({ deck, urls, onClose, recordingBackend, onRecorded, replay, initialIndex = 0, onIndexChange }) => {
+  const [manualIndex, setIndex] = useState(() => Math.max(0, Math.min(deck.slides.length - 1, initialIndex)));
+  const onIndexChangeRef = useRef(onIndexChange);
+  useEffect(() => { onIndexChangeRef.current = onIndexChange; }, [onIndexChange]);
+  useEffect(() => { if (!replay) onIndexChangeRef.current?.(manualIndex); }, [manualIndex, replay]);
   const [tocOpen, setTocOpen] = useState(false);
   const [loaded, setLoaded] = useState<Record<number, boolean>>({});
   const total = deck.slides.length;

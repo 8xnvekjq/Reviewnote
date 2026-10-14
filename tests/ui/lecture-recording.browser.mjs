@@ -101,7 +101,8 @@ try {
       Object.defineProperty(document, 'hidden', { configurable: true, get: () => (window.__vis ?? 'visible') === 'hidden' });
     });
     await page.reload();
-    await page.getByText(deck.title).waitFor();
+    await page.getByRole('button', { name: /^📘 고1 · / }).click();
+    await page.getByText('01 명제').waitFor();
 
     const viewer = page.getByRole('dialog');
     const counter = page.getByTestId('slide-counter');
@@ -124,7 +125,7 @@ try {
     }, { points, pointerType });
     const line = (x0, y0, x1, y1, n = 12) => Array.from({ length: n }, (_, i) => [x0 + (x1 - x0) * i / (n - 1), y0 + (y1 - y0) * i / (n - 1)]);
 
-    await page.getByRole('button', { name: '열기 ▶' }).click();
+    await page.getByRole('button', { name: '01 명제 열기' }).click();
     await viewer.waitFor();
     await page.waitForFunction(() => document.querySelector('[data-testid=slide-ink] .exam-ink')?.dataset.ready === 'true');
     // 펜 도구 막대는 보기 화면의 펜 자리에 있다.
@@ -223,7 +224,7 @@ try {
     assert.equal(entries.filter(e => e.type === 'ink' && e.event.kind === 'draw').length, 2, '멈춘 동안의 획은 따로 기록하지 않는다');
 
     // 3) 닫고 → 녹음 목록 → 다시 열어 재생
-    await page.getByRole('button', { name: '닫기' }).click();
+    await page.getByRole('button', { name: '닫기', exact: true }).click();
     await viewer.waitFor({ state: 'detached' });
     const list = page.getByTestId('lecture-recordings');
     await list.getByRole('button', { name: /녹음 재생$/ }).waitFor();

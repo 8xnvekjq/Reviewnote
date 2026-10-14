@@ -31,7 +31,12 @@ try {
           const id = url.searchParams.get('id').slice(3);
           decks.splice(decks.findIndex(d => d.id === id), 1); return route.fulfill({ status: 204, body: '' });
         }
+        if (req.method() === 'PATCH') {
+          const id = url.searchParams.get('id').slice(3);
+          Object.assign(decks.find(d => d.id === id), req.postDataJSON()); return route.fulfill({ status: 204, body: '' });
+        }
       }
+      if (url.pathname.endsWith('/rest/v1/lecture_recordings')) return route.fulfill({ json: [] });
       if (url.pathname.endsWith('/storage/v1/object/sign/lecture-slides')) {
         const { paths } = req.postDataJSON();
         return route.fulfill({ json: paths.map(path => ({ path, signedURL: `/object/sign/lecture-slides/${path}?token=t`, error: null })) });
@@ -66,9 +71,12 @@ try {
     const errors = []; page.on('pageerror', error => errors.push(error.message));
     page.on('dialog', dialog => dialog.accept());
     await page.goto(base + '/tests/ui/lecture-deck.html');
-    await page.getByText('아직 올린 교재 슬라이드가 없습니다.').waitFor();
-    // 기존 HTML 수업자료는 그대로 보인다.
+    // 기존 HTML 수업자료는 '특강 · 정리 자료'로 그대로 보인다.
     await page.getByText('개념원리 공통수학2 - Ⅱ. 집합의 연산 (p138~160)').waitFor();
+    // 올리기·삭제는 ⚙ 관리 안에 있다.
+    assert.equal(await page.getByRole('button', { name: '＋ 교재 슬라이드 올리기' }).count(), 0);
+    await page.getByRole('button', { name: '⚙ 관리' }).click();
+    await page.getByText('아직 올린 교재 슬라이드가 없습니다.').waitFor();
 
     // 교재 스캔처럼 글자가 많은 1920×1080 슬라이드를 만든다.
     const toc = { book: '개념원리 공통수학2', chapter: 'Ⅱ-3 명제', slides: [
@@ -113,7 +121,8 @@ try {
     await page.getByTestId('lecture-files-input').setInputFiles(files);
     await page.getByRole('radio', { name: '고2', exact: true }).click();
     await page.getByRole('button', { name: '슬라이드 5장 올리기' }).click();
-    await page.getByText('개념원리 공통수학2 - Ⅱ-3 명제 (p166~179)').waitFor();
+    const unitName = '01 명제와 조건 · 02 명제의 역과 대우';
+    await page.getByText(unitName).waitFor();
     assert.equal(decks.length, 1);
     const deck = decks[0];
     assert.equal(deck.grade, '고2');
@@ -123,14 +132,25 @@ try {
     const stored = [...objects.values()].reduce((sum, o) => sum + o.body.length, 0);
     sizes = { original, stored, type: [...objects.values()][0].type };
     assert.ok(stored <= original);
-    await page.locator('span', { hasText: /^교재$/ }).first().waitFor();
+    // 관리에서는 학년을 바꿀 수 있고, 열기 대신 삭제가 보인다.
+    assert.equal(await page.getByLabel(`${unitName} 학년`).inputValue(), '고2');
+    await page.getByText('교재 166–179쪽').waitFor();
+    await page.getByRole('button', { name: '⚙ 관리' }).click();
 
-    // 다른 학년 탭에서는 숨는다.
-    await page.getByRole('button', { name: /^📘 고1 \(/ }).click();
-    assert.equal(await page.getByText('Ⅱ-3 명제 (p166~179)').count(), 0);
-    await page.getByRole('button', { name: /전체보기/ }).click();
+    // 전체 탭: 학년 제목 아래 교재 카드(접힘) → 펼치면 단원
+    const book = page.getByTestId('lecture-book');
+    await page.locator('[data-grade=고2]').getByText('교재 슬라이드').waitFor();
+    assert.match(await book.innerText(), /개념원리 공통수학2[\s\S]*수업 1개 · 슬라이드 5장/);
+    await page.getByText(unitName).waitFor({ state: "detached" });
+    await book.getByRole('button', { name: /개념원리 공통수학2/ }).click();
+    await page.getByText(unitName).waitFor();
+    // 다른 학년 탭에서는 숨고, 그 학년 탭에서는 펼쳐져 있다.
+    await page.getByRole('button', { name: /^📘 고1 · / }).click();
+    await book.waitFor({ state: "detached" });
+    await page.getByRole('button', { name: /^📗 고2 · / }).click();
+    await page.getByText(unitName).waitFor();
 
-    await page.getByRole('button', { name: '열기 ▶' }).first().click();
+    await page.getByRole('button', { name: `${unitName} 열기` }).click();
     const viewer = page.getByRole('dialog');
     await viewer.waitFor();
     const counter = page.getByTestId('slide-counter');
@@ -188,6 +208,28 @@ try {
     await page.keyboard.press('Escape'); await nav.waitFor({ state: 'detached' });
     await page.keyboard.press('Escape'); await viewer.waitFor({ state: 'detached' });
 
+    // 이어서 보기: 마지막으로 본 3번째 장부터 다시 연다.
+    const resume = page.getByTestId('lecture-resume');
+    assert.match(await resume.innerText(), /01 명제와 조건[\s\S]*3 \/ 5장/);
+    await resume.getByRole('button').first().click();
+    await checkSlide(3);
+    await page.keyboard.press('Escape'); await viewer.waitFor({ state: 'detached' });
+
+    // 검색: 쪽수·단원 이름
+    const search = page.getByRole('searchbox', { name: '수업자료 검색' }).first();
+    await search.fill('176');
+    await page.getByText(unitName).waitFor();
+    await search.fill('없는단원');
+    await page.getByText("'없는단원'에 맞는 자료가 없습니다.").waitFor();
+    await search.fill('');
+
+    // 관리에서 학년을 바꾸면 그 학년으로 옮겨 간다.
+    await page.getByRole('button', { name: /^🌟 전체/ }).click();
+    await page.getByRole('button', { name: '⚙ 관리' }).click();
+    await page.getByLabel(`${unitName} 학년`).selectOption('고1');
+    await page.waitForFunction(() => document.querySelector('[data-grade=고1] [data-testid=lecture-book]'));
+    assert.equal(decks[0].grade, '고1');
+
     // 삭제하면 행과 파일이 함께 사라진다.
     await page.getByRole('button', { name: /Ⅱ-3 명제 \(p166~179\) 삭제/ }).click();
     await page.getByText('아직 올린 교재 슬라이드가 없습니다.').waitFor();
@@ -205,7 +247,9 @@ try {
     const page = await phone.newPage();
     const errors = []; page.on('pageerror', error => errors.push(error.message));
     await page.goto(base + '/tests/ui/lecture-deck.html');
-    await page.getByRole('button', { name: '열기 ▶' }).first().click();
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth) <= 390, '목록도 가로 스크롤 없음');
+    await page.getByTestId('lecture-book').getByRole('button', { name: /개념원리 공통수학2/ }).click();
+    await page.getByRole('button', { name: /^01 명제와 조건 .* 열기$/ }).click();
     await page.waitForFunction(() => document.querySelector('[data-testid=slide-counter]')?.textContent === '1 / 5');
     const box = await page.getByTestId('slide-stage').boundingBox();
     assert.ok(Math.abs(box.width / box.height - 16 / 9) < 0.01);
@@ -225,9 +269,10 @@ try {
     await page.goto(base + '/tests/ui/lecture-deck.html?admin=0');
     await page.getByText('개념원리 공통수학2 - Ⅱ. 집합의 연산 (p138~160)').waitFor();
     assert.equal(await page.getByTestId('lecture-deck-section').count(), 0);
+    assert.equal(await page.getByRole('button', { name: '⚙ 관리' }).count(), 0);
     assert.equal(requests.filter(r => r.includes('lecture')).length, 0);
   } finally { await phone.close(); }
-  console.log(`PASS: upload (5 slides, PNG ${sizes.original} B → ${sizes.type} ${sizes.stored} B), list/grade tab, viewer 16:9 fit, keys/buttons/swipe (pen ignored), prefetch, 목차 jump, delete; phone 390×844; non-admin hidden`);
+  console.log(`PASS: upload (5 slides, PNG ${sizes.original} B → ${sizes.type} ${sizes.stored} B), 관리(학년 변경·삭제), 교재 카드·학년 탭, 이어서 보기, 검색, viewer 16:9 fit, keys/buttons/swipe (pen ignored), prefetch, 목차 jump, delete; phone 390×844; non-admin hidden`);
 } finally {
   if (browser) await browser.close();
   if (vite.exitCode === null) { const stopped = new Promise(resolve => vite.once('exit', resolve)); vite.kill(); await stopped; }

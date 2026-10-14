@@ -47,6 +47,15 @@ export async function listLectureRecordings(client: SupabaseClient, deckId: stri
   return (data ?? []) as LectureRecordingRow[];
 }
 
+/** 덱별 녹음 개수(목록 표시용, 행의 deck_id만 읽는다). */
+export async function countLectureRecordings(client: SupabaseClient): Promise<Record<string, number>> {
+  const { data, error } = await client.from('lecture_recordings').select('deck_id');
+  if (error) throw error;
+  const counts: Record<string, number> = {};
+  for (const row of (data ?? []) as { deck_id: string }[]) counts[row.deck_id] = (counts[row.deck_id] ?? 0) + 1;
+  return counts;
+}
+
 /** 녹음 폴더의 파일을 모두 지운 뒤 행을 지운다(manifest에 아직 안 적힌 조각까지). */
 export async function deleteLectureRecording(client: SupabaseClient, id: string): Promise<void> {
   const bucket = client.storage.from(RECORDING_BUCKET);
