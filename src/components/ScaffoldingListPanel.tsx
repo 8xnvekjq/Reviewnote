@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { useScaffoldingRefresh } from '../features/mistakes/useScaffoldingRefresh';
+import React, { useState, useRef, useEffect, useEffectEvent } from 'react';
 import { supabase } from '../services/supabase';
 import type { MistakeEntry } from '../types';
 
@@ -30,7 +31,9 @@ export const ScaffoldingListPanel: React.FC<ScaffoldingListPanelProps> = ({
   const [threads, setThreads] = useState<ScaffoldingThread[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const fetchRequestRef = useRef(0);
   const loadScaffoldings = async () => {
+    const request = ++fetchRequestRef.current;
     if (!currentUserId) return;
     try {
       setLoading(true);
@@ -49,7 +52,7 @@ export const ScaffoldingListPanel: React.FC<ScaffoldingListPanelProps> = ({
       if (sErr) throw sErr;
 
       if (!rows || rows.length === 0) {
-        setThreads([]);
+        if (request === fetchRequestRef.current) setThreads([]);
         return;
       }
 
@@ -126,17 +129,22 @@ export const ScaffoldingListPanel: React.FC<ScaffoldingListPanelProps> = ({
 
       // 📍 최근 스캐폴딩 힌트가 첨부된 순서(최신순)로 정렬하여 맨 위에 표출
       list.sort((a, b) => new Date(b.latestTimestamp).getTime() - new Date(a.latestTimestamp).getTime());
-      setThreads(list);
+      if (request === fetchRequestRef.current) setThreads(list);
     } catch (err) {
       console.error('Failed to load scaffolding list:', err);
     } finally {
-      setLoading(false);
+      if (request === fetchRequestRef.current) setLoading(false);
     }
   };
 
+  const loadLatestScaffoldings = useEffectEvent(() => { void loadScaffoldings(); });
   useEffect(() => {
-    loadScaffoldings();
+    const requestRef = fetchRequestRef;
+    loadLatestScaffoldings();
+    return () => { requestRef.current++; };
   }, [currentUserId, isAdmin]);
+
+  useScaffoldingRefresh(loadScaffoldings);
 
   const formatRelativeTime = (isoString: string) => {
     try {

@@ -3,6 +3,7 @@ import type { MistakeAnalysis, MistakeEntry, ReviewState } from '../../types';
 import type { NoticeModalState } from '../../components/CustomNoticeModal';
 import { supabase } from '../../services/supabase';
 import { recordReviewStreak, getNewlyReachedMilestones, getKSTDateString, type StreakState } from '../../utils/streak';
+import { notifyScaffoldingCleanup } from './useScaffoldingRefresh';
 import { checkShardGain } from '../../utils/knowledgeShardFeed';
 
 interface UseReviewStateParams {
@@ -273,6 +274,11 @@ export function useReviewState({
 
       setMistakes(prev => prev.map(m => m.id === id ? updatedEntry : m));
       setSelectedEntry(prev => prev && prev.id === id ? updatedEntry : prev);
+
+      // 서버 정리가 끝난 뒤 이미지 목록과 배지를 다시 조회한다.
+      if (newReviews.filter(r => r === 'O').length === 3 && oldReviews.filter(r => r === 'O').length !== 3) {
+        notifyScaffoldingCleanup(id);
+      }
 
       // 🧭 정리하기(초기화)였다면 방금 지운 체크리스트를 즉시 재생성 트리거 + 진행 상태 표시.
       if (skipPointRecalc) {

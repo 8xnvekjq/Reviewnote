@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useEffectEvent, useMemo } from 'react';
+import { useScaffoldingRefresh } from '../features/mistakes/useScaffoldingRefresh';
 import { supabase } from '../services/supabase';
 import type { MistakeEntry } from '../types';
 import { MATH_CURRICULUM, resolveNeedsHelp } from '../types';
@@ -60,7 +61,9 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
   const [hintSaveNotice, setHintSaveNotice] = useState<string | null>(null);
 
   // ── 1. 전체 학생 오답 데이터 Supabase 로드 ──────────────────────────
+  const fetchRequestRef = useRef(0);
   const fetchAllMistakes = async () => {
+    const request = ++fetchRequestRef.current;
     if (!isAdmin) return;
     setLoading(true);
     try {
@@ -73,7 +76,6 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
       (profData || []).forEach((p: ProfileInfo) => {
         profMap[p.id] = p;
       });
-      setProfiles(profData || []);
 
       // 2. 전체 오답 노트 조회
       const { data: mData, error } = await supabase
@@ -84,10 +86,13 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
       if (error) throw error;
 
       // 2-2. ⚡ 경량 ID 쿼리: 이미지 힌트가 있는 mistake_id 집합만 쾌속 조회 (속도 저하 0ms 보장)
-      const { data: scafIdsData } = await supabase
+      const { data: scafIdsData, error: scafError } = await supabase
         .from('mistake_scaffoldings')
         .select('mistake_id');
 
+      if (scafError) throw scafError;
+      if (request !== fetchRequestRef.current) return;
+      setProfiles(profData || []);
       const scafIdSet = new Set<string>();
       (scafIdsData || []).forEach((s: any) => {
         if (s.mistake_id) scafIdSet.add(s.mistake_id);
@@ -139,29 +144,18 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
     } catch (e) {
       console.error('스캐폴딩 오답 로드 오류:', e);
     } finally {
-      setLoading(false);
+      if (request === fetchRequestRef.current) setLoading(false);
     }
   };
 
+  const loadLatestMistakes = useEffectEvent(() => { void fetchAllMistakes(); });
   useEffect(() => {
-    fetchAllMistakes();
-
-    // ⚡ Realtime 구독: 학생이 복습 체크나 새 오답 등록 시 즉시 실시간 갱신
-    const channel = supabase
-      .channel('scaffolding-mistakes-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'mistakes' },
-        () => {
-          fetchAllMistakes();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    const requestRef = fetchRequestRef;
+    loadLatestMistakes();
+    return () => { requestRef.current++; };
   }, [isAdmin]);
+
+  useScaffoldingRefresh(fetchAllMistakes);
 
   // ── 2. 필터링된 취약 오답 목록 계산 ──────────────────────────────
   const filteredMistakes = useMemo(() => {
@@ -204,16 +198,19 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
 
   // ── ⚡ 핀포인트 이미지 힌트 쾌속 조회 (현재 화면 5개 카드 전용) ──
   useEffect(() => {
+    let cancelled = false;
     const fetchVisibleScaffoldings = async () => {
       const visibleIds = visibleMistakes.map((m) => m.id);
       if (visibleIds.length === 0) return;
 
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('mistake_scaffoldings')
         .select('*')
         .in('mistake_id', visibleIds);
 
-      const map: Record<string, ScaffoldingImageItem[]> = {};
+      if (cancelled || error) return;
+      // 이미지가 모두 삭제된 오답도 빈 배열로 덮어써 캐시에서 지운다.
+      const map: Record<string, ScaffoldingImageItem[]> = Object.fromEntries(visibleIds.map(id => [id, []]));
       (data || []).forEach((item: any) => {
         if (!map[item.mistake_id]) map[item.mistake_id] = [];
         map[item.mistake_id].push(item);
@@ -223,6 +220,7 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
     };
 
     fetchVisibleScaffoldings();
+    return () => { cancelled = true; };
   }, [visibleMistakes]);
 
   // 학년 목록 추출
