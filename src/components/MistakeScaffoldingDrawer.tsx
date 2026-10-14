@@ -1,3 +1,4 @@
+import { uploadScaffoldingImage, resolveScaffoldingImages } from '../features/mistakes/scaffoldingImages';
 import { useScaffoldingRefresh } from '../features/mistakes/useScaffoldingRefresh';
 import React, { useState, useEffect, useEffectEvent, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -63,9 +64,10 @@ export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> =
         .order('created_at', { ascending: true });
 
       if (error) throw error;
+      const resolved = await resolveScaffoldingImages(supabase, data || []);
       if (request !== fetchRequestRef.current) return;
-      setScaffoldings(data || []);
-      setZoomImageUrl(prev => prev && !(data || []).some(row => row.image_url === prev) ? null : prev);
+      setScaffoldings(resolved);
+      setZoomImageUrl(prev => prev && !resolved.some(row => row.image_url === prev) ? null : prev);
     } catch (err) {
       console.error('Failed to load scaffoldings:', err);
     } finally {
@@ -201,7 +203,7 @@ export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> =
         mistake_id: mistakeId,
         student_id: studentId,
         teacher_id: currentUserId,
-        image_url: previewImage || '',
+        image_url: previewImage ? await uploadScaffoldingImage(supabase, previewImage, studentId, mistakeId) : '',
         caption: trimmedCaption,
       };
 
@@ -214,7 +216,8 @@ export const MistakeScaffoldingDrawer: React.FC<MistakeScaffoldingDrawerProps> =
       if (error) throw error;
 
       if (data) {
-        setScaffoldings(prev => [...prev, data]);
+        const [resolved] = await resolveScaffoldingImages(supabase, [data]);
+        setScaffoldings(prev => [...prev, resolved]);
         setPreviewImage(null);
         setCaption('');
         if (fileInputRef.current) fileInputRef.current.value = '';
