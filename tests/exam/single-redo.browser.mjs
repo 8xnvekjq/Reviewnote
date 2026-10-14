@@ -44,6 +44,7 @@ try {
   await page.getByTestId('exam-solve').waitFor();
   assert.equal(await page.getByTestId('exam-solve').getAttribute('data-question'), '1');
   assert.equal(await page.getByRole('button', { name: '채점해 보기', exact: true }).count(), 0);
+  assert.equal(await page.getByRole('button', { name: '이 문항 필기 지우기', exact: true }).count(), 1, '관리자는 한 번에 지우기를 쓸 수 있다');
   await page.getByTestId('exam-overview-open').click();
   assert.equal(await page.locator('.exam-thumb').count(), 1);
   await page.locator('.exam-thumb').click();

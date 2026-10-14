@@ -485,9 +485,10 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
             <div className="exam-tool-group">
               <button type="button" className="exam-tool" aria-label="실행 취소" title="실행 취소" disabled={!canUndo} onClick={() => { inkRef.current?.undo(); setHistoryTick(t => t + 1); }}>↶</button>
               <button type="button" className="exam-tool" aria-label="다시 실행" title="다시 실행" disabled={!canRedo} onClick={() => { inkRef.current?.redo(); setHistoryTick(t => t + 1); }}>↷</button>
-              <button type="button" className="exam-tool exam-tool-text" disabled={!(strokes.get(inkKey)?.length)} onClick={() => { inkRef.current?.clear(); setHistoryTick(t => t + 1); }}>
+              {/* 한 번에 모두 지우기는 관리자만(학생은 실행 취소·지우개로 지운다). */}
+              {isAdmin && <button type="button" className="exam-tool exam-tool-text" disabled={!(strokes.get(inkKey)?.length)} onClick={() => { inkRef.current?.clear(); setHistoryTick(t => t + 1); }}>
                 {hanneung ? '이 페이지 필기 지우기' : '이 문항 필기 지우기'}
-              </button>
+              </button>}
             </div>
           </div>
           <div className="exam-nav">

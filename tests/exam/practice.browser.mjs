@@ -136,17 +136,14 @@ async function spinWheel(page, place, steps) {
   // 필기 + 스톱워치
   await drawStroke(page);
   assert.equal(await strokeCount(page), '1');
-  // 실행 취소 / 다시 실행 / 이 문항 필기 지우기(실행 취소 기록은 지금 보는 문항 안에서만)
+  // 실행 취소 / 다시 실행(실행 취소 기록은 지금 보는 문항 안에서만). '이 문항 필기 지우기'는 관리자만 보인다.
   await page.getByRole('button', { name: '실행 취소' }).click();
   assert.equal(await strokeCount(page), '0');
   await page.getByRole('button', { name: '다시 실행' }).click();
   assert.equal(await strokeCount(page), '1');
   await drawStroke(page);
   assert.equal(await strokeCount(page), '2');
-  await page.getByRole('button', { name: '이 문항 필기 지우기' }).click();
-  assert.equal(await strokeCount(page), '0');
-  await page.getByRole('button', { name: '실행 취소' }).click();
-  assert.equal(await strokeCount(page), '2');
+  assert.equal(await page.getByRole('button', { name: '이 문항 필기 지우기' }).count(), 0, '학생에게는 한 번에 지우기 버튼이 없다');
   await page.getByRole('button', { name: '실행 취소' }).click();
   assert.equal(await strokeCount(page), '1');
   await page.waitForTimeout(1800);
@@ -1657,7 +1654,7 @@ for (const failure of [false, true]) {
   await student.goto(`${BASE}?broadcast=student`);
   await startExam(student, '자유 모드', '미적분');
   await drawStroke(student);
-  await student.getByRole('button', { name: '이 문항 필기 지우기', exact: true }).click();
+  await student.getByRole('button', { name: '실행 취소', exact: true }).click();
   await student.waitForTimeout(1000);
   assert.equal(await student.evaluate(() => window.__broadcast.log.length), 0, 'no admin means no student broadcasts');
   await admin.goto(`${BASE}?broadcast=admin`);
@@ -1672,7 +1669,7 @@ for (const failure of [false, true]) {
   await drawStroke(student);
   await admin.waitForFunction(() => document.querySelector('[data-testid="exam-live-cell"] .exam-ink')?.dataset.strokeCount === '1', null, { timeout: 1500 });
   assert.equal(await student.evaluate(() => window.__inkStats.requests), 0, 'broadcast does not accelerate the five-second save');
-  await student.getByRole('button', { name: '이 문항 필기 지우기', exact: true }).click();
+  await student.getByRole('button', { name: '실행 취소', exact: true }).click();
   await admin.waitForFunction(() => document.querySelector('[data-testid="exam-live-cell"] .exam-ink')?.dataset.strokeCount === '0', null, { timeout: 1500 });
   const beforeHidden = await student.evaluate(() => window.__broadcast.log.length);
   await admin.evaluate(() => {
