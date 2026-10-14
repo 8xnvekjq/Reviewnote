@@ -3,7 +3,7 @@ import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 
-const base = process.env.SCAFFOLDING_TEST_URL || 'http://127.0.0.1:5193';
+const base = process.env.SCAFFOLDING_TEST_URL || 'http://127.0.0.1:5175';
 const out = 'artifacts/scaffolding';
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch({ headless: true });
@@ -13,14 +13,20 @@ try {
       for (const analyzed of [false, true]) {
         const context = await browser.newContext({ viewport: { width, height: 1000 }, reducedMotion: 'reduce', serviceWorkers: 'block' });
         try {
+          const storagePath = '11111111-1111-1111-1111-111111111111/22222222-2222-2222-2222-222222222222/33333333-3333-3333-3333-333333333333.webp';
           const rows = [
-            { id: 'hint-1', mistake_id: 'scaffold-mistake', student_id: 'student-1', teacher_id: 'teacher-1', caption: '근과 계수의 관계를 먼저 확인하세요.', image_url: '', created_at: '2026-10-08T00:00:00Z' },
+            { id: 'hint-1', mistake_id: 'scaffold-mistake', student_id: 'student-1', teacher_id: 'teacher-1', caption: '근과 계수의 관계를 먼저 확인하세요.', image_url: 'storage:scaffolding-images/' + storagePath, created_at: '2026-10-08T00:00:00Z' },
             { id: 'note-1', mistake_id: 'scaffold-mistake', student_id: 'student-1', teacher_id: 'student-1', caption: '두 근의 합으로 다시 풀었어요.', image_url: '', created_at: '2026-10-08T01:00:00Z' },
           ];
           await context.routeWebSocket(/supabase/, ws => ws.close());
           await context.route('**/*', async route => {
             const req = route.request(), url = new URL(req.url());
             if (url.origin === base) return route.continue();
+            if (url.pathname.endsWith('/object/sign/scaffolding-images')) {
+              assert.deepEqual(req.postDataJSON().paths, [storagePath]);
+              return route.fulfill({ json: [{ path: storagePath, signedURL: '/object/sign/scaffolding-images/' + storagePath + '?token=test' }] });
+            }
+            if (url.pathname.includes('/object/sign/scaffolding-images/')) return route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="white"/></svg>' });
             if (url.pathname.endsWith('/mistake_scaffoldings')) {
               if (req.method() === 'POST') {
                 const row = { ...req.postDataJSON()[0], id: 'saved-1', created_at: '2026-10-08T02:00:00Z' };
@@ -46,6 +52,7 @@ try {
           await dialog.getByRole('button', { name: /풀이와 선생님 힌트.*2개/ }).click();
           await dialog.getByText(rows[0].caption, { exact: true }).waitFor();
           await dialog.getByText(rows[1].caption, { exact: true }).waitFor();
+          await page.waitForFunction(() => [...document.querySelectorAll('img')].some(img => img.src.includes('/object/sign/scaffolding-images/') && img.naturalWidth > 0));
           assert.equal(await dialog.getByText('⚡ AI 엔진:', { exact: true }).count(), Number(admin && analyzed));
           assert.equal(await dialog.getByText('✓ 새로운 진단이 준비됐어요', { exact: true }).count(), Number(analyzed));
           assert.equal(await dialog.getByRole('button', { name: '✏️ 네, 다시 풀어볼게요', exact: true }).count(), Number(analyzed));

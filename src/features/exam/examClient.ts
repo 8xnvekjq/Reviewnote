@@ -1,3 +1,4 @@
+import { uploadScaffoldingImage } from '../mistakes/scaffoldingImages';
 import { audioExtension, isAudioObjectDuplicate } from './audio/audioMath';
 import { supabase } from '../../services/supabase';
 import { examLiveTransport } from './liveTransport';
@@ -220,8 +221,9 @@ export const examClient: ExamClient = {
     // 한 장이 수백 KB라 한 번에 하나씩 보낸다.
     for (const row of rows) {
       if (skip.has(row.mistakeId)) continue;
+      const imageRef = await uploadScaffoldingImage(supabase, row.imageDataUrl, userId, row.mistakeId);
       const { error: insertError } = await supabase.from('mistake_scaffoldings').insert([{
-        mistake_id: row.mistakeId, student_id: userId, teacher_id: userId, image_url: row.imageDataUrl, caption: ORIGINAL_SOLUTION_CAPTION,
+        mistake_id: row.mistakeId, student_id: userId, teacher_id: userId, image_url: imageRef, caption: ORIGINAL_SOLUTION_CAPTION,
       }]);
       if (insertError) throw new ExamClientError(insertError);
       skip.add(row.mistakeId);

@@ -361,7 +361,7 @@ function App() {
     try {
       const { data: rows, error } = await supabase
         .from('mistake_scaffoldings')
-        .select('*')
+        .select('id,mistake_id,caption,created_at')
         .eq('student_id', userId)
         .neq('teacher_id', userId) // 본인이 자기 풀이로 셀프 업로드한 건 "선생님 힌트 도착" 알림 대상이 아님
         .or('is_read.is.null,is_read.eq.false')

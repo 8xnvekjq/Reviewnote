@@ -1,3 +1,4 @@
+import { uploadScaffoldingImage } from '../features/mistakes/scaffoldingImages';
 import React, { useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import '../styles/detail.css';
@@ -8,7 +9,7 @@ import { examInkExportRect, paintExamInk } from '../features/handwriting/examInk
 import { useInkCamera } from '../features/handwriting/useInkCamera';
 import { supabase } from '../services/supabase';
 import { type DocumentSize } from '../features/handwriting/useHandwritingInput';
-import { flattenHandwriting, blobToDataUrl } from '../features/handwriting/flattenHandwriting';
+import { flattenHandwriting } from '../features/handwriting/flattenHandwriting';
 import { getDrawingWorld, type DocRect } from '../features/handwriting/drawingWorld';
 import { visibleInkViewport } from '../features/handwriting/inkViewport';
 
@@ -413,7 +414,7 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
           svgRect: snapshotDrawingWorld,
           outputRect: exportRect,
         });
-        const dataUrl = await blobToDataUrl(blob);
+        const imageRef = await uploadScaffoldingImage(supabase, blob, snapshotStudentId, snapshotMistakeId);
 
         const { error } = await supabase
           .from('mistake_scaffoldings')
@@ -421,7 +422,7 @@ export const HandwritingOverlay = React.forwardRef<HandwritingOverlayHandle, Han
             mistake_id: snapshotMistakeId,
             student_id: snapshotStudentId,
             teacher_id: snapshotTeacherId,
-            image_url: dataUrl,
+            image_url: imageRef,
             caption: snapshotCaption,
           }]);
         if (error) throw error;

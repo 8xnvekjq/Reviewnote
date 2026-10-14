@@ -1,3 +1,4 @@
+import { resolveScaffoldingImages } from '../features/mistakes/scaffoldingImages';
 import { useScaffoldingRefresh } from '../features/mistakes/useScaffoldingRefresh';
 import React, { useState, useRef, useEffect, useEffectEvent } from 'react';
 import { supabase } from '../services/supabase';
@@ -129,7 +130,8 @@ export const ScaffoldingListPanel: React.FC<ScaffoldingListPanelProps> = ({
 
       // 📍 최근 스캐폴딩 힌트가 첨부된 순서(최신순)로 정렬하여 맨 위에 표출
       list.sort((a, b) => new Date(b.latestTimestamp).getTime() - new Date(a.latestTimestamp).getTime());
-      if (request === fetchRequestRef.current) setThreads(list);
+      const resolved = await resolveScaffoldingImages(supabase, list.map(item => ({ ...item, image_url: item.latestImageUrl })));
+      if (request === fetchRequestRef.current) setThreads(resolved.map(item => ({ ...item, latestImageUrl: item.image_url })));
     } catch (err) {
       console.error('Failed to load scaffolding list:', err);
     } finally {
@@ -231,7 +233,7 @@ export const ScaffoldingListPanel: React.FC<ScaffoldingListPanelProps> = ({
                 {/* 힌트 사진/이모지 썸네일 */}
                 <div className="w-14 h-14 rounded-xl overflow-hidden border border-slate-800 bg-black flex-none flex items-center justify-center">
                   {t.latestImageUrl ? (
-                    <img src={t.latestImageUrl} alt="Thumbnail" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                    <img loading="lazy" decoding="async" src={t.latestImageUrl} alt="Thumbnail" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                   ) : (
                     <span className="text-2xl select-none">🐶</span>
                   )}

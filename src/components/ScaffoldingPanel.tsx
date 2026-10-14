@@ -1,3 +1,5 @@
+import { resolveScaffoldingImages } from '../features/mistakes/scaffoldingImages';
+import { ScaffoldingImageMigration } from './ScaffoldingImageMigration';
 import React, { useState, useRef, useEffect, useEffectEvent, useMemo } from 'react';
 import { useScaffoldingRefresh } from '../features/mistakes/useScaffoldingRefresh';
 import { supabase } from '../services/supabase';
@@ -209,9 +211,11 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
         .in('mistake_id', visibleIds);
 
       if (cancelled || error) return;
+      const resolved = await resolveScaffoldingImages(supabase, data || []);
+      if (cancelled) return;
       // 이미지가 모두 삭제된 오답도 빈 배열로 덮어써 캐시에서 지운다.
       const map: Record<string, ScaffoldingImageItem[]> = Object.fromEntries(visibleIds.map(id => [id, []]));
-      (data || []).forEach((item: any) => {
+      resolved.forEach((item: any) => {
         if (!map[item.mistake_id]) map[item.mistake_id] = [];
         map[item.mistake_id].push(item);
       });
@@ -219,7 +223,7 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
       setScaffoldingsMap((prev) => ({ ...prev, ...map }));
     };
 
-    fetchVisibleScaffoldings();
+    void fetchVisibleScaffoldings().catch(error => console.error('이미지 힌트 조회 실패:', error));
     return () => { cancelled = true; };
   }, [visibleMistakes]);
 
@@ -303,6 +307,7 @@ export const ScaffoldingPanel: React.FC<ScaffoldingPanelProps> = ({ isAdmin, onO
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-12 animate-fade-in">
+      <ScaffoldingImageMigration />
       {/* 🧩 헤더 카드 */}
       <div className="bg-gradient-to-r from-purple-950/80 via-slate-900 to-indigo-950/80 border border-purple-500/30 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
         <div className="absolute -right-8 -top-8 w-36 h-36 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
