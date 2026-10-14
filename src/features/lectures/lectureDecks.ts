@@ -185,6 +185,12 @@ export async function listLectureDecks(client: SupabaseClient): Promise<LectureD
   return (data ?? []) as LectureDeck[];
 }
 
+/** 덱의 학년만 바꾼다(수업자료 관리). */
+export async function updateLectureDeckGrade(client: SupabaseClient, id: string, grade: GradeLevel): Promise<void> {
+  const { error } = await client.from('lecture_decks').update({ grade }).eq('id', id);
+  if (error) throw error;
+}
+
 export async function deleteLectureDeck(client: SupabaseClient, deck: Pick<LectureDeck, 'id' | 'slides'>): Promise<void> {
   const { error } = await client.from('lecture_decks').delete().eq('id', deck.id);
   if (error) throw error;
