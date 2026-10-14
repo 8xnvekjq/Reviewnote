@@ -1,6 +1,7 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { gunzipSync } from 'node:zlib';
 
 // 교재 슬라이드 필기(S펜) + 수업 녹음 → 저장 → 다시 열어 재생 검사. Supabase는 가짜 응답, 마이크는 크롬 가짜 장치.
 const base = 'http://127.0.0.1:5175';
@@ -159,14 +160,24 @@ try {
     const pausedAt = await page.getByTestId('lecture-recording').innerText();
     await page.waitForTimeout(1200);
     assert.equal(await page.getByTestId('lecture-recording').innerText(), pausedAt, '일시정지 중에는 시간이 멈춘다');
+    // 멈춘 동안 두 슬라이드에 쓰고 지워도 이어하기 때 결과만 나타난다.
+    for (const y of [0.6, 0.7, 0.8]) await draw(line(0.2, y, 0.6, y));
+    await waitStrokes(5);
+    await page.getByRole('button', { name: '지우개', exact: true }).click();
+    await draw(line(0.4, 0.77, 0.4, 0.83));
+    await waitStrokes(4);
+    await page.getByRole('button', { name: '펜', exact: true }).click();
+    await page.getByRole('button', { name: '다음 슬라이드' }).click();
+    await waitStrokes(0);
+    await draw(line(0.2, 0.4, 0.6, 0.4));
+    await waitStrokes(1);
     await page.getByRole('button', { name: '● 이어하기' }).click();
     await waitPhase('recording');
     await page.waitForTimeout(300);
-    await page.getByRole('button', { name: '다음 슬라이드' }).click();
     await page.waitForFunction(() => document.querySelector('[data-testid=slide-counter]')?.textContent === '2 / 3');
     await page.waitForTimeout(300);
     await draw(line(0.2, 0.7, 0.6, 0.7)); // 슬라이드 2의 획
-    await waitStrokes(1);
+    await waitStrokes(2);
     await page.waitForTimeout(300);
     // 앱 전환·화면 꺼짐 → 저절로 일시정지, 돌아오면 안내
     await page.evaluate(() => { window.__vis = 'hidden'; document.dispatchEvent(new Event('visibilitychange')); });
@@ -201,6 +212,15 @@ try {
     }
     assert.ok(manifest.chunks.length >= 1 && manifest.chunks.every(c => c.encoding === 'gzip'));
     assert.equal(recRows[0].duration_ms, manifest.durationMs);
+    const entries = manifest.chunks.flatMap(c => {
+      const bytes = recFiles.get(`${recId}/${c.file}`).body;
+      return JSON.parse((c.encoding === 'gzip' ? gunzipSync(bytes) : bytes).toString()).entries;
+    });
+    const resumeAt = manifest.clips[1].offsetMs;
+    const resumed = entries.filter(e => e.at === resumeAt);
+    assert.deepEqual(resumed.map(e => [e.type, e.slideId]), [['ink', slideIds[0]], ['ink', slideIds[1]], ['slide', slideIds[1]]]);
+    assert.deepEqual(resumed.slice(0, 2).map(e => [e.event.kind, e.event.added.length]), [['restore', 4], ['restore', 1]]);
+    assert.equal(entries.filter(e => e.type === 'ink' && e.event.kind === 'draw').length, 2, '멈춘 동안의 획은 따로 기록하지 않는다');
 
     // 3) 닫고 → 녹음 목록 → 다시 열어 재생
     await page.getByRole('button', { name: '닫기' }).click();
@@ -214,6 +234,8 @@ try {
     assert.equal(await page.getByTestId('lecture-pen-toolbar').count(), 0);
     const seek = async ms => page.evaluate(ms => {
       const input = document.querySelector('[data-testid=lecture-replay-bar] input[type=range]');
+      // 경계 시각을 검사할 때 100ms 눈금으로 반올림되지 않게 한다.
+      input.step = '1';
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, String(ms));
       input.dispatchEvent(new Event('input', { bubbles: true }));
     }, ms);
@@ -226,9 +248,12 @@ try {
     await seek(firstClipEnd - 10);
     await page.waitForTimeout(100);
     assert.deepEqual(await replayState(), { counter: '1 / 3', strokes: 2 }, '첫 구간 끝: 녹음 중 획까지');
+    await seek(resumeAt);
+    await page.waitForTimeout(100);
+    assert.deepEqual(await replayState(), { counter: '2 / 3', strokes: 1 }, '이어하기 순간: 두 번째 슬라이드의 결과 필기가 즉시 보인다');
     await seek(manifest.durationMs);
     await page.waitForTimeout(100);
-    assert.deepEqual(await replayState(), { counter: '2 / 3', strokes: 1 }, '끝: 두 번째 슬라이드와 그 필기');
+    assert.deepEqual(await replayState(), { counter: '2 / 3', strokes: 2 }, '끝: 두 번째 슬라이드와 그 필기');
     // 재생하면 시간이 흐르고 음성이 붙는다.
     await seek(0);
     await page.getByRole('button', { name: '재생', exact: true }).click();

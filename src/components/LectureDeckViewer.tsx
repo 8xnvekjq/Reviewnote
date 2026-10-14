@@ -112,7 +112,7 @@ export const LectureDeckViewer: React.FC<LectureDeckViewerProps> = ({ deck, urls
   }, [session]);
   const slideInkChange = useMemo(() => onInkChange(slide.id), [onInkChange, slide.id]);
 
-  // 슬라이드를 넘긴 시각을 남긴다(일시정지 중이면 멈춘 시각).
+  // 일시정지 중에는 현재 슬라이드만 기억하고 이어하기 때 이동을 기록한다.
   useEffect(() => { if (!replay) session?.logSlide(slide.id); }, [slide.id, session, replay]);
 
   // 녹음 중에 창을 닫거나 새로 고치려 하면 묻는다.

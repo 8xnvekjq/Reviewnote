@@ -90,6 +90,8 @@ export class LectureRecordingSession {
   state: RecordingSessionState = { phase: 'idle', recordingId: null, notice: '', autoPaused: false, uploading: 0, failed: 0, savedAt: null };
   private readonly clock: RecordingClock;
   private readonly log = new TimelineLog();
+  private currentSlideId: string | null = null;
+  private readonly pausedInk = new Map<string, { before: InkStroke[]; after: InkStroke[] }>();
   private manifest: LectureRecordingManifest | null = null;
   private stream: StreamLike | null = null;
   private recorder: RecorderLike | null = null;
@@ -131,7 +133,7 @@ export class LectureRecordingSession {
   elapsed() { return this.clock.now(); }
   get active() { return this.state.phase === 'recording' || this.state.phase === 'paused' || this.state.phase === 'starting'; }
   /** 아직 Storage에 다 올라가지 않은 기록이 있는지(닫기 전 확인용). */
-  get unsaved() { return this.log.size > 0 || this.state.uploading > 0 || this.state.failed > 0 || this.clips.some(c => c.pending.length); }
+  get unsaved() { return this.pausedInk.size > 0 || this.log.size > 0 || this.state.uploading > 0 || this.state.failed > 0 || this.clips.some(c => c.pending.length); }
 
   // ── 시작·일시정지·이어하기·끝내기 ──
   async start(input: { deckId: string; title: string; slides: LectureSlide[]; initialSlideId: string; ink: Record<string, InkStroke[]> }) {
@@ -149,6 +151,7 @@ export class LectureRecordingSession {
       return;
     }
     this.manifest = createManifest({ recordingId, deckId: input.deckId, title: input.title, slides: input.slides, initialSlideId: input.initialSlideId });
+    this.currentSlideId = input.initialSlideId;
     this.log.slide(0, input.initialSlideId);
     this.log.take(); // 첫 슬라이드는 manifest.initialSlideId로 남는다.
     this.log.baseline(input.ink);
@@ -191,6 +194,7 @@ export class LectureRecordingSession {
       this.publish({ phase: 'paused', notice: error instanceof Error && error.message === 'hidden' ? '' : micErrorMessage(error) });
       return;
     }
+    this.commitPausedChanges(this.clip!.offsetMs);
     this.publish({ phase: 'recording', autoPaused: false, notice: '' });
     void this.acquireWakeLock();
   }
@@ -199,6 +203,7 @@ export class LectureRecordingSession {
     if (this.state.phase === 'starting') return;
     if (this.state.phase === 'recording') await this.pause('user');
     if (this.state.phase !== 'paused' || !this.manifest) return;
+    this.commitPausedChanges(this.clock.now());
     this.publish({ phase: 'ending', notice: '' });
     this.manifest.status = 'done';
     this.flushInk();
@@ -235,10 +240,26 @@ export class LectureRecordingSession {
 
   // ── 기록 ──
   logSlide(slideId: string) {
-    if (this.state.phase === 'recording' || this.state.phase === 'paused') this.log.slide(this.clock.now(), slideId);
+    if (!this.manifest || !this.active) return;
+    this.currentSlideId = slideId;
+    if (this.state.phase === 'recording') this.log.slide(this.clock.now(), slideId);
   }
   logInk(slideId: string, before: InkStroke[], after: InkStroke[], kind: InkChangeKind) {
-    if (this.state.phase === 'recording' || this.state.phase === 'paused') this.log.ink(this.clock.now(), slideId, before, after, kind);
+    if (this.state.phase === 'recording') this.log.ink(this.clock.now(), slideId, before, after, kind);
+    else if (this.manifest && (this.state.phase === 'paused' || this.state.phase === 'starting')) {
+      // 마이크를 다시 여는 동안의 편집도 일시정지 결과에 포함한다.
+      const initial = this.pausedInk.get(slideId)?.before ?? structuredClone(before);
+      const final = structuredClone(after);
+      if (JSON.stringify(initial) === JSON.stringify(final)) this.pausedInk.delete(slideId);
+      else this.pausedInk.set(slideId, { before: initial, after: final });
+    }
+  }
+
+  private commitPausedChanges(at: number) {
+    for (const [slideId, ink] of this.pausedInk) this.log.snapshot(at, slideId, ink.before, ink.after);
+    this.pausedInk.clear();
+    // 결과 필기를 먼저 반영한 뒤 이어갈 슬라이드로 이동한다.
+    if (this.currentSlideId) this.log.slide(at, this.currentSlideId);
   }
 
   /** 화면을 닫을 때. 진행 중인 업로드는 계속 둔다. */
