@@ -1,0 +1,5 @@
+/* 교재 슬라이드 재생 막대의 소리 버튼(exam ReplayAudio를 그대로 쓴다). */
+.lecture-replay .exam-replay-audio { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.lecture-replay .exam-audio-toggle { display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid rgb(51 65 85); background: rgb(15 23 42); color: rgb(226 232 240); font-size: 11px; font-weight: 800; white-space: nowrap; }
+.lecture-replay .exam-audio-toggle[aria-pressed="true"] { background: rgb(79 70 229); border-color: rgb(129 140 248); color: #fff; }
+.lecture-replay .exam-peer-note { font-size: 10px; color: rgb(253 164 175); }

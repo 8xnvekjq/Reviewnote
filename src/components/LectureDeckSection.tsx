@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../services/supabase';
 import type { GradeLevel } from './SlideListModal';
 import { LectureDeckViewer } from './LectureDeckViewer';
@@ -6,6 +6,11 @@ import {
   defaultDeckTitle, deleteLectureDeck, findTocFile, guessGrade, LECTURE_GRADES, listLectureDecks, matchTocFiles,
   parseLectureToc, resolveLectureSlideUrls, uploadLectureDeck, type LectureDeck, type LectureToc, type UploadProgress,
 } from '../features/lectures/lectureDecks';
+import {
+  deleteDeckRecordings, deleteLectureRecording, listLectureRecordings, loadLectureRecording, supabaseRecordingBackend,
+  type LectureRecordingRow, type LoadedRecording,
+} from '../features/lectures/lectureRecordings';
+import { formatDuration } from '../features/lectures/lectureRecordingModel';
 
 interface LectureDeckSectionProps {
   /** 'ALL'이면 모든 학년 */
@@ -19,8 +24,12 @@ export const LectureDeckSection: React.FC<LectureDeckSectionProps> = ({ grade })
   const [decks, setDecks] = useState<LectureDeck[]>([]);
   const [loadError, setLoadError] = useState('');
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [viewer, setViewer] = useState<{ deck: LectureDeck; urls: string[] } | null>(null);
+  const [viewer, setViewer] = useState<{ deck: LectureDeck; urls: string[]; replay?: LoadedRecording } | null>(null);
   const [opening, setOpening] = useState<string | null>(null);
+  const [recordingsOf, setRecordingsOf] = useState<string | null>(null);
+  const [recordings, setRecordings] = useState<LectureRecordingRow[] | null>(null);
+  const [recordingError, setRecordingError] = useState('');
+  const backend = useMemo(() => supabaseRecordingBackend(supabase), []);
 
   const refresh = useCallback(async () => {
     try { setDecks(await listLectureDecks(supabase)); setLoadError(''); }
@@ -35,9 +44,41 @@ export const LectureDeckSection: React.FC<LectureDeckSectionProps> = ({ grade })
     finally { setOpening(null); }
   };
 
+  const loadRecordings = useCallback(async (deckId: string) => {
+    try { setRecordings(await listLectureRecordings(supabase, deckId)); setRecordingError(''); }
+    catch (err) { console.error('[lecture] 녹음 목록 실패:', err); setRecordings([]); setRecordingError('녹음 목록을 불러오지 못했습니다.'); }
+  }, []);
+  const toggleRecordings = (deck: LectureDeck) => {
+    if (recordingsOf === deck.id) { setRecordingsOf(null); return; }
+    setRecordingsOf(deck.id); setRecordings(null); void loadRecordings(deck.id);
+  };
+
+  const openRecording = async (deck: LectureDeck, row: LectureRecordingRow) => {
+    setOpening(row.id);
+    try {
+      const replay = await loadLectureRecording(supabase, row.id);
+      // 녹음할 때의 슬라이드 목록으로 연다(덱 이미지는 같은 비공개 버킷).
+      const slides = replay.manifest.slides;
+      setViewer({ deck: { ...deck, slides }, urls: await resolveLectureSlideUrls(supabase, slides), replay });
+    } catch (err) { console.error('[lecture] 녹음 열기 실패:', err); alert('녹음을 열지 못했습니다. 잠시 후 다시 시도해 주세요.'); }
+    finally { setOpening(null); }
+  };
+
+  const removeRecording = async (row: LectureRecordingRow) => {
+    if (!confirm(`'${row.title}' 녹음을 삭제할까요? 음성과 필기 기록이 모두 지워집니다.`)) return;
+    try { await deleteLectureRecording(supabase, row.id); await loadRecordings(row.deck_id); }
+    catch (err) { console.error('[lecture] 녹음 삭제 실패:', err); alert('녹음을 삭제하지 못했습니다.'); }
+  };
+
+  const closeViewer = () => {
+    viewer?.replay?.release();
+    setViewer(null);
+    if (recordingsOf) void loadRecordings(recordingsOf);
+  };
+
   const removeDeck = async (deck: LectureDeck) => {
-    if (!confirm(`'${deck.title}' 덱과 슬라이드 ${deck.slides.length}장을 삭제할까요?`)) return;
-    try { await deleteLectureDeck(supabase, deck); await refresh(); }
+    if (!confirm(`'${deck.title}' 덱과 슬라이드 ${deck.slides.length}장을 삭제할까요? 이 덱의 녹음도 함께 지워집니다.`)) return;
+    try { await deleteDeckRecordings(supabase, deck.id).catch(err => console.warn('[lecture] 녹음 삭제 실패:', err)); await deleteLectureDeck(supabase, deck); await refresh(); }
     catch (err) { console.error('[lecture] 덱 삭제 실패:', err); alert('삭제하지 못했습니다.'); }
   };
 
@@ -76,6 +117,13 @@ export const LectureDeckSection: React.FC<LectureDeckSectionProps> = ({ grade })
               <span className="text-[9.5px] text-slate-500 font-mono flex-none">📅 {deck.created_at.slice(0, 10)} · {deck.slides.length}장</span>
               <div className="flex items-center space-x-1.5 flex-none">
                 <button
+                  onClick={() => toggleRecordings(deck)}
+                  aria-expanded={recordingsOf === deck.id}
+                  className="text-[10px] font-extrabold text-slate-300 hover:text-rose-300 transition-colors bg-slate-900 px-2.5 py-1 border border-slate-800 rounded-lg hover:border-rose-500/40 active:scale-95"
+                >
+                  🎙️ 녹음 {recordingsOf === deck.id ? '▲' : '▼'}
+                </button>
+                <button
                   onClick={() => void openDeck(deck)}
                   disabled={opening === deck.id}
                   className="text-[10px] font-extrabold text-slate-300 hover:text-amber-300 transition-colors bg-slate-900 px-2.5 py-1 border border-slate-800 rounded-lg hover:border-amber-500/40 active:scale-95 disabled:opacity-50"
@@ -91,11 +139,50 @@ export const LectureDeckSection: React.FC<LectureDeckSectionProps> = ({ grade })
                 </button>
               </div>
             </div>
+            {recordingsOf === deck.id && (
+              <div className="pt-1.5 space-y-1" data-testid="lecture-recordings">
+                {recordingError && <p className="text-[10.5px] text-rose-300">{recordingError}</p>}
+                {recordings === null && <p className="text-[10.5px] text-slate-500">녹음 목록을 불러오는 중…</p>}
+                {recordings?.length === 0 && !recordingError && <p className="text-[10.5px] text-slate-500">아직 녹음이 없습니다. 열기 ▶ 후 ● 녹음 시작을 누르세요.</p>}
+                {recordings?.map(row => (
+                  <div key={row.id} className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-slate-950/70 border border-slate-850">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[11px] font-bold text-slate-200 truncate">{row.title}</div>
+                      <div className="text-[9.5px] text-slate-500 font-mono">
+                        {new Date(row.created_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} · {formatDuration(row.duration_ms)}
+                        {row.status === 'recording' && <span className="ml-1 text-amber-300 font-sans font-bold">끝내기 전에 멈춤(저장된 곳까지 재생)</span>}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => void openRecording(deck, row)}
+                      disabled={opening === row.id}
+                      aria-label={`${row.title} 재생`}
+                      className="flex-none text-[10px] font-extrabold text-slate-300 hover:text-amber-300 bg-slate-900 px-2 py-1 border border-slate-800 rounded-lg active:scale-95 disabled:opacity-50"
+                    >
+                      {opening === row.id ? '여는 중…' : '재생 ▶'}
+                    </button>
+                    <button
+                      onClick={() => void removeRecording(row)}
+                      aria-label={`${row.title} 녹음 삭제`}
+                      className="flex-none text-[10px] text-slate-400 hover:text-rose-300 bg-slate-900 px-2 py-1 border border-slate-800 rounded-lg active:scale-95"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         ))}
       </div>
 
-      {viewer && <LectureDeckViewer deck={viewer.deck} urls={viewer.urls} onClose={() => setViewer(null)} />}
+      {viewer && (
+        <LectureDeckViewer
+          deck={viewer.deck} urls={viewer.urls} onClose={closeViewer} replay={viewer.replay}
+          recordingBackend={viewer.replay ? undefined : backend}
+          onRecorded={() => { setRecordingsOf(viewer.deck.id); void loadRecordings(viewer.deck.id); }}
+        />
+      )}
     </div>
   );
 };

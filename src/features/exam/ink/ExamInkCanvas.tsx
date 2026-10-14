@@ -701,7 +701,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
       gestureStartedAt = e.timeStamp;
       if (e.pointerType === 'pen' && !penEverDetected) { penEverDetected = true; setPenSeen(true); }
       let p = propsRef.current;
-      if (touch && penEverDetected && p.penOnlyWhenPenDetected !== false) {
+      if (touch && (p.penOnly || (penEverDetected && p.penOnlyWhenPenDetected !== false))) {
         // 올가미 선택 테두리 위의 손가락은 옮기기·확대·회전, 그 밖은 스크롤.
         if (startSelectGesture(e, true)) return;
         // 손가락은 그리지 않고 직접 스크롤한다. 캔버스 touch-action을 pan으로 두면 iPad Safari가
@@ -964,7 +964,7 @@ export const ExamInkCanvas = forwardRef<ExamInkCanvasHandle, ExamInkCanvasProps>
     const onTouch = (e: TouchEvent) => {
       const stylus = Array.from(e.changedTouches).some(t => (t as Touch & { touchType?: string }).touchType === 'stylus');
       const p = propsRef.current;
-      const fingerDraws = !(penEverDetected && p.penOnlyWhenPenDetected !== false);
+      const fingerDraws = !p.penOnly && !(penEverDetected && p.penOnlyWhenPenDetected !== false);
       if (stylus || ((fingerDraws || e.touches.length >= 2) && e.cancelable)) e.preventDefault();
     };
     /** iPad Safari 핀치 확대(비표준 gesture 이벤트). */

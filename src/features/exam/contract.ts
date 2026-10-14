@@ -428,6 +428,8 @@ export interface ExamInkCanvasProps {
   size: number;
   /** 애플펜슬 등 펜 입력이 감지되면 손가락 터치는 그리지 않고 스크롤/확대에 양보(손바닥 무시). */
   penOnlyWhenPenDetected?: boolean;
+  /** 펜(과 마우스)만 그린다. 손가락은 펜을 감지하기 전에도 그리지 않는다(교재 수업 슬라이드). */
+  penOnly?: boolean;
   /** 꾹 눌러 직선/삼각형·사각형/원 변환(기본 true). 펜을 떼지 않고 ~650ms 멈추면 판정. */
   shapeSnap?: boolean;
   readOnly?: boolean;
