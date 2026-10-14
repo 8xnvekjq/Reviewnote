@@ -29,7 +29,7 @@ export class RecordingClock {
 }
 
 // ── 기록 항목 ─────────────────────────────────────────────────────────────
-/** at은 모두 녹음 시각(ms, 일시정지 제외). 일시정지 중의 변화는 멈춘 시각에 기록돼 재생에서는 이어하기 순간에 나타난다. */
+/** at은 모두 녹음 시각(ms, 일시정지 제외). 일시정지 중의 필기는 이어하기·끝내기 때 결과만 기록한다. */
 export type TimelineEntry =
   | { type: 'slide'; at: number; slideId: string }
   | { type: 'ink'; at: number; slideId: string; event: InkReplayEvent };
@@ -50,7 +50,16 @@ export class TimelineLog {
     this.pending.push({ type: 'ink', at, slideId, event });
     return event;
   }
-  /** 녹음 전에 이미 써 둔 필기(자유 연습)를 0초 상태로 남긴다. */
+  /** 일시정지 동안 바뀐 필기를 한 번에 교체한다. */
+  snapshot(at: number, slideId: string, before: InkStroke[], after: InkStroke[]) {
+    if (JSON.stringify(before) === JSON.stringify(after)) return;
+    this.pending.push({ type: 'ink', at, slideId, event: {
+      id: crypto.randomUUID(), kind: 'restore', at,
+      removed: before.map(stroke => stroke.id),
+      added: after.map((stroke, index) => ({ index, stroke })),
+    } });
+  }
+  /** 녹음 전 필기를 0초에 즉시 표시한다. */
   baseline(ink: Record<string, InkStroke[]>) {
     for (const [slideId, strokes] of Object.entries(ink)) {
       if (!strokes.length) continue;

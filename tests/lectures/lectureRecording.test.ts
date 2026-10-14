@@ -13,7 +13,7 @@ import type { InkStroke } from '../../src/features/exam/contract.ts';
 const slides = ['a', 'b', 'c'].map((id, i) => ({ id, path: `deck/${id}.webp`, section: '01', label: `슬라이드 ${i + 1}`, bookPage: 100 + i }));
 const stroke = (id: string, x = 0.1, ms = 400): InkStroke => ({
   id, tool: 'pen', color: '#1f2937', size: 4,
-  points: [{ x, y: 0.1, pressure: 0.6, t: 0 }, { x: x + 0.05, y: 0.12, pressure: 0.6, t: ms / 2 }, { x: x + 0.1, y: 0.15, pressure: 0.6, t: ms }],
+  points: [{ x, y: 0.1, pressure: 0.6, t: 0 }, { x: +(x + 0.05).toFixed(6), y: 0.12, pressure: 0.6, t: ms / 2 }, { x: +(x + 0.1).toFixed(6), y: 0.15, pressure: 0.6, t: ms }],
 });
 
 test('녹음 시계는 일시정지한 시간을 빼고 잰다', () => {
@@ -212,6 +212,120 @@ test('세션: 녹음 → 일시정지 → 이어하기 → 슬라이드 넘김 �
   assert.equal(replay.frame(7000).slideId, 'b');
   assert.deepEqual(replay.frame(10000).strokes.map(x => x.id), ['s2']);
   assert.deepEqual(replay.finalInk().a.map(x => x.id), ['pre', 's1']);
+});
+
+async function savedEntries(h: ReturnType<typeof harness>) {
+  const manifest = await h.manifest();
+  return mergeChunks(await Promise.all(manifest.chunks.map(c => decodeChunkFile(h.files.get(`${manifest.recordingId}/${c.file}`)!, c.encoding))));
+}
+
+test('일시정지 중 여러 슬라이드의 편집은 이어하기 때 최종 결과만 즉시 나타난다', async () => {
+  const h = harness(), s = h.session;
+  const old = stroke('old'), one = stroke('one'), two = stroke('two'), three = stroke('three'), other = stroke('other');
+  await s.start({ deckId: 'd1', title: '수업', slides, initialSlideId: 'a', ink: { a: [old] } });
+  h.advance(2000);
+  await s.pause();
+  s.logInk('a', [old], [old, one], 'draw');
+  s.logInk('a', [old, one], [old, one, two], 'draw');
+  s.logInk('a', [old, one, two], [old, one, two, three], 'draw');
+  s.logInk('a', [old, one, two, three], [one, two, three], 'erase');
+  s.logSlide('b');
+  s.logInk('b', [], [other], 'draw');
+  s.logSlide('c');
+  s.logSlide('b');
+  h.advance(60000);
+  await s.flush();
+  await s.whenIdle();
+  assert.deepEqual((await savedEntries(h)).map(e => e.at), [0], '일시정지 중에는 자동 저장해도 편집 과정이 없다');
+  await s.resume();
+  h.advance(1000);
+  const later = stroke('later');
+  s.logInk('b', [other], [other, later], 'draw');
+  await s.end();
+  const entries = await savedEntries(h);
+  const resumed = entries.filter(e => e.at === 2000);
+  assert.deepEqual(resumed.map(e => [e.type, e.slideId]), [['ink', 'a'], ['ink', 'b'], ['slide', 'b']]);
+  for (const entry of resumed.slice(0, 2)) {
+    assert.ok(entry.type === 'ink');
+    assert.equal(entry.event.kind, 'restore');
+    assert.equal(entry.event.at, 2000);
+  }
+  assert.equal(entries.filter(e => e.type === 'ink' && e.event.kind === 'draw').length, 1);
+  const replay = buildLectureReplay(await h.manifest(), entries);
+  for (const t of [0, 1600, 1800, 1999]) {
+    assert.deepEqual(replay.strokesAt('a', t), [old]);
+    assert.deepEqual(replay.strokesAt('b', t), [], '이어하기 전에는 획의 일부도 보이지 않는다');
+  }
+  assert.deepEqual(replay.strokesAt('a', 2000), [one, two, three]);
+  assert.deepEqual(replay.frame(2000).strokes, [other]);
+  assert.equal(replay.frame(2000).slideId, 'b');
+  assert.equal(replay.frame(2800).strokes.at(-1)!.points.length, 2, '이어하기 이후 획은 평소대로 그려진다');
+  assert.deepEqual((await h.manifest()).clips.map(c => c.offsetMs), [0, 2000]);
+});
+
+test('이어하기가 실패해도 일시정지 결과를 보존하고 다음 이어하기 때 한 번만 기록한다', async () => {
+  const options = { micError: '' }, h = harness(options), s = h.session;
+  const first = stroke('first'), final = stroke('final');
+  await s.start({ deckId: 'd1', title: '수업', slides, initialSlideId: 'a', ink: {} });
+  h.advance(1000);
+  await s.pause();
+  s.logInk('a', [], [first], 'draw');
+  options.micError = 'NotAllowedError';
+  await s.resume();
+  assert.equal(s.state.phase, 'paused');
+  s.logInk('a', [first], [final], 'restore');
+  options.micError = '';
+  await s.resume();
+  await s.end();
+  const entries = await savedEntries(h);
+  assert.equal(entries.length, 1);
+  assert.deepEqual(buildLectureReplay(await h.manifest(), entries).frame(1000).strokes, [final]);
+});
+
+test('예전 v1 일시정지 시각의 개별 획도 파일에서 읽어 그대로 재생한다', async () => {
+  const log = new TimelineLog(), one = stroke('one'), two = stroke('two');
+  log.ink(1000, 'a', [], [one], 'draw');
+  log.ink(1000, 'a', [one], [one, two], 'draw');
+  const encoded = await encodeChunkFile(splitIntoChunks(log.take(), 1)[0]);
+  const chunk = await decodeChunkFile(encoded.blob, encoded.encoding);
+  const manifest = createManifest({ recordingId: 'old', deckId: 'd1', title: '수업', slides, initialSlideId: 'a' });
+  assert.equal(manifest.version, 1);
+  assert.deepEqual(buildLectureReplay(parseManifest(manifest), chunk.entries).frame(1000).strokes, [one, two]);
+});
+
+test('일시정지 후 바로 끝내면 지우기와 실행 취소 결과도 마지막 시각에 저장한다', async () => {
+  const h = harness(), s = h.session;
+  const old = stroke('old'), extra = stroke('extra');
+  await s.start({ deckId: 'd1', title: '수업', slides, initialSlideId: 'a', ink: { a: [old] } });
+  h.advance(1000);
+  await s.pause();
+  s.logInk('a', [old], [], 'clear');
+  s.logSlide('b');
+  s.logInk('b', [], [extra], 'draw');
+  s.logInk('b', [extra], [], 'undo');
+  h.advance(60000);
+  await s.end();
+  const entries = await savedEntries(h);
+  assert.deepEqual(entries.map(e => [e.type, e.at, e.slideId]), [['ink', 0, 'a'], ['ink', 1000, 'a'], ['slide', 1000, 'b']]);
+  const replay = buildLectureReplay(await h.manifest(), entries);
+  assert.deepEqual(replay.finalInk().a, []);
+  assert.equal(replay.frame(1000).slideId, 'b');
+});
+
+test('일시정지 중 변경을 되돌리거나 변경 없이 이어하면 추가 기록이 없다', async () => {
+  const h = harness(), s = h.session, extra = stroke('extra');
+  await s.start({ deckId: 'd1', title: '수업', slides, initialSlideId: 'a', ink: {} });
+  h.advance(1000);
+  await s.pause();
+  s.logInk('a', [], [extra], 'draw');
+  s.logInk('a', [extra], [], 'undo');
+  s.logSlide('b'); s.logSlide('a');
+  await s.resume();
+  h.advance(1000);
+  await s.pause();
+  await s.resume();
+  await s.end();
+  assert.deepEqual(await savedEntries(h), []);
 });
 
 test('세션: 화면을 벗어나면 저절로 일시정지하고, 돌아오면 화면 켜짐 유지를 다시 잡는다', async () => {
