@@ -24,7 +24,7 @@ try {
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     let sheet = await open(page, 'user=student-1');
     assert.deepEqual(await sectionTitles(sheet), ['공부하기', '내 기록', '기타'], '최근 사용 기록이 없으면 그 영역은 없다');
-    assert.deepEqual(await rowsIn(sheet, '공부하기'), ['📝 기출문제 풀이', '복습체크', '선생님 풀이 힌트']);
+    assert.deepEqual(await rowsIn(sheet, '공부하기'), ['🙋 서로 도와주기', '📝 기출문제 풀이', '복습체크', '선생님 풀이 힌트']);
     assert.deepEqual(await rowsIn(sheet, '내 기록'), ['나의 학습 현황', '나의 시험대비 분석', '복습완료 보관함', '숨긴 카드 🙈']);
     assert.deepEqual(await rowsIn(sheet, '기타'), ['수업자료', '🎮 Pixel Room', '이용안내']);
 

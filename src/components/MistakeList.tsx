@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import '../styles/notes.css';
 import type { MistakeEntry } from '../types';
 import { MistakeCard } from './MistakeCard';
+import { useMyHelpRequests } from '../features/peerHelp/requester/useMyHelpRequests';
+import { HelpRequestChip } from '../features/peerHelp/requester/HelpRequestChip';
 import { LaTeXRenderer } from './LaTeXRenderer';
 import { supabase } from '../services/supabase';
 import { getScreenState, setScreenState } from '../app/screenStateStore';
@@ -88,6 +90,7 @@ export const MistakeList: React.FC<MistakeListProps> = ({
   onRetryCheckpointGeneration,
   onlineUsers = [],
 }) => {
+  const { requests: helpRequests, error: helpError } = useMyHelpRequests(currentUserId);
   const [showOnlinePopup, setShowOnlinePopup] = useState(false);
   // 'notes' 탭은 viewMode 생략(card 기본값), 'completed' 탭은 'list'를 넘겨서 두 사용처가
   // 이미 서로 다른 값을 쓰고 있으므로 이걸 그대로 저장 키로 재사용한다(새 prop 추가 없이 두
@@ -249,6 +252,7 @@ export const MistakeList: React.FC<MistakeListProps> = ({
 
   return (
     <div className="rn-notes space-y-5" ref={rootRef}>
+      {helpError && <p role="alert" className="text-sm text-rose-300">{helpError}</p>}
       <header className="rn-notes-header">
         <div>
           <p className="rn-eyebrow">{viewMode === 'list' ? 'MY PROGRESS' : 'DAILY PRACTICE'}</p>
@@ -461,6 +465,7 @@ export const MistakeList: React.FC<MistakeListProps> = ({
                     </label>}
                     <button type="button" className="rn-record-open" onClick={() => onSelectEntry(entry)}>
                       <span className="rn-note-subject">{entry.grade || '수학'}{entry.chapter ? ` · ${entry.chapter}` : ''}</span>
+                      <HelpRequestChip request={helpRequests[entry.id]} />
                       <span className="rn-record-title"><LaTeXRenderer text={entry.title} className="line-clamp-2" /></span>
                       <span className="rn-note-meta">{studentName && <span>{studentName}</span>}<span>{entry.date ? entry.date.slice(5, 10).replace(/-/g, '/') : '—/—'}</span>{entry.analysis?.printed && <span className="rn-note-hint">인쇄 완료</span>}</span>
                       <span className="rn-record-bottom">
@@ -480,6 +485,7 @@ export const MistakeList: React.FC<MistakeListProps> = ({
                 <MistakeCard
                   key={entry.id}
                   entry={entry}
+                  helpRequest={helpRequests[entry.id]}
                   onSelect={onSelectEntry}
                   onDelete={onDeleteMistake}
                   studentName={isAdmin && entry.userId ? (profilesMap[entry.userId] || entry.userId.slice(0, 8)) : undefined}

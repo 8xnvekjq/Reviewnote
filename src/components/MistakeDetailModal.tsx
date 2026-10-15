@@ -11,8 +11,10 @@ import { MistakeScaffoldingDrawer } from './MistakeScaffoldingDrawer';
 import { HandwritingOverlay, type HandwritingOverlayBounds, type HandwritingOverlayHandle } from './HandwritingOverlay';
 import { useSharedSaveLock } from '../features/handwriting/useSharedSaveLock';
 import { CollapsibleSection } from './CollapsibleSection';
+import { HelpRequesterPanel } from '../features/peerHelp/requester/HelpRequesterPanel';
 
 interface MistakeDetailModalProps {
+  onPointsChanged?: () => void;
   selectedEntry: MistakeEntry;
   allEntries?: MistakeEntry[];
   peerActivities?: any[];
@@ -121,6 +123,7 @@ const getInitialImageWindowLayout = (): ImageWindowLayout => {
 
 export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
   selectedEntry,
+  onPointsChanged,
   allEntries = [],
   peerActivities = [],
   isAnalyzing,
@@ -1156,6 +1159,7 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
         {/* Modal Body */}
         <div className="rn-detail-body flex-1 overflow-y-auto p-6 space-y-6">
+          {currentUserId && selectedEntry.userId === currentUserId && <HelpRequesterPanel key={selectedEntry.id} mistakeId={selectedEntry.id} imageUrl={selectedEntry.imageUrl} currentUserId={currentUserId} onPointsChanged={onPointsChanged} />}
 
           <section className="rn-problem" aria-label="문제와 풀이노트">
             <button type="button" className="rn-problem-image" onClick={openImageWindow} aria-label="문제 이미지 확대">

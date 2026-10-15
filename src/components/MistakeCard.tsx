@@ -1,4 +1,6 @@
 import React from 'react';
+import type { MyHelpRequest } from '../features/peerHelp/api';
+import { HelpRequestChip } from '../features/peerHelp/requester/HelpRequestChip';
 import '../styles/notes.css';
 import type { MistakeEntry } from '../types';
 import { SOLVING_PLACEHOLDER_TEXT, resolveNeedsHelp } from '../types';
@@ -9,6 +11,7 @@ import { LaTeXRenderer } from './LaTeXRenderer';
 import { CatPawIcon } from './CatPawIcon';
 
 interface MistakeCardProps {
+  helpRequest?: MyHelpRequest;
   entry: MistakeEntry;
   onSelect: (entry: MistakeEntry) => void;
   onDelete: (id: string, e: React.MouseEvent) => void;
@@ -22,7 +25,7 @@ interface MistakeCardProps {
   onRetryCheckpointGeneration?: () => void; // 재생성 실패 시 "다시 시도"
 }
 
-export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDelete, studentName, isOwnNote = true, equippedStamp, hasScaffolding, isReviewCheckWeak, onToggleHidden, checkpointRegenStatus, onRetryCheckpointGeneration }) => {
+export const MistakeCard: React.FC<MistakeCardProps> = ({ helpRequest, entry, onSelect, onDelete, studentName, isOwnNote = true, equippedStamp, hasScaffolding, isReviewCheckWeak, onToggleHidden, checkpointRegenStatus, onRetryCheckpointGeneration }) => {
   const needsHelp = resolveNeedsHelp(entry.reviews, entry.analysis?.needsHelp);
   const completedCount = (entry.reviews || []).filter(r => r === 'O').length;
   const isCompleted = completedCount === 3;
@@ -58,6 +61,7 @@ export const MistakeCard: React.FC<MistakeCardProps> = ({ entry, onSelect, onDel
           {!entry.reviewCheckMasteredAt && isReviewCheckWeak && <span className="rn-note-weak-badge" title="복습체크에서 최근에 틀렸어요 · 다시 복습해 보세요" aria-label="복습체크 약함">약함</span>}
         </div>
         <div className="rn-note-body">
+          {isOwnNote && <HelpRequestChip request={helpRequest} />}
           <h3 className="rn-note-title"><LaTeXRenderer text={entry.title} className="line-clamp-2" /></h3>
           {/* 과목/단원 — 상단 베젤에서 원래 위치(제목 바로 아래 한 줄)로 복원. 칩/배지가
               아니라 조용한 compact text로 둬서 "배지가 여러 개 쪼개진" 느낌을 줄인다. */}
