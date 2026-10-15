@@ -37,7 +37,7 @@ try {
   });
   await page.goto(base + '/tests/ui/lecture-deck.html');
 
-  const result = await page.evaluate(async ({ minutes, slideFiles, busyMs }) => {
+  const result = await page.evaluate(async ({ minutes, slideFiles, busyMs, repaint, repaintSlow }) => {
     const { buildLectureReplay } = await import('/src/features/lectures/lectureRecordingModel.ts');
     const { exportLectureMp4 } = await import('/src/features/lectures/lectureExport.ts');
     const mb = await import('/@id/mediabunny');
@@ -113,6 +113,22 @@ try {
     const setupMs = performance.now() - setupStarted;
 
     // BUSY_MS=8: 앱의 다른 작업처럼 16ms마다 메인 스레드를 그만큼 붙잡는다(인코딩이 메인 스레드 경쟁에 얼마나 약한지).
+    // REPAINT=1: 앱 화면처럼 계속 다시 그려지는 요소(rAF로 글자·폭이 바뀌는 막대) — 크롬 버그 414491381 재현용.
+    if (repaint) {
+      const bar = document.createElement('div');
+      bar.style.cssText = 'position:fixed;left:0;bottom:0;height:12px;background:#6366f1;z-index:99';
+      // 앱 화면(#root) 안에 둔다 — 내보내는 동안 숨겨져야 다시 그리기가 멈춘다.
+      (document.getElementById('root') ?? document.body).append(bar);
+      const tick = now => { bar.style.width = `${(now / 20) % 100}%`; bar.textContent = String(Math.floor(now)); requestAnimationFrame(tick); };
+      requestAnimationFrame(tick);
+    }
+    // REPAINT_SLOW=1: 진행 막대처럼 화면 밖(포털)에서 1초에 한 번 바뀌는 요소 — 이 정도는 괜찮은지.
+    if (repaintSlow) {
+      const bar = document.createElement('div');
+      bar.style.cssText = 'position:fixed;left:0;top:0;height:12px;background:#22c55e;z-index:99';
+      document.body.append(bar);
+      setInterval(() => { bar.style.width = `${Math.random() * 100}%`; bar.textContent = String(Date.now()); }, 1000);
+    }
     if (busyMs) setInterval(() => { const end = performance.now() + busyMs; while (performance.now() < end); }, 16);
     const replay = buildLectureReplay({ slides, initialSlideId: 's1', durationMs: total, clips }, entries);
     let peakHeap = 0, lastLog = -1;
@@ -172,7 +188,7 @@ try {
       duration: await input.computeDuration(), startHeapMB: Math.round(startHeap / 1048576), peakHeapMB: Math.round(peakHeap / 1048576),
       strokes: strokeTimes.length, beeps, edge, inkChecks, timings: exported.timings, encoder: exported.encoder, bench: exported.bench, hiddenMs: Math.round(exported.timings.hidden),
     };
-  }, { minutes, slideFiles, busyMs: Number(process.env.BUSY_MS ?? 0) });
+  }, { minutes, slideFiles, busyMs: Number(process.env.BUSY_MS ?? 0), repaint: !!process.env.REPAINT, repaintSlow: !!process.env.REPAINT_SLOW });
 
   console.log(JSON.stringify(result));
   assert.deepEqual(errors, []);

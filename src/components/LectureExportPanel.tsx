@@ -50,6 +50,7 @@ export const LectureExportPanel: React.FC<{
     if (urlRef.current) { URL.revokeObjectURL(urlRef.current); urlRef.current = null; }
     setState({ phase: 'running', full, fromMs, toMs, progress: null });
     let wake: WakeLockSentinel | null = null;
+    let lastPaint = 0;
     try {
       wake = await (navigator as Navigator & { wakeLock?: { request(type: 'screen'): Promise<WakeLockSentinel> } }).wakeLock?.request('screen') ?? null;
     } catch { /* 화면 켜짐 유지를 못 해도 계속 */ }
@@ -57,7 +58,13 @@ export const LectureExportPanel: React.FC<{
       const result = await exportLectureMp4({
         replay: recording.replay, slideIds: recording.manifest.slides.map(slide => slide.id), slideUrls, clips: recording.clips,
         fromMs, toMs, toFile: full, signal: controller.signal,
-        onProgress: progress => setState(prev => prev.phase === 'running' ? { ...prev, progress } : prev),
+        // 진행 표시는 1초에 한 번만 바꾼다 — 화면을 자주 다시 그리면 크롬 영상 인코더가 느려진다.
+        onProgress: progress => {
+          const now = performance.now();
+          if (now - lastPaint < 1000 && progress.doneMs < progress.totalMs) return;
+          lastPaint = now;
+          setState(prev => prev.phase === 'running' ? { ...prev, progress } : prev);
+        },
       });
       const url = URL.createObjectURL(result.blob);
       urlRef.current = url;
@@ -102,7 +109,7 @@ export const LectureExportPanel: React.FC<{
         return (
           <>
             <div className="h-2 rounded-full bg-slate-800 overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(ratio * 100)}>
-              <div className="h-full bg-indigo-500 transition-[width]" style={{ width: `${ratio * 100}%` }} />
+              <div className="h-full bg-indigo-500" style={{ width: `${ratio * 100}%` }} />
             </div>
             <div className="flex items-center justify-between text-[11px] text-slate-300">
               <span data-testid="export-progress">{Math.round(ratio * 100)}% · 영상 {formatDuration(p?.doneMs ?? 0)} / {formatDuration(state.toMs - state.fromMs)}</span>
