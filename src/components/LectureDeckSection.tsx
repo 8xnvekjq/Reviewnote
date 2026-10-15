@@ -11,7 +11,6 @@ import {
   type LectureRecordingRow, type LoadedRecording,
 } from '../features/lectures/lectureRecordings';
 import { formatDuration } from '../features/lectures/lectureRecordingModel';
-import { createTestRecording } from '../features/lectures/lectureTestRecording';
 import { groupLectureDecks, readResume, rememberResume, unitPages, type LectureBook, type LectureUnit, type ResumeEntry } from '../features/lectures/lectureLibrary';
 
 const formatMB = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)}MB`;
@@ -197,18 +196,6 @@ const LectureUnitRow: React.FC<{ lib: LectureLibrary; unit: LectureUnit; manage:
   useEffect(() => { if (lib.recordedDeckId === deck.id) setRecOpen(true); }, [lib.recordedDeckId, deck.id]);
   useEffect(() => { if (recOpen) void load(); }, [recOpen, load, lib.recordingsVersion]);
 
-  // 🧪 MP4 내보내기 시험용 가짜 긴 녹음(확인이 끝나면 지운다).
-  const [testStep, setTestStep] = useState('');
-  const makeTestRecording = async () => {
-    if (!confirm(`'${unit.name}' 슬라이드로 30분짜리 테스트 녹음을 만들까요? (가짜 필기 + 매 분 삐 소리, 저장소 약 1MB)`)) return;
-    setTestStep('준비 중…');
-    try {
-      await createTestRecording(supabaseRecordingBackend(supabase), deck, 30, setTestStep);
-      setRecOpen(true); await load(); await lib.refresh();
-    } catch (err) { console.error('[lecture] 테스트 녹음 실패:', err); alert(`테스트 녹음을 만들지 못했습니다: ${err instanceof Error ? err.message : err}`); }
-    finally { setTestStep(''); }
-  };
-
   const removeRecording = async (row: LectureRecordingRow) => {
     if (!confirm(`'${row.title}' 녹음을 삭제할까요? 음성과 필기 기록이 모두 지워집니다.`)) return;
     try { await deleteLectureRecording(supabase, row.id); await load(); await lib.refresh(); }
@@ -234,14 +221,6 @@ const LectureUnitRow: React.FC<{ lib: LectureLibrary; unit: LectureUnit; manage:
         </button>
         {manage ? (
           <>
-            <button
-              onClick={() => void makeTestRecording()}
-              disabled={!!testStep}
-              aria-label={`${unit.name} 30분 테스트 녹음 만들기`}
-              className="flex-none text-xs font-bold text-slate-300 hover:text-amber-200 bg-slate-900 px-2.5 py-1.5 border border-slate-700 rounded-lg active:scale-95 disabled:opacity-60"
-            >
-              {testStep || '🧪 30분 테스트 녹음'}
-            </button>
             <select
               value={deck.grade}
               onChange={e => void lib.changeGrade(deck, e.target.value as GradeLevel)}
