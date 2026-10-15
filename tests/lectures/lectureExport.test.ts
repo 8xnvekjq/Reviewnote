@@ -82,7 +82,8 @@ test('resample: 44.1kHz → 48kHz 길이와 값', () => {
   assert.equal(resample(input, 48_000, 48_000), input, '같으면 그대로');
 });
 
-test('exportFileName: 파일 이름에 못 쓰는 글자를 빼고 구간을 붙인다', () => {
-  assert.equal(exportFileName('개념원리: 명제/역', 60_000, 120_000, true), '개념원리 명제 역 (테스트 1m00s-2m00s).mp4');
-  assert.equal(exportFileName('  ', 0, 1, false), '수업.mp4');
+test('exportFileName: 파일 이름에 못 쓰는 글자를 뺀다', () => {
+  assert.equal(exportFileName('개념원리: 명제/역'), '개념원리 명제 역.mp4');
+  assert.equal(exportFileName('a\\b'), 'a b.mp4');
+  assert.equal(exportFileName('  '), '수업.mp4');
 });

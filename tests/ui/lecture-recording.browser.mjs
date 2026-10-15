@@ -264,11 +264,11 @@ try {
     await page.getByRole('button', { name: '일시정지', exact: true }).click();
     await page.screenshot({ path: '.test-artifacts/lecture-replay-tablet.png' }).catch(() => {});
 
-    // 3-1) MP4 테스트 내보내기: 처음부터(녹음이 1분보다 짧으면 전체) → 영상 파일을 다시 열어 길이·소리·장면을 검사한다.
+    // 3-1) MP4 내보내기(전체) → 영상 파일을 다시 열어 길이·소리·장면을 검사한다.
     await seek(0);
     await page.getByRole('button', { name: 'MP4로 저장' }).click();
     const exportPanel = page.getByTestId('lecture-export');
-    await exportPanel.getByRole('button', { name: /^1분 테스트/ }).click();
+    await exportPanel.getByRole('button', { name: /^전체 영상 만들기/ }).click();
     await page.waitForFunction(() => ['done', 'error'].includes(document.querySelector('[data-testid=lecture-export]')?.dataset.phase), null, { timeout: 60_000 });
     assert.equal(await exportPanel.getAttribute('data-phase'), 'done', await exportPanel.innerText());
     const stats = await page.getByTestId('export-stats').innerText();
@@ -278,7 +278,7 @@ try {
     const download = page.waitForEvent('download');
     await exportPanel.getByRole('link', { name: '⬇ 기기에 저장' }).click();
     const file = await download;
-    assert.match(file.suggestedFilename(), /\(테스트 0m00s-0m\d\ds\)\.mp4$/);
+    assert.match(file.suggestedFilename(), /녹음\.mp4$/);
     await file.saveAs('.test-artifacts/lecture-export.mp4').catch(() => {});
     const probe = await page.evaluate(async ({ resumeAt, total }) => {
       const mb = await import('/@id/mediabunny');
