@@ -313,7 +313,7 @@ try {
     assert.equal(probe.videoCodec, 'avc');
     assert.equal(probe.audioCodec, 'aac');
     assert.ok(Math.abs(probe.duration * 1000 - manifest.durationMs) < 150, `영상 길이 ${probe.duration}s ≈ 녹음 ${manifest.durationMs}ms`);
-    assert.ok(probe.peak > 0.01, '가짜 마이크 소리가 들어 있다');
+    assert.ok(probe.peak > 0.01 && probe.peak < 1.5, `가짜 마이크 소리가 들어 있고 튀지 않는다 (최고 ${probe.peak})`);
     const dark = v => v < 120, light = v => v > 200;
     assert.ok(dark(probe.start[0]) && light(probe.start[1]), `처음: 슬라이드1 + 녹음 전 획만 ${probe.start}`);
     assert.ok(light(probe.afterResume[0]) && dark(probe.afterResume[2]), `이어하기 직후: 슬라이드2 + 멈춘 동안 쓴 획 ${probe.afterResume}`);
@@ -327,6 +327,42 @@ try {
     await list.getByText('아직 녹음이 없습니다', { exact: false }).waitFor();
     assert.equal(recRows.length, 0);
     assert.equal([...recFiles.keys()].filter(k => k.startsWith(recId)).length, 0);
+
+    // 5) 🧪 30분 테스트 녹음(관리) → 재생 → 클립 경계(10분)를 지나는 1분을 MP4로: 삐 소리가 10:00에 있어야 한다.
+    await page.getByRole('button', { name: '⚙ 관리' }).click();
+    await page.getByRole('button', { name: '01 명제 30분 테스트 녹음 만들기' }).click();
+    for (let i = 0; i < 300 && recRows[0]?.status !== 'done'; i++) await page.waitForTimeout(100);
+    assert.equal(recRows[0]?.duration_ms, 30 * 60_000);
+    const testId = recRows[0].id;
+    const testManifest = JSON.parse(recFiles.get(`${testId}/manifest.json`).body.toString());
+    assert.deepEqual(testManifest.clips.map(c => c.offsetMs), [0, 600_000, 1_350_000]);
+    await list.getByRole('button', { name: /테스트 녹음 30분.*재생$/ }).click();
+    await page.getByTestId('lecture-replay-bar').waitFor();
+    assert.match(await page.getByTestId('replay-time').textContent(), /\/ 30:00$/);
+    await seek(570_000);
+    await page.getByRole('button', { name: 'MP4로 저장' }).click();
+    await exportPanel.getByRole('button', { name: '1분 테스트 (9:30–10:30)' }).click();
+    await page.waitForFunction(() => ['done', 'error'].includes(document.querySelector('[data-testid=lecture-export]')?.dataset.phase), null, { timeout: 60_000 });
+    assert.equal(await exportPanel.getAttribute('data-phase'), 'done', await exportPanel.innerText());
+    const beep = await page.evaluate(async () => {
+      const mb = await import('/@id/mediabunny');
+      const src = document.querySelector('[data-testid=export-preview]').src;
+      const input = new mb.Input({ source: new mb.BlobSource(await (await fetch(src)).blob()), formats: mb.ALL_FORMATS });
+      const audio = await input.getPrimaryAudioTrack();
+      const rms = async (from, to) => {
+        let sum = 0, n = 0;
+        for await (const { buffer, timestamp } of new mb.AudioBufferSink(audio).buffers(from, to)) {
+          const d = buffer.getChannelData(0);
+          for (let i = 0; i < d.length; i++) { const t = timestamp + i / buffer.sampleRate; if (t >= from && t < to) { sum += d[i] * d[i]; n++; } }
+        }
+        return n ? Math.sqrt(sum / n) : 0;
+      };
+      return { at: await rms(30.05, 30.35), before: await rms(29.5, 29.9), after: await rms(30.5, 30.9), duration: await input.computeDuration() };
+    });
+    assert.ok(beep.at > 0.2 && beep.before < 0.02 && beep.after < 0.02, `10:00 삐 소리 ${JSON.stringify(beep)}`);
+    assert.ok(Math.abs(beep.duration - 60) < 0.2);
+    await page.keyboard.press('Escape');
+    await viewer.waitFor({ state: 'detached' });
     assert.deepEqual(errors, []);
     console.log(`PASS: pen-only ink per slide, record→pause→resume→slide→hidden auto-pause→resume→end (${manifest.clips.length} clips, ${manifest.chunks.length} gzip ink chunks, ${manifest.durationMs} ms), reopen replay (slides+strokes at times, audio blob), delete`);
   } finally { await context.close(); }
