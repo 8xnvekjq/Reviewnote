@@ -131,9 +131,12 @@ export function drawLectureFrame(ctx: Ctx, highlightCtx: Ctx, image: CanvasImage
 export interface ExportProgress { doneMs: number; totalMs: number; elapsedMs: number; frames: number }
 /** 어디에 시간이 들었는지(ms). hidden = 화면이 숨겨져 있던 시간(그동안도 계속 만든다). */
 export interface ExportTimings { draw: number; video: number; audio: number; hidden: number }
+export type EncoderMode = 'prefer-hardware' | 'prefer-software';
+/** 시작할 때 잰 인코더 속도(프레임당 ms). 더 빠른 쪽으로 만든다. */
+export type EncoderBench = Partial<Record<EncoderMode, number>>;
 export interface ExportResult {
   blob: Blob; videoCodec: string; audioCodec: string | null; frames: number; elapsedMs: number; durationMs: number;
-  timings: ExportTimings;
+  timings: ExportTimings; encoder: EncoderMode | null; bench: EncoderBench;
   /** 영상 파일을 둔 곳: 브라우저 저장 공간(긴 영상) 또는 메모리. */
   storage: 'opfs' | 'memory';
 }
@@ -307,6 +310,39 @@ async function openFileTarget(mb: Mediabunny, durationMs: number) {
   };
 }
 
+/** 같은 컴퓨터에서도 하드웨어 인코더가 다른 프로그램과 겹치면 몇 배 느려질 수 있다(2026-10-16 PC 30분 영상:
+ *  프레임당 31ms ↔ 시험 환경 4–6ms). 그래서 실제 첫 화면으로 두 인코더를 잠깐 돌려 보고 빠른 쪽을 고른다. */
+export async function pickEncoder(mb: Mediabunny, codec: string, canvas: HTMLCanvasElement, ctx: Ctx, frames = 30, warmup = 5):
+  Promise<{ mode: EncoderMode | null; bench: EncoderBench }> {
+  const bench: EncoderBench = {};
+  const snapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  for (const mode of ['prefer-hardware', 'prefer-software'] as const) {
+    const config = { codec: codec as 'avc', quality: mb.QUALITY_HIGH, keyFrameInterval: EXPORT_KEYFRAME_S, hardwareAcceleration: mode };
+    if (!(await mb.canEncodeVideo(config.codec, { width: canvas.width, height: canvas.height, quality: mb.QUALITY_HIGH, hardwareAcceleration: mode }).catch(() => false))) continue;
+    const output = new mb.Output({ format: new mb.Mp4OutputFormat(), target: new mb.NullTarget() });
+    try {
+      const source = new mb.CanvasSource(canvas, config);
+      output.addVideoTrack(source, { frameRate: EXPORT_FPS });
+      await output.start();
+      let t0 = 0;
+      for (let i = 0; i < frames; i++) {
+        if (i === warmup) t0 = performance.now();
+        // 필기처럼 작은 곳만 바뀌는 프레임
+        ctx.fillStyle = '#1f2937';
+        ctx.fillRect(200 + i * 12, 600, 10, 10);
+        await source.add(i / EXPORT_FPS, 1 / EXPORT_FPS);
+      }
+      await output.finalize();
+      bench[mode] = Math.round((performance.now() - t0) / (frames - warmup) * 10) / 10;
+    } catch {
+      await output.cancel().catch(() => {});
+    }
+    ctx.putImageData(snapshot, 0, 0);
+  }
+  const modes = Object.entries(bench) as [EncoderMode, number][];
+  return { mode: modes.length ? modes.sort((a, b) => a[1] - b[1])[0][0] : null, bench };
+}
+
 export async function exportLectureMp4(input: LectureExportInput): Promise<ExportResult> {
   const { replay, fromMs, signal, onProgress } = input;
   const toMs = Math.min(input.toMs, replay.total);
@@ -342,13 +378,21 @@ export async function exportLectureMp4(input: LectureExportInput): Promise<Expor
   const timings: ExportTimings = { draw: 0, video: 0, audio: 0, hidden: 0 };
   const hidden = hiddenTimer();
   try {
-    const video = new mb.CanvasSource(canvas, { codec: videoCodec, quality: mb.QUALITY_HIGH, keyFrameInterval: EXPORT_KEYFRAME_S });
+    const frames = planFrames(replay.frameKey, fromMs, toMs);
+    // 첫 화면을 그려 두고 인코더를 고른다.
+    if (frames.length) {
+      const first = replay.frame(frames[0].atMs);
+      drawLectureFrame(ctx, hctx, await images.get(first.slideId), first.strokes);
+    }
+    const { mode: encoder, bench } = await pickEncoder(mb, videoCodec, canvas, ctx);
+    const video = new mb.CanvasSource(canvas, {
+      codec: videoCodec, quality: mb.QUALITY_HIGH, keyFrameInterval: EXPORT_KEYFRAME_S, ...(encoder ? { hardwareAcceleration: encoder } : {}),
+    });
     output.addVideoTrack(video, { frameRate: EXPORT_FPS });
     const audio = audioCodec ? new mb.AudioBufferSource({ codec: audioCodec, quality: mb.QUALITY_HIGH }) : null;
     if (audio) output.addAudioTrack(audio);
     await output.start();
 
-    const frames = planFrames(replay.frameKey, fromMs, toMs);
     let next = 0;
     for (let win = 0; win < totalMs; win += EXPORT_WINDOW_MS) {
       const winEnd = Math.min(totalMs, win + EXPORT_WINDOW_MS);
@@ -403,7 +447,7 @@ export async function exportLectureMp4(input: LectureExportInput): Promise<Expor
     return {
       blob, videoCodec, audioCodec, frames: frames.length,
       elapsedMs: performance.now() - started, durationMs: totalMs, storage: file ? 'opfs' : 'memory',
-      timings: { ...timings, hidden: hidden.get() },
+      timings: { ...timings, hidden: hidden.get() }, encoder, bench,
     };
   } catch (error) {
     if (output.state === 'started') await output.cancel().catch(() => {});
