@@ -274,6 +274,16 @@ function hiddenTimer() {
   };
 }
 
+/** 크롬은 페이지가 다시 그려지는 동안 하드웨어 영상 인코더가 몇 배 느려진다(crbug 414491381; 2026-10-16 이 PC에서
+ *  rAF로 계속 바뀌는 막대 하나에 프레임당 7.6 → 38.6ms). 내보내는 동안 앱 본 화면(#root)을 숨겨 다시 그릴 것을 없앤다.
+ *  수업 보기·내보내기 창은 body에 따로 붙은 포털이라 그대로 보인다. */
+function quietPage() {
+  const style = document.createElement('style');
+  style.textContent = '#root { display: none !important; }';
+  document.head.append(style);
+  return () => style.remove();
+}
+
 type OpfsDirectory = FileSystemDirectoryHandle & { entries(): AsyncIterable<[string, FileSystemHandle]> };
 
 /** 지난 내보내기 파일을 지운다(브라우저 저장 공간을 계속 차지하지 않게). */
@@ -377,6 +387,7 @@ export async function exportLectureMp4(input: LectureExportInput): Promise<Expor
   let finished = false;
   const timings: ExportTimings = { draw: 0, video: 0, audio: 0, hidden: 0 };
   const hidden = hiddenTimer();
+  const restorePage = quietPage();
   try {
     const frames = planFrames(replay.frameKey, fromMs, toMs);
     // 첫 화면을 그려 두고 인코더를 고른다.
@@ -454,6 +465,7 @@ export async function exportLectureMp4(input: LectureExportInput): Promise<Expor
     if (!finished) await file?.discard();
     throw error;
   } finally {
+    restorePage();
     hidden.stop();
     images.close();
     for (const reader of readers.values()) reader.dispose();
