@@ -1,6 +1,24 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import QRCode from 'qrcode';
+
+/** 가짜 카메라 영상(Y4M): 화면 가운데에 QR 하나. 크롬은 이 파일을 카메라 대신 되풀이해 보여 준다. */
+function qrCameraFile(text, path) {
+  const { modules } = QRCode.create(text, { errorCorrectionLevel: 'M' });
+  const W = 640, H = 480, n = modules.size, cell = Math.floor(400 / (n + 8));
+  const x0 = Math.floor((W - n * cell) / 2), y0 = Math.floor((H - n * cell) / 2);
+  const y = Buffer.alloc(W * H, 235);
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+    if (!modules.get(r, c)) continue;
+    for (let dy = 0; dy < cell; dy++) y.fill(16, (y0 + r * cell + dy) * W + x0 + c * cell, (y0 + r * cell + dy) * W + x0 + (c + 1) * cell);
+  }
+  const uv = Buffer.alloc(W * H / 4, 128);
+  const frame = Buffer.concat([Buffer.from('FRAME\n'), y, uv, uv]);
+  writeFileSync(path, Buffer.concat([Buffer.from(`YUV4MPEG2 W${W} H${H} F30:1 Ip A1:1 C420jpeg\n`), ...Array(10).fill(frame)]));
+}
 
 const base = 'http://127.0.0.1:5178';
 const vite = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', '5178', '--strictPort'], { stdio: 'pipe', windowsHide: true });
@@ -13,14 +31,17 @@ try {
     if (vite.exitCode !== null) throw new Error(output);
     await new Promise(resolve => setTimeout(resolve, 100));
   }
-  browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 390, height: 844 } });
+  const token = 'a'.repeat(43);
+  mkdirSync('.test-artifacts', { recursive: true });
+  const camera = resolve('.test-artifacts/qr-camera.y4m');
+  qrCameraFile(`${base}/?qr=${token}`, camera);
+  browser = await chromium.launch({ headless: true, args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', `--use-file-for-fake-video-capture=${camera}`] });
+  const context = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 390, height: 844 }, permissions: ['camera'] });
   try {
     let used = false, expired = false, fail = false;
     let creates = 0;
     const calls = [];
     const user = { id: '11111111-1111-4111-8111-111111111111', email: 'student@reviewnote.com', aud: 'authenticated', role: 'authenticated', app_metadata: {}, user_metadata: {}, created_at: new Date().toISOString() };
-    const token = 'a'.repeat(43);
     const session = { access_token: 'test-access', refresh_token: 'test-refresh', token_type: 'bearer', expires_in: 3600, user };
     await context.routeWebSocket(/supabase/, ws => ws.close());
     await context.route('**/*', async route => {
@@ -91,12 +112,21 @@ try {
     assert.equal(calls.length, previousCalls, '기존 세션을 다른 계정으로 바꾸지 않는다');
     await page.evaluate(() => localStorage.clear());
     await page.goto(`${base}/tests/ui/qr-login.html`);
-    await page.getByRole('button', { name: '휴대폰으로 로그인 (코드 입력)' }).click();
+    await page.getByRole('button', { name: '휴대폰으로 로그인 (QR·코드)' }).click();
     await page.getByRole('textbox', { name: '로그인 코드' }).fill('abcd-efgh');
     await page.screenshot({ path: '.test-artifacts/qr-login-code.png' }).catch(() => {});
     await page.getByRole('button', { name: '코드로 로그인', exact: true }).click();
     await page.waitForFunction(() => localStorage.length > 0);
     assert.deepEqual(calls.at(-2), { kind: 'redeem', body: { code: 'ABCDEFGH' } });
+    await page.evaluate(() => localStorage.clear());
+    // 카메라로 QR 찍기: 가짜 카메라가 휴대폰 QR(로그인 주소)을 보여 준다 → 토큰만 꺼내 로그인.
+    await page.goto(`${base}/tests/ui/qr-login.html`);
+    await page.getByRole('button', { name: '휴대폰으로 로그인 (QR·코드)' }).click();
+    await page.getByRole('button', { name: '📷 QR로 인증하기' }).click();
+    await page.getByTestId('qr-scanner').waitFor();
+    await page.screenshot({ path: '.test-artifacts/qr-login-camera.png' }).catch(() => {});
+    await page.waitForFunction(() => localStorage.length > 0, null, { timeout: 15_000 });
+    assert.deepEqual(calls.at(-2), { kind: 'redeem', body: { token } }, '카메라로 읽은 토큰으로 로그인');
     await page.evaluate(() => localStorage.clear());
     fail = true;
     await page.goto(`${base}/tests/ui/qr-login.html?qr=${token}`);
