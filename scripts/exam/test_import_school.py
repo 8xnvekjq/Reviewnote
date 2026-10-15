@@ -63,7 +63,7 @@ class CoverTests(unittest.TestCase):
             yield path, config, resolve_pdf(config, path)
 
     def test_three_real_covers(self):
-        expected = {'dunchon': dict(questionCount=22, points=100), 'yeongpa': dict(questionCount=20, points=25), 'dongbuk': None, 'sangil': dict(questionCount=23, points=None), 'daedong': dict(questionCount=22, points=100), 'godeok': dict(questionCount=26, points=100), 'seongdeok': None}
+        expected = {'dunchon': dict(questionCount=22, points=100), 'yeongpa': dict(questionCount=20, points=25), 'dongbuk': None, 'sangil': dict(questionCount=23, points=None), 'daedong': dict(questionCount=22, points=100), 'godeok': dict(questionCount=26, points=100), 'seongdeok': None, 'myeongil': dict(questionCount=24, points=100)}
         for _, config, pdf in self.configs():
             with self.subTest(school=config['slug']), fitz.open(pdf) as doc:
                 self.assertEqual(read_cover(doc), expected[config['slug']])
@@ -81,7 +81,7 @@ class CoverTests(unittest.TestCase):
                 for explicit in (True, False):
                     candidate = copy.deepcopy(config)
                     if explicit:
-                        candidate['paper']['questionCount'] = {'dunchon': 22, 'yeongpa': 21, 'sangil': 23, 'daedong': 22, 'godeok': 26}[config['slug']]
+                        candidate['paper']['questionCount'] = {'dunchon': 22, 'yeongpa': 21, 'sangil': 23, 'daedong': 22, 'godeok': 26, 'myeongil': 24}[config['slug']]
                     path.write_text(json.dumps(candidate), encoding='utf-8')
                     out = folder / str(explicit)
                     run(path, out, True)
