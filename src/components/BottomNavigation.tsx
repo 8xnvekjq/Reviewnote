@@ -19,6 +19,7 @@ interface BottomNavigationProps {
 // "숨긴 카드" 행은 다른 메뉴 행과 같은 구조/스타일(AppIcon + 제목 + 설명)을 그대로 쓰고, 학생들이
 // 익숙해하던 원숭이(🙈)만 제목 텍스트 옆에 덧붙인다 — 아이콘 슬롯 자체를 이모지로 바꾸지 않는다.
 type MenuEntry = { tab: ActiveTab; label: string; description: string; icon: AppIconName; emoji?: string };
+const helpMenu: MenuEntry = { tab: 'help', label: '🙋 서로 도와주기', description: '친구 문제 풀어 주고 포인트 받기', icon: 'help' };
 const statsMenu: MenuEntry = { tab: 'stats', label: '나의 학습 현황', description: '복습 기록과 취약 단원', icon: 'chart' };
 const completedMenu: MenuEntry = { tab: 'completed', label: '복습완료 보관함', description: '세 번 익힌 문제와 인쇄', icon: 'check' };
 const scaffoldingMenu: MenuEntry = { tab: 'scaffolding', label: '선생님 풀이 힌트', description: '막힌 문제를 함께 풀어봐요', icon: 'book' };
@@ -59,7 +60,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab, s
   const slidesItem: SheetItem | null = onOpenSlideList ? { key: 'slides', label: '수업자료', description: '선생님이 준비한 교안 슬라이드', icon: 'book', current: false, onSelect: () => { remember('slides'); setMenuOpen(false); onOpenSlideList(); } } : null;
   // 표시 조건은 기존 그대로: 기출문제 풀이는 로그인 시, Pixel Room은 로그인 + Pixel World 접근 시(전체 공개).
   const sections: SheetSection[] = [
-    { title: '공부하기', items: [currentUserId ? tabItem(examPracticeMenu) : null, reviewCheckMenu && tabItem(reviewCheckMenu), tabItem(scaffoldingMenu)].filter((item): item is SheetItem => !!item) },
+    { title: '공부하기', items: [currentUserId ? tabItem(helpMenu) : null, currentUserId ? tabItem(examPracticeMenu) : null, reviewCheckMenu && tabItem(reviewCheckMenu), tabItem(scaffoldingMenu)].filter((item): item is SheetItem => !!item) },
     { title: '내 기록', items: [tabItem(statsMenu), examPrepMenu && tabItem(examPrepMenu), tabItem(completedMenu), tabItem(hiddenMenu)].filter((item): item is SheetItem => !!item) },
     { title: '기타', items: [slidesItem, currentUserId && canAccessPixelWorld ? tabItem(pixelRoomMenu) : null, currentUserId && isAdmin ? tabItem(pixelRoomLegacyMenu) : null, tabItem(guideMenu)].filter((item): item is SheetItem => !!item) },
   ].filter(section => section.items.length > 0);
