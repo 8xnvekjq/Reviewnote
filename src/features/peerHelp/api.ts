@@ -12,7 +12,11 @@ export interface HelpLabel { face: string; title: string | null; grade: string |
 export type HelpRequestStatus = 'open' | 'closed' | 'cancelled';
 export type HelpFeedback = 'like' | 'unclear';
 
-export interface MyHelpRequest { id: string; mistake_id: string; status: HelpRequestStatus; created_at: string; solution_count: number; unseen_count: number }
+export interface MyHelpRequest {
+  id: string; mistake_id: string; status: HelpRequestStatus; created_at: string; solution_count: number; unseen_count: number;
+  /** 서로 도와주기 탭의 '내가 도움 요청한 문제' 목록용 */
+  image_url?: string | null; title?: string | null;
+}
 export interface OpenHelpRequest {
   id: string; image_url: string; title: string | null; grade: string | null; chapter: string | null;
   created_at: string; solution_count: number; requester: HelpLabel; mine_submitted: boolean;

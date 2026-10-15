@@ -5,6 +5,8 @@ import { HelpInkLog, helpSolutionStats, helpTooShortReason } from '../solutionFi
 import { ExamInkCanvas } from '../../exam/ink/ExamInkCanvas';
 import type { ExamInkCanvasHandle, InkChangeKind, InkStroke, InkTool } from '../../exam/contract';
 import { HelpLabel } from './HelpLabel';
+import { ExamInkToolbar } from '../../exam/ui/ExamInkToolbar';
+import { PEN_COLORS, PEN_SIZES } from '../../exam/ui/inkToolbarOptions';
 import '../../../styles/examPractice.css';
 
 export function HelpSolveScreen({ request, userId, onClose, onSent }: {
@@ -16,7 +18,9 @@ export function HelpSolveScreen({ request, userId, onClose, onSent }: {
   const current = useRef<InkStroke[]>([]);
   const [strokes, setStrokes] = useState<InkStroke[]>([]);
   const [tool, setTool] = useState<InkTool>('pen');
-  const [color, setColor] = useState('#1e293b');
+  const [color, setColor] = useState(PEN_COLORS[0].value);
+  const [size, setSize] = useState(PEN_SIZES[1].value);
+  const [, setHistoryTick] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const sending = useRef(false);
@@ -57,13 +61,17 @@ export function HelpSolveScreen({ request, userId, onClose, onSent }: {
         <div><h2 className="font-bold">친구 문제 풀기</h2><HelpLabel label={request.requester} /></div>
         <button type="button" disabled={busy} onClick={leave} className="rounded bg-slate-700 px-4 py-3 disabled:opacity-50">나가기</button>
       </header>
-      <div role="toolbar" aria-label="필기 도구" className="flex flex-wrap gap-2 p-3">
-        {(['pen', 'eraser'] as const).map(value => <button type="button" key={value} disabled={busy} aria-pressed={tool === value} onClick={() => setTool(value)} className={`rounded px-4 py-3 ${tool === value ? 'bg-indigo-600' : 'bg-slate-700'}`}>{value === 'pen' ? '펜' : '지우개'}</button>)}
-        <button type="button" disabled={busy || !canvas.current?.canUndo()} onClick={() => canvas.current?.undo()} className="rounded bg-slate-700 px-3 py-3 disabled:opacity-40">실행 취소</button>
-        <label className="flex items-center gap-2">색상<input aria-label="펜 색상" type="color" value={color} disabled={busy} onChange={event => setColor(event.target.value)} /></label>
+      {/* 기출문제 풀이와 같은 필기 도구(레이저는 리플레이에 남지 않아 뺀다). */}
+      <div className="px-3 py-2">
+        <ExamInkToolbar tool={tool} color={color} size={size} laser={false} inert={busy}
+          onTool={setTool} onColor={setColor} onSize={setSize}
+          canUndo={!busy && !!canvas.current?.canUndo()} canRedo={!busy && !!canvas.current?.canRedo()}
+          onUndo={() => { canvas.current?.undo(); setHistoryTick(t => t + 1); }}
+          onRedo={() => { canvas.current?.redo(); setHistoryTick(t => t + 1); }} />
       </div>
       <div className="min-h-0 flex-1 overflow-auto bg-slate-200" data-testid="help-drawing">
-        <ExamInkCanvas ref={canvas} imageUrl={request.image_url} strokes={strokes} onChange={change} tool={tool} color={color} size={3} readOnly={busy} imageMaxWidth={900} />
+        <ExamInkCanvas ref={canvas} imageUrl={request.image_url} strokes={strokes} onChange={change} tool={tool} color={color} size={size}
+          penOnlyWhenPenDetected shapeSnap readOnly={busy} imageMaxWidth={900} />
       </div>
       <footer className="space-y-2 border-t border-slate-700 p-3 pb-[max(12px,env(safe-area-inset-bottom))]">
         <p aria-live="polite" className="text-sm text-slate-300">{hint}</p>
