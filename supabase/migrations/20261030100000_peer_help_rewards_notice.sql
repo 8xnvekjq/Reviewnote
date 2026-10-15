@@ -9,3 +9,7 @@ begin;
 alter table public.help_solutions add column if not exists helper_shards numeric(4,2) not null default 0;
 alter table public.help_solutions add column if not exists requester_notified_at timestamptz;
 commit;
+
+-- 2026-10-16 추가(운영: peer_help_7_like_shard_and_points): 도움 됐어요 = 도우미 지식의 조각 1개 + 10P.
+-- give_help_feedback 안의 'if p_kind = ''like'' then v_shards := 1; else v_helper := 5; end if;' 를
+-- 'if p_kind = ''like'' then v_shards := 1; v_helper := 10; else v_helper := 5; end if;' 로 바꿨다.
