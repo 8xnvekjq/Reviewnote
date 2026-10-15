@@ -1,10 +1,14 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { readdirSync, readFileSync } from 'node:fs';
 
 // 긴 수업 MP4 내보내기 검사: 코드로 만든 가짜 녹음(기본 60분, 30슬라이드, 획 수백 개, 클립 3개 = 일시정지 2번)을
 // 전체 영상으로 만들고, 결과 파일을 다시 열어 길이·소리 위치(매 분 시작의 삐 소리)·필기 장면을 검사한다.
 // 길이 바꾸기: LONG_MIN=10 node tests/ui/lecture-export-long.browser.mjs
+// 실제 교재 슬라이드로: SLIDES_DIR="reference/lecture_out/…" (스캔 그림은 인코딩이 더 무겁다), 실제 크롬 창: HEADED=1
+const slidesDir = process.env.SLIDES_DIR;
+const slideFiles = slidesDir ? readdirSync(slidesDir).filter(name => /\.(png|webp|jpe?g)$/i.test(name)).sort() : [];
 const minutes = Number(process.env.LONG_MIN ?? 60);
 const port = 5178;
 const base = `http://127.0.0.1:${port}`;
@@ -23,13 +27,17 @@ try {
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.text().startsWith('[long]')) console.log(message.text()); });
   await page.route('**/rest/v1/**', route => route.fulfill({ json: [] }));
+  await page.route('**/__slides/**', route => {
+    const name = decodeURIComponent(new URL(route.request().url()).pathname.split('/__slides/')[1]);
+    return route.fulfill({ body: readFileSync(`${slidesDir}/${name}`), contentType: name.endsWith('.webp') ? 'image/webp' : 'image/png' });
+  });
   // 화면 숨김(앱 전환·화면 꺼짐)을 흉내 낼 수 있게 한다.
   await page.addInitScript(() => {
     Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => window.__vis ?? 'visible' });
   });
   await page.goto(base + '/tests/ui/lecture-deck.html');
 
-  const result = await page.evaluate(async minutes => {
+  const result = await page.evaluate(async ({ minutes, slideFiles, busyMs }) => {
     const { buildLectureReplay } = await import('/src/features/lectures/lectureRecordingModel.ts');
     const { exportLectureMp4 } = await import('/src/features/lectures/lectureExport.ts');
     const mb = await import('/@id/mediabunny');
@@ -41,6 +49,11 @@ try {
     // 슬라이드 30장(1920×1080 PNG)
     const slides = [], slideUrls = [];
     for (let n = 1; n <= 30; n++) {
+      if (slideFiles.length) {
+        slideUrls.push(`/__slides/${encodeURIComponent(slideFiles[(n - 1) % slideFiles.length])}`);
+        slides.push({ id: `s${n}`, path: `deck/s${n}.png`, section: '', label: `슬라이드 ${n}`, bookPage: 100 + n });
+        continue;
+      }
       const canvas = document.createElement('canvas'); canvas.width = 1920; canvas.height = 1080;
       const ctx = canvas.getContext('2d');
       ctx.fillStyle = '#fbfaf6'; ctx.fillRect(0, 0, 1920, 1080);
@@ -99,6 +112,8 @@ try {
     }
     const setupMs = performance.now() - setupStarted;
 
+    // BUSY_MS=8: 앱의 다른 작업처럼 16ms마다 메인 스레드를 그만큼 붙잡는다(인코딩이 메인 스레드 경쟁에 얼마나 약한지).
+    if (busyMs) setInterval(() => { const end = performance.now() + busyMs; while (performance.now() < end); }, 16);
     const replay = buildLectureReplay({ slides, initialSlideId: 's1', durationMs: total, clips }, entries);
     let peakHeap = 0, lastLog = -1;
     const heap = () => performance.memory?.usedJSHeapSize ?? 0;
@@ -155,9 +170,9 @@ try {
       setupS: +(setupMs / 1000).toFixed(1), exportS: +(exported.elapsedMs / 1000).toFixed(1), storage: exported.storage,
       sizeMB: +(exported.blob.size / 1048576).toFixed(1), frames: exported.frames, codecs: [exported.videoCodec, exported.audioCodec],
       duration: await input.computeDuration(), startHeapMB: Math.round(startHeap / 1048576), peakHeapMB: Math.round(peakHeap / 1048576),
-      strokes: strokeTimes.length, beeps, edge, inkChecks, timings: exported.timings, hiddenMs: Math.round(exported.timings.hidden),
+      strokes: strokeTimes.length, beeps, edge, inkChecks, timings: exported.timings, encoder: exported.encoder, bench: exported.bench, hiddenMs: Math.round(exported.timings.hidden),
     };
-  }, minutes);
+  }, { minutes, slideFiles, busyMs: Number(process.env.BUSY_MS ?? 0) });
 
   console.log(JSON.stringify(result));
   assert.deepEqual(errors, []);

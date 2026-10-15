@@ -10,6 +10,12 @@ const megabytes = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)}MB`;
 const seconds = (ms: number) => `${Math.round(ms / 1000)}초`;
 const timingText = ({ timings: t, frames }: ExportResult) =>
   `그리기 ${seconds(t.draw)} · 영상 ${seconds(t.video)} · 소리 ${seconds(t.audio)} · 프레임 ${frames.toLocaleString()}${t.hidden > 1000 ? ` · 창 숨김 ${seconds(t.hidden)}` : ''}`;
+const ENCODER_NAMES = { 'prefer-hardware': '하드웨어', 'prefer-software': '소프트웨어' } as const;
+const encoderText = ({ encoder, bench }: ExportResult) => {
+  const measured = (Object.keys(ENCODER_NAMES) as (keyof typeof ENCODER_NAMES)[])
+    .filter(mode => bench[mode] != null).map(mode => `${ENCODER_NAMES[mode]} ${bench[mode]}ms`).join(' / ');
+  return `${encoder ? ENCODER_NAMES[encoder] : '기본'}${measured ? ` (프레임당 ${measured})` : ''}`;
+};
 const remainText = (ms: number) => ms < 60_000 ? `${Math.max(1, Math.round(ms / 1000))}초` : `${Math.round(ms / 60_000)}분`;
 const CODEC_NAMES: Record<string, string> = { avc: 'H.264', vp9: 'VP9', av1: 'AV1', aac: 'AAC', opus: 'Opus' };
 
@@ -118,6 +124,8 @@ export const LectureExportPanel: React.FC<{
             <dd>{CODEC_NAMES[state.result.videoCodec] ?? state.result.videoCodec}{state.result.audioCodec ? ` + ${CODEC_NAMES[state.result.audioCodec] ?? state.result.audioCodec}` : ' (소리 없음)'}</dd>
             <dt className="text-slate-500">걸린 곳</dt>
             <dd data-testid="export-timings">{timingText(state.result)}</dd>
+            <dt className="text-slate-500">인코더</dt>
+            <dd data-testid="export-encoder">{encoderText(state.result)}</dd>
           </dl>
           <div className="flex gap-2">
             <a href={state.url} download={state.name} className={`${button} flex-1 flex items-center justify-center bg-emerald-600 border-emerald-400 text-white`}>⬇ 기기에 저장</a>
