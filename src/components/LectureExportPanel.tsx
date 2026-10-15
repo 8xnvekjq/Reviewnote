@@ -1,17 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { LoadedRecording } from '../features/lectures/lectureRecordings';
 import { formatDuration } from '../features/lectures/lectureRecordingModel';
-import { EXPORT_TEST_MS, exportFileName, exportLectureMp4, type ExportProgress, type ExportResult } from '../features/lectures/lectureExport';
+import { EXPORT_TEST_MS, clearExportFiles, exportFileName, exportLectureMp4, type ExportProgress, type ExportResult } from '../features/lectures/lectureExport';
 
-// 녹음 재생 화면의 'MP4로 저장' 창. 지금은 1분 시험 내보내기(갤럭시탭에서 화질·싱크·속도 확인용).
+// 녹음 재생 화면의 'MP4로 저장' 창: 현재 위치부터 1분 테스트, 또는 전체 영상(브라우저 저장 공간에 쓴 뒤 기기에 저장).
 type WakeLockSentinel = { release(): Promise<void> };
 
 const megabytes = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)}MB`;
+const remainText = (ms: number) => ms < 60_000 ? `${Math.max(1, Math.round(ms / 1000))}초` : `${Math.round(ms / 60_000)}분`;
 const CODEC_NAMES: Record<string, string> = { avc: 'H.264', vp9: 'VP9', av1: 'AV1', aac: 'AAC', opus: 'Opus' };
 
 type State =
   | { phase: 'idle' }
-  | { phase: 'running'; fromMs: number; toMs: number; progress: ExportProgress | null }
+  | { phase: 'running'; full: boolean; fromMs: number; toMs: number; progress: ExportProgress | null }
   | { phase: 'done'; result: ExportResult; url: string; name: string }
   | { phase: 'error'; message: string };
 
@@ -23,18 +24,22 @@ export const LectureExportPanel: React.FC<{
   const urlRef = useRef<string | null>(null);
   const total = recording.replay.total;
   // 끝 가까이에서 열면 끝에서 1분을 만든다.
-  const fromMs = Math.max(0, Math.min(Math.floor(time / 1000) * 1000, total - EXPORT_TEST_MS));
-  const toMs = Math.min(total, fromMs + EXPORT_TEST_MS);
+  const testFrom = Math.max(0, Math.min(Math.floor(time / 1000) * 1000, total - EXPORT_TEST_MS));
+  const testTo = Math.min(total, testFrom + EXPORT_TEST_MS);
 
+  // 닫으면 만들던 것을 멈추고, 저장 공간에 남은 영상 파일도 지운다(기기에 저장한 파일은 그대로).
   useEffect(() => () => {
     abortRef.current?.abort();
     if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+    void clearExportFiles();
   }, []);
 
-  const start = async () => {
+  const start = async (full: boolean) => {
+    const fromMs = full ? 0 : testFrom, toMs = full ? total : testTo;
     const controller = new AbortController();
     abortRef.current = controller;
-    setState({ phase: 'running', fromMs, toMs, progress: null });
+    if (urlRef.current) { URL.revokeObjectURL(urlRef.current); urlRef.current = null; }
+    setState({ phase: 'running', full, fromMs, toMs, progress: null });
     let wake: WakeLockSentinel | null = null;
     try {
       wake = await (navigator as Navigator & { wakeLock?: { request(type: 'screen'): Promise<WakeLockSentinel> } }).wakeLock?.request('screen') ?? null;
@@ -42,13 +47,12 @@ export const LectureExportPanel: React.FC<{
     try {
       const result = await exportLectureMp4({
         replay: recording.replay, slideIds: recording.manifest.slides.map(slide => slide.id), slideUrls, clips: recording.clips,
-        fromMs, toMs, signal: controller.signal,
+        fromMs, toMs, toFile: full, signal: controller.signal,
         onProgress: progress => setState(prev => prev.phase === 'running' ? { ...prev, progress } : prev),
       });
-      if (urlRef.current) URL.revokeObjectURL(urlRef.current);
       const url = URL.createObjectURL(result.blob);
       urlRef.current = url;
-      setState({ phase: 'done', result, url, name: exportFileName(recording.manifest.title, fromMs, toMs, true) });
+      setState({ phase: 'done', result, url, name: exportFileName(recording.manifest.title, fromMs, toMs, !full) });
     } catch (error) {
       if (controller.signal.aborted) setState({ phase: 'idle' });
       else setState({ phase: 'error', message: error instanceof Error ? error.message : String(error) });
@@ -63,17 +67,22 @@ export const LectureExportPanel: React.FC<{
     <div role="region" aria-label="MP4로 저장" data-testid="lecture-export" data-phase={state.phase}
       className="absolute right-2 bottom-16 z-20 w-[min(22rem,calc(100%-1rem))] rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl p-3 space-y-2.5 text-slate-100">
       <div className="flex items-center gap-2">
-        <div className="flex-1 text-sm font-black">🎬 MP4로 저장 <span className="text-[10px] font-bold text-amber-300 align-middle">1분 테스트</span></div>
+        <div className="flex-1 text-sm font-black">🎬 MP4로 저장</div>
         <button type="button" onClick={onClose} aria-label="MP4 창 닫기" className="w-8 h-8 rounded-lg text-slate-400 hover:text-white">✕</button>
       </div>
 
       {state.phase === 'idle' && (
         <>
           <p className="text-[11px] leading-relaxed text-slate-300 break-keep">
-            <b className="text-white">{formatDuration(fromMs)}–{formatDuration(toMs)}</b> 구간을 1920×1080 영상으로 만들어요.
-            재생 막대를 옮기면 다른 구간을 고를 수 있어요. 만드는 동안 화면을 켜 두세요.
+            1920×1080 영상으로 만들어요. 만드는 동안 화면을 켜 두세요(다른 앱으로 가면 멈췄다가 돌아오면 이어서 만들어요).
           </p>
-          <button type="button" onClick={start} className={`${button} w-full bg-indigo-600 border-indigo-400 text-white`}>테스트 영상 만들기</button>
+          <button type="button" onClick={() => void start(true)} className={`${button} w-full bg-indigo-600 border-indigo-400 text-white`}>
+            전체 영상 만들기 ({formatDuration(total)})
+          </button>
+          <button type="button" onClick={() => void start(false)} className={`${button} w-full bg-slate-800 border-slate-600 text-slate-100`}>
+            1분 테스트 ({formatDuration(testFrom)}–{formatDuration(testTo)})
+          </button>
+          <p className="text-[10px] text-slate-500 break-keep">1분 테스트는 재생 막대 위치부터 만들어요.</p>
         </>
       )}
 
@@ -88,7 +97,7 @@ export const LectureExportPanel: React.FC<{
             </div>
             <div className="flex items-center justify-between text-[11px] text-slate-300">
               <span data-testid="export-progress">{Math.round(ratio * 100)}% · 영상 {formatDuration(p?.doneMs ?? 0)} / {formatDuration(state.toMs - state.fromMs)}</span>
-              <span>{remain != null ? `약 ${Math.max(1, Math.round(remain / 1000))}초 남음` : '준비 중…'}</span>
+              <span>{p?.paused ? '⏸ 화면이 꺼져 멈춤' : remain != null ? `약 ${remainText(remain)} 남음` : '준비 중…'}</span>
             </div>
             <button type="button" onClick={() => abortRef.current?.abort()} className={`${button} w-full bg-slate-800 border-slate-600 text-slate-100`}>취소</button>
           </>
