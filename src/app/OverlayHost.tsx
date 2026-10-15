@@ -16,6 +16,8 @@ interface OverlayHostProps {
   // feature)가 계속 소유하고, 이 컴포넌트는 "그 값이 있으면 무엇을 렌더할지"만 결정한다.
   selectedEntry: MistakeEntry | null;
   mistakes: MistakeEntry[];
+  /** 서로 도와주기 피드백 뒤 포인트 잔액을 서버 값으로 다시 맞춘다. */
+  onPointsChanged?: () => void;
   peerActivities: any[];
   analyzingEntryId: string | null;
   averageWaitMs: number | null;
@@ -90,6 +92,7 @@ interface OverlayHostProps {
 export function OverlayHost({
   selectedEntry,
   mistakes,
+  onPointsChanged,
   peerActivities,
   analyzingEntryId,
   averageWaitMs,
@@ -141,6 +144,7 @@ export function OverlayHost({
       {selectedEntry && (
         <MistakeDetailModal
           selectedEntry={selectedEntry}
+          onPointsChanged={onPointsChanged}
           allEntries={mistakes}
           peerActivities={peerActivities}
           isAnalyzing={analyzingEntryId === selectedEntry.id}
