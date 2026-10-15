@@ -9,6 +9,7 @@ test('피드백이 있을 때만 실제 보상을 표시한다', () => {
   assert.equal(helpFeedbackText('like'), '👍 도움 됐어요');
   assert.equal(helpFeedbackText('unclear'), '🤔 이해 못 했어요');
   assert.equal(helpRewardText(null, 5), '피드백을 기다려요');
+  assert.equal(helpRewardText('like', 10, 1), '지식의 조각 +1개 · +10P');
   assert.equal(helpRewardText('like', 0, 1), '지식의 조각 +1개');
   assert.equal(helpRewardText('unclear', 5), '+5P');
   assert.equal(helpRewardText('like', 0, 0), '보상 한도라 보상 없음');

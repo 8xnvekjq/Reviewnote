@@ -37,7 +37,7 @@ try {
         { id: 'mine-2', mistake_id: 'm-2', status: 'closed', created_at: '2026-10-15T02:00:00Z', image_url: image, title: '내 해결된 문제', solution_count: 1, unseen_count: 0 },
       ]);
       if (rpc === 'cancel_help_request') { cancelled.push(JSON.parse(route.request().postData() || '{}').p_request_id); return respond(null); }
-      if (rpc === 'my_help_given') return respond(empty ? [] : [{ id: 'given-1', request_id: 'request-2', image_url: image, feedback: 'like', reward: 0, shards: givenShards, requester: label }, { id: 'given-2', request_id: 'request-3', image_url: image, feedback: 'unclear', reward: 5, requester: label }]);
+      if (rpc === 'my_help_given') return respond(empty ? [] : [{ id: 'given-1', request_id: 'request-2', image_url: image, feedback: 'like', reward: givenShards ? 10 : 0, shards: givenShards, requester: label }, { id: 'given-2', request_id: 'request-3', image_url: image, feedback: 'unclear', reward: 5, requester: label }]);
       if (rpc === 'submit_help_solution') {
         if (failSubmit) { failSubmit = false; return respond({ message: '요청이 마감됐어요' }, 400); }
         submitted = true; return respond({ id: 'solution-1' });
@@ -100,7 +100,7 @@ try {
     await send.click();
     await page.getByRole('alert').filter({ hasText: '요청이 마감됐어요' }).waitFor();
     await send.click();
-    await page.getByText('보냈어요! 친구가 ‘도움 됐어요’를 누르면 지식의 조각 +1개', { exact: true }).waitFor();
+    await page.getByText('보냈어요! 친구가 ‘도움 됐어요’를 누르면 지식의 조각 +1개 + 10P', { exact: true }).waitFor();
     assert.equal(calls.filter(call => call.rpc === 'submit_help_solution').length, 2);
     const submit = calls.find(call => call.rpc === 'submit_help_solution').body;
     assert.equal(submit.p_stroke_count, 5); assert.ok(submit.p_duration_ms >= 5000); assert.ok(file.length > 0);
@@ -111,7 +111,7 @@ try {
     await page.screenshot({ path: '.test-artifacts/peer-help-helper-tablet.png' });
     givenShards = 1;
     await page.getByRole('button', { name: '새로고침' }).click();
-    await page.getByText('지식의 조각 +1개', { exact: true }).waitFor();
+    await page.getByText('지식의 조각 +1개 · +10P', { exact: true }).waitFor();
     assert.equal(await page.locator('body').getAttribute('data-points-changed'), 'true');
     empty = true;
     await page.getByRole('button', { name: '새로고침' }).click();

@@ -77,7 +77,7 @@ export function HelpSolveScreen({ request, userId, onClose, onSent }: {
         <p aria-live="polite" className="text-sm text-slate-300">{hint}</p>
         {error && <p role="alert" className="text-rose-300">{error}</p>}
         <button type="button" disabled={busy || !!reason} onClick={() => void send()} className="w-full rounded-xl bg-indigo-600 px-4 py-3 font-bold disabled:opacity-40">{busy ? '보내는 중…' : '보내기'}</button>
-        <p className="text-xs text-slate-400">친구가 ‘도움 됐어요’를 누르면 지식의 조각 +{HELP_REWARD.likeShards}개, ‘이해 못 했어요’는 +{HELP_REWARD.unclear}P</p>
+        <p className="text-xs text-slate-400">친구가 ‘도움 됐어요’를 누르면 지식의 조각 +{HELP_REWARD.likeShards}개와 +{HELP_REWARD.likePoints}P, ‘이해 못 했어요’는 +{HELP_REWARD.unclear}P</p>
       </footer>
     </div>
   </dialog>;

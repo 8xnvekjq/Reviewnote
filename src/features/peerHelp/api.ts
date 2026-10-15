@@ -6,8 +6,8 @@ import { HELP_MAX_BYTES, decodeHelpSolution, encodeHelpSolution, helpSolutionSta
 
 export const HELP_BUCKET = 'help-solutions';
 /** 서버와 같은 보상. 화면 안내용 — 실제 지급은 서버가 한도에 따라 정한다.
- *  도움 됐어요 = 도우미에게 지식의 조각 1개, 이해 못 했어요 = 도우미 5P, 피드백을 남긴 요청자 3P. */
-export const HELP_REWARD = { likeShards: 1, unclear: 5, requester: 3 } as const;
+ *  도움 됐어요 = 도우미에게 지식의 조각 1개 + 10P, 이해 못 했어요 = 도우미 5P, 피드백을 남긴 요청자 3P. */
+export const HELP_REWARD = { likeShards: 1, likePoints: 10, unclear: 5, requester: 3 } as const;
 
 export interface HelpLabel { face: string; title: string | null; grade: string | null }
 export type HelpRequestStatus = 'open' | 'closed' | 'cancelled';

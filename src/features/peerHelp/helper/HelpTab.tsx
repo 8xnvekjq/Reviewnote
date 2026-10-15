@@ -40,7 +40,7 @@ export function HelpTab({ userId, onPointsChanged }: HelpTabProps) {
   }, [userId, revision]);
   return <main className="mx-auto max-w-6xl space-y-6 p-4 pb-28 text-slate-100">
     <header className="flex items-center justify-between gap-3"><h1 className="text-xl font-bold">🙋 서로 도와주기</h1><button type="button" disabled={loading} onClick={() => setRevision(value => value + 1)} className="rounded bg-slate-700 px-3 py-3 disabled:opacity-40">새로고침</button></header>
-    <p className="text-sm text-slate-300">친구 문제를 풀어 주세요. 도움 됐어요 = 지식의 조각 +{HELP_REWARD.likeShards}개 · 이해 못 했어요 = +{HELP_REWARD.unclear}P</p>
+    <p className="text-sm text-slate-300">친구 문제를 풀어 주세요. 도움 됐어요 = 지식의 조각 +{HELP_REWARD.likeShards}개 + {HELP_REWARD.likePoints}P · 이해 못 했어요 = +{HELP_REWARD.unclear}P</p>
     {message && <p role="status" className="rounded bg-emerald-950 p-3 text-emerald-200">{message}</p>}
     {error && <p role="alert" className="text-rose-300">{error}</p>}
     {loading ? <p role="status">문제를 불러오는 중…</p> : <>
@@ -62,6 +62,6 @@ export function HelpTab({ userId, onPointsChanged }: HelpTabProps) {
         </article>)}</div>
       </section>
     </>}
-    {selected && <HelpSolveScreen key={`${userId}:${selected.id}`} request={selected} userId={userId} onClose={() => setSelected(null)} onSent={() => { setSelected(null); setMessage(`보냈어요! 친구가 ‘도움 됐어요’를 누르면 지식의 조각 +${HELP_REWARD.likeShards}개`); setRevision(value => value + 1); }} />}
+    {selected && <HelpSolveScreen key={`${userId}:${selected.id}`} request={selected} userId={userId} onClose={() => setSelected(null)} onSent={() => { setSelected(null); setMessage(`보냈어요! 친구가 ‘도움 됐어요’를 누르면 지식의 조각 +${HELP_REWARD.likeShards}개 + ${HELP_REWARD.likePoints}P`); setRevision(value => value + 1); }} />}
   </main>;
 }
