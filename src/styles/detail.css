@@ -124,3 +124,10 @@
 .rn-writing-head-actions button { min-width: 32px; height: 32px; padding: 0 6px; border-radius: 8px; background: rgb(30 41 59); color: #e2e8f0; font-size: 15px; font-weight: 700; touch-action: manipulation; }
 .rn-writing-head-actions button:disabled { opacity: .35; }
 .rn-writing-head-actions .rn-writing-save { font-size: 12px; background: var(--rn-accent, #6366f1); color: #fff; white-space: nowrap; }
+
+/* 🙋 서로 도와주기 칸(오답 상세, 나의 학습 기록 아래) */
+.rn-help-panel { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; }
+.rn-help-status { flex: 1 1 180px; min-width: 0; margin: 0; font-size: 13px; color: var(--rn-muted); }
+.rn-help-status.is-new { color: var(--rn-accent); font-weight: 700; }
+.rn-help-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.rn-help-error { flex-basis: 100%; display: flex; align-items: center; gap: 8px; margin: 0; font-size: 12.5px; color: #fda4af; }

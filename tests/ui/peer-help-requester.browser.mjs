@@ -53,8 +53,9 @@ try {
       page.on('pageerror', error => errors.push(error.message));
       await page.goto(`${base}/tests/ui/peer-help-requester.html`);
       await page.getByRole('button', { name: '🙋 도움 요청', exact: true }).click();
-      await page.getByText('도움 요청 중 · 풀이 1개', { exact: true }).waitFor();
+      await page.getByTestId('help-requester-panel').getByText(/풀이 1개/).waitFor();
       await page.getByText('🙋 풀이 1개 도착', { exact: true }).waitFor();
+      await page.getByTestId('help-requester-panel').screenshot({ path: `.test-artifacts/peer-help-panel-${width}.png` });
       assert.equal(initialLoads, 2, '목록과 상세, StrictMode의 최초 조회는 한 번으로 합쳐져야 한다');
       failCancel = true;
       await page.getByRole('button', { name: '요청 취소', exact: true }).click();
@@ -73,12 +74,12 @@ try {
       assert.equal(downloads, 1);
       await viewer.getByRole('button', { name: '닫기', exact: true }).click();
       await page.screenshot({ path: `.test-artifacts/peer-help-requester-feedback-${width}.png` });
-      await page.getByRole('button', { name: '나중에', exact: true }).click();
+      // '나중에'는 없고 Esc로도 닫히지 않는다 — 둘 중 하나를 꼭 고른다.
+      assert.equal(await page.getByRole('button', { name: '나중에', exact: true }).count(), 0);
+      await page.keyboard.press('Escape');
+      await page.getByRole('dialog', { name: '풀이 피드백', exact: true }).waitFor();
       assert.equal(feedbackCalls.length, 0);
-      await solution().click();
-      await page.getByTestId('exam-replay-dock').waitFor();
-      await viewer.getByRole('button', { name: '닫기', exact: true }).click();
-      await page.getByRole('button', { name: '🤔 이해 안 돼요 (+10P)', exact: true }).click();
+      await page.getByRole('button', { name: '🤔 이해 못 했어요', exact: true }).click();
       await viewer.getByText('피드백 고마워요!', { exact: true }).waitFor();
       assert.equal(await page.getByLabel('포인트 갱신 횟수').innerText(), '1');
       await solution().click();
@@ -86,14 +87,14 @@ try {
       await viewer.getByRole('button', { name: '닫기', exact: true }).click();
       assert.equal(await page.getByRole('dialog', { name: '풀이 피드백', exact: true }).count(), 0);
       await viewer.getByRole('button', { name: '닫기', exact: true }).click();
-      await page.getByText('도움 요청 중 · 풀이 1개', { exact: true }).waitFor();
-      feedback = null; reward = 5;
+      await page.getByTestId('help-requester-panel').getByText(/풀이 1개/).waitFor();
+      feedback = null; reward = 3;
       await page.getByRole('button', { name: '풀이 보기 (1)', exact: true }).click();
       await solution().click();
       await page.getByTestId('exam-replay-dock').waitFor();
       await viewer.getByRole('button', { name: '닫기', exact: true }).click();
-      await page.getByRole('button', { name: '👍 좋아요 (풀어 준 친구 +30P)', exact: true }).click();
-      await viewer.getByText('피드백 고마워요! +5P', { exact: true }).waitFor();
+      await page.getByRole('button', { name: '👍 도움 됐어요', exact: true }).click();
+      await viewer.getByText('피드백 고마워요! +3P', { exact: true }).waitFor();
       assert.equal(await page.getByLabel('포인트 갱신 횟수').innerText(), '2');
       await page.screenshot({ path: `.test-artifacts/peer-help-requester-${width}.png` });
       assert.ok(await viewer.evaluate(el => el.scrollWidth <= el.clientWidth), '모바일에서도 가로 넘침이 없어야 한다');

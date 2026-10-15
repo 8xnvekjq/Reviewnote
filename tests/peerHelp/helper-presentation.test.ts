@@ -6,12 +6,12 @@ import type { InkStroke } from '../../src/features/exam/contract.ts';
 
 test('피드백이 있을 때만 실제 보상을 표시한다', () => {
   assert.equal(helpFeedbackText(null), '기다리는 중');
-  assert.equal(helpFeedbackText('like'), '👍 좋아요');
-  assert.equal(helpFeedbackText('unclear'), '🤔 이해 안 돼요');
-  assert.equal(helpRewardText(null, 30), '피드백을 기다려요');
-  assert.equal(helpRewardText('like', 30), '+30P');
-  assert.equal(helpRewardText('unclear', 10), '+10P');
-  assert.equal(helpRewardText('like', 0), '보상 한도라 포인트 없음');
+  assert.equal(helpFeedbackText('like'), '👍 도움 됐어요');
+  assert.equal(helpFeedbackText('unclear'), '🤔 이해 못 했어요');
+  assert.equal(helpRewardText(null, 5), '피드백을 기다려요');
+  assert.equal(helpRewardText('like', 0, 1), '지식의 조각 +1개');
+  assert.equal(helpRewardText('unclear', 5), '+5P');
+  assert.equal(helpRewardText('like', 0, 0), '보상 한도라 보상 없음');
 });
 
 test('필기 기록은 실행 취소를 포함하고 남은 획과 실제 기록 시간으로 전송을 제한한다', () => {

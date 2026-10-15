@@ -8,7 +8,7 @@ export const HELP_FILE_FORMAT = 'reviewnotes.help-solution';
 export const HELP_FILE_VERSION = 1;
 /** 서버(submit_help_solution)와 같은 최소 분량. */
 export const HELP_MIN_STROKES = 5;
-export const HELP_MIN_DURATION_MS = 20_000;
+export const HELP_MIN_DURATION_MS = 5_000;
 export const HELP_MAX_BYTES = 1024 * 1024;
 
 export interface HelpSolutionFile {

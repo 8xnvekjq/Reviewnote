@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { HelpRequesterPanel } from '../../src/features/peerHelp/requester/HelpRequesterPanel';
 import { MistakeList } from '../../src/components/MistakeList';
 import '../../src/index.css';
+import '../../src/styles/design-system.css';
+import '../../src/styles/detail.css';
 const imageUrl = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect width="600" height="400" fill="white"/><text x="20" y="50">1 + 1 = ?</text></svg>');
 const entry = { id: 'mistake', userId: 'student', imageUrl, title: '도움 요청 테스트', date: '2026-10-16', reviews: ['O', 'O', 'O'] as const };
 export function Fixture() {

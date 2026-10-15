@@ -1159,7 +1159,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
 
         {/* Modal Body */}
         <div className="rn-detail-body flex-1 overflow-y-auto p-6 space-y-6">
-          {currentUserId && selectedEntry.userId === currentUserId && <HelpRequesterPanel key={selectedEntry.id} mistakeId={selectedEntry.id} imageUrl={selectedEntry.imageUrl} currentUserId={currentUserId} onPointsChanged={onPointsChanged} />}
 
           <section className="rn-problem" aria-label="문제와 풀이노트">
             <button type="button" className="rn-problem-image" onClick={openImageWindow} aria-label="문제 이미지 확대">
@@ -1567,6 +1566,11 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                   </div>
                 )}
               </div>
+
+              {/* 🙋 서로 도와주기 — 나의 학습 기록(스캐폴딩) 바로 아래. 내 오답에서만. */}
+              {currentUserId && selectedEntry.userId === currentUserId && (
+                <HelpRequesterPanel key={selectedEntry.id} mistakeId={selectedEntry.id} imageUrl={selectedEntry.imageUrl} currentUserId={currentUserId} onPointsChanged={onPointsChanged} />
+              )}
 
               {/* 🧭 정리하기(초기화) 이후 체크리스트 재생성 진행 상태 — 정석 풀이는 전혀 건드리지
                   않고 이 배너들만 추가/제거된다(기존 데이터가 사라지거나 깜빡이지 않음). */}

@@ -90,7 +90,7 @@ export function HelpSolutionsViewer({ requestId, imageUrl, onClose, onPointsChan
                 <span>{label.face}</span>
                 {label.title ? <span className={`rounded px-2 py-1 ${label.title.style}`}>{label.title.icon} {label.title.text}</span> : <span>익명 학생</span>}
                 <span>{label.grade}</span><span className="text-sm text-slate-400">{formatPeerTime(row.duration_ms)}</span>
-                {row.feedback && <span>{row.feedback === 'like' ? '👍 좋아요' : '🤔 이해 안 돼요'}</span>}
+                {row.feedback && <span>{row.feedback === 'like' ? '👍 도움 됐어요' : '🤔 이해 못 했어요'}</span>}
                 {!row.file_available && <span>삭제된 풀이</span>}
               </button></li>;
             })}
@@ -98,15 +98,17 @@ export function HelpSolutionsViewer({ requestId, imageUrl, onClose, onPointsChan
         {opening && <p role="status">풀이를 여는 중이에요…</p>}
       </div>
     </div>
-    {rating && <RequesterDialog label="풀이 피드백" onClose={() => { if (!busy) { setRating(false); setActive(null); } }}>
+    {/* 닫을 때 둘 중 하나는 꼭 고른다('나중에'가 있으면 다들 그것만 누른다). Esc로도 닫히지 않는다. */}
+    {rating && <RequesterDialog label="풀이 피드백" onClose={() => {}}>
       <h3 className="mb-3 text-lg font-bold">친구의 풀이가 도움이 됐나요?</h3>
       {error && <p role="alert" className="mb-3 text-rose-300">{error}</p>}
       <div className="flex flex-col gap-3">
-        <button type="button" disabled={busy} onClick={() => void rate('like')} className="min-h-12 rounded-xl bg-indigo-600 p-3">👍 좋아요 (풀어 준 친구 +{HELP_REWARD.like}P)</button>
-        <button type="button" disabled={busy} onClick={() => void rate('unclear')} className="min-h-12 rounded-xl bg-slate-700 p-3">🤔 이해 안 돼요 (+{HELP_REWARD.unclear}P)</button>
-        <button type="button" disabled={busy} onClick={() => { setRating(false); setActive(null); }} className="min-h-11 text-sm text-slate-400">나중에</button>
+        <button type="button" disabled={busy} onClick={() => void rate('like')} className="min-h-12 rounded-xl bg-indigo-600 p-3">👍 도움 됐어요</button>
+        <button type="button" disabled={busy} onClick={() => void rate('unclear')} className="min-h-12 rounded-xl bg-slate-700 p-3">🤔 이해 못 했어요</button>
+        {/* 보내기가 실패했을 때만(연결 끊김·선생님이 지운 풀이) 빠져나갈 수 있게 */}
+        {error && !busy && <button type="button" onClick={() => { setRating(false); setActive(null); setError(''); }} className="min-h-11 text-sm text-slate-400">닫기</button>}
       </div>
-      <p className="mt-3 text-xs text-slate-400">좋아요를 누르면 요청이 해결됨으로 바뀌어요. 피드백을 남기면 최대 {HELP_REWARD.requester}P를 받아요. 포인트는 보상 조건에 따라 지급돼요.</p>
+      <p className="mt-3 text-xs text-slate-400">고르면 나에게 +{HELP_REWARD.requester}P · ‘도움 됐어요’를 고르면 이 질문은 해결됨으로 바뀌어요.</p>
     </RequesterDialog>}
   </RequesterDialog>;
 }
