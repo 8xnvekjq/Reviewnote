@@ -194,7 +194,7 @@ try {
   assert.deepEqual(errors, []);
   assert.ok(result.hiddenMs > 500, '화면이 숨겨진 동안에도 계속 만들었다');
   assert.equal(result.storage, 'opfs', '긴 영상은 브라우저 저장 공간에 쓴다');
-  assert.deepEqual(result.codecs, ['avc', 'aac']);
+  assert.deepEqual(result.codecs, ['avc', 'opus']);
   assert.ok(Math.abs(result.duration - minutes * 60) < 0.5, `영상 길이 ${result.duration}s`);
   for (const b of result.beeps) {
     assert.ok(b.beep > 0.2, `${b.m}분 시작의 삐 소리 ${b.beep}`);

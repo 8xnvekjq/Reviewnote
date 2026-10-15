@@ -362,7 +362,9 @@ export async function exportLectureMp4(input: LectureExportInput): Promise<Expor
   if (!videoCodec) throw new Error('이 브라우저는 영상 인코딩(WebCodecs)을 지원하지 않아요. 최신 크롬에서 다시 해 주세요.');
   const placements = placeAudio(input.clips, fromMs, toMs);
   const audioCodec = placements.length
-    ? await mb.getFirstEncodableAudioCodec(['aac', 'opus'], { numberOfChannels: 1, sampleRate: EXPORT_SAMPLE_RATE, quality: mb.QUALITY_HIGH })
+    // Opus 먼저: 윈도 크롬의 AAC 인코더는 가끔 소리가 터진다(2026-10-16 재현: 15번 중 1–3번 최고 3596배,
+    // 같은 소리를 Opus로는 15/15 정상). 유튜브는 MP4 속 Opus를 그대로 받는다.
+    ? await mb.getFirstEncodableAudioCodec(['opus', 'aac'], { numberOfChannels: 1, sampleRate: EXPORT_SAMPLE_RATE, quality: mb.QUALITY_HIGH })
     : null;
   if (placements.length && !audioCodec) throw new Error('이 브라우저는 음성 인코딩을 지원하지 않아요.');
 
@@ -432,7 +434,7 @@ export async function exportLectureMp4(input: LectureExportInput): Promise<Expor
           }
           await reader.read(read.srcSample, samples, read.outOffset, read.count);
         }
-        // 마이크가 1을 넘긴(찢어진) 소리는 잘라 둔다 — AAC 인코더가 범위 밖 값에서 튀는 소리를 낼 수 있다.
+        // 마이크가 1을 넘긴(찢어진) 소리는 잘라 둔다.
         for (let i = 0; i < length; i++) samples[i] = Math.max(-1, Math.min(1, samples[i]));
         const buffer = new AudioBuffer({ length, numberOfChannels: 1, sampleRate: EXPORT_SAMPLE_RATE });
         buffer.copyToChannel(samples, 0);

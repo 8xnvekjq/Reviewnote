@@ -95,20 +95,39 @@ export function filterBooks(books: LectureBook[], query: string): LectureBook[] 
     .filter(book => book.chapters.length);
 }
 
-// ── 이어서 보기(이 기기에만 기억) ──────────────────────────────────────────────
-export interface ResumeEntry { deckId: string; index: number; at: number }
+// ── 반(같은 교재를 두 반이 따로 듣는다) ─────────────────────────────────────────
+export const LECTURE_CLASSES = ['월수금반', '수토반'] as const;
+export type LectureClass = typeof LECTURE_CLASSES[number];
+export const isLectureClass = (value: unknown): value is LectureClass => LECTURE_CLASSES.includes(value as LectureClass);
+
+/** 녹음 목록을 반별로(월수금반 → 수토반 → 반을 고르기 전 녹음). 빈 묶음은 뺀다. */
+export function groupRecordingsByClass<T extends { class_name: string | null }>(rows: T[]): { label: string; rows: T[] }[] {
+  const groups = LECTURE_CLASSES.map(name => ({ label: name as string, rows: rows.filter(row => row.class_name === name) }));
+  groups.push({ label: '반 미지정', rows: rows.filter(row => !isLectureClass(row.class_name)) });
+  return groups.filter(group => group.rows.length);
+}
+
+// ── 이어서 보기(이 기기에만 기억, 덱 + 반마다 따로) ──────────────────────────────
+export interface ResumeEntry { deckId: string; index: number; at: number; className?: LectureClass }
 const RESUME_KEY = 'reviewnote.lecture-resume.v1';
 const RESUME_MAX = 6;
 
 export function readResume(storage: Pick<Storage, 'getItem'> | null = safeStorage()): ResumeEntry[] {
   try {
     const raw = JSON.parse(storage?.getItem(RESUME_KEY) ?? '[]');
-    return Array.isArray(raw) ? raw.filter((e): e is ResumeEntry => typeof e?.deckId === 'string' && Number.isInteger(e?.index) && typeof e?.at === 'number') : [];
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .filter((e): e is ResumeEntry => typeof e?.deckId === 'string' && Number.isInteger(e?.index) && typeof e?.at === 'number')
+      .map(({ deckId, index, at, className }) => isLectureClass(className) ? { deckId, index, at, className } : { deckId, index, at });
   } catch { return []; }
 }
 
-export function rememberResume(deckId: string, index: number, storage: Pick<Storage, 'getItem' | 'setItem'> | null = safeStorage(), now = Date.now()): ResumeEntry[] {
-  const next = [{ deckId, index: Math.max(0, index), at: now }, ...readResume(storage).filter(e => e.deckId !== deckId)].slice(0, RESUME_MAX);
+export function rememberResume(deckId: string, index: number, className: LectureClass | null = null,
+  storage: Pick<Storage, 'getItem' | 'setItem'> | null = safeStorage(), now = Date.now()): ResumeEntry[] {
+  const entry: ResumeEntry = className ? { deckId, index: Math.max(0, index), at: now, className } : { deckId, index: Math.max(0, index), at: now };
+  // 반을 고르면 같은 덱의 '반 없는' 기록은 지운다(열고 나서 녹음 때 반을 고르는 흐름이라 둘이 겹쳐 보였다).
+  const same = (e: ResumeEntry) => e.deckId === deckId && ((e.className ?? null) === className || (className !== null && !e.className));
+  const next = [entry, ...readResume(storage).filter(e => !same(e))].slice(0, RESUME_MAX);
   try { storage?.setItem(RESUME_KEY, JSON.stringify(next)); } catch { /* 사생활 보호 모드 등 — 기억만 못 한다 */ }
   return next;
 }

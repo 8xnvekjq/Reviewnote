@@ -136,7 +136,7 @@ export class LectureRecordingSession {
   get unsaved() { return this.pausedInk.size > 0 || this.log.size > 0 || this.state.uploading > 0 || this.state.failed > 0 || this.clips.some(c => c.pending.length); }
 
   // ── 시작·일시정지·이어하기·끝내기 ──
-  async start(input: { deckId: string; title: string; slides: LectureSlide[]; initialSlideId: string; ink: Record<string, InkStroke[]> }) {
+  async start(input: { deckId: string; title: string; className?: string; slides: LectureSlide[]; initialSlideId: string; ink: Record<string, InkStroke[]> }) {
     if (this.state.phase !== 'idle') return;
     this.publish({ phase: 'starting', notice: '' });
     this.format = this.media.format();
@@ -144,13 +144,13 @@ export class LectureRecordingSession {
     try { this.stream = await this.media.getUserMedia(); }
     catch (error) { this.publish({ phase: 'idle', notice: micErrorMessage(error) }); return; }
     const recordingId = crypto.randomUUID();
-    try { await this.backend.insertRow({ id: recordingId, deck_id: input.deckId, title: input.title, duration_ms: 0, status: 'recording' }); }
+    try { await this.backend.insertRow({ id: recordingId, deck_id: input.deckId, title: input.title, class_name: input.className ?? null, duration_ms: 0, status: 'recording' }); }
     catch {
       this.releaseStream();
       this.publish({ phase: 'idle', notice: '녹음 목록을 만들지 못했어요. 인터넷 연결을 확인하고 다시 눌러 주세요.' });
       return;
     }
-    this.manifest = createManifest({ recordingId, deckId: input.deckId, title: input.title, slides: input.slides, initialSlideId: input.initialSlideId });
+    this.manifest = createManifest({ recordingId, deckId: input.deckId, title: input.title, className: input.className, slides: input.slides, initialSlideId: input.initialSlideId });
     this.currentSlideId = input.initialSlideId;
     this.log.slide(0, input.initialSlideId);
     this.log.take(); // 첫 슬라이드는 manifest.initialSlideId로 남는다.

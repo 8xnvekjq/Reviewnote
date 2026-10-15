@@ -7,6 +7,7 @@ import { LectureRecordingSession } from '../features/lectures/lectureRecorder';
 import type { LoadedRecording, RecordingBackend } from '../features/lectures/lectureRecordings';
 import { LectureInkToolbar, LectureRecordingControls, LectureReplayBar } from './LectureDeckTools';
 import { LectureExportPanel } from './LectureExportPanel';
+import { LECTURE_CLASSES, type LectureClass } from '../features/lectures/lectureLibrary';
 
 interface LectureDeckViewerProps {
   deck: LectureDeck;
@@ -21,8 +22,10 @@ interface LectureDeckViewerProps {
   replay?: LoadedRecording;
   /** 처음 보여 줄 슬라이드(이어서 보기). */
   initialIndex?: number;
+  /** 이어서 보기로 열었을 때의 반(녹음 시작 때 먼저 골라 둔다). */
+  initialClass?: LectureClass | null;
   /** 넘긴 슬라이드 위치를 알려 준다(재생 중에는 부르지 않는다). */
-  onIndexChange?: (index: number) => void;
+  onIndexChange?: (index: number, className: LectureClass | null) => void;
 }
 
 const EMPTY: InkStroke[] = [];
@@ -45,11 +48,14 @@ function useElementSize(ref: React.RefObject<HTMLElement | null>) {
 
 // 교재 슬라이드 전체 화면 보기. 가로 태블릿(갤럭시 탭 + S펜) 우선.
 // 슬라이드 영역은 1920×1080 좌표계를 그대로 확대/축소하고, 슬라이드마다 필기 레이어를 같은 상자에 겹친다.
-export const LectureDeckViewer: React.FC<LectureDeckViewerProps> = ({ deck, urls, onClose, recordingBackend, onRecorded, replay, initialIndex = 0, onIndexChange }) => {
+export const LectureDeckViewer: React.FC<LectureDeckViewerProps> = ({ deck, urls, onClose, recordingBackend, onRecorded, replay, initialIndex = 0, initialClass = null, onIndexChange }) => {
   const [manualIndex, setIndex] = useState(() => Math.max(0, Math.min(deck.slides.length - 1, initialIndex)));
   const onIndexChangeRef = useRef(onIndexChange);
   useEffect(() => { onIndexChangeRef.current = onIndexChange; }, [onIndexChange]);
-  useEffect(() => { if (!replay) onIndexChangeRef.current?.(manualIndex); }, [manualIndex, replay]);
+  // 반: 녹음을 시작할 때 고른다. 고른 뒤에는 이어서 보기를 반마다 따로 기억한다.
+  const [lectureClass, setLectureClass] = useState<LectureClass | null>(initialClass);
+  const [pickingClass, setPickingClass] = useState(false);
+  useEffect(() => { if (!replay) onIndexChangeRef.current?.(manualIndex, lectureClass); }, [manualIndex, replay, lectureClass]);
   const [tocOpen, setTocOpen] = useState(false);
   const [loaded, setLoaded] = useState<Record<number, boolean>>({});
   const total = deck.slides.length;
@@ -132,11 +138,13 @@ export const LectureDeckViewer: React.FC<LectureDeckViewerProps> = ({ deck, urls
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, [session]);
 
-  const startRecording = () => {
+  const startRecording = (className: LectureClass) => {
+    setPickingClass(false);
     if (!session) return;
+    setLectureClass(className);
     const now = new Date();
     const stamp = `${now.getMonth() + 1}/${now.getDate()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    void session.start({ deckId: deck.id, title: `${deck.title} · ${stamp} 녹음`, slides: deck.slides, initialSlideId: slide.id, ink: inkStateRef.current });
+    void session.start({ deckId: deck.id, title: `${deck.title} · ${className} · ${stamp} 녹음`, className, slides: deck.slides, initialSlideId: slide.id, ink: inkStateRef.current });
   };
   const endRecording = async () => {
     if (!session) return;
@@ -204,7 +212,10 @@ export const LectureDeckViewer: React.FC<LectureDeckViewerProps> = ({ deck, urls
       <div className="flex-none h-12 flex items-center gap-2 px-2 sm:px-3 bg-slate-950/95 border-b border-slate-800">
         <button onClick={() => void close()} aria-label="닫기" className="w-9 h-9 flex-none rounded-full bg-slate-900 border border-slate-800 text-slate-300 text-sm font-bold active:scale-95">✕</button>
         <div className="min-w-[80px] flex-1">
-          <div className="text-[11px] sm:text-xs font-black text-slate-100 truncate">{replay ? `▶ ${replay.manifest.title}` : deck.title}</div>
+          <div className="text-[11px] sm:text-xs font-black text-slate-100 truncate">
+            {!replay && lectureClass && <span data-testid="lecture-class" className="mr-1.5 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-200 text-[10px]">{lectureClass}</span>}
+            {replay ? `▶ ${replay.manifest.title}` : deck.title}
+          </div>
           <div className="text-[10px] text-slate-400 truncate">{slide.section}{slide.section && slide.label ? ' · ' : ''}{slide.label}{slide.bookPage != null ? ` · ${pageText(slide.bookPage)}` : ''}</div>
         </div>
         <div data-slot="pen-toolbar" className="min-w-0 flex items-center gap-1">
@@ -219,7 +230,7 @@ export const LectureDeckViewer: React.FC<LectureDeckViewerProps> = ({ deck, urls
         </div>
         {session && recState && !replay && (
           <LectureRecordingControls state={recState} elapsedMs={elapsed}
-            onStart={startRecording} onPause={() => void session.pause()} onResume={() => void session.resume()}
+            onStart={() => setPickingClass(open => !open)} onPause={() => void session.pause()} onResume={() => void session.resume()}
             onEnd={() => void endRecording()} onRetry={() => session.retry()} onNew={newRecording} />
         )}
         <span data-testid="slide-counter" className="flex-none text-xs font-mono font-bold text-slate-300 px-1">{index + 1} / {total}</span>
@@ -232,6 +243,18 @@ export const LectureDeckViewer: React.FC<LectureDeckViewerProps> = ({ deck, urls
         </button>
       </div>
 
+      {pickingClass && phase === 'idle' && (
+        <div role="group" aria-label="녹음할 반" data-testid="lecture-class-picker" className="flex-none flex items-center gap-2 px-3 py-2 bg-slate-900 border-b border-slate-800 text-xs font-bold text-slate-200">
+          <span className="flex-1">어느 반 수업을 녹음할까요?</span>
+          {LECTURE_CLASSES.map(name => (
+            <button key={name} type="button" onClick={() => startRecording(name)}
+              className={`h-8 px-3 rounded-lg border text-[12px] font-black active:scale-95 ${lectureClass === name ? 'bg-rose-600 border-rose-400 text-white' : 'bg-slate-950 border-slate-700 text-slate-100'}`}>
+              ● {name}
+            </button>
+          ))}
+          <button type="button" aria-label="반 고르기 닫기" onClick={() => setPickingClass(false)} className="h-8 w-8 rounded-lg bg-slate-950 text-slate-400">✕</button>
+        </div>
+      )}
       {notice && (
         <div role="alert" data-testid="recording-notice" className={`flex-none flex items-center gap-2 px-3 py-2 text-xs font-bold ${phase === 'paused' ? 'bg-amber-500/20 text-amber-100 border-b border-amber-500/40' : 'bg-rose-900/60 text-rose-100 border-b border-rose-500/40'}`}>
           <span className="flex-1">{notice}</span>

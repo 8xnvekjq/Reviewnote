@@ -124,6 +124,8 @@ export interface LectureRecordingManifest {
   recordingId: string;
   deckId: string;
   title: string;
+  /** 녹음한 반(월수금반·수토반). 반을 고르기 전의 녹음에는 없다. */
+  className?: string;
   createdAt: string;
   updatedAt: string;
   status: RecordingStatus;
@@ -137,10 +139,11 @@ export interface LectureRecordingManifest {
   chunks: ManifestChunk[];
 }
 
-export function createManifest(input: { recordingId: string; deckId: string; title: string; slides: LectureSlide[]; initialSlideId: string; createdAt?: string }): LectureRecordingManifest {
+export function createManifest(input: { recordingId: string; deckId: string; title: string; className?: string; slides: LectureSlide[]; initialSlideId: string; createdAt?: string }): LectureRecordingManifest {
   const now = input.createdAt ?? new Date().toISOString();
   return {
     format: RECORDING_FORMAT, version: RECORDING_VERSION, recordingId: input.recordingId, deckId: input.deckId, title: input.title,
+    ...(input.className ? { className: input.className } : {}),
     createdAt: now, updatedAt: now, status: 'recording', durationMs: 0,
     coordinateSpace: { width: SLIDE_WIDTH, height: SLIDE_HEIGHT, unit: 'slide-width' },
     slides: input.slides.map(({ id, path, section, label, bookPage }) => ({ id, path, section, label, bookPage })),

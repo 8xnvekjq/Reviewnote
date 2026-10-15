@@ -171,7 +171,7 @@ test('세션: 녹음 → 일시정지 → 이어하기 → 슬라이드 넘김 �
   const h = harness();
   const s = h.session;
   const before = stroke('pre');
-  await s.start({ deckId: 'd1', title: '수업', slides, initialSlideId: 'a', ink: { a: [before] } });
+  await s.start({ deckId: 'd1', title: '수업', className: '수토반', slides, initialSlideId: 'a', ink: { a: [before] } });
   assert.equal(s.state.phase, 'recording');
   assert.equal(h.rows[0].status, 'recording');
   assert.equal(h.wakeRequests, 1);
@@ -201,7 +201,8 @@ test('세션: 녹음 → 일시정지 → 이어하기 → 슬라이드 넘김 �
   assert.deepEqual(m.clips.flatMap(c => c.files), ['audio-0001.webm', 'audio-0002.webm']);
   assert.equal(await h.files.get(`${m.recordingId}/audio-0001.webm`)!.text(), 'span1-0|');
   assert.equal(h.files.get(`${m.recordingId}/audio-0001.webm`)!.type, 'audio/webm');
-  assert.deepEqual(h.rows[0], { id: m.recordingId, deck_id: 'd1', title: '수업', duration_ms: 10000, status: 'done' });
+  assert.deepEqual(h.rows[0], { id: m.recordingId, deck_id: 'd1', title: '수업', class_name: '수토반', duration_ms: 10000, status: 'done' });
+  assert.equal(m.className, '수토반', '반은 manifest에도 남는다');
 
   // 저장된 파일만으로 다시 읽는다.
   const chunks = await Promise.all(m.chunks.map(async c => decodeChunkFile(h.files.get(`${m.recordingId}/${c.file}`)!, c.encoding)));
