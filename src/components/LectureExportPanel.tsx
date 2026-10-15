@@ -7,6 +7,9 @@ import { EXPORT_TEST_MS, clearExportFiles, exportFileName, exportLectureMp4, typ
 type WakeLockSentinel = { release(): Promise<void> };
 
 const megabytes = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)}MB`;
+const seconds = (ms: number) => `${Math.round(ms / 1000)}초`;
+const timingText = ({ timings: t, frames }: ExportResult) =>
+  `그리기 ${seconds(t.draw)} · 영상 ${seconds(t.video)} · 소리 ${seconds(t.audio)} · 프레임 ${frames.toLocaleString()}${t.hidden > 1000 ? ` · 창 숨김 ${seconds(t.hidden)}` : ''}`;
 const remainText = (ms: number) => ms < 60_000 ? `${Math.max(1, Math.round(ms / 1000))}초` : `${Math.round(ms / 60_000)}분`;
 const CODEC_NAMES: Record<string, string> = { avc: 'H.264', vp9: 'VP9', av1: 'AV1', aac: 'AAC', opus: 'Opus' };
 
@@ -74,7 +77,7 @@ export const LectureExportPanel: React.FC<{
       {state.phase === 'idle' && (
         <>
           <p className="text-[11px] leading-relaxed text-slate-300 break-keep">
-            1920×1080 영상으로 만들어요. 만드는 동안 화면을 켜 두세요(다른 앱으로 가면 멈췄다가 돌아오면 이어서 만들어요).
+            1920×1080 영상으로 만들어요. 태블릿은 만드는 동안 화면을 켜 두세요(다른 앱으로 가면 멈췄다가 돌아오면 이어서 만들어요).
           </p>
           <button type="button" onClick={() => void start(true)} className={`${button} w-full bg-indigo-600 border-indigo-400 text-white`}>
             전체 영상 만들기 ({formatDuration(total)})
@@ -97,7 +100,7 @@ export const LectureExportPanel: React.FC<{
             </div>
             <div className="flex items-center justify-between text-[11px] text-slate-300">
               <span data-testid="export-progress">{Math.round(ratio * 100)}% · 영상 {formatDuration(p?.doneMs ?? 0)} / {formatDuration(state.toMs - state.fromMs)}</span>
-              <span>{p?.paused ? '⏸ 화면이 꺼져 멈춤' : remain != null ? `약 ${remainText(remain)} 남음` : '준비 중…'}</span>
+              <span>{remain != null ? `약 ${remainText(remain)} 남음` : '준비 중…'}</span>
             </div>
             <button type="button" onClick={() => abortRef.current?.abort()} className={`${button} w-full bg-slate-800 border-slate-600 text-slate-100`}>취소</button>
           </>
@@ -113,6 +116,8 @@ export const LectureExportPanel: React.FC<{
             <dt className="text-slate-500">크기</dt><dd>{megabytes(state.result.blob.size)}</dd>
             <dt className="text-slate-500">형식</dt>
             <dd>{CODEC_NAMES[state.result.videoCodec] ?? state.result.videoCodec}{state.result.audioCodec ? ` + ${CODEC_NAMES[state.result.audioCodec] ?? state.result.audioCodec}` : ' (소리 없음)'}</dd>
+            <dt className="text-slate-500">걸린 곳</dt>
+            <dd data-testid="export-timings">{timingText(state.result)}</dd>
           </dl>
           <div className="flex gap-2">
             <a href={state.url} download={state.name} className={`${button} flex-1 flex items-center justify-center bg-emerald-600 border-emerald-400 text-white`}>⬇ 기기에 저장</a>

@@ -1,6 +1,7 @@
 // 저장된 수업 녹음(슬라이드 + 필기 기록 + 음성)을 MP4 영상으로 만든다. 화면을 녹화하지 않고 기록을 다시 그려서
 // 인코딩하므로 실제 길이보다 빨리 끝난다. 바뀌지 않는 장면은 프레임을 늘려(가변 프레임) 건너뛴다.
 // 긴 수업(1시간+)도 탭 메모리에 다 올리지 않는다: 음성은 조금씩 풀고, 영상 파일은 브라우저 저장 공간(OPFS)에 바로 쓴다.
+// 화면이 숨겨져도 멈추지 않는다(PC는 창을 내려도 계속, 탭은 안드로이드가 얼렸다가 돌아오면 이어진다).
 import type { InkStroke, SolutionAudioClip } from '../exam/contract.ts';
 import { HIGHLIGHTER_OPACITY, INK_REFERENCE_WIDTH } from '../exam/ink/inkModel.ts';
 import { drawStroke } from '../exam/ink/inkRender.ts';
@@ -127,9 +128,12 @@ export function drawLectureFrame(ctx: Ctx, highlightCtx: Ctx, image: CanvasImage
 }
 
 // ── 내보내기 ──────────────────────────────────────────────────────────────
-export interface ExportProgress { doneMs: number; totalMs: number; elapsedMs: number; frames: number; paused: boolean }
+export interface ExportProgress { doneMs: number; totalMs: number; elapsedMs: number; frames: number }
+/** 어디에 시간이 들었는지(ms). hidden = 화면이 숨겨져 있던 시간(그동안도 계속 만든다). */
+export interface ExportTimings { draw: number; video: number; audio: number; hidden: number }
 export interface ExportResult {
   blob: Blob; videoCodec: string; audioCodec: string | null; frames: number; elapsedMs: number; durationMs: number;
+  timings: ExportTimings;
   /** 영상 파일을 둔 곳: 브라우저 저장 공간(긴 영상) 또는 메모리. */
   storage: 'opfs' | 'memory';
 }
@@ -243,16 +247,28 @@ class ClipReader {
 
 const abortError = () => new DOMException('내보내기를 취소했어요.', 'AbortError');
 
-/** 화면이 숨겨지면(앱 전환·화면 꺼짐) 인코딩이 느려지거나 멈추므로, 다시 보일 때까지 기다린다. */
-function whenVisible(signal?: AbortSignal): Promise<void> {
-  if (typeof document === 'undefined' || document.visibilityState !== 'hidden') return Promise.resolve();
-  return new Promise((resolve, reject) => {
-    const done = () => { document.removeEventListener('visibilitychange', check); signal?.removeEventListener('abort', aborted); };
-    const check = () => { if (document.visibilityState !== 'hidden') { done(); resolve(); } };
-    const aborted = () => { done(); reject(abortError()); };
-    document.addEventListener('visibilitychange', check);
-    signal?.addEventListener('abort', aborted);
+/** 다른 일(진행 막대 그리기)에 잠깐 양보한다. setTimeout은 숨겨진 탭에서 1초 이상으로 늦춰지므로(30분 영상이면
+ *  양보 360번 = 6분+) 늦춰지지 않는 MessageChannel을 쓴다. */
+function yieldTask(): Promise<void> {
+  return new Promise(resolve => {
+    const channel = new MessageChannel();
+    channel.port1.onmessage = () => { channel.port1.close(); resolve(); };
+    channel.port2.postMessage(null);
   });
+}
+
+/** 화면이 숨겨져 있던 시간을 잰다(결과 창에 보여 주어 느린 까닭을 알 수 있게). */
+function hiddenTimer() {
+  let total = 0, since = document.visibilityState === 'hidden' ? performance.now() : null as number | null;
+  const onChange = () => {
+    if (document.visibilityState === 'hidden') since ??= performance.now();
+    else if (since !== null) { total += performance.now() - since; since = null; }
+  };
+  document.addEventListener('visibilitychange', onChange);
+  return {
+    get: () => total + (since !== null ? performance.now() - since : 0),
+    stop: () => document.removeEventListener('visibilitychange', onChange),
+  };
 }
 
 type OpfsDirectory = FileSystemDirectoryHandle & { entries(): AsyncIterable<[string, FileSystemHandle]> };
@@ -323,6 +339,8 @@ export async function exportLectureMp4(input: LectureExportInput): Promise<Expor
     target: file ? file.target : new mb.BufferTarget(),
   });
   let finished = false;
+  const timings: ExportTimings = { draw: 0, video: 0, audio: 0, hidden: 0 };
+  const hidden = hiddenTimer();
   try {
     const video = new mb.CanvasSource(canvas, { codec: videoCodec, quality: mb.QUALITY_HIGH, keyFrameInterval: EXPORT_KEYFRAME_S });
     output.addVideoTrack(video, { frameRate: EXPORT_FPS });
@@ -333,19 +351,21 @@ export async function exportLectureMp4(input: LectureExportInput): Promise<Expor
     const frames = planFrames(replay.frameKey, fromMs, toMs);
     let next = 0;
     for (let win = 0; win < totalMs; win += EXPORT_WINDOW_MS) {
-      if (document.visibilityState === 'hidden') {
-        onProgress?.({ doneMs: win, totalMs, elapsedMs: performance.now() - started, frames: next, paused: true });
-        await whenVisible(signal);
-      }
       const winEnd = Math.min(totalMs, win + EXPORT_WINDOW_MS);
       for (; next < frames.length && frames[next].atMs - fromMs < winEnd; next++) {
         if (signal?.aborted) throw abortError();
         const frame = frames[next];
         const state = replay.frame(frame.atMs);
-        drawLectureFrame(ctx, hctx, await images.get(state.slideId), state.strokes);
+        const image = await images.get(state.slideId);
+        let t = performance.now();
+        drawLectureFrame(ctx, hctx, image, state.strokes);
+        timings.draw += performance.now() - t;
+        t = performance.now();
         await video.add((frame.atMs - fromMs) / 1000, frame.durationMs / 1000);
+        timings.video += performance.now() - t;
       }
       if (audio) {
+        const t = performance.now();
         const length = Math.round((winEnd - win) * EXPORT_SAMPLE_RATE / 1000);
         const samples = new Float32Array(length);
         for (const read of windowReads(placements, win, length)) {
@@ -365,10 +385,11 @@ export async function exportLectureMp4(input: LectureExportInput): Promise<Expor
         const buffer = new AudioBuffer({ length, numberOfChannels: 1, sampleRate: EXPORT_SAMPLE_RATE });
         buffer.copyToChannel(samples, 0);
         await audio.add(buffer);
+        timings.audio += performance.now() - t;
       }
-      onProgress?.({ doneMs: winEnd, totalMs, elapsedMs: performance.now() - started, frames: next, paused: false });
+      onProgress?.({ doneMs: winEnd, totalMs, elapsedMs: performance.now() - started, frames: next });
       // 화면(진행 막대)이 멈춘 듯 보이지 않게 한 번씩 양보한다.
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await yieldTask();
     }
     await output.finalize();
     finished = true;
@@ -382,12 +403,14 @@ export async function exportLectureMp4(input: LectureExportInput): Promise<Expor
     return {
       blob, videoCodec, audioCodec, frames: frames.length,
       elapsedMs: performance.now() - started, durationMs: totalMs, storage: file ? 'opfs' : 'memory',
+      timings: { ...timings, hidden: hidden.get() },
     };
   } catch (error) {
     if (output.state === 'started') await output.cancel().catch(() => {});
     if (!finished) await file?.discard();
     throw error;
   } finally {
+    hidden.stop();
     images.close();
     for (const reader of readers.values()) reader.dispose();
   }
