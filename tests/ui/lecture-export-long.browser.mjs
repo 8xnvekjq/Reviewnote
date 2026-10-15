@@ -18,7 +18,7 @@ try {
     if (vite.exitCode !== null) throw new Error(output);
     await new Promise(resolve => setTimeout(resolve, 100));
   }
-  browser = await chromium.launch({ headless: true, args: ['--enable-precise-memory-info'] });
+  browser = await chromium.launch({ headless: !process.env.HEADED, channel: process.env.HEADED ? 'chrome' : undefined, args: ['--enable-precise-memory-info'] });
   const page = await browser.newPage();
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.text().startsWith('[long]')) console.log(message.text()); });
@@ -100,19 +100,18 @@ try {
     const setupMs = performance.now() - setupStarted;
 
     const replay = buildLectureReplay({ slides, initialSlideId: 's1', durationMs: total, clips }, entries);
-    let peakHeap = 0, lastLog = -1, pausedSeen = false;
+    let peakHeap = 0, lastLog = -1;
     const heap = () => performance.memory?.usedJSHeapSize ?? 0;
     const startHeap = heap();
     const exported = await exportLectureMp4({
       replay, slideIds: slides.map(s => s.id), slideUrls, clips, fromMs: 0, toMs: total, toFile: true,
       onProgress: p => {
         peakHeap = Math.max(peakHeap, heap());
-        // 1/3 지점에서 0.8초 동안 화면을 숨긴다 → 멈췄다가 이어서 만든다.
+        // 1/3 지점에서 0.8초 동안 화면을 숨긴다 → 멈추지 않고 계속 만든다(숨긴 시간은 따로 잰다).
         if (!window.__hid && p.doneMs > p.totalMs / 3) {
-          window.__hid = true; window.__vis = 'hidden';
+          window.__hid = true; window.__vis = 'hidden'; document.dispatchEvent(new Event('visibilitychange'));
           setTimeout(() => { window.__vis = 'visible'; document.dispatchEvent(new Event('visibilitychange')); }, 800);
         }
-        pausedSeen ||= p.paused;
         const pct = Math.floor(p.doneMs / p.totalMs * 10);
         if (pct !== lastLog) { lastLog = pct; console.log(`[long] ${pct * 10}% ${(p.elapsedMs / 1000).toFixed(0)}s heap ${(heap() / 1048576).toFixed(0)}MB frames ${p.frames}`); }
       },
@@ -156,13 +155,13 @@ try {
       setupS: +(setupMs / 1000).toFixed(1), exportS: +(exported.elapsedMs / 1000).toFixed(1), storage: exported.storage,
       sizeMB: +(exported.blob.size / 1048576).toFixed(1), frames: exported.frames, codecs: [exported.videoCodec, exported.audioCodec],
       duration: await input.computeDuration(), startHeapMB: Math.round(startHeap / 1048576), peakHeapMB: Math.round(peakHeap / 1048576),
-      strokes: strokeTimes.length, beeps, edge, inkChecks, pausedSeen,
+      strokes: strokeTimes.length, beeps, edge, inkChecks, timings: exported.timings, hiddenMs: Math.round(exported.timings.hidden),
     };
   }, minutes);
 
   console.log(JSON.stringify(result));
   assert.deepEqual(errors, []);
-  assert.ok(result.pausedSeen, '화면이 숨겨진 동안 멈췄다');
+  assert.ok(result.hiddenMs > 500, '화면이 숨겨진 동안에도 계속 만들었다');
   assert.equal(result.storage, 'opfs', '긴 영상은 브라우저 저장 공간에 쓴다');
   assert.deepEqual(result.codecs, ['avc', 'aac']);
   assert.ok(Math.abs(result.duration - minutes * 60) < 0.5, `영상 길이 ${result.duration}s`);
