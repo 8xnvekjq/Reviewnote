@@ -5,8 +5,9 @@ import type { InkReplayEvent, InkStroke } from '../exam/contract.ts';
 import { HELP_MAX_BYTES, decodeHelpSolution, encodeHelpSolution, helpSolutionStats, type HelpSolutionFile } from './solutionFile.ts';
 
 export const HELP_BUCKET = 'help-solutions';
-/** 서버와 같은 보상(포인트). 화면 안내용 — 실제 지급은 서버가 한도에 따라 정한다. */
-export const HELP_REWARD = { like: 30, unclear: 10, requester: 5 } as const;
+/** 서버와 같은 보상. 화면 안내용 — 실제 지급은 서버가 한도에 따라 정한다.
+ *  도움 됐어요 = 도우미에게 지식의 조각 1개, 이해 못 했어요 = 도우미 5P, 피드백을 남긴 요청자 3P. */
+export const HELP_REWARD = { likeShards: 1, unclear: 5, requester: 3 } as const;
 
 export interface HelpLabel { face: string; title: string | null; grade: string | null }
 export type HelpRequestStatus = 'open' | 'closed' | 'cancelled';
@@ -27,9 +28,11 @@ export interface HelpSolutionRow {
 }
 export interface GivenHelp {
   id: string; request_id: string; created_at: string; feedback: HelpFeedback | null; feedback_at: string | null;
-  reward: number; image_url: string | null; requester: HelpLabel;
+  reward: number; shards?: number; image_url: string | null; requester: HelpLabel;
 }
-export interface FeedbackResult { helper_reward: number; requester_reward: number; closed: boolean }
+export interface FeedbackResult { helper_reward: number; helper_shards?: number; requester_reward: number; closed: boolean }
+/** 로그인 알림: 내 요청에 새로 온 풀이(요청별 묶음). */
+export interface HelpArrival { request_id: string; title: string | null; image_url: string | null; count: number }
 export interface AdminHelpRow {
   solution_id: string; request_id: string; created_at: string; request_status: HelpRequestStatus;
   image_url: string | null; mistake_title: string | null; storage_path: string; stroke_count: number; duration_ms: number;
@@ -62,6 +65,10 @@ export const myHelpGiven = (client: SupabaseClient, limit = 30) =>
   rpc<GivenHelp[]>(client, 'my_help_given', { p_limit: limit }, '내가 보낸 풀이를 불러오지 못했어요.');
 export const giveHelpFeedback = (client: SupabaseClient, solutionId: string, kind: HelpFeedback) =>
   rpc<FeedbackResult>(client, 'give_help_feedback', { p_solution_id: solutionId, p_kind: kind }, '피드백을 보내지 못했어요.');
+export const helpNewArrivals = (client: SupabaseClient) =>
+  rpc<HelpArrival[]>(client, 'help_new_arrivals', {}, '새 풀이 알림을 불러오지 못했어요.');
+export const markHelpArrivalsNotified = (client: SupabaseClient) =>
+  rpc<number>(client, 'mark_help_arrivals_notified', {}, '알림을 확인 처리하지 못했어요.');
 export const adminListHelp = (client: SupabaseClient, limit = 100) =>
   rpc<AdminHelpRow[]>(client, 'admin_list_help', { p_limit: limit }, '도움 기록을 불러오지 못했어요.');
 export const adminRemoveHelpSolution = (client: SupabaseClient, solutionId: string) =>

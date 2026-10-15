@@ -14,7 +14,9 @@ function statusText(request: MyHelpRequest) {
 
 export function MyHelpRequestsSection({ userId, onPointsChanged }: { userId: string; onPointsChanged?: () => void }) {
   const { requests, error, loading } = useMyHelpRequests(userId);
-  const rows = useMemo(() => Object.values(requests).sort((a, b) => b.created_at.localeCompare(a.created_at)), [requests]);
+  // 새 풀이가 도착한 문제를 맨 위로, 나머지는 최근 요청 순
+  const rows = useMemo(() => Object.values(requests).sort((a, b) =>
+    Number(b.unseen_count > 0) - Number(a.unseen_count > 0) || b.created_at.localeCompare(a.created_at)), [requests]);
   const [viewing, setViewing] = useState<MyHelpRequest | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
@@ -37,9 +39,10 @@ export function MyHelpRequestsSection({ userId, onPointsChanged }: { userId: str
           : (
             <div className="grid gap-3 md:grid-cols-2">
               {rows.map(request => (
-                <article key={request.id} className="flex min-w-0 gap-3 rounded-xl border border-slate-700 bg-slate-900 p-3" data-status={request.status}>
+                <article key={request.id} className={`flex min-w-0 gap-3 rounded-xl border bg-slate-900 p-3 ${request.unseen_count ? 'border-indigo-400/70' : 'border-slate-700'}`} data-status={request.status}>
                   {request.image_url && <img src={request.image_url} alt="도움 요청한 문제" loading="lazy" className="h-24 w-24 shrink-0 rounded bg-white object-contain" />}
                   <div className="min-w-0 flex-1 space-y-2">
+                    {request.unseen_count > 0 && <span className="inline-block rounded-md bg-indigo-500/20 px-2 py-0.5 text-[11px] font-black text-indigo-200">🆕 풀이 도착</span>}
                     {request.title && <p className="line-clamp-2 break-words text-sm font-bold text-slate-100">{request.title}</p>}
                     <p className={`text-sm ${request.unseen_count ? 'text-amber-300' : 'text-slate-300'}`}>{statusText(request)}</p>
                     <div className="flex flex-wrap gap-2">

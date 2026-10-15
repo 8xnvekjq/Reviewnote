@@ -43,7 +43,7 @@ export function HelpSolveScreen({ request, userId, onClose, onSent }: {
   };
   const stats = helpSolutionStats(log.events, strokes);
   const reason = helpTooShortReason(stats);
-  const hint = reason ? `현재 ${stats.strokeCount}획 · ${(stats.durationMs / 1000).toFixed(1)}초 / 최소 5획 · 20초의 풀이가 필요해요.` : '풀이를 보낼 수 있어요!';
+  const hint = reason ? `현재 ${stats.strokeCount}획 · ${(stats.durationMs / 1000).toFixed(1)}초 / 최소 5획 · 5초의 풀이가 필요해요.` : '풀이를 보낼 수 있어요!';
   const send = async () => {
     canvas.current?.finish();
     if (sending.current || helpTooShortReason(helpSolutionStats(log.events, current.current))) return;
@@ -77,7 +77,7 @@ export function HelpSolveScreen({ request, userId, onClose, onSent }: {
         <p aria-live="polite" className="text-sm text-slate-300">{hint}</p>
         {error && <p role="alert" className="text-rose-300">{error}</p>}
         <button type="button" disabled={busy || !!reason} onClick={() => void send()} className="w-full rounded-xl bg-indigo-600 px-4 py-3 font-bold disabled:opacity-40">{busy ? '보내는 중…' : '보내기'}</button>
-        <p className="text-xs text-slate-400">친구가 좋아요를 누르면 +{HELP_REWARD.like}P, 이해 안 돼요는 +{HELP_REWARD.unclear}P</p>
+        <p className="text-xs text-slate-400">친구가 ‘도움 됐어요’를 누르면 지식의 조각 +{HELP_REWARD.likeShards}개, ‘이해 못 했어요’는 +{HELP_REWARD.unclear}P</p>
       </footer>
     </div>
   </dialog>;

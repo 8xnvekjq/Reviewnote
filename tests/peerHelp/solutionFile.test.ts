@@ -25,10 +25,10 @@ test('필기 변화를 재생 이벤트로 모으고, 바뀐 게 없으면 남�
   assert.equal(helpDurationMs([]), 0);
 });
 
-test('최소 분량 안내(서버와 같은 기준: 획 5개, 20초)', () => {
+test('최소 분량 안내(서버와 같은 기준: 획 5개, 5초)', () => {
   assert.match(helpTooShortReason({ strokeCount: 4, durationMs: 60_000 })!, /획 5개/);
-  assert.match(helpTooShortReason({ strokeCount: 9, durationMs: 19_999 })!, /20초/);
-  assert.equal(helpTooShortReason({ strokeCount: 5, durationMs: 20_000 }), null);
+  assert.match(helpTooShortReason({ strokeCount: 9, durationMs: 4_999 })!, /5초/);
+  assert.equal(helpTooShortReason({ strokeCount: 5, durationMs: 5_000 }), null);
 });
 
 test('풀이 파일: gzip으로 저장했다가 그대로 재생 데이터로 연다', async () => {

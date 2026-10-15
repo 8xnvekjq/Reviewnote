@@ -43,6 +43,8 @@ import { ShardGainToast } from './components/ShardGainToast';
 // 줄었고, 그중 관리자 전용 두 화면만 따로 떼면 gzip 11.24kB가 학생 계정에서는 아예 다운로드되지
 // 않는다). named export라 lazy()에 바로 못 넣고 default로 매핑해야 한다.
 const AdminPanel = lazy(() => import('./components/AdminPanel').then(m => ({ default: m.AdminPanel })));
+import { HelpArrivalModal } from './features/peerHelp/requester/HelpArrivalModal';
+import { helpNewArrivals, markHelpArrivalsNotified, type HelpArrival } from './features/peerHelp/api';
 const HelpTab = lazy(() => import('./features/peerHelp/helper/HelpTab').then(m => ({ default: m.HelpTab })));
 const HelpAdminPanel = lazy(() => import('./features/peerHelp/admin/HelpAdminPanel').then(m => ({ default: m.HelpAdminPanel })));
 const ExamPrepAnalysis = lazy(() => import('./components/ExamPrepAnalysis').then(m => ({ default: m.ExamPrepAnalysis })));
@@ -438,6 +440,20 @@ function App() {
       checkUnseenScaffoldings();
     }
   }, [session?.user?.id, isAdmin]);
+
+  // 🙋 서로 도와주기: 로그인할 때 내 질문에 새로 온 친구 풀이 알림(한 번만 띄운다 — 닫거나 보러 가면 서버에 표시)
+  const [helpArrivals, setHelpArrivals] = useState<HelpArrival[]>([]);
+  useEffect(() => {
+    if (!session?.user?.id || isAdmin) { setHelpArrivals([]); return; }
+    let live = true;
+    helpNewArrivals(supabase).then(rows => { if (live) setHelpArrivals(rows); }, () => {});
+    return () => { live = false; };
+  }, [session?.user?.id, isAdmin]);
+  const dismissHelpArrivals = (goToHelp: boolean) => {
+    setHelpArrivals([]);
+    void markHelpArrivalsNotified(supabase).catch(() => {});
+    if (goToHelp) setActiveTab('help');
+  };
 
   // 문제카드 "약함" 표시 — 학생 본인의 복습체크 전체 이력에서 파생되는 값이라 mistakes 자체와는
   // 별개 쿼리로 가져온다("마스터" 배지는 review_check_mastered_at이 mistakes 로우에 이미 실려
@@ -2205,6 +2221,11 @@ function App() {
           <PixelWorldPhaser isAdmin={isAdmin} userId={session.user.id} pointsBalance={currentDisplayPoints} onExit={() => setActiveTab('notes')}
             onPixelPurchase={handlePixelPurchase} onPointsReward={handlePixelReward} onPointsChanged={handlePixelPointsChanged} />
         </LazyScreenBoundary>
+      )}
+
+      {/* 선생님 힌트 알림이 떠 있으면 그게 닫힌 뒤에 보여 준다(겹치지 않게). */}
+      {helpArrivals.length > 0 && !isNewScaffoldingModalOpen && (
+        <HelpArrivalModal arrivals={helpArrivals} onClose={() => dismissHelpArrivals(false)} onGoToHelp={() => dismissHelpArrivals(true)} />
       )}
 
       <OverlayHost
