@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import { redeemQrLogin, QR_LOGIN_ERROR } from '../features/qrLogin/api';
 import { normalizeCode, stripQrParam } from '../features/qrLogin/helpers';
+import { QrScanner } from '../features/qrLogin/QrScanner';
 import logoImg from '../assets/logo.jpg';
 
 interface AuthScreenProps {
@@ -20,6 +21,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
   const [loading, setLoading] = useState(false);
 
   const [showCode, setShowCode] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const [code, setCode] = useState('');
   const [qrLoading, setQrLoading] = useState(false);
   const qrStarted = useRef(false);
@@ -174,7 +176,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
 
         {qrLoading && <p role="status" className="text-center text-indigo-300">QR로 로그인 중…</p>}
         {!isSignUp && <div className="space-y-3">
-          <button type="button" disabled={qrLoading} onClick={() => setShowCode(!showCode)} className="text-sm text-indigo-300">휴대폰으로 로그인 (코드 입력)</button>
+          <button type="button" disabled={qrLoading} onClick={() => { setShowCode(!showCode); setScanning(false); }} className="text-sm text-indigo-300">휴대폰으로 로그인 (QR·코드)</button>
+          {showCode && (scanning
+            ? <QrScanner onClose={() => setScanning(false)} onToken={token => { setScanning(false); void redeem({ token }); }} />
+            : <button type="button" disabled={qrLoading} onClick={() => setScanning(true)} className="w-full rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white disabled:opacity-50">📷 QR로 인증하기</button>)}
           {showCode && <form onSubmit={event => { event.preventDefault(); void redeem({ code }); }} className="flex gap-2">
             <input aria-label="로그인 코드" autoComplete="off" autoCapitalize="characters" spellCheck={false} value={code} onChange={event => setCode(event.target.value)} maxLength={17} placeholder="ABCD-EFGH" className="min-w-0 flex-1 rounded-xl bg-slate-950 px-3 py-3 text-white" />
             <button type="submit" disabled={qrLoading || !/^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{8}$/.test(normalizeCode(code))} className="rounded-xl bg-indigo-600 px-4 text-white disabled:opacity-50">코드로 로그인</button>
