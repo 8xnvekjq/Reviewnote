@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { exportFileName, mixWindow, placeAudio, planFrames } from '../../src/features/lectures/lectureExport.ts';
+import { exportFileName, placeAudio, planFrames, resample, windowReads } from '../../src/features/lectures/lectureExport.ts';
 import { TimelineLog, buildLectureReplay } from '../../src/features/lectures/lectureRecordingModel.ts';
 import type { InkStroke } from '../../src/features/exam/contract.ts';
 
@@ -59,25 +59,27 @@ test('placeAudio: 구간과 겹치는 클립 부분만, 다음 클립과 겹치�
   assert.deepEqual(placeAudio([], 0, 60_000), []);
 });
 
-test('mixWindow: 창마다 제자리에 샘플을 놓고 나머지는 무음', () => {
-  const rate = 1000; // 1ms = 샘플 1개로 단순하게
-  const clip = Float32Array.from({ length: 50 }, (_, i) => i + 1);
-  const placements = [{ clip: 0, srcMs: 10, dstMs: 5, lengthMs: 30 }]; // 클립 11..40을 5..35ms에
-  const first = new Float32Array(20), second = new Float32Array(20);
-  mixWindow(first, 0, placements, [clip], rate);
-  mixWindow(second, 20, placements, [clip], rate);
-  assert.deepEqual([...first.slice(0, 7)], [0, 0, 0, 0, 0, 11, 12]);
-  assert.equal(first[19], 25);
-  assert.equal(second[0], 26, '다음 창은 이어서');
-  assert.equal(second[14], 40);
-  assert.equal(second[15], 0, '배치 끝 뒤는 무음');
-  // 풀린 소리가 기록보다 짧아도 넘쳐 읽지 않는다.
-  const short = new Float32Array(20);
-  mixWindow(short, 0, [{ clip: 0, srcMs: 45, dstMs: 0, lengthMs: 20 }], [clip], rate);
-  assert.deepEqual([...short.slice(0, 6)], [46, 47, 48, 49, 50, 0]);
-  // 못 푼 클립은 건너뛴다.
-  mixWindow(short, 0, placements, [null], rate);
-  assert.ok(short.every(v => v === 0));
+test('windowReads: 창마다 어느 클립 샘플을 어디에 읽을지', () => {
+  const rate = 1000; // 1ms = 샘플 1개
+  const placements = [{ clip: 0, srcMs: 10, dstMs: 5, lengthMs: 30 }, { clip: 1, srcMs: 0, dstMs: 35, lengthMs: 100 }];
+  assert.deepEqual(windowReads(placements, 0, 20, rate), [{ clip: 0, srcSample: 10, outOffset: 5, count: 15 }]);
+  assert.deepEqual(windowReads(placements, 20, 20, rate), [
+    { clip: 0, srcSample: 25, outOffset: 0, count: 15 },
+    { clip: 1, srcSample: 0, outOffset: 15, count: 5 },
+  ], '다음 창은 이어서, 클립이 바뀌는 곳은 나눠 읽는다');
+  assert.deepEqual(windowReads(placements, 200, 20, rate), [], '소리 없는 곳');
+  // 창들을 이어 붙이면 빈틈·겹침 없이 배치 길이 그대로.
+  const all = [0, 20, 40, 60, 80, 100, 120].flatMap(w => windowReads(placements, w, 20, rate));
+  assert.equal(all.filter(r => r.clip === 1).reduce((s, r) => s + r.count, 0), 100);
+});
+
+test('resample: 44.1kHz → 48kHz 길이와 값', () => {
+  const input = Float32Array.from({ length: 441 }, (_, i) => i / 441);
+  const out = resample(input, 44_100, 48_000);
+  assert.equal(out.length, 480);
+  assert.equal(out[0], 0);
+  assert.ok(Math.abs(out[240] - 0.5) < 0.01);
+  assert.equal(resample(input, 48_000, 48_000), input, '같으면 그대로');
 });
 
 test('exportFileName: 파일 이름에 못 쓰는 글자를 빼고 구간을 붙인다', () => {

@@ -268,7 +268,7 @@ try {
     await seek(0);
     await page.getByRole('button', { name: 'MP4로 저장' }).click();
     const exportPanel = page.getByTestId('lecture-export');
-    await exportPanel.getByRole('button', { name: '테스트 영상 만들기' }).click();
+    await exportPanel.getByRole('button', { name: /^1분 테스트/ }).click();
     await page.waitForFunction(() => ['done', 'error'].includes(document.querySelector('[data-testid=lecture-export]')?.dataset.phase), null, { timeout: 60_000 });
     assert.equal(await exportPanel.getAttribute('data-phase'), 'done', await exportPanel.innerText());
     const stats = await page.getByTestId('export-stats').innerText();
