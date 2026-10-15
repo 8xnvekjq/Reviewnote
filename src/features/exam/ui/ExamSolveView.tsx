@@ -1,12 +1,12 @@
 // 전체화면 풀이: 상단 바(나가기·필기도구·이전/다음·번호·스톱워치·남은 시간) + 상단 답안 줄 + 문항 이미지/필기.
 // 전체 문제 보기·OMR 검토·나가기/제출 확인은 이 화면 위에 겹쳐 띄운다(전체화면을 유지한 채).
 // v2: 자유 모드에서 채점해 본 문항(checked)은 답을 잠근다 — 이어 풀기로 다시 열어도 서버 payload 의 items[].checked 로 유지.
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { TeacherAudioRecorder } from '../audio/TeacherAudioRecorder';
 import { prepareTeacherCheck, runAudioUploadGate, waitForAudioUploads, type AudioGateUi } from '../audio/audioFlush';
 import { ExamAssistOverlay } from './ExamAssistOverlay';
-import { LaserIcon } from './LaserIcon';
-import { LassoIcon } from './LassoIcon';
+import { ExamInkToolbar } from './ExamInkToolbar';
+import { PEN_COLORS, PEN_SIZES } from './inkToolbarOptions';
 import type { ExamAttempt, ExamClient, ExamInkCanvasHandle, ExamItemState, ExamResult, InkChangeKind, InkStroke, InkTool } from '../contract';
 import { ExamInkCanvas } from '../ink/ExamInkCanvas';
 import { preloadInkImages } from '../ink/inkImages';
@@ -31,18 +31,6 @@ import {
 const SAVE_DEBOUNCE_MS = 2500;
 // 획마다 문항 필기 전체가 서버로 가므로 너무 자주 보내지 않는다. 문항 이동·화면 숨김·제출 때는 바로 보낸다.
 const INK_SAVE_DEBOUNCE_MS = 5000;
-const PEN_COLORS = [
-  { value: '#1f2937', label: '검정' },
-  { value: '#2563eb', label: '파랑' },
-  { value: '#dc2626', label: '빨강' },
-  { value: '#16a34a', label: '초록' },
-];
-const SIZES = [
-  { value: 2, label: '가늘게' },
-  { value: 4, label: '보통' },
-  { value: 7, label: '굵게' },
-];
-
 interface LocalItem { answer: string | null; unsure: boolean; visits: number; checked: FreeCheck | null }
 type Overlay = null | 'overview' | 'review' | 'exit' | 'submit';
 
@@ -98,7 +86,7 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
   const strokes = inkSync.strokes;
   const [tool, setTool] = useState<InkTool>('pen');
   const [color, setColor] = useState(PEN_COLORS[0].value);
-  const [size, setSize] = useState(SIZES[1].value);
+  const [size, setSize] = useState(PEN_SIZES[1].value);
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [peerMode, setPeerMode] = useState(false);
   const peerTrigger = useRef<HTMLElement | null>(null);
@@ -462,35 +450,16 @@ export function ExamSolveView({ client, attempt, onExit, onSubmitted, isAdmin = 
           </button>
           {isAdmin && <TeacherAudioRecorder client={client} ownerId={currentUserId} attemptId={attempt.id} questionId={inkKey} navigationKey={question.id} stopRef={audioStopRef} captureRef={audioCaptureRef}
             onReset={client.resetQuestionSolution ? resetQuestion : undefined} />}
-          <div className="exam-tools" role="toolbar" aria-label="필기 도구" inert={peerMode || undefined}>
-            <div className="exam-tool-group">
-              {([['pen', '펜', '✏️'], ['highlighter', '형광펜', '🖍️'], ['eraser', '지우개', '🧽'], ['laser', '레이저(남지 않음)', null], ['lasso', '올가미(옮기기·크기·회전)', null]] as const).map(([value, label, icon]) => (
-                <button key={value} type="button" className={`exam-tool${tool === value && !pagePan ? ' is-on' : ''}`} aria-pressed={tool === value && !pagePan} aria-label={label} title={label} onClick={() => { setTool(value); setPagePan(false); }}>
-                  {icon ? <span aria-hidden="true">{icon}</span> : value === 'lasso' ? <LassoIcon /> : <LaserIcon />}
-                </button>
-              ))}
-            </div>
-            <div className="exam-tool-group">
-              {PEN_COLORS.map(c => (
-                <button key={c.value} type="button" className={`exam-color${color === c.value ? ' is-on' : ''}`} style={{ '--swatch': c.value } as CSSProperties} aria-pressed={color === c.value} aria-label={`${c.label}색`} onClick={() => { setColor(c.value); if (tool === 'eraser' || tool === 'laser' || tool === 'lasso') setTool('pen'); }} />
-              ))}
-            </div>
-            <div className="exam-tool-group">
-              {SIZES.map(s => (
-                <button key={s.value} type="button" className={`exam-size${size === s.value ? ' is-on' : ''}`} aria-pressed={size === s.value} aria-label={`굵기 ${s.label}`} onClick={() => setSize(s.value)}>
-                  <i style={{ width: s.value + 3, height: s.value + 3 }} />
-                </button>
-              ))}
-            </div>
-            <div className="exam-tool-group">
-              <button type="button" className="exam-tool" aria-label="실행 취소" title="실행 취소" disabled={!canUndo} onClick={() => { inkRef.current?.undo(); setHistoryTick(t => t + 1); }}>↶</button>
-              <button type="button" className="exam-tool" aria-label="다시 실행" title="다시 실행" disabled={!canRedo} onClick={() => { inkRef.current?.redo(); setHistoryTick(t => t + 1); }}>↷</button>
-              {/* 한 번에 모두 지우기는 관리자만(학생은 실행 취소·지우개로 지운다). */}
-              {isAdmin && <button type="button" className="exam-tool exam-tool-text" disabled={!(strokes.get(inkKey)?.length)} onClick={() => { inkRef.current?.clear(); setHistoryTick(t => t + 1); }}>
+          <ExamInkToolbar tool={tool} toolPressed={!pagePan} color={color} size={size} inert={peerMode}
+            onTool={value => { setTool(value); setPagePan(false); }}
+            onColor={setColor} onSize={setSize}
+            canUndo={canUndo} canRedo={canRedo}
+            onUndo={() => { inkRef.current?.undo(); setHistoryTick(t => t + 1); }}
+            onRedo={() => { inkRef.current?.redo(); setHistoryTick(t => t + 1); }}
+            historyExtra={isAdmin && /* 한 번에 모두 지우기는 관리자만(학생은 실행 취소·지우개로 지운다). */
+              <button type="button" className="exam-tool exam-tool-text" disabled={!(strokes.get(inkKey)?.length)} onClick={() => { inkRef.current?.clear(); setHistoryTick(t => t + 1); }}>
                 {hanneung ? '이 페이지 필기 지우기' : '이 문항 필기 지우기'}
-              </button>}
-            </div>
-          </div>
+              </button>} />
           <div className="exam-nav">
             <button type="button" className="rn-icon-button exam-nav-btn" aria-label="이전 문항" disabled={index === 0} onClick={() => goTo(index - 1)}>◀</button>
             <button type="button" className="exam-nav-count" aria-label={`${question.number}번 / ${questions.length} — 전체 문제 보기`} aria-haspopup="dialog" onClick={() => setOverlay('overview')} data-testid="exam-counter">

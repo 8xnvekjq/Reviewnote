@@ -4,6 +4,7 @@ import { HELP_REWARD, listHelpRequests, myHelpGiven, type GivenHelp, type OpenHe
 import { HelpLabel } from './HelpLabel';
 import { HelpSolveScreen } from './HelpSolveScreen';
 import { helpFeedbackText, helpRewardText } from './presentation';
+import { MyHelpRequestsSection } from '../requester/MyHelpRequestsSection';
 
 export interface HelpTabProps { userId: string; onPointsChanged?: () => void }
 
@@ -47,6 +48,7 @@ export function HelpTab({ userId, onPointsChanged }: HelpTabProps) {
           <p className="text-sm text-indigo-300">풀이 {request.solution_count}개 {request.mine_submitted && <span className="ml-2 rounded bg-slate-700 px-2 py-1">내가 보냈어요</span>}</p>
         </button>)}</div>
       </section>
+      <MyHelpRequestsSection userId={userId} onPointsChanged={onPointsChanged} />
       <section aria-label="내가 보낸 풀이" className="space-y-3"><h2 className="font-bold">내가 보낸 풀이</h2>
         {!given.length && !error && <p className="text-slate-400">아직 보낸 풀이가 없어요. 친구의 첫 도우미가 되어 주세요!</p>}
         <div className="grid gap-3 md:grid-cols-2">{given.map(row => <article key={row.id} className="flex min-w-0 gap-3 rounded-xl border border-slate-700 bg-slate-900 p-3">

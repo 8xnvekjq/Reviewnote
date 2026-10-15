@@ -19,6 +19,7 @@ try {
     const image = `${base}/fake-help-problem.svg`;
     const label = { face: '🐱', title: null, grade: '고2' };
     let submitted = false, removed = false, file, empty = false, failList = false, failSubmit = true, givenReward = 0;
+    const cancelled = [];
     const calls = [];
     await context.route('**/*', async route => {
       const req = route.request(), url = new URL(req.url());
@@ -30,6 +31,12 @@ try {
       const rpc = url.pathname.split('/rpc/')[1];
       if (rpc) calls.push({ rpc, body: req.postDataJSON() });
       if (rpc === 'list_help_requests') return failList ? respond({ message: '목록 오류예요' }, 400) : respond(empty ? [] : [{ id: 'request-1', image_url: image, title: '문제', chapter: '방정식', grade: '고2', created_at: new Date().toISOString(), solution_count: 1, requester: label, mine_submitted: submitted }, { id: 'request-2', image_url: image, chapter: '함수', grade: '고1', solution_count: 2, requester: label, mine_submitted: true }]);
+      // 내가 도움 요청한 문제: 풀이가 온 요청 하나 + 해결된 요청 하나
+      if (rpc === 'my_help_requests') return respond(empty ? [] : [
+        { id: 'mine-1', mistake_id: 'm-1', status: 'open', created_at: '2026-10-16T02:00:00Z', image_url: image, title: '내 이차함수 문제', solution_count: 2, unseen_count: 1 },
+        { id: 'mine-2', mistake_id: 'm-2', status: 'closed', created_at: '2026-10-15T02:00:00Z', image_url: image, title: '내 해결된 문제', solution_count: 1, unseen_count: 0 },
+      ]);
+      if (rpc === 'cancel_help_request') { cancelled.push(JSON.parse(route.request().postData() || '{}').p_request_id); return respond(null); }
       if (rpc === 'my_help_given') return respond(empty ? [] : [{ id: 'given-1', request_id: 'request-2', image_url: image, feedback: 'like', reward: givenReward, requester: label }, { id: 'given-2', request_id: 'request-3', image_url: image, feedback: 'unclear', reward: 10, requester: label }]);
       if (rpc === 'submit_help_solution') {
         if (failSubmit) { failSubmit = false; return respond({ message: '요청이 마감됐어요' }, 400); }
@@ -53,6 +60,16 @@ try {
     await page.clock.install();
     await page.goto(`${base}/tests/ui/peer-help-helper.html`);
     await page.getByText('보상 한도라 포인트 없음', { exact: true }).waitFor();
+    // 내가 도움 요청한 문제: 상태·새 풀이 수, 풀이 보기 버튼, 열린 요청만 취소 가능
+    const mine = page.getByTestId('my-help-requests');
+    await mine.getByText('도움 요청 중 · 풀이 2개 (새 풀이 1개)', { exact: true }).waitFor();
+    await mine.getByText('해결됨 👍', { exact: true }).waitFor();
+    assert.equal(await mine.getByRole('button', { name: '풀이 보기 (2)' }).count(), 1);
+    assert.equal(await mine.getByRole('button', { name: '요청 취소' }).count(), 1, '해결된 요청은 취소 버튼이 없다');
+    page.once('dialog', dialog => dialog.accept());
+    await mine.getByRole('button', { name: '요청 취소' }).click();
+    for (let i = 0; i < 50 && !cancelled.length; i++) await page.waitForTimeout(50);
+    assert.deepEqual(cancelled, ['mine-1']);
     assert.equal(await page.getByText('+10P', { exact: true }).count(), 1);
     assert.equal(await page.getByRole('button').filter({ hasText: '내가 보냈어요' }).isDisabled(), true);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
