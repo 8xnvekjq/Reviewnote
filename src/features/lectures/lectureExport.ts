@@ -360,6 +360,8 @@ export async function exportLectureMp4(input: LectureExportInput): Promise<Expor
           }
           await reader.read(read.srcSample, samples, read.outOffset, read.count);
         }
+        // 마이크가 1을 넘긴(찢어진) 소리는 잘라 둔다 — AAC 인코더가 범위 밖 값에서 튀는 소리를 낼 수 있다.
+        for (let i = 0; i < length; i++) samples[i] = Math.max(-1, Math.min(1, samples[i]));
         const buffer = new AudioBuffer({ length, numberOfChannels: 1, sampleRate: EXPORT_SAMPLE_RATE });
         buffer.copyToChannel(samples, 0);
         await audio.add(buffer);
