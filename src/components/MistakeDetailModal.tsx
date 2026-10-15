@@ -11,7 +11,7 @@ import { MistakeScaffoldingDrawer } from './MistakeScaffoldingDrawer';
 import { HandwritingOverlay, type HandwritingOverlayBounds, type HandwritingOverlayHandle } from './HandwritingOverlay';
 import { useSharedSaveLock } from '../features/handwriting/useSharedSaveLock';
 import { CollapsibleSection } from './CollapsibleSection';
-import { HelpRequesterPanel } from '../features/peerHelp/requester/HelpRequesterPanel';
+import { HelpRequestButton } from '../features/peerHelp/requester/HelpRequestButton';
 
 interface MistakeDetailModalProps {
   onPointsChanged?: () => void;
@@ -1165,7 +1165,13 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
               <img src={selectedEntry.imageUrl} alt={selectedEntry.title} />
               <span>이미지 확대 ↗</span>
             </button>
-            <div className="rn-problem-actions"><span className="rn-caption">먼저, 나의 힘으로 풀어봐요</span><button type="button" onClick={openProblemOverlay} aria-label="풀이노트 열기" className="rn-button rn-button-primary">✎ 풀이노트</button></div>
+            <div className="rn-problem-actions">
+              <button type="button" onClick={openProblemOverlay} aria-label="풀이노트 열기" className="rn-button rn-button-primary">✎ 풀이노트</button>
+              {/* 🙋 서로 도와주기 — 내 오답에서만 */}
+              {currentUserId && selectedEntry.userId === currentUserId && (
+                <HelpRequestButton key={selectedEntry.id} mistakeId={selectedEntry.id} imageUrl={selectedEntry.imageUrl} currentUserId={currentUserId} onPointsChanged={onPointsChanged} />
+              )}
+            </div>
           </section>
 
           {/* 문제 분류 — "문제 분류 편집"이라는 큰 section title/details 접힘 없이, 현재
@@ -1566,11 +1572,6 @@ export const MistakeDetailModal: React.FC<MistakeDetailModalProps> = ({
                   </div>
                 )}
               </div>
-
-              {/* 🙋 서로 도와주기 — 나의 학습 기록(스캐폴딩) 바로 아래. 내 오답에서만. */}
-              {currentUserId && selectedEntry.userId === currentUserId && (
-                <HelpRequesterPanel key={selectedEntry.id} mistakeId={selectedEntry.id} imageUrl={selectedEntry.imageUrl} currentUserId={currentUserId} onPointsChanged={onPointsChanged} />
-              )}
 
               {/* 🧭 정리하기(초기화) 이후 체크리스트 재생성 진행 상태 — 정석 풀이는 전혀 건드리지
                   않고 이 배너들만 추가/제거된다(기존 데이터가 사라지거나 깜빡이지 않음). */}
