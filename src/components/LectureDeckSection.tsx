@@ -11,7 +11,9 @@ import {
   type LectureRecordingRow, type LoadedRecording,
 } from '../features/lectures/lectureRecordings';
 import { formatDuration } from '../features/lectures/lectureRecordingModel';
-import { groupLectureDecks, readResume, rememberResume, unitPages, type LectureBook, type LectureUnit, type ResumeEntry } from '../features/lectures/lectureLibrary';
+import {
+  groupLectureDecks, groupRecordingsByClass, readResume, rememberResume, unitPages, type LectureBook, type LectureClass, type LectureUnit, type ResumeEntry,
+} from '../features/lectures/lectureLibrary';
 
 const formatMB = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)}MB`;
 
@@ -26,7 +28,7 @@ export interface LectureLibrary {
   resume: ResumeEntry[];
   opening: string | null;
   refresh: () => Promise<void>;
-  openDeck: (deck: LectureDeck, index?: number) => Promise<void>;
+  openDeck: (deck: LectureDeck, index?: number, className?: LectureClass | null) => Promise<void>;
   openRecording: (deck: LectureDeck, row: LectureRecordingRow) => Promise<void>;
   removeDeck: (deck: LectureDeck) => Promise<void>;
   changeGrade: (deck: LectureDeck, grade: GradeLevel) => Promise<void>;
@@ -42,7 +44,7 @@ export function useLectureLibrary(enabled: boolean): LectureLibrary {
   const [loaded, setLoaded] = useState(false);
   const [recordingCounts, setRecordingCounts] = useState<Record<string, number>>({});
   const [resume, setResume] = useState<ResumeEntry[]>(() => readResume());
-  const [viewer, setViewer] = useState<{ deck: LectureDeck; urls: string[]; replay?: LoadedRecording; index: number } | null>(null);
+  const [viewer, setViewer] = useState<{ deck: LectureDeck; urls: string[]; replay?: LoadedRecording; index: number; className?: LectureClass | null } | null>(null);
   const [opening, setOpening] = useState<string | null>(null);
   const [recordingsVersion, setRecordingsVersion] = useState(0);
   const [recordedDeckId, setRecordedDeckId] = useState<string | null>(null);
@@ -67,9 +69,9 @@ export function useLectureLibrary(enabled: boolean): LectureLibrary {
     return map;
   }, [books]);
 
-  const openDeck = async (deck: LectureDeck, index = 0) => {
+  const openDeck = async (deck: LectureDeck, index = 0, className: LectureClass | null = null) => {
     setOpening(deck.id);
-    try { setViewer({ deck, urls: await resolveLectureSlideUrls(supabase, deck.slides), index }); }
+    try { setViewer({ deck, urls: await resolveLectureSlideUrls(supabase, deck.slides), index, className }); }
     catch (err) { console.error('[lecture] 슬라이드 주소 실패:', err); alert('슬라이드를 열지 못했습니다. 잠시 후 다시 시도해 주세요.'); }
     finally { setOpening(null); }
   };
@@ -109,7 +111,8 @@ export function useLectureLibrary(enabled: boolean): LectureLibrary {
       deck={viewer.deck} urls={viewer.urls} onClose={closeViewer} replay={viewer.replay}
       recordingBackend={viewer.replay ? undefined : backend}
       initialIndex={viewer.index}
-      onIndexChange={viewer.replay ? undefined : index => setResume(rememberResume(viewer.deck.id, index))}
+      initialClass={viewer.className ?? null}
+      onIndexChange={viewer.replay ? undefined : (index, className) => setResume(rememberResume(viewer.deck.id, index, className))}
       onRecorded={() => { setRecordedDeckId(viewer.deck.id); setRecordingsVersion(v => v + 1); void refreshCounts(); }}
     />
   ) : null;
@@ -134,12 +137,15 @@ export const LectureResumeRow: React.FC<{ lib: LectureLibrary; grade: 'ALL' | Gr
           const recs = lib.recordingCounts[unit.deck.id] ?? 0;
           return (
             <button
-              key={unit.deck.id}
-              onClick={() => void lib.openDeck(unit.deck, entry.index)}
+              key={`${unit.deck.id}:${entry.className ?? ''}`}
+              onClick={() => void lib.openDeck(unit.deck, entry.index, entry.className ?? null)}
               disabled={lib.opening === unit.deck.id}
               className="flex-none w-72 text-left p-4 rounded-2xl bg-slate-900 border border-slate-800 hover:border-amber-500/40 transition-colors active:scale-98 disabled:opacity-60"
             >
-              <div className="text-base font-black text-slate-100 leading-snug line-clamp-2 break-keep">{unit.name}</div>
+              <div className="text-base font-black text-slate-100 leading-snug line-clamp-2 break-keep">
+                {entry.className && <span className="mr-1.5 align-middle px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-200 text-[11px]">{entry.className}</span>}
+                {unit.name}
+              </div>
               <div className="mt-1 text-xs text-slate-400">{unit.deck.book} · {at} / {total}장{recs ? ` · 녹음 ${recs}개` : ''}</div>
               <div className="mt-2.5 h-1.5 rounded-full bg-slate-800 overflow-hidden"><div className="h-full bg-amber-500" style={{ width: `${(at / total) * 100}%` }} /></div>
             </button>
@@ -253,30 +259,35 @@ const LectureUnitRow: React.FC<{ lib: LectureLibrary; unit: LectureUnit; manage:
           {recError && <p className="text-xs text-rose-300">{recError}</p>}
           {recordings === null && <p className="text-xs text-slate-500">녹음 목록을 불러오는 중…</p>}
           {recordings?.length === 0 && !recError && <p className="text-xs text-slate-500">아직 녹음이 없습니다. 열기 후 ● 녹음 시작을 누르세요.</p>}
-          {recordings?.map(row => (
-            <div key={row.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-900 border border-slate-800">
-              <div className="min-w-0 flex-1">
-                <div className="text-[13px] font-bold text-slate-200 truncate">{row.title}</div>
-                <div className="text-[11px] text-slate-500 font-mono">
-                  {new Date(row.created_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} · {formatDuration(row.duration_ms)}
-                  {row.status === 'recording' && <span className="ml-1 text-amber-300 font-sans font-bold">끝내기 전에 멈춤(저장된 곳까지 재생)</span>}
+          {recordings && groupRecordingsByClass(recordings).map(group => (
+            <div key={group.label} className="space-y-1.5" data-testid="lecture-recording-group" data-class={group.label}>
+              <div className="pt-1 text-[11px] font-black text-amber-300">{group.label} · {group.rows.length}개</div>
+              {group.rows.map(row => (
+              <div key={row.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-900 border border-slate-800">
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13px] font-bold text-slate-200 truncate">{row.title}</div>
+                  <div className="text-[11px] text-slate-500 font-mono">
+                    {new Date(row.created_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} · {formatDuration(row.duration_ms)}
+                    {row.status === 'recording' && <span className="ml-1 text-amber-300 font-sans font-bold">끝내기 전에 멈춤(저장된 곳까지 재생)</span>}
+                  </div>
                 </div>
+                <button
+                  onClick={() => void lib.openRecording(deck, row)}
+                  disabled={lib.opening === row.id}
+                  aria-label={`${row.title} 재생`}
+                  className="flex-none text-xs font-extrabold text-slate-200 hover:text-amber-300 bg-slate-950 px-2.5 py-1.5 border border-slate-800 rounded-lg active:scale-95 disabled:opacity-50"
+                >
+                  {lib.opening === row.id ? '여는 중…' : '재생 ▶'}
+                </button>
+                <button
+                  onClick={() => void removeRecording(row)}
+                  aria-label={`${row.title} 녹음 삭제`}
+                  className="flex-none text-xs text-slate-400 hover:text-rose-300 bg-slate-950 px-2 py-1.5 border border-slate-800 rounded-lg active:scale-95"
+                >
+                  🗑️
+                </button>
               </div>
-              <button
-                onClick={() => void lib.openRecording(deck, row)}
-                disabled={lib.opening === row.id}
-                aria-label={`${row.title} 재생`}
-                className="flex-none text-xs font-extrabold text-slate-200 hover:text-amber-300 bg-slate-950 px-2.5 py-1.5 border border-slate-800 rounded-lg active:scale-95 disabled:opacity-50"
-              >
-                {lib.opening === row.id ? '여는 중…' : '재생 ▶'}
-              </button>
-              <button
-                onClick={() => void removeRecording(row)}
-                aria-label={`${row.title} 녹음 삭제`}
-                className="flex-none text-xs text-slate-400 hover:text-rose-300 bg-slate-950 px-2 py-1.5 border border-slate-800 rounded-lg active:scale-95"
-              >
-                🗑️
-              </button>
+              ))}
             </div>
           ))}
         </div>

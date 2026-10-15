@@ -147,10 +147,18 @@ try {
     // 2) 녹음 시작 → 그리기 → 일시정지 → 이어하기 → 넘김 → 그리기 → (화면 숨김 자동 일시정지) → 이어하기 → 끝내기
     assert.equal(await phase(), 'idle');
     await page.getByRole('button', { name: '● 녹음 시작' }).click();
+    // 먼저 반을 고른다(같은 교재를 월수금반·수토반이 따로 듣는다).
+    await page.getByTestId('lecture-class-picker').waitFor();
+    assert.equal(await phase(), 'idle', '반을 고르기 전에는 녹음하지 않는다');
+    await page.screenshot({ path: '.test-artifacts/lecture-class-picker.png' }).catch(() => {});
+    await page.getByRole('button', { name: '● 수토반' }).click();
     await waitPhase('recording');
+    assert.equal(await page.getByTestId('lecture-class').innerText(), '수토반');
     await page.getByTestId('recording-indicator').getByText('녹음 중').waitFor();
     assert.equal(recRows.length, 1);
     assert.equal(recRows[0].status, 'recording');
+    assert.equal(recRows[0].class_name, '수토반');
+    assert.match(recRows[0].title, / · 수토반 · /);
     await page.waitForTimeout(800);
     await draw(line(0.5, 0.2, 0.8, 0.5)); // 슬라이드 1의 녹음 중 획
     await waitStrokes(2);
@@ -198,6 +206,7 @@ try {
     assert.equal(recRows[0].status, 'done');
     const manifest = JSON.parse(recFiles.get(`${recId}/manifest.json`).body.toString());
     assert.equal(manifest.status, 'done');
+    assert.equal(manifest.className, '수토반');
     assert.equal(manifest.deckId, deckId);
     assert.equal(manifest.initialSlideId, slideIds[0]);
     assert.deepEqual(manifest.slides.map(s => s.id), slideIds);
@@ -227,6 +236,9 @@ try {
     await page.getByRole('button', { name: '닫기', exact: true }).click();
     await viewer.waitFor({ state: 'detached' });
     const list = page.getByTestId('lecture-recordings');
+    await list.getByTestId('lecture-recording-group').first().waitFor();
+    assert.deepEqual(await list.getByTestId('lecture-recording-group').evaluateAll(els => els.map(e => e.dataset.class)), ['수토반'], '녹음 목록은 반별로 묶인다');
+    await page.screenshot({ path: '.test-artifacts/lecture-class-list.png' }).catch(() => {});
     await list.getByRole('button', { name: /녹음 재생$/ }).waitFor();
     assert.match(await list.innerText(), /0:0\d/);
     await list.getByRole('button', { name: /녹음 재생$/ }).click();
@@ -273,7 +285,7 @@ try {
     assert.equal(await exportPanel.getAttribute('data-phase'), 'done', await exportPanel.innerText());
     const stats = await page.getByTestId('export-stats').innerText();
     console.log('[export]', stats.replace(/\s+/g, ' '));
-    assert.match(stats, /H\.264 \+ AAC/);
+    assert.match(stats, /H\.264 \+ Opus/);
     await page.screenshot({ path: '.test-artifacts/lecture-export-tablet.png' }).catch(() => {});
     const download = page.waitForEvent('download');
     await exportPanel.getByRole('link', { name: '⬇ 기기에 저장' }).click();
@@ -311,7 +323,7 @@ try {
     console.log('[export probe]', JSON.stringify(probe));
     assert.deepEqual(probe.size, [1920, 1080]);
     assert.equal(probe.videoCodec, 'avc');
-    assert.equal(probe.audioCodec, 'aac');
+    assert.equal(probe.audioCodec, 'opus');
     assert.ok(Math.abs(probe.duration * 1000 - manifest.durationMs) < 150, `영상 길이 ${probe.duration}s ≈ 녹음 ${manifest.durationMs}ms`);
     assert.ok(probe.peak > 0.01 && probe.peak < 1.5, `가짜 마이크 소리가 들어 있고 튀지 않는다 (최고 ${probe.peak})`);
     const dark = v => v < 120, light = v => v > 200;

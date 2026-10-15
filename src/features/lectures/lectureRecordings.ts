@@ -8,6 +8,8 @@ import {
 // 녹음 파일은 비공개 버킷(lecture-recordings/<recordingId>/...)에, 목록용으로 작은 행(lecture_recordings)만 DB에 둔다.
 export interface LectureRecordingRow {
   id: string; deck_id: string; title: string; created_at: string; duration_ms: number; status: RecordingStatus;
+  /** 월수금반·수토반(반을 고르기 전 녹음은 null) */
+  class_name: string | null;
 }
 
 /** 녹음 세션이 쓰는 저장소(테스트에서는 가짜로 바꾼다). */
@@ -42,7 +44,7 @@ export function supabaseRecordingBackend(client: SupabaseClient): RecordingBacke
 
 export async function listLectureRecordings(client: SupabaseClient, deckId: string): Promise<LectureRecordingRow[]> {
   const { data, error } = await client.from('lecture_recordings')
-    .select('id,deck_id,title,created_at,duration_ms,status').eq('deck_id', deckId).order('created_at', { ascending: false });
+    .select('id,deck_id,title,created_at,duration_ms,status,class_name').eq('deck_id', deckId).order('created_at', { ascending: false });
   if (error) throw error;
   return (data ?? []) as LectureRecordingRow[];
 }

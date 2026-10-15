@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chapterBase, describeUnit, filterBooks, groupLectureDecks, matchesUnit, readResume, rememberResume, unitPages } from '../../src/features/lectures/lectureLibrary.ts';
+import { chapterBase, describeUnit, filterBooks, groupLectureDecks, groupRecordingsByClass, matchesUnit, readResume, rememberResume, unitPages } from '../../src/features/lectures/lectureLibrary.ts';
 import type { LectureDeck } from '../../src/features/lectures/lectureDecks.ts';
 
 let n = 0;
@@ -65,15 +65,37 @@ test('search by words and by book page', () => {
 test('resume keeps the latest decks first and survives bad storage', () => {
   const store = new Map<string, string>();
   const storage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v); } };
-  rememberResume('a', 3, storage, 1);
-  rememberResume('b', 0, storage, 2);
-  rememberResume('a', 5, storage, 3);
+  rememberResume('a', 3, null, storage, 1);
+  rememberResume('b', 0, null, storage, 2);
+  rememberResume('a', 5, null, storage, 3);
   assert.deepEqual(readResume(storage).map(e => [e.deckId, e.index]), [['a', 5], ['b', 0]]);
-  for (let i = 0; i < 10; i++) rememberResume(`x${i}`, i, storage, 10 + i);
+  for (let i = 0; i < 10; i++) rememberResume(`x${i}`, i, null, storage, 10 + i);
   assert.equal(readResume(storage).length, 6);
   store.set('reviewnote.lecture-resume.v1', '{broken');
   assert.deepEqual(readResume(storage), []);
   assert.deepEqual(readResume(null), []);
   const throwing = { getItem: () => null, setItem: () => { throw new Error('quota'); } };
-  assert.equal(rememberResume('z', 1, throwing).length, 1);
+  assert.equal(rememberResume('z', 1, null, throwing).length, 1);
+});
+
+test('이어서 보기는 덱 + 반마다 따로 기억한다', () => {
+  const data = new Map<string, string>();
+  const storage = { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => { data.set(k, v); } };
+  rememberResume('a', 3, '월수금반', storage, 1);
+  rememberResume('a', 8, '수토반', storage, 2);
+  rememberResume('a', 5, '월수금반', storage, 3);
+  rememberResume('a', 1, null, storage, 4);
+  assert.deepEqual(readResume(storage).map(e => [e.deckId, e.index, e.className ?? null]), [['a', 1, null], ['a', 5, '월수금반'], ['a', 8, '수토반']]);
+  // 반을 고르면 같은 덱의 반 없는 기록은 사라진다.
+  rememberResume('a', 6, '수토반', storage, 5);
+  assert.deepEqual(readResume(storage).map(e => [e.index, e.className ?? null]), [[6, '수토반'], [5, '월수금반']]);
+  // 모르는 반 이름은 버린다(반 없는 항목으로 읽는다).
+  data.set('reviewnote.lecture-resume.v1', JSON.stringify([{ deckId: 'b', index: 2, at: 1, className: '화목반' }]));
+  assert.deepEqual(readResume(storage), [{ deckId: 'b', index: 2, at: 1 }]);
+});
+
+test('녹음 목록을 반별로 묶는다(월수금반 → 수토반 → 반 미지정, 빈 묶음 없음)', () => {
+  const rows = [{ id: 1, class_name: '수토반' }, { id: 2, class_name: null }, { id: 3, class_name: '수토반' }, { id: 4, class_name: '이상한반' }];
+  assert.deepEqual(groupRecordingsByClass(rows).map(g => [g.label, g.rows.map(r => r.id)]), [['수토반', [1, 3]], ['반 미지정', [2, 4]]]);
+  assert.deepEqual(groupRecordingsByClass([]), []);
 });
