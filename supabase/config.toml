@@ -1,0 +1,2 @@
+[functions.qr-login]
+verify_jwt = false

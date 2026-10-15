@@ -1,4 +1,5 @@
 import React from 'react';
+import { QrLoginModal } from '../features/qrLogin/QrLoginModal';
 import type { ActiveTab } from '../types';
 import logoImg from '../assets/logo.jpg';
 import { AppIcon } from './ui/AppIcon';
@@ -67,6 +68,7 @@ export const Header: React.FC<HeaderProps> = ({
   onSelectTab,
   onlineUsers = [],
 }) => {
+  const [showQrLogin, setShowQrLogin] = React.useState(false);
   const [showUserMenu, setShowUserMenu] = React.useState(false);
   const [showOnlinePopup, setShowOnlinePopup] = React.useState(false);
   const [isNicknameModalOpen, setIsNicknameModalOpen] = React.useState(false);
@@ -209,6 +211,7 @@ export const Header: React.FC<HeaderProps> = ({
                     </button>
                   )}
 
+                  {!isAdmin && <button type="button" onClick={() => { setShowUserMenu(false); setShowQrLogin(true); }} className="w-full text-left rounded-lg bg-indigo-950/40 px-3 py-3 text-sm text-indigo-200">다른 기기 로그인 (QR)</button>}
                   <button
                     onClick={() => {
                       setShowUserMenu(false);
@@ -222,6 +225,7 @@ export const Header: React.FC<HeaderProps> = ({
 
         </div>
       </Sheet>
+      {showQrLogin && !isAdmin && <QrLoginModal onClose={() => setShowQrLogin(false)} />}
 
       {/* ── 닉네임 변경 자체 커스텀 UI 모달 팝업 창 (브라우저 alert/prompt 완전 대체) ── */}
       {isNicknameModalOpen && (

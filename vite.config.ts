@@ -23,6 +23,8 @@ export default defineConfig({
             if (id.includes('/node_modules/phaser/')) {
               return 'vendor-phaser';
             }
+            // QR 생성기와 전용 의존성은 프로필 메뉴를 열 때만 내려받는다.
+            if (/\/node_modules\/(qrcode|dijkstrajs|pngjs)\//.test(id)) return 'vendor-qrcode';
             // MP4 내보내기(관리자 수업 녹음)에서만 동적 import된다.
             if (id.includes('/node_modules/mediabunny/')) {
               return 'vendor-mediabunny';

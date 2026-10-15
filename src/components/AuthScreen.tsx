@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabase';
+import { redeemQrLogin, QR_LOGIN_ERROR } from '../features/qrLogin/api';
+import { normalizeCode, stripQrParam } from '../features/qrLogin/helpers';
 import logoImg from '../assets/logo.jpg';
 
 interface AuthScreenProps {
@@ -17,6 +19,30 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const [showCode, setShowCode] = useState(false);
+  const [code, setCode] = useState('');
+  const [qrLoading, setQrLoading] = useState(false);
+  const qrStarted = useRef(false);
+
+  const redeem = async (input: { token: string } | { code: string }) => {
+    setQrLoading(true); setError(null);
+    try { await redeemQrLogin(input); }
+    catch { setError(QR_LOGIN_ERROR); }
+    finally { setQrLoading(false); }
+  };
+
+  useEffect(() => {
+    if (qrStarted.current) return;
+    qrStarted.current = true;
+    const token = stripQrParam();
+    if (token === null) return;
+    // 기존 세션이 있으면 계정을 바꾸지 않는다.
+    void supabase.auth.getSession().then(({ data, error }) => {
+      if (error) { setError(QR_LOGIN_ERROR); return; }
+      if (!data.session) void redeem({ token });
+    });
+  }, []);
+
   // Load remembered username (ID) on mount
   useEffect(() => {
     const savedUsername = localStorage.getItem('reviewnote_remembered_username');
@@ -28,6 +54,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (qrLoading) return;
     setError(null);
     setSuccessMessage(null);
 
@@ -145,6 +172,14 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
           </p>
         </div>
 
+        {qrLoading && <p role="status" className="text-center text-indigo-300">QR로 로그인 중…</p>}
+        {!isSignUp && <div className="space-y-3">
+          <button type="button" disabled={qrLoading} onClick={() => setShowCode(!showCode)} className="text-sm text-indigo-300">휴대폰으로 로그인 (코드 입력)</button>
+          {showCode && <form onSubmit={event => { event.preventDefault(); void redeem({ code }); }} className="flex gap-2">
+            <input aria-label="로그인 코드" autoComplete="off" autoCapitalize="characters" spellCheck={false} value={code} onChange={event => setCode(event.target.value)} maxLength={17} placeholder="ABCD-EFGH" className="min-w-0 flex-1 rounded-xl bg-slate-950 px-3 py-3 text-white" />
+            <button type="submit" disabled={qrLoading || !/^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{8}$/.test(normalizeCode(code))} className="rounded-xl bg-indigo-600 px-4 text-white disabled:opacity-50">코드로 로그인</button>
+          </form>}
+        </div>}
         {/* Input Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1">
@@ -229,7 +264,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || qrLoading}
             className="w-full py-3.5 mt-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none transition-all text-sm font-bold text-white shadow-lg shadow-indigo-600/20"
           >
             {loading ? '인증 진행 중...' : isSignUp ? '회원가입 및 시작하기' : '로그인'}
