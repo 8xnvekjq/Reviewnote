@@ -1,3 +1,4 @@
+import { stripQrParam } from './features/qrLogin/helpers';
 import { useState, useEffect, useMemo, useRef, lazy } from 'react';
 import type { ActiveTab, MistakeEntry, MistakeAnalysis } from './types';
 import { ROOT_CAUSE_OPTIONS, resolveNeedsHelp } from './types';
@@ -625,6 +626,7 @@ function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (session?.user) {
+        stripQrParam();
         const username = session.user.email?.split('@')[0] || 'User';
         setCurrentUser(username);
         fetchUserData(session.user.id); // 내부에서 loadWeeklyChampions/fetchPeerActivities도 같이 호출함
