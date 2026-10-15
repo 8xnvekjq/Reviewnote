@@ -6,6 +6,7 @@ import type { ExamInkCanvasHandle, InkChangeKind, InkStroke, InkTool } from '../
 import { LectureRecordingSession } from '../features/lectures/lectureRecorder';
 import type { LoadedRecording, RecordingBackend } from '../features/lectures/lectureRecordings';
 import { LectureInkToolbar, LectureRecordingControls, LectureReplayBar } from './LectureDeckTools';
+import { LectureExportPanel } from './LectureExportPanel';
 
 interface LectureDeckViewerProps {
   deck: LectureDeck;
@@ -57,6 +58,7 @@ export const LectureDeckViewer: React.FC<LectureDeckViewerProps> = ({ deck, urls
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
+  const [exportOpen, setExportOpen] = useState(false);
   const timeRef = useRef(0);
   const speedRef = useRef(speed);
   useEffect(() => { speedRef.current = speed; }, [speed]);
@@ -348,8 +350,9 @@ export const LectureDeckViewer: React.FC<LectureDeckViewerProps> = ({ deck, urls
 
       {replay && (
         <LectureReplayBar time={time} total={replayTotal} playing={playing} speed={speed} clips={replay.clips}
-          onToggle={togglePlay} onSeek={seek} onSpeed={setSpeed} />
+          onToggle={togglePlay} onSeek={seek} onSpeed={setSpeed} onExport={() => { setPlaying(false); setExportOpen(open => !open); }} />
       )}
+      {replay && exportOpen && <LectureExportPanel recording={replay} slideUrls={urls} time={time} onClose={() => setExportOpen(false)} />}
     </div>,
     document.body,
   );

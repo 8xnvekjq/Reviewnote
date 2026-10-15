@@ -110,8 +110,8 @@ export const LectureRecordingControls: React.FC<{
 
 export const LectureReplayBar: React.FC<{
   time: number; total: number; playing: boolean; speed: number; clips: SolutionAudioClip[];
-  onToggle: () => void; onSeek: (ms: number) => void; onSpeed: (speed: number) => void;
-}> = ({ time, total, playing, speed, clips, onToggle, onSeek, onSpeed }) => (
+  onToggle: () => void; onSeek: (ms: number) => void; onSpeed: (speed: number) => void; onExport?: () => void;
+}> = ({ time, total, playing, speed, clips, onToggle, onSeek, onSpeed, onExport }) => (
   <div className="lecture-replay flex-none flex items-center gap-2 px-2 sm:px-3 py-1.5 bg-slate-950/95 border-t border-slate-800" data-testid="lecture-replay-bar">
     <button type="button" onClick={onToggle} aria-label={playing ? '일시정지' : '재생'}
       className="flex-none w-10 h-10 rounded-full bg-indigo-600 border border-indigo-400 text-white text-base font-black active:scale-95">
@@ -126,6 +126,10 @@ export const LectureReplayBar: React.FC<{
           className={`h-8 px-2 rounded-lg text-[11px] font-black border ${speed === value ? on : off}`}>{value}×</button>
       ))}
     </div>
+    {onExport && (
+      <button type="button" onClick={onExport} aria-label="MP4로 저장" title="MP4로 저장"
+        className={`flex-none h-8 px-2 rounded-lg text-[11px] font-black border ${off}`}>🎬 MP4</button>
+    )}
     {clips.length > 0 && <ReplayAudio clips={clips} time={time} playing={playing} speed={speed} shift={0} />}
   </div>
 );

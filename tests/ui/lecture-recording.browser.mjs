@@ -263,6 +263,62 @@ try {
     assert.match(audioSrc ?? await page.evaluate(() => document.querySelector('[data-testid=exam-audio-player]').src), /^blob:/);
     await page.getByRole('button', { name: '일시정지', exact: true }).click();
     await page.screenshot({ path: '.test-artifacts/lecture-replay-tablet.png' }).catch(() => {});
+
+    // 3-1) MP4 테스트 내보내기: 처음부터(녹음이 1분보다 짧으면 전체) → 영상 파일을 다시 열어 길이·소리·장면을 검사한다.
+    await seek(0);
+    await page.getByRole('button', { name: 'MP4로 저장' }).click();
+    const exportPanel = page.getByTestId('lecture-export');
+    await exportPanel.getByRole('button', { name: '테스트 영상 만들기' }).click();
+    await page.waitForFunction(() => ['done', 'error'].includes(document.querySelector('[data-testid=lecture-export]')?.dataset.phase), null, { timeout: 60_000 });
+    assert.equal(await exportPanel.getAttribute('data-phase'), 'done', await exportPanel.innerText());
+    const stats = await page.getByTestId('export-stats').innerText();
+    console.log('[export]', stats.replace(/\s+/g, ' '));
+    assert.match(stats, /H\.264 \+ AAC/);
+    await page.screenshot({ path: '.test-artifacts/lecture-export-tablet.png' }).catch(() => {});
+    const download = page.waitForEvent('download');
+    await exportPanel.getByRole('link', { name: '⬇ 기기에 저장' }).click();
+    const file = await download;
+    assert.match(file.suggestedFilename(), /\(테스트 0m00s-0m\d\ds\)\.mp4$/);
+    await file.saveAs('.test-artifacts/lecture-export.mp4').catch(() => {});
+    const probe = await page.evaluate(async ({ resumeAt, total }) => {
+      const mb = await import('/@id/mediabunny');
+      const src = document.querySelector('[data-testid=export-preview]').src;
+      const input = new mb.Input({ source: new mb.BlobSource(await (await fetch(src)).blob()), formats: mb.ALL_FORMATS });
+      const video = await input.getPrimaryVideoTrack();
+      const audio = await input.getPrimaryAudioTrack();
+      const sink = new mb.CanvasSink(video, { poolSize: 0 });
+      // 지점의 밝기(0 검정 ~ 255 흰색): 슬라이드 비율 좌표.
+      const lumaAt = async (sec, points) => {
+        const frame = await sink.getCanvas(sec);
+        const ctx = frame.canvas.getContext('2d');
+        return points.map(([x, y]) => {
+          const d = ctx.getImageData(Math.round(x * 1920) - 2, Math.round(y * 1080) - 2, 5, 5).data;
+          let min = 255; for (let i = 0; i < d.length; i += 4) min = Math.min(min, (d[i] + d[i + 1] + d[i + 2]) / 3);
+          return Math.round(min);
+        });
+      };
+      const pts = [[0.25, 0.325], [0.4, 0.7], [0.4, 0.4]]; // 녹음 전 획(슬라이드1), 녹음 중 획(슬라이드2), 멈춘 동안 쓴 획(슬라이드2)
+      let peak = 0;
+      for await (const { buffer } of new mb.AudioBufferSink(audio).buffers()) {
+        for (const v of buffer.getChannelData(0)) peak = Math.max(peak, Math.abs(v));
+      }
+      return {
+        duration: await input.computeDuration(), size: [video.displayWidth, video.displayHeight],
+        videoCodec: video.codec, audioCodec: audio?.codec, audioRate: audio?.sampleRate, peak,
+        start: await lumaAt(0.05, pts), afterResume: await lumaAt(resumeAt / 1000 + 0.05, pts), end: await lumaAt(total / 1000 - 0.05, pts),
+      };
+    }, { resumeAt, total: manifest.durationMs });
+    console.log('[export probe]', JSON.stringify(probe));
+    assert.deepEqual(probe.size, [1920, 1080]);
+    assert.equal(probe.videoCodec, 'avc');
+    assert.equal(probe.audioCodec, 'aac');
+    assert.ok(Math.abs(probe.duration * 1000 - manifest.durationMs) < 150, `영상 길이 ${probe.duration}s ≈ 녹음 ${manifest.durationMs}ms`);
+    assert.ok(probe.peak > 0.01, '가짜 마이크 소리가 들어 있다');
+    const dark = v => v < 120, light = v => v > 200;
+    assert.ok(dark(probe.start[0]) && light(probe.start[1]), `처음: 슬라이드1 + 녹음 전 획만 ${probe.start}`);
+    assert.ok(light(probe.afterResume[0]) && dark(probe.afterResume[2]), `이어하기 직후: 슬라이드2 + 멈춘 동안 쓴 획 ${probe.afterResume}`);
+    assert.ok(dark(probe.end[1]) && dark(probe.end[2]), `끝: 슬라이드2의 두 획 ${probe.end}`);
+    await exportPanel.getByRole('button', { name: 'MP4 창 닫기' }).click();
     await page.keyboard.press('Escape');
     await viewer.waitFor({ state: 'detached' });
 
