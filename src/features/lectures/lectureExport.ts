@@ -13,8 +13,6 @@ export const EXPORT_FPS = 30;
 export const EXPORT_MAX_HOLD_MS = 2000;
 /** 키프레임 간격(초). 정지 장면이 대부분이라 길게 잡아 파일을 줄인다(탐색은 유튜브가 다시 인코딩한다). */
 export const EXPORT_KEYFRAME_S = 5;
-/** 시험 내보내기 길이. */
-export const EXPORT_TEST_MS = 60_000;
 export const EXPORT_SAMPLE_RATE = 48_000;
 /** 영상과 음성을 이 길이씩 번갈아 넣는다(인코더·메모리가 한쪽에 몰리지 않게). */
 export const EXPORT_WINDOW_MS = 5000;
@@ -72,10 +70,9 @@ export function windowReads(placements: AudioPlacement[], winFromMs: number, len
   return reads;
 }
 
-export function exportFileName(title: string, fromMs: number, toMs: number, test: boolean) {
+export function exportFileName(title: string) {
   const clean = title.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim() || '수업';
-  const m = (ms: number) => `${Math.floor(ms / 60000)}m${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}s`;
-  return test ? `${clean} (테스트 ${m(fromMs)}-${m(toMs)}).mp4` : `${clean}.mp4`;
+  return `${clean}.mp4`;
 }
 
 /** 샘플을 sampleRate → EXPORT_SAMPLE_RATE로(선형 보간; 사파리 AAC 44.1kHz 녹음 대비). */

@@ -352,7 +352,7 @@ export const LectureDeckViewer: React.FC<LectureDeckViewerProps> = ({ deck, urls
         <LectureReplayBar time={time} total={replayTotal} playing={playing} speed={speed} clips={replay.clips}
           onToggle={togglePlay} onSeek={seek} onSpeed={setSpeed} onExport={() => { setPlaying(false); setExportOpen(open => !open); }} />
       )}
-      {replay && exportOpen && <LectureExportPanel recording={replay} slideUrls={urls} time={time} onClose={() => setExportOpen(false)} />}
+      {replay && exportOpen && <LectureExportPanel recording={replay} slideUrls={urls} onClose={() => setExportOpen(false)} />}
     </div>,
     document.body,
   );

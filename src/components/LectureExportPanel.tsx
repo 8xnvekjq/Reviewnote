@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { LoadedRecording } from '../features/lectures/lectureRecordings';
 import { formatDuration } from '../features/lectures/lectureRecordingModel';
-import { EXPORT_TEST_MS, clearExportFiles, exportFileName, exportLectureMp4, type ExportProgress, type ExportResult } from '../features/lectures/lectureExport';
+import { clearExportFiles, exportFileName, exportLectureMp4, type ExportProgress, type ExportResult } from '../features/lectures/lectureExport';
 
-// 녹음 재생 화면의 'MP4로 저장' 창: 현재 위치부터 1분 테스트, 또는 전체 영상(브라우저 저장 공간에 쓴 뒤 기기에 저장).
+// 녹음 재생 화면의 'MP4로 저장' 창: 전체 영상을 브라우저 저장 공간에 만든 뒤 기기에 저장한다.
 type WakeLockSentinel = { release(): Promise<void> };
 
 const megabytes = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)}MB`;
@@ -21,20 +21,17 @@ const CODEC_NAMES: Record<string, string> = { avc: 'H.264', vp9: 'VP9', av1: 'AV
 
 type State =
   | { phase: 'idle' }
-  | { phase: 'running'; full: boolean; fromMs: number; toMs: number; progress: ExportProgress | null }
+  | { phase: 'running'; fromMs: number; toMs: number; progress: ExportProgress | null }
   | { phase: 'done'; result: ExportResult; url: string; name: string }
   | { phase: 'error'; message: string };
 
 export const LectureExportPanel: React.FC<{
-  recording: LoadedRecording; slideUrls: string[]; time: number; onClose: () => void;
-}> = ({ recording, slideUrls, time, onClose }) => {
+  recording: LoadedRecording; slideUrls: string[]; onClose: () => void;
+}> = ({ recording, slideUrls, onClose }) => {
   const [state, setState] = useState<State>({ phase: 'idle' });
   const abortRef = useRef<AbortController | null>(null);
   const urlRef = useRef<string | null>(null);
   const total = recording.replay.total;
-  // 끝 가까이에서 열면 끝에서 1분을 만든다.
-  const testFrom = Math.max(0, Math.min(Math.floor(time / 1000) * 1000, total - EXPORT_TEST_MS));
-  const testTo = Math.min(total, testFrom + EXPORT_TEST_MS);
 
   // 닫으면 만들던 것을 멈추고, 저장 공간에 남은 영상 파일도 지운다(기기에 저장한 파일은 그대로).
   useEffect(() => () => {
@@ -43,12 +40,12 @@ export const LectureExportPanel: React.FC<{
     void clearExportFiles();
   }, []);
 
-  const start = async (full: boolean) => {
-    const fromMs = full ? 0 : testFrom, toMs = full ? total : testTo;
+  const start = async () => {
+    const fromMs = 0, toMs = total;
     const controller = new AbortController();
     abortRef.current = controller;
     if (urlRef.current) { URL.revokeObjectURL(urlRef.current); urlRef.current = null; }
-    setState({ phase: 'running', full, fromMs, toMs, progress: null });
+    setState({ phase: 'running', fromMs, toMs, progress: null });
     let wake: WakeLockSentinel | null = null;
     let lastPaint = 0;
     try {
@@ -57,7 +54,7 @@ export const LectureExportPanel: React.FC<{
     try {
       const result = await exportLectureMp4({
         replay: recording.replay, slideIds: recording.manifest.slides.map(slide => slide.id), slideUrls, clips: recording.clips,
-        fromMs, toMs, toFile: full, signal: controller.signal,
+        fromMs, toMs, toFile: true, signal: controller.signal,
         // 진행 표시는 1초에 한 번만 바꾼다 — 화면을 자주 다시 그리면 크롬 영상 인코더가 느려진다.
         onProgress: progress => {
           const now = performance.now();
@@ -68,7 +65,7 @@ export const LectureExportPanel: React.FC<{
       });
       const url = URL.createObjectURL(result.blob);
       urlRef.current = url;
-      setState({ phase: 'done', result, url, name: exportFileName(recording.manifest.title, fromMs, toMs, !full) });
+      setState({ phase: 'done', result, url, name: exportFileName(recording.manifest.title) });
     } catch (error) {
       if (controller.signal.aborted) setState({ phase: 'idle' });
       else setState({ phase: 'error', message: error instanceof Error ? error.message : String(error) });
@@ -92,13 +89,9 @@ export const LectureExportPanel: React.FC<{
           <p className="text-[11px] leading-relaxed text-slate-300 break-keep">
             1920×1080 영상으로 만들어요. 태블릿은 만드는 동안 화면을 켜 두세요(다른 앱으로 가면 멈췄다가 돌아오면 이어서 만들어요).
           </p>
-          <button type="button" onClick={() => void start(true)} className={`${button} w-full bg-indigo-600 border-indigo-400 text-white`}>
+          <button type="button" onClick={() => void start()} className={`${button} w-full bg-indigo-600 border-indigo-400 text-white`}>
             전체 영상 만들기 ({formatDuration(total)})
           </button>
-          <button type="button" onClick={() => void start(false)} className={`${button} w-full bg-slate-800 border-slate-600 text-slate-100`}>
-            1분 테스트 ({formatDuration(testFrom)}–{formatDuration(testTo)})
-          </button>
-          <p className="text-[10px] text-slate-500 break-keep">1분 테스트는 재생 막대 위치부터 만들어요.</p>
         </>
       )}
 
