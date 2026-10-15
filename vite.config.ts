@@ -23,6 +23,10 @@ export default defineConfig({
             if (id.includes('/node_modules/phaser/')) {
               return 'vendor-phaser';
             }
+            // MP4 내보내기(관리자 수업 녹음)에서만 동적 import된다.
+            if (id.includes('/node_modules/mediabunny/')) {
+              return 'vendor-mediabunny';
+            }
             if (id.includes('katex')) {
               return 'vendor-katex';
             }

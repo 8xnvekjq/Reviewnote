@@ -215,22 +215,27 @@ export function buildLectureReplay(manifest: Pick<LectureRecordingManifest, 'sli
   const changeAts = slideChanges.map(c => c.at);
   const total = Math.max(manifest.durationMs, ...entries.map(e => e.at), ...manifest.clips.map(c => c.offsetMs + c.durationMs), 0);
 
-  const strokesAt = (slideId: string, time: number): InkStroke[] => {
-    const ink = slideInk.get(slideId);
-    if (!ink) return [];
+  /** 시각별 필기 상태: 끝난 단계 수 + 그리는 중인 획의 점 수(0이면 없음). */
+  const inkStateAt = (ink: SlideInk, time: number) => {
     const done = upperBound(ink.ats, time);
-    const base = ink.timeline.at(done);
     const next = ink.events[done];
     const added = drawnStroke(next);
-    if (!added) return base;
+    if (!added) return { done, added: null, partial: 0 };
     // 획은 실제로 그린 속도대로: 끝난 시각(at)에서 그린 시간만큼 앞에서 시작한다.
     const drawMs = Math.max(0, ...added.stroke.points.map(p => p.t));
     const elapsed = time - (next.at - drawMs);
-    if (elapsed < 0) return base;
-    const points = added.stroke.points.filter(p => p.t <= elapsed);
-    if (!points.length) return base;
+    const partial = elapsed < 0 ? 0 : added.stroke.points.filter(p => p.t <= elapsed).length;
+    return { done, added, partial };
+  };
+
+  const strokesAt = (slideId: string, time: number): InkStroke[] => {
+    const ink = slideInk.get(slideId);
+    if (!ink) return [];
+    const { done, added, partial } = inkStateAt(ink, time);
+    const base = ink.timeline.at(done);
+    if (!added || !partial) return base;
     const out = base.slice();
-    out.splice(Math.min(added.index, out.length), 0, { ...added.stroke, points, shape: undefined });
+    out.splice(Math.min(added.index, out.length), 0, { ...added.stroke, points: added.stroke.points.slice(0, partial), shape: undefined });
     return out;
   };
 
@@ -238,6 +243,14 @@ export function buildLectureReplay(manifest: Pick<LectureRecordingManifest, 'sli
 
   return {
     total, slideChanges, slideAt, strokesAt,
+    /** 화면이 같으면 같은 값(영상 내보내기에서 바뀌지 않은 장면을 건너뛴다). */
+    frameKey(time: number): string {
+      const slideId = slideAt(time);
+      const ink = slideInk.get(slideId);
+      if (!ink) return slideId;
+      const { done, partial } = inkStateAt(ink, time);
+      return `${slideId}|${done}|${partial}`;
+    },
     frame(time: number): LectureReplayFrame {
       const slideId = slideAt(time);
       return { slideId, slideIndex: indexOf.get(slideId) ?? 0, strokes: strokesAt(slideId, time) };
