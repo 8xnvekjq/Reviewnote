@@ -42,7 +42,8 @@ try {
         if (failSubmit) { failSubmit = false; return respond({ message: '요청이 마감됐어요' }, 400); }
         submitted = true; return respond({ id: 'solution-1' });
       }
-      if (rpc === 'admin_list_help') return respond([{ solution_id: 'solution-1', request_id: 'request-1', created_at: new Date().toISOString(), request_status: 'closed', image_url: image, mistake_title: '방정식', storage_path: 'helper/file.json.gz', stroke_count: 5, duration_ms: 24000, feedback: 'like', helper_reward: removed ? 0 : 30, requester_reward: removed ? 0 : 5, removed_at: removed ? new Date().toISOString() : null, file_available: true, helper: { id: 'secret-helper', name: '도우미실명', face: '🐱' }, requester: { id: 'secret-requester', name: '요청자실명', face: '🐻' } }, { solution_id: null, request_id: 'request-2', created_at: new Date().toISOString(), request_status: 'open', image_url: image, mistake_title: '함수', storage_path: null, stroke_count: null, duration_ms: null, feedback: null, helper_reward: 0, requester_reward: 0, removed_at: null, file_available: false, helper: null, requester: { id: 'secret-asker', name: '질문만한학생', face: '🐰' } }]);
+      if (rpc === 'admin_list_help') return respond([{ solution_id: 'solution-1', request_id: 'request-1', created_at: new Date().toISOString(), request_status: 'closed', image_url: image, mistake_title: '방정식', storage_path: 'helper/file.json.gz', stroke_count: 5, duration_ms: 24000, feedback: 'like', helper_reward: removed ? 0 : 30, requester_reward: removed ? 0 : 5, removed_at: removed ? new Date().toISOString() : null, file_available: true, request_created_at: new Date(Date.now() - 3600_000).toISOString(), solution_created_at: new Date().toISOString(), mistake_id: 'mistake-1', helper: { face: '🐱', title: null, grade: '중2' }, requester: { face: '🐻', title: null, grade: '중3' } }, { solution_id: null, request_id: 'request-2', created_at: new Date().toISOString(), request_status: 'open', image_url: image, mistake_title: '함수', storage_path: null, stroke_count: null, duration_ms: null, feedback: null, helper_reward: 0, requester_reward: 0, removed_at: null, file_available: false, request_created_at: new Date().toISOString(), solution_created_at: null, mistake_id: 'mistake-2', helper: null, requester: { face: '🐰', title: null, grade: '고1' } }]);
+      if (url.pathname.endsWith('/rest/v1/mistakes')) return respond({ id: url.searchParams.get('id')?.slice(3), user_id: 'student', image_url: image, title: '방정식', created_at: new Date().toISOString() });
       if (rpc === 'admin_remove_help_solution') { removed = true; return respond({ removed: true, helper_clawback: 30, requester_clawback: 5 }); }
       if (url.pathname.includes('/storage/v1/object/')) {
         if (req.method() === 'POST') {
@@ -120,10 +121,17 @@ try {
     await page.getByRole('button', { name: '새로고침' }).click();
     await page.getByRole('alert').filter({ hasText: '목록 오류예요' }).waitFor();
     await page.goto(`${base}/tests/ui/peer-help-helper.html?admin`);
-    await page.getByText('도우미실명', { exact: false }).waitFor();
+    // 학생 화면과 같은 익명 라벨(이름 X), 질문·대답 날짜, 피드백은 이모지만, 포인트는 안 보인다.
+    const answered = page.getByTestId('help-admin-row').filter({ hasText: '(중2)' });
+    await answered.getByText('👍', { exact: true }).waitFor();
+    assert.match(await answered.innerText(), /🐻[\s\S]*\(중3\)[\s\S]*질문 [\s\S]*대답 /);
+    assert.doesNotMatch(await page.locator('body').innerText(), /\dP|secret/);
     // 아직 답이 없는 요청도 누가 물었는지 보인다(풀이 보기·지우기 버튼 없이).
-    await page.getByRole('row').filter({ hasText: '질문만한학생' }).getByText('아직 답 없음').waitFor();
+    await page.getByTestId('help-admin-row').filter({ hasText: '(고1)' }).getByText('아직 답 없음').waitFor();
     assert.equal(await page.getByRole('button', { name: '풀이 보기' }).count(), 1);
+    // 문제 사진을 누르면 그 오답노트가 열린다.
+    await answered.getByRole('button', { name: '오답노트 열기' }).click();
+    await page.waitForFunction(() => document.body.dataset.viewedMistake === 'mistake-1');
     await page.getByRole('button', { name: '풀이 보기' }).click();
     await page.getByRole('dialog').locator('.exam-ink').waitFor();
     await page.getByRole('button', { name: '닫기', exact: true }).click();
