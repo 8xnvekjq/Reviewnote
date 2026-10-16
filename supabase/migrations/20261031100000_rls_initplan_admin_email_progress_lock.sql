@@ -35,3 +35,7 @@ begin
 end $$;
 alter function public.save_exam_progress(uuid, jsonb, integer[]) set lock_timeout = '2s';
 commit;
+
+-- 운영: revoke_anon_save_pixel_room_layout — 로그인 확인이 함수 안에 있지만 anon 실행 권한도 뺀다.
+revoke execute on function public.save_pixel_room_layout(jsonb) from anon, public;
+grant execute on function public.save_pixel_room_layout(jsonb) to authenticated;
