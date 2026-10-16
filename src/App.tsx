@@ -902,6 +902,8 @@ function App() {
   // mistakes/selectedEntry 자체의 소유권은 계속 App.tsx에 남는다(이유는 훅 파일 주석 참고).
   const {
     refreshMistakesLight,
+    queueMistakeChange,
+    refreshScaffoldMarks,
     handleDeleteMistake,
     handleToggleHidden,
   } = useMistakes({
@@ -1092,16 +1094,27 @@ function App() {
   // 여기서는 그냥 항상 다시 조회하면 되는데, 프로필·전체 학생 이름맵까지 전부 다시 읽는 무거운
   // fetchUserData 대신 mistakes/스캐폴딩만 다시 읽는 refreshMistakesLight를 쓴다 (같은 값이 반복
   // 갱신될 때마다 필요 이상으로 여러 테이블을 다시 조회하지 않도록).
+  // 주간 랭킹(get_weekly_leaderboard)은 오답 변경마다 다시 읽지 않고, 변경이 몰려도 30초에 한 번만.
+  const loadWeeklyChampionsRef = useRef(loadWeeklyChampions);
+  loadWeeklyChampionsRef.current = loadWeeklyChampions;
+  const weeklyTimerRef = useRef<number | null>(null);
+  const scheduleWeeklyChampions = () => {
+    if (weeklyTimerRef.current != null) return;
+    weeklyTimerRef.current = window.setTimeout(() => { weeklyTimerRef.current = null; void loadWeeklyChampionsRef.current(); }, 30_000);
+  };
+
   useEffect(() => {
     if (!session?.user?.id) return;
     const channel = supabase
       .channel('mistakes_live_sync')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'mistakes' }, () => {
-        refreshMistakesLight();
-        loadWeeklyChampions();
+      // 바뀐 오답 줄만 다시 받는다(전체 X). 주간 랭킹은 변경이 몰려도 30초에 한 번만.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mistakes' }, payload => {
+        const row = (payload.new && 'id' in payload.new ? payload.new : payload.old) as { id?: string } | undefined;
+        queueMistakeChange(row?.id);
+        scheduleWeeklyChampions();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'mistake_scaffoldings' }, () => {
-        refreshMistakesLight();
+        void refreshScaffoldMarks();
         checkUnseenScaffoldingsRef.current();
       })
       .subscribe();
