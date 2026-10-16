@@ -6,6 +6,7 @@ test('최근 탭 라벨 — 학생 탭은 이름, 관리자·알 수 없는 값�
   assert.equal(onlineTabLabel('pixelRoom'), 'Pixel World');
   assert.equal(onlineTabLabel('examPractice'), '기출문제 풀이');
   assert.equal(onlineTabLabel('notes'), '오답노트');
+  assert.equal(onlineTabLabel('help'), '서로 도와주기');
   for (const hidden of ['admin', 'pixelRoomLegacy', 'toString', '', null, undefined]) assert.equal(onlineTabLabel(hidden), null);
 });
 
