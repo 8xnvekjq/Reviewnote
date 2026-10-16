@@ -1955,13 +1955,13 @@ function App() {
         <Screen when={activeTab === 'admin' && isAdmin}>
           <LazyScreenBoundary>
             <AdminPanel onSelectTab={(tab) => setActiveTab(tab)} />
-            <HelpAdminPanel />
+            <HelpAdminPanel onViewMistake={setSelectedEntry} />
           </LazyScreenBoundary>
         </Screen>
 
         <Screen when={activeTab === 'help' && !!session?.user?.id}>
           <LazyScreenBoundary>
-            {isAdmin && <HelpAdminPanel />}
+            {isAdmin && <HelpAdminPanel onViewMistake={setSelectedEntry} />}
             <HelpTab key={session?.user?.id} userId={session?.user?.id || ''} onPointsChanged={handlePixelPointsChanged} />
           </LazyScreenBoundary>
         </Screen>
