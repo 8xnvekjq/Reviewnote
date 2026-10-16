@@ -120,6 +120,13 @@ try {
     failList = true;
     await page.getByRole('button', { name: '새로고침' }).click();
     await page.getByRole('alert').filter({ hasText: '목록 오류예요' }).waitFor();
+    // 도와준 학생 로그인 알림: 👍/🤔와 받은 보상
+    await page.goto(`${base}/tests/ui/peer-help-helper.html?feedback`);
+    const notice = page.getByTestId('help-feedback-modal');
+    await notice.getByText('내 풀이가 친구에게 도움이 됐어요!').waitFor();
+    assert.match(await notice.innerText(), /지식의 조각 \+1개 · \+10P[\s\S]*\+5P/);
+    await notice.getByRole('button', { name: '서로 도와주기에서 보기' }).click();
+    await page.waitForFunction(() => document.body.dataset.goToHelp === 'true');
     await page.goto(`${base}/tests/ui/peer-help-helper.html?admin`);
     // 학생 화면과 같은 익명 라벨(이름 X), 질문·대답 날짜, 피드백은 이모지만, 포인트는 안 보인다.
     const answered = page.getByTestId('help-admin-row').filter({ hasText: '(중2)' });

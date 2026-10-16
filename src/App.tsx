@@ -44,7 +44,8 @@ import { ShardGainToast } from './components/ShardGainToast';
 // 않는다). named export라 lazy()에 바로 못 넣고 default로 매핑해야 한다.
 const AdminPanel = lazy(() => import('./components/AdminPanel').then(m => ({ default: m.AdminPanel })));
 import { HelpArrivalModal } from './features/peerHelp/requester/HelpArrivalModal';
-import { helpNewArrivals, markHelpArrivalsNotified, type HelpArrival } from './features/peerHelp/api';
+import { HelpFeedbackModal } from './features/peerHelp/helper/HelpFeedbackModal';
+import { helpFeedbackArrivals, helpNewArrivals, markHelpArrivalsNotified, markHelpFeedbackNotified, type HelpArrival, type HelpFeedbackArrival } from './features/peerHelp/api';
 const HelpTab = lazy(() => import('./features/peerHelp/helper/HelpTab').then(m => ({ default: m.HelpTab })));
 const HelpAdminPanel = lazy(() => import('./features/peerHelp/admin/HelpAdminPanel').then(m => ({ default: m.HelpAdminPanel })));
 const ExamPrepAnalysis = lazy(() => import('./components/ExamPrepAnalysis').then(m => ({ default: m.ExamPrepAnalysis })));
@@ -449,6 +450,19 @@ function App() {
     helpNewArrivals(supabase).then(rows => { if (live) setHelpArrivals(rows); }, () => {});
     return () => { live = false; };
   }, [session?.user?.id, isAdmin]);
+  // 도와준 학생: 내 풀이에 피드백(👍/🤔)이 왔고 보상을 받았다는 알림(역시 한 번만)
+  const [helpFeedbacks, setHelpFeedbacks] = useState<HelpFeedbackArrival[]>([]);
+  useEffect(() => {
+    if (!session?.user?.id || isAdmin) { setHelpFeedbacks([]); return; }
+    let live = true;
+    helpFeedbackArrivals(supabase).then(rows => { if (live) setHelpFeedbacks(rows); }, () => {});
+    return () => { live = false; };
+  }, [session?.user?.id, isAdmin]);
+  const dismissHelpFeedbacks = (goToHelp: boolean) => {
+    setHelpFeedbacks([]);
+    void markHelpFeedbackNotified(supabase).catch(() => {});
+    if (goToHelp) setActiveTab('help');
+  };
   const dismissHelpArrivals = (goToHelp: boolean) => {
     setHelpArrivals([]);
     void markHelpArrivalsNotified(supabase).catch(() => {});
@@ -2240,6 +2254,9 @@ function App() {
       {/* 선생님 힌트 알림이 떠 있으면 그게 닫힌 뒤에 보여 준다(겹치지 않게). */}
       {helpArrivals.length > 0 && !isNewScaffoldingModalOpen && (
         <HelpArrivalModal arrivals={helpArrivals} onClose={() => dismissHelpArrivals(false)} onGoToHelp={() => dismissHelpArrivals(true)} />
+      )}
+      {helpFeedbacks.length > 0 && helpArrivals.length === 0 && !isNewScaffoldingModalOpen && (
+        <HelpFeedbackModal feedbacks={helpFeedbacks} onClose={() => dismissHelpFeedbacks(false)} onGoToHelp={() => dismissHelpFeedbacks(true)} />
       )}
 
       <OverlayHost
