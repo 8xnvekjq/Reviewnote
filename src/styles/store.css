@@ -97,3 +97,21 @@
 }
 
 @media (max-height: 700px) and (max-width: 640px) { .rn-store-header > div > .rn-caption, .rn-store-header > div > .rn-eyebrow, .rn-store-hero-copy, .rn-store-chest { display: none; } .rn-store-header { gap: 8px; padding-bottom: 8px; } .rn-store-wallet > div { display: flex; align-items: center; gap: 8px; } .rn-store-wallet { padding: 8px 10px; gap: 8px; } .rn-store-wallet strong { font-size: 20px; } .rn-store-wallet .rn-caption { font-size: 11px; } }
+
+.theme-designed .rn-store { --store-amber: var(--rn-accent); }
+.theme-designed .rn-store-draw-primary { color: var(--rn-on-accent); }
+.theme-designed .rn-store-draw-primary:hover { background: var(--rn-accent); filter: brightness(.96); }
+.theme-designed .rn-store-hero { border-color: var(--rn-line); }
+.theme-designed .rn-store-chest { border-color: var(--rn-line); background: rgb(var(--theme-accent) / .06); }
+.theme-ornament .rn-store-hero {
+  background: radial-gradient(ellipse at top right, rgb(var(--theme-secondary) / .09), transparent 65%), var(--rn-surface);
+}
+/* Light-mode utility status labels on faint tinted surfaces. */
+.theme-light .rn-store :is(.text-amber-300, .text-amber-400) { color: #854d0e; }
+.theme-light .rn-store .text-pink-400 { color: #9d174d; }
+.theme-light .rn-store .text-purple-400 { color: #6b21a8; }
+.theme-light .rn-store .text-sky-400 { color: #075985; }
+
+.theme-light .rn-store :is(.text-indigo-300, .text-indigo-400) { color: #0369a1; }
+.theme-light .rn-store :is(.text-emerald-300, .text-emerald-400, .text-teal-300, .text-teal-400) { color: #166534; }
+.theme-light .rn-store :is(.text-cyan-300, .text-cyan-400) { color: #155e75; }

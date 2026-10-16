@@ -29,7 +29,7 @@ export const GACHA_ITEMS: GachaItem[] = [
   {
     id: 'title_math_god',
     name: '👑 칭호: 수학의 신',
-    description: '프로필 및 주간 MVP 카드에 영롱한 황금 칭호가 표시됩니다.',
+    description: '금빛에서 분홍, 보라로 이어지는 그라데이션 칭호 배지가 은은하게 반짝여요.',
     rarity: 'UR',
     category: 'TITLE',
     icon: '👑',
@@ -39,7 +39,7 @@ export const GACHA_ITEMS: GachaItem[] = [
   {
     id: 'title_cosmic_god',
     name: '🚀 칭호: 우주 최강 수재',
-    description: '은하수가 흩날리는 영롱한 우주 최고 수재 칭호가 표시됩니다.',
+    description: '시안에서 보라, 분홍으로 이어지는 그라데이션 칭호 배지가 은은하게 반짝여요.',
     rarity: 'UR',
     category: 'TITLE',
     icon: '🚀',
@@ -49,7 +49,7 @@ export const GACHA_ITEMS: GachaItem[] = [
   {
     id: 'stamp_diamond',
     name: '💎 다이아 스탬프',
-    description: '3차 복습 완료 시 찬란한 다이아몬드 도장이 찍힙니다.',
+    description: '맞힌 복습 칸에 다이아몬드 모양의 도장이 표시돼요.',
     rarity: 'UR',
     category: 'STAMP',
     icon: '💎',
@@ -58,8 +58,8 @@ export const GACHA_ITEMS: GachaItem[] = [
   },
   {
     id: 'stamp_rocket',
-    name: '🚀 우주선 돌파 스탬프',
-    description: '복습 완료 시 역동적인 로켓 도장이 찍힙니다.',
+    name: '🚀 로켓 스탬프',
+    description: '맞힌 복습 칸에 로켓 모양의 도장이 표시돼요.',
     rarity: 'UR',
     category: 'STAMP',
     icon: '🚀',
@@ -68,8 +68,8 @@ export const GACHA_ITEMS: GachaItem[] = [
   },
   {
     id: 'charm_score_hundred',
-    name: '🎴 부적: 시험 100점 선택권',
-    description: '시험지 답안 채점 시 언제든 전과목 100점 대박을 끌어당기는 신비한 기운의 부적입니다.',
+    name: '💯 부적: 100점 응원 부적',
+    description: '오답노트 화면의 작은 장식이에요. 누르면 꾸준한 한 문제를 응원하는 말이 나와요. 보물가방에서 장식을 보이거나 숨길 수 있어요.',
     rarity: 'UR',
     category: 'CHARM',
     icon: '🎴',
@@ -88,8 +88,8 @@ export const GACHA_ITEMS: GachaItem[] = [
   },
   {
     id: 'theme_legendary_gold',
-    name: '🎨 레전드 골드 갤럭시 테마',
-    description: '전설적인 황금빛 태양과 은하수가 어우러진 최고급 레전드 테마입니다.',
+    name: '🎨 골드 갤럭시 테마',
+    description: '짙은 남청색 바탕에 금빛 포인트와 연보라 장식을 더했어요.',
     rarity: 'UR',
     category: 'THEME',
     icon: '☀️',
@@ -100,8 +100,8 @@ export const GACHA_ITEMS: GachaItem[] = [
   },
   {
     id: 'theme_nebula_pink',
-    name: '🎨 네뷸라 네온 핑크 테마',
-    description: '우주 성운의 화려한 네온 핫핑크 감성이 폭발하는 레전드 테마입니다.',
+    name: '🎨 핑크 네뷸라 테마',
+    description: '짙은 자주색 바탕에 밝은 분홍과 시안 포인트가 빛나요.',
     rarity: 'UR',
     category: 'THEME',
     icon: '🌸',
@@ -112,8 +112,8 @@ export const GACHA_ITEMS: GachaItem[] = [
   },
   {
     id: 'theme_angelic_white',
-    name: '🎨 하이퍼 블라인딩 화이트 테마',
-    description: '눈부신 퓨어 순백의 광채와 다이아몬드 네온이 폭발하는 극강의 눈뽕 라이트 테마입니다.',
+    name: '🎨 다이아 화이트 테마',
+    description: '밝은 회백색 바탕에 짙은 파랑과 보라 포인트를 더했어요.',
     rarity: 'UR',
     category: 'THEME',
     icon: '🤍',
@@ -135,7 +135,7 @@ export const GACHA_ITEMS: GachaItem[] = [
   {
     id: 'item_ur_ticket',
     name: '🎫 UR 확정 뽑기권',
-    description: '사용하는 즉시 UR 등급 아이템 중 하나를 100% 확정으로 획득할 수 있는 최고급 티켓입니다.',
+    description: '사용하면 UR 아이템 하나를 뽑아요. 이미 가진 영구 아이템이 나오면 포인트로 환급돼요.',
     rarity: 'UR',
     category: 'SHIELD',
     icon: '🎫',
@@ -147,7 +147,7 @@ export const GACHA_ITEMS: GachaItem[] = [
   {
     id: 'item_ssr_ticket',
     name: '🎫 SSR 확정 뽑기권',
-    description: '사용하는 즉시 SSR 등급 아이템 중 하나를 100% 확정으로 획득할 수 있는 고급 티켓입니다.',
+    description: '사용하면 SSR 아이템 하나를 뽑아요. 이미 가진 영구 아이템이 나오면 포인트로 환급돼요.',
     rarity: 'SSR',
     category: 'SHIELD',
     icon: '🎫',
@@ -166,8 +166,8 @@ export const GACHA_ITEMS: GachaItem[] = [
   },
   {
     id: 'charm_grade_one',
-    name: '🎴 부적: 1등급 선택권',
-    description: '원하는 핵심 시험에서 당당히 1등급을 쟁취할 수 있는 행운의 전설 부적입니다.',
+    name: '🌱 부적: 1등급 응원 부적',
+    description: '오답노트 화면의 작은 장식이에요. 누르면 차근차근 쌓는 성장을 응원하는 말이 나와요. 보물가방에서 장식을 보이거나 숨길 수 있어요.',
     rarity: 'SSR',
     category: 'CHARM',
     icon: '🎴',
@@ -177,7 +177,7 @@ export const GACHA_ITEMS: GachaItem[] = [
   {
     id: 'stamp_cat_paw',
     name: '🐾 참잘했어요 냥발',
-    description: '복습 도장이 귀여운 핑크 냥발 도장으로 바뀝니다.',
+    description: '맞힌 복습 칸에 분홍 냥발 모양의 도장이 표시돼요.',
     rarity: 'SSR',
     category: 'STAMP',
     icon: '🐾',
@@ -186,8 +186,8 @@ export const GACHA_ITEMS: GachaItem[] = [
   },
   {
     id: 'stamp_lightning',
-    name: '⚡ 번개 폭풍 스탬프',
-    description: '복습 도장이 강렬한 번개 스탬프 표식으로 바뀝니다.',
+    name: '⚡ 번개 스탬프',
+    description: '맞힌 복습 칸에 번개 모양의 도장이 표시돼요.',
     rarity: 'SSR',
     category: 'STAMP',
     icon: '⚡',
@@ -196,8 +196,8 @@ export const GACHA_ITEMS: GachaItem[] = [
   },
   {
     id: 'stamp_cherry_blossom',
-    name: '🌸 벚꽃 흩날림 스탬프',
-    description: '복습 완료 시 화사한 핑크 벚꽃 도장이 찍힙니다.',
+    name: '🌸 벚꽃 스탬프',
+    description: '맞힌 복습 칸에 벚꽃 모양의 도장이 표시돼요.',
     rarity: 'SSR',
     category: 'STAMP',
     icon: '🌸',
@@ -206,8 +206,8 @@ export const GACHA_ITEMS: GachaItem[] = [
   },
   {
     id: 'theme_emerald',
-    name: '🎨 사이버 네온 에메랄드 테마',
-    description: '강렬한 사이버 에메랄드 & 네온 민트의 화려한 그라데이션 매트릭스 테마입니다.',
+    name: '🎨 네온 에메랄드 테마',
+    description: '짙은 청록 바탕에 선명한 민트 포인트를 더했어요.',
     rarity: 'SSR',
     category: 'THEME',
     icon: '🟢',
@@ -217,8 +217,8 @@ export const GACHA_ITEMS: GachaItem[] = [
   },
   {
     id: 'theme_ocean_blue',
-    name: '🎨 딥 오션 아틀란티스 테마',
-    description: '깊은 바다 속 찬란한 사파이어 블루 글로우를 선사하는 테마입니다.',
+    name: '🎨 딥 오션 테마',
+    description: '짙은 바다색 바탕에 하늘빛과 물빛 포인트를 더했어요.',
     rarity: 'SSR',
     category: 'THEME',
     icon: '🌊',
@@ -228,8 +228,8 @@ export const GACHA_ITEMS: GachaItem[] = [
   },
   {
     id: 'theme_toxic_lime',
-    name: '🎨 네온 토식 라이믹 테마',
-    description: '톡 쏘는 사이버 라임 그린이 시선을 사로잡는 테마입니다.',
+    name: '🎨 네온 라임 테마',
+    description: '차분한 올리브 바탕에 밝은 라임 포인트를 더했어요.',
     rarity: 'SSR',
     category: 'THEME',
     icon: '🧪',
@@ -240,7 +240,7 @@ export const GACHA_ITEMS: GachaItem[] = [
   {
     id: 'theme_crimson',
     name: '🎨 크림슨 레드 테마',
-    description: '앱 전체 배경 및 프레임이 강렬한 크림슨 레드 톤으로 변환됩니다.',
+    description: '짙은 적갈색 바탕에 밝은 장밋빛 포인트를 더했어요.',
     rarity: 'SSR',
     category: 'THEME',
     icon: '❤️',
@@ -251,7 +251,7 @@ export const GACHA_ITEMS: GachaItem[] = [
   {
     id: 'theme_charcoal',
     name: '🎨 차콜 그래파이트 테마',
-    description: '앱 전체 배경 및 프레임이 색을 절제한 고급스러운 차콜 그레이 톤으로 변환됩니다.',
+    description: '푸른 기가 살짝 도는 차콜 바탕에 은회색 포인트를 더했어요.',
     rarity: 'SSR',
     category: 'THEME',
     icon: '⚫',
@@ -312,7 +312,7 @@ export const GACHA_ITEMS: GachaItem[] = [
   {
     id: 'ai_gyaru',
     name: '🤖 AI 말투: 하이텐션 갸루 쌤',
-    description: 'AI 밤티 쌤이 콧소리 억양과 쵸베리구/쵸베리바 갸루 용어로 수학 오답을 신나게 해설해줍니다.\n💬 "공통인수 묶어서 풀면 마지데(マジで) 쵸베리구(超VeryGood)잖아?! 미분 야호~!"',
+    description: 'AI 밤티 쌤이 갸루 용어와 신나는 말투로 수학 오답을 설명해요.\n💬 "공통인수로 묶으면 쵸베리구! 한 단계씩 가보자~!"',
     rarity: 'SSR',
     category: 'AI_VOICE',
     icon: '✌️',
@@ -364,8 +364,8 @@ export const GACHA_ITEMS: GachaItem[] = [
   },
   {
     id: 'theme_cyber_purple',
-    name: '🎨 사이버 딥 퍼플 테마',
-    description: '오답노트 배경 세부 컬러가 고급스러운 딥 퍼플 글로우로 변경됩니다.',
+    name: '🎨 딥 퍼플 테마',
+    description: '짙은 보라색 바탕에 라벤더 포인트를 더했어요.',
     rarity: 'SR',
     category: 'THEME',
     icon: '🟣',
@@ -376,7 +376,7 @@ export const GACHA_ITEMS: GachaItem[] = [
   {
     id: 'theme_aurora',
     name: '🎨 미드나잇 오로라 테마',
-    description: '몽환적인 딥 바이올렛 & 시안 펄스 오로라 그라데이션이 앱 전체를 휘감습니다.',
+    description: '짙은 남청색 바탕에 민트와 연보라 오로라 장식을 더했어요.',
     rarity: 'SR',
     category: 'THEME',
     icon: '🌌',
@@ -387,7 +387,7 @@ export const GACHA_ITEMS: GachaItem[] = [
   {
     id: 'theme_coral',
     name: '🎨 선셋 코랄 테마',
-    description: '앱 전체 배경 및 프레임이 세련된 선셋 코랄 핑크 톤으로 변환됩니다.',
+    description: '짙은 로즈 바탕에 살구빛 코랄과 노을빛 포인트를 더했어요.',
     rarity: 'SR',
     category: 'THEME',
     icon: '🌅',
@@ -398,7 +398,7 @@ export const GACHA_ITEMS: GachaItem[] = [
   {
     id: 'theme_forest',
     name: '🎨 포레스트 그린 테마',
-    description: '눈이 편안하고 차분한 딥 파인 포레스트 그린 테마입니다.',
+    description: '차분한 숲색 바탕에 부드러운 연두 포인트를 더했어요.',
     rarity: 'SR',
     category: 'THEME',
     icon: '🌲',
@@ -409,7 +409,7 @@ export const GACHA_ITEMS: GachaItem[] = [
   {
     id: 'theme_burgundy',
     name: '🎨 버건디 와인 테마',
-    description: '앱 전체 배경 및 프레임이 고급스러운 버건디 와인 톤으로 변환됩니다.',
+    description: '짙은 와인색 바탕에 말린 장미빛 포인트를 더했어요.',
     rarity: 'SR',
     category: 'THEME',
     icon: '🍷',
@@ -430,7 +430,7 @@ export const GACHA_ITEMS: GachaItem[] = [
   {
     id: 'ai_cyberpunk',
     name: '🌌 AI 말투: 사이버펑크 AI',
-    description: 'AI 밤티 쌤이 미래 지향적 정밀 알고리즘 톤으로 풀이 프로세스를 제공합니다.\n💬 "[System Alert] 오답 프로세스 감지. 0.001초 만에 최적의 해법 알고리즘을 로딩합니다."',
+    description: 'AI 밤티 쌤이 미래의 시스템 안내 같은 말투로 풀이 과정을 설명해요.\n💬 "[System Alert] 오답 분석 시작. 조건을 확인하고 다음 단계로 이동합니다."',
     rarity: 'SR',
     category: 'AI_VOICE',
     icon: '🤖',
@@ -440,7 +440,7 @@ export const GACHA_ITEMS: GachaItem[] = [
   {
     id: 'item_streak_shield',
     name: '🛡️ 스트릭 방어권 (1회용)',
-    description: '시험 기간이나 바쁜 날 하루 복습을 못 해도 연속 복습 콤보를 보호해줍니다.',
+    description: '하루 복습을 놓쳤을 때 자동으로 1개 사용되어 연속 복습 콤보를 보호해요.',
     rarity: 'SR',
     category: 'SHIELD',
     icon: '🛡️',
@@ -461,8 +461,8 @@ export const GACHA_ITEMS: GachaItem[] = [
   // ── R (70%) - Rare (파란/일반 빛) ───────────────────────────
   {
     id: 'charm_luck_exam',
-    name: '🎴 부적: 찍기 신공 부적',
-    description: '시험날 헷갈리는 객관식 문제를 찍을 때 정답률이 솟구치는 기운의 부적입니다.',
+    name: '🍀 부적: 시험 응원 부적',
+    description: '오답노트 화면의 작은 장식이에요. 누르면 시험 앞의 차분한 도전을 응원하는 말이 나와요. 보물가방에서 장식을 보이거나 숨길 수 있어요.',
     rarity: 'R',
     category: 'CHARM',
     icon: '🎴',
@@ -471,8 +471,8 @@ export const GACHA_ITEMS: GachaItem[] = [
   },
   {
     id: 'charm_no_mistake',
-    name: '🎴 부적: 연산 실수 퇴치 부적',
-    description: '부호 실수, 덧셈 실수를 싹 막아주는 시험 대박 예방 부적입니다.',
+    name: '✏️ 부적: 꼼꼼 응원 부적',
+    description: '오답노트 화면의 작은 장식이에요. 누르면 한 번 더 확인하는 습관을 응원하는 말이 나와요. 보물가방에서 장식을 보이거나 숨길 수 있어요.',
     rarity: 'R',
     category: 'CHARM',
     icon: '🚫',
@@ -481,8 +481,8 @@ export const GACHA_ITEMS: GachaItem[] = [
   },
   {
     id: 'theme_classic_mono',
-    name: '🎨 클래식 모노 다크 테마',
-    description: '색조가 거의 없는 순수 무채색 그레이 다크 테마입니다.',
+    name: '🎨 클래식 모노 테마',
+    description: '검정과 회색만으로 차분한 학습 화면을 만들어요.',
     rarity: 'R',
     category: 'THEME',
     icon: '🖤',
@@ -492,7 +492,7 @@ export const GACHA_ITEMS: GachaItem[] = [
   {
     id: 'theme_warm_latte',
     name: '🎨 웜 카페 라떼 테마',
-    description: '따스하고 차분한 브라운 라떼 감성의 스터디 테마입니다.',
+    description: '짙은 커피색 바탕에 부드러운 라떼빛 포인트를 더했어요.',
     rarity: 'R',
     category: 'THEME',
     icon: '☕',
@@ -532,7 +532,7 @@ export const GACHA_ITEMS: GachaItem[] = [
   {
     id: 'stamp_star',
     name: '⭐ 황금 별 스탬프',
-    description: '복습 완료 시 반짝이는 황금 미니 스타 도장이 찍힙니다.',
+    description: '맞힌 복습 칸에 별 모양의 도장이 표시돼요.',
     rarity: 'R',
     category: 'STAMP',
     icon: '⭐',
@@ -552,7 +552,7 @@ export const GACHA_ITEMS: GachaItem[] = [
   {
     id: 'stamp_fire',
     name: '🔥 불타는 열공 도장',
-    description: '복습 완료 시 열정의 불꽃 스탬프가 찍힙니다.',
+    description: '맞힌 복습 칸에 불꽃 모양의 도장이 표시돼요.',
     rarity: 'R',
     category: 'STAMP',
     icon: '🔥',

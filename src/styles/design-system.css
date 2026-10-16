@@ -113,3 +113,45 @@
 .rn-shard-toast small { color:#c9b3f0; font-size:11px; }
 @keyframes rn-shard-pop { from { opacity:0; transform:translate(-50%,8px) scale(.96); } to { opacity:1; transform:translate(-50%,0); } }
 @media (prefers-reduced-motion: reduce) { .rn-shard-toast { animation:none; } }
+
+/* Equipped palettes override roles only while active; defaults above are exact. */
+:root.theme-designed {
+  color-scheme: dark;
+  --rn-text: rgb(var(--theme-text));
+  --rn-muted: rgb(var(--theme-muted));
+  --rn-accent: rgb(var(--theme-accent));
+  --rn-line: rgb(var(--theme-border) / .45);
+  --rn-on-accent: rgb(var(--theme-on-accent));
+}
+:root.theme-light {
+  color-scheme: light;
+  --rn-success: #166534;
+  --rn-warning: #854d0e;
+  --rn-danger: #9f1239;
+}
+.theme-designed body, .theme-designed .rn-app { color: var(--rn-text); }
+.theme-designed .rn-header { background-color: rgb(var(--theme-header)); }
+.theme-designed .rn-button-primary,
+.theme-designed .rn-nav-camera svg { background: var(--rn-accent); color: var(--rn-on-accent); border-color: var(--rn-accent); }
+.theme-designed .rn-nav-item[aria-current=page],
+.theme-designed .rn-nav-item[aria-expanded=true] { color: var(--rn-accent); background: rgb(var(--theme-accent) / .1); }
+/* Static, small painted ornaments: no moving shadows, filters or screen overlays. */
+.theme-ornament .rn-header, .theme-ornament .rn-dock {
+  background-image: linear-gradient(90deg, rgb(var(--theme-accent)), rgb(var(--theme-secondary)));
+  background-size: 100% 2px;
+  background-repeat: no-repeat;
+}
+.theme-ornament .rn-header { background-position: bottom; }
+.theme-ornament .rn-dock { background-position: top; }
+.theme-ornament .rn-button-primary,
+.theme-ornament .rn-store-draw-primary { box-shadow: 0 3px 14px rgb(var(--theme-secondary) / .16); }
+.theme-light .rn-note-mastered-badge, .theme-light .rn-note-weak-badge { color: #fff; }
+
+/* Account actions used fixed dark utility tints; keep them in the same reading
+   surfaces as the header and dock, including the light palette. */
+.theme-designed .rn-account-menu > button {
+  background: var(--rn-elevated);
+  color: var(--rn-text);
+  border-color: var(--rn-line);
+}
+.theme-designed .rn-account-menu > button[class*="bg-red-"] { color: var(--rn-danger); }

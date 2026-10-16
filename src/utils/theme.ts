@@ -1,3 +1,11 @@
+import { GACHA_ITEMS } from './gachaCatalog';
+import { THEME_PALETTES } from './themePalettes';
+
+const themeIdsByHex = new Map(
+  GACHA_ITEMS.flatMap(item => item.category === 'THEME' && item.effectValue
+    ? [[item.effectValue.toUpperCase(), item.id] as const] : []),
+);
+
 // 럭키상점에서 장착한 테마(단일 hex 색상)를 앱 전체 메인 배경, 상/하단 바, 패널 프레임 테두리에 파격적으로 반영하는 유틸리티
 
 function hexToHsl(hex: string): [number, number, number] {
@@ -55,49 +63,41 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
   return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
 }
 
-/**
- * 장착한 테마 색상(hex, 예: '#06B6D4' 오로라, '#10B981' 네온 에메랄드, '#166534' 포레스트, '#DC2626' 크림슨 등)을
- * 앱 전체 메인 배경, 상단 헤더, 하단 네비게이션 바, 각 패널 프레임 테두리 선에 깊이감 있게 반영한다.
- *
- * accentHex를 넘기면(UR 등급 "레전드" 테마 전용) 완전히 다른 배색 전략을 쓴다: 배경은 거의
- * 블랙에 가깝게 죽이고, 그 대신 테두리는 테마 고유색(예: 골드)을 눈부시게 밝혀서 살리고,
- * 액센트는 accentHex(예: 은하수 보라)로 대비되는 스파클 포인트를 준다 — 실제 가챠 게임들이
- * 레전더리 등급을 "화려한 배경색"이 아니라 "검은 캔버스 + 찬란한 금테 + 보조 스파클색"으로
- * 표현하는 것과 같은 원리. 배경을 통째로 물들이면 오히려 탁하고 저렴해 보인다는 피드백을 받고
- * 리워크함. accentHex가 없으면 기존처럼 테두리·액센트도 base hex를 그대로 쓴다.
- */
+const THEME_PROPERTIES = [
+  '--theme-bg-main', '--theme-bg-surface', '--theme-bg-elevated', '--theme-header',
+  '--theme-border', '--theme-accent', '--theme-glow-opacity', '--theme-secondary',
+  '--theme-text', '--theme-muted', '--theme-on-accent',
+];
+
+/** Resolve saved catalog hexes to designed palettes; retain derivation for legacy hexes. */
 export function applyThemeColor(hex?: string, accentHex?: string): void {
   const root = document.documentElement;
 
-  if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) {
-    root.style.removeProperty('--theme-bg-main');
-    root.style.removeProperty('--theme-bg-surface');
-    root.style.removeProperty('--theme-bg-elevated');
-    root.style.removeProperty('--theme-header');
-    root.style.removeProperty('--theme-border');
-    root.style.removeProperty('--theme-accent');
-    root.style.removeProperty('--theme-glow-opacity');
-    root.classList.remove('theme-light');
-    root.classList.remove('theme-rainbow-frame');
-    return;
-  }
+  // Clear every owned override before switching, falling back, or unequipping.
+  for (const property of THEME_PROPERTIES) root.style.removeProperty(property);
+  root.classList.remove('theme-light', 'theme-rainbow-frame', 'theme-designed', 'theme-ornament');
+  delete root.dataset.themeId;
+  if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) return;
 
-  const isPureWhite = hex.toUpperCase() === '#FFFFFF';
-  if (isPureWhite) {
-    // 🤍 눈부신 하이퍼 블라인딩 화이트 테마 전용 (초고휘도 백색 캔버스 + 무지개 실시간 웨이브 프레임)
-    root.style.setProperty('--theme-bg-main', '255 255 255');
-    root.style.setProperty('--theme-bg-surface', '248 250 252');
-    root.style.setProperty('--theme-bg-elevated', '241 245 249');
-    root.style.setProperty('--theme-header', '255 255 255');
-    root.style.setProperty('--theme-border', '56 189 248');
-    root.style.setProperty('--theme-accent', '0 240 255');
-    root.style.setProperty('--theme-glow-opacity', '0.6');
-    root.classList.add('theme-light');
-    root.classList.add('theme-rainbow-frame');
+  const id = themeIdsByHex.get(hex.toUpperCase());
+  const palette = id ? THEME_PALETTES[id] : undefined;
+  if (palette) {
+    const tokens = {
+      '--theme-bg-main': palette.bg, '--theme-bg-surface': palette.surface,
+      '--theme-bg-elevated': palette.elevated, '--theme-header': palette.header,
+      '--theme-border': palette.border, '--theme-accent': palette.accent,
+      '--theme-secondary': palette.secondary, '--theme-text': palette.text,
+      '--theme-muted': palette.muted, '--theme-on-accent': palette.onAccent,
+    };
+    for (const [name, value] of Object.entries(tokens)) {
+      root.style.setProperty(name, value.slice(1).match(/.{2}/g)!.map(channel => parseInt(channel, 16)).join(' '));
+    }
+    root.style.setProperty('--theme-glow-opacity', palette.ornament ? '0.16' : '0');
+    root.classList.add('theme-designed');
+    root.classList.toggle('theme-light', !!palette.light);
+    root.classList.toggle('theme-ornament', !!palette.ornament);
+    root.dataset.themeId = id!;
     return;
-  } else {
-    root.classList.remove('theme-light');
-    root.classList.remove('theme-rainbow-frame');
   }
 
   const [h, s] = hexToHsl(hex);

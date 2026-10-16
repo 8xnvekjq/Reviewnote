@@ -1,0 +1,16 @@
+.rn-charms { color: var(--rn-text); background: var(--rn-surface, var(--theme-bg-surface)); border: 1px solid var(--rn-line); border-radius: 16px; padding: 4px 12px; }
+.rn-charms-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rn-charms-caption { font-size: 11px; color: var(--rn-muted); margin-right: auto; }
+.rn-charm-icon { width: 32px; height: 46px; display: block; flex: none; color: var(--rn-muted); }
+.rn-charm-pendant { display: flex; justify-content: center; align-items: center; width: 44px; min-height: 54px; border-radius: 10px; background: transparent; border: 0; cursor: pointer; transform-origin: center top; }
+.rn-charm-pendant:hover { background: var(--rn-elevated, var(--theme-bg-elevated)); }
+.rn-charm-pendant:focus-visible, .rn-charm-toggle:focus-visible { outline: 2px solid var(--rn-accent); outline-offset: 3px; }
+.rn-charm-message { font-size: 12px; line-height: 1.6; margin: 2px 0 8px; overflow-wrap: anywhere; }
+.rn-charm-toggle { flex: none; margin-left: 8px; min-height: 44px; padding: 6px 8px; border: 1px solid var(--rn-line); border-radius: 10px; color: var(--rn-text); background: var(--rn-elevated, var(--theme-bg-elevated)); font-size: 10px; cursor: pointer; }
+.rn-charm-inventory { flex-wrap: wrap; gap: 8px; }
+.rn-charm-inventory > div:first-child { flex: 1 1 210px; }
+@media (prefers-reduced-motion: no-preference) {
+  .rn-charm-sway { display: block; transform-origin: center top; animation: rn-charm-sway 5s ease-in-out infinite; }
+  .rn-charm-pendant:nth-of-type(even) .rn-charm-sway { animation-delay: -2s; }
+}
+@keyframes rn-charm-sway { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
