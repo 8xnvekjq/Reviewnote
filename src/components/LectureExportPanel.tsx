@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import type { LoadedRecording } from '../features/lectures/lectureRecordings';
+import { deleteLectureRecording, type LoadedRecording } from '../features/lectures/lectureRecordings';
+import { supabase } from '../services/supabase';
 import { formatDuration } from '../features/lectures/lectureRecordingModel';
 import { clearExportFiles, exportFileName, exportLectureMp4, lectureVideoTitle, type ExportProgress, type ExportResult } from '../features/lectures/lectureExport';
 
@@ -32,6 +33,18 @@ export const LectureExportPanel: React.FC<{
 }> = ({ recording, slideUrls, onClose, deck }) => {
   const [state, setState] = useState<State>({ phase: 'idle' });
   // 파일 이름 = 유튜브 제목 양식(고칠 수 있다)
+  // 영상을 기기에 저장하면 서버의 녹음(필기 기록·음성)은 바로 지운다 — 저장 공간(무료 1GB)을 아끼려고.
+  // 이 창이 열려 있는 동안은 녹음이 메모리에 남아 있어 '다시'로 영상을 또 만들 수 있다.
+  const [serverCopy, setServerCopy] = useState<'kept' | 'deleting' | 'deleted' | 'failed'>('kept');
+  const removeServerCopy = () => {
+    if (serverCopy === 'deleting' || serverCopy === 'deleted') return;
+    setServerCopy('deleting');
+    // 다운로드가 시작될 시간을 조금 준다.
+    window.setTimeout(() => {
+      deleteLectureRecording(supabase, recording.manifest.recordingId)
+        .then(() => setServerCopy('deleted'), () => setServerCopy('failed'));
+    }, 1500);
+  };
   const [title, setTitle] = useState(() => lectureVideoTitle({
     createdAt: recording.manifest.createdAt, grade: deck?.grade, className: recording.manifest.className,
     book: deck?.book, sections: recording.manifest.slides.map(slide => slide.section),
@@ -140,9 +153,15 @@ export const LectureExportPanel: React.FC<{
               className="w-full rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-2 text-xs text-slate-100" />
           </label>
           <div className="flex gap-2">
-            <a href={state.url} download={exportFileName(title || recording.manifest.title)} className={`${button} flex-1 flex items-center justify-center bg-emerald-600 border-emerald-400 text-white`}>⬇ 기기에 저장</a>
+            <a href={state.url} download={exportFileName(title || recording.manifest.title)} onClick={removeServerCopy} className={`${button} flex-1 flex items-center justify-center bg-emerald-600 border-emerald-400 text-white`}>⬇ 기기에 저장</a>
             <button type="button" onClick={() => setState({ phase: 'idle' })} className={`${button} bg-slate-800 border-slate-600 text-slate-100`}>다시</button>
           </div>
+          <p data-testid="export-server-copy" className={`text-[11px] break-keep ${serverCopy === 'failed' ? 'text-rose-300' : serverCopy === 'deleted' ? 'text-emerald-300' : 'text-slate-400'}`}>
+            {serverCopy === 'kept' ? '저장하면 이 녹음은 서버에서 지워져요(이 창을 닫기 전까지는 다시 만들 수 있어요).'
+              : serverCopy === 'deleting' ? '서버의 녹음을 지우는 중…'
+              : serverCopy === 'deleted' ? '✓ 서버의 녹음을 지웠어요. 창을 닫기 전까지는 다시 만들 수 있어요.'
+              : '서버의 녹음을 지우지 못했어요. 녹음 목록에서 직접 지워 주세요.'}
+          </p>
         </>
       )}
 
