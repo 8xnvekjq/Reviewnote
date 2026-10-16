@@ -15,6 +15,7 @@ const LABELS: Partial<Record<ActiveTab, string>> = {
   reviewCheck: '복습체크',
   pixelRoom: 'Pixel World',
   examPractice: '기출문제 풀이',
+  help: '서로 도와주기',
 };
 
 export function onlineTabLabel(tab: string | null | undefined): string | null {
