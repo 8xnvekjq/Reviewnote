@@ -1,4 +1,5 @@
 import { useScaffoldingRefresh } from './useScaffoldingRefresh';
+import { mergeChangedMistakes } from './mistakeMerge';
 import { useRef } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { MistakeEntry } from '../../types';
@@ -93,7 +94,42 @@ export function useMistakes({
     }
   };
 
-  useScaffoldingRefresh(refreshMistakesLight, undefined, false);
+  // 🔄 실시간 변경은 '바뀐 오답 줄만' 다시 받아 끼워 넣는다. 예전에는 변경 하나마다 refreshMistakesLight로
+  // 전체를 다시 받았는데, 관리자 기기에서는 학생 전원의 오답(약 1,000개·6MB)이라 학생이 복습 체크를 한 번
+  // 누를 때마다 선생님 기기마다 6MB씩 내려받아 Supabase 트래픽 한도(5GB/월)를 넘겼다(2026-10, 8GB).
+  // 실시간 알림의 new 값은 쓰지 않는다 — 큰 jsonb(analysis)가 안 바뀌면 알림에서 빠질 수 있어서다.
+  // 짧은 시간에 몰린 변경은 모아서 한 번에(in 조회) 받는다.
+  const changedIdsRef = useRef(new Set<string>());
+  const changeTimerRef = useRef<number | null>(null);
+  const applyChangedMistakes = async () => {
+    changeTimerRef.current = null;
+    const ids = [...changedIdsRef.current];
+    changedIdsRef.current.clear();
+    if (!ids.length) return;
+    try {
+      const { data, error } = await supabase.from('mistakes').select('*').in('id', ids);
+      if (error) throw error;
+      const rows = new Map((data || []).map((row: any) => [row.id as string, mapDbMistakeRow(row)]));
+      setMistakes(prev => mergeChangedMistakes(prev, ids, rows));
+    } catch (err) {
+      console.error('Error applying mistake changes:', err);
+      // 실패하면 예전처럼 전체를 한 번 다시 받는다(드문 경우).
+      refreshMistakesLight();
+    }
+  };
+  const queueMistakeChange = (id: string | undefined) => {
+    if (!id) return;
+    changedIdsRef.current.add(id);
+    if (changeTimerRef.current == null) changeTimerRef.current = window.setTimeout(() => { void applyChangedMistakes(); }, 400);
+  };
+
+  // 스캐폴딩(선생님 힌트) 표시는 mistake_id 목록만 다시 받는다(오답 전체를 다시 받지 않는다).
+  const refreshScaffoldMarks = async () => {
+    const { data, error } = await supabase.from('mistake_scaffoldings').select('mistake_id');
+    if (!error) setScaffoldedMistakeIds(new Set((data || []).map((r: any) => r.mistake_id)));
+  };
+
+  useScaffoldingRefresh(refreshScaffoldMarks, undefined, false);
 
   // Delete mistake from Supabase & local state
   const handleDeleteMistake = async (id: string, e: React.MouseEvent) => {
@@ -150,6 +186,8 @@ export function useMistakes({
 
   return {
     refreshMistakesLight,
+    queueMistakeChange,
+    refreshScaffoldMarks,
     handleDeleteMistake,
     handleToggleHidden,
   };

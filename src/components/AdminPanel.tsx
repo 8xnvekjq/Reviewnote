@@ -346,12 +346,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onSelectTab }) => {
     // 수업 중에는 학생들의 복습 체크가 연달아 들어온다. 변경마다 바로 전체를 다시 받지 않고,
     // 마지막 변경 후 잠깐 조용해지면 한 번만 다시 받는다. 탭이 숨겨져 있으면 돌아올 때 받는다.
     const REFETCH_DEBOUNCE_MS = 3000;
+    // 학생 기기마다 2분마다 last_seen_at을 써서 profiles 변경이 끊이지 않는다 — 3초 묶기만으로는 10초마다
+    // 전체 통계(약 350KB)를 다시 받아 트래픽이 컸다. 다시 받기는 최소 1분 간격으로.
+    const REFETCH_MIN_INTERVAL_MS = 60_000;
+    let lastRefetchAt = 0;
     let refetchTimer: ReturnType<typeof setTimeout> | null = null;
     let missedWhileHidden = false;
     const scheduleRefetch = () => {
       if (document.hidden) { missedWhileHidden = true; return; }
-      if (refetchTimer) clearTimeout(refetchTimer);
-      refetchTimer = setTimeout(() => { refetchTimer = null; fetchAdminStats(false); }, REFETCH_DEBOUNCE_MS);
+      if (refetchTimer) return; // 이미 예약됨 — 끊이지 않는 이벤트가 예약을 계속 미루지 않게
+      const wait = Math.max(REFETCH_DEBOUNCE_MS, lastRefetchAt + REFETCH_MIN_INTERVAL_MS - Date.now());
+      refetchTimer = setTimeout(() => { refetchTimer = null; lastRefetchAt = Date.now(); fetchAdminStats(false); }, wait);
     };
     const onVisibility = () => {
       if (!document.hidden && missedWhileHidden) { missedWhileHidden = false; fetchAdminStats(false); }

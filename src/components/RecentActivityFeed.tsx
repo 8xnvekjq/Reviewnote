@@ -72,14 +72,18 @@ export const RecentActivityFeed: React.FC = () => {
     fetchEvents();
 
     // 실시간 갱신: 누군가 오답을 등록하거나 복습을 수행하면 새로고침 없이 즉시 반영
+    // 오답 변경이 몰려도 15초에 한 번만 다시 받는다(학생 복습 체크마다 매번 받으면 트래픽이 크다).
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const channel = supabase
       .channel('recent_activity_feed_live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'mistakes' }, () => {
-        fetchEvents();
+        if (timer) return;
+        timer = setTimeout(() => { timer = null; fetchEvents(); }, 15_000);
       })
       .subscribe();
 
     return () => {
+      if (timer) clearTimeout(timer);
       supabase.removeChannel(channel);
     };
   }, []);
