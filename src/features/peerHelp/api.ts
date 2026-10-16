@@ -33,11 +33,12 @@ export interface GivenHelp {
 export interface FeedbackResult { helper_reward: number; helper_shards?: number; requester_reward: number; closed: boolean }
 /** 로그인 알림: 내 요청에 새로 온 풀이(요청별 묶음). */
 export interface HelpArrival { request_id: string; title: string | null; image_url: string | null; count: number }
+/** 관리자 목록 한 줄 = 풀이 하나. 아직 풀이가 없는 요청은 solution_id·storage_path·helper가 null인 줄로 온다. */
 export interface AdminHelpRow {
-  solution_id: string; request_id: string; created_at: string; request_status: HelpRequestStatus;
-  image_url: string | null; mistake_title: string | null; storage_path: string; stroke_count: number; duration_ms: number;
+  solution_id: string | null; request_id: string; created_at: string; request_created_at?: string; request_status: HelpRequestStatus;
+  image_url: string | null; mistake_title: string | null; storage_path: string | null; stroke_count: number | null; duration_ms: number | null;
   feedback: HelpFeedback | null; helper_reward: number; requester_reward: number; removed_at: string | null; file_available: boolean;
-  helper: { id: string; name: string | null; face: string }; requester: { id: string; name: string | null; face: string };
+  helper: { id: string; name: string | null; face: string } | null; requester: { id: string; name: string | null; face: string };
 }
 
 /** 서버 오류 문구(한국어)를 그대로 보여 줄 수 있게 꺼낸다. */

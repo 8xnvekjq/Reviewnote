@@ -1961,6 +1961,7 @@ function App() {
 
         <Screen when={activeTab === 'help' && !!session?.user?.id}>
           <LazyScreenBoundary>
+            {isAdmin && <HelpAdminPanel />}
             <HelpTab key={session?.user?.id} userId={session?.user?.id || ''} onPointsChanged={handlePixelPointsChanged} />
           </LazyScreenBoundary>
         </Screen>
