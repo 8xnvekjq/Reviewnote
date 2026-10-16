@@ -293,6 +293,10 @@ try {
     // 유튜브 제목 양식: '날짜 학년 반 교재 (단원)', '/'는 전각 '／'
     assert.match(file.suggestedFilename(), /^\d{1,2}／\d{1,2} 고1 수토 공통수학2 \(명제\)\.mp4$/);
     await file.saveAs('.test-artifacts/lecture-export.mp4').catch(() => {});
+    // 4) 기기에 저장하면 서버의 녹음(파일과 행)은 바로 지운다.
+    await exportPanel.getByTestId('export-server-copy').getByText('서버의 녹음을 지웠어요').waitFor({ timeout: 10_000 });
+    assert.equal(recRows.length, 0);
+    assert.equal([...recFiles.keys()].filter(k => k.startsWith(recId)).length, 0);
     const probe = await page.evaluate(async ({ resumeAt, total }) => {
       const mb = await import('/@id/mediabunny');
       const src = document.querySelector('[data-testid=export-preview]').src;
@@ -335,14 +339,11 @@ try {
     await page.keyboard.press('Escape');
     await viewer.waitFor({ state: 'detached' });
 
-    // 4) 녹음 삭제: 파일과 행이 함께 사라진다.
-    await list.getByRole('button', { name: /녹음 삭제/ }).click();
+    // 뷰어를 닫으면 목록에서도 빠져 있다.
     await list.getByText('아직 녹음이 없습니다', { exact: false }).waitFor();
-    assert.equal(recRows.length, 0);
-    assert.equal([...recFiles.keys()].filter(k => k.startsWith(recId)).length, 0);
 
     assert.deepEqual(errors, []);
-    console.log(`PASS: pen-only ink per slide, record→pause→resume→slide→hidden auto-pause→resume→end (${manifest.clips.length} clips, ${manifest.chunks.length} gzip ink chunks, ${manifest.durationMs} ms), reopen replay (slides+strokes at times, audio blob), delete`);
+    console.log(`PASS: pen-only ink per slide, record→pause→resume→slide→hidden auto-pause→resume→end (${manifest.clips.length} clips, ${manifest.chunks.length} gzip ink chunks, ${manifest.durationMs} ms), reopen replay (slides+strokes at times, audio blob), export → save deletes the server copy`);
   } finally { await context.close(); }
 } finally {
   if (browser) await browser.close();
