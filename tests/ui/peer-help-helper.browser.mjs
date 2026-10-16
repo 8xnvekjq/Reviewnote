@@ -42,7 +42,7 @@ try {
         if (failSubmit) { failSubmit = false; return respond({ message: '요청이 마감됐어요' }, 400); }
         submitted = true; return respond({ id: 'solution-1' });
       }
-      if (rpc === 'admin_list_help') return respond([{ solution_id: 'solution-1', request_id: 'request-1', created_at: new Date().toISOString(), request_status: 'closed', image_url: image, mistake_title: '방정식', storage_path: 'helper/file.json.gz', stroke_count: 5, duration_ms: 24000, feedback: 'like', helper_reward: removed ? 0 : 30, requester_reward: removed ? 0 : 5, removed_at: removed ? new Date().toISOString() : null, file_available: true, helper: { id: 'secret-helper', name: '도우미실명', face: '🐱' }, requester: { id: 'secret-requester', name: '요청자실명', face: '🐻' } }]);
+      if (rpc === 'admin_list_help') return respond([{ solution_id: 'solution-1', request_id: 'request-1', created_at: new Date().toISOString(), request_status: 'closed', image_url: image, mistake_title: '방정식', storage_path: 'helper/file.json.gz', stroke_count: 5, duration_ms: 24000, feedback: 'like', helper_reward: removed ? 0 : 30, requester_reward: removed ? 0 : 5, removed_at: removed ? new Date().toISOString() : null, file_available: true, helper: { id: 'secret-helper', name: '도우미실명', face: '🐱' }, requester: { id: 'secret-requester', name: '요청자실명', face: '🐻' } }, { solution_id: null, request_id: 'request-2', created_at: new Date().toISOString(), request_status: 'open', image_url: image, mistake_title: '함수', storage_path: null, stroke_count: null, duration_ms: null, feedback: null, helper_reward: 0, requester_reward: 0, removed_at: null, file_available: false, helper: null, requester: { id: 'secret-asker', name: '질문만한학생', face: '🐰' } }]);
       if (rpc === 'admin_remove_help_solution') { removed = true; return respond({ removed: true, helper_clawback: 30, requester_clawback: 5 }); }
       if (url.pathname.includes('/storage/v1/object/')) {
         if (req.method() === 'POST') {
@@ -121,6 +121,9 @@ try {
     await page.getByRole('alert').filter({ hasText: '목록 오류예요' }).waitFor();
     await page.goto(`${base}/tests/ui/peer-help-helper.html?admin`);
     await page.getByText('도우미실명', { exact: false }).waitFor();
+    // 아직 답이 없는 요청도 누가 물었는지 보인다(풀이 보기·지우기 버튼 없이).
+    await page.getByRole('row').filter({ hasText: '질문만한학생' }).getByText('아직 답 없음').waitFor();
+    assert.equal(await page.getByRole('button', { name: '풀이 보기' }).count(), 1);
     await page.getByRole('button', { name: '풀이 보기' }).click();
     await page.getByRole('dialog').locator('.exam-ink').waitFor();
     await page.getByRole('button', { name: '닫기', exact: true }).click();
