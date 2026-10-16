@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import '../styles/store.css';
+import { CharmIcon, CharmVisibilityToggle } from '../features/charms/Charms';
 import type { GachaItem, EquippedItems } from '../types';
 import { GACHA_ITEMS, drawGachaItem, getRarityTheme, getRarityBadgeTextColor, getTitleBadgeStyle } from '../utils/gachaCatalog';
 import { CatPawIcon } from './CatPawIcon';
@@ -995,20 +996,22 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                   return (
                     <div
                       key={item.id}
-                      className={`p-3.5 rounded-2xl border flex items-center justify-between bg-slate-900/60 transition-all ${
+                      className={`${item.category === 'CHARM' ? 'rn-charm-inventory' : ''} p-3.5 rounded-2xl border flex items-center justify-between bg-slate-900/60 transition-all ${
                         isEquipped ? 'border-amber-400/80 bg-amber-500/10 shadow-lg shadow-amber-500/10' : 'border-slate-800 hover:border-slate-700'
                       }`}
                     >
                       <div className="flex items-center space-x-3 min-w-0">
                         <div className="relative flex-none flex items-center justify-center">
-                          {item.imageUrl ? (
+                          {item.category === 'CHARM' ? (
+                            <CharmIcon id={item.id} />
+                          ) : item.imageUrl ? (
                             <img src={item.imageUrl} alt={item.name} className="w-8 h-8 rounded-full object-cover border border-amber-400/60 shadow" />
                           ) : item.icon === '🐾' ? (
                             <CatPawIcon className="w-7 h-7" />
                           ) : (
                             <span className="text-3xl">{item.icon}</span>
                           )}
-                          {item.category === 'SHIELD' && qty > 1 && (
+                          {(item.category === 'SHIELD' || item.category === 'CHARM') && qty > 1 && (
                             <span className="absolute -top-1 -right-1 text-[9px] bg-indigo-600 text-white rounded-full w-4 h-4 flex items-center justify-center font-black">
                               {qty}
                             </span>
@@ -1025,7 +1028,9 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                         </div>
                       </div>
 
-                      {/* SHIELD/CHARM 류 소모성 아이템 */}
+                      {item.category === 'CHARM' && <CharmVisibilityToggle id={item.id} />}
+
+                      {/* Functional items */}
                       {item.category === 'SHIELD' && item.id === 'item_name_change' && onUseNameChangeTicket && (
                         <button
                           onClick={onUseNameChangeTicket}
@@ -1138,7 +1143,7 @@ export const GachaStore: React.FC<GachaStoreProps> = ({
                   >
                     <div className="text-3xl flex-none select-none flex items-center justify-center">
                       {isUnlocked ? (
-                        item.imageUrl ? (
+                        item.category === 'CHARM' ? <CharmIcon id={item.id} /> : item.imageUrl ? (
                           <img src={item.imageUrl} alt={item.name} className="w-8 h-8 rounded-full object-cover border border-amber-400/60 shadow" />
                         ) : item.icon === '🐾' ? (
                           <CatPawIcon className="w-7 h-7" />

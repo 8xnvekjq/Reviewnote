@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import '../styles/notes.css';
+import { CharmPendants } from '../features/charms/Charms';
 import type { MistakeEntry } from '../types';
 import { MistakeCard } from './MistakeCard';
 import { useMyHelpRequests } from '../features/peerHelp/requester/useMyHelpRequests';
@@ -289,6 +290,7 @@ export const MistakeList: React.FC<MistakeListProps> = ({
           {!hideAddButton && <button type="button" onClick={onAddClick} className="rn-button rn-button-primary rn-button-compact">+ 문제 추가</button>}
         </div>
       </header>
+      {!isAdmin && viewMode === 'card' && <CharmPendants userId={currentUserId} />}
       {onPrintClick && mistakes.length > 0 && (
         <div className="rn-notes-print">
           <span className="rn-caption">{selectedPrintIds.length}개 선택</span>
