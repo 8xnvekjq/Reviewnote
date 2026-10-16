@@ -70,9 +70,21 @@ export function windowReads(placements: AudioPlacement[], winFromMs: number, len
   return reads;
 }
 
+/** 파일 이름. '/'는 쓸 수 없어 생김새가 같은 전각 '／'로(유튜브가 파일 이름을 제목으로 쓴다). */
 export function exportFileName(title: string) {
-  const clean = title.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim() || '수업';
+  const clean = title.replace(/\//g, '／').replace(/[\\:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim() || '수업';
   return `${clean}.mp4`;
+}
+
+/** 유튜브 제목 양식: '10/15 고2 월수금 미적분1 (함수의 최댓값과 최솟값)'.
+ *  날짜는 녹음한 날(KST), 반은 '반'을 떼고, 교재는 '개념원리'를 떼고, 괄호에는 단원 이름(번호·연습문제 제외). */
+export function lectureVideoTitle(input: { createdAt: string; grade?: string | null; className?: string | null; book?: string | null; sections: string[] }) {
+  const kst = new Date(new Date(input.createdAt).getTime() + 9 * 3600_000);
+  const date = Number.isNaN(kst.getTime()) ? '' : `${kst.getUTCMonth() + 1}/${kst.getUTCDate()}`;
+  const topics = [...new Set(input.sections.map(section => section.replace(/^\s*\d+\s*/, '').trim()))]
+    .filter(section => section && !/^(연습문제|실력\s*UP)/.test(section));
+  const head = [date, input.grade, input.className?.replace(/반$/, ''), input.book?.replace(/^개념원리\s*/, '')].filter(Boolean).join(' ');
+  return topics.length ? `${head} (${topics.join(', ')})` : head;
 }
 
 /** 샘플을 sampleRate → EXPORT_SAMPLE_RATE로(선형 보간; 사파리 AAC 44.1kHz 녹음 대비). */

@@ -290,7 +290,8 @@ try {
     const download = page.waitForEvent('download');
     await exportPanel.getByRole('link', { name: '⬇ 기기에 저장' }).click();
     const file = await download;
-    assert.match(file.suggestedFilename(), /녹음\.mp4$/);
+    // 유튜브 제목 양식: '날짜 학년 반 교재 (단원)', '/'는 전각 '／'
+    assert.match(file.suggestedFilename(), /^\d{1,2}／\d{1,2} 고1 수토 공통수학2 \(명제\)\.mp4$/);
     await file.saveAs('.test-artifacts/lecture-export.mp4').catch(() => {});
     const probe = await page.evaluate(async ({ resumeAt, total }) => {
       const mb = await import('/@id/mediabunny');

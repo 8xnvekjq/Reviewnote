@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { exportFileName, placeAudio, planFrames, resample, windowReads } from '../../src/features/lectures/lectureExport.ts';
+import { exportFileName, lectureVideoTitle, placeAudio, planFrames, resample, windowReads } from '../../src/features/lectures/lectureExport.ts';
 import { TimelineLog, buildLectureReplay } from '../../src/features/lectures/lectureRecordingModel.ts';
 import type { InkStroke } from '../../src/features/exam/contract.ts';
 
@@ -83,7 +83,22 @@ test('resample: 44.1kHz → 48kHz 길이와 값', () => {
 });
 
 test('exportFileName: 파일 이름에 못 쓰는 글자를 뺀다', () => {
-  assert.equal(exportFileName('개념원리: 명제/역'), '개념원리 명제 역.mp4');
+  assert.equal(exportFileName('개념원리: 명제/역'), '개념원리 명제／역.mp4', "'/'는 생김새가 같은 전각 '／'로");
   assert.equal(exportFileName('a\\b'), 'a b.mp4');
   assert.equal(exportFileName('  '), '수업.mp4');
+});
+
+test('lectureVideoTitle: 유튜브 제목 양식(날짜 학년 반 교재 (단원))', () => {
+  // 2026-10-15 18:18 KST = 09:18 UTC
+  assert.equal(lectureVideoTitle({
+    createdAt: '2026-10-15T09:18:00Z', grade: '고2', className: '월수금반', book: '개념원리 미적분1',
+    sections: ['06 함수의 최댓값과 최솟값', '06 함수의 최댓값과 최솟값', '연습문제'],
+  }), '10/15 고2 월수금 미적분1 (함수의 최댓값과 최솟값)');
+  // KST 자정을 넘긴 시각은 다음 날
+  assert.match(lectureVideoTitle({ createdAt: '2026-10-15T16:30:00Z', sections: [] }), /^10\/16$/);
+  // 여러 단원은 쉼표로, 반이 없으면 빠진다
+  assert.equal(lectureVideoTitle({
+    createdAt: '2026-10-15T09:18:00Z', grade: '고1', book: '개념원리 공통수학2', sections: ['01 명제와 조건', '02 명제 p → q', '연습문제'],
+  }), '10/15 고1 공통수학2 (명제와 조건, 명제 p → q)');
+  assert.equal(exportFileName('10/15 고2 월수금 미적분1 (함수의 최대최소)'), '10／15 고2 월수금 미적분1 (함수의 최대최소).mp4');
 });

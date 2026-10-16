@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { LoadedRecording } from '../features/lectures/lectureRecordings';
 import { formatDuration } from '../features/lectures/lectureRecordingModel';
-import { clearExportFiles, exportFileName, exportLectureMp4, type ExportProgress, type ExportResult } from '../features/lectures/lectureExport';
+import { clearExportFiles, exportFileName, exportLectureMp4, lectureVideoTitle, type ExportProgress, type ExportResult } from '../features/lectures/lectureExport';
 
 // 녹음 재생 화면의 'MP4로 저장' 창: 전체 영상을 브라우저 저장 공간에 만든 뒤 기기에 저장한다.
 type WakeLockSentinel = { release(): Promise<void> };
@@ -27,8 +27,15 @@ type State =
 
 export const LectureExportPanel: React.FC<{
   recording: LoadedRecording; slideUrls: string[]; onClose: () => void;
-}> = ({ recording, slideUrls, onClose }) => {
+  /** 유튜브 제목용 학년·교재(수업자료 덱) */
+  deck?: { grade?: string | null; book?: string | null };
+}> = ({ recording, slideUrls, onClose, deck }) => {
   const [state, setState] = useState<State>({ phase: 'idle' });
+  // 파일 이름 = 유튜브 제목 양식(고칠 수 있다)
+  const [title, setTitle] = useState(() => lectureVideoTitle({
+    createdAt: recording.manifest.createdAt, grade: deck?.grade, className: recording.manifest.className,
+    book: deck?.book, sections: recording.manifest.slides.map(slide => slide.section),
+  }));
   const abortRef = useRef<AbortController | null>(null);
   const urlRef = useRef<string | null>(null);
   const total = recording.replay.total;
@@ -127,8 +134,13 @@ export const LectureExportPanel: React.FC<{
             <dt className="text-slate-500">인코더</dt>
             <dd data-testid="export-encoder">{encoderText(state.result)}</dd>
           </dl>
+          <label className="block space-y-1">
+            <span className="text-[11px] text-slate-400">파일 이름 (유튜브 제목)</span>
+            <input value={title} onChange={event => setTitle(event.target.value)} aria-label="파일 이름"
+              className="w-full rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-2 text-xs text-slate-100" />
+          </label>
           <div className="flex gap-2">
-            <a href={state.url} download={state.name} className={`${button} flex-1 flex items-center justify-center bg-emerald-600 border-emerald-400 text-white`}>⬇ 기기에 저장</a>
+            <a href={state.url} download={exportFileName(title || recording.manifest.title)} className={`${button} flex-1 flex items-center justify-center bg-emerald-600 border-emerald-400 text-white`}>⬇ 기기에 저장</a>
             <button type="button" onClick={() => setState({ phase: 'idle' })} className={`${button} bg-slate-800 border-slate-600 text-slate-100`}>다시</button>
           </div>
         </>
