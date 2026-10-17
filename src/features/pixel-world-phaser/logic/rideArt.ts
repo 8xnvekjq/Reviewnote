@@ -13,14 +13,15 @@ import { isGardenFence } from '../../pixel-room/farm/gardenModel';
 export const RIDE_GRID = { cell: 48, columns: 4, rows: 4, footY: 46 } as const;
 export const RIDE_ART = {
   bear: { riderY: -13, backY: -14, sideX: 4, crop: 21, petY: 0, tagY: 4, radius: 12, shadow: 28 },
-  pigeon: { riderY: -15, backY: -15, sideX: 0, crop: 32, petY: -40, tagY: 2, radius: 7, shadow: 14 },
-  duck: { riderY: -6, backY: -7, sideX: 2, crop: 21, petY: 0, tagY: 4, radius: 10, shadow: 22 },
-  dog: { riderY: 0, backY: 0, sideX: 0, crop: 32, petY: -15, tagY: 2, radius: 8, shadow: 16 },
+  pigeon: { riderY: -17, backY: -17, sideX: 0, crop: 32, petY: -40, tagY: 2, radius: 7, shadow: 14 },
+  duck: { riderY: -12, backY: -12, sideX: 2, crop: 32, petY: 0, tagY: 4, radius: 10, shadow: 22 },
+  dog: { riderY: 0, backY: 0, sideX: 0, crop: 25, petY: 0, tagY: 2, radius: 8, shadow: 16 },
 } as const;
-export const RIDE_EFFECT = { dogY: -4, duckY: 1, fallbackDogScale: .65, bobMs: 180, swayMs: 260, pantMs: 120, pantScale: .025 } as const;
+export const RIDE_EFFECT = { dogY: 0, duckY: 1, fallbackDogScale: .65, bobMs: 180, swayMs: 260, pantMs: 120, pantScale: .025 } as const;
 export function rideOffset(pet: PetId | null | undefined, facing: Facing): Point {
-  const art = RIDE_ART[rideKind(pet) ?? 'bear'];
-  return { x: facing === 'Left' ? art.sideX : facing === 'Right' ? -art.sideX : 0, y: facing === 'Back' ? art.backY : art.riderY };
+  const kind = rideKind(pet) ?? 'bear', art = RIDE_ART[kind];
+  // A mirrored 48px cell moves its x=24 reference to x=23.
+  return { x: facing === 'Left' ? art.sideX : facing === 'Right' ? -art.sideX - (kind === 'bear' ? 0 : 1) : 0, y: facing === 'Back' ? art.backY : art.riderY };
 }
 export function rideRadius(pet: PetId | null | undefined, riding: boolean): number {
   const kind = riding ? rideKind(pet) : null;

@@ -15,18 +15,21 @@ import type { FishingRpcClient } from '../../src/features/pixel-world-phaser/ui/
 const SQL = readFileSync(new URL('../../supabase/migrations/supabase_pixel_fishing.sql', import.meta.url), 'utf8');
 
 test('SQL seed matches fishCatalog.ts exactly', () => {
-  const expansion = readFileSync(new URL('../../supabase/migrations/20261011170000_pixel_fishing_expansion.sql', import.meta.url), 'utf8');
-  const block = /insert into public\.pixel_fish_species[^]*?values([^]*?)on conflict/.exec(SQL);
-  const added = /insert into public\.pixel_fish_species[^]*?values([^]*?)on conflict/.exec(expansion)![1];
-  assert.ok(block, 'seed insert not found');
-  const row = /\('([a-z_]+)', '([^']+)', '([a-z]+)', (null|array\[[^\]]*\]), (null|array\[[^\]]*\]), ([\d.]+), ([\d.]+), '([SML])', (\d+)\)/g;
+  const migrations = [SQL, ...['20261011170000_pixel_fishing_expansion.sql', '20261104100000_pixel_fishing_secret_spots.sql'].map(name =>
+    readFileSync(new URL('../../supabase/migrations/' + name, import.meta.url), 'utf8'))];
+  const values = migrations.map(sql => {
+    const block = /insert into public\.pixel_fish_species[^]*?values([^]*?)on conflict/.exec(sql);
+    assert.ok(block, 'seed insert not found');
+    return block[1];
+  }).join('\n');
+  const row = /\(\s*'([a-z_]+)'\s*,\s*'([^']+)'\s*,\s*'([a-z]+)'\s*,\s*(null|array\[[^\]]*\])\s*,\s*(null|array\[[^\]]*\])\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*'([SML])'\s*,\s*(\d+)\s*\)/g;
   const list = (v: string) => v === 'null' ? 'any' : [...v.matchAll(/'([a-z]+)'/g)].map(m => m[1]);
-  const seed = [...(block[1] + added).matchAll(row)].map(m => ({ order: Number(m[9]), fish: {
+  const seed = [...values.matchAll(row)].map(m => ({ order: Number(m[9]), fish: {
     id: m[1], name: m[2], rarity: m[3], phases: list(m[4]), weather: list(m[5]), minCm: Number(m[6]), maxCm: Number(m[7]), shadow: m[8],
   } }));
   assert.equal(seed.length, FISH_CATALOG.length);
   assert.deepEqual(seed.map(s => s.order), seed.map((_, i) => i + 1), 'sort_order follows catalog order');
-  assert.deepEqual(seed.map(s => s.fish), FISH_CATALOG.map(f => ({ ...f, phases: f.phases === 'any' ? 'any' : [...f.phases], weather: f.weather === 'any' ? 'any' : [...f.weather] })));
+  assert.deepEqual(seed.map(s => s.fish), FISH_CATALOG.map(({ secretSpot: _spot, ...f }) => ({ ...f, phases: f.phases === 'any' ? 'any' : [...f.phases], weather: f.weather === 'any' ? 'any' : [...f.weather] })));
   // 하루 6마리·희귀도 가중치도 SQL과 같은 숫자.
   assert.equal((SQL.match(/>= 6/g) ?? []).length >= 2 && DAILY_CATCHES === 6, true);
   assert.match(SQL, /'common' then 60 when 'uncommon' then 28 when 'rare' then 10 else 2/);

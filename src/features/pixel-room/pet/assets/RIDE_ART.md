@@ -74,8 +74,8 @@ For Right, mirrored grips are (20,40)/(26,40), midpoint (23,40); avatar origin
 
 ### duck_ride.png and duck_ride_front.png
 
-Low, broad swimming duck, warm yellow, orange bill, two dark head feathers and
-a slightly puzzled face. Four slow wing/flank paddles, **6 fps**. The body does
+Round chick-shaped swimming duck matching `duck.png`, warm yellow, tiny orange
+bill and a low crown tuft. No long neck or pointed float tail. Four slow wing/flank paddles, **6 fps**. The body does
 not translate and the seat stays fixed; motion is internal pixel movement.
 No baked water or ground shadow. The head faces left/front/back as appropriate.
 
@@ -108,8 +108,10 @@ Each facing has four distinct frames. Do not add another whole-sprite bob.
 | 1 Front | (24,46) | (24,33) | (0,-13) | (8,14) |
 | 2 Back | (24,46) | (24,33) | (0,-13) | (8,14) |
 
-The whole puppy at c0 occupies x15..33, y29..44 (inclusive); bob/ear motion can
-reach y27..45. This puts it in front of the chest below the avatar's eyes.
+The puppy has the source dog's broad forehead, small folded shade-colored ears,
+square dark eyes, cream muzzle/chest/paws and peach tongue. Its c0 bounds are
+x16..32, y27..44 (inclusive); bob/ear motion can reach y26..45.
+This puts it in front of the chest below the avatar's eyes.
 Draw avatar, swirl, puppy, then avatar hands embracing the puppy. Preview hands
 are avatar-local x10..12 and x20..22, y23..25, and are not baked into the sheet.
 Right sheet foot reference is (23,46), avatar origin (7,14), mirrored dog head

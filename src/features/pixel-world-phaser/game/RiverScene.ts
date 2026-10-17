@@ -1,5 +1,6 @@
 import { SECRET_SPOTS, SECRET_SPOT_RADIUS, secretSpotAt, rememberSecretSpot } from '../logic/hotspots';
 import { canFishWhileRiding } from '../logic/petRide';
+import { rideLanding } from '../logic/rideArt';
 import type Phaser from 'phaser';
 import { rodTip } from './heldTool';
 import type { HeldToolMode } from './heldTool';
@@ -167,7 +168,12 @@ export class RiverScene extends WorldScene {
   /** 낚싯줄이 나가는 곳: 낚싯대를 들었으면 내민 낚싯대 끝, 맨손이면 손(예전 castFrom). 찌가 떨어지는 곳은 그대로 castFrom 기준. */
   get lineFrom(): Point { if (this.mountedDuck) return this.castFrom; return this.ctx.heldTool?.kind === 'rod' ? rodTip(this.feet, this.facing, 'cast') : this.castFrom; }
   protected heldToolMode(): HeldToolMode { return this.chargeAt !== null ? 'windup' : this.fishingCollision ? 'cast' : 'carry'; }
-  get canCast() { return !this.ctx.controls.frozen && !super.snapshot().transitioning && !facedInteractable(this.feet, this.facing, this.spec.interactables) && canChargeCast(this.feet, this.facing, this.mountedDuck); }
+  get canCast() {
+    // A hovering pigeon must be allowed to land before validating a shore cast.
+    const from = this.ctx.riding && !this.mountedDuck ? rideLanding(this.spec, this.feet) : this.feet;
+    return !!from && !this.ctx.controls.frozen && !super.snapshot().transitioning
+      && !facedInteractable(from, this.facing, this.spec.interactables) && canChargeCast(from, this.facing, this.mountedDuck);
+  }
   beginCast(): boolean {
     if (!this.canCast || this.chargeAt !== null) return false;
     // 낚시 시작: 곰·강아지는 내리고 비둘기는 땅에 내려앉는다. 오리는 탄 채로 낚시한다(안전한 땅이 없으면 시작하지 않음).

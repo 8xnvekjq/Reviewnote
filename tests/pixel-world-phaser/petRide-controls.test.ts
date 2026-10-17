@@ -31,9 +31,11 @@ test('water access preserves river bounds, trees, and other solid objects', () =
     assert.equal(solid(bush), pet !== 'pet_pigeon');
     assert.equal(solid(tree), true);
     assert.equal(solid({ x: 5, y: 8 }), true); // turtle
-    for (const edge of [{ x: 0, y: 7 }, { x: 24, y: 7 }, { x: 12, y: 0 }, { x: 12, y: 20 }]) assert.equal(solid(edge), true);
+    for (const edge of [{ x: 0, y: 7 }, { x: spec.cols - 2, y: 7 }, { x: 12, y: 0 }, { x: 12, y: 20 }]) assert.equal(solid(edge), true);
     assert.equal(rideSolid(spec, pet, false)(water), true);
   }
+  assert.equal(rideSolid(spec, 'pet_duck', true)({ x: 28, y: 8 }), false); // widened river
+  assert.equal(rideSolid(spec, 'pet_duck', true)({ x: 28, y: 8 }), false); // widened river
   assert.equal(rideSolid(spec, 'pet_duck', true)({ x: 12, y: 6 }), true); // lily
   assert.equal(rideSolid(spec, 'pet_pigeon', true)({ x: 12, y: 6 }), false);
 });
@@ -65,6 +67,6 @@ test('rider anchors and collision sizes differ by pet', () => {
   assert.equal(rideRadius('pet_duck', true), 10);
   assert.equal(rideRadius('pet_dog', true), 8);
   assert.equal(rideRadius('pet_bear', false), 7);
-  assert.equal(rideOffset('pet_pigeon', 'Front').y, -15);
+  assert.equal(rideOffset('pet_pigeon', 'Front').y, -17);
   assert.equal(rideOffset('pet_dog', 'Front').y, 0);
 });

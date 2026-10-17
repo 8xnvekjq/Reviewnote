@@ -72,7 +72,7 @@ export class RiverPeers {
     const facings = new Map<string, Facing>();
     const faces = new Map<string, string>([[this.selfId, selfFace]]);
     for (const [id, f] of this.friends) {
-      const p = f.state, feet = riverFeet({ x: p.x, y: p.y });
+      const p = f.state, feet = riverFeet(p);
       spots.set(id, feet); faces.set(id, peerAnimalFace(p)); facings.set(id, p.direction);
       if (f.tag) { updateAnimalTag(f.tag, feet, peerAnimalFace(p), p.riding === true && canRide(p.pet), p.pet); }
       updatePeerCompanion(f, feet, time, deltaMs, this.solid, rideOnWater({ id: 'river' }, cellOf(feet)));
