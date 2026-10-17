@@ -4,6 +4,7 @@ import { HELP_REWARD, listHelpRequests, myHelpGiven, type GivenHelp, type OpenHe
 import { HelpLabel } from './HelpLabel';
 import { HelpSolveScreen } from './HelpSolveScreen';
 import { helpFeedbackText, helpRewardText } from './presentation';
+import { MySolutionViewer } from './MySolutionViewer';
 import { MyHelpRequestsSection } from '../requester/MyHelpRequestsSection';
 import { useMyHelpRequests } from '../requester/useMyHelpRequests';
 
@@ -16,6 +17,8 @@ export function HelpTab({ userId, onPointsChanged }: HelpTabProps) {
   const hasArrivals = Object.values(myRequests).some(request => request.unseen_count > 0);
   const [given, setGiven] = useState<GivenHelp[]>([]);
   const [selected, setSelected] = useState<OpenHelpRequest | null>(null);
+  const [viewing, setViewing] = useState<GivenHelp | null>(null);
+  const [replacing, setReplacing] = useState<GivenHelp | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -23,7 +26,7 @@ export function HelpTab({ userId, onPointsChanged }: HelpTabProps) {
   const lastRewards = useRef<number | null>(null);
   const pointsCallback = useRef(onPointsChanged);
   pointsCallback.current = onPointsChanged;
-  useEffect(() => { lastRewards.current = null; setSelected(null); setRequests([]); setGiven([]); }, [userId]);
+  useEffect(() => { lastRewards.current = null; setSelected(null); setViewing(null); setReplacing(null); setRequests([]); setGiven([]); }, [userId]);
   useEffect(() => {
     let active = true;
     setLoading(true); setError('');
@@ -58,10 +61,19 @@ export function HelpTab({ userId, onPointsChanged }: HelpTabProps) {
         {!given.length && !error && <p className="text-slate-400">아직 보낸 풀이가 없어요. 친구의 첫 도우미가 되어 주세요!</p>}
         <div className="grid gap-3 md:grid-cols-2">{given.map(row => <article key={row.id} className="flex min-w-0 gap-3 rounded-xl border border-slate-700 bg-slate-900 p-3">
           {row.image_url && <img src={row.image_url} alt="보낸 풀이의 문제" loading="lazy" className="h-24 w-24 shrink-0 rounded bg-white object-contain" />}
-          <div className="min-w-0 space-y-1"><HelpLabel label={row.requester} /><p>{helpFeedbackText(row.feedback)}</p><p className="text-sm text-emerald-300">{helpRewardText(row.feedback, row.reward, row.shards)}</p></div>
+          <div className="min-w-0 flex-1 space-y-1"><HelpLabel label={row.requester} /><p>{helpFeedbackText(row.feedback)}</p><p className="text-sm text-emerald-300">{helpRewardText(row.feedback, row.reward, row.shards)}</p>
+            <div className="flex flex-wrap gap-2 pt-1">
+              {row.storage_path && row.file_available !== false && <button type="button" onClick={() => { setMessage(''); setViewing(row); }} className="min-h-11 rounded-lg bg-slate-700 px-3 text-sm">내 풀이 보기</button>}
+              {row.can_resubmit && <button type="button" onClick={() => { setMessage(''); setReplacing(row); }} className="min-h-11 rounded-lg bg-indigo-700 px-3 text-sm">다시 보내기</button>}
+            </div>
+          </div>
         </article>)}</div>
       </section>
     </>}
+    {viewing && <MySolutionViewer key={viewing.id} row={viewing} onClose={() => setViewing(null)} onResubmit={() => { setReplacing(viewing); setViewing(null); }} />}
+    {replacing && replacing.image_url && <HelpSolveScreen key={`${userId}:replace:${replacing.id}`} replaceSolutionId={replacing.id}
+      request={{ id: replacing.request_id, image_url: replacing.image_url, requester: replacing.requester }} userId={userId}
+      onClose={() => setReplacing(null)} onSent={() => { setReplacing(null); setMessage('풀이를 바꿨어요! 친구에게 새 풀이로 다시 알려 줄게요.'); setRevision(value => value + 1); }} />}
     {selected && <HelpSolveScreen key={`${userId}:${selected.id}`} request={selected} userId={userId} onClose={() => setSelected(null)} onSent={() => { setSelected(null); setMessage(`보냈어요! 친구가 ‘도움 됐어요’를 누르면 지식의 조각 +${HELP_REWARD.likeShards}개 + ${HELP_REWARD.likePoints}P`); setRevision(value => value + 1); }} />}
   </main>;
 }

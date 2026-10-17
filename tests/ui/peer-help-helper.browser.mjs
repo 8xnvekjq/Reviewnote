@@ -37,7 +37,9 @@ try {
         { id: 'mine-2', mistake_id: 'm-2', status: 'closed', created_at: '2026-10-15T02:00:00Z', image_url: image, title: '내 해결된 문제', solution_count: 1, unseen_count: 0 },
       ]);
       if (rpc === 'cancel_help_request') { cancelled.push(JSON.parse(route.request().postData() || '{}').p_request_id); return respond(null); }
-      if (rpc === 'my_help_given') return respond(empty ? [] : [{ id: 'given-1', request_id: 'request-2', image_url: image, feedback: 'like', reward: givenShards ? 10 : 0, shards: givenShards, requester: label }, { id: 'given-2', request_id: 'request-3', image_url: image, feedback: 'unclear', reward: 5, requester: label }]);
+      if (rpc === 'my_help_given') return respond(empty ? [] : [{ id: 'given-1', request_id: 'request-2', image_url: image, feedback: 'like', reward: givenShards ? 10 : 0, shards: givenShards, requester: label }, { id: 'given-2', request_id: 'request-3', image_url: image, feedback: 'unclear', reward: 5, requester: label, storage_path: 'helper/old-2.json.gz', file_available: true, can_resubmit: false },
+        { id: 'given-3', request_id: 'request-4', image_url: image, feedback: null, reward: 0, requester: label, storage_path: 'helper/old-3.json.gz', file_available: true, can_resubmit: true }]);
+      if (rpc === 'resubmit_help_solution') return respond({ id: 'given-3' });
       if (rpc === 'submit_help_solution') {
         if (failSubmit) { failSubmit = false; return respond({ message: '요청이 마감됐어요' }, 400); }
         submitted = true; return respond({ id: 'solution-1' });
@@ -106,6 +108,27 @@ try {
     const submit = calls.find(call => call.rpc === 'submit_help_solution').body;
     assert.equal(submit.p_stroke_count, 5); assert.ok(submit.p_duration_ms >= 5000); assert.ok(file.length > 0);
     assert.ok(submit.p_storage_path.startsWith('11111111-1111-4111-8111-111111111111/'));
+    // 내가 보낸 풀이: 다시 보기, 친구가 아직 답하지 않은 풀이만 바꿔 보내기
+    const given = page.getByRole('region', { name: '내가 보낸 풀이' });
+    await given.getByRole('button', { name: '다시 보내기' }).waitFor();
+    assert.equal(await given.getByRole('button', { name: '내 풀이 보기' }).count(), 2);
+    assert.equal(await given.getByRole('button', { name: '다시 보내기' }).count(), 1, '친구가 답한 풀이는 바꿀 수 없다');
+    await given.getByRole('button', { name: '내 풀이 보기' }).last().click();
+    const viewer = page.getByRole('dialog', { name: '내가 보낸 풀이' });
+    await viewer.locator('.exam-ink').waitFor();
+    await viewer.getByRole('button', { name: '다시 보내기' }).click();
+    await page.getByRole('dialog', { name: '풀이 다시 보내기' }).waitFor();
+    assert.equal(await viewer.count(), 0);
+    await page.waitForFunction(() => document.querySelector('.exam-ink')?.dataset.ready === 'true');
+    const replace = page.getByRole('button', { name: '이 풀이로 바꾸기' });
+    assert.equal(await replace.isDisabled(), true);
+    for (let i = 0; i < 5; i++) { await page.clock.fastForward(6000); await draw(i); }
+    await replace.click();
+    await page.getByText('풀이를 바꿨어요! 친구에게 새 풀이로 다시 알려 줄게요.', { exact: true }).waitFor();
+    const resubmit = calls.find(call => call.rpc === 'resubmit_help_solution').body;
+    assert.equal(resubmit.p_solution_id, 'given-3'); assert.equal(resubmit.p_stroke_count, 5);
+    assert.ok(resubmit.p_storage_path.startsWith('11111111-1111-4111-8111-111111111111/'));
+    assert.equal(calls.filter(call => call.rpc === 'submit_help_solution').length, 2, '바꿔 보내기는 새 풀이를 만들지 않는다');
     await page.setViewportSize({ width: 1280, height: 900 });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     mkdirSync('.test-artifacts', { recursive: true });

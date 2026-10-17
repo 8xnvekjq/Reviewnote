@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../../services/supabase';
-import { HELP_REWARD, submitHelpSolution, type OpenHelpRequest } from '../api';
+import { HELP_REWARD, resubmitHelpSolution, submitHelpSolution, type HelpLabel as HelpLabelData } from '../api';
 import { HelpInkLog, helpSolutionStats, helpTooShortReason } from '../solutionFile';
 import { ExamInkCanvas } from '../../exam/ink/ExamInkCanvas';
 import type { ExamInkCanvasHandle, InkChangeKind, InkStroke, InkTool } from '../../exam/contract';
@@ -9,8 +9,13 @@ import { ExamInkToolbar } from '../../exam/ui/ExamInkToolbar';
 import { PEN_COLORS, PEN_SIZES } from '../../exam/ui/inkToolbarOptions';
 import '../../../styles/examPractice.css';
 
-export function HelpSolveScreen({ request, userId, onClose, onSent }: {
-  request: OpenHelpRequest; userId: string; onClose: () => void; onSent: () => void;
+/** 풀 문제. 새로 보낼 때는 도움 요청, 바꿔 보낼 때는 '내가 보낸 풀이'에서 같은 모양으로 넘긴다. */
+export interface HelpSolveTarget { id: string; image_url: string; requester: HelpLabelData }
+
+export function HelpSolveScreen({ request, userId, onClose, onSent, replaceSolutionId }: {
+  request: HelpSolveTarget; userId: string; onClose: () => void; onSent: () => void;
+  /** 있으면 새 풀이 대신 이 풀이를 바꾼다(친구가 아직 답하지 않은 풀이만). */
+  replaceSolutionId?: string;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const canvas = useRef<ExamInkCanvasHandle>(null);
@@ -49,16 +54,17 @@ export function HelpSolveScreen({ request, userId, onClose, onSent }: {
     if (sending.current || helpTooShortReason(helpSolutionStats(log.events, current.current))) return;
     sending.current = true; setBusy(true); setError('');
     try {
-      await submitHelpSolution(supabase, request.id, userId, log.events, current.current);
+      if (replaceSolutionId) await resubmitHelpSolution(supabase, replaceSolutionId, userId, log.events, current.current);
+      else await submitHelpSolution(supabase, request.id, userId, log.events, current.current);
       log.clear(); onSent();
     } catch (err) { setError(err instanceof Error ? err.message : '풀이를 보내지 못했어요.'); }
     finally { sending.current = false; setBusy(false); }
   };
-  return <dialog ref={dialog} aria-label="친구 문제 풀기" onCancel={event => { event.preventDefault(); leave(); }}
+  return <dialog ref={dialog} aria-label={replaceSolutionId ? '풀이 다시 보내기' : '친구 문제 풀기'} onCancel={event => { event.preventDefault(); leave(); }}
     className="fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none bg-slate-950 p-0 text-slate-100 backdrop:bg-black/70">
     <div className="flex h-full flex-col">
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-700 p-3">
-        <div><h2 className="font-bold">친구 문제 풀기</h2><HelpLabel label={request.requester} /></div>
+        <div><h2 className="font-bold">{replaceSolutionId ? '풀이 다시 보내기' : '친구 문제 풀기'}</h2><HelpLabel label={request.requester} /></div>
         <button type="button" disabled={busy} onClick={leave} className="rounded bg-slate-700 px-4 py-3 disabled:opacity-50">나가기</button>
       </header>
       {/* 기출문제 풀이와 같은 필기 도구(레이저는 리플레이에 남지 않아 뺀다). */}
@@ -76,7 +82,8 @@ export function HelpSolveScreen({ request, userId, onClose, onSent }: {
       <footer className="space-y-2 border-t border-slate-700 p-3 pb-[max(12px,env(safe-area-inset-bottom))]">
         <p aria-live="polite" className="text-sm text-slate-300">{hint}</p>
         {error && <p role="alert" className="text-rose-300">{error}</p>}
-        <button type="button" disabled={busy || !!reason} onClick={() => void send()} className="w-full rounded-xl bg-indigo-600 px-4 py-3 font-bold disabled:opacity-40">{busy ? '보내는 중…' : '보내기'}</button>
+        <button type="button" disabled={busy || !!reason} onClick={() => void send()} className="w-full rounded-xl bg-indigo-600 px-4 py-3 font-bold disabled:opacity-40">{busy ? '보내는 중…' : replaceSolutionId ? '이 풀이로 바꾸기' : '보내기'}</button>
+        {replaceSolutionId && <p className="text-xs text-amber-200">바꾸면 예전 풀이는 사라지고, 친구에게는 새 풀이로 다시 알려 줘요.</p>}
         <p className="text-xs text-slate-400">친구가 ‘도움 됐어요’를 누르면 지식의 조각 +{HELP_REWARD.likeShards}개와 +{HELP_REWARD.likePoints}P, ‘이해 못 했어요’는 +{HELP_REWARD.unclear}P</p>
       </footer>
     </div>
