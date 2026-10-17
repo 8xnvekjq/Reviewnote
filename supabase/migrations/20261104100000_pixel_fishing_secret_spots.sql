@@ -60,3 +60,7 @@ grant execute on function pixel_private.start_pixel_cast(text,text,text,integer,
  public.start_pixel_cast(text,text,text,integer,text,boolean) to authenticated;
 notify pgrst,'reload schema';
 commit;
+
+-- 운영 적용 기록(2026-10-18): MCP가 DROP을 자동 취소해서, 위 drop 두 줄 대신
+-- public.start_pixel_cast(text,text,text,integer) → pixel_private.start_pixel_cast_legacy4로 이름·스키마를 옮기고
+-- 그것과 pixel_private.start_pixel_cast(text,text,text,integer)의 실행 권한을 회수했다(공개 오버로드는 6인자 하나뿐).
