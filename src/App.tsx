@@ -31,6 +31,7 @@ import { getTitleBadgeStyle, GACHA_ITEMS } from './utils/gachaCatalog';
 import { getRandomCheer } from './utils/aiVoiceCheers';
 import type { EquippedItems } from './types';
 import { applyThemeColor } from './utils/theme';
+import { cachedCatalog, CATALOG_TTL_MS } from './utils/catalogCache';
 import { loadStreakState, reconcileStreakState, getKSTDateString, type StreakState } from './utils/streak';
 import { canViewOwnExamPrep } from './utils/examPrepAccess';
 import { fetchLatestReviewCheckVerdictByMistake } from './utils/reviewCheckClient';
@@ -572,8 +573,16 @@ function App() {
   // Supabase로부터 55개 강의 및 타임라인 정보를 한 번에 읽어와 매칭용 구조로 가공
   const loadYoutubeLectures = async () => {
     try {
-      const { data: lectures } = await supabase.from('youtube_lectures').select('*');
-      const { data: timelines } = await supabase.from('youtube_timelines').select('*').order('start_seconds', { ascending: true });
+      const catalog = await cachedCatalog('rn-cache:youtube-v1', CATALOG_TTL_MS, async () => {
+        const [lectureRes, timelineRes] = await Promise.all([
+          supabase.from('youtube_lectures').select('id, video_id, title, description'),
+          supabase.from('youtube_timelines').select('lecture_id, start_seconds, chapter_title').order('start_seconds', { ascending: true }),
+        ]);
+        if (lectureRes.error || timelineRes.error || !lectureRes.data) return null;
+        return { lectures: lectureRes.data, timelines: timelineRes.data ?? [] };
+      });
+      const lectures = catalog?.lectures;
+      const timelines = catalog?.timelines;
 
       if (lectures) {
         const mapped = lectures.map(l => {
@@ -636,7 +645,10 @@ function App() {
   // 단원별 선생님 실제 강의 접근법 가이드 카탈로그 로드 (검증된 소수 단원만 등록됨 — 없으면 매칭 안 되고 넘어감)
   const loadTeacherApproachGuides = async () => {
     try {
-      const { data } = await supabase.from('teacher_approach_guides').select('grade, chapter, guide_text');
+      const data = await cachedCatalog('rn-cache:approach-guides-v1', CATALOG_TTL_MS, async () => {
+        const res = await supabase.from('teacher_approach_guides').select('grade, chapter, guide_text');
+        return res.error ? null : res.data;
+      });
       setTeacherApproachGuides((data || []).map(row => ({
         grade: row.grade,
         chapter: row.chapter,
@@ -773,10 +785,15 @@ function App() {
       }
     };
 
+    // 2분마다, 화면이 보일 때만 받는다(30초·숨김 상태에서도 받던 것이 egress의 큰 몫이었다).
+    // 화면으로 돌아오면 바로 한 번 받는다. 접속 판정(5분)과 하트비트(2분)는 그대로다.
     fetchOnlineUsers();
-    const interval = setInterval(fetchOnlineUsers, 30000); // 30초 폴링
-    return () => clearInterval(interval);
-  }, [session]);
+    const interval = setInterval(() => { if (!document.hidden) void fetchOnlineUsers(); }, 120000);
+    const onVisible = () => { if (!document.hidden) void fetchOnlineUsers(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { clearInterval(interval); document.removeEventListener('visibilitychange', onVisible); };
+    // 토큰 갱신(세션 객체만 새로 생김)마다 다시 시작하지 않게 사용자 id에만 묶는다.
+  }, [session?.user?.id]);
 
   // Fetch mistakes from Supabase
   const fetchUserData = async (targetUserId?: string) => {
