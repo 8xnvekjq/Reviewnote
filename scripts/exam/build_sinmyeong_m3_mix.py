@@ -311,7 +311,7 @@ def build(review_dir=None, pdf=None, force=False):
     for q, p in zip(questions, raw):  # 객관식 3점 ×26 + 서술형(10지선다) 4.4점 ×5 = 100
         q['points'] = p
     paper = dict(id=PID, title='신명중 3학년 2학기 시험대비 1회 (삼각비~원주각)', kind='school', schoolName=SCHOOL, year=None,
-                 grade=3, semester=None, examTerm=None, schoolGrade='중3', subject='중3-2', source=SCHOOL, unitName='삼각비~원주각',
+                 grade=9, semester=None, examTerm=None, schoolGrade='중3', subject='중3-2', source=SCHOOL, unitName='삼각비~원주각',
                  questionCount=len(questions), timeLimitMinutes=90, maxScore=100.0, electives=[], published=False, gradeCuts=None)
     assert round(sum(q['points'] for q in questions), 6) == 100
     data = dict(paper, questions=[dict(q, section='common', curriculumGrade='중3-2', imageUrl=f'/exams/{PID}/q-{q["number"]:02}.png')
