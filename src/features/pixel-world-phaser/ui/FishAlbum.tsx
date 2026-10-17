@@ -1,3 +1,4 @@
+import { SECRET_SPOTS, seenSecretSpots } from '../logic/hotspots';
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { FISH_CATALOG, JUNK_CATALOG, RARITY_STARS } from '../logic/fishCatalog';
@@ -23,8 +24,8 @@ export function FishIcon({ speciesId, silhouette = false }: { speciesId: string;
   const index = FISH_CATALOG.findIndex(fish => fish.id === speciesId);
   const [failed, setFailed] = useState(false);
   return <span className={`pwp-fish-icon${silhouette ? ' is-silhouette' : ''}`} aria-hidden="true">
-    {sheet && !failed && index >= 0 ? <img src={sheet} onError={() => setFailed(true)} style={{ left: -index * 48 }} alt="" />
-      : <svg viewBox="0 0 16 16" shapeRendering="crispEdges"><path fill={['#6c9fb0', '#da9a57', '#8a9973'][Math.max(0, index) % 3]} d="M1 5h2v1h2V5h2V4h5v1h2v2h1v3h-1v2h-2v1H7v-1H5v-1H3v1H1z"/><path fill="#fff4d9" d="M11 6h2v2h-2z"/><path fill="#354443" d="M12 6h1v1h-1z"/></svg>}
+    {sheet && !failed && index >= 0 && index < 14 ? <img src={sheet} onError={() => setFailed(true)} style={{ left: -index * 48 }} alt="" />
+      : <svg viewBox="0 0 16 16" shapeRendering="crispEdges"><path fill={['#6c9fb0', '#da9a57', '#8a9973'][Math.max(0, index) % 3]} d="M1 5h2v1h2V5h2V4h5v1h2v2h1v3h-1v2h-2v1H7v-1H5v-1H3v1H1z"/>{speciesId === 'eddy_dragon' && <path fill="#d6be73" d="M6 4V1h1v2h2V1h1v3M2 5V3h1v2M3 11v3h1v-2"/>}{speciesId === 'bridge_moon_eel' && <path fill="#ddd8e9" d="M5 5h1v7H5zM8 4h1v9H8z"/>}{speciesId === 'rain_reed_koi' && <path fill="#c9e8b4" d="M6 6h2v2H6zM9 10h2v2H9zM10 4h1V2h1v2h1v1h-3z"/>}<path fill="#fff4d9" d="M11 6h2v2h-2z"/><path fill="#354443" d="M12 6h1v1h-1z"/></svg>}
   </span>;
 }
 
@@ -54,7 +55,7 @@ export function FishAlbum({ adapter, onClose, newSpeciesId, top }: { adapter?: F
           return <li className="pwp-fish-slot" key={fish.id} data-species={fish.id} data-caught={!!entry}>
             <FishIcon speciesId={fish.id} silhouette={!entry} />
             {entry ? <><strong>{fish.name}</strong><span className="pwp-fish-stars" data-rarity={fish.rarity} aria-label={`희귀도 ${RARITY_STARS[fish.rarity]}별`}>{'★'.repeat(RARITY_STARS[fish.rarity])}</span><span>{entry.count}마리 · 최고 {entry.bestCm.toFixed(1)}cm</span></>
-              : <><strong>아직 못 만난 친구</strong><span>{fishHint(fish)}</span></>}
+              : <><strong>{fish.secretSpot ? '???' : '아직 못 만난 친구'}</strong><span>{fish.secretSpot ? (seenSecretSpots().includes(fish.secretSpot) ? SECRET_SPOTS.find(s => s.id === fish.secretSpot)?.hint : '물 위에 비밀이 숨겨져 있어요.') : fishHint(fish)}</span></>}
           </li>;
         })}</ul>
       </>}

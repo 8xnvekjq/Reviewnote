@@ -1,8 +1,10 @@
+import { canRide } from '../logic/petRide';
+import { rideRadius, rideOnWater } from '../logic/rideArt';
+import { cellOf } from '../logic/world';
 import { dragonfliesFor } from './dragonflies';
 import type { Facing } from '../logic/joystick';
 import { HeldTool, rodTip, updatePeerTool } from './heldTool';
 import { heldToolFromTag } from '../logic/heldTool';
-import { RIDING_RADIUS, PERSON_RADIUS } from '../logic/softCollision';
 import { createAnimalTag, updateAnimalTag, animalTagSnapshot, peerAnimalFace } from './animalTag';
 import { updatePeerCompanion, peerCompanionSnapshot } from './peerCompanion';
 import type { PetFollowState } from '../logic/petFollow';
@@ -70,10 +72,10 @@ export class RiverPeers {
     const facings = new Map<string, Facing>();
     const faces = new Map<string, string>([[this.selfId, selfFace]]);
     for (const [id, f] of this.friends) {
-      const p = f.state, feet = riverFeet({ x: p.x, y: p.y });
+      const p = f.state, feet = riverFeet(p);
       spots.set(id, feet); faces.set(id, peerAnimalFace(p)); facings.set(id, p.direction);
-      if (f.tag) { updateAnimalTag(f.tag, feet, peerAnimalFace(p), p.riding === true && p.pet === 'pet_bear'); }
-      updatePeerCompanion(f, feet, time, deltaMs, this.solid);
+      if (f.tag) { updateAnimalTag(f.tag, feet, peerAnimalFace(p), p.riding === true && canRide(p.pet), p.pet); }
+      updatePeerCompanion(f, feet, time, deltaMs, this.solid, rideOnWater({ id: 'river' }, cellOf(feet)));
       const view = this.fishing[id], lineOut = !!view?.target && ['casting', 'waiting', 'bite', 'reeling'].includes(view.phase);
       updatePeerTool(this.scene, f, f.sprite ? { x: f.sprite.x, y: f.sprite.y } : feet, lineOut ? 'cast' : 'carry', dragonfliesFor('river')?.isSwinging(id) ?? false);
       this.drawLine(f, feet, this.fishing[id], now, time);
@@ -95,7 +97,7 @@ export class RiverPeers {
 
   collisionObstacles() {
     return [...this.friends].filter(([, f]) => !!f.sprite).map(([id, f]) => ({ id, ...riverFeet(f.state),
-      radius: f.state.riding === true && f.state.pet === 'pet_bear' ? RIDING_RADIUS : PERSON_RADIUS, moving: f.state.moving }));
+      radius: rideRadius(f.state.pet, f.state.riding === true), moving: f.state.moving }));
   }
   collisionCompanions(): Array<[string, Friend]> { return [...this.friends]; }
   snapshot() {

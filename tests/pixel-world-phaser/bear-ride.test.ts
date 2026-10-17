@@ -5,16 +5,16 @@ import { canRide, rideState, rideInScene, rideSpeed, riderOffset, rideRow } from
 test('bear mounting and dismounting are session state transitions', () => {
   assert.equal(rideState(false, 'toggle', 'pet_bear'), true);
   assert.equal(rideState(true, 'toggle', 'pet_bear'), false);
-  for (const pet of ['pet_dog', 'pet_duck', 'pet_pigeon', null] as const) {
-    assert.equal(canRide(pet), false);
-    assert.equal(rideState(true, 'pet', pet), false);
-    assert.equal(rideState(false, 'toggle', pet), false);
+  for (const pet of ['pet_dog', 'pet_duck', 'pet_pigeon'] as const) {
+    assert.equal(canRide(pet), true);
+    assert.equal(rideState(true, 'pet', pet), true);
+    assert.equal(rideState(false, 'toggle', pet), true);
   }
 });
-test('riding multiplies walking and running by 1.4', () => {
+test('riding multiplies walking and running by 1.15', () => {
   assert.equal(rideSpeed(false), 1);
-  assert.equal(56 * rideSpeed(true), 56 * 1.4);
-  assert.equal(96 * rideSpeed(true), 96 * 1.4);
+  assert.equal(56 * rideSpeed(true), 56 * 1.15);
+  assert.equal(96 * rideSpeed(true), 96 * 1.15);
 });
 test('room and fishing dismount; outdoor scene changes preserve riding', () => {
   for (const scene of ['yard', 'plaza', 'river'] as const) assert.equal(rideInScene(true, scene, 'pet_bear'), true);

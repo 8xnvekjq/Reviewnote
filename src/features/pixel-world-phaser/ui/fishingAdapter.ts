@@ -1,3 +1,4 @@
+import type { SecretSpotId } from '../logic/petRide';
 import type { ServerWorldClock } from '../logic/worldClock';
 import type { GamePointsResult } from '../logic/gamePoints';
 import { MAX_LEVEL, nonnegativeInteger, parseXpGain, playerLevelFromXp } from '../logic/levels';
@@ -62,7 +63,7 @@ export interface ClassFishBoard { rows: { speciesId: string; lengthCm: number; a
   /** 이번 주 등급별 챔피언(★5→★1, 그 등급을 아무도 못 낚았으면 빠짐). */
   champions?: import('../logic/gamePoints').FishTierChampion[] }
 export type BuyBaitResult = { ok: true; newBalance: number; charges: number } | { ok: false; reason: 'insufficient_balance' | 'error'; message?: string };
-export interface FishingAdapter { getWorldClock?(): Promise<ServerWorldClock | null>; adminSetWorldOverride?(weather: FishWeather | null, phase: FishPhase | null, hours: number): Promise<boolean>; buyBait?(): Promise<BuyBaitResult>; getLevel?(): Promise<PlayerLevel | null>; state(): Promise<FishingState>; /** spot: 찌가 떨어진 포인트 id(원 밖이면 null). 서버가 활성 여부·남은 마리를 확인한다. */ start(pet: string | null, spot?: number | null): Promise<CastStart>; finish(castId: string, landed: boolean): Promise<CastFinish>; board(): Promise<ClassFishBoard>; /** 낚싯대 장착(null = 해제). 서버 RPC equip_pixel_rod. */ equipRod?(itemId: FishingRodId | null): Promise<EquipRodResult> }
+export interface FishingAdapter { getWorldClock?(): Promise<ServerWorldClock | null>; adminSetWorldOverride?(weather: FishWeather | null, phase: FishPhase | null, hours: number): Promise<boolean>; buyBait?(): Promise<BuyBaitResult>; getLevel?(): Promise<PlayerLevel | null>; state(): Promise<FishingState>; /** spot: 찌가 떨어진 포인트 id(원 밖이면 null). 서버가 활성 여부·남은 마리를 확인한다. */ start(pet: string | null, spot?: number | null, secret?: { spotId: SecretSpotId; mountedDuck: boolean }): Promise<CastStart>; finish(castId: string, landed: boolean): Promise<CastFinish>; board(): Promise<ClassFishBoard>; /** 낚싯대 장착(null = 해제). 서버 RPC equip_pixel_rod. */ equipRod?(itemId: FishingRodId | null): Promise<EquipRodResult> }
 /** 관리자 시험용 시계·날씨 덮어쓰기(관리자만 서버가 받아 준다). */
 export interface FishingOverride { clock?: string; weather?: FishWeather }
 
@@ -276,8 +277,8 @@ export function createFishingAdapter(supabase: FishingRpcClient, override?: Fish
       try { return parseFishingState(await callRpc(supabase, 'get_pixel_fishing_state', overrideArgs), fallback); }
       catch { return fallback; }
     },
-    async start(pet, spot) {
-      try { return parseCastStart(await callRpc(supabase, 'start_pixel_cast', { p_pet: pet ?? null, ...overrideArgs, ...(typeof spot === 'number' ? { p_spot: spot } : {}) })); }
+    async start(pet, spot, secret) {
+      try { return parseCastStart(await callRpc(supabase, 'start_pixel_cast', { p_pet: pet ?? null, ...overrideArgs, ...(secret ? { p_secret_spot: secret.spotId, p_mounted_duck: secret.mountedDuck } : {}), ...(typeof spot === 'number' ? { p_spot: spot } : {}) })); }
       catch { return { ok: false, reason: 'error' }; }
     },
     async finish(castId, landed) {

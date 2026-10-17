@@ -80,7 +80,7 @@ function ensureNetTexture(scene: Phaser.Scene) {
 
 /** 친구 캐릭터의 도구: 받은 표시(state.tool)대로 아바타 옆에 그린다. 곰을 타면 감춘다. */
 export function updatePeerTool(scene: Phaser.Scene, f: { tool?: HeldTool; sprite?: Phaser.GameObjects.Sprite; state: { tool?: string; riding?: boolean; pet?: string | null; direction: Facing } }, feet: Pt, mode: HeldToolMode = 'carry', hidden = false) {
-  const spec = f.sprite && !(f.state.riding === true && f.state.pet === 'pet_bear') ? heldToolFromTag(f.state.tool) : null;
+  const spec = f.sprite && !(f.state.riding === true && f.state.pet !== 'pet_duck') ? heldToolFromTag(f.state.tool) : null;
   if (!spec && !f.tool) return;
   f.tool ??= new HeldTool(scene);
   f.tool.update(spec, feet.x, feet.y, f.state.direction, f.sprite?.depth ?? feet.y, f.sprite?.alpha ?? 1, mode, hidden);

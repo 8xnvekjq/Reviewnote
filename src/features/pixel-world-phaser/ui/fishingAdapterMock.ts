@@ -1,3 +1,4 @@
+import { secretSpotAvailable } from '../logic/hotspots';
 import { FISH_POINTS, JUNK_POINTS, FISH_TIER_REWARDS, GAME_POINT_DAILY_CAP, awardGamePoints, sizeScore } from '../logic/gamePoints';
 import type { WorldOverride } from '../logic/worldClock';
 import { BAIT_CHARGES, BAIT_PRICE, FISH_XP, TROPHY_XP, levelForXp, playerLevelFromXp, levelBaitDifficulty, hardFishChance, nonnegativeInteger } from '../logic/levels';
@@ -89,9 +90,9 @@ function mulberry32(seed: number): () => number {
 }
 
 function weightedPick(pool: readonly FishSpecies[], roll: number): FishSpecies {
-  const total = pool.reduce((sum, f) => sum + RARITY_WEIGHT[f.rarity], 0);
+  const total = pool.reduce((sum, f) => sum + (f.id === 'eddy_dragon' ? .05 : RARITY_WEIGHT[f.rarity]), 0);
   let left = roll * total;
-  for (const fish of pool) { left -= RARITY_WEIGHT[fish.rarity]; if (left < 0) return fish; }
+  for (const fish of pool) { left -= fish.id === 'eddy_dragon' ? .05 : RARITY_WEIGHT[fish.rarity]; if (left < 0) return fish; }
   return pool[pool.length - 1];
 }
 
@@ -125,9 +126,9 @@ export function rollCastFish({ valid, caught, pityDue: due, skipPity, rareBonus,
   if (rand() * 100 < hardFishChance(rareBonus, bait)) {
     const hard = valid.filter(f => f.rarity === 'rare' || f.rarity === 'legendary' || f.rarity === 'mythic');
     if (hard.length) {
-      const total = hard.reduce((a, f) => a + (f.rarity === 'rare' ? 5 : f.rarity === 'mythic' ? 0.5 : 1), 0);
+      const total = hard.reduce((a, f) => a + (f.id === 'eddy_dragon' ? .05 : f.rarity === 'rare' ? 5 : f.rarity === 'mythic' ? 0.5 : 1), 0);
       let left = rand() * total;
-      const fish = hard.find(f => (left -= f.rarity === 'rare' ? 5 : f.rarity === 'mythic' ? 0.5 : 1) < 0) ?? hard[hard.length - 1];
+      const fish = hard.find(f => (left -= f.id === 'eddy_dragon' ? .05 : f.rarity === 'rare' ? 5 : f.rarity === 'mythic' ? 0.5 : 1) < 0) ?? hard[hard.length - 1];
       return { fish, pity: false, hard: true, trophy: false };
     }
     const uncommon = valid.filter(f => f.rarity === 'uncommon');
@@ -227,7 +228,7 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
       const remaining = -1, sparkleShadow = null, pigeonHint = null;
       return delay({ kstDate: c.kstDate, phase: c.phase, weather: c.weather, remaining, sparkleShadow, pigeonHint, spots: spotStates(), junk: { ...junkCounts }, album: album(), rod: currentRod(), level: playerLevel(), bait: { charges } });
     },
-    async start(askedPet: string | null, spotId?: number | null): Promise<CastStart> {
+    async start(askedPet: string | null, spotId?: number | null, secret?: { spotId: import('../logic/petRide').SecretSpotId; mountedDuck: boolean }): Promise<CastStart> {
       const c = clock();
       if (pending && pending.expiresAt <= now()) dropPending();
       if (pending) return delay({ ok: false, reason: 'pending' });
@@ -238,7 +239,7 @@ export function createMockFishingAdapter(opts: MockFishingOptions = {}): MockFis
       const spotBonus = !!spot && (spot.readyAt === null || spot.readyAt <= now()) && spot.left > 0;
       const rod = currentRod();
       const spec = rodSpec(rod.id) ?? BASIC_ROD;
-      const valid = FISH_CATALOG.filter(f => fishValidNow(f, c.phase, c.weather));
+      const valid = FISH_CATALOG.filter(f => fishValidNow(f, c.phase, c.weather) && (!f.secretSpot || (secret?.mountedDuck === true && pet(askedPet) === 'pet_duck' && secret.spotId === f.secretSpot && secretSpotAvailable(secret.spotId, c.phase, c.weather))));
       const baitUsed = charges > 0;
       const roll = rollCastFish({ valid, caught: caughtIds(), pityDue: pityDue(catches), skipPity, rareBonus: spec.rareBonus + (spotBonus ? 15 : 0), bait: baitUsed, rand });
       skipPity = false;

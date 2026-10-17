@@ -18,6 +18,10 @@ test('river uses its own channel so legacy plaza clients never see river traffic
 });
 
 test('river presence: continuous cell coordinates survive the shared reducer with river bounds, plaza bounds unchanged', () => {
+  const wide = riverPayload({ x: 29.3 * 16, y: 17.6 * 16 });
+  const widePlayer = { sessionId: 'wide', direction: 'Right' as const, moving: true, seq: 1, updatedAt: 1, appearance, ...wide };
+  const wideStore = createPlazaStoreReducer(RIVER_BOUNDS)(createPlazaStoreState(), { type: 'broadcast', player: widePlayer });
+  assert.deepEqual(riverFeet(wideStore.players.get('wide')!), { x: 29.3 * 16, y: 17.6 * 16 });
   const feet = { x: 20.3 * 16, y: 17.6 * 16 }; // 광장 범위(16×12)를 넘는 강가 좌표
   const payload = riverPayload(feet);
   assert.equal(payload.version, 2);
@@ -31,11 +35,11 @@ test('river presence: continuous cell coordinates survive the shared reducer wit
   // 같은 payload를 광장 reducer에 넣으면 광장 범위 밖이라 칸 좌표로 떨어진다(광장 동작 그대로).
   const plaza = plazaStoreReducer(createPlazaStoreState(), { type: 'broadcast', player });
   assert.deepEqual(continuousPosition(plaza.players.get('b')!), { x: 20, y: 17 });
-  // 광장은 16×12 + 바깥 네 칸 여백(fx-walkable). 강가는 여백 없이 26×22.
+  // 광장은 16×12 + 바깥 네 칸 여백(fx-walkable). 강가는 여백 없이 34×22.
   assert.deepEqual(PLAZA_BOUNDS, { width: 16, height: 12, slack: 4 });
   assert.equal(RIVER_BOUNDS.slack ?? 0, 0);
   // 강가 범위 밖·NaN은 연속 좌표로 믿지 않는다.
-  assert.deepEqual(continuousPosition({ ...player, position: { x: 26, y: 3 } }, RIVER_BOUNDS), { x: 20, y: 17 });
+  assert.deepEqual(continuousPosition({ ...player, position: { x: RIVER_BOUNDS.width, y: 3 } }, RIVER_BOUNDS), { x: 20, y: 17 });
   assert.deepEqual(continuousPosition({ ...player, position: { x: NaN, y: 3 } }, RIVER_BOUNDS), { x: 20, y: 17 });
 });
 

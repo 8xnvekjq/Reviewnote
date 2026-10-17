@@ -67,3 +67,13 @@ export function fishingFrames(scene: import('phaser').Scene) {
   const shadows = scene.textures.exists('fishing:fish-shadow') ? scene.textures.get('fishing:fish-shadow') : null;
   if (shadows && !shadows.has('S')) { shadows.add('S', 0, 0, 0, 16, 8); shadows.add('M', 0, 16, 0, 24, 12); shadows.add('L', 0, 40, 0, 32, 14); }
 }
+
+// A glob excludes absent files from the bundle; no failed requests or startup failure.
+const rideSources = import.meta.glob('../../pixel-room/pet/assets/{pigeon_ride,duck_ride,duck_ride_front,dog_carry,swirl_legs,duck_wake}.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
+export async function loadRideSheets(): Promise<Record<string, HTMLImageElement>> {
+  const entries = await Promise.all(Object.entries(rideSources).map(async ([path, url]) => {
+    try { return [path.split('/').pop()!.replace('.png', '').replaceAll('_', '-'), await loadImage(url)] as const; }
+    catch { return null; }
+  }));
+  return Object.fromEntries(entries.filter((e): e is NonNullable<typeof e> => e !== null));
+}
