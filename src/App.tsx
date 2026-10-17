@@ -666,19 +666,35 @@ function App() {
   // 조회 4번) + fetchAdminStatus + loadYoutubeLectures + loadWeeklyChampions +
   // fetchDiagnosisStats가 전부 두 번씩 실행되고 있었다 — 로딩이
   // 느려진 원인 중 하나. onAuthStateChange 하나로 통합해서 중복 요청을 없앤다.
+  // 같은 계정의 토큰 갱신(약 1시간마다)·탭 복귀 때 오는 알림에도 아래 전체 불러오기를 다시 하던 것이
+  // Supabase egress의 가장 큰 몫이었다. 이미 불러온 계정이면 세션만 바꾸고 건너뛴다.
+  // 다른 계정으로 바뀌면(QR 로그인 등) 그 계정으로 다시 불러오고, 로그아웃하면 기억을 지운다.
+  // 첫 불러오기가 실패했으면 기억하지 않아서 다음 알림 때 다시 시도한다(예전과 같은 회복 경로).
+  const bootstrappedUserRef = useRef<string | null>(null);
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (session?.user) {
+        const userId = session.user.id;
+        if (bootstrappedUserRef.current === userId) return;
+        bootstrappedUserRef.current = userId;
         stripQrParam();
         const username = session.user.email?.split('@')[0] || 'User';
         setCurrentUser(username);
-        fetchUserData(session.user.id); // 내부에서 loadWeeklyChampions/fetchPeerActivities도 같이 호출함
-        fetchAdminStatus();
-        loadYoutubeLectures(); // 유튜브 강의 데이터 로드
-        loadTeacherApproachGuides(); // 단원별 선생님 강의 접근법 가이드 로드
-        fetchDiagnosisStats(); // 평균 진단 소요시간 조회
+        // 이 콜백 안에서 바로 Supabase를 부르면 인증 잠금 안(setSession·로그인 처리 중)에서 서로 기다리다
+        // 멈출 수 있다(Supabase 문서의 권고). 콜백이 끝난 뒤에 불러온다.
+        setTimeout(() => {
+          if (bootstrappedUserRef.current !== userId) return; // 그사이 로그아웃·다른 계정이면 건너뛴다
+          void fetchUserData(userId).then(ok => { // 내부에서 loadWeeklyChampions/fetchPeerActivities도 같이 호출함
+            if (!ok && bootstrappedUserRef.current === userId) bootstrappedUserRef.current = null;
+          });
+          fetchAdminStatus();
+          loadYoutubeLectures(); // 유튜브 강의 데이터 로드
+          loadTeacherApproachGuides(); // 단원별 선생님 강의 접근법 가이드 로드
+          fetchDiagnosisStats(); // 평균 진단 소요시간 조회
+        }, 0);
       } else {
+        bootstrappedUserRef.current = null;
         setCurrentUser('');
         setIsAdmin(false);
         setMistakes([]);
@@ -699,6 +715,22 @@ function App() {
     });
 
     return () => subscription.unsubscribe();
+  }, []);
+
+  // 기기가 오래 잠들었다 깨어나면 그사이 실시간 알림을 놓쳤을 수 있다. 예전엔 토큰 갱신 때 전체를
+  // 다시 받아서 저절로 맞춰졌으므로, 20분 넘게 화면을 떠났다 돌아올 때만 한 번 다시 받는다.
+  useEffect(() => {
+    let hiddenAt: number | null = document.hidden ? Date.now() : null;
+    const onVisibility = () => {
+      if (document.hidden) { hiddenAt = Date.now(); return; }
+      const userId = bootstrappedUserRef.current;
+      const away = hiddenAt === null ? 0 : Date.now() - hiddenAt;
+      hiddenAt = null;
+      if (userId && away >= 20 * 60 * 1000) void fetchUserData(userId);
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+    // fetchUserData는 매 렌더 새로 만들어지지만 최신 세션 id를 인자로 받으므로 한 번만 등록한다.
   }, []);
 
   // 인벤토리 상태 변경 시 (가챠 보물 획득/사용 시) 닉네임 변경권 수량 및 콤보 부스터 만료시각 실시간 재조회
@@ -924,8 +956,10 @@ function App() {
       setScaffoldedMistakeIds(new Set((scaffoldingRows || []).map((r: any) => r.mistake_id)));
 
       setMistakes((dbMistakes || []).map(mapDbMistakeRow));
+      return true;
     } catch (err) {
       console.error('Error loading Supabase user data:', err);
+      return false;
     }
   };
 
