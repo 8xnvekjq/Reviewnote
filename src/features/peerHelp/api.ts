@@ -29,6 +29,10 @@ export interface HelpSolutionRow {
 export interface GivenHelp {
   id: string; request_id: string; created_at: string; feedback: HelpFeedback | null; feedback_at: string | null;
   reward: number; shards?: number; image_url: string | null; requester: HelpLabel;
+  /** 내 풀이 다시 보기·바꿔 보내기용 */
+  storage_path?: string; file_available?: boolean;
+  /** 친구가 아직 답하지 않았고 요청이 열려 있을 때만 true(서버가 정한다) */
+  can_resubmit?: boolean;
 }
 export interface FeedbackResult { helper_reward: number; helper_shards?: number; requester_reward: number; closed: boolean }
 /** 로그인 알림: 내 요청에 새로 온 풀이(요청별 묶음). */
@@ -83,17 +87,26 @@ export const adminListHelp = (client: SupabaseClient, limit = 100) =>
 export const adminRemoveHelpSolution = (client: SupabaseClient, solutionId: string) =>
   rpc<{ removed: boolean; helper_clawback?: number; requester_clawback?: number }>(client, 'admin_remove_help_solution', { p_solution_id: solutionId }, '풀이를 지우지 못했어요.');
 
-/** 필기를 파일로 올린 뒤 풀이를 제출한다. 제출이 거절되면 올린 파일은 정리 작업이 하루 뒤 지운다. */
-export async function submitHelpSolution(client: SupabaseClient, requestId: string, userId: string, events: InkReplayEvent[], strokes: InkStroke[]) {
+async function uploadHelpSolution(client: SupabaseClient, userId: string, events: InkReplayEvent[], strokes: InkStroke[]) {
   const blob = await encodeHelpSolution(events, strokes);
   if (blob.size > HELP_MAX_BYTES) throw new Error('풀이가 너무 커요. 필기를 조금 줄여 주세요.');
   const path = `${userId}/${crypto.randomUUID()}.json.gz`;
   const { error: uploadError } = await client.storage.from(HELP_BUCKET).upload(path, blob, { contentType: 'application/gzip', upsert: false });
   if (uploadError) fail(null, '풀이 파일을 올리지 못했어요. 인터넷 연결을 확인해 주세요.');
   const stats = helpSolutionStats(events, strokes);
-  return rpc<{ id: string }>(client, 'submit_help_solution', {
-    p_request_id: requestId, p_storage_path: path, p_stroke_count: stats.strokeCount, p_duration_ms: stats.durationMs, p_bytes: blob.size,
-  }, '풀이를 보내지 못했어요.');
+  return { p_storage_path: path, p_stroke_count: stats.strokeCount, p_duration_ms: stats.durationMs, p_bytes: blob.size };
+}
+
+/** 필기를 파일로 올린 뒤 풀이를 제출한다. 제출이 거절되면 올린 파일은 정리 작업이 하루 뒤 지운다. */
+export async function submitHelpSolution(client: SupabaseClient, requestId: string, userId: string, events: InkReplayEvent[], strokes: InkStroke[]) {
+  const file = await uploadHelpSolution(client, userId, events, strokes);
+  return rpc<{ id: string }>(client, 'submit_help_solution', { p_request_id: requestId, ...file }, '풀이를 보내지 못했어요.');
+}
+
+/** 내가 보낸 풀이를 새 필기로 바꾼다(친구가 아직 답하지 않은 열린 요청만). 예전 파일은 정리 작업이 하루 뒤 지운다. */
+export async function resubmitHelpSolution(client: SupabaseClient, solutionId: string, userId: string, events: InkReplayEvent[], strokes: InkStroke[]) {
+  const file = await uploadHelpSolution(client, userId, events, strokes);
+  return rpc<{ id: string }>(client, 'resubmit_help_solution', { p_solution_id: solutionId, ...file }, '풀이를 바꾸지 못했어요.');
 }
 
 export async function downloadHelpSolution(client: SupabaseClient, storagePath: string): Promise<HelpSolutionFile> {
