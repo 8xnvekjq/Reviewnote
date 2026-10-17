@@ -1,3 +1,5 @@
+import { SECRET_SPOTS, SECRET_SPOT_RADIUS, secretSpotAt, rememberSecretSpot } from '../logic/hotspots';
+import { canFishWhileRiding } from '../logic/petRide';
 import type Phaser from 'phaser';
 import { rodTip } from './heldTool';
 import type { HeldToolMode } from './heldTool';
@@ -17,6 +19,9 @@ import type { WorldContext } from './WorldScene';
 
 export class RiverScene extends WorldScene {
   protected readonly background = '#578d78';
+  private secretVisual: Phaser.GameObjects.Graphics | null = null;
+  private secretMarker: Phaser.GameObjects.Text | null = null;
+  get mountedDuck(): boolean { return this.ctx.riding && canFishWhileRiding(this.ctx.assets.pet?.id); }
   private spots: FishingState['spots'];
   /** 포인트별 그림과 지금 그려 둔 남은 물고기 수(1마리 낚을 때마다 그림자가 하나씩 줄어든다). */
   private spotVisuals = new Map<number, { g: Phaser.GameObjects.Graphics; fish: { body: Phaser.GameObjects.Image | Phaser.GameObjects.Ellipse; x: number; y: number; phase: number }[]; left: number }>();
@@ -90,6 +95,8 @@ export class RiverScene extends WorldScene {
     board.fillStyle(0xe2b13c).fillRect(b.x - 4, b.y - 35, 8, 4);
     this.add.text(b.x, b.y - 21.5, '이번 주\n물고기 랭킹', { fontFamily: 'sans-serif', fontSize: '6px', fontStyle: 'bold', color: '#382918', align: 'center', lineSpacing: -1, resolution: 4 }).setOrigin(.5).setDepth(b.y + 1);
     this.drawDecorations();
+    this.secretVisual = this.add.graphics().setDepth(-900);
+    this.secretMarker = this.add.text(0, 0, '?', { fontSize: '12px', color: '#fff2ac' }).setOrigin(.5).setDepth(10004).setVisible(false);
     this.waterStars = this.add.graphics().setDepth(-898);
     // 조명은 기존 야간 틴트 위에 작은 빛만 더한다.
     this.lampGlow = this.add.graphics().setDepth(200001);
@@ -99,7 +106,7 @@ export class RiverScene extends WorldScene {
     const scene = this;
     this.fx = createFishingFx(this, { get castFrom() { return scene.lineFrom; } });
     this.peers.current = new RiverPeers(this, this.spec.solid);
-    this.events.once('shutdown', () => { this.ready = false; this.spotVisuals = new Map(); this.chargeAt = null; this.water = []; this.fx = null; this.preview = null;  this.waterStars = null; this.lampGlow = null; this.peers.current?.clear(); this.peers.current = null; });
+    this.events.once('shutdown', () => { this.ready = false; this.spotVisuals = new Map(); this.chargeAt = null; this.water = []; this.fx = null; this.preview = null; this.secretVisual = null; this.secretMarker = null;  this.waterStars = null; this.lampGlow = null; this.peers.current?.clear(); this.peers.current = null; });
   }
   private drawDecorations() {
     if (!this.textures.exists('town')) this.textures.addSpriteSheet('town', this.ctx.assets.town, { frameWidth: 16, frameHeight: 16 });
@@ -158,11 +165,13 @@ export class RiverScene extends WorldScene {
   fishingFx(game: FishingGame, point: Point, now: number) { this.fishingCollision = ['casting', 'waiting', 'bite', 'reeling'].includes(game.phase); if (this.ready) this.fx?.update(game, point, now); }
   get castFrom(): Point { const d = facingDelta(this.facing); return { x: this.feet.x + d.x * 9, y: this.feet.y - 14 + d.y * 4 }; }
   /** 낚싯줄이 나가는 곳: 낚싯대를 들었으면 내민 낚싯대 끝, 맨손이면 손(예전 castFrom). 찌가 떨어지는 곳은 그대로 castFrom 기준. */
-  get lineFrom(): Point { return this.ctx.heldTool?.kind === 'rod' ? rodTip(this.feet, this.facing, 'cast') : this.castFrom; }
+  get lineFrom(): Point { if (this.mountedDuck) return this.castFrom; return this.ctx.heldTool?.kind === 'rod' ? rodTip(this.feet, this.facing, 'cast') : this.castFrom; }
   protected heldToolMode(): HeldToolMode { return this.chargeAt !== null ? 'windup' : this.fishingCollision ? 'cast' : 'carry'; }
-  get canCast() { return !this.ctx.controls.frozen && !super.snapshot().transitioning && !facedInteractable(this.feet, this.facing, this.spec.interactables) && canChargeCast(this.feet, this.facing); }
+  get canCast() { return !this.ctx.controls.frozen && !super.snapshot().transitioning && !facedInteractable(this.feet, this.facing, this.spec.interactables) && canChargeCast(this.feet, this.facing, this.mountedDuck); }
   beginCast(): boolean {
     if (!this.canCast || this.chargeAt !== null) return false;
+    // 낚시 시작: 곰·강아지는 내리고 비둘기는 땅에 내려앉는다. 오리는 탄 채로 낚시한다(안전한 땅이 없으면 시작하지 않음).
+    if (!this.prepareFishingRide()) return false;
     this.cancelWalk(); this.chargeAt = performance.now(); return true;
   }
   releaseCast(cancelled = false): Point | null {
@@ -173,6 +182,8 @@ export class RiverScene extends WorldScene {
   }
   update(time: number, delta: number) {
     super.update(time, delta);
+    this.drawSecretSpots(time);
+
     if (this.chargeAt !== null) {
       if (!this.canCast) this.releaseCast(true);
       else {
@@ -217,9 +228,48 @@ export class RiverScene extends WorldScene {
       }
     }
   }
+  private drawSecretSpots(time: number) {
+    const g = this.secretVisual;
+    if (!g) return;
+    g.clear();
+    for (const [i, spot] of SECRET_SPOTS.entries()) {
+      const p = cellCenter(spot.cell);
+      if (i === 0) {
+        for (let arm = 0; arm < 3; arm++) {
+          g.lineStyle(1, 0xb0dbd8, .45).beginPath();
+          for (let n = 0; n <= 20; n++) {
+            const a = n / 5 + time / 1800 + arm * Math.PI * 2 / 3, r = 2 + n / 1.8;
+            const x = p.x + Math.cos(a) * r, y = p.y + Math.sin(a) * r * .55;
+            if (n === 0) g.moveTo(x, y); else g.lineTo(x, y);
+          }
+          g.strokePath();
+        }
+      } else if (i === 1) {
+        // Ruined pillars are decoration only; every tile remains river water.
+        g.fillStyle(0x193c50, .4).fillEllipse(p.x, p.y, 36, 20);
+        for (const dx of [-22, 22]) {
+          g.fillStyle(0x596c70).fillRect(p.x + dx - 4, p.y - 15, 8, 16);
+          g.fillStyle(0x91a0a1).fillRect(p.x + dx - 5, p.y - 16, 5, 3);
+          g.lineStyle(1, 0x344b54).lineBetween(p.x + dx, p.y - 11, p.x + dx - 2, p.y - 5);
+        }
+      } else {
+        g.fillStyle(0x547761).fillEllipse(p.x + 24, p.y, 15, 7);
+        for (let reed = 0; reed < 5; reed++) {
+          const x = p.x + 19 + reed * 2, sway = Math.sin(time / 600 + reed) * 2;
+          g.lineStyle(1, 0x83aa67).lineBetween(x, p.y, x + sway, p.y - 9 - reed % 3);
+          g.fillStyle(0xb8a176).fillRect(x + sway, p.y - 11 - reed % 3, 1, 3);
+        }
+      }
+      const bubble = (time / 2500 + i * .3) % 1;
+      if (bubble < .35) g.lineStyle(1, 0xc0e8df, .4 * (1 - bubble / .35)).strokeCircle(p.x + 6, p.y - bubble * 15, 1 + bubble * 8);
+      if (Math.hypot(this.feet.x - p.x, this.feet.y - p.y) < 64) rememberSecretSpot(spot.id);
+    }
+    const inside = this.mountedDuck && secretSpotAt(this.feet);
+    this.secretMarker?.setVisible(!!inside).setPosition(this.feet.x, this.feet.y - 42 + Math.sin(time / 400) * 2);
+  }
   snapshot() {
     const debug = super.snapshot();
-    return { ...debug, castFrom: this.castFrom, canCast: this.canCast, charging: this.chargeAt !== null,
+    return { ...debug, castFrom: this.castFrom, mountedDuck: this.mountedDuck, secretSpots: SECRET_SPOTS, secretSpotRadius: SECRET_SPOT_RADIUS, canCast: this.canCast, charging: this.chargeAt !== null,
       hotspots: HOTSPOTS.filter(s => this.spots === undefined || this.spots.some(v => v.id === s.id && v.active)), decorations: RIVER_DECORATIONS,
       waterBounds: { left: bankEdge(9) * 16, right: RIVER_COLS * 16, top: 0, bottom: RIVER_ROWS * 16 },
       ...(this.peers.current?.snapshot() ?? { classmates: [], bubbles: [], sparkles: [] }) };

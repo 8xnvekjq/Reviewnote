@@ -1,3 +1,4 @@
+import { secretSpotAt } from '../logic/hotspots';
 import type { Point } from '../logic/joystick';
 import { activeHotspotAt, waterLanding } from '../logic/castThrow';
 import { playSoundEffect } from '../../pixel-room/bgm/sfx';
@@ -25,6 +26,8 @@ export type LandedCatch = Extract<CastFinish, { landed: true }>;
 // 추가 연결점: RiverScene은 이 호출을 자신의 createFishingFx().update로 전달한다.
 export interface FishingHandle {
   readonly canCast?: boolean;
+  readonly mountedDuck?: boolean;
+  debug?(): { riding: boolean; petId: string | null };
   dismount?(): void;
   cancelWalk(): void;
   setHotspots?(spots: FishingState['spots']): void;
@@ -150,12 +153,16 @@ export function useFishing({ adapter, handle, scene, pet, freeze, report }: {
     const { adapter: current, scene: where, pet: companion } = latest.current;
     if (!current || where !== 'river' || lock.current || !stateRef.current) return;
     if (!waterLanding(point)) { setMessage('물에 던져 주세요'); return; }
-    latest.current.handle.current?.dismount?.();
+    const player = latest.current.handle.current?.debug?.();
+    const mountedDuck = latest.current.handle.current?.mountedDuck === true || (player?.riding === true && player.petId === 'pet_duck');
+    // NON-DUCK DISMOUNT HOOK: controls worker may connect this existing handle.
+    if (!mountedDuck) latest.current.handle.current?.dismount?.();
     lock.current = true; setBusy(true); setCaught(null); setMessage(''); game.current = idleFishingGame();
     latest.current.freeze(true); latest.current.handle.current?.cancelWalk();
     const epoch = generation.current;
     try {
-      const cast = await current.start(companion, activeHotspotAt(point, stateRef.current.spots));
+      const secret = mountedDuck ? secretSpotAt(point) : null;
+      const cast = await current.start(companion, activeHotspotAt(point, stateRef.current.spots), secret ? { spotId: secret, mountedDuck } : undefined);
       if (!mounted.current || epoch !== generation.current || latest.current.scene !== 'river') {
         if (cast.ok) await current.finish(cast.castId, false);
         lock.current = false; if (mounted.current) { setBusy(false); latest.current.freeze(false); } return;

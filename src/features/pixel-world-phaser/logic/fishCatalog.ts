@@ -1,7 +1,8 @@
 // 물고기 14종(2026-10-11 상어·고래 추가) — 서버 시드(supabase/migrations/supabase_pixel_fishing.sql)와 똑같아야 한다(단위 테스트가 대조).
 // 화면 표시용. 실제로 무엇이 잡힐지는 서버가 정한다.
+import type { SecretSpotId } from './petRide';
 import type { FishPhase, FishRarity, FishShadow, FishWeather, JunkId } from '../ui/fishingAdapter';
-export interface FishSpecies { id: string; name: string; rarity: FishRarity; phases: readonly FishPhase[] | 'any'; weather: readonly FishWeather[] | 'any'; minCm: number; maxCm: number; shadow: FishShadow }
+export interface FishSpecies { id: string; name: string; rarity: FishRarity; phases: readonly FishPhase[] | 'any'; weather: readonly FishWeather[] | 'any'; minCm: number; maxCm: number; shadow: FishShadow; secretSpot?: SecretSpotId }
 export const FISH_CATALOG: readonly FishSpecies[] = [
   { id: 'pirami', name: '피라미', rarity: 'common', phases: 'any', weather: 'any', minCm: 6, maxCm: 12, shadow: 'S' },
   { id: 'buri', name: '붕어', rarity: 'common', phases: 'any', weather: 'any', minCm: 10, maxCm: 25, shadow: 'M' },
@@ -18,6 +19,9 @@ export const FISH_CATALOG: readonly FishSpecies[] = [
   // 별 5개(mythic): 실제 크기, 릴에서 힘이 세다(위아래로 크게). 아이콘 시트 13·14번째 칸.
   { id: 'shark', name: '상어', rarity: 'mythic', phases: ['evening', 'night'], weather: 'any', minCm: 120, maxCm: 400, shadow: 'L' },
   { id: 'whale', name: '고래', rarity: 'mythic', phases: ['morning', 'day'], weather: ['clear', 'cloudy'], minCm: 500, maxCm: 1500, shadow: 'L' },
+  { id: 'eddy_dragon', name: '소용돌이 용어', rarity: 'mythic', phases: 'any', weather: 'any', minCm: 180, maxCm: 600, shadow: 'L', secretSpot: 'secret_whirlpool' },
+  { id: 'bridge_moon_eel', name: '그늘 달장어', rarity: 'legendary', phases: ['night'], weather: 'any', minCm: 60, maxCm: 140, shadow: 'L', secretSpot: 'secret_bridge_shade' },
+  { id: 'rain_reed_koi', name: '빗방울 갈대잉어', rarity: 'legendary', phases: 'any', weather: ['rain'], minCm: 35, maxCm: 85, shadow: 'M', secretSpot: 'secret_reed_isle' },
 ];
 /** 잡동사니 — 물고기 대신 가끔 걸린다(던지기의 약 6%). 아이콘은 assets/fishing/junk-icons.png 순서. */
 export const JUNK_CATALOG: readonly { id: JunkId; name: string }[] = [

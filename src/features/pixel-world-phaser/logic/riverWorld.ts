@@ -2,7 +2,7 @@ import type { Point } from './joystick';
 import type { SceneSpec } from './scenes';
 import { cellCenter } from './world';
 
-export const RIVER_COLS = 26;
+export const RIVER_COLS = 34;
 export const RIVER_ROWS = 22;
 export const WATER_X = 8;
 export const DOCK = { left: 7, right: 17, top: 10, bottom: 12 };

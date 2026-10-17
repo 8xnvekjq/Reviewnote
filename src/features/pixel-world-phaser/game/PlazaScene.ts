@@ -1,7 +1,8 @@
+import { canRide } from '../logic/petRide';
+import { rideRadius } from '../logic/rideArt';
 import { dragonfliesFor } from './dragonflies';
 import type { Facing } from '../logic/joystick';
 import { HeldTool, updatePeerTool } from './heldTool';
-import { RIDING_RADIUS, PERSON_RADIUS } from '../logic/softCollision';
 import { createAnimalTag, updateAnimalTag, animalTagSnapshot, peerAnimalFace } from './animalTag';
 import { updatePeerCompanion, peerCompanionSnapshot } from './peerCompanion';
 import type { PetFollowState } from '../logic/petFollow';
@@ -170,7 +171,7 @@ export class PlazaScene extends WorldScene {
   protected collisionObstacles() {
     return [...this.friends].filter(([, f]) => !!f.sprite).map(([id, f]) => ({ id,
       x: (f.state.x + PLAZA_MARGIN + .5) * 16, y: (f.state.y + PLAZA_MARGIN + .5) * 16,
-      radius: f.state.riding === true && f.state.pet === 'pet_bear' ? RIDING_RADIUS : PERSON_RADIUS, moving: f.state.moving }));
+      radius: rideRadius(f.state.pet, f.state.riding === true), moving: f.state.moving }));
   }
   protected collisionCompanions() { return [...this.friends]; }
   update(time: number, delta: number) {
@@ -181,7 +182,7 @@ export class PlazaScene extends WorldScene {
     for (const [id, f] of this.friends) {
       const p = f.state, feet = { x: (p.x + PLAZA_MARGIN + .5) * 16, y: (p.y + PLAZA_MARGIN + .5) * 16 };
       spots.set(id, feet); faces.set(id, peerAnimalFace(p)); facings.set(id, p.direction);
-      if (f.tag) { updateAnimalTag(f.tag, feet, peerAnimalFace(p), p.riding === true && p.pet === 'pet_bear'); }
+      if (f.tag) { updateAnimalTag(f.tag, feet, peerAnimalFace(p), p.riding === true && canRide(p.pet), p.pet); }
       updatePeerCompanion(f, feet, time, delta, this.spec.solid);
       updatePeerTool(this, f, f.sprite ? { x: f.sprite.x, y: f.sprite.y } : feet, 'carry', dragonfliesFor('plaza')?.isSwinging(id) ?? false);
     }

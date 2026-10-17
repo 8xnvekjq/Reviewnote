@@ -1,3 +1,4 @@
+import { rideChipLabel } from './logic/petRide';
 import { useBugCatching } from './ui/useBugCatching';
 import { dragonfliesFor } from './game/dragonflies';
 import type { NetSwingReporter } from './ui/useBugCatching';
@@ -31,7 +32,7 @@ import { dialogueFor } from './logic/dialogues';
 import type { SceneId } from './logic/scenes';
 import type { FurnitureType, Placement } from '../pixel-room/model';
 import { composeAvatar } from './game/avatarTexture';
-import { loadBearRide, loadFloors, loadFurnitureSheets, loadInterior, loadPetSheet, loadScarecrow, loadTown, loadPlazaStall } from './game/sceneAssets';
+import { loadRideSheets, loadBearRide, loadFloors, loadFurnitureSheets, loadInterior, loadPetSheet, loadScarecrow, loadTown, loadPlazaStall } from './game/sceneAssets';
 import { GardenToolbar } from './ui/GardenToolbar';
 import { CROP_RULES, SPRINKLER_ITEM_ID, cropTypeOf, gardenAction, gardenLookKey, gardenResultMessage, sprinklerPlaced } from '../pixel-room/farm/gardenModel';
 import type { GardenLook, GardenTool } from '../pixel-room/farm/gardenModel';
@@ -188,6 +189,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   useEffect(() => { if (status === 'ready') handle.current?.setAnimalFace(animalFace); }, [animalFace, status]);
   const [riding, setRiding] = useState(false);
+  const [rideNearby, setRideNearby] = useState(false);
   const [hudMenu, setHudMenu] = useState(false);
   // 가방 무게 → 이동 속도(용량을 넘으면 점점 느려지고 최하 20%). 장면이 바뀌어도 boot가 기억한다.
   const bagFactor = panels?.bag?.bag ? bagSpeedFactor(panels.bag.bag.weight, panels.bag.bag.capacity) : 1;
@@ -412,18 +414,19 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     (async () => {
       try {
         const avatar = composeAvatar(appearance);
-        const [town, interior, floors, furnitureSheets, avatarCanvas, petSource, scarecrow, { startWorldGame }, plazaStall, bearRide] = await Promise.all([
+        const [town, interior, floors, furnitureSheets, avatarCanvas, petSource, scarecrow, { startWorldGame }, plazaStall, bearRide, rideSheets] = await Promise.all([
           loadTown(), loadInterior(), loadFloors(), loadFurnitureSheets(), avatar.canvas, pet ? loadPetSheet(pet) : Promise.resolve(null),
-          Promise.resolve().then(loadScarecrow), import('./game/boot'), Promise.resolve().then(loadPlazaStall), loadBearRide(),
+          Promise.resolve().then(loadScarecrow), import('./game/boot'), Promise.resolve().then(loadPlazaStall), loadBearRide(), loadRideSheets(),
         ]);
         if (cancelled || !stage.current) return;
         const game = await startWorldGame(stage.current, {
-          assets: { bearRide, town, interior, floors, furniture: furnitureSheets, avatar: { key: avatar.key, canvas: avatarCanvas }, pet: pet && petSource ? { id: pet, source: petSource } : null, scarecrow, plazaStall },
+          assets: { rideSheets, bearRide, town, interior, floors, furniture: furnitureSheets, avatar: { key: avatar.key, canvas: avatarCanvas }, pet: pet && petSource ? { id: pet, source: petSource } : null, scarecrow, plazaStall },
           garden: gardenLookRef.current, furniture: furnitureRef.current, clockOverride, face: faceRef.current, admin: isAdmin,
         }, controls, {
           onPrompt: next => setPrompt(next),
           onPetMessage: setPetMessage,
           onRide: setRiding,
+          onRideNearby: setRideNearby,
           onTalk: id => talkRef.current(id),
           onPanel: panel => scenePanelRef.current(panel),
           onGarden: next => setGardenAt(next),
@@ -802,7 +805,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
       <button type="button" className="pwp-chip" aria-label="곤충 도감" disabled={status !== 'ready' || fishing.busy || bugs.busy || !!placing} onClick={() => { void bugs.refresh(); openPanel('bugs'); }}><span aria-hidden="true">🦋</span>도감</button>
       {panels.bag?.bag && <button type="button" className="pwp-chip pwp-bag-chip" data-heavy={bagFactor < 1} aria-label={`가방 ${panels.bag.bag.weight}kg / ${panels.bag.bag.capacity}kg`}
         disabled={status !== 'ready' || !!placing} onClick={() => { void panels.bag?.refresh(); openPanel('bag'); }}><span aria-hidden="true">🎒</span>{Math.round(panels.bag.bag.weight)}/{Math.round(panels.bag.bag.capacity)}</button>}
-      {riding && <button type="button" className="pwp-chip" aria-label="곰에서 내리기" disabled={!!placing || roomPending} onClick={() => handle.current?.dismount()}>내리기</button>}
+      {(riding || rideNearby) && scene?.id !== 'room' && <button type="button" className="pwp-chip" aria-label={rideChipLabel(pet, riding)} disabled={!!placing || roomPending || !!panel || !!dialogue} onClick={() => handle.current?.toggleRide()}>{rideChipLabel(pet, riding)}</button>}
       {scene?.id === 'room' && <button type="button" className="pwp-chip" disabled={status !== 'ready' || !onSaveFurniture || !panels.shop.ready || panels.shop.loadError || !!panel || !!dialogue || !!placing || roomPending} onClick={() => { setRoomMessage(''); openPanel('furniture'); }}>꾸미기</button>}
     </div>}
     {gardenActive && !panel && !dialogue && <GardenToolbar tool={gardenTool} onTool={tool => { setGardenTool(tool); setGardenMessage(''); }} sprinkler={sprinklerOwned}
@@ -838,7 +841,7 @@ export const GameShell = memo(function GameShell({ isAdmin = false, appearance, 
     {(panel === 'turtle' || panel === 'fishboard') && <FishingPanels key={panel} kind={panel} adapter={fishingAdapter} shop={panels} newSpeciesId={newFishSpeciesId ?? freshSpecies} onClose={() => { if (panel === 'turtle') setFreshSpecies(null); closePanel(); }} />}
     {scene?.id === 'river' && status === 'ready' && <RiverBridge key={'river:' + scene.visit} handle={handle} appearance={appearance} face={animalFace} tool={heldToolTag(heldTool, heldRodId)} pet={pet} riding={riding} panel={panel} reporter={riverReporter} swingReporter={swingReporter} />}
     {scene?.id === 'plaza' && status === 'ready' && <PlazaBridge key={'plaza:' + scene.visit} handle={handle} appearance={appearance} face={animalFace} tool={heldToolTag(heldTool, heldRodId)} pet={pet} riding={riding} userId={userId} panel={panel} blocked={!!dialogue} balance={balance} onClose={closePanel} swingReporter={swingReporter} rpsEndReporter={rpsEndReporter} rpsAdapter={rpsAdapter} onOpenRps={opponent => { setRpsOpponentAppearance(opponent); openPanel('card-rps'); }} />}
-    {panel && panel !== 'bugs' && panel !== 'kiosk' && panel !== 'bag' && panel !== 'level' && panel !== 'card-rps' && panel !== 'card-rps-rules' && panel !== 'turtle' && panel !== 'fishboard' && panel !== 'furniture' && panel !== 'shop' && panel !== 'wardrobe' && panel !== 'contest' && panel !== 'well' && panel !== 'bench' && <FarmPanels key={panel} petId={pet} riding={riding} onRide={() => { closePanel(); handle.current?.toggleRide(); }} kind={panel} adapter={farmAdapter} onClose={closePanel}
+    {panel && panel !== 'bugs' && panel !== 'kiosk' && panel !== 'bag' && panel !== 'level' && panel !== 'card-rps' && panel !== 'card-rps-rules' && panel !== 'turtle' && panel !== 'fishboard' && panel !== 'furniture' && panel !== 'shop' && panel !== 'wardrobe' && panel !== 'contest' && panel !== 'well' && panel !== 'bench' && <FarmPanels key={panel} kind={panel} adapter={farmAdapter} onClose={closePanel}
       onCollection={() => openPanel('collection')} onTalk={() => { closePanel(); openDialogue('scarecrow'); }}
       onPet={kind => { closePanel(); handle.current?.reactPet(kind); }} />}
     {panel === 'furniture' && panels && <FurniturePanel furniture={handle.current?.getFurniture() ?? furniture} shop={panels.shop}

@@ -79,7 +79,7 @@ test('PGlite: 마이그레이션 재적용·실제 캐스트·전체 백분위·
     await db.exec(expansion); await db.exec(expansion);
     assert.deepEqual((await db.query(`select proname, proacl::text acl from pg_proc where pronamespace='pixel_private'::regnamespace and proname in ('start_pixel_cast','finish_pixel_cast','get_pixel_fishing_state','fish_difficulty') order by proname`)).rows, before.rows);
     const catalog = await db.query<any>('select * from pixel_fish_species order by sort_order');
-    assert.deepEqual(catalog.rows.map(s => ({ id: s.id, name: s.name, rarity: s.rarity, phases: s.phases ?? 'any', weather: s.weather ?? 'any', minCm: Number(s.min_cm), maxCm: Number(s.max_cm), shadow: s.shadow })), FISH_CATALOG);
+    assert.deepEqual(catalog.rows.map(s => ({ id: s.id, name: s.name, rarity: s.rarity, phases: s.phases ?? 'any', weather: s.weather ?? 'any', minCm: Number(s.min_cm), maxCm: Number(s.max_cm), shadow: s.shadow })), FISH_CATALOG.filter(f => !f.secretSpot));
     for (const species of ['shark', 'whale']) for (const length of [1, 200, 10000]) assert.equal(Number((await db.query<any>('select pixel_private.fish_difficulty($1,$2) d', [species, length])).rows[0].d), 5);
     const rpc = async (query: string, args: any[] = []) => (await db.query<any>(query, args)).rows[0].r;
     await db.exec(`insert into pixel_rod_equipment(user_id,rod_id) values ('${user}',null);
